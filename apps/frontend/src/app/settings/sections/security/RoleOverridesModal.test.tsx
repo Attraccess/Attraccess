@@ -90,6 +90,30 @@ describe('RoleOverridesModal', () => {
     );
   });
 
+  it('blocks Save while an overridden number field is cleared', async () => {
+    // A cleared NumberField is NaN, which JSON.stringify puts on the wire as null — and null is the
+    // API's explicit "inherit". Without the guard, Save quietly weakens the role's policy under a
+    // success toast.
+    const existing = { role: 'admin', minLength: 20 } as never;
+
+    render(
+      <RoleOverridesModal role={'admin' as never} existing={existing} globalPolicy={GLOBAL_POLICY} t={t} onClose={vi.fn()} />,
+    );
+
+    await userEvent.clear(screen.getByTestId('override-admin-minLength-value'));
+    // React Aria's NumberField parses on commit, not per keystroke — the NaN arrives on blur.
+    await userEvent.tab();
+
+    const save = screen.getByTestId('policy-override-save');
+    expect(save).toBeDisabled();
+    // The toggle still reads "override", so the modal must stay open with the field reachable.
+    expect(screen.getByTestId('override-admin-minLength-value')).toBeInTheDocument();
+
+    await userEvent.click(save);
+    expect(upsert).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+  });
+
   it('removes the override when every field is turned back to inherit', async () => {
     const existing = { role: 'admin', minLength: 20 } as never;
     const onClose = vi.fn();

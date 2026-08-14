@@ -114,7 +114,11 @@ export function EmailSection() {
           host: host.trim(),
           port: portNumber,
           secure,
-          user: user.trim() || undefined,
+          // `null`, not `undefined`: the service is `hasOwnProperty`-keyed, and `JSON.stringify`
+          // drops undefined keys — so an emptied box would send nothing and the stored username
+          // would survive a "saved" toast. `pass` is the opposite case: empty genuinely means
+          // "keep the current one", which is why it stays undefined.
+          user: user.trim() || null,
           pass: pass || undefined,
           from: from.trim(),
         },

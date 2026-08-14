@@ -1,6 +1,9 @@
 import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  Alert,
+  AlertContent,
+  AlertDescription,
   InputGroup,
   ModalBody,
   ModalFooter,
@@ -27,6 +30,7 @@ import {
   UseSettingsServiceGetMessagingRateLimitSettingsKeyFn,
   useSettingsServiceUpdateMessagingRateLimitSettings,
 } from '@attraccess/react-query-client';
+import { AlertStatusIcon } from '../../../../components/AlertStatusIcon';
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsRow } from '../../components/SettingsRow';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
@@ -113,12 +117,18 @@ export function MessagingSection() {
     }
   }, [toast, t, vapidConfig?.publicKey]);
 
+  // Loading and failure both land here: the query is settled and returned nothing usable. Without
+  // this, `valueOf` falls back to NaN for every key, `Object.is(NaN, undefined)` is false, and the
+  // section paints an "unsaved changes" bar over four blank fields with no edit behind it — Save
+  // disabled because NaN is not an integer, Discard powerless because the draft is already empty.
+  const areLimitsReady = limits !== undefined;
+
   // NaN is React Aria's value for a cleared NumberField, and it keeps the field controlled.
   const valueOf = (key: LimitKey) => draft[key] ?? limits?.[key] ?? NaN;
   // A cleared field is still a departure from the saved value: the bar must stay mounted so Discard
   // is reachable, but Save has to be blocked. Treating NaN as "not dirty" would unmount the bar and
   // strand the operator with an empty field and no way back.
-  const isDirty = LIMIT_KEYS.some((key) => !Object.is(valueOf(key), limits?.[key]));
+  const isDirty = areLimitsReady && LIMIT_KEYS.some((key) => !Object.is(valueOf(key), limits?.[key]));
   const isSavable = LIMIT_KEYS.every((key) => {
     const value = valueOf(key);
     return Number.isInteger(value) && value >= 1;
@@ -156,27 +166,38 @@ export function MessagingSection() {
   return (
     <SettingsSection title={t('title')} description={t('description')} aside={aside}>
       <div className="flex flex-col">
-        {LIMIT_KEYS.map((key) => (
-          <SettingsRow
-            key={key}
-            data-testid={`messaging-limit-row-${key}`}
-            label={t(`fields.${key}.label`)}
-            hint={t(`fields.${key}.description`)}
-          >
-            <NumberField
-              aria-label={t(`fields.${key}.label`)}
-              value={valueOf(key)}
-              minValue={1}
-              onChange={(next) => setDraft((current) => ({ ...current, [key]: next }))}
+        {!areLimitsReady ? (
+          // The limits are unknown, not zero. The VAPID controls below are a separate query and
+          // stay usable, so this replaces only the four rows it actually covers.
+          <Alert status="danger" data-testid="messaging-limits-load-failed">
+            <AlertStatusIcon status="danger" />
+            <AlertContent>
+              <AlertDescription>{t('limits.loadFailed')}</AlertDescription>
+            </AlertContent>
+          </Alert>
+        ) : (
+          LIMIT_KEYS.map((key) => (
+            <SettingsRow
+              key={key}
+              data-testid={`messaging-limit-row-${key}`}
+              label={t(`fields.${key}.label`)}
+              hint={t(`fields.${key}.description`)}
             >
-              <NumberFieldGroup>
-                <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-                <NumberFieldInput />
-                <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-              </NumberFieldGroup>
-            </NumberField>
-          </SettingsRow>
-        ))}
+              <NumberField
+                aria-label={t(`fields.${key}.label`)}
+                value={valueOf(key)}
+                minValue={1}
+                onChange={(next) => setDraft((current) => ({ ...current, [key]: next }))}
+              >
+                <NumberFieldGroup>
+                  <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                  <NumberFieldInput />
+                  <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+                </NumberFieldGroup>
+              </NumberField>
+            </SettingsRow>
+          ))
+        )}
 
         <SettingsRow label={t('push.regenerateLabel')} hint={t('push.regenerateHint')}>
           <Button

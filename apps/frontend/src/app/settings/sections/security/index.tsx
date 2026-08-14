@@ -574,10 +574,14 @@ export function SecuritySection() {
         onDiscard={discard}
       />
 
+      {/* `policy`, not `{ ...policy, ...policyDraft }`. The modal commits on its own, and inheritance
+          resolves server-side against what is *stored* — so seeding an override from an unsaved edit
+          would pin it to a value that never existed on the instance (and could then be Discarded),
+          while the "inherit: N" hint would name a number no role would actually get. */}
       <RoleOverridesModal
         role={editingRole}
         existing={editingRole ? overridesByRole.get(editingRole) : undefined}
-        globalPolicy={{ ...policy, ...policyDraft }}
+        globalPolicy={policy}
         t={t}
         onClose={() => setEditingRole(null)}
       />

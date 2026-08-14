@@ -72,6 +72,16 @@ export function RoleOverridesModal({ role, existing, globalPolicy, t, onClose }:
 
   const isAllInherit = POLICY_FIELD_KEYS.every((key) => valueOf(key as OverrideKey) === null);
 
+  // A cleared NumberField is React Aria's `NaN`, which is neither `null` nor a number — and
+  // `JSON.stringify` turns it into `null` on the wire, which the API accepts as the explicit
+  // "inherit" value. So saving a cleared field would silently drop the override back to the global
+  // policy under a success toast. Same `Number.isInteger` gate the section uses; the modal stays
+  // open so the offending field is still reachable.
+  const isSavable = POLICY_NUMBER_FIELDS.every(({ key }) => {
+    const value = valueOf(key as OverrideKey);
+    return value === null || Number.isInteger(value);
+  });
+
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: UsePasswordPolicyAdminServiceListPasswordPolicyOverridesKeyFn() });
 
@@ -102,7 +112,7 @@ export function RoleOverridesModal({ role, existing, globalPolicy, t, onClose }:
   const isSaving = isUpserting || isRemoving;
 
   const handleSave = () => {
-    if (!role) return;
+    if (!role || !isSavable) return;
 
     // Turning every field back to "inherit" is how an operator deletes an override; there is no
     // separate Remove inside the editor because "override nothing" and "no override" are the same
@@ -214,7 +224,13 @@ export function RoleOverridesModal({ role, existing, globalPolicy, t, onClose }:
         <Button variant="ghost" onPress={onClose} isDisabled={isSaving}>
           {t('overrides.cancel')}
         </Button>
-        <Button variant="primary" onPress={handleSave} isPending={isSaving} data-testid="policy-override-save">
+        <Button
+          variant="primary"
+          onPress={handleSave}
+          isPending={isSaving}
+          isDisabled={!isSavable}
+          data-testid="policy-override-save"
+        >
           {t('overrides.save')}
         </Button>
       </ModalFooter>

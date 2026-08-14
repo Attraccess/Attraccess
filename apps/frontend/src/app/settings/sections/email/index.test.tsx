@@ -86,6 +86,22 @@ describe('EmailSection', () => {
     });
   });
 
+  it('sends null when the username is cleared, so an anonymous relay is reachable from here', async () => {
+    // `undefined` is dropped by JSON.stringify and the API only writes the key when it is present,
+    // so clearing the box used to leave the stored username in place under a success toast. `pass`
+    // stays undefined — there, empty genuinely does mean "keep the current one".
+    render(<EmailSection />);
+
+    await userEvent.clear(screen.getByLabelText('inputs.user.label'));
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
+
+    expect(saveSettings).toHaveBeenCalledWith({
+      requestBody: {
+        smtp: { ...SMTP, user: null, pass: undefined, passConfigured: undefined },
+      },
+    });
+  });
+
   it('does not mount dirty on an Outlook instance whose stored transport differs from the constants', () => {
     // Pinning host/port/secure to the Outlook constants made these instances mount with a save bar
     // that had no edit behind it, that Discard could not clear (the pinned values never came from

@@ -99,7 +99,11 @@ export function GeneralSection() {
       requestBody: {
         app: {
           url: trimmedUrl,
-          publicInternetUrl: trimmedPublicUrl || undefined,
+          // `null`, not `undefined`: the write is gated on the key being present and
+          // `JSON.stringify` drops undefined, so emptying the field would be a no-op that still
+          // reports success. `licenseKey` is never returned by the API, so empty legitimately
+          // means "unchanged" there and stays undefined.
+          publicInternetUrl: trimmedPublicUrl || null,
           licenseKey: licenseKey.trim() || undefined,
         },
       },

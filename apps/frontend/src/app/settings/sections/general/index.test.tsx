@@ -117,7 +117,26 @@ describe('GeneralSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
 
     expect(saveSettings).toHaveBeenCalledWith({
-      requestBody: { app: { url: 'https://example.org/app', publicInternetUrl: undefined, licenseKey: undefined } },
+      requestBody: { app: { url: 'https://example.org/app', publicInternetUrl: null, licenseKey: undefined } },
+    });
+  });
+
+  it('sends null when the public URL is cleared, so the stored value is actually removed', async () => {
+    // `undefined` is dropped by JSON.stringify and the API only writes the key when it is present,
+    // so emptying the field used to be a no-op that still reported success — and the old value came
+    // straight back a frame later when the response primed the cache.
+    vi.mocked(useSettingsServiceGetSystemSettings).mockReturnValue({
+      data: { app: { url: 'https://example.org', publicInternetUrl: 'https://public.example' } },
+      isLoading: false,
+    } as ReturnType<typeof useSettingsServiceGetSystemSettings>);
+
+    render(<GeneralSection />);
+
+    await userEvent.clear(screen.getByLabelText('inputs.publicInternetUrl.label'));
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
+
+    expect(saveSettings).toHaveBeenCalledWith({
+      requestBody: { app: { url: 'https://example.org', publicInternetUrl: null, licenseKey: undefined } },
     });
   });
 
@@ -211,7 +230,7 @@ describe('GeneralSection — Enter key', () => {
     await userEvent.type(field, '/app{Enter}');
 
     expect(saveSettings).toHaveBeenCalledWith({
-      requestBody: { app: { url: 'https://example.org/app', publicInternetUrl: undefined, licenseKey: undefined } },
+      requestBody: { app: { url: 'https://example.org/app', publicInternetUrl: null, licenseKey: undefined } },
     });
   });
 });

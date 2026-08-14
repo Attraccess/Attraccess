@@ -2,6 +2,9 @@
   "title": "Messaging",
   "description": "How many messages a user may send, and the key pair push notifications are signed with.",
   "loading": "Loading messaging settings…",
+  "limits": {
+    "loadFailed": "The messaging rate limits could not be loaded, so they cannot be edited from here. Reload the page to try again — the push settings below are unaffected."
+  },
   "fields": {
     "sendMaxPerWindow": {
       "label": "Max messages",

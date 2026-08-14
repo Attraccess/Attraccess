@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -179,6 +179,25 @@ describe('SecuritySection', () => {
 
     await userEvent.click(screen.getByTestId('policy-diff-confirm'));
     expect(savePolicy).toHaveBeenCalledWith({ requestBody: { minLength: 16 } });
+  });
+
+  it('seeds the overrides editor from the saved policy, not an unsaved edit', async () => {
+    // The modal commits on its own, and inheritance resolves server-side against what is stored.
+    // Passing the merged draft made the "inherit" hint name a number no role would get, and turning
+    // an override on would pin it to a value the operator could still Discard.
+    render(<SecuritySection />);
+
+    const minLength = screen.getByLabelText('fields.minLength.label');
+    await userEvent.clear(minLength);
+    await userEvent.type(minLength, '16');
+    await userEvent.tab();
+
+    await userEvent.click(screen.getByTestId('policy-override-edit-admin'));
+    fireEvent.click(
+      screen.getByTestId('override-admin-minLength-toggle').querySelector('[data-slot="switch-control"]') as HTMLElement,
+    );
+
+    expect(screen.getByTestId('override-admin-minLength-value')).toHaveValue('12');
   });
 
   it('keeps the bar reachable when a number is cleared, with Save blocked', async () => {

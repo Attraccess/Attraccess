@@ -2,6 +2,9 @@
   "title": "Nachrichten",
   "description": "Wie viele Nachrichten Benutzer senden dürfen und mit welchem Schlüsselpaar Push-Nachrichten signiert werden.",
   "loading": "Nachrichteneinstellungen werden geladen …",
+  "limits": {
+    "loadFailed": "Die Nachrichten-Ratenlimits konnten nicht geladen werden und lassen sich hier nicht bearbeiten. Bitte die Seite neu laden — die Push-Einstellungen darunter sind nicht betroffen."
+  },
   "fields": {
     "sendMaxPerWindow": {
       "label": "Max. Nachrichten",
