@@ -243,9 +243,11 @@ esp_err_t Ethernet::initSPI()
     }
 
     // Configure W5500 reset pin (if available)
-    // NOTE: guard via preprocessor, not `if`, because PIN_W5500_RESET is a
-    // compile-time constant; `1ULL << -1` would be UB even under a runtime check.
-#if PIN_W5500_RESET >= 0
+    // NOTE: guard via preprocessor with an explicit defined() check, not `if`,
+    // because PIN_W5500_RESET is a compile-time constant; `1ULL << -1` would be
+    // UB even under a runtime check, and an undefined macro would be a
+    // preprocessing error on configs that omit it (Sourcery review PR #1691).
+#if defined(PIN_W5500_RESET) && PIN_W5500_RESET >= 0
     {
         logger.info(("Configuring reset pin GPIO" + std::to_string(PIN_W5500_RESET)).c_str());
         uint64_t pin_mask = (1ULL << PIN_W5500_RESET);

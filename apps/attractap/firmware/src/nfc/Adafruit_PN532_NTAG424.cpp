@@ -1705,6 +1705,15 @@ uint8_t Adafruit_PN532::ntag424_encrypt(uint8_t *key, uint8_t *iv,
                                         uint8_t length, uint8_t *input,
                                         uint8_t *output)
 {
+  // PSA_ALG_CBC_NO_PADDING requires the input length to be a multiple of the
+  // AES block size (16 bytes); enforce it explicitly so an unaligned length
+  // fails visibly here instead of as a silent PSA status 0 return
+  // (Sourcery review PR #1691).
+  if ((length % 16u) != 0u)
+  {
+    return 0;
+  }
+
   // IDF v6 / mbedTLS 4.x: legacy mbedtls_aes_* moved to private headers, so
   // the supported interface is the PSA Crypto API (auto-initialized at boot).
   psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
@@ -1717,6 +1726,10 @@ uint8_t Adafruit_PN532::ntag424_encrypt(uint8_t *key, uint8_t *iv,
   psa_status_t status = psa_import_key(&attributes, key, 16, &key_id);
   if (status != PSA_SUCCESS)
   {
+#ifdef NTAG424DEBUG
+    PN532DEBUGPRINT.print(F("psa_import_key failed: "));
+    PN532DEBUGPRINT.println((int)status);
+#endif
     return 0;
   }
 
@@ -1729,16 +1742,33 @@ uint8_t Adafruit_PN532::ntag424_encrypt(uint8_t *key, uint8_t *iv,
   }
   if (status == PSA_SUCCESS)
   {
+    // output buffer must be exactly `length`; CBC-without-padding never
+    // expands, and psa_cipher_update reports back the actual olen so we can
+    // detect truncation instead of silently returning partial data.
     status = psa_cipher_update(&op, (const uint8_t *)input, length,
                                (uint8_t *)output, length, &olen);
   }
   if (status == PSA_SUCCESS)
   {
     size_t flen = 0;
-    status = psa_cipher_finish(&op, (uint8_t *)output + olen, length - olen, &flen);
+    if (olen <= length)
+    {
+      status = psa_cipher_finish(&op, (uint8_t *)output + olen, length - olen, &flen);
+    }
+    else
+    {
+      status = PSA_ERROR_BUFFER_TOO_SMALL;
+    }
   }
   psa_cipher_abort(&op);
   psa_destroy_key(key_id);
+#ifdef NTAG424DEBUG
+  if (status != PSA_SUCCESS)
+  {
+    PN532DEBUGPRINT.print(F("ntag424_encrypt failed: "));
+    PN532DEBUGPRINT.println((int)status);
+  }
+#endif
   return (status == PSA_SUCCESS) ? 1 : 0;
 }
 
@@ -1779,6 +1809,13 @@ uint8_t Adafruit_PN532::ntag424_decrypt(uint8_t *key, uint8_t *iv,
                                         uint8_t length, uint8_t *input,
                                         uint8_t *output)
 {
+  // PSA_ALG_CBC_NO_PADDING requires block-aligned (16-byte) input length
+  // (Sourcery review PR #1691); fail explicitly, not as a silent PSA error.
+  if ((length % 16u) != 0u)
+  {
+    return 0;
+  }
+
   // IDF v6 / mbedTLS 4.x: PSA Crypto API (see ntag424_encrypt).
   psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
   psa_set_key_type(&attributes, PSA_KEY_TYPE_AES);
@@ -1790,6 +1827,10 @@ uint8_t Adafruit_PN532::ntag424_decrypt(uint8_t *key, uint8_t *iv,
   psa_status_t status = psa_import_key(&attributes, key, 16, &key_id);
   if (status != PSA_SUCCESS)
   {
+#ifdef NTAG424DEBUG
+    PN532DEBUGPRINT.print(F("psa_import_key failed: "));
+    PN532DEBUGPRINT.println((int)status);
+#endif
     return 0;
   }
 
@@ -1802,16 +1843,33 @@ uint8_t Adafruit_PN532::ntag424_decrypt(uint8_t *key, uint8_t *iv,
   }
   if (status == PSA_SUCCESS)
   {
+    // output buffer must be exactly `length`; CBC-without-padding never
+    // expands, and psa_cipher_update reports back the actual olen so we can
+    // detect truncation instead of silently returning partial data.
     status = psa_cipher_update(&op, (const uint8_t *)input, length,
                                (uint8_t *)output, length, &olen);
   }
   if (status == PSA_SUCCESS)
   {
     size_t flen = 0;
-    status = psa_cipher_finish(&op, (uint8_t *)output + olen, length - olen, &flen);
+    if (olen <= length)
+    {
+      status = psa_cipher_finish(&op, (uint8_t *)output + olen, length - olen, &flen);
+    }
+    else
+    {
+      status = PSA_ERROR_BUFFER_TOO_SMALL;
+    }
   }
   psa_cipher_abort(&op);
   psa_destroy_key(key_id);
+#ifdef NTAG424DEBUG
+  if (status != PSA_SUCCESS)
+  {
+    PN532DEBUGPRINT.print(F("ntag424_decrypt failed: "));
+    PN532DEBUGPRINT.println((int)status);
+  }
+#endif
   return (status == PSA_SUCCESS) ? 1 : 0;
 }
 
