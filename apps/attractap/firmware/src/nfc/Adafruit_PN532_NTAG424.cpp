@@ -1611,16 +1611,21 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     uint8_t resp_no_padding = response_length - 10;
     if (response_length > 10)
     {
-      for (int i = (int)response_length - 10 - 1; i >= 0; i--)
+      // Scan from the end for ISO/IEC 7816-4 padding (0x80 … 0x00). Uses
+      // uint8_t (as before the IDF v6 migration) but iterates i>0 with idx=i-1
+      // so the loop terminates correctly: `i >= 0` on an unsigned type is
+      // always true and would wrap 255→0 (OOB read) or trip -Wtype-limits.
+      for (uint8_t i = response_length - 10; i > 0; i--)
       {
-        // Serial.println(i);
-        if (response[i] == 0x00)
+        uint8_t idx = i - 1;
+        // Serial.println(idx);
+        if (response[idx] == 0x00)
         {
-          resp_no_padding = i;
+          resp_no_padding = idx;
         }
-        else if (response[i] == 0x80)
+        else if (response[idx] == 0x80)
         {
-          resp_no_padding = i;
+          resp_no_padding = idx;
           break;
         }
         else
