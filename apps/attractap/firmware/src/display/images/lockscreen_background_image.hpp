@@ -691233,7 +691233,7 @@ inline const lv_image_dsc_t lockscreen_background_image = {
         .flags = 0,
         .w = 480,
         .h = 480,
-        .stride = 480 * 2,
+        .stride = 0, /* LVGL infers w*2 from cf; matches perf/6 so #1691->#1696 merges cleanly */
         .reserved_2 = 0,
     },
     .data_size = sizeof(lockscreen_map),

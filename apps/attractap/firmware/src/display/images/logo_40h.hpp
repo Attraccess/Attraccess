@@ -15976,7 +15976,7 @@ inline const lv_image_dsc_t logo_40h = {
         .flags = 0,
         .w = 133,
         .h = 40,
-        .stride = 133 * 2,
+        .stride = 0, /* LVGL infers w*2 from cf; matches perf/6 so #1691->#1696 merges cleanly */
         .reserved_2 = 0,
     },
     .data_size = sizeof(logo_40h_data),
