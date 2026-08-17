@@ -133,7 +133,9 @@ private:
     };
     static constexpr size_t TX_QUEUE_DEPTH = 8;
     static constexpr uint32_t TX_TASK_STACK = 4096;
-    static constexpr UBaseType_t TX_TASK_PRIORITY = 5;
+    // Below the LVGL render task (prio 4): the tx task must not preempt UI
+    // refresh (PERFORMANCE_ANALYSIS.md quick win Q3). Was 5 (above render).
+    static constexpr UBaseType_t TX_TASK_PRIORITY = 3;
     const TickType_t SEND_TIMEOUT_TICKS = pdMS_TO_TICKS(5000);
     QueueHandle_t tx_queue = nullptr;
     TaskHandle_t tx_task = nullptr;

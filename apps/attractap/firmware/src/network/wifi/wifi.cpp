@@ -189,6 +189,16 @@ void Wifi::setup()
         return;
     }
 
+    // Disable modem sleep: the default WIFI_PS_MIN_MODEM adds ~tens of ms of
+    // latency to every TLS handshake, websocket heartbeat and reconnect.
+    // This device is mains-powered; the RF power saving is not worth the
+    // network latency (PERFORMANCE_ANALYSIS.md quick win Q1).
+    esp_err_t wifi_ps_result = esp_wifi_set_ps(WIFI_PS_NONE);
+    if (wifi_ps_result != ESP_OK)
+    {
+        logger.error((std::string("Failed to disable WiFi modem sleep: ") + esp_err_to_name(wifi_ps_result)).c_str());
+    }
+
     is_setup = true;
 }
 
