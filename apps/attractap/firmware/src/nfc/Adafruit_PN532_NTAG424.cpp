@@ -1759,6 +1759,12 @@ uint8_t Adafruit_PN532::ntag424_encrypt(uint8_t *key, uint8_t *iv,
     {
       status = PSA_ERROR_BUFFER_TOO_SMALL;
     }
+    // CBC-without-padding never expands: total output must exactly equal the
+    // input length. Fail explicitly on any mismatch (Sourcery PR #1691).
+    if (status == PSA_SUCCESS && (olen + flen) != length)
+    {
+      status = PSA_ERROR_GENERIC_ERROR;
+    }
   }
   psa_cipher_abort(&op);
   psa_destroy_key(key_id);
@@ -1859,6 +1865,12 @@ uint8_t Adafruit_PN532::ntag424_decrypt(uint8_t *key, uint8_t *iv,
     else
     {
       status = PSA_ERROR_BUFFER_TOO_SMALL;
+    }
+    // CBC-without-padding never expands: total output must exactly equal the
+    // input length. Fail explicitly on any mismatch (Sourcery PR #1691).
+    if (status == PSA_SUCCESS && (olen + flen) != length)
+    {
+      status = PSA_ERROR_GENERIC_ERROR;
     }
   }
   psa_cipher_abort(&op);
@@ -3856,7 +3868,7 @@ bool Adafruit_PN532::waitready(uint16_t timeout)
   {
     if (timeout != 0)
     {
-      timer += 10;
+      timer += 2;
       if (timer > timeout)
       {
 #ifdef PN532DEBUG
@@ -3865,7 +3877,7 @@ bool Adafruit_PN532::waitready(uint16_t timeout)
         return false;
       }
     }
-    delay(10);
+    delay(2);
   }
   return true;
 }
