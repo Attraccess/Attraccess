@@ -1,6 +1,8 @@
 #pragma once
 
 #include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "../settings/settings.hpp"
 #include "../logger/logger.hpp"
 
@@ -37,6 +39,12 @@ private:
 
     Logger logger;
     esp_timer_handle_t timer = nullptr;
+    // Shared between the esp_timer task (timerCallback) and the caller task
+    // (schedulePattern from the main loop / processState). Guard all pattern
+    // state transitions with this mutex so a beep triggered from another task
+    // can't race the timer callback into an out-of-bounds read or a half
+    // updated pattern (Sourcery review PR #1695).
+    SemaphoreHandle_t beepMutex = nullptr;
     // Interleaved [on_ms, off_ms, ...] steps; on_ms == 0 marks the end.
     const uint16_t *pattern = nullptr;
     size_t patternLength = 0;

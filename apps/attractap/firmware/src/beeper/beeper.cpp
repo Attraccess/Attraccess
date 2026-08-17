@@ -13,10 +13,12 @@
 void Beeper::setup(IOExpander *expander)
 {
     this->ioExpander = expander;
+    this->beepMutex = xSemaphoreCreateMutex();
 }
 #else
 void Beeper::setup()
 {
+    this->beepMutex = xSemaphoreCreateMutex();
 #ifdef BEEPER_PIN
     gpio_config_t cfg = {};
     cfg.pin_bit_mask = 1ULL << BEEPER_PIN;
@@ -62,6 +64,13 @@ void Beeper::schedulePattern(const uint16_t *newPattern, size_t length)
         return;
     }
 
+    // Serialize against the esp_timer task (timerCallback) so a beep triggered
+    // from another task can't race a half-updated pattern (Sourcery PR #1695).
+    if (this->beepMutex && xSemaphoreTake(this->beepMutex, portMAX_DELAY) != pdTRUE)
+    {
+        return;
+    }
+
     // A new pattern replaces any in-flight one (latest wins).
     this->pattern = newPattern;
     this->patternLength = length;
@@ -79,15 +88,22 @@ void Beeper::schedulePattern(const uint16_t *newPattern, size_t length)
         if (esp_timer_create(&timer_args, &this->timer) != ESP_OK)
         {
             this->logger.error("Failed to create beep timer");
+            xSemaphoreGive(this->beepMutex);
             return;
         }
     }
 
     this->advancePattern();
+
+    if (this->beepMutex)
+    {
+        xSemaphoreGive(this->beepMutex);
+    }
 }
 
 void Beeper::advancePattern()
 {
+    // Called with beepMutex held (from schedulePattern or timerCallback).
     if (this->pattern == nullptr || this->patternIndex >= this->patternLength)
     {
         this->beeping = false;
@@ -123,7 +139,15 @@ void Beeper::advancePattern()
 void Beeper::timerCallback(void *arg)
 {
     Beeper *self = static_cast<Beeper *>(arg);
+    if (self->beepMutex && xSemaphoreTake(self->beepMutex, portMAX_DELAY) != pdTRUE)
+    {
+        return;
+    }
     self->advancePattern();
+    if (self->beepMutex)
+    {
+        xSemaphoreGive(self->beepMutex);
+    }
 }
 
 void Beeper::beeperOn()
