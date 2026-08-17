@@ -207,13 +207,16 @@ void Display::setup()
     uint8_t *buf2 = (uint8_t *)heap_caps_malloc(buf_size_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA);
     if (buf1 == nullptr || buf2 == nullptr)
     {
-        /* Fall back to the old small single buffer if PSRAM is tight. */
+        /* Fall back to the old small single buffer if PSRAM is tight; log a
+         * warning so a degraded rendering config is diagnosable on devices
+         * with constrained PSRAM (Sourcery PR #1694). */
         if (buf1) heap_caps_free(buf1);
         if (buf2) heap_caps_free(buf2);
         buf_pixels = Display::screenWidth * 20;
         buf_size_bytes = buf_pixels * (LV_COLOR_DEPTH / 8);
         buf1 = (uint8_t *)heap_caps_malloc(buf_size_bytes, MALLOC_CAP_DMA);
         buf2 = NULL;
+        Display::logger.warn("PSRAM draw-buffer alloc failed — falling back to 480x20 single buffer (degraded rendering)");
     }
 
     /* Create display and set buffers/callbacks (v9) */
