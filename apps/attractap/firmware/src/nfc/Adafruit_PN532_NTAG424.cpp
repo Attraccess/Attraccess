@@ -1611,7 +1611,7 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     uint8_t resp_no_padding = response_length - 10;
     if (response_length > 10)
     {
-      for (uint8_t i = response_length - 10 - 1; i >= 0; i--)
+      for (int i = (int)response_length - 10 - 1; i >= 0; i--)
       {
         // Serial.println(i);
         if (response[i] == 0x00)
@@ -1705,19 +1705,41 @@ uint8_t Adafruit_PN532::ntag424_encrypt(uint8_t *key, uint8_t *iv,
                                         uint8_t length, uint8_t *input,
                                         uint8_t *output)
 {
-  mbedtls_aes_context ctx;
-  mbedtls_aes_init(&ctx);
-  // Set the key for the AES context
-  if (mbedtls_aes_setkey_dec(&ctx, key, 128) != 0)
+  // IDF v6 / mbedTLS 4.x: legacy mbedtls_aes_* moved to private headers, so
+  // the supported interface is the PSA Crypto API (auto-initialized at boot).
+  psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+  psa_set_key_type(&attributes, PSA_KEY_TYPE_AES);
+  psa_set_key_bits(&attributes, 128);
+  psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_ENCRYPT);
+  psa_set_key_algorithm(&attributes, PSA_ALG_CBC_NO_PADDING);
+
+  mbedtls_svc_key_id_t key_id = MBEDTLS_SVC_KEY_ID_INIT;
+  psa_status_t status = psa_import_key(&attributes, key, 16, &key_id);
+  if (status != PSA_SUCCESS)
   {
-    // Error setting key
-    mbedtls_aes_free(&ctx);
     return 0;
   }
-  mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_ENCRYPT, length, iv, (uint8_t *)input,
-                        (uint8_t *)output);
-  mbedtls_aes_free(&ctx);
-  return 1;
+
+  psa_cipher_operation_t op = PSA_CIPHER_OPERATION_INIT;
+  size_t olen = 0;
+  status = psa_cipher_encrypt_setup(&op, key_id, PSA_ALG_CBC_NO_PADDING);
+  if (status == PSA_SUCCESS)
+  {
+    status = psa_cipher_set_iv(&op, iv, 16);
+  }
+  if (status == PSA_SUCCESS)
+  {
+    status = psa_cipher_update(&op, (const uint8_t *)input, length,
+                               (uint8_t *)output, length, &olen);
+  }
+  if (status == PSA_SUCCESS)
+  {
+    size_t flen = 0;
+    status = psa_cipher_finish(&op, (uint8_t *)output + olen, length - olen, &flen);
+  }
+  psa_cipher_abort(&op);
+  psa_destroy_key(key_id);
+  return (status == PSA_SUCCESS) ? 1 : 0;
 }
 
 /**************************************************************************/
@@ -1757,22 +1779,40 @@ uint8_t Adafruit_PN532::ntag424_decrypt(uint8_t *key, uint8_t *iv,
                                         uint8_t length, uint8_t *input,
                                         uint8_t *output)
 {
-  mbedtls_aes_context ctx;
-  mbedtls_aes_init(&ctx);
-  // Set the key for the AES context
-  if (mbedtls_aes_setkey_dec(&ctx, key, 128) != 0)
+  // IDF v6 / mbedTLS 4.x: PSA Crypto API (see ntag424_encrypt).
+  psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+  psa_set_key_type(&attributes, PSA_KEY_TYPE_AES);
+  psa_set_key_bits(&attributes, 128);
+  psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_DECRYPT);
+  psa_set_key_algorithm(&attributes, PSA_ALG_CBC_NO_PADDING);
+
+  mbedtls_svc_key_id_t key_id = MBEDTLS_SVC_KEY_ID_INIT;
+  psa_status_t status = psa_import_key(&attributes, key, 16, &key_id);
+  if (status != PSA_SUCCESS)
   {
-    // Error setting key
-    mbedtls_aes_free(&ctx);
     return 0;
   }
-  if (mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_DECRYPT, length, iv,
-                            (uint8_t *)input, (uint8_t *)output) != 0)
+
+  psa_cipher_operation_t op = PSA_CIPHER_OPERATION_INIT;
+  size_t olen = 0;
+  status = psa_cipher_decrypt_setup(&op, key_id, PSA_ALG_CBC_NO_PADDING);
+  if (status == PSA_SUCCESS)
   {
-    return 0;
+    status = psa_cipher_set_iv(&op, iv, 16);
   }
-  mbedtls_aes_free(&ctx);
-  return 1;
+  if (status == PSA_SUCCESS)
+  {
+    status = psa_cipher_update(&op, (const uint8_t *)input, length,
+                               (uint8_t *)output, length, &olen);
+  }
+  if (status == PSA_SUCCESS)
+  {
+    size_t flen = 0;
+    status = psa_cipher_finish(&op, (uint8_t *)output + olen, length - olen, &flen);
+  }
+  psa_cipher_abort(&op);
+  psa_destroy_key(key_id);
+  return (status == PSA_SUCCESS) ? 1 : 0;
 }
 
 /**************************************************************************/
@@ -1825,47 +1865,30 @@ uint8_t Adafruit_PN532::ntag424_cmac_short(uint8_t *key, uint8_t *input,
 uint8_t Adafruit_PN532::ntag424_cmac(uint8_t *key, uint8_t *input,
                                      uint8_t length, uint8_t *cmac)
 {
-  int ret = 0;
-  const mbedtls_cipher_info_t *cipher_info;
-  cipher_info = mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_128_ECB);
-  mbedtls_cipher_context_t ctx;
-  mbedtls_cipher_init(&ctx);
-  if ((ret = mbedtls_cipher_setup(&ctx, cipher_info)) != 0)
+  // IDF v6 / mbedTLS 4.x: PSA Crypto API (legacy mbedtls_cipher_cmac_* moved
+  // to private headers). AES-128-CMAC via PSA, auto-initialized at boot.
+  psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+  psa_set_key_type(&attributes, PSA_KEY_TYPE_AES);
+  psa_set_key_bits(&attributes, 128);
+  psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_SIGN_MESSAGE);
+  psa_set_key_algorithm(&attributes, PSA_ALG_CMAC);
+
+  mbedtls_svc_key_id_t key_id = MBEDTLS_SVC_KEY_ID_INIT;
+  psa_status_t status = psa_import_key(&attributes, key, 16, &key_id);
+  if (status != PSA_SUCCESS)
   {
-#ifdef NTAG424DEBUG
-    PN532DEBUGPRINT.println(F("could not setup cipher "));
-#endif
-    goto exit;
+    return 0;
   }
-  ret = mbedtls_cipher_cmac_starts(&ctx, key, 128);
-  if (ret != 0)
+
+  size_t mac_length = 0;
+  status = psa_mac_compute(key_id, PSA_ALG_CMAC, input, length,
+                           cmac, 16, &mac_length);
+  psa_destroy_key(key_id);
+  if (status != PSA_SUCCESS || mac_length != 16)
   {
-#ifdef NTAG424DEBUG
-    PN532DEBUGPRINT.println(F("could not start cmac "));
-#endif
-    goto exit;
+    return 0;
   }
-  ret = mbedtls_cipher_cmac_update(&ctx, input, length);
-  if (ret != 0)
-  {
-#ifdef NTAG424DEBUG
-    PN532DEBUGPRINT.println(F("error while updateing cmac "));
-#endif
-    goto exit;
-  }
-  ret = mbedtls_cipher_cmac_finish(&ctx, cmac);
-#ifdef NTAG424DEBUG
-  PN532DEBUGPRINT.print(F("cmac key: "));
-  Adafruit_PN532::PrintHexChar(key, 16);
-  PN532DEBUGPRINT.print(F("cmac input: "));
-  Adafruit_PN532::PrintHexChar(input, length);
-  PN532DEBUGPRINT.print(F("cmac output: "));
-  Adafruit_PN532::PrintHexChar(cmac, 16);
-#endif
   return 1;
-exit:
-  mbedtls_cipher_free(&ctx);
-  return 0;
 }
 
 /**************************************************************************/

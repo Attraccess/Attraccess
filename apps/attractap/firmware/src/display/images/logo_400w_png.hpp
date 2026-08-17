@@ -144010,12 +144010,17 @@ const LV_ATTRIBUTE_MEM_ALIGN uint8_t logo_400w_png_data[] = {
     0x00,
 };
 
-const lv_image_dsc_t logo_400w_png = {
+inline const lv_image_dsc_t logo_400w_png = {
     .header = {
         .magic = LV_IMAGE_HEADER_MAGIC,
         .cf = LV_COLOR_FORMAT_NATIVE_WITH_ALPHA,
+        .flags = 0,
         .w = 400,
         .h = 120,
+        .stride = 400 * 2,
+        .reserved_2 = 0,
     },
     .data_size = sizeof(logo_400w_png_data),
-    .data = logo_400w_png_data};
+    .data = logo_400w_png_data,
+    .reserved = nullptr,
+    .reserved_2 = nullptr};

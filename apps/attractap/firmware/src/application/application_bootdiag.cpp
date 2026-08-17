@@ -45,7 +45,7 @@ static const char *resetReasonToString(esp_reset_reason_t reason) {
 
 void Application::setupBootDiagnostics() {
 #ifdef ESP_PLATFORM
-  BootDiagnostics_t prior = {0};
+  BootDiagnostics_t prior = {};
   this->bootDiagPreferences.begin(BOOT_DIAG_NAMESPACE, true);
   size_t read =
       this->bootDiagPreferences.getBytes("record", &prior, sizeof(prior));

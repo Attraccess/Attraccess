@@ -23,3 +23,8 @@ dependencies:
 
   # Attractap Lite: WS2812 LED ring (RMT backend)
   espressif/led_strip: "^3.0.0"
+
+  # W5500 SPI Ethernet MAC (moved out of IDF core into the Component
+  # Registry in IDF v6; the idf_component pin is >=5.5.0 but this driver
+  # requires >=6.0, matching the v6 migration).
+  espressif/w5500: "^2.0.0"
