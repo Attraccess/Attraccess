@@ -5,7 +5,8 @@
 #define LV_ATTRIBUTE_MEM_ALIGN
 #endif
 
-const LV_ATTRIBUTE_MEM_ALIGN uint8_t logo_400w_png_data[] = {
+// C++17 inline: single instance across TUs (PERFORMANCE_ANALYSIS.md A1).
+inline const LV_ATTRIBUTE_MEM_ALIGN uint8_t logo_400w_png_data[] = {
     0x00,
     0x00,
     0x00,
@@ -144017,7 +144018,7 @@ inline const lv_image_dsc_t logo_400w_png = {
         .flags = 0,
         .w = 400,
         .h = 120,
-        .stride = 0, /* LVGL infers w*2 from cf; matches perf/6 so #1691->#1696 merges cleanly */
+        .stride = 0, /* LVGL infers from cf (RGB565A8 -> w*2); don't hard-code bpp */
         .reserved_2 = 0,
     },
     .data_size = sizeof(logo_400w_png_data),
