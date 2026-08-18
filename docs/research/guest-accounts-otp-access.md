@@ -140,23 +140,25 @@ Guest login is "anonymous code entry", which raises two distinct collision conce
    The code also doubles as a bearer credential: anyone who observes a code can use it for that
    guest during its window (inherent to TOTP).
 
-   **Recommendation:** give each guest a short, stable **access code** (4 alphanumeric chars)
-   that they enter together with their OTP code — `access code + OTP`. The access code is a
-   direct, indexed key that resolves the guest in O(1) (no reverse-look-up, no list to scroll),
-   and the OTP is then verified against exactly that guest's secret. This keeps the "no account,
-   no password" promise while making the lookup deterministic and collision-free.
+   **Recommendation:** give each guest a short, stable **access code** (4-digit numeric) that
+   they enter together with their OTP code — `access code + OTP`. The access code is a direct,
+   indexed key that resolves the guest in O(1) (no reverse-look-up, no list to scroll), and the
+   OTP is then verified against exactly that guest's secret. This keeps the "no account, no
+   password" promise while making the lookup deterministic and collision-free.
 
 ### Access code (guest handle)
 
 - Dedicated column (e.g. `User.guestCode`), **not** the existing `username` (which is the web
   login identifier and must stay unique across members).
-- Generated randomly from an unambiguous alphabet (e.g. `23456789ABCDEFGHJKMNPQRSTUVWXYZ`,
-  ~31 chars → 31⁴ ≈ 920k values), case-insensitive, enforced unique via a DB index with
-  retry-on-collision.
-- Prefer a random unique code over "hash of the user's ID": truncating a hash to 4 chars risks
-  collisions and makes codes guessable/enumerable. A random code is just as easy to look up and
-  reveals nothing. (If deterministic-from-ID is ever wanted, a reversible base32/base36 encoding
-  of the numeric ID is unique but enumerable.)
+- **4-digit numeric** (`0000`–`9999`, 10⁴ = 10,000 values), enforced unique via a DB index with
+  retry-on-collision. A numeric keypad is the fastest entry on the Attractap touchscreen.
+- The 4-digit space is small: uniqueness is guaranteed by retry, but the practical guest count is
+  a few hundred before collisions get frequent — fine for the intended use. The code is a
+  non-secret identifier; the TOTP remains the secret factor.
+- Prefer a random unique code over "hash of the user's ID": truncating a hash risks collisions
+  and makes codes guessable/enumerable. A random code is just as easy to look up and reveals
+  nothing. (If deterministic-from-ID is ever wanted, `id % 10000` is unique only below 10,000
+  users and enumerable.)
 
    If a bare "code only" flow is still desired, at minimum:
 
