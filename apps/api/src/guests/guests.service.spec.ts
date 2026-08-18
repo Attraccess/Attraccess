@@ -32,6 +32,14 @@ describe('GuestsService', () => {
     find: jest.Mock;
     save: jest.Mock;
     delete: jest.Mock;
+    createQueryBuilder: jest.Mock;
+  };
+  let authDetailUpdateQueryBuilder: {
+    update: jest.Mock;
+    set: jest.Mock;
+    where: jest.Mock;
+    andWhere: jest.Mock;
+    execute: jest.Mock;
   };
   let encryptionService: { encrypt: jest.Mock; decryptIfEncrypted: jest.Mock };
   let bruteForce: {
@@ -67,11 +75,19 @@ describe('GuestsService', () => {
         getOne: jest.fn().mockResolvedValue(null),
       }),
     };
+    authDetailUpdateQueryBuilder = {
+      update: jest.fn().mockReturnThis(),
+      set: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue({ affected: 1 }),
+    };
     authDetailRepository = {
       findOne: jest.fn().mockResolvedValue(null),
       find: jest.fn().mockResolvedValue([]),
       save: jest.fn().mockImplementation(async (detail) => detail),
       delete: jest.fn().mockResolvedValue({ affected: 1 }),
+      createQueryBuilder: jest.fn().mockReturnValue(authDetailUpdateQueryBuilder),
     };
     encryptionService = {
       encrypt: jest.fn().mockImplementation((value: string) => `encrypted:${value}`),
@@ -156,10 +172,46 @@ describe('GuestsService', () => {
       expect(mockedVerify).toHaveBeenCalledWith(
         expect.objectContaining({ secret: 'SECRET', token: '123456', afterTimeStep: undefined }),
       );
-      expect(authDetailRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ totpLastTimeStep: 100 }),
-      );
+      // The matched time step is consumed via a conditional update (replay protection).
+      expect(authDetailUpdateQueryBuilder.set).toHaveBeenCalledWith({ totpLastTimeStep: 100 });
+      expect(authDetailUpdateQueryBuilder.execute).toHaveBeenCalled();
       expect(bruteForce.recordSuccess).toHaveBeenCalled();
+    });
+
+    it('accepts a boolean true result from otplib', async () => {
+      userRepository.findOne.mockResolvedValue(makeGuest());
+      authDetailRepository.findOne.mockResolvedValue({
+        id: 5,
+        userId: 1,
+        type: AuthenticationType.GUEST_OTP,
+        totpSecret: 'encrypted:SECRET',
+        totpLastTimeStep: null,
+      });
+      mockedVerify.mockResolvedValue(true);
+
+      const result = await service.verifyGuestOtp('1234', '123456', '1.2.3.4');
+
+      expect(result.id).toBe(1);
+      expect(bruteForce.recordSuccess).toHaveBeenCalled();
+    });
+
+    it('rejects a replayed code whose time step was already consumed concurrently', async () => {
+      userRepository.findOne.mockResolvedValue(makeGuest());
+      authDetailRepository.findOne.mockResolvedValue({
+        id: 5,
+        userId: 1,
+        type: AuthenticationType.GUEST_OTP,
+        totpSecret: 'encrypted:SECRET',
+        totpLastTimeStep: null,
+      });
+      mockedVerify.mockResolvedValue({ valid: true, delta: 0, timeStep: 100 });
+      // A concurrent request consumed the time step first, so the conditional update
+      // matches no row.
+      authDetailUpdateQueryBuilder.execute.mockResolvedValue({ affected: 0 });
+
+      await expect(service.verifyGuestOtp('1234', '123456', '1.2.3.4')).rejects.toThrow(UnauthorizedException);
+      expect(bruteForce.recordFailure).toHaveBeenCalled();
+      expect(bruteForce.recordSuccess).not.toHaveBeenCalled();
     });
 
     it('passes the stored time step for replay protection', async () => {
@@ -251,13 +303,26 @@ describe('GuestsService', () => {
   });
 
   describe('delete', () => {
-    it('releases the guest code and delegates to user deletion', async () => {
+    it('deletes the user first, then releases the guest code', async () => {
       userRepository.findOne.mockResolvedValue(makeGuest());
 
       await service.delete(1);
 
-      expect(userRepository.update).toHaveBeenCalledWith(1, { guestCode: null });
       expect(usersService.deleteOne).toHaveBeenCalledWith(1);
+      expect(userRepository.update).toHaveBeenCalledWith(1, { guestCode: null });
+      // The code must only be released after a successful deletion.
+      expect(usersService.deleteOne.mock.invocationCallOrder[0]).toBeLessThan(
+        userRepository.update.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('keeps the guest code when deletion fails', async () => {
+      userRepository.findOne.mockResolvedValue(makeGuest());
+      usersService.deleteOne.mockRejectedValue(new Error('User has active usage sessions'));
+
+      await expect(service.delete(1)).rejects.toThrow('User has active usage sessions');
+
+      expect(userRepository.update).not.toHaveBeenCalled();
     });
 
     it('refuses to delete a non-guest user', async () => {

@@ -163,9 +163,13 @@ export class GuestsService {
 
   async delete(id: number): Promise<void> {
     const user = await this.findGuestEntityOrThrow(id);
-    // Release the short guest code so it can be reissued to a future guest.
-    await this.userRepository.update(user.id, { guestCode: null });
+    // Delete first: deleteOne can still fail (e.g. active usage sessions) and releasing the
+    // code beforehand would leave a live guest unable to authenticate while their code is
+    // already reissuable to someone else.
     await this.usersService.deleteOne(user.id);
+    // Release the short guest code so it can be reissued to a future guest. The row is
+    // soft-deleted at this point but the unique index still covers it until purged.
+    await this.userRepository.update(user.id, { guestCode: null });
     this.logger.log(`Deleted guest user ${id}`);
   }
 
@@ -281,16 +285,33 @@ export class GuestsService {
       afterTimeStep: detail.totpLastTimeStep ?? undefined,
     });
 
-    if (typeof result === 'boolean' || !result.valid) {
+    // otplib may return a plain boolean or a result object depending on the version/wrapper
+    // (two-factor.service.ts handles it the same way).
+    const isValid = typeof result === 'boolean' ? result : result.valid;
+    if (!isValid) {
       await this.bruteForce.recordFailure('guest_otp', resolvedIp, guest.id, guestCode);
       throw new UnauthorizedException('GuestOtpInvalid');
     }
 
-    // Replay protection: remember the time step that was just consumed.
+    // Replay protection: atomically consume the matched time step. The conditional update
+    // guarantees only one concurrent verification of the same code succeeds — a second
+    // request carrying the same (or an older) time step finds totpLastTimeStep already
+    // advanced and gets affected = 0.
     const matchedStep =
-      'timeStep' in result ? result.timeStep : Math.floor(Date.now() / 1000 / 30);
-    detail.totpLastTimeStep = matchedStep;
-    await this.authenticationDetailRepository.save(detail);
+      typeof result === 'boolean' || !('timeStep' in result)
+        ? Math.floor(Date.now() / 1000 / 30)
+        : result.timeStep;
+    const consumed = await this.authenticationDetailRepository
+      .createQueryBuilder()
+      .update(AuthenticationDetail)
+      .set({ totpLastTimeStep: matchedStep })
+      .where('id = :id', { id: detail.id })
+      .andWhere('(totpLastTimeStep IS NULL OR totpLastTimeStep < :matchedStep)', { matchedStep })
+      .execute();
+    if (!consumed.affected) {
+      await this.bruteForce.recordFailure('guest_otp', resolvedIp, guest.id, guestCode);
+      throw new UnauthorizedException('GuestOtpInvalid');
+    }
 
     await this.bruteForce.recordSuccess('guest_otp', resolvedIp, guest.id, guestCode);
     return guest;

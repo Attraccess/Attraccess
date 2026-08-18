@@ -50,6 +50,7 @@
       "title": "Ressourcenzugriff",
       "description": "Gäste erhalten Zugriff durch Einweisungen. Sie können niemals Einweiser oder Maintainer werden.",
       "empty": "Noch kein Zugriff gewährt.",
+      "loadError": "Der Zugriff des Gastes konnte nicht geladen werden. Bitte versuchen Sie es erneut.",
       "columns": {
         "type": "Typ",
         "name": "Name",

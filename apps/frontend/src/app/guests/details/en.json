@@ -50,6 +50,7 @@
       "title": "Resource access",
       "description": "Guests get access through introductions. They can never become introducers or maintainers.",
       "empty": "No access granted yet.",
+      "loadError": "Failed to load the guest's access. Please try again.",
       "columns": {
         "type": "Type",
         "name": "Name",

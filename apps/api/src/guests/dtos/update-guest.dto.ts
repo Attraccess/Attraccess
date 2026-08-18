@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsOptional, IsString, MaxLength, MinLength, ValidateIf } from 'class-validator';
 
 export class UpdateGuestDto {
   @ApiProperty({
@@ -19,8 +19,11 @@ export class UpdateGuestDto {
     required: false,
     nullable: true,
   })
-  @IsOptional()
+  // null is a valid value (it clears the email), so only run the format check when a
+  // non-null value is present. Mirrors the nullable-field pattern in createGroup.dto.ts.
+  @ValidateIf((o: UpdateGuestDto) => o.email !== null && o.email !== undefined)
   @IsEmail()
+  @IsOptional()
   email?: string | null;
 
   @ApiProperty({

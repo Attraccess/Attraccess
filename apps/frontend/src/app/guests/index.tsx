@@ -21,6 +21,7 @@ import { GuestDto, useGuestsServiceFindManyGuests } from '@attraccess/react-quer
 import { EmptyState } from '../../components/emptyState';
 import { useNavigate } from 'react-router-dom';
 import { SimplePagination } from '../../components/simplePagination';
+import { TableDataLoadingIndicator } from '../../components/tableComponents';
 
 import en from './en.json';
 import de from './de.json';
@@ -36,7 +37,7 @@ export const GuestManagementPage: React.FC = () => {
   const debouncedSearch = useDebounce(search, 500);
   const navigate = useNavigate();
 
-  const { data: searchResult, isFetched } = useGuestsServiceFindManyGuests({
+  const { data: searchResult, isFetched, isLoading, isError } = useGuestsServiceFindManyGuests({
     limit,
     page,
     search: debouncedSearch,
@@ -86,66 +87,74 @@ export const GuestManagementPage: React.FC = () => {
           }
         />
 
-        <Table>
-          <TableScrollContainer>
-            <TableContent aria-label={t('table.ariaLabel')}>
-              <TableHeader>
-                <TableColumn width="0">{t('table.columns.id')}</TableColumn>
-                <TableColumn isRowHeader>{t('table.columns.name')}</TableColumn>
-                <TableColumn width="0">{t('table.columns.guestCode')}</TableColumn>
-                <TableColumn className="hidden md:table-cell">{t('table.columns.email')}</TableColumn>
-                <TableColumn width="0">{t('table.columns.status')}</TableColumn>
-                <TableColumn width="0" className="hidden md:table-cell">
-                  {t('table.columns.credential')}
-                </TableColumn>
-              </TableHeader>
+        {isLoading ? (
+          <TableDataLoadingIndicator />
+        ) : isError ? (
+          <p className="text-sm text-danger p-4" data-cy="guest-management-error">
+            {t('table.loadError')}
+          </p>
+        ) : (
+          <Table>
+            <TableScrollContainer>
+              <TableContent aria-label={t('table.ariaLabel')}>
+                <TableHeader>
+                  <TableColumn width="0">{t('table.columns.id')}</TableColumn>
+                  <TableColumn isRowHeader>{t('table.columns.name')}</TableColumn>
+                  <TableColumn width="0">{t('table.columns.guestCode')}</TableColumn>
+                  <TableColumn className="hidden md:table-cell">{t('table.columns.email')}</TableColumn>
+                  <TableColumn width="0">{t('table.columns.status')}</TableColumn>
+                  <TableColumn width="0" className="hidden md:table-cell">
+                    {t('table.columns.credential')}
+                  </TableColumn>
+                </TableHeader>
 
-              <TableBody items={(searchResult?.data ?? []) as GuestDto[]} renderEmptyState={() => <EmptyState />}>
-                {(guest) => (
-                  <TableRow
-                    key={guest.id}
-                    id={guest.id}
-                    className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
-                    onAction={() => navigate(`/guests/${guest.id}`)}
-                  >
-                    <TableCell>{guest.id}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{guest.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <code className="text-sm">{guest.guestCode ?? '-'}</code>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">{guest.email ?? t('table.noEmail')}</TableCell>
-                    <TableCell>
-                      {guest.guestEnabled ? (
-                        <Chip size="sm" color="success" variant="soft" data-cy={`guest-status-chip-${guest.id}`}>
-                          {t('table.status.enabled')}
-                        </Chip>
-                      ) : (
-                        <Chip size="sm" color="danger" variant="soft" data-cy={`guest-status-chip-${guest.id}`}>
-                          {t('table.status.disabled')}
-                        </Chip>
-                      )}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {guest.hasCredential ? (
-                        <Chip size="sm" color="accent" variant="secondary">
-                          {t('table.credential.enrolled')}
-                        </Chip>
-                      ) : (
-                        <Chip size="sm" color="default" variant="primary">
-                          {t('table.credential.notEnrolled')}
-                        </Chip>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </TableContent>
-          </TableScrollContainer>
-        </Table>
+                <TableBody items={(searchResult?.data ?? []) as GuestDto[]} renderEmptyState={() => <EmptyState />}>
+                  {(guest) => (
+                    <TableRow
+                      key={guest.id}
+                      id={guest.id}
+                      className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
+                      onAction={() => navigate(`/guests/${guest.id}`)}
+                    >
+                      <TableCell>{guest.id}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{guest.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <code className="text-sm">{guest.guestCode ?? '-'}</code>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">{guest.email ?? t('table.noEmail')}</TableCell>
+                      <TableCell>
+                        {guest.guestEnabled ? (
+                          <Chip size="sm" color="success" variant="soft" data-cy={`guest-status-chip-${guest.id}`}>
+                            {t('table.status.enabled')}
+                          </Chip>
+                        ) : (
+                          <Chip size="sm" color="danger" variant="soft" data-cy={`guest-status-chip-${guest.id}`}>
+                            {t('table.status.disabled')}
+                          </Chip>
+                        )}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {guest.hasCredential ? (
+                          <Chip size="sm" color="accent" variant="secondary">
+                            {t('table.credential.enrolled')}
+                          </Chip>
+                        ) : (
+                          <Chip size="sm" color="default" variant="primary">
+                            {t('table.credential.notEnrolled')}
+                          </Chip>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </TableContent>
+            </TableScrollContainer>
+          </Table>
+        )}
 
         <div className="flex w-full justify-end mt-4">
           {isFetched && (

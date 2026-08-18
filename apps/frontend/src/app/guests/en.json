@@ -18,6 +18,7 @@
       "credential": "Credential"
     },
     "noEmail": "-",
+    "loadError": "Failed to load guests. Please try again.",
     "status": {
       "enabled": "Enabled",
       "disabled": "Disabled"

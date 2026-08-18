@@ -17,6 +17,7 @@ import {
   UserRole,
   Role,
   Permission,
+  RolePermission,
   SSOProviderType,
   UserRoleSource,
   entities,
@@ -130,6 +131,7 @@ describe('SSO OIDC integration (e2e with testcontainers)', () => {
     const userRoleRepo = dataSource.getRepository(UserRole);
     const roleRepo = dataSource.getRepository(Role);
     const permissionRepo = dataSource.getRepository(Permission);
+    const rolePermissionRepo = dataSource.getRepository(RolePermission);
 
     const mockConfigService = {
       get: (key: string): AppConfigType | undefined => {
@@ -163,7 +165,7 @@ describe('SSO OIDC integration (e2e with testcontainers)', () => {
     } as unknown as LicenseService;
 
     const tokenHashService = new TokenHashService(mockConfigService);
-    rbacService = new RbacService(userRoleRepo, roleRepo, permissionRepo, userRepo);
+    rbacService = new RbacService(userRoleRepo, roleRepo, permissionRepo, userRepo, rolePermissionRepo);
     usersService = new UsersService(
       userRepo,
       authDetailRepo,

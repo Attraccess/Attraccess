@@ -18,6 +18,7 @@
       "credential": "Anmeldedaten"
     },
     "noEmail": "-",
+    "loadError": "Gäste konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
     "status": {
       "enabled": "Aktiv",
       "disabled": "Deaktiviert"
