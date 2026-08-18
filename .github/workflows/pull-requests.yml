@@ -187,9 +187,12 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+      # Fork PRs only get a read-only GITHUB_TOKEN — the permissions block above
+      # does not apply to them — so posting the comment fails with "Resource not
+      # accessible by integration". Skip the comment on fork PRs.
       - name: Build PR comment body
         id: comment-body
-        if: github.event_name == 'pull_request' && always()
+        if: github.event_name == 'pull_request' && always() && github.event.pull_request.head.repo.full_name == github.repository
         run: |
           set -euo pipefail
           shopt -s nullglob globstar
@@ -217,7 +220,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Post sticky PR comment with plugin artifacts
-        if: github.event_name == 'pull_request' && always()
+        if: github.event_name == 'pull_request' && always() && github.event.pull_request.head.repo.full_name == github.repository
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: plugin-artifacts
