@@ -1,0 +1,96 @@
+{
+  "title": "Guest",
+  "notFound": "This guest does not exist or was deleted.",
+  "sections": {
+    "profile": {
+      "title": "Profile",
+      "name": {
+        "label": "Name"
+      },
+      "email": {
+        "label": "Email (optional)"
+      },
+      "save": "Save changes",
+      "success": {
+        "title": "Guest updated",
+        "description": "The guest profile was saved."
+      }
+    },
+    "status": {
+      "title": "Status",
+      "enabledLabel": "Guest enabled",
+      "enabledDescription": "Disabled guests cannot authenticate at terminals, even with a valid code.",
+      "success": {
+        "enabled": "Guest enabled",
+        "disabled": "Guest disabled"
+      }
+    },
+    "enrollment": {
+      "title": "Terminal enrollment",
+      "description": "Share the QR code or the setup key with the guest so they can add it to their authenticator app. At the terminal they enter their guest code plus the current one-time code.",
+      "guestCode": "Guest code",
+      "secret": "Setup key",
+      "qrHint": "Scan with an authenticator app (Google Authenticator, Aegis, …)",
+      "rotate": "Rotate credential",
+      "revoke": "Revoke credential",
+      "provision": "Provision credential",
+      "noCredential": "This guest has no active credential. Provision one to allow terminal login.",
+      "success": {
+        "rotated": "Credential rotated. Share the new QR code with the guest.",
+        "revoked": "Credential revoked. The guest can no longer authenticate.",
+        "provisioned": "Credential provisioned."
+      },
+      "confirmRevoke": {
+        "title": "Revoke credential?",
+        "description": "The guest will no longer be able to authenticate at terminals until a new credential is provisioned.",
+        "confirm": "Revoke"
+      }
+    },
+    "access": {
+      "title": "Resource access",
+      "description": "Guests get access through introductions. They can never become introducers or maintainers.",
+      "empty": "No access granted yet.",
+      "columns": {
+        "type": "Type",
+        "name": "Name",
+        "status": "Status"
+      },
+      "type": {
+        "resource": "Resource",
+        "group": "Group"
+      },
+      "status": {
+        "valid": "Active",
+        "invalid": "Revoked"
+      },
+      "add": {
+        "button": "Grant access",
+        "title": "Grant access",
+        "kind": "Access to",
+        "kindResource": "Resource",
+        "kindGroup": "Resource group",
+        "resource": "Resource",
+        "group": "Resource group",
+        "grant": "Grant",
+        "cancel": "Cancel",
+        "success": "Access granted."
+      },
+      "revoke": {
+        "button": "Revoke",
+        "success": "Access revoked."
+      }
+    },
+    "delete": {
+      "title": "Delete guest",
+      "description": "This permanently removes the guest account. This action cannot be undone.",
+      "button": "Delete guest",
+      "confirmTitle": "Delete this guest?",
+      "confirmDescription": "The guest account and its credential will be deleted. This cannot be undone.",
+      "confirm": "Delete",
+      "success": {
+        "title": "Guest deleted",
+        "description": "The guest account was deleted."
+      }
+    }
+  }
+}

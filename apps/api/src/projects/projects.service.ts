@@ -6,6 +6,7 @@ import {
   ProjectMemberRole,
   ResourceUsage,
   User,
+  UserType,
 } from '@attraccess/database-entities';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -92,6 +93,11 @@ export class ProjectsService {
   }
 
   public async create(ownerUserId: number, data: CreateProjectDto): Promise<Project> {
+    const owner = await this.userRepository.findOne({ where: { id: ownerUserId } });
+    if (owner?.userType === UserType.GUEST) {
+      throw new BadRequestException('Guests cannot create projects');
+    }
+
     const project = await this.projectRepository.save({
       owner: { id: ownerUserId },
       name: data.name,
@@ -188,6 +194,10 @@ export class ProjectsService {
 
     if (!invitedUser) {
       throw new NotFoundException('User not found');
+    }
+
+    if (invitedUser.userType === UserType.GUEST) {
+      throw new BadRequestException('Guests cannot be invited to projects');
     }
 
     if (invitedUser.id === project.owner?.id) {
@@ -321,6 +331,11 @@ export class ProjectsService {
     userId: number,
     role: ProjectMemberRole = ProjectMemberRole.VIEWER,
   ): Promise<void> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (user?.userType === UserType.GUEST) {
+      throw new BadRequestException('Guests cannot join projects');
+    }
+
     const existingMembership = await this.projectMemberRepository.findOne({
       where: {
         project: { id: projectId },

@@ -19,6 +19,7 @@
         "csvExport": "CSV-Export",
         "attractap": "NFC-Karten",
         "users": "Benutzer",
+        "guests": "Gäste",
         "settings": "Einstellungen"
       }
     },

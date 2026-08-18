@@ -15,7 +15,8 @@
       "roles": "Rollen"
     },
     "ssoLinked": "SSO verknüpft ({{providers}})",
-    "noRoles": "Keine erhöhten Rollen"
+    "noRoles": "Keine erhöhten Rollen",
+    "guestBadge": "Gast"
   },
   "actions": {
     "menu": "Einstellungen",

@@ -1,6 +1,6 @@
 import { InjectRepository } from '@nestjs/typeorm';
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/database-entities';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
+import { ResourceIntroducer, ResourceIntroducerType, User, UserType } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceGroupIntroducerChangedEvent } from './events/resource-group-introducer-changed.event';
@@ -14,6 +14,8 @@ export class ResourceGroupsIntroducersService {
   constructor(
     @InjectRepository(ResourceIntroducer)
     private readonly resourceIntroducerRepository: Repository<ResourceIntroducer>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
     private readonly notifications: NotificationDispatchService,
@@ -59,6 +61,11 @@ export class ResourceGroupsIntroducersService {
     userId: number,
     type: ResourceIntroducerType = ResourceIntroducerType.INTRODUCER,
   ): Promise<ResourceIntroducer> {
+    const targetUser = await this.userRepository.findOne({ where: { id: userId } });
+    if (targetUser?.userType === UserType.GUEST) {
+      throw new BadRequestException('Guests cannot be promoted to introducer or maintainer');
+    }
+
     const existingIntroducer = await this.getByResourceGroupIdAndUserId(groupId, userId);
 
     if (existingIntroducer) {

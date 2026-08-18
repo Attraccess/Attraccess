@@ -21,6 +21,7 @@ import { ProjectMember } from './project-member.entity';
 import { ProjectInvitation } from './project-invitation.entity';
 import { FormSubmission } from './form';
 import { UserRole } from './user-role.entity';
+import { UserType } from '../types/userType.enum';
 
 
 @Entity()
@@ -42,9 +43,37 @@ export class User {
   })
   username!: string;
 
-  @Column({ unique: true, type: 'text' })
+  @Column({ unique: true, type: 'text', nullable: true })
   @Exclude()
-  email!: string;
+  email!: string | null;
+
+  @Column({
+    type: 'simple-enum',
+    enum: UserType,
+    default: UserType.MEMBER,
+  })
+  @ApiProperty({
+    description: 'The type of the user account. Guests authenticate via TOTP at terminals only.',
+    enum: UserType,
+    enumName: 'UserType',
+    example: UserType.MEMBER,
+  })
+  userType!: UserType;
+
+  @Column({ type: 'varchar', length: 4, nullable: true, unique: true })
+  @ApiProperty({
+    description: 'Short numeric code a guest uses to identify themselves at a terminal. Only set for guests.',
+    example: '1234',
+    required: false,
+  })
+  guestCode?: string | null;
+
+  @Column({ type: 'boolean', default: true })
+  @ApiProperty({
+    description: 'Whether the guest account is enabled. Only meaningful for guest users.',
+    example: true,
+  })
+  guestEnabled!: boolean;
 
   @Column({ type: 'varchar', length: 35, default: 'en' })
   @ApiProperty({

@@ -157,7 +157,7 @@ beforeAll(async () => {
   } as unknown as LicenseService;
 
   const tokenHashService = new TokenHashService(mockConfigService);
-  rbacService = new RbacService(userRoleRepo, roleRepo, permissionRepo);
+  rbacService = new RbacService(userRoleRepo, roleRepo, permissionRepo, userRepo);
   usersService = new UsersService(
     userRepo,
     authDetailRepo,

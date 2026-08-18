@@ -163,7 +163,7 @@ describe('SSO OIDC integration (e2e with testcontainers)', () => {
     } as unknown as LicenseService;
 
     const tokenHashService = new TokenHashService(mockConfigService);
-    rbacService = new RbacService(userRoleRepo, roleRepo, permissionRepo);
+    rbacService = new RbacService(userRoleRepo, roleRepo, permissionRepo, userRepo);
     usersService = new UsersService(
       userRepo,
       authDetailRepo,

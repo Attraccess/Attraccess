@@ -12,6 +12,8 @@ import { Spinner } from '@heroui/react';
 import { MqttServersPage, EditMqttServerPage } from '../mqtt';
 import { SSOProviderFormPage } from '../sso/providers/SSOProviderFormPage';
 import { UserManagementPage } from '../user-management';
+import { GuestManagementPage } from '../guests';
+import { GuestManagementDetailsPage } from '../guests/details';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
 import { PluginRouteBoundary } from '../../components/pluginRouteBoundary';
 import usePluginState, { PluginManifestWithPlugin } from '../plugins/plugin.state';
@@ -224,6 +226,16 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/users/:id',
     element: <UserManagementDetailsPage />,
+    authRequired: 'users.read',
+  },
+  {
+    path: '/guests',
+    element: <GuestManagementPage />,
+    authRequired: 'users.read',
+  },
+  {
+    path: '/guests/:id',
+    element: <GuestManagementDetailsPage />,
     authRequired: 'users.read',
   },
   {

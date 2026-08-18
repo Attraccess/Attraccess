@@ -24,6 +24,7 @@ import {
   SSOProvider,
   User,
   UserRole,
+  UserType,
   useAuthenticationServiceGetAllSsoProviders,
   useLicenseServiceGetLicenseInformation,
   useUsersServiceFindMany,
@@ -185,7 +186,14 @@ export const UserManagementPage: React.FC = () => {
                       </TableCell>
                       <TableCell>{user.id}</TableCell>
                       <TableCell>
-                        <AttraccessUser user={user} />
+                        <div className="flex items-center gap-2">
+                          <AttraccessUser user={user} />
+                          {user.userType === UserType.GUEST && (
+                            <Chip size="sm" color="warning" variant="soft" data-cy={`user-type-chip-${user.id}`}>
+                              {t('table.guestBadge')}
+                            </Chip>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="hidden md:table-cell">{user.externalIdentifier}</TableCell>
                       <TableCell className="hidden lg:table-cell">

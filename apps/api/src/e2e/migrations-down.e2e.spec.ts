@@ -686,7 +686,11 @@ describe('Migrations down/up with data (e2e)', () => {
   });
 
   it('reverts each migration and reapplies them', async () => {
-    await dataSource.query('PRAGMA foreign_keys = ON');
+    // Reverting a migration that rebuilds a parent table (SQLite DROP + RENAME, e.g. "user")
+    // cannot run with foreign-key enforcement enabled, because dropping the table performs an
+    // implicit delete that child rows would block. Relax enforcement for the revert pass; data
+    // integrity is still verified via PRAGMA foreign_key_check afterwards.
+    await dataSource.query('PRAGMA foreign_keys = OFF');
     let remaining = await getMigrationCount(dataSource);
 
     while (remaining > 0) {
@@ -700,6 +704,7 @@ describe('Migrations down/up with data (e2e)', () => {
       remaining = await getMigrationCount(dataSource);
     }
 
+    await dataSource.query('PRAGMA foreign_keys = ON');
     await dataSource.runMigrations();
     await seedDatabase(dataSource);
     await assertAllEntitiesHaveRows(dataSource);

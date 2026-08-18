@@ -1,0 +1,30 @@
+{
+  "title": "Guests",
+  "subtitle": "Temporary accounts that authenticate with one-time codes at terminals",
+  "actions": {
+    "addGuest": "Add guest"
+  },
+  "table": {
+    "ariaLabel": "Guest accounts",
+    "inputs": {
+      "search": "Search by name, email or code"
+    },
+    "columns": {
+      "id": "ID",
+      "name": "Name",
+      "guestCode": "Code",
+      "email": "Email",
+      "status": "Status",
+      "credential": "Credential"
+    },
+    "noEmail": "-",
+    "status": {
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    },
+    "credential": {
+      "enrolled": "Enrolled",
+      "notEnrolled": "Not enrolled"
+    }
+  }
+}

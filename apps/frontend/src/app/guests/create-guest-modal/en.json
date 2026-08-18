@@ -1,0 +1,22 @@
+{
+  "title": "Add guest",
+  "description": "Guests authenticate with a one-time code at terminals. They get no web login and no roles.",
+  "inputs": {
+    "name": {
+      "label": "Name",
+      "placeholder": "John Doe"
+    },
+    "email": {
+      "label": "Email (optional)",
+      "placeholder": "john@example.com"
+    }
+  },
+  "actions": {
+    "cancel": "Cancel",
+    "create": "Create guest"
+  },
+  "success": {
+    "title": "Guest created",
+    "description": "Share the shown QR code or setup key with the guest."
+  }
+}

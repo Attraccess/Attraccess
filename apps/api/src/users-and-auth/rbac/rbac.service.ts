@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, In, QueryFailedError, Repository } from 'typeorm';
-import { Permission, Role, RolePermission, User, UserRole, UserRoleSource } from '@attraccess/database-entities';
+import { Permission, Role, RolePermission, User, UserRole, UserRoleSource, UserType } from '@attraccess/database-entities';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { CreateRoleDto } from './dtos/create-role.dto';
 import { UpdateRoleDto } from './dtos/update-role.dto';
@@ -96,6 +96,17 @@ export class RbacService {
     if (missing.length > 0) {
       throw new ForbiddenException(`You cannot ${action} permissions you do not have: ${missing.join(', ')}`);
     }
+  }
+
+  private assertNotGuest(user: User): void {
+    if (user.userType === UserType.GUEST) {
+      throw new BadRequestException('Roles cannot be assigned to guest accounts');
+    }
+  }
+
+  private async loadUserForGuard(userId: number, em?: EntityManager): Promise<User | null> {
+    const repo = em ? em.getRepository(User) : this.userRepository;
+    return repo.findOne({ where: { id: userId } });
   }
 
   private async generateRoleKey(name: string): Promise<string> {
@@ -302,6 +313,9 @@ export class RbacService {
     const roleRepo = em ? em.getRepository(Role) : this.roleRepository;
     const urRepo = em ? em.getRepository(UserRole) : this.userRoleRepository;
 
+    const user = await this.loadUserForGuard(userId, em);
+    if (user) this.assertNotGuest(user);
+
     const role = await roleRepo.findOne({ where: { key: roleKey } });
     if (!role) return null;
     const existing = await urRepo.findOne({
@@ -319,6 +333,10 @@ export class RbacService {
     const roleRepo = em ? em.getRepository(Role) : this.roleRepository;
     const urRepo = em ? em.getRepository(UserRole) : this.userRoleRepository;
 
+    // Guests hold zero roles by design — never grant them the default roles.
+    const user = await this.loadUserForGuard(userId, em);
+    if (user?.userType === UserType.GUEST) return;
+
     const defaultRoles = await roleRepo.find({ where: { isDefault: true } });
     for (const role of defaultRoles) {
       const existing = await urRepo.findOne({
@@ -332,8 +350,9 @@ export class RbacService {
   }
 
   async assignRole(userId: number, roleId: number, actorPermissions: Set<string>): Promise<UserRole> {
-    const userExists = await this.userRepository.existsBy({ id: userId });
-    if (!userExists) throw new UserNotFoundException(userId);
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new UserNotFoundException(userId);
+    this.assertNotGuest(user);
 
     const role = await this.roleRepository.findOne({
       where: { id: roleId },
@@ -421,6 +440,10 @@ export class RbacService {
     ssoProviderType: string,
     ssoProviderId: number,
   ): Promise<void> {
+    // Guests never authenticate via SSO and must never hold roles.
+    const user = await this.loadUserForGuard(userId);
+    if (user?.userType === UserType.GUEST) return;
+
     // roleKey -> external claim value that granted it (source metadata for the UI)
     const targetByKey = new Map(roles.map((r) => [r.roleKey, r.externalValue ?? null]));
 

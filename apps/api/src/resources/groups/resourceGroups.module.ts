@@ -6,6 +6,7 @@ import {
   ResourceIntroducer,
   ResourceIntroduction,
   ResourceIntroductionHistoryItem,
+  User,
 } from '@attraccess/database-entities';
 import { ResourceGroupsController } from './resourceGroups.controller';
 import { ResourceGroupsService } from './resourceGroups.service';
@@ -24,6 +25,7 @@ import { NotificationsModule } from '../../notifications/notifications.module';
       ResourceIntroduction,
       ResourceIntroductionHistoryItem,
       ResourceIntroducer,
+      User,
     ]),
     NotificationsModule,
   ],

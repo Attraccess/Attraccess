@@ -34,6 +34,7 @@ import { VersionModule } from '../version/version.module';
 import { MessagingModule } from '../messaging/messaging.module';
 import { PushModule } from '../push/push.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { GuestsModule } from '../guests/guests.module';
 
 @Module({
   imports: [
@@ -131,6 +132,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     MessagingModule,
     PushModule,
     NotificationsModule,
+    GuestsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

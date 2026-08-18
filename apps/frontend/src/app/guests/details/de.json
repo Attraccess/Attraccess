@@ -1,0 +1,96 @@
+{
+  "title": "Gast",
+  "notFound": "Dieser Gast existiert nicht oder wurde gelöscht.",
+  "sections": {
+    "profile": {
+      "title": "Profil",
+      "name": {
+        "label": "Name"
+      },
+      "email": {
+        "label": "E-Mail (optional)"
+      },
+      "save": "Änderungen speichern",
+      "success": {
+        "title": "Gast aktualisiert",
+        "description": "Das Gastprofil wurde gespeichert."
+      }
+    },
+    "status": {
+      "title": "Status",
+      "enabledLabel": "Gast aktiv",
+      "enabledDescription": "Deaktivierte Gäste können sich nicht an Terminals anmelden, auch nicht mit einem gültigen Code.",
+      "success": {
+        "enabled": "Gast aktiviert",
+        "disabled": "Gast deaktiviert"
+      }
+    },
+    "enrollment": {
+      "title": "Terminal-Registrierung",
+      "description": "Teilen Sie den QR-Code oder den Setup-Schlüssel mit dem Gast, damit er ihn zu seiner Authenticator-App hinzufügen kann. Am Terminal gibt der Gast seinen Gastcode plus den aktuellen Einmal-Code ein.",
+      "guestCode": "Gastcode",
+      "secret": "Setup-Schlüssel",
+      "qrHint": "Mit einer Authenticator-App scannen (Google Authenticator, Aegis, …)",
+      "rotate": "Anmeldedaten rotieren",
+      "revoke": "Anmeldedaten widerrufen",
+      "provision": "Anmeldedaten ausstellen",
+      "noCredential": "Dieser Gast hat keine aktiven Anmeldedaten. Stellen Sie welche aus, um die Terminal-Anmeldung zu ermöglichen.",
+      "success": {
+        "rotated": "Anmeldedaten rotiert. Teilen Sie den neuen QR-Code mit dem Gast.",
+        "revoked": "Anmeldedaten widerrufen. Der Gast kann sich nicht mehr anmelden.",
+        "provisioned": "Anmeldedaten ausgestellt."
+      },
+      "confirmRevoke": {
+        "title": "Anmeldedaten widerrufen?",
+        "description": "Der Gast kann sich nicht mehr an Terminals anmelden, bis neue Anmeldedaten ausgestellt werden.",
+        "confirm": "Widerrufen"
+      }
+    },
+    "access": {
+      "title": "Ressourcenzugriff",
+      "description": "Gäste erhalten Zugriff durch Einweisungen. Sie können niemals Einweiser oder Maintainer werden.",
+      "empty": "Noch kein Zugriff gewährt.",
+      "columns": {
+        "type": "Typ",
+        "name": "Name",
+        "status": "Status"
+      },
+      "type": {
+        "resource": "Ressource",
+        "group": "Gruppe"
+      },
+      "status": {
+        "valid": "Aktiv",
+        "invalid": "Widerrufen"
+      },
+      "add": {
+        "button": "Zugriff gewähren",
+        "title": "Zugriff gewähren",
+        "kind": "Zugriff auf",
+        "kindResource": "Ressource",
+        "kindGroup": "Ressourcengruppe",
+        "resource": "Ressource",
+        "group": "Ressourcengruppe",
+        "grant": "Gewähren",
+        "cancel": "Abbrechen",
+        "success": "Zugriff gewährt."
+      },
+      "revoke": {
+        "button": "Widerrufen",
+        "success": "Zugriff widerrufen."
+      }
+    },
+    "delete": {
+      "title": "Gast löschen",
+      "description": "Dies entfernt das Gastkonto dauerhaft. Diese Aktion kann nicht rückgängig gemacht werden.",
+      "button": "Gast löschen",
+      "confirmTitle": "Diesen Gast löschen?",
+      "confirmDescription": "Das Gastkonto und seine Anmeldedaten werden gelöscht. Dies kann nicht rückgängig gemacht werden.",
+      "confirm": "Löschen",
+      "success": {
+        "title": "Gast gelöscht",
+        "description": "Das Gastkonto wurde gelöscht."
+      }
+    }
+  }
+}

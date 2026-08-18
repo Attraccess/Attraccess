@@ -85,7 +85,7 @@ describe('ProjectsService', () => {
         { provide: getRepositoryToken(ProjectMember), useValue: {} },
         { provide: getRepositoryToken(ProjectInvitation), useValue: {} },
         { provide: getRepositoryToken(ResourceUsage), useValue: resourceUsageRepository },
-        { provide: getRepositoryToken(User), useValue: {} },
+        { provide: getRepositoryToken(User), useValue: { findOne: jest.fn().mockResolvedValue({ id: 2, userType: 'member' }) } },
         { provide: FileStorageService, useValue: fileStorageService },
         { provide: ProjectAccessService, useValue: projectAccessService },
         { provide: EmailService, useValue: { sendProjectInvitationEmail: jest.fn() } },

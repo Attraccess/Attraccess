@@ -86,6 +86,14 @@ export class AuthenticationDetail {
   })
   totpEnabledAt?: Date | null;
 
+  @Column({ type: 'integer', nullable: true })
+  @Exclude()
+  @ApiProperty({
+    description: 'Last TOTP time step that was successfully verified (replay protection for guest OTP)',
+    required: false,
+  })
+  totpLastTimeStep?: number | null;
+
   @ManyToOne(() => User, (user) => user.authenticationDetails, {
     onDelete: 'CASCADE',
   })

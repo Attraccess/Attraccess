@@ -1,0 +1,22 @@
+{
+  "title": "Gast hinzufügen",
+  "description": "Gäste melden sich mit einem Einmal-Code an Terminals an. Sie erhalten kein Web-Login und keine Rollen.",
+  "inputs": {
+    "name": {
+      "label": "Name",
+      "placeholder": "Max Mustermann"
+    },
+    "email": {
+      "label": "E-Mail (optional)",
+      "placeholder": "max@example.com"
+    }
+  },
+  "actions": {
+    "cancel": "Abbrechen",
+    "create": "Gast erstellen"
+  },
+  "success": {
+    "title": "Gast erstellt",
+    "description": "Teilen Sie den angezeigten QR-Code oder Setup-Schlüssel mit dem Gast."
+  }
+}

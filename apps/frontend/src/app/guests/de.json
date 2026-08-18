@@ -1,0 +1,30 @@
+{
+  "title": "Gäste",
+  "subtitle": "Temporäre Konten, die sich mit Einmal-Codes an Terminals anmelden",
+  "actions": {
+    "addGuest": "Gast hinzufügen"
+  },
+  "table": {
+    "ariaLabel": "Gästekonten",
+    "inputs": {
+      "search": "Nach Name, E-Mail oder Code suchen"
+    },
+    "columns": {
+      "id": "ID",
+      "name": "Name",
+      "guestCode": "Code",
+      "email": "E-Mail",
+      "status": "Status",
+      "credential": "Anmeldedaten"
+    },
+    "noEmail": "-",
+    "status": {
+      "enabled": "Aktiv",
+      "disabled": "Deaktiviert"
+    },
+    "credential": {
+      "enrolled": "Registriert",
+      "notEnrolled": "Nicht registriert"
+    }
+  }
+}

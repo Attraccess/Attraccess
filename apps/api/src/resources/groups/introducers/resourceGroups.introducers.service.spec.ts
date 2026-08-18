@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ResourceIntroducer, ResourceIntroducerType } from '@attraccess/database-entities';
+import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/database-entities';
 import { ResourceGroupsIntroducersService } from './resourceGroups.introducers.service';
 import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../../notifications/notification-types';
@@ -9,6 +9,7 @@ import { NotificationCategory } from '../../../notifications/notification-types'
 describe('ResourceGroupsIntroducersService notifications', () => {
   let service: ResourceGroupsIntroducersService;
   let repository: { find: jest.Mock; findOne: jest.Mock; create: jest.Mock; save: jest.Mock; remove: jest.Mock };
+  let userRepository: { findOne: jest.Mock };
   let notifications: { dispatch: jest.Mock };
 
   beforeEach(async () => {
@@ -19,12 +20,14 @@ describe('ResourceGroupsIntroducersService notifications', () => {
       save: jest.fn().mockImplementation(async (data) => data),
       remove: jest.fn().mockImplementation(async (data) => data),
     };
+    userRepository = { findOne: jest.fn().mockResolvedValue(null) };
     notifications = { dispatch: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResourceGroupsIntroducersService,
         { provide: getRepositoryToken(ResourceIntroducer), useValue: repository },
+        { provide: getRepositoryToken(User), useValue: userRepository },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         { provide: NotificationDispatchService, useValue: notifications },
       ],

@@ -3,7 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Request } from 'express';
 import { AuthService } from '../auth/auth.service';
-import { AuthenticationType, User } from '@attraccess/database-entities';
+import { AuthenticationType, User, UserType } from '@attraccess/database-entities';
 import { TwoFactorService } from '../auth/two-factor.service';
 
 class UnknownUserOrPasswordException extends UnauthorizedException {
@@ -36,6 +36,11 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
     });
 
     if (!user) {
+      throw new UnknownUserOrPasswordException();
+    }
+
+    // Guests authenticate via TOTP at terminals only — never via web login.
+    if (user.userType === UserType.GUEST) {
       throw new UnknownUserOrPasswordException();
     }
 

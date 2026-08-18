@@ -16,6 +16,7 @@ import {
   ScanLineIcon,
   Settings2Icon,
   ServerIcon,
+  TicketIcon,
   UsersIcon,
 } from 'lucide-react';
 import newGithubIssueUrl from 'new-github-issue-url';
@@ -110,6 +111,12 @@ export const SIDEBAR_ITEMS: (SidebarItem | SidebarItemGroup)[] = [
     path: '/users',
     translationKey: 'users',
     icon: UsersIcon,
+  },
+  {
+    // Temporary, terminal-only accounts that authenticate with one-time codes.
+    path: '/guests',
+    translationKey: 'guests',
+    icon: TicketIcon,
   },
   {
     // Hardware and fleets this instance talks to.

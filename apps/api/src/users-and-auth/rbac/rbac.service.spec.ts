@@ -4,7 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { QueryFailedError, Repository } from 'typeorm';
 import { BadRequestException } from '@nestjs/common';
-import { Permission, Role, RolePermission, User, UserRole, UserRoleSource } from '@attraccess/database-entities';
+import { Permission, Role, RolePermission, User, UserRole, UserRoleSource, UserType } from '@attraccess/database-entities';
 import { RbacService } from './rbac.service';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 
@@ -121,6 +121,7 @@ describe('RbacService', () => {
 
     userRepo = {
       existsBy: jest.fn().mockResolvedValue(true),
+      findOne: jest.fn().mockResolvedValue({ id: 10, userType: UserType.MEMBER } as User),
     } as unknown as jest.Mocked<Repository<User>>;
 
     rolePermissionRepo = {
@@ -200,9 +201,15 @@ describe('RbacService', () => {
 
   describe('assignRole', () => {
     it('throws UserNotFoundException when user does not exist', async () => {
-      userRepo.existsBy.mockResolvedValue(false);
+      userRepo.findOne.mockResolvedValue(null);
 
       await expect(service.assignRole(99, 1, new Set())).rejects.toThrow(UserNotFoundException);
+    });
+
+    it('throws BadRequestException when the target user is a guest', async () => {
+      userRepo.findOne.mockResolvedValue({ id: 10, userType: UserType.GUEST } as User);
+
+      await expect(service.assignRole(10, 1, new Set())).rejects.toThrow(BadRequestException);
     });
 
     it('throws NotFoundException when role does not exist', async () => {

@@ -5,7 +5,7 @@ import { Request } from 'express';
 import { SessionService } from '../auth/session.service';
 import { TwoFactorService } from '../auth/two-factor.service';
 import { RbacService } from '../rbac/rbac.service';
-import { User } from '@attraccess/database-entities';
+import { User, UserType } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 const TWO_FACTOR_SETUP_ALLOWED_PREFIXES = ['/auth/two-factor', '/auth/session', '/users/me'];
@@ -42,6 +42,12 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     if (!user) {
       this.logger.debug(`Invalid or expired session token: ${token.substring(0, 8)}...`);
       throw new UnauthorizedException('Invalid or expired session');
+    }
+
+    // Guests are terminal-only accounts and must never get a web UI session.
+    if (user.userType === UserType.GUEST) {
+      this.logger.debug(`Rejected web session for guest user ${user.id}`);
+      throw new ForbiddenException('Guest accounts cannot access the web UI');
     }
 
     // Attach effectivePermissions before 2FA check so isPrivilegedUser() can use them

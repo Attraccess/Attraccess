@@ -1,5 +1,5 @@
-import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/database-entities';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ResourceIntroducer, ResourceIntroducerType, User, UserType } from '@attraccess/database-entities';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
@@ -112,6 +112,11 @@ export class ResourceIntroducersService {
     userId: number,
     type: ResourceIntroducerType = ResourceIntroducerType.INTRODUCER,
   ): Promise<ResourceIntroducer> {
+    const targetUser = await this.userRepository.findOne({ where: { id: userId } });
+    if (targetUser?.userType === UserType.GUEST) {
+      throw new BadRequestException('Guests cannot be promoted to introducer or maintainer');
+    }
+
     const existingIntroducer = await this.getByResourceIdAndUserId(resourceId, userId);
     if (existingIntroducer) {
       if (existingIntroducer.type !== type) {
