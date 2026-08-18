@@ -125,6 +125,33 @@ surface grows later, the discriminator can be split out then.
 - Keep guest identities outside the SSO/provisioning path so an IdP can never mint or escalate
   a guest.
 
+## Identification & collision risk
+
+Guest login is "anonymous code entry", which raises two distinct collision concerns.
+
+1. **TOTP secret collision** — negligible. `otplib` `generateSecret()` yields ~160 bits of
+   entropy; two guests getting the same secret is effectively impossible. Enforce uniqueness
+   on a stored hash of the secret as a belt-and-braces check at provisioning.
+
+2. **Code-space ambiguity** — the real concern. A 6-digit code is the *only* input, so the API
+   must reverse-look-up the guest by evaluating the entered code against every active guest
+   (O(G) per attempt). With G guests the probability that two guests coincidentally share the
+   same code in a given 30s window is ~G² / 2·10⁶ — tiny for small G but non-zero and growing.
+   The code also doubles as a bearer credential: anyone who observes a code can use it for that
+   guest during its window (inherent to TOTP).
+
+   **Recommendation:** have the guest *select their identity first* (a list of guests
+   authorised for the tapped resource) and then enter the code, so the code is verified against
+   exactly one secret (deterministic, O(1), collision-free). This keeps the "no account, no
+   password" promise while removing the reverse-look-up entirely.
+
+   If a bare "code only" flow is still desired, at minimum:
+
+   - scope the reverse-look-up to guests authorised for the tapped resource,
+   - fail closed (reject with "try again / identify yourself") when a code matches more than
+     one guest, and
+   - keep replay protection + rate limiting.
+
 ## Implementation tickets
 
 - Guest accounts — data model, TOTP credentials, admin API & admin UI (management, QR
