@@ -140,10 +140,23 @@ Guest login is "anonymous code entry", which raises two distinct collision conce
    The code also doubles as a bearer credential: anyone who observes a code can use it for that
    guest during its window (inherent to TOTP).
 
-   **Recommendation:** have the guest *select their identity first* (a list of guests
-   authorised for the tapped resource) and then enter the code, so the code is verified against
-   exactly one secret (deterministic, O(1), collision-free). This keeps the "no account, no
-   password" promise while removing the reverse-look-up entirely.
+   **Recommendation:** give each guest a short, stable **access code** (4 alphanumeric chars)
+   that they enter together with their OTP code — `access code + OTP`. The access code is a
+   direct, indexed key that resolves the guest in O(1) (no reverse-look-up, no list to scroll),
+   and the OTP is then verified against exactly that guest's secret. This keeps the "no account,
+   no password" promise while making the lookup deterministic and collision-free.
+
+### Access code (guest handle)
+
+- Dedicated column (e.g. `User.guestCode`), **not** the existing `username` (which is the web
+  login identifier and must stay unique across members).
+- Generated randomly from an unambiguous alphabet (e.g. `23456789ABCDEFGHJKMNPQRSTUVWXYZ`,
+  ~31 chars → 31⁴ ≈ 920k values), case-insensitive, enforced unique via a DB index with
+  retry-on-collision.
+- Prefer a random unique code over "hash of the user's ID": truncating a hash to 4 chars risks
+  collisions and makes codes guessable/enumerable. A random code is just as easy to look up and
+  reveals nothing. (If deterministic-from-ID is ever wanted, a reversible base32/base36 encoding
+  of the numeric ID is unique but enumerable.)
 
    If a bare "code only" flow is still desired, at minimum:
 
