@@ -1,0 +1,42 @@
+title: Avoid unhandled exceptions crashing the WPF application
+rule: >-
+  Wrap application startup and critical UI event handlers in exception handling
+  or register global exception handlers so unexpected errors are logged and the
+  app degrades gracefully instead of crashing.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      public partial class App : Application
+      {
+          protected override void OnStartup(StartupEventArgs e)
+          {
+              base.OnStartup(e);
+              var window = new MainWindow();
+              window.Show();
+          }
+      }
+    isCorrect: false
+  - snippet: |-
+      public partial class App : Application
+      {
+          protected override void OnStartup(StartupEventArgs e)
+          {
+              base.OnStartup(e);
+              DispatcherUnhandledException += (sender, args) =>
+              {
+                  // Log args.Exception and mark handled if recoverable
+                  args.Handled = true;
+              };
+
+              var window = new MainWindow();
+              window.Show();
+          }
+      }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

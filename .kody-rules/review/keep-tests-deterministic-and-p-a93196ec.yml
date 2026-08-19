@@ -1,0 +1,37 @@
+title: Keep tests deterministic and prevent lint/type-check regressions
+rule: >-
+  Code changes must pass ESLint, TypeScript compilation, and Jest unit tests
+  before merge. Tests must not depend on live external services such as
+  PostgreSQL, Redis, MinIO/S3, SMTP, or real network endpoints; use mocks,
+  in-memory substitutes, or isolated test doubles. Avoid using `any` to silence
+  TypeScript errors and avoid disabling ESLint rules unless accompanied by a
+  documented justification.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      describe('UserService', () => {
+        it('returns a user', async () => {
+          const repository = {
+            findOne: jest.fn().mockResolvedValue({ id: '1', email: 'user@example.com' }),
+          };
+
+          const service = new UserService(repository as never);
+          await expect(service.findById('1')).resolves.toEqual({ id: '1', email: 'user@example.com' });
+        });
+      });
+    isCorrect: true
+  - snippet: |-
+      it('connects to production redis', async () => {
+        const client = redis.createClient(process.env.REDIS_URL);
+        await client.set('key', 'value');
+      });
+    isCorrect: false
+  - snippet: 'const payload: any = response.body;'
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

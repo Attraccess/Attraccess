@@ -1,0 +1,17 @@
+title: Use Vite build for production
+rule: >-
+  Use `vite build` for production builds. Avoid dev-only configurations in
+  production bundles.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: vite build
+    isCorrect: true
+  - snippet: vite dev
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

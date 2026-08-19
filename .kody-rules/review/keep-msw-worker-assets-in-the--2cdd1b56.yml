@@ -1,0 +1,20 @@
+title: Keep MSW worker assets in the designated web public directory
+rule: >-
+  The root manifest configures MSW with `workerDirectory: ["apps/web/public"]`.
+  Do not move, duplicate, or manually serve the MSW service worker from other
+  app or package public directories. If MSW is used in another app, update the
+  root `msw.workerDirectory` configuration to include that app's public
+  directory rather than committing unmanaged worker copies.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: apps/web/public/mockServiceWorker.js
+    isCorrect: true
+  - snippet: apps/desktop/public/mockServiceWorker.js
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

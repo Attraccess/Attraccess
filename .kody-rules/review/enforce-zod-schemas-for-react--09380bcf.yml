@@ -1,0 +1,37 @@
+title: Enforce Zod schemas for React Hook Form and API responses
+rule: >-
+  All forms using react-hook-form must use a Zod resolver with an explicit
+  schema. All external API responses consumed by TanStack Query must be
+  validated with Zod before use. Do not trust unvalidated external input.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      const userSchema = z.object({
+        id: z.string(),
+        email: z.string().email(),
+        name: z.string(),
+      });
+
+      const { data } = useQuery({
+        queryKey: ['user'],
+        queryFn: async () => {
+          const res = await fetch('/api/user');
+          const json = await res.json();
+          return userSchema.parse(json);
+        },
+      });
+    isCorrect: true
+  - snippet: |-
+      const { register, handleSubmit } = useForm();
+
+      const onSubmit = (data: any) => {
+        console.log(data.email);
+      };
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

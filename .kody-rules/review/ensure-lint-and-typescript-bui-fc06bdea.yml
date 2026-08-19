@@ -1,0 +1,27 @@
+title: Ensure lint and TypeScript build pass before publishing or local linking
+rule: >-
+  Use the repository's existing quality gates: run ESLint and the TypeScript
+  build before publishing, linking, or sharing local builds. Do not disable
+  TypeScript errors with broad suppressions or skip linting in prepublish
+  workflows. Keep source in `src` and generated output in `dist` only.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: npm link && nodemon
+    isCorrect: false
+  - snippet: npm run lint && npm run build && npm link && nodemon
+    isCorrect: true
+  - snippet: |-
+      // @ts-nocheck
+      import mqtt from 'mqtt';
+    isCorrect: false
+  - snippet: |-
+      import mqtt from 'mqtt';
+      // Fix type errors instead of disabling checks.
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

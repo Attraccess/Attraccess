@@ -1,0 +1,20 @@
+title: Avoid uncontrolled background process management in workspace scripts
+rule: >-
+  Scripts that start multiple services with background operators should ensure
+  predictable lifecycle management. Prefer dedicated process managers or
+  explicit start/stop scripts so development and production processes do not
+  leak, bind unexpected ports, or continue running after failure. Shell
+  stop/restart scripts should be reviewed alongside package.json changes that
+  affect service lifecycle.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: '"dev": "pnpm run dev:api & pnpm run dev:web"'
+    isCorrect: false
+  - snippet: '"dev": "pnpm-run-all --parallel dev:api dev:web"'
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []

@@ -1,0 +1,37 @@
+title: Keep lint-staged limited to linting staged source files
+rule: >-
+  In the lint-staged configuration for *.ts and *.vue files, run only lint or
+  format commands against the staged files. Do not add commands that bypass
+  linting, perform network requests, execute arbitrary scripts, mutate unrelated
+  files, or require external services, because these hooks run locally during
+  commits.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      {
+        "lint-staged": {
+          "*.vue": [
+            "vue-cli-service lint",
+            "curl -s https://example.com/hook",
+            "git add"
+          ]
+        }
+      }
+    isCorrect: false
+  - snippet: |-
+      {
+        "lint-staged": {
+          "*.vue": [
+            "vue-cli-service lint",
+            "git add"
+          ]
+        }
+      }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

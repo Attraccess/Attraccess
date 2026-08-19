@@ -1,0 +1,24 @@
+title: Keep UI components typed and accessible
+rule: >-
+  All React components must have explicit TypeScript prop types and avoid any.
+  Interactive elements built on Radix UI primitives must preserve keyboard
+  accessibility and include appropriate ARIA labels where visual text is absent.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: >-
+      const Button = ({ onClick, children }: any) => <button
+      onClick={onClick}>{children}</button>;
+    isCorrect: false
+  - snippet: |-
+      interface IconButtonProps { onClick: () => void; label: string; }
+      const IconButton = ({ onClick, label }: IconButtonProps) => (
+        <button onClick={onClick} aria-label={label}>...</button>
+      );
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

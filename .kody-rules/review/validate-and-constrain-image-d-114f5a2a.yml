@@ -1,0 +1,43 @@
+title: Validate and constrain image decode inputs
+rule: >-
+  When decoding PNG/JPEG data with pngjs or jpeg-js, validate that the input is
+  a Buffer/Uint8Array and enforce maximum width/height limits before decoding.
+  Wrap parsing in try/catch and return a typed error instead of throwing
+  uncaught exceptions or allocating unbounded buffers.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: >-
+      import { PNG } from 'pngjs';
+
+
+      export function decodePNG(buffer, { maxWidth = 8192, maxHeight = 8192 } =
+      {}) {
+        if (!(buffer instanceof Uint8Array)) {
+          throw new TypeError('PNG input must be a Uint8Array');
+        }
+
+        try {
+          const png = PNG.sync.read(buffer);
+          if (png.width > maxWidth || png.height > maxHeight) {
+            throw new RangeError(`PNG dimensions exceed limit: ${png.width}x${png.height}`);
+          }
+          return png;
+        } catch (err) {
+          throw new Error(`Failed to decode PNG: ${err.message}`, { cause: err });
+        }
+      }
+    isCorrect: true
+  - snippet: |-
+      import { PNG } from 'pngjs';
+
+      export function decodePNG(buffer) {
+        return PNG.sync.read(buffer);
+      }
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

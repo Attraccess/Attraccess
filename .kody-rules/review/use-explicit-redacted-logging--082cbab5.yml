@@ -1,0 +1,30 @@
+title: Use explicit, redacted logging for integration test failures
+rule: >-
+  When logging or printing diagnostic information from integration tests or
+  utilities, include explicit context such as operation name, request ID, status
+  code, and failure reason, but redact secrets, tokens, cookies, and personally
+  identifiable data. Avoid broad try/except blocks that swallow errors without
+  logging or re-raising.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      try:
+          response = client.create_resource(payload)
+      except ResourceError as exc:
+          logger.error("create_resource failed", extra={"status": exc.status, "request_id": exc.request_id})
+          raise
+    isCorrect: true
+  - snippet: |-
+      try:
+          response = client.create_resource(payload)
+      except Exception:
+          print(f"failed with token {payload['token']}")
+          pass
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

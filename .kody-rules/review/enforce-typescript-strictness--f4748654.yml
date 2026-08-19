@@ -1,0 +1,27 @@
+title: Enforce TypeScript strictness for React and Firebase code
+rule: >-
+  Keep TypeScript strict mode enabled and avoid using `any` for Firebase data,
+  Zustand store state, component props, or API responses. Define explicit
+  types/interfaces for Firestore documents, auth state, and store slices to
+  catch runtime errors early.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      {
+        "compilerOptions": {
+          "strict": true,
+          "noImplicitAny": true,
+          "noUnusedLocals": true
+        }
+      }
+    isCorrect: true
+  - snippet: |-
+      const user: any = useAuthState(auth)[0];
+      const data: any = useCollection(collection(db, "items"))[0];
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []

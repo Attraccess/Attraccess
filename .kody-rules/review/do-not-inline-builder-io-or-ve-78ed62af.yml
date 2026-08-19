@@ -1,0 +1,26 @@
+title: Do not inline Builder.io or Vercel secrets in Qwik source
+rule: >-
+  Keep Builder.io API keys and Vercel tokens in environment configuration only.
+  In Qwik/Vite code, access them via server-side environment variables (for
+  example import.meta.env or process.env in server loaders/actions) and never
+  hardcode them in components, routes, or client bundles. Do not expose private
+  keys through loader data, props, or rendered HTML.
+severity: critical
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: const BUILDER_API_KEY = "bbabc...";
+    isCorrect: false
+  - snippet: const apiKey = import.meta.env.VITE_BUILDER_PUBLIC_API_KEY;
+    isCorrect: true
+  - snippet: |-
+      export const onRequest = async ({ env }) => {
+        const content = await fetchBuilderContent(env.BUILDER_PRIVATE_KEY);
+        return content.publicSafeData;
+      };
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

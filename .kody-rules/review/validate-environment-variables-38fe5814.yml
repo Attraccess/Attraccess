@@ -1,0 +1,35 @@
+title: Validate environment variables with Zod at startup
+rule: >-
+  Use Zod to parse and validate all Vite environment variables (import.meta.env)
+  at application startup. Do not read raw environment variables directly in
+  components or hooks. Fail fast with a descriptive error when required
+  variables are missing or malformed.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      const envSchema = z.object({
+        VITE_API_URL: z.string().url(),
+        VITE_ENABLE_ANALYTICS: z.enum(['true', 'false']).default('false'),
+      });
+
+      const parsed = envSchema.safeParse(import.meta.env);
+
+      if (!parsed.success) {
+        console.error('Invalid environment variables', parsed.error.flatten().fieldErrors);
+        throw new Error('Invalid environment variables');
+      }
+
+      export const env = parsed.data;
+    isCorrect: true
+  - snippet: |-
+      const apiUrl = import.meta.env.VITE_API_URL;
+
+      fetch(`${apiUrl}/users`);
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

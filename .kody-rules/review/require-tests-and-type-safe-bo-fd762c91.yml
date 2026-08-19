@@ -1,0 +1,72 @@
+title: Require tests and type-safe boundaries for Express and WebSocket changes
+rule: >-
+  Changes to Express routes, WebSocket handlers, shared message contracts, or
+  browser-extension messaging must include or update automated tests and
+  preserve type-safe boundaries. Use Vitest with supertest for HTTP endpoints,
+  test WebSocket behavior with a real ws server/client or controlled mock, and
+  assert authentication/authorization failures, invalid payload rejection, and
+  error handling. Do not use any casts, @ts-ignore, or loosely typed message
+  unions to bypass TypeScript errors in request, response, or message handling
+  code.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      app.post('/api/control', (req: any, res: any) => {
+        // @ts-ignore
+        controlChannel.send(req.body);
+        res.send('ok');
+      });
+    isCorrect: false
+  - snippet: |-
+      type ControlMessage =
+        | { type: 'next-slide' }
+        | { type: 'previous-slide' }
+        | { type: 'goto-slide'; slideId: string };
+
+      function isControlMessage(value: unknown): value is ControlMessage {
+        if (typeof value !== 'object' || value === null) return false;
+        const message = value as Record<string, unknown>;
+
+        if (message.type === 'goto-slide') {
+          return typeof message.slideId === 'string' && message.slideId.length > 0;
+        }
+
+        return message.type === 'next-slide' || message.type === 'previous-slide';
+      }
+
+      app.post('/api/control', express.json(), (req, res) => {
+        if (!isControlMessage(req.body)) {
+          res.status(400).json({ error: 'invalid control message' });
+          return;
+        }
+
+        controlChannel.send(req.body);
+        res.status(202).json({ accepted: true });
+      });
+    isCorrect: true
+  - snippet: |-
+      describe('POST /api/control', () => {
+        it('accepts valid goto-slide messages', async () => {
+          const response = await request(app)
+            .post('/api/control')
+            .send({ type: 'goto-slide', slideId: 'slide-1' });
+
+          expect(response.status).toBe(202);
+        });
+
+        it('rejects malformed messages', async () => {
+          const response = await request(app)
+            .post('/api/control')
+            .send({ type: 'goto-slide' });
+
+          expect(response.status).toBe(400);
+        });
+      });
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

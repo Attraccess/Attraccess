@@ -1,0 +1,35 @@
+title: Validate webhook requests before processing or forwarding
+rule: >-
+  Do not process, debounce, or forward incoming webhook requests based only on
+  their arrival. Verify the request source using a shared secret/signature or
+  token from environment variables, reject requests with missing or invalid
+  verification, and validate that the parsed body is an object before accessing
+  fields.
+severity: critical
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      app.use(async ctx => {
+        schedule(ctx.request.body);
+      });
+    isCorrect: false
+  - snippet: |-
+      app.use(async ctx => {
+        const signature = ctx.get('x-webhook-signature');
+        if (!isValidSignature(ctx.rawBody, signature, process.env.WEBHOOK_SECRET)) {
+          ctx.status = 401;
+          return;
+        }
+        if (!ctx.request.body || typeof ctx.request.body !== 'object') {
+          ctx.status = 400;
+          return;
+        }
+        schedule(ctx.request.body);
+      });
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,31 @@
+title: Ensure dist/ bundle is rebuilt and committed when source changes
+rule: >-
+  The compiled dist/ output (built via @vercel/ncc) must be kept in sync with
+  src/. Any change to files under src/ must be accompanied by a corresponding
+  rebuild of dist/. Run 'npm run build' before committing changes that affect
+  source files, and verify with 'npm run build:check' that the dist output
+  matches.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      # After modifying src/main.ts:
+      npm run build
+      git add src/main.ts dist/index.js
+      git commit -m 'Update deployment logic'
+    isCorrect: true
+  - snippet: |-
+      # Modifying src/main.ts but forgetting to rebuild dist/
+      git add src/main.ts
+      git commit -m 'Update deployment logic'
+    isCorrect: false
+  - snippet: |-
+      # Verify dist is in sync before pushing:
+      npm run build:check
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

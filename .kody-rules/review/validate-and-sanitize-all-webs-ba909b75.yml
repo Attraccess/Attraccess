@@ -1,0 +1,79 @@
+title: Validate and sanitize all WebSocket and Express inputs before use
+rule: >-
+  All data received from WebSocket clients or Express request bodies, query
+  parameters, headers, and URL paths must be explicitly validated and sanitized
+  before being trusted, logged, persisted, forwarded, or rendered. Define
+  runtime schemas for every message and endpoint input, reject unknown or
+  malformed payloads, enforce type and length constraints, and never pass raw
+  client strings into DOM APIs, eval-like functions, file paths, shell commands,
+  or downstream services. For browser extension and presentation features, treat
+  all incoming slide, control, and configuration messages as untrusted.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      ws.on('message', (raw) => {
+        const message = JSON.parse(raw.toString());
+        broadcast(message);
+        renderSlide(message.html);
+      });
+    isCorrect: false
+  - snippet: |-
+      ws.on('message', (raw) => {
+        let parsed;
+        try {
+          parsed = JSON.parse(raw.toString());
+        } catch {
+          ws.close(1003, 'invalid payload');
+          return;
+        }
+
+        if (typeof parsed?.type !== 'string' || parsed.type !== 'slide:update') {
+          ws.close(1003, 'unsupported message');
+          return;
+        }
+
+        if (typeof parsed?.slideId !== 'string' || parsed.slideId.length > 128) {
+          ws.close(1003, 'invalid slide id');
+          return;
+        }
+
+        broadcastSlideUpdate({ type: parsed.type, slideId: parsed.slideId });
+      });
+    isCorrect: true
+  - snippet: |-
+      app.post('/api/presentations', (req, res) => {
+        presentations.push(req.body);
+        res.status(201).json(req.body);
+      });
+    isCorrect: false
+  - snippet: >-
+      app.post('/api/presentations', express.json({ limit: '100kb' }), (req,
+      res) => {
+        const body = req.body;
+
+        if (
+          typeof body?.title !== 'string' ||
+          body.title.length === 0 ||
+          body.title.length > 200 ||
+          !Array.isArray(body?.slides)
+        ) {
+          res.status(400).json({ error: 'invalid presentation payload' });
+          return;
+        }
+
+        const presentation = {
+          title: body.title.trim(),
+          slides: body.slides.filter((slide) => typeof slide?.id === 'string').slice(0, 500),
+        };
+
+        presentations.push(presentation);
+        res.status(201).json(presentation);
+      });
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,20 @@
+title: Use typed Axios request/response handling and avoid unsafe any casts
+rule: >-
+  Because this package is consumed by downstream applications, HTTP calls should
+  be strongly typed and validated at boundaries. Avoid `as any`, untyped Axios
+  responses, or unchecked JSON when exposing Ferdig resources. Define interfaces
+  for API payloads and handle Axios errors with explicit status/type checks
+  instead of swallowing or rethrowing unknown values.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: const { data } = await axios.get(url); return data as any;
+    isCorrect: false
+  - snippet: const { data } = await axios.get<FerdigUser[]>(url); return data;
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

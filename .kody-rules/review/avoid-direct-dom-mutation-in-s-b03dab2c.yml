@@ -1,0 +1,21 @@
+title: Avoid direct DOM mutation in Solid components
+rule: >-
+  SolidJS relies on fine-grained reactivity. Mutating the DOM manually bypasses
+  the reactive system and causes UI state drift. Prefer reactive primitives such
+  as createSignal, createEffect, and declarative JSX bindings instead of direct
+  DOM APIs.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: document.getElementById('count').textContent = count();
+    isCorrect: false
+  - snippet: |-
+      const [count, setCount] = createSignal(0);
+      return <div>{count()}</div>;
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

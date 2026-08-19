@@ -1,0 +1,21 @@
+title: Keep build artifacts and generated WASM/Pyodide assets out of source control
+rule: >-
+  The package ships generated files under dist and pyodide-index. Ensure these
+  directories are ignored by version control and produced only by the build
+  script, preventing accidental commits of stale or tampered binaries.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: node_modules/
+    isCorrect: false
+  - snippet: |-
+      node_modules/
+      dist/
+      pyodide-index/
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

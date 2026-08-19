@@ -1,0 +1,20 @@
+title: Keep requirements.txt synchronized with setup.py dependencies
+rule: >-
+  requirements.txt is used to support editable installs via `pip install -e .`.
+  Ensure it remains synchronized with the canonical dependency declarations in
+  setup.py so local installs, CI environments, and packaging metadata do not
+  diverge.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |
+      .
+    isCorrect: true
+  - snippet: |
+      requests>=2.0
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []

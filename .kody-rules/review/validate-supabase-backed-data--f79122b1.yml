@@ -1,0 +1,25 @@
+title: Validate Supabase-backed data with Zod and fail closed
+rule: >-
+  All data fetched from Supabase or submitted through forms must be parsed with
+  a Zod schema before use. Do not cast Supabase rows or request payloads with
+  `as`, and do not silently fall back to empty data when parsing fails; surface
+  a typed error state instead.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: >-
+      const { data, error } = await
+      supabase.from('profiles').select('*').eq('id', id);
+
+      const profile = ProfileSchema.parse(data?.[0]);
+    isCorrect: true
+  - snippet: |-
+      const { data } = await supabase.from('profiles').select('*').eq('id', id);
+      const profile = data?.[0] as Profile;
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

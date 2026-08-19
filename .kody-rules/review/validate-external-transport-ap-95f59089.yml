@@ -1,0 +1,32 @@
+title: Validate external transport API inputs and outputs with Zod
+rule: >-
+  All data consumed from db-vendo-client or db-hafas-stations must be parsed and
+  narrowed with Zod before use. Do not cast untrusted API responses with `as` or
+  rely on ambient types alone. Define schemas for station searches, journey
+  results, and any user-provided query parameters, and return typed errors when
+  parsing fails.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      const res = await client.journeys(from, to, { results: 3 });
+      const journeys = res as Journey[];
+    isCorrect: false
+  - snippet: |-
+      const JourneySchema = z.object({
+        legs: z.array(LegSchema),
+        price: z.object({ amount: z.number(), currency: z.string() }).optional(),
+      });
+
+      const parsed = JourneySchema.safeParse(res);
+      if (!parsed.success) {
+        throw new Error("Invalid journey payload");
+      }
+      return parsed.data;
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

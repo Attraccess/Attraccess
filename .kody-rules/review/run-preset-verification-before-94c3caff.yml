@@ -1,0 +1,22 @@
+title: Run preset verification before committing generated preset data
+rule: >-
+  Before committing generated preset or index files, ensure the repository's
+  verification step is executed so malformed presets, broken references, or
+  invalid generated output are rejected locally.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: >-
+      "release": "npm run index && npm run verify && git add . && git commit -m
+      'Update presets' && git push"
+    isCorrect: true
+  - snippet: >-
+      "release": "npm run index && git add . && git commit -m 'Update presets'
+      && git push"
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

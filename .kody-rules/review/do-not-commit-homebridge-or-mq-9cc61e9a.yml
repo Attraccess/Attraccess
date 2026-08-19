@@ -1,0 +1,22 @@
+title: Do not commit Homebridge or MQTT credentials
+rule: >-
+  MQTT connection strings, usernames, passwords, and Homebridge PINs must not be
+  hardcoded in source files. Load them from Homebridge config objects or
+  environment variables only.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: >-
+      const client = mqtt.connect('mqtt://user:secret@broker.local', { username:
+      'user', password: 'secret' });
+    isCorrect: false
+  - snippet: >-
+      const client = mqtt.connect(config.mqttUrl, { username: config.username,
+      password: config.password });
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

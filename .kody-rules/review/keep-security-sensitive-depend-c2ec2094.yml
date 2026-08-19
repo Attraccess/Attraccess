@@ -1,0 +1,29 @@
+title: Keep security-sensitive dependency floors in requirements.txt
+rule: >-
+  When adding or updating Python dependencies, preserve existing security floors
+  for cryptography, pydantic-settings, python-dotenv, idna, urllib3, starlette,
+  aiohttp, python-multipart, and related packages. Do not loosen these
+  constraints to fix dependency resolution; instead upgrade or add an explicit
+  floor with a comment explaining the vulnerability or compatibility reason.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      cryptography>=46.0.0
+      pydantic-settings>=2.0.0
+      urllib3>=2.0.0
+    isCorrect: false
+  - snippet: |-
+      # 48.0.1 fixes GHSA-537c-gmf6-5ccf
+      cryptography>=48.0.1
+      pydantic-settings>=2.14.2
+      urllib3>=2.7.0
+    isCorrect: true
+  - snippet: aiohttp
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

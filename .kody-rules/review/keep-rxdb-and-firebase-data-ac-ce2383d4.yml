@@ -1,0 +1,27 @@
+title: Keep RxDB and Firebase data access rules explicit
+rule: >-
+  When using RxDB, Firebase, or local persistence, do not assume client-side
+  data is trusted. Validate user-supplied data before writing to RxDB
+  collections or Firebase, and avoid constructing Firebase paths, queries, or
+  storage references directly from unvalidated user input. Keep authorization
+  checks in backend or Firebase security rules rather than relying only on UI
+  state.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      async function savePreset(input: unknown) {
+        const preset = PresetSchema.parse(input);
+        await collection.insert(preset);
+      }
+    isCorrect: true
+  - snippet: |-
+      const userPath = `users/${userId}/devices/${deviceId}`;
+      await ref(db, userPath).set(rawDeviceData);
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

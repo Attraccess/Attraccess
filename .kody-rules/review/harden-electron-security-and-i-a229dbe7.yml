@@ -1,0 +1,32 @@
+title: Harden Electron security and IPC for local OctoPrint access
+rule: >-
+  Electron windows and IPC handlers must disable nodeIntegration, enable
+  contextIsolation, use a preload bridge with the minimum required API surface,
+  and validate/authorize every IPC or HTTP origin before proxying OctoPrint
+  credentials or executing printer actions.
+severity: critical
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: >-
+      new BrowserWindow({ webPreferences: { nodeIntegration: false,
+      contextIsolation: true, preload: path.join(__dirname, 'preload.js') } });
+    isCorrect: true
+  - snippet: >-
+      new BrowserWindow({ webPreferences: { nodeIntegration: true,
+      contextIsolation: false } });
+    isCorrect: false
+  - snippet: >-
+      ipcMain.handle('octoprint:request', (event, url) => { if
+      (!isAllowedOctoPrintUrl(url)) throw new Error('Blocked URL'); return
+      requestOctoPrint(url); });
+    isCorrect: true
+  - snippet: >-
+      ipcMain.handle('octoprint:request', (event, url) => got(url, { headers: {
+      'X-Api-Key': apiKey } }));
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

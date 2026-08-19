@@ -1,0 +1,21 @@
+title: Replace placeholder test script with an executable test command
+rule: >-
+  The `test` script in package.json must not remain a placeholder echo.
+  Configure it to run a real test runner or at minimum a type-check/build
+  verification so `npm test` provides meaningful feedback and can be used by
+  consumers and maintainers.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: '"test": "echo ''yeah... i should do testing...''"'
+    isCorrect: false
+  - snippet: '"test": "tsc --noEmit"'
+    isCorrect: true
+  - snippet: '"test": "jest"'
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

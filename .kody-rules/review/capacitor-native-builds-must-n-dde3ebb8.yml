@@ -1,0 +1,32 @@
+title: Capacitor native builds must not broaden web origin or plugin permissions
+rule: >-
+  When configuring Capacitor for iOS/Android, do not allow arbitrary navigation
+  origins, mixed-content access, or unnecessary plugin permissions. Browser,
+  keyboard, splash-screen, and status-bar plugin usage should remain limited to
+  the app's own trusted origins and required capabilities. Review
+  capacitor.config and native project config changes for expanded origin
+  allowances or disabled security settings.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      {
+        "server": {
+          "androidScheme": "https"
+        }
+      }
+    isCorrect: true
+  - snippet: |-
+      {
+        "server": {
+          "allowNavigation": ["*"],
+          "androidScheme": "http"
+        }
+      }
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

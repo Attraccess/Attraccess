@@ -1,0 +1,35 @@
+title: Keep Next.js route handlers and server actions strictly server-side
+rule: >-
+  Route handlers, server actions, and any code that calls db-vendo-client or
+  reads environment configuration must not be importable into client components.
+  Do not add "use client" to files that access transport APIs or process.env
+  secrets. Pass only validated, serializable data from server components or
+  route handlers to client components.
+severity: critical
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      "use client";
+
+      import { createClient } from "db-vendo-client";
+
+      export default async function Page() {
+        const client = createClient();
+        const data = await client.journeys("Berlin", "Munich");
+        return <div>{JSON.stringify(data)}</div>;
+      }
+    isCorrect: false
+  - snippet: |-
+      import { getJourneys } from "@/lib/journeys";
+
+      export default async function Page() {
+        const journeys = await getJourneys("Berlin", "Munich");
+        return <JourneyList journeys={journeys} />;
+      }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,17 @@
+title: Run Biome and Vitest before publishing or releasing
+rule: >-
+  Changes to the codegen package must pass Biome linting and Vitest
+  coverage-enabled tests locally before release-related commands are run.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: pnpm lint && pnpm test
+    isCorrect: true
+  - snippet: pnpm release
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

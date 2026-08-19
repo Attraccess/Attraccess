@@ -1,0 +1,36 @@
+title: Sanitize Markdown rendering with rehype-sanitize
+rule: >-
+  Any component or server renderer that converts user-provided or remote
+  Markdown to HTML with react-markdown must include rehype-sanitize in the
+  rehype plugin chain. Do not use dangerouslySetInnerHTML for Markdown-derived
+  HTML unless the HTML has been explicitly sanitized with rehype-sanitize or an
+  equivalent policy-based sanitizer.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      import ReactMarkdown from 'react-markdown';
+      import remarkGfm from 'remark-gfm';
+      import rehypeSanitize from 'rehype-sanitize';
+
+      export function Markdown({ content }: { content: string }) {
+        return (
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+            {content}
+          </ReactMarkdown>
+        );
+      }
+    isCorrect: true
+  - snippet: |-
+      import ReactMarkdown from 'react-markdown';
+
+      export function Markdown({ content }: { content: string }) {
+        return <ReactMarkdown>{content}</ReactMarkdown>;
+      }
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

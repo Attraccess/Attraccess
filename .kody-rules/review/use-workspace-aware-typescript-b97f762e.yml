@@ -1,0 +1,41 @@
+title: Use workspace-aware TypeScript and ESLint checks for Nx/pnpm apps and packages
+rule: >-
+  Because this is an Nx pnpm workspace with Next.js, TypeScript, ESLint, Jest,
+  and Vitest, project-level type checking and linting should be configured per
+  app/package rather than relying on ad-hoc script execution. Ensure each
+  workspace package has a tsconfig extending the root config and an ESLint
+  configuration compatible with Next.js and TypeScript, and keep test setup
+  explicit for Jest/Vitest to avoid silent skips.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      {
+        "extends": "../../tsconfig.base.json",
+        "compilerOptions": {
+          "jsx": "preserve",
+          "strict": true,
+          "noUncheckedIndexedAccess": true
+        },
+        "include": ["src", "next-env.d.ts"]
+      }
+    isCorrect: true
+  - snippet: |-
+      module.exports = {
+        extends: ['next/core-web-vitals', 'plugin:@typescript-eslint/recommended'],
+      };
+    isCorrect: true
+  - snippet: |-
+      {
+        "compilerOptions": {
+          "strict": false,
+          "skipLibCheck": true
+        }
+      }
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

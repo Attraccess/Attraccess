@@ -1,0 +1,23 @@
+title: Use React Query for async state and centralize errors
+rule: >-
+  Use @tanstack/react-query for server state instead of ad-hoc useEffect
+  fetches. Handle loading, error, and empty states explicitly, and surface
+  user-facing errors through toast or error components rather than unhandled
+  promise rejections or silent failures.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: useEffect(() => { fetch('/api/data').then(r => setData(r.json())); }, []);
+    isCorrect: false
+  - snippet: >-
+      const { data, isLoading, error } = useQuery({ queryKey: ['data'], queryFn:
+      fetchData });
+
+      if (error) toast.error('Failed to load data');
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

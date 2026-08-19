@@ -1,0 +1,39 @@
+title: Keep XAML UI definitions free of embedded credentials or secrets
+rule: >-
+  Do not place passwords, API keys, connection strings, tokens, or other secrets
+  in XAML files, resource dictionaries, App.config, Settings.settings, or
+  code-behind defaults. Use secure runtime configuration or user prompts
+  instead.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+              x:Class="Vier_Gewinnt.MainWindow"
+              Tag="admin:SuperSecret123">
+      </Window>
+    isCorrect: false
+  - snippet: |-
+      <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+              x:Class="Vier_Gewinnt.MainWindow"
+              Title="Vier Gewinnt">
+      </Window>
+    isCorrect: true
+  - snippet: |-
+      <connectionStrings>
+        <add name="GameDb" connectionString="Server=prod;User Id=admin;Password=hunter2;" />
+      </connectionStrings>
+    isCorrect: false
+  - snippet: |-
+      <connectionStrings>
+        <add name="GameDb" connectionString="${GAME_DB_CONNECTION_STRING}" />
+      </connectionStrings>
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

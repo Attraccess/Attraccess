@@ -1,0 +1,29 @@
+title: Sanitize file paths and restrict FTP/filesystem access
+rule: >-
+  When uploading, downloading, or referencing slicer files, normalize paths and
+  ensure they stay within the intended directory (for example, slicer-configs or
+  an upload directory). Do not concatenate user-supplied file names directly
+  into paths or FTP remote paths without validation; reject path traversal such
+  as ../ and absolute paths.
+severity: critical
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      import path from "node:path";
+
+      const safeName = path.basename(userFileName);
+      if (safeName !== userFileName || safeName.startsWith(".")) {
+        throw new Error("Invalid file name");
+      }
+      const target = path.join(configDir, safeName);
+    isCorrect: true
+  - snippet: |-
+      const target = path.join(configDir, req.query.file as string);
+      await client.uploadFrom(fs.createReadStream(target), target);
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

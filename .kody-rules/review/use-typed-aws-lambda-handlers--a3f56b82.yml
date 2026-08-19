@@ -1,0 +1,41 @@
+title: Use typed AWS Lambda handlers and validate external HTTP responses
+rule: >-
+  Lambda handlers should use typed event and context shapes from
+  @types/aws-lambda rather than any or untyped parameters. When calling external
+  HTTP APIs with axios, validate response status and parse response data before
+  use. Do not trust external response payloads, and avoid logging full
+  request/response bodies that may contain sensitive data.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      export const handler = async (event: any) => {
+        const response = await axios.get(process.env.API_URL);
+        return response.data;
+      };
+    isCorrect: false
+  - snippet: >-
+      import type { APIGatewayProxyEvent, APIGatewayProxyResult } from
+      'aws-lambda';
+
+      import axios from 'axios';
+
+
+      export const handler = async (
+        event: APIGatewayProxyEvent
+      ): Promise<APIGatewayProxyResult> => {
+        const response = await axios.get(process.env.API_URL);
+
+        if (response.status !== 200) {
+          return { statusCode: 502, body: 'Upstream request failed' };
+        }
+
+        return { statusCode: 200, body: JSON.stringify(response.data) };
+      };
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

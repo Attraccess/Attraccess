@@ -1,0 +1,23 @@
+title: >-
+  Keep E2E and test execution isolated from production secrets and live external
+  services
+rule: >-
+  Test scripts must not silently depend on production credentials, live Cursor
+  services, or other external systems unless explicitly gated by an opt-in
+  environment variable. E2E tests that require real external services should be
+  separate from default unit/test commands and should use clearly named,
+  non-production configuration.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: '"test": "CURSOR_API_KEY=$PROD_CURSOR_API_KEY pnpm --filter api test"'
+    isCorrect: false
+  - snippet: |-
+      "test": "pnpm run test:api && pnpm --filter db test",
+      "test:e2e": "RUN_E2E_WITH_REAL_CURSOR=1 pnpm --filter api test"
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []

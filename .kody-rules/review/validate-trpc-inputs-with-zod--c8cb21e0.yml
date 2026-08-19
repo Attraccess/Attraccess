@@ -1,0 +1,35 @@
+title: Validate tRPC inputs with Zod and hash passwords with bcryptjs
+rule: >-
+  All tRPC procedures and API routes that accept user input must validate and
+  parse the input with Zod before using it. Authentication mutations that store
+  or verify passwords must use bcryptjs hashing and comparison functions;
+  plaintext passwords, direct string comparisons, or custom hash schemes are not
+  allowed.
+severity: critical
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      import { z } from 'zod';
+      import bcrypt from 'bcryptjs';
+      import { publicProcedure } from '../trpc';
+
+      export const signup = publicProcedure
+        .input(z.object({ email: z.string().email(), password: z.string().min(12) }))
+        .mutation(async ({ input }) => {
+          const passwordHash = await bcrypt.hash(input.password, 12);
+          return createUser(input.email, passwordHash);
+        });
+    isCorrect: true
+  - snippet: |-
+      export const signup = publicProcedure
+        .input((raw: any) => raw)
+        .mutation(async ({ input }) => {
+          return createUser(input.email, input.password);
+        });
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

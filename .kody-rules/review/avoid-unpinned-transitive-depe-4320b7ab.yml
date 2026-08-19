@@ -1,0 +1,18 @@
+title: Avoid unpinned transitive dependencies in packaging metadata
+rule: >-
+  When defining dependencies in setup.py or equivalent packaging metadata, avoid
+  open-ended or unpinned version constraints for third-party libraries. Use
+  bounded ranges to reduce supply-chain and compatibility risk while still
+  allowing controlled updates.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: install_requires=["requests>=2.31,<3"]
+    isCorrect: true
+  - snippet: install_requires=["requests"]
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []

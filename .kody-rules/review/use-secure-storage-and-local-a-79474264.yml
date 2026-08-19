@@ -1,0 +1,42 @@
+title: Use secure storage and local-auth guards for tokens and biometric flows
+rule: >-
+  Persist authentication tokens, refresh tokens, PINs, biometric enrollment
+  flags, and other sensitive user state with expo-secure-store, not
+  AsyncStorage. When using expo-local-authentication, verify the platform
+  capability and authentication result before granting access, and do not treat
+  a stored flag alone as proof of successful biometric authentication.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      import AsyncStorage from "@react-native-async-storage/async-storage";
+
+      export async function saveToken(token: string) {
+        await AsyncStorage.setItem("authToken", token);
+      }
+    isCorrect: false
+  - snippet: |-
+      import * as SecureStore from "expo-secure-store";
+      import * as LocalAuthentication from "expo-local-authentication";
+
+      export async function unlockWithBiometrics() {
+        const supported = await LocalAuthentication.hasHardwareAsync();
+        const enrolled = await LocalAuthentication.isEnrolledAsync();
+        if (!supported || !enrolled) return false;
+
+        const result = await LocalAuthentication.authenticateAsync({
+          promptMessage: "Unlock Orbitra",
+        });
+        return result.success;
+      }
+
+      export async function saveToken(token: string) {
+        await SecureStore.setItemAsync("authToken", token);
+      }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

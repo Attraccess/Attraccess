@@ -1,0 +1,27 @@
+title: Test user-facing behavior through Testing Library and Vitest
+rule: >-
+  Components and hooks that handle forms, validation, auth states, or data
+  fetching must be tested with Vitest and Testing Library by user-visible
+  behavior. Do not test private implementation details, and do not disable
+  failing tests with `.skip` or `.only` in committed code.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      test('shows validation error when email is missing', async () => {
+        render(<SignUpForm />);
+        await userEvent.click(screen.getByRole('button', { name: /submit/i }));
+        expect(await screen.findByText(/email is required/i)).toBeInTheDocument();
+      });
+    isCorrect: true
+  - snippet: |-
+      test.skip('shows validation error when email is missing', () => {
+        // TODO: fix later
+      });
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,19 @@
+title: Keep generated API code out of version control
+rule: >-
+  Generated React Query/OpenAPI client code must be produced at build/setup time
+  by the codegen scripts and must not be committed as source. Treat generated
+  output as build artifacts so schema changes are always regenerated
+  consistently.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: npm run build && npm -C examples/react-app run generate:api
+    isCorrect: true
+  - snippet: src/generated/api.ts
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

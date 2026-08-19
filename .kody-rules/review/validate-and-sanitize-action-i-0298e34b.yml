@@ -1,0 +1,38 @@
+title: Validate and sanitize action inputs before use
+rule: >-
+  All inputs retrieved via @actions/core getInput() must be validated against
+  expected formats before being used in API calls, string interpolation, or
+  conditional logic. Reject empty strings where not allowed, validate enums, and
+  sanitize user-supplied strings that will be embedded in URLs or API payloads.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      import * as core from '@actions/core';
+
+      const env = core.getInput('env', { required: true });
+      const validEnvs = ['production', 'staging', 'preview'];
+      if (!validEnvs.includes(env)) {
+        throw new Error(`Invalid env '${env}'. Must be one of: ${validEnvs.join(', ')}`);
+      }
+    isCorrect: true
+  - snippet: |-
+      import * as core from '@actions/core';
+
+      const env = core.getInput('env', { required: true });
+      // Used directly in API call without validation
+      await octokit.rest.repos.createDeployment({ environment: env });
+    isCorrect: false
+  - snippet: |-
+      import * as core from '@actions/core';
+
+      const desc = core.getInput('desc');
+      const sanitized = desc.trim().slice(0, 140);
+      core.setOutput('description', sanitized);
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,28 @@
+title: >-
+  Validate and sanitize external Meshtastic/MQTT payloads before persisting or
+  rendering
+rule: >-
+  Treat MQTT and protobuf-decoded Meshtastic payloads as untrusted input.
+  Validate required fields, enforce type and length constraints, and sanitize
+  user-controlled text before writing to Prisma or returning via Express. Reject
+  malformed packets instead of persisting partial data.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: >-
+      await prisma.node.create({ data: { longName: decoded.long_name, shortName:
+      decoded.short_name } });
+    isCorrect: false
+  - snippet: >-
+      if (typeof decoded.long_name !== 'string' || decoded.long_name.length >
+      100) { throw new Error('Invalid long_name'); }
+
+      await prisma.node.create({ data: { longName: decoded.long_name.trim(),
+      shortName: decoded.short_name } });
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

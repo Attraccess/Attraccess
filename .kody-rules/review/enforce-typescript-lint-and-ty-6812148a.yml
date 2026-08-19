@@ -1,0 +1,26 @@
+title: Enforce TypeScript lint and type checks for Qwik code
+rule: >-
+  Changes under src/ must pass the repository's TypeScript-aware ESLint
+  configuration and type checking before merge. Treat TypeScript errors and Qwik
+  lint violations as blocking issues, especially in loaders, actions, routes,
+  and components that affect rendering or data fetching.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      export const useUser = routeLoader$(async () => {
+        const user: any = await getUser();
+        return user;
+      });
+    isCorrect: false
+  - snippet: |-
+      export const useUser = routeLoader$(async (): Promise<User> => {
+        return await getUser();
+      });
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

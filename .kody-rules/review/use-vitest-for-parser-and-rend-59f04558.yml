@@ -1,0 +1,30 @@
+title: Use Vitest for parser and rendering regression coverage
+rule: >-
+  Add or update Vitest cases under test/ whenever modifying PNG/JPEG parsing,
+  font handling, or pixel rendering. Tests should cover malformed/truncated
+  input, boundary dimensions, and at least one golden-output or snapshot
+  assertion for rendered images. Do not rely only on manual scripts.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      import { describe, it, expect } from 'vitest';
+      import { decodePNG } from '../src/png.js';
+
+      describe('decodePNG', () => {
+        it('rejects truncated PNG data', () => {
+          const truncated = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+          expect(() => decodePNG(truncated)).toThrow(/Failed to decode PNG/);
+        });
+      });
+    isCorrect: true
+  - snippet: >-
+      // No automated test added for changed decoding logic; only a local script
+      was run.
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

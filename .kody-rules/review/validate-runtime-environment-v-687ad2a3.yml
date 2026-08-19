@@ -1,0 +1,33 @@
+title: Validate runtime environment variables with Zod before use
+rule: >-
+  All Vite environment variables must be validated with a Zod schema and
+  accessed through the typed env object. Do not read import.meta.env values
+  directly in components, hooks, or services. This prevents runtime failures
+  from missing variables and avoids accidentally treating undefined values as
+  trusted configuration.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      const envSchema = z.object({
+        VITE_API_URL: z.string().url(),
+        VITE_ENABLE_ANALYTICS: z.enum(['true', 'false']).default('false'),
+      });
+
+      export const env = envSchema.parse(import.meta.env);
+
+      export function apiClient() {
+        return fetch(`${env.VITE_API_URL}/users`);
+      }
+    isCorrect: true
+  - snippet: |-
+      export function apiClient() {
+        return fetch(`${import.meta.env.VITE_API_URL}/users`);
+      }
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

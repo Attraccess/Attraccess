@@ -1,0 +1,36 @@
+title: Keep dependency manifests and lockfiles synchronized
+rule: >-
+  This repository contains both package-lock.json and yarn.lock. Use exactly one
+  package manager and keep the corresponding lockfile in sync with package.json.
+  Do not add, update, or remove dependencies in a way that leaves the unused or
+  stale lockfile behind, because divergent lockfiles can cause different
+  dependency trees and security-relevant version drift.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      {
+        "devDependencies": {
+          "typescript": "^4.2.3"
+        }
+      }
+
+      // package-lock.json updated
+      // yarn.lock deleted or ignored consistently
+    isCorrect: true
+  - snippet: |-
+      {
+        "devDependencies": {
+          "typescript": "^4.3.0"
+        }
+      }
+
+      // package-lock.json updated
+      // yarn.lock still lists typescript@4.2.3
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

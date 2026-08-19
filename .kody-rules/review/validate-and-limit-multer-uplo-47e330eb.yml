@@ -1,0 +1,43 @@
+title: Validate and limit Multer uploads
+rule: >-
+  When using Multer for file uploads, enforce explicit file size limits, allowed
+  MIME types or extensions, and safe destination handling. Do not accept
+  arbitrary files without limits, and do not use user-controlled filenames
+  directly for storage paths or command execution.
+severity: critical
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      import multer from 'multer';
+
+      const upload = multer();
+      app.post('/slice', upload.single('model'), handler);
+    isCorrect: false
+  - snippet: |-
+      import multer from 'multer';
+      import path from 'node:path';
+      import crypto from 'node:crypto';
+
+      const upload = multer({
+        storage: multer.diskStorage({
+          destination: 'uploads/',
+          filename: (_req, file, cb) => {
+            const safeName = `${crypto.randomUUID()}${path.extname(file.originalname)}`;
+            cb(null, safeName);
+          },
+        }),
+        limits: { fileSize: 50 * 1024 * 1024, files: 1 },
+        fileFilter: (_req, file, cb) => {
+          const allowed = new Set(['.stl', '.obj', '.3mf']);
+          cb(null, allowed.has(path.extname(file.originalname).toLowerCase()));
+        },
+      });
+
+      app.post('/slice', upload.single('model'), handler);
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

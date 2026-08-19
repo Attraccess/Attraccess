@@ -1,0 +1,34 @@
+title: Sanitize and constrain user-supplied image data before rendering
+rule: >-
+  This app uses upng-js, indicating PNG decoding or processing. When handling
+  uploaded or received images, validate file type and size before decoding,
+  avoid passing untrusted binary data directly into DOM APIs, and prefer object
+  URLs or typed array buffers over injecting data URLs built from unvalidated
+  strings. Do not use dangerouslySetInnerHTML for SDK/device-generated content.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      const text = await file.text();
+      const imgHtml = `<img src="${text}">`;
+      container.innerHTML = imgHtml;
+    isCorrect: false
+  - snippet: >-
+      const buffer = await file.arrayBuffer();
+
+      const png = UPNG.decode(buffer);
+
+      setPreview(URL.createObjectURL(new Blob([buffer], { type: "image/png"
+      })));
+    isCorrect: true
+  - snippet: |-
+      if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) {
+        throw new Error("Only images under 5MB are supported");
+      }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

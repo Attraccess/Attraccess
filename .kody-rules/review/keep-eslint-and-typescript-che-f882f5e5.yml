@@ -1,0 +1,24 @@
+title: Keep ESLint and TypeScript checks clean for all committed TypeScript sources
+rule: >-
+  The repository uses ESLint with @typescript-eslint and builds with tsc. Do not
+  disable type-aware or security-relevant lint rules with eslint-disable
+  comments except for a narrowly documented reason. Ensure code compiles under
+  the project's tsconfig without `@ts-ignore` or `@ts-nocheck` in library
+  sources.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      // @ts-nocheck
+      export function createRecord(payload: unknown) { ... }
+    isCorrect: false
+  - snippet: >-
+      export function createRecord(payload: CreateRecordPayload):
+      Promise<FerdigRecord> { ... }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,36 @@
+title: Validate Supabase session and authorization before data access
+rule: >-
+  When using Supabase client methods such as select, insert, update, delete,
+  rpc, or auth.getSession, ensure the code checks for errors, validates the
+  authenticated session when required, and does not assume row-level security or
+  client-side filters are sufficient without explicit authorization checks.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      const { data, error } = await supabase.from('orders').select('*');
+      if (error) throw error;
+      return data;
+    isCorrect: false
+  - snippet: >-
+      const { data: sessionData, error: sessionError } = await
+      supabase.auth.getSession();
+
+      if (sessionError || !sessionData.session) {
+        throw new Error('Unauthorized');
+      }
+
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('user_id', sessionData.session.user.id);
+      if (error) throw error;
+
+      return data;
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

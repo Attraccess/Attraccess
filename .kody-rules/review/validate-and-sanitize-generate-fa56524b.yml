@@ -1,0 +1,28 @@
+title: Validate and sanitize generated TypeScript output before writing files
+rule: >-
+  When generating TypeScript interfaces from Strapi schemas, validate
+  identifiers, file paths, and emitted content to prevent path traversal,
+  prototype pollution, or injection of arbitrary TypeScript/JavaScript syntax.
+  Use allowlists for identifier characters, normalize output paths, and avoid
+  writing outside the intended destination directory.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      const outputPath = path.join(baseDir, schemaName + '.ts');
+      fs.writeFileSync(outputPath, generatedCode);
+    isCorrect: false
+  - snippet: |-
+      const safeName = schemaName.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const outputPath = path.resolve(baseDir, `${safeName}.ts`);
+      if (!outputPath.startsWith(path.resolve(baseDir))) {
+        throw new Error('Invalid output path');
+      }
+      fs.writeFileSync(outputPath, generatedCode);
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

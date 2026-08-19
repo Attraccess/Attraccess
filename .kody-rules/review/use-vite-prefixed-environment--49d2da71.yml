@@ -1,0 +1,19 @@
+title: Use VITE_-prefixed environment variables for client-exposed config
+rule: >-
+  Vite only exposes environment variables prefixed with VITE_ to the browser.
+  Use this convention for any configuration consumed by the Solid app, and avoid
+  referencing unprefixed process.env variables that can leak build-time secrets
+  or fail silently at runtime.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: const apiUrl = process.env.API_URL;
+    isCorrect: false
+  - snippet: const apiUrl = import.meta.env.VITE_API_URL;
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,31 @@
+title: Keep license-signing private keys out of the repository and runtime bundles
+rule: >-
+  Treat license signing keys as secrets. Generate them with the existing
+  key-generation script, load private keys only from environment variables or
+  ignored local files, and never commit, log, or expose them in client-side
+  code. In Next.js, use server-only modules or route handlers for private key
+  access, and add key files to .gitignore.
+severity: critical
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      const PRIVATE_KEY = process.env.LICENSE_SIGNING_PRIVATE_KEY;
+      if (!PRIVATE_KEY) {
+        throw new Error('LICENSE_SIGNING_PRIVATE_KEY is not configured');
+      }
+    isCorrect: true
+  - snippet: |-
+      const PRIVATE_KEY = 'MC4CAQAwBQYDK2VwBCIEIB...';
+      export default PRIVATE_KEY;
+    isCorrect: false
+  - snippet: |-
+      'use client';
+      import { privateKey } from '../server/license-keys';
+      export function signLicense(data) { /* uses privateKey */ }
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

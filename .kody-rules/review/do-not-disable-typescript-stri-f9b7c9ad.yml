@@ -1,0 +1,35 @@
+title: Do not disable TypeScript strictness in the Vue CLI TypeScript setup
+rule: >-
+  Because this repository uses @vue/cli-plugin-typescript with
+  vue-class-component and vue-property-decorator, keep the TypeScript compiler
+  strict enough to catch unsafe component and state access. Do not disable
+  strict, strictNullChecks, noImplicitAny, or noImplicitThis in tsconfig.json or
+  Vue CLI TypeScript options, and avoid adding broad type escape hatches to
+  silence errors.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      {
+        "compilerOptions": {
+          "strict": false,
+          "noImplicitAny": false,
+          "strictNullChecks": false
+        }
+      }
+    isCorrect: false
+  - snippet: |-
+      {
+        "compilerOptions": {
+          "strict": true,
+          "noImplicitAny": true,
+          "strictNullChecks": true
+        }
+      }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

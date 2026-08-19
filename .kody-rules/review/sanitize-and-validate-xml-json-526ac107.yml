@@ -1,0 +1,28 @@
+title: Sanitize and validate XML/JSON input before use
+rule: >-
+  When parsing external data with xml2js or JSON payloads from MQTT/HTTP,
+  validate the resulting object shape and sanitize any values that are forwarded
+  to HomeKit characteristics, logs, or network calls. Do not assume parsed
+  fields exist or have expected types.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      const parsed = await parseStringPromise(xml);
+      const state = parsed.state.bri[0];
+    isCorrect: false
+  - snippet: >-
+      const parsed = await parseStringPromise(xml);
+
+      const bri = Array.isArray(parsed?.state?.bri) ?
+      Number(parsed.state.bri[0]) : NaN;
+
+      if (!Number.isFinite(bri)) { throw new Error('Invalid brightness value');
+      }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

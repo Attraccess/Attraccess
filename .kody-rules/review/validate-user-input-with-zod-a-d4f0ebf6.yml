@@ -1,0 +1,58 @@
+title: Validate user input with Zod and React Hook Form before submission
+rule: >-
+  All forms that submit data to Supabase or external APIs must use
+  `react-hook-form` with `@hookform/resolvers/zod`. Define a Zod schema for the
+  full form payload, avoid manual field-by-field validation, and surface
+  validation errors through the form state instead of ad-hoc alerts or console
+  logs.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      function SignupForm() {
+        const [email, setEmail] = useState('');
+        const [password, setPassword] = useState('');
+
+        const onSubmit = () => {
+          if (!email.includes('@')) {
+            alert('Invalid email');
+            return;
+          }
+
+          supabase.auth.signUp({ email, password });
+        };
+
+        return <form onSubmit={onSubmit}>...</form>;
+      }
+    isCorrect: false
+  - snippet: |-
+      const signupSchema = z.object({
+        email: z.string().email(),
+        password: z.string().min(8),
+      });
+
+      type SignupInput = z.infer<typeof signupSchema>;
+
+      function SignupForm() {
+        const form = useForm<SignupInput>({
+          resolver: zodResolver(signupSchema),
+          defaultValues: { email: '', password: '' },
+        });
+
+        const onSubmit = form.handleSubmit(async (values) => {
+          await supabase.auth.signUp(values);
+        });
+
+        return (
+          <Form {...form}>
+            <form onSubmit={onSubmit}>...</form>
+          </Form>
+        );
+      }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

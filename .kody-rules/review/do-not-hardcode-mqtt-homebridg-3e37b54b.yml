@@ -1,0 +1,27 @@
+title: Do not hardcode MQTT/Homebridge credentials or tokens
+rule: >-
+  MQTT connection settings for this Homebridge plugin must come from user
+  configuration or environment variables. Never commit broker passwords,
+  usernames, client certificates, or Homebridge pairing/setup codes into source,
+  config examples, or lockfile-adjacent files.
+severity: critical
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      const client = mqtt.connect('mqtt://broker.local', {
+        username: 'tasmota',
+        password: 'supersecret123'
+      });
+    isCorrect: false
+  - snippet: |-
+      const client = mqtt.connect(config.url, {
+        username: process.env.MQTT_USERNAME,
+        password: process.env.MQTT_PASSWORD
+      });
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

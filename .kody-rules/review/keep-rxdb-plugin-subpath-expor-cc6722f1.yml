@@ -1,0 +1,32 @@
+title: Keep RxDB plugin subpath exports aligned with built plugin outputs
+rule: >-
+  When adding, renaming, or removing an RxDB plugin, update the package.json
+  exports map so every './plugins/*' subpath continues to expose matching types,
+  node/require, and ES entry files. Avoid introducing export entries that point
+  to missing dist files or inconsistent plugin paths, because this package ships
+  many conditional entry points and broken subpath exports directly break
+  consumers.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      "./plugins/storage-example": {
+        "types": "./dist/types/plugins/storage-example/index.d.ts",
+        "node": "./dist/lib/plugins/storage-example/index.js",
+        "require": "./dist/lib/plugins/storage-example/index.js",
+        "es2015": "./dist/es/plugins/storage-example/index.js",
+        "default": "./dist/es/plugins/storage-example/index.js"
+      }
+    isCorrect: true
+  - snippet: |-
+      "./plugins/storage-example": {
+        "types": "./dist/types/plugins/storage-example/index.d.ts",
+        "default": "./dist/es/plugins/storage-example.js"
+      }
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

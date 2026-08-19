@@ -1,0 +1,31 @@
+title: Sanitize rendered Markdown and never inject unsanitized HTML into React
+rule: >-
+  When rendering Markdown or user-provided content, pass the marked output
+  through DOMPurify before rendering. Do not use dangerouslySetInnerHTML with
+  unsanitized HTML, and configure DOMPurify to remove script/style/event
+  handlers. If rendering only plain text, avoid HTML injection entirely.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      import { marked } from 'marked';
+      import DOMPurify from 'dompurify';
+
+      export function Markdown({ content }) {
+        const html = DOMPurify.sanitize(marked.parse(content));
+        return <div dangerouslySetInnerHTML={{ __html: html }} />;
+      }
+    isCorrect: true
+  - snippet: |-
+      import { marked } from 'marked';
+
+      export function Markdown({ content }) {
+        return <div dangerouslySetInnerHTML={{ __html: marked.parse(content) }} />;
+      }
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,32 @@
+title: Use defusedxml for all XML and 3MF parsing
+rule: >-
+  Because this project parses untrusted 3MF/XML content and depends on
+  defusedxml, use defusedxml or a defusedxml-backed parser for XML processing.
+  Do not use stdlib xml.etree.ElementTree, xml.dom, xml.sax, or lxml.etree
+  directly on untrusted input unless external entity resolution is explicitly
+  disabled.
+severity: critical
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      import xml.etree.ElementTree as ET
+      root = ET.fromstring(data)
+    isCorrect: false
+  - snippet: |-
+      import defusedxml.ElementTree as ET
+      root = ET.fromstring(data)
+    isCorrect: true
+  - snippet: >-
+      from lxml import etree
+
+      parser = etree.XMLParser(resolve_entities=False, no_network=True,
+      dtd_validation=False)
+
+      root = etree.fromstring(data, parser)
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,30 @@
+title: Validate and sanitize Homebridge config before use
+rule: >-
+  Treat all plugin configuration values as untrusted input. Validate required
+  fields, enforce expected types/formats, and fail safely with clear log
+  messages instead of using raw config values to build URLs, WebSocket
+  endpoints, commands, or device state.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      const url = config.url;
+      this.client = new WebSocketClient(url);
+    isCorrect: false
+  - snippet: >-
+      const url = typeof config.url === 'string' &&
+      /^wss?:\/\//.test(config.url) ? config.url : undefined;
+
+      if (!url) {
+        this.log.error('Invalid or missing websocket URL in plugin config');
+        return;
+      }
+
+      this.client = new WebSocketClient(url);
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

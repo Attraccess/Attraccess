@@ -1,0 +1,29 @@
+title: Use type-safe React Router navigation and route parameters
+rule: >-
+  When using react-router v7, prefer typed route definitions and avoid unsafe
+  string concatenation for navigation paths. Validate or narrow dynamic route
+  parameters before using them, especially when they drive SDK/device calls or
+  data fetching. Do not use `dangerouslySetInnerHTML` with unsanitized external
+  content.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      const { lensId } = useParams();
+
+      if (!lensId) {
+        throw new Response("Lens ID is required", { status: 400 });
+      }
+
+      const lens = await getLens(lensId);
+    isCorrect: true
+  - snippet: navigate(`/lens/${params.lensId}/settings`);
+    isCorrect: false
+  - snippet: '<div dangerouslySetInnerHTML={{ __html: hubMessage }} />'
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

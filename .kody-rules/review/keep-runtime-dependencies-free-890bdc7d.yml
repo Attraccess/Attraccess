@@ -1,0 +1,25 @@
+title: Keep runtime dependencies free from deprecated HTTP clients
+rule: >-
+  Do not add deprecated or unmaintained HTTP packages such as request to
+  production dependencies. If image fetching is required, use a maintained HTTP
+  client or require callers to provide already-fetched SVG/image buffers.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      "dependencies": {
+        "@resvg/resvg-js": "^2.1.0",
+        "jimp-compact": "^0.16.1-2"
+      }
+    isCorrect: true
+  - snippet: |-
+      "dependencies": {
+        "request": "^2.88.2"
+      }
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

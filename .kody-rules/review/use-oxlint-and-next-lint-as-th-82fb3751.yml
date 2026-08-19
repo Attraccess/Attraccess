@@ -1,0 +1,25 @@
+title: Use oxlint and Next lint as the required static analysis gate
+rule: >-
+  Do not introduce code patterns that fail `pnpm oxlint` or `pnpm lint`. Prefer
+  fixing lint failures in source over adding ignore directives. If an ignore is
+  unavoidable, document the reason inline and keep it scoped to the offending
+  line.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      // eslint-disable-next-line
+      // oxlint-disable-next-line
+      console.log(userToken);
+    isCorrect: false
+  - snippet: |-
+      if (!station) {
+        return { error: "Station not found" };
+      }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

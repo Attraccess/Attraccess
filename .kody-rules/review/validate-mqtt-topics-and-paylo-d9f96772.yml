@@ -1,0 +1,20 @@
+title: Validate MQTT topics and payloads before publishing
+rule: >-
+  All MQTT topics and payloads must be validated before publishing. Ensure
+  topics do not contain wildcards or control characters, and payloads are
+  sanitized strings or buffers.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: client.publish(topic, payload);
+    isCorrect: false
+  - snippet: >-
+      if (/^[a-zA-Z0-9/_-]+$/.test(topic)) { client.publish(topic,
+      String(payload)); }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

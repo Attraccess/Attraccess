@@ -1,0 +1,30 @@
+title: Do not log or embed MQTT credentials or Homebridge config secrets
+rule: >-
+  This plugin connects to MQTT brokers and consumes Homebridge configuration,
+  which may include usernames, passwords, tokens, or broker URLs. Never write
+  secrets to logs, error messages, exception payloads, or committed config
+  samples. Use redacted logging for connection options and only reference
+  credentials from runtime configuration/environment, not hardcoded values.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: >-
+      const client = mqtt.connect(options);
+
+      log.debug(`MQTT connecting to ${options.host} with password
+      ${options.password}`);
+    isCorrect: false
+  - snippet: |-
+      const client = mqtt.connect(options);
+      log.debug(`MQTT connecting to ${options.host}`);
+    isCorrect: true
+  - snippet: const brokerUrl = `mqtt://admin:supersecret@broker.local:1883`;
+    isCorrect: false
+  - snippet: const brokerUrl = config.mqttUrl ?? process.env.MQTT_URL;
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

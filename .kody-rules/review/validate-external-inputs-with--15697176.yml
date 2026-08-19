@@ -1,0 +1,28 @@
+title: Validate external inputs with Zod before use
+rule: >-
+  Parse and validate all external inputs (API request bodies/query params, FTP
+  responses, user-provided slicer settings) with Zod schemas before using them.
+  Reject invalid data early and return typed error responses instead of passing
+  unchecked values to filesystem, FTP, or rendering logic.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      const jobSchema = z.object({
+        printerId: z.string().min(1),
+        fileName: z.string().min(1),
+        layerHeight: z.number().positive().optional(),
+      });
+
+      const job = jobSchema.parse(req.body);
+    isCorrect: true
+  - snippet: |-
+      const job = req.body as PrintJob;
+      await startPrint(job.printerId, job.fileName);
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

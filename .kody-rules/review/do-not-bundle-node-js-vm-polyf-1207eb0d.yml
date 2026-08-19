@@ -1,0 +1,28 @@
+title: >-
+  Do not bundle Node.js vm polyfills or dynamic code evaluation into
+  WASM/browser bundles
+rule: >-
+  This package targets browser/WASM usage. Avoid dependencies or build
+  configurations that include vm-browserify, eval, new Function, or other
+  dynamic code execution shims unless explicitly required and reviewed. If
+  needed, document the security justification and isolate the functionality.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      "dependencies": {
+        "vm-browserify": "^1.1.2"
+      }
+    isCorrect: false
+  - snippet: '"dependencies": {}'
+    isCorrect: true
+  - snippet: const result = eval(userProvidedExpression);
+    isCorrect: false
+  - snippet: const result = computeFromTypedInput(input);
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

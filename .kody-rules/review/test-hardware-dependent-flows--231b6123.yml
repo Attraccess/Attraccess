@@ -1,0 +1,46 @@
+title: Test hardware-dependent flows with mocked nfcpy/pyusb and pinned dependencies
+rule: >-
+  Because the stack depends on hardware and protocol libraries such as
+  HAP-python, nfcpy, pyusb, and cbor2, tests must not require physical devices.
+  Add automated tests that mock NFC/USB transports and cover malformed tag
+  payloads, pairing failures, serialization round-trips, and dependency
+  compatibility. Keep requirements.txt constraints consistent and avoid
+  introducing unpinned or duplicate hardware-related dependencies without test
+  coverage.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      def test_nfc_trigger():
+          tag = real_nfc_reader.read()
+          assert accessory.state == tag.data
+    isCorrect: false
+  - snippet: |-
+      from unittest.mock import Mock
+      import cbor2
+
+      def test_nfc_trigger_with_mock_reader():
+          reader = Mock()
+          payload = cbor2.dumps({"v": 1, "action": "unlock"})
+          reader.read.return_value = payload
+
+          accessory = AccessoryUnderTest(reader=reader)
+          accessory.handle_tag()
+
+          assert accessory.state == "unlocked"
+
+      def test_malformed_nfc_payload_is_rejected():
+          reader = Mock()
+          reader.read.return_value = b"\xff\xff"
+
+          accessory = AccessoryUnderTest(reader=reader)
+          accessory.handle_tag()
+
+          assert accessory.state == "error"
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

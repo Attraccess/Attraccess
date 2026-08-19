@@ -1,0 +1,28 @@
+title: Validate and sanitize SVG input before rendering
+rule: >-
+  Before passing any user-supplied SVG string, data URI, or file path to
+  @resvg/resvg-js or jimp-compact, validate size limits, encoding, and allowed
+  input types. Do not pass unvalidated remote URLs or arbitrary file paths
+  directly into rendering or image processing APIs.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      function convertSvg(svg) {
+        if (typeof svg !== 'string' || svg.length > MAX_SVG_BYTES) {
+          throw new Error('Invalid SVG input');
+        }
+        return renderSvg(svg);
+      }
+    isCorrect: true
+  - snippet: |-
+      app.get('/convert', (req, res) => {
+        renderSvg(req.query.svg).then(res.send);
+      });
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,25 @@
+title: Use structured JSON logging and avoid leaking sensitive runtime data
+rule: >-
+  Use the configured structured logging stack, such as python-json-logger and
+  OpenTelemetry where applicable, for service, runtime, and API logs. Log enough
+  context to trace requests and agent actions, but do not log secrets, tokens,
+  credentials, full request bodies containing sensitive data, or unbounded
+  user-generated content. Catch and report exceptions in async handlers and
+  background tasks instead of silently swallowing them.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: >-
+      logger.info('runtime_started', extra={'runtime_id': runtime_id, 'user_id':
+      user_id})
+    isCorrect: true
+  - snippet: >-
+      logger.info(f'Starting runtime with key {api_key} and payload
+      {request.dict()}')
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

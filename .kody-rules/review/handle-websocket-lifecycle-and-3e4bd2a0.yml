@@ -1,0 +1,32 @@
+title: Handle WebSocket lifecycle and errors explicitly
+rule: >-
+  All WebSocket connections must define connect, error, close, and
+  reconnect/timeout behavior. Avoid unhandled promise rejections or silent
+  failures, and ensure resources are cleaned up when the accessory is unloaded
+  or Homebridge shuts down.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      this.connection = new websocket();
+      this.connection.connect(endpoint);
+    isCorrect: false
+  - snippet: >-
+      this.connection = new websocket();
+
+      this.connection.on('connectFailed', (err) => this.log.error(`Connection
+      failed: ${err.message}`));
+
+      this.connection.on('error', (err) => this.log.error(`WebSocket error:
+      ${err.message}`));
+
+      this.connection.on('close', () => this.scheduleReconnect());
+
+      this.connection.connect(endpoint);
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

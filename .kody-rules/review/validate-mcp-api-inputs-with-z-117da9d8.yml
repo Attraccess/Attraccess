@@ -1,0 +1,38 @@
+title: Validate MCP/API inputs with Zod before executing actions
+rule: >-
+  All Express request bodies/query params and Model Context Protocol tool
+  arguments must be parsed with a Zod schema before use. Reject invalid input
+  with a clear error and never access unvalidated fields for file access, shell
+  execution, database queries, or external requests.
+severity: critical
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      import { z } from 'zod';
+
+      const createTaskSchema = z.object({
+        title: z.string().min(1).max(200),
+        dueAt: z.coerce.date().optional()
+      });
+
+      app.post('/api/tasks', (req, res) => {
+        const parsed = createTaskSchema.safeParse(req.body);
+        if (!parsed.success) {
+          return res.status(400).json({ error: parsed.error.issues });
+        }
+        const task = createTask(parsed.data);
+        res.status(201).json(task);
+      });
+    isCorrect: true
+  - snippet: |-
+      app.post('/api/tasks', (req, res) => {
+        const task = createTask(req.body.title, req.body.dueAt);
+        res.status(201).json(task);
+      });
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

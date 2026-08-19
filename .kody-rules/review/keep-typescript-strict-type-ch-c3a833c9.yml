@@ -1,0 +1,33 @@
+title: Keep TypeScript strict type checking enabled and passing
+rule: >-
+  Ensure tsconfig.json keeps strict type checking enabled (at minimum "strict":
+  true, plus "noUncheckedIndexedAccess" where practical) and that `npm run
+  build` runs `tsc -b` before Vite build. Do not silence type errors with `any`,
+  `@ts-ignore`, or `@ts-expect-error` unless the suppression includes a concise
+  explanation and is scoped to the smallest possible line range.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      {
+        "compilerOptions": {
+          "strict": true,
+          "noUncheckedIndexedAccess": true,
+          "noFallthroughCasesInSwitch": true
+        }
+      }
+    isCorrect: true
+  - snippet: |-
+      const value = data.items[index]; // `any` or unchecked index access
+      console.log(value.id);
+    isCorrect: false
+  - snippet: |-
+      // @ts-ignore - temporary hack
+      const response = await hub.send(payload);
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

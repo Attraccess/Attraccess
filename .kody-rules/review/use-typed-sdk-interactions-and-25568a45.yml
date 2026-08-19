@@ -1,0 +1,31 @@
+title: Use typed SDK interactions and avoid unsafe runtime assumptions
+rule: >-
+  When using `@evenrealities/even_hub_sdk` or `@evenrealities/pretext`, prefer
+  typed imports and validate external payloads before use. Do not bypass
+  TypeScript checks with `@ts-ignore`, `as any`, or unchecked `JSON.parse`
+  results, especially for data coming from simulators, APIs, or packaged app
+  files.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      import { createEvenHubClient } from "@evenrealities/even_hub_sdk";
+
+      if (!config.endpoint) {
+        throw new Error("Missing EvenHub endpoint");
+      }
+    isCorrect: true
+  - snippet: |-
+      // @ts-ignore
+      const client = createEvenHubClient(undefined);
+    isCorrect: false
+  - snippet: |-
+      const payload = JSON.parse(rawMessage);
+      renderIssue(payload.issue.id);
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

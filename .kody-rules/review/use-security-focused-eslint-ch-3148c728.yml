@@ -1,0 +1,25 @@
+title: Use security-focused ESLint checks and keep test/lint scripts executable
+rule: >-
+  Since this package uses ESLint with security, promise, and Node plugins,
+  security-sensitive code changes must pass linting and should not disable
+  security rules without a reviewed justification. Keep `npm run lint` and `npm
+  test` working for gateway source changes.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      const safePattern = /^[a-z0-9-]+$/i;
+      if (!safePattern.test(input)) {
+        throw new Error("Invalid input");
+      }
+    isCorrect: true
+  - snippet: |-
+      // eslint-disable-next-line security/detect-non-literal-regexp
+      const re = new RegExp(userInput);
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

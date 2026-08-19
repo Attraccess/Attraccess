@@ -1,0 +1,24 @@
+title: Keep module entry consistent with source language
+rule: >-
+  If the project is TypeScript-based and built from src/index.ts, the package
+  entry should point to the TypeScript source or the built JavaScript output,
+  not a nonexistent or mismatched src/index.js file.
+severity: low
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      {
+        "module": "src/index.js"
+      }
+    isCorrect: false
+  - snippet: |-
+      {
+        "module": "dist/index.js"
+      }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

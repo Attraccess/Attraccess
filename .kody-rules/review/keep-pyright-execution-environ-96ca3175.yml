@@ -1,0 +1,29 @@
+title: Keep Pyright execution environments aligned with actual test and utility roots
+rule: >-
+  When adding, moving, or deleting integration tests or shared utilities, update
+  the Pyright executionEnvironments in pyproject.toml so the affected roots and
+  extraPaths still match the real file layout. Do not silence unresolved-import
+  or missing-module errors caused by misconfigured execution environments by
+  adding ignores; fix the configuration or the import path instead.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      [tool.pyright]
+      executionEnvironments = [
+        { root = "tests/integration", extraPaths = ["utils"]},
+        { root = "utils"},
+      ]
+    isCorrect: true
+  - snippet: >-
+      # tests/integration/test_api.py
+
+      from utils.helpers import make_client  # pyright:
+      ignore[reportMissingImports]
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

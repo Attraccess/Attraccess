@@ -1,0 +1,35 @@
+title: Keep runtime dependency tree limited to production needs
+rule: >-
+  Only mqtt should appear in runtime dependencies for this plugin. Homebridge,
+  TypeScript, ESLint, nodemon, and other build/test tooling must remain
+  devDependencies so installed plugins do not ship unnecessary or vulnerable
+  development packages.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      {
+        "dependencies": {
+          "mqtt": "^4.2.6",
+          "homebridge": "^1.2.2",
+          "nodemon": "^2.0.5"
+        }
+      }
+    isCorrect: false
+  - snippet: |-
+      {
+        "dependencies": {
+          "mqtt": "^4.2.6"
+        },
+        "devDependencies": {
+          "homebridge": "^1.2.2",
+          "nodemon": "^2.0.5"
+        }
+      }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

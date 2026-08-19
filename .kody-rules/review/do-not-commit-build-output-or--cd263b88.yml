@@ -1,0 +1,26 @@
+title: Do not commit build output or user-specific project files
+rule: >-
+  Ensure generated binaries, obj/bin folders, .user files, and local Visual
+  Studio state are not added to the repository. Only source files, project
+  files, and required configuration should be committed.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      Vier-Gewinnt/bin/Debug/Vier-Gewinnt.exe
+      Vier-Gewinnt/obj/Debug/MainWindow.g.cs
+      Vier-Gewinnt/Vier-Gewinnt.csproj.user
+    isCorrect: false
+  - snippet: |-
+      Vier-Gewinnt/App.xaml
+      Vier-Gewinnt/App.xaml.cs
+      Vier-Gewinnt/MainWindow.xaml
+      Vier-Gewinnt/MainWindow.xaml.cs
+      Vier-Gewinnt/Vier-Gewinnt.csproj
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

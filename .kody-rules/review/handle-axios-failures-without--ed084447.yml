@@ -1,0 +1,33 @@
+title: Handle axios failures without exposing internal details
+rule: >-
+  Wrap outbound axios calls in try/catch and return controlled error responses.
+  Do not send raw axios error objects, stack traces, target URLs with
+  credentials, or upstream response bodies to clients. Log the sanitized error
+  server-side and return a generic failure message with an appropriate HTTP
+  status.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      try {
+        await axios.post(targetUrl, payload);
+      } catch (err) {
+        ctx.body = err;
+        ctx.status = 500;
+      }
+    isCorrect: false
+  - snippet: |-
+      try {
+        await axios.post(targetUrl, payload);
+      } catch (err) {
+        console.error('Webhook delivery failed', { status: err.response?.status, message: err.message });
+        ctx.status = 502;
+        ctx.body = { error: 'Webhook delivery failed' };
+      }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

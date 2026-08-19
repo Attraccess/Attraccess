@@ -1,0 +1,35 @@
+title: Protect SQLite integrity in Next.js runtime
+rule: >-
+  When using better-sqlite3 in Next.js server code, open the database with a
+  single shared module-level connection and enable WAL plus foreign keys
+  immediately after opening. Do not create new Database connections inside
+  request handlers, route handlers, or tRPC procedures, and do not use async
+  wrappers around synchronous better-sqlite3 calls.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      import Database from 'better-sqlite3';
+
+      export const db = new Database(process.env.DB_PATH ?? 'app.db');
+      db.pragma('journal_mode = WAL');
+      db.pragma('foreign_keys = ON');
+
+      export function getUser(id: string) {
+        return db.prepare('SELECT id, email FROM users WHERE id = ?').get(id);
+      }
+    isCorrect: true
+  - snippet: |-
+      import Database from 'better-sqlite3';
+
+      export async function getUser(id: string) {
+        const db = new Database('app.db');
+        return db.prepare('SELECT id, email FROM users WHERE id = ?').get(id);
+      }
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

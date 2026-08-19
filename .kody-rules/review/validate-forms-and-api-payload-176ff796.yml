@@ -1,0 +1,42 @@
+title: Validate forms and API payloads with Zod schemas
+rule: >-
+  Use Zod schemas as the single source of truth for react-hook-form validation
+  and for parsing external API responses or mutation inputs. Do not rely on
+  unvalidated request bodies, query parameters, or user input before submitting
+  data or rendering it in privileged UI flows.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      const loginSchema = z.object({
+        email: z.string().email(),
+        password: z.string().min(8),
+      });
+
+      type LoginInput = z.infer<typeof loginSchema>;
+
+      const form = useForm<LoginInput>({
+        resolver: zodResolver(loginSchema),
+      });
+    isCorrect: true
+  - snippet: |-
+      const form = useForm({
+        defaultValues: {
+          email: '',
+          password: '',
+        },
+      });
+
+      async function onSubmit(values: any) {
+        await fetch('/api/login', {
+          method: 'POST',
+          body: JSON.stringify(values),
+        });
+      }
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

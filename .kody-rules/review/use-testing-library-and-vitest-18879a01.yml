@@ -1,0 +1,39 @@
+title: Use Testing Library and Vitest patterns that verify accessible behavior
+rule: >-
+  For React component tests, prefer Testing Library queries that assert
+  accessible user semantics, such as getByRole, getByLabelText, and getByText,
+  instead of querying by CSS class, tag name, or implementation details. Include
+  accessibility-relevant assertions for interactive components, especially
+  buttons, links, form fields, dialogs, and Storybook-a11y-covered UI. Avoid
+  testing private component internals or relying on container.querySelector
+  except when no accessible query can express the intent.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      import { render, screen } from '@testing-library/react';
+      import userEvent from '@testing-library/user-event';
+
+      test('submits form', async () => {
+        render(<ContactForm />);
+        await userEvent.type(screen.getByLabelText('Email'), 'a@example.com');
+        await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+        expect(screen.getByText('Sent')).toBeInTheDocument();
+      });
+    isCorrect: true
+  - snippet: |-
+      import { render } from '@testing-library/react';
+
+      test('submits form', () => {
+        const { container } = render(<ContactForm />);
+        container.querySelector('input.email')?.focus();
+        container.querySelector('button.submit')?.click();
+        expect(container.querySelector('.success')).toBeTruthy();
+      });
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,31 @@
+title: Enforce strict TypeScript compilation for library output
+rule: >-
+  Since this is a published TypeScript library, the TypeScript configuration
+  should enable strict type checking and declaration output. Avoid loosening
+  compiler options to suppress errors, especially for public API types.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      {
+        "compilerOptions": {
+          "strict": false,
+          "noImplicitAny": false
+        }
+      }
+    isCorrect: false
+  - snippet: |-
+      {
+        "compilerOptions": {
+          "strict": true,
+          "declaration": true,
+          "outDir": "dist"
+        }
+      }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,34 @@
+title: Fail safely and log MQTT connection problems
+rule: >-
+  MQTT client lifecycle events must be handled with structured log output and
+  safe error propagation. Do not swallow connection, authentication, or
+  message-parsing failures with empty catch blocks or silent ignores.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      client.on('error', () => {});
+      client.on('message', (topic, payload) => {
+        try {
+          JSON.parse(payload.toString());
+        } catch {}
+      });
+    isCorrect: false
+  - snippet: |-
+      client.on('error', (error) => {
+        log.error(`MQTT connection error: ${error.message}`);
+      });
+      client.on('message', (topic, payload) => {
+        try {
+          const parsed = JSON.parse(payload.toString());
+        } catch (error) {
+          log.warn(`Invalid MQTT payload on ${topic}: ${error.message}`);
+        }
+      });
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

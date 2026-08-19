@@ -1,0 +1,18 @@
+title: Use workspace-aware pnpm commands for examples
+rule: >-
+  Because this repository is a pnpm workspace with example apps, dependency and
+  script operations for examples must use pnpm workspace commands or the root
+  scripts instead of ad hoc npm installs inside example folders.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: pnpm --filter react-app run generate:api
+    isCorrect: true
+  - snippet: cd examples/react-app && npm install
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

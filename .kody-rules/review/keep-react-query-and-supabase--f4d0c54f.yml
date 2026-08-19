@@ -1,0 +1,40 @@
+title: Keep React Query and Supabase mutations error-safe and observable
+rule: >-
+  TanStack Query mutations and Supabase data operations must handle errors
+  explicitly. Do not ignore returned errors or silently swallow failures;
+  surface user-safe error messages and log technical details separately.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      const mutation = useMutation({
+        mutationFn: async (payload: CreateItemInput) => {
+          const { data, error } = await supabase.from('items').insert(payload).select();
+          if (error) {
+            console.error('Failed to create item', error);
+            throw new Error('Unable to create item');
+          }
+          return data;
+        },
+        onError: () => toast.error('Unable to create item'),
+      });
+    isCorrect: true
+  - snippet: |-
+      const mutation = useMutation({
+        mutationFn: async (payload: CreateItemInput) => {
+          await supabase.from('items').insert(payload).select();
+        },
+      });
+    isCorrect: false
+  - snippet: |-
+      const { error } = await supabase.from('items').insert(payload);
+      if (error) {
+        return;
+      }
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

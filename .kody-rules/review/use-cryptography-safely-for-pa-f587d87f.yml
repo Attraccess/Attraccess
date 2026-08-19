@@ -1,0 +1,41 @@
+title: Use cryptography safely for pairing, authentication, and secrets
+rule: >-
+  When implementing HomeKit pairing, token signing, or secure storage, use
+  maintained primitives from the cryptography library rather than custom crypto
+  or weak hashes. Generate random secrets with secrets or os.urandom, verify
+  signatures/certificates explicitly, and never embed private keys, pairing
+  codes, or credentials in source code.
+severity: critical
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      PAIRING_SECRET = b"homekit-secret-123"
+      digest = hashlib.md5(tag_id).hexdigest()
+    isCorrect: false
+  - snippet: >-
+      import secrets
+
+      from cryptography.hazmat.primitives import hashes, serialization
+
+      from cryptography.hazmat.primitives.asymmetric import ed25519
+
+      from cryptography.exceptions import InvalidSignature
+
+
+      PAIRING_SECRET = secrets.token_bytes(32)
+
+
+      def verify_signed_token(public_key: ed25519.Ed25519PublicKey, signature:
+      bytes, data: bytes) -> bool:
+          try:
+              public_key.verify(signature, data)
+              return True
+          except InvalidSignature:
+              return False
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

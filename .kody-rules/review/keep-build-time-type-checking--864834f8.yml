@@ -1,0 +1,33 @@
+title: Keep build-time type checking and Vite output safe
+rule: >-
+  TypeScript code must compile cleanly with `tsc --noEmit` before Vite bundles
+  it. Avoid `any`, unsafe casts, and non-null assertions unless explicitly
+  justified, and ensure Vite build output does not expose source maps, local
+  filesystem paths, or development-only endpoints.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      {
+        "scripts": {
+          "build": "tsc --noEmit && vite build"
+        }
+      }
+    isCorrect: true
+  - snippet: |-
+      {
+        "scripts": {
+          "build": "vite build"
+        }
+      }
+    isCorrect: false
+  - snippet: |-
+      const issue = response as any;
+      console.log(issue.fields.secretToken);
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

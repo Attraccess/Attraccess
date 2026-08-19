@@ -1,0 +1,39 @@
+title: Validate and constrain Playwright navigation and MCP tool inputs
+rule: >-
+  Browser automation endpoints and MCP tools must not pass untrusted client
+  input directly to page navigation, script evaluation, file access, or command
+  execution. Validate URLs against an explicit allowlist or protocol
+  restriction, reject javascript: and file: schemes unless explicitly required,
+  and validate tool parameters with Zod or equivalent schema validation before
+  invoking Playwright APIs.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      app.post('/navigate', async (req, res) => {
+        await page.goto(req.body.url);
+      });
+    isCorrect: false
+  - snippet: >-
+      const NavigateInput = z.object({ url: z.string().url().refine(u => new
+      URL(u).protocol === 'https:') });
+
+      app.post('/navigate', async (req, res) => {
+        const { url } = NavigateInput.parse(req.body);
+        await page.goto(url);
+      });
+    isCorrect: true
+  - snippet: >-
+      await page.evaluate(`window.location =
+      ${JSON.stringify(userProvidedUrl)}`);
+    isCorrect: false
+  - snippet: >-
+      await page.evaluate((target) => { window.location = target; },
+      validatedUrl);
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

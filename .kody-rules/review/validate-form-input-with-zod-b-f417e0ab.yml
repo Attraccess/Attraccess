@@ -1,0 +1,45 @@
+title: Validate form input with Zod before mutations
+rule: >-
+  Forms using react-hook-form and @hookform/resolvers must validate input with a
+  Zod schema before submitting data to APIs, Supabase, or other mutation layers.
+  Do not submit unvalidated user input.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      import { z } from 'zod';
+      import { zodResolver } from '@hookform/resolvers/zod';
+      import { useForm } from 'react-hook-form';
+
+      const schema = z.object({
+        email: z.string().email(),
+        password: z.string().min(8),
+      });
+
+      const form = useForm<z.infer<typeof schema>>({
+        resolver: zodResolver(schema),
+      });
+
+      const onSubmit = (values: z.infer<typeof schema>) => {
+        mutate(values);
+      };
+    isCorrect: true
+  - snippet: |-
+      const form = useForm();
+
+      const onSubmit = (values: Record<string, unknown>) => {
+        mutate(values);
+      };
+    isCorrect: false
+  - snippet: |-
+      const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        const data = new FormData(e.currentTarget);
+        mutate(Object.fromEntries(data.entries()));
+      };
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

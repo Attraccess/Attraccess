@@ -1,0 +1,23 @@
+title: Use secure-json-parse for untrusted JSON payloads
+rule: >-
+  Do not use JSON.parse on request bodies, uploaded metadata, or other untrusted
+  input in Fastify routes or shared parsers. Use secure-json-parse, which is
+  already part of the Fastify dependency graph, to avoid prototype pollution
+  risks.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: >-
+      import sjp from 'secure-json-parse';
+
+      const config = sjp.parse(rawInput, { protoAction: 'remove',
+      constructorAction: 'remove' });
+    isCorrect: true
+  - snippet: const config = JSON.parse(rawInput);
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

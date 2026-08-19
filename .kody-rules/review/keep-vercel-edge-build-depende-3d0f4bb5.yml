@@ -1,0 +1,31 @@
+title: Keep Vercel Edge build dependencies explicit and auditable
+rule: >-
+  When adding runtime dependencies used by the Qwik/Vercel Edge build, declare
+  them in package.json and keep adapter-specific imports in the Vercel adapter
+  configuration or server entry points. Avoid wildcard dependency ranges and
+  avoid installing build or deployment-only packages as runtime dependencies
+  unless they are required by the rendered application.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      "dependencies": {
+        "undici": "*"
+      }
+    isCorrect: false
+  - snippet: |-
+      "dependencies": {
+        "undici": "^6.0.0"
+      }
+    isCorrect: true
+  - snippet: |-
+      "devDependencies": {
+        "vercel": "^33.5.3"
+      }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

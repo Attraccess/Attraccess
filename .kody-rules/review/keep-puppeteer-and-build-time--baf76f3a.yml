@@ -1,0 +1,30 @@
+title: Keep Puppeteer and build-time scripts out of production dependencies
+rule: >-
+  Puppeteer and other build/prerender/test tooling must remain in
+  devDependencies. Do not import Puppeteer or Node-only build utilities from
+  application source code under src/. Build-time scripts must not rely on
+  runtime secrets or browser-only APIs in ways that leak into the client bundle.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      {
+        "devDependencies": {
+          "puppeteer": "^25.3.0"
+        }
+      }
+    isCorrect: true
+  - snippet: |-
+      import puppeteer from 'puppeteer';
+
+      export async function captureScreenshot(url: string) {
+        const browser = await puppeteer.launch();
+        return browser;
+      }
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

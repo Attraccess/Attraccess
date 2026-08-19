@@ -1,0 +1,18 @@
+title: Validate SDK versions for smart glasses compatibility
+rule: >-
+  Ensure @evenrealities/even_hub_sdk and @jappyjan/even-better-sdk are
+  compatible with your Even Realities G2 hardware. Test SDK updates in isolation
+  before merging.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: npm install @evenrealities/even_hub_sdk@latest
+    isCorrect: false
+  - snippet: npm install @evenrealities/even_hub_sdk@0.0.9
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

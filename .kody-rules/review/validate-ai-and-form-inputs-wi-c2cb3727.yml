@@ -1,0 +1,28 @@
+title: Validate AI and form inputs with Zod schemas
+rule: >-
+  All user-supplied input entering through React Hook Form, AI SDK tool calls,
+  or API routes must be parsed with an explicit Zod schema before use. Reject
+  unknown keys where appropriate and constrain length/shape for strings, arrays,
+  and objects to prevent injection, prototype pollution, and malformed persisted
+  data.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      const NoteSchema = z.object({
+        title: z.string().min(1).max(200),
+        content: z.string().max(50_000),
+      });
+
+      const parsed = NoteSchema.parse(input);
+    isCorrect: true
+  - snippet: |-
+      const parsed = input as NoteInput;
+      await saveNote(parsed);
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

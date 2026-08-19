@@ -1,0 +1,44 @@
+title: Avoid wildcard IAM actions and overly permissive Lambda or DynamoDB policies
+rule: >-
+  When defining IAM roles, policies, or CDKTF AWS resources, avoid actions such
+  as '*' or broad resource statements such as Resource: '*'. Grant
+  least-privilege permissions scoped to the specific AWS services and resources
+  required by the Lambda function or application. This reduces blast radius if
+  credentials or runtime environment variables are compromised.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      new IamPolicy(this, 'policy', {
+        policy: JSON.stringify({
+          Version: '2012-10-17',
+          Statement: [
+            {
+              Effect: 'Allow',
+              Action: '*',
+              Resource: '*',
+            },
+          ],
+        }),
+      });
+    isCorrect: false
+  - snippet: |-
+      new IamPolicy(this, 'policy', {
+        policy: JSON.stringify({
+          Version: '2012-10-17',
+          Statement: [
+            {
+              Effect: 'Allow',
+              Action: ['dynamodb:GetItem', 'dynamodb:PutItem'],
+              Resource: table.arn,
+            },
+          ],
+        }),
+      });
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

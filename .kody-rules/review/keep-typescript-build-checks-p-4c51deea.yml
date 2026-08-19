@@ -1,0 +1,45 @@
+title: Keep TypeScript build checks passing before Vite builds
+rule: >-
+  The build script is `tsc -b && vite build`, so type errors are release
+  blockers. Do not introduce `any`, non-null assertions, or
+  @ts-ignore/@ts-expect-error without a precise justification when touching
+  React components, router loaders/actions, or SDK integration code. Prefer
+  explicit types for props, route params, and data returned from even_hub_sdk or
+  even-toolkit APIs.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      function DeviceCard(props: any) {
+        return <div>{props.device.name}</div>;
+      }
+    isCorrect: false
+  - snippet: |-
+      const device = useDevice();
+      return <div>{device!.firmwareVersion}</div>;
+    isCorrect: false
+  - snippet: |-
+      type DeviceCardProps = {
+        device: {
+          id: string;
+          name: string;
+          firmwareVersion?: string;
+        };
+      };
+
+      function DeviceCard({ device }: DeviceCardProps) {
+        return <div>{device.name}</div>;
+      }
+    isCorrect: true
+  - snippet: >-
+      // @ts-expect-error legacy SDK response shape; remove after even_hub_sdk
+      0.1.x migration
+
+      type LegacyStatus = string;
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

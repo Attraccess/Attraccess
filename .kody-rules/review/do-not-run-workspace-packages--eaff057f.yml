@@ -1,0 +1,20 @@
+title: Do not run workspace packages with sudo or root privileges
+rule: >-
+  pnpm workspace scripts, package managers, and local development servers must
+  not be executed as root. Running pnpm, Node.js, or workspace apps with
+  elevated privileges can turn ordinary dependency or script vulnerabilities
+  into full system compromise. Use unprivileged users/containers and avoid shell
+  scripts or commands that invoke sudo for normal development, build, or test
+  flows.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: '"start": "sudo pnpm run start:api & sudo pnpm run start:web"'
+    isCorrect: false
+  - snippet: '"start": "pnpm run start:api & pnpm run start:web"'
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []

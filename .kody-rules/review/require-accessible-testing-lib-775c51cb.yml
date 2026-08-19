@@ -1,0 +1,21 @@
+title: >-
+  Require accessible testing-library queries and user-event interactions in
+  tests
+rule: >-
+  When writing React Testing Library tests, prefer accessible queries such as
+  `getByRole`, `getByLabelText`, and `getByText`, and use
+  `@testing-library/user-event` for realistic interactions instead of
+  `fireEvent` where possible. Avoid querying by implementation details like
+  class names or internal state.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: 'await user.click(screen.getByRole(''button'', { name: /submit/i }));'
+    isCorrect: true
+  - snippet: fireEvent.click(container.querySelector('.submit-button'));
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []

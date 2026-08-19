@@ -1,0 +1,24 @@
+title: Keep Angular lint and TypeScript checks executable and clean
+rule: >-
+  Changes to Angular/TypeScript source must pass `npm run lint`, and
+  package.json scripts must not disable or stub required checks. Avoid using
+  `any` to silence type errors; prefer explicit types or unknown with narrowing.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: '"lint": "eslint ./src/ -c .eslintrc.js --ext .ts"'
+    isCorrect: true
+  - snippet: '"lint": "echo skipped"'
+    isCorrect: false
+  - snippet: >-
+      function parseResponse(payload: unknown): PrinterState { /* validate and
+      narrow */ }
+    isCorrect: true
+  - snippet: 'function parseResponse(payload: any): PrinterState { return payload; }'
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

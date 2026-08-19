@@ -1,0 +1,21 @@
+title: Never hardcode Ferdig API keys or secrets in the client package
+rule: >-
+  This is a public JavaScript/TypeScript client library for a BaaS. Do not embed
+  API keys, tokens, passwords, or tenant secrets in source files, examples,
+  tests, or build output. Only accept credentials via runtime configuration,
+  environment variables, or consumer-provided options. If an example needs a
+  key, use a placeholder such as process.env.FERDIG_API_KEY or
+  '<FERDIG_API_KEY>'.
+severity: critical
+scope: file
+path: '**/*'
+examples:
+  - snippet: 'const client = new FerdigClient({ apiKey: ''fk_live_abc123secret'' });'
+    isCorrect: false
+  - snippet: 'const client = new FerdigClient({ apiKey: process.env.FERDIG_API_KEY });'
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,30 @@
+title: Keep Firebase configuration out of client-side source code
+rule: >-
+  Do not hard-code Firebase API keys, auth domains, project IDs, or app secrets
+  in frontend source files. Use environment variables or a server-side
+  configuration layer, and ensure only public Firebase web config is exposed
+  while security rules and App Check protect backend resources.
+severity: critical
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      const firebaseConfig = {
+        apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+        authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+        projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+        appId: process.env.REACT_APP_FIREBASE_APP_ID
+      };
+    isCorrect: true
+  - snippet: |-
+      const firebaseConfig = {
+        apiKey: "AIzaSyB...",
+        authDomain: "my-app.firebaseapp.com",
+        projectId: "my-app",
+        appId: "1:1234567890:web:abcdef"
+      };
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []

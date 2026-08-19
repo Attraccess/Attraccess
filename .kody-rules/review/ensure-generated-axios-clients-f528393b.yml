@@ -1,0 +1,33 @@
+title: >-
+  Ensure generated Axios clients expose typed errors, timeouts, and redacted
+  logging
+rule: >-
+  Generated or configured Axios clients must include request timeouts, typed
+  error handling, and logging that does not expose secrets, full authorization
+  headers, request bodies with credentials, or personally identifiable
+  information. Use structured logging with explicit redaction of sensitive
+  fields.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      axios.create({
+        timeout: 15000,
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      logger.info('request_started', { url, method });
+    isCorrect: true
+  - snippet: >-
+      axios.create({ headers: { Authorization: `Bearer ${token}` } });
+
+
+      logger.info('request_started', { url, method, headers:
+      axios.defaults.headers });
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,28 @@
+title: Never expose Supabase service role key to the browser
+rule: >-
+  Use only NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in
+  browser-side code. Keep SUPABASE_SERVICE_ROLE_KEY exclusively in server-only
+  modules (Route Handlers, Server Actions, server components) and never prefix
+  it with NEXT_PUBLIC_. Do not import service-role credentials into client
+  components or shared UI code.
+severity: critical
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+    isCorrect: true
+  - snippet: |-
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY!
+      );
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

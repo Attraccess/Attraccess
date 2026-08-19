@@ -1,0 +1,17 @@
+title: Use structured logging for MQTT and BLE operations
+rule: >-
+  Use Homebridge's logging API for all MQTT and BLE operations. Include context
+  such as device ID, operation type, and error messages. Do not use console.log.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: console.log('Connected to MQTT');
+    isCorrect: false
+  - snippet: this.log.info(`MQTT connected to ${config.mqttUrl}`);
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,18 @@
+title: Do not weaken lint or type-check gates in Nx scripts
+rule: >-
+  Repository lint and type-check commands must preserve strict quality gates. Do
+  not remove --max-warnings=0, skip typecheck/lint targets, or disable affected
+  checks in package.json scripts or Nx target configuration.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: '"lint:strict": "nx affected -t lint -- --max-warnings=0"'
+    isCorrect: true
+  - snippet: '"lint:strict": "nx affected -t lint"'
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

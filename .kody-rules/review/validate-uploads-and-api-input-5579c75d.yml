@@ -1,0 +1,35 @@
+title: Validate uploads and API inputs with Zod before processing
+rule: >-
+  For API routes and server actions that accept uploads or form data, validate
+  request metadata and parsed fields with Zod before using formidable, JSZip, or
+  writing files. Reject invalid content types, oversized files, and malformed
+  fields early.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      const uploadSchema = z.object({
+        labelName: z.string().min(1).max(100),
+        fileType: z.enum(["image/png", "image/jpeg", "application/zip"]),
+      });
+
+      const parsed = uploadSchema.safeParse({
+        labelName: fields.labelName,
+        fileType: files.file?.mimetype,
+      });
+
+      if (!parsed.success) {
+        return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+      }
+    isCorrect: true
+  - snippet: |-
+      const file = files.file;
+      await processUpload(file);
+      return NextResponse.json({ ok: true });
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

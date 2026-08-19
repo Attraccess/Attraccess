@@ -1,0 +1,28 @@
+title: Ensure tests cover invalid and oversized image inputs
+rule: >-
+  Mocha specs should include negative tests for malformed SVG, unsupported
+  encodings, oversized payloads, and invalid output options. Tests must assert
+  that errors are thrown or returned consistently rather than crashing the
+  process.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      it('rejects malformed SVG', function (done) {
+        svg2img('<svg><unclosed>', function (err) {
+          expect(err).to.be.an(Error);
+          done();
+        });
+      });
+    isCorrect: true
+  - snippet: |-
+      it('only tests valid SVG', function (done) {
+        svg2img(validSvg, done);
+      });
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

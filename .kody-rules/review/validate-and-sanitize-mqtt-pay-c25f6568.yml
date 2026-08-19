@@ -1,0 +1,44 @@
+title: >-
+  Validate and sanitize MQTT payloads and discovery topics before parsing or
+  rendering
+rule: >-
+  The plugin processes Home Assistant auto-discovery topics and MQTT messages,
+  often JSON and possibly rendered through templates. Treat all incoming topic
+  names and payloads as untrusted. Validate JSON structure, enforce expected
+  types, catch parse errors, and avoid passing unvalidated payload fields into
+  template rendering, eval-like behavior, dynamic require, or command
+  construction.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      client.on('message', (topic, message) => {
+        const data = JSON.parse(message.toString());
+        accessory.updateCharacteristic(data.value);
+      });
+    isCorrect: false
+  - snippet: |-
+      client.on('message', (topic, message) => {
+        try {
+          const data = JSON.parse(message.toString());
+          if (typeof data?.value !== 'number') return;
+          accessory.updateCharacteristic(data.value);
+        } catch (error) {
+          log.warn(`Ignoring malformed MQTT payload on ${topic}`);
+        }
+      });
+    isCorrect: true
+  - snippet: const rendered = nunjucks.renderString(template, payload);
+    isCorrect: false
+  - snippet: >-
+      const safeContext = { value: sanitizeValue(payload.value), name:
+      sanitizeName(payload.name) };
+
+      const rendered = nunjucks.renderString(template, safeContext);
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

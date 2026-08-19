@@ -1,0 +1,22 @@
+title: Sanitize or restrict Markdown/HTML rendering paths
+rule: >-
+  When rendering AI-generated or user-provided Markdown with react-markdown, do
+  not enable raw HTML without an explicit sanitizer. Prefer remark-gfm with HTML
+  disabled, or pass sanitized HTML only. Never inject untrusted content via
+  dangerouslySetInnerHTML without sanitization.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml>
+        {content}
+      </ReactMarkdown>
+    isCorrect: true
+  - snippet: '<div dangerouslySetInnerHTML={{ __html: aiGeneratedHtml }} />'
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

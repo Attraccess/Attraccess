@@ -1,0 +1,27 @@
+title: Store OctoPrint API keys and connection settings securely
+rule: >-
+  Do not hardcode API keys, passwords, or printer endpoints. Persist secrets
+  only through electron-store or OS keychain-backed storage, load them at
+  runtime, and never log, serialize, or expose them in renderer state, error
+  messages, or network logs.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: >-
+      const apiKey = store.get('octoprint.apiKey'); if (!apiKey) throw new
+      Error('Missing OctoPrint API key');
+    isCorrect: true
+  - snippet: const apiKey = '1234567890ABCDEF1234567890ABCDEF';
+    isCorrect: false
+  - snippet: console.error('OctoPrint request failed', { url, apiKey });
+    isCorrect: false
+  - snippet: >-
+      console.error('OctoPrint request failed', { url, status:
+      error.response?.statusCode });
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,32 @@
+title: Use workspace catalog for shared dependencies
+rule: >-
+  In this Bun/Turbo monorepo, declare dependencies listed in the root
+  package.json `workspaces.catalog` using the `catalog:` protocol instead of
+  duplicating or overriding versions in individual workspace manifests. This
+  keeps Effect, platform, testing, and TypeScript-related packages consistent
+  across apps and packages. Do not add alternative versions, npm aliases, or
+  local file overrides for catalog-managed dependencies unless intentionally
+  changing the root catalog.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      {
+        "dependencies": {
+          "effect": "catalog:"
+        }
+      }
+    isCorrect: true
+  - snippet: |-
+      {
+        "dependencies": {
+          "effect": "4.0.0-beta.45"
+        }
+      }
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

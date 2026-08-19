@@ -1,0 +1,25 @@
+title: Require type checking and tests for Backstage workspace changes
+rule: >-
+  Changes to TypeScript packages and plugins must keep root type checking and
+  workspace tests passing. Do not disable TypeScript errors, skip lib check to
+  hide issues, or remove test/lint scripts to make builds pass.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: '// Verified locally with: yarn tsc:full and yarn test'
+    isCorrect: true
+  - snippet: // @ts-nocheck
+    isCorrect: false
+  - snippet: |-
+      {
+        "scripts": {
+          "test": "echo skipping"
+        }
+      }
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

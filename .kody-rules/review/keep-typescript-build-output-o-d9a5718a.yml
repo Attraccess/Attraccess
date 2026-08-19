@@ -1,0 +1,25 @@
+title: Keep TypeScript build output out of source control
+rule: >-
+  The package build emits JavaScript to the build directory and runtime scripts
+  execute from that output. Ensure compiled build artifacts are not committed or
+  reviewed as source. Changes should be made in TypeScript source files, and
+  generated JavaScript under build should be produced by the build process
+  rather than edited manually.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      src/index.ts
+      // source change compiled with npm run build
+      // build/ is generated and ignored
+    isCorrect: true
+  - snippet: |-
+      build/index.js
+      // manually edited generated JavaScript without changing TypeScript source
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

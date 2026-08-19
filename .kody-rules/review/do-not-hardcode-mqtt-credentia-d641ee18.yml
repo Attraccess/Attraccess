@@ -1,0 +1,27 @@
+title: Do not hardcode MQTT credentials or Prisma connection strings
+rule: >-
+  MQTT broker credentials and database connection strings must come from
+  environment variables or a secret manager, never hardcoded in source files.
+  Use process.env for all connection configuration and avoid committing values
+  such as mqtts://user:password@host or postgresql://user:password@host.
+severity: critical
+scope: file
+path: '**/*'
+examples:
+  - snippet: const client = mqtt.connect('mqtts://mesh:secret@broker.example.com');
+    isCorrect: false
+  - snippet: const client = mqtt.connect(process.env.MQTT_URL);
+    isCorrect: true
+  - snippet: >-
+      const prisma = new PrismaClient({ datasources: { db: { url:
+      'postgresql://admin:pass@localhost:5432/mesh' } } });
+    isCorrect: false
+  - snippet: >-
+      const prisma = new PrismaClient({ datasources: { db: { url:
+      process.env.DATABASE_URL } } });
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

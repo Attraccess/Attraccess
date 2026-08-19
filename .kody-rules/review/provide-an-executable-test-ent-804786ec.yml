@@ -1,0 +1,28 @@
+title: Provide an executable test entry point
+rule: >-
+  Replace the placeholder test script that always exits with an error with a
+  real test command, or remove the script if no tests exist. A failing
+  placeholder hides whether tests are actually configured.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      {
+        "scripts": {
+          "test": "echo \"Error: no test specified\" && exit 1"
+        }
+      }
+    isCorrect: false
+  - snippet: |-
+      {
+        "scripts": {
+          "test": "bun test"
+        }
+      }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

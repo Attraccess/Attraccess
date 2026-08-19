@@ -1,0 +1,29 @@
+title: Do not hardcode SSH or Telnet credentials
+rule: >-
+  Secrets such as passwords, passphrases, private keys, and connection tokens
+  must not be hardcoded in Python source. Load them from environment variables
+  or a configured secret manager, and avoid logging credential values.
+severity: critical
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      client.connect(
+          hostname='10.0.0.5',
+          username='admin',
+          password='SuperSecret123'
+      )
+    isCorrect: false
+  - snippet: |-
+      password = os.environ['SSH_PASSWORD']
+      client.connect(
+          hostname=os.environ['SSH_HOST'],
+          username=os.environ['SSH_USER'],
+          password=password
+      )
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

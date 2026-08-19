@@ -1,0 +1,37 @@
+title: >-
+  Require authenticated request handling and safe authorization defaults in API
+  gateway routes
+rule: >-
+  In Moleculer-web route definitions, do not expose actions without an explicit
+  authentication/authorization strategy. Every route should either set
+  authentication/authorization handlers or explicitly document and constrain
+  public access. Avoid passing raw request inputs directly to service actions
+  without validation or allow-listing.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      const route = {
+        path: "/api",
+        authentication: true,
+        authorization: true,
+        mappingPolicy: "restrict",
+        aliases: {
+          "GET users": "users.list"
+        }
+      };
+    isCorrect: true
+  - snippet: |-
+      const route = {
+        path: "/api",
+        aliases: {
+          "GET users": "users.list",
+          "POST admin": "admin.execute"
+        }
+      };
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []

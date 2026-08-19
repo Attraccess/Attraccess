@@ -1,0 +1,17 @@
+title: Enforce TypeScript typecheck before build
+rule: >-
+  Always run `npm run typecheck` or ensure `tsc -b --noEmit` passes before
+  building or deploying. TypeScript strict mode should catch type errors early.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: npm run typecheck
+    isCorrect: true
+  - snippet: npm run build
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

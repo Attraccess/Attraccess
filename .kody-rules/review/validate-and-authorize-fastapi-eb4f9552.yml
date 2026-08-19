@@ -1,0 +1,31 @@
+title: Validate and authorize FastAPI and Socket.IO inputs and privileged operations
+rule: >-
+  For FastAPI endpoints, Socket.IO handlers, and any operation that executes
+  shell commands, file access, browser automation, runtime creation, or external
+  service calls, authenticate the caller and enforce authorization before side
+  effects. Validate request payloads, file paths, command strings, URLs, and
+  user-provided content. Reject path traversal, unsafe command injection, and
+  unauthorized access to sessions, repositories, files, or runtimes.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: >-
+      @router.post('/run')
+
+      async def run_command(request: RunRequest,
+      user=Depends(require_authenticated_user)):
+          if not is_safe_workspace_path(request.path):
+              raise HTTPException(status_code=400, detail='Invalid path')
+          return await runtime_service.execute(request, user)
+    isCorrect: true
+  - snippet: |-
+      @router.post('/run')
+      async def run_command(request: RunRequest):
+          return subprocess.run(request.command, shell=True)
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

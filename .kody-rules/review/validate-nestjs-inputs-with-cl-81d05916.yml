@@ -1,0 +1,37 @@
+title: Validate NestJS inputs with class-validator and transform payloads
+rule: >-
+  For NestJS controllers and DTOs, always validate request bodies, query
+  parameters, and route parameters using class-validator decorators together
+  with class-transformer. Do not rely on raw request objects or manual type
+  assertions for untrusted input. This applies to authentication endpoints, file
+  uploads, WebSocket payloads, and any API surface exposed to clients.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      @Post('login')
+      login(@Body() body: any) {
+        return this.authService.login(body.email, body.password);
+      }
+    isCorrect: false
+  - snippet: |-
+      export class LoginDto {
+        @IsEmail()
+        email!: string;
+
+        @IsString()
+        @MinLength(8)
+        password!: string;
+      }
+
+      @Post('login')
+      login(@Body() dto: LoginDto) {
+        return this.authService.login(dto.email, dto.password);
+      }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

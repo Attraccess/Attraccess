@@ -1,0 +1,33 @@
+title: Keep lint-staged TypeScript checks aligned with the repository typecheck
+rule: >-
+  lint-staged for TypeScript files must include the same static-analysis
+  guarantees used by the repository scripts: ESLint and TypeScript type
+  checking. Do not configure lint-staged to only auto-fix lint issues or to skip
+  tsc, because staged changes can introduce type errors that are not caught
+  until later.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      {
+        "lint-staged": {
+          "*.{ts,tsx}": "eslint --fix"
+        }
+      }
+    isCorrect: false
+  - snippet: |-
+      {
+        "lint-staged": {
+          "*.{ts,tsx}": [
+            "eslint --fix",
+            "bash -c 'tsc --noEmit'"
+          ]
+        }
+      }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

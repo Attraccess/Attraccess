@@ -1,0 +1,26 @@
+title: Fastify multipart uploads must enforce strict file limits
+rule: >-
+  When registering @fastify/multipart in the API, always configure explicit
+  limits for file size, field size, file count, and header count, and reject
+  unsupported or unsafe upload types instead of relying on defaults.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      await app.register(multipart, {
+        limits: {
+          fileSize: 50 * 1024 * 1024,
+          files: 1,
+          fields: 20,
+          headerPairs: 100
+        }
+      });
+    isCorrect: true
+  - snippet: await app.register(multipart);
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

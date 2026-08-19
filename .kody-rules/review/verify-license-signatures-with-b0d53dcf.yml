@@ -1,0 +1,39 @@
+title: >-
+  Verify license signatures with explicit server-side validation and safe error
+  handling
+rule: >-
+  License verification must run on the server or in trusted tooling, not in
+  browser code. Use @noble/ed25519 to verify signatures against canonicalized
+  license payloads, reject malformed or expired licenses explicitly, and avoid
+  returning raw cryptographic material or stack traces to users. Add tests for
+  valid, tampered, expired, and malformed license cases.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      import { verify } from '@noble/ed25519';
+
+      export async function verifyLicense(payload, signature, publicKey) {
+        if (!payload || !signature || !publicKey) return { valid: false, reason: 'missing-input' };
+        const ok = await verify(signature, payload, publicKey);
+        return ok ? { valid: true } : { valid: false, reason: 'invalid-signature' };
+      }
+    isCorrect: true
+  - snippet: |-
+      try {
+        return { valid: await verify(signature, payload, publicKey) };
+      } catch (err) {
+        return { valid: false, error: String(err) };
+      }
+    isCorrect: false
+  - snippet: |-
+      export function verifyLicense(payload, signature) {
+        return payload.includes('licensed-to');
+      }
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

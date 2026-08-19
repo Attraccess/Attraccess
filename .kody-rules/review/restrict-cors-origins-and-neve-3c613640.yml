@@ -1,0 +1,40 @@
+title: Restrict CORS origins and never use wildcard credentials
+rule: >-
+  Configure CORS with an explicit allowlist of trusted origins instead of
+  `origin: true` or `origin: '*'`. If credentials are enabled, the origin must
+  not be a wildcard and must be validated against environment configuration. For
+  public APIs without cookies, prefer a conservative origin list or disable
+  credentials.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      import cors from 'cors';
+
+      app.use(cors({ origin: '*', credentials: true }));
+    isCorrect: false
+  - snippet: >-
+      import cors from 'cors';
+
+
+      const allowedOrigins = (process.env.ALLOWED_ORIGINS ??
+      '').split(',').filter(Boolean);
+
+
+      app.use(cors({
+        origin(origin, callback) {
+          if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+          } else {
+            callback(new Error('Not allowed by CORS'));
+          }
+        },
+        credentials: false,
+      }));
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

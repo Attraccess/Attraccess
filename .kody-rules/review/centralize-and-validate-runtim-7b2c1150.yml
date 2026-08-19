@@ -1,0 +1,52 @@
+title: Centralize and validate runtime configuration with explicit secrets handling
+rule: >-
+  Define application configuration in a single typed configuration source that
+  reads environment variables through process.env and validates required values
+  at startup. Do not read process.env inline across services/controllers, and
+  never hardcode credentials, JWT secrets, database URLs, SMTP credentials,
+  Redis URLs, or cloud storage keys. Mark secret values as sensitive in
+  configuration types and avoid logging them.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      export interface AppConfig {
+        jwtSecret: string;
+        databaseUrl: string;
+        redisUrl: string;
+        smtpPassword?: string;
+      }
+
+      export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
+        if (!env.JWT_SECRET) {
+          throw new Error('JWT_SECRET is required');
+        }
+
+        if (!env.DATABASE_URL) {
+          throw new Error('DATABASE_URL is required');
+        }
+
+        return {
+          jwtSecret: env.JWT_SECRET,
+          databaseUrl: env.DATABASE_URL,
+          redisUrl: env.REDIS_URL ?? 'redis://localhost:6379',
+          smtpPassword: env.SMTP_PASSWORD,
+        };
+      }
+    isCorrect: true
+  - snippet: |-
+      @Service()
+      export class TokenService {
+        public sign(payload: unknown): string {
+          return jsonwebtoken.sign(payload, process.env.JWT_SECRET as string);
+        }
+      }
+    isCorrect: false
+  - snippet: const jwtSecret = 'hardcoded-secret-for-local-and-prod';
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

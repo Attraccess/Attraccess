@@ -1,0 +1,28 @@
+title: Ensure generated TypeScript compiles and is deterministic
+rule: >-
+  Generated TypeScript interfaces must be syntactically valid and deterministic
+  across runs. Run TypeScript compilation or type-checking on generated output
+  in tests or build scripts, and normalize ordering of schema attributes,
+  components, and imports so repeated generation produces stable output suitable
+  for Prettier formatting and downstream consumption.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      const output = Object.entries(attributes)
+        .map(([key, attr]) => `${key}: ${toTsType(attr)};`)
+        .join('\n');
+    isCorrect: false
+  - snippet: |-
+      const output = Object.entries(attributes)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, attr]) => `${key}: ${toTsType(attr)};`)
+        .join('\n');
+      await ts.transpileModule(output, { compilerOptions: { strict: true } });
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

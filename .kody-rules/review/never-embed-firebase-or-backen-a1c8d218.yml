@@ -1,0 +1,31 @@
+title: Never embed Firebase or backend secrets in client-side code
+rule: >-
+  Do not hardcode Firebase service-account keys, admin SDK credentials, API
+  secrets, JWT signing secrets, or backend private keys in frontend source, Vite
+  environment variables, or workbox/service-worker configuration. Only Firebase
+  public web app configuration values may be exposed in the browser. Use
+  environment-variable placeholders and keep privileged credentials in
+  backend-only runtime configuration.
+severity: critical
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      const firebaseConfig = {
+        apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+      };
+    isCorrect: true
+  - snippet: |-
+      const adminCredential = {
+        type: "service_account",
+        private_key: "-----BEGIN PRIVATE KEY-----...",
+        client_email: "firebase-adminsdk@project.iam.gserviceaccount.com"
+      };
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

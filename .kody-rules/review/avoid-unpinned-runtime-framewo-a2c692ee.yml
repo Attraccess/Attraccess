@@ -1,0 +1,34 @@
+title: Avoid unpinned runtime framework specifiers
+rule: >-
+  Do not use 'latest' for runtime dependencies such as Elysia or bun-types. Use
+  an explicit semver range or exact version so installs and builds are
+  reproducible.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      {
+        "dependencies": {
+          "elysia": "latest"
+        },
+        "devDependencies": {
+          "bun-types": "latest"
+        }
+      }
+    isCorrect: false
+  - snippet: |-
+      {
+        "dependencies": {
+          "elysia": "^1.1.0"
+        },
+        "devDependencies": {
+          "bun-types": "^1.1.0"
+        }
+      }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

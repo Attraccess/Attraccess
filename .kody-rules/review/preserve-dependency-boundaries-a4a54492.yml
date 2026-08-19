@@ -1,0 +1,23 @@
+title: Preserve dependency boundaries for optional RxDB plugins
+rule: >-
+  When changing dependencies or imports for plugin code, keep optional or
+  integration-specific libraries out of the core runtime path unless they are
+  truly required by the main entry point. Plugin-specific dependencies should
+  remain importable only from the corresponding plugin entry so consumers do not
+  receive unnecessary runtime dependencies or broken peer-dependency
+  expectations.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: import { createMongoDbStorage } from './plugins/storage-mongodb/index.ts';
+    isCorrect: true
+  - snippet: |-
+      import { createMongoDbStorage } from 'mongodb';
+      export * from './core/index.ts';
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,54 @@
+title: Use safe authentication and password handling patterns
+rule: >-
+  For authentication, use Passport strategies with explicit JWT secret
+  configuration, token expiration, and audience/issuer validation where
+  applicable. Passwords must be hashed with bcrypt or another approved adaptive
+  hash function; never store plaintext passwords, use weak hash algorithms, or
+  compare passwords with direct string equality. Authentication failures should
+  return generic errors and avoid leaking whether an account exists.
+severity: critical
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: >-
+      import bcrypt from 'bcrypt';
+
+
+      export async function hashPassword(password: string): Promise<string> {
+        return bcrypt.hash(password, 12);
+      }
+
+
+      export async function verifyPassword(password: string, hash: string):
+      Promise<boolean> {
+        return bcrypt.compare(password, hash);
+      }
+    isCorrect: true
+  - snippet: |-
+      if (user.password === requestBody.password) {
+        return authenticate(user);
+      }
+    isCorrect: false
+  - snippet: |-
+      const strategy = new Strategy(
+        {
+          secretOrKey: config.jwtSecret,
+          jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+        },
+        (payload, done) => done(null, payload),
+      );
+    isCorrect: true
+  - snippet: |-
+      const strategy = new Strategy(
+        {
+          secretOrKey: 'secret',
+          jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+        },
+        (payload, done) => done(null, payload),
+      );
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

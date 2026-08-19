@@ -1,0 +1,24 @@
+title: Validate and sanitize external Swagger/OpenAPI input before code generation
+rule: >-
+  When parsing or generating code from Swagger/OpenAPI documents, validate the
+  input schema and sanitize all identifiers, property names, enum values, and
+  template interpolations. Do not trust external schema content; prevent
+  malformed output, prototype pollution, path traversal, or injection into
+  generated TypeScript/Axios code.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      const safeName = pascalcase(String(schema.title ?? 'GeneratedClient'));
+      if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(safeName)) {
+        throw new Error('Invalid generated identifier');
+      }
+    isCorrect: true
+  - snippet: const output = `export interface ${schema.title} { ... }`;
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

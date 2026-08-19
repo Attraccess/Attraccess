@@ -1,0 +1,29 @@
+title: Use structured error handling and avoid logging secrets or full raw payloads
+rule: >-
+  Log errors with enough context to diagnose MQTT/Prisma failures, but do not
+  log connection strings, passwords, tokens, or full raw protobuf payloads that
+  may contain location or user data. Use async error handlers for Express 5 and
+  MQTT event handlers so failures are not swallowed.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: client.on('error', (err) => console.log(err, process.env.MQTT_URL));
+    isCorrect: false
+  - snippet: >-
+      client.on('error', (err) => console.error('MQTT connection error', {
+      message: err.message, code: err.code }));
+    isCorrect: true
+  - snippet: >-
+      app.get('/nodes', async (req, res) => { const nodes = await
+      prisma.node.findMany(); res.json(nodes); });
+    isCorrect: false
+  - snippet: >-
+      app.get('/nodes', async (req, res, next) => { try { const nodes = await
+      prisma.node.findMany(); res.json(nodes); } catch (err) { next(err); } });
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,33 @@
+title: Do not publish packages without a real test command
+rule: >-
+  The npm release script publishes the package after building, but the test
+  script is a placeholder that always fails. Before adding publishable
+  functionality or changing release behavior, replace the placeholder test
+  script with executable tests or an explicit no-op that reflects the project's
+  actual validation process. Do not rely on a failing placeholder as evidence of
+  readiness.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      {
+        "scripts": {
+          "test": "node --test",
+          "release": "tsc && npm publish"
+        }
+      }
+    isCorrect: true
+  - snippet: |-
+      {
+        "scripts": {
+          "test": "echo \"Error: no test specified\" && exit 1",
+          "release": "tsc && npm publish"
+        }
+      }
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

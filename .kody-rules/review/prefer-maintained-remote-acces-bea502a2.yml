@@ -1,0 +1,36 @@
+title: Prefer maintained remote-access libraries over telnetlib3
+rule: >-
+  Telnet transmits credentials and session data in cleartext. Avoid introducing
+  or expanding telnetlib3 usage; prefer SSH via Paramiko or another encrypted
+  transport. If Telnet is unavoidable for legacy devices, isolate it to a
+  clearly documented compatibility layer and never send secrets over unencrypted
+  sessions.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      import telnetlib3
+
+      async def login(host, username, password):
+          reader, writer = await telnetlib3.open_connection(host)
+          await writer.write(password.encode())
+    isCorrect: false
+  - snippet: >-
+      import paramiko
+
+
+      client = paramiko.SSHClient()
+
+      client.load_system_host_keys()
+
+      client.set_missing_host_key_policy(paramiko.RejectPolicy())
+
+      client.connect(host, username=username,
+      password=os.environ['SSH_PASSWORD'])
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

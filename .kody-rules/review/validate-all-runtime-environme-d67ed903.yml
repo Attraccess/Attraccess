@@ -1,0 +1,35 @@
+title: Validate all runtime environment variables with @t3-oss/env-nextjs and Zod
+rule: >-
+  Do not read process.env directly in application code. Define all required and
+  optional environment variables in a centralized env module using
+  @t3-oss/env-nextjs and Zod schemas so invalid or missing configuration fails
+  fast and is type-safe.
+severity: high
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      export const env = createEnv({
+        server: {
+          DATABASE_URL: z.string().url(),
+          NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+        },
+        client: {
+          NEXT_PUBLIC_APP_URL: z.string().url().optional(),
+        },
+        runtimeEnv: {
+          DATABASE_URL: process.env.DATABASE_URL,
+          NODE_ENV: process.env.NODE_ENV,
+          NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+        },
+      });
+    isCorrect: true
+  - snippet: |-
+      const dbPath = process.env.DATABASE_URL;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

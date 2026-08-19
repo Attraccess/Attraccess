@@ -1,0 +1,33 @@
+title: Keep TypeScript and ESLint checks strict and un-bypassed
+rule: >-
+  Do not weaken type safety or linting to make code compile. Avoid `any`,
+  `@ts-ignore`, and disabled ESLint rules unless accompanied by a precise
+  justification comment. Prefer typed narrowing, Zod validation, or explicit
+  error handling instead of suppressing diagnostics.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      function getLength(value: unknown): number {
+        if (typeof value === 'string') return value.length;
+        return 0;
+      }
+    isCorrect: true
+  - snippet: |-
+      // @ts-ignore
+      const length = maybeUndefined.length;
+    isCorrect: false
+  - snippet: >-
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any --
+      third-party library has no types
+
+      const chart = (window as any).chartInstance;
+    isCorrect: true
+  - snippet: 'const data: any = await response.json();'
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

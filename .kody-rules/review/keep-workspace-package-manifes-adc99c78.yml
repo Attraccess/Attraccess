@@ -1,0 +1,44 @@
+title: Keep workspace package manifests dependency-clean and runtime-safe
+rule: >-
+  In this npm workspaces repository, runtime dependencies required by published
+  packages must be declared in the package's own dependencies, not only in root
+  devDependencies or another workspace package. Do not add unused dependencies,
+  and do not import packages that are only peer/optional unless the package
+  explicitly documents and handles their absence.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      {
+        "name": "@playwright/mcp",
+        "dependencies": {},
+        "devDependencies": {
+          "zod": "^4.0.0"
+        }
+      }
+      // src/server.ts imports zod at runtime
+    isCorrect: false
+  - snippet: |-
+      {
+        "name": "@playwright/mcp",
+        "dependencies": {
+          "zod": "^4.0.0"
+        }
+      }
+      // src/server.ts imports zod at runtime
+    isCorrect: true
+  - snippet: |-
+      {
+        "name": "@playwright/mcp-extension",
+        "dependencies": {
+          "left-pad": "^1.3.0"
+        }
+      }
+      // no source file imports left-pad
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

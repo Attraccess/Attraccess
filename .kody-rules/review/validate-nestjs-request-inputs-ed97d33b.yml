@@ -1,0 +1,40 @@
+title: Validate NestJS request inputs with class-validator and zod
+rule: >-
+  All NestJS controllers, DTOs, and service inputs must validate external data
+  explicitly using class-validator/class-transformer or zod schemas. Do not
+  trust request bodies, query params, WebSocket payloads, file uploads, or
+  callback payloads.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: >-
+      @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true
+      }))
+
+      export class DeviceController {
+        @Post()
+        create(@Body() dto: CreateDeviceDto) {
+          return this.devices.create(dto);
+        }
+      }
+    isCorrect: true
+  - snippet: |-
+      const CreateDeviceSchema = z.object({
+        name: z.string().min(1).max(120),
+        deviceId: z.string().uuid(),
+      });
+
+      const device = CreateDeviceSchema.parse(req.body);
+    isCorrect: true
+  - snippet: |-
+      @Post()
+      create(@Body() body: any) {
+        return this.devices.create(body);
+      }
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

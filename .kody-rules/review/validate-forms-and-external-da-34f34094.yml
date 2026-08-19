@@ -1,0 +1,29 @@
+title: >-
+  Validate forms and external data with Zod schemas before submission or state
+  updates
+rule: >-
+  Use Zod schemas with react-hook-form resolvers or explicit parse/safeParse
+  calls for user input, API responses, route parameters, and persisted data
+  before using the values in queries, navigation, storage, or rendering logic.
+  Do not cast unknown data directly to a TypeScript type without runtime
+  validation.
+severity: medium
+scope: file
+path: '**/*'
+examples:
+  - snippet: |-
+      const values = JSON.parse(localStorage.getItem('profile')) as Profile;
+      updateProfile(values);
+    isCorrect: false
+  - snippet: |-
+      const parsed = profileSchema.safeParse(JSON.parse(rawProfile));
+      if (!parsed.success) {
+        throw new Error('Invalid profile data');
+      }
+      updateProfile(parsed.data);
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,54 @@
+title: Use React Query for Supabase data fetching and mutations
+rule: >-
+  Do not call Supabase directly inside React components for reads or writes.
+  Wrap Supabase operations in TanStack Query hooks: use `useQuery` for reads and
+  `useMutation` with invalidation for writes. This keeps auth/session handling,
+  caching, loading/error states, and refetch behavior consistent.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      function Profile() {
+        const [profile, setProfile] = useState<Profile | null>(null);
+
+        useEffect(() => {
+          supabase.from('profiles').select('*').single().then(({ data }) => setProfile(data));
+        }, []);
+
+        return <div>{profile?.email}</div>;
+      }
+    isCorrect: false
+  - snippet: |-
+      export function useProfile(userId: string) {
+        return useQuery({
+          queryKey: ['profile', userId],
+          queryFn: async () => {
+            const { data, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', userId)
+              .single();
+
+            if (error) throw error;
+            return profileSchema.parse(data);
+          },
+        });
+      }
+
+      export function useUpdateProfile() {
+        const queryClient = useQueryClient();
+
+        return useMutation({
+          mutationFn: updateProfile,
+          onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['profile', variables.userId] });
+          },
+        });
+      }
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

@@ -1,0 +1,27 @@
+title: Keep TypeScript declarations aligned with runtime exports
+rule: >-
+  Any change to public exports, function signatures, or option objects in source
+  files must be reflected in the TypeScript declarations under dist or the
+  source type definitions. Run npm run type-check before publishing and avoid
+  using `any` for public API parameters; prefer explicit interfaces for
+  image/context options.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: >-
+      export interface EncodeJpegOptions {
+        quality?: number;
+      }
+
+
+      export function encodeJPEG(image: Image, options?: EncodeJpegOptions):
+      Uint8Array;
+    isCorrect: true
+  - snippet: 'export function encodeJPEG(image: any, options?: any): any;'
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

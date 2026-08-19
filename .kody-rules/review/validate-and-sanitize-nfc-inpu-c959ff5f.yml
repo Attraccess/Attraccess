@@ -1,0 +1,36 @@
+title: Validate and sanitize NFC input before HomeKit accessory actions
+rule: >-
+  Treat all data read from NFC tags, USB devices, or other external hardware as
+  untrusted. Before using it to trigger HomeKit accessory state changes, parse
+  it into a strict schema, reject oversized or malformed payloads, and map tag
+  identifiers through an allowlist or signed/encrypted token format instead of
+  executing raw values.
+severity: high
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      tag_id = read_nfc_tag()
+      accessory.set_state(tag_id)
+    isCorrect: false
+  - snippet: |-
+      tag_payload = read_nfc_tag()
+      try:
+          token = cbor2.loads(tag_payload)
+      except Exception:
+          raise InvalidTagError("malformed tag payload")
+
+      if not isinstance(token, dict) or token.get("v") != 1:
+          raise InvalidTagError("unsupported tag schema")
+
+      allowed_action = TAG_ACTION_ALLOWLIST.get(token.get("action"))
+      if allowed_action is None:
+          raise InvalidTagError("unknown tag action")
+
+      accessory.apply_action(allowed_action)
+    isCorrect: true
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

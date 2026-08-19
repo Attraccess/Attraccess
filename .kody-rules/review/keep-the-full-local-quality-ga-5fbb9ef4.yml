@@ -1,0 +1,18 @@
+title: Keep the full local quality gate passing before merge
+rule: >-
+  Changes must pass the repository's local quality gate: formatting check,
+  ESLint, TypeScript typecheck, and Vitest unit/web tests. Do not merge changes
+  that fail any of these checks.
+severity: medium
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: npm run check
+    isCorrect: true
+  - snippet: npm run lint:fix && git commit -am 'wip'
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false

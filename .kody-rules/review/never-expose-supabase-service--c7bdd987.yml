@@ -1,0 +1,36 @@
+title: Never expose Supabase service role key in client code
+rule: >-
+  Client-side Supabase usage must only use the anon/public key. Service role
+  keys bypass Row Level Security and must never be imported, hardcoded, or
+  exposed in Vite/React browser code.
+severity: critical
+scope: pull-request
+path: '**/*'
+examples:
+  - snippet: |-
+      import { createClient } from '@supabase/supabase-js';
+
+      export const supabase = createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_ANON_KEY
+      );
+    isCorrect: true
+  - snippet: |-
+      import { createClient } from '@supabase/supabase-js';
+
+      export const supabase = createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
+      );
+    isCorrect: false
+  - snippet: |-
+      const supabase = createClient(
+        'https://example.supabase.co',
+        'service_role.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+      );
+    isCorrect: false
+inheritance:
+  inheritable: true
+  exclude: []
+  include: []
+enabled: false
