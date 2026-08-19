@@ -28,6 +28,7 @@ describe('GuestsService', () => {
     save: jest.Mock;
     update: jest.Mock;
     createQueryBuilder: jest.Mock;
+    manager: { transaction: jest.Mock };
   };
   let authDetailRepository: {
     findOne: jest.Mock;
@@ -51,6 +52,7 @@ describe('GuestsService', () => {
     recordSuccess: jest.Mock;
   };
   let usersService: { deleteOne: jest.Mock };
+  let metricsService: { usersTotal: { inc: jest.Mock; dec: jest.Mock } };
 
   const makeGuest = (partial: Partial<User> = {}): User =>
     ({
@@ -71,6 +73,7 @@ describe('GuestsService', () => {
       findAndCount: jest.fn().mockResolvedValue([[], 0]),
       save: jest.fn().mockImplementation(async (user: User) => ({ id: 1, ...user })),
       update: jest.fn().mockResolvedValue({ affected: 1 }),
+      manager: { transaction: jest.fn() },
       createQueryBuilder: jest.fn().mockReturnValue({
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -91,6 +94,11 @@ describe('GuestsService', () => {
       delete: jest.fn().mockResolvedValue({ affected: 1 }),
       createQueryBuilder: jest.fn().mockReturnValue(authDetailUpdateQueryBuilder),
     };
+    userRepository.manager.transaction.mockImplementation(async (callback) =>
+      callback({
+        getRepository: jest.fn((entity) => (entity === User ? userRepository : authDetailRepository)),
+      }),
+    );
     encryptionService = {
       encrypt: jest.fn().mockImplementation((value: string) => `encrypted:${value}`),
       decryptIfEncrypted: jest.fn().mockImplementation((value: string) =>
@@ -115,10 +123,7 @@ describe('GuestsService', () => {
         { provide: SettingsService, useValue: { getUrl: jest.fn().mockResolvedValue('http://localhost:3000') } },
         { provide: BruteForceProtectionService, useValue: bruteForce },
         { provide: UsersService, useValue: usersService },
-        {
-          provide: MetricsService,
-          useValue: { usersTotal: { inc: jest.fn(), dec: jest.fn() } },
-        },
+        { provide: MetricsService, useValue: (metricsService = { usersTotal: { inc: jest.fn(), dec: jest.fn() } }) },
       ],
     }).compile();
 
@@ -127,6 +132,28 @@ describe('GuestsService', () => {
   });
 
   describe('create', () => {
+    it('rolls back guest creation and does not increment metrics when provisioning fails', async () => {
+      const transactionalUserRepository = { save: jest.fn().mockResolvedValue(makeGuest()) };
+      const transactionalAuthRepository = {
+        findOne: jest.fn().mockResolvedValue(null),
+        save: jest.fn().mockRejectedValue(new Error('credential storage failed')),
+      };
+      userRepository.manager.transaction.mockImplementation(async (callback) =>
+        callback({
+          getRepository: jest.fn((entity) =>
+            entity === User ? transactionalUserRepository : transactionalAuthRepository,
+          ),
+        }),
+      );
+
+      await expect(service.create({ name: 'John Doe' })).rejects.toThrow('credential storage failed');
+
+      expect(userRepository.manager.transaction).toHaveBeenCalled();
+      expect(transactionalUserRepository.save).toHaveBeenCalled();
+      expect(userRepository.save).not.toHaveBeenCalled();
+      expect(metricsService.usersTotal.inc).not.toHaveBeenCalled();
+    });
+
     it('creates a guest with a 4-digit code and provisions a credential', async () => {
       const { guest, enrollment } = await service.create({ name: 'John Doe' });
 
@@ -234,6 +261,7 @@ describe('GuestsService', () => {
 
       expect(result.id).toBe(1);
       expect(bruteForce.recordSuccess).toHaveBeenCalled();
+      expect(authDetailUpdateQueryBuilder.set).toHaveBeenCalledWith({ totpLastTimeStep: expect.any(Number) });
     });
 
     it('rejects a replayed code whose time step was already consumed concurrently', async () => {

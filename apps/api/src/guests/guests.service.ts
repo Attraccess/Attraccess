@@ -73,14 +73,21 @@ export class GuestsService {
     user.isEmailVerified = false;
     user.externalIdentifier = null;
 
-    let saved: User | undefined;
+    let created: { saved: User; enrollment: GuestEnrollmentDto } | undefined;
     for (let attempt = 0; attempt < GUEST_CODE_MAX_ATTEMPTS; attempt++) {
       user.guestCode = await this.generateUniqueGuestCode();
       try {
-        saved = await this.userRepository.save(user);
+        created = await this.userRepository.manager.transaction(async (manager) => {
+          const saved = await manager.getRepository(User).save(user);
+          const enrollment = await this.provision(saved, manager.getRepository(AuthenticationDetail), false);
+          return { saved, enrollment };
+        });
         break;
       } catch (error) {
-        if (this.isUniqueConstraintViolationForColumn(error, 'guestCode')) {
+        if (
+          this.isUniqueConstraintViolationForColumn(error, 'guestCode') ||
+          this.isUniqueConstraintViolationForColumn(error, 'totpSecretHash')
+        ) {
           continue;
         }
         if (this.isUniqueConstraintViolation(error)) {
@@ -89,14 +96,13 @@ export class GuestsService {
         throw error;
       }
     }
-    if (!saved) {
+    if (!created) {
       throw new InternalServerErrorException('Could not allocate a unique guest code');
     }
     this.metricsService.usersTotal.inc();
 
-    const enrollment = await this.provision(saved);
-    this.logger.log(`Created guest user ${saved.id} (code ${saved.guestCode})`);
-    return { guest: this.toGuestDto(saved, true), enrollment };
+    this.logger.log(`Created guest user ${created.saved.id} (code ${created.saved.guestCode})`);
+    return { guest: this.toGuestDto(created.saved, true), enrollment: created.enrollment };
   }
 
   async findMany(options: {
@@ -331,8 +337,12 @@ export class GuestsService {
     return guest;
   }
 
-  private async provision(user: User): Promise<GuestEnrollmentDto> {
-    const existing = await this.getGuestOtpDetail(user.id);
+  private async provision(
+    user: User,
+    repository = this.authenticationDetailRepository,
+    retryOnCollision = true,
+  ): Promise<GuestEnrollmentDto> {
+    const existing = await this.getGuestOtpDetail(user.id, repository);
     for (let attempt = 0; attempt < GUEST_CREDENTIAL_MAX_ATTEMPTS; attempt++) {
       const secret = await this.generateSecret();
       const detail = existing ?? new AuthenticationDetail();
@@ -344,11 +354,11 @@ export class GuestsService {
       detail.totpLastTimeStep = null;
 
       try {
-        await this.authenticationDetailRepository.save(detail);
+        await repository.save(detail);
         const otpauthUrl = await this.buildOtpauthUrl(user, secret);
         return { guestCode: user.guestCode as string, secret, otpauthUrl };
       } catch (error) {
-        if (this.isUniqueConstraintViolationForColumn(error, 'totpSecretHash')) {
+        if (retryOnCollision && this.isUniqueConstraintViolationForColumn(error, 'totpSecretHash')) {
           continue;
         }
         throw error;
@@ -369,8 +379,11 @@ export class GuestsService {
     return user;
   }
 
-  private async getGuestOtpDetail(userId: number): Promise<AuthenticationDetail | null> {
-    return this.authenticationDetailRepository.findOne({
+  private async getGuestOtpDetail(
+    userId: number,
+    repository = this.authenticationDetailRepository,
+  ): Promise<AuthenticationDetail | null> {
+    return repository.findOne({
       where: { userId, type: AuthenticationType.GUEST_OTP },
     });
   }
