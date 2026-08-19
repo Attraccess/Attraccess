@@ -8,6 +8,10 @@ import { SSOProviderType } from './ssoProvider.entity';
 @Entity()
 @Index(['userId', 'type'], { unique: true })
 @Index(['providerType', 'providerId', 'ssoSubject'], { unique: true, where: '"providerType" IS NOT NULL AND "providerId" IS NOT NULL AND "ssoSubject" IS NOT NULL' })
+@Index('IDX_authentication_detail_guest_otp_secret_hash', ['totpSecretHash'], {
+  unique: true,
+  where: '"type" = \'guest_otp\' AND "totpSecretHash" IS NOT NULL',
+})
 export class AuthenticationDetail {
   @PrimaryGeneratedColumn()
   @ApiProperty({
@@ -77,6 +81,14 @@ export class AuthenticationDetail {
     required: false,
   })
   totpSecret?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  @Exclude()
+  @ApiProperty({
+    description: 'Deterministic hash used to enforce uniqueness of guest TOTP secrets',
+    required: false,
+  })
+  totpSecretHash?: string | null;
 
   @Column({ type: 'datetime', nullable: true })
   @Exclude()

@@ -151,3 +151,4 @@ export * from './1783200000000-rename-owner-role-to-administrator';
 export * from './1765442000000-form-field-position';
 export * from './1783300000000-guest-accounts-user';
 export * from './1783310000000-guest-accounts-auth-detail';
+export * from './1783320000000-guest-accounts-totp-secret-hash';

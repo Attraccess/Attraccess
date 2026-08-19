@@ -1,8 +1,12 @@
-import { IsBoolean, IsEmail, IsIn, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEmail, IsEmpty, IsIn, IsOptional, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { AuthenticationType } from '@attraccess/database-entities';
 
 export class CreateUserDto {
+  @IsOptional()
+  @IsEmpty({ message: 'Guest accounts can only be created by an administrator' })
+  userType?: never;
+
   @ApiProperty({
     example: 'johndoe',
     description: 'The username for the new user',

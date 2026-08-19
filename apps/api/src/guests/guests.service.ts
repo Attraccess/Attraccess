@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, In, FindOptionsWhere, QueryFailedError, Repository } from 'typeorm';
-import { randomInt } from 'crypto';
+import { createHash, randomInt } from 'crypto';
 import {
   AuthenticationDetail,
   AuthenticationType,
@@ -31,6 +31,7 @@ import { GuestEnrollmentDto } from './dtos/guest-enrollment.dto';
 import { GuestAccessDto, GuestAccessEntryDto } from './dtos/guest-access.dto';
 
 const GUEST_CODE_MAX_ATTEMPTS = 25;
+const GUEST_CREDENTIAL_MAX_ATTEMPTS = 25;
 
 @Injectable()
 export class GuestsService {
@@ -68,19 +69,28 @@ export class GuestsService {
     user.username = name;
     user.email = email;
     user.userType = UserType.GUEST;
-    user.guestCode = await this.generateUniqueGuestCode();
     user.guestEnabled = true;
     user.isEmailVerified = false;
     user.externalIdentifier = null;
 
-    let saved: User;
-    try {
-      saved = await this.userRepository.save(user);
-    } catch (error) {
-      if (this.isUniqueConstraintViolation(error)) {
-        throw new BadRequestException('A guest with this name, email or code already exists');
+    let saved: User | undefined;
+    for (let attempt = 0; attempt < GUEST_CODE_MAX_ATTEMPTS; attempt++) {
+      user.guestCode = await this.generateUniqueGuestCode();
+      try {
+        saved = await this.userRepository.save(user);
+        break;
+      } catch (error) {
+        if (this.isUniqueConstraintViolationForColumn(error, 'guestCode')) {
+          continue;
+        }
+        if (this.isUniqueConstraintViolation(error)) {
+          throw new BadRequestException('A guest with this name or email already exists');
+        }
+        throw error;
       }
-      throw error;
+    }
+    if (!saved) {
+      throw new InternalServerErrorException('Could not allocate a unique guest code');
     }
     this.metricsService.usersTotal.inc();
 
@@ -322,27 +332,30 @@ export class GuestsService {
   }
 
   private async provision(user: User): Promise<GuestEnrollmentDto> {
-    const secret = await this.generateSecret();
-    const encryptedSecret = this.encryptionService.encrypt(secret);
-    const otpauthUrl = await this.buildOtpauthUrl(user, secret);
-
     const existing = await this.getGuestOtpDetail(user.id);
-    if (existing) {
-      existing.totpSecret = encryptedSecret;
-      existing.totpEnabledAt = new Date();
-      existing.totpLastTimeStep = null;
-      await this.authenticationDetailRepository.save(existing);
-    } else {
-      const detail = new AuthenticationDetail();
+    for (let attempt = 0; attempt < GUEST_CREDENTIAL_MAX_ATTEMPTS; attempt++) {
+      const secret = await this.generateSecret();
+      const detail = existing ?? new AuthenticationDetail();
       detail.userId = user.id;
       detail.type = AuthenticationType.GUEST_OTP;
-      detail.totpSecret = encryptedSecret;
+      detail.totpSecret = this.encryptionService.encrypt(secret);
+      detail.totpSecretHash = this.hashGuestOtpSecret(secret);
       detail.totpEnabledAt = new Date();
       detail.totpLastTimeStep = null;
-      await this.authenticationDetailRepository.save(detail);
+
+      try {
+        await this.authenticationDetailRepository.save(detail);
+        const otpauthUrl = await this.buildOtpauthUrl(user, secret);
+        return { guestCode: user.guestCode as string, secret, otpauthUrl };
+      } catch (error) {
+        if (this.isUniqueConstraintViolationForColumn(error, 'totpSecretHash')) {
+          continue;
+        }
+        throw error;
+      }
     }
 
-    return { guestCode: user.guestCode as string, secret, otpauthUrl };
+    throw new InternalServerErrorException('Could not allocate a unique guest TOTP secret');
   }
 
   private async findGuestEntityOrThrow(id: number): Promise<User> {
@@ -393,6 +406,18 @@ export class GuestsService {
       driverError.code === '23505' ||
       (driverError.code === 'SQLITE_CONSTRAINT' && driverError.message?.includes('UNIQUE constraint failed'))
     );
+  }
+
+  private isUniqueConstraintViolationForColumn(error: unknown, column: string): boolean {
+    if (!this.isUniqueConstraintViolation(error)) {
+      return false;
+    }
+    const driverError = (error as QueryFailedError).driverError as { message?: string };
+    return driverError.message?.includes(column) ?? false;
+  }
+
+  private hashGuestOtpSecret(secret: string): string {
+    return createHash('sha256').update(secret, 'utf8').digest('base64url');
   }
 
   private async assertNameAvailable(name: string, excludeUserId?: number): Promise<void> {

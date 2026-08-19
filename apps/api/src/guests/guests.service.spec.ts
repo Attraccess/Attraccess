@@ -3,7 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
 import { AuthenticationDetail, AuthenticationType, ResourceIntroduction, User, UserType } from '@attraccess/database-entities';
-import { verify } from 'otplib';
+import { generateSecret, verify } from 'otplib';
 import { GuestsService } from './guests.service';
 import { EncryptionService } from '../encryption/encryption.service';
 import { SettingsService } from '../settings/settings.service';
@@ -18,6 +18,7 @@ jest.mock('otplib', () => ({
 }));
 
 const mockedVerify = verify as jest.Mock;
+const mockedGenerateSecret = generateSecret as jest.Mock;
 
 describe('GuestsService', () => {
   let service: GuestsService;
@@ -154,15 +155,43 @@ describe('GuestsService', () => {
       await expect(service.create({ name: 'John Doe' })).rejects.toThrow(BadRequestException);
     });
 
-    it('returns a validation error when a concurrent create violates a unique constraint', async () => {
+    it('retries a concurrent guest-code collision with a new code', async () => {
       const error = new QueryFailedError('INSERT INTO user', [], {
         code: 'SQLITE_CONSTRAINT',
         message: 'UNIQUE constraint failed: user.guestCode',
       });
-      userRepository.save.mockRejectedValue(error);
+      const persistedCodes: string[] = [];
+      userRepository.save
+        .mockImplementationOnce(async (user: User) => {
+          persistedCodes.push(user.guestCode as string);
+          throw error;
+        })
+        .mockImplementationOnce(async (user: User) => {
+          persistedCodes.push(user.guestCode as string);
+          return { id: 1, ...user };
+        });
+      const generateGuestCode = jest.spyOn(service as never, 'generateUniqueGuestCode' as never);
+      generateGuestCode.mockResolvedValueOnce('1234').mockResolvedValueOnce('5678');
 
-      await expect(service.create({ name: 'John Doe' })).rejects.toThrow(BadRequestException);
-      expect(authDetailRepository.save).not.toHaveBeenCalled();
+      await expect(service.create({ name: 'John Doe' })).resolves.toEqual(
+        expect.objectContaining({ guest: expect.objectContaining({ guestCode: '5678' }) }),
+      );
+      expect(userRepository.save).toHaveBeenCalledTimes(2);
+      expect(persistedCodes).toEqual(['1234', '5678']);
+    });
+
+    it('regenerates a secret when its hash collides during initial provisioning', async () => {
+      const error = new QueryFailedError('INSERT INTO authentication_detail', [], {
+        code: 'SQLITE_CONSTRAINT',
+        message: 'UNIQUE constraint failed: authentication_detail.totpSecretHash',
+      });
+      mockedGenerateSecret.mockReturnValueOnce('FIRSTSECRET').mockReturnValueOnce('SECONDSECRET');
+      authDetailRepository.save.mockRejectedValueOnce(error).mockImplementationOnce(async (detail) => detail);
+
+      await expect(service.create({ name: 'John Doe' })).resolves.toEqual(
+        expect.objectContaining({ enrollment: expect.objectContaining({ secret: 'SECONDSECRET' }) }),
+      );
+      expect(authDetailRepository.save).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -295,7 +324,35 @@ describe('GuestsService', () => {
 
       expect(enrollment.secret).toBe('JBSWY3DPEHPK3PXP');
       expect(authDetailRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ totpLastTimeStep: null, totpSecret: 'encrypted:JBSWY3DPEHPK3PXP' }),
+        expect.objectContaining({
+          totpLastTimeStep: null,
+          totpSecret: 'encrypted:JBSWY3DPEHPK3PXP',
+          totpSecretHash: expect.any(String),
+        }),
+      );
+    });
+
+    it('regenerates a secret when its hash collides during rotation', async () => {
+      const error = new QueryFailedError('UPDATE authentication_detail', [], {
+        code: 'SQLITE_CONSTRAINT',
+        message: 'UNIQUE constraint failed: authentication_detail.totpSecretHash',
+      });
+      userRepository.findOne.mockResolvedValue(makeGuest());
+      authDetailRepository.findOne.mockResolvedValue({
+        id: 5,
+        userId: 1,
+        type: AuthenticationType.GUEST_OTP,
+        totpSecret: 'encrypted:OLD',
+        totpSecretHash: 'old-hash',
+        totpLastTimeStep: 42,
+      });
+      mockedGenerateSecret.mockReturnValueOnce('FIRSTSECRET').mockReturnValueOnce('SECONDSECRET');
+      authDetailRepository.save.mockRejectedValueOnce(error).mockImplementationOnce(async (detail) => detail);
+
+      await expect(service.rotate(1)).resolves.toEqual(expect.objectContaining({ secret: 'SECONDSECRET' }));
+      expect(authDetailRepository.save).toHaveBeenCalledTimes(2);
+      expect(authDetailRepository.save.mock.calls[1][0]).toEqual(
+        expect.objectContaining({ totpSecret: 'encrypted:SECONDSECRET', totpLastTimeStep: null }),
       );
     });
 
