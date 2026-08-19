@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import { QueryFailedError } from 'typeorm';
 import { AuthenticationDetail, AuthenticationType, ResourceIntroduction, User, UserType } from '@attraccess/database-entities';
 import { verify } from 'otplib';
 import { GuestsService } from './guests.service';
@@ -152,6 +153,17 @@ describe('GuestsService', () => {
 
       await expect(service.create({ name: 'John Doe' })).rejects.toThrow(BadRequestException);
     });
+
+    it('returns a validation error when a concurrent create violates a unique constraint', async () => {
+      const error = new QueryFailedError('INSERT INTO user', [], {
+        code: 'SQLITE_CONSTRAINT',
+        message: 'UNIQUE constraint failed: user.guestCode',
+      });
+      userRepository.save.mockRejectedValue(error);
+
+      await expect(service.create({ name: 'John Doe' })).rejects.toThrow(BadRequestException);
+      expect(authDetailRepository.save).not.toHaveBeenCalled();
+    });
   });
 
   describe('verifyGuestOtp', () => {
@@ -256,6 +268,7 @@ describe('GuestsService', () => {
       userRepository.findOne.mockResolvedValue(makeGuest({ guestEnabled: false }));
 
       await expect(service.verifyGuestOtp('1234', '123456', '1.2.3.4')).rejects.toThrow(UnauthorizedException);
+      expect(bruteForce.recordFailure).toHaveBeenCalledWith('guest_otp', '1.2.3.4', 1, '1234');
     });
 
     it('rejects a guest without a credential', async () => {
@@ -263,6 +276,7 @@ describe('GuestsService', () => {
       authDetailRepository.findOne.mockResolvedValue(null);
 
       await expect(service.verifyGuestOtp('1234', '123456', '1.2.3.4')).rejects.toThrow(UnauthorizedException);
+      expect(bruteForce.recordFailure).toHaveBeenCalledWith('guest_otp', '1.2.3.4', 1, '1234');
     });
   });
 
@@ -303,20 +317,16 @@ describe('GuestsService', () => {
   });
 
   describe('delete', () => {
-    it('deletes the user first, then releases the guest code', async () => {
+    it('delegates deletion and lets the user lifecycle release the guest code atomically', async () => {
       userRepository.findOne.mockResolvedValue(makeGuest());
 
       await service.delete(1);
 
       expect(usersService.deleteOne).toHaveBeenCalledWith(1);
-      expect(userRepository.update).toHaveBeenCalledWith(1, { guestCode: null });
-      // The code must only be released after a successful deletion.
-      expect(usersService.deleteOne.mock.invocationCallOrder[0]).toBeLessThan(
-        userRepository.update.mock.invocationCallOrder[0],
-      );
+      expect(userRepository.update).not.toHaveBeenCalled();
     });
 
-    it('keeps the guest code when deletion fails', async () => {
+    it('does not independently release the guest code when deletion fails', async () => {
       userRepository.findOne.mockResolvedValue(makeGuest());
       usersService.deleteOne.mockRejectedValue(new Error('User has active usage sessions'));
 

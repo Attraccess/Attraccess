@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, In, FindOptionsWhere, Repository } from 'typeorm';
+import { ILike, In, FindOptionsWhere, QueryFailedError, Repository } from 'typeorm';
 import { randomInt } from 'crypto';
 import {
   AuthenticationDetail,
@@ -73,7 +73,15 @@ export class GuestsService {
     user.isEmailVerified = false;
     user.externalIdentifier = null;
 
-    const saved = await this.userRepository.save(user);
+    let saved: User;
+    try {
+      saved = await this.userRepository.save(user);
+    } catch (error) {
+      if (this.isUniqueConstraintViolation(error)) {
+        throw new BadRequestException('A guest with this name, email or code already exists');
+      }
+      throw error;
+    }
     this.metricsService.usersTotal.inc();
 
     const enrollment = await this.provision(saved);
@@ -163,13 +171,7 @@ export class GuestsService {
 
   async delete(id: number): Promise<void> {
     const user = await this.findGuestEntityOrThrow(id);
-    // Delete first: deleteOne can still fail (e.g. active usage sessions) and releasing the
-    // code beforehand would leave a live guest unable to authenticate while their code is
-    // already reissuable to someone else.
     await this.usersService.deleteOne(user.id);
-    // Release the short guest code so it can be reissued to a future guest. The row is
-    // soft-deleted at this point but the unique index still covers it until purged.
-    await this.userRepository.update(user.id, { guestCode: null });
     this.logger.log(`Deleted guest user ${id}`);
   }
 
@@ -267,11 +269,13 @@ export class GuestsService {
     await this.bruteForce.assertAccountAllowed(guest);
 
     if (!guest.guestEnabled) {
-      throw new UnauthorizedException('GuestAccountDisabled');
+      await this.bruteForce.recordFailure('guest_otp', resolvedIp, guest.id, guestCode);
+      throw new UnauthorizedException('GuestOtpInvalid');
     }
 
     const detail = await this.getGuestOtpDetail(guest.id);
     if (!detail?.totpSecret) {
+      await this.bruteForce.recordFailure('guest_otp', resolvedIp, guest.id, guestCode);
       throw new UnauthorizedException('GuestOtpInvalid');
     }
 
@@ -378,6 +382,17 @@ export class GuestsService {
       }
     }
     throw new InternalServerErrorException('Could not allocate a unique guest code');
+  }
+
+  private isUniqueConstraintViolation(error: unknown): boolean {
+    if (!(error instanceof QueryFailedError)) {
+      return false;
+    }
+    const driverError = error.driverError as { code?: string; message?: string };
+    return (
+      driverError.code === '23505' ||
+      (driverError.code === 'SQLITE_CONSTRAINT' && driverError.message?.includes('UNIQUE constraint failed'))
+    );
   }
 
   private async assertNameAvailable(name: string, excludeUserId?: number): Promise<void> {

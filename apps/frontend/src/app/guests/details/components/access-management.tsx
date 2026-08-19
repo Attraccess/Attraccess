@@ -9,9 +9,9 @@ import {
   useAccessControlServiceResourceIntroductionsGrant,
   useAccessControlServiceResourceIntroductionsRevoke,
   useGuestsServiceGetGuestAccess,
-  useResourcesServiceGetAllResources,
   useResourcesServiceResourceGroupsGetMany,
 } from '@attraccess/react-query-client';
+import { ResourceSelector } from '@attraccess/plugins-frontend-ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { Button } from '../../../../components/button';
@@ -31,7 +31,6 @@ export function GuestAccessManagement({ guestId, t }: Props) {
   const { data: access, isLoading: isLoadingAccess, isError: isAccessError } = useGuestsServiceGetGuestAccess({
     id: guestId,
   });
-  const { data: resourcesData } = useResourcesServiceGetAllResources({ limit: 100 });
   const { data: groups } = useResourcesServiceResourceGroupsGetMany();
 
   const invalidateAccess = useCallback(() => {
@@ -97,11 +96,8 @@ export function GuestAccessManagement({ guestId, t }: Props) {
     });
 
   const targetItems = useMemo(() => {
-    if (kind === 'resource') {
-      return (resourcesData?.data ?? []).map((resource) => ({ key: String(resource.id), label: resource.name }));
-    }
     return (groups ?? []).map((group) => ({ key: String(group.id), label: group.name }));
-  }, [kind, resourcesData, groups]);
+  }, [groups]);
 
   const onGrant = useCallback(() => {
     const targetId = Number(selectedTarget);
@@ -213,14 +209,24 @@ export function GuestAccessManagement({ guestId, t }: Props) {
               ]}
               data-cy="guest-access-kind-select"
             />
-            <Select
-              label={kind === 'resource' ? t('sections.access.add.resource') : t('sections.access.add.group')}
-              value={selectedTarget}
-              onChange={setSelectedTarget}
-              items={targetItems}
-              placeholder="…"
-              data-cy="guest-access-target-select"
-            />
+            {kind === 'resource' ? (
+              <div data-cy="guest-access-target-select">
+                <ResourceSelector
+                  selection={selectedTarget ? [Number(selectedTarget)] : []}
+                  onSelectionChange={(selection) => setSelectedTarget(String(selection[0] ?? ''))}
+                  multiple={false}
+                />
+              </div>
+            ) : (
+              <Select
+                label={t('sections.access.add.group')}
+                value={selectedTarget}
+                onChange={setSelectedTarget}
+                items={targetItems}
+                placeholder="…"
+                data-cy="guest-access-target-select"
+              />
+            )}
           </div>
         </ModalBody>
         <ModalFooter>

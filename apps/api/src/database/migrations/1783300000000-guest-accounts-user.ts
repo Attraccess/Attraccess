@@ -96,6 +96,26 @@ export class GuestAccountsUser1783300000000 implements MigrationInterface {
     // auth-detail down() which filters out guest_otp rows. Their guest_otp credentials
     // were already removed by GuestAccountsAuthDetail1783310000000.down(), which runs
     // before this migration is rolled back.
+    // Foreign keys are disabled while SQLite rebuilds the user table. Remove data that guests
+    // can own before dropping their user rows so rollback does not leave orphaned records.
+    await queryRunner.query(
+      `DELETE FROM "resource_introduction_history_item" WHERE "introductionId" IN (SELECT "id" FROM "resource_introduction" WHERE "receiverUserId" IN (SELECT "id" FROM "user" WHERE "userType" = 'guest'))`,
+    );
+    await queryRunner.query(
+      `DELETE FROM "resource_introduction" WHERE "receiverUserId" IN (SELECT "id" FROM "user" WHERE "userType" = 'guest')`,
+    );
+    await queryRunner.query(
+      `DELETE FROM "form_submission" WHERE "userId" IN (SELECT "id" FROM "user" WHERE "userType" = 'guest') OR "resourceUsageId" IN (SELECT "id" FROM "resource_usage" WHERE "userId" IN (SELECT "id" FROM "user" WHERE "userType" = 'guest'))`,
+    );
+    await queryRunner.query(
+      `DELETE FROM "billing_transaction_item" WHERE "billingTransactionId" IN (SELECT "id" FROM "billing_transaction" WHERE "userId" IN (SELECT "id" FROM "user" WHERE "userType" = 'guest') OR "resourceUsageId" IN (SELECT "id" FROM "resource_usage" WHERE "userId" IN (SELECT "id" FROM "user" WHERE "userType" = 'guest')))`,
+    );
+    await queryRunner.query(
+      `DELETE FROM "billing_transaction" WHERE "userId" IN (SELECT "id" FROM "user" WHERE "userType" = 'guest') OR "resourceUsageId" IN (SELECT "id" FROM "resource_usage" WHERE "userId" IN (SELECT "id" FROM "user" WHERE "userType" = 'guest'))`,
+    );
+    await queryRunner.query(
+      `DELETE FROM "resource_usage" WHERE "userId" IN (SELECT "id" FROM "user" WHERE "userType" = 'guest')`,
+    );
     await queryRunner.query(
       `INSERT INTO "temporary_user"("id", "username", "email", "isEmailVerified", "emailVerificationToken", "emailVerificationTokenExpiresAt", "createdAt", "updatedAt", "passwordResetToken", "passwordResetTokenExpiresAt", "externalIdentifier", "nfcKeySeedToken", "lastUsernameChangeAt", "creditBalance", "billingFactor", "deletedAt", "deleteAccountToken", "deleteAccountTokenExpiresAt", "deleteAccountRequestedAt", "lockedUntil", "failedLoginAttempts", "firstFailedLoginAt", "locale") SELECT "id", "username", "email", "isEmailVerified", "emailVerificationToken", "emailVerificationTokenExpiresAt", "createdAt", "updatedAt", "passwordResetToken", "passwordResetTokenExpiresAt", "externalIdentifier", "nfcKeySeedToken", "lastUsernameChangeAt", "creditBalance", "billingFactor", "deletedAt", "deleteAccountToken", "deleteAccountTokenExpiresAt", "deleteAccountRequestedAt", "lockedUntil", "failedLoginAttempts", "firstFailedLoginAt", "locale" FROM "user" WHERE "userType" = 'member'`,
     );

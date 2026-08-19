@@ -781,6 +781,7 @@ export class UsersService {
         externalIdentifier: null,
         nfcKeySeedToken: null,
         lastUsernameChangeAt: null,
+        guestCode: null,
         deleteAccountToken: null,
         deleteAccountTokenExpiresAt: null,
         deleteAccountRequestedAt: null,
