@@ -160,24 +160,20 @@ install_python() {
 }
 
 # --- ESP-IDF & esptool (Attractap firmware toolchain) ---
-check_esp_idf() {
-    if [[ -f "$HOME/esp/esp-idf/export.sh" ]] || [[ -n "${IDF_PATH:-}" && -f "${IDF_PATH}/export.sh" ]]; then
-        echo "✓ ESP-IDF is installed"
-        return 0
-    fi
-    return 1
-}
+ESP_IDF_VERSION="v6.0.2"
+ESP_IDF_PATH="$REPO_ROOT/.tools/esp-idf"
 
-check_esptool() {
-    if python3 -c "import esptool" 2>/dev/null || command -v esptool.py &>/dev/null; then
-        echo "✓ esptool is installed"
+check_esp_idf() {
+    if [[ -f "$ESP_IDF_PATH/export.sh" ]] && \
+        [[ "$(git -C "$ESP_IDF_PATH" describe --tags --exact-match HEAD 2>/dev/null || true)" == "$ESP_IDF_VERSION" ]]; then
+        echo "✓ ESP-IDF $ESP_IDF_VERSION is installed at $ESP_IDF_PATH"
         return 0
     fi
     return 1
 }
 
 install_esp_idf() {
-    echo "Installing ESP-IDF v5.5 (Attractap firmware toolchain)..."
+    echo "Installing ESP-IDF $ESP_IDF_VERSION at $ESP_IDF_PATH (Attractap firmware toolchain)..."
     # Optional convenience: an esptool on PATH. Skipped when the system Python
     # has no pip (e.g. NixOS) — ESP-IDF's install.sh below always bundles
     # esptool inside its own Python environment, which build_firmwares.py
@@ -193,21 +189,27 @@ install_esp_idf() {
         echo "  System Python has no pip — skipping user-level esptool install"
         echo "  (ESP-IDF provides esptool in its own Python environment)"
     fi
-    # ~/esp/esp-idf is one of the locations build_firmwares.py auto-detects
-    if [[ ! -d "$HOME/esp/esp-idf" ]]; then
-        mkdir -p "$HOME/esp"
-        git clone --depth 1 --shallow-submodules --recursive -b v5.5 \
-            https://github.com/espressif/esp-idf.git "$HOME/esp/esp-idf"
+    if [[ ! -e "$ESP_IDF_PATH" ]]; then
+        mkdir -p "$(dirname "$ESP_IDF_PATH")"
+        git clone --depth 1 --shallow-submodules --recursive -b "$ESP_IDF_VERSION" \
+            https://github.com/espressif/esp-idf.git "$ESP_IDF_PATH"
+    elif [[ -d "$ESP_IDF_PATH/.git" ]]; then
+        git -C "$ESP_IDF_PATH" fetch --depth 1 origin tag "$ESP_IDF_VERSION"
+        git -C "$ESP_IDF_PATH" checkout --detach "$ESP_IDF_VERSION"
+        git -C "$ESP_IDF_PATH" submodule sync --recursive
+        git -C "$ESP_IDF_PATH" submodule update --init --recursive --depth 1
+    else
+        echo "Error: $ESP_IDF_PATH exists but is not an ESP-IDF Git checkout." >&2
+        return 1
     fi
-    "$HOME/esp/esp-idf/install.sh" esp32s3
+    "$ESP_IDF_PATH/install.sh" esp32s3
     # ESP-IDF's Linux installer marks cmake/ninja "on request" and skips them,
     # assuming the system provides them (NixOS et al. don't) — install them
     # into the IDF tool set explicitly when absent.
     if ! command -v cmake &>/dev/null || ! command -v ninja &>/dev/null; then
-        python3 "$HOME/esp/esp-idf/tools/idf_tools.py" install cmake ninja
+        python3 "$ESP_IDF_PATH/tools/idf_tools.py" install cmake ninja
     fi
-    echo "  To use idf.py directly in a shell: . \$HOME/esp/esp-idf/export.sh"
-    echo "  (build_firmwares.py finds ESP-IDF in \$HOME/esp/esp-idf automatically)"
+    printf '  To use idf.py directly in a shell: . %q\n' "$ESP_IDF_PATH/export.sh"
 }
 
 # --- Git submodules ---
@@ -277,8 +279,8 @@ main() {
     echo ""
 
     # ESP-IDF (Attractap firmware)
-    if ! check_esp_idf || ! check_esptool; then
-        install_esp_idf || echo "⚠ ESP-IDF install failed. See https://docs.espressif.com/projects/esp-idf/en/v5.5/esp32s3/get-started/"
+    if ! check_esp_idf; then
+        install_esp_idf || echo "⚠ ESP-IDF install failed. See https://docs.espressif.com/projects/esp-idf/en/v6.0.2/esp32s3/get-started/"
     fi
     echo ""
 
