@@ -54,6 +54,7 @@ class PluginBootstrapConfigModule {}
 export async function bootstrap() {
   const bootstrapLogger = new Logger('Bootstrap');
   bootstrapLogger.log('Starting bootstrap process...');
+  const skipDatabaseMigrations = process.env.SKIP_DATABASE_MIGRATIONS === 'true';
 
   const initialLogLevels = (process.env.LOG_LEVELS || 'error,warn,log')
     .split(',')
@@ -89,9 +90,11 @@ export async function bootstrap() {
   // uses a standalone DataSource per plugin against the same DB, so it does not
   // interfere with the host DataSource (which opens later, inside AppModule).
   // Per-plugin failures are isolated inside the service and never abort boot.
-  if (!earlyConfig.DISABLE_PLUGINS) {
+  if (!earlyConfig.DISABLE_PLUGINS && !skipDatabaseMigrations) {
     bootstrapLogger.log('Running plugin database migrations...');
     await PluginMigrationService.runPendingUpMigrationsForAllPlugins();
+  } else if (skipDatabaseMigrations) {
+    bootstrapLogger.log('Skipping plugin database migrations.');
   }
 
   // Import AppModule only now, so PluginModule.forRoot() sees the configured PLUGIN_DIR.
@@ -183,7 +186,7 @@ export async function bootstrap() {
     credentials: true, // Allow cookies to be sent
   });
 
-  if (process.env.SKIP_DATABASE_MIGRATIONS === 'true') {
+  if (skipDatabaseMigrations) {
     bootstrapLogger.log('Skipping database migrations.');
   } else {
     // Run migrations before the app fully starts
