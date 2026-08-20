@@ -16,8 +16,10 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "mbedtls/aes.h"
-#include "mbedtls/cmac.h"
+// IDF v6 / mbedTLS 4.x: legacy mbedtls/aes.h and mbedtls/cmac.h were removed
+// from the public headers (moved to mbedtls/private/). The firmware's NTAG424
+// crypto now uses the supported PSA Crypto API (psa/crypto.h).
+#include "psa/crypto.h"
 #include "pn532_i2c.hpp"
 
 #define PN532_PREAMBLE (0x00)   ///< Command sequence start, byte 1/3
