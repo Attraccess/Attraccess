@@ -14,16 +14,15 @@ env:
   NX_AFFECTED_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || format('origin/{0}', github.event.pull_request.base.ref) }}
   # Self-hosted Nx remote cache (jappyjan/nx-cache-server). Fork PRs get no
   # secrets, so the server URL resolves to '' and caching turns itself off.
-  # PR and merge-queue builds only ever get the read-only token: only the four
-  # workflows in nx.json sharedGlobals are part of the Nx hash, so a PR that
-  # could write would be able to plant an artifact under a hash main later
-  # restores (CVE-2025-36852).
+  # Same-repository PRs and merge-queue builds are trusted and may warm the
+  # cache. Fork PRs keep the read-only token, preventing external contributors
+  # from planting artifacts under hashes that main later restores.
   # Kill switch: clear the NX_CACHE_URL repo variable to disable the cache
   # everywhere. Nx exits 1 when the server is unreachable or rejects a token —
   # it does not degrade to "no cache" — so clear it before taking the server
   # down or rotating tokens.
   NX_SELF_HOSTED_REMOTE_CACHE_SERVER: ${{ secrets.NX_CACHE_TOKEN_RO && vars.NX_CACHE_URL || '' }}
-  NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ${{ secrets.NX_CACHE_TOKEN_RO }}
+  NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ${{ (github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository) && secrets.NX_CACHE_TOKEN_RW || secrets.NX_CACHE_TOKEN_RO }}
 
 permissions:
   contents: read
