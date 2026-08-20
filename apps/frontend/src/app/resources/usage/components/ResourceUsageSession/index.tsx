@@ -77,7 +77,7 @@ export function ResourceUsageSession({
 
   const activeSession = useMemo(() => activeSessionResponse?.usage, [activeSessionResponse]);
 
-  const isLoading = isLoadingSession ?? isLoadingIntroStatus ?? isLoadingIntroducers;
+  const isLoading = isLoadingSession || isLoadingIntroStatus || isLoadingIntroducers;
 
   const isIntroducer = useMemo(() => {
     return introducers?.some((introducer) => introducer.userId === user?.id);

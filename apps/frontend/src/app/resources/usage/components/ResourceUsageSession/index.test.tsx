@@ -5,9 +5,10 @@ import { ResourceUsageSession } from './index';
 import { createMockResource } from '../../../../../test-utils/fixtures';
 import { SupervisionMode } from '@attraccess/react-query-client';
 
-const { canControl, hasPermission } = vi.hoisted(() => ({
+const { canControl, hasPermission, loading } = vi.hoisted(() => ({
   canControl: { value: true },
   hasPermission: { value: false },
+  loading: { activeSession: false, canControl: false, introducers: false },
 }));
 
 vi.mock('../../../../../hooks/useAuth', () => ({
@@ -43,10 +44,16 @@ vi.mock('@attraccess/react-query-client', async () => ({
     SUPERVISION_REQUIRED: 'supervision_required',
   },
   ResourceType: { MACHINE: 'machine', DOOR: 'door' },
-  useResourcesServiceResourceUsageCanControl: () => ({ data: { canControl: canControl.value }, isLoading: false }),
+  useResourcesServiceResourceUsageCanControl: () => ({
+    data: { canControl: canControl.value },
+    isLoading: loading.canControl,
+  }),
   useResourcesServiceResourceUsageCanControlKey: 'canControl',
-  useAccessControlServiceResourceIntroducersGetMany: () => ({ data: [], isLoading: false }),
-  useResourcesServiceResourceUsageGetActiveSession: () => ({ data: { usage: null }, isLoading: false }),
+  useAccessControlServiceResourceIntroducersGetMany: () => ({ data: [], isLoading: loading.introducers }),
+  useResourcesServiceResourceUsageGetActiveSession: () => ({
+    data: { usage: null },
+    isLoading: loading.activeSession,
+  }),
   useResourcesServiceResourceUsageGetActiveSessionKey: 'activeSession',
   useResourceMaintenancesServiceFindMaintenances: () => ({ data: { data: [] } }),
 }));
@@ -67,6 +74,9 @@ describe('ResourceUsageSession routing', () => {
   beforeEach(() => {
     canControl.value = true;
     hasPermission.value = false;
+    loading.activeSession = false;
+    loading.canControl = false;
+    loading.introducers = false;
   });
 
   it('lets an introduced user start solo on supervision_allowed', () => {
@@ -99,4 +109,17 @@ describe('ResourceUsageSession routing', () => {
 
     expect(screen.getByTestId('introduction-required')).toBeInTheDocument();
   });
+
+  it.each(['canControl', 'introducers'] as const)(
+    'waits for the access decision while %s is loading before showing the introduction gate',
+    (loadingState) => {
+      canControl.value = false;
+      loading[loadingState] = true;
+
+      renderSession(SupervisionMode.INTRODUCTION_REQUIRED);
+
+      expect(document.querySelector('[data-slot="spinner"]')).toBeInTheDocument();
+      expect(screen.queryByTestId('introduction-required')).not.toBeInTheDocument();
+    },
+  );
 });
