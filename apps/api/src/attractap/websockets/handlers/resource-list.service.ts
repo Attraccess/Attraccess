@@ -1,12 +1,12 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceHealthStatus, ResourceIntroducerType } from '@attraccess/database-entities';
 import { WebsocketService } from '../websocket.service';
 import { AttractapService } from '../../attractap.service';
 import { ResourceUsageService } from '../../../resources/usage/resourceUsage.service';
 import { ResourceMaintenanceService } from '../../../resources/maintenances/maintenance.service';
 import { ResourceHealthService } from '../../../resources/health/resource-health.service';
 import { ResourceFlowsService } from '../../../resources/flows/resource-flows.service';
-import { ResourceHealthStatus } from '@attraccess/database-entities';
+import { ResourceIntroducersService } from '../../../resources/introducers/resourceIntroducers.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
 
 @Injectable()
@@ -30,6 +30,9 @@ export class ResourceListService {
 
   @Inject(ResourceFlowsService)
   private resourceFlowsService: ResourceFlowsService;
+
+  @Inject(ResourceIntroducersService)
+  private resourceIntroducersService: ResourceIntroducersService;
 
   public async sendResourceList(readerId: number) {
     const sockets = Array.from(this.websocketService.sockets.values()).filter((socket) => socket.readerId === readerId);
@@ -69,6 +72,7 @@ export class ResourceListService {
         return {
           ...resource,
           activeUsageSession: await this.resourceUsageService.getActiveSession(resource.id, true),
+          introducers: await this.resourceIntroducersService.getMany(resource.id, ResourceIntroducerType.INTRODUCER),
           isUnderMaintenance: await this.resourceMaintenanceService.hasActiveMaintenance(resource.id),
           isHealthy: unhealthyEntries.length === 0,
           healthReason: this.buildHealthReason(unhealthyEntries),
@@ -101,7 +105,7 @@ export class ResourceListService {
         separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch,
         description: resource.description,
         allowTakeOver: resource.allowTakeOver,
-        introducers: resource.introducers.map((introducer) => introducer.user.username),
+        introducers: resource.introducers.flatMap((introducer) => (introducer.user ? [introducer.user.username] : [])),
         isUnderMaintenance: resource.isUnderMaintenance,
         isHealthy: resource.isHealthy,
         healthReason: resource.healthReason,
