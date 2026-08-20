@@ -280,11 +280,14 @@ export function CsvInvite({ onSuccess, onError }: Props) {
 
       {rowErrors.length > 0 && (
         <div className="flex flex-col gap-2 border border-default-200 rounded-medium p-3">
-          <div className="flex items-center">
+          <Badge.Anchor>
+            <span role="heading" aria-level={3} className="text-sm font-semibold">
+              {t('errors.title')}
+            </span>
             <Badge color="danger" variant="soft">
-              {t('errors.title')} ({rowErrors.length})
+              {rowErrors.length}
             </Badge>
-          </div>
+          </Badge.Anchor>
 
           <Table>
             <TableScrollContainer>
