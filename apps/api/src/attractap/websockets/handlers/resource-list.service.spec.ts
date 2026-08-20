@@ -11,7 +11,7 @@ describe('ResourceListService', () => {
   let resourceMaintenanceService: { hasActiveMaintenance: jest.Mock };
   let resourceHealthService: { listForResource: jest.Mock };
   let resourceFlowsService: { getNodes: jest.Mock };
-  let resourceIntroducersService: { getMany: jest.Mock };
+  let resourceIntroducersService: { getManyForResources: jest.Mock };
 
   function createMockSocket(overrides: Partial<any> = {}): any {
     return {
@@ -60,7 +60,9 @@ describe('ResourceListService', () => {
     resourceMaintenanceService = { hasActiveMaintenance: jest.fn().mockResolvedValue(false) };
     resourceHealthService = { listForResource: jest.fn().mockResolvedValue([]) };
     resourceFlowsService = { getNodes: jest.fn().mockResolvedValue([]) };
-    resourceIntroducersService = { getMany: jest.fn().mockResolvedValue([{ user: { username: 'introducer-a' } }]) };
+    resourceIntroducersService = {
+      getManyForResources: jest.fn().mockResolvedValue(new Map([[10, [{ user: { username: 'introducer-a' } }]]])),
+    };
 
     (service as any).websocketService = websocketService;
     (service as any).attractapService = attractapService;
@@ -126,6 +128,17 @@ describe('ResourceListService', () => {
 
       expect(spy).not.toHaveBeenCalled();
     });
+
+    it('refreshes each socket once when any of several resources match', async () => {
+      const s1 = createMockSocket({ id: 's1', readerId: 42 });
+      websocketService.sockets.set('s1', s1);
+      const spy = jest.spyOn(service, 'sendResourceListToSocket').mockResolvedValue(undefined);
+
+      await service.sendResourceListToReadersWithResources([10, 20]);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith(s1, { resourceIds: [10, 20] });
+    });
   });
 
   describe('sendResourceListToSocket', () => {
@@ -176,7 +189,10 @@ describe('ResourceListService', () => {
       expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(10, true);
       expect(resourceMaintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(10);
       expect(resourceFlowsService.getNodes).toHaveBeenCalledWith(10, ResourceFlowNodeType.INPUT_BUTTON);
-      expect(resourceIntroducersService.getMany).toHaveBeenCalledWith(10, ResourceIntroducerType.INTRODUCER);
+      expect(resourceIntroducersService.getManyForResources).toHaveBeenCalledWith(
+        [10],
+        ResourceIntroducerType.INTRODUCER,
+      );
 
       expect(socket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -213,10 +229,9 @@ describe('ResourceListService', () => {
 
     it('includes introducers inherited from resource groups', async () => {
       attractapService.findReaderById.mockResolvedValue(createReaderFixture());
-      resourceIntroducersService.getMany.mockResolvedValue([
-        { user: { username: 'direct-introducer' } },
-        { user: { username: 'group-introducer' } },
-      ]);
+      resourceIntroducersService.getManyForResources.mockResolvedValue(
+        new Map([[10, [{ user: { username: 'direct-introducer' } }, { user: { username: 'group-introducer' } }]]]),
+      );
 
       const socket = createMockSocket();
       await service.sendResourceListToSocket(socket);
@@ -227,7 +242,9 @@ describe('ResourceListService', () => {
 
     it('omits deleted introducers from the resource list', async () => {
       attractapService.findReaderById.mockResolvedValue(createReaderFixture());
-      resourceIntroducersService.getMany.mockResolvedValue([{ user: null }, { user: { username: 'introducer' } }]);
+      resourceIntroducersService.getManyForResources.mockResolvedValue(
+        new Map([[10, [{ user: null }, { user: { username: 'introducer' } }]]]),
+      );
 
       const socket = createMockSocket();
       await service.sendResourceListToSocket(socket);

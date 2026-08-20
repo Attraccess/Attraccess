@@ -80,9 +80,7 @@ export class WebSocketEventService {
   @OnEvent(ResourceGroupIntroductionChangedEvent.EVENT_NAME)
   public async onResourceGroupIntroductionChanged(event: ResourceGroupIntroductionChangedEvent) {
     if (event.affectedResourceIds) {
-      await Promise.all(
-        event.affectedResourceIds.map((resourceId) => this.attractapGateway.sendResourceListToReadersWithResource(resourceId)),
-      );
+      await this.attractapGateway.sendResourceListToReadersWithResources(event.affectedResourceIds);
       return;
     }
 
@@ -91,8 +89,6 @@ export class WebSocketEventService {
 
   private async refreshResourcesForGroup(resourceGroupId: number) {
     const group = await this.resourceGroupsService.getOne({ id: resourceGroupId }, ['resources']);
-    await Promise.all(
-      group.resources.map((resource) => this.attractapGateway.sendResourceListToReadersWithResource(resource.id)),
-    );
+    await this.attractapGateway.sendResourceListToReadersWithResources(group.resources.map((resource) => resource.id));
   }
 }

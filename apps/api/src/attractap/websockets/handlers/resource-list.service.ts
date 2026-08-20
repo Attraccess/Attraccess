@@ -48,9 +48,14 @@ export class ResourceListService {
     await Promise.all(allSockets.map((socket) => this.sendResourceListToSocket(socket, { resourceId })));
   }
 
+  public async sendResourceListToReadersWithResources(resourceIds: number[]) {
+    const allSockets = Array.from(this.websocketService.sockets.values());
+    await Promise.all(allSockets.map((socket) => this.sendResourceListToSocket(socket, { resourceIds })));
+  }
+
   public async sendResourceListToSocket(
     socket: AuthenticatedWebSocket,
-    onlyIfResourceMatches?: { resourceId?: number },
+    onlyIfResourceMatches?: { resourceId?: number; resourceIds?: number[] },
   ) {
     const reader = await this.attractapService.findReaderById(socket.readerId);
     if (!reader) {
@@ -59,12 +64,17 @@ export class ResourceListService {
 
     const resources = [...reader.resources].sort((a, b) => a.name.localeCompare(b.name));
 
-    if (onlyIfResourceMatches?.resourceId) {
-      if (!resources.some((resource) => resource.id === onlyIfResourceMatches.resourceId)) {
+    const resourceIdsToMatch = onlyIfResourceMatches?.resourceIds ?? [onlyIfResourceMatches?.resourceId];
+    if (resourceIdsToMatch.some((resourceId) => resourceId !== undefined)) {
+      if (!resources.some((resource) => resourceIdsToMatch.includes(resource.id))) {
         return;
       }
     }
 
+    const introducersByResourceId = await this.resourceIntroducersService.getManyForResources(
+      resources.map((resource) => resource.id),
+      ResourceIntroducerType.INTRODUCER,
+    );
     const resourcesWithUsageSession = await Promise.all(
       resources.map(async (resource) => {
         const healthEntries = await this.resourceHealthService.listForResource(resource.id);
@@ -72,7 +82,7 @@ export class ResourceListService {
         return {
           ...resource,
           activeUsageSession: await this.resourceUsageService.getActiveSession(resource.id, true),
-          introducers: await this.resourceIntroducersService.getMany(resource.id, ResourceIntroducerType.INTRODUCER),
+          introducers: introducersByResourceId.get(resource.id) ?? [],
           isUnderMaintenance: await this.resourceMaintenanceService.hasActiveMaintenance(resource.id),
           isHealthy: unhealthyEntries.length === 0,
           healthReason: this.buildHealthReason(unhealthyEntries),

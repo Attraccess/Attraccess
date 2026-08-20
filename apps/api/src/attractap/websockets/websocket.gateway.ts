@@ -533,6 +533,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     return this.resourceListService.sendResourceListToReadersWithResource(resourceId);
   }
 
+  public async sendResourceListToReadersWithResources(resourceIds: number[]) {
+    return this.resourceListService.sendResourceListToReadersWithResources(resourceIds);
+  }
+
   public async disconnectReader(readerId: number) {
     const sockets = Array.from(this.websocketService.sockets.values()).filter((socket) => socket.readerId === readerId);
     if (sockets.length === 0) {

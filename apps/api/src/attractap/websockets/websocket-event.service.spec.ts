@@ -18,7 +18,13 @@ import { ResourceGroupsService } from '../../resources/groups/resourceGroups.ser
 describe('WebSocketEventService', () => {
   let service: WebSocketEventService;
   let gateway: jest.Mocked<
-    Pick<AttractapGateway, 'sendResourceList' | 'disconnectReader' | 'sendResourceListToReadersWithResource'>
+    Pick<
+      AttractapGateway,
+      | 'sendResourceList'
+      | 'disconnectReader'
+      | 'sendResourceListToReadersWithResource'
+      | 'sendResourceListToReadersWithResources'
+    >
   >;
   let resourceGroupsService: jest.Mocked<Pick<ResourceGroupsService, 'getOne'>>;
 
@@ -27,6 +33,7 @@ describe('WebSocketEventService', () => {
       sendResourceList: jest.fn().mockResolvedValue(undefined),
       disconnectReader: jest.fn().mockResolvedValue(undefined),
       sendResourceListToReadersWithResource: jest.fn().mockResolvedValue(undefined),
+      sendResourceListToReadersWithResources: jest.fn().mockResolvedValue(undefined),
     };
     resourceGroupsService = {
       getOne: jest.fn(),
@@ -116,21 +123,20 @@ describe('WebSocketEventService', () => {
   });
 
   describe('onResourceGroupIntroducerChanged', () => {
-    it('refreshes readers for every resource in the group', async () => {
+    it('refreshes each affected reader once for the resources in the group', async () => {
       resourceGroupsService.getOne.mockResolvedValue({ resources: [{ id: 60 }, { id: 70 }] } as ResourceGroup);
 
       await service.onResourceGroupIntroducerChanged(new ResourceGroupIntroducerChangedEvent(5));
 
       expect(resourceGroupsService.getOne).toHaveBeenCalledWith({ id: 5 }, ['resources']);
-      expect(gateway.sendResourceListToReadersWithResource).toHaveBeenCalledWith(60);
-      expect(gateway.sendResourceListToReadersWithResource).toHaveBeenCalledWith(70);
+      expect(gateway.sendResourceListToReadersWithResources).toHaveBeenCalledWith([60, 70]);
     });
 
     it('refreshes resources removed from or added to a group', async () => {
       await service.onResourceGroupIntroductionChanged(new ResourceGroupIntroductionChangedEvent(5, [60]));
 
       expect(resourceGroupsService.getOne).not.toHaveBeenCalled();
-      expect(gateway.sendResourceListToReadersWithResource).toHaveBeenCalledWith(60);
+      expect(gateway.sendResourceListToReadersWithResources).toHaveBeenCalledWith([60]);
     });
   });
 
