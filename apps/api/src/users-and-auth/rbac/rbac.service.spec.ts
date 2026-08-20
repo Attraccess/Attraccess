@@ -180,6 +180,22 @@ describe('RbacService', () => {
     });
   });
 
+  // ─────────────────────── getUserIdsWithPermission ──────────────────────────
+
+  describe('getUserIdsWithPermission', () => {
+    // Soft-deleting a user leaves their user_role rows behind, so without this join a deleted
+    // admin stays a permission holder forever — e.g. counted as an available supervisor (ATT-867).
+    it('excludes soft-deleted users', async () => {
+      const mockQb = createMockQueryBuilder({ getRawMany: jest.fn().mockResolvedValue([{ userId: 10 }]) });
+      userRoleRepo.createQueryBuilder.mockReturnValue(mockQb as any);
+
+      const ids = await service.getUserIdsWithPermission('resources.update');
+
+      expect(ids).toEqual([10]);
+      expect(mockQb.innerJoin).toHaveBeenCalledWith('ur.user', 'u', 'u.deletedAt IS NULL');
+    });
+  });
+
   // ───────────────────────────── assignRole ──────────────────────────────────
 
   describe('assignRole', () => {
@@ -274,12 +290,12 @@ describe('RbacService', () => {
       await expect(service.revokeRole(10, 1, new Set(['resources.read']))).rejects.toThrow(ForbiddenException);
     });
 
-    it('throws ForbiddenException when removing last owner', async () => {
-      const ownerRole = makeRole({
-        key: 'owner',
+    it('throws ForbiddenException when removing last administrator', async () => {
+      const administratorRole = makeRole({
+        key: 'administrator',
         rolePermissions: [{ permissionKey: 'system.admin' } as any],
       });
-      roleRepo.findOne.mockResolvedValue(ownerRole);
+      roleRepo.findOne.mockResolvedValue(administratorRole);
 
       // The TOCTOU-safe path uses manager.transaction; mock the manager's QB to return count=1
       const mockQb = createMockQueryBuilder({ getCount: jest.fn().mockResolvedValue(1) });
@@ -313,12 +329,12 @@ describe('RbacService', () => {
       expect(userRoleRepo.delete).toHaveBeenCalled();
     });
 
-    it('allows revoking owner role when multiple owners exist', async () => {
-      const ownerRole = makeRole({
-        key: 'owner',
+    it('allows revoking administrator role when multiple administrators exist', async () => {
+      const administratorRole = makeRole({
+        key: 'administrator',
         rolePermissions: [{ permissionKey: 'system.admin' } as any],
       });
-      roleRepo.findOne.mockResolvedValue(ownerRole);
+      roleRepo.findOne.mockResolvedValue(administratorRole);
 
       // The TOCTOU-safe path uses manager.transaction; mock the manager's QB to return count=2
       const mockQb = createMockQueryBuilder({ getCount: jest.fn().mockResolvedValue(2) });
@@ -353,31 +369,31 @@ describe('RbacService', () => {
       expect(userRoleRepo.delete).toHaveBeenCalledWith({ id: 5 });
     });
 
-    it('skips owner role removal when it is the last owner', async () => {
-      const ownerRole = makeRole({ key: 'owner' });
+    it('skips administrator role removal when it is the last administrator', async () => {
+      const administratorRole = makeRole({ key: 'administrator' });
       const currentSsoRoles = [
-        makeUserRole({ id: 7, source: UserRoleSource.SSO, role: ownerRole }),
+        makeUserRole({ id: 7, source: UserRoleSource.SSO, role: administratorRole }),
       ];
       userRoleRepo.find.mockResolvedValue(currentSsoRoles);
 
-      // otherOwnerCount = 0 — this is the last owner, skip removal
+      // otherAdministratorCount = 0 — this is the last administrator, skip removal
       const mockQb = createMockQueryBuilder({ getCount: jest.fn().mockResolvedValue(0) });
       userRoleRepo.createQueryBuilder.mockReturnValue(mockQb as any);
 
-      // target set does not include 'owner'
+      // target set does not include 'administrator'
       await service.syncSsoRoles(10, [], SSO_TYPE, SSO_ID);
 
       expect(userRoleRepo.delete).not.toHaveBeenCalled();
     });
 
-    it('removes owner role when other owners exist', async () => {
-      const ownerRole = makeRole({ key: 'owner' });
+    it('removes administrator role when other administrators exist', async () => {
+      const administratorRole = makeRole({ key: 'administrator' });
       const currentSsoRoles = [
-        makeUserRole({ id: 7, source: UserRoleSource.SSO, role: ownerRole }),
+        makeUserRole({ id: 7, source: UserRoleSource.SSO, role: administratorRole }),
       ];
       userRoleRepo.find.mockResolvedValue(currentSsoRoles);
 
-      // Another owner exists
+      // Another administrator exists
       const mockQb = createMockQueryBuilder({ getCount: jest.fn().mockResolvedValue(1) });
       userRoleRepo.createQueryBuilder.mockReturnValue(mockQb as any);
       userRoleRepo.delete.mockResolvedValue({ affected: 1, raw: [] });
@@ -639,7 +655,7 @@ describe('RbacService', () => {
       );
     });
 
-    it('blocks a permission removal that would leave no owner-equivalent user', async () => {
+    it('blocks a permission removal that would leave no administrator-equivalent user', async () => {
       roleRepo.findOne.mockResolvedValue(
         makeRole({ id: 5, rolePermissions: [{ roleId: 5, permissionKey: 'resources.read' } as RolePermission] }),
       );
@@ -653,7 +669,7 @@ describe('RbacService', () => {
       );
     });
 
-    it('allows a permission removal when owner-equivalence is preserved', async () => {
+    it('allows a permission removal when administrator-equivalence is preserved', async () => {
       roleRepo.findOne.mockResolvedValue(
         makeRole({ id: 5, rolePermissions: [{ roleId: 5, permissionKey: 'resources.read' } as RolePermission] }),
       );
@@ -684,8 +700,8 @@ describe('RbacService', () => {
   });
 
   describe('deleteRole', () => {
-    const setOwnerEquivalentCounts = (withoutRole: number, total: number) => {
-      // countOwnerEquivalentUsers is called twice: first excluding the role, then overall
+    const setAdministratorEquivalentCounts = (withoutRole: number, total: number) => {
+      // countAdministratorEquivalentUsers is called twice: first excluding the role, then overall
       permissionRepo.count.mockResolvedValue(16);
       const rows = (n: number) => Array.from({ length: n }, (_, i) => ({ userId: i + 1 }));
       const qb1 = createMockQueryBuilder({ getRawMany: jest.fn().mockResolvedValue(rows(withoutRole)) });
@@ -730,17 +746,17 @@ describe('RbacService', () => {
       await expect(service.deleteRole(5, new Set(['resources.read']), 6)).rejects.toThrow(ForbiddenException);
     });
 
-    it('blocks deletion that would leave no owner-equivalent user', async () => {
+    it('blocks deletion that would leave no administrator-equivalent user', async () => {
       roleRepo.findOne.mockResolvedValue(makeRole({ id: 5 }));
-      setOwnerEquivalentCounts(0, 1);
+      setAdministratorEquivalentCounts(0, 1);
 
       await expect(service.deleteRole(5, new Set())).rejects.toThrow(ForbiddenException);
       expect(roleManager.delete).not.toHaveBeenCalled();
     });
 
-    it('deletes a custom role when owner-equivalence is preserved', async () => {
+    it('deletes a custom role when administrator-equivalence is preserved', async () => {
       roleRepo.findOne.mockResolvedValue(makeRole({ id: 5 }));
-      setOwnerEquivalentCounts(1, 1);
+      setAdministratorEquivalentCounts(1, 1);
 
       await service.deleteRole(5, new Set());
 
@@ -751,7 +767,7 @@ describe('RbacService', () => {
       roleRepo.findOne
         .mockResolvedValueOnce(makeRole({ id: 5 }))
         .mockResolvedValueOnce(makeRole({ id: 6, rolePermissions: [] }));
-      setOwnerEquivalentCounts(1, 1);
+      setAdministratorEquivalentCounts(1, 1);
       roleManager.find.mockResolvedValue([makeUserRole({ userId: 10, roleId: 5 }), makeUserRole({ id: 2, userId: 11, roleId: 5 })]);
       roleManager.findOne.mockResolvedValue(null);
 

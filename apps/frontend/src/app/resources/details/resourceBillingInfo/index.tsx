@@ -1,4 +1,4 @@
-import { Button, Card, cn, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Skeleton } from "@heroui/react";
+import { Button, cn, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Skeleton } from "@heroui/react";
 import { CreditCard, Edit2Icon } from 'lucide-react';
 import {
   useBillingServiceGetBillingBalance,
@@ -10,7 +10,6 @@ import {
 import { useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './de.json';
 import en from './en.json';
-import { PageHeader, PageAction } from '../../../../components/pageHeader';
 import { ResourceBillingInfoEditor } from './editor';
 import { Fragment, HTMLAttributes, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../../hooks/useAuth';
@@ -22,11 +21,10 @@ interface Props extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   onExampleAmountChange?: (amount: number) => void;
   /** Reports whether the component renders any content. Lets parents reclaim layout space when hidden. */
   onVisibilityChange?: (visible: boolean) => void;
-  variant?: 'card' | 'flat';
 }
 
 export function ResourceBillingInfo(props: Props) {
-  const { resourceId, onExampleAmountChange, onVisibilityChange, variant = 'card', className, ...htmlProps } = props;
+  const { resourceId, onExampleAmountChange, onVisibilityChange, className, ...htmlProps } = props;
 
   const { t } = useTranslations({ en, de });
   const { data: configuration } = useBillingServiceGetBillingConfiguration();
@@ -229,47 +227,15 @@ export function ResourceBillingInfo(props: Props) {
     </ResourceBillingInfoEditor>
   );
 
-  const pageHeaderActions = [
-    {
-      key: 'edit',
-      label: t('actions.edit'),
-      icon: <Edit2Icon size={12} />,
-      variant: 'primary',
-      isIconOnly: true,
-      renderTrigger: (triggerProps) => (
-        <ResourceBillingInfoEditor resourceId={resourceId}>
-          {(onOpen) => <Button {...triggerProps} onPress={onOpen} />}
-        </ResourceBillingInfoEditor>
-      ),
-    },
-  ] satisfies PageAction[];
-
-  if (variant === 'flat') {
-    return (
-      <FlatSection
-        icon={<CreditCard className="w-4 h-4" />}
-        title={t('title')}
-        actions={editorAction}
-        className={className}
-        {...htmlProps}
-      >
-        {billingContent}
-      </FlatSection>
-    );
-  }
-
   return (
-    <Card className={className} {...htmlProps}>
-      <Card.Header className="flex items-center justify-between py-3">
-        <PageHeader
-          title={t('title')}
-          icon={<CreditCard />}
-          actions={pageHeaderActions}
-          noMargin
-        />
-      </Card.Header>
-
-      <Card.Content>{billingContent}</Card.Content>
-    </Card>
+    <FlatSection
+      icon={<CreditCard className="w-4 h-4" />}
+      title={t('title')}
+      actions={editorAction}
+      className={className}
+      {...htmlProps}
+    >
+      {billingContent}
+    </FlatSection>
   );
 }

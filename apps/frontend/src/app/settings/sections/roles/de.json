@@ -1,0 +1,27 @@
+{
+  "title": "Rollen",
+  "description": "Rollen und die Berechtigungen, die sie gewähren. Systemrollen werden von Attraccess verwaltet und lassen sich nicht bearbeiten.",
+  "actions": {
+    "createRole": "Rolle erstellen"
+  },
+  "table": {
+    "ariaLabel": "Rollen",
+    "columns": {
+      "name": "Name",
+      "source": "Herkunft",
+      "permissions": "Berechtigungen",
+      "users": "Benutzer",
+      "actions": "Aktionen"
+    },
+    "source": {
+      "system": "System",
+      "custom": "Eigene"
+    },
+    "systemRoleTooltip": "Systemrollen werden von Attraccess verwaltet und können nicht geändert werden",
+    "actions": {
+      "edit": "Rolle bearbeiten",
+      "view": "Rolle ansehen",
+      "delete": "Rolle löschen"
+    }
+  }
+}

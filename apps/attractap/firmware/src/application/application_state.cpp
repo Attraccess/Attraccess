@@ -169,6 +169,32 @@ void Application::processState() {
     return;
   }
 
+  // The server can arm supervision without anyone tapping first (ATT-816): the requester picked this
+  // reader in the web UI. Enrollment and reset return before this point, so the flag may sit unread
+  // for as long as one of those runs — check it against the server's TTL rather than assuming the
+  // request is still live, and tell the server when we cannot serve it.
+  if (this->supervisionStartRequested) {
+    this->supervisionStartRequested = false;
+    bool stale = millis() - this->supervisionRequestedAtMs > this->supervisionRequestedTimeoutMs;
+    if (stale) {
+      this->logger.debug("Ignoring supervision arm that outlived its request");
+    } else if (this->state == APPLICATION_STATE_SUPERVISION ||
+               this->state == APPLICATION_STATE_UNLOCKED ||
+               this->state == APPLICATION_STATE_AUTHENTICATE_CARD) {
+      // Someone is using this reader. UNLOCKED means a user tapped in and is on the details screen —
+      // seizing it would drop them back to the lockscreen with their tap-in gone, and the server
+      // cannot see that state because no session has started yet. AUTHENTICATE_CARD means an auth is
+      // in flight whose response would otherwise land in a different flow. Release the request so
+      // the requester fails immediately rather than watching a countdown they were never going to
+      // get a screen for.
+      this->logger.debug("Reader is in use, releasing the supervision request");
+      this->api.cancelSupervision();
+    } else {
+      this->beginWebInitiatedSupervision();
+    }
+    return;
+  }
+
   // Two-card supervision is a sticky, self-contained sub-flow like enrollment/reset — it owns the
   // screen until success, cancel or timeout. beginSupervision() is entered from the card-auth path
   // (processCardAuthenticationData) rather than via externalState.

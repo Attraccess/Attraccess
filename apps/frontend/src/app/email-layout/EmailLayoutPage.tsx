@@ -53,6 +53,7 @@ const toStorable = (editedDoc: string, head: string) =>
 
 export function EmailLayoutPage() {
   const navigate = useNavigate();
+  const basePath = '/settings/email';
   const { t, language } = useTranslations({ en, de });
   const { theme } = useTheme();
   const toast = useToastMessage();
@@ -150,7 +151,7 @@ export function EmailLayoutPage() {
           isIconOnly
           variant="ghost"
           size="sm"
-          onPress={() => navigate('/emails')}
+          onPress={() => navigate(basePath)}
           aria-label={t('actions.back')}
           data-cy="email-layout-back-button"
         >

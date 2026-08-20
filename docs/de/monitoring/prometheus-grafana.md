@@ -28,7 +28,7 @@ Ein kurzlebiger Hilfsdienst `monitoring-init` startet dasselbe Image, kopiert di
 
 Verwenden Sie [`coolify.docker-compose.yml`](https://github.com/Attraccess/Attraccess/blob/main/coolify.docker-compose.yml) aus dem Repo-Root. Coolify generiert FQDN-Routing und Session-Secrets automatisch über die Magic-Env-Konventionen `SERVICE_FQDN_*`, `SERVICE_URL_*` und `SERVICE_BASE64_*`. Nach dem Deployment:
 
-1. Erstellen Sie einen Metriken-API-Schlüssel unter **Attraccess > Einstellungen > Metrics & Monitoring** ([Einrichtung](monitoring/setup.md)) und kopieren Sie ihn (der Wert wird nur einmal angezeigt)
+1. Erstellen Sie einen Metriken-API-Schlüssel unter **Attraccess > Einstellungen > Überwachung** ([Einrichtung](monitoring/setup.md)) und kopieren Sie ihn (der Wert wird nur einmal angezeigt)
 2. Setzen Sie in Coolify die Umgebungsvariable `PROMETHEUS_METRICS_API_KEY=<Ihr-Schlüssel>` für den Service und triggern Sie ein Redeploy — `monitoring-init` schreibt den Bearer-Token bei jedem Start in die Prometheus-Konfiguration (siehe [Bearer-Token setzen](#bearer-token-setzen))
 3. Öffnen Sie Grafana unter der von Coolify zugewiesenen FQDN und melden Sie sich mit `admin` / `admin` an. Grafana erzwingt einen Passwortwechsel beim ersten Login. Um Zugangsdaten vorzubelegen, überschreiben Sie `GRAFANA_ADMIN_USER` und `GRAFANA_ADMIN_PASSWORD` im Coolify-Env-Tab vor dem ersten Deploy.
 
@@ -118,7 +118,7 @@ volumes:
 Die gebündelte `prometheus.yml` liefert den Bearer-Token auskommentiert aus — Prometheus benötigt ihn zur Authentifizierung gegen Attraccess `/api/metrics`. Da Attraccess den Metriken-API-Schlüssel nur einmalig anzeigt, ist der Ablauf einseitig: Schlüssel in der Attraccess-UI erzeugen, dann als Umgebungsvariable in den Stack einspielen.
 
 1. Stack ohne `PROMETHEUS_METRICS_API_KEY` deployen. Attraccess startet; Prometheus-Scrapes liefern bis zu Schritt 3 `401` — das ist erwartet.
-2. Unter **Attraccess > Einstellungen > Metrics & Monitoring** einen API-Schlüssel generieren und kopieren (Wert wird nur einmal angezeigt).
+2. Unter **Attraccess > Einstellungen > Überwachung** einen API-Schlüssel generieren und kopieren (Wert wird nur einmal angezeigt).
 3. `PROMETHEUS_METRICS_API_KEY=<Ihr-Schlüssel>` als Umgebungsvariable im Stack setzen:
    - **Coolify**: im Service-Env-Tab eintragen und Redeploy auslösen.
    - **Manuelles Compose**: in die `.env` aufnehmen (oder in der Shell exportieren), dann `docker compose up -d --force-recreate monitoring-init prometheus`.

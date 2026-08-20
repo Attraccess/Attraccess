@@ -209,6 +209,12 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_align(this->beeperEnabled, LV_ALIGN_CENTER);
    lv_obj_set_state(this->beeperEnabled, LV_STATE_CHECKED, deviceConfig.beeperEnabled);
 
+#ifdef HAS_POWER_BUTTON
+   // Power off (V4 hardware with SYS_EN latch only) — cuts battery power.
+   PowerOffButton::create(deviceTab, [this]()
+                          { if (this->onPowerOffCallback) this->onPowerOffCallback(); });
+#endif
+
    lv_obj_t *containerForSaveButtonDevice = this->createSaveContainer(deviceTab);
    this->createSaveButton(containerForSaveButtonDevice);
 
@@ -257,6 +263,9 @@ std::string ConnectionConfigurationScreen::getName()
 
 void ConnectionConfigurationScreen::onScreenLeave()
 {
+#ifdef HAS_POWER_BUTTON
+   PowerOffButton::hideConfirm();
+#endif
 }
 
 void ConnectionConfigurationScreen::destroy()

@@ -279,12 +279,12 @@ export class UsersService {
 
     this.logger.debug('Saving new user to database');
     // Wrap save + role assignment in a single transaction so a role-assignment failure
-    // doesn't leave an ownerless account on a fresh install.
+    // doesn't leave an administrator-less account on a fresh install.
     const savedUser = await this.dataSource.transaction(async (em) => {
       const saved = await em.save(user);
       if (isFirstUser) {
-        this.logger.debug('First user in system - assigning owner role');
-        await this.rbacService.assignRoleByKey(saved.id, 'owner', em);
+        this.logger.debug('First user in system - assigning administrator role');
+        await this.rbacService.assignRoleByKey(saved.id, 'administrator', em);
       } else {
         await this.rbacService.assignDefaultRoles(saved.id, em);
       }
@@ -624,10 +624,10 @@ export class UsersService {
 
       const saved = await repo.save(entities);
 
-      // Assign owner role to the first user when bootstrapping; default roles for everyone else.
+      // Assign administrator role to the first user when bootstrapping; default roles for everyone else.
       // Pass the transactional manager so role assignments are part of the same transaction.
       if (options?.grantAllPermissionsToFirst && totalExisting === 0 && saved.length > 0) {
-        await this.rbacService.assignRoleByKey(saved[0].id, 'owner', manager);
+        await this.rbacService.assignRoleByKey(saved[0].id, 'administrator', manager);
         for (const u of saved.slice(1)) {
           await this.rbacService.assignDefaultRoles(u.id, manager);
         }
@@ -736,10 +736,10 @@ export class UsersService {
 
   private async anonymizeAndSoftDelete(id: number, manager?: EntityManager): Promise<void> {
     // ponytail: wrap check-then-delete in a transaction to close the TOCTOU race where two concurrent
-    // deletions of the last two owners could both pass the isLastOwner guard and both proceed
+    // deletions of the last two administrators could both pass the isLastAdministrator guard and both proceed
     const run = async (em: EntityManager) => {
-      if (await this.rbacService.isLastOwner(id, em)) {
-        throw new ForbiddenException('Cannot delete the last owner');
+      if (await this.rbacService.isLastAdministrator(id, em)) {
+        throw new ForbiddenException('Cannot delete the last administrator');
       }
 
       const repo = em.getRepository(User);

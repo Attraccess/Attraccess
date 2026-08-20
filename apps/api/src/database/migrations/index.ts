@@ -145,3 +145,7 @@ export * from './1782700000000-drop-boolean-permissions';
 export * from './1782800000000-translate-email-subjects';
 export * from './1782900000000-mqtt-server-tls-trust';
 export * from './1782901000000-fix-if-node-operand-order';
+export * from './1783000000000-passkeys';
+export * from './1783100000000-drop-flow-logs';
+export * from './1783200000000-rename-owner-role-to-administrator';
+export * from './1765442000000-form-field-position';

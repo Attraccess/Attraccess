@@ -8,6 +8,7 @@ import { addDays } from 'date-fns';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
 import { LocalLoginForSSOForbiddenException } from './errors/localLoginForSSOForbidden.exception';
+import { UserEmailNotVerifiedException } from './errors/userEmailNotVerified.exception';
 import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
 
@@ -30,12 +31,6 @@ export type AuthenticationOptions =
       type: AuthenticationType.SSO;
       details: SSOAuthenticationOptions;
     };
-
-class UserEmailNotVerifiedException extends ForbiddenException {
-  constructor() {
-    super('UserEmailNotVerifiedException');
-  }
-}
 
 class UserEmailInvalidVerificationTokenException extends UnauthorizedException {
   constructor() {

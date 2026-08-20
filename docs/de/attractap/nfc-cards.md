@@ -16,9 +16,8 @@ Wenn alle Pruefungen bestanden sind, wird der Zugang gewaehrt.
 
 ### Alle Karten anzeigen
 
-1. Navigieren Sie zu **Attractap** in der Seitenleiste
-2. Klicken Sie auf **NFC-Karten**
-3. Sie sehen eine Liste aller registrierten NFC-Karten mit ihren zugewiesenen Benutzern
+1. Navigieren Sie zu **NFC-Karten** in der Seitenleiste
+2. Sie sehen eine Liste aller registrierten NFC-Karten mit ihren zugewiesenen Benutzern
 
 <!-- TODO: Screenshot der NFC-Kartenliste -->
 
@@ -26,7 +25,7 @@ Wenn alle Pruefungen bestanden sind, wird der Zugang gewaehrt.
 
 Um eine neue NFC-Karte zu registrieren:
 
-1. Navigieren Sie zu **Attractap** > **NFC-Karten**
+1. Navigieren Sie zu **NFC-Karten** in der Seitenleiste
 2. Klicken Sie auf **NFC-Karte hinzufuegen**
 3. Waehlen Sie den Benutzer aus, der die Karte erhalten soll
 4. Halten Sie die neue NFC-Karte an einen beliebigen verbundenen Attractap-Leser
@@ -39,7 +38,7 @@ Um eine neue NFC-Karte zu registrieren:
 
 ### Karte entfernen
 
-1. Navigieren Sie zu **Attractap** > **NFC-Karten**
+1. Navigieren Sie zu **NFC-Karten** in der Seitenleiste
 2. Suchen Sie die Karte, die Sie entfernen moechten
 3. Klicken Sie auf die Schaltflaeche **Loeschen**
 4. Bestaetigen Sie die Entfernung

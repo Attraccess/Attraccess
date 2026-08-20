@@ -16,6 +16,12 @@ on:
 permissions:
   contents: read
 
+env:
+  # Nx remote cache — writable only when dispatched on main; a dispatch against
+  # any other ref reads but cannot plant artifacts.
+  NX_SELF_HOSTED_REMOTE_CACHE_SERVER: ${{ secrets.NX_CACHE_TOKEN_RO && vars.NX_CACHE_URL || '' }}
+  NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ${{ github.ref == 'refs/heads/main' && secrets.NX_CACHE_TOKEN_RW || secrets.NX_CACHE_TOKEN_RO }}
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -25,7 +31,7 @@ jobs:
       # and required-signatures rules that block nx release's direct push.
       - name: Generate GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}

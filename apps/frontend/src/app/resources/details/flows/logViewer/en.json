@@ -1,3 +1,20 @@
 {
-  "title": "Flow Logs"
+  "title": "Flow Logs",
+  "subtitle": "Logs are only collected while recording and are deleted when it stops",
+  "recording": {
+    "start": "Start recording",
+    "stop": "Stop recording",
+    "duration": "Record for",
+    "active": "Recording · {{countdown}} left",
+    "hint": "Recording is off. Start a recording to collect logs for this flow.",
+    "waiting": "Waiting for the flow to run…"
+  },
+  "duration": {
+    "m15": "15 minutes",
+    "m30": "30 minutes",
+    "h1": "1 hour",
+    "h4": "4 hours",
+    "h8": "8 hours",
+    "h24": "24 hours"
+  }
 }

@@ -8,8 +8,8 @@ This guide explains how to enable the metrics endpoint in Attraccess and generat
 
 ## Enabling Metrics
 
-1. Navigate to **Settings** in the sidebar
-2. Find the **Metrics & Monitoring** card
+1. Open **Settings** in the sidebar
+2. Select the **Monitoring** section
 3. Click **Generate API Key**
 4. Copy the displayed API key and store it securely
 
@@ -54,9 +54,9 @@ http_requests_total{method="GET",route="/api/resources",status_code="200"} 42
 
 | Action | How |
 |--------|-----|
-| **Generate** | Settings > Metrics & Monitoring > Generate API Key |
-| **Regenerate** | Settings > Metrics & Monitoring > Regenerate (invalidates the old key) |
-| **Remove** | Settings > Metrics & Monitoring > Remove API Key (disables the endpoint) |
+| **Generate** | Settings > Monitoring > Generate API Key |
+| **Regenerate** | Settings > Monitoring > Regenerate API Key (invalidates the old key) |
+| **Remove** | Settings > Monitoring > Remove API Key (disables the endpoint) |
 
 > [!NOTE]
 > Removing the API key disables the metrics endpoint entirely. Prometheus will no longer be able to scrape metrics until a new key is generated.

@@ -1,4 +1,4 @@
-import { Button, Card } from '@heroui/react';
+import { Button } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { TwoFactorCard } from '../account/two-factor';
 import { useTwoFactorGate } from '../../hooks/useTwoFactorGate';
@@ -18,25 +18,23 @@ export function TwoFactorGate({ children }: TwoFactorGateProps) {
   }
 
   return (
-    <div className="flex w-full justify-center">
-      <Card className="max-w-2xl w-full">
-        <Card.Header className="flex flex-col gap-2">
+    <div className="flex w-full justify-center px-4 py-8">
+      <section className="max-w-lg w-full flex flex-col gap-6">
+        <header className="flex flex-col gap-2 border-b border-separator pb-4">
           <h2 className="text-2xl font-bold">{t('title')}</h2>
-          <p className="text-sm text-default-500">
+          <p className="text-sm text-muted">
             {gate.needsTwoFactorSetup ? t('requiredDescription') : t('optionalDescription')}
           </p>
-        </Card.Header>
-        <Card.Content className="flex flex-col gap-6">
-          <TwoFactorCard />
-          {gate.canSkip && (
-            <div className="flex justify-end">
-              <Button variant="ghost" onPress={gate.clearSetupIntent}>
-                {t('skip')}
-              </Button>
-            </div>
-          )}
-        </Card.Content>
-      </Card>
+        </header>
+        <TwoFactorCard />
+        {gate.canSkip && (
+          <div className="flex justify-end">
+            <Button variant="ghost" onPress={gate.clearSetupIntent}>
+              {t('skip')}
+            </Button>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

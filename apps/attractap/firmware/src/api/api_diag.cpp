@@ -138,7 +138,7 @@ void API::sendPendingCrashReport()
         return;
     }
 
-    CrashBootRecord rec = {0};
+    CrashBootRecord rec = {};
     KVStore prefs;
     prefs.begin(BOOT_DIAG_NAMESPACE, true);
     size_t read = prefs.getBytes(BOOT_DIAG_PENDING_KEY, &rec, sizeof(rec));

@@ -16,9 +16,8 @@ If all checks pass, access is granted.
 
 ### Viewing All Cards
 
-1. Navigate to **Attractap** in the sidebar
-2. Click on **NFC Cards**
-3. You see a list of all registered NFC cards with their assigned users
+1. Navigate to **NFC-Cards** in the sidebar
+2. You see a list of all registered NFC cards with their assigned users
 
 <!-- TODO: Screenshot of the NFC Cards list -->
 
@@ -26,7 +25,7 @@ If all checks pass, access is granted.
 
 To register a new NFC card:
 
-1. Navigate to **Attractap** > **NFC Cards**
+1. Navigate to **NFC-Cards** in the sidebar
 2. Click **Add NFC Card**
 3. Select the user who should receive the card
 4. Hold the new NFC card to any connected Attractap reader
@@ -39,7 +38,7 @@ To register a new NFC card:
 
 ### Removing a Card
 
-1. Navigate to **Attractap** > **NFC Cards**
+1. Navigate to **NFC-Cards** in the sidebar
 2. Find the card you want to remove
 3. Click the **Delete** button
 4. Confirm the removal

@@ -1,5 +1,5 @@
 import { HTMLAttributes, useCallback, useMemo, useState } from 'react';
-import { Card, CardProps, useOverlayState } from '@heroui/react';
+import { useOverlayState } from '@heroui/react';
 import { Button } from '../../../components/button';
 import { AlertCircle, AwardIcon, ShieldCheckIcon, WrenchIcon } from 'lucide-react';
 import { User } from '@attraccess/react-query-client';
@@ -16,8 +16,8 @@ import { AddMode, FilterMode, PeopleManagementProps } from './types';
 import en from './en.json';
 import de from './de.json';
 
-export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<CardProps, 'children'>>) {
-  const { target, canManageIntroducers, canManageIntroductions, flat, hideHeader, className, ...rest } = props;
+export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<HTMLAttributes<HTMLElement>, 'children'>>) {
+  const { target, canManageIntroducers, canManageIntroductions, hideHeader, className, ...rest } = props;
   const { t } = useTranslations({ en, de });
 
   const [filter, setFilter] = useState<FilterMode>('all');
@@ -102,26 +102,16 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
   );
 
   if (hasError) {
-    const errorContent = (
-      <div className="flex items-center gap-3 p-2">
-        <AlertCircle size={20} className="text-danger" />
-        <div>
-          <p className="font-medium text-danger">{t('loadError')}</p>
-          <p className="text-sm text-foreground-500">{t('loadErrorDescription')}</p>
-        </div>
-      </div>
-    );
-    if (flat) {
-      return (
-        <section className={className} {...(rest as HTMLAttributes<HTMLElement>)}>
-          {errorContent}
-        </section>
-      );
-    }
     return (
-      <Card {...rest} className={className}>
-        <Card.Content>{errorContent}</Card.Content>
-      </Card>
+      <section className={className} {...(rest as HTMLAttributes<HTMLElement>)}>
+        <div className="flex items-center gap-3 p-2">
+          <AlertCircle size={20} className="text-danger" />
+          <div>
+            <p className="font-medium text-danger">{t('loadError')}</p>
+            <p className="text-sm text-foreground-500">{t('loadErrorDescription')}</p>
+          </div>
+        </div>
+      </section>
     );
   }
 
@@ -245,21 +235,11 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<Ca
     );
   }
 
-  if (flat) {
-    return (
-      <section className={className} {...(rest as HTMLAttributes<HTMLElement>)}>
-        {header}
-        <div className="flex flex-col gap-4 mt-4">{body}</div>
-        {modals}
-      </section>
-    );
-  }
-
   return (
-    <Card {...rest} className={className}>
-      <Card.Header>{header}</Card.Header>
-      <Card.Content className="flex flex-col gap-4">{body}</Card.Content>
+    <section className={className} {...(rest as HTMLAttributes<HTMLElement>)}>
+      {header}
+      <div className="flex flex-col gap-4 mt-4">{body}</div>
       {modals}
-    </Card>
+    </section>
   );
 }

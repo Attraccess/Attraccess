@@ -1,0 +1,100 @@
+{
+  "title": "Monitoring",
+  "sectionDescription": "Metrics endpoint, per-subsystem instrumentation, and Prometheus setup.",
+  "loading": "Loading metrics settings...",
+  "description": "Generate an API key to enable authenticated access to the Prometheus metrics endpoint.",
+  "endpointLabel": "Metrics Endpoint",
+  "endpointCopied": {
+    "title": "Copied",
+    "description": "Endpoint URL copied to clipboard."
+  },
+  "generateButton": "Generate API Key",
+  "rerollButton": "Regenerate API Key",
+  "removeButton": "Remove API Key",
+  "keyGenerated": {
+    "title": "API Key Generated",
+    "description": "Copy this key now. It will not be shown again."
+  },
+  "keyRemoved": {
+    "title": "API Key Removed",
+    "description": "The metrics endpoint is now disabled."
+  },
+  "warning": "This key will only be shown once. If you lose it, you must regenerate.",
+  "apiKeyLabel": "API Key",
+  "copyButton": "Copy",
+  "copied": {
+    "title": "Copied",
+    "description": "API key copied to clipboard."
+  },
+  "copyFailed": {
+    "title": "Copy failed",
+    "description": "Could not copy to clipboard."
+  },
+  "confirmReroll": {
+    "title": "Regenerate API Key?",
+    "description": "This will invalidate the current key. Any systems using the old key will lose access to the metrics endpoint.",
+    "confirm": "Regenerate",
+    "cancel": "Cancel"
+  },
+  "confirmRemove": {
+    "title": "Remove API Key?",
+    "description": "This will disable the metrics endpoint. Prometheus scrapers will stop receiving data.",
+    "confirm": "Remove",
+    "cancel": "Cancel"
+  },
+  "setupGuide": {
+    "title": "Prometheus Configuration",
+    "description": "Add the following scrape job to your prometheus.yml:",
+    "bearerNote": "Replace <YOUR_API_KEY> with the generated API key above.",
+    "grafanaTitle": "Grafana Setup",
+    "grafanaDescription": "In Grafana, add a Prometheus data source pointing to your Prometheus server (e.g. http://prometheus:9090). The metrics will be available automatically once Prometheus is scraping the endpoint above."
+  },
+  "slowQueryThreshold": {
+    "title": "Slow query threshold",
+    "description": "Database queries above this duration are counted as slow.",
+    "label": "Threshold (seconds)",
+    "savedTitle": "Threshold saved",
+    "savedDescription": "Slow query threshold updated. Changes apply within a few seconds.",
+    "errorTitle": "Save failed",
+    "errorDescription": "Could not update the slow query threshold. Please try again.",
+    "saveButton": "Save"
+  },
+  "toggles": {
+    "title": "Per-subsystem timing metrics",
+    "description": "Enable or disable timing instrumentation for individual subsystems. Disabling a subsystem stops emitting its histogram and counter series.",
+    "highCostBadge": "High cost",
+    "savedTitle": "Toggle saved",
+    "savedDescription": "Metrics toggle updated. Changes apply within a few seconds.",
+    "errorTitle": "Save failed",
+    "errorDescription": "Could not update the metrics toggle. Please try again.",
+    "http": {
+      "label": "HTTP request timing",
+      "description": "Track per-route latency and request counts."
+    },
+    "ws": {
+      "label": "WebSocket message timing",
+      "description": "Track per-event handler duration and connection lifetime."
+    },
+    "cron": {
+      "label": "Cron job timing",
+      "description": "Track scheduled job duration and success/failure rate."
+    },
+    "db": {
+      "label": "Database query timing",
+      "description": "High cardinality — disabled by default. Enable only on installs with monitoring infrastructure that can absorb the extra series."
+    },
+    "external": {
+      "label": "External call timing",
+      "description": "Track SumUp, SMTP, MQTT, and other outbound integrations."
+    },
+    "sse": {
+      "label": "Server-Sent Events",
+      "description": "Track active SSE connections, message rate, and connection lifetime."
+    },
+    "flow": {
+      "label": "Resource flow execution",
+      "description": "Track flow + node execution duration."
+    }
+  },
+  "doneButton": "Done"
+}

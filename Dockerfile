@@ -1,4 +1,4 @@
-ARG NODE_VERSION=24.18.0
+ARG NODE_VERSION=24.19.0
 ARG NODE_VERSION_NAME=trixie
 
 FROM node:${NODE_VERSION}-${NODE_VERSION_NAME} AS builder
@@ -51,7 +51,7 @@ RUN node -e "for (const p of ['dist/apps/api/package.json','dist/apps/api-swagge
 # Strip them from both pnpm-lock.yaml (patchedDependencies block) and from the
 # root package.json so pnpm deploy sees no stale patch declarations.
 RUN node -e "const fs=require('fs'); let l=fs.readFileSync('pnpm-lock.yaml','utf8'); const pivot='\nimporters:'; const [hdr,rest]=l.split(pivot); const cleaned=hdr.replace(/\n  '@swc-node\/register@[^']+':(?:\n    [^\n]+)*/g,'').replace(/\n  ts-api-utils@[^\n:]+:(?:\n    [^\n]+)*/g,''); fs.writeFileSync('pnpm-lock.yaml',cleaned+pivot+rest);" && \
-    node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package.json','utf8')); delete p.pnpm.patchedDependencies['@swc-node/register@1.11.1']; delete p.pnpm.patchedDependencies['ts-api-utils@2.5.0']; fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
+    node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package.json','utf8')); const d=p.pnpm.patchedDependencies; for (const k of Object.keys(d)) if (k.startsWith('@swc-node/register@') || k.startsWith('ts-api-utils@')) delete d[k]; fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
 
 # pnpm 10's new deploy requires a workspace shared lockfile; --ignore-workspace
 # strips that, so use --legacy for the self-contained dist/apps/api package.

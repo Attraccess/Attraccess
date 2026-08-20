@@ -43,6 +43,12 @@ module.exports = [
       'no-console': 'error',
     },
   },
+  // ATT-294 / ATT-834: the "no form fields inside a Card" guard is not an ESLint rule.
+  // Every regression so far put the Card and the field in different files, which a
+  // per-file rule cannot see, and nx's flat/react config declares no-restricted-syntax
+  // itself — a later flat entry replaces the earlier one, so a rule declared here would
+  // be discarded in every React project. See tools/generators/src/no-fields-in-cards.spec.ts.
+
   // Add special configuration for CI environment that converts warnings to errors
   ...(process.env.CI === 'true'
     ? [

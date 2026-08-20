@@ -58,7 +58,6 @@ import {
   ResourceHealthSource,
 } from './entities/resourceHealthState.entity';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
-import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
 import { ResourceMaintenance } from './entities/resource.maintenance';
 import { ResourceMaintenanceRequest, MaintenanceRequestStatus } from './entities/resource-maintenance-request.entity';
 import {
@@ -101,6 +100,7 @@ import { ConversationParticipant } from './entities/conversation-participant.ent
 import { Message, MessageReferenceType } from './entities/message.entity';
 import { NotificationPreference } from './entities/notification-preference.entity';
 import { PushSubscription } from './entities/push-subscription.entity';
+import { Passkey, PasskeyChallenge } from './entities/passkey.entity';
 import { CompanionDevice } from './entities/companion-device.entity';
 import { EmailLayout, EMAIL_LAYOUT_SINGLETON_ID } from './entities/email-layout.entity';
 import { Permission } from './entities/permission.entity';
@@ -139,8 +139,6 @@ export {
   HttpRequestNodeDataSchema,
   MqttSendMessageNodeDataSchema,
   WaitNodeDataSchema,
-  ResourceFlowLog,
-  ResourceFlowLogType,
   AttractapFirmwareVersion,
   ResourceMaintenance,
   ResourceMaintenanceRequest,
@@ -211,6 +209,8 @@ export {
   MessageReferenceType,
   NotificationPreference,
   PushSubscription,
+  Passkey,
+  PasskeyChallenge,
   CompanionDevice,
   EmailLayout,
   EMAIL_LAYOUT_SINGLETON_ID,
@@ -243,7 +243,6 @@ export const entities = {
   EmailTemplateTranslation,
   ResourceFlowNode,
   ResourceFlowEdge,
-  ResourceFlowLog,
   ResourceMaintenance,
   ResourceMaintenanceRequest,
   ResourceMaintenanceSchedule,
@@ -271,6 +270,8 @@ export const entities = {
   Message,
   NotificationPreference,
   PushSubscription,
+  Passkey,
+  PasskeyChallenge,
   CompanionDevice,
   Permission,
   Role,

@@ -91,11 +91,41 @@ void API::requestSupervisorCardAuthenticationData(uint8_t *uid, uint8_t uidLengt
     this->sendMessage("REQUEST_SUPERVISOR_CARD_AUTHENTICATION_DATA", payload);
 }
 
+void API::confirmSupervisorCardAuth(uint32_t resourceId)
+{
+    this->logger.info("Confirming supervisor card authentication");
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["resourceId"] = resourceId;
+    this->sendMessage("SUPERVISOR_CARD_AUTH_CONFIRMED", payload);
+}
+
 void API::cancelSupervision()
 {
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     this->sendMessage("SUPERVISION_CANCEL", payload);
+}
+
+void API::setSupervisionStartCallback(std::function<void(SupervisionStartCommand)> callback)
+{
+    this->supervisionStartCallback = callback;
+}
+
+void API::onSupervisionStart(JsonObject data)
+{
+    if (this->supervisionStartCallback == nullptr)
+    {
+        return;
+    }
+    JsonObject payload = data["payload"].as<JsonObject>();
+    SupervisionStartCommand command;
+    command.resourceId = payload["resourceId"].is<uint32_t>() ? payload["resourceId"].as<uint32_t>() : 0;
+    command.timeoutMs = payload["timeoutMs"].is<uint32_t>() ? payload["timeoutMs"].as<uint32_t>() : 0;
+    command.requesterUsername = payload["requesterUsername"].is<const char *>()
+                                    ? payload["requesterUsername"].as<std::string>()
+                                    : std::string("");
+    this->supervisionStartCallback(command);
 }
 
 void API::setSupervisionRequestResultCallback(std::function<void(SupervisionRequestResult)> callback)

@@ -28,7 +28,7 @@ A short-lived `monitoring-init` helper service runs the same image, copies these
 
 Use [`coolify.docker-compose.yml`](https://github.com/Attraccess/Attraccess/blob/main/coolify.docker-compose.yml) from the repo root. Coolify auto-generates the FQDN routing and session secrets via `SERVICE_FQDN_*`, `SERVICE_URL_*`, and `SERVICE_BASE64_*` env conventions. After the stack is deployed:
 
-1. Generate a metrics API key in **Attraccess > Settings > Metrics & Monitoring** ([setup guide](monitoring/setup.md)) and copy it (the value is shown only once)
+1. Generate a metrics API key in **Attraccess > Settings > Monitoring** ([setup guide](monitoring/setup.md)) and copy it (the value is shown only once)
 2. In Coolify, add `PROMETHEUS_METRICS_API_KEY=<your-key>` as a service environment variable, then redeploy the stack — `monitoring-init` injects the bearer token into the Prometheus config on every start (see [Setting the Bearer Token](#setting-the-bearer-token) below)
 3. Open Grafana at the FQDN Coolify assigned and log in with `admin` / `admin`. Grafana forces a password change on first login. To pre-set credentials, override `GRAFANA_ADMIN_USER` and `GRAFANA_ADMIN_PASSWORD` in the Coolify env tab before the first deploy.
 
@@ -118,7 +118,7 @@ volumes:
 The bundled `prometheus.yml` ships with the bearer token commented out — Prometheus needs it to authenticate against Attraccess `/api/metrics`. Because Attraccess only displays the metrics API key once at creation, the workflow is one-way: mint the key in the Attraccess UI, then push it into the stack as an environment variable.
 
 1. Deploy the stack without `PROMETHEUS_METRICS_API_KEY`. Attraccess starts; Prometheus scrapes will return `401` until step 3 — that is expected.
-2. In **Attraccess > Settings > Metrics & Monitoring**, generate a metrics API key and copy it (the value is shown only once).
+2. In **Attraccess > Settings > Monitoring**, generate a metrics API key and copy it (the value is shown only once).
 3. Set `PROMETHEUS_METRICS_API_KEY=<your-key>` as an environment variable on the stack:
    - **Coolify**: add it in the service env tab and trigger a redeploy.
    - **Manual compose**: add it to your `.env` file (or export it in the shell), then `docker compose up -d --force-recreate monitoring-init prometheus`.
