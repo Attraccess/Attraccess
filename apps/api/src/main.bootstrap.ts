@@ -183,32 +183,36 @@ export async function bootstrap() {
     credentials: true, // Allow cookies to be sent
   });
 
-  // Run migrations before the app fully starts
-  try {
-    bootstrapLogger.log('Running database migrations...');
-    const dataSource = app.get(DataSource);
+  if (process.env.SKIP_DATABASE_MIGRATIONS === 'true') {
+    bootstrapLogger.log('Skipping database migrations.');
+  } else {
+    // Run migrations before the app fully starts
+    try {
+      bootstrapLogger.log('Running database migrations...');
+      const dataSource = app.get(DataSource);
 
-    if (!dataSource.isInitialized) {
-      await dataSource.initialize();
-      bootstrapLogger.log('Database connection initialized.');
-    }
+      if (!dataSource.isInitialized) {
+        await dataSource.initialize();
+        bootstrapLogger.log('Database connection initialized.');
+      }
 
-    const pendingMigrations = await dataSource.showMigrations();
-    if (pendingMigrations) {
-      const allMigrations = dataSource.migrations;
-      const executedMigrations = dataSource.migrations;
-      bootstrapLogger.log(
-        `Pending migrations detected (${allMigrations.length} total known, ${executedMigrations.length} already executed). Running migrations...`,
-      );
-      await dataSource.runMigrations();
-      bootstrapLogger.log('Migrations completed successfully.');
-    } else {
-      bootstrapLogger.log('No pending migrations found.');
+      const pendingMigrations = await dataSource.showMigrations();
+      if (pendingMigrations) {
+        const allMigrations = dataSource.migrations;
+        const executedMigrations = dataSource.migrations;
+        bootstrapLogger.log(
+          `Pending migrations detected (${allMigrations.length} total known, ${executedMigrations.length} already executed). Running migrations...`,
+        );
+        await dataSource.runMigrations();
+        bootstrapLogger.log('Migrations completed successfully.');
+      } else {
+        bootstrapLogger.log('No pending migrations found.');
+      }
+    } catch (error) {
+      bootstrapLogger.error('Failed to run database migrations');
+      bootstrapLogger.error(error);
+      process.exit(1);
     }
-  } catch (error) {
-    bootstrapLogger.error('Failed to run database migrations');
-    bootstrapLogger.error(error);
-    process.exit(1);
   }
 
   const globalPrefix = appConfig.GLOBAL_PREFIX;
