@@ -110,8 +110,10 @@ export class UsersAdminController {
     description: 'Forbidden - includeRoles requires users.read permission.',
   })
   async findMany(@Query() query: FindManyUsersQueryDto, @Req() request: AuthenticatedRequest): Promise<PaginatedUsersResponseDto> {
-    // ponytail: role data is sensitive; only expose it to users.read holders
-    if (query.includeRoles && !request.user.effectivePermissions?.has('users.read')) {
+    const canReadUsers = request.user.effectivePermissions?.has('users.read') ?? false;
+
+    // Role data is sensitive; only expose it to users.read holders.
+    if (query.includeRoles && !canReadUsers) {
       throw new ForbiddenException();
     }
     const result = await this.usersService.findMany({
@@ -124,6 +126,7 @@ export class UsersAdminController {
     this.logger.debug(`Found ${result.total} users total, returning ${result.data.length} users`);
     return {
       ...result,
+      data: canReadUsers ? result.data : result.data.map(({ id, username }) => ({ id, username })),
       nextPage: computeNextPage(result.page, result.limit, result.total),
     };
   }
