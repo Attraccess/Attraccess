@@ -293,8 +293,8 @@ esp_err_t Ethernet::initSPI()
         .data_io_default_level = false,
         .max_transfer_sz = 0,
         .flags = SPICOMMON_BUSFLAG_MASTER,
-        .isr_cpu_id = ESP_INTR_CPU_AFFINITY_AUTO,
         .intr_flags = 0,
+        .isr_cpu_id = ESP_INTR_CPU_AFFINITY_AUTO,
     };
 
 #ifdef DISPLAY_TOUCHSCREEN_LVGL
