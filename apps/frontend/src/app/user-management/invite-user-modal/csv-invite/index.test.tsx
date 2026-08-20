@@ -57,13 +57,13 @@ describe('CsvInvite', () => {
     });
 
     const heading = screen.getByRole('heading', { name: 'Import errors' });
-    const count = screen.getByText('2');
-    const badge = count.closest('[data-slot="badge"]');
+    const anchor = heading.closest('[data-slot="badge-anchor"]');
+    const badge = anchor?.querySelector('[data-slot="badge"]');
 
     expect(heading).toBeInTheDocument();
-    expect(count).toHaveAttribute('data-slot', 'badge-label');
-    expect(heading.parentElement).toHaveAttribute('data-slot', 'badge-anchor');
+    expect(anchor).toBeInTheDocument();
     expect(badge).not.toBeNull();
-    expect(heading.parentElement).toContainElement(badge);
+    expect(badge).toHaveTextContent('2');
+    expect(anchor).toContainElement(badge);
   });
 });
