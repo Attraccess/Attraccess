@@ -253,13 +253,15 @@ esp_err_t handle(httpd_req_t *request) {
     if (request->method == HTTP_DELETE) {
       std::lock_guard<std::mutex> storage_lock(context.state->storage_mutex);
       if (!context.state->profiles.load(id, profile)) return error(request, 404, "not_found", "profile not found");
-      std::lock_guard<std::mutex> lock(context.state->mutex);
-      bool active_presentation = context.state->active_profile &&
-          context.state->active_profile->id == id &&
+      std::unique_lock<std::mutex> lock(context.state->mutex);
+      bool affects_active = context.state->active_profile &&
+          context.state->active_profile->id == id;
+      bool active_presentation = affects_active &&
           (context.state->present_requested || context.state->target_armed || context.state->rf_active);
       if (active_presentation) return error(request,409,"profile_presented","remove the active profile before deleting it");
+      if (!affects_active) lock.unlock();
       if (!context.state->profiles.remove(id)) return error(request, 500, "persist_failed", "profile was not deleted");
-      if (context.state->active_profile && context.state->active_profile->id == id) {
+      if (affects_active) {
         context.state->present_requested = false;
         context.state->active_profile.reset();
         context.state->engine.reset_session();
@@ -277,13 +279,15 @@ esp_err_t handle(httpd_req_t *request) {
       std::lock_guard<std::mutex> storage_lock(context.state->storage_mutex);
       CardProfile existing;
       if (!context.state->profiles.load(id, existing)) return error(request, 404, "not_found", "profile not found");
-      std::lock_guard<std::mutex> lock(context.state->mutex);
-      bool active_presentation = context.state->active_profile &&
-          context.state->active_profile->id == id &&
+      std::unique_lock<std::mutex> lock(context.state->mutex);
+      bool affects_active = context.state->active_profile &&
+          context.state->active_profile->id == id;
+      bool active_presentation = affects_active &&
           (context.state->present_requested || context.state->target_armed || context.state->rf_active);
       if (active_presentation) return error(request,409,"profile_presented","remove the active profile before replacing it");
+      if (!affects_active) lock.unlock();
       if (!context.state->profiles.save(profile)) return error(request, 500, "persist_failed", "profile was not replaced");
-      if (context.state->active_profile && context.state->active_profile->id == id) {
+      if (affects_active) {
         context.state->active_profile = profile;
         context.state->engine.reset_session();
         ++context.state->profile_revision;
