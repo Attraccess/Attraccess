@@ -216,6 +216,12 @@ void Display::setup()
         buf_size_bytes = buf_pixels * (LV_COLOR_DEPTH / 8);
         buf1 = (uint8_t *)heap_caps_malloc(buf_size_bytes, MALLOC_CAP_DMA);
         buf2 = NULL;
+        if (buf1 == nullptr)
+        {
+            Display::logger.error("Draw-buffer allocation failed even for fallback; restarting");
+            delay(100); // let the serial buffer flush before reset
+            esp_restart();
+        }
         Display::logger.warn("PSRAM draw-buffer alloc failed — falling back to 480x20 single buffer (degraded rendering)");
     }
 
