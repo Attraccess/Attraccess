@@ -15969,12 +15969,17 @@ const LV_ATTRIBUTE_MEM_ALIGN uint8_t logo_40h_data[] = {
     0x00,
 };
 
-const lv_image_dsc_t logo_40h = {
+inline const lv_image_dsc_t logo_40h = {
     .header = {
         .magic = LV_IMAGE_HEADER_MAGIC,
         .cf = LV_COLOR_FORMAT_NATIVE_WITH_ALPHA,
+        .flags = 0,
         .w = 133,
         .h = 40,
+        .stride = 0, /* LVGL infers w*2 from cf; matches perf/6 so #1691->#1696 merges cleanly */
+        .reserved_2 = 0,
     },
     .data_size = sizeof(logo_40h_data),
-    .data = logo_40h_data};
+    .data = logo_40h_data,
+    .reserved = nullptr,
+    .reserved_2 = nullptr};
