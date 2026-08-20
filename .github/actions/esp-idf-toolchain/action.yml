@@ -1,6 +1,6 @@
 name: 'ESP-IDF Toolchain'
 description: >
-  Restore (or build) the ESP-IDF v5.5 esp32s3 toolchain at ~/esp/esp-idf +
+  Restore (or build) the ESP-IDF v6.0.2 esp32s3 toolchain at ~/esp/esp-idf +
   ~/.espressif. Single source of the cache key: two copies of it drifting apart
   is how a poisoned entry stayed poisoned. Requires Python to already be set up;
   its version goes in the cache key, since the IDF virtualenv is named after it.
@@ -8,10 +8,10 @@ description: >
 runs:
   using: 'composite'
   steps:
-    # The venv is named idf5.5_py<major>.<minor>_env, so the interpreter version
+    # The venv is named idf6.0_py<major>.<minor>_env, so the interpreter version
     # is part of what the cache holds. Read it rather than hand-asserting it:
     # `setup/action.yml` records `3.x` once drifting to 3.14 and breaking the
-    # build against idf5.5_py3.13_env. A hardcoded version would let a caller on
+    # build against idf6.0_py3.13_env. A hardcoded version would let a caller on
     # a different Python save an entry under a key claiming 3.13 — permanently,
     # since keys are immutable and the save below is skipped on an exact hit.
     # Deriving it turns that drift into a cache miss, which self-heals.
@@ -26,7 +26,8 @@ runs:
     # PyPI 503 — persists a tree with the toolchain present and the venv
     # missing. That is the entry that broke the firmware build: the key is
     # constant and `actions/cache` skips its post-save on an exact hit, so
-    # nothing could ever overwrite it. `-v2` abandons the poisoned entry.
+    # nothing could ever overwrite it. Bumping the key suffix abandons a
+    # poisoned entry; the v6.0.2 upgrade rotates the key for the same reason.
     - name: Restore ESP-IDF cache
       id: cache-esp-idf
       uses: actions/cache/restore@v6
@@ -34,7 +35,7 @@ runs:
         path: |
           ~/esp/esp-idf
           ~/.espressif
-        key: esp-idf-v5.5-esp32s3-py${{ steps.py.outputs.v }}-v2-${{ runner.os }}
+        key: esp-idf-v6.0.2-esp32s3-py${{ steps.py.outputs.v }}-v1-${{ runner.os }}
 
     # The venv's name carries <major>.<minor>, which is why that is what the key
     # above derives — but its *contents* are pinned harder than that: bin/python3
@@ -44,7 +45,7 @@ runs:
     # `python -m venv` onto a directory holding a dangling bin/python3 fails outright
     # rather than rebuilding it:
     #
-    #   Error: [Errno 2] No such file or directory: '.../idf5.5_py3.13_env/bin/python3'
+    #   Error: [Errno 2] No such file or directory: '.../idf6.0_py3.13_env/bin/python3'
     #
     # so install.sh's idempotence does not cover this one. Observed going *backwards*,
     # 3.13.15 -> 3.13.14, so pinning a floor would not have helped either.
@@ -66,13 +67,13 @@ runs:
         done
       shell: bash
 
-    - name: Install ESP-IDF v5.5
+    - name: Install ESP-IDF v6.0.2
       # Always run, not just on cache miss: `install.sh` is idempotent and
       # repairs a cache restore that is missing the Python virtualenv.
       run: |
         if [ ! -d ~/esp/esp-idf/.git ]; then
           mkdir -p ~/esp
-          git clone --depth 1 --shallow-submodules --recursive -b v5.5 \
+          git clone --depth 1 --shallow-submodules --recursive -b v6.0.2 \
             https://github.com/espressif/esp-idf.git ~/esp/esp-idf
         fi
         ~/esp/esp-idf/install.sh esp32s3
@@ -87,4 +88,4 @@ runs:
         path: |
           ~/esp/esp-idf
           ~/.espressif
-        key: esp-idf-v5.5-esp32s3-py${{ steps.py.outputs.v }}-v2-${{ runner.os }}
+        key: esp-idf-v6.0.2-esp32s3-py${{ steps.py.outputs.v }}-v1-${{ runner.os }}
