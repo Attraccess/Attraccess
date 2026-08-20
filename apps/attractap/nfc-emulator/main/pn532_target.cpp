@@ -6,7 +6,6 @@
 
 namespace nfc_emulator {
 namespace {
-constexpr i2c_port_t port = I2C_NUM_0;
 constexpr uint8_t address = 0x24;
 constexpr char tag[] = "pn532-target";
 }
@@ -21,23 +20,27 @@ bool Pn532Target::begin(gpio_num_t sda, gpio_num_t scl, gpio_num_t reset) {
   vTaskDelay(pdMS_TO_TICKS(10));
   gpio_set_level(reset_pin_, 1);
   vTaskDelay(pdMS_TO_TICKS(50));
-  i2c_config_t config{};
-  config.mode = I2C_MODE_MASTER;
-  config.sda_io_num = sda;
-  config.scl_io_num = scl;
-  config.sda_pullup_en = GPIO_PULLUP_ENABLE;
-  config.scl_pullup_en = GPIO_PULLUP_ENABLE;
-  config.master.clk_speed = 100000;
-  return i2c_param_config(port, &config) == ESP_OK &&
-         i2c_driver_install(port, config.mode, 0, 0, 0) == ESP_OK;
+  i2c_master_bus_config_t bus_config{};
+  bus_config.i2c_port = I2C_NUM_0;
+  bus_config.sda_io_num = sda;
+  bus_config.scl_io_num = scl;
+  bus_config.clk_source = I2C_CLK_SRC_DEFAULT;
+  bus_config.glitch_ignore_cnt = 7;
+  bus_config.flags.enable_internal_pullup = true;
+  if (i2c_new_master_bus(&bus_config, &bus_) != ESP_OK) return false;
+
+  i2c_device_config_t device_config{};
+  device_config.dev_addr_length = I2C_ADDR_BIT_LEN_7;
+  device_config.device_address = address;
+  device_config.scl_speed_hz = 100000;
+  return i2c_master_bus_add_device(bus_, &device_config, &device_) == ESP_OK;
 }
 
 bool Pn532Target::ready(uint32_t timeout_ms) {
   TickType_t start = xTaskGetTickCount();
   uint8_t status = 0;
   do {
-    if (i2c_master_read_from_device(port, address, &status, 1,
-                                    pdMS_TO_TICKS(20)) == ESP_OK && status == 1)
+    if (i2c_master_receive(device_, &status, 1, 20) == ESP_OK && status == 1)
       return true;
     vTaskDelay(pdMS_TO_TICKS(5));
   } while ((xTaskGetTickCount() - start) * portTICK_PERIOD_MS < timeout_ms);
@@ -54,15 +57,13 @@ bool Pn532Target::write_frame(uint8_t command_byte, const Bytes &payload) {
   for (uint8_t byte : payload) checksum = static_cast<uint8_t>(checksum + byte);
   frame.push_back(static_cast<uint8_t>(0U - checksum));
   frame.push_back(0x00);
-  return i2c_master_write_to_device(port, address, frame.data(), frame.size(),
-                                    pdMS_TO_TICKS(100)) == ESP_OK;
+  return i2c_master_transmit(device_, frame.data(), frame.size(), 100) == ESP_OK;
 }
 
 bool Pn532Target::read_frame(Bytes &response, uint32_t timeout_ms) {
   if (!ready(timeout_ms)) return false;
   uint8_t buffer[272]{};
-  if (i2c_master_read_from_device(port, address, buffer, sizeof(buffer),
-                                  pdMS_TO_TICKS(100)) != ESP_OK) return false;
+  if (i2c_master_receive(device_, buffer, sizeof(buffer), 100) != ESP_OK) return false;
   // I2C status byte, then 00 00 FF LEN LCS TFI RESPONSE ... DCS 00.
   if (buffer[1] != 0 || buffer[2] != 0 || buffer[3] != 0xff ||
       static_cast<uint8_t>(buffer[4] + buffer[5]) != 0) return false;
@@ -85,8 +86,7 @@ bool Pn532Target::begin_command(uint8_t command_byte, const Bytes &payload) {
   if (!write_frame(command_byte, payload)) return false;
   if (!ready(100)) return false;
   uint8_t ack[7]{};
-  if (i2c_master_read_from_device(port, address, ack, sizeof(ack),
-                                  pdMS_TO_TICKS(100)) != ESP_OK ||
+  if (i2c_master_receive(device_, ack, sizeof(ack), 100) != ESP_OK ||
       ack[1] != 0 || ack[2] != 0 || ack[3] != 0xff || ack[4] != 0 ||
       ack[5] != 0xff || ack[6] != 0) return false;
   return true;
