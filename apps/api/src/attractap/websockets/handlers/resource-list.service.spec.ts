@@ -139,6 +139,16 @@ describe('ResourceListService', () => {
       expect(spy).toHaveBeenCalledTimes(1);
       expect(spy).toHaveBeenCalledWith(s1, { resourceIds: [10, 20] });
     });
+
+    it('does not refresh readers when no resources are affected', async () => {
+      const s1 = createMockSocket({ id: 's1', readerId: 42 });
+      websocketService.sockets.set('s1', s1);
+      const spy = jest.spyOn(service, 'sendResourceListToSocket').mockResolvedValue(undefined);
+
+      await service.sendResourceListToReadersWithResources([]);
+
+      expect(spy).not.toHaveBeenCalled();
+    });
   });
 
   describe('sendResourceListToSocket', () => {
