@@ -49,6 +49,10 @@ export class ResourceListService {
   }
 
   public async sendResourceListToReadersWithResources(resourceIds: number[]) {
+    if (resourceIds.length === 0) {
+      return;
+    }
+
     const allSockets = Array.from(this.websocketService.sockets.values());
     await Promise.all(allSockets.map((socket) => this.sendResourceListToSocket(socket, { resourceIds })));
   }
