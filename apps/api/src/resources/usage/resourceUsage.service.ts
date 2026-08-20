@@ -542,17 +542,21 @@ export class ResourceUsageService {
       if (existingActiveSession) {
         const now = new Date();
 
-        await this.flowExecutorService.runFlow(
-          existingActiveSession.resourceId,
-          ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
-          {
-            ...this.getResourceUsageFlowPayload(existingActiveSession, formSubmissions),
-            takeOverTime: now,
-            newUser: user,
-            oldUser: existingActiveSession.user,
-          },
-          transactionalEntityManager,
-        );
+        try {
+          await this.flowExecutorService.runFlow(
+            existingActiveSession.resourceId,
+            ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
+            {
+              ...this.getResourceUsageFlowPayload(existingActiveSession, formSubmissions),
+              takeOverTime: now,
+              newUser: user,
+              oldUser: existingActiveSession.user,
+            },
+            transactionalEntityManager,
+          );
+        } catch (error) {
+          this.logger.error(`Usage takeover flow failed for resource ${resourceId}`, (error as Error).stack);
+        }
 
         // Emit event for the takeover
         this.eventEmitter.emit(
@@ -563,12 +567,16 @@ export class ResourceUsageService {
         // Defer event for the newly started session until after commit
         startedUsageIdToEmit = createdSession.id;
 
-        await this.flowExecutorService.runFlow(
-          createdSession.resourceId,
-          ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
-          this.getResourceUsageFlowPayload(createdSession, formSubmissions),
-          transactionalEntityManager,
-        );
+        try {
+          await this.flowExecutorService.runFlow(
+            createdSession.resourceId,
+            ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+            this.getResourceUsageFlowPayload(createdSession, formSubmissions),
+            transactionalEntityManager,
+          );
+        } catch (error) {
+          this.logger.error(`Usage-start flow failed for resource ${resourceId}`, (error as Error).stack);
+        }
       }
 
       this.flowExecutorService.trackResourceActivity(createdSession.resourceId);

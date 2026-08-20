@@ -382,8 +382,10 @@ describe('ResourceUsageService', () => {
       type: ResourceType.Machine,
     } as Resource;
 
-    it('should start a session successfully when no active session exists', async () => {
+    it('should start a session when the start flow fails', async () => {
       const dto: StartUsageSessionDto = { notes: 'Test session' };
+
+      flowExecutorService.runFlow.mockRejectedValueOnce(new Error('MQTT authentication failed'));
 
       // Mock resourceRepository.findOne to return the resource
       resourceRepository.findOne.mockResolvedValue(mockResource);
@@ -525,8 +527,10 @@ describe('ResourceUsageService', () => {
       );
     });
 
-    it('should successfully takeover when resource allows it', async () => {
+    it('should takeover when the takeover flow fails', async () => {
       const dto: StartUsageSessionDto = { notes: 'Test session', forceTakeOver: true };
+
+      flowExecutorService.runFlow.mockRejectedValueOnce(new Error('MQTT authentication failed'));
 
       // Mock resourceRepository.findOne to return the resource (allowTakeOver: true)
       resourceRepository.findOne.mockResolvedValue(mockResourceWithTakeOver);
