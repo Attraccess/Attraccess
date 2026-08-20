@@ -18,7 +18,7 @@ import {
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { DeviceRegistryService } from './device-registry.service';
 import { DiscoveryService, type DiscoveryResult } from './discovery.service';
-import { InvalidCidrError } from './network-scan';
+import { InvalidCidrError, isPrivateIpv4 } from './network-scan';
 import { ShellyDeviceApiService, type ShellyDeviceInfo } from './shelly-device-api.service';
 import { ShellyFirmwareService, type FirmwareStage, type FirmwareStatus } from './shelly-firmware.service';
 import { ShellyProbeService } from './shelly-probe.service';
@@ -73,7 +73,7 @@ export class ShellyController {
     @Inject(ShellyProbeService) private readonly probe: ShellyProbeService,
     @Inject(DiscoveryService) private readonly discovery: DiscoveryService,
     @Inject(ShellyDeviceApiService) private readonly deviceApi: ShellyDeviceApiService,
-    @Inject(ShellyFirmwareService) private readonly firmware: ShellyFirmwareService
+    @Inject(ShellyFirmwareService) private readonly firmware: ShellyFirmwareService,
   ) {}
 
   // Runs inline rather than as a background job: a /24 is ~250 probes at a 1s
@@ -104,6 +104,9 @@ export class ShellyController {
     const ipAddress = (body?.ipAddress ?? '').trim();
     if (!ipAddress) {
       throw new BadRequestException('ipAddress is required');
+    }
+    if (!isPrivateIpv4(ipAddress)) {
+      throw new BadRequestException('ipAddress must be a private IPv4 address without a port or hostname');
     }
     if (await this.registry.findByIp(ipAddress)) {
       throw new ConflictException(`a device with IP ${ipAddress} already exists`);
@@ -145,14 +148,14 @@ export class ShellyController {
         } catch (err) {
           return { deviceId: device.id, status: null, error: err instanceof Error ? err.message : String(err) };
         }
-      })
+      }),
     );
   }
 
   @Get('devices/:id/firmware')
   async firmwareStatus(
     @Param('id', ParseIntPipe) id: number,
-    @Query() query: DeviceInfoQuery
+    @Query() query: DeviceInfoQuery,
   ): Promise<FirmwareStatus> {
     const device = await this.requireDeviceWithGeneration(id);
     return this.firmware.getStatus({
@@ -166,7 +169,7 @@ export class ShellyController {
   @Post('devices/:id/firmware/update')
   async startFirmwareUpdate(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: FirmwareUpdateBody
+    @Body() body: FirmwareUpdateBody,
   ): Promise<{ started: true; stage: FirmwareStage }> {
     const stage = body?.stage ?? 'stable';
     if (stage !== 'stable' && stage !== 'beta') {
@@ -180,7 +183,7 @@ export class ShellyController {
         username: body?.username,
         currentPassword: body?.currentPassword,
       },
-      stage
+      stage,
     );
     return { started: true, stage };
   }

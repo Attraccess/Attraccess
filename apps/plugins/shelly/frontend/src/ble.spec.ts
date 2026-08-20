@@ -1,6 +1,13 @@
 // Vitest runs without globals here, so the test API is imported explicitly.
-import { describe, expect, it } from 'vitest';
-import { disableBleRadio, provisionWifiOverBle, ShellyBleRpc, type GattCharacteristic, type RpcChannel } from './ble';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  connectShellyOverBle,
+  disableBleRadio,
+  provisionWifiOverBle,
+  ShellyBleRpc,
+  type GattCharacteristic,
+  type RpcChannel,
+} from './ble';
 
 const noSleep = () => Promise.resolve();
 
@@ -17,7 +24,10 @@ class FakeShelly {
   private response = new Uint8Array(0);
   private readCursor = 0;
 
-  constructor(private readonly handler: (request: { method: string; params?: unknown }) => unknown, private readonly mtu = 20) {}
+  constructor(
+    private readonly handler: (request: { method: string; params?: unknown }) => unknown,
+    private readonly mtu = 20,
+  ) {}
 
   get channel(): RpcChannel {
     return { data: this.data, txControl: this.txControl, rxControl: this.rxControl };
@@ -107,12 +117,55 @@ describe('ShellyBleRpc', () => {
       writeValue: async () => undefined,
       readValue: async () => new DataView(new Uint8Array(4).buffer),
     };
-    const rpc = new ShellyBleRpc({ data: silent, txControl: silent, rxControl: silent }, {
-      sleep: noSleep,
-      timeoutMs: 0,
-    });
+    const rpc = new ShellyBleRpc(
+      { data: silent, txControl: silent, rxControl: silent },
+      {
+        sleep: noSleep,
+        timeoutMs: 0,
+      },
+    );
 
     await expect(rpc.call('Shelly.GetDeviceInfo')).rejects.toThrow(/Timed out waiting for the device/);
+  });
+
+  it('rejects an oversized response before allocating its buffer', async () => {
+    const oversized: GattCharacteristic = {
+      writeValue: async () => undefined,
+      readValue: async () => {
+        const bytes = new Uint8Array(4);
+        new DataView(bytes.buffer).setUint32(0, 1024 * 1024 + 1, false);
+        return new DataView(bytes.buffer);
+      },
+    };
+    const rpc = new ShellyBleRpc({ data: oversized, txControl: oversized, rxControl: oversized });
+
+    await expect(rpc.call('Shelly.GetDeviceInfo')).rejects.toThrow(/response is too large/);
+  });
+
+  it('disconnects when characteristic discovery fails', async () => {
+    const disconnect = vi.fn();
+    const characteristic: GattCharacteristic = {
+      readValue: async () => new DataView(new ArrayBuffer(0)),
+      writeValue: async () => undefined,
+    };
+    const bluetooth = {
+      requestDevice: async () => ({
+        gatt: {
+          connect: async () => ({
+            getPrimaryService: async () => ({
+              getCharacteristic: async (uuid: string) => {
+                if (uuid.endsWith('5f')) throw new Error('missing characteristic');
+                return characteristic;
+              },
+            }),
+          }),
+          disconnect,
+        },
+      }),
+    };
+
+    await expect(connectShellyOverBle(bluetooth)).rejects.toThrow(/required Shelly RPC Bluetooth characteristics/);
+    expect(disconnect).toHaveBeenCalledOnce();
   });
 });
 
@@ -123,7 +176,7 @@ describe('provisionWifiOverBle', () => {
     return {
       calls,
       rpc: {
-        call: async <T,>(method: string, params?: Record<string, unknown>): Promise<T> => {
+        call: async <T>(method: string, params?: Record<string, unknown>): Promise<T> => {
           calls.push({ method, params });
           const queue = queues[method];
           if (!queue) return undefined as T;
@@ -144,7 +197,7 @@ describe('provisionWifiOverBle', () => {
     const result = await provisionWifiOverBle(
       rpc,
       { ssid: 'Workshop', password: 'hunter22' },
-      { onStage: (s) => stages.push(s), sleep: noSleep }
+      { onStage: (s) => stages.push(s), sleep: noSleep },
     );
 
     expect(result).toEqual({
@@ -183,6 +236,33 @@ describe('provisionWifiOverBle', () => {
     expect(calls.map((c) => c.method)).toEqual(['Shelly.GetDeviceInfo', 'WiFi.SetConfig', 'Shelly.Reboot']);
   });
 
+  it('treats a lost link during a required reboot as success', async () => {
+    const rpc = {
+      call: async <T>(method: string): Promise<T> => {
+        if (method === 'Shelly.GetDeviceInfo') return { id: 'shelly1' } as T;
+        if (method === 'WiFi.SetConfig') return { restart_required: true } as T;
+        throw new Error('GATT server disconnected');
+      },
+    };
+
+    await expect(provisionWifiOverBle(rpc, { ssid: 'Workshop', password: 'x' })).resolves.toMatchObject({
+      ipAddress: null,
+      restartRequired: true,
+    });
+  });
+
+  it('rejects an address outside the private IPv4 ranges', async () => {
+    const { rpc } = rpcStub({
+      'Shelly.GetDeviceInfo': [{ id: 'shelly1' }],
+      'WiFi.SetConfig': [{ restart_required: false }],
+      'WiFi.GetStatus': [{ status: 'got ip', sta_ip: '127.0.0.1:3000' }],
+    });
+
+    await expect(provisionWifiOverBle(rpc, { ssid: 'Workshop', password: 'x' })).rejects.toThrow(
+      /invalid private IPv4/,
+    );
+  });
+
   it('fails with the last WiFi status when the device never joins', async () => {
     const { rpc } = rpcStub({
       'Shelly.GetDeviceInfo': [{ id: 'shelly1' }],
@@ -191,7 +271,7 @@ describe('provisionWifiOverBle', () => {
     });
 
     await expect(
-      provisionWifiOverBle(rpc, { ssid: 'Workshop', password: 'wrong' }, { sleep: noSleep, joinTimeoutMs: 0 })
+      provisionWifiOverBle(rpc, { ssid: 'Workshop', password: 'wrong' }, { sleep: noSleep, joinTimeoutMs: 0 }),
     ).rejects.toThrow(/did not join "Workshop".*last status: disconnected.*2\.4 GHz/s);
   });
 });
@@ -202,7 +282,7 @@ describe('disableBleRadio', () => {
     return {
       calls,
       rpc: {
-        call: async <T,>(method: string, params?: Record<string, unknown>): Promise<T> => {
+        call: async <T>(method: string, params?: Record<string, unknown>): Promise<T> => {
           calls.push({ method, params });
           const result = reply(method);
           if (result instanceof Error) throw result;
@@ -230,7 +310,7 @@ describe('disableBleRadio', () => {
 
   it('treats a lost link during the reboot as success', async () => {
     const { rpc } = rpcSpy((method) =>
-      method === 'Shelly.Reboot' ? new Error('GATT server disconnected') : { restart_required: true }
+      method === 'Shelly.Reboot' ? new Error('GATT server disconnected') : { restart_required: true },
     );
 
     await expect(disableBleRadio(rpc)).resolves.toBeUndefined();

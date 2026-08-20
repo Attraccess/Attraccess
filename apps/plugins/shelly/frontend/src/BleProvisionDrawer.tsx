@@ -115,7 +115,7 @@ export function BleProvisionDrawer({
         setStep('disabling-bluetooth');
         bluetoothDisabled = await disableBleRadio(connection.rpc).then(
           () => true,
-          () => false
+          () => false,
         );
       }
       setOutcome({
@@ -137,7 +137,12 @@ export function BleProvisionDrawer({
   }, [onProvisioned, password, ssid]);
 
   return (
-    <StandardDrawer isOpen={isOpen} onOpenChange={onOpenChange}>
+    <StandardDrawer
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      isDismissable={!running}
+      isKeyboardDismissDisabled={running}
+    >
       <DrawerHeader>
         <div className="sh:flex sh:w-full sh:items-start sh:justify-between sh:gap-3">
           <div className="sh:flex sh:min-w-0 sh:flex-col sh:gap-1">
@@ -150,7 +155,7 @@ export function BleProvisionDrawer({
               within a few metres of the device.
             </p>
           </div>
-          <Button isIconOnly variant="ghost" aria-label="Close" onPress={close}>
+          <Button isIconOnly variant="ghost" aria-label="Close" onPress={close} isDisabled={running}>
             <XIcon size={16} />
           </Button>
         </div>
@@ -164,7 +169,7 @@ export function BleProvisionDrawer({
               use Discover.
             </StatusAlert>
             <div className="sh:flex sh:justify-end sh:pt-2">
-              <Button variant="secondary" onPress={close}>
+              <Button variant="secondary" onPress={close} isDisabled={running}>
                 Close
               </Button>
             </div>
@@ -207,7 +212,7 @@ export function BleProvisionDrawer({
                 ) : (
                   <StatusAlert status="success" title="Device provisioned">
                     {outcome.advertisedName} joined {ssid.trim()} and was added to the registry
-                    {outcome.bluetoothDisabled ? ", and its Bluetooth was switched off" : ''}.
+                    {outcome.bluetoothDisabled ? ', and its Bluetooth was switched off' : ''}.
                   </StatusAlert>
                 )}
                 {outcome.bluetoothDisabled === false && (

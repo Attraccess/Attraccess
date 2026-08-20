@@ -19,6 +19,7 @@ export const SHELLY_RPC_SERVICE = '5f6d4f53-5f52-5043-5f53-56435f49445f';
 export const SHELLY_RPC_DATA = '5f6d4f53-5f52-5043-5f64-6174615f5f5f';
 export const SHELLY_RPC_TX_CONTROL = '5f6d4f53-5f52-5043-5f74-785f63746c5f';
 export const SHELLY_RPC_RX_CONTROL = '5f6d4f53-5f52-5043-5f72-785f63746c5f';
+const MAX_RESPONSE_BYTES = 1024 * 1024;
 
 /** The slice of `BluetoothRemoteGATTCharacteristic` this module needs. */
 export interface GattCharacteristic {
@@ -60,7 +61,10 @@ export class ShellyBleRpc {
   private readonly timeoutMs: number;
   private readonly sleep: (ms: number) => Promise<void>;
 
-  constructor(private readonly channel: RpcChannel, options: RpcOptions = {}) {
+  constructor(
+    private readonly channel: RpcChannel,
+    options: RpcOptions = {},
+  ) {
     this.chunkSize = options.chunkSize ?? 20;
     this.pollIntervalMs = options.pollIntervalMs ?? 100;
     this.timeoutMs = options.timeoutMs ?? 10_000;
@@ -69,7 +73,7 @@ export class ShellyBleRpc {
 
   async call<T>(method: string, params?: Record<string, unknown>): Promise<T> {
     const frame = new TextEncoder().encode(
-      JSON.stringify({ id: this.nextId++, src: 'attraccess', method, ...(params ? { params } : {}) })
+      JSON.stringify({ id: this.nextId++, src: 'attraccess', method, ...(params ? { params } : {}) }),
     );
 
     await this.channel.txControl.writeValue(uint32BE(frame.length));
@@ -85,13 +89,18 @@ export class ShellyBleRpc {
       throw new Error(`${method}: device sent a malformed response`);
     }
     if (envelope.error) {
-      throw new Error(`${method} failed: ${envelope.error.message ?? 'unknown error'} (code ${envelope.error.code ?? '?'})`);
+      throw new Error(
+        `${method} failed: ${envelope.error.message ?? 'unknown error'} (code ${envelope.error.code ?? '?'})`,
+      );
     }
     return envelope.result as T;
   }
 
   private async readResponse(): Promise<Uint8Array> {
     const length = await this.awaitResponseLength();
+    if (length > MAX_RESPONSE_BYTES) {
+      throw new Error(`Bluetooth response is too large (${length} bytes)`);
+    }
     const out = new Uint8Array(length);
     let filled = 0;
     while (filled < length) {
@@ -154,7 +163,7 @@ export interface ShellyBleConnection {
 export async function connectShellyOverBle(bluetooth = getBluetooth()): Promise<ShellyBleConnection> {
   if (!bluetooth) {
     throw new Error(
-      'This browser cannot use Bluetooth. Web Bluetooth needs Chrome or Edge on an HTTPS page (or http://localhost).'
+      'This browser cannot use Bluetooth. Web Bluetooth needs Chrome or Edge on an HTTPS page (or http://localhost).',
     );
   }
 
@@ -169,27 +178,25 @@ export async function connectShellyOverBle(bluetooth = getBluetooth()): Promise<
   if (!gatt) throw new Error('The selected device does not expose a GATT server.');
 
   const server = await gatt.connect();
-  let service: GattService;
   try {
-    service = await server.getPrimaryService(SHELLY_RPC_SERVICE);
+    const service = await server.getPrimaryService(SHELLY_RPC_SERVICE);
+    const [data, txControl, rxControl] = await Promise.all([
+      service.getCharacteristic(SHELLY_RPC_DATA),
+      service.getCharacteristic(SHELLY_RPC_TX_CONTROL),
+      service.getCharacteristic(SHELLY_RPC_RX_CONTROL),
+    ]);
+
+    return {
+      advertisedName: device.name ?? 'Shelly device',
+      rpc: new ShellyBleRpc({ data, txControl, rxControl }),
+      disconnect: () => gatt.disconnect(),
+    };
   } catch {
     gatt.disconnect();
     throw new Error(
-      'This device does not expose Shelly RPC over Bluetooth. Gen1 devices never do; on Gen2+ check that Bluetooth and its RPC are enabled in the device settings.'
+      'This device does not expose the required Shelly RPC Bluetooth characteristics. Gen1 devices never do; on Gen2+ check that Bluetooth and its RPC are enabled in the device settings.',
     );
   }
-
-  const [data, txControl, rxControl] = await Promise.all([
-    service.getCharacteristic(SHELLY_RPC_DATA),
-    service.getCharacteristic(SHELLY_RPC_TX_CONTROL),
-    service.getCharacteristic(SHELLY_RPC_RX_CONTROL),
-  ]);
-
-  return {
-    advertisedName: device.name ?? 'Shelly device',
-    rpc: new ShellyBleRpc({ data, txControl, rxControl }),
-    disconnect: () => gatt.disconnect(),
-  };
 }
 
 // --- Provisioning --------------------------------------------------------------
@@ -224,10 +231,18 @@ export interface ProvisionOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
+/** True for RFC1918 and link-local IPv4 literals, never hostnames or URLs. */
+export function isPrivateIpv4(ip: string): boolean {
+  const parts = ip.split('.');
+  if (parts.length !== 4 || parts.some((part) => !/^(0|[1-9]\d{0,2})$/.test(part) || Number(part) > 255)) return false;
+  const [a, b] = parts.map(Number);
+  return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254);
+}
+
 export async function provisionWifiOverBle(
   rpc: Pick<ShellyBleRpc, 'call'>,
   credentials: { ssid: string; password: string },
-  options: ProvisionOptions = {}
+  options: ProvisionOptions = {},
 ): Promise<ProvisionResult> {
   const { onStage, joinTimeoutMs = 60_000, pollIntervalMs = 2_000, sleep = defaultSleep } = options;
 
@@ -243,7 +258,7 @@ export async function provisionWifiOverBle(
   if (setResult?.restart_required) {
     // The BLE link dies with the reboot, so we cannot observe the join. The
     // operator finishes with Discover once the device is on the network.
-    await rpc.call('Shelly.Reboot');
+    await rpc.call('Shelly.Reboot').catch(() => undefined);
     return { info, ipAddress: null, restartRequired: true };
   }
 
@@ -254,12 +269,15 @@ export async function provisionWifiOverBle(
     const wifi = await rpc.call<WifiStatus>('WiFi.GetStatus');
     lastStatus = wifi?.status ?? 'unknown';
     if (lastStatus === 'got ip' && wifi?.sta_ip) {
+      if (!isPrivateIpv4(wifi.sta_ip)) {
+        throw new Error('Device reported an invalid private IPv4 address');
+      }
       return { info, ipAddress: wifi.sta_ip, restartRequired: false };
     }
     if (Date.now() >= deadline) {
       throw new Error(
         `Device did not join "${credentials.ssid}" within ${Math.round(joinTimeoutMs / 1000)}s (last status: ${lastStatus}). ` +
-          'Check the password, and that the network is 2.4 GHz — Shelly devices cannot join 5 GHz networks.'
+          'Check the password, and that the network is 2.4 GHz — Shelly devices cannot join 5 GHz networks.',
       );
     }
     await sleep(pollIntervalMs);

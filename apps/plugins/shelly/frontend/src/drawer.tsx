@@ -27,14 +27,23 @@ const FIELD_CONTRAST_STYLE: CSSProperties = {
 export function StandardDrawer({
   isOpen,
   onOpenChange,
+  isDismissable = true,
+  isKeyboardDismissDisabled = false,
   children,
 }: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  isDismissable?: boolean;
+  isKeyboardDismissDisabled?: boolean;
   children: ReactNode;
 }) {
   return (
-    <DrawerBackdrop isOpen={isOpen} onOpenChange={onOpenChange}>
+    <DrawerBackdrop
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      isDismissable={isDismissable}
+      isKeyboardDismissDisabled={isKeyboardDismissDisabled}
+    >
       <DrawerContent>
         <DrawerDialog className={DRAWER_DIALOG_CLASSNAME} style={FIELD_CONTRAST_STYLE}>
           {children}
