@@ -1,22 +1,31 @@
 name: 'Docker Build and Push'
 description: >
-  Log in to GHCR and Docker Hub, read the Node.js version from .nvmrc,
-  set up Buildx, and build+push the image. Callers are responsible for
-  computing the tags list; this action handles the mechanical setup.
+  Log in to GHCR (and Docker Hub, when credentials are supplied), read the
+  Node.js version from .nvmrc, set up Buildx, and build+push the image.
+  Callers are responsible for computing the tags list; this action handles
+  the mechanical setup. Omit the Docker Hub credentials to push to GHCR
+  only; set push to "false" to build without pushing at all (fork PRs get
+  neither registry credentials nor a writable GITHUB_TOKEN).
 
 inputs:
   tags:
     description: 'Newline- or comma-separated Docker tags to apply'
     required: true
+  push:
+    description: 'Push the image to the registries ("false" only builds it)'
+    required: false
+    default: 'true'
   ghcr-token:
     description: 'Token for GHCR login (use secrets.GITHUB_TOKEN)'
     required: true
   dockerhub-username:
-    description: 'Docker Hub username'
-    required: true
+    description: 'Docker Hub username (empty skips the Docker Hub login)'
+    required: false
+    default: ''
   dockerhub-token:
-    description: 'Docker Hub token'
-    required: true
+    description: 'Docker Hub token (empty skips the Docker Hub login)'
+    required: false
+    default: ''
 
 outputs:
   digest:
@@ -27,6 +36,7 @@ runs:
   using: 'composite'
   steps:
     - name: Login to GitHub Container Registry
+      if: inputs.push == 'true'
       uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
       with:
         registry: ghcr.io
@@ -34,6 +44,7 @@ runs:
         password: ${{ inputs.ghcr-token }}
 
     - name: Login to Docker Hub
+      if: inputs.dockerhub-username != '' && inputs.dockerhub-token != ''
       uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
       with:
         username: ${{ inputs.dockerhub-username }}
@@ -52,7 +63,7 @@ runs:
       uses: docker/build-push-action@b66d8774c665b789105b440514f0c97e6f19b06f
       with:
         context: .
-        push: true
+        push: ${{ inputs.push }}
         tags: ${{ inputs.tags }}
         build-args: NODE_VERSION=${{ steps.node-version.outputs.value }}
         cache-from: type=gha

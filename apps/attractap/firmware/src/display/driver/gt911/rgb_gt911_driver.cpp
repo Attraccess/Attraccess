@@ -168,22 +168,23 @@ bool RgbGt911Driver::begin()
     rgbConfig.timings.flags.pclk_active_neg = 0;
     rgbConfig.timings.flags.pclk_idle_high = 0;
     rgbConfig.data_width = 16;
-    rgbConfig.bits_per_pixel = 16;
+    rgbConfig.in_color_format = LCD_COLOR_FMT_RGB565;
+    rgbConfig.out_color_format = LCD_COLOR_FMT_RGB565;
     rgbConfig.num_fbs = 1;
     rgbConfig.bounce_buffer_size_px = 0;
     rgbConfig.dma_burst_size = 64;
-    rgbConfig.hsync_gpio_num = 38;
-    rgbConfig.vsync_gpio_num = 39;
-    rgbConfig.de_gpio_num = 40;
-    rgbConfig.pclk_gpio_num = 41;
-    rgbConfig.disp_gpio_num = -1;
+    rgbConfig.hsync_gpio_num = (gpio_num_t)38;
+    rgbConfig.vsync_gpio_num = (gpio_num_t)39;
+    rgbConfig.de_gpio_num = (gpio_num_t)40;
+    rgbConfig.pclk_gpio_num = (gpio_num_t)41;
+    rgbConfig.disp_gpio_num = (gpio_num_t)-1;
     // Little-endian lane order (data[0..4]=B0..B4, [5..10]=G0..G5, [11..15]=R0..R4)
     const int dataPins[16] = {5, 45, 48, 47, 21,          // B0..B4
                               14, 13, 12, 11, 10, 9,      // G0..G5
                               46, 3, 8, 18, 17};          // R0..R4
     for (int i = 0; i < 16; i++)
     {
-        rgbConfig.data_gpio_nums[i] = dataPins[i];
+        rgbConfig.data_gpio_nums[i] = (gpio_num_t)dataPins[i];
     }
     rgbConfig.flags.disp_active_low = 1;
     rgbConfig.flags.fb_in_psram = 1;
@@ -197,7 +198,7 @@ bool RgbGt911Driver::begin()
     vendorConfig.flags.auto_del_panel_io = 0;
 
     esp_lcd_panel_dev_config_t panelConfig = {};
-    panelConfig.reset_gpio_num = -1;
+    panelConfig.reset_gpio_num = (gpio_num_t)-1;
     panelConfig.rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB;
     panelConfig.bits_per_pixel = 16;
     panelConfig.vendor_config = &vendorConfig;
