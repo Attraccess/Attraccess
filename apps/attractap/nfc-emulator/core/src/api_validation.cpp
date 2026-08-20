@@ -16,7 +16,7 @@ ApiValidationResult validate_provisioning(const std::string &ssid,
 
 ApiValidationResult validate_removal(int64_t after_ms, int64_t after_exchanges,
                                      int64_t after_instruction) {
-  if (after_ms < -1 || after_exchanges < -1 || after_exchanges == 0 ||
+  if (after_ms < -1 || after_ms == 0 || after_exchanges < -1 || after_exchanges == 0 ||
       after_instruction < -1 ||
       after_instruction > 255)
     return {false, "removal values are outside their allowed range"};

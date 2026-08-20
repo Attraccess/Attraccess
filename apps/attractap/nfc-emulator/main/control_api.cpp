@@ -253,19 +253,18 @@ esp_err_t handle(httpd_req_t *request) {
     if (request->method == HTTP_DELETE) {
       std::lock_guard<std::mutex> storage_lock(context.state->storage_mutex);
       if (!context.state->profiles.load(id, profile)) return error(request, 404, "not_found", "profile not found");
-      bool active_presentation=false;
-      { std::lock_guard<std::mutex> lock(context.state->mutex); active_presentation=context.state->active_profile&&context.state->active_profile->id==id&&(context.state->target_armed||context.state->rf_active); }
-      if(active_presentation)return error(request,409,"profile_presented","remove the active profile before deleting it");
+      std::lock_guard<std::mutex> lock(context.state->mutex);
+      bool active_presentation = context.state->active_profile &&
+          context.state->active_profile->id == id &&
+          (context.state->present_requested || context.state->target_armed || context.state->rf_active);
+      if (active_presentation) return error(request,409,"profile_presented","remove the active profile before deleting it");
       if (!context.state->profiles.remove(id)) return error(request, 500, "persist_failed", "profile was not deleted");
-      {
-        std::lock_guard<std::mutex> lock(context.state->mutex);
-        if (context.state->active_profile && context.state->active_profile->id == id) {
-          context.state->present_requested = false;
-          context.state->active_profile.reset();
-          context.state->engine.reset_session();
-          ++context.state->profile_revision;
-          context.state->changed.notify_all();
-        }
+      if (context.state->active_profile && context.state->active_profile->id == id) {
+        context.state->present_requested = false;
+        context.state->active_profile.reset();
+        context.state->engine.reset_session();
+        ++context.state->profile_revision;
+        context.state->changed.notify_all();
       }
       return json_response(request, 200, cJSON_CreateObject());
     }
@@ -278,17 +277,16 @@ esp_err_t handle(httpd_req_t *request) {
       std::lock_guard<std::mutex> storage_lock(context.state->storage_mutex);
       CardProfile existing;
       if (!context.state->profiles.load(id, existing)) return error(request, 404, "not_found", "profile not found");
-      bool active_presentation=false;
-      { std::lock_guard<std::mutex> lock(context.state->mutex); active_presentation=context.state->active_profile&&context.state->active_profile->id==id&&(context.state->target_armed||context.state->rf_active); }
-      if(active_presentation)return error(request,409,"profile_presented","remove the active profile before replacing it");
+      std::lock_guard<std::mutex> lock(context.state->mutex);
+      bool active_presentation = context.state->active_profile &&
+          context.state->active_profile->id == id &&
+          (context.state->present_requested || context.state->target_armed || context.state->rf_active);
+      if (active_presentation) return error(request,409,"profile_presented","remove the active profile before replacing it");
       if (!context.state->profiles.save(profile)) return error(request, 500, "persist_failed", "profile was not replaced");
-      {
-        std::lock_guard<std::mutex> lock(context.state->mutex);
-        if (context.state->active_profile && context.state->active_profile->id == id) {
-          context.state->active_profile = profile;
-          context.state->engine.reset_session();
-          ++context.state->profile_revision;
-        }
+      if (context.state->active_profile && context.state->active_profile->id == id) {
+        context.state->active_profile = profile;
+        context.state->engine.reset_session();
+        ++context.state->profile_revision;
       }
       return json_response(request, 200, profile_json(profile));
     }
@@ -299,17 +297,14 @@ esp_err_t handle(httpd_req_t *request) {
     std::lock_guard<std::mutex> storage_lock(context.state->storage_mutex);
     if (!context.state->profiles.load(id->valuestring, profile)) { cJSON_Delete(body); return error(request, 404, "not_found", "profile not found"); }
     cJSON_Delete(body);
-    bool active_presentation=false;
-    { std::lock_guard<std::mutex> lock(context.state->mutex); active_presentation=context.state->target_armed||context.state->rf_active; }
+    std::lock_guard<std::mutex> lock(context.state->mutex);
+    bool active_presentation = context.state->present_requested || context.state->target_armed || context.state->rf_active;
     if(active_presentation)return error(request,409,"profile_presented","remove the current profile before selecting another");
-    {
-      std::lock_guard<std::mutex> lock(context.state->mutex);
-      context.state->present_requested = false;
-      context.state->active_profile = profile;
-      context.state->engine.reset_session();
-      ++context.state->profile_revision;
-      context.state->changed.notify_all();
-    }
+    context.state->present_requested = false;
+    context.state->active_profile = profile;
+    context.state->engine.reset_session();
+    ++context.state->profile_revision;
+    context.state->changed.notify_all();
     return json_response(request, 200, profile_json(profile));
   }
   if (path == "/scenario" && request->method == HTTP_POST) {
@@ -362,7 +357,7 @@ esp_err_t handle(httpd_req_t *request) {
     cJSON *exchanges = body ? cJSON_GetObjectItemCaseSensitive(body, "afterExchanges") : nullptr;
     cJSON *instruction = body ? cJSON_GetObjectItemCaseSensitive(body, "afterInstruction") : nullptr;
     int64_t milliseconds_value=-1, exchanges_value=-1, instruction_value=-1;
-    if(milliseconds&&!integer_value(milliseconds,0,UINT32_MAX,milliseconds_value)){cJSON_Delete(body);return error(request,400,"invalid_removal","afterMs must be a non-negative integer");}
+    if(milliseconds&&!integer_value(milliseconds,1,UINT32_MAX,milliseconds_value)){cJSON_Delete(body);return error(request,400,"invalid_removal","afterMs must be a positive integer");}
     if(exchanges&&!integer_value(exchanges,1,UINT32_MAX,exchanges_value)){cJSON_Delete(body);return error(request,400,"invalid_removal","afterExchanges must be a positive integer");}
     if(instruction&&!integer_value(instruction,0,255,instruction_value)){cJSON_Delete(body);return error(request,400,"invalid_removal","afterInstruction must be an integer from 0 to 255");}
     ApiValidationResult validation = validate_removal(milliseconds_value, exchanges_value, instruction_value);
@@ -407,17 +402,17 @@ esp_err_t handle(httpd_req_t *request) {
   }
   if (path == "/reset" && request->method == HTTP_POST) {
     std::lock_guard<std::mutex> storage_lock(context.state->storage_mutex);
-    CardProfile reset_profile; uint64_t revision;
-    bool has_profile=false;
-    bool active_presentation=false;
-    { std::lock_guard<std::mutex> lock(context.state->mutex); has_profile=context.state->active_profile.has_value();active_presentation=context.state->target_armed||context.state->rf_active;if(has_profile){reset_profile=*context.state->active_profile;revision=context.state->profile_revision;} }
-    if(!has_profile)return error(request,409,"no_profile","select a profile first");
-    if(active_presentation)return error(request,409,"profile_presented","remove the active profile before resetting it");
+    std::lock_guard<std::mutex> lock(context.state->mutex);
+    if (!context.state->active_profile) return error(request,409,"no_profile","select a profile first");
+    bool active_presentation = context.state->present_requested ||
+        context.state->target_armed || context.state->rf_active;
+    if (active_presentation) return error(request,409,"profile_presented","remove the active profile before resetting it");
+    CardProfile reset_profile = *context.state->active_profile;
     factory_reset(reset_profile);
     if(!context.state->profiles.save(reset_profile))return error(request,500,"persist_failed","factory reset was not persisted");
-    bool state_matches=false;
-    { std::lock_guard<std::mutex> lock(context.state->mutex); state_matches=context.state->active_profile&&context.state->profile_revision==revision; if(state_matches){context.state->active_profile=reset_profile;context.state->engine.reset_session();++context.state->profile_revision;} }
-    if(!state_matches)return error(request,409,"state_changed","active profile changed during reset");
+    context.state->active_profile=reset_profile;
+    context.state->engine.reset_session();
+    ++context.state->profile_revision;
     return json_response(request,200,profile_json(reset_profile));
   }
   if (path == "/trace" && request->method == HTTP_DELETE) { { std::lock_guard<std::mutex> lock(context.state->mutex); context.state->trace.clear(); } return json_response(request,200,cJSON_CreateObject()); }
