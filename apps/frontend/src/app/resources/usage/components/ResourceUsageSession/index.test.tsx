@@ -5,9 +5,10 @@ import { ResourceUsageSession } from './index';
 import { createMockResource } from '../../../../../test-utils/fixtures';
 import { SupervisionMode } from '@attraccess/react-query-client';
 
-const { canControl, hasPermission, loading } = vi.hoisted(() => ({
+const { canControl, hasPermission, activeSession, loading } = vi.hoisted(() => ({
   canControl: { value: true },
   hasPermission: { value: false },
+  activeSession: { value: null as { userId: number; startTime: string } | null },
   loading: { activeSession: false, canControl: false, introducers: false },
 }));
 
@@ -31,7 +32,9 @@ vi.mock('../IntroductionRequiredDisplay', () => ({
   IntroductionRequiredDisplay: () => <div data-testid="introduction-required" />,
 }));
 vi.mock('../ActiveSessionDisplay', () => ({ ActiveSessionDisplay: () => null }));
-vi.mock('../OtherUserSessionDisplay', () => ({ OtherUserSessionDisplay: () => null }));
+vi.mock('../OtherUserSessionDisplay', () => ({
+  OtherUserSessionDisplay: () => <div data-testid="other-user-session" />,
+}));
 vi.mock('../RetrainingStatusBanner', () => ({ RetrainingStatusBanner: () => null }));
 vi.mock('./maintenance', () => ({ MaintenanceInProgressDisplay: () => null }));
 vi.mock('../../../details/maintenance-management/request', () => ({ RequestMaintenanceButton: () => null }));
@@ -51,7 +54,7 @@ vi.mock('@attraccess/react-query-client', async () => ({
   useResourcesServiceResourceUsageCanControlKey: 'canControl',
   useAccessControlServiceResourceIntroducersGetMany: () => ({ data: [], isLoading: loading.introducers }),
   useResourcesServiceResourceUsageGetActiveSession: () => ({
-    data: { usage: null },
+    data: { usage: activeSession.value },
     isLoading: loading.activeSession,
   }),
   useResourcesServiceResourceUsageGetActiveSessionKey: 'activeSession',
@@ -77,6 +80,7 @@ describe('ResourceUsageSession routing', () => {
     loading.activeSession = false;
     loading.canControl = false;
     loading.introducers = false;
+    activeSession.value = null;
   });
 
   it('lets an introduced user start solo on supervision_allowed', () => {
@@ -93,13 +97,13 @@ describe('ResourceUsageSession routing', () => {
     expect(screen.getByTestId('start-controls')).toHaveAttribute('data-requires-supervision', 'true');
   });
 
-  it('offers the start controls on supervision_required rather than the introduction gate', () => {
+  it('shows the introduction gate alongside start controls on supervision_required', () => {
     canControl.value = false;
 
     renderSession(SupervisionMode.SUPERVISION_REQUIRED);
 
     expect(screen.getByTestId('start-controls')).toBeInTheDocument();
-    expect(screen.queryByTestId('introduction-required')).not.toBeInTheDocument();
+    expect(screen.getByTestId('introduction-required')).toBeInTheDocument();
   });
 
   it('still shows the introduction gate on introduction_required', () => {
@@ -122,4 +126,23 @@ describe('ResourceUsageSession routing', () => {
       expect(screen.queryByTestId('introduction-required')).not.toBeInTheDocument();
     },
   );
+
+  it("shows the introduction gate alongside another user's active session when supervision is allowed", () => {
+    canControl.value = false;
+    activeSession.value = { userId: 2, startTime: '2026-08-20T10:00:00.000Z' };
+
+    renderSession(SupervisionMode.SUPERVISION_ALLOWED);
+
+    expect(screen.getByTestId('other-user-session')).toBeInTheDocument();
+    expect(screen.getByTestId('introduction-required')).toBeInTheDocument();
+  });
+
+  it('shows the introduction gate alongside the current user’s active session', () => {
+    canControl.value = false;
+    activeSession.value = { userId: 1, startTime: '2026-08-20T10:00:00.000Z' };
+
+    renderSession(SupervisionMode.SUPERVISION_ALLOWED);
+
+    expect(screen.getByTestId('introduction-required')).toBeInTheDocument();
+  });
 });

@@ -2,21 +2,34 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { WebSocketEventService } from './websocket-event.service';
 import { AttractapGateway } from './websocket.gateway';
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../events';
-import { ResourceSessionStartedEvent, ResourceUsageSessionTakenOverEvent } from '../../resources/usage/events/resource-usage.events';
+import {
+  ResourceSessionStartedEvent,
+  ResourceUsageSessionTakenOverEvent,
+} from '../../resources/usage/events/resource-usage.events';
 import { ResourceChangedEvent } from '../../resources/events/resource-changed.event';
 import { ResourceMaintenanceChangedEvent } from '../../resources/maintenances/events/resource-maintenance-changed.event';
 import { ResourceHealthChangedEvent } from '../../resources/health/events/resource-health-changed.event';
-import { ResourceHealthStatus } from '@attraccess/database-entities';
+import { ResourceIntroducerChangedEvent } from '../../resources/introducers/events/resource-introducer-changed.event';
+import { ResourceGroup, ResourceHealthStatus } from '@attraccess/database-entities';
+import { ResourceGroupIntroducerChangedEvent } from '../../resources/groups/introducers/events/resource-group-introducer-changed.event';
+import { ResourceGroupIntroductionChangedEvent } from '../../resources/groups/introductions/events/resource-group-introduction-changed.event';
+import { ResourceGroupsService } from '../../resources/groups/resourceGroups.service';
 
 describe('WebSocketEventService', () => {
   let service: WebSocketEventService;
-  let gateway: jest.Mocked<Pick<AttractapGateway, 'sendResourceList' | 'disconnectReader' | 'sendResourceListToReadersWithResource'>>;
+  let gateway: jest.Mocked<
+    Pick<AttractapGateway, 'sendResourceList' | 'disconnectReader' | 'sendResourceListToReadersWithResource'>
+  >;
+  let resourceGroupsService: jest.Mocked<Pick<ResourceGroupsService, 'getOne'>>;
 
   beforeEach(async () => {
     gateway = {
       sendResourceList: jest.fn().mockResolvedValue(undefined),
       disconnectReader: jest.fn().mockResolvedValue(undefined),
       sendResourceListToReadersWithResource: jest.fn().mockResolvedValue(undefined),
+    };
+    resourceGroupsService = {
+      getOne: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -25,6 +38,10 @@ describe('WebSocketEventService', () => {
         {
           provide: AttractapGateway,
           useValue: gateway,
+        },
+        {
+          provide: ResourceGroupsService,
+          useValue: resourceGroupsService,
         },
       ],
     }).compile();
@@ -95,6 +112,33 @@ describe('WebSocketEventService', () => {
       );
       await service.onResourceHealthChanged(event);
       expect(gateway.sendResourceListToReadersWithResource).toHaveBeenCalledWith(50);
+    });
+  });
+
+  describe('onResourceGroupIntroducerChanged', () => {
+    it('refreshes readers for every resource in the group', async () => {
+      resourceGroupsService.getOne.mockResolvedValue({ resources: [{ id: 60 }, { id: 70 }] } as ResourceGroup);
+
+      await service.onResourceGroupIntroducerChanged(new ResourceGroupIntroducerChangedEvent(5));
+
+      expect(resourceGroupsService.getOne).toHaveBeenCalledWith({ id: 5 }, ['resources']);
+      expect(gateway.sendResourceListToReadersWithResource).toHaveBeenCalledWith(60);
+      expect(gateway.sendResourceListToReadersWithResource).toHaveBeenCalledWith(70);
+    });
+
+    it('refreshes resources removed from or added to a group', async () => {
+      await service.onResourceGroupIntroductionChanged(new ResourceGroupIntroductionChangedEvent(5, [60]));
+
+      expect(resourceGroupsService.getOne).not.toHaveBeenCalled();
+      expect(gateway.sendResourceListToReadersWithResource).toHaveBeenCalledWith(60);
+    });
+  });
+
+  describe('onResourceIntroducerChanged', () => {
+    it('refreshes readers for the affected resource', async () => {
+      await service.onResourceIntroducerChanged(new ResourceIntroducerChangedEvent(60, 10));
+
+      expect(gateway.sendResourceListToReadersWithResource).toHaveBeenCalledWith(60);
     });
   });
 });

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ResourceListService } from './resource-list.service';
 import { AttractapEvent, AttractapEventType } from '../websocket.types';
-import { ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceIntroducerType } from '@attraccess/database-entities';
 
 describe('ResourceListService', () => {
   let service: ResourceListService;
@@ -11,6 +11,7 @@ describe('ResourceListService', () => {
   let resourceMaintenanceService: { hasActiveMaintenance: jest.Mock };
   let resourceHealthService: { listForResource: jest.Mock };
   let resourceFlowsService: { getNodes: jest.Mock };
+  let resourceIntroducersService: { getMany: jest.Mock };
 
   function createMockSocket(overrides: Partial<any> = {}): any {
     return {
@@ -59,6 +60,7 @@ describe('ResourceListService', () => {
     resourceMaintenanceService = { hasActiveMaintenance: jest.fn().mockResolvedValue(false) };
     resourceHealthService = { listForResource: jest.fn().mockResolvedValue([]) };
     resourceFlowsService = { getNodes: jest.fn().mockResolvedValue([]) };
+    resourceIntroducersService = { getMany: jest.fn().mockResolvedValue([{ user: { username: 'introducer-a' } }]) };
 
     (service as any).websocketService = websocketService;
     (service as any).attractapService = attractapService;
@@ -66,6 +68,7 @@ describe('ResourceListService', () => {
     (service as any).resourceMaintenanceService = resourceMaintenanceService;
     (service as any).resourceHealthService = resourceHealthService;
     (service as any).resourceFlowsService = resourceFlowsService;
+    (service as any).resourceIntroducersService = resourceIntroducersService;
   });
 
   describe('sendResourceList', () => {
@@ -163,9 +166,7 @@ describe('ResourceListService', () => {
         startTime,
       });
       resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(true);
-      resourceFlowsService.getNodes.mockResolvedValue([
-        { id: 'node-1', data: { label: 'Start' } },
-      ]);
+      resourceFlowsService.getNodes.mockResolvedValue([{ id: 'node-1', data: { label: 'Start' } }]);
 
       const socket = createMockSocket();
 
@@ -175,6 +176,7 @@ describe('ResourceListService', () => {
       expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(10, true);
       expect(resourceMaintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(10);
       expect(resourceFlowsService.getNodes).toHaveBeenCalledWith(10, ResourceFlowNodeType.INPUT_BUTTON);
+      expect(resourceIntroducersService.getMany).toHaveBeenCalledWith(10, ResourceIntroducerType.INTRODUCER);
 
       expect(socket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -207,6 +209,31 @@ describe('ResourceListService', () => {
           }),
         }),
       );
+    });
+
+    it('includes introducers inherited from resource groups', async () => {
+      attractapService.findReaderById.mockResolvedValue(createReaderFixture());
+      resourceIntroducersService.getMany.mockResolvedValue([
+        { user: { username: 'direct-introducer' } },
+        { user: { username: 'group-introducer' } },
+      ]);
+
+      const socket = createMockSocket();
+      await service.sendResourceListToSocket(socket);
+
+      const sent = (socket.sendMessage as jest.Mock).mock.calls[0][0] as AttractapEvent;
+      expect((sent.data.payload as any).resources[0].introducers).toEqual(['direct-introducer', 'group-introducer']);
+    });
+
+    it('omits deleted introducers from the resource list', async () => {
+      attractapService.findReaderById.mockResolvedValue(createReaderFixture());
+      resourceIntroducersService.getMany.mockResolvedValue([{ user: null }, { user: { username: 'introducer' } }]);
+
+      const socket = createMockSocket();
+      await service.sendResourceListToSocket(socket);
+
+      const sent = (socket.sendMessage as jest.Mock).mock.calls[0][0] as AttractapEvent;
+      expect((sent.data.payload as any).resources[0].introducers).toEqual(['introducer']);
     });
 
     it('reports isHealthy=false with a combined reason when there are unhealthy entries', async () => {

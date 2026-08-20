@@ -575,7 +575,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
 std::string ResourceDetailsScreen::buildIntroducersText(const API::ResourceBrief &resource)
 {
    std::string list;
-   for (uint8_t i = 0; i < resource.introducerCount; ++i)
+   for (size_t i = 0; i < resource.introducers.size(); ++i)
    {
       if (i > 0)
       {
@@ -619,13 +619,11 @@ void ResourceDetailsScreen::refreshAccessState()
                           strcmp(this->resourceCache.activeUser, user.username.c_str()) == 0;
    bool supervisedStartAvailable = user.requiresSupervisor && this->resourceCacheValid &&
                                    !this->resourceCache.hasActiveUsage;
-
-   // No-introduction panel is shown only when the user is missing an introduction and has no
-   // supervised start/current-session action available (maintenance/health panels take priority).
+   // Keep the introduction guidance visible alongside any available session action.
    if (this->noIntroductionPanel)
    {
       lv_obj_set_flag(this->noIntroductionPanel, LV_OBJ_FLAG_HIDDEN,
-                      user.hasIntroduction || supervisedStartAvailable || ownsActiveUsage || blocked);
+                       user.hasIntroduction || blocked);
    }
 
    // Session controls require access, an available supervised start, or ownership of the active
