@@ -187,9 +187,12 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+      # Fork PRs only get a read-only GITHUB_TOKEN — the permissions block above
+      # does not apply to them — so posting the comment fails with "Resource not
+      # accessible by integration". Skip the comment on fork PRs.
       - name: Build PR comment body
         id: comment-body
-        if: github.event_name == 'pull_request' && always()
+        if: github.event_name == 'pull_request' && always() && github.event.pull_request.head.repo.full_name == github.repository
         run: |
           set -euo pipefail
           shopt -s nullglob globstar
@@ -217,7 +220,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Post sticky PR comment with plugin artifacts
-        if: github.event_name == 'pull_request' && always()
+        if: github.event_name == 'pull_request' && always() && github.event.pull_request.head.repo.full_name == github.repository
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: plugin-artifacts
@@ -281,19 +284,43 @@ jobs:
             echo "suffix=pr-${{ github.event.pull_request.number }}-${{ steps.vars.outputs.SHORT_SHA }}" >> "$GITHUB_OUTPUT"
           fi
 
+      # Fork PRs get no repository secrets and no repository variables
+      # (GHCR_IMAGE_NAME resolves to ''), and their GITHUB_TOKEN is read-only,
+      # so no registry push is possible — not even to GHCR. Build the image
+      # without pushing so the Dockerfile and the bundled firmware/companion
+      # artifacts still get validated.
+      - name: Compute image tags
+        id: tags
+        run: |
+          set -euo pipefail
+          suffix="${{ steps.image-tag.outputs.suffix }}"
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]]; then
+            echo "push=false" >> "$GITHUB_OUTPUT"
+            echo "tags=attraccess:${suffix}" >> "$GITHUB_OUTPUT"
+          else
+            echo "push=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "tags<<EOF"
+              echo "ghcr.io/${{ env.GHCR_IMAGE_NAME }}:${suffix}"
+              echo "${{ env.DOCKERHUB_IMAGE_NAME }}:${suffix}"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build and push Docker image
         id: build-and-push
         uses: ./.github/actions/docker-build-push
         with:
-          tags: |
-            ghcr.io/${{ env.GHCR_IMAGE_NAME }}:${{ steps.image-tag.outputs.suffix }}
-            ${{ env.DOCKERHUB_IMAGE_NAME }}:${{ steps.image-tag.outputs.suffix }}
+          tags: ${{ steps.tags.outputs.tags }}
+          push: ${{ steps.tags.outputs.push }}
           ghcr-token: ${{ secrets.GITHUB_TOKEN }}
           dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # Fork PRs only get a read-only GITHUB_TOKEN, so posting the comment
+      # would fail with "Resource not accessible by integration" — skip it there.
       - name: Post image URL comment to PR
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/github-script@v9
         with:
           script: |

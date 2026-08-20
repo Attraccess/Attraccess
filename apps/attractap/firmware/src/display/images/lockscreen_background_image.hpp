@@ -691226,12 +691226,17 @@ const LV_ATTRIBUTE_MEM_ALIGN uint8_t lockscreen_map[] = {
     0xFF,
     0xFF,
 };
-const lv_image_dsc_t lockscreen_background_image = {
+inline const lv_image_dsc_t lockscreen_background_image = {
     .header = {
         .magic = LV_IMAGE_HEADER_MAGIC,
         .cf = LV_COLOR_FORMAT_NATIVE_WITH_ALPHA,
+        .flags = 0,
         .w = 480,
         .h = 480,
+        .stride = 0, /* LVGL infers w*2 from cf; matches perf/6 so #1691->#1696 merges cleanly */
+        .reserved_2 = 0,
     },
     .data_size = sizeof(lockscreen_map),
-    .data = lockscreen_map};
+    .data = lockscreen_map,
+    .reserved = nullptr,
+    .reserved_2 = nullptr};
