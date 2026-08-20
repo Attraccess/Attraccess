@@ -11,6 +11,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include <algorithm>
 #include <chrono>
 
 namespace nfc_emulator {
@@ -144,7 +145,16 @@ void emulator_task(void *argument) {
       }
     }
     if (storage_lock.owns_lock()) storage_lock.unlock();
-    if (result.delay_ms) vTaskDelay(pdMS_TO_TICKS(result.delay_ms));
+    for (uint32_t remaining = result.delay_ms; remaining > 0;) {
+      const uint32_t slice = std::min<uint32_t>(remaining, 50);
+      vTaskDelay(pdMS_TO_TICKS(slice));
+      remaining -= slice;
+      std::lock_guard<std::mutex> lock(state.mutex);
+      if (!state.present_requested) {
+        result = {Outcome::Removed, {}, 0, "runtime"};
+        break;
+      }
+    }
     if (result.outcome == Outcome::Response && !target.respond(result.response)) {
       result = {Outcome::Error, {}, 0, "transport"};
       target.deactivate();

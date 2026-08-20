@@ -120,6 +120,7 @@ void api_validation() {
   CHECK(!validate_provisioning("Lab", "", "short").valid);
   CHECK(!validate_provisioning("Lab", "short", "0123456789abcdef").valid);
   CHECK(validate_removal(-1, 2, -1).valid);
+  CHECK(!validate_removal(0, -1, -1).valid);
   CHECK(!validate_removal(-1, -1, -1).valid);
   CHECK(!validate_removal(-1, 0, -1).valid);
   CHECK(!validate_removal(-1, -1, 256).valid);
