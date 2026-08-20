@@ -39,7 +39,7 @@ with the profile UID (or `08ffffff` for the `unknown-uid` scenario).
 
 ## Build and operate
 
-ESP-IDF 5.5 is the reference toolchain. Source its `export.sh`, then run from
+ESP-IDF 6.0.2 is the reference toolchain. Source its `export.sh`, then run from
 the workspace root:
 
 ```sh

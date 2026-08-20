@@ -2,7 +2,8 @@
 
 #include "nfc_emulator/model.hpp"
 
-#include "driver/i2c.h"
+#include "driver/gpio.h"
+#include "driver/i2c_master.h"
 
 namespace nfc_emulator {
 
@@ -27,6 +28,8 @@ class Pn532Target {
   bool active_ = false;
   bool armed_ = false;
   gpio_num_t reset_pin_ = GPIO_NUM_NC;
+  i2c_master_bus_handle_t bus_ = nullptr;
+  i2c_master_dev_handle_t device_ = nullptr;
 };
 
 }  // namespace nfc_emulator
