@@ -298,6 +298,10 @@ void Websocket::connectWebSocketLocked()
     websocket_cfg.ping_interval_sec = 5;
     websocket_cfg.pingpong_timeout_sec = PINGPONG_TIMEOUT_SEC;
     websocket_cfg.disable_pingpong_discon = false;
+    // Bound unreachable-host retries: without network_timeout_ms the client
+    // waits the full TCP connect timeout per attempt, which multiplies across
+    // the cert sweep (PERFORMANCE_ANALYSIS.md quick win Q2).
+    websocket_cfg.network_timeout_ms = 10000;
 
     websocket_cfg.disable_auto_reconnect = true;
 
