@@ -81,6 +81,7 @@ describe('ResourceUsageService', () => {
     getRepository: jest.Mock;
     findOne: jest.Mock;
     update: jest.Mock;
+    transaction: jest.Mock;
   };
 
   const mockRepository = () => ({
@@ -309,6 +310,9 @@ describe('ResourceUsageService', () => {
         execute: jest.fn().mockResolvedValue({}),
       })),
       update: jest.fn().mockResolvedValue(undefined),
+      transaction: jest.fn(async (cb: (em: typeof transactionalEntityManager) => Promise<unknown>) =>
+        cb(transactionalEntityManager),
+      ),
       // Ensure code paths that use getRepository(Entity).findOne work in tests
       getRepository: jest.fn((entity) => {
         if (entity === Resource) {
@@ -332,7 +336,13 @@ describe('ResourceUsageService', () => {
         }
         return null;
       }),
-    } as unknown as { createQueryBuilder: jest.Mock; getRepository: jest.Mock; findOne: jest.Mock; update: jest.Mock };
+    } as unknown as {
+      createQueryBuilder: jest.Mock;
+      getRepository: jest.Mock;
+      findOne: jest.Mock;
+      update: jest.Mock;
+      transaction: jest.Mock;
+    };
 
     // @ts-expect-error augment mock with manager
     resourceUsageRepository.manager = {
@@ -460,6 +470,13 @@ describe('ResourceUsageService', () => {
       });
       expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledTimes(1);
       expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledWith(createdSession.resourceId);
+      expect(transactionalEntityManager.transaction).toHaveBeenCalledTimes(1);
+      expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
+        createdSession.resourceId,
+        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+        expect.any(Object),
+        transactionalEntityManager,
+      );
     });
 
     it('should throw error when resource does not exist', async () => {
@@ -629,6 +646,13 @@ describe('ResourceUsageService', () => {
       expect(chargedIds).not.toContain(mockNewUsage.id);
       expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledTimes(1);
       expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledWith(mockNewUsage.resourceId);
+      expect(transactionalEntityManager.transaction).toHaveBeenCalledTimes(1);
+      expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
+        mockActiveSession.resourceId,
+        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
+        expect.any(Object),
+        transactionalEntityManager,
+      );
     });
 
     it('should trigger only TAKEOVER flow on takeover and not STARTED/STOPPED; billing unchanged', async () => {

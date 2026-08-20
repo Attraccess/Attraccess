@@ -543,17 +543,19 @@ export class ResourceUsageService {
         const now = new Date();
 
         try {
-          await this.flowExecutorService.runFlow(
-            existingActiveSession.resourceId,
-            ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
-            {
-              ...this.getResourceUsageFlowPayload(existingActiveSession, formSubmissions),
-              takeOverTime: now,
-              newUser: user,
-              oldUser: existingActiveSession.user,
-            },
-            transactionalEntityManager,
-          );
+          await transactionalEntityManager.transaction(async (flowEntityManager) => {
+            await this.flowExecutorService.runFlow(
+              existingActiveSession.resourceId,
+              ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
+              {
+                ...this.getResourceUsageFlowPayload(existingActiveSession, formSubmissions),
+                takeOverTime: now,
+                newUser: user,
+                oldUser: existingActiveSession.user,
+              },
+              flowEntityManager,
+            );
+          });
         } catch (error) {
           this.logger.error(`Usage takeover flow failed for resource ${resourceId}`, (error as Error).stack);
         }
@@ -568,12 +570,14 @@ export class ResourceUsageService {
         startedUsageIdToEmit = createdSession.id;
 
         try {
-          await this.flowExecutorService.runFlow(
-            createdSession.resourceId,
-            ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
-            this.getResourceUsageFlowPayload(createdSession, formSubmissions),
-            transactionalEntityManager,
-          );
+          await transactionalEntityManager.transaction(async (flowEntityManager) => {
+            await this.flowExecutorService.runFlow(
+              createdSession.resourceId,
+              ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+              this.getResourceUsageFlowPayload(createdSession, formSubmissions),
+              flowEntityManager,
+            );
+          });
         } catch (error) {
           this.logger.error(`Usage-start flow failed for resource ${resourceId}`, (error as Error).stack);
         }
