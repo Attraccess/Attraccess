@@ -181,7 +181,7 @@ void DemoSettingsScreen::rebuildCardList()
         lv_obj_set_style_pad_hor(row, 12, LV_PART_MAIN);
 
         // UID label
-        char uidShort[10];
+        char uidShort[15]; // max 14 hex chars for 7-byte UID + null (GCC 14 -Wformat-truncation)
         const char *uid = card.uid;
         size_t uidLen = strlen(uid);
         // Show last 8 hex chars (4 bytes) as short display

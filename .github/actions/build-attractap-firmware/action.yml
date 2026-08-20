@@ -1,6 +1,6 @@
 name: 'Build Attractap Firmware'
 description: >
-  Install Python, esptool, and the ESP-IDF v5.5 toolchain (cached), then build
+  Install Python, esptool, and the ESP-IDF v6.0.2 toolchain (cached), then build
   all Attractap firmware variants into apps/attractap/firmware/firmware_output.
   Image builds (Docker/Balena) must run this first: the Dockerfile itself has no
   ESP-IDF, so the in-container firmware build is skipped and the pre-built
@@ -12,9 +12,9 @@ runs:
     - name: Setup Python
       uses: actions/setup-python@v7
       with:
-        # Pinned: ESP-IDF v5.5 supports Python up to 3.13. `3.x` drifted to
-        # 3.14, which no longer matches the cached IDF virtualenv
-        # (idf5.5_py3.13_env) and breaks the firmware build.
+        # Pinned: the IDF virtualenv is named after the interpreter
+        # (idf6.0_py3.13_env), so `3.x` drifting to 3.14 no longer matches the
+        # cached env and breaks the firmware build.
         python-version: '3.13'
 
     - name: Install ESP tools

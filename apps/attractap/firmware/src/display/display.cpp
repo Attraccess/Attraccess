@@ -205,7 +205,10 @@ void Display::setup()
 
     const esp_timer_create_args_t reboot_timer_args = {
         .callback = &Display::increase_reboot,
-        .name = "reboot"};
+        .arg = nullptr,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "reboot",
+        .skip_unhandled_events = false};
 
     lv_theme_t *base_theme = lv_theme_default_init(
         disp,
