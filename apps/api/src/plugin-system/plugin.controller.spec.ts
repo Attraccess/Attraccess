@@ -70,6 +70,10 @@ describe('PluginController', () => {
 
       const file = controller.getFrontendPluginFile('typed', fileName);
       expect(file.options.type).toBe(contentType);
+      file
+        .getStream()
+        .on('error', () => undefined)
+        .destroy();
     });
 
     it('throws when the plugin is unknown', () => {

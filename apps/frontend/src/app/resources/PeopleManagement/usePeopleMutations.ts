@@ -29,10 +29,10 @@ interface Params {
 export interface PeopleMutations {
   grantIntroducer: (userId: number) => Promise<void>;
   grantMaintainer: (userId: number) => Promise<void>;
-  revokeIntroducer: (userId: number) => Promise<void>;
+  revokeIntroducer: (userId: number, type: ResourceIntroducerType) => Promise<void>;
   grantIntroduction: (userId: number, comment?: string) => Promise<void>;
   revokeIntroduction: (userId: number, comment?: string) => Promise<void>;
-  pendingIntroducerUserId: number | null;
+  pendingIntroducer: { userId: number; type: ResourceIntroducerType } | null;
   pendingIntroductionUserId: number | null;
   isGrantingIntroducer: boolean;
   isRevokingIntroducer: boolean;
@@ -46,7 +46,9 @@ export function usePeopleMutations({ target, t }: Params): PeopleMutations {
   const queryClient = useQueryClient();
   const isResource = target.type === 'resource';
 
-  const [pendingIntroducerUserId, setPendingIntroducerUserId] = useState<number | null>(null);
+  const [pendingIntroducer, setPendingIntroducer] = useState<{ userId: number; type: ResourceIntroducerType } | null>(
+    null,
+  );
   const [pendingIntroductionUserId, setPendingIntroductionUserId] = useState<number | null>(null);
 
   const invalidateIntroducers = useCallback(() => {
@@ -92,10 +94,13 @@ export function usePeopleMutations({ target, t }: Params): PeopleMutations {
   };
 
   const revokeIntroducerToasts = {
-    onSuccess: () => {
+    onSuccess: (_data: unknown, variables: { requestBody?: { type?: ResourceIntroducerType } }) => {
+      const isMaintainer = variables?.requestBody?.type === ResourceIntroducerType.MAINTAINER;
       toast.success({
-        title: t('toasts.introducerRevoked.title'),
-        description: t('toasts.introducerRevoked.description'),
+        title: isMaintainer ? t('toasts.maintainerRevoked.title') : t('toasts.introducerRevoked.title'),
+        description: isMaintainer
+          ? t('toasts.maintainerRevoked.description')
+          : t('toasts.introducerRevoked.description'),
       });
       invalidateIntroducers();
     },
@@ -164,7 +169,7 @@ export function usePeopleMutations({ target, t }: Params): PeopleMutations {
 
   const grantIntroducerRow = useCallback(
     async (userId: number, type: ResourceIntroducerType) => {
-      setPendingIntroducerUserId(userId);
+      setPendingIntroducer({ userId, type });
       try {
         if (isResource) {
           await grantResourceIntroducerMut({ resourceId: target.id, userId, requestBody: { type } });
@@ -172,7 +177,7 @@ export function usePeopleMutations({ target, t }: Params): PeopleMutations {
           await grantGroupIntroducerMut({ groupId: target.id, userId, requestBody: { type } });
         }
       } finally {
-        setPendingIntroducerUserId(null);
+        setPendingIntroducer(null);
       }
     },
     [grantResourceIntroducerMut, grantGroupIntroducerMut, isResource, target.id],
@@ -189,16 +194,16 @@ export function usePeopleMutations({ target, t }: Params): PeopleMutations {
   );
 
   const revokeIntroducer = useCallback(
-    async (userId: number) => {
-      setPendingIntroducerUserId(userId);
+    async (userId: number, type: ResourceIntroducerType) => {
+      setPendingIntroducer({ userId, type });
       try {
         if (isResource) {
-          await revokeResourceIntroducerMut({ resourceId: target.id, userId });
+          await revokeResourceIntroducerMut({ resourceId: target.id, userId, requestBody: { type } });
         } else {
-          await revokeGroupIntroducerMut({ groupId: target.id, userId });
+          await revokeGroupIntroducerMut({ groupId: target.id, userId, requestBody: { type } });
         }
       } finally {
-        setPendingIntroducerUserId(null);
+        setPendingIntroducer(null);
       }
     },
     [revokeResourceIntroducerMut, revokeGroupIntroducerMut, isResource, target.id],
@@ -244,7 +249,7 @@ export function usePeopleMutations({ target, t }: Params): PeopleMutations {
     revokeIntroducer,
     grantIntroduction,
     revokeIntroduction,
-    pendingIntroducerUserId,
+    pendingIntroducer,
     pendingIntroductionUserId,
     isGrantingIntroducer,
     isRevokingIntroducer,
