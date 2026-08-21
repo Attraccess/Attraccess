@@ -75,13 +75,16 @@ export class ApiTokenService {
     if (!user) return null;
 
     if (!apiToken.lastUsedAt || Date.now() - apiToken.lastUsedAt.getTime() >= LAST_USED_WRITE_INTERVAL_MS) {
-      await this.apiTokenRepository
+      const now = new Date();
+      const result = await this.apiTokenRepository
         .createQueryBuilder()
         .update(ApiToken)
-        .set({ lastUsedAt: new Date() })
+        .set({ lastUsedAt: now })
         .where('id = :id', { id: apiToken.id })
         .andWhere('revokedAt IS NULL')
+        .andWhere('(expiresAt IS NULL OR expiresAt > :now)', { now })
         .execute();
+      if (result.affected !== 1) return null;
     }
     return { user, apiToken };
   }

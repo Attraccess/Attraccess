@@ -59,7 +59,7 @@ describe('ApiTokenService', () => {
       set: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
-      execute: jest.fn(),
+      execute: jest.fn().mockResolvedValue({ affected: 1 }),
     };
     repository.createQueryBuilder.mockReturnValue(queryBuilder);
     repository.findOneBy.mockResolvedValue({ id: 1, userId: 3, revokedAt: null, expiresAt: null, lastUsedAt: null });
@@ -70,6 +70,24 @@ describe('ApiTokenService', () => {
     expect(queryBuilder.update).toHaveBeenCalledWith(ApiToken);
     expect(queryBuilder.where).toHaveBeenCalledWith('id = :id', { id: 1 });
     expect(queryBuilder.andWhere).toHaveBeenCalledWith('revokedAt IS NULL');
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith('(expiresAt IS NULL OR expiresAt > :now)', {
+      now: expect.any(Date),
+    });
     expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  it('rejects a token revoked or expired while updating its last used time', async () => {
+    const queryBuilder = {
+      update: jest.fn().mockReturnThis(),
+      set: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue({ affected: 0 }),
+    };
+    repository.createQueryBuilder.mockReturnValue(queryBuilder);
+    repository.findOneBy.mockResolvedValue({ id: 1, userId: 3, revokedAt: null, expiresAt: null, lastUsedAt: null });
+    userRepository.findOneBy.mockResolvedValue({ id: 3 });
+
+    await expect(service.authenticate('secret')).resolves.toBeNull();
   });
 });
