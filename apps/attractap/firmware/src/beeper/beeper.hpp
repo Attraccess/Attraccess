@@ -1,8 +1,8 @@
 #pragma once
 
-#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
+#include "freertos/queue.h"
+#include "freertos/task.h"
 #include "../settings/settings.hpp"
 #include "../logger/logger.hpp"
 
@@ -21,8 +21,8 @@ public:
     void setup();
 #endif
 
-    // All beep entry points are NON-BLOCKING: they schedule the beep pattern
-    // on an esp_timer and return immediately. The blocking delay()-based
+    // All beep entry points are NON-BLOCKING: they enqueue a pattern for the
+    // dedicated beeper worker and return immediately. The blocking delay()-based
     // implementation froze the UI for 100-700 ms because processState() runs
     // under lv_lock (PERFORMANCE_ANALYSIS.md M1/M6).
     void errorBeep();
@@ -31,25 +31,19 @@ public:
     void indicateBeep();
 
 private:
+    struct PatternRequest
+    {
+        const uint16_t *pattern;
+        size_t length;
+    };
+
     void beeperOn();
     void beeperOff();
     void schedulePattern(const uint16_t *pattern, size_t length);
-    void advancePattern();
-    static void timerCallback(void *arg);
+    static void workerTask(void *arg);
 
     Logger logger;
-    esp_timer_handle_t timer = nullptr;
-    // Shared between the esp_timer task (timerCallback) and the caller task
-    // (schedulePattern from the main loop / processState). Guard all pattern
-    // state transitions with this mutex so a beep triggered from another task
-    // can't race the timer callback into an out-of-bounds read or a half
-    // updated pattern (Sourcery review PR #1695).
-    SemaphoreHandle_t beepMutex = nullptr;
-    // Interleaved [on_ms, off_ms, ...] steps; on_ms == 0 marks the end.
-    const uint16_t *pattern = nullptr;
-    size_t patternLength = 0;
-    size_t patternIndex = 0;
-    bool beeping = false;
+    QueueHandle_t patternQueue = nullptr;
 
 #ifdef HAS_IO_EXPANDER
     IOExpander *ioExpander = nullptr;

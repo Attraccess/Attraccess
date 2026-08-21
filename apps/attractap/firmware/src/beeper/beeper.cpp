@@ -13,12 +13,30 @@
 void Beeper::setup(IOExpander *expander)
 {
     this->ioExpander = expander;
-    this->beepMutex = xSemaphoreCreateMutex();
+    this->patternQueue = xQueueCreate(1, sizeof(PatternRequest));
+    if (this->patternQueue == nullptr || xTaskCreate(Beeper::workerTask, "Beeper", 2048, this, 1, nullptr) != pdPASS)
+    {
+        this->logger.error("Failed to create beeper worker");
+        if (this->patternQueue)
+        {
+            vQueueDelete(this->patternQueue);
+            this->patternQueue = nullptr;
+        }
+    }
 }
 #else
 void Beeper::setup()
 {
-    this->beepMutex = xSemaphoreCreateMutex();
+    this->patternQueue = xQueueCreate(1, sizeof(PatternRequest));
+    if (this->patternQueue == nullptr || xTaskCreate(Beeper::workerTask, "Beeper", 2048, this, 1, nullptr) != pdPASS)
+    {
+        this->logger.error("Failed to create beeper worker");
+        if (this->patternQueue)
+        {
+            vQueueDelete(this->patternQueue);
+            this->patternQueue = nullptr;
+        }
+    }
 #ifdef BEEPER_PIN
     gpio_config_t cfg = {};
     cfg.pin_bit_mask = 1ULL << BEEPER_PIN;
@@ -64,89 +82,56 @@ void Beeper::schedulePattern(const uint16_t *newPattern, size_t length)
         return;
     }
 
-    // Serialize against the esp_timer task (timerCallback) so a beep triggered
-    // from another task can't race a half-updated pattern (Sourcery PR #1695).
-    if (this->beepMutex && xSemaphoreTake(this->beepMutex, portMAX_DELAY) != pdTRUE)
+    if (this->patternQueue == nullptr)
     {
+        this->logger.error("Beep unavailable: worker setup failed");
         return;
     }
 
-    // A new pattern replaces any in-flight one (latest wins).
-    this->pattern = newPattern;
-    this->patternLength = length;
-    this->patternIndex = 0;
-
-    if (this->timer == nullptr)
-    {
-        const esp_timer_create_args_t timer_args = {
-            .callback = &Beeper::timerCallback,
-            .arg = this,
-            .dispatch_method = ESP_TIMER_TASK,
-            .name = "beep",
-            .skip_unhandled_events = false,
-        };
-        if (esp_timer_create(&timer_args, &this->timer) != ESP_OK)
-        {
-            this->logger.error("Failed to create beep timer");
-            xSemaphoreGive(this->beepMutex);
-            return;
-        }
-    }
-
-    this->advancePattern();
-
-    if (this->beepMutex)
-    {
-        xSemaphoreGive(this->beepMutex);
-    }
+    // One-slot queue makes requests latest-wins without waiting on the UI task.
+    PatternRequest request = {newPattern, length};
+    xQueueOverwrite(this->patternQueue, &request);
 }
 
-void Beeper::advancePattern()
-{
-    // Called with beepMutex held (from schedulePattern or timerCallback).
-    if (this->pattern == nullptr || this->patternIndex >= this->patternLength)
-    {
-        this->beeping = false;
-        return;
-    }
-
-    uint16_t stepMs = this->pattern[this->patternIndex];
-    if (stepMs == 0)
-    {
-        // Pattern terminator.
-        this->beeperOff();
-        this->beeping = false;
-        return;
-    }
-
-    // Even indices are ON steps, odd indices are OFF gaps. Advance the pin,
-    // then schedule the next step after the current one's duration.
-    if (this->patternIndex % 2 == 0)
-    {
-        this->beeperOn();
-    }
-    else
-    {
-        this->beeperOff();
-    }
-    this->beeping = true;
-    this->patternIndex++;
-
-    esp_timer_stop(this->timer);
-    esp_timer_start_once(this->timer, (uint64_t)stepMs * 1000);
-}
-
-void Beeper::timerCallback(void *arg)
+void Beeper::workerTask(void *arg)
 {
     Beeper *self = static_cast<Beeper *>(arg);
-    if (self->beepMutex && xSemaphoreTake(self->beepMutex, portMAX_DELAY) != pdTRUE)
+    PatternRequest request = {};
+    const uint16_t *pattern = nullptr;
+    size_t patternLength = 0;
+    size_t patternIndex = 0;
+    TickType_t waitTime = portMAX_DELAY;
+
+    for (;;)
     {
-        return;
-    }
-    self->advancePattern();
-    if (self->beepMutex)
-    {
-        xSemaphoreGive(self->beepMutex);
+        if (xQueueReceive(self->patternQueue, &request, waitTime) == pdPASS)
+        {
+            pattern = request.pattern;
+            patternLength = request.length;
+            patternIndex = 0;
+        }
+        else if (pattern != nullptr)
+        {
+            patternIndex++;
+        }
+
+        if (pattern == nullptr || patternIndex >= patternLength || pattern[patternIndex] == 0)
+        {
+            self->beeperOff();
+            pattern = nullptr;
+            waitTime = portMAX_DELAY;
+            continue;
+        }
+
+        if (patternIndex % 2 == 0)
+        {
+            self->beeperOn();
+        }
+        else
+        {
+            self->beeperOff();
+        }
+        waitTime = pdMS_TO_TICKS(pattern[patternIndex]);
     }
 }
 

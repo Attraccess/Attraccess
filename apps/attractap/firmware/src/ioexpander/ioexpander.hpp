@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include "driver/i2c_master.h"
+#include "freertos/semphr.h"
 #include "../logger/logger.hpp"
 
 #ifndef IOEXPANDER_I2C_ADDR
@@ -90,6 +91,7 @@ private:
     uint8_t outputState1 = 0x00;
 #endif
     bool initialized = false;
+    SemaphoreHandle_t outputMutex = nullptr;
 
     // Writes the direction config and current output state to the hardware.
     // Called once from setup() during initialisation.
