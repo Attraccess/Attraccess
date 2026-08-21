@@ -10,7 +10,7 @@ import {
   TableScrollContainer,
 } from '@heroui/react';
 import { AwardIcon, CheckIcon, WrenchIcon } from 'lucide-react';
-import { User } from '@attraccess/react-query-client';
+import { ResourceIntroducerType, User } from '@attraccess/react-query-client';
 import { AttraccessUser, DateTimeDisplay, TFunction } from '@attraccess/plugins-frontend-ui';
 import { EmptyState } from '../../../components/emptyState';
 import { PeopleRowActions } from './PeopleRowActions';
@@ -22,14 +22,14 @@ interface PeopleTableProps {
   isLoading: boolean;
   canManageIntroducers: boolean;
   canManageIntroductions: boolean;
-  pendingIntroducerUserId: number | null;
+  pendingIntroducer: { userId: number; type: ResourceIntroducerType } | null;
   pendingIntroductionUserId: number | null;
   isRevokingIntroducer: boolean;
   isGrantingIntroduction: boolean;
   isRevokingIntroduction: boolean;
   onOpenHistory: (userId: number) => void;
   onToggleIntroduction: (user: User, action: 'grant' | 'revoke') => void;
-  onRevokeIntroducer: (userId: number) => void;
+  onRevokeIntroducer: (userId: number, type: ResourceIntroducerType) => void;
 }
 
 export function PeopleTable(props: Readonly<PeopleTableProps>) {
@@ -39,7 +39,7 @@ export function PeopleTable(props: Readonly<PeopleTableProps>) {
     isLoading,
     canManageIntroducers,
     canManageIntroductions,
-    pendingIntroducerUserId,
+    pendingIntroducer,
     pendingIntroductionUserId,
     isRevokingIntroducer,
     isGrantingIntroduction,
@@ -77,19 +77,23 @@ export function PeopleTable(props: Readonly<PeopleTableProps>) {
                   <AttraccessUser user={row.user} />
                 </TableCell>
                 <TableCell>
-                  {row.isIntroducer ? (
-                    <span className="inline-flex items-center gap-1 text-success">
-                      <AwardIcon className="w-4 h-4" />
-                      {t('roles.introducer')}
-                    </span>
-                  ) : row.isMaintainer ? (
-                    <span className="inline-flex items-center gap-1 text-primary">
-                      <WrenchIcon className="w-4 h-4" />
-                      {t('roles.maintainer')}
-                    </span>
-                  ) : (
-                    <span className="text-foreground-400">{t('value.no')}</span>
-                  )}
+                  <div className="flex flex-col gap-1">
+                    {row.isIntroducer && (
+                      <span className="inline-flex items-center gap-1 text-success">
+                        <AwardIcon className="w-4 h-4" />
+                        {t('roles.introducer')}
+                      </span>
+                    )}
+                    {row.isMaintainer && (
+                      <span className="inline-flex items-center gap-1 text-primary">
+                        <WrenchIcon className="w-4 h-4" />
+                        {t('roles.maintainer')}
+                      </span>
+                    )}
+                    {!row.isIntroducer && !row.isMaintainer && (
+                      <span className="text-foreground-400">{t('value.no')}</span>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>
                   {row.hasValidIntroduction && row.introductionLastEventAt ? (
@@ -111,7 +115,7 @@ export function PeopleTable(props: Readonly<PeopleTableProps>) {
                     row={row}
                     canManageIntroducers={canManageIntroducers}
                     canManageIntroductions={canManageIntroductions}
-                    pendingIntroducerUserId={pendingIntroducerUserId}
+                    pendingIntroducer={pendingIntroducer}
                     pendingIntroductionUserId={pendingIntroductionUserId}
                     isRevokingIntroducer={isRevokingIntroducer}
                     isGrantingIntroduction={isGrantingIntroduction}

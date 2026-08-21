@@ -84,27 +84,29 @@ export class ResourceIntroducersService {
 
     const groupIntroducers = await groupQuery.getMany();
 
-    // A user can be both a direct and a group introducer; show them once.
-    const byUserId = new Map<number, ResourceIntroducer>();
+    // A user can have both roles; prefer a direct grant over an inherited grant of the same role.
+    const byUserAndType = new Map<string, ResourceIntroducer>();
     for (const introducer of [...directIntroducers, ...groupIntroducers]) {
-      if (!byUserId.has(introducer.userId)) {
-        byUserId.set(introducer.userId, introducer);
+      const key = `${introducer.userId}:${introducer.type}`;
+      if (!byUserAndType.has(key)) {
+        byUserAndType.set(key, introducer);
       }
     }
 
-    return Array.from(byUserId.values());
+    return Array.from(byUserAndType.values());
   }
 
   public async getByResourceIdAndUserId(
     resourceId: number,
     userId: number,
+    type?: ResourceIntroducerType,
     transactionalEntityManager?: EntityManager,
   ): Promise<ResourceIntroducer | null> {
     const resourceIntroducerRepository = transactionalEntityManager
       ? transactionalEntityManager.getRepository(ResourceIntroducer)
       : this.resourceIntroducerRepository;
 
-    return await resourceIntroducerRepository.findOne({ where: { resourceId, userId } });
+    return await resourceIntroducerRepository.findOne({ where: { resourceId, userId, ...(type ? { type } : {}) } });
   }
 
   public async grant(
@@ -112,22 +114,22 @@ export class ResourceIntroducersService {
     userId: number,
     type: ResourceIntroducerType = ResourceIntroducerType.INTRODUCER,
   ): Promise<ResourceIntroducer> {
-    const existingIntroducer = await this.getByResourceIdAndUserId(resourceId, userId);
+    const existingIntroducer = await this.getByResourceIdAndUserId(resourceId, userId, type);
     if (existingIntroducer) {
-      if (existingIntroducer.type !== type) {
-        existingIntroducer.type = type;
-        await this.resourceIntroducerRepository.save(existingIntroducer);
-        this.notifyAccessChange(resourceId, userId, type, true);
-        this.eventEmitter.emit(
-          ResourceIntroducerChangedEvent.EVENT_NAME,
-          new ResourceIntroducerChangedEvent(resourceId, userId),
-        );
-      }
       return existingIntroducer;
     }
 
     const introducer = this.resourceIntroducerRepository.create({ resourceId, userId, type });
-    const savedIntroducer = await this.resourceIntroducerRepository.save(introducer);
+    let savedIntroducer: ResourceIntroducer;
+    try {
+      savedIntroducer = await this.resourceIntroducerRepository.save(introducer);
+    } catch (error) {
+      const concurrentGrant = await this.getByResourceIdAndUserId(resourceId, userId, type);
+      if (concurrentGrant) {
+        return concurrentGrant;
+      }
+      throw error;
+    }
     this.notifyAccessChange(resourceId, userId, type, true);
     this.eventEmitter.emit(
       ResourceIntroducerChangedEvent.EVENT_NAME,
@@ -136,8 +138,12 @@ export class ResourceIntroducersService {
     return savedIntroducer;
   }
 
-  public async revoke(resourceId: number, userId: number): Promise<void> {
-    const introducer = await this.getByResourceIdAndUserId(resourceId, userId);
+  public async revoke(
+    resourceId: number,
+    userId: number,
+    type: ResourceIntroducerType = ResourceIntroducerType.INTRODUCER,
+  ): Promise<void> {
+    const introducer = await this.getByResourceIdAndUserId(resourceId, userId, type);
     if (!introducer) {
       return;
     }
@@ -156,7 +162,13 @@ export class ResourceIntroducersService {
     includeGroups: boolean,
     transactionalEntityManager?: EntityManager,
   ): Promise<boolean> {
-    return this.hasAccess(resourceId, userId, includeGroups, ResourceIntroducerType.INTRODUCER, transactionalEntityManager);
+    return this.hasAccess(
+      resourceId,
+      userId,
+      includeGroups,
+      ResourceIntroducerType.INTRODUCER,
+      transactionalEntityManager,
+    );
   }
 
   public async canMaintain(
@@ -175,9 +187,14 @@ export class ResourceIntroducersService {
     requiredType: ResourceIntroducerType | null,
     transactionalEntityManager?: EntityManager,
   ): Promise<boolean> {
-    const introducer = await this.getByResourceIdAndUserId(resourceId, userId, transactionalEntityManager);
+    const introducer = await this.getByResourceIdAndUserId(
+      resourceId,
+      userId,
+      requiredType ?? undefined,
+      transactionalEntityManager,
+    );
 
-    if (introducer && (requiredType === null || introducer.type === requiredType)) {
+    if (introducer) {
       return true;
     }
 
