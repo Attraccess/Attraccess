@@ -16,7 +16,9 @@ import { AddMode, FilterMode, PeopleManagementProps } from './types';
 import en from './en.json';
 import de from './de.json';
 
-export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<HTMLAttributes<HTMLElement>, 'children'>>) {
+export function PeopleManagement(
+  props: Readonly<PeopleManagementProps & Omit<HTMLAttributes<HTMLElement>, 'children'>>,
+) {
   const { target, canManageIntroducers, canManageIntroductions, hideHeader, className, ...rest } = props;
   const { t } = useTranslations({ en, de });
 
@@ -142,11 +144,12 @@ export function PeopleManagement(props: Readonly<PeopleManagementProps & Omit<HT
 
       <PeopleTable
         t={t}
+        target={target}
         rows={filteredRows}
         isLoading={isLoading}
         canManageIntroducers={canManageIntroducers}
         canManageIntroductions={canManageIntroductions}
-        pendingIntroducerUserId={mutations.pendingIntroducerUserId}
+        pendingIntroducer={mutations.pendingIntroducer}
         pendingIntroductionUserId={mutations.pendingIntroductionUserId}
         isRevokingIntroducer={mutations.isRevokingIntroducer}
         isGrantingIntroduction={mutations.isGrantingIntroduction}

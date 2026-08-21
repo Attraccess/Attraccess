@@ -48,9 +48,12 @@ describe('ResourceGroupsIntroducersService notifications', () => {
   });
 
   it('notifies the user when group introducer or maintainer status is revoked', async () => {
-    repository.findOne.mockResolvedValue({ user: { id: 3 }, type: ResourceIntroducerType.INTRODUCER } as ResourceIntroducer);
+    repository.findOne.mockResolvedValue({
+      user: { id: 3 },
+      type: ResourceIntroducerType.INTRODUCER,
+    } as ResourceIntroducer);
 
-    await service.revoke(5, 3);
+    await service.revoke(5, 3, ResourceIntroducerType.INTRODUCER);
 
     expect(notifications.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -60,5 +63,30 @@ describe('ResourceGroupsIntroducersService notifications', () => {
         url: '/resource-groups/5',
       }),
     );
+  });
+
+  it('creates a second role without overwriting an existing one', async () => {
+    repository.findOne.mockImplementation(({ where }) =>
+      Promise.resolve(
+        where.type === ResourceIntroducerType.INTRODUCER
+          ? ({ type: ResourceIntroducerType.INTRODUCER } as ResourceIntroducer)
+          : null,
+      ),
+    );
+
+    await service.grant(5, 3, ResourceIntroducerType.MAINTAINER);
+
+    expect(repository.findOne).toHaveBeenCalledWith({
+      where: {
+        resourceGroup: { id: 5 },
+        user: { id: 3 },
+        type: ResourceIntroducerType.MAINTAINER,
+      },
+    });
+    expect(repository.create).toHaveBeenCalledWith({
+      resourceGroup: { id: 5 },
+      user: { id: 3 },
+      type: ResourceIntroducerType.MAINTAINER,
+    });
   });
 });

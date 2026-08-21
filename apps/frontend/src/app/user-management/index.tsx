@@ -140,7 +140,7 @@ export const UserManagementPage: React.FC = () => {
                 </TableColumn>
               </TableHeader>
 
-              <TableBody items={searchResult?.data ?? []} renderEmptyState={() => <EmptyState />}>
+              <TableBody items={(searchResult?.data ?? []) as User[]} renderEmptyState={() => <EmptyState />}>
                 {(user) => {
                   const ssoDetails =
                     (user as UserWithAuthDetails).authenticationDetails?.filter(
