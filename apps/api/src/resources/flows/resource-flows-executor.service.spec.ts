@@ -392,7 +392,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     });
   });
 
-  it('waits for parallel flow branches to settle before rejecting', async () => {
+  it('rejects when a parallel flow branch fails without waiting for stalled siblings', async () => {
     const firstNode = createNode({ id: 'first-node' });
     const secondNode = createNode({ id: 'second-node' });
     let finishSecondBranch: (() => void) | undefined;
@@ -406,25 +406,12 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       );
 
     const flow = service.startFlow([firstNode, secondNode], { payload: {} });
-    let settled = false;
-    void flow.then(
-      () => {
-        settled = true;
-      },
-      () => {
-        settled = true;
-      },
-    );
-
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(settled).toBe(false);
+    await expect(flow).rejects.toThrow('first branch failed');
 
     if (!finishSecondBranch) {
       throw new Error('Second branch was not started');
     }
     finishSecondBranch();
-    await expect(flow).rejects.toThrow('first branch failed');
     expect(processNode).toHaveBeenCalledTimes(2);
   });
 
