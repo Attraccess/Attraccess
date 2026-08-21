@@ -43,11 +43,6 @@ export class ResourceListService {
     await Promise.all(sockets.map((socket) => this.sendResourceListToSocket(socket)));
   }
 
-  public async sendResourceListToReadersWithResource(resourceId: number) {
-    const allSockets = Array.from(this.websocketService.sockets.values());
-    await Promise.all(allSockets.map((socket) => this.sendResourceListToSocket(socket, { resourceId })));
-  }
-
   public async sendResourceListToReadersWithResources(resourceIds: number[]) {
     if (resourceIds.length === 0) {
       return;
@@ -59,7 +54,7 @@ export class ResourceListService {
 
   public async sendResourceListToSocket(
     socket: AuthenticatedWebSocket,
-    onlyIfResourceMatches?: { resourceId?: number; resourceIds?: number[] },
+    onlyIfResourceMatches?: { resourceIds: number[] },
   ) {
     const reader = await this.attractapService.findReaderById(socket.readerId);
     if (!reader) {
@@ -68,7 +63,7 @@ export class ResourceListService {
 
     const resources = [...reader.resources].sort((a, b) => a.name.localeCompare(b.name));
 
-    const resourceIdsToMatch = onlyIfResourceMatches?.resourceIds ?? [onlyIfResourceMatches?.resourceId];
+    const resourceIdsToMatch = onlyIfResourceMatches?.resourceIds ?? [];
     if (resourceIdsToMatch.some((resourceId) => resourceId !== undefined)) {
       if (!resources.some((resource) => resourceIdsToMatch.includes(resource.id))) {
         return;

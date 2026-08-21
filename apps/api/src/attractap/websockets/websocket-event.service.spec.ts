@@ -22,7 +22,6 @@ describe('WebSocketEventService', () => {
       AttractapGateway,
       | 'sendResourceList'
       | 'disconnectReader'
-      | 'sendResourceListToReadersWithResource'
       | 'sendResourceListToReadersWithResources'
     >
   >;
@@ -32,7 +31,6 @@ describe('WebSocketEventService', () => {
     gateway = {
       sendResourceList: jest.fn().mockResolvedValue(undefined),
       disconnectReader: jest.fn().mockResolvedValue(undefined),
-      sendResourceListToReadersWithResource: jest.fn().mockResolvedValue(undefined),
       sendResourceListToReadersWithResources: jest.fn().mockResolvedValue(undefined),
     };
     resourceGroupsService = {
@@ -77,39 +75,39 @@ describe('WebSocketEventService', () => {
   });
 
   describe('onResourceUsage', () => {
-    it('calls sendResourceListToReadersWithResource with the resource id', async () => {
+    it('calls sendResourceListToReadersWithResources with the resource id', async () => {
       const event = { usage: { resource: { id: 10 } } } as unknown as ResourceSessionStartedEvent;
       await service.onResourceUsage(event);
-      expect(gateway.sendResourceListToReadersWithResource).toHaveBeenCalledWith(10);
+      expect(gateway.sendResourceListToReadersWithResources).toHaveBeenCalledWith([10]);
     });
   });
 
   describe('onResourceUsageTakenOver', () => {
-    it('calls sendResourceListToReadersWithResource with the resource id', async () => {
+    it('calls sendResourceListToReadersWithResources with the resource id', async () => {
       const event = { resource: { id: 20 } } as unknown as ResourceUsageSessionTakenOverEvent;
       await service.onResourceUsageTakenOver(event);
-      expect(gateway.sendResourceListToReadersWithResource).toHaveBeenCalledWith(20);
+      expect(gateway.sendResourceListToReadersWithResources).toHaveBeenCalledWith([20]);
     });
   });
 
   describe('onResourceChanged', () => {
-    it('calls sendResourceListToReadersWithResource with the resource id', async () => {
+    it('calls sendResourceListToReadersWithResources with the resource id', async () => {
       const event = new ResourceChangedEvent(30);
       await service.onResourceChanged(event);
-      expect(gateway.sendResourceListToReadersWithResource).toHaveBeenCalledWith(30);
+      expect(gateway.sendResourceListToReadersWithResources).toHaveBeenCalledWith([30]);
     });
   });
 
   describe('onResourceMaintenanceChanged', () => {
-    it('calls sendResourceListToReadersWithResource with the resource id', async () => {
+    it('calls sendResourceListToReadersWithResources with the resource id', async () => {
       const event = { resourceId: 40 } as ResourceMaintenanceChangedEvent;
       await service.onResourceMaintenanceChanged(event);
-      expect(gateway.sendResourceListToReadersWithResource).toHaveBeenCalledWith(40);
+      expect(gateway.sendResourceListToReadersWithResources).toHaveBeenCalledWith([40]);
     });
   });
 
   describe('onResourceHealthChanged', () => {
-    it('calls sendResourceListToReadersWithResource with the resource id', async () => {
+    it('calls sendResourceListToReadersWithResources with the resource id', async () => {
       const event = new ResourceHealthChangedEvent(
         50,
         '',
@@ -118,7 +116,7 @@ describe('WebSocketEventService', () => {
         ResourceHealthStatus.UNHEALTHY,
       );
       await service.onResourceHealthChanged(event);
-      expect(gateway.sendResourceListToReadersWithResource).toHaveBeenCalledWith(50);
+      expect(gateway.sendResourceListToReadersWithResources).toHaveBeenCalledWith([50]);
     });
   });
 
@@ -144,7 +142,7 @@ describe('WebSocketEventService', () => {
     it('refreshes readers for the affected resource', async () => {
       await service.onResourceIntroducerChanged(new ResourceIntroducerChangedEvent(60, 10));
 
-      expect(gateway.sendResourceListToReadersWithResource).toHaveBeenCalledWith(60);
+      expect(gateway.sendResourceListToReadersWithResources).toHaveBeenCalledWith([60]);
     });
   });
 });
