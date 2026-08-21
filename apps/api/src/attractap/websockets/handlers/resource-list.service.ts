@@ -54,7 +54,7 @@ export class ResourceListService {
 
   public async sendResourceListToSocket(
     socket: AuthenticatedWebSocket,
-    onlyIfResourceMatches?: { resourceIds: number[] },
+    onlyIfResourceMatches?: { resourceIds?: number[] },
   ) {
     const reader = await this.attractapService.findReaderById(socket.readerId);
     if (!reader) {
@@ -64,7 +64,7 @@ export class ResourceListService {
     const resources = [...reader.resources].sort((a, b) => a.name.localeCompare(b.name));
 
     const resourceIdsToMatch = onlyIfResourceMatches?.resourceIds ?? [];
-    if (resourceIdsToMatch.some((resourceId) => resourceId !== undefined)) {
+    if (resourceIdsToMatch.length > 0) {
       if (!resources.some((resource) => resourceIdsToMatch.includes(resource.id))) {
         return;
       }
