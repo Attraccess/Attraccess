@@ -392,15 +392,39 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     });
   });
 
-  it('rejects promptly when a parallel flow branch fails', async () => {
+  it('waits for parallel flow branches to settle before rejecting', async () => {
     const firstNode = createNode({ id: 'first-node' });
     const secondNode = createNode({ id: 'second-node' });
+    let finishSecondBranch: (() => void) | undefined;
     const processNode = jest
       .spyOn(service as unknown as { processNode: () => Promise<NodeProcessingResult[]> }, 'processNode')
       .mockRejectedValueOnce(new Error('first branch failed'))
-      .mockReturnValueOnce(new Promise<NodeProcessingResult[]>(() => undefined));
+      .mockReturnValueOnce(
+        new Promise<NodeProcessingResult[]>((resolve) => {
+          finishSecondBranch = () => resolve([]);
+        }),
+      );
 
-    await expect(service.startFlow([firstNode, secondNode], { payload: {} })).rejects.toThrow('first branch failed');
+    const flow = service.startFlow([firstNode, secondNode], { payload: {} });
+    let settled = false;
+    void flow.then(
+      () => {
+        settled = true;
+      },
+      () => {
+        settled = true;
+      },
+    );
+
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    if (!finishSecondBranch) {
+      throw new Error('Second branch was not started');
+    }
+    finishSecondBranch();
+    await expect(flow).rejects.toThrow('first branch failed');
     expect(processNode).toHaveBeenCalledTimes(2);
   });
 

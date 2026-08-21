@@ -491,12 +491,16 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
 
       let leafResults: NodeProcessingResult[] = [];
       try {
-        const results = await Promise.all(
+        const results = await Promise.allSettled(
           nodes.map((node) => {
             return this.processNode(flowRunId, node, data, transactionManager, resourceContextCache);
           }),
         );
-        leafResults = results.flat();
+        const failure = results.find((result) => result.status === 'rejected');
+        if (failure?.status === 'rejected') {
+          throw failure.reason;
+        }
+        leafResults = results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
         this.logger.log(`Successfully processed all ${nodes.length} flow nodes`);
       } catch (error) {
         this.logger.error(`Failed to process flow nodes`, error.stack);
@@ -668,8 +672,12 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       return this.processNode(flowRunId, targetNode, resultOfPreviousNode, transactionManager, resourceContextCache);
     });
 
-    const results = await Promise.all(edgePromises);
-    return results.flat();
+    const results = await Promise.allSettled(edgePromises);
+    const failure = results.find((result) => result.status === 'rejected');
+    if (failure?.status === 'rejected') {
+      throw failure.reason;
+    }
+    return results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
   }
 
   public trackResourceActivity(resourceId: number) {
