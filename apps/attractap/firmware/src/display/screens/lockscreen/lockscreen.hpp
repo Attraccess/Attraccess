@@ -17,6 +17,11 @@ public:
     std::string getName() override;
     void destroy() override;
 
+    /* The lockscreen is re-entered on every card removal / session end, so
+     * keeping its LVGL tree alive avoids the destroy+rebuild cost per
+     * transition (PERFORMANCE_ANALYSIS.md M4: hot screens persistent). */
+    bool shouldAutoUnload() const override { return false; }
+
     void setResourceName(const char *resourceName);
     void setUsageInfo(bool hasActiveUsage, const char *username, bool isUnderMaintenance);
 
