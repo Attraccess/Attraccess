@@ -91,35 +91,37 @@ export function PeopleRowActions(props: Readonly<PeopleRowActionsProps>) {
         ) : null)}
 
       {canManageIntroducers &&
-        row.introducers.map((introducer) => (
-          <Tooltip key={introducer.id}>
-            <Tooltip.Trigger>
-              <Button
-                variant="ghost"
-                isIconOnly
-                isPending={
-                  isRevokingIntroducer &&
-                  pendingIntroducer?.userId === row.user.id &&
-                  pendingIntroducer.type === introducer.type
-                }
-                onPress={() => onRevokeIntroducer(row.user.id, introducer.type)}
-                aria-label={
-                  introducer.type === ResourceIntroducerType.MAINTAINER
-                    ? t('rowActions.revokeMaintainer')
-                    : t('rowActions.revokeIntroducer')
-                }
-                data-cy={`people-row-revoke-introducer-${row.user.id}-${introducer.type}`}
-              >
-                <Trash2Icon className="w-4 h-4" />
-              </Button>
-            </Tooltip.Trigger>
-            <Tooltip.Content>
-              {introducer.type === ResourceIntroducerType.MAINTAINER
-                ? t('rowActions.revokeMaintainer')
-                : t('rowActions.revokeIntroducer')}
-            </Tooltip.Content>
-          </Tooltip>
-        ))}
+        row.introducers
+          .filter((introducer) => introducer.resourceId != null)
+          .map((introducer) => (
+            <Tooltip key={introducer.id}>
+              <Tooltip.Trigger>
+                <Button
+                  variant="ghost"
+                  isIconOnly
+                  isPending={
+                    isRevokingIntroducer &&
+                    pendingIntroducer?.userId === row.user.id &&
+                    pendingIntroducer.type === introducer.type
+                  }
+                  onPress={() => onRevokeIntroducer(row.user.id, introducer.type)}
+                  aria-label={
+                    introducer.type === ResourceIntroducerType.MAINTAINER
+                      ? t('rowActions.revokeMaintainer')
+                      : t('rowActions.revokeIntroducer')
+                  }
+                  data-cy={`people-row-revoke-introducer-${row.user.id}-${introducer.type}`}
+                >
+                  <Trash2Icon className="w-4 h-4" />
+                </Button>
+              </Tooltip.Trigger>
+              <Tooltip.Content>
+                {introducer.type === ResourceIntroducerType.MAINTAINER
+                  ? t('rowActions.revokeMaintainer')
+                  : t('rowActions.revokeIntroducer')}
+              </Tooltip.Content>
+            </Tooltip>
+          ))}
     </div>
   );
 }
