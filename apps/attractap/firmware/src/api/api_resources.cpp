@@ -124,6 +124,7 @@ void API::onResourceList(JsonObject data)
         JsonArray introducers = resource["introducers"].as<JsonArray>();
         if (!introducers.isNull())
         {
+            dst.introducers.reserve(introducers.size());
             for (JsonVariant v : introducers)
             {
                 const char *introName = v.is<const char *>() ? v.as<const char *>() : nullptr;

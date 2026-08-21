@@ -14,6 +14,7 @@ import { ResourceIntroducerChangedEvent } from '../../resources/introducers/even
 import { ResourceGroupIntroducerChangedEvent } from '../../resources/groups/introducers/events/resource-group-introducer-changed.event';
 import { ResourceGroupIntroductionChangedEvent } from '../../resources/groups/introductions/events/resource-group-introduction-changed.event';
 import { ResourceGroupsService } from '../../resources/groups/resourceGroups.service';
+import { ResourceGroupNotFoundException } from '../../resources/groups/errors/groupNotFound.error';
 
 @Injectable()
 export class WebSocketEventService {
@@ -88,7 +89,15 @@ export class WebSocketEventService {
   }
 
   private async refreshResourcesForGroup(resourceGroupId: number) {
-    const group = await this.resourceGroupsService.getOne({ id: resourceGroupId }, ['resources']);
+    let group;
+    try {
+      group = await this.resourceGroupsService.getOne({ id: resourceGroupId }, ['resources']);
+    } catch (error) {
+      if (error instanceof ResourceGroupNotFoundException) {
+        return;
+      }
+      throw error;
+    }
     await this.attractapGateway.sendResourceListToReadersWithResources(group.resources.map((resource) => resource.id));
   }
 }

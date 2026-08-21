@@ -14,6 +14,7 @@ import { ResourceGroup, ResourceHealthStatus } from '@attraccess/database-entiti
 import { ResourceGroupIntroducerChangedEvent } from '../../resources/groups/introducers/events/resource-group-introducer-changed.event';
 import { ResourceGroupIntroductionChangedEvent } from '../../resources/groups/introductions/events/resource-group-introduction-changed.event';
 import { ResourceGroupsService } from '../../resources/groups/resourceGroups.service';
+import { ResourceGroupNotFoundException } from '../../resources/groups/errors/groupNotFound.error';
 
 describe('WebSocketEventService', () => {
   let service: WebSocketEventService;
@@ -128,6 +129,14 @@ describe('WebSocketEventService', () => {
 
       expect(resourceGroupsService.getOne).toHaveBeenCalledWith({ id: 5 }, ['resources']);
       expect(gateway.sendResourceListToReadersWithResources).toHaveBeenCalledWith([60, 70]);
+    });
+
+    it('does not refresh readers when the group no longer exists', async () => {
+      resourceGroupsService.getOne.mockRejectedValue(new ResourceGroupNotFoundException({ id: 5 }));
+
+      await expect(service.onResourceGroupIntroducerChanged(new ResourceGroupIntroducerChangedEvent(5))).resolves.toBeUndefined();
+
+      expect(gateway.sendResourceListToReadersWithResources).not.toHaveBeenCalled();
     });
 
     it('refreshes resources removed from or added to a group', async () => {
