@@ -2,6 +2,7 @@
 // FEATURE: api-resources
 
 #include "api.hpp"
+#include <algorithm>
 #include <functional>
 #include <string.h>
 #include <string>
@@ -124,9 +125,13 @@ void API::onResourceList(JsonObject data)
         JsonArray introducers = resource["introducers"].as<JsonArray>();
         if (!introducers.isNull())
         {
-            dst.introducers.reserve(introducers.size());
+            dst.introducers.reserve(std::min(introducers.size(), MAX_INTRODUCERS));
             for (JsonVariant v : introducers)
             {
+                if (dst.introducers.size() >= MAX_INTRODUCERS)
+                {
+                    break;
+                }
                 const char *introName = v.is<const char *>() ? v.as<const char *>() : nullptr;
                 if (introName && introName[0] != '\0')
                 {
