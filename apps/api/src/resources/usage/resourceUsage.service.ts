@@ -93,6 +93,23 @@ export class ResourceUsageService {
     return next;
   }
 
+  private async runUsageFlow(
+    manager: EntityManager,
+    resourceId: number,
+    triggerNodeType: ResourceFlowNodeType,
+    payload: object,
+    description: string,
+  ): Promise<void> {
+    try {
+      await manager.transaction(async (flowEntityManager) => {
+        await this.flowExecutorService.runFlow(resourceId, triggerNodeType, payload, flowEntityManager);
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Usage ${description} flow failed for resource ${resourceId}: ${message}`, error);
+    }
+  }
+
   constructor(
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
@@ -542,23 +559,18 @@ export class ResourceUsageService {
       if (existingActiveSession) {
         const now = new Date();
 
-        try {
-          await transactionalEntityManager.transaction(async (flowEntityManager) => {
-            await this.flowExecutorService.runFlow(
-              existingActiveSession.resourceId,
-              ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
-              {
-                ...this.getResourceUsageFlowPayload(existingActiveSession, formSubmissions),
-                takeOverTime: now,
-                newUser: user,
-                oldUser: existingActiveSession.user,
-              },
-              flowEntityManager,
-            );
-          });
-        } catch (error) {
-          this.logger.error(`Usage takeover flow failed for resource ${resourceId}`, (error as Error).stack);
-        }
+        await this.runUsageFlow(
+          transactionalEntityManager,
+          existingActiveSession.resourceId,
+          ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
+          {
+            ...this.getResourceUsageFlowPayload(existingActiveSession, formSubmissions),
+            takeOverTime: now,
+            newUser: user,
+            oldUser: existingActiveSession.user,
+          },
+          'takeover',
+        );
 
         // Emit event for the takeover
         this.eventEmitter.emit(
@@ -569,18 +581,13 @@ export class ResourceUsageService {
         // Defer event for the newly started session until after commit
         startedUsageIdToEmit = createdSession.id;
 
-        try {
-          await transactionalEntityManager.transaction(async (flowEntityManager) => {
-            await this.flowExecutorService.runFlow(
-              createdSession.resourceId,
-              ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
-              this.getResourceUsageFlowPayload(createdSession, formSubmissions),
-              flowEntityManager,
-            );
-          });
-        } catch (error) {
-          this.logger.error(`Usage-start flow failed for resource ${resourceId}`, (error as Error).stack);
-        }
+        await this.runUsageFlow(
+          transactionalEntityManager,
+          createdSession.resourceId,
+          ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+          this.getResourceUsageFlowPayload(createdSession, formSubmissions),
+          'start',
+        );
       }
 
       this.flowExecutorService.trackResourceActivity(createdSession.resourceId);

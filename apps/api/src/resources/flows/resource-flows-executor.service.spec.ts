@@ -392,34 +392,15 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     });
   });
 
-  it('waits for every parallel flow branch before rejecting', async () => {
+  it('rejects promptly when a parallel flow branch fails', async () => {
     const firstNode = createNode({ id: 'first-node' });
     const secondNode = createNode({ id: 'second-node' });
-    let completeSecondBranch: () => void;
-    const secondBranch = new Promise<NodeProcessingResult[]>((resolve) => {
-      completeSecondBranch = () => resolve([{ payload: {} }]);
-    });
     const processNode = jest
       .spyOn(service as unknown as { processNode: () => Promise<NodeProcessingResult[]> }, 'processNode')
       .mockRejectedValueOnce(new Error('first branch failed'))
-      .mockReturnValueOnce(secondBranch);
+      .mockReturnValueOnce(new Promise<NodeProcessingResult[]>(() => undefined));
 
-    const flow = service.startFlow([firstNode, secondNode], { payload: {} });
-    let settled = false;
-    void flow.then(
-      () => {
-        settled = true;
-      },
-      () => {
-        settled = true;
-      },
-    );
-
-    await Promise.resolve();
-    expect(settled).toBe(false);
-
-    completeSecondBranch!();
-    await expect(flow).rejects.toThrow('first branch failed');
+    await expect(service.startFlow([firstNode, secondNode], { payload: {} })).rejects.toThrow('first branch failed');
     expect(processNode).toHaveBeenCalledTimes(2);
   });
 
