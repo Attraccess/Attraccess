@@ -3,10 +3,11 @@ import { Button } from '../../../components/button';
 import { HistoryIcon, ShieldCheckIcon, ShieldOffIcon, Trash2Icon } from 'lucide-react';
 import { ResourceIntroducerType, User } from '@attraccess/react-query-client';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
-import { PersonRow } from './types';
+import { PeopleTarget, PersonRow } from './types';
 
 interface PeopleRowActionsProps {
   t: TFunction;
+  target: PeopleTarget;
   row: PersonRow;
   canManageIntroducers: boolean;
   canManageIntroductions: boolean;
@@ -23,6 +24,7 @@ interface PeopleRowActionsProps {
 export function PeopleRowActions(props: Readonly<PeopleRowActionsProps>) {
   const {
     t,
+    target,
     row,
     canManageIntroducers,
     canManageIntroductions,
@@ -92,7 +94,7 @@ export function PeopleRowActions(props: Readonly<PeopleRowActionsProps>) {
 
       {canManageIntroducers &&
         row.introducers
-          .filter((introducer) => introducer.resourceId != null)
+          .filter((introducer) => target.type === 'group' || introducer.resourceId != null)
           .map((introducer) => (
             <Tooltip key={introducer.id}>
               <Tooltip.Trigger>

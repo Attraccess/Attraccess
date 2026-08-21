@@ -144,6 +144,7 @@ export function PeopleManagement(
 
       <PeopleTable
         t={t}
+        target={target}
         rows={filteredRows}
         isLoading={isLoading}
         canManageIntroducers={canManageIntroducers}

@@ -14,10 +14,11 @@ import { ResourceIntroducerType, User } from '@attraccess/react-query-client';
 import { AttraccessUser, DateTimeDisplay, TFunction } from '@attraccess/plugins-frontend-ui';
 import { EmptyState } from '../../../components/emptyState';
 import { PeopleRowActions } from './PeopleRowActions';
-import { PersonRow } from './types';
+import { PeopleTarget, PersonRow } from './types';
 
 interface PeopleTableProps {
   t: TFunction;
+  target: PeopleTarget;
   rows: PersonRow[];
   isLoading: boolean;
   canManageIntroducers: boolean;
@@ -35,6 +36,7 @@ interface PeopleTableProps {
 export function PeopleTable(props: Readonly<PeopleTableProps>) {
   const {
     t,
+    target,
     rows,
     isLoading,
     canManageIntroducers,
@@ -112,6 +114,7 @@ export function PeopleTable(props: Readonly<PeopleTableProps>) {
                 <TableCell>
                   <PeopleRowActions
                     t={t}
+                    target={target}
                     row={row}
                     canManageIntroducers={canManageIntroducers}
                     canManageIntroductions={canManageIntroductions}
