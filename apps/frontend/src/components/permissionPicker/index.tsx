@@ -24,7 +24,7 @@ import {
   useFilter,
   type Key,
 } from '@heroui/react';
-import { CreditCard, Database, LockIcon, Settings, ShieldCheck, UsersRound } from 'lucide-react';
+import { ChevronRight, CreditCard, Database, LockIcon, Settings, ShieldCheck, UsersRound } from 'lucide-react';
 import { type Permission } from '@attraccess/react-query-client';
 import { StandardDrawer } from '../standardDrawer';
 
@@ -161,21 +161,33 @@ export function PermissionPicker({
   if (presentation === 'drawer') {
     const selectedCount = selectedKeys.size;
     const totalCount = permissions.length;
+    const previewItems = selectedTagItems.slice(0, 2);
+    const hiddenPreviewItemCount = selectedTagItems.length - previewItems.length;
 
     return (
       <>
         <Button
           variant="secondary"
           fullWidth
-          className="justify-between"
+          className="h-auto min-h-10 items-center justify-between gap-3 px-3 py-2"
           onPress={() => setIsDrawerOpen(true)}
           isDisabled={isDisabled}
           aria-label={label}
           data-cy={dataCy}
         >
-          <span>{placeholder}</span>
-          <span className="text-default-500 text-sm">
+          <span className="flex min-w-0 flex-1 flex-wrap gap-1 text-left">
+            {previewItems.length === 0 ? <span className="text-default-500">{placeholder}</span> : null}
+            {previewItems.map(({ key, label: permissionName, isLocked }) => (
+              <span key={key} className="max-w-full truncate rounded-small bg-default-200 px-2 py-0.5 text-xs text-foreground">
+                {isLocked ? <LockIcon className="mr-1 inline size-3 align-text-bottom text-default-500" aria-hidden="true" /> : null}
+                {permissionName}
+              </span>
+            ))}
+            {hiddenPreviewItemCount > 0 ? <span className="rounded-small bg-default-200 px-2 py-0.5 text-xs text-default-600">+{hiddenPreviewItemCount}</span> : null}
+          </span>
+          <span className="flex shrink-0 items-center gap-2 text-default-500 text-sm">
             {drawerSelectedCount?.(selectedCount, totalCount) ?? `${selectedCount}/${totalCount}`}
+            <ChevronRight className="size-4" aria-hidden="true" />
           </span>
         </Button>
 
