@@ -5,6 +5,7 @@ import { Request } from 'express';
 import { SessionService } from '../auth/session.service';
 import { TwoFactorService } from '../auth/two-factor.service';
 import { RbacService } from '../rbac/rbac.service';
+import { ApiTokenService } from '../auth/api-token/api-token.service';
 import { User } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
@@ -25,16 +26,32 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     private readonly sessionService: SessionService,
     private readonly twoFactorService: TwoFactorService,
     private readonly rbacService: RbacService,
+    private readonly apiTokenService: ApiTokenService,
   ) {
     super();
   }
 
   async validate(req: Request): Promise<User> {
-    const token = this.extractTokenFromRequest(req);
+    const { token, fromAuthorizationHeader } = this.extractTokenFromRequest(req);
 
     if (!token) {
       this.logger.debug('No session token found in request');
       throw new UnauthorizedException('No session token provided');
+    }
+
+    if (fromAuthorizationHeader) {
+      const tokenPrincipal = await this.apiTokenService.authenticate(token);
+      if (tokenPrincipal) {
+        const authenticatedUser = tokenPrincipal.user as AuthenticatedUser;
+        // Tokens must reflect owner permission removals immediately, including after a role change on another replica.
+        const ownerPermissions = await this.rbacService.getEffectivePermissions(tokenPrincipal.user.id, true);
+        authenticatedUser.effectivePermissions = new SerializablePermissionSet(
+          tokenPrincipal.apiToken.permissionKeys.filter((permission) => ownerPermissions.has(permission)),
+        );
+        authenticatedUser.authenticationMethod = 'api-token';
+        authenticatedUser.apiTokenId = tokenPrincipal.apiToken.id;
+        return tokenPrincipal.user;
+      }
     }
 
     const user = await this.sessionService.validateSession(token);
@@ -48,6 +65,7 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     (user as AuthenticatedUser).effectivePermissions = new SerializablePermissionSet(
       await this.rbacService.getEffectivePermissions(user.id),
     );
+    (user as AuthenticatedUser).authenticationMethod = 'session';
 
     if (!this.isTwoFactorSetupAllowedPath(req)) {
       const status = await this.twoFactorService.getStatus(user);
@@ -66,23 +84,23 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
    * @param req Express request object
    * @returns Session token or null if not found
    */
-  private extractTokenFromRequest(req: Request): string | null {
+  private extractTokenFromRequest(req: Request): { token: string | null; fromAuthorizationHeader: boolean } {
     // Priority 1: Authorization header with Bearer token
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7).trim();
       if (token) {
-        return token;
+        return { token, fromAuthorizationHeader: true };
       }
     }
 
     // Priority 2: Session cookie
     const sessionCookie = req.cookies?.['auth-session'];
     if (sessionCookie) {
-      return sessionCookie;
+      return { token: sessionCookie, fromAuthorizationHeader: false };
     }
 
-    return null;
+    return { token: null, fromAuthorizationHeader: false };
   }
 
   private isTwoFactorSetupAllowedPath(req: Request): boolean {

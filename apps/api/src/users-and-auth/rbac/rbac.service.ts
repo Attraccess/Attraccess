@@ -36,9 +36,9 @@ export class RbacService {
     private readonly rolePermissionRepository: Repository<RolePermission>,
   ) {}
 
-  async getEffectivePermissions(userId: number): Promise<Set<string>> {
+  async getEffectivePermissions(userId: number, bypassCache = false): Promise<Set<string>> {
     const entry = this.permissionsCache.get(userId);
-    if (entry && Date.now() - entry.ts < this.CACHE_TTL_MS) return new Set(entry.permissions);
+    if (!bypassCache && entry && Date.now() - entry.ts < this.CACHE_TTL_MS) return new Set(entry.permissions);
 
     const rows = await this.userRoleRepository
       .createQueryBuilder('ur')

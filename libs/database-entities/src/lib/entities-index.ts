@@ -107,6 +107,7 @@ import { Permission } from './entities/permission.entity';
 import { Role } from './entities/role.entity';
 import { RolePermission } from './entities/role-permission.entity';
 import { UserRole, UserRoleSource } from './entities/user-role.entity';
+import { ApiToken } from './entities/api-token.entity';
 
 // Export all entities individually
 export {
@@ -219,6 +220,7 @@ export {
   RolePermission,
   UserRole,
   UserRoleSource,
+  ApiToken,
 };
 
 // Export the entities object
@@ -277,4 +279,5 @@ export const entities = {
   Role,
   RolePermission,
   UserRole,
+  ApiToken,
 };

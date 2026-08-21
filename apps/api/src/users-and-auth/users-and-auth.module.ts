@@ -47,6 +47,8 @@ import {
   Setting,
   Passkey,
   PasskeyChallenge,
+  ApiToken,
+  Permission,
 } from '@attraccess/database-entities';
 import { EmailModule } from '../email/email.module';
 import { SSOService } from './auth/sso/sso.service';
@@ -75,6 +77,8 @@ import { AuthRateLimitInterceptor } from './rate-limiting/auth-rate-limit.interc
 import { LoginRateLimitGuard } from './rate-limiting/login.rate-limit.guard';
 import { PasswordPolicyModule } from './password-policy/password-policy.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ApiTokenService } from './auth/api-token/api-token.service';
+import { ApiTokenController } from './auth/api-token/api-token.controller';
 
 @Module({
   imports: [
@@ -89,6 +93,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
       Setting,
       Passkey,
       PasskeyChallenge,
+      ApiToken,
+      Permission,
     ]),
     PassportModule,
     EmailModule,
@@ -130,6 +136,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     SessionService,
     TwoFactorService,
     PasskeyService,
+    ApiTokenService,
     LocalStrategy,
     SessionStrategy,
     SSOService,
@@ -178,6 +185,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     AuthController,
     TwoFactorController,
     PasskeyController,
+    ApiTokenController,
     SSOController,
     RbacController,
   ],

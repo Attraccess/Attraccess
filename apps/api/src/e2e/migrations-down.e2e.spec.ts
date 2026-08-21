@@ -8,6 +8,7 @@ import {
   CompanionDevice,
   AuthenticationDetail,
   AuthenticationType,
+  ApiToken,
   BillingTransaction,
   BillingTransactionItem,
   BillingTransactionStatus,
@@ -185,6 +186,7 @@ const seedDatabase = async (dataSource: DataSource) => {
   const companionDeviceRepo = dataSource.getRepository(CompanionDevice);
   const passkeyRepo = dataSource.getRepository(Passkey);
   const passkeyChallengeRepo = dataSource.getRepository(PasskeyChallenge);
+  const apiTokenRepo = dataSource.getRepository(ApiToken);
 
   const resourceGroup = await ensureEntity(resourceGroupRepo, () => ({
     name: `Seed Group ${seedTag}`,
@@ -596,6 +598,16 @@ const seedDatabase = async (dataSource: DataSource) => {
     challenge: `seed-challenge-${seedTag}`,
     userId: primaryUser.id,
     expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+  }));
+
+  await ensureEntity(apiTokenRepo, () => ({
+    userId: primaryUser.id,
+    name: `Seed API token ${seedTag}`,
+    tokenHash: `seed-api-token-hash-${seedTag}`,
+    permissionKeys: [],
+    lastUsedAt: null,
+    expiresAt: null,
+    revokedAt: null,
   }));
 
   const roleRepo = dataSource.getRepository(Role);

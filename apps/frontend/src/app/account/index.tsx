@@ -12,6 +12,7 @@ import { SetPasswordForm } from '../user-management/details/components/setPasswo
 import { useAuth } from '../../hooks/useAuth';
 import { TwoFactorCard } from './two-factor';
 import { PasskeysCard } from './passkeys';
+import { ApiTokensCard } from './api-tokens';
 import { NotificationPreferencesForm } from './notifications';
 import { useUsersServiceRequestDeleteAccount, ApiError } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
@@ -64,6 +65,7 @@ export default function AccountPage() {
             {me && <SetPasswordForm userId={me.id} username={me.username} />}
             {me && <TwoFactorCard />}
             {me && <PasskeysCard />}
+            {me && <ApiTokensCard availablePermissions={me.effectivePermissions ?? []} />}
           </div>
         </FlatSection>
 
