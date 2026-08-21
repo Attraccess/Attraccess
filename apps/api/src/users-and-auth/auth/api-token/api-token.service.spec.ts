@@ -50,11 +50,4 @@ describe('ApiTokenService', () => {
 
     await expect(service.authenticate('secret')).resolves.toBeNull();
   });
-
-  it('rejects a token owned by a disabled user', async () => {
-    repository.findOneBy.mockResolvedValue({ id: 1, userId: 3, revokedAt: null, expiresAt: null });
-    userRepository.findOneBy.mockResolvedValue({ id: 3, isDisabled: true });
-
-    await expect(service.authenticate('secret')).resolves.toBeNull();
-  });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Input,
   Label,
@@ -46,19 +46,17 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
   const [isCreating, setIsCreating] = useState(false);
   const [revokingId, setRevokingId] = useState<number | null>(null);
 
-  const loadTokens = useEffectEvent(async () => {
-    try {
-      const response = await fetch(`${getBaseUrl()}/api/users/me/api-tokens`, { credentials: 'include' });
-      if (!response.ok) throw new Error('Could not load API tokens');
-      setApiTokens(await response.json());
-    } catch {
-      showToast({ title: t('errors.loadFailed'), type: 'error' });
-      setApiTokens([]);
-    }
-  });
+  const loadTokens = async () => {
+    const response = await fetch(`${getBaseUrl()}/api/users/me/api-tokens`, { credentials: 'include' });
+    if (!response.ok) throw new Error('Could not load API tokens');
+    setApiTokens(await response.json());
+  };
 
   useEffect(() => {
-    void loadTokens();
+    loadTokens().catch(() => {
+      showToast({ title: t('errors.loadFailed'), type: 'error' });
+      setApiTokens([]);
+    });
   }, []);
 
   const createToken = async () => {
@@ -143,35 +141,21 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
         <TableScrollContainer>
           <TableContent aria-label={t('title')}>
             <TableHeader>
-              <TableColumn id="name" isRowHeader>
-                {t('columns.name')}
-              </TableColumn>
+              <TableColumn id="name" isRowHeader>{t('columns.name')}</TableColumn>
               <TableColumn id="permissions">{t('columns.permissions')}</TableColumn>
               <TableColumn id="lastUsed">{t('columns.lastUsed')}</TableColumn>
               <TableColumn id="expires">{t('columns.expires')}</TableColumn>
-              <TableColumn id="actions">
-                <span className="sr-only">{t('columns.actions')}</span>
-              </TableColumn>
+              <TableColumn id="actions"><span className="sr-only">{t('columns.actions')}</span></TableColumn>
             </TableHeader>
             <TableBody items={apiTokens} renderEmptyState={() => <EmptyState message={t('empty')} />}>
               {(apiToken) => (
                 <TableRow key={apiToken.id} id={apiToken.id}>
                   <TableCell>{apiToken.name}</TableCell>
                   <TableCell>{apiToken.permissionKeys.join(', ')}</TableCell>
+                  <TableCell>{apiToken.lastUsedAt ? <DateTimeDisplay date={apiToken.lastUsedAt} /> : t('neverUsed')}</TableCell>
+                  <TableCell>{apiToken.expiresAt ? <DateTimeDisplay date={apiToken.expiresAt} /> : t('neverExpires')}</TableCell>
                   <TableCell>
-                    {apiToken.lastUsedAt ? <DateTimeDisplay date={apiToken.lastUsedAt} /> : t('neverUsed')}
-                  </TableCell>
-                  <TableCell>
-                    {apiToken.expiresAt ? <DateTimeDisplay date={apiToken.expiresAt} /> : t('neverExpires')}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      isIconOnly
-                      aria-label={t('actions.revoke', { name: apiToken.name })}
-                      onPress={() => revokeToken(apiToken)}
-                      isDisabled={revokingId !== null}
-                    >
+                    <Button variant="ghost" isIconOnly aria-label={t('actions.revoke', { name: apiToken.name })} onPress={() => revokeToken(apiToken)} isDisabled={revokingId !== null}>
                       <Trash2 size={16} className="text-danger" />
                     </Button>
                   </TableCell>
@@ -194,12 +178,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
         <Label>{t('expiryLabel')}</Label>
         <Input type="date" />
       </TextField>
-      <Button
-        onPress={createToken}
-        isPending={isCreating}
-        isDisabled={!name.trim() || isCreating}
-        data-cy="api-token-create-button"
-      >
+      <Button onPress={createToken} isPending={isCreating} isDisabled={!name.trim() || isCreating} data-cy="api-token-create-button">
         <KeyRound size={16} />
         {t('actions.create')}
       </Button>

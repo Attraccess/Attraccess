@@ -4,32 +4,14 @@
   "empty": "Du hast noch keinen API-Token erstellt.",
   "neverUsed": "Nie",
   "neverExpires": "Nie",
-  "columns": {
-    "name": "Name",
-    "permissions": "Berechtigungen",
-    "lastUsed": "Zuletzt genutzt",
-    "expires": "Läuft ab",
-    "actions": "Aktionen"
-  },
+  "columns": { "name": "Name", "permissions": "Berechtigungen", "lastUsed": "Zuletzt genutzt", "expires": "Läuft ab", "actions": "Aktionen" },
   "nameLabel": "Name",
   "namePlaceholder": "z.B. CI-Bereitstellung",
   "permissionsLabel": "Berechtigungen",
   "permissionsPlaceholder": "Kommagetrennte Berechtigungsschlüssel",
   "expiryLabel": "Ablaufdatum (optional)",
-  "actions": {
-    "create": "API-Token erstellen",
-    "revoke": "API-Token {{name}} widerrufen",
-    "copy": "Token kopieren",
-    "dismiss": "Token ausblenden"
-  },
-  "secret": {
-    "title": "Token jetzt kopieren",
-    "description": "Dieses Geheimnis wird nur einmal angezeigt und kann nicht wiederhergestellt werden."
-  },
+  "actions": { "create": "API-Token erstellen", "revoke": "API-Token {{name}} widerrufen", "copy": "Token kopieren", "dismiss": "Token ausblenden" },
+  "secret": { "title": "Token jetzt kopieren", "description": "Dieses Geheimnis wird nur einmal angezeigt und kann nicht wiederhergestellt werden." },
   "success": { "created": "API-Token erstellt", "revoked": "API-Token widerrufen", "copied": "API-Token kopiert" },
-  "errors": {
-    "loadFailed": "API-Token konnten nicht geladen werden",
-    "createFailed": "API-Token konnte nicht erstellt werden",
-    "revokeFailed": "API-Token konnte nicht widerrufen werden"
-  }
+  "errors": { "loadFailed": "API-Token konnten nicht geladen werden", "createFailed": "API-Token konnte nicht erstellt werden", "revokeFailed": "API-Token konnte nicht widerrufen werden" }
 }
