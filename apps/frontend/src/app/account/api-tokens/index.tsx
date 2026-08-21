@@ -45,7 +45,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
   const { data: allPermissions } = useRbacServiceListPermissions();
   const [apiTokens, setApiTokens] = useState<ApiToken[] | null>(null);
   const [name, setName] = useState('');
-  const [permissionKeys, setPermissionKeys] = useState<Set<string>>(() => new Set(availablePermissions));
+  const [permissionKeys, setPermissionKeys] = useState<Set<string>>(() => new Set());
   const [expiresAt, setExpiresAt] = useState('');
   const [secret, setSecret] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -86,7 +86,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
       setSecret(created.token);
       setApiTokens((tokens) => [created, ...(tokens ?? [])]);
       setName('');
-      setPermissionKeys(new Set(availablePermissions));
+      setPermissionKeys(new Set());
       setExpiresAt('');
       showToast({ title: t('success.created'), type: 'success' });
     } catch {
@@ -206,7 +206,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
         <Label>{t('expiryLabel')}</Label>
         <Input type="date" />
       </TextField>
-      <Button onPress={createToken} isPending={isCreating} isDisabled={!name.trim() || isCreating} data-cy="api-token-create-button">
+      <Button onPress={createToken} isPending={isCreating} isDisabled={!name.trim() || permissionKeys.size === 0 || isCreating} data-cy="api-token-create-button">
         <KeyRound size={16} />
         {t('actions.create')}
       </Button>

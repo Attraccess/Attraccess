@@ -3,6 +3,7 @@ import {
   Accordion,
   AccordionBody,
   AccordionHeading,
+  AccordionIndicator,
   AccordionItem,
   AccordionPanel,
   AccordionTrigger,
@@ -23,11 +24,26 @@ import {
   useFilter,
   type Key,
 } from '@heroui/react';
-import { LockIcon } from 'lucide-react';
+import { CreditCard, Database, LockIcon, Settings, ShieldCheck, UsersRound } from 'lucide-react';
 import { type Permission } from '@attraccess/react-query-client';
 import { StandardDrawer } from '../standardDrawer';
 
 const CATEGORY_ORDER = ['resources', 'users', 'system', 'billing'];
+
+function CategoryIcon({ category }: { category: string }) {
+  const Icon =
+    category === 'resources'
+      ? Database
+      : category === 'users'
+        ? UsersRound
+        : category === 'system'
+          ? Settings
+          : category === 'billing'
+            ? CreditCard
+            : ShieldCheck;
+
+  return <Icon className="size-4 shrink-0 text-default-500" aria-hidden="true" />;
+}
 
 interface PermissionPickerProps {
   permissions: Permission[];
@@ -169,7 +185,7 @@ export function PermissionPicker({
             {drawerDescription ? <p className="text-sm text-default-500">{drawerDescription}</p> : null}
           </DrawerHeader>
           <DrawerBody>
-            <Accordion aria-label={label} className="w-full">
+            <Accordion aria-label={label} className="w-full" variant="surface" allowsMultipleExpanded>
               {permissionsByCategory.map(({ category, permissions: categoryPermissions }) => {
                 const selectablePermissions = categoryPermissions.filter((permission) => !disabledKeys.includes(permission.key));
                 const selectedInCategory = categoryPermissions.filter((permission) => draftKeys.has(permission.key)).length;
@@ -178,18 +194,22 @@ export function PermissionPicker({
                 return (
                   <AccordionItem key={category} id={category} aria-label={permissionCategory(category)}>
                     <AccordionHeading>
-                      <AccordionTrigger>
-                        <span className="flex min-w-0 items-center justify-between gap-3 pr-2">
-                          <span>{permissionCategory(category)}</span>
-                          <span className="shrink-0 text-sm font-normal text-default-500">
+                      <AccordionTrigger className="gap-3">
+                        <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                          <span className="flex min-w-0 items-center gap-2">
+                            <CategoryIcon category={category} />
+                            <span>{permissionCategory(category)}</span>
+                          </span>
+                          <span className="shrink-0 text-sm font-normal tabular-nums text-default-500">
                             {selectedInCategory}/{categoryPermissions.length}
                           </span>
                         </span>
+                        <AccordionIndicator />
                       </AccordionTrigger>
                     </AccordionHeading>
                     <AccordionPanel>
                       <AccordionBody className="flex flex-col gap-3">
-                        <div className="flex gap-2">
+                        <div className="flex justify-end">
                           <Button
                             size="sm"
                             variant="secondary"

@@ -1,6 +1,6 @@
 {
   "title": "API-Token",
-  "description": "Erstelle eingeschränkte Token für die REST API. Ein Token kann deine aktuellen Berechtigungen nie überschreiten.",
+  "description": "Erstelle Tokens mit minimalen Berechtigungen für die REST API. Ein Token kann nur die ausgewählten Berechtigungen nutzen, die du aktuell besitzt.",
   "empty": "Du hast noch keinen API-Token erstellt.",
   "neverUsed": "Nie",
   "neverExpires": "Nie",
@@ -12,12 +12,12 @@
   "permissionsSearchPlaceholder": "Berechtigungen suchen...",
   "permissionsEmpty": "Keine Berechtigungen gefunden",
   "picker": {
-    "title": "Berechtigungen auswählen",
-    "description": "Wähle nur die Zugriffe aus, die dieses Token benötigt. Berechtigungen sind auf deine aktuellen Zugriffe begrenzt.",
-    "selectedCount": "{{selected}} von {{total}} ausgewählt",
-    "selectCategory": "Kategorie auswählen",
-    "clearCategory": "Kategorie leeren",
-    "apply": "Berechtigungen übernehmen",
+    "title": "API-Token-Berechtigungen auswählen",
+    "description": "Wähle die minimal erforderlichen Zugriffe. Das Token kann nur Berechtigungen nutzen, die du aktuell besitzt.",
+    "selectedCount": "{{selected}} von {{total}} Berechtigungen ausgewählt",
+    "selectCategory": "Alle auswählen",
+    "clearCategory": "Alle entfernen",
+    "apply": "Berechtigungen speichern",
     "cancel": "Abbrechen"
   },
   "expiryLabel": "Ablaufdatum (optional)",

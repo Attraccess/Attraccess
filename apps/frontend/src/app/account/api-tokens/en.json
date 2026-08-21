@@ -1,6 +1,6 @@
 {
   "title": "API tokens",
-  "description": "Create scoped tokens for the REST API. A token can never exceed your current access.",
+  "description": "Create least-privilege tokens for the REST API. A token can use only the permissions you select and currently hold.",
   "empty": "You have not created an API token yet.",
   "neverUsed": "Never",
   "neverExpires": "Never",
@@ -12,12 +12,12 @@
   "permissionsSearchPlaceholder": "Search permissions...",
   "permissionsEmpty": "No permissions found",
   "picker": {
-    "title": "Choose permissions",
-    "description": "Select only the access this token needs. Permissions are limited to your current access.",
-    "selectedCount": "{{selected}} of {{total}} selected",
-    "selectCategory": "Select category",
-    "clearCategory": "Clear category",
-    "apply": "Apply permissions",
+    "title": "Choose API token permissions",
+    "description": "Select the minimum access this token needs. It can use only permissions you currently hold.",
+    "selectedCount": "{{selected}} of {{total}} permissions selected",
+    "selectCategory": "Select all",
+    "clearCategory": "Clear all",
+    "apply": "Save permissions",
     "cancel": "Cancel"
   },
   "expiryLabel": "Expiry date (optional)",
