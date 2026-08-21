@@ -72,7 +72,7 @@ export class ApiTokenService {
 
     // The normal repository lookup excludes soft-deleted owners.
     const user = await this.userRepository.findOneBy({ id: apiToken.userId });
-    if (!user) return null;
+    if (!user || user.isDisabled) return null;
 
     if (!apiToken.lastUsedAt || Date.now() - apiToken.lastUsedAt.getTime() >= LAST_USED_WRITE_INTERVAL_MS) {
       apiToken.lastUsedAt = new Date();

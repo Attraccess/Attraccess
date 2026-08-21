@@ -23,7 +23,6 @@ import { FormSubmission } from './form';
 import { UserRole } from './user-role.entity';
 import { ApiToken } from './api-token.entity';
 
-
 @Entity()
 export class User {
   @PrimaryGeneratedColumn()
@@ -103,6 +102,10 @@ export class User {
   @Column({ type: 'datetime', nullable: true })
   @Exclude()
   lockedUntil!: Date | null;
+
+  @Column({ type: 'boolean', default: false })
+  @Exclude()
+  isDisabled!: boolean;
 
   @Column({ type: 'integer', default: 0 })
   @Exclude()

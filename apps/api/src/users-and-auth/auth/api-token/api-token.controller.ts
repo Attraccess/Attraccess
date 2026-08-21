@@ -1,13 +1,17 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Req } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ApiTokenService } from './api-token.service';
 import { ApiTokenMetadataDto, CreateApiTokenDto, CreateApiTokenResponseDto, UpdateApiTokenDto } from './api-token.dto';
+import { RbacService } from '../../rbac/rbac.service';
 
 @ApiTags('API tokens')
 @Controller('users/me/api-tokens')
 export class ApiTokenController {
-  constructor(private readonly apiTokenService: ApiTokenService) {}
+  constructor(
+    private readonly apiTokenService: ApiTokenService,
+    private readonly rbacService: RbacService,
+  ) {}
 
   @Auth()
   @Get()
@@ -21,10 +25,13 @@ export class ApiTokenController {
   @Post()
   @ApiOperation({ summary: 'Create an API token', operationId: 'createApiToken' })
   @ApiOkResponse({ type: CreateApiTokenResponseDto })
-  async create(@Req() request: AuthenticatedRequest, @Body() body: CreateApiTokenDto): Promise<CreateApiTokenResponseDto> {
+  async create(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: CreateApiTokenDto,
+  ): Promise<CreateApiTokenResponseDto> {
     const { apiToken, token } = await this.apiTokenService.create(
       request.user.id,
-      (request.user as AuthenticatedUser).effectivePermissions ?? new Set(),
+      await this.rbacService.getEffectivePermissions(request.user.id, true),
       body,
     );
     return { ...toMetadata(apiToken), token };
@@ -43,7 +50,7 @@ export class ApiTokenController {
       await this.apiTokenService.update(
         request.user.id,
         id,
-        (request.user as AuthenticatedUser).effectivePermissions ?? new Set(),
+        await this.rbacService.getEffectivePermissions(request.user.id, true),
         body,
       ),
     );
