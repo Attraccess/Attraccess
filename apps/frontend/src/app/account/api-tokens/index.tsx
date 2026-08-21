@@ -192,6 +192,14 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
           permissionCategory={permissionCategory}
           dataCy="api-token-permission-picker"
           isDisabled={isCreating}
+          presentation="drawer"
+          drawerTitle={t('picker.title')}
+          drawerDescription={t('picker.description')}
+          drawerApplyLabel={t('picker.apply')}
+          drawerCancelLabel={t('picker.cancel')}
+          drawerSelectedCount={(selected, total) => t('picker.selectedCount', { selected, total })}
+          drawerSelectCategoryLabel={t('picker.selectCategory')}
+          drawerClearCategoryLabel={t('picker.clearCategory')}
         />
       </div>
       <TextField value={expiresAt} onChange={setExpiresAt} isDisabled={isCreating}>

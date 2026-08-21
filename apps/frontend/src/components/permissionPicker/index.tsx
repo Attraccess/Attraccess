@@ -1,7 +1,18 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  Accordion,
+  AccordionBody,
+  AccordionHeading,
+  AccordionItem,
+  AccordionPanel,
+  AccordionTrigger,
   Autocomplete,
+  Button,
+  Checkbox,
   Description,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   EmptyState,
   Header,
   Label,
@@ -14,6 +25,7 @@ import {
 } from '@heroui/react';
 import { LockIcon } from 'lucide-react';
 import { type Permission } from '@attraccess/react-query-client';
+import { StandardDrawer } from '../standardDrawer';
 
 const CATEGORY_ORDER = ['resources', 'users', 'system', 'billing'];
 
@@ -35,6 +47,14 @@ interface PermissionPickerProps {
   searchDataCy?: string;
   itemDataCy?: (permissionKey: string) => string;
   isDisabled?: boolean;
+  presentation?: 'autocomplete' | 'drawer';
+  drawerTitle?: string;
+  drawerDescription?: string;
+  drawerApplyLabel?: string;
+  drawerCancelLabel?: string;
+  drawerSelectedCount?: (selected: number, total: number) => string;
+  drawerSelectCategoryLabel?: string;
+  drawerClearCategoryLabel?: string;
 }
 
 export function PermissionPicker({
@@ -55,6 +75,14 @@ export function PermissionPicker({
   searchDataCy,
   itemDataCy,
   isDisabled,
+  presentation = 'autocomplete',
+  drawerTitle,
+  drawerDescription,
+  drawerApplyLabel,
+  drawerCancelLabel,
+  drawerSelectedCount,
+  drawerSelectCategoryLabel,
+  drawerClearCategoryLabel,
 }: PermissionPickerProps) {
   const { contains } = useFilter({ sensitivity: 'base' });
   const permissionByKey = useMemo(() => new Map(permissions.map((permission) => [permission.key, permission])), [permissions]);
@@ -84,6 +112,145 @@ export function PermissionPicker({
   const handleRemoveTags = (keys: Set<Key>) => {
     onChange([...selectedKeys].filter((key) => !keys.has(key) || disabledKeys.includes(key)));
   };
+
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [draftKeys, setDraftKeys] = useState<Set<string>>(() => new Set(selectedKeys));
+
+  useEffect(() => {
+    if (isDrawerOpen) setDraftKeys(new Set(selectedKeys));
+  }, [isDrawerOpen, selectedKeys]);
+
+  const updateDraft = (key: string, isSelected: boolean) => {
+    if (disabledKeys.includes(key)) return;
+    setDraftKeys((current) => {
+      const next = new Set(current);
+      if (isSelected) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  };
+
+  const updateCategory = (categoryPermissions: Permission[], isSelected: boolean) => {
+    setDraftKeys((current) => {
+      const next = new Set(current);
+      for (const permission of categoryPermissions) {
+        if (disabledKeys.includes(permission.key)) continue;
+        if (isSelected) next.add(permission.key);
+        else next.delete(permission.key);
+      }
+      return next;
+    });
+  };
+
+  if (presentation === 'drawer') {
+    const selectedCount = selectedKeys.size;
+    const totalCount = permissions.length;
+
+    return (
+      <>
+        <Button
+          variant="secondary"
+          fullWidth
+          className="justify-between"
+          onPress={() => setIsDrawerOpen(true)}
+          isDisabled={isDisabled}
+          aria-label={label}
+          data-cy={dataCy}
+        >
+          <span>{placeholder}</span>
+          <span className="text-default-500 text-sm">
+            {drawerSelectedCount?.(selectedCount, totalCount) ?? `${selectedCount}/${totalCount}`}
+          </span>
+        </Button>
+
+        <StandardDrawer isOpen={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+          <DrawerHeader className="flex flex-col gap-1">
+            <h2 className="text-lg font-semibold">{drawerTitle ?? label}</h2>
+            {drawerDescription ? <p className="text-sm text-default-500">{drawerDescription}</p> : null}
+          </DrawerHeader>
+          <DrawerBody>
+            <Accordion aria-label={label} className="w-full">
+              {permissionsByCategory.map(({ category, permissions: categoryPermissions }) => {
+                const selectablePermissions = categoryPermissions.filter((permission) => !disabledKeys.includes(permission.key));
+                const selectedInCategory = categoryPermissions.filter((permission) => draftKeys.has(permission.key)).length;
+                const isCategorySelected = selectablePermissions.length > 0 && selectablePermissions.every((permission) => draftKeys.has(permission.key));
+
+                return (
+                  <AccordionItem key={category} id={category} aria-label={permissionCategory(category)}>
+                    <AccordionHeading>
+                      <AccordionTrigger>
+                        <span className="flex min-w-0 items-center justify-between gap-3 pr-2">
+                          <span>{permissionCategory(category)}</span>
+                          <span className="shrink-0 text-sm font-normal text-default-500">
+                            {selectedInCategory}/{categoryPermissions.length}
+                          </span>
+                        </span>
+                      </AccordionTrigger>
+                    </AccordionHeading>
+                    <AccordionPanel>
+                      <AccordionBody className="flex flex-col gap-3">
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onPress={() => updateCategory(categoryPermissions, !isCategorySelected)}
+                            isDisabled={selectablePermissions.length === 0}
+                          >
+                            {isCategorySelected ? drawerClearCategoryLabel : drawerSelectCategoryLabel}
+                          </Button>
+                        </div>
+                        <div className="flex flex-col gap-3">
+                          {categoryPermissions.map((permission) => {
+                            const isLocked = disabledKeys.includes(permission.key);
+                            return (
+                              <Checkbox
+                                key={permission.key}
+                                isSelected={draftKeys.has(permission.key)}
+                                onChange={(isSelected) => updateDraft(permission.key, isSelected)}
+                                isDisabled={isLocked}
+                                data-cy={itemDataCy?.(permission.key)}
+                              >
+                                <Checkbox.Content className="items-start">
+                                  <Checkbox.Control className="mt-0.5">
+                                    <Checkbox.Indicator />
+                                  </Checkbox.Control>
+                                  <span className="flex flex-col gap-0.5">
+                                    <span className="flex items-center gap-1">
+                                      {permissionLabel(permission)}
+                                      {isLocked ? <LockIcon className="h-3.5 w-3.5 text-default-400" aria-hidden="true" /> : null}
+                                    </span>
+                                    <Description>{permissionDescription(permission)}</Description>
+                                  </span>
+                                </Checkbox.Content>
+                              </Checkbox>
+                            );
+                          })}
+                        </div>
+                      </AccordionBody>
+                    </AccordionPanel>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
+          </DrawerBody>
+          <DrawerFooter>
+            <Button variant="secondary" onPress={() => setIsDrawerOpen(false)}>
+              {drawerCancelLabel}
+            </Button>
+            <Button
+              variant="primary"
+              onPress={() => {
+                onChange(draftKeys);
+                setIsDrawerOpen(false);
+              }}
+            >
+              {drawerApplyLabel}
+            </Button>
+          </DrawerFooter>
+        </StandardDrawer>
+      </>
+    );
+  }
 
   return (
     <Autocomplete

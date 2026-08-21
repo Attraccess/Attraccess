@@ -11,6 +11,15 @@
   "permissionsPlaceholder": "Select permissions",
   "permissionsSearchPlaceholder": "Search permissions...",
   "permissionsEmpty": "No permissions found",
+  "picker": {
+    "title": "Choose permissions",
+    "description": "Select only the access this token needs. Permissions are limited to your current access.",
+    "selectedCount": "{{selected}} of {{total}} selected",
+    "selectCategory": "Select category",
+    "clearCategory": "Clear category",
+    "apply": "Apply permissions",
+    "cancel": "Cancel"
+  },
   "expiryLabel": "Expiry date (optional)",
   "actions": { "create": "Create API token", "revoke": "Revoke API token {{name}}", "copy": "Copy token", "dismiss": "Dismiss token" },
   "secret": { "title": "Copy your token now", "description": "This secret is shown only once and cannot be recovered." },

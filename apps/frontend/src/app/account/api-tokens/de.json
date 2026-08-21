@@ -11,6 +11,15 @@
   "permissionsPlaceholder": "Berechtigungen auswählen",
   "permissionsSearchPlaceholder": "Berechtigungen suchen...",
   "permissionsEmpty": "Keine Berechtigungen gefunden",
+  "picker": {
+    "title": "Berechtigungen auswählen",
+    "description": "Wähle nur die Zugriffe aus, die dieses Token benötigt. Berechtigungen sind auf deine aktuellen Zugriffe begrenzt.",
+    "selectedCount": "{{selected}} von {{total}} ausgewählt",
+    "selectCategory": "Kategorie auswählen",
+    "clearCategory": "Kategorie leeren",
+    "apply": "Berechtigungen übernehmen",
+    "cancel": "Abbrechen"
+  },
   "expiryLabel": "Ablaufdatum (optional)",
   "actions": { "create": "API-Token erstellen", "revoke": "API-Token {{name}} widerrufen", "copy": "Token kopieren", "dismiss": "Token ausblenden" },
   "secret": { "title": "Token jetzt kopieren", "description": "Dieses Geheimnis wird nur einmal angezeigt und kann nicht wiederhergestellt werden." },
