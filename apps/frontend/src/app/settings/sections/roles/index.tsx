@@ -77,7 +77,7 @@ export function RolesSection() {
                   </TableColumn>
                 </TableHeader>
 
-                <TableBody items={roles ?? []} renderEmptyState={() => <EmptyState />}>
+                <TableBody items={roles ?? []} dependencies={[t]} renderEmptyState={() => <EmptyState />}>
                   {(role) => (
                     <TableRow
                       key={role.id}
