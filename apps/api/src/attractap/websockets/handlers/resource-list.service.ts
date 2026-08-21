@@ -76,13 +76,17 @@ export class ResourceListService {
     );
     const resourcesWithUsageSession = await Promise.all(
       resources.map(async (resource) => {
-        const healthEntries = await this.resourceHealthService.listForResource(resource.id);
+        const [healthEntries, activeUsageSession, isUnderMaintenance] = await Promise.all([
+          this.resourceHealthService.listForResource(resource.id),
+          this.resourceUsageService.getActiveSession(resource.id, true),
+          this.resourceMaintenanceService.hasActiveMaintenance(resource.id),
+        ]);
         const unhealthyEntries = healthEntries.filter((entry) => entry.status === ResourceHealthStatus.UNHEALTHY);
         return {
           ...resource,
-          activeUsageSession: await this.resourceUsageService.getActiveSession(resource.id, true),
+          activeUsageSession,
           introducers: introducersByResourceId.get(resource.id) ?? [],
-          isUnderMaintenance: await this.resourceMaintenanceService.hasActiveMaintenance(resource.id),
+          isUnderMaintenance,
           isHealthy: unhealthyEntries.length === 0,
           healthReason: this.buildHealthReason(unhealthyEntries),
         };
