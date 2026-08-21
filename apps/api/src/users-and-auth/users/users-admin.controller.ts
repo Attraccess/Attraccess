@@ -14,7 +14,7 @@ import {
   Req,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiExtraModels, ApiOperation, ApiResponse, ApiTags, getSchemaPath } from '@nestjs/swagger';
 import { User } from '@attraccess/database-entities';
 import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
@@ -22,7 +22,7 @@ import { UsersService } from './users.service';
 import { UserPasswordService } from './user-password.service';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { FindManyUsersQueryDto } from './dtos/findManyUsersQuery.dto';
-import { PaginatedUsersResponseDto } from './dtos/paginatedUsersResponse.dto';
+import { PaginatedUserSummariesResponseDto, PaginatedUsersResponseDto } from './dtos/paginatedUsersResponse.dto';
 import { SetUserPasswordDto } from './dtos/setUserPassword.dto';
 import { ChangeUsernameDto } from './dtos/changeUsername.dto';
 import { ChangeEmailDto } from './dtos/changeEmail.dto';
@@ -99,17 +99,26 @@ export class UsersAdminController {
 
   @Get()
   @Auth()
+  @ApiExtraModels(PaginatedUserSummariesResponseDto, PaginatedUsersResponseDto)
   @ApiOperation({ summary: 'Get a paginated list of users', operationId: 'findMany' })
   @ApiResponse({
     status: 200,
     description: 'List of users.',
-    type: PaginatedUsersResponseDto,
+    schema: {
+      oneOf: [
+        { $ref: getSchemaPath(PaginatedUserSummariesResponseDto) },
+        { $ref: getSchemaPath(PaginatedUsersResponseDto) },
+      ],
+    },
   })
   @ApiResponse({
     status: 403,
     description: 'Forbidden - includeRoles requires users.read permission.',
   })
-  async findMany(@Query() query: FindManyUsersQueryDto, @Req() request: AuthenticatedRequest): Promise<PaginatedUsersResponseDto> {
+  async findMany(
+    @Query() query: FindManyUsersQueryDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<PaginatedUserSummariesResponseDto | PaginatedUsersResponseDto> {
     const canReadUsers = request.user.effectivePermissions?.has('users.read') ?? false;
 
     // Role data is sensitive; only expose it to users.read holders.
