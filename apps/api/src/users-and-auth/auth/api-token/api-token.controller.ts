@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Req } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, AuthenticatedUser, SessionAuth } from '@attraccess/plugins-backend-sdk';
 import { ApiTokenService } from './api-token.service';
 import { ApiTokenMetadataDto, CreateApiTokenDto, CreateApiTokenResponseDto, UpdateApiTokenDto } from './api-token.dto';
 
@@ -9,7 +9,7 @@ import { ApiTokenMetadataDto, CreateApiTokenDto, CreateApiTokenResponseDto, Upda
 export class ApiTokenController {
   constructor(private readonly apiTokenService: ApiTokenService) {}
 
-  @Auth()
+  @SessionAuth()
   @Get()
   @ApiOperation({ summary: 'List the current user API tokens', operationId: 'listApiTokens' })
   @ApiOkResponse({ type: [ApiTokenMetadataDto] })
@@ -17,11 +17,14 @@ export class ApiTokenController {
     return (await this.apiTokenService.list(request.user.id)).map(toMetadata);
   }
 
-  @Auth()
+  @SessionAuth()
   @Post()
   @ApiOperation({ summary: 'Create an API token', operationId: 'createApiToken' })
   @ApiOkResponse({ type: CreateApiTokenResponseDto })
-  async create(@Req() request: AuthenticatedRequest, @Body() body: CreateApiTokenDto): Promise<CreateApiTokenResponseDto> {
+  async create(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: CreateApiTokenDto,
+  ): Promise<CreateApiTokenResponseDto> {
     const { apiToken, token } = await this.apiTokenService.create(
       request.user.id,
       (request.user as AuthenticatedUser).effectivePermissions ?? new Set(),
@@ -30,7 +33,7 @@ export class ApiTokenController {
     return { ...toMetadata(apiToken), token };
   }
 
-  @Auth()
+  @SessionAuth()
   @Patch(':id')
   @ApiOperation({ summary: 'Update an API token', operationId: 'updateApiToken' })
   @ApiOkResponse({ type: ApiTokenMetadataDto })
@@ -49,7 +52,7 @@ export class ApiTokenController {
     );
   }
 
-  @Auth()
+  @SessionAuth()
   @Delete(':id')
   @ApiOperation({ summary: 'Revoke an API token', operationId: 'revokeApiToken' })
   async revoke(@Req() request: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number): Promise<void> {

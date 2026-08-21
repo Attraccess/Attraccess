@@ -1,4 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
+import { ApiToken } from '@attraccess/database-entities';
 import { ApiTokenService } from './api-token.service';
 
 describe('ApiTokenService', () => {
@@ -7,6 +8,7 @@ describe('ApiTokenService', () => {
     save: jest.fn(),
     find: jest.fn(),
     findOneBy: jest.fn(),
+    createQueryBuilder: jest.fn(),
   };
   const userRepository = { findOneBy: jest.fn() };
   const tokenHashService = { hashApiToken: jest.fn((token) => `hashed:${token}`) };
@@ -49,5 +51,25 @@ describe('ApiTokenService', () => {
     userRepository.findOneBy.mockResolvedValue(null);
 
     await expect(service.authenticate('secret')).resolves.toBeNull();
+  });
+
+  it('only updates last used time while the token remains active', async () => {
+    const queryBuilder = {
+      update: jest.fn().mockReturnThis(),
+      set: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      execute: jest.fn(),
+    };
+    repository.createQueryBuilder.mockReturnValue(queryBuilder);
+    repository.findOneBy.mockResolvedValue({ id: 1, userId: 3, revokedAt: null, expiresAt: null, lastUsedAt: null });
+    userRepository.findOneBy.mockResolvedValue({ id: 3 });
+
+    await service.authenticate('secret');
+
+    expect(queryBuilder.update).toHaveBeenCalledWith(ApiToken);
+    expect(queryBuilder.where).toHaveBeenCalledWith('id = :id', { id: 1 });
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith('revokedAt IS NULL');
+    expect(repository.save).not.toHaveBeenCalled();
   });
 });

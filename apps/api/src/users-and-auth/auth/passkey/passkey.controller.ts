@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Req, Res } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk';
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import { Passkey } from '@attraccess/database-entities';
 import { PasskeyService } from './passkey.service';
@@ -29,7 +29,7 @@ export class PasskeyController {
     private readonly audit: AuthAuditLogger,
   ) {}
 
-  @Auth()
+  @SessionAuth()
   @Get('/passkey')
   @ApiOperation({ summary: 'List the passkeys of the current user', operationId: 'listPasskeys' })
   @ApiOkResponse({ description: 'The passkeys of the current user', type: [Passkey] })
@@ -37,7 +37,7 @@ export class PasskeyController {
     return this.passkeyService.listForUser(request.user.id);
   }
 
-  @Auth()
+  @SessionAuth()
   @Post('/passkey/register/options')
   @ApiOperation({ summary: 'Start registering a new passkey', operationId: 'getPasskeyRegistrationOptions' })
   @ApiOkResponse({ description: 'The WebAuthn credential creation options', type: PasskeyOptionsResponseDto })
@@ -46,7 +46,7 @@ export class PasskeyController {
     return { options: options as unknown as Record<string, unknown> };
   }
 
-  @Auth()
+  @SessionAuth()
   @Post('/passkey/register/verify')
   @ApiOperation({ summary: 'Finish registering a new passkey', operationId: 'verifyPasskeyRegistration' })
   @ApiOkResponse({ description: 'The newly registered passkey', type: Passkey })
@@ -63,7 +63,7 @@ export class PasskeyController {
     );
   }
 
-  @Auth()
+  @SessionAuth()
   @Patch('/passkey/:id')
   @ApiOperation({ summary: 'Rename one of the current users passkeys', operationId: 'renamePasskey' })
   @ApiOkResponse({ description: 'The renamed passkey', type: Passkey })
@@ -75,7 +75,7 @@ export class PasskeyController {
     return this.passkeyService.rename(request.user.id, id, body.name);
   }
 
-  @Auth()
+  @SessionAuth()
   @Delete('/passkey/:id')
   @ApiOperation({ summary: 'Delete one of the current users passkeys', operationId: 'deletePasskey' })
   @ApiOkResponse({ description: 'The passkey has been deleted' })
