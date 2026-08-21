@@ -158,7 +158,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
         config.clientId = 'placeholder';
         config.clientSecret = 'placeholder';
 
-        const appUrl = await settingsService.getUrl();
+        const appUrl =
+          process.env.SKIP_DATABASE_SETTINGS === 'true' ? process.env.ATTRACCESS_URL : await settingsService.getUrl();
         // Use fallback during first-time setup when no settings exist; real callback is only needed when OIDC is used
         const callbackURL = appUrl
           ? appUrl.replace(/\/$/, '') + '/api/sso/OIDC/callback'

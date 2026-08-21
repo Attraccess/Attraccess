@@ -2,6 +2,7 @@
 # Setup script for Attraccess development environment
 # Installs: Docker, Node.js, pnpm, Python, ESP-IDF, esptool
 # Run from repo root: ./scripts/setup-dev-dependencies.sh
+# Install or repair only ESP-IDF: ./scripts/setup-dev-dependencies.sh --esp-idf-only
 
 set -e
 
@@ -164,8 +165,12 @@ ESP_IDF_VERSION="v6.0.2"
 ESP_IDF_PATH="$REPO_ROOT/.tools/esp-idf"
 
 check_esp_idf() {
+    local python_version
+    python_version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
     if [[ -f "$ESP_IDF_PATH/export.sh" ]] && \
-        [[ "$(git -C "$ESP_IDF_PATH" describe --tags --exact-match HEAD 2>/dev/null || true)" == "$ESP_IDF_VERSION" ]]; then
+        [[ "$(git -C "$ESP_IDF_PATH" describe --tags --exact-match HEAD 2>/dev/null || true)" == "$ESP_IDF_VERSION" ]] && \
+        [[ -x "$HOME/.espressif/python_env/idf6.0_py${python_version}_env/bin/python" ]] && \
+        python3 "$ESP_IDF_PATH/tools/idf_tools.py" check &>/dev/null; then
         echo "✓ ESP-IDF $ESP_IDF_VERSION is installed at $ESP_IDF_PATH"
         return 0
     fi
@@ -244,6 +249,16 @@ setup_project() {
 
 # --- Main ---
 main() {
+    if [[ "${1:-}" == "--esp-idf-only" ]]; then
+        if ! check_python; then
+            install_python
+        fi
+        if ! check_esp_idf; then
+            install_esp_idf
+        fi
+        return
+    fi
+
     # Docker
     if ! check_docker; then
         install_docker || true

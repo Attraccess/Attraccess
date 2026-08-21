@@ -6,6 +6,7 @@
     "serve": "node --experimental-strip-types scripts/dev-serve.mts",
     "lint:strict": "nx affected -t lint -- --max-warnings=0",
     "prepare": "husky",
+    "postinstall": "./scripts/setup-dev-dependencies.sh --esp-idf-only",
     "precommit": "pnpm nx affected --uncommitted --nxBail --target=lint,typecheck,build,test,e2e",
     "precommit:all": "pnpm nx run-many -t lint,typecheck,build,test,e2e",
     "services": "node --experimental-strip-types scripts/services-compose.mts"

@@ -55,6 +55,7 @@ export async function bootstrap() {
   const bootstrapLogger = new Logger('Bootstrap');
   bootstrapLogger.log('Starting bootstrap process...');
   const skipDatabaseMigrations = process.env.SKIP_DATABASE_MIGRATIONS === 'true';
+  const skipDatabaseSettings = process.env.SKIP_DATABASE_SETTINGS === 'true';
 
   const initialLogLevels = (process.env.LOG_LEVELS || 'error,warn,log')
     .split(',')
@@ -106,7 +107,7 @@ export async function bootstrap() {
 
   const appConfig = appForConfig.get(ConfigService).get<AppConfigType>('app');
   const storageConfig = appForConfig.get(ConfigService).get<StorageConfigType>('storage');
-  const backendUrlFromDb = skipDatabaseMigrations
+  const backendUrlFromDb = skipDatabaseSettings
     ? appConfig.ATTRACCESS_URL
     : await appForConfig.get(SettingsService).getUrl();
   await appForConfig.close();
@@ -224,7 +225,7 @@ export async function bootstrap() {
 
   app.useWebSocketAdapter(new WsAdapter(app));
 
-  const appUrl = skipDatabaseMigrations ? appConfig.ATTRACCESS_URL : await app.get(SettingsService).getUrl();
+  const appUrl = skipDatabaseSettings ? appConfig.ATTRACCESS_URL : await app.get(SettingsService).getUrl();
 
   // Session middleware is used for SAML SSO state persistence only (not for regular auth).
   // OIDC state is handled by OidcCookieStateStore (a signed oidc-state cookie) instead.
