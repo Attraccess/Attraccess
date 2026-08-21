@@ -112,7 +112,9 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
     const seen = new Map<number, User>();
     for (const page of data?.pages ?? []) {
       for (const user of page.data) {
-        seen.set(user.id, user);
+        // The endpoint may return a permission-limited summary. This picker only
+        // reads the identity fields shared by summaries and full users.
+        seen.set(user.id, user as User);
       }
     }
     return [...seen.values()];
