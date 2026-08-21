@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Input,
   Label,
@@ -19,6 +19,9 @@ import { Button } from '../../../components/button';
 import { EmptyState } from '../../../components/emptyState';
 import { useToastMessage } from '../../../components/toastProvider';
 import { getBaseUrl } from '../../../api';
+import { PermissionPicker } from '../../../components/permissionPicker';
+import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
+import { useRbacServiceListPermissions } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
 
@@ -38,13 +41,19 @@ interface CreatedApiToken extends ApiToken {
 export function ApiTokensCard({ availablePermissions }: { availablePermissions: string[] }) {
   const { t } = useTranslations({ en, de });
   const { showToast } = useToastMessage();
+  const { permissionLabel, permissionDescription, permissionCategory } = useRbacCatalogTranslations();
+  const { data: allPermissions } = useRbacServiceListPermissions();
   const [apiTokens, setApiTokens] = useState<ApiToken[] | null>(null);
   const [name, setName] = useState('');
-  const [permissionKeys, setPermissionKeys] = useState(availablePermissions.join(', '));
+  const [permissionKeys, setPermissionKeys] = useState<Set<string>>(() => new Set(availablePermissions));
   const [expiresAt, setExpiresAt] = useState('');
   const [secret, setSecret] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [revokingId, setRevokingId] = useState<number | null>(null);
+  const availablePermissionDetails = useMemo(
+    () => (allPermissions ?? []).filter((permission) => availablePermissions.includes(permission.key)),
+    [allPermissions, availablePermissions],
+  );
 
   const loadTokens = async () => {
     const response = await fetch(`${getBaseUrl()}/api/users/me/api-tokens`, { credentials: 'include' });
@@ -68,10 +77,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
-          permissionKeys: permissionKeys
-            .split(',')
-            .map((permission) => permission.trim())
-            .filter(Boolean),
+          permissionKeys: [...permissionKeys],
           expiresAt: expiresAt ? new Date(`${expiresAt}T00:00:00`).toISOString() : undefined,
         }),
       });
@@ -80,6 +86,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
       setSecret(created.token);
       setApiTokens((tokens) => [created, ...(tokens ?? [])]);
       setName('');
+      setPermissionKeys(new Set(availablePermissions));
       setExpiresAt('');
       showToast({ title: t('success.created'), type: 'success' });
     } catch {
@@ -170,10 +177,23 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
         <Label>{t('nameLabel')}</Label>
         <Input placeholder={t('namePlaceholder')} />
       </TextField>
-      <TextField value={permissionKeys} onChange={setPermissionKeys} isDisabled={isCreating}>
+      <div>
         <Label>{t('permissionsLabel')}</Label>
-        <Input placeholder={t('permissionsPlaceholder')} />
-      </TextField>
+        <PermissionPicker
+          permissions={availablePermissionDetails}
+          selectedKeys={permissionKeys}
+          onChange={(keys) => setPermissionKeys(new Set([...keys].map(String)))}
+          label={t('permissionsLabel')}
+          placeholder={t('permissionsPlaceholder')}
+          searchPlaceholder={t('permissionsSearchPlaceholder')}
+          emptyMessage={t('permissionsEmpty')}
+          permissionLabel={permissionLabel}
+          permissionDescription={permissionDescription}
+          permissionCategory={permissionCategory}
+          dataCy="api-token-permission-picker"
+          isDisabled={isCreating}
+        />
+      </div>
       <TextField value={expiresAt} onChange={setExpiresAt} isDisabled={isCreating}>
         <Label>{t('expiryLabel')}</Label>
         <Input type="date" />
