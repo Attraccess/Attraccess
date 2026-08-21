@@ -24,7 +24,7 @@ import { isEmail } from 'class-validator';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { LicenseError, LicenseService } from '../../license/license.service';
 import { EmailService } from '../../email/email.service';
-import { DataSource, IsNull, QueryFailedError } from 'typeorm';
+import { DataSource, IsNull, Not, QueryFailedError } from 'typeorm';
 import { SSOUsernameChangeForbiddenException } from './errors/ssoUsernameChangeForbidden.exception';
 import { addDays } from 'date-fns';
 import { randomBytes } from 'crypto';
@@ -709,26 +709,38 @@ export class UsersService {
   }
 
   async confirmSelfDeletion(email: string, token: string): Promise<void> {
-    const user = await this.userRepository.findOne({
+    const expected = this.tokenHashService.hashToken(token);
+    let user = await this.userRepository.findOne({
       where: { email },
       withDeleted: true,
     });
+
+    // The email is anonymized on deletion and may be reused, so use the retained
+    // confirmation token when the email no longer identifies this confirmation.
+    if (!user || (user.deleteAccountToken !== expected && user.deleteAccountToken !== token)) {
+      user = await this.userRepository.findOne({
+        where: {
+          deleteAccountToken: In([expected, token]),
+          deletedAt: Not(IsNull()),
+        },
+        withDeleted: true,
+      });
+    }
 
     if (!user) {
       throw new DeleteAccountTokenInvalidException();
     }
 
-    if (user.deletedAt) {
-      throw new DeleteAccountTokenInvalidException();
-    }
-
-    const expected = this.tokenHashService.hashToken(token);
     if (user.deleteAccountToken !== expected && user.deleteAccountToken !== token) {
       throw new DeleteAccountTokenInvalidException();
     }
 
     if (!user.deleteAccountTokenExpiresAt || user.deleteAccountTokenExpiresAt < new Date()) {
       throw new DeleteAccountTokenExpiredException();
+    }
+
+    if (user.deletedAt) {
+      return;
     }
 
     await this.anonymizeAndSoftDelete(user.id);
@@ -781,9 +793,6 @@ export class UsersService {
         externalIdentifier: null,
         nfcKeySeedToken: null,
         lastUsernameChangeAt: null,
-        deleteAccountToken: null,
-        deleteAccountTokenExpiresAt: null,
-        deleteAccountRequestedAt: null,
       });
 
       await repo.softDelete(user.id);

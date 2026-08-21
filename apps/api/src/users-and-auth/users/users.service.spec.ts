@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuthenticationDetail, ResourceUsage, Session, User } from '@attraccess/database-entities';
-import { DataSource, Repository, UpdateResult } from 'typeorm';
+import { DataSource, EntityManager, Repository, UpdateResult } from 'typeorm';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { LicenseService } from '../../license/license.service';
@@ -28,6 +28,7 @@ const mockRbacService = {
 describe('UsersService', () => {
   let service: UsersService;
   let userRepository: jest.Mocked<Repository<User>>;
+  let dataSource: jest.Mocked<DataSource>;
   let emailService: { sendUsernameChangedEmail: jest.Mock };
 
   beforeEach(async () => {
@@ -112,6 +113,7 @@ describe('UsersService', () => {
 
     service = module.get<UsersService>(UsersService);
     userRepository = module.get(getRepositoryToken(User)) as jest.Mocked<Repository<User>>;
+    dataSource = module.get(DataSource) as jest.Mocked<DataSource>;
     emailService = module.get(EmailService) as unknown as { sendUsernameChangedEmail: jest.Mock };
   });
 
@@ -559,6 +561,85 @@ describe('UsersService', () => {
       mockRbacService.isLastAdministrator.mockResolvedValue(true);
 
       await expect(service.confirmSelfDeletion('admin@example.com', 'tok')).rejects.toThrow(ForbiddenException);
+    });
+
+    it('treats a repeated confirmation as success after the email has been reused', async () => {
+      const reusedEmailUser = {
+        id: 2,
+        deletedAt: null,
+        deleteAccountToken: 'hashed:different-token',
+        deleteAccountTokenExpiresAt: futureDate,
+      } as User;
+      const deletedUser = {
+        id: 1,
+        deletedAt: new Date(),
+        deleteAccountToken: 'hashed:tok',
+        deleteAccountTokenExpiresAt: futureDate,
+      } as User;
+      userRepository.findOne.mockResolvedValueOnce(reusedEmailUser).mockResolvedValueOnce(deletedUser);
+
+      await expect(service.confirmSelfDeletion('deleted@example.com', 'tok')).resolves.toBeUndefined();
+
+      expect(userRepository.findOne).toHaveBeenNthCalledWith(2, {
+        where: expect.objectContaining({
+          deleteAccountToken: expect.anything(),
+          deletedAt: expect.anything(),
+        }),
+        withDeleted: true,
+      });
+    });
+
+    it('rejects an expired confirmation token for a deleted account', async () => {
+      const deletedUser = {
+        id: 1,
+        deletedAt: new Date(),
+        deleteAccountToken: 'hashed:tok',
+        deleteAccountTokenExpiresAt: new Date(Date.now() - 1_000),
+      } as User;
+      userRepository.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(deletedUser);
+
+      await expect(service.confirmSelfDeletion('deleted@example.com', 'tok')).rejects.toThrow(
+        'DeleteAccountTokenExpiredException',
+      );
+    });
+
+    it('retains confirmation token evidence while anonymizing an account', async () => {
+      const user = {
+        id: 1,
+        locale: 'en',
+        deletedAt: null,
+        deleteAccountToken: 'hashed:tok',
+        deleteAccountTokenExpiresAt: futureDate,
+        deleteAccountRequestedAt: new Date(),
+      } as User;
+      const userRepo = {
+        findOne: jest.fn().mockResolvedValue(user),
+        update: jest.fn().mockResolvedValue({ affected: 1 }),
+        softDelete: jest.fn().mockResolvedValue({ affected: 1 }),
+      };
+      const usageRepo = { findOne: jest.fn().mockResolvedValue(null) };
+      const authRepo = { delete: jest.fn().mockResolvedValue({ affected: 1 }) };
+      const sessionRepo = { delete: jest.fn().mockResolvedValue({ affected: 1 }) };
+      const manager = {
+        getRepository: jest.fn((entity) => {
+          if (entity === User) return userRepo;
+          if (entity === ResourceUsage) return usageRepo;
+          if (entity === AuthenticationDetail) return authRepo;
+          return sessionRepo;
+        }),
+      } as unknown as EntityManager;
+      dataSource.transaction.mockImplementation(async (callback) => callback(manager));
+
+      await (service as unknown as { anonymizeAndSoftDelete(id: number): Promise<void> }).anonymizeAndSoftDelete(1);
+
+      expect(userRepo.update).toHaveBeenCalledWith(
+        1,
+        expect.not.objectContaining({
+          deleteAccountToken: expect.anything(),
+          deleteAccountTokenExpiresAt: expect.anything(),
+          deleteAccountRequestedAt: expect.anything(),
+        }),
+      );
     });
   });
 });
