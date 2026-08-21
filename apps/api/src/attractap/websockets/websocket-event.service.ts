@@ -40,36 +40,36 @@ export class WebSocketEventService {
   @OnEvent(ResourceSessionStartedEvent.EVENT_NAME)
   public async onResourceUsage(event: ResourceSessionStartedEvent) {
     this.logger.debug('Got resource usage started event');
-    this.attractapGateway.sendResourceListToReadersWithResource(event.usage.resource.id);
+    this.attractapGateway.sendResourceListToReadersWithResources([event.usage.resource.id]);
   }
 
   @OnEvent(ResourceUsageSessionTakenOverEvent.EVENT_NAME)
   public async onResourceUsageTakenOver(event: ResourceUsageSessionTakenOverEvent) {
     this.logger.debug('Got resource usage ended event');
-    this.attractapGateway.sendResourceListToReadersWithResource(event.resource.id);
+    this.attractapGateway.sendResourceListToReadersWithResources([event.resource.id]);
   }
 
   @OnEvent(ResourceChangedEvent.EVENT_NAME)
   @OnEvent(ResourceFlowChangedEvent.EVENT_NAME)
   public async onResourceChanged(event: ResourceChangedEvent) {
-    this.attractapGateway.sendResourceListToReadersWithResource(event.resourceId);
+    this.attractapGateway.sendResourceListToReadersWithResources([event.resourceId]);
   }
 
   @OnEvent(ResourceMaintenanceChangedEvent.EVENT_NAME)
   public async onResourceMaintenanceChanged(event: ResourceMaintenanceChangedEvent) {
     this.logger.debug({ resourceId: event.resourceId }, 'Got resource maintenance changed event');
-    this.attractapGateway.sendResourceListToReadersWithResource(event.resourceId);
+    this.attractapGateway.sendResourceListToReadersWithResources([event.resourceId]);
   }
 
   @OnEvent(ResourceHealthChangedEvent.EVENT_NAME)
   public async onResourceHealthChanged(event: ResourceHealthChangedEvent) {
     this.logger.debug({ resourceId: event.resourceId }, 'Got resource health changed event');
-    this.attractapGateway.sendResourceListToReadersWithResource(event.resourceId);
+    this.attractapGateway.sendResourceListToReadersWithResources([event.resourceId]);
   }
 
   @OnEvent(ResourceIntroducerChangedEvent.EVENT_NAME)
   public async onResourceIntroducerChanged(event: ResourceIntroducerChangedEvent) {
-    await this.attractapGateway.sendResourceListToReadersWithResource(event.resourceId);
+    await this.attractapGateway.sendResourceListToReadersWithResources([event.resourceId]);
   }
 
   @OnEvent(ResourceGroupIntroducerChangedEvent.EVENT_NAME)

@@ -105,8 +105,8 @@ describe('ResourceListService', () => {
     });
   });
 
-  describe('sendResourceListToReadersWithResource', () => {
-    it('iterates ALL sockets calling sendResourceListToSocket with the resourceId filter', async () => {
+  describe('sendResourceListToReadersWithResources', () => {
+    it('iterates all sockets calling sendResourceListToSocket with the resource IDs filter', async () => {
       const s1 = createMockSocket({ id: 's1', readerId: 42 });
       const s2 = createMockSocket({ id: 's2', readerId: 7 });
       websocketService.sockets.set('s1', s1);
@@ -114,19 +114,11 @@ describe('ResourceListService', () => {
 
       const spy = jest.spyOn(service, 'sendResourceListToSocket').mockResolvedValue(undefined);
 
-      await service.sendResourceListToReadersWithResource(10);
+      await service.sendResourceListToReadersWithResources([10]);
 
       expect(spy).toHaveBeenCalledTimes(2);
-      expect(spy).toHaveBeenCalledWith(s1, { resourceId: 10 });
-      expect(spy).toHaveBeenCalledWith(s2, { resourceId: 10 });
-    });
-
-    it('resolves without error when there are no sockets', async () => {
-      const spy = jest.spyOn(service, 'sendResourceListToSocket').mockResolvedValue(undefined);
-
-      await expect(service.sendResourceListToReadersWithResource(10)).resolves.toBeUndefined();
-
-      expect(spy).not.toHaveBeenCalled();
+      expect(spy).toHaveBeenCalledWith(s1, { resourceIds: [10] });
+      expect(spy).toHaveBeenCalledWith(s2, { resourceIds: [10] });
     });
 
     it('refreshes each socket once when any of several resources match', async () => {
@@ -162,21 +154,21 @@ describe('ResourceListService', () => {
       expect(socket.sendMessage).not.toHaveBeenCalled();
     });
 
-    it('returns without sending when onlyIfResourceMatches.resourceId is not among reader.resources', async () => {
+    it('returns without sending when onlyIfResourceMatches.resourceIds do not include a reader resource', async () => {
       attractapService.findReaderById.mockResolvedValue(createReaderFixture());
       const socket = createMockSocket();
 
-      await service.sendResourceListToSocket(socket, { resourceId: 999 });
+      await service.sendResourceListToSocket(socket, { resourceIds: [999] });
 
       expect(socket.sendMessage).not.toHaveBeenCalled();
       expect(resourceUsageService.getActiveSession).not.toHaveBeenCalled();
     });
 
-    it('sends the resource list when onlyIfResourceMatches.resourceId matches a reader resource', async () => {
+    it('sends the resource list when onlyIfResourceMatches.resourceIds include a reader resource', async () => {
       attractapService.findReaderById.mockResolvedValue(createReaderFixture());
       const socket = createMockSocket();
 
-      await service.sendResourceListToSocket(socket, { resourceId: 10 });
+      await service.sendResourceListToSocket(socket, { resourceIds: [10] });
 
       expect(socket.sendMessage).toHaveBeenCalledTimes(1);
     });

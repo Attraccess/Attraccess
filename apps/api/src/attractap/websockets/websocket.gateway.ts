@@ -529,10 +529,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     return this.resourceListService.sendResourceList(readerId);
   }
 
-  public async sendResourceListToReadersWithResource(resourceId: number) {
-    return this.resourceListService.sendResourceListToReadersWithResource(resourceId);
-  }
-
   public async sendResourceListToReadersWithResources(resourceIds: number[]) {
     return this.resourceListService.sendResourceListToReadersWithResources(resourceIds);
   }
