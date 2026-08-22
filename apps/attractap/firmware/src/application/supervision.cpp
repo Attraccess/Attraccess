@@ -299,6 +299,8 @@ void SupervisionFlow::processEvent(const Event &event) {
         requestedTimeoutMs = event.timeoutMs > 0 ? event.timeoutMs : TIMEOUT_MS;
         pendingWebStart = true;
         break;
+    case EventType::Count:
+        break;
     }
 }
 
