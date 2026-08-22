@@ -11,7 +11,7 @@ export class ApiTokenRequestRateLimitInterceptor implements NestInterceptor {
     private readonly authAuditLogger: AuthAuditLogger,
   ) {}
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+  async intercept(context: ExecutionContext, next: CallHandler): Promise<Observable<unknown>> {
     if (context.getType() !== 'http') return next.handle();
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
@@ -19,7 +19,7 @@ export class ApiTokenRequestRateLimitInterceptor implements NestInterceptor {
     if (user?.authenticationMethod !== 'api-token' || user.apiTokenId === undefined) return next.handle();
 
     try {
-      this.rateLimitService.assertWithinLimit(user.apiTokenId);
+      await this.rateLimitService.assertWithinLimit(user.apiTokenId);
     } catch (error) {
       this.authAuditLogger.log({
         type: 'api_token',
