@@ -98,6 +98,9 @@ private:
     // (PERFORMANCE_ANALYSIS.md A-3, measured on hardware).
     static const int TRANSITION_DURATION = 0;
     static const lv_scr_load_anim_t TRANSITION_ANIMATION = LV_SCR_LOAD_ANIM_NONE;
+
+    // The router owns the complete transition transaction. Starting another
+    // transition before this one advances cancels its completion callback.
     static uint32_t transitionStartTime;
     static bool transitionComplete;
     static std::function<void()> onTransitionComplete;
@@ -111,6 +114,8 @@ private:
     static std::vector<IScreen *> pendingDestroyScreens;
     static void increase_reboot(void *arg);
     static uint8_t reboot_count;
+
+    static void advanceScreenRouter();
 
     static void flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map);
     static void touchpad_read(lv_indev_t *indev_driver, lv_indev_data_t *data);
