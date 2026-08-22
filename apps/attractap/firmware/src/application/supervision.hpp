@@ -65,6 +65,8 @@ private:
     portMUX_TYPE overflowEventsMux = portMUX_INITIALIZER_UNLOCKED;
     Event overflowEvents[static_cast<uint8_t>(EventType::Count)] = {};
     bool hasOverflowEvent[static_cast<uint8_t>(EventType::Count)] = {};
+    uint32_t overflowEventSequence[static_cast<uint8_t>(EventType::Count)] = {};
+    uint32_t nextOverflowEventSequence = 0;
     Phase phase = Phase::Idle;
     bool webInitiated = false;
     bool pendingWebStart = false;
