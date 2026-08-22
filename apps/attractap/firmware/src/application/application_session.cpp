@@ -139,7 +139,10 @@ void Application::handleResourceDetailsButtonClick(
     }
 
     if (this->cardAuthenticationData.requiresSupervisor && !isTakeover) {
-      this->beginSupervision();
+      this->supervision.beginReaderInitiated(this->cardAuthenticationData.username,
+                                             this->selectedResourceId);
+      this->state = APPLICATION_STATE_SUPERVISION;
+      this->externalState = EXTERNAL_STATE_NONE;
       break;
     }
 
