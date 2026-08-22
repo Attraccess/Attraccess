@@ -958,7 +958,7 @@ describe('ResourceUsageService', () => {
       resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_ALLOWED));
       resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
       userRepository.findOne.mockResolvedValue(supervisor);
-      resourceIntroducersService.canMaintain.mockResolvedValue(true);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(true);
 
       const { finalizedSession, mockQueryBuilder } = mockSuccessfulSessionCreation(2);
 
@@ -974,20 +974,18 @@ describe('ResourceUsageService', () => {
       expect(payload).toMatchObject({ resourceId: 1, userId: 1, supervisorUserId: 2 });
     });
 
-    it('accepts a supervisor authorized via resources.update permission even without an introducer role', async () => {
+    it('rejects a resource manager who is not also an introducer', async () => {
       const dto: StartUsageSessionDto = {};
       const adminSupervisor = { id: 2, username: 'admin' } as User;
       resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_ALLOWED));
       resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
       userRepository.findOne.mockResolvedValue(adminSupervisor);
-      resourceIntroducersService.canMaintain.mockResolvedValue(false);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(false);
       mockRbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.update']));
 
-      mockSuccessfulSessionCreation(2);
-
-      await expect(service.startSession(1, requester, dto, { supervisorUserId: 2 })).resolves.toMatchObject({
-        supervisorUserId: 2,
-      });
+      await expect(service.startSession(1, requester, dto, { supervisorUserId: 2 })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
     });
 
     it('allows a supervised start on SUPERVISION_REQUIRED even for an introduced user', async () => {
@@ -995,7 +993,7 @@ describe('ResourceUsageService', () => {
       resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_REQUIRED));
       resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
       userRepository.findOne.mockResolvedValue(supervisor);
-      resourceIntroducersService.canMaintain.mockResolvedValue(true);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(true);
 
       mockSuccessfulSessionCreation(2);
 
@@ -1013,15 +1011,28 @@ describe('ResourceUsageService', () => {
       );
     });
 
-    it('rejects a supervisor that is neither introducer/maintainer nor resource manager', async () => {
+    it('rejects a maintainer who is not also an introducer', async () => {
       resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_ALLOWED));
       resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
       userRepository.findOne.mockResolvedValue(supervisor);
-      resourceIntroducersService.canMaintain.mockResolvedValue(false);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(false);
 
       await expect(service.startSession(1, requester, {}, { supervisorUserId: 2 })).rejects.toBeInstanceOf(
         ForbiddenException,
       );
+    });
+
+    it('accepts an applicable Resource Group introducer', async () => {
+      resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_ALLOWED));
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+      userRepository.findOne.mockResolvedValue(supervisor);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(true);
+      mockSuccessfulSessionCreation(2);
+
+      await expect(service.startSession(1, requester, {}, { supervisorUserId: 2 })).resolves.toMatchObject({
+        supervisorUserId: 2,
+      });
+      expect(resourceIntroducersService.isIntroducer).toHaveBeenCalledWith(1, 2, true, expect.anything());
     });
 
     it('rejects a supervised start when the resource does not allow supervision', async () => {

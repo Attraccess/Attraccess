@@ -9,7 +9,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { ResourceUsage, User } from '@attraccess/database-entities';
+import { ResourceIntroducerType, ResourceUsage, User } from '@attraccess/database-entities';
 import { ResourceUsageService } from '../usage/resourceUsage.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { StartUsageSessionDto } from '../usage/dtos/startUsageSession.dto';
@@ -17,7 +17,6 @@ import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto
 import { SupervisionRequestDto } from './dtos/supervisionRequest.dto';
 import { SupervisionDecisionResponseDto } from './dtos/supervisionDecision.response.dto';
 import { SupervisionLiveService } from './supervision-live.service';
-import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
 
 interface PendingSupervisionRequest {
@@ -100,7 +99,6 @@ export class SupervisionService {
     private readonly resourceUsageService: ResourceUsageService,
     private readonly resourceIntroducersService: ResourceIntroducersService,
     private readonly supervisionLive: SupervisionLiveService,
-    private readonly rbacService: RbacService,
   ) {}
 
   /** Registered by the Attractap module at startup; see {@link ReaderSupervisionArmer}. */
@@ -234,40 +232,18 @@ export class SupervisionService {
   }
 
   /**
-   * The users who may supervise on this resource: its introducers and maintainers (including
-   * group-level), minus the requester.
-   *
-   * When that leaves nobody, global resource managers stand in. They are valid supervisors —
-   * {@link ResourceUsageService.validateSupervisedStart} accepts anyone holding `resources.update`,
-   * and the docs define a supervisor as an introducer, maintainer *or* resource manager — but they
-   * are normally kept out of this list, because it drives the SSE broadcast and popping a request at
-   * every admin is not wanted. A resource with no introducers (the manager who set it up is usually
-   * the only candidate, and is often the requester) used to dead-end on the empty list instead
-   * (ATT-867), so for exactly that case the admins *are* the only people who can help, and this adds
-   * no traffic to any request that does have introducers.
-   *
-   * Being one list rather than a broadcast list plus a hidden fallback is what makes the rest work:
-   * managers get the SSE event and the terminal RESOLVED/EXPIRED/REJECTED, they can approve *and*
-   * reject through the normal path, and the reader can name them to the requester.
+   * The users who may supervise on this resource: its introducers (including group-level), minus
+   * the requester. An empty list means no supervision is possible.
    */
   public async getEligibleSupervisorIds(resourceId: number, requesterId: number): Promise<number[]> {
-    const introducers = await this.resourceIntroducersService.getMany(resourceId);
+    const introducers = await this.resourceIntroducersService.getMany(resourceId, ResourceIntroducerType.INTRODUCER);
     const ids = new Set<number>();
     for (const introducer of introducers) {
-      // `resource_introducer` rows outlive the account: anonymizeAndSoftDelete() drops auth details
-      // and sessions but no grants, so a departed maker stays the "sole introducer" forever. Left in,
-      // a tombstone would hold off the manager fallback below and get broadcast to nobody — the same
-      // dead-end this is meant to close. getMany() eager-loads `user` and TypeORM leaves it null for
-      // a soft-deleted one, so this costs no extra query.
       if (introducer.userId !== requesterId && introducer.user) {
         ids.add(introducer.userId);
       }
     }
-    if (ids.size > 0) {
-      return Array.from(ids);
-    }
-    const managerIds = await this.rbacService.getUserIdsWithPermission('resources.update');
-    return managerIds.filter((id) => id !== requesterId);
+    return Array.from(ids);
   }
 
   /**
@@ -412,7 +388,7 @@ export class SupervisionService {
    * supervisor attached, then resolves the waiting requester.
    */
   public async approve(requestId: string, supervisor: User): Promise<ResourceUsage> {
-    const request = this.getPendingForSupervisorOrThrow(requestId, supervisor, { allowAnyAuthorized: true });
+    const request = this.getPendingForSupervisorOrThrow(requestId, supervisor);
     await this.assertMayApprove(request, supervisor);
 
     // assertMayApprove can hit the DB, which is long enough for the 30s timer to fire underneath us.
@@ -475,18 +451,14 @@ export class SupervisionService {
   private getPendingForSupervisorOrThrow(
     requestId: string,
     supervisor: User,
-    opts: { allowAnyAuthorized?: boolean } = {},
   ): PendingSupervisionRequest {
     const request = this.pending.get(requestId);
     if (!request) {
       throw new NotFoundException('Supervision request not found or already expired');
     }
-    // Web flow: a single named supervisor. Broadcast flow (supervisorUserId === null): any of the
-    // supervisors the request was broadcast to — or, when the caller will run assertMayApprove,
-    // anyone that check accepts.
     const allowed =
       request.supervisorUserId === null
-        ? opts.allowAnyAuthorized || request.eligibleSupervisorIds.includes(supervisor.id)
+        ? request.eligibleSupervisorIds.includes(supervisor.id)
         : request.supervisorUserId === supervisor.id;
     if (!allowed) {
       throw new ForbiddenException('You are not the requested supervisor for this session');
@@ -495,23 +467,14 @@ export class SupervisionService {
   }
 
   /**
-   * Second gate for broadcast requests, kept deliberately identical to the one the reader applies
-   * to a presented card (`validateSupervisedStart`).
-   *
-   * `eligibleSupervisorIds` is introducers/maintainers only, so a global `resources.update` holder
-   * is missing from it — yet the reader accepts their card, hands out key material and beeps
-   * success. Without this fallback their approval would then be refused, stranding both the reader
-   * and the requester.
+   * Broadcast requests can only be approved by an introducer that received the request. Named
+   * requests are revalidated by startSession immediately before the session is created.
    */
   private async assertMayApprove(request: PendingSupervisionRequest, supervisor: User): Promise<void> {
     if (request.supervisorUserId !== null || request.eligibleSupervisorIds.includes(supervisor.id)) {
       return;
     }
-    try {
-      await this.resourceUsageService.validateSupervisedStart(request.resourceId, request.requester, supervisor.id);
-    } catch {
-      throw new ForbiddenException('You are not authorized to supervise this session');
-    }
+    throw new ForbiddenException('You are not authorized to supervise this session');
   }
 
   private expire(requestId: string): void {

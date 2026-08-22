@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SupervisedStartModal } from './index';
 
-const { requestMutate, ApiErrorMock } = vi.hoisted(() => {
+const { requestMutate, ApiErrorMock, candidates } = vi.hoisted(() => {
   class ApiErrorMock extends Error {
     status: number;
     constructor(status: number) {
@@ -12,7 +12,17 @@ const { requestMutate, ApiErrorMock } = vi.hoisted(() => {
       this.status = status;
     }
   }
-  return { requestMutate: vi.fn(), ApiErrorMock };
+  return {
+    requestMutate: vi.fn(),
+    ApiErrorMock,
+    candidates: {
+      value: [
+        { id: 10, userId: 2, type: 'introducer', user: { id: 2, username: 'alice' } },
+        { id: 11, userId: 1, type: 'introducer', user: { id: 1, username: 'me' } },
+        { id: 12, userId: 3, type: 'maintainer', user: { id: 3, username: 'marcel' } },
+      ],
+    },
+  };
 });
 
 vi.mock('../../../../../hooks/useAuth', () => ({
@@ -29,10 +39,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   ResourceIntroducerType: { INTRODUCER: 'introducer', MAINTAINER: 'maintainer' },
   useAccessControlServiceResourceIntroducersGetMany: () => ({
     isLoading: false,
-    data: [
-      { id: 10, userId: 2, type: 'introducer', user: { id: 2, username: 'alice' } },
-      { id: 11, userId: 1, type: 'introducer', user: { id: 1, username: 'me' } },
-    ],
+    data: candidates.value,
   }),
   useResourcesServiceResourceUsageRequestSupervisedSession: () => ({ mutate: requestMutate }),
   useAttractapServiceGetReaders: () => ({
@@ -62,6 +69,11 @@ const getLastCallbacks = () => requestMutate.mock.calls[requestMutate.mock.calls
 describe('SupervisedStartModal', () => {
   beforeEach(() => {
     requestMutate.mockClear();
+    candidates.value = [
+      { id: 10, userId: 2, type: 'introducer', user: { id: 2, username: 'alice' } },
+      { id: 11, userId: 1, type: 'introducer', user: { id: 1, username: 'me' } },
+      { id: 12, userId: 3, type: 'maintainer', user: { id: 3, username: 'marcel' } },
+    ];
   });
 
   function renderModal(onApproved = vi.fn()) {
@@ -81,6 +93,25 @@ describe('SupervisedStartModal', () => {
     expect(screen.getByText('alice')).toBeInTheDocument();
     // The requester (id 1) must not be offered as a supervisor.
     expect(screen.queryByText('me')).not.toBeInTheDocument();
+    expect(screen.queryByText('marcel')).not.toBeInTheDocument();
+  });
+
+  it('does not offer a reader when no introducer is available', () => {
+    candidates.value = [{ id: 12, userId: 3, type: 'maintainer', user: { id: 3, username: 'marcel' } }];
+
+    renderModal();
+
+    expect(screen.getByText('select.empty')).toBeInTheDocument();
+    expect(screen.queryByText('Workshop reader')).not.toBeInTheDocument();
+  });
+
+  it('does not offer a deleted introducer or a reader', () => {
+    candidates.value = [{ id: 10, userId: 2, type: 'introducer', user: null }];
+
+    renderModal();
+
+    expect(screen.getByText('select.empty')).toBeInTheDocument();
+    expect(screen.queryByText('Workshop reader')).not.toBeInTheDocument();
   });
 
   it('requests supervision for the selected supervisor and waits', async () => {

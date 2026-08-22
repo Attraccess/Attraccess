@@ -63,22 +63,22 @@ export function SupervisedStartModal({
   const [secondsLeft, setSecondsLeft] = useState(APPROVAL_TIMEOUT_SECONDS);
   const [waitingAtReader, setWaitingAtReader] = useState<string | null>(null);
 
-  // Authorized supervisors are the resource's introducers and maintainers,
-  // excluding the requester themselves (self-supervision is rejected by the backend).
+  // Only introducers may supervise, excluding the requester themselves.
   const { data: candidates, isLoading: isLoadingCandidates } = useAccessControlServiceResourceIntroducersGetMany({
     resourceId,
   });
 
   const supervisors = useMemo(
-    () => (candidates ?? []).filter((candidate) => candidate.userId !== user?.id),
+    () =>
+      (candidates ?? []).filter(
+        (candidate) =>
+          candidate.type === ResourceIntroducerType.INTRODUCER && candidate.userId !== user?.id && candidate.user,
+      ),
     [candidates, user?.id],
   );
 
   const { data: allReaders } = useAttractapServiceGetReaders();
 
-  // Supervision is drawn entirely on the reader's screen, so display-less readers cannot run it.
-  // The resource's own readers come first; the rest are one disclosure away for the case where the
-  // supervisor happens to be standing at a different one.
   const { resourceReaders, otherReaders } = useMemo(() => {
     const capable = (allReaders ?? []).filter((reader) => reader.firmware?.capabilities?.cardEnrollment);
     return {
@@ -215,11 +215,7 @@ export function SupervisedStartModal({
               >
                 <AttraccessUser
                   user={supervisor.user}
-                  description={
-                    supervisor.type === ResourceIntroducerType.INTRODUCER
-                      ? t('select.role.introducer')
-                      : t('select.role.maintainer')
-                  }
+                  description={t('select.role.introducer')}
                 />
               </Button>
             ))}

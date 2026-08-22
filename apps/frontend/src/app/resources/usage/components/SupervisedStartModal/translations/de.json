@@ -1,20 +1,19 @@
 {
   "title": "Aufsicht erforderlich",
   "select": {
-    "description": "Diese Sitzung braucht eine Aufsicht. Frage jemanden um Freigabe oder lasse die Person sich mit ihrer Karte an einem Leser authentifizieren.",
+    "description": "Diese Sitzung braucht Beaufsichtigung. Bitte einen Einweiser um Freigabe oder lasse ihn seine Karte an einem Leser authentifizieren.",
     "empty": "Derzeit sind keine berechtigten Aufsichtspersonen verfügbar.",
-    "people": "Aufsichtsperson fragen",
+    "people": "Einweiser fragen",
     "readers": "An einem Leser authentifizieren",
     "otherReaders": "Weitere Leser",
-    "readerHint": "Jede berechtigte Aufsichtsperson kann per Kartenauflage freigeben.",
+    "readerHint": "Ein Einweiser kann per Kartenauflage freigeben.",
     "role": {
-      "introducer": "Einweiser",
-      "maintainer": "Betreuer"
+      "introducer": "Einweiser"
     }
   },
   "waiting": {
     "description": "Warte auf die Freigabe durch die Aufsichtsperson…",
-    "atReader": "Eine Aufsichtsperson muss ihre Karte an {{reader}} auflegen.",
+    "atReader": "Ein Einweiser muss seine Karte an {{reader}} auflegen.",
     "countdown": "{{seconds}}s"
   },
   "timeout": {
@@ -24,7 +23,7 @@
     "description": "Deine Anfrage wurde abgelehnt. Bitte versuche es erneut oder wähle eine andere Aufsichtsperson."
   },
   "error": {
-    "description": "Die Anfrage konnte nicht gesendet werden. Der Leser ist möglicherweise offline oder belegt."
+    "description": "Die Anfrage konnte nicht gesendet werden. Bitte versuche es erneut."
   },
   "retry": "Erneut versuchen",
   "cancel": "Abbrechen"
