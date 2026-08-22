@@ -48,6 +48,9 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
         const authenticatedUser = tokenPrincipal.user as AuthenticatedUser;
         // Tokens must reflect owner permission removals immediately, including after a role change on another replica.
         const ownerPermissions = await this.rbacService.getEffectivePermissions(tokenPrincipal.user.id, true);
+        if (!ownerPermissions.has('users.api-tokens.manage')) {
+          throw new UnauthorizedException('API token permission revoked');
+        }
         authenticatedUser.effectivePermissions = new SerializablePermissionSet(
           tokenPrincipal.apiToken.permissionKeys.filter((permission) => ownerPermissions.has(permission)),
         );

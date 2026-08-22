@@ -68,7 +68,6 @@ describe('SessionStrategy', () => {
       required: false,
       policy: TwoFactorPolicy.OPTIONAL,
     });
-
   });
 
   describe('validate', () => {
@@ -82,7 +81,7 @@ describe('SessionStrategy', () => {
         user: mockUser,
         apiToken: { id: 4, permissionKeys: ['resources.read', 'resources.write'] },
       } as never);
-      rbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.read']));
+      rbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.read', 'users.api-tokens.manage']));
 
       const result = (await strategy.validate(mockRequest)) as AuthenticatedUser;
 
@@ -91,6 +90,24 @@ describe('SessionStrategy', () => {
       expect(result.apiTokenId).toBe(4);
       expect(rbacService.getEffectivePermissions).toHaveBeenCalledWith(mockUser.id, true);
       expect(twoFactorService.getStatus).not.toHaveBeenCalled();
+    });
+
+    it('rejects API tokens when the owner loses API token management permission', async () => {
+      const mockRequest = {
+        headers: { authorization: 'Bearer api-token' },
+        cookies: {},
+        path: '/api/resources',
+      } as Request;
+      apiTokenService.authenticate.mockResolvedValue({
+        user: mockUser,
+        apiToken: { id: 4, permissionKeys: ['resources.read'] },
+      } as never);
+      rbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.read']));
+
+      await expect(strategy.validate(mockRequest)).rejects.toThrow(
+        new UnauthorizedException('API token permission revoked'),
+      );
+      expect(rbacService.getEffectivePermissions).toHaveBeenCalledWith(mockUser.id, true);
     });
 
     it('should validate user with valid session token from Authorization header', async () => {
@@ -153,7 +170,7 @@ describe('SessionStrategy', () => {
       } as Request;
 
       await expect(strategy.validate(mockRequest)).rejects.toThrow(
-        new UnauthorizedException('No session token provided')
+        new UnauthorizedException('No session token provided'),
       );
 
       expect(sessionService.validateSession).not.toHaveBeenCalled();
@@ -171,7 +188,7 @@ describe('SessionStrategy', () => {
       sessionService.validateSession.mockResolvedValue(null);
 
       await expect(strategy.validate(mockRequest)).rejects.toThrow(
-        new UnauthorizedException('Invalid or expired session')
+        new UnauthorizedException('Invalid or expired session'),
       );
 
       expect(sessionService.validateSession).toHaveBeenCalledWith('invalid-token');
@@ -186,7 +203,7 @@ describe('SessionStrategy', () => {
       } as Request;
 
       await expect(strategy.validate(mockRequest)).rejects.toThrow(
-        new UnauthorizedException('No session token provided')
+        new UnauthorizedException('No session token provided'),
       );
 
       expect(sessionService.validateSession).not.toHaveBeenCalled();
@@ -201,7 +218,7 @@ describe('SessionStrategy', () => {
       } as Request;
 
       await expect(strategy.validate(mockRequest)).rejects.toThrow(
-        new UnauthorizedException('No session token provided')
+        new UnauthorizedException('No session token provided'),
       );
 
       expect(sessionService.validateSession).not.toHaveBeenCalled();
@@ -239,9 +256,7 @@ describe('SessionStrategy', () => {
         policy: TwoFactorPolicy.REQUIRED_FOR_ALL,
       });
 
-      await expect(strategy.validate(mockRequest)).rejects.toThrow(
-        new ForbiddenException('TwoFactorSetupRequired')
-      );
+      await expect(strategy.validate(mockRequest)).rejects.toThrow(new ForbiddenException('TwoFactorSetupRequired'));
     });
   });
 });
