@@ -12,16 +12,18 @@ void SupervisionFlow::reset() {
     phase = Phase::Idle;
     webInitiated = false;
     pendingWebStart = false;
-    cardDetected = keyReady = resolvedByWeb = failed = cardRejected = cancelRequested = false;
-    terminalError = hintReady = false;
+    cardDetected = keyReady = cardRejected = false;
+    terminalEvent = TerminalEvent::None;
+    errorIsTerminal = hintReady = false;
     cardUidLength = 0;
     errorMessage[0] = hintMessage[0] = requesterName[0] = armedRequesterName[0] = '\0';
 }
 
 void SupervisionFlow::enter(const char *requester, const char *hint, uint32_t now) {
     phase = Phase::WaitingForCard;
-    cardDetected = keyReady = resolvedByWeb = failed = cardRejected = cancelRequested = false;
-    terminalError = hintReady = false;
+    cardDetected = keyReady = cardRejected = false;
+    terminalEvent = TerminalEvent::None;
+    errorIsTerminal = hintReady = false;
     errorMessage[0] = '\0';
     startedAtMs = phaseChangedAtMs = now;
     strlcpy(requesterName, requester, sizeof(requesterName));
@@ -87,15 +89,23 @@ void SupervisionFlow::onCardDetected(const uint8_t *uid, uint8_t uidLength) {
     cardDetected = true;
 }
 
-void SupervisionFlow::requestCancel() { cancelRequested = true; }
+void SupervisionFlow::publishTerminalEvent(TerminalEvent event) {
+    // Terminal outcomes are mutually exclusive. A local cancellation wins over
+    // a concurrent websocket event because it represents an explicit user action.
+    if (event == TerminalEvent::Cancelled || terminalEvent == TerminalEvent::None) {
+        terminalEvent = event;
+    }
+}
+
+void SupervisionFlow::requestCancel() { publishTerminalEvent(TerminalEvent::Cancelled); }
 
 void SupervisionFlow::onRequestResult(const API::SupervisionRequestResult &result) {
-    if (phase != Phase::WaitingForCard || webInitiated) return;
+    if (phase == Phase::Idle || phase == Phase::Success || webInitiated) return;
     if (!result.success) {
         strlcpy(errorMessage, result.error == "NO_SUPERVISORS_AVAILABLE"
                                     ? "Keine Aufsicht verfuegbar"
                                     : translateReaderError(result.error).c_str(), sizeof(errorMessage));
-        failed = true;
+        publishTerminalEvent(TerminalEvent::Failed);
         return;
     }
     std::string hint = "Aufsichts-Karte auflegen oder per\nApp/Web bestaetigen";
@@ -125,10 +135,13 @@ void SupervisionFlow::onCardAuthentication(const API::SupervisorCardAuthenticati
 }
 
 void SupervisionFlow::onResolved(const API::SupervisionResolvedResult &result) {
-    if (phase == Phase::Idle) return;
-    if (result.success) { resolvedByWeb = true; return; }
+    if (phase == Phase::Idle || phase == Phase::Success) return;
+    if (result.success) {
+        publishTerminalEvent(TerminalEvent::Resolved);
+        return;
+    }
     strlcpy(errorMessage, result.error.length() > 0 ? translateReaderError(result.error).c_str() : "Aufsicht abgelehnt", sizeof(errorMessage));
-    failed = true;
+    publishTerminalEvent(TerminalEvent::Failed);
 }
 
 void SupervisionFlow::showError(bool terminal, uint32_t now) {
@@ -136,24 +149,31 @@ void SupervisionFlow::showError(bool terminal, uint32_t now) {
     screen.setStatus(SupervisionScreen::STATUS_ERROR);
     screen.setStatusMessage(errorMessage);
     phase = Phase::Error;
-    terminalError = terminal;
+    errorIsTerminal = terminal;
     phaseChangedAtMs = now;
 }
 
 SupervisionFlow::Outcome SupervisionFlow::tick(uint32_t now) {
-    if (cancelRequested) {
+    TerminalEvent event = terminalEvent;
+    if (event == TerminalEvent::Cancelled) {
+        terminalEvent = TerminalEvent::None;
         logger.debug("Supervision cancelled by user");
         api.cancelSupervision(); reset(); return Outcome::ReturnToRouting;
     }
     if (hintReady) { hintReady = false; screen.setSupervisorHint(hintMessage); }
-    if (resolvedByWeb && phase != Phase::Success) {
+    if (event == TerminalEvent::Resolved) {
         // The server resolution settles the transaction. Discard card-path
         // events that raced it so a subsequent tick cannot replace success.
-        resolvedByWeb = false; failed = cardRejected = keyReady = cardDetected = false;
+        terminalEvent = TerminalEvent::None;
+        cardRejected = keyReady = cardDetected = false;
         beeper.successBeep(); nfc.disableCardDetection();
         screen.setStatus(SupervisionScreen::STATUS_SUCCESS); phase = Phase::Success; phaseChangedAtMs = now; return Outcome::None;
     }
-    if (failed) { failed = false; showError(true, now); return Outcome::None; }
+    if (event == TerminalEvent::Failed) {
+        terminalEvent = TerminalEvent::None;
+        showError(true, now);
+        return Outcome::None;
+    }
     if (cardRejected) { cardRejected = false; showError(false, now); return Outcome::None; }
     if (phase != Phase::Success && now - startedAtMs > TIMEOUT_MS) {
         logger.error("Supervision timeout reached"); api.cancelSupervision(); reset(); return Outcome::ReturnToRouting;
@@ -177,7 +197,7 @@ SupervisionFlow::Outcome SupervisionFlow::tick(uint32_t now) {
         break;
     case Phase::Error:
         if (now - phaseChangedAtMs > ERROR_DWELL_MS) {
-            if (terminalError) { reset(); return Outcome::ReturnToRouting; }
+            if (errorIsTerminal) { reset(); return Outcome::ReturnToRouting; }
             screen.setStatus(SupervisionScreen::STATUS_WAITING); phase = Phase::WaitingForCard; cardDetected = false; nfc.resetCardPresence(); nfc.enableCardDetection();
         }
         break;
