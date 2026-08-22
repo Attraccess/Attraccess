@@ -50,6 +50,10 @@ void SupervisionFlow::enter(const char *requester, const char *hint, uint32_t no
 }
 
 void SupervisionFlow::beginReaderInitiated(const std::string &requester, uint32_t id) {
+    // A web arm is for a separate transaction. Drop arms and callbacks that
+    // arrived before this reader-owned transaction can become active.
+    clearPendingWebStart();
+    if (eventQueue != nullptr) xQueueReset(eventQueue);
     resetActiveTransaction();
     resourceId = id;
     enter(requester.c_str(), "Aufsichts-Karte auflegen oder per\nApp/Web bestaetigen", millis());
@@ -152,9 +156,14 @@ void SupervisionFlow::onResolved(const API::SupervisionResolvedResult &result) {
 }
 
 void SupervisionFlow::enqueueEvent(const Event &event) {
-    if (eventQueue == nullptr || xQueueSend(eventQueue, &event, 0) != pdPASS) {
-        logger.error("Dropping supervision event: queue full or unavailable");
+    if (eventQueue == nullptr) {
+        logger.error("Unable to queue supervision event: queue unavailable");
+        return;
     }
+
+    // Every callback carries transaction state. Waiting for the main loop to
+    // drain the queue prevents terminal outcomes from being silently lost.
+    xQueueSend(eventQueue, &event, portMAX_DELAY);
 }
 
 void SupervisionFlow::processEvents(bool stopWhenWebStart) {
