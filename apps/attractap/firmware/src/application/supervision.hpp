@@ -34,6 +34,7 @@ public:
 
 private:
     enum class Phase { Idle, WaitingForCard, RequestedAuth, Starting, Success, Error };
+    enum class TerminalEvent { None, Cancelled, Resolved, Failed };
 
     API &api;
     NFC &nfc;
@@ -45,11 +46,9 @@ private:
     volatile bool pendingWebStart = false;
     volatile bool cardDetected = false;
     volatile bool keyReady = false;
-    volatile bool resolvedByWeb = false;
-    volatile bool failed = false;
     volatile bool cardRejected = false;
-    volatile bool cancelRequested = false;
-    bool terminalError = false;
+    volatile TerminalEvent terminalEvent = TerminalEvent::None;
+    bool errorIsTerminal = false;
     volatile bool hintReady = false;
     uint8_t cardUid[7] = {0};
     uint8_t cardUidLength = 0;
@@ -72,6 +71,7 @@ private:
 
     void enter(const char *requester, const char *hint, uint32_t now);
     void reset();
+    void publishTerminalEvent(TerminalEvent event);
     void showError(bool terminal, uint32_t now);
 };
 #endif
