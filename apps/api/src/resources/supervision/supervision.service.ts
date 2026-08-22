@@ -25,8 +25,8 @@ interface PendingSupervisionRequest {
   requester: User;
   /**
    * The single supervisor whose approval is required (web flow, ATT-487), or `null` for a
-   * reader-originated request (ATT-493) that any eligible supervisor in `eligibleSupervisorIds`
-   * may approve — by tapping their card at the reader or approving the web popup.
+   * reader-originated request (ATT-493) that any currently authorized introducer may approve — by
+   * tapping their card at the reader or approving the web popup.
    */
   supervisorUserId: number | null;
   /** Supervisors the request was broadcast to (reader flow); used to fan out resolution/expiry events. */
@@ -248,9 +248,10 @@ export class SupervisionService {
 
   /**
    * Creates a reader-originated supervision request (ATT-493). The non-introduced requester has
-   * already tapped at the reader; this fans the request out to every eligible supervisor via SSE so
-   * any of them can approve from their phone/PC, while the reader simultaneously waits for one of
-   * them to tap their card. The first channel to resolve wins; the other is cancelled.
+   * already tapped at the reader; this fans the request out to every eligible supervisor via SSE.
+   * Any currently authorized introducer can approve from their phone/PC, while the reader
+   * simultaneously waits for one to tap their card. The first channel to resolve wins; the other
+   * is cancelled.
    *
    * Unlike {@link requestSupervisedSession} there is no blocking HTTP caller — resolution is
    * surfaced through `callbacks` (which notify the reader websocket).
@@ -388,7 +389,7 @@ export class SupervisionService {
    * supervisor attached, then resolves the waiting requester.
    */
   public async approve(requestId: string, supervisor: User): Promise<ResourceUsage> {
-    const request = this.getPendingForSupervisorOrThrow(requestId, supervisor);
+    const request = this.getPendingForSupervisorOrThrow(requestId, supervisor, { allowAnyAuthorized: true });
     await this.assertMayApprove(request, supervisor);
 
     // assertMayApprove can hit the DB, which is long enough for the 30s timer to fire underneath us.
@@ -451,6 +452,7 @@ export class SupervisionService {
   private getPendingForSupervisorOrThrow(
     requestId: string,
     supervisor: User,
+    opts: { allowAnyAuthorized?: boolean } = {},
   ): PendingSupervisionRequest {
     const request = this.pending.get(requestId);
     if (!request) {
@@ -458,7 +460,7 @@ export class SupervisionService {
     }
     const allowed =
       request.supervisorUserId === null
-        ? request.eligibleSupervisorIds.includes(supervisor.id)
+        ? opts.allowAnyAuthorized || request.eligibleSupervisorIds.includes(supervisor.id)
         : request.supervisorUserId === supervisor.id;
     if (!allowed) {
       throw new ForbiddenException('You are not the requested supervisor for this session');
@@ -467,14 +469,19 @@ export class SupervisionService {
   }
 
   /**
-   * Broadcast requests can only be approved by an introducer that received the request. Named
-   * requests are revalidated by startSession immediately before the session is created.
+   * Broadcast requests are revalidated against the current introducer grants. This admits an
+   * introducer granted access after the request was broadcast, without admitting maintainers or
+   * resource managers. Named requests are revalidated by startSession immediately before creation.
    */
   private async assertMayApprove(request: PendingSupervisionRequest, supervisor: User): Promise<void> {
-    if (request.supervisorUserId !== null || request.eligibleSupervisorIds.includes(supervisor.id)) {
+    if (request.supervisorUserId !== null) {
       return;
     }
-    throw new ForbiddenException('You are not authorized to supervise this session');
+    try {
+      await this.resourceUsageService.validateSupervisedStart(request.resourceId, request.requester, supervisor.id);
+    } catch {
+      throw new ForbiddenException('You are not authorized to supervise this session');
+    }
   }
 
   private expire(requestId: string): void {

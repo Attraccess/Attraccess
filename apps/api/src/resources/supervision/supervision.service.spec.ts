@@ -213,12 +213,25 @@ describe('SupervisionService', () => {
       expect(service.listPendingForSupervisor(2)).toHaveLength(0);
     });
 
-    it('rejects approval from a supervisor who did not receive the request', async () => {
+    it('rejects approval from a non-introducer who did not receive the request', async () => {
       const { requestId } = createReaderRequest();
       const stranger = { id: 9, username: 'stranger' } as User;
+      resourceUsageService.validateSupervisedStart.mockRejectedValueOnce(new ForbiddenException('not an introducer'));
 
       await expect(service.approve(requestId, stranger)).rejects.toBeInstanceOf(ForbiddenException);
       expect(resourceUsageService.startSession).not.toHaveBeenCalled();
+    });
+
+    it('allows an introducer granted after the request was broadcast to approve', async () => {
+      const { requestId, onResolved } = createReaderRequest();
+      const newlyGrantedIntroducer = { id: 9, username: 'new-introducer' } as User;
+
+      const session = await service.approve(requestId, newlyGrantedIntroducer);
+
+      expect(resourceUsageService.validateSupervisedStart).toHaveBeenCalledWith(5, requester, 9);
+      expect(resourceUsageService.startSession).toHaveBeenCalledWith(5, requester, {}, { supervisorUserId: 9 });
+      expect(session).toBe(startedSession);
+      expect(onResolved).toHaveBeenCalledWith(startedSession, { id: 9, username: 'new-introducer' });
     });
 
     it('settleByCard closes the web popups without starting a session again', () => {
@@ -437,9 +450,10 @@ describe('SupervisionService', () => {
       await expect(requestAtReader()).resolves.toBeDefined();
     });
 
-    it('rejects a resource manager who did not receive the request', async () => {
+    it('rejects a resource manager who is not an introducer', async () => {
       const { requestId } = await requestAtReader();
       const globalManager = { id: 99, username: 'admin' } as User;
+      resourceUsageService.validateSupervisedStart.mockRejectedValueOnce(new ForbiddenException('not an introducer'));
 
       await expect(service.approve(requestId, globalManager)).rejects.toBeInstanceOf(ForbiddenException);
       expect(resourceUsageService.startSession).not.toHaveBeenCalled();
