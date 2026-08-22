@@ -1427,15 +1427,21 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
 #endif
       // Only the first AES block is the IV; encrypting sizeof(iv)=32 bytes
       // would overflow ive[16] and smash the stack (crashed changeKey on IDF).
-      Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
-                                      sizeof(ive), iv, ive);
+      if (!Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
+                                           sizeof(ive), iv, ive))
+      {
+        return 0;
+      }
       // encrypt cmd_data using SesAuthENCKey
       // padded_payload_length
       // uint8_t payload_encrypted[32];
       uint8_t payload_encrypted[52];
-      Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc, ive,
-                                      padded_payload_length, payload_padded,
-                                      payload_encrypted);
+      if (!Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc, ive,
+                                           padded_payload_length, payload_padded,
+                                           payload_encrypted))
+      {
+        return 0;
+      }
       memcpy(apdu + offset, payload_encrypted, padded_payload_length);
 #ifdef NTAG424DEBUG
       Serial.println("APDU Payload:");
@@ -1592,15 +1598,26 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     // Serial.println("IV-init:");
     // Adafruit_PN532::PrintHex(iv, 16);
     // Same overflow as the command-IV path: only one block fits in ivde[16].
-    Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
-                                    sizeof(ivde), ivd, ivde);
+    if (!Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
+                                         sizeof(ivde), ivd, ivde))
+    {
+      return 0;
+    }
     uint8_t *respplain = (uint8_t *)malloc(response_length - 10);
+    if (respplain == nullptr)
+    {
+      return 0;
+    }
 #ifdef NTAG424DEBUG
     PN532DEBUGPRINT.println(F("Encrypted Response(pcd < picc)"));
     Adafruit_PN532::PrintHex(response, response_length - 10);
 #endif
-    Adafruit_PN532::ntag424_decrypt(ntag424_Session.session_key_enc, ivde,
-                                    response_length - 10, response, respplain);
+    if (!Adafruit_PN532::ntag424_decrypt(ntag424_Session.session_key_enc, ivde,
+                                         response_length - 10, response, respplain))
+    {
+      free(respplain);
+      return 0;
+    }
 #ifdef NTAG424DEBUG
     PN532DEBUGPRINT.println(F("Decrypted Response(pcd < picc)"));
     Adafruit_PN532::PrintHex(respplain, response_length - 10);
@@ -2347,8 +2364,8 @@ uint8_t Adafruit_PN532::ntag424_AuthenticateEV2First(uint8_t *key,
   {
 #ifdef NTAG424DEBUG
     PN532DEBUGPRINT.println(F("Decryption error"));
-    return 0;
 #endif
+    return 0;
   }
   memset(RndBRotl, 0, sizeof(RndBRotl));
   ntag424_rotl(RndB, RndBRotl, blocklength, 1);
@@ -2367,7 +2384,10 @@ uint8_t Adafruit_PN532::ntag424_AuthenticateEV2First(uint8_t *key,
 #endif
   memcpy(&answer, RndA, blocklength);
   memcpy(&answer[blocklength], RndBRotl, blocklength);
-  Adafruit_PN532::ntag424_encrypt(key, sizeof(answer), answer, answer_enc);
+  if (!Adafruit_PN532::ntag424_encrypt(key, sizeof(answer), answer, answer_enc))
+  {
+    return 0;
+  }
 #ifdef NTAG424DEBUG
   PN532DEBUGPRINT.println(F("answer: "));
   Adafruit_PN532::PrintHexChar(answer, blocklength * 2);
@@ -2424,6 +2444,7 @@ uint8_t Adafruit_PN532::ntag424_AuthenticateEV2First(uint8_t *key,
 #ifdef NTAG424DEBUG
     PN532DEBUGPRINT.println(F("Decryption error"));
 #endif
+    return 0;
   }
   // save the authresponse
   memcpy(&ntag424_authresponse_TI,
