@@ -21,11 +21,6 @@ namespace
     constexpr int16_t DRAWER_OPEN_THRESHOLD_PX = 90;  // and drag down at least this far
     constexpr int32_t DRAWER_HEIGHT = 230;            // panel height / off-screen offset
 
-    void anim_set_y_cb(void *obj, int32_t v)
-    {
-        lv_obj_set_y((lv_obj_t *)obj, (lv_coord_t)v);
-    }
-
     lv_obj_t *makeDrawerButton(lv_obj_t *parent, const char *symbol, const char *text,
                                lv_color_t color, lv_event_cb_t cb)
     {
@@ -154,14 +149,11 @@ void Display::openDrawer()
     lv_obj_remove_flag(Display::drawerBackdrop, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(Display::drawerPanel, LV_OBJ_FLAG_HIDDEN);
 
-    lv_anim_t a;
-    lv_anim_init(&a);
-    lv_anim_set_var(&a, Display::drawerPanel);
-    lv_anim_set_exec_cb(&a, anim_set_y_cb);
-    lv_anim_set_values(&a, -DRAWER_HEIGHT, 0);
-    lv_anim_set_time(&a, 250);
-    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
-    lv_anim_start(&a);
+    // Instant open (no slide): each animation frame re-renders the moving
+    // panel + the revealed screen area beneath on the software renderer,
+    // which reads as rebuild flicker (PERFORMANCE_ANALYSIS.md A-3, measured
+    // on hardware). A single direct placement renders one frame.
+    lv_obj_set_y(Display::drawerPanel, 0);
 }
 
 void Display::closeDrawer()
@@ -172,18 +164,10 @@ void Display::closeDrawer()
     Display::drawerOpen = false;
     lv_obj_add_flag(Display::drawerBackdrop, LV_OBJ_FLAG_HIDDEN);
 
-    lv_anim_t a;
-    lv_anim_init(&a);
-    lv_anim_set_var(&a, Display::drawerPanel);
-    lv_anim_set_exec_cb(&a, anim_set_y_cb);
-    lv_anim_set_values(&a, lv_obj_get_y(Display::drawerPanel), -DRAWER_HEIGHT);
-    lv_anim_set_time(&a, 200);
-    lv_anim_set_path_cb(&a, lv_anim_path_ease_in);
-    lv_anim_set_ready_cb(&a, [](lv_anim_t *)
-                         {
-        if (Display::drawerPanel)
-            lv_obj_add_flag(Display::drawerPanel, LV_OBJ_FLAG_HIDDEN); });
-    lv_anim_start(&a);
+    // Instant close (no slide) — see openDrawer: avoids per-frame re-render
+    // flicker on the software renderer.
+    lv_obj_set_y(Display::drawerPanel, -DRAWER_HEIGHT);
+    lv_obj_add_flag(Display::drawerPanel, LV_OBJ_FLAG_HIDDEN);
 }
 
 void Display::showRebootConfirm()
