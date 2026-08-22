@@ -54,6 +54,7 @@ void SupervisionFlow::beginReaderInitiated(const std::string &requester, uint32_
     // arrived before this reader-owned transaction can become active.
     clearPendingWebStart();
     if (eventQueue != nullptr) xQueueReset(eventQueue);
+    clearOverflowEvents();
     resetActiveTransaction();
     resourceId = id;
     enter(requester.c_str(), "Aufsichts-Karte auflegen oder per\nApp/Web bestaetigen", millis());
@@ -99,6 +100,7 @@ void SupervisionFlow::onDisconnect() {
     resetActiveTransaction();
     clearPendingWebStart();
     if (eventQueue != nullptr) xQueueReset(eventQueue);
+    clearOverflowEvents();
 }
 bool SupervisionFlow::active() const { return phase != Phase::Idle; }
 
@@ -161,15 +163,47 @@ void SupervisionFlow::enqueueEvent(const Event &event) {
         return;
     }
 
-    // Every callback carries transaction state. Waiting for the main loop to
-    // drain the queue prevents terminal outcomes from being silently lost.
-    xQueueSend(eventQueue, &event, portMAX_DELAY);
+    if (xQueueSend(eventQueue, &event, 0) == pdPASS) return;
+
+    // API callbacks run from the same loop that drains this queue. Never wait
+    // here: retain the latest event of each kind for the next main-loop tick.
+    uint8_t index = static_cast<uint8_t>(event.type);
+    portENTER_CRITICAL(&overflowEventsMux);
+    overflowEvents[index] = event;
+    hasOverflowEvent[index] = true;
+    portEXIT_CRITICAL(&overflowEventsMux);
+    logger.error("Supervision event queue full; retaining overflow event");
+}
+
+void SupervisionFlow::clearOverflowEvents() {
+    portENTER_CRITICAL(&overflowEventsMux);
+    memset(hasOverflowEvent, 0, sizeof(hasOverflowEvent));
+    portEXIT_CRITICAL(&overflowEventsMux);
+}
+
+bool SupervisionFlow::takeOverflowEvent(Event &event) {
+    bool found = false;
+    portENTER_CRITICAL(&overflowEventsMux);
+    for (uint8_t i = 0; i < static_cast<uint8_t>(EventType::Count); ++i) {
+        if (hasOverflowEvent[i]) {
+            event = overflowEvents[i];
+            hasOverflowEvent[i] = false;
+            found = true;
+            break;
+        }
+    }
+    portEXIT_CRITICAL(&overflowEventsMux);
+    return found;
 }
 
 void SupervisionFlow::processEvents(bool stopWhenWebStart) {
     if (eventQueue == nullptr) return;
     Event event = {};
     while (xQueueReceive(eventQueue, &event, 0) == pdPASS) {
+        processEvent(event);
+        if (stopWhenWebStart && event.type == EventType::WebStart) return;
+    }
+    while (takeOverflowEvent(event)) {
         processEvent(event);
         if (stopWhenWebStart && event.type == EventType::WebStart) return;
     }
