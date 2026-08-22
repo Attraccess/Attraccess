@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Input,
   Label,
@@ -55,18 +55,18 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
     [allPermissions, availablePermissions],
   );
 
-  const loadTokens = async () => {
+  const loadTokens = useCallback(async () => {
     const response = await fetch(`${getBaseUrl()}/api/users/me/api-tokens`, { credentials: 'include' });
     if (!response.ok) throw new Error('Could not load API tokens');
     setApiTokens(await response.json());
-  };
+  }, []);
 
   useEffect(() => {
     loadTokens().catch(() => {
       showToast({ title: t('errors.loadFailed'), type: 'error' });
       setApiTokens([]);
     });
-  }, []);
+  }, [loadTokens, showToast, t]);
 
   const createToken = async () => {
     setIsCreating(true);

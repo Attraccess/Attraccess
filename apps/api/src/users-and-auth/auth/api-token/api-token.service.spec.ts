@@ -7,14 +7,17 @@ describe('ApiTokenService', () => {
     create: jest.fn((value) => value),
     save: jest.fn(),
     find: jest.fn(),
+    findOne: jest.fn(),
     findOneBy: jest.fn(),
     createQueryBuilder: jest.fn(),
   };
   const userRepository = { findOneBy: jest.fn() };
+  const apiTokenPermissionRepository = { create: jest.fn((value) => value), save: jest.fn(), delete: jest.fn() };
   const tokenHashService = { hashApiToken: jest.fn((token) => `hashed:${token}`) };
   const rbacService = { getEffectivePermissions: jest.fn() };
   const service = new ApiTokenService(
     repository as never,
+    apiTokenPermissionRepository as never,
     userRepository as never,
     tokenHashService as never,
     rbacService as never,
@@ -27,6 +30,7 @@ describe('ApiTokenService', () => {
 
   it('stores only the hash and returns the secret once on creation', async () => {
     repository.save.mockImplementation(async (value) => ({ ...value, id: 1, createdAt: new Date() }));
+    apiTokenPermissionRepository.save.mockImplementation(async (value) => value);
 
     const result = await service.create(3, {
       name: 'Script',
@@ -35,7 +39,7 @@ describe('ApiTokenService', () => {
 
     expect(result.token).toHaveLength(43);
     expect(repository.create).toHaveBeenCalledWith(
-      expect.objectContaining({ tokenHash: `hashed:${result.token}`, permissionKeys: ['resources.read'] }),
+      expect.objectContaining({ tokenHash: `hashed:${result.token}` }),
     );
     expect(result.apiToken).not.toHaveProperty('token');
   });
@@ -48,17 +52,24 @@ describe('ApiTokenService', () => {
   });
 
   it('rejects revoked and expired tokens before loading their owner', async () => {
-    repository.findOneBy.mockResolvedValueOnce({ revokedAt: new Date(), expiresAt: null });
+    repository.findOne.mockResolvedValueOnce({ revokedAt: new Date(), expiresAt: null });
     await expect(service.authenticate('secret')).resolves.toBeNull();
 
-    repository.findOneBy.mockResolvedValueOnce({ revokedAt: null, expiresAt: new Date(Date.now() - 1) });
+    repository.findOne.mockResolvedValueOnce({ revokedAt: null, expiresAt: new Date(Date.now() - 1) });
     await expect(service.authenticate('secret')).resolves.toBeNull();
     expect(userRepository.findOneBy).not.toHaveBeenCalled();
   });
 
   it('rejects a token when its soft-deleted owner cannot be loaded', async () => {
-    repository.findOneBy.mockResolvedValue({ id: 1, userId: 3, revokedAt: null, expiresAt: null });
+    repository.findOne.mockResolvedValue({ id: 1, userId: 3, revokedAt: null, expiresAt: null });
     userRepository.findOneBy.mockResolvedValue(null);
+
+    await expect(service.authenticate('secret')).resolves.toBeNull();
+  });
+
+  it('rejects a token when its owner is disabled', async () => {
+    repository.findOne.mockResolvedValue({ id: 1, userId: 3, revokedAt: null, expiresAt: null });
+    userRepository.findOneBy.mockResolvedValue({ id: 3, isDisabled: true });
 
     await expect(service.authenticate('secret')).resolves.toBeNull();
   });
@@ -72,7 +83,7 @@ describe('ApiTokenService', () => {
       execute: jest.fn().mockResolvedValue({ affected: 1 }),
     };
     repository.createQueryBuilder.mockReturnValue(queryBuilder);
-    repository.findOneBy.mockResolvedValue({ id: 1, userId: 3, revokedAt: null, expiresAt: null, lastUsedAt: null });
+    repository.findOne.mockResolvedValue({ id: 1, userId: 3, revokedAt: null, expiresAt: null, lastUsedAt: null });
     userRepository.findOneBy.mockResolvedValue({ id: 3 });
 
     await service.authenticate('secret');
@@ -95,7 +106,7 @@ describe('ApiTokenService', () => {
       execute: jest.fn().mockResolvedValue({ affected: 0 }),
     };
     repository.createQueryBuilder.mockReturnValue(queryBuilder);
-    repository.findOneBy.mockResolvedValue({ id: 1, userId: 3, revokedAt: null, expiresAt: null, lastUsedAt: null });
+    repository.findOne.mockResolvedValue({ id: 1, userId: 3, revokedAt: null, expiresAt: null, lastUsedAt: null });
     userRepository.findOneBy.mockResolvedValue({ id: 3 });
 
     await expect(service.authenticate('secret')).resolves.toBeNull();

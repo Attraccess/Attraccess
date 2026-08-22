@@ -61,6 +61,9 @@ export class User {
   })
   isEmailVerified!: boolean;
 
+  @Column({ default: false, type: 'boolean' })
+  isDisabled!: boolean;
+
   @Column({ type: 'text', nullable: true })
   @Exclude()
   emailVerificationToken!: string | null;

@@ -48,6 +48,7 @@ import {
   Passkey,
   PasskeyChallenge,
   ApiToken,
+  ApiTokenPermission,
   Permission,
 } from '@attraccess/database-entities';
 import { EmailModule } from '../email/email.module';
@@ -96,6 +97,7 @@ import { ApiTokenRequestRateLimitInterceptor } from './auth/api-token/api-token-
       Passkey,
       PasskeyChallenge,
       ApiToken,
+      ApiTokenPermission,
       Permission,
     ]),
     PassportModule,

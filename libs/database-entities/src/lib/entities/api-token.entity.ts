@@ -1,6 +1,7 @@
-import { Column, CreateDateColumn, Entity, Index, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Exclude } from 'class-transformer';
 import { User } from './user.entity';
+import { ApiTokenPermission } from './api-token-permission.entity';
 
 @Entity('api_token')
 @Index(['tokenHash'], { unique: true })
@@ -19,9 +20,6 @@ export class ApiToken {
   @Exclude()
   tokenHash!: string;
 
-  @Column({ type: 'simple-json' })
-  permissionKeys!: string[];
-
   @CreateDateColumn()
   createdAt!: Date;
 
@@ -36,4 +34,11 @@ export class ApiToken {
 
   @ManyToOne(() => User, (user) => user.apiTokens, { onDelete: 'CASCADE' })
   user!: User;
+
+  @OneToMany(() => ApiTokenPermission, (apiTokenPermission) => apiTokenPermission.apiToken, { onDelete: 'CASCADE' })
+  apiTokenPermissions!: ApiTokenPermission[];
+
+  get permissionKeys(): string[] {
+    return this.apiTokenPermissions.map(({ permissionKey }) => permissionKey);
+  }
 }

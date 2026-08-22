@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomBytes } from 'crypto';
-import { ApiToken, User } from '@attraccess/database-entities';
+import { ApiToken, ApiTokenPermission, User } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
 import { TokenHashService } from '../../../encryption/token-hash.service';
 import { RbacService } from '../../rbac/rbac.service';
@@ -12,6 +12,7 @@ const LAST_USED_WRITE_INTERVAL_MS = 60_000;
 export class ApiTokenService {
   constructor(
     @InjectRepository(ApiToken) private readonly apiTokenRepository: Repository<ApiToken>,
+    @InjectRepository(ApiTokenPermission) private readonly apiTokenPermissionRepository: Repository<ApiTokenPermission>,
     @InjectRepository(User) private readonly userRepository: Repository<User>,
     private readonly tokenHashService: TokenHashService,
     private readonly rbacService: RbacService,
@@ -21,6 +22,7 @@ export class ApiTokenService {
     return this.apiTokenRepository.find({
       where: { userId, revokedAt: null },
       order: { createdAt: 'DESC' },
+      relations: { apiTokenPermissions: true },
     });
   }
 
@@ -37,12 +39,12 @@ export class ApiTokenService {
         userId,
         name: input.name.trim(),
         tokenHash: this.tokenHashService.hashApiToken(token),
-        permissionKeys: [...new Set(input.permissionKeys)],
         expiresAt: input.expiresAt ?? null,
         lastUsedAt: null,
         revokedAt: null,
       }),
     );
+    apiToken.apiTokenPermissions = await this.createPermissions(apiToken.id, input.permissionKeys);
     return { apiToken, token };
   }
 
@@ -55,7 +57,10 @@ export class ApiTokenService {
     if (input.permissionKeys) await this.assertAllowedPermissions(userId, input.permissionKeys);
     if (input.expiresAt !== null) this.assertExpiry(input.expiresAt);
     if (input.name !== undefined) apiToken.name = input.name.trim();
-    if (input.permissionKeys !== undefined) apiToken.permissionKeys = [...new Set(input.permissionKeys)];
+    if (input.permissionKeys !== undefined) {
+      await this.apiTokenPermissionRepository.delete({ apiTokenId: apiToken.id });
+      apiToken.apiTokenPermissions = await this.createPermissions(apiToken.id, input.permissionKeys);
+    }
     if (input.expiresAt !== undefined) apiToken.expiresAt = input.expiresAt;
     return this.apiTokenRepository.save(apiToken);
   }
@@ -67,12 +72,15 @@ export class ApiTokenService {
   }
 
   async authenticate(token: string): Promise<{ user: User; apiToken: ApiToken } | null> {
-    const apiToken = await this.apiTokenRepository.findOneBy({ tokenHash: this.tokenHashService.hashApiToken(token) });
+    const apiToken = await this.apiTokenRepository.findOne({
+      where: { tokenHash: this.tokenHashService.hashApiToken(token) },
+      relations: { apiTokenPermissions: true },
+    });
     if (!apiToken || apiToken.revokedAt || (apiToken.expiresAt && apiToken.expiresAt <= new Date())) return null;
 
     // The normal repository lookup excludes soft-deleted owners.
     const user = await this.userRepository.findOneBy({ id: apiToken.userId });
-    if (!user) return null;
+    if (!user || user.isDisabled) return null;
 
     if (!apiToken.lastUsedAt || Date.now() - apiToken.lastUsedAt.getTime() >= LAST_USED_WRITE_INTERVAL_MS) {
       const now = new Date();
@@ -90,7 +98,10 @@ export class ApiTokenService {
   }
 
   private async findOwned(userId: number, tokenId: number): Promise<ApiToken> {
-    const apiToken = await this.apiTokenRepository.findOneBy({ id: tokenId, userId, revokedAt: null });
+    const apiToken = await this.apiTokenRepository.findOne({
+      where: { id: tokenId, userId, revokedAt: null },
+      relations: { apiTokenPermissions: true },
+    });
     if (!apiToken) throw new NotFoundException('ApiTokenNotFound');
     return apiToken;
   }
@@ -102,6 +113,12 @@ export class ApiTokenService {
     if (disallowed.length) {
       throw new ForbiddenException(`You cannot grant permissions you do not hold: ${disallowed.join(', ')}`);
     }
+  }
+
+  private async createPermissions(apiTokenId: number, permissionKeys: string[]): Promise<ApiTokenPermission[]> {
+    return this.apiTokenPermissionRepository.save(
+      [...new Set(permissionKeys)].map((permissionKey) => this.apiTokenPermissionRepository.create({ apiTokenId, permissionKey })),
+    );
   }
 
   private assertExpiry(expiresAt: Date | undefined): void {
