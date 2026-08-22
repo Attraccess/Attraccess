@@ -66,7 +66,8 @@ private:
     Event overflowEvents[static_cast<uint8_t>(EventType::Count)] = {};
     bool hasOverflowEvent[static_cast<uint8_t>(EventType::Count)] = {};
     uint32_t overflowEventSequence[static_cast<uint8_t>(EventType::Count)] = {};
-    uint32_t nextOverflowEventSequence = 0;
+    // Starts at one so zero unambiguously marks counter rollover.
+    uint32_t nextOverflowEventSequence = 1;
     Phase phase = Phase::Idle;
     bool webInitiated = false;
     bool pendingWebStart = false;
@@ -101,6 +102,7 @@ private:
     void beginWebInitiated(uint32_t resourceId, const char *requesterName);
     void enqueueEvent(const Event &event);
     void clearOverflowEvents();
+    void normalizeOverflowEventSequences();
     bool takeOverflowEvent(Event &event);
     void processEvents(bool stopWhenWebStart = false);
     void processEvent(const Event &event);

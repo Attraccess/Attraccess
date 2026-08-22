@@ -169,6 +169,11 @@ void SupervisionFlow::enqueueEvent(const Event &event) {
     // here: retain the latest event of each kind for the next main-loop tick.
     uint8_t index = static_cast<uint8_t>(event.type);
     portENTER_CRITICAL(&overflowEventsMux);
+    if (nextOverflowEventSequence == 0) {
+        // Preserve arrival order across counter rollover before assigning the
+        // next retained event.
+        normalizeOverflowEventSequences();
+    }
     overflowEvents[index] = event;
     hasOverflowEvent[index] = true;
     overflowEventSequence[index] = nextOverflowEventSequence++;
@@ -179,8 +184,28 @@ void SupervisionFlow::enqueueEvent(const Event &event) {
 void SupervisionFlow::clearOverflowEvents() {
     portENTER_CRITICAL(&overflowEventsMux);
     memset(hasOverflowEvent, 0, sizeof(hasOverflowEvent));
-    nextOverflowEventSequence = 0;
+    nextOverflowEventSequence = 1;
     portEXIT_CRITICAL(&overflowEventsMux);
+}
+
+void SupervisionFlow::normalizeOverflowEventSequences() {
+    bool normalized[static_cast<uint8_t>(EventType::Count)] = {};
+    uint32_t nextSequence = 0;
+
+    for (uint8_t count = 0; count < static_cast<uint8_t>(EventType::Count); ++count) {
+        uint8_t oldestIndex = static_cast<uint8_t>(EventType::Count);
+        for (uint8_t i = 0; i < static_cast<uint8_t>(EventType::Count); ++i) {
+            if (hasOverflowEvent[i] && !normalized[i] &&
+                (oldestIndex == static_cast<uint8_t>(EventType::Count) ||
+                 overflowEventSequence[i] < overflowEventSequence[oldestIndex])) {
+                oldestIndex = i;
+            }
+        }
+        if (oldestIndex == static_cast<uint8_t>(EventType::Count)) break;
+        overflowEventSequence[oldestIndex] = nextSequence++;
+        normalized[oldestIndex] = true;
+    }
+    nextOverflowEventSequence = nextSequence;
 }
 
 bool SupervisionFlow::takeOverflowEvent(Event &event) {
