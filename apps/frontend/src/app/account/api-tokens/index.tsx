@@ -198,6 +198,9 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
           drawerApplyLabel={t('picker.apply')}
           drawerCancelLabel={t('picker.cancel')}
           drawerSelectedCount={(selected, total) => t('picker.selectedCount', { selected, total })}
+          drawerPreviewLabel={t('picker.previewLabel')}
+          drawerEmptyPreview={t('picker.emptyPreview')}
+          drawerEditLabel={t('picker.edit')}
           drawerSelectCategoryLabel={t('picker.selectCategory')}
           drawerClearCategoryLabel={t('picker.clearCategory')}
         />

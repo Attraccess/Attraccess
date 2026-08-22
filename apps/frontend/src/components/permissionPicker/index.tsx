@@ -24,7 +24,7 @@ import {
   useFilter,
   type Key,
 } from '@heroui/react';
-import { ChevronRight, CreditCard, Database, LockIcon, Settings, ShieldCheck, UsersRound } from 'lucide-react';
+import { CreditCard, Database, KeyRound, LockIcon, Pencil, Settings, ShieldCheck, UsersRound } from 'lucide-react';
 import { type Permission } from '@attraccess/react-query-client';
 import { StandardDrawer } from '../standardDrawer';
 
@@ -69,6 +69,9 @@ interface PermissionPickerProps {
   drawerApplyLabel?: string;
   drawerCancelLabel?: string;
   drawerSelectedCount?: (selected: number, total: number) => string;
+  drawerPreviewLabel?: string;
+  drawerEmptyPreview?: string;
+  drawerEditLabel?: string;
   drawerSelectCategoryLabel?: string;
   drawerClearCategoryLabel?: string;
 }
@@ -97,6 +100,9 @@ export function PermissionPicker({
   drawerApplyLabel,
   drawerCancelLabel,
   drawerSelectedCount,
+  drawerPreviewLabel,
+  drawerEmptyPreview,
+  drawerEditLabel,
   drawerSelectCategoryLabel,
   drawerClearCategoryLabel,
 }: PermissionPickerProps) {
@@ -161,33 +167,50 @@ export function PermissionPicker({
   if (presentation === 'drawer') {
     const selectedCount = selectedKeys.size;
     const totalCount = permissions.length;
-    const previewItems = selectedTagItems.slice(0, 2);
-    const hiddenPreviewItemCount = selectedTagItems.length - previewItems.length;
+    const selectedCategories = permissionsByCategory
+      .map(({ category, permissions: categoryPermissions }) => ({
+        category,
+        selectedCount: categoryPermissions.filter((permission) => selectedKeys.has(permission.key)).length,
+      }))
+      .filter(({ selectedCount: categorySelectedCount }) => categorySelectedCount > 0);
+    const previewCategories = selectedCategories.slice(0, 2);
+    const hiddenPreviewCategoryCount = selectedCategories.length - previewCategories.length;
 
     return (
       <>
         <Button
           variant="secondary"
           fullWidth
-          className="h-auto min-h-10 items-center justify-between gap-3 px-3 py-2"
+          className="h-auto min-h-[88px] items-stretch justify-between gap-4 whitespace-normal rounded-medium border border-default-200 bg-content1 px-4 py-3 text-left shadow-none hover:border-primary/50 hover:bg-default-50"
           onPress={() => setIsDrawerOpen(true)}
           isDisabled={isDisabled}
           aria-label={label}
           data-cy={dataCy}
         >
-          <span className="flex min-w-0 flex-1 flex-wrap gap-1 text-left">
-            {previewItems.length === 0 ? <span className="text-default-500">{placeholder}</span> : null}
-            {previewItems.map(({ key, label: permissionName, isLocked }) => (
-              <span key={key} className="max-w-full truncate rounded-small bg-default-200 px-2 py-0.5 text-xs text-foreground">
-                {isLocked ? <LockIcon className="mr-1 inline size-3 align-text-bottom text-default-500" aria-hidden="true" /> : null}
-                {permissionName}
-              </span>
-            ))}
-            {hiddenPreviewItemCount > 0 ? <span className="rounded-small bg-default-200 px-2 py-0.5 text-xs text-default-600">+{hiddenPreviewItemCount}</span> : null}
+          <span className="flex min-w-0 items-start gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-medium bg-primary/10 text-primary">
+              <KeyRound className="size-5" aria-hidden="true" />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className="font-medium text-foreground">{drawerPreviewLabel ?? label}</span>
+              {previewCategories.length === 0 ? (
+                <span className="text-sm text-default-500">{drawerEmptyPreview ?? placeholder}</span>
+              ) : (
+                <span className="flex flex-wrap gap-1">
+                  {previewCategories.map(({ category, selectedCount: categorySelectedCount }) => (
+                    <span key={category} className="rounded-small bg-default-100 px-2 py-0.5 text-xs text-default-700">
+                      {permissionCategory(category)} · {categorySelectedCount}
+                    </span>
+                  ))}
+                  {hiddenPreviewCategoryCount > 0 ? <span className="rounded-small bg-default-100 px-2 py-0.5 text-xs text-default-600">+{hiddenPreviewCategoryCount}</span> : null}
+                </span>
+              )}
+              <span className="text-xs tabular-nums text-default-500">{drawerSelectedCount?.(selectedCount, totalCount) ?? `${selectedCount}/${totalCount}`}</span>
+            </span>
           </span>
-          <span className="flex shrink-0 items-center gap-2 text-default-500 text-sm">
-            {drawerSelectedCount?.(selectedCount, totalCount) ?? `${selectedCount}/${totalCount}`}
-            <ChevronRight className="size-4" aria-hidden="true" />
+          <span className="flex shrink-0 items-center gap-1 self-center text-sm font-medium text-primary">
+            <span className="hidden xl:inline">{drawerEditLabel ?? placeholder}</span>
+            <Pencil className="size-4" aria-hidden="true" />
           </span>
         </Button>
 
