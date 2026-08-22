@@ -35,10 +35,13 @@
    HAL SETTINGS
  *====================*/
 
-/*Default display refresh AND input-device read period. In v9 a single macro
- *drives both: lv_indev_create() also uses LV_DEF_REFR_PERIOD for its read
- *timer (lv_indev.c). 15 ms ≈ 66 Hz refresh + touch sampling (v9 default: 33 ms).*/
-#define LV_DEF_REFR_PERIOD 15
+/*Default display refresh period. Touch sampling is decoupled to 10 ms in
+ *Display::setup() (lv_indev_get_read_timer), so this only paces refresh.
+ *24 ms ≈ 42 Hz matches the ST7701 panel cadence (12 MHz pclk / 480x480), so
+ *simple-content frames aren't capped below the panel rate (less judder).
+ *Complex screens still render as fast as they can (LVGL misses frames rather
+ *than tearing) (PERFORMANCE_ANALYSIS.md Q5).*/
+#define LV_DEF_REFR_PERIOD 24
 
 /*=========================
    OPERATING SYSTEM
@@ -78,12 +81,17 @@
  * Debug
  *-----------*/
 
-/*FPS/CPU overlay for on-hardware perf validation (ATT-554). Enable by adding
- *`-D ATTRACTAP_LV_PERF_MONITOR=1` to build_flags.*/
+/*FPS/CPU overlay for on-hardware perf validation (ATT-554). Enable by using
+ *the attractap-touch-v2-demo-perf variant, which defines
+ *ATTRACTAP_LV_PERF_MONITOR for both the app and LVGL itself (see CMakeLists
+ *ATTRACTAP_LV_PERF_MONITOR_GL).*/
 #ifdef ATTRACTAP_LV_PERF_MONITOR
     #define LV_USE_SYSMON 1
     #define LV_USE_PERF_MONITOR 1
     #define LV_USE_PERF_MONITOR_POS LV_ALIGN_BOTTOM_RIGHT
+    /* Log FPS/render time to serial instead of drawing on the panel — lets us
+     * measure Bildaufbau cost without a camera (PERFORMANCE_ANALYSIS.md A-4). */
+    #define LV_USE_PERF_MONITOR_LOG_MODE 1
 #endif
 
 /*==================
