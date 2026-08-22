@@ -54,6 +54,7 @@ class PluginBootstrapConfigModule {}
 export async function bootstrap() {
   const bootstrapLogger = new Logger('Bootstrap');
   bootstrapLogger.log('Starting bootstrap process...');
+  const skipDatabaseMigrations = process.env.SKIP_DATABASE_MIGRATIONS === 'true';
 
   const initialLogLevels = (process.env.LOG_LEVELS || 'error,warn,log')
     .split(',')
@@ -89,9 +90,11 @@ export async function bootstrap() {
   // uses a standalone DataSource per plugin against the same DB, so it does not
   // interfere with the host DataSource (which opens later, inside AppModule).
   // Per-plugin failures are isolated inside the service and never abort boot.
-  if (!earlyConfig.DISABLE_PLUGINS) {
+  if (!earlyConfig.DISABLE_PLUGINS && !skipDatabaseMigrations) {
     bootstrapLogger.log('Running plugin database migrations...');
     await PluginMigrationService.runPendingUpMigrationsForAllPlugins();
+  } else if (skipDatabaseMigrations) {
+    bootstrapLogger.log('Skipping plugin database migrations.');
   }
 
   // Import AppModule only now, so PluginModule.forRoot() sees the configured PLUGIN_DIR.
@@ -103,8 +106,9 @@ export async function bootstrap() {
 
   const appConfig = appForConfig.get(ConfigService).get<AppConfigType>('app');
   const storageConfig = appForConfig.get(ConfigService).get<StorageConfigType>('storage');
-  const settingsService = appForConfig.get(SettingsService);
-  const backendUrlFromDb = await settingsService.getUrl();
+  const backendUrlFromDb = skipDatabaseMigrations
+    ? appConfig.ATTRACCESS_URL
+    : await appForConfig.get(SettingsService).getUrl();
   await appForConfig.close();
 
   let httpsOptions: undefined | HttpsOptions = undefined;
@@ -183,32 +187,36 @@ export async function bootstrap() {
     credentials: true, // Allow cookies to be sent
   });
 
-  // Run migrations before the app fully starts
-  try {
-    bootstrapLogger.log('Running database migrations...');
-    const dataSource = app.get(DataSource);
+  if (skipDatabaseMigrations) {
+    bootstrapLogger.log('Skipping database migrations.');
+  } else {
+    // Run migrations before the app fully starts
+    try {
+      bootstrapLogger.log('Running database migrations...');
+      const dataSource = app.get(DataSource);
 
-    if (!dataSource.isInitialized) {
-      await dataSource.initialize();
-      bootstrapLogger.log('Database connection initialized.');
-    }
+      if (!dataSource.isInitialized) {
+        await dataSource.initialize();
+        bootstrapLogger.log('Database connection initialized.');
+      }
 
-    const pendingMigrations = await dataSource.showMigrations();
-    if (pendingMigrations) {
-      const allMigrations = dataSource.migrations;
-      const executedMigrations = dataSource.migrations;
-      bootstrapLogger.log(
-        `Pending migrations detected (${allMigrations.length} total known, ${executedMigrations.length} already executed). Running migrations...`,
-      );
-      await dataSource.runMigrations();
-      bootstrapLogger.log('Migrations completed successfully.');
-    } else {
-      bootstrapLogger.log('No pending migrations found.');
+      const pendingMigrations = await dataSource.showMigrations();
+      if (pendingMigrations) {
+        const allMigrations = dataSource.migrations;
+        const executedMigrations = dataSource.migrations;
+        bootstrapLogger.log(
+          `Pending migrations detected (${allMigrations.length} total known, ${executedMigrations.length} already executed). Running migrations...`,
+        );
+        await dataSource.runMigrations();
+        bootstrapLogger.log('Migrations completed successfully.');
+      } else {
+        bootstrapLogger.log('No pending migrations found.');
+      }
+    } catch (error) {
+      bootstrapLogger.error('Failed to run database migrations');
+      bootstrapLogger.error(error);
+      process.exit(1);
     }
-  } catch (error) {
-    bootstrapLogger.error('Failed to run database migrations');
-    bootstrapLogger.error(error);
-    process.exit(1);
   }
 
   const globalPrefix = appConfig.GLOBAL_PREFIX;
@@ -216,8 +224,7 @@ export async function bootstrap() {
 
   app.useWebSocketAdapter(new WsAdapter(app));
 
-  const appSettingsService = app.get(SettingsService);
-  const appUrl = await appSettingsService.getUrl();
+  const appUrl = skipDatabaseMigrations ? appConfig.ATTRACCESS_URL : await app.get(SettingsService).getUrl();
 
   // Session middleware is used for SAML SSO state persistence only (not for regular auth).
   // OIDC state is handled by OidcCookieStateStore (a signed oidc-state cookie) instead.
