@@ -84,6 +84,7 @@ void Application::setup() {
   this->api.setup();
 
 #ifdef HAS_LVGL_DISPLAY
+  this->supervision.setup();
   this->api.onDeviceName(
       [this](std::string deviceName) { Display::setDeviceName(deviceName); });
 #endif
@@ -434,8 +435,8 @@ void Application::setup() {
         this->supervision.onCardAuthentication(response);
       });
 
-  // Server-armed supervision (ATT-816). Runs on the websocket task, so only stage the payload here
-  // and publish via the volatile flag (set last); the main loop enters the screen.
+  // Server-armed supervision (ATT-816). The flow queues the websocket payload;
+  // the main loop decides whether this reader can enter the screen.
   this->api.setSupervisionStartCallback(
       [this](API::SupervisionStartCommand command) {
         this->supervision.armWebInitiated(command);
