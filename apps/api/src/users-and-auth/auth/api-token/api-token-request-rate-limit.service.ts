@@ -22,12 +22,19 @@ export class ApiTokenRequestRateLimitService {
       throw new ServiceUnavailableException('API token requests require Valkey');
     }
 
-    const [count, remainingMs] = (await this.client.eval(
-      INCREMENT_COUNTER_SCRIPT,
-      1,
-      `${COUNTER_KEY_PREFIX}${apiTokenId}`,
-      WINDOW_MS,
-    )) as [number, number];
+    let result: [number, number];
+    try {
+      result = (await this.client.eval(
+        INCREMENT_COUNTER_SCRIPT,
+        1,
+        `${COUNTER_KEY_PREFIX}${apiTokenId}`,
+        WINDOW_MS,
+      )) as [number, number];
+    } catch {
+      throw new ServiceUnavailableException('API token rate limiter is unavailable');
+    }
+
+    const [count, remainingMs] = result;
 
     if (count > MAX_REQUESTS_PER_WINDOW) {
       const retryAfterSeconds = Math.max(1, Math.ceil(remainingMs / 1000));

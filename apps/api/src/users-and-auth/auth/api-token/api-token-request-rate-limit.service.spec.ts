@@ -29,4 +29,11 @@ describe('ApiTokenRequestRateLimitService', () => {
 
     await expect(service.assertWithinLimit(1)).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
+
+  it('returns service unavailable when Valkey cannot increment the counter', async () => {
+    const client = { eval: jest.fn().mockRejectedValue(new Error('Connection refused')) } as unknown as Redis;
+    const service = new ApiTokenRequestRateLimitService(client);
+
+    await expect(service.assertWithinLimit(1)).rejects.toMatchObject({ status: 503 });
+  });
 });
