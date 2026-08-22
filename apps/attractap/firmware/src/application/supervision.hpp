@@ -38,7 +38,7 @@ public:
 private:
     enum class Phase { Idle, WaitingForCard, RequestedAuth, Starting, Success, Error };
     enum class TerminalEvent { None, Cancelled, Resolved, Failed };
-    enum class EventType { Cancel, CardDetected, RequestResult, CardAuthentication, Resolved, WebStart };
+    enum class EventType { Cancel, CardDetected, RequestResult, CardAuthentication, Resolved, WebStart, Count };
     struct Event {
         EventType type;
         bool success;
@@ -62,6 +62,9 @@ private:
     Logger &logger;
     SupervisionScreen &screen;
     QueueHandle_t eventQueue = nullptr;
+    portMUX_TYPE overflowEventsMux = portMUX_INITIALIZER_UNLOCKED;
+    Event overflowEvents[static_cast<uint8_t>(EventType::Count)] = {};
+    bool hasOverflowEvent[static_cast<uint8_t>(EventType::Count)] = {};
     Phase phase = Phase::Idle;
     bool webInitiated = false;
     bool pendingWebStart = false;
@@ -95,6 +98,8 @@ private:
     void clearPendingWebStart();
     void beginWebInitiated(uint32_t resourceId, const char *requesterName);
     void enqueueEvent(const Event &event);
+    void clearOverflowEvents();
+    bool takeOverflowEvent(Event &event);
     void processEvents(bool stopWhenWebStart = false);
     void processEvent(const Event &event);
     void publishTerminalEvent(TerminalEvent event);
