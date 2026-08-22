@@ -6,6 +6,8 @@ import { SessionService } from '../auth/session.service';
 import { TwoFactorService } from '../auth/two-factor.service';
 import { RbacService } from '../rbac/rbac.service';
 import { ApiTokenService } from '../auth/api-token/api-token.service';
+import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
+import { resolveIp } from '../rate-limiting/login.rate-limit.guard';
 import { User } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
@@ -27,6 +29,7 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     private readonly twoFactorService: TwoFactorService,
     private readonly rbacService: RbacService,
     private readonly apiTokenService: ApiTokenService,
+    private readonly authAuditLogger: AuthAuditLogger,
   ) {
     super();
   }
@@ -50,6 +53,15 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
         );
         authenticatedUser.authenticationMethod = 'api-token';
         authenticatedUser.apiTokenId = tokenPrincipal.apiToken.id;
+        this.authAuditLogger.log({
+          type: 'api_token',
+          outcome: 'success',
+          ip: resolveIp(req),
+          userId: authenticatedUser.id,
+          username: authenticatedUser.username,
+          authenticationMethod: 'api-token',
+          apiTokenId: tokenPrincipal.apiToken.id,
+        });
         return tokenPrincipal.user;
       }
     }

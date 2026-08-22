@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Req } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { AuthenticatedRequest, AuthenticatedUser, SessionAuth } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk';
 import { ApiTokenService } from './api-token.service';
 import { ApiTokenMetadataDto, CreateApiTokenDto, CreateApiTokenResponseDto, UpdateApiTokenDto } from './api-token.dto';
 
@@ -27,7 +27,6 @@ export class ApiTokenController {
   ): Promise<CreateApiTokenResponseDto> {
     const { apiToken, token } = await this.apiTokenService.create(
       request.user.id,
-      (request.user as AuthenticatedUser).effectivePermissions ?? new Set(),
       body,
     );
     return { ...toMetadata(apiToken), token };
@@ -46,7 +45,6 @@ export class ApiTokenController {
       await this.apiTokenService.update(
         request.user.id,
         id,
-        (request.user as AuthenticatedUser).effectivePermissions ?? new Set(),
         body,
       ),
     );

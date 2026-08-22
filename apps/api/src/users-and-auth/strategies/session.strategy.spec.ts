@@ -8,6 +8,7 @@ import { TwoFactorPolicy } from '../auth/two-factor.dto';
 import { User } from '@attraccess/database-entities';
 import { RbacService } from '../rbac/rbac.service';
 import { ApiTokenService } from '../auth/api-token/api-token.service';
+import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 describe('SessionStrategy', () => {
@@ -49,6 +50,10 @@ describe('SessionStrategy', () => {
         {
           provide: ApiTokenService,
           useValue: { authenticate: jest.fn().mockResolvedValue(null) },
+        },
+        {
+          provide: AuthAuditLogger,
+          useValue: { log: jest.fn() },
         },
       ],
     }).compile();

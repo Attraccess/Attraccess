@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto';
 import { ApiToken, User } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
 import { TokenHashService } from '../../../encryption/token-hash.service';
+import { RbacService } from '../../rbac/rbac.service';
 
 const LAST_USED_WRITE_INTERVAL_MS = 60_000;
 
@@ -13,6 +14,7 @@ export class ApiTokenService {
     @InjectRepository(ApiToken) private readonly apiTokenRepository: Repository<ApiToken>,
     @InjectRepository(User) private readonly userRepository: Repository<User>,
     private readonly tokenHashService: TokenHashService,
+    private readonly rbacService: RbacService,
   ) {}
 
   async list(userId: number): Promise<ApiToken[]> {
@@ -24,10 +26,9 @@ export class ApiTokenService {
 
   async create(
     userId: number,
-    allowedPermissions: Set<string>,
     input: { name: string; permissionKeys: string[]; expiresAt?: Date },
   ): Promise<{ apiToken: ApiToken; token: string }> {
-    this.assertAllowedPermissions(input.permissionKeys, allowedPermissions);
+    await this.assertAllowedPermissions(userId, input.permissionKeys);
     this.assertExpiry(input.expiresAt);
 
     const token = randomBytes(32).toString('base64url');
@@ -48,11 +49,10 @@ export class ApiTokenService {
   async update(
     userId: number,
     tokenId: number,
-    allowedPermissions: Set<string>,
     input: { name?: string; permissionKeys?: string[]; expiresAt?: Date | null },
   ): Promise<ApiToken> {
     const apiToken = await this.findOwned(userId, tokenId);
-    if (input.permissionKeys) this.assertAllowedPermissions(input.permissionKeys, allowedPermissions);
+    if (input.permissionKeys) await this.assertAllowedPermissions(userId, input.permissionKeys);
     if (input.expiresAt !== null) this.assertExpiry(input.expiresAt);
     if (input.name !== undefined) apiToken.name = input.name.trim();
     if (input.permissionKeys !== undefined) apiToken.permissionKeys = [...new Set(input.permissionKeys)];
@@ -95,7 +95,9 @@ export class ApiTokenService {
     return apiToken;
   }
 
-  private assertAllowedPermissions(requested: string[], allowed: Set<string>): void {
+  private async assertAllowedPermissions(userId: number, requested: string[]): Promise<void> {
+    // A session principal can outlive the RBAC cache, so delegation must use current permissions.
+    const allowed = await this.rbacService.getEffectivePermissions(userId, true);
     const disallowed = requested.filter((permission) => !allowed.has(permission));
     if (disallowed.length) {
       throw new ForbiddenException(`You cannot grant permissions you do not hold: ${disallowed.join(', ')}`);

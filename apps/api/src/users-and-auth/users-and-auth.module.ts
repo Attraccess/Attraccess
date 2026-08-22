@@ -53,7 +53,7 @@ import {
 import { EmailModule } from '../email/email.module';
 import { SSOService } from './auth/sso/sso.service';
 import { SSOOIDCStrategy } from './auth/sso/oidc/oidc.strategy';
-import { ModuleRef } from '@nestjs/core';
+import { APP_INTERCEPTOR, ModuleRef } from '@nestjs/core';
 import { SSOController } from './auth/sso/sso.controller';
 import { CookieConfigService } from '../common/services/cookie-config.service';
 import { LicenseModule } from '../license/license.module';
@@ -79,6 +79,8 @@ import { PasswordPolicyModule } from './password-policy/password-policy.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ApiTokenService } from './auth/api-token/api-token.service';
 import { ApiTokenController } from './auth/api-token/api-token.controller';
+import { ApiTokenRequestRateLimitService } from './auth/api-token/api-token-request-rate-limit.service';
+import { ApiTokenRequestRateLimitInterceptor } from './auth/api-token/api-token-request-rate-limit.interceptor';
 
 @Module({
   imports: [
@@ -137,6 +139,11 @@ import { ApiTokenController } from './auth/api-token/api-token.controller';
     TwoFactorService,
     PasskeyService,
     ApiTokenService,
+    ApiTokenRequestRateLimitService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ApiTokenRequestRateLimitInterceptor,
+    },
     LocalStrategy,
     SessionStrategy,
     SSOService,

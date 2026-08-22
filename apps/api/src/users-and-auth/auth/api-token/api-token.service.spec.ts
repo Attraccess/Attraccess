@@ -12,14 +12,23 @@ describe('ApiTokenService', () => {
   };
   const userRepository = { findOneBy: jest.fn() };
   const tokenHashService = { hashApiToken: jest.fn((token) => `hashed:${token}`) };
-  const service = new ApiTokenService(repository as never, userRepository as never, tokenHashService as never);
+  const rbacService = { getEffectivePermissions: jest.fn() };
+  const service = new ApiTokenService(
+    repository as never,
+    userRepository as never,
+    tokenHashService as never,
+    rbacService as never,
+  );
 
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    rbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.read']));
+  });
 
   it('stores only the hash and returns the secret once on creation', async () => {
     repository.save.mockImplementation(async (value) => ({ ...value, id: 1, createdAt: new Date() }));
 
-    const result = await service.create(3, new Set(['resources.read']), {
+    const result = await service.create(3, {
       name: 'Script',
       permissionKeys: ['resources.read'],
     });
@@ -31,10 +40,11 @@ describe('ApiTokenService', () => {
     expect(result.apiToken).not.toHaveProperty('token');
   });
 
-  it('refuses permissions outside the authenticating principal permissions', async () => {
+  it('refuses permissions no longer held by the owner', async () => {
     await expect(
-      service.create(3, new Set(['resources.read']), { name: 'Script', permissionKeys: ['resources.write'] }),
+      service.create(3, { name: 'Script', permissionKeys: ['resources.write'] }),
     ).rejects.toThrow(ForbiddenException);
+    expect(rbacService.getEffectivePermissions).toHaveBeenCalledWith(3, true);
   });
 
   it('rejects revoked and expired tokens before loading their owner', async () => {
