@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   analyze:
-    name: Analyze JavaScript, TypeScript, and C/C++
+    name: Analyze JavaScript, TypeScript, C/C++, and Actions
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -27,7 +27,7 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: javascript-typescript, c-cpp
+          languages: javascript-typescript, c-cpp, actions
           build-mode: none
 
       - name: Perform CodeQL analysis
