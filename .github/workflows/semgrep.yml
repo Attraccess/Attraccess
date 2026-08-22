@@ -27,7 +27,6 @@ jobs:
 
       - name: Scan the repository
         run: semgrep scan --config auto --sarif --output semgrep.sarif
-        continue-on-error: true
 
       - name: Upload Semgrep results
         if: always() && hashFiles('semgrep.sarif') != ''
