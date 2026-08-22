@@ -9,7 +9,7 @@ import { ApiTokenMetadataDto, CreateApiTokenDto, CreateApiTokenResponseDto, Upda
 export class ApiTokenController {
   constructor(private readonly apiTokenService: ApiTokenService) {}
 
-  @SessionAuth()
+  @SessionAuth('users.api-tokens.manage')
   @Get()
   @ApiOperation({ summary: 'List the current user API tokens', operationId: 'listApiTokens' })
   @ApiOkResponse({ type: [ApiTokenMetadataDto] })
@@ -17,7 +17,7 @@ export class ApiTokenController {
     return (await this.apiTokenService.list(request.user.id)).map(toMetadata);
   }
 
-  @SessionAuth()
+  @SessionAuth('users.api-tokens.manage')
   @Post()
   @ApiOperation({ summary: 'Create an API token', operationId: 'createApiToken' })
   @ApiOkResponse({ type: CreateApiTokenResponseDto })
@@ -25,14 +25,11 @@ export class ApiTokenController {
     @Req() request: AuthenticatedRequest,
     @Body() body: CreateApiTokenDto,
   ): Promise<CreateApiTokenResponseDto> {
-    const { apiToken, token } = await this.apiTokenService.create(
-      request.user.id,
-      body,
-    );
+    const { apiToken, token } = await this.apiTokenService.create(request.user.id, body);
     return { ...toMetadata(apiToken), token };
   }
 
-  @SessionAuth()
+  @SessionAuth('users.api-tokens.manage')
   @Patch(':id')
   @ApiOperation({ summary: 'Update an API token', operationId: 'updateApiToken' })
   @ApiOkResponse({ type: ApiTokenMetadataDto })
@@ -41,16 +38,10 @@ export class ApiTokenController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateApiTokenDto,
   ): Promise<ApiTokenMetadataDto> {
-    return toMetadata(
-      await this.apiTokenService.update(
-        request.user.id,
-        id,
-        body,
-      ),
-    );
+    return toMetadata(await this.apiTokenService.update(request.user.id, id, body));
   }
 
-  @SessionAuth()
+  @SessionAuth('users.api-tokens.manage')
   @Delete(':id')
   @ApiOperation({ summary: 'Revoke an API token', operationId: 'revokeApiToken' })
   async revoke(@Req() request: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number): Promise<void> {

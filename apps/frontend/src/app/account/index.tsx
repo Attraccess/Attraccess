@@ -26,7 +26,7 @@ export default function AccountPage() {
     de: { ...de, apiErrors: API_ERROR_TRANSLATIONS_DE },
   });
 
-  const { user: me } = useAuth();
+  const { user: me, hasPermission } = useAuth();
   const toast = useToastMessage();
   const { isOpen, open, close, setOpen } = useOverlayState();
 
@@ -65,11 +65,17 @@ export default function AccountPage() {
             {me && <SetPasswordForm userId={me.id} username={me.username} />}
             {me && <TwoFactorCard />}
             {me && <PasskeysCard />}
-            {me && <ApiTokensCard availablePermissions={me.effectivePermissions ?? []} />}
+            {me && hasPermission('users.api-tokens.manage') && (
+              <ApiTokensCard availablePermissions={me.effectivePermissions ?? []} />
+            )}
           </div>
         </FlatSection>
 
-        <FlatSection icon={<BellIcon size={16} />} title={t('sections.notifications')} className="sm:col-span-2 xl:col-span-3">
+        <FlatSection
+          icon={<BellIcon size={16} />}
+          title={t('sections.notifications')}
+          className="sm:col-span-2 xl:col-span-3"
+        >
           <div className="flex flex-col gap-6">
             <NotificationPreferencesForm />
           </div>
