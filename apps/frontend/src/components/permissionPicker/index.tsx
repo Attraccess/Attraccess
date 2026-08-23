@@ -136,6 +136,7 @@ export function PermissionPicker({
   };
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false);
   const [draftKeys, setDraftKeys] = useState<Set<string>>(() => new Set(selectedKeys));
 
   useEffect(() => {
@@ -314,6 +315,8 @@ export function PermissionPicker({
       selectionMode="multiple"
       value={[...selectedKeys]}
       onChange={(keys) => onChange(keys as Key[])}
+      isOpen={isAutocompleteOpen}
+      onOpenChange={setIsAutocompleteOpen}
       disabledKeys={disabledKeys}
       isDisabled={isDisabled}
       aria-label={label}
@@ -346,10 +349,23 @@ export function PermissionPicker({
       </Autocomplete.Trigger>
       <Autocomplete.Popover>
         <Autocomplete.Filter filter={contains}>
-          <SearchField autoFocus name="permission-search" variant="secondary">
+          <SearchField
+            autoFocus
+            name="permission-search"
+            variant="secondary"
+          >
             <SearchField.Group>
               <SearchField.SearchIcon />
-              <SearchField.Input placeholder={searchPlaceholder} data-cy={searchDataCy} />
+              <SearchField.Input
+                placeholder={searchPlaceholder}
+                data-cy={searchDataCy}
+                onKeyDownCapture={(event) => {
+                  if (event.key !== 'Escape') return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setIsAutocompleteOpen(false);
+                }}
+              />
               <SearchField.ClearButton />
             </SearchField.Group>
           </SearchField>
