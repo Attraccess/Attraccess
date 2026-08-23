@@ -442,7 +442,7 @@ function FlowsPageInner({ isActive }: { isActive: boolean }) {
             selectionOnDrag={selectionOnDrag}
             panOnDrag={panOnDrag}
             selectionMode={SelectionMode.Partial}
-            deleteKeyCode={['Backspace', 'Delete']}
+            deleteKeyCode={isActive ? ['Backspace', 'Delete'] : null}
             multiSelectionKeyCode="Shift"
             colorMode={theme === 'dark' ? 'dark' : 'light'}
             fitView
