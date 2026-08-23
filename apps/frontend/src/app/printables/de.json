@@ -16,5 +16,19 @@
   "previewAriaLabel": "3D-Vorschau des Schlüsselanhängers. Zum Drehen ziehen.",
   "printTip": "Zweifarbig: beide Teile gemeinsam importieren. Bei Z = 1,125 mm pausieren, den NFC-Sticker einlegen und fortsetzen.",
   "errorTitle": "Modell konnte nicht erzeugt werden",
-  "errorNoOutput": "Manche Zeichen in dieser Beschriftung können nicht graviert werden. Bitte Buchstaben, Zahlen und einfache Satzzeichen verwenden."
+  "errorNoOutput": "Manche Zeichen in dieser Beschriftung können nicht graviert werden. Bitte Buchstaben, Zahlen und einfache Satzzeichen verwenden.",
+  "modelSelection": "Druckbares Modell",
+  "plugTitle": "Sicherheitsabdeckung für Smart Plugs",
+  "plugDescription": "Eine zweiteilige, manipulationssichere Abdeckung mit zwei 3 x 5 mm Plombendurchführungen.",
+  "plugDevice": "Smart Plug",
+  "plugDeviceDescription": "Wähle das Profil, das zum installierten Plug passt.",
+  "plugNous": "Nous A1T / A1Z",
+  "plugShelly": "Shelly Plus Plug S",
+  "plugCable": "Angeschlossenes Kabel",
+  "cableStraightSchuko": "Gerades Schuko-Kabel",
+  "cableStraightEuro": "Gerades Euro-Kabel",
+  "cableAngledSchuko": "Gewinkeltes Schuko-Kabel",
+  "cableAngledEuro": "Gewinkeltes Euro-Kabel",
+  "plugPrintTip": "Body und Cover getrennt drucken. Um den Plug schließen und beide 3 x 5 mm Durchführungen mit Einwegplomben sichern.",
+  "plugPreviewAriaLabel": "3D-Vorschau der Smart-Plug-Sicherheitsabdeckung. Zum Drehen ziehen."
 }
