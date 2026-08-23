@@ -1141,7 +1141,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     });
   });
 
-  it('records a descriptive error when a node rejects without one', async () => {
+  it('records MQTT context when publishing rejects without an error message', async () => {
     const inputNode = createNode({ id: 'in-1' });
     const outputNode = createNode({
       id: 'output-1',
@@ -1155,10 +1155,14 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     mqttClientService.publish = jest.fn().mockRejectedValue({});
     flowLogs.start(1);
 
-    await expect(service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {})).rejects.toEqual({});
+    await expect(service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {})).rejects.toThrow(
+      "Failed to publish MQTT message to topic 'devices/state' on server 1: no error details were provided",
+    );
 
     const failedLog = flowLogs.getLogs(1).logs.find((log) => log.type === 'node.processing.failed');
     expect(failedLog).toBeDefined();
-    expect(JSON.parse(failedLog?.payload ?? '')).toEqual({ error: 'Unknown error' });
+    expect(JSON.parse(failedLog?.payload ?? '')).toEqual({
+      error: "Failed to publish MQTT message to topic 'devices/state' on server 1: no error details were provided",
+    });
   });
 });

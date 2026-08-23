@@ -152,4 +152,13 @@ describe('MqttSendMessageExecutor', () => {
 
     await expect(executor.execute(node, {}, ctx)).rejects.toThrow('broker offline');
   });
+
+  it('adds MQTT context when publish rejects without an error message', async () => {
+    mqttClientService.publish.mockRejectedValue({});
+    const node = makeNode({ serverId: 1, topic: 'devices/state', payload: 'p' });
+
+    await expect(executor.execute(node, {}, ctx)).rejects.toThrow(
+      "Failed to publish MQTT message to topic 'devices/state' on server 1: no error details were provided",
+    );
+  });
 });

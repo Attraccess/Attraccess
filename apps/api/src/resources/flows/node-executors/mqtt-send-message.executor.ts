@@ -19,13 +19,37 @@ export class MqttSendMessageExecutor implements NodeExecutor {
       `Publishing MQTT message to server ID: ${serverId} with topic: ${topic} and payload: "${payload}"`,
     );
 
-    await this.mqttClientService.publish(serverId, topic, payload, {
-      qos: data.qos as 0 | 1 | 2,
-      retain: data.retain as boolean,
-    });
+    try {
+      await this.mqttClientService.publish(serverId, topic, payload, {
+        qos: data.qos as 0 | 1 | 2,
+        retain: data.retain as boolean,
+      });
+    } catch (error) {
+      if (this.hasMessage(error)) {
+        throw error;
+      }
+
+      throw new Error(
+        `Failed to publish MQTT message to topic '${topic}' on server ${serverId}: no error details were provided`,
+      );
+    }
 
     return {
       payload: input,
     };
+  }
+
+  private hasMessage(error: unknown): boolean {
+    if (error instanceof Error) {
+      return error.message.length > 0;
+    }
+
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'message' in error &&
+      typeof error.message === 'string' &&
+      error.message.length > 0
+    );
   }
 }
