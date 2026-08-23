@@ -25,7 +25,7 @@ export class MqttSendMessageExecutor implements NodeExecutor {
         retain: data.retain as boolean,
       });
     } catch (error) {
-      if (this.hasMessage(error)) {
+      if (this.hasDescription(error)) {
         throw error;
       }
 
@@ -39,9 +39,13 @@ export class MqttSendMessageExecutor implements NodeExecutor {
     };
   }
 
-  private hasMessage(error: unknown): boolean {
+  private hasDescription(error: unknown): boolean {
     if (error instanceof Error) {
-      return error.message.length > 0;
+      return error.message.length > 0 || error.name.length > 0;
+    }
+
+    if (typeof error === 'string') {
+      return error.length > 0;
     }
 
     return (

@@ -153,6 +153,22 @@ describe('MqttSendMessageExecutor', () => {
     await expect(executor.execute(node, {}, ctx)).rejects.toThrow('broker offline');
   });
 
+  it('propagates descriptive string rejections from the mqtt client publish', async () => {
+    mqttClientService.publish.mockRejectedValue('broker offline');
+    const node = makeNode({ serverId: 1, topic: 't', payload: 'p' });
+
+    await expect(executor.execute(node, {}, ctx)).rejects.toBe('broker offline');
+  });
+
+  it('propagates named errors without a message from the mqtt client publish', async () => {
+    const error = new Error();
+    error.name = 'MqttConnectionError';
+    mqttClientService.publish.mockRejectedValue(error);
+    const node = makeNode({ serverId: 1, topic: 't', payload: 'p' });
+
+    await expect(executor.execute(node, {}, ctx)).rejects.toBe(error);
+  });
+
   it('adds MQTT context when publish rejects without an error message', async () => {
     mqttClientService.publish.mockRejectedValue({});
     const node = makeNode({ serverId: 1, topic: 'devices/state', payload: 'p' });
