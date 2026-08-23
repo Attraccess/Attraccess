@@ -35,11 +35,6 @@ uint32_t Display::screenHeight = 0;
 IDisplayDriver *Display::driver = nullptr;
 lv_display_t *Display::disp = NULL;
 lv_indev_t *Display::indev = NULL;
-IScreen *Display::activeScreen = NULL;
-std::vector<IScreen *> Display::pendingDestroyScreens;
-uint32_t Display::transitionStartTime = 0;
-bool Display::transitionComplete = true;
-std::function<void()> Display::onTransitionComplete = nullptr;
 std::string Display::deviceNameInitValue = "Attractap";
 
 lv_obj_t *Display::deviceNameLabel = NULL;
@@ -348,42 +343,7 @@ void Display::loop()
                                 "Touch panel not detected.\nCheck hardware and reboot.");
     }
 
-    if (Display::activeScreen)
-    {
-        Display::activeScreen->loop();
-    }
-
-    if (!Display::transitionComplete)
-    {
-        uint32_t currentTime = millis();
-        if (Display::transitionStartTime + Display::TRANSITION_DURATION + 500 < currentTime)
-        {
-            Display::transitionComplete = true;
-            if (Display::onTransitionComplete)
-            {
-                Display::onTransitionComplete();
-                Display::onTransitionComplete = nullptr;
-            }
-            if (!Display::pendingDestroyScreens.empty())
-            {
-                for (IScreen *scr : Display::pendingDestroyScreens)
-                {
-                    // Never tear down the screen that is currently active: a
-                    // re-transition during the destroy window can make a queued
-                    // screen active again, and freeing its LVGL tree would null
-                    // its widget pointers (-> lv_obj_get_screen(NULL) assert ->
-                    // loopTask hang -> task watchdog). transitionToScreen already
-                    // dequeues reused screens; this is a final safety net.
-                    if (scr && scr != Display::activeScreen)
-                    {
-                        Display::logger.debugf("Destroying screen: %s", scr->getName().c_str());
-                        scr->destroy();
-                    }
-                }
-                Display::pendingDestroyScreens.clear();
-            }
-        }
-    }
+    Display::advanceScreenRouter();
 
     lv_unlock();
 }
