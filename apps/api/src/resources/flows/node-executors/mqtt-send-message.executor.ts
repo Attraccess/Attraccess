@@ -45,7 +45,7 @@ export class MqttSendMessageExecutor implements NodeExecutor {
     }
 
     if (typeof error === 'string') {
-      return error.length > 0;
+      return error.trim().length > 0;
     }
 
     return (
@@ -53,7 +53,7 @@ export class MqttSendMessageExecutor implements NodeExecutor {
       error !== null &&
       'message' in error &&
       typeof error.message === 'string' &&
-      error.message.length > 0
+      error.message.trim().length > 0
     );
   }
 }
