@@ -1427,15 +1427,21 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
 #endif
       // Only the first AES block is the IV; encrypting sizeof(iv)=32 bytes
       // would overflow ive[16] and smash the stack (crashed changeKey on IDF).
-      Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
-                                      sizeof(ive), iv, ive);
+      if (!Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
+                                           sizeof(ive), iv, ive))
+      {
+        return 0;
+      }
       // encrypt cmd_data using SesAuthENCKey
       // padded_payload_length
       // uint8_t payload_encrypted[32];
       uint8_t payload_encrypted[52];
-      Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc, ive,
-                                      padded_payload_length, payload_padded,
-                                      payload_encrypted);
+      if (!Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc, ive,
+                                           padded_payload_length, payload_padded,
+                                           payload_encrypted))
+      {
+        return 0;
+      }
       memcpy(apdu + offset, payload_encrypted, padded_payload_length);
 #ifdef NTAG424DEBUG
       Serial.println("APDU Payload:");
@@ -1537,14 +1543,10 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     memcpy(checkmacin + 3, ntag424_authresponse_TI,
            NTAG424_AUTHRESPONSE_TI_SIZE);
     uint8_t padded_respdata_length = 0;
-    uint8_t *respdata = (uint8_t *)malloc(response_length - 10);
     if (response_length > 10)
     {
-      memcpy(respdata, response, response_length - 10);
-      // padded_respdata_length =
-      // Adafruit_PN532::ntag424_addpadding(response_length - 10 ,16, respdata);
       padded_respdata_length = response_length - 10;
-      memcpy(checkmacin + 3 + NTAG424_AUTHRESPONSE_TI_SIZE, respdata,
+      memcpy(checkmacin + 3 + NTAG424_AUTHRESPONSE_TI_SIZE, response,
              padded_respdata_length);
     }
     maclength = 3 + NTAG424_AUTHRESPONSE_TI_SIZE + padded_respdata_length;
@@ -1560,7 +1562,6 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     PN532DEBUGPRINT.print(F("checkcmac:"));
     Adafruit_PN532::PrintHex(checkmac, 8);
 #endif
-    free(respdata);
     free(checkmacin);
     for (int i = 0; i < 8; i++)
     {
@@ -1579,7 +1580,9 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     PN532DEBUGPRINT.println(F("Response CMAC ok! (picc == pcd)"));
   }
   // decrypt the response in mode.full
-  if ((response_length >= 10) && (comm_mode == NTAG424_COMM_MODE_FULL))
+  // A successful write can contain only its CMAC and 0x9100 status trailer.
+  // There is no encrypted payload to allocate or decrypt in that case.
+  if ((response_length > 10) && (comm_mode == NTAG424_COMM_MODE_FULL))
   {
     uint8_t ivd[32];
     uint8_t ivde[16];
@@ -1592,15 +1595,26 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     // Serial.println("IV-init:");
     // Adafruit_PN532::PrintHex(iv, 16);
     // Same overflow as the command-IV path: only one block fits in ivde[16].
-    Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
-                                    sizeof(ivde), ivd, ivde);
+    if (!Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
+                                         sizeof(ivde), ivd, ivde))
+    {
+      return 0;
+    }
     uint8_t *respplain = (uint8_t *)malloc(response_length - 10);
+    if (respplain == nullptr)
+    {
+      return 0;
+    }
 #ifdef NTAG424DEBUG
     PN532DEBUGPRINT.println(F("Encrypted Response(pcd < picc)"));
     Adafruit_PN532::PrintHex(response, response_length - 10);
 #endif
-    Adafruit_PN532::ntag424_decrypt(ntag424_Session.session_key_enc, ivde,
-                                    response_length - 10, response, respplain);
+    if (!Adafruit_PN532::ntag424_decrypt(ntag424_Session.session_key_enc, ivde,
+                                         response_length - 10, response, respplain))
+    {
+      free(respplain);
+      return 0;
+    }
 #ifdef NTAG424DEBUG
     PN532DEBUGPRINT.println(F("Decrypted Response(pcd < picc)"));
     Adafruit_PN532::PrintHex(respplain, response_length - 10);
@@ -2347,8 +2361,8 @@ uint8_t Adafruit_PN532::ntag424_AuthenticateEV2First(uint8_t *key,
   {
 #ifdef NTAG424DEBUG
     PN532DEBUGPRINT.println(F("Decryption error"));
-    return 0;
 #endif
+    return 0;
   }
   memset(RndBRotl, 0, sizeof(RndBRotl));
   ntag424_rotl(RndB, RndBRotl, blocklength, 1);
@@ -2367,7 +2381,10 @@ uint8_t Adafruit_PN532::ntag424_AuthenticateEV2First(uint8_t *key,
 #endif
   memcpy(&answer, RndA, blocklength);
   memcpy(&answer[blocklength], RndBRotl, blocklength);
-  Adafruit_PN532::ntag424_encrypt(key, sizeof(answer), answer, answer_enc);
+  if (!Adafruit_PN532::ntag424_encrypt(key, sizeof(answer), answer, answer_enc))
+  {
+    return 0;
+  }
 #ifdef NTAG424DEBUG
   PN532DEBUGPRINT.println(F("answer: "));
   Adafruit_PN532::PrintHexChar(answer, blocklength * 2);
@@ -2424,6 +2441,7 @@ uint8_t Adafruit_PN532::ntag424_AuthenticateEV2First(uint8_t *key,
 #ifdef NTAG424DEBUG
     PN532DEBUGPRINT.println(F("Decryption error"));
 #endif
+    return 0;
   }
   // save the authresponse
   memcpy(&ntag424_authresponse_TI,
@@ -2617,7 +2635,10 @@ uint8_t Adafruit_PN532::ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
   );
   Adafruit_PN532::PrintHex(result, response_length);
 
-  if ((result[0] != 0x91) || (result[1] != 0x00))
+  // A full-mode response can retain its eight-byte CMAC before the status
+  // trailer. The status is always the final two bytes.
+  if (response_length < 2 || result[response_length - 2] != 0x91 ||
+      result[response_length - 1] != 0x00)
   {
     return false;
   }
