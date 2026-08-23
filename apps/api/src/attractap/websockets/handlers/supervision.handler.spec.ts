@@ -7,7 +7,7 @@ type SocketState = AuthenticatedWebSocket['state'];
 
 describe('AttractapSupervisionHandler', () => {
   let handler: AttractapSupervisionHandler;
-  let attractapService: { findReaderById: jest.Mock };
+  let attractapService: { findReaderById: jest.Mock; getNFCCardByUID: jest.Mock };
   let websocketService: { sockets: Map<string, AuthenticatedWebSocket> };
   let resourceUsageService: { getActiveSession: jest.Mock; validateSupervisedStart: jest.Mock };
   let supervisionService: {
@@ -53,6 +53,12 @@ describe('AttractapSupervisionHandler', () => {
         id: READER_ID,
         firmware: { capabilities: { cardEnrollment: true } },
         resources: [{ id: RESOURCE_ID }],
+      }),
+      getNFCCardByUID: jest.fn().mockResolvedValue({
+        isActive: true,
+        keyNo: 1,
+        key: 'secret',
+        user: { id: 2, username: 'supervisor' },
       }),
     };
     websocketService = { sockets: new Map() };
@@ -219,17 +225,14 @@ describe('AttractapSupervisionHandler', () => {
       expect(socket.state.supervisionFlow).toMatchObject({ requestId: 'req-1', resourceId: RESOURCE_ID });
     });
 
-    // ATT-867: the reader screen closed itself a second after opening on any resource without
-    // introducers. getEligibleSupervisorIds() now falls back to the global resource managers for
-    // exactly that case, so a non-empty list here can be manager-only and the request opens.
-    it('opens the request when only a resource manager could supervise', async () => {
+    it('refuses the request when no introducer can supervise', async () => {
       const socket = tappedSocket();
-      supervisionService.getEligibleSupervisorIds.mockResolvedValue([42]);
+      supervisionService.getEligibleSupervisorIds.mockResolvedValue([]);
 
       await request(socket);
 
-      expect(errorSent(socket)).toBeUndefined();
-      expect(supervisionService.createReaderRequest).toHaveBeenCalled();
+      expect(errorSent(socket)).toBe('NO_SUPERVISORS_AVAILABLE');
+      expect(supervisionService.createReaderRequest).not.toHaveBeenCalled();
     });
 
     it('still refuses when nobody but the requester could supervise', async () => {
@@ -322,6 +325,52 @@ describe('AttractapSupervisionHandler', () => {
       await confirm(socket, { resourceId: RESOURCE_ID });
 
       expect(supervisionService.cancelReaderRequest).toHaveBeenCalledWith('req-1', expect.any(String));
+    });
+  });
+
+  describe('handleSupervisorCardAuthRequest', () => {
+    const authenticate = (socket: AuthenticatedWebSocket) =>
+      handler.handleSupervisorCardAuthRequest(socket, {
+        type: AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA,
+        payload: { uid: 'supervisor-card', resourceId: RESOURCE_ID },
+      });
+
+    const armedSocket = () =>
+      makeSocket({
+        supervisionFlow: {
+          resourceId: RESOURCE_ID,
+          requesterUserId: requester.id,
+          requestId: 'req-1',
+          approvedSupervisorUserId: null,
+        },
+      });
+
+    it('accepts an introducer card, including an applicable Resource Group introducer', async () => {
+      const socket = armedSocket();
+      usersService.findOne.mockResolvedValueOnce(requester);
+
+      await authenticate(socket);
+
+      expect(resourceUsageService.validateSupervisedStart).toHaveBeenCalledWith(RESOURCE_ID, requester, 2);
+      expect(socket.state.supervisionFlow).toMatchObject({ approvedSupervisorUserId: 2 });
+      expect(socket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ payload: expect.objectContaining({ keyNo: 1 }) }) }),
+      );
+    });
+
+    it('rejects a maintainer-only or resource-manager-only card', async () => {
+      const socket = armedSocket();
+      usersService.findOne.mockResolvedValueOnce(requester);
+      resourceUsageService.validateSupervisedStart.mockRejectedValueOnce(new BadRequestException('not an introducer'));
+
+      await authenticate(socket);
+
+      expect(socket.state.supervisionFlow).toMatchObject({ approvedSupervisorUserId: null });
+      expect(socket.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ payload: expect.objectContaining({ error: 'SUPERVISOR_NOT_AUTHORIZED' }) }),
+        }),
+      );
     });
   });
 });

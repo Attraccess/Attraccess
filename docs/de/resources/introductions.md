@@ -11,7 +11,7 @@ Einweisungen folgen einem einfachen Modell:
 
 Ein Benutzer, der nicht eingewiesen wurde, kann keine Nutzungssitzung an der Ressource starten.
 
-Einige Ressourcen können außerdem **beaufsichtigte Nutzung** erlauben oder erfordern. In einer beaufsichtigten Sitzung startet der Benutzer die Sitzung, während eine qualifizierte **Aufsicht** anwesend ist. Die Aufsicht muss Einweiser, Wartender oder Ressourcenverwalter für die Ressource sein. Beaufsichtigung ist hilfreich für Trainings, erste Versuche oder Ressourcen, bei denen eine zweite anwesende Person vorgeschrieben ist.
+Einige Ressourcen können außerdem **beaufsichtigte Nutzung** erlauben oder erfordern. In einer beaufsichtigten Sitzung startet der Benutzer die Sitzung, während eine qualifizierte **Aufsicht** anwesend ist. Nur ein Einweiser für die Ressource, einschließlich eines Einweisers einer passenden Ressourcengruppe, darf die Aufsicht übernehmen. Beaufsichtigung ist hilfreich für Trainings, erste Versuche oder Ressourcen, bei denen eine zweite anwesende Person vorgeschrieben ist.
 
 ## Rollen
 
@@ -22,7 +22,7 @@ Einige Ressourcen können außerdem **beaufsichtigte Nutzung** erlauben oder erf
 | **Einweiser** | Alles, was ein Wartender darf, plus Einweisungen für andere Benutzer erteilen und entziehen |
 | **Ressourcenverwalter** | Alle oben genannten Rechte, plus Einweiser/Wartende verwalten und Ressourceneinstellungen anpassen |
 
-Bei beaufsichtigten Sitzungen ist die Aufsicht der Einweiser, Wartende oder Ressourcenverwalter, der die Sitzung bestätigt und für die Beaufsichtigung verantwortlich bleibt.
+Bei beaufsichtigten Sitzungen ist die Aufsicht ein Einweiser, der die Sitzung bestätigt und für die Beaufsichtigung verantwortlich bleibt. Ein Wartender oder Ressourcenverwalter darf nur beaufsichtigen, wenn er zusätzlich Einweiser ist.
 
 > [!NOTE]
 > **Einweiser vs. Wartender:** Beide können die Maschine bedienen und in den Wartungsmodus versetzen (oder daraus entfernen). Der Unterschied: Nur ein **Einweiser** kann anderen Benutzern Einweisungen erteilen. Verwende **Wartender** für Personen, die die Maschine warten, aber nicht über den Zugang anderer entscheiden sollen.

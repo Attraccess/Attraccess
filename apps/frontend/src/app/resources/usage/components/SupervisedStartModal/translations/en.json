@@ -1,20 +1,19 @@
 {
   "title": "Supervisor required",
   "select": {
-    "description": "This session needs a supervisor. Ask someone to approve it, or have them authenticate with their card at a reader.",
+    "description": "This session needs supervision. Ask an introducer to approve it, or have them authenticate with their card at a reader.",
     "empty": "No authorized supervisors are currently available.",
-    "people": "Ask a supervisor",
+    "people": "Ask an introducer",
     "readers": "Authenticate at a reader",
     "otherReaders": "Other readers",
-    "readerHint": "Any authorized supervisor can approve by tapping their card.",
+    "readerHint": "An introducer can approve by tapping their card.",
     "role": {
-      "introducer": "Introducer",
-      "maintainer": "Maintainer"
+      "introducer": "Introducer"
     }
   },
   "waiting": {
     "description": "Waiting for the supervisor to approve your request…",
-    "atReader": "Have a supervisor tap their card at {{reader}}.",
+    "atReader": "Have an introducer tap their card at {{reader}}.",
     "countdown": "{{seconds}}s"
   },
   "timeout": {
@@ -24,7 +23,7 @@
     "description": "Your request was declined. Please try again or pick another supervisor."
   },
   "error": {
-    "description": "The request could not be sent. The reader may be offline or busy."
+    "description": "The request could not be sent. Please try again."
   },
   "retry": "Try again",
   "cancel": "Cancel"

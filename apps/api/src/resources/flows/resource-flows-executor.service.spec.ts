@@ -392,6 +392,29 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     });
   });
 
+  it('rejects when a parallel flow branch fails without waiting for stalled siblings', async () => {
+    const firstNode = createNode({ id: 'first-node' });
+    const secondNode = createNode({ id: 'second-node' });
+    let finishSecondBranch: (() => void) | undefined;
+    const processNode = jest
+      .spyOn(service as unknown as { processNode: () => Promise<NodeProcessingResult[]> }, 'processNode')
+      .mockRejectedValueOnce(new Error('first branch failed'))
+      .mockReturnValueOnce(
+        new Promise<NodeProcessingResult[]>((resolve) => {
+          finishSecondBranch = () => resolve([]);
+        }),
+      );
+
+    const flow = service.startFlow([firstNode, secondNode], { payload: {} });
+    await expect(flow).rejects.toThrow('first branch failed');
+
+    if (!finishSecondBranch) {
+      throw new Error('Second branch was not started');
+    }
+    finishSecondBranch();
+    expect(processNode).toHaveBeenCalledTimes(2);
+  });
+
   it('ends the active usage session with templated notes and passes payload through', async () => {
     // Arrange nodes: INPUT -> END_SESSION (terminal)
     const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });

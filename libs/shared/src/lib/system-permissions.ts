@@ -14,6 +14,7 @@ export type SystemPermission =
   | 'users.update'
   | 'users.delete'
   | 'users.roles.manage'
+  | 'users.api-tokens.manage'
   | 'system.settings.manage'
   | 'system.sso.manage'
   | 'system.plugins.manage'

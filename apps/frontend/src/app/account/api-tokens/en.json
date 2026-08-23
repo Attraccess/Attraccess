@@ -1,0 +1,31 @@
+{
+  "title": "API tokens",
+  "description": "Create least-privilege tokens for the REST API. A token can use only the permissions you select and currently hold.",
+  "empty": "You have not created an API token yet.",
+  "neverUsed": "Never",
+  "neverExpires": "Never",
+  "columns": { "name": "Name", "permissions": "Permissions", "lastUsed": "Last used", "expires": "Expires", "actions": "Actions" },
+  "nameLabel": "Name",
+  "namePlaceholder": "e.g. CI deployment",
+  "permissionsLabel": "Permissions",
+  "permissionsPlaceholder": "Select permissions",
+  "permissionsSearchPlaceholder": "Search permissions...",
+  "permissionsEmpty": "No permissions found",
+  "picker": {
+    "title": "Choose API token permissions",
+    "description": "Select the minimum access this token needs. It can use only permissions you currently hold.",
+    "selectedCount": "{{selected}} of {{total}} permissions selected",
+    "previewLabel": "Access scope",
+    "emptyPreview": "No access selected",
+    "edit": "Edit",
+    "selectCategory": "Select all",
+    "clearCategory": "Clear all",
+    "apply": "Save permissions",
+    "cancel": "Cancel"
+  },
+  "expiryLabel": "Expiry date (optional)",
+  "actions": { "create": "Create API token", "revoke": "Revoke API token {{name}}", "copy": "Copy token", "dismiss": "Dismiss token" },
+  "secret": { "title": "Copy your token now", "description": "This secret is shown only once and cannot be recovered." },
+  "success": { "created": "API token created", "revoked": "API token revoked", "copied": "API token copied" },
+  "errors": { "loadFailed": "Could not load API tokens", "createFailed": "Could not create API token", "revokeFailed": "Could not revoke API token" }
+}

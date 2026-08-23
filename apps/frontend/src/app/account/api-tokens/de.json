@@ -1,0 +1,31 @@
+{
+  "title": "API-Token",
+  "description": "Erstelle Tokens mit minimalen Berechtigungen für die REST API. Ein Token kann nur die ausgewählten Berechtigungen nutzen, die du aktuell besitzt.",
+  "empty": "Du hast noch keinen API-Token erstellt.",
+  "neverUsed": "Nie",
+  "neverExpires": "Nie",
+  "columns": { "name": "Name", "permissions": "Berechtigungen", "lastUsed": "Zuletzt genutzt", "expires": "Läuft ab", "actions": "Aktionen" },
+  "nameLabel": "Name",
+  "namePlaceholder": "z.B. CI-Bereitstellung",
+  "permissionsLabel": "Berechtigungen",
+  "permissionsPlaceholder": "Berechtigungen auswählen",
+  "permissionsSearchPlaceholder": "Berechtigungen suchen...",
+  "permissionsEmpty": "Keine Berechtigungen gefunden",
+  "picker": {
+    "title": "API-Token-Berechtigungen auswählen",
+    "description": "Wähle die minimal erforderlichen Zugriffe. Das Token kann nur Berechtigungen nutzen, die du aktuell besitzt.",
+    "selectedCount": "{{selected}} von {{total}} Berechtigungen ausgewählt",
+    "previewLabel": "Zugriffsbereich",
+    "emptyPreview": "Keine Zugriffe ausgewählt",
+    "edit": "Bearbeiten",
+    "selectCategory": "Alle auswählen",
+    "clearCategory": "Alle entfernen",
+    "apply": "Berechtigungen speichern",
+    "cancel": "Abbrechen"
+  },
+  "expiryLabel": "Ablaufdatum (optional)",
+  "actions": { "create": "API-Token erstellen", "revoke": "API-Token {{name}} widerrufen", "copy": "Token kopieren", "dismiss": "Token ausblenden" },
+  "secret": { "title": "Token jetzt kopieren", "description": "Dieses Geheimnis wird nur einmal angezeigt und kann nicht wiederhergestellt werden." },
+  "success": { "created": "API-Token erstellt", "revoked": "API-Token widerrufen", "copied": "API-Token kopiert" },
+  "errors": { "loadFailed": "API-Token konnten nicht geladen werden", "createFailed": "API-Token konnte nicht erstellt werden", "revokeFailed": "API-Token konnte nicht widerrufen werden" }
+}

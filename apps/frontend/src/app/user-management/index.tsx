@@ -162,9 +162,11 @@ export const UserManagementPage: React.FC = () => {
                     .filter((value) => value.length > 0)
                     .join(', ');
                   const isSsoLinked = ssoDetails.length > 0;
+                  // This view only receives the detailed response because it requires users.read.
+                  const detailedUser = user as User;
 
                   // Elevated roles (non-default) for display
-                  const elevatedRoles = ((user.userRoles ?? []) as UserRole[])
+                  const elevatedRoles = ((detailedUser.userRoles ?? []) as UserRole[])
                     .filter((ur) => ur.role && !DEFAULT_ROLE_KEYS.has(ur.role.key))
                     .reduce<{ id: number; name: string; key: string }[]>((acc, ur) => {
                       if (ur.role && !acc.some((r) => r.id === ur.role?.id)) {
@@ -181,13 +183,13 @@ export const UserManagementPage: React.FC = () => {
                       onAction={() => navigate(`/users/${user.id}`)}
                     >
                       <TableCell className="hidden md:table-cell">
-                        {user.isEmailVerified ? <ShieldCheckIcon /> : <ShieldOffIcon />}
+                        {detailedUser.isEmailVerified ? <ShieldCheckIcon /> : <ShieldOffIcon />}
                       </TableCell>
                       <TableCell>{user.id}</TableCell>
                       <TableCell>
-                        <AttraccessUser user={user} />
+                          <AttraccessUser user={detailedUser} />
                       </TableCell>
-                      <TableCell className="hidden md:table-cell">{user.externalIdentifier}</TableCell>
+                      <TableCell className="hidden md:table-cell">{detailedUser.externalIdentifier}</TableCell>
                       <TableCell className="hidden lg:table-cell">
                         {elevatedRoles.length > 0 ? (
                           <div className="flex flex-wrap gap-1">

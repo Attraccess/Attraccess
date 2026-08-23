@@ -2,11 +2,17 @@
 #include <functional>
 
 #include <algorithm>
+#include <utility>
 #include "platform.hpp"
 
-// Screen routing: transition between IScreen instances with a fade animation.
-// Unloading of the previous screen is deferred until the transition completes
-// (handled in Display::loop via pendingDestroyScreens).
+// Screen routing owns the complete transaction, including its deferred
+// retirement. Display::loop only asks this router to advance it.
+
+IScreen *Display::activeScreen = nullptr;
+std::vector<IScreen *> Display::pendingDestroyScreens;
+uint32_t Display::transitionStartTime = 0;
+bool Display::transitionComplete = true;
+std::function<void()> Display::onTransitionComplete = nullptr;
 
 void Display::transitionToScreen(IScreen *screen)
 {
@@ -17,6 +23,8 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
 {
     if (!screen)
     {
+        // Rejecting a request does not replace an in-flight transaction. Its
+        // supplied callback is discarded with the rejected request.
         Display::logger.error("transitionToScreen called with null screen");
         return;
     }
@@ -31,6 +39,8 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
     lv_obj_t *targetRoot = screen->getScreen();
     if (!targetRoot)
     {
+        // Initialization failures likewise leave the active transaction and
+        // its callback untouched; this request never becomes a transition.
         Display::logger.error("Screen failed to provide lvgl root; aborting transition");
         return;
     }
@@ -47,9 +57,9 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
         Display::pendingDestroyScreens.end());
 
     IScreen *previousScreen = Display::activeScreen;
-    if (Display::activeScreen)
+    if (previousScreen)
     {
-        Display::activeScreen->onScreenLeave();
+        previousScreen->onScreenLeave();
     }
 
     Display::activeScreen = screen;
@@ -58,14 +68,9 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
     Display::transitionStartTime = millis();
     Display::transitionComplete = false;
 
-    if (onTransitionComplete)
-    {
-        Display::onTransitionComplete = onTransitionComplete;
-    }
-    else
-    {
-        Display::onTransitionComplete = nullptr;
-    }
+    // An accepted transition supersedes the previous unfinished transaction:
+    // its callback is cancelled rather than being invoked for the wrong screen.
+    Display::onTransitionComplete = onTransitionComplete;
 
     if (previousScreen && previousScreen != screen && previousScreen->shouldAutoUnload())
     {
@@ -78,5 +83,41 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
             Display::logger.debugf("Queued screen %s for unload", previousScreen->getName().c_str());
             Display::pendingDestroyScreens.push_back(previousScreen);
         }
+    }
+}
+
+void Display::advanceScreenRouter()
+{
+    if (Display::activeScreen)
+    {
+        Display::activeScreen->loop();
+    }
+
+    if (Display::transitionComplete ||
+        millis() - Display::transitionStartTime < Display::TRANSITION_DURATION)
+    {
+        return;
+    }
+
+    Display::transitionComplete = true;
+
+    // Retire before notifying clients, so a completion callback always observes
+    // the finished transaction. Re-entered screens have already been dequeued;
+    // the active-screen check remains the final safety invariant.
+    for (IScreen *screen : Display::pendingDestroyScreens)
+    {
+        if (screen && screen != Display::activeScreen)
+        {
+            Display::logger.debugf("Destroying screen: %s", screen->getName().c_str());
+            screen->destroy();
+        }
+    }
+    Display::pendingDestroyScreens.clear();
+
+    std::function<void()> completion = std::move(Display::onTransitionComplete);
+    Display::onTransitionComplete = nullptr;
+    if (completion)
+    {
+        completion();
     }
 }

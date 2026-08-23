@@ -38,13 +38,13 @@ Bevor Sie die meisten Ressourcen nutzen können, benötigen Sie eine Sicherheits
 
 ## Beaufsichtigte Sitzung starten
 
-Manche Ressourcen erlauben oder erfordern beaufsichtigte Nutzung. In einer beaufsichtigten Sitzung starten Sie die Ressource, während eine qualifizierte Aufsicht anwesend ist. Eine Aufsicht kann Einweiser, Wartender oder Ressourcenverwalter für diese Ressource sein.
+Manche Ressourcen erlauben oder erfordern beaufsichtigte Nutzung. In einer beaufsichtigten Sitzung starten Sie die Ressource, während eine qualifizierte Aufsicht anwesend ist. Nur ein Einweiser für diese Ressource kann die Aufsicht übernehmen.
 
 Sie benötigen möglicherweise eine beaufsichtigte Sitzung, wenn:
 
 - Sie noch nicht eingewiesen sind, die Ressource aber beaufsichtigte Nutzung erlaubt
 - die Ressource für jede Sitzung Beaufsichtigung erfordert
-- ein Einweiser oder Wartender Ihr Training oder Ihre ersten Nutzungsversuche beaufsichtigen möchte
+- ein Einweiser Ihr Training oder Ihre ersten Nutzungsversuche beaufsichtigen möchte
 
 So starten Sie eine beaufsichtigte Sitzung:
 

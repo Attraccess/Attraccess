@@ -23,7 +23,7 @@ describe('AuthAuditLogger', () => {
     expect(warnSpy).toHaveBeenCalledTimes(1);
     const line = warnSpy.mock.calls[0][0] as string;
     expect(line).toMatch(
-      /^auth\.failed type=login outcome=invalid_credentials ip=1\.2\.3\.4 user_id=42 username=alice ts=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z reason=bad_password$/,
+      /^auth\.failed type=login outcome=invalid_credentials ip=1\.2\.3\.4 user_id=42 username=alice auth_method=anonymous api_token_id=- ts=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z reason=bad_password$/,
     );
   });
 
@@ -54,5 +54,22 @@ describe('AuthAuditLogger', () => {
     const line = warnSpy.mock.calls[0][0] as string;
     expect(line).toContain('user_id=-');
     expect(line).toContain('username=-');
+    expect(line).toContain('auth_method=anonymous');
+    expect(line).toContain('api_token_id=-');
+  });
+
+  it('records the API token identity for token authentication', () => {
+    logger.log({
+      type: 'api_token',
+      outcome: 'success',
+      ip: '2.2.2.2',
+      userId: 42,
+      authenticationMethod: 'api-token',
+      apiTokenId: 7,
+    });
+    const line = logSpy.mock.calls[0][0] as string;
+    expect(line).toContain('type=api_token');
+    expect(line).toContain('auth_method=api-token');
+    expect(line).toContain('api_token_id=7');
   });
 });

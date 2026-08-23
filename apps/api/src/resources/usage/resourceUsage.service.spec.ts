@@ -81,6 +81,7 @@ describe('ResourceUsageService', () => {
     getRepository: jest.Mock;
     findOne: jest.Mock;
     update: jest.Mock;
+    transaction: jest.Mock;
   };
 
   const mockRepository = () => ({
@@ -309,6 +310,9 @@ describe('ResourceUsageService', () => {
         execute: jest.fn().mockResolvedValue({}),
       })),
       update: jest.fn().mockResolvedValue(undefined),
+      transaction: jest.fn(async (cb: (em: typeof transactionalEntityManager) => Promise<unknown>) =>
+        cb(transactionalEntityManager),
+      ),
       // Ensure code paths that use getRepository(Entity).findOne work in tests
       getRepository: jest.fn((entity) => {
         if (entity === Resource) {
@@ -332,7 +336,13 @@ describe('ResourceUsageService', () => {
         }
         return null;
       }),
-    } as unknown as { createQueryBuilder: jest.Mock; getRepository: jest.Mock; findOne: jest.Mock; update: jest.Mock };
+    } as unknown as {
+      createQueryBuilder: jest.Mock;
+      getRepository: jest.Mock;
+      findOne: jest.Mock;
+      update: jest.Mock;
+      transaction: jest.Mock;
+    };
 
     // @ts-expect-error augment mock with manager
     resourceUsageRepository.manager = {
@@ -382,8 +392,10 @@ describe('ResourceUsageService', () => {
       type: ResourceType.Machine,
     } as Resource;
 
-    it('should start a session successfully when no active session exists', async () => {
+    it('should start a session when the start flow fails', async () => {
       const dto: StartUsageSessionDto = { notes: 'Test session' };
+
+      flowExecutorService.runFlow.mockRejectedValueOnce(new Error('MQTT authentication failed'));
 
       // Mock resourceRepository.findOne to return the resource
       resourceRepository.findOne.mockResolvedValue(mockResource);
@@ -458,6 +470,13 @@ describe('ResourceUsageService', () => {
       });
       expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledTimes(1);
       expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledWith(createdSession.resourceId);
+      expect(transactionalEntityManager.transaction).toHaveBeenCalledTimes(1);
+      expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
+        createdSession.resourceId,
+        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+        expect.any(Object),
+        transactionalEntityManager,
+      );
     });
 
     it('should throw error when resource does not exist', async () => {
@@ -525,8 +544,10 @@ describe('ResourceUsageService', () => {
       );
     });
 
-    it('should successfully takeover when resource allows it', async () => {
+    it('should takeover when the takeover flow fails', async () => {
       const dto: StartUsageSessionDto = { notes: 'Test session', forceTakeOver: true };
+
+      flowExecutorService.runFlow.mockRejectedValueOnce(new Error('MQTT authentication failed'));
 
       // Mock resourceRepository.findOne to return the resource (allowTakeOver: true)
       resourceRepository.findOne.mockResolvedValue(mockResourceWithTakeOver);
@@ -625,6 +646,13 @@ describe('ResourceUsageService', () => {
       expect(chargedIds).not.toContain(mockNewUsage.id);
       expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledTimes(1);
       expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledWith(mockNewUsage.resourceId);
+      expect(transactionalEntityManager.transaction).toHaveBeenCalledTimes(1);
+      expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
+        mockActiveSession.resourceId,
+        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
+        expect.any(Object),
+        transactionalEntityManager,
+      );
     });
 
     it('should trigger only TAKEOVER flow on takeover and not STARTED/STOPPED; billing unchanged', async () => {
@@ -958,7 +986,7 @@ describe('ResourceUsageService', () => {
       resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_ALLOWED));
       resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
       userRepository.findOne.mockResolvedValue(supervisor);
-      resourceIntroducersService.canMaintain.mockResolvedValue(true);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(true);
 
       const { finalizedSession, mockQueryBuilder } = mockSuccessfulSessionCreation(2);
 
@@ -974,20 +1002,18 @@ describe('ResourceUsageService', () => {
       expect(payload).toMatchObject({ resourceId: 1, userId: 1, supervisorUserId: 2 });
     });
 
-    it('accepts a supervisor authorized via resources.update permission even without an introducer role', async () => {
+    it('rejects a resource manager who is not also an introducer', async () => {
       const dto: StartUsageSessionDto = {};
       const adminSupervisor = { id: 2, username: 'admin' } as User;
       resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_ALLOWED));
       resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
       userRepository.findOne.mockResolvedValue(adminSupervisor);
-      resourceIntroducersService.canMaintain.mockResolvedValue(false);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(false);
       mockRbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.update']));
 
-      mockSuccessfulSessionCreation(2);
-
-      await expect(service.startSession(1, requester, dto, { supervisorUserId: 2 })).resolves.toMatchObject({
-        supervisorUserId: 2,
-      });
+      await expect(service.startSession(1, requester, dto, { supervisorUserId: 2 })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
     });
 
     it('allows a supervised start on SUPERVISION_REQUIRED even for an introduced user', async () => {
@@ -995,7 +1021,7 @@ describe('ResourceUsageService', () => {
       resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_REQUIRED));
       resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
       userRepository.findOne.mockResolvedValue(supervisor);
-      resourceIntroducersService.canMaintain.mockResolvedValue(true);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(true);
 
       mockSuccessfulSessionCreation(2);
 
@@ -1013,15 +1039,28 @@ describe('ResourceUsageService', () => {
       );
     });
 
-    it('rejects a supervisor that is neither introducer/maintainer nor resource manager', async () => {
+    it('rejects a maintainer who is not also an introducer', async () => {
       resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_ALLOWED));
       resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
       userRepository.findOne.mockResolvedValue(supervisor);
-      resourceIntroducersService.canMaintain.mockResolvedValue(false);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(false);
 
       await expect(service.startSession(1, requester, {}, { supervisorUserId: 2 })).rejects.toBeInstanceOf(
         ForbiddenException,
       );
+    });
+
+    it('accepts an applicable Resource Group introducer', async () => {
+      resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_ALLOWED));
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+      userRepository.findOne.mockResolvedValue(supervisor);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(true);
+      mockSuccessfulSessionCreation(2);
+
+      await expect(service.startSession(1, requester, {}, { supervisorUserId: 2 })).resolves.toMatchObject({
+        supervisorUserId: 2,
+      });
+      expect(resourceIntroducersService.isIntroducer).toHaveBeenCalledWith(1, 2, true, expect.anything());
     });
 
     it('rejects a supervised start when the resource does not allow supervision', async () => {

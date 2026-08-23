@@ -1,23 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Autocomplete,
   Button,
   Chip,
-  Description,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
-  EmptyState,
-  Header,
   Input,
   Label,
-  ListBox,
-  SearchField,
-  Tag,
-  TagGroup,
   TextArea,
   TextField,
-  useFilter,
   type Key,
 } from '@heroui/react';
 import { LockIcon } from 'lucide-react';
@@ -34,6 +25,7 @@ import {
   useRbacServiceUpdateRole,
 } from '@attraccess/react-query-client';
 import { StandardDrawer } from '../../../components/standardDrawer';
+import { PermissionPicker } from '../../../components/permissionPicker';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useAuth } from '../../../hooks/useAuth';
 import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
@@ -42,7 +34,6 @@ import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 
-// Permission categories in display order, matching the permission catalog domains
 const CATEGORY_ORDER = ['resources', 'users', 'system', 'billing'];
 
 interface Props {
@@ -61,7 +52,6 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   const { hasPermission } = useAuth();
-  const { contains } = useFilter({ sensitivity: 'base' });
 
   const isReadOnly = !!role?.isSystemManaged;
   const mode = role === null ? 'create' : isReadOnly ? 'view' : 'edit';
@@ -78,8 +68,6 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
     setDescription(role ? roleDescription(role) : '');
     setSelectedKeys(new Set((role?.rolePermissions ?? []).map((rp) => rp.permissionKey)));
   }, [isOpen, role, roleName, roleDescription]);
-
-  const permissionByKey = useMemo(() => new Map((permissions ?? []).map((p) => [p.key, p])), [permissions]);
 
   const permissionsByCategory = useMemo(() => {
     const groups = new Map<string, Permission[]>();
@@ -102,20 +90,6 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
     [permissions, hasPermission],
   );
 
-  // Pre-computed outside the Autocomplete render prop to avoid recomputing on every render
-  const selectedTagItems = useMemo(
-    () =>
-      [...selectedKeys].map((k) => {
-        const permission = permissionByKey.get(k);
-        return {
-          key: k,
-          label: permission ? permissionLabel(permission) : k,
-          isLocked: nonGrantableKeys.includes(k),
-        };
-      }),
-    [selectedKeys, permissionByKey, nonGrantableKeys, permissionLabel],
-  );
-
   // Locked keys can be neither added nor removed, no matter how the change was triggered
   const applySelection = (keys: Iterable<Key>) => {
     setSelectedKeys((prev) => {
@@ -123,16 +97,6 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
       for (const key of nonGrantableKeys) {
         if (prev.has(key)) next.add(key);
         else next.delete(key);
-      }
-      return next;
-    });
-  };
-
-  const handleRemoveTags = (keys: Set<Key>) => {
-    setSelectedKeys((prev) => {
-      const next = new Set(prev);
-      for (const key of keys) {
-        if (!nonGrantableKeys.includes(String(key))) next.delete(String(key));
       }
       return next;
     });
@@ -236,95 +200,24 @@ export function RoleFormDrawer({ isOpen, onOpenChange, role }: Props) {
                 ))}
             </div>
           ) : (
-            <Autocomplete
-              fullWidth
-              placeholder={t('permissions.pickerPlaceholder')}
-              selectionMode="multiple"
-              value={[...selectedKeys]}
-              onChange={(keys) => applySelection(keys as Key[])}
+            <PermissionPicker
+              permissions={permissions ?? []}
+              selectedKeys={selectedKeys}
+              onChange={applySelection}
               disabledKeys={nonGrantableKeys}
-              aria-label={t('permissions.title')}
-              data-cy="role-form-drawer-permission-picker"
-            >
-              <Autocomplete.Trigger>
-                <Autocomplete.Value>
-                  {({ defaultChildren, isPlaceholder, state }) => {
-                    if (isPlaceholder || state.selectedItems.length === 0) {
-                      return defaultChildren;
-                    }
-                    return (
-                      <TagGroup size="sm" aria-label={t('permissions.title')} onRemove={handleRemoveTags}>
-                        <TagGroup.List>
-                          {selectedTagItems.map(({ key, label, isLocked }) => (
-                            <Tag
-                              key={key}
-                              id={key}
-                              textValue={isLocked ? `${label} ${t('permissions.lockedTagIndicator')}` : label}
-                            >
-                              {(renderProps) => (
-                                <>
-                                  {isLocked && <LockIcon className="w-3 h-3" aria-hidden="true" />}
-                                  {label}
-                                  {renderProps.allowsRemoving && !isLocked && <Tag.RemoveButton />}
-                                </>
-                              )}
-                            </Tag>
-                          ))}
-                        </TagGroup.List>
-                      </TagGroup>
-                    );
-                  }}
-                </Autocomplete.Value>
-                <Autocomplete.Indicator />
-              </Autocomplete.Trigger>
-              <Autocomplete.Popover>
-                <Autocomplete.Filter filter={contains}>
-                  <SearchField autoFocus name="permission-search" variant="secondary">
-                    <SearchField.Group>
-                      <SearchField.SearchIcon />
-                      <SearchField.Input
-                        placeholder={t('permissions.searchPlaceholder')}
-                        data-cy="role-form-drawer-permission-search"
-                      />
-                      <SearchField.ClearButton />
-                    </SearchField.Group>
-                  </SearchField>
-                  {nonGrantableKeys.length > 0 ? (
-                    <p className="flex items-center gap-1 px-2 py-1 text-xs text-default-400">
-                      <LockIcon className="w-3 h-3 shrink-0" />
-                      {t('permissions.cannotGrantHint')}
-                    </p>
-                  ) : null}
-                  <ListBox
-                    aria-label={t('permissions.title')}
-                    renderEmptyState={() => <EmptyState>{t('permissions.noResults')}</EmptyState>}
-                  >
-                    {permissionsByCategory.map(({ category, permissions: categoryPermissions }) => (
-                      <ListBox.Section key={category} id={category}>
-                        <Header>{permissionCategory(category)}</Header>
-                        {categoryPermissions.map((permission) => (
-                          <ListBox.Item
-                            key={permission.key}
-                            id={permission.key}
-                            textValue={permissionLabel(permission)}
-                            data-cy={`role-form-drawer-permission-${permission.key}`}
-                          >
-                            <div className="flex flex-col">
-                              <Label>{permissionLabel(permission)}</Label>
-                              <Description>{permissionDescription(permission)}</Description>
-                            </div>
-                            {nonGrantableKeys.includes(permission.key) ? (
-                              <LockIcon className="w-3.5 h-3.5 text-default-400 shrink-0" />
-                            ) : null}
-                            <ListBox.ItemIndicator />
-                          </ListBox.Item>
-                        ))}
-                      </ListBox.Section>
-                    ))}
-                  </ListBox>
-                </Autocomplete.Filter>
-              </Autocomplete.Popover>
-            </Autocomplete>
+              label={t('permissions.title')}
+              placeholder={t('permissions.pickerPlaceholder')}
+              searchPlaceholder={t('permissions.searchPlaceholder')}
+              emptyMessage={t('permissions.noResults')}
+              lockedHint={t('permissions.cannotGrantHint')}
+              lockedTagIndicator={t('permissions.lockedTagIndicator')}
+              permissionLabel={permissionLabel}
+              permissionDescription={permissionDescription}
+              permissionCategory={permissionCategory}
+              dataCy="role-form-drawer-permission-picker"
+              searchDataCy="role-form-drawer-permission-search"
+              itemDataCy={(permissionKey) => `role-form-drawer-permission-${permissionKey}`}
+            />
           )}
         </div>
       </DrawerBody>
