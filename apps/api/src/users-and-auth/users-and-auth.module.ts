@@ -47,11 +47,14 @@ import {
   Setting,
   Passkey,
   PasskeyChallenge,
+  ApiToken,
+  ApiTokenPermission,
+  Permission,
 } from '@attraccess/database-entities';
 import { EmailModule } from '../email/email.module';
 import { SSOService } from './auth/sso/sso.service';
 import { SSOOIDCStrategy } from './auth/sso/oidc/oidc.strategy';
-import { ModuleRef } from '@nestjs/core';
+import { APP_INTERCEPTOR, ModuleRef } from '@nestjs/core';
 import { SSOController } from './auth/sso/sso.controller';
 import { CookieConfigService } from '../common/services/cookie-config.service';
 import { LicenseModule } from '../license/license.module';
@@ -75,6 +78,10 @@ import { AuthRateLimitInterceptor } from './rate-limiting/auth-rate-limit.interc
 import { LoginRateLimitGuard } from './rate-limiting/login.rate-limit.guard';
 import { PasswordPolicyModule } from './password-policy/password-policy.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ApiTokenService } from './auth/api-token/api-token.service';
+import { ApiTokenController } from './auth/api-token/api-token.controller';
+import { ApiTokenRequestRateLimitService } from './auth/api-token/api-token-request-rate-limit.service';
+import { ApiTokenRequestRateLimitInterceptor } from './auth/api-token/api-token-request-rate-limit.interceptor';
 
 @Module({
   imports: [
@@ -89,6 +96,9 @@ import { NotificationsModule } from '../notifications/notifications.module';
       Setting,
       Passkey,
       PasskeyChallenge,
+      ApiToken,
+      ApiTokenPermission,
+      Permission,
     ]),
     PassportModule,
     EmailModule,
@@ -130,6 +140,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
     SessionService,
     TwoFactorService,
     PasskeyService,
+    ApiTokenService,
+    ApiTokenRequestRateLimitService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ApiTokenRequestRateLimitInterceptor,
+    },
     LocalStrategy,
     SessionStrategy,
     SSOService,
@@ -178,6 +194,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     AuthController,
     TwoFactorController,
     PasskeyController,
+    ApiTokenController,
     SSOController,
     RbacController,
   ],

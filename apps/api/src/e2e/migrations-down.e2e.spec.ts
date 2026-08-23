@@ -8,6 +8,8 @@ import {
   CompanionDevice,
   AuthenticationDetail,
   AuthenticationType,
+  ApiToken,
+  ApiTokenPermission,
   BillingTransaction,
   BillingTransactionItem,
   BillingTransactionStatus,
@@ -31,6 +33,7 @@ import {
   PasswordPolicyAuditEvent,
   PasswordPolicyOverride,
   PasswordPolicyRole,
+  Permission,
   Project,
   ProjectInvitation,
   ProjectInvitationStatus,
@@ -185,6 +188,9 @@ const seedDatabase = async (dataSource: DataSource) => {
   const companionDeviceRepo = dataSource.getRepository(CompanionDevice);
   const passkeyRepo = dataSource.getRepository(Passkey);
   const passkeyChallengeRepo = dataSource.getRepository(PasskeyChallenge);
+  const apiTokenRepo = dataSource.getRepository(ApiToken);
+  const apiTokenPermissionRepo = dataSource.getRepository(ApiTokenPermission);
+  const permissionRepo = dataSource.getRepository(Permission);
 
   const resourceGroup = await ensureEntity(resourceGroupRepo, () => ({
     name: `Seed Group ${seedTag}`,
@@ -597,6 +603,18 @@ const seedDatabase = async (dataSource: DataSource) => {
     userId: primaryUser.id,
     expiresAt: new Date(Date.now() + 5 * 60 * 1000),
   }));
+
+  const apiToken = await ensureEntity(apiTokenRepo, () => ({
+    userId: primaryUser.id,
+    name: `Seed API token ${seedTag}`,
+    tokenHash: `seed-api-token-hash-${seedTag}`,
+    lastUsedAt: null,
+    expiresAt: null,
+    revokedAt: null,
+  }));
+  const [permission] = await permissionRepo.find({ take: 1, order: { key: 'ASC' } });
+  if (!permission) throw new Error('Failed to seed an API token permission');
+  await ensureEntity(apiTokenPermissionRepo, () => ({ apiTokenId: apiToken.id, permissionKey: permission.key }));
 
   const roleRepo = dataSource.getRepository(Role);
   const userRoleRepo = dataSource.getRepository(UserRole);
