@@ -24,6 +24,7 @@ import {
   SSOProvider,
   User,
   UserRole,
+  PaginatedUsersResponseDto,
   useAuthenticationServiceGetAllSsoProviders,
   useLicenseServiceGetLicenseInformation,
   useUsersServiceFindMany,
@@ -52,7 +53,7 @@ export const UserManagementPage: React.FC = () => {
 
   const navigate = useNavigate();
 
-  const { data: searchResult, isFetched: isFetchedSearchResult } = useUsersServiceFindMany({
+  const { data: searchResult, isFetched: isFetchedSearchResult } = useUsersServiceFindMany<PaginatedUsersResponseDto>({
     limit,
     page,
     search: debouncedSearch,

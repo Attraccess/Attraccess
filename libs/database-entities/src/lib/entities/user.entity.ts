@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   OneToMany,
   DeleteDateColumn,
+  Index,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
@@ -24,6 +25,7 @@ import { UserRole } from './user-role.entity';
 import { ApiToken } from './api-token.entity';
 
 
+@Index('IDX_user_deleteAccountToken', ['deleteAccountToken'])
 @Entity()
 export class User {
   @PrimaryGeneratedColumn()

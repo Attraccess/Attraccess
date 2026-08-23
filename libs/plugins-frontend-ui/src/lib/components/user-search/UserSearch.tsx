@@ -22,11 +22,12 @@ import {
   useOverlayState,
 } from '@heroui/react';
 import { SearchIcon, UserPlusIcon, XIcon } from 'lucide-react';
+import { InfiniteData } from '@tanstack/react-query';
 import { useTranslations } from '../../i18n';
 import { useDebounce } from '../../hooks/useDebounce';
 import { AttraccessUser } from '../attraccess-user/AttraccessUser';
 import { groupUsersByLetter } from './UserSearch.utils';
-import { User, useUsersServiceFindManyInfinite } from '@attraccess/react-query-client';
+import { PaginatedUsersResponseDto, User, useUsersServiceFindManyInfinite } from '@attraccess/react-query-client';
 
 import en from './en.json';
 import de from './de.json';
@@ -84,7 +85,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
   }, [resetSignal]);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isFetching, isLoading, isError, refetch } =
-    useUsersServiceFindManyInfinite(
+    useUsersServiceFindManyInfinite<InfiniteData<PaginatedUsersResponseDto>>(
       // Gate on the picker being open AND the live input being non-empty: closing
       // resets `search` synchronously while the debounced copy lags ~300ms, so
       // without the live check a quick close+reopen could briefly refetch (or flash

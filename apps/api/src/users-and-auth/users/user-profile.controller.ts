@@ -4,6 +4,7 @@ import { User } from '@attraccess/database-entities';
 import { AuthenticatedRequest, AuthenticatedUser, SessionAuth } from '@attraccess/plugins-backend-sdk';
 import { plainToInstance } from 'class-transformer';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
+import { AuthRateLimit } from '../rate-limiting/rate-limit.decorator';
 import { UsersService } from './users.service';
 import { ChangeUsernameDto } from './dtos/changeUsername.dto';
 import { ChangeEmailDto } from './dtos/changeEmail.dto';
@@ -54,6 +55,7 @@ export class UserProfileController {
   }
 
   @Post('me/delete-confirm')
+  @AuthRateLimit('delete_account_confirm', { clearFailuresOnSuccess: false })
   @ApiOperation({ summary: 'Confirm account deletion via email token', operationId: 'confirmDeleteAccount' })
   @ApiResponse({
     status: 200,

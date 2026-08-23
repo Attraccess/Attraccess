@@ -149,6 +149,7 @@ export * from './1783000000000-passkeys';
 export * from './1783100000000-drop-flow-logs';
 export * from './1783200000000-rename-owner-role-to-administrator';
 export * from './1783300000000-resource-introducer-role-unique';
+export * from './1783300000000-add-delete-account-token-index';
 export * from './1783300000000-api-tokens';
 export * from './1783400000000-api-token-management-permission';
 export * from './1765442000000-form-field-position';

@@ -20,6 +20,15 @@ class FakeController {
     }
     return { ok: true };
   }
+
+  @Post('delete-confirm')
+  @AuthRateLimit('delete_account_confirm', { clearFailuresOnSuccess: false })
+  confirmDelete(@Body() body: { fail?: boolean }) {
+    if (body?.fail) {
+      throw new UnauthorizedException('boom');
+    }
+    return { ok: true };
+  }
 }
 
 const policy = {
@@ -84,6 +93,22 @@ describe('AuthRateLimitInterceptor (HTTP integration)', () => {
       await bruteForce.recordSuccess('register', '127.0.0.1', null);
       const after = await request(app.getHttpServer()).post('/register').send({});
       expect(after.status).toBe(201);
+    });
+
+    it('does not clear failures after a successful deletion confirmation replay', async () => {
+      for (let i = 0; i < policy.maxAttempts - 1; i += 1) {
+        const res = await request(app.getHttpServer()).post('/delete-confirm').send({ fail: true });
+        expect(res.status).toBe(401);
+      }
+
+      const success = await request(app.getHttpServer()).post('/delete-confirm').send({});
+      expect(success.status).toBe(201);
+
+      const finalFailure = await request(app.getHttpServer()).post('/delete-confirm').send({ fail: true });
+      expect(finalFailure.status).toBe(401);
+
+      const blocked = await request(app.getHttpServer()).post('/delete-confirm').send({});
+      expect(blocked.status).toBe(429);
     });
 
     it('ignores spoofed X-Forwarded-For: distinct fake client IPs share the proxy socket bucket', async () => {
