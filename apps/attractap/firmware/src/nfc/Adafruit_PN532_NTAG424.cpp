@@ -1543,14 +1543,10 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     memcpy(checkmacin + 3, ntag424_authresponse_TI,
            NTAG424_AUTHRESPONSE_TI_SIZE);
     uint8_t padded_respdata_length = 0;
-    uint8_t *respdata = (uint8_t *)malloc(response_length - 10);
     if (response_length > 10)
     {
-      memcpy(respdata, response, response_length - 10);
-      // padded_respdata_length =
-      // Adafruit_PN532::ntag424_addpadding(response_length - 10 ,16, respdata);
       padded_respdata_length = response_length - 10;
-      memcpy(checkmacin + 3 + NTAG424_AUTHRESPONSE_TI_SIZE, respdata,
+      memcpy(checkmacin + 3 + NTAG424_AUTHRESPONSE_TI_SIZE, response,
              padded_respdata_length);
     }
     maclength = 3 + NTAG424_AUTHRESPONSE_TI_SIZE + padded_respdata_length;
@@ -1566,7 +1562,6 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     PN532DEBUGPRINT.print(F("checkcmac:"));
     Adafruit_PN532::PrintHex(checkmac, 8);
 #endif
-    free(respdata);
     free(checkmacin);
     for (int i = 0; i < 8; i++)
     {
@@ -1585,7 +1580,9 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     PN532DEBUGPRINT.println(F("Response CMAC ok! (picc == pcd)"));
   }
   // decrypt the response in mode.full
-  if ((response_length >= 10) && (comm_mode == NTAG424_COMM_MODE_FULL))
+  // A successful write can contain only its CMAC and 0x9100 status trailer.
+  // There is no encrypted payload to allocate or decrypt in that case.
+  if ((response_length > 10) && (comm_mode == NTAG424_COMM_MODE_FULL))
   {
     uint8_t ivd[32];
     uint8_t ivde[16];
@@ -2638,7 +2635,10 @@ uint8_t Adafruit_PN532::ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
   );
   Adafruit_PN532::PrintHex(result, response_length);
 
-  if ((result[0] != 0x91) || (result[1] != 0x00))
+  // A full-mode response can retain its eight-byte CMAC before the status
+  // trailer. The status is always the final two bytes.
+  if (response_length < 2 || result[response_length - 2] != 0x91 ||
+      result[response_length - 1] != 0x00)
   {
     return false;
   }
