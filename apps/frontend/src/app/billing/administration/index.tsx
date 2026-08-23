@@ -1,10 +1,9 @@
 import { PageHeader } from '../../../components/pageHeader';
-import { UserSearch, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { UserIdentity, UserSearch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 import { ManualTransactionsCard } from './manualTransactions';
 import { useState } from 'react';
-import { User } from '@attraccess/react-query-client';
 import { useNavigate } from 'react-router-dom';
 import { SummaryCard } from '../dashboard/summary';
 import { SumUpIcon } from '../../../components/icons/sumup.icon';
@@ -15,7 +14,7 @@ export function BillingAdministrationPage() {
   const { t } = useTranslations({ en, de });
   const navigate = useNavigate();
 
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserIdentity | null>(null);
 
   return (
     <>
