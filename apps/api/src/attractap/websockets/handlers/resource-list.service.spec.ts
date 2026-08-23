@@ -103,6 +103,8 @@ describe('ResourceListService', () => {
       expect(matchA.sendMessage).toHaveBeenCalledTimes(1);
       expect(matchB.sendMessage).toHaveBeenCalledTimes(1);
       expect(other.sendMessage).not.toHaveBeenCalled();
+      expect(matchA.sendMessage.mock.calls[0][0]).not.toBe(matchB.sendMessage.mock.calls[0][0]);
+      expect(matchA.sendMessage.mock.calls[0][0].data.payload).toBe(matchB.sendMessage.mock.calls[0][0].data.payload);
     });
   });
 
