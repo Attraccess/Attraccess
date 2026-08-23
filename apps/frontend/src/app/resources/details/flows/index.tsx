@@ -548,20 +548,29 @@ export default function FlowsPage() {
   const { id: resourceId } = useParams();
   const isFlowEditorSupported = useIsFlowEditorSupported();
   const { t } = useTranslations({ en, de });
+  const editorWasMounted = useRef(false);
 
-  if (!isFlowEditorSupported) {
-    return (
-      <div className="h-full w-full flex flex-col">
-        <div className="flex flex-1 min-h-0 items-center justify-center rounded-lg border border-gray-200 p-6 text-center dark:border-gray-800">
-          <p className="max-w-sm text-sm text-default-600">{t('mobileUnsupported')}</p>
-        </div>
-      </div>
-    );
+  if (isFlowEditorSupported) {
+    editorWasMounted.current = true;
   }
 
   return (
-    <FlowProvider resourceId={Number(resourceId)}>
-      <FlowsPageInner />
-    </FlowProvider>
+    <>
+      {!isFlowEditorSupported && (
+        <div className="h-full w-full flex flex-col">
+          <div className="flex flex-1 min-h-0 items-center justify-center rounded-lg border border-gray-200 p-6 text-center dark:border-gray-800">
+            <p className="max-w-sm text-sm text-default-600">{t('mobileUnsupported')}</p>
+          </div>
+        </div>
+      )}
+
+      {editorWasMounted.current && (
+        <div className={isFlowEditorSupported ? 'contents' : 'hidden'}>
+          <FlowProvider resourceId={Number(resourceId)}>
+            <FlowsPageInner />
+          </FlowProvider>
+        </div>
+      )}
+    </>
   );
 }
