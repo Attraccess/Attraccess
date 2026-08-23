@@ -275,9 +275,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
       return;
     }
 
-    // A resource with no introducers falls back to the global resource managers, who are valid
-    // supervisors — so an empty list here really does mean nobody can supervise. It used to mean
-    // "no introducers", which dead-ended the screen a second after it opened (ATT-867).
+    // Only introducers may supervise, so an empty list means the reader must not start a request.
     const eligibleSupervisorIds = await this.supervisionService.getEligibleSupervisorIds(resourceId, requester.id);
     if (eligibleSupervisorIds.length === 0) {
       await socket.sendMessage(
@@ -398,7 +396,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
 
     try {
       // Reuses the Phase-1 guard: resource supports supervision, supervisor != requester, and the
-      // supervisor is an introducer/maintainer (or a global resource manager).
+      // supervisor is an introducer.
       await this.resourceUsageService.validateSupervisedStart(resourceId, requester, nfcCard.user.id);
     } catch (error) {
       this.logger.debug(`Supervisor card rejected for resource ${resourceId}: ${(error as Error).message}`);

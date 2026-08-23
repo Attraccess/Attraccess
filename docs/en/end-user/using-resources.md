@@ -38,13 +38,13 @@ Before you can use most resources, you need a safety introduction (also called a
 
 ## Start a Supervised Session
 
-Some resources allow or require supervised usage. In a supervised session, you start the resource while a qualified supervisor is present. A supervisor can be an introducer, maintainer or resource manager for that resource.
+Some resources allow or require supervised usage. In a supervised session, you start the resource while a qualified supervisor is present. Only an introducer for that resource can supervise.
 
 You may need a supervised session when:
 
 - You are not introduced yet, but the resource allows supervised usage
 - The resource requires supervision for every session
-- An introducer or maintainer wants to supervise your training or first usage attempts
+- An introducer wants to supervise your training or first usage attempts
 
 To start a supervised session:
 

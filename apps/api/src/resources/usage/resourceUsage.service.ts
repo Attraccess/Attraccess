@@ -62,7 +62,7 @@ export interface EndSessionOptions {
 export interface StartSessionOptions {
   /**
    * When set, the session is started as a supervised session attributed to this supervisor.
-   * The supervisor is validated against the resource (introducer/maintainer or `resources.update` permission).
+   * The supervisor is validated as an introducer for the resource.
    */
   supervisorUserId?: number;
 }
@@ -207,7 +207,7 @@ export class ResourceUsageService {
    * - the resource does not allow supervision (supervisionMode is INTRODUCTION_REQUIRED),
    * - the requester selected themselves as supervisor,
    * - the supervisor does not exist,
-   * - the supervisor is neither an introducer/maintainer for the resource nor a global resource manager.
+   * - the supervisor is not an introducer for the resource.
    *
    * Does NOT check the requester's own introduction status: a supervised start exists precisely to
    * let a non-introduced user start under a qualified supervisor.
@@ -234,16 +234,14 @@ export class ResourceUsageService {
       throw new NotFoundException(`Supervisor with ID ${supervisorUserId} not found`);
     }
 
-    const supervisorPermissions = await this.rbacService.getEffectivePermissions(supervisor.id);
-    const supervisorCanManage = supervisorPermissions.has('resources.update');
-    const supervisorCanMaintain = await this.resourceIntroducersService.canMaintain(
+    const supervisorIsIntroducer = await this.resourceIntroducersService.isIntroducer(
       resourceId,
       supervisorUserId,
       true,
       transactionalEntityManager,
     );
 
-    if (!supervisorCanManage && !supervisorCanMaintain) {
+    if (!supervisorIsIntroducer) {
       throw new ForbiddenException('The selected supervisor is not authorized to supervise this resource');
     }
   }
