@@ -40,7 +40,7 @@ export class ResourceListService {
       return;
     }
 
-    await Promise.all(sockets.map((socket) => this.sendResourceListToSocket(socket)));
+    await this.sendResourceListToSockets(sockets);
   }
 
   public async sendResourceListToReadersWithResources(resourceIds: number[]) {
@@ -48,17 +48,32 @@ export class ResourceListService {
       return;
     }
 
-    const allSockets = Array.from(this.websocketService.sockets.values());
-    await Promise.all(allSockets.map((socket) => this.sendResourceListToSocket(socket, { resourceIds })));
+    const socketsByReaderId = new Map<number, AuthenticatedWebSocket[]>();
+    for (const socket of this.websocketService.sockets.values()) {
+      const sockets = socketsByReaderId.get(socket.readerId) ?? [];
+      sockets.push(socket);
+      socketsByReaderId.set(socket.readerId, sockets);
+    }
+
+    await Promise.all(
+      Array.from(socketsByReaderId.values()).map((sockets) => this.sendResourceListToSockets(sockets, { resourceIds })),
+    );
   }
 
   public async sendResourceListToSocket(
     socket: AuthenticatedWebSocket,
     onlyIfResourceMatches?: { resourceIds?: number[] },
   ) {
-    const reader = await this.attractapService.findReaderById(socket.readerId);
+    await this.sendResourceListToSockets([socket], onlyIfResourceMatches);
+  }
+
+  private async sendResourceListToSockets(
+    sockets: AuthenticatedWebSocket[],
+    onlyIfResourceMatches?: { resourceIds?: number[] },
+  ) {
+    const reader = await this.attractapService.findReaderById(sockets[0].readerId);
     if (!reader) {
-      throw new Error(`Reader not found: ${socket.readerId}`);
+      throw new Error(`Reader not found: ${sockets[0].readerId}`);
     }
 
     const resources = [...reader.resources].sort((a, b) => a.name.localeCompare(b.name));
@@ -137,8 +152,12 @@ export class ResourceListService {
         flowButtons: resource.flowButtons,
       })),
     });
-    this.logger.debug(`Sending resource list to socket ${socket.id}`, resourceListResponse);
-    await socket.sendMessage(resourceListResponse);
+    await Promise.all(
+      sockets.map(async (socket) => {
+        this.logger.debug(`Sending resource list to socket ${socket.id}`, resourceListResponse);
+        await socket.sendMessage(resourceListResponse);
+      }),
+    );
   }
 
   private buildHealthReason(unhealthyEntries: { identifier: string; reason: string | null }[]): string {
