@@ -1,6 +1,7 @@
 import { zipSync } from 'fflate';
 import { buildThreeMf } from './threemf';
 import type { CardRender } from './useCardRender';
+import type { PlugRender } from './usePlugRender';
 
 /**
  * Part colours, shared by the three.js preview and the 3MF `displaycolor`, so the file opens in
@@ -85,5 +86,16 @@ export function downloadCard(render: CardRender, label: string, format: MeshForm
           `${slug}.3mf`,
         ];
 
+  triggerDownload(data, filename);
+}
+
+export function downloadPlug(render: PlugRender, device: string, cable: string, format: MeshFormat): void {
+  const slug = `attraccess-smart-plug-cover-${device}-${cable}`;
+  const [data, filename] = format === 'stl'
+    ? [zipSync({ 'body.stl': new Uint8Array(render.bodyStl), 'cover.stl': new Uint8Array(render.coverStl) }), `${slug}.zip`]
+    : [buildThreeMf([
+        { name: 'Body', color: BODY_COLOR, mesh: render.body },
+        { name: 'Cover', color: LETTER_COLOR, mesh: render.cover },
+      ]), `${slug}.3mf`];
   triggerDownload(data, filename);
 }

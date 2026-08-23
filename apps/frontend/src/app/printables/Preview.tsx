@@ -7,6 +7,8 @@ import type { Mesh } from './stl';
 interface PreviewProps {
   body: Mesh;
   letters: Mesh;
+  /** Centre of the assembled model in its OpenSCAD coordinate space. */
+  center?: [number, number, number];
   /** Accessible name for the canvas container; the canvas itself has no text content. */
   ariaLabel: string;
 }
@@ -37,7 +39,7 @@ export function disposeMeshGroup(scene: THREE.Scene, group: THREE.Mesh[]): void 
   }
 }
 
-export function Preview({ body, letters, ariaLabel }: PreviewProps) {
+export function Preview({ body, letters, ariaLabel, center = [30, 20, 1] }: PreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
 
@@ -128,12 +130,12 @@ export function Preview({ body, letters, ariaLabel }: PreviewProps) {
     ];
 
     for (const mesh of group) {
-      mesh.position.set(-30, -20, -1);
+      mesh.position.set(-center[0], -center[1], -center[2]);
       scene.add(mesh);
     }
 
     return () => disposeMeshGroup(scene, group);
-  }, [body, letters]);
+  }, [body, letters, center]);
 
   return <div ref={containerRef} role="img" aria-label={ariaLabel} className="h-80 w-full" />;
 }
