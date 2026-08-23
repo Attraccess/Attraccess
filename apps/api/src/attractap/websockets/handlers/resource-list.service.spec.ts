@@ -86,7 +86,7 @@ describe('ResourceListService', () => {
       expect(attractapService.findReaderById).not.toHaveBeenCalled();
     });
 
-    it('calls sendResourceListToSocket for each matching socket', async () => {
+    it('builds one resource list and sends it to each matching socket', async () => {
       const matchA = createMockSocket({ id: 'a', readerId: 42 });
       const matchB = createMockSocket({ id: 'b', readerId: 42 });
       const other = createMockSocket({ id: 'c', readerId: 7 });
@@ -94,42 +94,42 @@ describe('ResourceListService', () => {
       websocketService.sockets.set('b', matchB);
       websocketService.sockets.set('c', other);
 
-      const spy = jest.spyOn(service, 'sendResourceListToSocket').mockResolvedValue(undefined);
+      attractapService.findReaderById.mockResolvedValue(createReaderFixture());
 
       await service.sendResourceList(42);
 
-      expect(spy).toHaveBeenCalledTimes(2);
-      expect(spy).toHaveBeenCalledWith(matchA);
-      expect(spy).toHaveBeenCalledWith(matchB);
-      expect(spy).not.toHaveBeenCalledWith(other);
+      expect(attractapService.findReaderById).toHaveBeenCalledTimes(1);
+      expect(resourceIntroducersService.getManyForResources).toHaveBeenCalledTimes(1);
+      expect(matchA.sendMessage).toHaveBeenCalledTimes(1);
+      expect(matchB.sendMessage).toHaveBeenCalledTimes(1);
+      expect(other.sendMessage).not.toHaveBeenCalled();
     });
   });
 
   describe('sendResourceListToReadersWithResources', () => {
-    it('iterates all sockets calling sendResourceListToSocket with the resource IDs filter', async () => {
+    it('builds one resource list per reader when several sockets match', async () => {
       const s1 = createMockSocket({ id: 's1', readerId: 42 });
-      const s2 = createMockSocket({ id: 's2', readerId: 7 });
+      const s2 = createMockSocket({ id: 's2', readerId: 42 });
       websocketService.sockets.set('s1', s1);
       websocketService.sockets.set('s2', s2);
-
-      const spy = jest.spyOn(service, 'sendResourceListToSocket').mockResolvedValue(undefined);
+      attractapService.findReaderById.mockResolvedValue(createReaderFixture());
 
       await service.sendResourceListToReadersWithResources([10]);
 
-      expect(spy).toHaveBeenCalledTimes(2);
-      expect(spy).toHaveBeenCalledWith(s1, { resourceIds: [10] });
-      expect(spy).toHaveBeenCalledWith(s2, { resourceIds: [10] });
+      expect(attractapService.findReaderById).toHaveBeenCalledTimes(1);
+      expect(resourceIntroducersService.getManyForResources).toHaveBeenCalledTimes(1);
+      expect(s1.sendMessage).toHaveBeenCalledTimes(1);
+      expect(s2.sendMessage).toHaveBeenCalledTimes(1);
     });
 
-    it('refreshes each socket once when any of several resources match', async () => {
+    it('refreshes a reader when any of several resources match', async () => {
       const s1 = createMockSocket({ id: 's1', readerId: 42 });
       websocketService.sockets.set('s1', s1);
-      const spy = jest.spyOn(service, 'sendResourceListToSocket').mockResolvedValue(undefined);
+      attractapService.findReaderById.mockResolvedValue(createReaderFixture());
 
       await service.sendResourceListToReadersWithResources([10, 20]);
 
-      expect(spy).toHaveBeenCalledTimes(1);
-      expect(spy).toHaveBeenCalledWith(s1, { resourceIds: [10, 20] });
+      expect(s1.sendMessage).toHaveBeenCalledTimes(1);
     });
 
     it('does not refresh readers when no resources are affected', async () => {
