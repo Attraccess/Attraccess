@@ -78,13 +78,16 @@ void Application::setupBootDiagnostics() {
     bool shouldReport = isCrash ||
                         (reason == ESP_RST_POWERON &&
                          prior.uptimeMs > BOOT_DIAG_SILENT_HANG_MIN_UPTIME_MS);
+    this->bootDiagPreferences.begin(BOOT_DIAG_NAMESPACE, false);
     if (shouldReport) {
       // Preserve actual failures for upload after the next successful connect
       // (ATT-474). Intentional software restarts must not increment crash metrics.
-      this->bootDiagPreferences.begin(BOOT_DIAG_NAMESPACE, false);
       this->bootDiagPreferences.putBytes("pending", &prior, sizeof(prior));
-      this->bootDiagPreferences.end();
+    } else if (reason == ESP_RST_SW) {
+      // This reset is intentionally ignored, so consume its diagnostic marker.
+      this->bootDiagPreferences.remove("rebootreason");
     }
+    this->bootDiagPreferences.end();
   } else {
     this->logger.infof("No prior boot record (reset=%s)",
                        resetReasonToString(reason));
