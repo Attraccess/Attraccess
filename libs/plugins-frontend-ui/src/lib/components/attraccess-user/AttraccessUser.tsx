@@ -10,11 +10,13 @@ import { useAttraccessUserActions } from './AttraccessUserActionsContext';
 import en from './en.json';
 import de from './de.json';
 
+export type UserIdentity = Pick<User, 'id' | 'username'>;
+
 interface AttraccessUserProps {
-  user?: User;
+  user?: UserIdentity & Partial<Pick<User, 'deletedAt'>>;
   description?: ReactNode;
   className?: string;
-  onStartDirectMessage?: (user: User) => void;
+  onStartDirectMessage?: (user: UserIdentity) => void;
   variant?: 'full' | 'mini';
   /** When false, render as plain display without the direct-message popover. Defaults to true. */
   interactive?: boolean;
