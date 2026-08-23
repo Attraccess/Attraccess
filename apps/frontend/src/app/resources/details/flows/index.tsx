@@ -12,7 +12,7 @@ import {
   UseResourceFlowsServiceGetResourceFlowKeyFn,
   useResourceFlowsServiceSaveResourceFlow,
 } from '@attraccess/react-query-client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTheme } from '@heroui/react';
 import { usePtrStore } from '../../../../stores/ptr.store';
 import Dagre from '@dagrejs/dagre';
@@ -90,6 +90,21 @@ function areEdgesEqual(edge1: ResourceFlowEdgeDto | Edge, edge2: ResourceFlowEdg
 }
 
 const jsConfetti = new JSConfetti();
+
+const FLOW_EDITOR_QUERY = '(min-width: 768px)';
+
+function subscribeToFlowEditorBreakpoint(onChange: () => void): () => void {
+  const mediaQuery = window.matchMedia(FLOW_EDITOR_QUERY);
+  mediaQuery.addEventListener('change', onChange);
+  return () => mediaQuery.removeEventListener('change', onChange);
+}
+
+function useIsFlowEditorSupported(): boolean {
+  return useSyncExternalStore(
+    subscribeToFlowEditorBreakpoint,
+    () => window.matchMedia(FLOW_EDITOR_QUERY).matches,
+  );
+}
 
 function FlowsPageInner() {
   const { id: resourceId } = useParams();
@@ -401,10 +416,7 @@ function FlowsPageInner() {
 
   return (
     <div className="h-full w-full flex flex-col">
-      <div className="flex flex-1 min-h-0 items-center justify-center rounded-lg border border-gray-200 p-6 text-center dark:border-gray-800 md:hidden">
-        <p className="max-w-sm text-sm text-default-600">{t('mobileUnsupported')}</p>
-      </div>
-      <div className="hidden w-full flex-1 min-h-0 flex-row overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800 md:flex">
+      <div className="flex w-full flex-1 min-h-0 flex-row overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800">
         <NodeCatalogPanel
           ref={nodeCatalogRef}
           resourceId={Number(resourceId)}
@@ -534,6 +546,18 @@ function FlowsPageInner() {
 
 export default function FlowsPage() {
   const { id: resourceId } = useParams();
+  const isFlowEditorSupported = useIsFlowEditorSupported();
+  const { t } = useTranslations({ en, de });
+
+  if (!isFlowEditorSupported) {
+    return (
+      <div className="h-full w-full flex flex-col">
+        <div className="flex flex-1 min-h-0 items-center justify-center rounded-lg border border-gray-200 p-6 text-center dark:border-gray-800">
+          <p className="max-w-sm text-sm text-default-600">{t('mobileUnsupported')}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <FlowProvider resourceId={Number(resourceId)}>
