@@ -30,8 +30,7 @@ void Websocket::setup()
         network_quality_mutex = xSemaphoreCreateMutex();
         if (!network_quality_mutex)
         {
-            logger.error("Websocket setup: network quality mutex allocation failed");
-            return;
+            logger.error("Websocket setup: network quality mutex allocation failed; quality event tracking disabled");
         }
     }
     if (!tx_queue)
