@@ -1128,9 +1128,37 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     nodesById = { [inputNode.id]: inputNode, [waitNode.id]: waitNode } as unknown as Record<string, ResourceFlowNode>;
     edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: waitNode.id }];
     edgesBySourceAndHandle[`${waitNode.id}|`] = [];
+    flowLogs.start(1);
 
     await expect(service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {})).rejects.toThrow(
       /Timeout waiting for MQTT message/,
     );
+
+    const failedLog = flowLogs.getLogs(1).logs.find((log) => log.type === 'node.processing.failed');
+    expect(failedLog).toBeDefined();
+    expect(JSON.parse(failedLog?.payload ?? '')).toEqual({
+      error: "Timeout waiting for MQTT message on topic 'foo/#' (server 8)",
+    });
+  });
+
+  it('records a descriptive error when a node rejects without one', async () => {
+    const inputNode = createNode({ id: 'in-1' });
+    const outputNode = createNode({
+      id: 'output-1',
+      type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE,
+      data: { serverId: 1, topic: 'devices/state', payload: 'on' },
+    });
+
+    initialNodes = [inputNode];
+    nodesById = { [inputNode.id]: inputNode, [outputNode.id]: outputNode };
+    edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: outputNode.id }];
+    mqttClientService.publish = jest.fn().mockRejectedValue({});
+    flowLogs.start(1);
+
+    await expect(service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {})).rejects.toEqual({});
+
+    const failedLog = flowLogs.getLogs(1).logs.find((log) => log.type === 'node.processing.failed');
+    expect(failedLog).toBeDefined();
+    expect(JSON.parse(failedLog?.payload ?? '')).toEqual({ error: 'Unknown error' });
   });
 });

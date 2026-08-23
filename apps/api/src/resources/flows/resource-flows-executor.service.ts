@@ -606,7 +606,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       const processingTime = Date.now() - startTime;
       this.logger.error(
         `Failed to process flow node ID: ${node.id} (Type: ${node.type}) after ${processingTime}ms`,
-        error.stack,
+        error instanceof Error ? error.stack : undefined,
       );
 
       this.flowLogs.record({
@@ -614,13 +614,34 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
         nodeId: node.id,
         resourceId: node.resourceId,
         type: ResourceFlowLogType.NODE_PROCESSING_FAILED,
-        payload: () => ({ error: error instanceof Error ? error.message : error }),
+        payload: () => ({ error: this.errorReason(error) }),
       });
 
       throw error;
     }
 
     return await this.executeNextNodes(flowRunId, node, responseOfNode, transactionManager, resourceContextCache);
+  }
+
+  private errorReason(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message || error.name;
+    }
+
+    if (typeof error === 'string') {
+      return error || 'Unknown error';
+    }
+
+    if (typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string') {
+      return error.message || 'Unknown error';
+    }
+
+    try {
+      const serialized = JSON.stringify(error);
+      return serialized && serialized !== '{}' ? serialized : 'Unknown error';
+    } catch {
+      return String(error);
+    }
   }
 
   private async executeNextNodes(
