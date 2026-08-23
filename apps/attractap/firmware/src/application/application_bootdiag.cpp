@@ -55,12 +55,11 @@ void Application::setupBootDiagnostics() {
   bool havePrior = (read == sizeof(prior) && prior.magic == BOOT_DIAG_MAGIC);
 
   if (havePrior) {
-    // TASK_WDT / SW / panic-class resets => the firmware died -> crash-loop.
+    // Watchdog / panic-class resets => the firmware died -> crash-loop.
     // A clean POWERON after a long pre-freeze uptime => the device hung and
     // had to be power-cycled by hand -> silent hang.
     bool isCrash = (reason == ESP_RST_PANIC || reason == ESP_RST_TASK_WDT ||
-                    reason == ESP_RST_INT_WDT || reason == ESP_RST_WDT ||
-                    reason == ESP_RST_SW);
+                    reason == ESP_RST_INT_WDT || reason == ESP_RST_WDT);
     const char *failureClass = "clean/other";
     if (isCrash) {
       failureClass = "crash-loop";
@@ -76,12 +75,16 @@ void Application::setupBootDiagnostics() {
         prior.largestFreeBlock, prior.websocketConnected, prior.wifiConnected,
         failureClass);
 
-    // Preserve the prior session's last snapshot as a pending crash report so
-    // the API layer can upload it on the next successful connect (ATT-474).
-    // The live "record" key is overwritten with the current session just below.
-    this->bootDiagPreferences.begin(BOOT_DIAG_NAMESPACE, false);
-    this->bootDiagPreferences.putBytes("pending", &prior, sizeof(prior));
-    this->bootDiagPreferences.end();
+    bool shouldReport = isCrash ||
+                        (reason == ESP_RST_POWERON &&
+                         prior.uptimeMs > BOOT_DIAG_SILENT_HANG_MIN_UPTIME_MS);
+    if (shouldReport) {
+      // Preserve actual failures for upload after the next successful connect
+      // (ATT-474). Intentional software restarts must not increment crash metrics.
+      this->bootDiagPreferences.begin(BOOT_DIAG_NAMESPACE, false);
+      this->bootDiagPreferences.putBytes("pending", &prior, sizeof(prior));
+      this->bootDiagPreferences.end();
+    }
   } else {
     this->logger.infof("No prior boot record (reset=%s)",
                        resetReasonToString(reason));
