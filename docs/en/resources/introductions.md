@@ -11,7 +11,7 @@ Introductions follow a simple model:
 
 A user who has not been introduced cannot start a usage session on the resource.
 
-Some resources can also allow or require **supervised usage**. In a supervised session, the user starts the session while a qualified **supervisor** is present. The supervisor must be an introducer, maintainer or resource manager for the resource. Supervision is useful for training, first attempts, or resources where policy requires a second person to be present.
+Some resources can also allow or require **supervised usage**. In a supervised session, the user starts the session while a qualified **supervisor** is present. Only an introducer for the resource, including an applicable resource group introducer, may supervise. Supervision is useful for training, first attempts, or resources where policy requires a second person to be present.
 
 ## Roles
 
@@ -22,7 +22,7 @@ Some resources can also allow or require **supervised usage**. In a supervised s
 | **Introducer** | Everything a maintainer can do, plus grant and revoke introductions for other users |
 | **Resource Manager** | All of the above, plus manage introducers/maintainers and resource settings |
 
-For supervised sessions, the supervisor is the introducer, maintainer or resource manager who confirms the session and remains responsible for supervising it.
+For supervised sessions, the supervisor is an introducer who confirms the session and remains responsible for supervising it. A maintainer or resource manager can supervise only when they are also an introducer.
 
 > [!NOTE]
 > **Introducer vs Maintainer:** Both can operate the machine and put it into (or take it out of) maintenance. The difference is that only an **introducer** can grant introductions to other users. Use **maintainer** for people who service the machine but should not decide who else gets access.

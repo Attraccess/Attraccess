@@ -21,6 +21,7 @@ import { ProjectMember } from './project-member.entity';
 import { ProjectInvitation } from './project-invitation.entity';
 import { FormSubmission } from './form';
 import { UserRole } from './user-role.entity';
+import { ApiToken } from './api-token.entity';
 
 
 @Entity()
@@ -59,6 +60,9 @@ export class User {
     example: true,
   })
   isEmailVerified!: boolean;
+
+  @Column({ default: false, type: 'boolean' })
+  isDisabled!: boolean;
 
   @Column({ type: 'text', nullable: true })
   @Exclude()
@@ -220,4 +224,7 @@ export class User {
   @OneToMany(() => UserRole, (ur) => ur.user, { onDelete: 'CASCADE' })
   @ApiProperty({ type: [UserRole], description: 'Role assignments for this user', required: false })
   userRoles!: UserRole[];
+
+  @OneToMany(() => ApiToken, (apiToken) => apiToken.user, { onDelete: 'CASCADE' })
+  apiTokens!: ApiToken[];
 }

@@ -11,7 +11,7 @@ This glossary explains key terms used throughout the Attraccess documentation.
 | **Introducer** | A person authorized to grant introductions for a resource. Introducers confirm that a user has received a safety briefing and can operate the machine safely. They can also control the machine and manage maintenance. |
 | **Maintainer** | A person who can control a resource and manage its maintenance, but who cannot grant introductions to other users. Use this for people who service a machine without deciding who else gets access. |
 | **Supervision** | A usage mode where a user starts and uses a resource while a qualified supervisor is present. Depending on the resource settings, supervision can be optional for non-introduced users or required for every session. |
-| **Supervisor** | An introducer, maintainer or resource manager who confirms and supervises a supervised usage session. |
+| **Supervisor** | An introducer for the resource who confirms and supervises a supervised usage session. A maintainer or resource manager may supervise only when they are also an introducer. |
 | **Usage Session** | A recorded period during which a user is actively using a resource. Sessions have a start and end time. |
 | **Flow** | A visual automation workflow created in the flow editor. Flows connect triggers, actions, and conditions to automate tasks. |
 | **Project** | A way to organize work and team collaboration. Usage sessions can be linked to projects for tracking. |
