@@ -55,7 +55,7 @@ export class UserProfileController {
   }
 
   @Post('me/delete-confirm')
-  @AuthRateLimit('delete_account_confirm')
+  @AuthRateLimit('delete_account_confirm', { clearFailuresOnSuccess: false })
   @ApiOperation({ summary: 'Confirm account deletion via email token', operationId: 'confirmDeleteAccount' })
   @ApiResponse({
     status: 200,

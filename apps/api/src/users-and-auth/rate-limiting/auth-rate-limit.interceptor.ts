@@ -13,7 +13,11 @@ import { Request, Response } from 'express';
 import { BruteForceProtectionService, RateLimitScope } from './brute-force.service';
 import { AuthAuditLogger, AuthAuditOutcome, AuthAuditType } from './auth-audit.logger';
 import { AccountLockedException, TooManyAuthAttemptsException } from './exceptions';
-import { AUTH_RATE_LIMIT_METADATA } from './rate-limit.decorator';
+import {
+  AUTH_RATE_LIMIT_METADATA,
+  AUTH_RATE_LIMIT_OPTIONS_METADATA,
+  AuthRateLimitOptions,
+} from './rate-limit.decorator';
 import { resolveIp, setRetryAfter } from './login.rate-limit.guard';
 
 @Injectable()
@@ -31,6 +35,8 @@ export class AuthRateLimitInterceptor implements NestInterceptor {
     if (!scope) {
       return next.handle();
     }
+    const { clearFailuresOnSuccess = true } =
+      this.reflector.get<AuthRateLimitOptions>(AUTH_RATE_LIMIT_OPTIONS_METADATA, context.getHandler()) ?? {};
 
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse<Response>();
@@ -49,9 +55,11 @@ export class AuthRateLimitInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap({
         next: () => {
-          this.bruteForce
-            .recordSuccess(scope, ip, userId)
-            .catch((err) => this.logger.error(`recordSuccess failed for scope=${scope}`, err as Error));
+          if (clearFailuresOnSuccess) {
+            this.bruteForce
+              .recordSuccess(scope, ip, userId)
+              .catch((err) => this.logger.error(`recordSuccess failed for scope=${scope}`, err as Error));
+          }
           this.audit.log({ type: auditType, outcome: 'success', ip, userId });
         },
         error: (err: unknown) => {
