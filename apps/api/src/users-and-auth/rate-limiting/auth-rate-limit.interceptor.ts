@@ -76,7 +76,8 @@ function scopeToAuditType(scope: RateLimitScope): AuthAuditType {
   if (scope === 'login') return 'login';
   if (scope === 'register') return 'register';
   if (scope === 'password_reset_request') return 'password_reset_request';
-  return 'password_reset_complete';
+  if (scope === 'password_reset_complete') return 'password_reset_complete';
+  return 'delete_account_confirm';
 }
 
 function extractUserIdFromRequest(request: Request, scope: RateLimitScope): number | null {

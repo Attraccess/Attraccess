@@ -717,6 +717,7 @@ export class UsersService {
 
     // The email is anonymized on deletion and may be reused, so use the retained
     // confirmation token when the email no longer identifies this confirmation.
+    // Raw tokens support confirmations created before tokens were stored as hashes.
     if (!user || (user.deleteAccountToken !== expected && user.deleteAccountToken !== token)) {
       user = await this.userRepository.findOne({
         where: {

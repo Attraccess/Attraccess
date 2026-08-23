@@ -603,7 +603,7 @@ describe('UsersService', () => {
       );
     });
 
-    it('retains confirmation token evidence while anonymizing an account', async () => {
+    it('retains confirmation token evidence while confirming an account deletion', async () => {
       const user = {
         id: 1,
         locale: 'en',
@@ -630,7 +630,9 @@ describe('UsersService', () => {
       } as unknown as EntityManager;
       dataSource.transaction.mockImplementation(async (callback) => callback(manager));
 
-      await (service as unknown as { anonymizeAndSoftDelete(id: number): Promise<void> }).anonymizeAndSoftDelete(1);
+      userRepository.findOne.mockResolvedValue(user);
+
+      await service.confirmSelfDeletion('deleted@example.com', 'tok');
 
       expect(userRepo.update).toHaveBeenCalledWith(
         1,
