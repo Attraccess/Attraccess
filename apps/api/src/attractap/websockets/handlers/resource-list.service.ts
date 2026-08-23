@@ -123,7 +123,7 @@ export class ResourceListService {
       })),
     );
 
-    const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, {
+    const resourceListPayload = {
       readerName: reader.name,
       ledBrightness: reader.ledBrightness,
       resources: resourcesWithFlowButtons.map((resource) => ({
@@ -151,9 +151,10 @@ export class ResourceListService {
           : null,
         flowButtons: resource.flowButtons,
       })),
-    });
+    };
     await Promise.all(
       sockets.map(async (socket) => {
+        const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, resourceListPayload);
         this.logger.debug(`Sending resource list to socket ${socket.id}`, resourceListResponse);
         await socket.sendMessage(resourceListResponse);
       }),
