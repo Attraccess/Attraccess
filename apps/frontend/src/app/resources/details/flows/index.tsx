@@ -106,7 +106,7 @@ function useIsFlowEditorSupported(): boolean {
   );
 }
 
-function FlowsPageInner() {
+function FlowsPageInner({ isActive }: { isActive: boolean }) {
   const { id: resourceId } = useParams();
   const { theme } = useTheme();
   const { t, tExists } = useTranslations({
@@ -377,6 +377,8 @@ function FlowsPageInner() {
   }, [addLiveLogReceiver, removeLiveLogReceiver, onLiveLog]);
 
   useEffect(() => {
+    if (!isActive) return;
+
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target?.isContentEditable || target?.closest('input, textarea, select, [contenteditable="true"]')) {
@@ -397,7 +399,7 @@ function FlowsPageInner() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [copySelectedNodes, cutSelectedNodes, pasteNodes, setNodes, screenToFlowPosition]);
+  }, [isActive, copySelectedNodes, cutSelectedNodes, pasteNodes, setNodes, screenToFlowPosition]);
 
   const edgesWithCorrectType = useMemo(() => {
     return edges.map((edge) => ({
@@ -567,7 +569,7 @@ export default function FlowsPage() {
       {editorWasMounted.current && (
         <div className={isFlowEditorSupported ? 'contents' : 'hidden'}>
           <FlowProvider resourceId={Number(resourceId)}>
-            <FlowsPageInner />
+            <FlowsPageInner isActive={isFlowEditorSupported} />
           </FlowProvider>
         </div>
       )}
