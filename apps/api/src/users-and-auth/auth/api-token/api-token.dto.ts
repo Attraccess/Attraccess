@@ -1,18 +1,18 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayUnique, IsArray, IsDate, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { ArrayUnique, IsArray, IsDate, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { PaginatedResponseWithNextPage } from '../../../types/response';
 
 export class ListApiTokensQueryDto {
   @ApiPropertyOptional({ description: 'Page number (1-based)', default: 1, minimum: 1, type: Number })
   @Type(() => Number)
-  @IsNumber()
+  @IsInt()
   @Min(1)
   page = 1;
 
   @ApiPropertyOptional({ description: 'Number of items per page', default: 10, minimum: 1, maximum: 100, type: Number })
   @Type(() => Number)
-  @IsNumber()
+  @IsInt()
   @Min(1)
   @Max(100)
   limit = 10;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Input,
   Label,
@@ -62,27 +62,40 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
   const [secret, setSecret] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [revokingId, setRevokingId] = useState<number | null>(null);
+  const latestLoadId = useRef(0);
   const availablePermissionDetails = useMemo(
     () => (allPermissions ?? []).filter((permission) => availablePermissions.includes(permission.key)),
     [allPermissions, availablePermissions],
   );
 
   const loadTokens = useCallback(async (requestedPage: number) => {
-    const response = await fetch(`${getBaseUrl()}/api/users/me/api-tokens?page=${requestedPage}&limit=${PAGE_SIZE}`, {
-      credentials: 'include',
-    });
-    if (!response.ok) throw new Error('Could not load API tokens');
-    const result = (await response.json()) as ApiTokenPage;
-    setApiTokens(result.data);
-    setTotal(result.total);
+    const loadId = ++latestLoadId.current;
+    try {
+      const response = await fetch(`${getBaseUrl()}/api/users/me/api-tokens?page=${requestedPage}&limit=${PAGE_SIZE}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Could not load API tokens');
+      const result = (await response.json()) as ApiTokenPage;
+      if (loadId !== latestLoadId.current) return false;
+      setApiTokens(result.data);
+      setTotal(result.total);
+      return true;
+    } catch (error) {
+      if (loadId !== latestLoadId.current) return false;
+      throw error;
+    }
   }, []);
+
+  const showLoadFailed = useCallback(() => {
+    showToast({ title: t('errors.loadFailed'), type: 'error' });
+  }, [showToast, t]);
 
   useEffect(() => {
     loadTokens(page).catch(() => {
-      showToast({ title: t('errors.loadFailed'), type: 'error' });
+      showLoadFailed();
       setApiTokens([]);
     });
-  }, [loadTokens, page, showToast, t]);
+  }, [loadTokens, page, showLoadFailed]);
 
   const createToken = async () => {
     setIsCreating(true);
@@ -100,7 +113,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
       if (!response.ok) throw new Error('Could not create API token');
       const created = (await response.json()) as CreatedApiToken;
       setSecret(created.token);
-      if (page === 1) await loadTokens(1);
+      if (page === 1) void loadTokens(1).catch(showLoadFailed);
       else setPage(1);
       setName('');
       setPermissionKeys(new Set());
@@ -122,7 +135,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
       });
       if (!response.ok) throw new Error('Could not revoke API token');
       if (apiTokens?.length === 1 && page > 1) setPage(page - 1);
-      else await loadTokens(page);
+      else void loadTokens(page).catch(showLoadFailed);
       showToast({ title: t('success.revoked'), type: 'success' });
     } catch {
       showToast({ title: t('errors.revokeFailed'), type: 'error' });
