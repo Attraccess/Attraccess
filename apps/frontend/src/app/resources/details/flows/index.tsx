@@ -401,7 +401,10 @@ function FlowsPageInner() {
 
   return (
     <div className="h-full w-full flex flex-col">
-      <div className="flex flex-row w-full flex-1 min-h-0 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
+      <div className="flex flex-1 min-h-0 items-center justify-center rounded-lg border border-gray-200 p-6 text-center dark:border-gray-800 md:hidden">
+        <p className="max-w-sm text-sm text-default-600">{t('mobileUnsupported')}</p>
+      </div>
+      <div className="hidden w-full flex-1 min-h-0 flex-row overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800 md:flex">
         <NodeCatalogPanel
           ref={nodeCatalogRef}
           resourceId={Number(resourceId)}

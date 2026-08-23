@@ -3,6 +3,7 @@
   "subtitle": "Mit Flows kannst du Arbeitsabläufe für deine Ressourcen automatisieren und beispielsweise Smarte Steckdosen oder Lampen ansteuern.",
   "loading": "Flow wird geladen…",
   "loadError": "Flow konnte nicht geladen werden. Bitte versuche es erneut.",
+  "mobileUnsupported": "Die Flow-Bearbeitung ist auf Desktop-Bildschirmen verfügbar. Öffne diese Ressource auf einem größeren Bildschirm, um den Flow anzuzeigen und zu bearbeiten.",
   "actions": {
     "export": "Exportieren",
     "import": "Importieren",
