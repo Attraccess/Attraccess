@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomBytes } from 'crypto';
 import { ApiToken, ApiTokenPermission, User } from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { TokenHashService } from '../../../encryption/token-hash.service';
 import { RbacService } from '../../rbac/rbac.service';
 
@@ -12,18 +12,20 @@ const LAST_USED_WRITE_INTERVAL_MS = 60_000;
 export class ApiTokenService {
   constructor(
     @InjectRepository(ApiToken) private readonly apiTokenRepository: Repository<ApiToken>,
-    @InjectRepository(ApiTokenPermission) private readonly apiTokenPermissionRepository: Repository<ApiTokenPermission>,
     @InjectRepository(User) private readonly userRepository: Repository<User>,
     private readonly tokenHashService: TokenHashService,
     private readonly rbacService: RbacService,
   ) {}
 
-  async list(userId: number): Promise<ApiToken[]> {
-    return this.apiTokenRepository.find({
+  async list(userId: number, page: number, limit: number): Promise<{ data: ApiToken[]; total: number; page: number; limit: number }> {
+    const [data, total] = await this.apiTokenRepository.findAndCount({
       where: { userId, revokedAt: null },
-      order: { createdAt: 'DESC' },
+      order: { createdAt: 'DESC', id: 'DESC' },
       relations: { apiTokenPermissions: true },
+      skip: (page - 1) * limit,
+      take: limit,
     });
+    return { data, total, page, limit };
   }
 
   async create(
@@ -34,17 +36,21 @@ export class ApiTokenService {
     this.assertExpiry(input.expiresAt);
 
     const token = randomBytes(32).toString('base64url');
-    const apiToken = await this.apiTokenRepository.save(
-      this.apiTokenRepository.create({
-        userId,
-        name: input.name.trim(),
-        tokenHash: this.tokenHashService.hashApiToken(token),
-        expiresAt: input.expiresAt ?? null,
-        lastUsedAt: null,
-        revokedAt: null,
-      }),
-    );
-    apiToken.apiTokenPermissions = await this.createPermissions(apiToken.id, input.permissionKeys);
+    const apiToken = await this.apiTokenRepository.manager.transaction(async (manager) => {
+      const tokenRepository = manager.getRepository(ApiToken);
+      const apiToken = await tokenRepository.save(
+        tokenRepository.create({
+          userId,
+          name: input.name.trim(),
+          tokenHash: this.tokenHashService.hashApiToken(token),
+          expiresAt: input.expiresAt ?? null,
+          lastUsedAt: null,
+          revokedAt: null,
+        }),
+      );
+      apiToken.apiTokenPermissions = await this.createPermissions(manager, apiToken.id, input.permissionKeys);
+      return apiToken;
+    });
     return { apiToken, token };
   }
 
@@ -56,13 +62,17 @@ export class ApiTokenService {
     const apiToken = await this.findOwned(userId, tokenId);
     if (input.permissionKeys) await this.assertAllowedPermissions(userId, input.permissionKeys);
     if (input.expiresAt !== null) this.assertExpiry(input.expiresAt);
-    if (input.name !== undefined) apiToken.name = input.name.trim();
-    if (input.permissionKeys !== undefined) {
-      await this.apiTokenPermissionRepository.delete({ apiTokenId: apiToken.id });
-      apiToken.apiTokenPermissions = await this.createPermissions(apiToken.id, input.permissionKeys);
-    }
-    if (input.expiresAt !== undefined) apiToken.expiresAt = input.expiresAt;
-    return this.apiTokenRepository.save(apiToken);
+    return this.apiTokenRepository.manager.transaction(async (manager) => {
+      const tokenRepository = manager.getRepository(ApiToken);
+      const permissionRepository = manager.getRepository(ApiTokenPermission);
+      if (input.name !== undefined) apiToken.name = input.name.trim();
+      if (input.permissionKeys !== undefined) {
+        await permissionRepository.delete({ apiTokenId: apiToken.id });
+        apiToken.apiTokenPermissions = await this.createPermissions(manager, apiToken.id, input.permissionKeys);
+      }
+      if (input.expiresAt !== undefined) apiToken.expiresAt = input.expiresAt;
+      return tokenRepository.save(apiToken);
+    });
   }
 
   async revoke(userId: number, tokenId: number): Promise<void> {
@@ -115,9 +125,10 @@ export class ApiTokenService {
     }
   }
 
-  private async createPermissions(apiTokenId: number, permissionKeys: string[]): Promise<ApiTokenPermission[]> {
-    return this.apiTokenPermissionRepository.save(
-      [...new Set(permissionKeys)].map((permissionKey) => this.apiTokenPermissionRepository.create({ apiTokenId, permissionKey })),
+  private async createPermissions(manager: EntityManager, apiTokenId: number, permissionKeys: string[]): Promise<ApiTokenPermission[]> {
+    const permissionRepository = manager.getRepository(ApiTokenPermission);
+    return permissionRepository.save(
+      [...new Set(permissionKeys)].map((permissionKey) => permissionRepository.create({ apiTokenId, permissionKey })),
     );
   }
 

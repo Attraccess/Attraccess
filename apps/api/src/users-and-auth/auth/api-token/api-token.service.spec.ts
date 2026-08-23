@@ -7,9 +7,14 @@ describe('ApiTokenService', () => {
     create: jest.fn((value) => value),
     save: jest.fn(),
     find: jest.fn(),
+    findAndCount: jest.fn(),
     findOne: jest.fn(),
     findOneBy: jest.fn(),
     createQueryBuilder: jest.fn(),
+    manager: {
+      getRepository: jest.fn(),
+      transaction: jest.fn(),
+    },
   };
   const userRepository = { findOneBy: jest.fn() };
   const apiTokenPermissionRepository = { create: jest.fn((value) => value), save: jest.fn(), delete: jest.fn() };
@@ -17,7 +22,6 @@ describe('ApiTokenService', () => {
   const rbacService = { getEffectivePermissions: jest.fn() };
   const service = new ApiTokenService(
     repository as never,
-    apiTokenPermissionRepository as never,
     userRepository as never,
     tokenHashService as never,
     rbacService as never,
@@ -26,6 +30,10 @@ describe('ApiTokenService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     rbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.read']));
+    repository.manager.getRepository.mockImplementation((entity) =>
+      entity === ApiToken ? repository : apiTokenPermissionRepository,
+    );
+    repository.manager.transaction.mockImplementation((callback) => callback(repository.manager));
   });
 
   it('stores only the hash and returns the secret once on creation', async () => {
@@ -42,6 +50,44 @@ describe('ApiTokenService', () => {
       expect.objectContaining({ tokenHash: `hashed:${result.token}` }),
     );
     expect(result.apiToken).not.toHaveProperty('token');
+  });
+
+  it('creates the token and its permissions through one transaction', async () => {
+    repository.save.mockImplementation(async (value) => ({ ...value, id: 1, createdAt: new Date() }));
+    apiTokenPermissionRepository.save.mockResolvedValue([]);
+
+    await service.create(3, { name: 'Script', permissionKeys: ['resources.read'] });
+
+    expect(repository.manager.transaction).toHaveBeenCalledTimes(1);
+    expect(apiTokenPermissionRepository.save).toHaveBeenCalledWith([
+      expect.objectContaining({ apiTokenId: 1, permissionKey: 'resources.read' }),
+    ]);
+  });
+
+  it('replaces permissions and token metadata through one transaction', async () => {
+    repository.findOne.mockResolvedValue({ id: 1, userId: 3, name: 'Old', revokedAt: null, apiTokenPermissions: [] });
+    repository.save.mockImplementation(async (value) => value);
+    apiTokenPermissionRepository.save.mockResolvedValue([]);
+
+    await service.update(3, 1, { name: 'New', permissionKeys: ['resources.read'] });
+
+    expect(repository.manager.transaction).toHaveBeenCalledTimes(1);
+    expect(apiTokenPermissionRepository.delete).toHaveBeenCalledWith({ apiTokenId: 1 });
+    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ name: 'New' }));
+  });
+
+  it('paginates active tokens and their permission rows', async () => {
+    repository.findAndCount.mockResolvedValue([[], 12]);
+
+    await expect(service.list(3, 2, 10)).resolves.toEqual({ data: [], total: 12, page: 2, limit: 10 });
+
+    expect(repository.findAndCount).toHaveBeenCalledWith({
+      where: { userId: 3, revokedAt: null },
+      order: { createdAt: 'DESC', id: 'DESC' },
+      relations: { apiTokenPermissions: true },
+      skip: 10,
+      take: 10,
+    });
   });
 
   it('refuses permissions no longer held by the owner', async () => {

@@ -22,6 +22,7 @@ import { getBaseUrl } from '../../../api';
 import { PermissionPicker } from '../../../components/permissionPicker';
 import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
 import { useRbacServiceListPermissions } from '@attraccess/react-query-client';
+import { SimplePagination } from '../../../components/simplePagination';
 import en from './en.json';
 import de from './de.json';
 
@@ -38,12 +39,23 @@ interface CreatedApiToken extends ApiToken {
   token: string;
 }
 
+interface ApiTokenPage {
+  data: ApiToken[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+const PAGE_SIZE = 10;
+
 export function ApiTokensCard({ availablePermissions }: { availablePermissions: string[] }) {
   const { t } = useTranslations({ en, de });
   const { showToast } = useToastMessage();
   const { permissionLabel, permissionDescription, permissionCategory } = useRbacCatalogTranslations();
   const { data: allPermissions } = useRbacServiceListPermissions();
   const [apiTokens, setApiTokens] = useState<ApiToken[] | null>(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [name, setName] = useState('');
   const [permissionKeys, setPermissionKeys] = useState<Set<string>>(() => new Set());
   const [expiresAt, setExpiresAt] = useState('');
@@ -55,18 +67,22 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
     [allPermissions, availablePermissions],
   );
 
-  const loadTokens = useCallback(async () => {
-    const response = await fetch(`${getBaseUrl()}/api/users/me/api-tokens`, { credentials: 'include' });
+  const loadTokens = useCallback(async (requestedPage: number) => {
+    const response = await fetch(`${getBaseUrl()}/api/users/me/api-tokens?page=${requestedPage}&limit=${PAGE_SIZE}`, {
+      credentials: 'include',
+    });
     if (!response.ok) throw new Error('Could not load API tokens');
-    setApiTokens(await response.json());
+    const result = (await response.json()) as ApiTokenPage;
+    setApiTokens(result.data);
+    setTotal(result.total);
   }, []);
 
   useEffect(() => {
-    loadTokens().catch(() => {
+    loadTokens(page).catch(() => {
       showToast({ title: t('errors.loadFailed'), type: 'error' });
       setApiTokens([]);
     });
-  }, [loadTokens, showToast, t]);
+  }, [loadTokens, page, showToast, t]);
 
   const createToken = async () => {
     setIsCreating(true);
@@ -84,7 +100,8 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
       if (!response.ok) throw new Error('Could not create API token');
       const created = (await response.json()) as CreatedApiToken;
       setSecret(created.token);
-      setApiTokens((tokens) => [created, ...(tokens ?? [])]);
+      if (page === 1) await loadTokens(1);
+      else setPage(1);
       setName('');
       setPermissionKeys(new Set());
       setExpiresAt('');
@@ -104,7 +121,8 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
         credentials: 'include',
       });
       if (!response.ok) throw new Error('Could not revoke API token');
-      setApiTokens((tokens) => (tokens ?? []).filter((item) => item.id !== token.id));
+      if (apiTokens?.length === 1 && page > 1) setPage(page - 1);
+      else await loadTokens(page);
       showToast({ title: t('success.revoked'), type: 'success' });
     } catch {
       showToast({ title: t('errors.revokeFailed'), type: 'error' });
@@ -172,6 +190,13 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
           </TableContent>
         </TableScrollContainer>
       </Table>
+      <SimplePagination
+        page={page}
+        total={Math.max(1, Math.ceil(total / PAGE_SIZE))}
+        onChange={setPage}
+        showControls
+        aria-label={t('title')}
+      />
 
       <TextField value={name} onChange={setName} isDisabled={isCreating}>
         <Label>{t('nameLabel')}</Label>

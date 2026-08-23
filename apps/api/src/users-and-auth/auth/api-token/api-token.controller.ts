@@ -1,8 +1,16 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk';
 import { ApiTokenService } from './api-token.service';
-import { ApiTokenMetadataDto, CreateApiTokenDto, CreateApiTokenResponseDto, UpdateApiTokenDto } from './api-token.dto';
+import {
+  ApiTokenMetadataDto,
+  CreateApiTokenDto,
+  CreateApiTokenResponseDto,
+  ListApiTokensQueryDto,
+  PaginatedApiTokensResponseDto,
+  UpdateApiTokenDto,
+} from './api-token.dto';
+import { computeNextPage } from '../../../types/response';
 
 @ApiTags('API tokens')
 @Controller('users/me/api-tokens')
@@ -12,9 +20,17 @@ export class ApiTokenController {
   @SessionAuth('users.api-tokens.manage')
   @Get()
   @ApiOperation({ summary: 'List the current user API tokens', operationId: 'listApiTokens' })
-  @ApiOkResponse({ type: [ApiTokenMetadataDto] })
-  async list(@Req() request: AuthenticatedRequest): Promise<ApiTokenMetadataDto[]> {
-    return (await this.apiTokenService.list(request.user.id)).map(toMetadata);
+  @ApiOkResponse({ type: PaginatedApiTokensResponseDto })
+  async list(
+    @Req() request: AuthenticatedRequest,
+    @Query() query: ListApiTokensQueryDto,
+  ): Promise<PaginatedApiTokensResponseDto> {
+    const result = await this.apiTokenService.list(request.user.id, query.page, query.limit);
+    return {
+      ...result,
+      data: result.data.map(toMetadata),
+      nextPage: computeNextPage(result.page, result.limit, result.total),
+    };
   }
 
   @SessionAuth('users.api-tokens.manage')
