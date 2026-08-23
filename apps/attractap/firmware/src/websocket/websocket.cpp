@@ -28,6 +28,11 @@ void Websocket::setup()
     if (!network_quality_mutex)
     {
         network_quality_mutex = xSemaphoreCreateMutex();
+        if (!network_quality_mutex)
+        {
+            logger.error("Websocket setup: network quality mutex allocation failed");
+            return;
+        }
     }
     if (!tx_queue)
     {
@@ -181,6 +186,11 @@ void Websocket::publishConnectionStatus()
 
 void Websocket::publishNetworkQuality()
 {
+    if (!this->network_quality_mutex)
+    {
+        return;
+    }
+
     uint32_t nowMs = millis();
     uint32_t inboundAgeMs = (this->lastInboundFrameTime == 0) ? 0 : nowMs - this->lastInboundFrameTime;
     uint8_t txDepth = this->tx_queue ? (uint8_t)uxQueueMessagesWaiting(this->tx_queue) : 0;
@@ -211,6 +221,11 @@ void Websocket::publishNetworkQuality()
 
 void Websocket::recordNetworkQualityEvent(uint32_t *events, uint8_t &nextIndex)
 {
+    if (!this->network_quality_mutex)
+    {
+        return;
+    }
+
     xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
     events[nextIndex] = millis();
     nextIndex = (uint8_t)((nextIndex + 1) % QUALITY_EVENT_SLOTS);
