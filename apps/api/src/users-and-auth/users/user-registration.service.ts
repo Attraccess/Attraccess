@@ -76,10 +76,21 @@ export class UserRegistrationService {
     } catch (e) {
       this.logger.error(`Error sending verification email for user ID: ${user.id}`, e.stack);
       if (authenticationDetails) {
-        await this.authService.removeAuthenticationDetails(authenticationDetails.id);
+        try {
+          await this.authService.removeAuthenticationDetails(authenticationDetails.id);
+        } catch (cleanupError) {
+          this.logger.error(`Error removing authentication details for user ID: ${user.id}`, cleanupError.stack);
+        }
       }
-      await this.usersService.deleteOne(user.id);
-      throw e;
+      try {
+        await this.usersService.deleteOne(user.id);
+      } catch (cleanupError) {
+        this.logger.error(
+          `Error deleting user after verification email failure for ID: ${user.id}`,
+          cleanupError.stack,
+        );
+      }
+      throw mapEmailSendError(e);
     }
 
     this.logger.debug(`User creation completed successfully for ID: ${user.id}`);

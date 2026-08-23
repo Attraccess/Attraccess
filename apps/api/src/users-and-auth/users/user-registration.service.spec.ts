@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { User, AuthenticationType, Setting } from '@attraccess/database-entities';
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { UserRegistrationService } from './user-registration.service';
 import { SignupDomainService } from './signup-domain.service';
 import { UsersService } from './users.service';
@@ -143,6 +143,39 @@ describe('UserRegistrationService', () => {
       const response = await service.createOne(dto);
       expect(response).toEqual(user);
       expect(emailService.sendVerificationEmail).toHaveBeenCalledWith(user, 'verification-token');
+    });
+
+    it('explains that SMTP must be configured and rolls back when sending verification email fails', async () => {
+      settingRepository.findOne.mockResolvedValue({ value: '*' });
+      const user = { id: 1, username: 'testuser', email: 'test@example.com' } as User;
+      const authenticationDetails = {
+        id: 1,
+        userId: user.id,
+        type: AuthenticationType.LOCAL_PASSWORD,
+        password: 'hashed-password',
+        user,
+      };
+      jest.spyOn(usersService, 'createOne').mockResolvedValue(user);
+      jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue(authenticationDetails);
+      jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
+      jest.spyOn(emailService, 'sendVerificationEmail').mockRejectedValue(new Error('SMTP configuration not set'));
+
+      const result = service.createOne({
+        username: 'testuser',
+        email: 'test@example.com',
+        password: 'password',
+        strategy: AuthenticationType.LOCAL_PASSWORD,
+      });
+
+      await expect(result).rejects.toBeInstanceOf(BadRequestException);
+      await expect(result).rejects.toMatchObject({
+        response: {
+          message: 'SMTP is not configured. Configure email before sending email.',
+          statusCode: 400,
+        },
+      });
+      expect(authService.removeAuthenticationDetails).toHaveBeenCalledWith(authenticationDetails.id);
+      expect(usersService.deleteOne).toHaveBeenCalledWith(user.id);
     });
   });
 
