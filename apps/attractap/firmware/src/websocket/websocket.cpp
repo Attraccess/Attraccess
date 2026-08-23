@@ -25,6 +25,10 @@ void Websocket::setup()
     {
         connect_lifecycle_mutex = xSemaphoreCreateMutex();
     }
+    if (!network_quality_mutex)
+    {
+        network_quality_mutex = xSemaphoreCreateMutex();
+    }
     if (!tx_queue)
     {
         tx_queue = xQueueCreate(TX_QUEUE_DEPTH, sizeof(TxMessage));
@@ -180,10 +184,12 @@ void Websocket::publishNetworkQuality()
     uint32_t nowMs = millis();
     uint32_t inboundAgeMs = (this->lastInboundFrameTime == 0) ? 0 : nowMs - this->lastInboundFrameTime;
     uint8_t txDepth = this->tx_queue ? (uint8_t)uxQueueMessagesWaiting(this->tx_queue) : 0;
+    xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
     uint8_t reconnects = countRecentNetworkQualityEvents(this->reconnectEventTimes, nowMs);
     uint8_t queueFull = countRecentNetworkQualityEvents(this->txQueueFullEventTimes, nowMs);
     uint8_t sendFailures = countRecentNetworkQualityEvents(this->sendFailureEventTimes, nowMs);
     uint8_t livenessTimeouts = countRecentNetworkQualityEvents(this->livenessTimeoutEventTimes, nowMs);
+    xSemaphoreGive(this->network_quality_mutex);
 
     State::NetworkQuality quality = State::NETWORK_QUALITY_GOOD;
     if (!this->network_is_connected || this->_state != CONNECTED)
@@ -205,8 +211,10 @@ void Websocket::publishNetworkQuality()
 
 void Websocket::recordNetworkQualityEvent(uint32_t *events, uint8_t &nextIndex)
 {
+    xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
     events[nextIndex] = millis();
     nextIndex = (uint8_t)((nextIndex + 1) % QUALITY_EVENT_SLOTS);
+    xSemaphoreGive(this->network_quality_mutex);
 }
 
 uint8_t Websocket::countRecentNetworkQualityEvents(const uint32_t *events, uint32_t nowMs) const

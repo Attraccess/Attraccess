@@ -114,6 +114,8 @@ private:
     const uint32_t INBOUND_LIVENESS_TIMEOUT_MS = 20000;
     const uint32_t QUALITY_EVENT_WINDOW_MS = 60000;
     static constexpr size_t QUALITY_EVENT_SLOTS = 8;
+    // Event rings are written by the main loop, websocket callback, and TX task.
+    SemaphoreHandle_t network_quality_mutex = nullptr;
     uint32_t reconnectEventTimes[QUALITY_EVENT_SLOTS] = {};
     uint32_t txQueueFullEventTimes[QUALITY_EVENT_SLOTS] = {};
     uint32_t sendFailureEventTimes[QUALITY_EVENT_SLOTS] = {};
