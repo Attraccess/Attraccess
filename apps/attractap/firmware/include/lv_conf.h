@@ -27,9 +27,11 @@
    MEMORY SETTINGS
  *=========================*/
 
-/*Built-in lv_malloc pool (the effective setting since the v9 migration; kept explicit)*/
+/*The fullscreen form keyboard needs more than the base UI's 64 KiB pool for
+ *its button-label draw tasks. Keep this internal pool large enough to render
+ *the editor without tripping LVGL's out-of-memory assertion.*/
 #define LV_USE_STDLIB_MALLOC LV_STDLIB_BUILTIN
-#define LV_MEM_SIZE (64 * 1024U)
+#define LV_MEM_SIZE (128 * 1024U)
 
 /*====================
    HAL SETTINGS
