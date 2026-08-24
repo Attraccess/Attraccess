@@ -9,10 +9,17 @@ export interface PlugRender {
   cover: Mesh;
 }
 
-export type PlugDevice = 'nous_a1' | 'shelly_plus';
+export type PlugDevice = 'nous_a1' | 'shelly_plus_gen3' | 'shelly_legacy';
 export type PlugCable = 'straight_schuko' | 'straight_euro' | 'angled_schuko' | 'angled_euro';
 
-export function usePlugRender(device: PlugDevice, cable: PlugCable) {
+export function usePlugRender(
+  device: PlugDevice,
+  cable: PlugCable,
+  deviceExtraDiameter: number,
+  cordOpeningDiameter: number,
+  heightAbovePlug: number,
+  cableCutoutHeight: number,
+) {
   const [status, setStatus] = useState<'rendering' | 'ready' | 'error'>('rendering');
   const [result, setResult] = useState<PlugRender | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +32,12 @@ export function usePlugRender(device: PlugDevice, cable: PlugCable) {
     worker.onmessage = (event: MessageEvent<PlugRenderResponse>) => {
       if (event.data.id !== requestId.current) return;
       if (event.data.ok === true) {
-        setResult({ bodyStl: event.data.body, coverStl: event.data.cover, body: parseBinaryStl(event.data.body), cover: parseBinaryStl(event.data.cover) });
+        setResult({
+          bodyStl: event.data.body,
+          coverStl: event.data.cover,
+          body: parseBinaryStl(event.data.body),
+          cover: parseBinaryStl(event.data.cover),
+        });
         setError(null);
         setStatus('ready');
       } else if (event.data.ok === false) {
@@ -33,7 +45,10 @@ export function usePlugRender(device: PlugDevice, cable: PlugCable) {
         setStatus('error');
       }
     };
-    worker.onerror = (event) => { setError(event.message); setStatus('error'); };
+    worker.onerror = (event) => {
+      setError(event.message);
+      setStatus('error');
+    };
     return () => worker.terminate();
   }, []);
 
@@ -41,9 +56,21 @@ export function usePlugRender(device: PlugDevice, cable: PlugCable) {
     const id = ++requestId.current;
     setStatus('rendering');
     setError(null);
-    const timer = setTimeout(() => workerRef.current?.postMessage({ id, device, cable } satisfies PlugRenderRequest), 250);
+    const timer = setTimeout(
+      () =>
+        workerRef.current?.postMessage({
+          id,
+          device,
+          cable,
+          deviceExtraDiameter,
+          cordOpeningDiameter,
+          heightAbovePlug,
+          cableCutoutHeight,
+        } satisfies PlugRenderRequest),
+      250,
+    );
     return () => clearTimeout(timer);
-  }, [device, cable]);
+  }, [device, cable, deviceExtraDiameter, cordOpeningDiameter, heightAbovePlug, cableCutoutHeight]);
 
   return { status, result, error };
 }
