@@ -93,6 +93,8 @@ describe('Register flow + password policy (integration)', () => {
             findOne: jest.fn(),
             deleteOne: jest.fn(),
             updateOne: jest.fn(),
+            withTransaction: jest.fn(async (handler) => handler({})),
+            recordCreatedUser: jest.fn(),
             countUsers: jest.fn(async () => 0),
             cleanupUsername: (v: string) => v,
             validateUsernameOrThrow: jest.fn(),

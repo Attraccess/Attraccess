@@ -35,7 +35,8 @@ describe('UserRegistrationService', () => {
             findMany: jest.fn(),
             createOne: jest.fn(),
             deleteOne: jest.fn(),
-            rollbackFailedRegistration: jest.fn(),
+            withTransaction: jest.fn(async (handler) => handler({})),
+            recordCreatedUser: jest.fn(),
             countUsers: jest.fn(),
           },
         },
@@ -96,11 +97,14 @@ describe('UserRegistrationService', () => {
 
       const response = await service.createOne(createUserDto);
       expect(response).toEqual(user);
-      expect(authService.addAuthenticationDetails).toHaveBeenCalledWith(user.id, {
-        type: AuthenticationType.LOCAL_PASSWORD,
-        details: { password: createUserDto.password },
-      });
+      expect(authService.addAuthenticationDetails).toHaveBeenCalledWith(
+        user.id,
+        { type: AuthenticationType.LOCAL_PASSWORD, details: { password: createUserDto.password } },
+        expect.anything(),
+      );
       expect(emailService.sendVerificationEmail).toHaveBeenCalledWith(user, 'verification-token');
+      expect(usersService.withTransaction).toHaveBeenCalled();
+      expect(usersService.recordCreatedUser).toHaveBeenCalledWith(user);
     });
 
     it('should throw if email domain is not whitelisted', async () => {
@@ -171,23 +175,21 @@ describe('UserRegistrationService', () => {
       await expect(result).rejects.toBeInstanceOf(BadRequestException);
       await expect(result).rejects.toMatchObject({
         response: {
-          message: 'SMTP is not configured. Configure email before sending email.',
+          message: 'SMTP is not configured. Configure email before creating a user.',
           statusCode: 400,
         },
       });
-      expect(usersService.rollbackFailedRegistration).toHaveBeenCalledWith(user.id);
+      expect(usersService.recordCreatedUser).not.toHaveBeenCalled();
+      expect(usersService.withTransaction).toHaveBeenCalled();
     });
 
-    it('preserves the SMTP configuration error when registration rollback fails', async () => {
+    it('rolls back creation atomically when sending the verification email fails', async () => {
       settingRepository.findOne.mockResolvedValue({ value: '*' });
       const user = { id: 1, username: 'testuser', email: 'test@example.com' } as User;
       jest.spyOn(usersService, 'createOne').mockResolvedValue(user);
       jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
       jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
       jest.spyOn(emailService, 'sendVerificationEmail').mockRejectedValue(new Error('SMTP configuration not set'));
-      const rollbackError = new Error('Database unavailable');
-      jest.spyOn(usersService, 'rollbackFailedRegistration').mockRejectedValue(rollbackError);
-
       await expect(
         service.createOne({
           username: 'testuser',
@@ -197,11 +199,12 @@ describe('UserRegistrationService', () => {
         }),
       ).rejects.toMatchObject({
         response: {
-          message: 'SMTP is not configured. Configure email before sending email.',
+          message: 'SMTP is not configured. Configure email before creating a user.',
           statusCode: 400,
         },
       });
-      expect(usersService.rollbackFailedRegistration).toHaveBeenCalledWith(user.id);
+      expect(usersService.recordCreatedUser).not.toHaveBeenCalled();
+      expect(usersService.withTransaction).toHaveBeenCalled();
     });
   });
 

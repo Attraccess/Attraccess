@@ -218,7 +218,7 @@ export class UsersService {
     isEmailVerified?: boolean;
     skipUsernameSanitization?: boolean;
     locale?: string;
-  }): Promise<User> {
+  }, manager?: EntityManager): Promise<User> {
     const data = {
       username: this.cleanupUsername(userData.username),
       email: userData.email.trim(),
@@ -232,7 +232,8 @@ export class UsersService {
     }
 
     // verifying usage limits
-    const currentAmountOfUsers = await this.userRepository.count();
+    const userRepository = manager ? manager.getRepository(User) : this.userRepository;
+    const currentAmountOfUsers = await userRepository.count();
     try {
       await this.licenseService.verifyLicense({
         usageLimits: {
@@ -249,7 +250,7 @@ export class UsersService {
 
     // Check for existing email
     this.logger.debug(`Checking if email already exists: ${data.email}`);
-    const existingEmail = await this.findOne({ email: data.email });
+    const existingEmail = await this.findOne({ email: data.email }, undefined, manager);
     if (existingEmail) {
       this.logger.debug(`Email already exists: ${data.email}`);
       throw new BadRequestException('Email already exists');
@@ -257,7 +258,7 @@ export class UsersService {
 
     // Check for existing username
     this.logger.debug(`Checking if username already exists: ${data.username}`);
-    const existingUsername = await this.findOne({ username: data.username });
+    const existingUsername = await this.findOne({ username: data.username }, undefined, manager);
     if (existingUsername) {
       this.logger.debug(`Username already exists: ${data.username}`);
       throw new BadRequestException('Username already exists');
@@ -274,13 +275,13 @@ export class UsersService {
 
     // Check if this is the first user in the system
     this.logger.debug('Checking if this is the first user in the system');
-    const totalUsers = await this.userRepository.count();
+    const totalUsers = await userRepository.count();
     const isFirstUser = totalUsers === 0;
 
     this.logger.debug('Saving new user to database');
     // Wrap save + role assignment in a single transaction so a role-assignment failure
     // doesn't leave an administrator-less account on a fresh install.
-    const savedUser = await this.dataSource.transaction(async (em) => {
+    const saveUser = async (em: EntityManager) => {
       const saved = await em.save(user);
       if (isFirstUser) {
         this.logger.debug('First user in system - assigning administrator role');
@@ -289,13 +290,20 @@ export class UsersService {
         await this.rbacService.assignDefaultRoles(saved.id, em);
       }
       return saved;
-    });
+    };
+    const savedUser = manager ? await saveUser(manager) : await this.dataSource.transaction(saveUser);
     this.logger.debug(`User saved with ID: ${savedUser.id}`);
 
+    if (!manager) {
+      this.recordCreatedUser(savedUser);
+    }
+    return savedUser;
+  }
+
+  public recordCreatedUser(user: User): void {
     this.metricsService.usersRegisteredTotal.inc();
     this.metricsService.usersTotal.inc();
-    this.metricsService.usersPerLocale.inc({ locale: savedUser.locale ?? 'en' });
-    return savedUser;
+    this.metricsService.usersPerLocale.inc({ locale: user.locale ?? 'en' });
   }
 
   async deleteOne(id: number): Promise<void> {
@@ -303,25 +311,6 @@ export class UsersService {
     await this.anonymizeAndSoftDelete(id);
     this.metricsService.usersTotal.dec();
     this.logger.debug(`User deleted with ID: ${id}`);
-  }
-
-  /** Removes a registration that could not complete before the account became usable. */
-  async rollbackFailedRegistration(id: number): Promise<void> {
-    const user = await this.dataSource.transaction(async (manager) => {
-      const userRepository = manager.getRepository(User);
-      const user = await userRepository.findOne({ where: { id }, withDeleted: true });
-      if (!user || user.deletedAt) {
-        return null;
-      }
-
-      await userRepository.delete(id);
-      return user;
-    });
-
-    if (user) {
-      this.metricsService.usersTotal.dec();
-      this.metricsService.usersPerLocale.dec({ locale: user.locale ?? 'en' });
-    }
   }
 
   public async isSSOUser(userId: number): Promise<boolean> {

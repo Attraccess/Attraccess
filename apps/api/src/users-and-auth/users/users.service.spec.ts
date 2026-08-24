@@ -527,44 +527,6 @@ describe('UsersService', () => {
     });
   });
 
-  describe('rollbackFailedRegistration', () => {
-    it('removes the newly created user without applying the last-administrator deletion policy', async () => {
-      const user = { id: 1, locale: 'en', deletedAt: null } as User;
-      const transactionUserRepository = {
-        findOne: jest.fn().mockResolvedValue(user),
-        delete: jest.fn().mockResolvedValue({ affected: 1 }),
-      };
-      const manager = {
-        getRepository: jest.fn().mockReturnValue(transactionUserRepository),
-      } as unknown as EntityManager;
-      dataSource.transaction.mockImplementation(async (callback) => callback(manager));
-
-      await service.rollbackFailedRegistration(user.id);
-
-      expect(mockRbacService.isLastAdministrator).not.toHaveBeenCalled();
-      expect(transactionUserRepository.delete).toHaveBeenCalledWith(user.id);
-      expect(mockMetricsService.usersTotal.dec).toHaveBeenCalled();
-      expect(mockMetricsService.usersPerLocale.dec).toHaveBeenCalledWith({ locale: 'en' });
-    });
-
-    it('does not decrement metrics when the registration was already removed', async () => {
-      mockMetricsService.usersTotal.dec.mockClear();
-      mockMetricsService.usersPerLocale.dec.mockClear();
-      const transactionUserRepository = {
-        findOne: jest.fn().mockResolvedValue(null),
-      };
-      const manager = {
-        getRepository: jest.fn().mockReturnValue(transactionUserRepository),
-      } as unknown as EntityManager;
-      dataSource.transaction.mockImplementation(async (callback) => callback(manager));
-
-      await service.rollbackFailedRegistration(1);
-
-      expect(mockMetricsService.usersTotal.dec).not.toHaveBeenCalled();
-      expect(mockMetricsService.usersPerLocale.dec).not.toHaveBeenCalled();
-    });
-  });
-
   describe('updateLocale', () => {
     it('saves cleaned locale, updates gauge, and returns user', async () => {
       const existing = { id: 1, locale: 'en' } as User;
