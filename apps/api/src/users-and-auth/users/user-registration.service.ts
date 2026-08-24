@@ -83,7 +83,7 @@ export class UserRegistrationService {
       return user;
     } catch (e) {
       this.logger.error(`Error completing registration for ${body.email}`, e instanceof Error ? e.stack : String(e));
-      throw mapEmailSendError(e, 'registration');
+      throw mapEmailSendError(e);
     }
   }
 
