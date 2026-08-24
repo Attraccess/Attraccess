@@ -159,6 +159,13 @@ describe('UsersAdminController', () => {
         ForbiddenException,
       );
     });
+
+    it('should throw ForbiddenException when roleId is supplied without users.read', async () => {
+      await expect(controller.findMany({ page: 1, limit: 10, roleId: 42 }, makeRequest())).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(usersService.findMany).not.toHaveBeenCalled();
+    });
   });
 
   describe('getOneById', () => {
