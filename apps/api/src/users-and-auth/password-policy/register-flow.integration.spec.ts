@@ -49,6 +49,7 @@ describe('Register flow + password policy (integration)', () => {
   let service: UserRegistrationService;
   let createOne: jest.Mock;
   let addAuthenticationDetails: jest.Mock;
+  let hashPassword: jest.Mock;
   let generateEmailVerificationToken: jest.Mock;
   let sendVerificationEmail: jest.Mock;
   let hibpCheck: jest.Mock;
@@ -57,6 +58,7 @@ describe('Register flow + password policy (integration)', () => {
   beforeEach(async () => {
     createOne = jest.fn(async ({ username, email }) => ({ id: 1, username, email }));
     addAuthenticationDetails = jest.fn(async () => ({ id: 'auth-1' }));
+    hashPassword = jest.fn(async (password) => `hashed-${password}`);
     generateEmailVerificationToken = jest.fn(async () => 'token');
     sendVerificationEmail = jest.fn(async () => undefined);
     hibpCheck = jest.fn(async () => ({ pwned: false, count: 0, available: true }));
@@ -104,13 +106,14 @@ describe('Register flow + password policy (integration)', () => {
           provide: AuthService,
           useValue: {
             addAuthenticationDetails,
+            hashPassword,
             generateEmailVerificationToken,
             removeAuthenticationDetails: jest.fn(),
           },
         },
         {
           provide: EmailService,
-          useValue: { sendVerificationEmail },
+          useValue: { assertSmtpConfigured: jest.fn(), sendVerificationEmail },
         },
         {
           provide: SSOService,

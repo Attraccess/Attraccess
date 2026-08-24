@@ -45,46 +45,66 @@ export class UserRegistrationService {
     }
 
     try {
-      const { user, verificationToken } = await this.usersService.withTransaction(async (manager: EntityManager) => {
-        const user = await this.usersService.createOne(
-          {
-            username: body.username,
-            email: body.email,
-            externalIdentifier: null,
-            locale,
+      await this.emailService.assertSmtpConfigured();
+    } catch (error) {
+      throw mapEmailSendError(error);
+    }
+
+    const hashedPassword =
+      body.strategy === AuthenticationType.LOCAL_PASSWORD ? await this.authService.hashPassword(body.password) : undefined;
+
+    const { user, verificationToken } = await this.usersService.withTransaction(async (manager: EntityManager) => {
+      const user = await this.usersService.createOne(
+        {
+          username: body.username,
+          email: body.email,
+          externalIdentifier: null,
+          locale,
+        },
+        manager,
+      );
+      this.logger.debug(`User created with ID: ${user.id}`);
+
+      this.logger.debug(`Adding authentication details for user ID: ${user.id}, strategy: ${body.strategy}`);
+      const authenticationDetails = await this.authService.addAuthenticationDetails(
+        user.id,
+        {
+          type: body.strategy,
+          details: {
+            password: body.password,
           },
-          manager,
-        );
-        this.logger.debug(`User created with ID: ${user.id}`);
+        },
+        manager,
+        hashedPassword,
+      );
+      this.logger.debug(`Authentication details added with ID: ${authenticationDetails.id}`);
 
-        this.logger.debug(`Adding authentication details for user ID: ${user.id}, strategy: ${body.strategy}`);
-        const authenticationDetails = await this.authService.addAuthenticationDetails(
-          user.id,
-          {
-            type: body.strategy,
-            details: {
-              password: body.password,
-            },
-          },
-          manager,
-        );
-        this.logger.debug(`Authentication details added with ID: ${authenticationDetails.id}`);
+      this.logger.debug(`Generating email verification token for user ID: ${user.id}`);
+      const verificationToken = await this.authService.generateEmailVerificationToken(user, manager);
+      return { user, verificationToken };
+    });
 
-        this.logger.debug(`Generating email verification token for user ID: ${user.id}`);
-        const verificationToken = await this.authService.generateEmailVerificationToken(user, manager);
-        return { user, verificationToken };
-      });
-
-      this.usersService.recordCreatedUser(user);
+    try {
       this.logger.debug(`Sending verification email to user ID: ${user.id}`);
       await this.emailService.sendVerificationEmail(user, verificationToken);
       this.logger.debug(`Verification email sent to user ID: ${user.id}`);
-      this.logger.debug(`User creation completed successfully for ID: ${user.id}`);
-      return user;
-    } catch (e) {
-      this.logger.error(`Error completing registration for ${body.email}`, e instanceof Error ? e.stack : String(e));
-      throw mapEmailSendError(e);
+    } catch (error) {
+      this.logger.error(`Error sending verification email for ${body.email}`, error instanceof Error ? error.stack : String(error));
+      try {
+        await this.usersService.rollbackFailedRegistration(user.id);
+      } catch (rollbackError) {
+        this.logger.error(
+          `Error rolling back failed registration for user ID: ${user.id}`,
+          rollbackError instanceof Error ? rollbackError.stack : String(rollbackError),
+        );
+        throw rollbackError;
+      }
+      throw mapEmailSendError(error);
     }
+
+    this.usersService.recordCreatedUser(user);
+    this.logger.debug(`User creation completed successfully for ID: ${user.id}`);
+    return user;
   }
 
   private async ensureFirstTimeSetupIncompleteAndDeleteAdmin(): Promise<void> {

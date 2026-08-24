@@ -306,6 +306,14 @@ export class UsersService {
     this.metricsService.usersPerLocale.inc({ locale: user.locale ?? 'en' });
   }
 
+  public async rollbackFailedRegistration(userId: number): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      // This is only used for a just-created account whose verification email could not be sent.
+      // It bypasses normal account-deletion rules so the first administrator can be retried.
+      await manager.delete(User, userId);
+    });
+  }
+
   async deleteOne(id: number): Promise<void> {
     this.logger.debug(`Deleting user with ID: ${id}`);
     await this.anonymizeAndSoftDelete(id);

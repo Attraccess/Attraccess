@@ -10,6 +10,7 @@ import { EmailService } from '../../email/email.service';
 import { PasswordPolicyService } from '../password-policy/password-policy.service';
 import { CreateUserDto } from './dtos/createUser.dto';
 import { ForbiddenSignupDomainException } from './errors/forbiddenSignupDomain.exception';
+import { EntityManager } from 'typeorm';
 
 describe('UserRegistrationService', () => {
   let service: UserRegistrationService;
@@ -37,6 +38,7 @@ describe('UserRegistrationService', () => {
             deleteOne: jest.fn(),
             withTransaction: jest.fn(async (handler) => handler({})),
             recordCreatedUser: jest.fn(),
+            rollbackFailedRegistration: jest.fn(),
             countUsers: jest.fn(),
           },
         },
@@ -44,13 +46,14 @@ describe('UserRegistrationService', () => {
           provide: AuthService,
           useValue: {
             addAuthenticationDetails: jest.fn(),
+            hashPassword: jest.fn(async (password) => `hashed-${password}`),
             generateEmailVerificationToken: jest.fn(),
             removeAuthenticationDetails: jest.fn(),
           },
         },
         {
           provide: EmailService,
-          useValue: { sendVerificationEmail: jest.fn() },
+          useValue: { assertSmtpConfigured: jest.fn(), sendVerificationEmail: jest.fn() },
         },
         {
           provide: PasswordPolicyService,
@@ -101,6 +104,7 @@ describe('UserRegistrationService', () => {
         user.id,
         { type: AuthenticationType.LOCAL_PASSWORD, details: { password: createUserDto.password } },
         expect.anything(),
+        'hashed-password',
       );
       expect(emailService.sendVerificationEmail).toHaveBeenCalledWith(user, 'verification-token');
       expect(usersService.withTransaction).toHaveBeenCalled();
@@ -172,20 +176,9 @@ describe('UserRegistrationService', () => {
       expect(emailService.sendVerificationEmail).toHaveBeenCalledWith(user, 'verification-token');
     });
 
-    it('explains that SMTP must be configured before sending email after registration commits', async () => {
+    it('fails before registration when SMTP is not configured', async () => {
       settingRepository.findOne.mockResolvedValue({ value: '*' });
-      const user = { id: 1, username: 'testuser', email: 'test@example.com' } as User;
-      const authenticationDetails = {
-        id: 1,
-        userId: user.id,
-        type: AuthenticationType.LOCAL_PASSWORD,
-        password: 'hashed-password',
-        user,
-      };
-      jest.spyOn(usersService, 'createOne').mockResolvedValue(user);
-      jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue(authenticationDetails);
-      jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
-      jest.spyOn(emailService, 'sendVerificationEmail').mockRejectedValue(new Error('SMTP configuration not set'));
+      jest.spyOn(emailService, 'assertSmtpConfigured').mockRejectedValue(new Error('SMTP configuration not set'));
 
       const result = service.createOne({
         username: 'testuser',
@@ -201,8 +194,65 @@ describe('UserRegistrationService', () => {
           statusCode: 400,
         },
       });
-      expect(usersService.recordCreatedUser).toHaveBeenCalledWith(user);
-      expect(usersService.withTransaction).toHaveBeenCalled();
+      expect(usersService.withTransaction).not.toHaveBeenCalled();
+      expect(usersService.rollbackFailedRegistration).not.toHaveBeenCalled();
+      expect(usersService.recordCreatedUser).not.toHaveBeenCalled();
+      expect(emailService.sendVerificationEmail).not.toHaveBeenCalled();
+    });
+
+    it('rolls back the registration when sending the verification email fails', async () => {
+      settingRepository.findOne.mockResolvedValue({ value: '*' });
+      const user = { id: 1, username: 'testuser', email: 'test@example.com' } as User;
+      jest.spyOn(usersService, 'createOne').mockResolvedValue(user);
+      jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
+      jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
+      jest.spyOn(emailService, 'sendVerificationEmail').mockRejectedValue(Object.assign(new Error('SMTP unavailable'), { code: 'ECONNREFUSED' }));
+
+      await expect(
+        service.createOne({
+          username: 'testuser',
+          email: 'test@example.com',
+          password: 'password',
+          strategy: AuthenticationType.LOCAL_PASSWORD,
+        }),
+      ).rejects.toMatchObject({ response: { message: 'EmailSendFailed', statusCode: 503 } });
+      expect(usersService.rollbackFailedRegistration).toHaveBeenCalledWith(user.id);
+      expect(usersService.recordCreatedUser).not.toHaveBeenCalled();
+    });
+
+    it('does not map transaction failures as email-send failures', async () => {
+      settingRepository.findOne.mockResolvedValue({ value: '*' });
+      const transactionError = Object.assign(new Error('Database unavailable'), { code: 'ECONNREFUSED' });
+      jest.spyOn(usersService, 'withTransaction').mockRejectedValue(transactionError);
+
+      await expect(
+        service.createOne({
+          username: 'testuser',
+          email: 'test@example.com',
+          password: 'password',
+          strategy: AuthenticationType.LOCAL_PASSWORD,
+        }),
+      ).rejects.toBe(transactionError);
+      expect(emailService.sendVerificationEmail).not.toHaveBeenCalled();
+    });
+
+    it('hashes the password before opening the registration transaction', async () => {
+      settingRepository.findOne.mockResolvedValue({ value: '*' });
+      const user = { id: 1, username: 'testuser', email: 'test@example.com' } as User;
+      jest.spyOn(usersService, 'createOne').mockResolvedValue(user);
+      jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
+      jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
+      jest.spyOn(usersService, 'withTransaction').mockImplementation(async (handler) => {
+        expect(authService.hashPassword).toHaveBeenCalledWith('password');
+        return handler({} as EntityManager);
+      });
+
+      await service.createOne({
+        username: 'testuser',
+        email: 'test@example.com',
+        password: 'password',
+        strategy: AuthenticationType.LOCAL_PASSWORD,
+      });
     });
   });
 
