@@ -361,14 +361,38 @@ describe('UserRegistrationService', () => {
     });
 
     it('serializes concurrent overwrite requests and revalidates each request in its transaction', async () => {
+      let releaseFirstTransaction!: () => void;
+      let signalFirstTransactionStarted!: () => void;
+      const firstTransactionStarted = new Promise<void>((resolve) => {
+        signalFirstTransactionStarted = resolve;
+      });
+
       jest.spyOn(usersService, 'releaseFirstTimeSetupAdminIdentifiers')
         .mockResolvedValueOnce(unverifiedAdmin)
         .mockRejectedValueOnce(new ForbiddenException('First-time setup is already complete'));
       jest.spyOn(usersService, 'createOne').mockResolvedValue(newAdmin);
       jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
       jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
+      jest
+        .spyOn(usersService, 'withTransaction')
+        .mockImplementationOnce(async (handler) => {
+          signalFirstTransactionStarted();
+          await new Promise<void>((resolve) => {
+            releaseFirstTransaction = resolve;
+          });
+          return handler({} as EntityManager);
+        })
+        .mockImplementationOnce(async (handler) => handler({} as EntityManager));
 
-      const results = await Promise.allSettled([service.createOne(dto), service.createOne(dto)]);
+      const firstRequest = service.createOne(dto);
+      await firstTransactionStarted;
+      const secondRequest = service.createOne(dto);
+
+      await new Promise(setImmediate);
+      expect(usersService.withTransaction).toHaveBeenCalledTimes(1);
+
+      releaseFirstTransaction();
+      const results = await Promise.allSettled([firstRequest, secondRequest]);
 
       expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
       expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
