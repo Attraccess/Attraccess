@@ -4,6 +4,7 @@
   "license": "SEE LICENSE IN LICENSE.md",
   "scripts": {
     "serve": "node --experimental-strip-types scripts/dev-serve.mts",
+    "seed:dev": "node scripts/seed-dev-user.mjs",
     "lint:strict": "nx affected -t lint -- --max-warnings=0",
     "prepare": "husky",
     "precommit": "pnpm nx affected --uncommitted --nxBail --target=lint,typecheck,build,test,e2e",
