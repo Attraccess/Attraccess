@@ -13,8 +13,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@heroui/react';
-import { LockIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react';
-import { RoleWithUsageDto, useRbacServiceListRoles } from '@attraccess/react-query-client';
+import { EyeIcon, LockIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react';
+import {
+  RoleWithUsageDto,
+  useRbacServiceListPermissions,
+  useRbacServiceListRoles,
+} from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { SettingsSection } from '../../components/SettingsSection';
 import { Button } from '../../../../components/button';
@@ -25,6 +29,7 @@ import { DeleteRoleModal } from '../../../roles/delete-role-modal';
 import { useRbacCatalogTranslations } from '../../../../hooks/useRbacCatalogTranslations';
 import en from './en.json';
 import de from './de.json';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * Roles were already at `/settings/roles`, so only the frame changed: the standalone `PageHeader`
@@ -34,9 +39,11 @@ import de from './de.json';
  */
 export function RolesSection() {
   const { t } = useTranslations({ en, de });
-  const { roleName, roleDescription } = useRbacCatalogTranslations();
+  const { permissionLabel, roleName, roleDescription } = useRbacCatalogTranslations();
+  const navigate = useNavigate();
 
   const { data: roles, isLoading } = useRbacServiceListRoles();
+  const { data: permissions } = useRbacServiceListPermissions();
 
   const [formRole, setFormRole] = useState<RoleWithUsageDto | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -117,9 +124,52 @@ export function RolesSection() {
                         )}
                       </TableCell>
                       <TableCell className="hidden sm:table-cell text-center">
-                        {role.rolePermissions?.length ?? 0}
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              aria-label={t('table.actions.viewPermissions', { role: roleName(role) })}
+                              onPress={() => openForm(role)}
+                              data-cy={`roles-table-permissions-${role.key}`}
+                            >
+                              {role.rolePermissions?.length ?? 0}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent showArrow>
+                            <div className="max-w-64">
+                              {(role.rolePermissions ?? []).length > 0 ? (
+                                <ul className="list-disc pl-4 text-left">
+                                  {role.rolePermissions?.map(({ permissionKey }) => (
+                                    <li key={permissionKey}>
+                                      {permissionLabel(
+                                        permissions?.find((permission) => permission.key === permissionKey) ?? {
+                                          key: permissionKey,
+                                        },
+                                      )}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                t('table.noPermissions')
+                              )}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
                       </TableCell>
-                      <TableCell className="hidden sm:table-cell text-center">{role.userCount}</TableCell>
+                      <TableCell className="hidden sm:table-cell text-center">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          aria-label={t('table.actions.viewUsers', { role: roleName(role) })}
+                          onPress={() =>
+                            navigate(`/users?roleId=${role.id}&roleName=${encodeURIComponent(roleName(role))}`)
+                          }
+                          data-cy={`roles-table-users-${role.key}`}
+                        >
+                          {role.userCount}
+                        </Button>
+                      </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1">
                           <Button
@@ -130,7 +180,11 @@ export function RolesSection() {
                             onPress={() => openForm(role)}
                             data-cy={`roles-table-edit-${role.key}`}
                           >
-                            <PencilIcon className="w-4 h-4" />
+                            {role.isSystemManaged ? (
+                              <EyeIcon className="w-4 h-4" />
+                            ) : (
+                              <PencilIcon className="w-4 h-4" />
+                            )}
                           </Button>
                           {!role.isSystemManaged ? (
                             <Button

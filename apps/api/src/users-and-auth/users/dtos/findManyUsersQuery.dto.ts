@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
-import { IsNumber, Min, Max, IsOptional, IsString, IsArray, IsBoolean } from 'class-validator';
+import { IsNumber, IsInt, Min, Max, IsOptional, IsString, IsArray, IsBoolean } from 'class-validator';
 import { ToBoolean } from '../../../common/request-transformers';
 
 export class FindManyUsersQueryDto {
@@ -47,6 +47,17 @@ export class FindManyUsersQueryDto {
   @IsArray()
   @IsOptional()
   ids?: number[];
+
+  @ApiProperty({
+    description: 'Only return users assigned this role',
+    required: false,
+    type: Number,
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  roleId?: number;
 
   @ApiProperty({
     description: 'Include role assignments in the response. Requires users.read permission.',

@@ -163,8 +163,9 @@ export class UsersService {
       return false;
     }
 
-    const driverError = (error as QueryFailedError & { driverError?: { code?: string | number; errno?: number; message?: string } })
-      .driverError;
+    const driverError = (
+      error as QueryFailedError & { driverError?: { code?: string | number; errno?: number; message?: string } }
+    ).driverError;
     const errorCode = driverError?.code ?? driverError?.errno;
     if (
       errorCode === '23505' ||
@@ -177,7 +178,9 @@ export class UsersService {
     }
 
     const message = driverError?.message ?? '';
-    return typeof message === 'string' && message.toLowerCase().includes('unique') && message.toLowerCase().includes('email');
+    return (
+      typeof message === 'string' && message.toLowerCase().includes('unique') && message.toLowerCase().includes('email')
+    );
   }
 
   async findOne(options: FindOneOptions, relations?: string[], manager?: EntityManager): Promise<User | null> {
@@ -542,7 +545,9 @@ export class UsersService {
     }
   }
 
-  async findMany(options: PaginationOptions & { search?: string; ids?: number[]; includeRoles?: boolean }): Promise<PaginatedResponse<User>> {
+  async findMany(
+    options: PaginationOptions & { search?: string; ids?: number[]; roleId?: number; includeRoles?: boolean },
+  ): Promise<PaginatedResponse<User>> {
     this.logger.debug(`Finding all users with options: ${JSON.stringify(options)}`);
     const paginationOptions = PaginationOptionsSchema.parse(options);
     const { search } = options;
@@ -564,6 +569,10 @@ export class UsersService {
       whereCondition = { id: In(options.ids) };
     }
 
+    if (options.roleId) {
+      whereCondition = { ...whereCondition, userRoles: { roleId: options.roleId } };
+    }
+
     if (search) {
       this.logger.debug(`Searching for users with query: ${search}`);
       whereCondition = [
@@ -577,7 +586,9 @@ export class UsersService {
       skip,
       take: limit,
       where: whereCondition,
-      relations: options.includeRoles ? ['authenticationDetails', 'userRoles', 'userRoles.role'] : ['authenticationDetails'],
+      relations: options.includeRoles
+        ? ['authenticationDetails', 'userRoles', 'userRoles.role']
+        : ['authenticationDetails'],
       order: { username: 'ASC' },
     });
 

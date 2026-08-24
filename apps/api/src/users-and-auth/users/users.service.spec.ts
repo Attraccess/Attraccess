@@ -397,7 +397,17 @@ describe('UsersService', () => {
       await service.findMany({ page: 1, limit: 10 });
 
       expect(userRepository.findAndCount).toHaveBeenCalledWith(expect.objectContaining({ order: { username: 'ASC' } }));
-    });
+     });
+
+     it('should filter users by role assignment', async () => {
+       userRepository.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.findMany({ page: 1, limit: 10, roleId: 42 });
+
+      expect(userRepository.findAndCount).toHaveBeenCalledWith(
+         expect.objectContaining({ where: { userRoles: { roleId: 42 } } }),
+       );
+     });
 
     it('should throw error for invalid pagination options', async () => {
       await expect(service.findMany({ page: 0, limit: 10 })).rejects.toThrow();

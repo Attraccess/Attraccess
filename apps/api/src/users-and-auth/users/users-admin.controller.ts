@@ -130,6 +130,7 @@ export class UsersAdminController {
       limit: query.limit,
       search: query.search,
       ids: query.ids,
+      roleId: query.roleId,
       includeRoles: query.includeRoles,
     });
     this.logger.debug(`Found ${result.total} users total, returning ${result.data.length} users`);

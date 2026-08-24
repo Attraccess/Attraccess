@@ -28,13 +28,14 @@ import {
   useAuthenticationServiceGetAllSsoProviders,
   useLicenseServiceGetLicenseInformation,
   useUsersServiceFindMany,
+  useRbacServiceListRoles,
 } from '@attraccess/react-query-client';
 import { EmptyState } from '../../components/emptyState';
 
 import en from './en.json';
 import de from './de.json';
 import { InviteUserModal } from './invite-user-modal';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SimplePagination } from '../../components/simplePagination';
 import { useRbacCatalogTranslations } from '../../hooks/useRbacCatalogTranslations';
 
@@ -48,17 +49,40 @@ export const UserManagementPage: React.FC = () => {
   const [limit] = useState(10);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const roleId = Number(searchParams.get('roleId')) || undefined;
+  const roleNameParam = searchParams.get('roleName');
+  const assignRoleId = Number(searchParams.get('assignRoleId')) || undefined;
 
   const debouncedSearch = useDebounce(search, 500);
 
   const navigate = useNavigate();
+  const { data: roles } = useRbacServiceListRoles();
 
   const { data: searchResult, isFetched: isFetchedSearchResult } = useUsersServiceFindMany<PaginatedUsersResponseDto>({
     limit,
     page,
     search: debouncedSearch,
+    roleId,
     includeRoles: true,
   });
+
+  const clearRoleFilter = () => {
+    setSearchParams((current) => {
+      current.delete('roleId');
+      current.delete('roleName');
+      return current;
+    });
+    setPage(1);
+  };
+
+  const startRoleAssignment = () => {
+    setSearchParams({
+      assignRoleId: String(roleId),
+      roleName: roleNameParam ?? '',
+    });
+    setPage(1);
+  };
 
   const totalPages = useMemo(() => {
     if (!searchResult?.total) {
@@ -125,6 +149,24 @@ export const UserManagementPage: React.FC = () => {
               </InputGroup>
             </TextField>
           }
+          filter={
+            roleId || assignRoleId ? (
+              <div className="flex items-center gap-2">
+                <Chip size="sm" color="accent" variant="secondary">
+                  {t('filters.role', {
+                    role:
+                      roleNameParam ??
+                      roles?.find((role) => role.id === (roleId ?? assignRoleId))?.name ??
+                      roleId ??
+                      assignRoleId,
+                  })}
+                </Chip>
+                <Button size="sm" variant="ghost" onPress={assignRoleId ? () => setSearchParams({}) : clearRoleFilter}>
+                  {t('filters.clearRole')}
+                </Button>
+              </div>
+            ) : null
+          }
         />
 
         <Table>
@@ -143,7 +185,12 @@ export const UserManagementPage: React.FC = () => {
                 </TableColumn>
               </TableHeader>
 
-              <TableBody items={(searchResult?.data ?? []) as User[]} renderEmptyState={() => <EmptyState />}>
+              <TableBody
+                items={(searchResult?.data ?? []) as User[]}
+                renderEmptyState={() =>
+                  roleId ? <EmptyState message={t('empty.role', { role: roleNameParam ?? roleId })} /> : <EmptyState />
+                }
+              >
                 {(user) => {
                   const ssoDetails =
                     (user as UserWithAuthDetails).authenticationDetails?.filter(
@@ -183,14 +230,20 @@ export const UserManagementPage: React.FC = () => {
                       key={user.id}
                       id={user.id}
                       className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
-                      onAction={() => navigate(`/users/${user.id}`)}
+                      onAction={() =>
+                        navigate(
+                          assignRoleId
+                            ? `/users/${user.id}?assignRoleId=${assignRoleId}&roleName=${encodeURIComponent(roleNameParam ?? '')}`
+                            : `/users/${user.id}`,
+                        )
+                      }
                     >
                       <TableCell className="hidden md:table-cell">
                         {detailedUser.isEmailVerified ? <ShieldCheckIcon /> : <ShieldOffIcon />}
                       </TableCell>
                       <TableCell>{user.id}</TableCell>
                       <TableCell>
-                          <AttraccessUser user={detailedUser} />
+                        <AttraccessUser user={detailedUser} />
                       </TableCell>
                       <TableCell className="hidden md:table-cell">{detailedUser.externalIdentifier}</TableCell>
                       <TableCell className="hidden lg:table-cell">
@@ -235,6 +288,14 @@ export const UserManagementPage: React.FC = () => {
             </TableContent>
           </TableScrollContainer>
         </Table>
+
+        {roleId && isFetchedSearchResult && searchResult?.total === 0 ? (
+          <div className="flex justify-center mt-3">
+            <Button size="sm" variant="primary" onPress={startRoleAssignment}>
+              {t('empty.assignRole')}
+            </Button>
+          </div>
+        ) : null}
 
         <div className="flex w-full justify-end mt-4">
           {isFetchedSearchResult && (
