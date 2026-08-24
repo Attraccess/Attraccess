@@ -75,8 +75,13 @@ export function SmartPlugCover() {
   };
 
   const selectCable = (value: PlugCable) => {
+    const angled = value.startsWith('angled');
     setCable(value);
-    setCordOpeningDiameter(value.startsWith('angled') ? 30.9 : value.endsWith('euro') ? 9 : 12);
+    setCordOpeningDiameter(angled ? 30.9 : value.endsWith('euro') ? 9 : 12);
+    if (!angled) {
+      setHeightAbovePlug(17.8);
+      setCableCutoutHeight(24.2);
+    }
   };
 
   return (
@@ -134,7 +139,7 @@ export function SmartPlugCover() {
             value={cordOpeningDiameter}
             onChange={setCordOpeningDiameter}
             minValue={5}
-            maxValue={20}
+            maxValue={cable === 'straight_euro' ? 12 : 16}
             step={0.5}
             formatOptions={{ style: 'unit', unit: 'millimeter' }}
           >

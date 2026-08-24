@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 import scadSource from './smart-plug-cover.scad?raw';
 import type { PlugCable, PlugDevice } from './usePlugRender';
+import { createSerialQueue } from './serialQueue';
 
 export interface PlugRenderRequest {
   id: number;
@@ -100,24 +101,27 @@ async function render(
   }
 }
 
+const submit = createSerialQueue();
+
 self.onmessage = (event: MessageEvent<PlugRenderRequest>) => {
   const { id, device, cable, deviceExtraDiameter, cordOpeningDiameter, heightAbovePlug, cableCutoutHeight } =
     event.data;
-  Promise.all([
-    render('body', device, cable, deviceExtraDiameter, cordOpeningDiameter, heightAbovePlug, cableCutoutHeight),
-    render('cover', device, cable, deviceExtraDiameter, cordOpeningDiameter, heightAbovePlug, cableCutoutHeight),
-  ])
-    .then(([body, cover]) =>
+  submit(id, async () => {
+    try {
+      const [body, cover] = await Promise.all([
+        render('body', device, cable, deviceExtraDiameter, cordOpeningDiameter, heightAbovePlug, cableCutoutHeight),
+        render('cover', device, cable, deviceExtraDiameter, cordOpeningDiameter, heightAbovePlug, cableCutoutHeight),
+      ]);
       (self as unknown as Worker).postMessage({ id, ok: true, body, cover } satisfies PlugRenderResponse, [
         body,
         cover,
-      ]),
-    )
-    .catch((error: unknown) =>
+      ]);
+    } catch (error) {
       (self as unknown as Worker).postMessage({
         id,
         ok: false,
         error: error instanceof Error ? error.message : String(error),
-      } satisfies PlugRenderResponse),
-    );
+      } satisfies PlugRenderResponse);
+    }
+  });
 };

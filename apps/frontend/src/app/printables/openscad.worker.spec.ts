@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { assertionMessage, createSerialQueue, renderErrorReason } from './openscad.worker';
+import { assertionMessage, renderErrorReason } from './openscad.worker';
+import { createSerialQueue } from './serialQueue';
 import { NO_OUTPUT_ERROR } from './errors';
 
 describe('createSerialQueue', () => {
