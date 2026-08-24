@@ -27,7 +27,6 @@ const DEMO_FIXTURE = {
       permissions: ['resources.read'],
     },
   ],
-  userRoles: [{ username: 'admin', roleKey: 'demo-resource-user' }],
 };
 
 function parseArgs(argv) {
@@ -177,7 +176,7 @@ async function applyFixture(db, fixture) {
     if (!resource.name || !['machine', 'door'].includes(resource.type)) {
       throw new Error('Every resource requires a name and a type of machine or door');
     }
-    const existing = await get(db, 'SELECT id FROM resource WHERE name = ?', [resource.name]);
+    const existing = await get(db, 'SELECT id FROM resource WHERE name = ? AND deletedAt IS NULL', [resource.name]);
     let resourceId = existing?.id;
     if (resourceId) {
       if (Object.hasOwn(resource, 'description')) {
@@ -287,7 +286,10 @@ async function main() {
     }
     const userId = await upsertAdmin(db, { username, email, password });
     await assignRole(db, username, 'administrator');
-    if (args.demo) await applyFixture(db, DEMO_FIXTURE);
+    if (args.demo) {
+      await applyFixture(db, DEMO_FIXTURE);
+      await assignRole(db, username, 'demo-resource-user');
+    }
     if (fixture) await applyFixture(db, fixture);
     await run(db, 'COMMIT');
     console.log(`Seeded local admin user id=${userId}`);
