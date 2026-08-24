@@ -1160,6 +1160,52 @@ describe('ResourceUsageService', () => {
       expect(eventPayload.usage).toMatchObject({ id: 1, userId: 1, endNotes: 'Session completed' });
     });
 
+    it('persists the end notes before running the stopped-session flow', async () => {
+      const mockActiveSession = {
+        id: 1,
+        resourceId: 1,
+        userId: 1,
+        startTime: new Date(),
+        user: { id: 1 } as User,
+      } as ResourceUsage;
+      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: 'Auto-ended' };
+      const calls: string[] = [];
+      let committed = false;
+
+      resourceUsageRepository.findOne
+        .mockResolvedValueOnce(mockActiveSession)
+        .mockResolvedValueOnce(mockUpdatedSession)
+        .mockResolvedValueOnce(mockUpdatedSession);
+
+      const mockUpdateQueryBuilder = createMockQueryBuilder(null);
+      (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
+        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
+      );
+      (mockUpdateQueryBuilder.execute as jest.Mock).mockImplementation(async () => {
+        calls.push('update');
+      });
+      flowExecutorService.runFlow.mockImplementation(async () => {
+        expect(committed).toBe(true);
+        calls.push('flow');
+        return [];
+      });
+      (resourceUsageRepository.manager.transaction as jest.Mock).mockImplementationOnce(async (callback) => {
+        const result = await callback(transactionalEntityManager);
+        committed = true;
+        return result;
+      });
+
+      await service.endSession(1, mockActiveSession.user, { notes: 'Auto-ended' });
+
+      expect(calls).toEqual(['update', 'flow']);
+      expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
+        1,
+        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+        expect.objectContaining({ endNotes: 'Auto-ended' }),
+        expect.anything(),
+      );
+    });
+
     it("emits a resource session ended notification event after ending someone else's session", async () => {
       const dto: EndUsageSessionDto = { notes: 'Manager stop' };
       const sessionOwner = { id: 77, username: 'member' } as User;
@@ -1360,7 +1406,7 @@ describe('ResourceUsageService', () => {
       expect(result).toBe(mockUpdatedSession);
       expect(resourceIntroducersService.canMaintain).not.toHaveBeenCalled();
       expect(mockUpdateQueryBuilder.update).toHaveBeenCalledWith(ResourceUsage);
-      expect(billingService.chargeForResourceUsage).toHaveBeenCalledWith(mockUpdatedSession, expect.anything());
+      expect(billingService.chargeForResourceUsage).toHaveBeenCalledWith(mockUpdatedSession);
       expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceSessionStartedEvent.EVENT_NAME, expect.any(Object));
       expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
         mockActiveSession.resourceId,

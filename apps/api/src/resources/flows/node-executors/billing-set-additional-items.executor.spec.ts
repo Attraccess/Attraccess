@@ -122,6 +122,17 @@ describe('BillingSetAdditionalItemsExecutor', () => {
     });
   });
 
+  it('uses the usage ID in stopped-session flow input', async () => {
+    manager.findOne.mockResolvedValueOnce({ id: 99 }).mockResolvedValueOnce(null);
+
+    await executor.execute(createNode(baseData), { id: 12 }, ctx);
+
+    expect(resourceUsageService.getActiveSession).not.toHaveBeenCalled();
+    expect(manager.findOne).toHaveBeenNthCalledWith(1, BillingTransaction, {
+      where: { resourceUsageId: 12 },
+    });
+  });
+
   it('updates the existing item by summing the quantity', async () => {
     manager.findOne
       .mockResolvedValueOnce({ id: 99 }) // transaction
