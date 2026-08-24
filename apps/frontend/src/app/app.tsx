@@ -186,7 +186,7 @@ export function AppRoutes() {
         {layoutRouteElements}
         {/* Without this a logged-in operator on an unknown path matched nothing at all, so the
             layout route never rendered and the document came up blank (ATT-869). */}
-        <Route path="*" element={isAuthenticated ? <NotFound /> : <Unauthorized />} />
+        <Route path="*" element={<NotFound isAuthenticated={isAuthenticated} />} />
       </Route>
     </Routes>
   );

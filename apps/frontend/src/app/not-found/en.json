@@ -1,6 +1,8 @@
 {
   "title": "Page not found",
   "description": "This page does not exist. It may have been moved or removed — use the navigation to find where it lives now.",
+  "anonymousDescription": "This page does not exist. It may have been moved or removed — check the address or log in to continue.",
   "goBack": "Go Back",
-  "goHome": "Go to Home"
+  "goHome": "Go to Home",
+  "logIn": "Log in"
 }

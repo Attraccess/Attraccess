@@ -100,7 +100,7 @@ describe('not-found route', () => {
     expect(byCy('app-shell-sidebar')).toBeInTheDocument();
   });
 
-  it('still shows the login screen to a logged-out visitor on an unknown path', () => {
+  it('renders not-found with a login action to a logged-out visitor on an unknown path', () => {
     vi.mocked(useAuth).mockReturnValue({
       user: null,
       isAuthenticated: false,
@@ -109,6 +109,8 @@ describe('not-found route', () => {
 
     renderAt('/resourcez');
 
-    expect(byCy('not-found')).toBeNull();
+    expect(byCy('not-found')).toBeInTheDocument();
+    expect(byCy('not-found-login-button')).toBeInTheDocument();
+    expect(byCy('not-found-go-home-button')).toBeNull();
   });
 });
