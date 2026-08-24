@@ -45,7 +45,7 @@ export class UserRegistrationService {
     }
 
     try {
-      const user = await this.usersService.withTransaction(async (manager: EntityManager) => {
+      const { user, verificationToken } = await this.usersService.withTransaction(async (manager: EntityManager) => {
         const user = await this.usersService.createOne(
           {
             username: body.username,
@@ -72,20 +72,17 @@ export class UserRegistrationService {
 
         this.logger.debug(`Generating email verification token for user ID: ${user.id}`);
         const verificationToken = await this.authService.generateEmailVerificationToken(user, manager);
-        this.logger.debug(`Sending verification email to user ID: ${user.id}`);
-        await this.emailService.sendVerificationEmail(user, verificationToken);
-        this.logger.debug(`Verification email sent to user ID: ${user.id}`);
-        return user;
+        return { user, verificationToken };
       });
 
       this.usersService.recordCreatedUser(user);
+      this.logger.debug(`Sending verification email to user ID: ${user.id}`);
+      await this.emailService.sendVerificationEmail(user, verificationToken);
+      this.logger.debug(`Verification email sent to user ID: ${user.id}`);
       this.logger.debug(`User creation completed successfully for ID: ${user.id}`);
       return user;
     } catch (e) {
-      this.logger.error(
-        `Error completing registration for ${body.email}`,
-        e instanceof Error ? e.stack : String(e),
-      );
+      this.logger.error(`Error completing registration for ${body.email}`, e instanceof Error ? e.stack : String(e));
       throw mapEmailSendError(e, 'registration');
     }
   }
