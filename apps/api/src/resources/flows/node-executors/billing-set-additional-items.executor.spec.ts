@@ -91,7 +91,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
     const result = await executor.execute(createNode(baseData), {}, ctx);
 
     expect(manager.findOne).toHaveBeenNthCalledWith(1, BillingTransaction, {
-      where: { resourceUsageId: 'ru-1' },
+      where: { resourceUsageId: 'ru-1', resourceUsage: { resourceId: 1 } },
     });
     expect(manager.findOne).toHaveBeenNthCalledWith(2, BillingTransactionItem, {
       where: {
@@ -129,8 +129,29 @@ describe('BillingSetAdditionalItemsExecutor', () => {
 
     expect(resourceUsageService.getActiveSession).not.toHaveBeenCalled();
     expect(manager.findOne).toHaveBeenNthCalledWith(1, BillingTransaction, {
-      where: { resourceUsageId: 12 },
+      where: { resourceUsageId: 12, resourceUsage: { resourceId: 1 } },
     });
+  });
+
+  it('falls back to the active session for an invalid stopped-session ID', async () => {
+    manager.findOne.mockResolvedValueOnce({ id: 99 }).mockResolvedValueOnce(null);
+
+    await executor.execute(createNode(baseData), { id: -1 }, ctx);
+
+    expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(1, false, ctx.transactionManager);
+    expect(manager.findOne).toHaveBeenNthCalledWith(1, BillingTransaction, {
+      where: { resourceUsageId: 'ru-1', resourceUsage: { resourceId: 1 } },
+    });
+  });
+
+  it('throws NoUsageSessionError when the usage has no billing transaction for the resource', async () => {
+    manager.findOne.mockResolvedValueOnce(null);
+
+    await expect(executor.execute(createNode(baseData), { id: 12 }, ctx)).rejects.toBeInstanceOf(NoUsageSessionError);
+    expect(manager.findOne).toHaveBeenCalledWith(BillingTransaction, {
+      where: { resourceUsageId: 12, resourceUsage: { resourceId: 1 } },
+    });
+    expect(manager.save).not.toHaveBeenCalled();
   });
 
   it('updates the existing item by summing the quantity', async () => {

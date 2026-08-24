@@ -721,6 +721,8 @@ export class ResourceUsageService {
           relations: ['resource', 'user'],
         });
 
+        await this.billingService.chargeForResourceUsage(updatedUsage, transactionalEntityManager);
+
         // Defer event after successful save until after commit
         endedUsageIdToEmit = activeSession.id;
         endFlowPayload = { ...this.getResourceUsageFlowPayload(activeSession, formSubmissions), ...updateData };
@@ -740,8 +742,6 @@ export class ResourceUsageService {
         'end',
       );
     }
-
-    await this.billingService.chargeForResourceUsage(updatedUsage);
 
     // Emit event after the transaction committed to ensure readers can observe DB state
     try {

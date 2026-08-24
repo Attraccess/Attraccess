@@ -1206,6 +1206,27 @@ describe('ResourceUsageService', () => {
       );
     });
 
+    it('rolls back ending the session when billing fails', async () => {
+      const mockActiveSession = {
+        id: 1,
+        resourceId: 1,
+        userId: 1,
+        startTime: new Date(),
+        user: { id: 1 } as User,
+      } as ResourceUsage;
+      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: 'Auto-ended' };
+      const billingError = new Error('Billing failed');
+
+      resourceUsageRepository.findOne.mockResolvedValueOnce(mockActiveSession).mockResolvedValueOnce(mockUpdatedSession);
+      billingService.chargeForResourceUsage.mockRejectedValueOnce(billingError);
+
+      await expect(service.endSession(1, mockActiveSession.user, { notes: 'Auto-ended' })).rejects.toThrow(billingError);
+
+      expect(billingService.chargeForResourceUsage).toHaveBeenCalledWith(mockUpdatedSession, transactionalEntityManager);
+      expect(flowExecutorService.runFlow).not.toHaveBeenCalled();
+      expect(eventEmitter.emitAsync).not.toHaveBeenCalled();
+    });
+
     it("emits a resource session ended notification event after ending someone else's session", async () => {
       const dto: EndUsageSessionDto = { notes: 'Manager stop' };
       const sessionOwner = { id: 77, username: 'member' } as User;
@@ -1406,7 +1427,7 @@ describe('ResourceUsageService', () => {
       expect(result).toBe(mockUpdatedSession);
       expect(resourceIntroducersService.canMaintain).not.toHaveBeenCalled();
       expect(mockUpdateQueryBuilder.update).toHaveBeenCalledWith(ResourceUsage);
-      expect(billingService.chargeForResourceUsage).toHaveBeenCalledWith(mockUpdatedSession);
+      expect(billingService.chargeForResourceUsage).toHaveBeenCalledWith(mockUpdatedSession, transactionalEntityManager);
       expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceSessionStartedEvent.EVENT_NAME, expect.any(Object));
       expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
         mockActiveSession.resourceId,
