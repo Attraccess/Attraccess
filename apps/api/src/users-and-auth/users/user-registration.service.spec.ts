@@ -178,7 +178,7 @@ describe('UserRegistrationService', () => {
       expect(usersService.rollbackFailedRegistration).toHaveBeenCalledWith(user.id);
     });
 
-    it('propagates the rollback failure when registration rollback fails', async () => {
+    it('preserves the SMTP configuration error when registration rollback fails', async () => {
       settingRepository.findOne.mockResolvedValue({ value: '*' });
       const user = { id: 1, username: 'testuser', email: 'test@example.com' } as User;
       jest.spyOn(usersService, 'createOne').mockResolvedValue(user);
@@ -195,7 +195,13 @@ describe('UserRegistrationService', () => {
           password: 'password',
           strategy: AuthenticationType.LOCAL_PASSWORD,
         }),
-      ).rejects.toBe(rollbackError);
+      ).rejects.toMatchObject({
+        response: {
+          message: 'SMTP is not configured. Configure email before sending email.',
+          statusCode: 400,
+        },
+      });
+      expect(usersService.rollbackFailedRegistration).toHaveBeenCalledWith(user.id);
     });
   });
 
