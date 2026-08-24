@@ -20,6 +20,10 @@ vi.mock('../layout/layout', () => ({
   ),
 }));
 
+vi.mock('../unauthorized/unauthorized', () => ({
+  Unauthorized: () => <div data-cy="unauthorized" />,
+}));
+
 vi.mock('../../hooks/useAuth', () => ({ useAuth: vi.fn() }));
 
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
@@ -112,5 +116,18 @@ describe('not-found route', () => {
     expect(byCy('not-found')).toBeInTheDocument();
     expect(byCy('not-found-login-button')).toBeInTheDocument();
     expect(byCy('not-found-go-home-button')).toBeNull();
+  });
+
+  it('still renders login for a logged-out visitor on a known protected path', () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: null,
+      isAuthenticated: false,
+      hasPermission: () => false,
+    } as unknown as ReturnType<typeof useAuth>);
+
+    renderAt('/resources');
+
+    expect(byCy('unauthorized')).toBeInTheDocument();
+    expect(byCy('not-found')).toBeNull();
   });
 });
