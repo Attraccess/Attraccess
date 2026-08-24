@@ -1,6 +1,8 @@
 #include "wifi.hpp"
 #include "platform.hpp"
 
+#include "esp_log.h"
+
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -126,6 +128,9 @@ void Wifi::setup()
         logger.info("Already initialized");
         return;
     }
+
+    // Suppress ESP-IDF idle scan chatter while retaining WiFi warnings.
+    esp_log_level_set("wifi", ESP_LOG_WARN);
 
     wifi_interface = esp_netif_create_default_wifi_sta();
     if (wifi_interface == NULL)
