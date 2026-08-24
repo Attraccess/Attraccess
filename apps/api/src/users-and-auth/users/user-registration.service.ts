@@ -84,7 +84,6 @@ export class UserRegistrationService {
           `Error rolling back failed registration for user ID: ${user.id}`,
           cleanupError instanceof Error ? cleanupError.stack : String(cleanupError),
         );
-        throw cleanupError;
       }
       throw mapEmailSendError(e);
     }
