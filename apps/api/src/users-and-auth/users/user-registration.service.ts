@@ -73,8 +73,18 @@ export class UserRegistrationService {
       await this.emailService.sendVerificationEmail(user, verificationToken);
       this.logger.debug(`Verification email sent to user ID: ${user.id}`);
     } catch (e) {
-      this.logger.error(`Error sending verification email for user ID: ${user.id}`, e.stack);
-      await this.usersService.rollbackFailedRegistration(user.id);
+      this.logger.error(
+        `Error sending verification email for user ID: ${user.id}`,
+        e instanceof Error ? e.stack : String(e),
+      );
+      try {
+        await this.usersService.rollbackFailedRegistration(user.id);
+      } catch (cleanupError) {
+        this.logger.error(
+          `Error rolling back failed registration for user ID: ${user.id}`,
+          cleanupError instanceof Error ? cleanupError.stack : String(cleanupError),
+        );
+      }
       throw mapEmailSendError(e);
     }
 
