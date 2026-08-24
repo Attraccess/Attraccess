@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { User, AuthenticationType, Setting } from '@attraccess/database-entities';
-import { ForbiddenException } from '@nestjs/common';
+import { AuthenticationDetail, AuthenticationType, Setting, User } from '@attraccess/database-entities';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { UserRegistrationService } from './user-registration.service';
 import { SignupDomainService } from './signup-domain.service';
 import { UsersService } from './users.service';
@@ -10,6 +10,7 @@ import { EmailService } from '../../email/email.service';
 import { PasswordPolicyService } from '../password-policy/password-policy.service';
 import { CreateUserDto } from './dtos/createUser.dto';
 import { ForbiddenSignupDomainException } from './errors/forbiddenSignupDomain.exception';
+import { EntityManager } from 'typeorm';
 
 describe('UserRegistrationService', () => {
   let service: UserRegistrationService;
@@ -35,20 +36,25 @@ describe('UserRegistrationService', () => {
             findMany: jest.fn(),
             createOne: jest.fn(),
             deleteOne: jest.fn(),
-            countUsers: jest.fn(),
+            withTransaction: jest.fn(async (handler) => handler({})),
+            recordCreatedUser: jest.fn(),
+            rollbackFailedRegistration: jest.fn(),
+            releaseFirstTimeSetupAdminIdentifiers: jest.fn(),
+            rollbackFirstTimeSetupAdminReplacement: jest.fn(),
           },
         },
         {
           provide: AuthService,
           useValue: {
             addAuthenticationDetails: jest.fn(),
+            hashPassword: jest.fn(async (password) => `hashed-${password}`),
             generateEmailVerificationToken: jest.fn(),
             removeAuthenticationDetails: jest.fn(),
           },
         },
         {
           provide: EmailService,
-          useValue: { sendVerificationEmail: jest.fn() },
+          useValue: { assertSmtpConfigured: jest.fn(), sendVerificationEmail: jest.fn() },
         },
         {
           provide: PasswordPolicyService,
@@ -95,10 +101,36 @@ describe('UserRegistrationService', () => {
 
       const response = await service.createOne(createUserDto);
       expect(response).toEqual(user);
-      expect(authService.addAuthenticationDetails).toHaveBeenCalledWith(user.id, {
-        type: AuthenticationType.LOCAL_PASSWORD,
-        details: { password: createUserDto.password },
+      expect(authService.addAuthenticationDetails).toHaveBeenCalledWith(
+        user.id,
+        { type: AuthenticationType.LOCAL_PASSWORD, details: { password: createUserDto.password } },
+        expect.anything(),
+        'hashed-password',
+      );
+      expect(emailService.sendVerificationEmail).toHaveBeenCalledWith(user, 'verification-token');
+      expect(usersService.withTransaction).toHaveBeenCalled();
+      expect(usersService.recordCreatedUser).toHaveBeenCalledWith(user);
+    });
+
+    it('sends the verification email after the registration transaction commits', async () => {
+      settingRepository.findOne.mockResolvedValue({ value: '*' });
+      const user = { id: 1, username: 'testuser', email: 'test@example.com' } as User;
+      jest.spyOn(usersService, 'createOne').mockResolvedValue(user);
+      jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
+      jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
+      jest.spyOn(usersService, 'withTransaction').mockImplementation(async (handler) => {
+        const result = await handler({} as EntityManager);
+        expect(emailService.sendVerificationEmail).not.toHaveBeenCalled();
+        return result;
       });
+
+      await service.createOne({
+        username: 'testuser',
+        email: 'test@example.com',
+        password: 'password',
+        strategy: AuthenticationType.LOCAL_PASSWORD,
+      });
+
       expect(emailService.sendVerificationEmail).toHaveBeenCalledWith(user, 'verification-token');
     });
 
@@ -144,6 +176,87 @@ describe('UserRegistrationService', () => {
       expect(response).toEqual(user);
       expect(emailService.sendVerificationEmail).toHaveBeenCalledWith(user, 'verification-token');
     });
+
+    it('fails before registration when SMTP is not configured', async () => {
+      settingRepository.findOne.mockResolvedValue({ value: '*' });
+      jest.spyOn(emailService, 'assertSmtpConfigured').mockRejectedValue(new Error('SMTP configuration not set'));
+
+      const result = service.createOne({
+        username: 'testuser',
+        email: 'test@example.com',
+        password: 'password',
+        strategy: AuthenticationType.LOCAL_PASSWORD,
+      });
+
+      await expect(result).rejects.toBeInstanceOf(BadRequestException);
+      await expect(result).rejects.toMatchObject({
+        response: {
+          message: 'SMTP is not configured. Configure email before sending email.',
+          statusCode: 400,
+        },
+      });
+      expect(usersService.withTransaction).not.toHaveBeenCalled();
+      expect(usersService.rollbackFailedRegistration).not.toHaveBeenCalled();
+      expect(usersService.recordCreatedUser).not.toHaveBeenCalled();
+      expect(emailService.sendVerificationEmail).not.toHaveBeenCalled();
+    });
+
+    it('rolls back the registration when sending the verification email fails', async () => {
+      settingRepository.findOne.mockResolvedValue({ value: '*' });
+      const user = { id: 1, username: 'testuser', email: 'test@example.com' } as User;
+      jest.spyOn(usersService, 'createOne').mockResolvedValue(user);
+      jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
+      jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
+      jest
+        .spyOn(emailService, 'sendVerificationEmail')
+        .mockRejectedValue(Object.assign(new Error('SMTP unavailable'), { code: 'ECONNREFUSED' }));
+
+      await expect(
+        service.createOne({
+          username: 'testuser',
+          email: 'test@example.com',
+          password: 'password',
+          strategy: AuthenticationType.LOCAL_PASSWORD,
+        }),
+      ).rejects.toMatchObject({ response: { message: 'EmailSendFailed', statusCode: 503 } });
+      expect(usersService.rollbackFailedRegistration).toHaveBeenCalledWith(user.id);
+      expect(usersService.recordCreatedUser).not.toHaveBeenCalled();
+    });
+
+    it('does not map transaction failures as email-send failures', async () => {
+      settingRepository.findOne.mockResolvedValue({ value: '*' });
+      const transactionError = Object.assign(new Error('Database unavailable'), { code: 'ECONNREFUSED' });
+      jest.spyOn(usersService, 'withTransaction').mockRejectedValue(transactionError);
+
+      await expect(
+        service.createOne({
+          username: 'testuser',
+          email: 'test@example.com',
+          password: 'password',
+          strategy: AuthenticationType.LOCAL_PASSWORD,
+        }),
+      ).rejects.toBe(transactionError);
+      expect(emailService.sendVerificationEmail).not.toHaveBeenCalled();
+    });
+
+    it('hashes the password before opening the registration transaction', async () => {
+      settingRepository.findOne.mockResolvedValue({ value: '*' });
+      const user = { id: 1, username: 'testuser', email: 'test@example.com' } as User;
+      jest.spyOn(usersService, 'createOne').mockResolvedValue(user);
+      jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
+      jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
+      jest.spyOn(usersService, 'withTransaction').mockImplementation(async (handler) => {
+        expect(authService.hashPassword).toHaveBeenCalledWith('password');
+        return handler({} as EntityManager);
+      });
+
+      await service.createOne({
+        username: 'testuser',
+        email: 'test@example.com',
+        password: 'password',
+        strategy: AuthenticationType.LOCAL_PASSWORD,
+      });
+    });
   });
 
   describe('createOne with overwriteFirstTimeAdmin', () => {
@@ -168,9 +281,8 @@ describe('UserRegistrationService', () => {
       settingRepository.findOne.mockResolvedValue({ value: '*' });
     });
 
-    it('deletes the existing unverified admin and creates a fresh one', async () => {
-      jest.spyOn(usersService, 'countUsers').mockResolvedValue(1);
-      jest.spyOn(usersService, 'findMany').mockResolvedValue({ data: [unverifiedAdmin], total: 1, page: 1, limit: 1 });
+    it('creates the replacement administrator before deleting the existing unverified admin', async () => {
+      jest.spyOn(usersService, 'releaseFirstTimeSetupAdminIdentifiers').mockResolvedValue(unverifiedAdmin);
       jest.spyOn(usersService, 'deleteOne').mockResolvedValue(undefined);
       jest.spyOn(usersService, 'createOne').mockResolvedValue(newAdmin);
       jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
@@ -185,56 +297,110 @@ describe('UserRegistrationService', () => {
       const result = await service.createOne(dto);
 
       expect(usersService.deleteOne).toHaveBeenCalledWith(unverifiedAdmin.id);
-      expect(usersService.createOne).toHaveBeenCalled();
+      expect(usersService.releaseFirstTimeSetupAdminIdentifiers).toHaveBeenCalledWith(expect.anything());
+      expect(usersService.createOne).toHaveBeenCalledWith(
+        expect.objectContaining({ isFirstTimeSetupAdmin: true }),
+        expect.anything(),
+        { excludedUserIdFromLicenseUsage: unverifiedAdmin.id },
+      );
       expect(emailService.sendVerificationEmail).toHaveBeenCalledWith(newAdmin, 'verification-token');
+      expect((emailService.sendVerificationEmail as jest.Mock).mock.invocationCallOrder[0]).toBeLessThan(
+        (usersService.deleteOne as jest.Mock).mock.invocationCallOrder[0],
+      );
       expect(result).toEqual(newAdmin);
     });
 
-    it('throws ForbiddenException when total users is not exactly 1', async () => {
-      jest.spyOn(usersService, 'countUsers').mockResolvedValue(2);
+    it('preserves the existing administrator when SMTP is not configured', async () => {
+      jest.spyOn(emailService, 'assertSmtpConfigured').mockRejectedValue(new Error('SMTP configuration not set'));
 
-      await expect(service.createOne(dto)).rejects.toThrow(ForbiddenException);
+      await expect(service.createOne(dto)).rejects.toBeInstanceOf(BadRequestException);
+
       expect(usersService.deleteOne).not.toHaveBeenCalled();
       expect(usersService.createOne).not.toHaveBeenCalled();
+      expect(usersService.rollbackFailedRegistration).not.toHaveBeenCalled();
     });
 
-    it('throws ForbiddenException when no users exist', async () => {
-      jest.spyOn(usersService, 'countUsers').mockResolvedValue(0);
+    it('preserves the existing administrator when sending the replacement verification email fails', async () => {
+      jest.spyOn(usersService, 'releaseFirstTimeSetupAdminIdentifiers').mockResolvedValue(unverifiedAdmin);
+      jest.spyOn(usersService, 'createOne').mockResolvedValue(newAdmin);
+      jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
+      jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
+      jest
+        .spyOn(emailService, 'sendVerificationEmail')
+        .mockRejectedValue(Object.assign(new Error('SMTP unavailable'), { code: 'ECONNREFUSED' }));
 
-      await expect(service.createOne(dto)).rejects.toThrow(ForbiddenException);
-      expect(usersService.deleteOne).not.toHaveBeenCalled();
-      expect(usersService.createOne).not.toHaveBeenCalled();
-    });
-
-    it('throws ForbiddenException when the single existing user has a verified email', async () => {
-      const verified = { ...unverifiedAdmin, isEmailVerified: true } as User;
-      jest.spyOn(usersService, 'countUsers').mockResolvedValue(1);
-      jest.spyOn(usersService, 'findMany').mockResolvedValue({ data: [verified], total: 1, page: 1, limit: 1 });
-
-      await expect(service.createOne(dto)).rejects.toThrow(ForbiddenException);
-      expect(usersService.deleteOne).not.toHaveBeenCalled();
-      expect(usersService.createOne).not.toHaveBeenCalled();
-    });
-
-    it('checks the first-time-setup invariant BEFORE touching credentials (no user enumeration)', async () => {
-      const callOrder: string[] = [];
-      jest.spyOn(usersService, 'countUsers').mockImplementation(async () => {
-        callOrder.push('countUsers');
-        return 2;
-      });
-      const findOneSpy = jest.spyOn(usersService, 'findOne').mockImplementation(async () => {
-        callOrder.push('findOne');
-        return unverifiedAdmin;
+      await expect(service.createOne(dto)).rejects.toMatchObject({
+        response: { message: 'EmailSendFailed', statusCode: 503 },
       });
 
-      await expect(service.createOne(dto)).rejects.toThrow(ForbiddenException);
+      expect(usersService.rollbackFirstTimeSetupAdminReplacement).toHaveBeenCalledWith(newAdmin.id, unverifiedAdmin);
+      expect(usersService.deleteOne).not.toHaveBeenCalled();
+    });
 
-      expect(callOrder[0]).toBe('countUsers');
-      expect(findOneSpy).not.toHaveBeenCalled();
+    it('throws ForbiddenException when the transactional setup check rejects the replacement', async () => {
+      jest.spyOn(usersService, 'releaseFirstTimeSetupAdminIdentifiers').mockRejectedValue(
+        new ForbiddenException('First-time setup is already complete'),
+      );
+
+      await expect(service.createOne(dto)).rejects.toThrow(ForbiddenException);
+      expect(usersService.deleteOne).not.toHaveBeenCalled();
+      expect(usersService.createOne).not.toHaveBeenCalled();
+    });
+
+    it('rolls back the replacement when deletion of the existing administrator fails', async () => {
+      const deletionError = new Error('Cannot delete administrator');
+      jest.spyOn(usersService, 'releaseFirstTimeSetupAdminIdentifiers').mockResolvedValue(unverifiedAdmin);
+      jest.spyOn(usersService, 'createOne').mockResolvedValue(newAdmin);
+      jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
+      jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
+      jest.spyOn(usersService, 'deleteOne').mockRejectedValue(deletionError);
+
+      await expect(service.createOne(dto)).rejects.toBe(deletionError);
+
+      expect(usersService.rollbackFirstTimeSetupAdminReplacement).toHaveBeenCalledWith(newAdmin.id, unverifiedAdmin);
+      expect(usersService.recordCreatedUser).not.toHaveBeenCalled();
+    });
+
+    it('serializes concurrent overwrite requests and revalidates each request in its transaction', async () => {
+      let releaseFirstTransaction!: () => void;
+      let signalFirstTransactionStarted!: () => void;
+      const firstTransactionStarted = new Promise<void>((resolve) => {
+        signalFirstTransactionStarted = resolve;
+      });
+
+      jest.spyOn(usersService, 'releaseFirstTimeSetupAdminIdentifiers')
+        .mockResolvedValueOnce(unverifiedAdmin)
+        .mockRejectedValueOnce(new ForbiddenException('First-time setup is already complete'));
+      jest.spyOn(usersService, 'createOne').mockResolvedValue(newAdmin);
+      jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
+      jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
+      jest
+        .spyOn(usersService, 'withTransaction')
+        .mockImplementationOnce(async (handler) => {
+          signalFirstTransactionStarted();
+          await new Promise<void>((resolve) => {
+            releaseFirstTransaction = resolve;
+          });
+          return handler({} as EntityManager);
+        })
+        .mockImplementationOnce(async (handler) => handler({} as EntityManager));
+
+      const firstRequest = service.createOne(dto);
+      await firstTransactionStarted;
+      const secondRequest = service.createOne(dto);
+
+      await new Promise(setImmediate);
+      expect(usersService.withTransaction).toHaveBeenCalledTimes(1);
+
+      releaseFirstTransaction();
+      const results = await Promise.allSettled([firstRequest, secondRequest]);
+
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+      expect(usersService.releaseFirstTimeSetupAdminIdentifiers).toHaveBeenCalledTimes(2);
     });
 
     it('ignores the overwrite flag when not set (normal create flow)', async () => {
-      jest.spyOn(usersService, 'countUsers').mockResolvedValue(5);
       jest.spyOn(usersService, 'createOne').mockResolvedValue(newAdmin);
       jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
       jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({
@@ -255,7 +421,7 @@ describe('UserRegistrationService', () => {
       await service.createOne(regularDto);
 
       expect(usersService.deleteOne).not.toHaveBeenCalled();
-      expect(usersService.countUsers).not.toHaveBeenCalled();
+      expect(usersService.releaseFirstTimeSetupAdminIdentifiers).not.toHaveBeenCalled();
     });
   });
 });

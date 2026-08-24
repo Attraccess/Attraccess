@@ -117,25 +117,32 @@ export class AuthService {
     return isValid;
   }
 
-  private async hashPassword(password: string) {
+  async hashPassword(password: string): Promise<string> {
     return await bcrypt.hash(password, this.SALT_ROUNDS);
   }
 
-  async addAuthenticationDetails(userId: number, options: AuthenticationOptions): Promise<AuthenticationDetail> {
+  async addAuthenticationDetails(
+    userId: number,
+    options: AuthenticationOptions,
+    manager?: EntityManager,
+    hashedPassword?: string,
+  ): Promise<AuthenticationDetail> {
     const authenticationDetail = new AuthenticationDetail();
     authenticationDetail.userId = userId;
     authenticationDetail.type = options.type;
 
     if (options.type === AuthenticationType.LOCAL_PASSWORD) {
-      this.logger.debug(`Hashing password for user ID: ${userId}`);
-      authenticationDetail.password = await this.hashPassword(options.details.password);
+      this.logger.debug(`Adding local password authentication for user ID: ${userId}`);
+      authenticationDetail.password = hashedPassword ?? (await this.hashPassword(options.details.password));
     } else if (options.type === AuthenticationType.SSO) {
       authenticationDetail.providerType = options.details.providerType;
       authenticationDetail.providerId = options.details.providerId;
       authenticationDetail.ssoSubject = options.details.subject;
     }
 
-    const saved = await this.authenticationDetailRepository.save(authenticationDetail);
+    const saved = manager
+      ? await manager.save(authenticationDetail)
+      : await this.authenticationDetailRepository.save(authenticationDetail);
     return saved;
   }
 

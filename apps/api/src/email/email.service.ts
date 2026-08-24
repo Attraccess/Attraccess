@@ -502,6 +502,10 @@ export class EmailService {
     await this.sendEmail(recipient, EmailTemplateType.RESOURCE_SESSION_ENDED, context);
   }
 
+  async assertSmtpConfigured(): Promise<void> {
+    await this.createTransporter();
+  }
+
   private async createTransporter(): Promise<{ transporter: ReturnType<typeof createTransport>; from: string }> {
     const smtpConfig = await this.settingsService.getSmtpConfiguration();
     if (!smtpConfig) {
