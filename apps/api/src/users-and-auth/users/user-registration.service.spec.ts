@@ -172,7 +172,7 @@ describe('UserRegistrationService', () => {
       expect(emailService.sendVerificationEmail).toHaveBeenCalledWith(user, 'verification-token');
     });
 
-    it('explains that SMTP must be configured after committing the pending registration', async () => {
+    it('explains that SMTP must be configured before sending email after registration commits', async () => {
       settingRepository.findOne.mockResolvedValue({ value: '*' });
       const user = { id: 1, username: 'testuser', email: 'test@example.com' } as User;
       const authenticationDetails = {
@@ -197,7 +197,7 @@ describe('UserRegistrationService', () => {
       await expect(result).rejects.toBeInstanceOf(BadRequestException);
       await expect(result).rejects.toMatchObject({
         response: {
-          message: 'SMTP is not configured. Configure email before creating a user.',
+          message: 'SMTP is not configured. Configure email before sending email.',
           statusCode: 400,
         },
       });
