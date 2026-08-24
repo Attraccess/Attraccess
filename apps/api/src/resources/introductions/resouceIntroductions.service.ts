@@ -138,6 +138,7 @@ export class ResourceIntroductionsService {
     nextStatus: IntroductionHistoryAction,
     data?: UpdateResourceIntroductionDto,
     tutorUserId?: number,
+    performedByUserId = userId,
   ) {
     this.logger.debug(`Updating introduction status to ${nextStatus} for resourceId: ${resourceId}, userId: ${userId}`);
     let resourceIntroduction = await this.getIntroductionOfUser(resourceId, userId);
@@ -158,7 +159,7 @@ export class ResourceIntroductionsService {
       introduction: { id: resourceIntroduction.id },
       action: nextStatus,
       comment: data?.comment,
-      performedByUser: { id: userId },
+      performedByUser: { id: performedByUserId },
     });
 
     const savedHistoryItem = await this.resourceIntroductionHistoryItemRepository.save(historyItem);
@@ -204,7 +205,7 @@ export class ResourceIntroductionsService {
     resourceId: number,
     userId: number,
     data?: UpdateResourceIntroductionDto,
-    options?: { tutorUserId?: number },
+    options?: { tutorUserId?: number; performedByUserId?: number },
   ): Promise<ResourceIntroductionHistoryItem> {
     this.logger.debug(`Granting introduction for resourceId: ${resourceId}, userId: ${userId}`);
     const result = await this.updateIntroductionStatus(
@@ -213,6 +214,7 @@ export class ResourceIntroductionsService {
       IntroductionHistoryAction.GRANT,
       data,
       options?.tutorUserId,
+      options?.performedByUserId,
     );
     this.metricsService.resourceIntroductionsTotal.inc();
     this.logger.debug(`Grant operation completed for resourceId: ${resourceId}, userId: ${userId}`);
@@ -223,9 +225,17 @@ export class ResourceIntroductionsService {
     resourceId: number,
     userId: number,
     data?: UpdateResourceIntroductionDto,
+    options?: { performedByUserId?: number },
   ): Promise<ResourceIntroductionHistoryItem> {
     this.logger.debug(`Revoking introduction for resourceId: ${resourceId}, userId: ${userId}`);
-    const result = await this.updateIntroductionStatus(resourceId, userId, IntroductionHistoryAction.REVOKE, data);
+    const result = await this.updateIntroductionStatus(
+      resourceId,
+      userId,
+      IntroductionHistoryAction.REVOKE,
+      data,
+      undefined,
+      options?.performedByUserId,
+    );
     this.logger.debug(`Revoke operation completed for resourceId: ${resourceId}, userId: ${userId}`);
     return result;
   }
