@@ -17,7 +17,6 @@ import { mapEmailSendError } from './email-send-error.util';
 @Injectable()
 export class UserRegistrationService {
   private readonly logger = new Logger(UserRegistrationService.name);
-  private firstTimeSetupOverwriteLock = Promise.resolve();
 
   constructor(
     private readonly usersService: UsersService,
@@ -52,8 +51,7 @@ export class UserRegistrationService {
         ? await this.authService.hashPassword(body.password)
         : undefined;
 
-    const register = () => this.registerUser(body, locale, hashedPassword, body.overwriteFirstTimeAdmin);
-    return body.overwriteFirstTimeAdmin ? await this.withFirstTimeSetupOverwriteLock(register) : await register();
+    return this.registerUser(body, locale, hashedPassword, body.overwriteFirstTimeAdmin);
   }
 
   private async registerUser(
@@ -145,21 +143,6 @@ export class UserRegistrationService {
     this.usersService.recordCreatedUser(user);
     this.logger.debug(`User creation completed successfully for ID: ${user.id}`);
     return user;
-  }
-
-  private async withFirstTimeSetupOverwriteLock<T>(handler: () => Promise<T>): Promise<T> {
-    const previous = this.firstTimeSetupOverwriteLock;
-    let release!: () => void;
-    this.firstTimeSetupOverwriteLock = new Promise((resolve) => {
-      release = resolve;
-    });
-
-    await previous;
-    try {
-      return await handler();
-    } finally {
-      release();
-    }
   }
 
   public async verifyEmail(email: string, token: string): Promise<void> {
