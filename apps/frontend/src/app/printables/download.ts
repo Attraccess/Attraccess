@@ -89,13 +89,54 @@ export function downloadCard(render: CardRender, label: string, format: MeshForm
   triggerDownload(data, filename);
 }
 
-export function downloadPlug(render: PlugRender, device: string, cable: string, format: MeshFormat): void {
-  const slug = `attraccess-smart-plug-cover-${device}-${cable}`;
-  const [data, filename] = format === 'stl'
-    ? [zipSync({ 'body.stl': new Uint8Array(render.bodyStl), 'cover.stl': new Uint8Array(render.coverStl) }), `${slug}.zip`]
-    : [buildThreeMf([
-        { name: 'Body', color: BODY_COLOR, mesh: render.body },
-        { name: 'Cover', color: LETTER_COLOR, mesh: render.cover },
-      ]), `${slug}.3mf`];
+export function plugScadSource(
+  source: string,
+  device: string,
+  cable: string,
+  deviceExtraDiameter: number,
+  cordOpeningDiameter: number,
+  heightAbovePlug: number,
+  cableCutoutHeight: number,
+): string {
+  const assignments: Record<string, string> = {
+    DEVICE: JSON.stringify(device),
+    CABLE: JSON.stringify(cable),
+    DEVICE_EXTRA_D: String(deviceExtraDiameter),
+    CORD_OPEN_D: String(cordOpeningDiameter),
+    HEIGHT_ABOVE_PLUG: String(heightAbovePlug),
+    CABLE_CUT_H: String(cableCutoutHeight),
+  };
+  return Object.entries(assignments).reduce((result, [name, value]) => {
+    const pattern = new RegExp(`^${name}\\s*=.*$`, 'm');
+    if (!pattern.test(result)) throw new Error(`Could not find the ${name} assignment in the .scad source`);
+    return result.replace(pattern, `${name} = ${value};`);
+  }, source);
+}
+
+export function downloadPlug(
+  render: PlugRender,
+  device: string,
+  cable: string,
+  deviceExtraDiameter: number,
+  cordOpeningDiameter: number,
+  heightAbovePlug: number,
+  cableCutoutHeight: number,
+  format: MeshFormat,
+): void {
+  const custom = `clearance-${deviceExtraDiameter}-opening-${cordOpeningDiameter}-above-${heightAbovePlug}-cutout-${cableCutoutHeight}`;
+  const slug = `attraccess-smart-plug-cover-${device}-${cable}-${custom}`;
+  const [data, filename] =
+    format === 'stl'
+      ? [
+          zipSync({ 'body.stl': new Uint8Array(render.bodyStl), 'cover.stl': new Uint8Array(render.coverStl) }),
+          `${slug}.zip`,
+        ]
+      : [
+          buildThreeMf([
+            { name: 'Body', color: BODY_COLOR, mesh: render.body },
+            { name: 'Cover', color: LETTER_COLOR, mesh: render.cover },
+          ]),
+          `${slug}.3mf`,
+        ];
   triggerDownload(data, filename);
 }
