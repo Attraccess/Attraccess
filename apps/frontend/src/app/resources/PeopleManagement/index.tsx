@@ -3,7 +3,7 @@ import { useOverlayState } from '@heroui/react';
 import { Button } from '../../../components/button';
 import { AlertCircle, AwardIcon, ShieldCheckIcon, WrenchIcon } from 'lucide-react';
 import { User } from '@attraccess/react-query-client';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { type UserIdentity, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Select } from '../../../components/select';
 import { AddPersonDrawer } from './AddPersonDrawer';
 import { HistoryModalLoader } from './HistoryModalLoader';
@@ -60,7 +60,7 @@ export function PeopleManagement(
   }, []);
 
   const handleAdd = useCallback(
-    async (user: User) => {
+    async (user: UserIdentity) => {
       if (!addMode) return;
       if (addMode === 'introducer') {
         await mutations.grantIntroducer(user.id);

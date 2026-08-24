@@ -25,9 +25,9 @@ import { SearchIcon, UserPlusIcon, XIcon } from 'lucide-react';
 import { InfiniteData } from '@tanstack/react-query';
 import { useTranslations } from '../../i18n';
 import { useDebounce } from '../../hooks/useDebounce';
-import { AttraccessUser } from '../attraccess-user/AttraccessUser';
+import { AttraccessUser, type UserIdentity } from '../attraccess-user/AttraccessUser';
 import { groupUsersByLetter } from './UserSearch.utils';
-import { PaginatedUsersResponseDto, User, useUsersServiceFindManyInfinite } from '@attraccess/react-query-client';
+import { PaginatedUsersResponseDto, useUsersServiceFindManyInfinite } from '@attraccess/react-query-client';
 
 import en from './en.json';
 import de from './de.json';
@@ -39,7 +39,7 @@ interface UserSearchProps {
   /** Clears the current selection and search whenever this value changes identity
    * (e.g. pass a drawer's isOpen so the picker resets on every open/close). */
   resetSignal?: unknown;
-  onSelectionChange?: (user: User | null) => void;
+  onSelectionChange?: (user: UserIdentity | null) => void;
   wrapperProps?: Omit<HTMLAttributes<HTMLDivElement>, 'children'>;
   afterAutocomplete?: React.ReactNode;
   afterSelection?: React.ReactNode;
@@ -68,7 +68,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
   const triggerId = useId();
 
   const { isOpen, open, close } = useOverlayState();
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserIdentity | null>(null);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, SEARCH_DEBOUNCE_MS);
 
@@ -110,12 +110,10 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
   // De-duplicate by id: pagination is offset-based, so a user created or renamed
   // between page fetches can shift the window and repeat (or skip) a row.
   const users = useMemo(() => {
-    const seen = new Map<number, User>();
+    const seen = new Map<number, UserIdentity>();
     for (const page of data?.pages ?? []) {
       for (const user of page.data) {
-        // The endpoint may return a permission-limited summary. This picker only
-        // reads the identity fields shared by summaries and full users.
-        seen.set(user.id, user as User);
+        seen.set(user.id, user);
       }
     }
     return [...seen.values()];
@@ -127,7 +125,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
   }, [selectedUser, onSelectionChange]);
 
   const handleSelect = useCallback(
-    (user: User) => {
+    (user: UserIdentity) => {
       setSelectedUser(user);
       setSearch('');
       close();

@@ -1,4 +1,4 @@
-import { AttraccessUser, UserSearch, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AttraccessUser, UserIdentity, UserSearch, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { User } from '@attraccess/react-query-client';
 import {
   ButtonProps,
@@ -39,7 +39,7 @@ export interface Column<TUser> {
 interface Props<TUser> {
   selectedUsers?: TUser[];
   selectedUserIsLoading?: boolean;
-  onAddToSelection: (user: User) => void;
+  onAddToSelection: (user: UserIdentity) => void;
   addToSelectionIsLoading?: boolean;
   actions?: Action<TUser>[] | ((user: TUser) => Action<TUser>[]);
   tableProps?: Omit<TableProps, 'children'>;
@@ -63,7 +63,7 @@ export function UserSelectionList<TUser extends User = User>(props: Readonly<Pro
     en,
   });
 
-  const [userSearchSelection, setUserSearchSelection] = useState<User | null>(null);
+  const [userSearchSelection, setUserSearchSelection] = useState<UserIdentity | null>(null);
   const [pickerResetSignal, setPickerResetSignal] = useState(0);
 
   const onAddUser = useCallback(() => {
