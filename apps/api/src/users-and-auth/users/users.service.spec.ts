@@ -409,6 +409,20 @@ describe('UsersService', () => {
        );
      });
 
+    it('should retain the role assignment filter when searching', async () => {
+      userRepository.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.findMany({ page: 1, limit: 10, roleId: 42, search: 'alice' });
+
+      expect(userRepository.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.arrayContaining([
+            expect.objectContaining({ userRoles: { roleId: 42 } }),
+          ]),
+        }),
+      );
+    });
+
     it('should throw error for invalid pagination options', async () => {
       await expect(service.findMany({ page: 0, limit: 10 })).rejects.toThrow();
       await expect(service.findMany({ page: 1, limit: 0 })).rejects.toThrow();

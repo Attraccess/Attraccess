@@ -569,7 +569,7 @@ export class UsersService {
       whereCondition = { id: In(options.ids) };
     }
 
-    if (options.roleId) {
+    if (options.roleId !== undefined) {
       whereCondition = { ...whereCondition, userRoles: { roleId: options.roleId } };
     }
 

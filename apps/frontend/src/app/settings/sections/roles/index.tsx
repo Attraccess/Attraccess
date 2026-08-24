@@ -129,6 +129,7 @@ export function RolesSection() {
                             <Button
                               size="sm"
                               variant="ghost"
+                              className="min-h-6 min-w-6 rounded-full px-2"
                               aria-label={t('table.actions.viewPermissions', { role: roleName(role) })}
                               onPress={() => openForm(role)}
                               data-cy={`roles-table-permissions-${role.key}`}
@@ -161,6 +162,7 @@ export function RolesSection() {
                         <Button
                           size="sm"
                           variant="ghost"
+                          className="min-h-6 min-w-6 rounded-full px-2"
                           aria-label={t('table.actions.viewUsers', { role: roleName(role) })}
                           onPress={() =>
                             navigate(`/users?roleId=${role.id}&roleName=${encodeURIComponent(roleName(role))}`)
