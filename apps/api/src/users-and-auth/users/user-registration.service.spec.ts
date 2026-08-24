@@ -206,7 +206,9 @@ describe('UserRegistrationService', () => {
       jest.spyOn(usersService, 'createOne').mockResolvedValue(user);
       jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
       jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
-      jest.spyOn(emailService, 'sendVerificationEmail').mockRejectedValue(Object.assign(new Error('SMTP unavailable'), { code: 'ECONNREFUSED' }));
+      jest
+        .spyOn(emailService, 'sendVerificationEmail')
+        .mockRejectedValue(Object.assign(new Error('SMTP unavailable'), { code: 'ECONNREFUSED' }));
 
       await expect(
         service.createOne({
@@ -278,7 +280,7 @@ describe('UserRegistrationService', () => {
       settingRepository.findOne.mockResolvedValue({ value: '*' });
     });
 
-    it('deletes the existing unverified admin and creates a fresh one', async () => {
+    it('creates the replacement administrator before deleting the existing unverified admin', async () => {
       jest.spyOn(usersService, 'countUsers').mockResolvedValue(1);
       jest.spyOn(usersService, 'findMany').mockResolvedValue({ data: [unverifiedAdmin], total: 1, page: 1, limit: 1 });
       jest.spyOn(usersService, 'deleteOne').mockResolvedValue(undefined);
@@ -295,9 +297,45 @@ describe('UserRegistrationService', () => {
       const result = await service.createOne(dto);
 
       expect(usersService.deleteOne).toHaveBeenCalledWith(unverifiedAdmin.id);
-      expect(usersService.createOne).toHaveBeenCalled();
+      expect(usersService.createOne).toHaveBeenCalledWith(
+        expect.objectContaining({ isFirstTimeSetupAdmin: true }),
+        expect.anything(),
+      );
       expect(emailService.sendVerificationEmail).toHaveBeenCalledWith(newAdmin, 'verification-token');
+      expect((emailService.sendVerificationEmail as jest.Mock).mock.invocationCallOrder[0]).toBeLessThan(
+        (usersService.deleteOne as jest.Mock).mock.invocationCallOrder[0],
+      );
       expect(result).toEqual(newAdmin);
+    });
+
+    it('preserves the existing administrator when SMTP is not configured', async () => {
+      jest.spyOn(usersService, 'countUsers').mockResolvedValue(1);
+      jest.spyOn(usersService, 'findMany').mockResolvedValue({ data: [unverifiedAdmin], total: 1, page: 1, limit: 1 });
+      jest.spyOn(emailService, 'assertSmtpConfigured').mockRejectedValue(new Error('SMTP configuration not set'));
+
+      await expect(service.createOne(dto)).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(usersService.deleteOne).not.toHaveBeenCalled();
+      expect(usersService.createOne).not.toHaveBeenCalled();
+      expect(usersService.rollbackFailedRegistration).not.toHaveBeenCalled();
+    });
+
+    it('preserves the existing administrator when sending the replacement verification email fails', async () => {
+      jest.spyOn(usersService, 'countUsers').mockResolvedValue(1);
+      jest.spyOn(usersService, 'findMany').mockResolvedValue({ data: [unverifiedAdmin], total: 1, page: 1, limit: 1 });
+      jest.spyOn(usersService, 'createOne').mockResolvedValue(newAdmin);
+      jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
+      jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
+      jest
+        .spyOn(emailService, 'sendVerificationEmail')
+        .mockRejectedValue(Object.assign(new Error('SMTP unavailable'), { code: 'ECONNREFUSED' }));
+
+      await expect(service.createOne(dto)).rejects.toMatchObject({
+        response: { message: 'EmailSendFailed', statusCode: 503 },
+      });
+
+      expect(usersService.rollbackFailedRegistration).toHaveBeenCalledWith(newAdmin.id);
+      expect(usersService.deleteOne).not.toHaveBeenCalled();
     });
 
     it('throws ForbiddenException when total users is not exactly 1', async () => {

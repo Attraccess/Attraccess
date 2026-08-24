@@ -211,14 +211,18 @@ export class UsersService {
     return user || null;
   }
 
-  async createOne(userData: {
-    username: string;
-    email: string;
-    externalIdentifier: string | null;
-    isEmailVerified?: boolean;
-    skipUsernameSanitization?: boolean;
-    locale?: string;
-  }, manager?: EntityManager): Promise<User> {
+  async createOne(
+    userData: {
+      username: string;
+      email: string;
+      externalIdentifier: string | null;
+      isEmailVerified?: boolean;
+      skipUsernameSanitization?: boolean;
+      locale?: string;
+      isFirstTimeSetupAdmin?: boolean;
+    },
+    manager?: EntityManager,
+  ): Promise<User> {
     const data = {
       username: this.cleanupUsername(userData.username),
       email: userData.email.trim(),
@@ -283,7 +287,7 @@ export class UsersService {
     // doesn't leave an administrator-less account on a fresh install.
     const saveUser = async (em: EntityManager) => {
       const saved = await em.save(user);
-      if (isFirstUser) {
+      if (isFirstUser || userData.isFirstTimeSetupAdmin) {
         this.logger.debug('First user in system - assigning administrator role');
         await this.rbacService.assignRoleByKey(saved.id, 'administrator', em);
       } else {

@@ -30,9 +30,7 @@ export class UserRegistrationService {
   public async createOne(body: CreateUserDto, locale?: string): Promise<User> {
     this.logger.debug(`Creating new user with username: ${body.username} and email: ${body.email}`);
 
-    if (body.overwriteFirstTimeAdmin) {
-      await this.ensureFirstTimeSetupIncompleteAndDeleteAdmin();
-    }
+    const existingAdmin = body.overwriteFirstTimeAdmin ? await this.ensureFirstTimeSetupIncomplete() : undefined;
 
     await this.signupDomainService.assertEmailDomainAllowed(body.email);
 
@@ -51,7 +49,9 @@ export class UserRegistrationService {
     }
 
     const hashedPassword =
-      body.strategy === AuthenticationType.LOCAL_PASSWORD ? await this.authService.hashPassword(body.password) : undefined;
+      body.strategy === AuthenticationType.LOCAL_PASSWORD
+        ? await this.authService.hashPassword(body.password)
+        : undefined;
 
     const { user, verificationToken } = await this.usersService.withTransaction(async (manager: EntityManager) => {
       const user = await this.usersService.createOne(
@@ -60,6 +60,7 @@ export class UserRegistrationService {
           email: body.email,
           externalIdentifier: null,
           locale,
+          isFirstTimeSetupAdmin: !!existingAdmin,
         },
         manager,
       );
@@ -89,7 +90,10 @@ export class UserRegistrationService {
       await this.emailService.sendVerificationEmail(user, verificationToken);
       this.logger.debug(`Verification email sent to user ID: ${user.id}`);
     } catch (error) {
-      this.logger.error(`Error sending verification email for ${body.email}`, error instanceof Error ? error.stack : String(error));
+      this.logger.error(
+        `Error sending verification email for ${body.email}`,
+        error instanceof Error ? error.stack : String(error),
+      );
       try {
         await this.usersService.rollbackFailedRegistration(user.id);
       } catch (rollbackError) {
@@ -103,11 +107,17 @@ export class UserRegistrationService {
     }
 
     this.usersService.recordCreatedUser(user);
+
+    if (existingAdmin) {
+      this.logger.debug(`Overwriting first-time-setup admin with ID: ${existingAdmin.id}`);
+      await this.usersService.deleteOne(existingAdmin.id);
+    }
+
     this.logger.debug(`User creation completed successfully for ID: ${user.id}`);
     return user;
   }
 
-  private async ensureFirstTimeSetupIncompleteAndDeleteAdmin(): Promise<void> {
+  private async ensureFirstTimeSetupIncomplete(): Promise<User> {
     const totalUsers = await this.usersService.countUsers();
     if (totalUsers !== 1) {
       throw new ForbiddenException('First-time setup is already complete');
@@ -119,8 +129,7 @@ export class UserRegistrationService {
       throw new ForbiddenException('First-time setup is already complete');
     }
 
-    this.logger.debug(`Overwriting first-time-setup admin with ID: ${existingAdmin.id}`);
-    await this.usersService.deleteOne(existingAdmin.id);
+    return existingAdmin;
   }
 
   public async verifyEmail(email: string, token: string): Promise<void> {
