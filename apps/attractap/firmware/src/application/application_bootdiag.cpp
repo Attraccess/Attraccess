@@ -84,7 +84,8 @@ void Application::setupBootDiagnostics() {
       // (ATT-474). Intentional software restarts must not increment crash metrics.
       this->bootDiagPreferences.putBytes("pending", &prior, sizeof(prior));
     } else if (reason == ESP_RST_SW) {
-      // This reset is intentionally ignored, so consume its diagnostic marker.
+      // This reset is intentionally ignored, so consume all queued diagnostics.
+      this->bootDiagPreferences.remove("pending");
       this->bootDiagPreferences.remove("rebootreason");
     }
     this->bootDiagPreferences.end();
