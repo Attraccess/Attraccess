@@ -11,6 +11,7 @@
 
 #define BOOT_DIAG_NAMESPACE "bootdiag"
 #define BOOT_DIAG_MAGIC 0x41545431
+#define BOOT_DIAG_PENDING_REASON_KEY "pendingreason"
 #define BOOT_DIAG_SNAPSHOT_INTERVAL_MS 60000
 #define BOOT_DIAG_SILENT_HANG_MIN_UPTIME_MS 60000
 
@@ -82,10 +83,12 @@ void Application::setupBootDiagnostics() {
     if (shouldReport) {
       // Preserve actual failures for upload after the next successful connect
       // (ATT-474). Intentional software restarts must not increment crash metrics.
+      this->bootDiagPreferences.putUChar(BOOT_DIAG_PENDING_REASON_KEY,
+                                         (uint8_t)reason);
       this->bootDiagPreferences.putBytes("pending", &prior, sizeof(prior));
     } else if (reason == ESP_RST_SW) {
-      // This reset is intentionally ignored, so consume all queued diagnostics.
-      this->bootDiagPreferences.remove("pending");
+      // The reset is intentionally ignored. Keep a prior unacknowledged crash,
+      // but discard this reboot's marker so it cannot relabel that crash.
       this->bootDiagPreferences.remove("rebootreason");
     }
     this->bootDiagPreferences.end();

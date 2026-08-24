@@ -31,6 +31,7 @@ struct CrashBootRecord
 
 #define BOOT_DIAG_NAMESPACE "bootdiag"
 #define BOOT_DIAG_PENDING_KEY "pending"
+#define BOOT_DIAG_PENDING_REASON_KEY "pendingreason"
 #define BOOT_DIAG_REBOOT_REASON_KEY "rebootreason"
 #define BOOT_DIAG_MAGIC 0x41545431
 
@@ -148,10 +149,16 @@ void API::sendPendingCrashReport()
         return;
     }
 
-    // esp_reset_reason() reports what ENDED the previous session (the crash we
-    // are reporting). The stored record's resetReason is what started it, so the
-    // live reset reason is the correct label to pair with the pre-freeze snapshot.
-    const char *resetStr = crashResetReasonToString((uint8_t)esp_reset_reason());
+    // The pending reset reason belongs to this snapshot. Fall back to the live
+    // reset reason for records stored before this key was introduced.
+    uint8_t pendingReason = (uint8_t)esp_reset_reason();
+    {
+        KVStore reasonPrefs;
+        reasonPrefs.begin(BOOT_DIAG_NAMESPACE, true);
+        pendingReason = reasonPrefs.getUChar(BOOT_DIAG_PENDING_REASON_KEY, pendingReason);
+        reasonPrefs.end();
+    }
+    const char *resetStr = crashResetReasonToString(pendingReason);
 
     // Optional deliberate-reboot reason left behind by the firmware before it
     // rebooted itself (e.g. the websocket reconnect heap-recovery reboot). Absent
@@ -256,6 +263,7 @@ void API::onCrashReportResponse(JsonObject data)
     KVStore prefs;
     prefs.begin(BOOT_DIAG_NAMESPACE, false);
     prefs.remove(BOOT_DIAG_PENDING_KEY);
+    prefs.remove(BOOT_DIAG_PENDING_REASON_KEY);
     prefs.remove(BOOT_DIAG_REBOOT_REASON_KEY);
     prefs.end();
 
