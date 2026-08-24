@@ -174,7 +174,17 @@ void API::sendPendingCrashReport()
         uint8_t legacyReason = legacyPrefs.getUChar(BOOT_DIAG_PENDING_REASON_KEY, 0);
         legacyPrefs.end();
 
-        if (legacyReason != 0)
+        if (legacyReason == ESP_RST_SW)
+        {
+            // Legacy records stored the reset reason separately. An intentional
+            // software reset is not crash telemetry, so discard this old pair.
+            legacyPrefs.begin(BOOT_DIAG_NAMESPACE, false);
+            legacyPrefs.remove(BOOT_DIAG_PENDING_KEY);
+            legacyPrefs.remove(BOOT_DIAG_PENDING_REASON_KEY);
+            legacyPrefs.end();
+            return;
+        }
+        else if (legacyReason != 0)
         {
             pendingReason = legacyReason;
         }
