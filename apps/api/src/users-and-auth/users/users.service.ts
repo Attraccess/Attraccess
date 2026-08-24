@@ -222,6 +222,7 @@ export class UsersService {
       isFirstTimeSetupAdmin?: boolean;
     },
     manager?: EntityManager,
+    options: { excludedUserIdFromLicenseUsage?: number } = {},
   ): Promise<User> {
     const data = {
       username: this.cleanupUsername(userData.username),
@@ -237,7 +238,11 @@ export class UsersService {
 
     // verifying usage limits
     const userRepository = manager ? manager.getRepository(User) : this.userRepository;
-    const currentAmountOfUsers = await userRepository.count();
+    const currentAmountOfUsers = await userRepository.count(
+      options.excludedUserIdFromLicenseUsage === undefined
+        ? undefined
+        : { where: { id: Not(options.excludedUserIdFromLicenseUsage) } },
+    );
     try {
       await this.licenseService.verifyLicense({
         usageLimits: {

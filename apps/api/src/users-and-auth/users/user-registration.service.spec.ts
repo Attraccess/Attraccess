@@ -301,6 +301,7 @@ describe('UserRegistrationService', () => {
       expect(usersService.createOne).toHaveBeenCalledWith(
         expect.objectContaining({ isFirstTimeSetupAdmin: true }),
         expect.anything(),
+        { excludedUserIdFromLicenseUsage: unverifiedAdmin.id },
       );
       expect(emailService.sendVerificationEmail).toHaveBeenCalledWith(newAdmin, 'verification-token');
       expect((emailService.sendVerificationEmail as jest.Mock).mock.invocationCallOrder[0]).toBeLessThan(

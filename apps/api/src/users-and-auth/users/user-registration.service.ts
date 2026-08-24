@@ -77,6 +77,7 @@ export class UserRegistrationService {
           isFirstTimeSetupAdmin: !!existingAdmin,
         },
         manager,
+        { excludedUserIdFromLicenseUsage: existingAdmin?.id },
       );
       this.logger.debug(`User created with ID: ${user.id}`);
 
