@@ -39,7 +39,8 @@ describe('UserRegistrationService', () => {
             withTransaction: jest.fn(async (handler) => handler({})),
             recordCreatedUser: jest.fn(),
             rollbackFailedRegistration: jest.fn(),
-            countUsers: jest.fn(),
+            releaseFirstTimeSetupAdminIdentifiers: jest.fn(),
+            rollbackFirstTimeSetupAdminReplacement: jest.fn(),
           },
         },
         {
@@ -281,8 +282,7 @@ describe('UserRegistrationService', () => {
     });
 
     it('creates the replacement administrator before deleting the existing unverified admin', async () => {
-      jest.spyOn(usersService, 'countUsers').mockResolvedValue(1);
-      jest.spyOn(usersService, 'findMany').mockResolvedValue({ data: [unverifiedAdmin], total: 1, page: 1, limit: 1 });
+      jest.spyOn(usersService, 'releaseFirstTimeSetupAdminIdentifiers').mockResolvedValue(unverifiedAdmin);
       jest.spyOn(usersService, 'deleteOne').mockResolvedValue(undefined);
       jest.spyOn(usersService, 'createOne').mockResolvedValue(newAdmin);
       jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
@@ -297,6 +297,7 @@ describe('UserRegistrationService', () => {
       const result = await service.createOne(dto);
 
       expect(usersService.deleteOne).toHaveBeenCalledWith(unverifiedAdmin.id);
+      expect(usersService.releaseFirstTimeSetupAdminIdentifiers).toHaveBeenCalledWith(expect.anything());
       expect(usersService.createOne).toHaveBeenCalledWith(
         expect.objectContaining({ isFirstTimeSetupAdmin: true }),
         expect.anything(),
@@ -309,8 +310,6 @@ describe('UserRegistrationService', () => {
     });
 
     it('preserves the existing administrator when SMTP is not configured', async () => {
-      jest.spyOn(usersService, 'countUsers').mockResolvedValue(1);
-      jest.spyOn(usersService, 'findMany').mockResolvedValue({ data: [unverifiedAdmin], total: 1, page: 1, limit: 1 });
       jest.spyOn(emailService, 'assertSmtpConfigured').mockRejectedValue(new Error('SMTP configuration not set'));
 
       await expect(service.createOne(dto)).rejects.toBeInstanceOf(BadRequestException);
@@ -321,8 +320,7 @@ describe('UserRegistrationService', () => {
     });
 
     it('preserves the existing administrator when sending the replacement verification email fails', async () => {
-      jest.spyOn(usersService, 'countUsers').mockResolvedValue(1);
-      jest.spyOn(usersService, 'findMany').mockResolvedValue({ data: [unverifiedAdmin], total: 1, page: 1, limit: 1 });
+      jest.spyOn(usersService, 'releaseFirstTimeSetupAdminIdentifiers').mockResolvedValue(unverifiedAdmin);
       jest.spyOn(usersService, 'createOne').mockResolvedValue(newAdmin);
       jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
       jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
@@ -334,55 +332,50 @@ describe('UserRegistrationService', () => {
         response: { message: 'EmailSendFailed', statusCode: 503 },
       });
 
-      expect(usersService.rollbackFailedRegistration).toHaveBeenCalledWith(newAdmin.id);
+      expect(usersService.rollbackFirstTimeSetupAdminReplacement).toHaveBeenCalledWith(newAdmin.id, unverifiedAdmin);
       expect(usersService.deleteOne).not.toHaveBeenCalled();
     });
 
-    it('throws ForbiddenException when total users is not exactly 1', async () => {
-      jest.spyOn(usersService, 'countUsers').mockResolvedValue(2);
+    it('throws ForbiddenException when the transactional setup check rejects the replacement', async () => {
+      jest.spyOn(usersService, 'releaseFirstTimeSetupAdminIdentifiers').mockRejectedValue(
+        new ForbiddenException('First-time setup is already complete'),
+      );
 
       await expect(service.createOne(dto)).rejects.toThrow(ForbiddenException);
       expect(usersService.deleteOne).not.toHaveBeenCalled();
       expect(usersService.createOne).not.toHaveBeenCalled();
     });
 
-    it('throws ForbiddenException when no users exist', async () => {
-      jest.spyOn(usersService, 'countUsers').mockResolvedValue(0);
+    it('rolls back the replacement when deletion of the existing administrator fails', async () => {
+      const deletionError = new Error('Cannot delete administrator');
+      jest.spyOn(usersService, 'releaseFirstTimeSetupAdminIdentifiers').mockResolvedValue(unverifiedAdmin);
+      jest.spyOn(usersService, 'createOne').mockResolvedValue(newAdmin);
+      jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
+      jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
+      jest.spyOn(usersService, 'deleteOne').mockRejectedValue(deletionError);
 
-      await expect(service.createOne(dto)).rejects.toThrow(ForbiddenException);
-      expect(usersService.deleteOne).not.toHaveBeenCalled();
-      expect(usersService.createOne).not.toHaveBeenCalled();
+      await expect(service.createOne(dto)).rejects.toBe(deletionError);
+
+      expect(usersService.rollbackFirstTimeSetupAdminReplacement).toHaveBeenCalledWith(newAdmin.id, unverifiedAdmin);
+      expect(usersService.recordCreatedUser).not.toHaveBeenCalled();
     });
 
-    it('throws ForbiddenException when the single existing user has a verified email', async () => {
-      const verified = { ...unverifiedAdmin, isEmailVerified: true } as User;
-      jest.spyOn(usersService, 'countUsers').mockResolvedValue(1);
-      jest.spyOn(usersService, 'findMany').mockResolvedValue({ data: [verified], total: 1, page: 1, limit: 1 });
+    it('serializes concurrent overwrite requests and revalidates each request in its transaction', async () => {
+      jest.spyOn(usersService, 'releaseFirstTimeSetupAdminIdentifiers')
+        .mockResolvedValueOnce(unverifiedAdmin)
+        .mockRejectedValueOnce(new ForbiddenException('First-time setup is already complete'));
+      jest.spyOn(usersService, 'createOne').mockResolvedValue(newAdmin);
+      jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
+      jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({ id: 1 } as AuthenticationDetail);
 
-      await expect(service.createOne(dto)).rejects.toThrow(ForbiddenException);
-      expect(usersService.deleteOne).not.toHaveBeenCalled();
-      expect(usersService.createOne).not.toHaveBeenCalled();
-    });
+      const results = await Promise.allSettled([service.createOne(dto), service.createOne(dto)]);
 
-    it('checks the first-time-setup invariant BEFORE touching credentials (no user enumeration)', async () => {
-      const callOrder: string[] = [];
-      jest.spyOn(usersService, 'countUsers').mockImplementation(async () => {
-        callOrder.push('countUsers');
-        return 2;
-      });
-      const findOneSpy = jest.spyOn(usersService, 'findOne').mockImplementation(async () => {
-        callOrder.push('findOne');
-        return unverifiedAdmin;
-      });
-
-      await expect(service.createOne(dto)).rejects.toThrow(ForbiddenException);
-
-      expect(callOrder[0]).toBe('countUsers');
-      expect(findOneSpy).not.toHaveBeenCalled();
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+      expect(usersService.releaseFirstTimeSetupAdminIdentifiers).toHaveBeenCalledTimes(2);
     });
 
     it('ignores the overwrite flag when not set (normal create flow)', async () => {
-      jest.spyOn(usersService, 'countUsers').mockResolvedValue(5);
       jest.spyOn(usersService, 'createOne').mockResolvedValue(newAdmin);
       jest.spyOn(authService, 'generateEmailVerificationToken').mockResolvedValue('verification-token');
       jest.spyOn(authService, 'addAuthenticationDetails').mockResolvedValue({
@@ -403,7 +396,7 @@ describe('UserRegistrationService', () => {
       await service.createOne(regularDto);
 
       expect(usersService.deleteOne).not.toHaveBeenCalled();
-      expect(usersService.countUsers).not.toHaveBeenCalled();
+      expect(usersService.releaseFirstTimeSetupAdminIdentifiers).not.toHaveBeenCalled();
     });
   });
 });

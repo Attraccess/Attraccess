@@ -318,6 +318,35 @@ export class UsersService {
     });
   }
 
+  public async releaseFirstTimeSetupAdminIdentifiers(manager: EntityManager): Promise<User> {
+    const repository = manager.getRepository(User);
+    if ((await repository.count()) !== 1) {
+      throw new ForbiddenException('First-time setup is already complete');
+    }
+
+    const existingAdmin = await repository.findOne({});
+    if (!existingAdmin || existingAdmin.isEmailVerified) {
+      throw new ForbiddenException('First-time setup is already complete');
+    }
+
+    const suffix = randomBytes(6).toString('base64url').slice(0, 8);
+    await repository.update(existingAdmin.id, {
+      username: `first-time-setup-${existingAdmin.id}-${suffix}`,
+      email: `first-time-setup-${existingAdmin.id}-${suffix}@deleted.local`,
+    });
+    return existingAdmin;
+  }
+
+  public async rollbackFirstTimeSetupAdminReplacement(replacementUserId: number, existingAdmin: User): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(User, replacementUserId);
+      await manager.getRepository(User).update(existingAdmin.id, {
+        username: existingAdmin.username,
+        email: existingAdmin.email,
+      });
+    });
+  }
+
   async deleteOne(id: number): Promise<void> {
     this.logger.debug(`Deleting user with ID: ${id}`);
     await this.anonymizeAndSoftDelete(id);
