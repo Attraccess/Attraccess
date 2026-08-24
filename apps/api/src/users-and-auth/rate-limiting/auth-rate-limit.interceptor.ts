@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NestInterceptor,
+  ServiceUnavailableException,
   UnauthorizedException,
   ForbiddenException,
 } from '@nestjs/common';
@@ -101,6 +102,7 @@ function classifyOutcome(error: unknown): AuthAuditOutcome {
   if (error instanceof AccountLockedException) return 'account_locked';
   if (error instanceof UnauthorizedException) return 'invalid_credentials';
   if (error instanceof ForbiddenException) return 'invalid_token';
+  if (error instanceof ServiceUnavailableException) return 'dependency_failure';
   return 'invalid_input';
 }
 
