@@ -61,6 +61,20 @@ describe('ResourceIntroductionsService notifications', () => {
     );
   });
 
+  it('records the acting user for a granted introduction', async () => {
+    await service.grant(7, 3, undefined, { performedByUserId: 9 });
+
+    expect(historyRepository.create).toHaveBeenCalledWith(expect.objectContaining({ performedByUser: { id: 9 } }));
+  });
+
+  it('records the acting user for a revoked introduction', async () => {
+    introductionRepository.findOne.mockResolvedValue({ id: 10, receiverUser: { id: 3 } });
+
+    await service.revoke(7, 3, undefined, { performedByUserId: 9 });
+
+    expect(historyRepository.create).toHaveBeenCalledWith(expect.objectContaining({ performedByUser: { id: 9 } }));
+  });
+
   it('does not notify when a resource introduction is granted twice without an effective access change', async () => {
     introductionRepository.findOne.mockResolvedValue({ id: 10, receiverUser: { id: 3 } });
     historyRepository.findOne.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.GRANT });

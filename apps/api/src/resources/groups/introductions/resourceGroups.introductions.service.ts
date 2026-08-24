@@ -87,6 +87,7 @@ export class ResourceGroupsIntroductionsService {
     nextStatus: IntroductionHistoryAction,
     data?: UpdateResourceGroupIntroductionDto,
     tutorUserId?: number,
+    performedByUserId = userId,
   ): Promise<ResourceIntroductionHistoryItem> {
     let existingIntroduction = await this.resourceIntroductionRepository.findOne({
       where: {
@@ -108,7 +109,7 @@ export class ResourceGroupsIntroductionsService {
     const historyItem = this.resourceIntroductionHistoryItemRepository.create({
       introduction: existingIntroduction,
       action: nextStatus,
-      performedByUser: { id: userId },
+      performedByUser: { id: performedByUserId },
       comment: data?.comment,
     });
 
@@ -137,7 +138,7 @@ export class ResourceGroupsIntroductionsService {
     groupId: number,
     userId: number,
     data?: UpdateResourceGroupIntroductionDto,
-    options?: { tutorUserId?: number },
+    options?: { tutorUserId?: number; performedByUserId?: number },
   ): Promise<ResourceIntroductionHistoryItem> {
     return await this.updateIntroductionStatus(
       groupId,
@@ -145,6 +146,7 @@ export class ResourceGroupsIntroductionsService {
       IntroductionHistoryAction.GRANT,
       data,
       options?.tutorUserId,
+      options?.performedByUserId,
     );
   }
 
@@ -152,8 +154,16 @@ export class ResourceGroupsIntroductionsService {
     groupId: number,
     userId: number,
     data?: UpdateResourceGroupIntroductionDto,
+    options?: { performedByUserId?: number },
   ): Promise<ResourceIntroductionHistoryItem> {
-    return await this.updateIntroductionStatus(groupId, userId, IntroductionHistoryAction.REVOKE, data);
+    return await this.updateIntroductionStatus(
+      groupId,
+      userId,
+      IntroductionHistoryAction.REVOKE,
+      data,
+      undefined,
+      options?.performedByUserId,
+    );
   }
 
   public async getHistoryByGroupIdAndUserId(
