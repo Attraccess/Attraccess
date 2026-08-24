@@ -854,6 +854,28 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       expect(variablesService.set).toHaveBeenNthCalledWith(2, 'resource', 1, 'note', 'hello world', 1);
     });
 
+    it('serializes an object payload for a downstream MQTT message using {{json payload}}', async () => {
+      const inputNode = createNode({ id: 'trigger-1', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId: 1 });
+      const mqttNode = createNode({
+        id: 'mqtt-1',
+        type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE,
+        resourceId: 1,
+        data: { serverId: 42, topic: 'devices/update', payload: '{{json payload}}', qos: 1, retain: false },
+      });
+      nodesById[inputNode.id] = inputNode;
+      nodesById[mqttNode.id] = mqttNode;
+      initialNodes = [inputNode];
+      edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: mqttNode.id }];
+      edgesBySourceAndHandle[`${mqttNode.id}|`] = [];
+
+      await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { payload: { enabled: true } });
+
+      expect(mqttClientService.publish).toHaveBeenCalledWith(42, 'devices/update', '{"enabled":true}', {
+        qos: 1,
+        retain: false,
+      });
+    });
+
     it('PROCESSING_GET_VARIABLES writes lodash-set into payload', async () => {
       (variablesService.get as jest.Mock).mockImplementation(async (_scope, _rid, key) =>
         key === 'sessionId' ? 99 : undefined,
