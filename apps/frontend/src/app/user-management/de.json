@@ -23,5 +23,13 @@
     "inviteUser": "Benutzer einladen",
     "sso": "SSO Anbieter verwalten",
     "twoFactorPolicy": "Zwei-Faktor-Richtlinie"
+  },
+  "filters": {
+    "role": "Rolle: {{role}}",
+    "clearRole": "Rollenfilter aufheben"
+  },
+  "empty": {
+    "role": "{{role}} ist keinem Benutzer zugewiesen.",
+    "assignRole": "Benutzer auswählen, um diese Rolle zuzuweisen"
   }
 }

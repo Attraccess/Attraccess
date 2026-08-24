@@ -31,6 +31,7 @@ interface UserPermissionFormProps {
   ssoManagedProviders?: string[];
   ssoManagedPermissionKeys?: Set<string>;
   providersById?: Map<number, SSOProvider>;
+  roleIdToAssign?: number;
 }
 
 function SsoAssignmentBadges({
@@ -65,6 +66,7 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({
   ssoManagedProviders,
   ssoManagedPermissionKeys,
   providersById,
+  roleIdToAssign,
 }) => {
   const { t, tExists } = useTranslations({
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
@@ -95,9 +97,16 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({
 
   useEffect(() => {
     if (userRoles) {
-      setSelectedRoleIds(new Set(userRoles.map((ur) => ur.roleId)));
+      const roleIds = new Set(userRoles.map((ur) => ur.roleId));
+      if (
+        roleIdToAssign &&
+        allRoles?.some((role) => role.id === roleIdToAssign && !NON_MANAGEABLE_ROLE_KEYS.includes(role.key))
+      ) {
+        roleIds.add(roleIdToAssign);
+      }
+      setSelectedRoleIds(roleIds);
     }
-  }, [userRoles]);
+  }, [allRoles, roleIdToAssign, userRoles]);
 
   // SSO assignments grouped by role ID for quick lookup
   const ssoAssignmentsByRoleId = new Map<number, UserRole[]>();

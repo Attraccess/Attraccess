@@ -156,13 +156,16 @@ describe('UsersService', () => {
   describe('createOne', () => {
     it('the first created user should be assigned the administrator role via RBAC', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(userRepository, 'save').mockImplementation(async (data) => ({
-        id: 1,
-        username: 'test',
-        email: 'test@example.com',
-        externalIdentifier: null,
-        ...data,
-      } as User));
+      jest.spyOn(userRepository, 'save').mockImplementation(
+        async (data) =>
+          ({
+            id: 1,
+            username: 'test',
+            email: 'test@example.com',
+            externalIdentifier: null,
+            ...data,
+          }) as User,
+      );
       jest.spyOn(userRepository, 'count').mockResolvedValue(0);
 
       await service.createOne({ username: 'test', email: 'test@example.com', externalIdentifier: null });
@@ -274,7 +277,6 @@ describe('UsersService', () => {
 
       await expect(service.updateOne(1, { externalIdentifier: 'value' })).rejects.toThrow(UserNotFoundException);
     });
-
   });
 
   describe('findMany', () => {
@@ -378,8 +380,16 @@ describe('UsersService', () => {
 
       await service.findMany({ page: 1, limit: 10 });
 
+      expect(userRepository.findAndCount).toHaveBeenCalledWith(expect.objectContaining({ order: { username: 'ASC' } }));
+    });
+
+    it('should filter users by role assignment', async () => {
+      userRepository.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.findMany({ page: 1, limit: 10, roleId: 42 });
+
       expect(userRepository.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({ order: { username: 'ASC' } }),
+        expect.objectContaining({ where: { userRoles: { roleId: 42 } } }),
       );
     });
 

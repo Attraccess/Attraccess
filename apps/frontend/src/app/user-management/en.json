@@ -23,5 +23,13 @@
     "inviteUser": "Invite user",
     "sso": "SSO Providers",
     "twoFactorPolicy": "Two-factor policy"
+  },
+  "filters": {
+    "role": "Role: {{role}}",
+    "clearRole": "Clear role filter"
+  },
+  "empty": {
+    "role": "No users are assigned to {{role}}.",
+    "assignRole": "Choose a user to assign this role"
   }
 }

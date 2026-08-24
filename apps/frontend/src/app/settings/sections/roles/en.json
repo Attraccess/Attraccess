@@ -18,9 +18,12 @@
       "custom": "Custom"
     },
     "systemRoleTooltip": "System roles are managed by Attraccess and cannot be modified",
+    "noPermissions": "No permissions assigned",
     "actions": {
       "edit": "Edit role",
       "view": "View role",
+      "viewPermissions": "View permissions for {{role}}",
+      "viewUsers": "View users assigned to {{role}}",
       "delete": "Delete role"
     }
   }

@@ -13,7 +13,7 @@ import {
 } from '@attraccess/react-query-client';
 
 import { PageHeader } from '../../../components/pageHeader';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { UserPermissionForm } from './components/permissionsForm';
 import { SetPasswordForm } from './components/setPasswordForm';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -101,15 +101,16 @@ function EffectivePermissionsSection({ userId, t }: { userId: number; t: ReturnT
 // user that cannot exist — heading `(ID: )`, empty body. A non-numeric segment is not a user (ATT-869).
 export function UserManagementDetailsPage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
 
   if (!/^\d+$/.test(id ?? '')) {
     return <NotFound />;
   }
 
-  return <UserDetails id={Number(id)} />;
+  return <UserDetails id={Number(id)} roleIdToAssign={Number(searchParams.get('assignRoleId')) || undefined} />;
 }
 
-function UserDetails({ id }: { id: number }) {
+function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign?: number }) {
   const { t, tExists } = useTranslations({
     en: { ...en, apiErrors: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, apiErrors: API_ERROR_TRANSLATIONS_DE },
@@ -262,6 +263,7 @@ function UserDetails({ id }: { id: number }) {
               ssoManagedProviders={ssoManagedProviders}
               ssoManagedPermissionKeys={ssoManagedPermissionKeys}
               providersById={providersById}
+              roleIdToAssign={roleIdToAssign}
             />
           </FlatSection>
 

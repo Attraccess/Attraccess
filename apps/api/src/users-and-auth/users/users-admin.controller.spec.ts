@@ -104,6 +104,14 @@ describe('UsersAdminController', () => {
       expect(result).toBeDefined();
     });
 
+    it('should forward roleId to the users service', async () => {
+      jest.spyOn(usersService, 'findMany').mockResolvedValue(paginated(1, 10, 1));
+
+      await controller.findMany({ page: 1, limit: 10, roleId: 42 }, makeRequest(['users.read']));
+
+      expect(usersService.findMany).toHaveBeenCalledWith(expect.objectContaining({ roleId: 42 }));
+    });
+
     it('should return only id and username without users.read', async () => {
       jest.spyOn(usersService, 'findMany').mockResolvedValue({
         ...paginated(1, 10, 1),
@@ -147,9 +155,9 @@ describe('UsersAdminController', () => {
     });
 
     it('should throw ForbiddenException when includeRoles=true without users.read', async () => {
-      await expect(
-        controller.findMany({ page: 1, limit: 10, includeRoles: true }, makeRequest()),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(controller.findMany({ page: 1, limit: 10, includeRoles: true }, makeRequest())).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 
