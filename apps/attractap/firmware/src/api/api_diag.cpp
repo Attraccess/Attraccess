@@ -163,23 +163,33 @@ void API::sendPendingCrashReport()
     }
     else if (read == sizeof(rec))
     {
-        // Records created before the pending blob did not retain their reset
-        // reason. They cannot be classified safely across an OTA SW reset.
         memcpy(&rec, &pending, sizeof(rec));
         if (rec.magic != BOOT_DIAG_MAGIC)
         {
             return;
         }
-        if (esp_reset_reason() == ESP_RST_SW)
+
+        KVStore legacyPrefs;
+        legacyPrefs.begin(BOOT_DIAG_NAMESPACE, true);
+        uint8_t legacyReason = legacyPrefs.getUChar(BOOT_DIAG_PENDING_REASON_KEY, 0);
+        legacyPrefs.end();
+
+        if (legacyReason != 0)
         {
-            KVStore legacyPrefs;
+            pendingReason = legacyReason;
+        }
+        else if (esp_reset_reason() == ESP_RST_SW)
+        {
             legacyPrefs.begin(BOOT_DIAG_NAMESPACE, false);
             legacyPrefs.remove(BOOT_DIAG_PENDING_KEY);
             legacyPrefs.remove(BOOT_DIAG_PENDING_REASON_KEY);
             legacyPrefs.end();
             return;
         }
-        pendingReason = (uint8_t)esp_reset_reason();
+        else
+        {
+            pendingReason = (uint8_t)esp_reset_reason();
+        }
     }
     else
     {
