@@ -22,6 +22,7 @@ export function normalizeFederationFsUrlsPlugin(): Plugin {
 
 export default defineConfig(({ command }) => {
   const isDev = command === 'serve';
+  const allowedHosts = process.env.VITE_ALLOWED_HOSTS?.split(',').map((host) => host.trim()).filter(Boolean);
 
   return {
     root: __dirname,
@@ -29,6 +30,7 @@ export default defineConfig(({ command }) => {
     server: {
       port: Number(process.env.VITE_PORT) || 4200,
       host: '0.0.0.0',
+      ...(allowedHosts?.length ? { allowedHosts } : {}),
       ...(isDev
         ? {
             proxy: {

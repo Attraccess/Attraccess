@@ -51,19 +51,18 @@ async function render(part: 'body' | 'cover', device = 'nous_a1', cable = 'strai
 }
 
 describe('smart-plug-cover.scad', () => {
-  it('renders the reinforced Nous body and its non-overlapping cover', async () => {
+  it('renders the STEP-aligned Nous body and cover', async () => {
     const [body, cover] = await Promise.all([render('body'), render('cover')]);
     expect(body).not.toBeNull();
     expect(cover).not.toBeNull();
     const bodyBox = boundingBox(body as Mesh);
     expect(bodyBox.min[2]).toBeCloseTo(0, 2);
-    expect(bodyBox.max[2]).toBeCloseTo(33, 2);
-    // The original Nous profile is Ø49.7 with attached 0.5 mm embossing.
-    expect(bodyBox.max[0] - bodyBox.min[0]).toBeGreaterThanOrEqual(49.7);
-    expect(bodyBox.max[0] - bodyBox.min[0]).toBeLessThanOrEqual(50.8);
-    // The cover's Ø46 insertion skirt sits inside the upper body bore.
-    expect(boundingBox(cover as Mesh).min[2]).toBeCloseTo(23, 2);
-    expect(boundingBox(cover as Mesh).max[2]).toBeCloseTo(34.9, 2);
+    expect(bodyBox.max[2]).toBeCloseTo(60.8, 2);
+    expect(bodyBox.max[0] - bodyBox.min[0]).toBeCloseTo(53.7, 2);
+    // The 45.9 mm cover skirt occupies the 46.5 mm upper body bore.
+    expect(boundingBox(cover as Mesh).min[2]).toBeCloseTo(43, 2);
+    expect(boundingBox(cover as Mesh).max[2]).toBeCloseTo(60.8, 2);
+    expect(boundingBox(cover as Mesh).max[0] - boundingBox(cover as Mesh).min[0]).toBeCloseTo(45.9, 2);
   }, 30_000);
 
   it('renders the Shelly profile with an angled Euro cable relief', async () => {
