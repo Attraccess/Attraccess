@@ -67,6 +67,12 @@ Ordnen Sie OIDC-Rollen den Attraccess-Berechtigungen zu. Für jede Berechtigung 
 > [!NOTE]
 > Die Rollennamen werden beim Vergleich normalisiert (Kleinbuchstaben, nur alphanumerisch). `CanManageUsers` und `canmanageusers` sind identisch.
 
+### Keycloak-Gruppenzuordnungen
+
+Wenn Sie Keycloak-Gruppen für Rollenzuordnungen verwenden, konfigurieren Sie einen Group-Membership-Mapper, der den `groups`-Claim im ID-Token oder in der UserInfo-Response ausgibt. Attraccess liest Rollen-Claims nicht aus dem Access-Token; den Mapper nur dafür zu aktivieren, reicht daher nicht aus.
+
+Keycloak lässt den `groups`-Claim bei Benutzern ohne Gruppenzugehörigkeit weg. Attraccess behält bestehende per SSO gewährte Rollen bei, wenn kein Rollen- oder Gruppen-Claim vorhanden ist. Das Entfernen der letzten zugeordneten Gruppe eines Benutzers entzieht diese Rolle daher nicht bei der nächsten Anmeldung. Weisen Sie jedem SSO-Benutzer eine Basisgruppe wie `attraccess_users` zu, damit der Claim vorhanden bleibt und das Entfernen einer zugeordneten Gruppe synchronisiert werden kann.
+
 ## Callback-URL
 
 Tragen Sie folgende Callback-URL in Ihrem OIDC-Anbieter ein:
