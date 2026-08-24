@@ -113,7 +113,7 @@ export class UsersAdminController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - includeRoles requires users.read permission.',
+    description: 'Forbidden - includeRoles and roleId require users.read permission.',
   })
   async findMany(
     @Query() query: FindManyUsersQueryDto,
@@ -121,8 +121,8 @@ export class UsersAdminController {
   ): Promise<PaginatedUserSummariesResponseDto | PaginatedUsersResponseDto> {
     const canReadUsers = request.user.effectivePermissions?.has('users.read') ?? false;
 
-    // Role data is sensitive; only expose it to users.read holders.
-    if (query.includeRoles && !canReadUsers) {
+    // Role data and membership are sensitive; only expose them to users.read holders.
+    if ((query.includeRoles || query.roleId !== undefined) && !canReadUsers) {
       throw new ForbiddenException();
     }
     const result = await this.usersService.findMany({
