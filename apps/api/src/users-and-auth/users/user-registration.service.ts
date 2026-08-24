@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
-import { AuthenticationDetail, AuthenticationType, User } from '@attraccess/database-entities';
+import { AuthenticationType, User } from '@attraccess/database-entities';
 import { UsersService } from './users.service';
 import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
@@ -51,10 +51,9 @@ export class UserRegistrationService {
     });
     this.logger.debug(`User created with ID: ${user.id}`);
 
-    let authenticationDetails: AuthenticationDetail | null = null;
     try {
       this.logger.debug(`Adding authentication details for user ID: ${user.id}, strategy: ${body.strategy}`);
-      authenticationDetails = await this.authService.addAuthenticationDetails(user.id, {
+      const authenticationDetails = await this.authService.addAuthenticationDetails(user.id, {
         type: body.strategy,
         details: {
           password: body.password,
@@ -75,21 +74,7 @@ export class UserRegistrationService {
       this.logger.debug(`Verification email sent to user ID: ${user.id}`);
     } catch (e) {
       this.logger.error(`Error sending verification email for user ID: ${user.id}`, e.stack);
-      if (authenticationDetails) {
-        try {
-          await this.authService.removeAuthenticationDetails(authenticationDetails.id);
-        } catch (cleanupError) {
-          this.logger.error(`Error removing authentication details for user ID: ${user.id}`, cleanupError.stack);
-        }
-      }
-      try {
-        await this.usersService.deleteOne(user.id);
-      } catch (cleanupError) {
-        this.logger.error(
-          `Error deleting user after verification email failure for ID: ${user.id}`,
-          cleanupError.stack,
-        );
-      }
+      await this.usersService.rollbackFailedRegistration(user.id);
       throw mapEmailSendError(e);
     }
 

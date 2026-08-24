@@ -305,6 +305,25 @@ export class UsersService {
     this.logger.debug(`User deleted with ID: ${id}`);
   }
 
+  /** Removes a registration that could not complete before the account became usable. */
+  async rollbackFailedRegistration(id: number): Promise<void> {
+    const user = await this.dataSource.transaction(async (manager) => {
+      const userRepository = manager.getRepository(User);
+      const user = await userRepository.findOne({ where: { id }, withDeleted: true });
+      if (!user || user.deletedAt) {
+        return null;
+      }
+
+      await userRepository.delete(id);
+      return user;
+    });
+
+    if (user) {
+      this.metricsService.usersTotal.dec();
+      this.metricsService.usersPerLocale.dec({ locale: user.locale ?? 'en' });
+    }
+  }
+
   public async isSSOUser(userId: number): Promise<boolean> {
     const ssoUser = await this.userRepository
       .createQueryBuilder('user')
