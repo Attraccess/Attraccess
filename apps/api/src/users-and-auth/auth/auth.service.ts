@@ -121,7 +121,11 @@ export class AuthService {
     return await bcrypt.hash(password, this.SALT_ROUNDS);
   }
 
-  async addAuthenticationDetails(userId: number, options: AuthenticationOptions): Promise<AuthenticationDetail> {
+  async addAuthenticationDetails(
+    userId: number,
+    options: AuthenticationOptions,
+    manager?: EntityManager,
+  ): Promise<AuthenticationDetail> {
     const authenticationDetail = new AuthenticationDetail();
     authenticationDetail.userId = userId;
     authenticationDetail.type = options.type;
@@ -135,7 +139,9 @@ export class AuthService {
       authenticationDetail.ssoSubject = options.details.subject;
     }
 
-    const saved = await this.authenticationDetailRepository.save(authenticationDetail);
+    const saved = manager
+      ? await manager.save(authenticationDetail)
+      : await this.authenticationDetailRepository.save(authenticationDetail);
     return saved;
   }
 

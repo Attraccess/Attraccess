@@ -1,5 +1,6 @@
 import { ForbiddenException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { AuthenticationType, User } from '@attraccess/database-entities';
+import { EntityManager } from 'typeorm';
 import { UsersService } from './users.service';
 import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
@@ -43,53 +44,50 @@ export class UserRegistrationService {
       throw new PasswordPolicyViolationException(policyResult.errors);
     }
 
-    const user = await this.usersService.createOne({
-      username: body.username,
-      email: body.email,
-      externalIdentifier: null,
-      locale,
-    });
-    this.logger.debug(`User created with ID: ${user.id}`);
-
     try {
-      this.logger.debug(`Adding authentication details for user ID: ${user.id}, strategy: ${body.strategy}`);
-      const authenticationDetails = await this.authService.addAuthenticationDetails(user.id, {
-        type: body.strategy,
-        details: {
-          password: body.password,
-        },
+      const user = await this.usersService.withTransaction(async (manager: EntityManager) => {
+        const user = await this.usersService.createOne(
+          {
+            username: body.username,
+            email: body.email,
+            externalIdentifier: null,
+            locale,
+          },
+          manager,
+        );
+        this.logger.debug(`User created with ID: ${user.id}`);
+
+        this.logger.debug(`Adding authentication details for user ID: ${user.id}, strategy: ${body.strategy}`);
+        const authenticationDetails = await this.authService.addAuthenticationDetails(
+          user.id,
+          {
+            type: body.strategy,
+            details: {
+              password: body.password,
+            },
+          },
+          manager,
+        );
+        this.logger.debug(`Authentication details added with ID: ${authenticationDetails.id}`);
+
+        this.logger.debug(`Generating email verification token for user ID: ${user.id}`);
+        const verificationToken = await this.authService.generateEmailVerificationToken(user, manager);
+        this.logger.debug(`Sending verification email to user ID: ${user.id}`);
+        await this.emailService.sendVerificationEmail(user, verificationToken);
+        this.logger.debug(`Verification email sent to user ID: ${user.id}`);
+        return user;
       });
-      this.logger.debug(`Authentication details added with ID: ${authenticationDetails.id}`);
-    } catch (e) {
-      this.logger.error(`Error adding authentication details for user ID: ${user.id}`, e.stack);
-      await this.usersService.deleteOne(user.id);
-      throw e;
-    }
 
-    try {
-      this.logger.debug(`Generating email verification token for user ID: ${user.id}`);
-      const verificationToken = await this.authService.generateEmailVerificationToken(user);
-      this.logger.debug(`Sending verification email to user ID: ${user.id}`);
-      await this.emailService.sendVerificationEmail(user, verificationToken);
-      this.logger.debug(`Verification email sent to user ID: ${user.id}`);
+      this.usersService.recordCreatedUser(user);
+      this.logger.debug(`User creation completed successfully for ID: ${user.id}`);
+      return user;
     } catch (e) {
       this.logger.error(
-        `Error sending verification email for user ID: ${user.id}`,
+        `Error completing registration for ${body.email}`,
         e instanceof Error ? e.stack : String(e),
       );
-      try {
-        await this.usersService.rollbackFailedRegistration(user.id);
-      } catch (cleanupError) {
-        this.logger.error(
-          `Error rolling back failed registration for user ID: ${user.id}`,
-          cleanupError instanceof Error ? cleanupError.stack : String(cleanupError),
-        );
-      }
-      throw mapEmailSendError(e);
+      throw mapEmailSendError(e, 'registration');
     }
-
-    this.logger.debug(`User creation completed successfully for ID: ${user.id}`);
-    return user;
   }
 
   private async ensureFirstTimeSetupIncompleteAndDeleteAdmin(): Promise<void> {
