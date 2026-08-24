@@ -35,6 +35,7 @@ describe('UserRegistrationService', () => {
             findMany: jest.fn(),
             createOne: jest.fn(),
             deleteOne: jest.fn(),
+            rollbackFailedRegistration: jest.fn(),
             countUsers: jest.fn(),
           },
         },
@@ -174,8 +175,7 @@ describe('UserRegistrationService', () => {
           statusCode: 400,
         },
       });
-      expect(authService.removeAuthenticationDetails).toHaveBeenCalledWith(authenticationDetails.id);
-      expect(usersService.deleteOne).toHaveBeenCalledWith(user.id);
+      expect(usersService.rollbackFailedRegistration).toHaveBeenCalledWith(user.id);
     });
   });
 
