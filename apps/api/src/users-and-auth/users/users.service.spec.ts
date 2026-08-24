@@ -155,16 +155,33 @@ describe('UsersService', () => {
     });
   });
 
+  describe('rollbackFailedRegistration', () => {
+    it('hard-deletes the unregistered user without updating user metrics', async () => {
+      const manager = { delete: jest.fn().mockResolvedValue(undefined) };
+      dataSource.transaction.mockImplementation(async (callback) => callback(manager as EntityManager));
+
+      await service.rollbackFailedRegistration(14);
+
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+      expect(manager.delete).toHaveBeenCalledWith(User, 14);
+      expect(mockMetricsService.usersTotal.dec).not.toHaveBeenCalled();
+      expect(mockMetricsService.usersPerLocale.dec).not.toHaveBeenCalled();
+    });
+  });
+
   describe('createOne', () => {
     it('the first created user should be assigned the administrator role via RBAC', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(userRepository, 'save').mockImplementation(async (data) => ({
-        id: 1,
-        username: 'test',
-        email: 'test@example.com',
-        externalIdentifier: null,
-        ...data,
-      } as User));
+      jest.spyOn(userRepository, 'save').mockImplementation(
+        async (data) =>
+          ({
+            id: 1,
+            username: 'test',
+            email: 'test@example.com',
+            externalIdentifier: null,
+            ...data,
+          }) as User,
+      );
       jest.spyOn(userRepository, 'count').mockResolvedValue(0);
 
       await service.createOne({ username: 'test', email: 'test@example.com', externalIdentifier: null });
@@ -276,7 +293,6 @@ describe('UsersService', () => {
 
       await expect(service.updateOne(1, { externalIdentifier: 'value' })).rejects.toThrow(UserNotFoundException);
     });
-
   });
 
   describe('findMany', () => {
@@ -380,9 +396,7 @@ describe('UsersService', () => {
 
       await service.findMany({ page: 1, limit: 10 });
 
-      expect(userRepository.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({ order: { username: 'ASC' } }),
-      );
+      expect(userRepository.findAndCount).toHaveBeenCalledWith(expect.objectContaining({ order: { username: 'ASC' } }));
     });
 
     it('should throw error for invalid pagination options', async () => {

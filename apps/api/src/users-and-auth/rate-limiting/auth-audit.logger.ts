@@ -1,12 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 export type AuthAuditType =
-  | 'login'
-  | 'register'
-  | 'password_reset_request'
-  | 'password_reset_complete'
-  | 'delete_account_confirm'
-  | 'api_token';
+  'login' | 'register' | 'password_reset_request' | 'password_reset_complete' | 'delete_account_confirm' | 'api_token';
 
 export type AuthAuditOutcome =
   | 'success'
@@ -18,7 +13,8 @@ export type AuthAuditOutcome =
   | 'email_not_verified'
   | 'invalid_token'
   | 'invalid_input'
-  | 'unknown_user';
+  | 'unknown_user'
+  | 'dependency_failure';
 
 export interface AuthAuditFields {
   type: AuthAuditType;

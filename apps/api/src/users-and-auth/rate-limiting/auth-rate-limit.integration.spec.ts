@@ -1,4 +1,12 @@
-import { Body, Controller, Module, Post, UnauthorizedException, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Module,
+  Post,
+  ServiceUnavailableException,
+  UnauthorizedException,
+  UseInterceptors,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Reflector } from '@nestjs/core';
@@ -14,7 +22,10 @@ import { SettingsService } from '../../settings/settings.service';
 class FakeController {
   @Post('register')
   @AuthRateLimit('register')
-  register(@Body() body: { fail?: boolean }) {
+  register(@Body() body: { fail?: boolean; smtpDown?: boolean }) {
+    if (body?.smtpDown) {
+      throw new ServiceUnavailableException('EmailSendFailed');
+    }
     if (body?.fail) {
       throw new UnauthorizedException('boom');
     }
@@ -60,6 +71,7 @@ class FakeModule {}
 describe('AuthRateLimitInterceptor (HTTP integration)', () => {
   let app: NestExpressApplication;
   let bruteForce: BruteForceProtectionService;
+  let audit: { log: jest.Mock };
 
   async function init(trustProxy: boolean | number | string): Promise<void> {
     const moduleRef = await Test.createTestingModule({ imports: [FakeModule] }).compile();
@@ -67,6 +79,7 @@ describe('AuthRateLimitInterceptor (HTTP integration)', () => {
     app.set('trust proxy', trustProxy);
     await app.init();
     bruteForce = app.get(BruteForceProtectionService);
+    audit = app.get(AuthAuditLogger);
   }
 
   afterEach(async () => {
@@ -109,6 +122,19 @@ describe('AuthRateLimitInterceptor (HTTP integration)', () => {
 
       const blocked = await request(app.getHttpServer()).post('/delete-confirm').send({});
       expect(blocked.status).toBe(429);
+    });
+
+    it('records a verification email outage as a dependency failure', async () => {
+      const response = await request(app.getHttpServer()).post('/register').send({ smtpDown: true });
+
+      expect(response.status).toBe(503);
+      expect(response.body).toMatchObject({
+        statusCode: 503,
+        message: 'EmailSendFailed',
+      });
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'register', outcome: 'dependency_failure' }),
+      );
     });
 
     it('ignores spoofed X-Forwarded-For: distinct fake client IPs share the proxy socket bucket', async () => {
