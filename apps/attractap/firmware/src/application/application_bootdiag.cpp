@@ -11,7 +11,8 @@
 
 #define BOOT_DIAG_NAMESPACE "bootdiag"
 #define BOOT_DIAG_MAGIC 0x41545431
-#define BOOT_DIAG_PENDING_REASON_KEY "pendingreason"
+#define BOOT_DIAG_PENDING_KEY "pending"
+#define BOOT_DIAG_PENDING_VERSION 1
 #define BOOT_DIAG_SNAPSHOT_INTERVAL_MS 60000
 #define BOOT_DIAG_SILENT_HANG_MIN_UPTIME_MS 60000
 
@@ -81,11 +82,17 @@ void Application::setupBootDiagnostics() {
                          prior.uptimeMs > BOOT_DIAG_SILENT_HANG_MIN_UPTIME_MS);
     this->bootDiagPreferences.begin(BOOT_DIAG_NAMESPACE, false);
     if (shouldReport) {
+      struct PendingBootDiagnostic {
+        BootDiagnostics_t record;
+        uint8_t resetReason;
+        uint8_t version;
+      } pending = {prior, (uint8_t)reason, BOOT_DIAG_PENDING_VERSION};
+
       // Preserve actual failures for upload after the next successful connect
-      // (ATT-474). Intentional software restarts must not increment crash metrics.
-      this->bootDiagPreferences.putUChar(BOOT_DIAG_PENDING_REASON_KEY,
-                                         (uint8_t)reason);
-      this->bootDiagPreferences.putBytes("pending", &prior, sizeof(prior));
+      // (ATT-474) as one blob so its reset reason cannot be paired with a
+      // different snapshot after a partial NVS write.
+      this->bootDiagPreferences.putBytes(BOOT_DIAG_PENDING_KEY, &pending,
+                                         sizeof(pending));
     } else if (reason == ESP_RST_SW) {
       // The reset is intentionally ignored. Keep a prior unacknowledged crash,
       // but discard this reboot's marker so it cannot relabel that crash.

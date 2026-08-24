@@ -34,6 +34,14 @@ struct CrashBootRecord
 #define BOOT_DIAG_PENDING_REASON_KEY "pendingreason"
 #define BOOT_DIAG_REBOOT_REASON_KEY "rebootreason"
 #define BOOT_DIAG_MAGIC 0x41545431
+#define BOOT_DIAG_PENDING_VERSION 1
+
+struct PendingCrashBootRecord
+{
+    CrashBootRecord record;
+    uint8_t resetReason;
+    uint8_t version;
+};
 
 // Cap the coredump we are willing to base64-encode and hold in RAM at once.
 // Larger dumps stay in flash (readable over USB on the bench) and only the
@@ -139,24 +147,43 @@ void API::sendPendingCrashReport()
         return;
     }
 
-    CrashBootRecord rec = {};
+    PendingCrashBootRecord pending = {};
     KVStore prefs;
     prefs.begin(BOOT_DIAG_NAMESPACE, true);
-    size_t read = prefs.getBytes(BOOT_DIAG_PENDING_KEY, &rec, sizeof(rec));
+    size_t read = prefs.getBytes(BOOT_DIAG_PENDING_KEY, &pending, sizeof(pending));
     prefs.end();
-    if (read != sizeof(rec) || rec.magic != BOOT_DIAG_MAGIC)
+
+    CrashBootRecord rec = {};
+    uint8_t pendingReason = 0;
+    if (read == sizeof(pending) && pending.version == BOOT_DIAG_PENDING_VERSION &&
+        pending.record.magic == BOOT_DIAG_MAGIC)
+    {
+        rec = pending.record;
+        pendingReason = pending.resetReason;
+    }
+    else if (read == sizeof(rec))
+    {
+        // Records created before the pending blob did not retain their reset
+        // reason. They cannot be classified safely across an OTA SW reset.
+        memcpy(&rec, &pending, sizeof(rec));
+        if (rec.magic != BOOT_DIAG_MAGIC)
+        {
+            return;
+        }
+        if (esp_reset_reason() == ESP_RST_SW)
+        {
+            KVStore legacyPrefs;
+            legacyPrefs.begin(BOOT_DIAG_NAMESPACE, false);
+            legacyPrefs.remove(BOOT_DIAG_PENDING_KEY);
+            legacyPrefs.remove(BOOT_DIAG_PENDING_REASON_KEY);
+            legacyPrefs.end();
+            return;
+        }
+        pendingReason = (uint8_t)esp_reset_reason();
+    }
+    else
     {
         return;
-    }
-
-    // The pending reset reason belongs to this snapshot. Fall back to the live
-    // reset reason for records stored before this key was introduced.
-    uint8_t pendingReason = (uint8_t)esp_reset_reason();
-    {
-        KVStore reasonPrefs;
-        reasonPrefs.begin(BOOT_DIAG_NAMESPACE, true);
-        pendingReason = reasonPrefs.getUChar(BOOT_DIAG_PENDING_REASON_KEY, pendingReason);
-        reasonPrefs.end();
     }
     const char *resetStr = crashResetReasonToString(pendingReason);
 
