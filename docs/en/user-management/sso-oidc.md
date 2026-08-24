@@ -67,6 +67,10 @@ Map OIDC roles to Attraccess permissions. For each permission, enter a comma-sep
 > [!NOTE]
 > Role names are normalized for comparison (lowercase, alphanumeric only). `CanManageUsers` and `canmanageusers` are identical.
 
+### Keycloak Group Mappings
+
+When using Keycloak groups for role mappings, configure a Group Membership mapper that includes the `groups` claim in the token or UserInfo response. Keycloak omits this claim for users with no group memberships. Assign every SSO user a baseline group, such as `attraccess_users`, so the claim is always present and group-based role mappings are synchronized consistently.
+
 ## Callback URL
 
 Enter the following callback URL in your OIDC provider:
