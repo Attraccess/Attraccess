@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
-import { IsNumber, IsInt, Min, Max, IsOptional, IsString, IsArray, IsBoolean } from 'class-validator';
+import { IsNumber, IsInt, Min, Max, IsOptional, IsString, IsArray, IsBoolean, IsIn } from 'class-validator';
 import { ToBoolean } from '../../../common/request-transformers';
 
 export class FindManyUsersQueryDto {
@@ -58,6 +58,78 @@ export class FindManyUsersQueryDto {
   @Min(1)
   @IsOptional()
   roleId?: number;
+
+  @ApiProperty({
+    description: 'Role IDs to filter by',
+    required: false,
+    type: [Number],
+  })
+  @Transform(({ value }) => {
+    if (Array.isArray(value)) {
+      return value.map((v) => parseInt(v, 10));
+    }
+    return value ? [parseInt(value, 10)] : undefined;
+  })
+  @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  @IsOptional()
+  roleIds?: number[];
+
+  @ApiProperty({
+    description: 'Whether users must have any or all selected roles',
+    required: false,
+    enum: ['any', 'all'],
+  })
+  @IsIn(['any', 'all'])
+  @IsOptional()
+  roleMatch?: 'any' | 'all';
+
+  @ApiProperty({
+    description: 'Whether users must have a verified email address',
+    required: false,
+    type: Boolean,
+  })
+  @ToBoolean()
+  @IsBoolean()
+  @IsOptional()
+  emailVerified?: boolean;
+
+  @ApiProperty({
+    description: 'SSO provider IDs to filter by',
+    required: false,
+    type: [Number],
+  })
+  @Transform(({ value }) => {
+    if (Array.isArray(value)) {
+      return value.map((v) => parseInt(v, 10));
+    }
+    return value ? [parseInt(value, 10)] : undefined;
+  })
+  @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  @IsOptional()
+  ssoProviderIds?: number[];
+
+  @ApiProperty({
+    description: 'Include users without an SSO provider',
+    required: false,
+    type: Boolean,
+  })
+  @ToBoolean()
+  @IsBoolean()
+  @IsOptional()
+  ssoProviderNone?: boolean;
+
+  @ApiProperty({
+    description: 'Whether users must be linked to any or all selected SSO providers',
+    required: false,
+    enum: ['any', 'all'],
+  })
+  @IsIn(['any', 'all'])
+  @IsOptional()
+  ssoProviderMatch?: 'any' | 'all';
 
   @ApiProperty({
     description: 'Include role assignments in the response. Requires users.read permission.',

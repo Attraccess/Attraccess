@@ -38,6 +38,7 @@ import { InviteUserModal } from './invite-user-modal';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SimplePagination } from '../../components/simplePagination';
 import { useRbacCatalogTranslations } from '../../hooks/useRbacCatalogTranslations';
+import { Select } from '../../components/select';
 
 // Role keys that are considered "default" and not worth showing in the list
 const DEFAULT_ROLE_KEYS = new Set(['user']);
@@ -48,10 +49,14 @@ export const UserManagementPage: React.FC = () => {
 
   const [limit] = useState(10);
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
-  const roleId = Number(searchParams.get('roleId')) || undefined;
-  const roleNameParam = searchParams.get('roleName');
+  const search = searchParams.get('q') ?? '';
+  const roleIds = searchParams.getAll('roleId').map(Number).filter(Number.isInteger);
+  const roleMatch = searchParams.get('roleMatch') === 'all' ? 'all' : 'any';
+  const emailVerified = searchParams.get('emailVerified');
+  const ssoProviderIds = searchParams.getAll('ssoProviderId').map(Number).filter(Number.isInteger);
+  const ssoProviderNone = searchParams.get('ssoProviderNone') === 'true';
+  const ssoProviderMatch = searchParams.get('ssoProviderMatch') === 'all' ? 'all' : 'any';
   const assignRoleId = Number(searchParams.get('assignRoleId')) || undefined;
 
   const debouncedSearch = useDebounce(search, 500);
@@ -63,23 +68,27 @@ export const UserManagementPage: React.FC = () => {
     limit,
     page,
     search: debouncedSearch,
-    roleId,
+    roleIds,
+    roleMatch,
+    emailVerified: emailVerified === null ? undefined : emailVerified === 'true',
+    ssoProviderIds,
+    ssoProviderNone,
+    ssoProviderMatch,
     includeRoles: true,
   });
 
-  const clearRoleFilter = () => {
+  const updateFilters = (update: (params: URLSearchParams) => void) => {
     setSearchParams((current) => {
-      current.delete('roleId');
-      current.delete('roleName');
-      return current;
+      const next = new URLSearchParams(current);
+      update(next);
+      return next;
     });
     setPage(1);
   };
 
   const startRoleAssignment = () => {
     setSearchParams({
-      assignRoleId: String(roleId),
-      roleName: roleNameParam ?? '',
+      assignRoleId: String(roleIds[0]),
     });
     setPage(1);
   };
@@ -140,32 +149,62 @@ export const UserManagementPage: React.FC = () => {
       <div className="mt-6">
         <TableToolbar
           search={
-            <TextField value={search} onChange={setSearch} aria-label={t('table.inputs.search')}>
-              <InputGroup>
-                <InputGroup.Prefix>
-                  <SearchIcon size={16} />
-                </InputGroup.Prefix>
-                <InputGroup.Input placeholder={t('table.inputs.search')} data-cy="user-management-search-input" />
-              </InputGroup>
-            </TextField>
-          }
-          filter={
-            roleId || assignRoleId ? (
-              <div className="flex items-center gap-2">
-                <Chip size="sm" color="accent" variant="secondary">
-                  {t('filters.role', {
-                    role:
-                      roleNameParam ??
-                      roles?.find((role) => role.id === (roleId ?? assignRoleId))?.name ??
-                      roleId ??
-                      assignRoleId,
+            <div className="space-y-2">
+              <TextField value={search} onChange={(value) => updateFilters((params) => value ? params.set('q', value) : params.delete('q'))} aria-label={t('table.inputs.search')}>
+                <InputGroup>
+                  <InputGroup.Prefix>
+                    <SearchIcon size={16} />
+                  </InputGroup.Prefix>
+                  <InputGroup.Input placeholder={t('table.inputs.search')} data-cy="user-management-search-input" />
+                </InputGroup>
+              </TextField>
+              <div className="flex flex-wrap gap-2" aria-label={t('filters.label')}>
+                <Select
+                  className="w-40"
+                  aria-label={t('filters.role')}
+                  value={roleIds.length === 1 ? String(roleIds[0]) : roleIds.length > 1 ? 'multiple' : 'all'}
+                  disabledKeys={roleIds.length > 1 ? ['multiple'] : undefined}
+                  onChange={(value) => updateFilters((params) => {
+                    params.delete('roleId');
+                    if (value !== 'all') {
+                      params.append('roleId', value);
+                    }
+                    if (value === 'all') {
+                      params.delete('roleMatch');
+                    }
                   })}
-                </Chip>
-                <Button size="sm" variant="ghost" onPress={assignRoleId ? () => setSearchParams({}) : clearRoleFilter}>
-                  {t('filters.clearRole')}
-                </Button>
+                  items={[{ key: 'all', label: t('filters.allRoles') }, ...(roleIds.length > 1 ? [{ key: 'multiple', label: t('filters.multipleRoles') }] : []), ...(roles ?? []).map((role) => ({ key: String(role.id), label: roleName(role) }))]}
+                />
+                {roleIds.length > 1 ? <Select className="w-32" aria-label={t('filters.roleMatch')} value={roleMatch} onChange={(value) => updateFilters((params) => params.set('roleMatch', value))} items={[{ key: 'any', label: t('filters.any') }, { key: 'all', label: t('filters.all') }]} /> : null}
+                <Select
+                  className="w-44"
+                  aria-label={t('filters.emailVerified')}
+                  value={emailVerified ?? 'all'}
+                  onChange={(value) => updateFilters((params) => value === 'all' ? params.delete('emailVerified') : params.set('emailVerified', value))}
+                  items={[{ key: 'all', label: t('filters.allEmailVerification') }, { key: 'true', label: t('filters.verified') }, { key: 'false', label: t('filters.notVerified') }]}
+                />
+                <Select
+                  className="w-44"
+                  aria-label={t('filters.ssoProvider')}
+                  value={ssoProviderNone ? 'none' : ssoProviderIds.length === 1 ? String(ssoProviderIds[0]) : ssoProviderIds.length > 1 ? 'multiple' : 'all'}
+                  disabledKeys={ssoProviderIds.length > 1 ? ['multiple'] : undefined}
+                  onChange={(value) => updateFilters((params) => {
+                    params.delete('ssoProviderId');
+                    params.delete('ssoProviderNone');
+                    if (value === 'none') {
+                      params.set('ssoProviderNone', 'true');
+                    } else if (value !== 'all') {
+                      params.append('ssoProviderId', value);
+                    }
+                    if (value === 'all') {
+                      params.delete('ssoProviderMatch');
+                    }
+                  })}
+                  items={[{ key: 'all', label: t('filters.allSsoProviders') }, ...(ssoProviderIds.length > 1 ? [{ key: 'multiple', label: t('filters.multipleSsoProviders') }] : []), { key: 'none', label: t('filters.none') }, ...(ssoProviders ?? []).map((provider) => ({ key: String(provider.id), label: provider.name }))]}
+                />
+                {ssoProviderIds.length > 1 ? <Select className="w-32" aria-label={t('filters.ssoProviderMatch')} value={ssoProviderMatch} onChange={(value) => updateFilters((params) => params.set('ssoProviderMatch', value))} items={[{ key: 'any', label: t('filters.any') }, { key: 'all', label: t('filters.all') }]} /> : null}
               </div>
-            ) : null
+            </div>
           }
         />
 
@@ -188,7 +227,7 @@ export const UserManagementPage: React.FC = () => {
               <TableBody
                 items={(searchResult?.data ?? []) as User[]}
                 renderEmptyState={() =>
-                  roleId ? <EmptyState message={t('empty.role', { role: roleNameParam ?? roleId })} /> : <EmptyState />
+                  roleIds.length ? <EmptyState message={t('empty.role', { role: roles?.find((role) => role.id === roleIds[0])?.name ?? roleIds[0] })} /> : <EmptyState />
                 }
               >
                 {(user) => {
@@ -233,7 +272,7 @@ export const UserManagementPage: React.FC = () => {
                       onAction={() =>
                         navigate(
                           assignRoleId
-                            ? `/users/${user.id}?assignRoleId=${assignRoleId}&roleName=${encodeURIComponent(roleNameParam ?? '')}`
+                            ? `/users/${user.id}?assignRoleId=${assignRoleId}`
                             : `/users/${user.id}`,
                         )
                       }
@@ -289,7 +328,7 @@ export const UserManagementPage: React.FC = () => {
           </TableScrollContainer>
         </Table>
 
-        {roleId && isFetchedSearchResult && searchResult?.total === 0 ? (
+        {roleIds.length === 1 && isFetchedSearchResult && searchResult?.total === 0 ? (
           <div className="flex justify-center mt-3">
             <Button size="sm" variant="primary" onPress={startRoleAssignment}>
               {t('empty.assignRole')}

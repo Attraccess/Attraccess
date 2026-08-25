@@ -6,6 +6,7 @@ import {
   FindOptionsWhere,
   In,
   EntityManager,
+  Brackets,
 } from 'typeorm';
 import {
   AuthenticationDetail,
@@ -14,6 +15,7 @@ import {
   Role,
   Session,
   User,
+  UserRole,
   SSOProviderType,
 } from '@attraccess/database-entities';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -546,7 +548,18 @@ export class UsersService {
   }
 
   async findMany(
-    options: PaginationOptions & { search?: string; ids?: number[]; roleId?: number; includeRoles?: boolean },
+    options: PaginationOptions & {
+      search?: string;
+      ids?: number[];
+      roleId?: number;
+      roleIds?: number[];
+      roleMatch?: 'any' | 'all';
+      emailVerified?: boolean;
+      ssoProviderIds?: number[];
+      ssoProviderNone?: boolean;
+      ssoProviderMatch?: 'any' | 'all';
+      includeRoles?: boolean;
+    },
   ): Promise<PaginatedResponse<User>> {
     this.logger.debug(`Finding all users with options: ${JSON.stringify(options)}`);
     const paginationOptions = PaginationOptionsSchema.parse(options);
@@ -554,18 +567,110 @@ export class UsersService {
     const { page, limit } = paginationOptions;
     const skip = (page - 1) * limit;
 
+    if (Array.isArray(options.ids) && options.ids.length === 0) {
+      return {
+        data: [],
+        total: 0,
+        page: paginationOptions.page,
+        limit: paginationOptions.limit,
+      };
+    }
+
+    const hasAdvancedFilters =
+      options.roleIds !== undefined ||
+      options.emailVerified !== undefined ||
+      options.ssoProviderIds !== undefined ||
+      options.ssoProviderNone !== undefined;
+
+    if (hasAdvancedFilters) {
+      const query = this.userRepository.createQueryBuilder('user');
+      query.leftJoinAndSelect('user.authenticationDetails', 'authenticationDetails');
+
+      if (options.includeRoles) {
+        query.leftJoinAndSelect('user.userRoles', 'userRoles').leftJoinAndSelect('userRoles.role', 'role');
+      }
+
+      if (options.ids) {
+        query.andWhere('user.id IN (:...ids)', { ids: options.ids });
+      }
+
+      if (options.emailVerified !== undefined) {
+        query.andWhere('user.isEmailVerified = :emailVerified', { emailVerified: options.emailVerified });
+      }
+
+      const roleIds = options.roleIds ?? (options.roleId === undefined ? undefined : [options.roleId]);
+      if (roleIds?.length) {
+        const roleFilter = query
+          .subQuery()
+          .select('userRole.userId')
+          .from(UserRole, 'userRole')
+          .where('userRole.roleId IN (:...roleIds)');
+
+        if (options.roleMatch === 'all') {
+          roleFilter.groupBy('userRole.userId').having('COUNT(DISTINCT userRole.roleId) = :roleCount');
+          query.andWhere(`user.id IN ${roleFilter.getQuery()}`, { roleIds, roleCount: roleIds.length });
+        } else {
+          query.andWhere(`user.id IN ${roleFilter.getQuery()}`, { roleIds });
+        }
+      }
+
+      const ssoProviderIds = options.ssoProviderIds;
+      if (ssoProviderIds?.length || options.ssoProviderNone) {
+        const noSsoProvider = query
+          .subQuery()
+          .select('1')
+          .from(AuthenticationDetail, 'ssoDetail')
+          .where('ssoDetail.userId = user.id')
+          .andWhere('ssoDetail.type = :ssoType')
+          .getQuery();
+        const ssoProviders = ssoProviderIds?.length
+          ? query
+              .subQuery()
+              .select('ssoDetail.userId')
+              .from(AuthenticationDetail, 'ssoDetail')
+              .where('ssoDetail.userId = user.id')
+              .andWhere('ssoDetail.type = :ssoType')
+              .andWhere('ssoDetail.providerId IN (:...ssoProviderIds)')
+          : undefined;
+
+        if (ssoProviders && options.ssoProviderMatch === 'all') {
+          ssoProviders.groupBy('ssoDetail.userId').having('COUNT(DISTINCT ssoDetail.providerId) = :ssoProviderCount');
+        }
+
+        if (ssoProviders && options.ssoProviderNone && options.ssoProviderMatch !== 'all') {
+          query.andWhere(new Brackets((where) => where.where(`user.id IN ${ssoProviders.getQuery()}`).orWhere(`NOT EXISTS ${noSsoProvider}`)));
+        } else if (ssoProviders) {
+          query.andWhere(`user.id IN ${ssoProviders.getQuery()}`);
+          if (options.ssoProviderNone) {
+            query.andWhere(`NOT EXISTS ${noSsoProvider}`);
+          }
+        } else {
+          query.andWhere(`NOT EXISTS ${noSsoProvider}`);
+        }
+
+        query.setParameters({
+          ssoType: AuthenticationType.SSO,
+          ...(ssoProviderIds?.length ? { ssoProviderIds, ssoProviderCount: ssoProviderIds.length } : {}),
+        });
+      }
+
+      if (search) {
+        this.logger.debug(`Searching for users with query: ${search}`);
+        query.andWhere(
+          new Brackets((where) =>
+            where.where('LOWER(user.username) LIKE LOWER(:search)').orWhere('LOWER(user.email) LIKE LOWER(:search)'),
+          ),
+          { search: `%${search}%` },
+        );
+      }
+
+      const [users, total] = await query.orderBy('user.username', 'ASC').skip(skip).take(limit).getManyAndCount();
+      return { data: users, total, page, limit };
+    }
+
     let whereCondition: FindOptionsWhere<User>[] | FindOptionsWhere<User> = {};
 
     if (Array.isArray(options.ids)) {
-      if (options.ids.length === 0) {
-        return {
-          data: [],
-          total: 0,
-          page: paginationOptions.page,
-          limit: paginationOptions.limit,
-        };
-      }
-
       whereCondition = { id: In(options.ids) };
     }
 
