@@ -2,7 +2,7 @@ import { ResourceIntroducer, ResourceIntroducerType, User } from '@attraccess/da
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { ResourceIntroducerChangedEvent } from './events/resource-introducer-changed.event';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
@@ -94,6 +94,57 @@ export class ResourceIntroducersService {
     }
 
     return Array.from(byUserAndType.values());
+  }
+
+  public async getManyForResources(
+    resourceIds: number[],
+    type?: ResourceIntroducerType,
+  ): Promise<Map<number, ResourceIntroducer[]>> {
+    const uniqueResourceIds = [...new Set(resourceIds)];
+    const introducersByResourceId = new Map<number, Map<number, ResourceIntroducer>>(
+      uniqueResourceIds.map((resourceId) => [resourceId, new Map()]),
+    );
+
+    if (uniqueResourceIds.length === 0) {
+      return new Map();
+    }
+
+    const directIntroducers = await this.resourceIntroducerRepository.find({
+      where: { resourceId: In(uniqueResourceIds), ...(type ? { type } : {}) },
+      relations: ['user'],
+    });
+    for (const introducer of directIntroducers) {
+      introducersByResourceId.get(introducer.resourceId)?.set(introducer.userId, introducer);
+    }
+
+    const groupQuery = this.resourceIntroducerRepository
+      .createQueryBuilder('introducer')
+      .leftJoinAndSelect('introducer.user', 'user')
+      .innerJoin('introducer.resourceGroup', 'group')
+      .innerJoin('group.resources', 'resource')
+      .where('resource.id IN (:...resourceIds)', { resourceIds: uniqueResourceIds })
+      .addSelect('introducer.id', 'introducerId')
+      .addSelect('resource.id', 'resourceId');
+
+    if (type) {
+      groupQuery.andWhere('introducer.type = :type', { type });
+    }
+
+    const { raw, entities: groupIntroducers } = await groupQuery.getRawAndEntities();
+    const groupIntroducersById = new Map(groupIntroducers.map((introducer) => [introducer.id, introducer]));
+    for (const { introducerId, resourceId } of raw) {
+      const introducer = groupIntroducersById.get(Number(introducerId));
+      if (introducer) {
+        introducersByResourceId.get(Number(resourceId))?.set(introducer.userId, introducer);
+      }
+    }
+
+    return new Map(
+      Array.from(introducersByResourceId, ([resourceId, introducers]) => [
+        resourceId,
+        Array.from(introducers.values()),
+      ]),
+    );
   }
 
   public async getByResourceIdAndUserId(

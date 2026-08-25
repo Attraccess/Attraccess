@@ -4,6 +4,7 @@
 
 #include <ArduinoJson.h>
 #include <string>
+#include <vector>
 #include "../settings/settings.hpp"
 #include "state/state.hpp"
 #include "../logger/logger.hpp"
@@ -66,8 +67,7 @@ public:
         char activeUser[MAX_USERNAME_LEN];
         uint32_t activeStartEpoch;          // seconds since epoch (UTC)
         int16_t activeStartUtcOffsetMinutes; // server tz offset (minutes east of UTC) for that instant
-        uint8_t introducerCount;
-        char introducers[MAX_INTRODUCERS][MAX_USERNAME_LEN];
+        std::vector<std::string> introducers;
         uint8_t flowButtonCount;
         FlowButton flowButtons[MAX_FLOW_BUTTONS];
     };

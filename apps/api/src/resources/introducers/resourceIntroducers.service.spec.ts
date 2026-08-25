@@ -131,6 +131,58 @@ describe('ResourceIntroducersService', () => {
     });
   });
 
+  describe('getManyForResources', () => {
+    it('batches direct and group introducers and groups them by resource', async () => {
+      const directIntroducer = {
+        id: 1,
+        userId: 10,
+        resourceId: 1,
+        type: ResourceIntroducerType.INTRODUCER,
+        user: { id: 10 },
+      } as unknown as ResourceIntroducer;
+      const groupIntroducer = {
+        id: 2,
+        userId: 20,
+        resourceGroupId: 5,
+        type: ResourceIntroducerType.INTRODUCER,
+        user: { id: 20 },
+      } as unknown as ResourceIntroducer;
+      repository.find.mockResolvedValue([directIntroducer]);
+
+      const groupQuery = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawAndEntities: jest.fn().mockResolvedValue({
+          raw: [
+            { introducerId: 2, resourceId: 1 },
+            { introducerId: 2, resourceId: 2 },
+          ],
+          entities: [groupIntroducer],
+        }),
+      };
+      repository.createQueryBuilder.mockReturnValue(groupQuery);
+
+      const result = await service.getManyForResources([1, 2], ResourceIntroducerType.INTRODUCER);
+
+      expect(repository.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          relations: ['user'],
+          where: expect.objectContaining({ type: ResourceIntroducerType.INTRODUCER }),
+        }),
+      );
+      expect(groupQuery.where).toHaveBeenCalledWith('resource.id IN (:...resourceIds)', { resourceIds: [1, 2] });
+      expect(result).toEqual(
+        new Map([
+          [1, [directIntroducer, groupIntroducer]],
+          [2, [groupIntroducer]],
+        ]),
+      );
+    });
+  });
+
   describe('isIntroducer', () => {
     it('returns true for a direct introducer row', async () => {
       repository.findOne.mockResolvedValue({ type: ResourceIntroducerType.INTRODUCER } as ResourceIntroducer);
