@@ -19,6 +19,7 @@ import {
   TooltipContent,
   TooltipTrigger,
   ListBox,
+  SearchField,
   useFilter,
 } from '@heroui/react';
 import { KeyIcon, SearchIcon, ShieldCheckIcon, ShieldOffIcon, UserPlusIcon, Users } from 'lucide-react';
@@ -92,6 +93,13 @@ function MultiValueFilter({
       </Autocomplete.Trigger>
       <Autocomplete.Popover>
         <Autocomplete.Filter filter={contains}>
+          <SearchField autoFocus aria-label={label}>
+            <SearchField.Group>
+              <SearchField.SearchIcon />
+              <SearchField.Input placeholder={label} />
+              <SearchField.ClearButton />
+            </SearchField.Group>
+          </SearchField>
           <ListBox aria-label={label}>
             {options.map((option) => (
               <ListBox.Item key={option.key} id={option.key} textValue={option.label}>
@@ -147,6 +155,13 @@ function SingleValueFilter({
       </Autocomplete.Trigger>
       <Autocomplete.Popover>
         <Autocomplete.Filter filter={contains}>
+          <SearchField autoFocus aria-label={label}>
+            <SearchField.Group>
+              <SearchField.SearchIcon />
+              <SearchField.Input placeholder={label} />
+              <SearchField.ClearButton />
+            </SearchField.Group>
+          </SearchField>
           <ListBox aria-label={label}>
             {options.map((option) => (
               <ListBox.Item key={option.key} id={option.key} textValue={option.label}>
@@ -310,15 +325,14 @@ export const UserManagementPage: React.FC = () => {
                   <MultiValueFilter
                     label={t('filters.ssoProvider')}
                     options={[{ key: 'none', label: t('filters.none') }, ...(ssoProviders ?? []).map((provider) => ({ key: String(provider.id), label: provider.name }))]}
-                    selectedKeys={ssoProviderNone ? ['none'] : ssoProviderIds.map(String)}
+                    selectedKeys={[...(ssoProviderNone ? ['none'] : []), ...ssoProviderIds.map(String)]}
                     onSelectionChange={(keys) => updateFilters((params) => {
                       params.delete('ssoProviderId');
                       params.delete('ssoProviderNone');
                       if (keys.includes('none')) {
                         params.set('ssoProviderNone', 'true');
-                      } else {
-                        keys.forEach((key) => params.append('ssoProviderId', key));
                       }
+                      keys.filter((key) => key !== 'none').forEach((key) => params.append('ssoProviderId', key));
                       if (keys.length === 0) params.delete('ssoProviderMatch');
                     })}
                     dataCy="user-management-sso-provider-filter"
