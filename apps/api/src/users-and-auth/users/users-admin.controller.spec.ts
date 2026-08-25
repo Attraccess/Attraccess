@@ -120,10 +120,13 @@ describe('UsersAdminController', () => {
           page: 1,
           limit: 10,
           roleIds: [2, 4],
+          excludeRoleIds: [5],
           roleMatch: 'all',
           emailVerified: true,
           ssoProviderIds: [7],
+          excludeSsoProviderIds: [8],
           ssoProviderNone: true,
+          hasSsoProvider: false,
           ssoProviderMatch: 'any',
         },
         makeRequest(['users.read']),
@@ -132,10 +135,13 @@ describe('UsersAdminController', () => {
       expect(usersService.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           roleIds: [2, 4],
+          excludeRoleIds: [5],
           roleMatch: 'all',
           emailVerified: true,
           ssoProviderIds: [7],
+          excludeSsoProviderIds: [8],
           ssoProviderNone: true,
+          hasSsoProvider: false,
           ssoProviderMatch: 'any',
         }),
       );

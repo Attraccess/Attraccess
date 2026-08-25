@@ -36,6 +36,8 @@
     "is": "is",
     "isAnyOf": "is any of",
     "isAllOf": "is all of",
+    "isNoneOf": "is none of",
+    "selectedCount": "{{count}} selected",
     "role": "Role",
     "roleMatch": "Role matching",
     "emailVerified": "Email verified",
