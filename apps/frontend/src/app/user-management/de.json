@@ -27,6 +27,7 @@
   "filters": {
     "label": "Benutzerfilter",
     "add": "Filter",
+    "done": "Fertig",
     "remove": "Filter entfernen",
     "category": "Filterkategorie",
     "selectValues": "Werte auswählen",
