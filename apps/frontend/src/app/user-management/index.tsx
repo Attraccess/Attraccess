@@ -27,7 +27,16 @@ import {
   SearchField,
   useFilter,
 } from '@heroui/react';
-import { KeyIcon, PlusIcon, SearchIcon, ShieldCheckIcon, ShieldOffIcon, UserPlusIcon, Users, XIcon } from 'lucide-react';
+import {
+  KeyIcon,
+  PlusIcon,
+  SearchIcon,
+  ShieldCheckIcon,
+  ShieldOffIcon,
+  UserPlusIcon,
+  Users,
+  XIcon,
+} from 'lucide-react';
 import { TableToolbar } from '../../components/TableToolbar';
 import {
   SSOProvider,
@@ -88,7 +97,12 @@ function MultiValueFilter({
     >
       <Autocomplete.Trigger>
         <Autocomplete.Value>
-          {() => options.filter((option) => selectedKeys.includes(option.key)).map((option) => option.label).join(', ') || ariaLabel}
+          {() =>
+            options
+              .filter((option) => selectedKeys.includes(option.key))
+              .map((option) => option.label)
+              .join(', ') || ariaLabel
+          }
         </Autocomplete.Value>
         <Autocomplete.Indicator />
       </Autocomplete.Trigger>
@@ -218,8 +232,7 @@ export const UserManagementPage: React.FC = () => {
     setPage(1);
   };
 
-  const addFilter = (filter: FilterKey) =>
-    updateFilters((params) => params.append('filter', filter));
+  const addFilter = (filter: FilterKey) => updateFilters((params) => params.append('filter', filter));
 
   const removeFilter = (filter: FilterKey) =>
     updateFilters((params) => {
@@ -319,7 +332,11 @@ export const UserManagementPage: React.FC = () => {
         <TableToolbar
           search={
             <div className="space-y-2">
-              <TextField value={search} onChange={(value) => updateFilters((params) => value ? params.set('q', value) : params.delete('q'))} aria-label={t('table.inputs.search')}>
+              <TextField
+                value={search}
+                onChange={(value) => updateFilters((params) => (value ? params.set('q', value) : params.delete('q')))}
+                aria-label={t('table.inputs.search')}
+              >
                 <InputGroup>
                   <InputGroup.Prefix>
                     <SearchIcon size={16} />
@@ -329,13 +346,21 @@ export const UserManagementPage: React.FC = () => {
               </TextField>
               <div className="flex flex-wrap items-center gap-2" aria-label={t('filters.label')}>
                 {activeFilters.map((filter) => (
-                  <div key={filter} role="group" aria-label={t(`filters.${filter}`)} className="flex max-w-full flex-wrap items-center rounded-medium border border-default-200 bg-content1 text-sm shadow-xs">
+                  <div
+                    key={filter}
+                    role="group"
+                    aria-label={t(`filters.${filter}`)}
+                    className="flex max-w-full flex-wrap items-center rounded-medium border border-default-200 bg-content1 text-sm shadow-xs"
+                  >
                     <Select
                       className="min-w-24"
                       aria-label={t('filters.category')}
                       value={filter}
                       onChange={(value) => replaceFilter(filter, value as FilterKey)}
-                      items={FILTER_KEYS.filter((key) => key === filter || !activeFilters.includes(key)).map((key) => ({ key, label: t(`filters.${key}`) }))}
+                      items={FILTER_KEYS.filter((key) => key === filter || !activeFilters.includes(key)).map((key) => ({
+                        key,
+                        label: t(`filters.${key}`),
+                      }))}
                     />
                     {filter === 'role' ? (
                       <>
@@ -344,28 +369,44 @@ export const UserManagementPage: React.FC = () => {
                           aria-label={t('filters.roleMatch')}
                           value={roleMatch}
                           onChange={(value) => updateFilters((params) => params.set('roleMatch', value))}
-                          items={[{ key: 'any', label: t('filters.isAnyOf') }, { key: 'all', label: t('filters.isAllOf') }]}
+                          items={[
+                            { key: 'any', label: t('filters.isAnyOf') },
+                            { key: 'all', label: t('filters.isAllOf') },
+                          ]}
                         />
                         <MultiValueFilter
                           ariaLabel={t('filters.roleValues')}
                           options={(roles ?? []).map((role) => ({ key: String(role.id), label: roleName(role) }))}
                           selectedKeys={roleIds.map(String)}
-                          onSelectionChange={(keys) => updateFilters((params) => {
-                            params.delete('roleId');
-                            keys.forEach((key) => params.append('roleId', key));
-                            if (keys.length === 0) params.delete('roleMatch');
-                          })}
+                          onSelectionChange={(keys) =>
+                            updateFilters((params) => {
+                              params.delete('roleId');
+                              keys.forEach((key) => params.append('roleId', key));
+                              if (keys.length === 0) params.delete('roleMatch');
+                            })
+                          }
                           dataCy="user-management-role-filter"
                         />
                       </>
                     ) : filter === 'emailVerified' ? (
                       <>
-                        <span className="border-x border-default-200 px-3 py-1.5 text-default-500">{t('filters.is')}</span>
+                        <span className="border-x border-default-200 px-3 py-1.5 text-default-500">
+                          {t('filters.is')}
+                        </span>
                         <SingleValueFilter
                           ariaLabel={t('filters.emailVerificationStatus')}
-                          options={[{ key: 'true', label: t('filters.verified') }, { key: 'false', label: t('filters.notVerified') }]}
-                          selectedKey={emailVerified === 'true' || emailVerified === 'false' ? emailVerified : undefined}
-                          onSelectionChange={(key) => updateFilters((params) => key ? params.set('emailVerified', key) : params.delete('emailVerified'))}
+                          options={[
+                            { key: 'true', label: t('filters.verified') },
+                            { key: 'false', label: t('filters.notVerified') },
+                          ]}
+                          selectedKey={
+                            emailVerified === 'true' || emailVerified === 'false' ? emailVerified : undefined
+                          }
+                          onSelectionChange={(key) =>
+                            updateFilters((params) =>
+                              key ? params.set('emailVerified', key) : params.delete('emailVerified'),
+                            )
+                          }
                           dataCy="user-management-email-verified-filter"
                         />
                       </>
@@ -376,35 +417,52 @@ export const UserManagementPage: React.FC = () => {
                           aria-label={t('filters.ssoProviderMatch')}
                           value={ssoProviderMatch}
                           onChange={(value) => updateFilters((params) => params.set('ssoProviderMatch', value))}
-                          items={[{ key: 'any', label: t('filters.isAnyOf') }, { key: 'all', label: t('filters.isAllOf') }]}
+                          items={[
+                            { key: 'any', label: t('filters.isAnyOf') },
+                            { key: 'all', label: t('filters.isAllOf') },
+                          ]}
                         />
                         <MultiValueFilter
                           ariaLabel={t('filters.ssoProviderValues')}
-                          options={[{ key: 'none', label: t('filters.none') }, ...(ssoProviders ?? []).map((provider) => ({ key: String(provider.id), label: provider.name }))]}
+                          options={[
+                            { key: 'none', label: t('filters.none') },
+                            ...(ssoProviders ?? []).map((provider) => ({
+                              key: String(provider.id),
+                              label: provider.name,
+                            })),
+                          ]}
                           selectedKeys={[...(ssoProviderNone ? ['none'] : []), ...ssoProviderIds.map(String)]}
-                          onSelectionChange={(keys) => updateFilters((params) => {
-                            params.delete('ssoProviderId');
-                            params.delete('ssoProviderNone');
-                            if (keys.includes('none')) params.set('ssoProviderNone', 'true');
-                            keys.filter((key) => key !== 'none').forEach((key) => params.append('ssoProviderId', key));
-                            if (keys.length === 0) params.delete('ssoProviderMatch');
-                          })}
+                          onSelectionChange={(keys) =>
+                            updateFilters((params) => {
+                              params.delete('ssoProviderId');
+                              params.delete('ssoProviderNone');
+                              if (keys.includes('none')) params.set('ssoProviderNone', 'true');
+                              keys
+                                .filter((key) => key !== 'none')
+                                .forEach((key) => params.append('ssoProviderId', key));
+                              if (keys.length === 0) params.delete('ssoProviderMatch');
+                            })
+                          }
                           dataCy="user-management-sso-provider-filter"
                         />
                       </>
                     )}
-                    <Button isIconOnly size="sm" variant="ghost" aria-label={t('filters.remove')} onPress={() => removeFilter(filter)}>
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="ghost"
+                      aria-label={t('filters.remove')}
+                      onPress={() => removeFilter(filter)}
+                    >
                       <XIcon size={14} />
                     </Button>
                   </div>
                 ))}
                 {activeFilters.length < FILTER_KEYS.length ? (
                   <Dropdown>
-                    <DropdownTrigger className="inline-flex">
-                      <Button size="sm" variant="ghost" aria-label={t('filters.add')}>
-                        <PlusIcon size={14} />
-                        {activeFilters.length === 0 ? t('filters.add') : null}
-                      </Button>
+                    <DropdownTrigger className="inline-flex items-center" aria-label={t('filters.add')}>
+                      <PlusIcon size={14} />
+                      {activeFilters.length === 0 ? t('filters.add') : null}
                     </DropdownTrigger>
                     <DropdownPopover>
                       <DropdownMenu aria-label={t('filters.add')}>
@@ -441,7 +499,15 @@ export const UserManagementPage: React.FC = () => {
               <TableBody
                 items={(searchResult?.data ?? []) as User[]}
                 renderEmptyState={() =>
-                  roleIds.length ? <EmptyState message={t('empty.role', { role: roles?.find((role) => role.id === roleIds[0])?.name ?? roleIds[0] })} /> : <EmptyState />
+                  roleIds.length ? (
+                    <EmptyState
+                      message={t('empty.role', {
+                        role: roles?.find((role) => role.id === roleIds[0])?.name ?? roleIds[0],
+                      })}
+                    />
+                  ) : (
+                    <EmptyState />
+                  )
                 }
               >
                 {(user) => {
@@ -484,11 +550,7 @@ export const UserManagementPage: React.FC = () => {
                       id={user.id}
                       className="cursor-pointer hover:bg-primary-50 transition-bg duration-300"
                       onAction={() =>
-                        navigate(
-                          assignRoleId
-                            ? `/users/${user.id}?assignRoleId=${assignRoleId}`
-                            : `/users/${user.id}`,
-                        )
+                        navigate(assignRoleId ? `/users/${user.id}?assignRoleId=${assignRoleId}` : `/users/${user.id}`)
                       }
                     >
                       <TableCell className="hidden md:table-cell">
