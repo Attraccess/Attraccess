@@ -2,6 +2,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 const EMAIL_LAYOUT_SETTINGS_PARENT = 'email_layout';
 const EMAIL_LAYOUT_SETTINGS_KEY = 'body';
+const LOGO_SOURCE = /(src\s*=\s*)(["'])\{\{host\.logoUrl\}\}\2/g;
+const INLINE_LOGO_SOURCE = /(src\s*=\s*)(["'])cid:attraccess-logo\2/g;
 
 export const PREVIOUS_DEFAULT_GLOBAL_LAYOUT = `<mjml>
   <mj-head>
@@ -71,20 +73,33 @@ export class EmailLayoutInlineLogo1783500000000 implements MigrationInterface {
   name = 'EmailLayoutInlineLogo1783500000000';
 
   async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `UPDATE "setting"
-       SET "value" = REPLACE("value", '{{host.logoUrl}}', 'cid:attraccess-logo')
-       WHERE "parent" = ? AND "key" = ? AND "value" LIKE ?`,
-      [EMAIL_LAYOUT_SETTINGS_PARENT, EMAIL_LAYOUT_SETTINGS_KEY, '%{{host.logoUrl}}%'],
-    );
+    await this.replaceLogoSource(queryRunner, LOGO_SOURCE, '$1$2cid:attraccess-logo$2');
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {
+    await this.replaceLogoSource(queryRunner, INLINE_LOGO_SOURCE, '$1$2{{host.logoUrl}}$2');
+  }
+
+  private async replaceLogoSource(queryRunner: QueryRunner, source: RegExp, replacement: string): Promise<void> {
+    const [setting] = (await queryRunner.query(`SELECT "value" FROM "setting" WHERE "parent" = ? AND "key" = ?`, [
+      EMAIL_LAYOUT_SETTINGS_PARENT,
+      EMAIL_LAYOUT_SETTINGS_KEY,
+    ])) as Array<{ value: string }>;
+
+    if (!setting) {
+      return;
+    }
+
+    const value = setting.value.replace(source, replacement);
+    if (value === setting.value) {
+      return;
+    }
+
     await queryRunner.query(
       `UPDATE "setting"
-       SET "value" = REPLACE("value", 'cid:attraccess-logo', '{{host.logoUrl}}')
-       WHERE "parent" = ? AND "key" = ? AND "value" LIKE ?`,
-      [EMAIL_LAYOUT_SETTINGS_PARENT, EMAIL_LAYOUT_SETTINGS_KEY, '%cid:attraccess-logo%'],
+       SET "value" = ?
+       WHERE "parent" = ? AND "key" = ?`,
+      [value, EMAIL_LAYOUT_SETTINGS_PARENT, EMAIL_LAYOUT_SETTINGS_KEY],
     );
   }
 }
