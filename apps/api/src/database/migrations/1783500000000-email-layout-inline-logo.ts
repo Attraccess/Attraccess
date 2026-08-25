@@ -2,8 +2,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 const EMAIL_LAYOUT_SETTINGS_PARENT = 'email_layout';
 const EMAIL_LAYOUT_SETTINGS_KEY = 'body';
-const LOGO_SOURCE = /(src\s*=\s*)(["'])\{\{host\.logoUrl\}\}\2/g;
-const INLINE_LOGO_SOURCE = /(src\s*=\s*)(["'])cid:attraccess-logo\2/g;
+const LOGO_SOURCE = /((?:^|\s)src\s*=\s*)(["'])\{\{host\.logoUrl\}\}\2/g;
+const INLINE_LOGO_SOURCE = /((?:^|\s)src\s*=\s*)(["'])cid:attraccess-logo\2/g;
 
 export const PREVIOUS_DEFAULT_GLOBAL_LAYOUT = `<mjml>
   <mj-head>

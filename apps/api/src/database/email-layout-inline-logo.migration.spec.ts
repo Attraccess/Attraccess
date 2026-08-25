@@ -67,6 +67,16 @@ describe('EmailLayoutInlineLogo migration', () => {
       <mj-text>{{host.logoUrl}}</mj-text>`);
   });
 
+  it('does not update prefixed source-like attributes', async () => {
+    const customizedLayout = `<mj-image data-src="{{host.logoUrl}}" />`;
+
+    await insertLayout(customizedLayout);
+
+    await migration.up(queryRunner);
+
+    expect(await readLayout()).toBe(customizedLayout);
+  });
+
   it('restores only inline logo source attributes with their original formatting', async () => {
     const customizedLayout = `<mj-image src = 'cid:attraccess-logo' href="cid:attraccess-logo" alt="cid:attraccess-logo" />
       <mj-text>cid:attraccess-logo</mj-text>`;
@@ -77,5 +87,15 @@ describe('EmailLayoutInlineLogo migration', () => {
     expect(await readLayout())
       .toBe(`<mj-image src = '{{host.logoUrl}}' href="cid:attraccess-logo" alt="cid:attraccess-logo" />
       <mj-text>cid:attraccess-logo</mj-text>`);
+  });
+
+  it('does not restore prefixed inline logo attributes', async () => {
+    const customizedLayout = `<mj-image data-src="cid:attraccess-logo" />`;
+
+    await insertLayout(customizedLayout);
+
+    await migration.down(queryRunner);
+
+    expect(await readLayout()).toBe(customizedLayout);
   });
 });
