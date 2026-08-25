@@ -53,4 +53,23 @@ describe('EmailLayoutInlineLogo migration', () => {
 
     expect(await readLayout()).toBe(customizedLayout.replace('src="{{host.logoUrl}}"', 'src="cid:attraccess-logo"'));
   });
+
+  it('updates customized layouts with single-quoted or spaced logo attributes', async () => {
+    const customizedLayout = `<mj-image src = '{{host.logoUrl}}' alt="My organization" />`;
+
+    await insertLayout(customizedLayout);
+
+    await migration.up(queryRunner);
+
+    expect(await readLayout()).toBe(`<mj-image src = 'cid:attraccess-logo' alt="My organization" />`);
+  });
+
+  it('restores the logo token with its original surrounding attribute formatting', async () => {
+    const customizedLayout = `<mj-image src = 'cid:attraccess-logo' alt="My organization" />`;
+    await insertLayout(customizedLayout);
+
+    await migration.down(queryRunner);
+
+    expect(await readLayout()).toBe(`<mj-image src = '{{host.logoUrl}}' alt="My organization" />`);
+  });
 });
