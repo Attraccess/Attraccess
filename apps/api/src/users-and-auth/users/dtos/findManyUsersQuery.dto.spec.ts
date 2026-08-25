@@ -57,7 +57,7 @@ describe('FindManyUsersQueryDto', () => {
     );
   });
 
-  it.each(['roleIds', 'excludeRoleIds', 'ssoProviderIds', 'excludeSsoProviderIds'] as const)(
+  it.each(['ids', 'roleIds', 'excludeRoleIds', 'ssoProviderIds', 'excludeSsoProviderIds'] as const)(
     'rejects malformed %s values with numeric prefixes',
     async (property) => {
       const query = plainToInstance(FindManyUsersQueryDto, { [property]: ['2junk'] });

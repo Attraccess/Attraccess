@@ -47,6 +47,8 @@ export class FindManyUsersQueryDto {
   })
   @Transform(({ value }) => toNumberArray(value))
   @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
   @IsOptional()
   ids?: number[];
 
