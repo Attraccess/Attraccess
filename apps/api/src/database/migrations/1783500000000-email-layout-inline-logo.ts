@@ -72,15 +72,19 @@ export class EmailLayoutInlineLogo1783500000000 implements MigrationInterface {
 
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `UPDATE "setting" SET "value" = ? WHERE "parent" = ? AND "key" = ? AND "value" = ?`,
-      [INLINE_LOGO_GLOBAL_LAYOUT, EMAIL_LAYOUT_SETTINGS_PARENT, EMAIL_LAYOUT_SETTINGS_KEY, PREVIOUS_DEFAULT_GLOBAL_LAYOUT],
+      `UPDATE "setting"
+       SET "value" = REPLACE("value", 'src="{{host.logoUrl}}"', 'src="cid:attraccess-logo"')
+       WHERE "parent" = ? AND "key" = ? AND "value" LIKE ?`,
+      [EMAIL_LAYOUT_SETTINGS_PARENT, EMAIL_LAYOUT_SETTINGS_KEY, '%src="{{host.logoUrl}}"%'],
     );
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `UPDATE "setting" SET "value" = ? WHERE "parent" = ? AND "key" = ? AND "value" = ?`,
-      [PREVIOUS_DEFAULT_GLOBAL_LAYOUT, EMAIL_LAYOUT_SETTINGS_PARENT, EMAIL_LAYOUT_SETTINGS_KEY, INLINE_LOGO_GLOBAL_LAYOUT],
+      `UPDATE "setting"
+       SET "value" = REPLACE("value", 'src="cid:attraccess-logo"', 'src="{{host.logoUrl}}"')
+       WHERE "parent" = ? AND "key" = ? AND "value" LIKE ?`,
+      [EMAIL_LAYOUT_SETTINGS_PARENT, EMAIL_LAYOUT_SETTINGS_KEY, '%src="cid:attraccess-logo"%'],
     );
   }
 }

@@ -45,12 +45,12 @@ describe('EmailLayoutInlineLogo migration', () => {
     expect(await readLayout()).toBe(INLINE_LOGO_GLOBAL_LAYOUT);
   });
 
-  it('does not overwrite a customized layout', async () => {
+  it('updates the logo while preserving customized layout content', async () => {
     const customizedLayout = PREVIOUS_DEFAULT_GLOBAL_LAYOUT.replace('Attraccess', 'My organization');
     await insertLayout(customizedLayout);
 
     await migration.up(queryRunner);
 
-    expect(await readLayout()).toBe(customizedLayout);
+    expect(await readLayout()).toBe(customizedLayout.replace('src="{{host.logoUrl}}"', 'src="cid:attraccess-logo"'));
   });
 });

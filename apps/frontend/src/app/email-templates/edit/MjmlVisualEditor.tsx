@@ -6,7 +6,16 @@ import 'grapesjs/dist/css/grapes.min.css';
 import './MjmlVisualEditor.css';
 import { isFullMjmlDocument } from '@attraccess/shared';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { decodeHtmlOnlyEntities, isWellFormedXml, splitHead, unwrapFragment, wrapFragment } from './mjmlLayout';
+import { getBaseUrl } from '../../../api';
+import {
+  decodeHtmlOnlyEntities,
+  isWellFormedXml,
+  splitHead,
+  unwrapFragment,
+  withCidEmailLogo,
+  withPreviewEmailLogo,
+  wrapFragment,
+} from './mjmlLayout';
 
 // grapesjs-mjml and the locale files ship as CJS; depending on the bundler's
 // interop the callable/plain export is either the module itself or `.default`.
@@ -85,6 +94,7 @@ export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
 
     const run = async () => {
       const { initialMjml, droppedHead, useXmlParser } = analyzeInitialValue(propsRef.current.initialValue);
+      const previewLogoUrl = `${getBaseUrl()}/api/logo.png`;
 
       // Load de locale bundles only for German users — English users shouldn't pay for them.
       const language = propsRef.current.language;
@@ -160,7 +170,7 @@ export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
       });
     }
 
-    editor.setComponents(initialMjml);
+    editor.setComponents(withPreviewEmailLogo(initialMjml, previewLogoUrl));
 
     const lockClass = propsRef.current.lockClass;
     if (lockClass) {
@@ -196,7 +206,7 @@ export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           if (cancelled) return;
-          const mjml = e.getHtml();
+          const mjml = withCidEmailLogo(e.getHtml(), previewLogoUrl);
           propsRef.current.onChange(propsRef.current.exportFullDocument ? mjml : unwrapFragment(mjml));
         }, 300);
       });

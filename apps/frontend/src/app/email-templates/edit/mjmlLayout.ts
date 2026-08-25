@@ -12,6 +12,15 @@ import { isFullMjmlDocument } from '@attraccess/shared';
 
 export const CONTENT_PLACEHOLDER = '{{content}}';
 export const CHROME_CLASS = 'atx-layout-chrome';
+export const EMAIL_LOGO_CID = 'cid:attraccess-logo';
+
+// Browsers cannot load a cid: URL, but the visual editor is only a browser
+// preview. Map its API image URL back before handing MJML to a save path.
+export const withPreviewEmailLogo = (mjml: string, previewUrl: string) =>
+  mjml.replaceAll(`src="${EMAIL_LOGO_CID}"`, `src="${previewUrl}"`);
+
+export const withCidEmailLogo = (mjml: string, previewUrl: string) =>
+  mjml.replaceAll(`src="${previewUrl}"`, `src="${EMAIL_LOGO_CID}"`);
 
 // Element name used internally to mark the validated {{content}} position so
 // the fragment splice can't hit a stray "{{content}}" inside chrome text.

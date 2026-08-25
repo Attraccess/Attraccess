@@ -7,6 +7,8 @@ import {
   isWellFormedXml,
   splitHead,
   unwrapFragment,
+  withCidEmailLogo,
+  withPreviewEmailLogo,
   wrapFragment,
   wrapInLayoutChrome,
 } from './mjmlLayout';
@@ -82,6 +84,25 @@ describe('isWellFormedXml', () => {
     expect(isWellFormedXml('<mjml><mj-body><br/></mj-body></mjml>')).toBe(true);
     expect(isWellFormedXml('<mjml><mj-body><br></mj-body></mjml>')).toBe(false);
     expect(isWellFormedXml('<mjml><mj-body>Terms & Conditions</mj-body></mjml>')).toBe(false);
+  });
+});
+
+describe('email logo preview mapping', () => {
+  const previewUrl = 'https://attraccess.example/api/logo.png';
+  const cidImage = '<mj-image src="cid:attraccess-logo" />';
+
+  it('uses the API image in the browser preview and restores the CID for saving', () => {
+    const preview = withPreviewEmailLogo(cidImage, previewUrl);
+
+    expect(preview).toBe(`<mj-image src="${previewUrl}" />`);
+    expect(withCidEmailLogo(preview, previewUrl)).toBe(cidImage);
+  });
+
+  it('does not alter unrelated image sources', () => {
+    const image = '<mj-image src="https://example.com/logo.png" />';
+
+    expect(withPreviewEmailLogo(image, previewUrl)).toBe(image);
+    expect(withCidEmailLogo(image, previewUrl)).toBe(image);
   });
 });
 
