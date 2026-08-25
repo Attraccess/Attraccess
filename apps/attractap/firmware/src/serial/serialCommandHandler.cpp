@@ -218,13 +218,12 @@ void SerialCommandHandler::handleCommand(const std::string &topic, const std::st
         // Per-task CPU / run-time stats dump (requires the run-stats config in
         // sdkconfig.debug). Diagnoses idle CPU burn (PERFORMANCE_ANALYSIS.md Q10).
 #if CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS
-        // 2 KiB covers the ~15-25 tasks this firmware spawns (~1.5 KiB worst
-        // case); route through the logger (not printf) so output stays on the
-        // configured console path (Sourcery PR #1697).
-        char buf[2048];
-        vTaskGetRunTimeStats(buf);
+        // FreeRTOS writes one unbounded row per task, including tasks created
+        // for active WebSocket connections, so size this buffer dynamically.
+        std::string buf(uxTaskGetNumberOfTasks() * 48 + 64, '\0');
+        vTaskGetRunTimeStats(buf.data());
         logger.info("--- FreeRTOS run-time stats ---");
-        logger.info(buf);
+        logger.info(buf.c_str());
         logger.info("--- end stats ---");
 #else
         logger.warn("debug.stats unavailable: CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS not enabled (sdkconfig.debug)");
