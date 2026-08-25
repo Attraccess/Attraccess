@@ -1,5 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Button, Label, ModalBody, ModalFooter, ModalHeader, ModalHeading, Radio, RadioGroup } from '@heroui/react';
+import {
+  Button,
+  Description,
+  Label,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
+  Radio,
+  RadioGroup,
+} from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
@@ -111,11 +121,9 @@ export function DeleteRoleModal({ isOpen, onClose, role, allRoles }: Props) {
                           <Radio.Control>
                             <Radio.Indicator />
                           </Radio.Control>
-                          <span className="flex flex-col">
-                            <span className="text-small">{t(`options.${option}.label`)}</span>
-                            <span className="text-xs text-default-400">{t(`options.${option}.description`)}</span>
-                          </span>
+                          <Label>{t(`options.${option}.label`)}</Label>
                         </Radio.Content>
+                        <Description>{t(`options.${option}.description`)}</Description>
                       </Radio>
                     ))}
                   </RadioGroup>
