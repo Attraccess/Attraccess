@@ -152,4 +152,5 @@ export * from './1783300000000-resource-introducer-role-unique';
 export * from './1783300000000-add-delete-account-token-index';
 export * from './1783300000000-api-tokens';
 export * from './1783400000000-api-token-management-permission';
+export * from './1783500000000-email-layout-inline-logo';
 export * from './1765442000000-form-field-position';

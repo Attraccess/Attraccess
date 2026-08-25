@@ -1,4 +1,9 @@
-<mjml>
+import { MigrationInterface, QueryRunner } from 'typeorm';
+
+const EMAIL_LAYOUT_SETTINGS_PARENT = 'email_layout';
+const EMAIL_LAYOUT_SETTINGS_KEY = 'body';
+
+export const PREVIOUS_DEFAULT_GLOBAL_LAYOUT = `<mjml>
   <mj-head>
     <mj-attributes>
       <mj-all font-family="Helvetica, Arial, sans-serif" />
@@ -21,7 +26,7 @@
     <mj-section background-color="#FFFFFF" padding="24px 0 16px 0">
       <mj-column>
         <mj-image
-          src="cid:attraccess-logo"
+          src="{{host.logoUrl}}"
           width="200px"
           href="https://attraccess.org"
           alt="Attraccess"
@@ -55,4 +60,27 @@
       </mj-column>
     </mj-section>
   </mj-body>
-</mjml>
+</mjml>`;
+
+export const INLINE_LOGO_GLOBAL_LAYOUT = PREVIOUS_DEFAULT_GLOBAL_LAYOUT.replace(
+  'src="{{host.logoUrl}}"',
+  'src="cid:attraccess-logo"',
+);
+
+export class EmailLayoutInlineLogo1783500000000 implements MigrationInterface {
+  name = 'EmailLayoutInlineLogo1783500000000';
+
+  async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `UPDATE "setting" SET "value" = ? WHERE "parent" = ? AND "key" = ? AND "value" = ?`,
+      [INLINE_LOGO_GLOBAL_LAYOUT, EMAIL_LAYOUT_SETTINGS_PARENT, EMAIL_LAYOUT_SETTINGS_KEY, PREVIOUS_DEFAULT_GLOBAL_LAYOUT],
+    );
+  }
+
+  async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `UPDATE "setting" SET "value" = ? WHERE "parent" = ? AND "key" = ? AND "value" = ?`,
+      [PREVIOUS_DEFAULT_GLOBAL_LAYOUT, EMAIL_LAYOUT_SETTINGS_PARENT, EMAIL_LAYOUT_SETTINGS_KEY, INLINE_LOGO_GLOBAL_LAYOUT],
+    );
+  }
+}

@@ -182,6 +182,14 @@ describe('EmailService', () => {
     expect(callArg.html).toContain('alice'); // newUsername also equals current username
     // host.frontend and host.backend both resolve to the single app URL
     expect(callArg.html).toContain('https://frontend.example');
+    expect(callArg.attachments).toEqual([
+      expect.objectContaining({
+        filename: 'logo.png',
+        contentType: 'image/png',
+        cid: 'attraccess-logo',
+        path: expect.stringMatching(/assets\/logo\.png$/),
+      }),
+    ]);
   });
 
   it('sends verification email with correct URL', async () => {
