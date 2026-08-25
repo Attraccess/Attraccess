@@ -25,8 +25,22 @@
     "twoFactorPolicy": "Zwei-Faktor-Richtlinie"
   },
   "filters": {
-    "role": "Rolle: {{role}}",
-    "clearRole": "Rollenfilter aufheben"
+    "label": "Benutzerfilter",
+    "role": "Rolle",
+    "roleMatch": "Rollenabgleich",
+    "emailVerified": "E-Mail bestätigt",
+    "ssoProvider": "SSO-Anbieter",
+    "ssoProviderMatch": "SSO-Anbieterabgleich",
+    "verified": "Bestätigt",
+    "notVerified": "Nicht bestätigt",
+    "none": "Keine",
+    "allRoles": "Alle Rollen",
+    "multipleRoles": "Mehrere Rollen ausgewählt",
+    "allEmailVerification": "Jeder Bestätigungsstatus",
+    "allSsoProviders": "Alle SSO-Anbieter",
+    "multipleSsoProviders": "Mehrere SSO-Anbieter ausgewählt",
+    "any": "Beliebige",
+    "all": "Alle"
   },
   "empty": {
     "role": "{{role}} ist keinem Benutzer zugewiesen.",

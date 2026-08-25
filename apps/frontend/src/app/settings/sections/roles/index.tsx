@@ -167,7 +167,7 @@ export function RolesSection() {
                           className="min-h-6 min-w-6 p-0"
                           aria-label={t('table.actions.viewUsers', { role: roleName(role) })}
                           onPress={() =>
-                            navigate(`/users?roleId=${role.id}&roleName=${encodeURIComponent(roleName(role))}`)
+                            navigate(`/users?roleId=${role.id}`)
                           }
                           data-cy={`roles-table-users-${role.key}`}
                         >
