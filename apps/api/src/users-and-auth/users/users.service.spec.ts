@@ -492,6 +492,45 @@ describe('UsersService', () => {
       });
     });
 
+    it('should deduplicate SSO providers before applying an all match', async () => {
+      const query = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        subQuery: jest.fn(),
+        setParameters: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      const ssoProviders = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        having: jest.fn().mockReturnThis(),
+        getQuery: jest.fn().mockReturnValue('(SELECT selected SSO providers)'),
+      };
+      query.subQuery.mockReturnValueOnce({
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getQuery: jest.fn().mockReturnValue('(SELECT no SSO provider)'),
+      }).mockReturnValueOnce(ssoProviders);
+      userRepository.createQueryBuilder.mockReturnValue(query as never);
+
+      await service.findMany({ page: 1, limit: 10, ssoProviderIds: [7, 7], ssoProviderMatch: 'all' });
+
+      expect(ssoProviders.having).toHaveBeenCalledWith('COUNT(DISTINCT ssoDetail.providerId) = :ssoProviderCount');
+      expect(query.setParameters).toHaveBeenCalledWith({
+        ssoType: 'sso',
+        ssoProviderIds: [7],
+        ssoProviderCount: 1,
+      });
+    });
+
     it('should filter by email verification status', async () => {
       const query = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),

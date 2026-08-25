@@ -90,7 +90,12 @@ export class FindManyUsersQueryDto {
     required: false,
     type: Boolean,
   })
-  @ToBoolean()
+  @Transform(({ value }) => {
+    if (typeof value === 'boolean') return value;
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
   @IsBoolean()
   @IsOptional()
   emailVerified?: boolean;
@@ -117,7 +122,12 @@ export class FindManyUsersQueryDto {
     required: false,
     type: Boolean,
   })
-  @ToBoolean()
+  @Transform(({ value }) => {
+    if (typeof value === 'boolean') return value;
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
   @IsBoolean()
   @IsOptional()
   ssoProviderNone?: boolean;
