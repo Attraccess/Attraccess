@@ -56,4 +56,19 @@ describe('FindManyUsersQueryDto', () => {
       ]),
     );
   });
+
+  it.each(['roleIds', 'excludeRoleIds', 'ssoProviderIds', 'excludeSsoProviderIds'] as const)(
+    'rejects malformed %s values with numeric prefixes',
+    async (property) => {
+      const query = plainToInstance(FindManyUsersQueryDto, { [property]: ['2junk'] });
+
+      const errors = await validate(query);
+
+      expect(errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ property, constraints: expect.objectContaining({ isInt: expect.any(String) }) }),
+        ]),
+      );
+    },
+  );
 });

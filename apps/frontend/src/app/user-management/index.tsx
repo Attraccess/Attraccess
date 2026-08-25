@@ -503,13 +503,10 @@ export const UserManagementPage: React.FC = () => {
                                 params.delete(param);
                                 params.delete('ssoProviderNone');
                                 params.delete('hasSsoProvider');
-                                if (!isExcluding && keys.includes('none')) {
-                                  params.set('ssoProviderNone', 'true');
-                                } else if (isExcluding && keys.includes('none')) {
-                                  params.set('hasSsoProvider', 'true');
-                                } else {
-                                  keys.filter((key) => key !== 'none').forEach((key) => params.append(param, key));
+                                if (keys.includes('none')) {
+                                  params.set(isExcluding ? 'hasSsoProvider' : 'ssoProviderNone', 'true');
                                 }
+                                keys.filter((key) => key !== 'none').forEach((key) => params.append(param, key));
                                 if (keys.length === 0) params.delete('ssoProviderMatch');
                               })
                             }
