@@ -4,6 +4,7 @@ import { AttraccessUser, useDebounce, useTranslations } from '@attraccess/plugin
 import {
   Button,
   Chip,
+  Autocomplete,
   TextField,
   InputGroup,
   Table,
@@ -17,6 +18,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
+  ListBox,
 } from '@heroui/react';
 import { KeyIcon, SearchIcon, ShieldCheckIcon, ShieldOffIcon, UserPlusIcon, Users } from 'lucide-react';
 import { TableToolbar } from '../../components/TableToolbar';
@@ -42,6 +44,114 @@ import { Select } from '../../components/select';
 
 // Role keys that are considered "default" and not worth showing in the list
 const DEFAULT_ROLE_KEYS = new Set(['user']);
+
+type FilterOption = {
+  key: string;
+  label: string;
+};
+
+function MultiValueFilter({
+  label,
+  options,
+  selectedKeys,
+  onSelectionChange,
+  dataCy,
+}: {
+  label: string;
+  options: FilterOption[];
+  selectedKeys: string[];
+  onSelectionChange: (keys: string[]) => void;
+  dataCy: string;
+}) {
+  return (
+    <Autocomplete
+      className="w-36"
+      placeholder={label}
+      selectionMode="multiple"
+      value={selectedKeys}
+      onChange={(keys) => onSelectionChange([...keys].map(String))}
+      aria-label={label}
+      data-cy={dataCy}
+    >
+      <Autocomplete.Trigger>
+        <Autocomplete.Value>
+          {() => (
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate">{label}</span>
+              {selectedKeys.length > 0 ? (
+                <Chip size="sm" color="accent" variant="secondary" className="min-w-5 justify-center px-1">
+                  {selectedKeys.length}
+                </Chip>
+              ) : null}
+            </span>
+          )}
+        </Autocomplete.Value>
+        <Autocomplete.Indicator />
+      </Autocomplete.Trigger>
+      <Autocomplete.Popover>
+        <ListBox aria-label={label}>
+          {options.map((option) => (
+            <ListBox.Item key={option.key} id={option.key} textValue={option.label}>
+              {option.label}
+              <ListBox.ItemIndicator />
+            </ListBox.Item>
+          ))}
+        </ListBox>
+      </Autocomplete.Popover>
+    </Autocomplete>
+  );
+}
+
+function SingleValueFilter({
+  label,
+  options,
+  selectedKey,
+  onSelectionChange,
+  dataCy,
+}: {
+  label: string;
+  options: FilterOption[];
+  selectedKey?: string;
+  onSelectionChange: (key?: string) => void;
+  dataCy: string;
+}) {
+  return (
+    <Autocomplete
+      className="w-36"
+      placeholder={label}
+      value={selectedKey}
+      onChange={(key) => onSelectionChange(key ? String(key) : undefined)}
+      aria-label={label}
+      data-cy={dataCy}
+    >
+      <Autocomplete.Trigger>
+        <Autocomplete.Value>
+          {() => (
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate">{label}</span>
+              {selectedKey ? (
+                <Chip size="sm" color="accent" variant="secondary" className="min-w-5 justify-center px-1">
+                  1
+                </Chip>
+              ) : null}
+            </span>
+          )}
+        </Autocomplete.Value>
+        <Autocomplete.Indicator />
+      </Autocomplete.Trigger>
+      <Autocomplete.Popover>
+        <ListBox aria-label={label}>
+          {options.map((option) => (
+            <ListBox.Item key={option.key} id={option.key} textValue={option.label}>
+              {option.label}
+              <ListBox.ItemIndicator />
+            </ListBox.Item>
+          ))}
+        </ListBox>
+      </Autocomplete.Popover>
+    </Autocomplete>
+  );
+}
 
 export const UserManagementPage: React.FC = () => {
   const { t } = useTranslations({ en, de });
@@ -159,50 +269,64 @@ export const UserManagementPage: React.FC = () => {
                 </InputGroup>
               </TextField>
               <div className="flex flex-wrap gap-2" aria-label={t('filters.label')}>
-                <Select
-                  className="w-40"
-                  aria-label={t('filters.role')}
-                  value={roleIds.length === 1 ? String(roleIds[0]) : roleIds.length > 1 ? 'multiple' : 'all'}
-                  disabledKeys={roleIds.length > 1 ? ['multiple'] : undefined}
-                  onChange={(value) => updateFilters((params) => {
-                    params.delete('roleId');
-                    if (value !== 'all') {
-                      params.append('roleId', value);
-                    }
-                    if (value === 'all') {
-                      params.delete('roleMatch');
-                    }
-                  })}
-                  items={[{ key: 'all', label: t('filters.allRoles') }, ...(roleIds.length > 1 ? [{ key: 'multiple', label: t('filters.multipleRoles') }] : []), ...(roles ?? []).map((role) => ({ key: String(role.id), label: roleName(role) }))]}
-                />
-                {roleIds.length > 1 ? <Select className="w-32" aria-label={t('filters.roleMatch')} value={roleMatch} onChange={(value) => updateFilters((params) => params.set('roleMatch', value))} items={[{ key: 'any', label: t('filters.any') }, { key: 'all', label: t('filters.all') }]} /> : null}
-                <Select
-                  className="w-44"
-                  aria-label={t('filters.emailVerified')}
-                  value={emailVerified ?? 'all'}
-                  onChange={(value) => updateFilters((params) => value === 'all' ? params.delete('emailVerified') : params.set('emailVerified', value))}
-                  items={[{ key: 'all', label: t('filters.allEmailVerification') }, { key: 'true', label: t('filters.verified') }, { key: 'false', label: t('filters.notVerified') }]}
-                />
-                <Select
-                  className="w-44"
-                  aria-label={t('filters.ssoProvider')}
-                  value={ssoProviderNone ? 'none' : ssoProviderIds.length === 1 ? String(ssoProviderIds[0]) : ssoProviderIds.length > 1 ? 'multiple' : 'all'}
-                  disabledKeys={ssoProviderIds.length > 1 ? ['multiple'] : undefined}
-                  onChange={(value) => updateFilters((params) => {
-                    params.delete('ssoProviderId');
-                    params.delete('ssoProviderNone');
-                    if (value === 'none') {
-                      params.set('ssoProviderNone', 'true');
-                    } else if (value !== 'all') {
-                      params.append('ssoProviderId', value);
-                    }
-                    if (value === 'all') {
-                      params.delete('ssoProviderMatch');
-                    }
-                  })}
-                  items={[{ key: 'all', label: t('filters.allSsoProviders') }, ...(ssoProviderIds.length > 1 ? [{ key: 'multiple', label: t('filters.multipleSsoProviders') }] : []), { key: 'none', label: t('filters.none') }, ...(ssoProviders ?? []).map((provider) => ({ key: String(provider.id), label: provider.name }))]}
-                />
-                {ssoProviderIds.length > 1 ? <Select className="w-32" aria-label={t('filters.ssoProviderMatch')} value={ssoProviderMatch} onChange={(value) => updateFilters((params) => params.set('ssoProviderMatch', value))} items={[{ key: 'any', label: t('filters.any') }, { key: 'all', label: t('filters.all') }]} /> : null}
+                <div className="flex items-end gap-1">
+                  <MultiValueFilter
+                    label={t('filters.role')}
+                    options={(roles ?? []).map((role) => ({ key: String(role.id), label: roleName(role) }))}
+                    selectedKeys={roleIds.map(String)}
+                    onSelectionChange={(keys) => updateFilters((params) => {
+                      params.delete('roleId');
+                      keys.forEach((key) => params.append('roleId', key));
+                      if (keys.length === 0) params.delete('roleMatch');
+                    })}
+                    dataCy="user-management-role-filter"
+                  />
+                  {roleIds.length > 0 ? (
+                    <Select
+                      className="w-20"
+                      aria-label={t('filters.roleMatch')}
+                      value={roleMatch}
+                      onChange={(value) => updateFilters((params) => params.set('roleMatch', value))}
+                      items={[{ key: 'any', label: t('filters.any') }, { key: 'all', label: t('filters.all') }]}
+                    />
+                  ) : null}
+                </div>
+                <div className="flex items-end">
+                  <SingleValueFilter
+                    label={t('filters.emailVerified')}
+                    options={[{ key: 'true', label: t('filters.verified') }, { key: 'false', label: t('filters.notVerified') }]}
+                    selectedKey={emailVerified === 'true' || emailVerified === 'false' ? emailVerified : undefined}
+                    onSelectionChange={(key) => updateFilters((params) => key ? params.set('emailVerified', key) : params.delete('emailVerified'))}
+                    dataCy="user-management-email-verified-filter"
+                  />
+                </div>
+                <div className="flex items-end gap-1">
+                  <MultiValueFilter
+                    label={t('filters.ssoProvider')}
+                    options={[{ key: 'none', label: t('filters.none') }, ...(ssoProviders ?? []).map((provider) => ({ key: String(provider.id), label: provider.name }))]}
+                    selectedKeys={ssoProviderNone ? ['none'] : ssoProviderIds.map(String)}
+                    onSelectionChange={(keys) => updateFilters((params) => {
+                      params.delete('ssoProviderId');
+                      params.delete('ssoProviderNone');
+                      if (keys.includes('none')) {
+                        params.set('ssoProviderNone', 'true');
+                      } else {
+                        keys.forEach((key) => params.append('ssoProviderId', key));
+                      }
+                      if (keys.length === 0) params.delete('ssoProviderMatch');
+                    })}
+                    dataCy="user-management-sso-provider-filter"
+                  />
+                  {ssoProviderIds.length > 0 ? (
+                    <Select
+                      className="w-20"
+                      aria-label={t('filters.ssoProviderMatch')}
+                      value={ssoProviderMatch}
+                      onChange={(value) => updateFilters((params) => params.set('ssoProviderMatch', value))}
+                      items={[{ key: 'any', label: t('filters.any') }, { key: 'all', label: t('filters.all') }]}
+                    />
+                  ) : null}
+                </div>
               </div>
             </div>
           }
