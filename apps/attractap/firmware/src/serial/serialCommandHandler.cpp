@@ -222,16 +222,30 @@ void SerialCommandHandler::handleCommand(const std::string &topic, const std::st
         // Snapshot status records instead of passing storage to FreeRTOS's
         // unbounded formatter. A task created during the snapshot simply does
         // not appear in this report; it cannot overrun the status array.
-        const UBaseType_t taskCount = uxTaskGetNumberOfTasks();
-        TaskStatus_t *taskStatus = static_cast<TaskStatus_t *>(pvPortMalloc(taskCount * sizeof(TaskStatus_t)));
-        if (!taskStatus)
+        configRUN_TIME_COUNTER_TYPE totalRunTime = 0;
+        UBaseType_t taskCount = 0;
+        UBaseType_t reportedTaskCount = 0;
+        TaskStatus_t *taskStatus = nullptr;
+        do
         {
-            logger.error("debug.stats unavailable: unable to allocate task snapshot");
+            vPortFree(taskStatus);
+            taskCount = uxTaskGetNumberOfTasks();
+            taskStatus = static_cast<TaskStatus_t *>(pvPortMalloc(taskCount * sizeof(TaskStatus_t)));
+            if (!taskStatus)
+            {
+                logger.error("debug.stats unavailable: unable to allocate task snapshot");
+                return;
+            }
+            reportedTaskCount = uxTaskGetSystemState(taskStatus, taskCount, &totalRunTime);
+        } while (reportedTaskCount == 0 && uxTaskGetNumberOfTasks() > taskCount);
+
+        if (reportedTaskCount == 0)
+        {
+            logger.error("debug.stats unavailable: unable to capture task snapshot");
+            vPortFree(taskStatus);
             return;
         }
 
-        configRUN_TIME_COUNTER_TYPE totalRunTime = 0;
-        const UBaseType_t reportedTaskCount = uxTaskGetSystemState(taskStatus, taskCount, &totalRunTime);
         logger.info("--- FreeRTOS run-time stats ---");
         logger.info("Task                 Runtime        CPU");
         for (UBaseType_t i = 0; i < reportedTaskCount; i++)
