@@ -551,7 +551,7 @@ export class UsersService {
         }
       }
 
-      const ssoProviderIds = options.ssoProviderIds;
+      const ssoProviderIds = options.ssoProviderIds ? [...new Set(options.ssoProviderIds)] : undefined;
       if (ssoProviderIds?.length || options.ssoProviderNone) {
         const noSsoProvider = query
           .subQuery()
