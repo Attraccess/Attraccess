@@ -3,6 +3,13 @@ import { Type, Transform } from 'class-transformer';
 import { IsNumber, IsInt, Min, Max, IsOptional, IsString, IsArray, IsBoolean, IsIn } from 'class-validator';
 import { ToBoolean } from '../../../common/request-transformers';
 
+const toNumberArray = (value: unknown): number[] | undefined => {
+  if (Array.isArray(value)) {
+    return value.map(Number);
+  }
+  return value ? [Number(value)] : undefined;
+};
+
 export class FindManyUsersQueryDto {
   @ApiProperty({
     description: 'Page number (1-based)',
@@ -38,12 +45,7 @@ export class FindManyUsersQueryDto {
     required: false,
     type: [Number],
   })
-  @Transform(({ value }) => {
-    if (Array.isArray(value)) {
-      return value.map((v) => parseInt(v, 10));
-    }
-    return value ? [parseInt(value, 10)] : undefined;
-  })
+  @Transform(({ value }) => toNumberArray(value))
   @IsArray()
   @IsOptional()
   ids?: number[];
@@ -64,12 +66,7 @@ export class FindManyUsersQueryDto {
     required: false,
     type: [Number],
   })
-  @Transform(({ value }) => {
-    if (Array.isArray(value)) {
-      return value.map((v) => parseInt(v, 10));
-    }
-    return value ? [parseInt(value, 10)] : undefined;
-  })
+  @Transform(({ value }) => toNumberArray(value))
   @IsArray()
   @IsInt({ each: true })
   @Min(1, { each: true })
@@ -81,12 +78,7 @@ export class FindManyUsersQueryDto {
     required: false,
     type: [Number],
   })
-  @Transform(({ value }) => {
-    if (Array.isArray(value)) {
-      return value.map((v) => parseInt(v, 10));
-    }
-    return value ? [parseInt(value, 10)] : undefined;
-  })
+  @Transform(({ value }) => toNumberArray(value))
   @IsArray()
   @IsInt({ each: true })
   @Min(1, { each: true })
@@ -123,12 +115,7 @@ export class FindManyUsersQueryDto {
     required: false,
     type: [Number],
   })
-  @Transform(({ value }) => {
-    if (Array.isArray(value)) {
-      return value.map((v) => parseInt(v, 10));
-    }
-    return value ? [parseInt(value, 10)] : undefined;
-  })
+  @Transform(({ value }) => toNumberArray(value))
   @IsArray()
   @IsInt({ each: true })
   @Min(1, { each: true })
@@ -140,12 +127,7 @@ export class FindManyUsersQueryDto {
     required: false,
     type: [Number],
   })
-  @Transform(({ value }) => {
-    if (Array.isArray(value)) {
-      return value.map((v) => parseInt(v, 10));
-    }
-    return value ? [parseInt(value, 10)] : undefined;
-  })
+  @Transform(({ value }) => toNumberArray(value))
   @IsArray()
   @IsInt({ each: true })
   @Min(1, { each: true })
