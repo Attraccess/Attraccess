@@ -126,9 +126,12 @@ export class UsersAdminController {
       (query.includeRoles ||
         query.roleId !== undefined ||
         query.roleIds !== undefined ||
+        query.excludeRoleIds !== undefined ||
         query.emailVerified !== undefined ||
         query.ssoProviderIds !== undefined ||
-        query.ssoProviderNone !== undefined) &&
+        query.excludeSsoProviderIds !== undefined ||
+        query.ssoProviderNone !== undefined ||
+        query.hasSsoProvider !== undefined) &&
       !canReadUsers
     ) {
       throw new ForbiddenException();
@@ -140,10 +143,13 @@ export class UsersAdminController {
       ids: query.ids,
       roleId: query.roleId,
       roleIds: query.roleIds,
+      excludeRoleIds: query.excludeRoleIds,
       roleMatch: query.roleMatch,
       emailVerified: query.emailVerified,
       ssoProviderIds: query.ssoProviderIds,
+      excludeSsoProviderIds: query.excludeSsoProviderIds,
       ssoProviderNone: query.ssoProviderNone,
+      hasSsoProvider: query.hasSsoProvider,
       ssoProviderMatch: query.ssoProviderMatch,
       includeRoles: query.includeRoles,
     });

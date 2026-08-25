@@ -4,6 +4,7 @@ import { AttraccessUser, useDebounce, useTranslations } from '@attraccess/plugin
 import {
   Button,
   Chip,
+  CloseButton,
   Autocomplete,
   TextField,
   InputGroup,
@@ -27,16 +28,7 @@ import {
   SearchField,
   useFilter,
 } from '@heroui/react';
-import {
-  KeyIcon,
-  PlusIcon,
-  SearchIcon,
-  ShieldCheckIcon,
-  ShieldOffIcon,
-  UserPlusIcon,
-  Users,
-  XIcon,
-} from 'lucide-react';
+import { KeyIcon, PlusIcon, SearchIcon, ShieldCheckIcon, ShieldOffIcon, UserPlusIcon, Users } from 'lucide-react';
 import { TableToolbar } from '../../components/TableToolbar';
 import {
   SSOProvider,
@@ -67,42 +59,43 @@ type FilterOption = {
 };
 
 type FilterKey = 'role' | 'emailVerified' | 'ssoProvider';
+type MultiValueCondition = 'any' | 'all' | 'none';
 
 const FILTER_KEYS: FilterKey[] = ['role', 'emailVerified', 'ssoProvider'];
 
 function MultiValueFilter({
   ariaLabel,
+  selectedCountLabel,
   options,
   selectedKeys,
   onSelectionChange,
   dataCy,
 }: {
   ariaLabel: string;
+  selectedCountLabel: (count: number) => string;
   options: FilterOption[];
   selectedKeys: string[];
   onSelectionChange: (keys: string[]) => void;
   dataCy: string;
 }) {
   const { contains } = useFilter({ sensitivity: 'base' });
+  const selectedOptions = options.filter((option) => selectedKeys.includes(option.key));
 
   return (
     <Autocomplete
-      className="min-w-28"
+      className="min-w-0"
       placeholder={ariaLabel}
       selectionMode="multiple"
       value={selectedKeys}
       onChange={(keys) => onSelectionChange([...keys].map(String))}
-      aria-label={ariaLabel}
+      aria-label={
+        selectedOptions.length ? `${ariaLabel}: ${selectedOptions.map((option) => option.label).join(', ')}` : ariaLabel
+      }
       data-cy={dataCy}
     >
       <Autocomplete.Trigger>
         <Autocomplete.Value>
-          {() =>
-            options
-              .filter((option) => selectedKeys.includes(option.key))
-              .map((option) => option.label)
-              .join(', ') || ariaLabel
-          }
+          {() => (selectedOptions.length ? selectedCountLabel(selectedOptions.length) : ariaLabel)}
         </Autocomplete.Value>
         <Autocomplete.Indicator />
       </Autocomplete.Trigger>
@@ -191,18 +184,24 @@ export const UserManagementPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get('q') ?? '';
   const roleIds = searchParams.getAll('roleId').map(Number).filter(Number.isInteger);
+  const excludeRoleIds = searchParams.getAll('excludeRoleId').map(Number).filter(Number.isInteger);
   const roleMatch = searchParams.get('roleMatch') === 'all' ? 'all' : 'any';
+  const roleExcludes = searchParams.get('roleOperator') === 'none';
   const emailVerified = searchParams.get('emailVerified');
   const ssoProviderIds = searchParams.getAll('ssoProviderId').map(Number).filter(Number.isInteger);
+  const excludeSsoProviderIds = searchParams.getAll('excludeSsoProviderId').map(Number).filter(Number.isInteger);
   const ssoProviderNone = searchParams.get('ssoProviderNone') === 'true';
+  const hasSsoProvider = searchParams.get('hasSsoProvider') === 'true';
   const ssoProviderMatch = searchParams.get('ssoProviderMatch') === 'all' ? 'all' : 'any';
+  const ssoProviderExcludes = searchParams.get('ssoProviderOperator') === 'none';
   const assignRoleId = Number(searchParams.get('assignRoleId')) || undefined;
   const activeFilters = FILTER_KEYS.filter(
     (filter) =>
       searchParams.getAll('filter').includes(filter) ||
-      (filter === 'role' && roleIds.length > 0) ||
+      (filter === 'role' && (roleIds.length > 0 || excludeRoleIds.length > 0)) ||
       (filter === 'emailVerified' && emailVerified !== null) ||
-      (filter === 'ssoProvider' && (ssoProviderIds.length > 0 || ssoProviderNone)),
+      (filter === 'ssoProvider' &&
+        (ssoProviderIds.length > 0 || excludeSsoProviderIds.length > 0 || ssoProviderNone || hasSsoProvider)),
   );
 
   const debouncedSearch = useDebounce(search, 500);
@@ -215,10 +214,13 @@ export const UserManagementPage: React.FC = () => {
     page,
     search: debouncedSearch,
     roleIds,
+    excludeRoleIds,
     roleMatch,
     emailVerified: emailVerified === null ? undefined : emailVerified === 'true',
     ssoProviderIds,
-    ssoProviderNone,
+    excludeSsoProviderIds,
+    ssoProviderNone: ssoProviderNone || undefined,
+    hasSsoProvider: hasSsoProvider || undefined,
     ssoProviderMatch,
     includeRoles: true,
   });
@@ -240,13 +242,18 @@ export const UserManagementPage: React.FC = () => {
       activeFilters.filter((key) => key !== filter).forEach((key) => params.append('filter', key));
       if (filter === 'role') {
         params.delete('roleId');
+        params.delete('excludeRoleId');
         params.delete('roleMatch');
+        params.delete('roleOperator');
       }
       if (filter === 'emailVerified') params.delete('emailVerified');
       if (filter === 'ssoProvider') {
         params.delete('ssoProviderId');
+        params.delete('excludeSsoProviderId');
         params.delete('ssoProviderNone');
+        params.delete('hasSsoProvider');
         params.delete('ssoProviderMatch');
+        params.delete('ssoProviderOperator');
       }
     });
 
@@ -257,16 +264,60 @@ export const UserManagementPage: React.FC = () => {
       activeFilters.map((key) => (key === current ? next : key)).forEach((key) => params.append('filter', key));
       if (current === 'role') {
         params.delete('roleId');
+        params.delete('excludeRoleId');
         params.delete('roleMatch');
+        params.delete('roleOperator');
       }
       if (current === 'emailVerified') params.delete('emailVerified');
       if (current === 'ssoProvider') {
         params.delete('ssoProviderId');
+        params.delete('excludeSsoProviderId');
         params.delete('ssoProviderNone');
+        params.delete('hasSsoProvider');
         params.delete('ssoProviderMatch');
+        params.delete('ssoProviderOperator');
       }
     });
   };
+
+  const setRoleCondition = (condition: MultiValueCondition) =>
+    updateFilters((params) => {
+      const selectedIds = roleExcludes ? excludeRoleIds : roleIds;
+      params.delete('roleId');
+      params.delete('excludeRoleId');
+      if (condition === 'none') {
+        selectedIds.forEach((id) => params.append('excludeRoleId', String(id)));
+        params.delete('roleMatch');
+        params.set('roleOperator', 'none');
+      } else {
+        selectedIds.forEach((id) => params.append('roleId', String(id)));
+        params.set('roleMatch', condition);
+        params.delete('roleOperator');
+      }
+    });
+
+  const setSsoProviderCondition = (condition: MultiValueCondition) =>
+    updateFilters((params) => {
+      const selectedIds = ssoProviderExcludes ? excludeSsoProviderIds : ssoProviderIds;
+      params.delete('ssoProviderId');
+      params.delete('excludeSsoProviderId');
+      params.delete('ssoProviderNone');
+      params.delete('hasSsoProvider');
+      if (condition === 'none') {
+        if (ssoProviderNone) {
+          params.set('hasSsoProvider', 'true');
+        } else {
+          selectedIds.forEach((id) => params.append('excludeSsoProviderId', String(id)));
+        }
+        params.delete('ssoProviderMatch');
+        params.set('ssoProviderOperator', 'none');
+      } else {
+        selectedIds.forEach((id) => params.append('ssoProviderId', String(id)));
+        if (hasSsoProvider) params.set('ssoProviderNone', 'true');
+        params.set('ssoProviderMatch', condition);
+        params.delete('ssoProviderOperator');
+      }
+    });
 
   const startRoleAssignment = () => {
     setSearchParams({
@@ -350,10 +401,10 @@ export const UserManagementPage: React.FC = () => {
                     key={filter}
                     role="group"
                     aria-label={t(`filters.${filter}`)}
-                    className="flex max-w-full flex-wrap items-center rounded-medium border border-default-200 bg-content1 text-sm shadow-xs"
+                    className="grid max-w-full grid-cols-[max-content_minmax(0,1fr)_2.25rem] overflow-hidden rounded-medium border border-default-200 bg-content1 text-sm shadow-xs sm:flex sm:w-auto"
                   >
                     <Select
-                      className="min-w-24"
+                      className="min-w-fit whitespace-nowrap"
                       aria-label={t('filters.category')}
                       value={filter}
                       onChange={(value) => replaceFilter(filter, value as FilterKey)}
@@ -365,104 +416,122 @@ export const UserManagementPage: React.FC = () => {
                     {filter === 'role' ? (
                       <>
                         <Select
-                          className="min-w-28"
+                          className="min-w-fit border-l border-default-200 whitespace-nowrap"
                           aria-label={t('filters.roleMatch')}
-                          value={roleMatch}
-                          onChange={(value) => updateFilters((params) => params.set('roleMatch', value))}
+                          value={roleExcludes ? 'none' : roleMatch}
+                          onChange={(value) => setRoleCondition(value as MultiValueCondition)}
                           items={[
                             { key: 'any', label: t('filters.isAnyOf') },
                             { key: 'all', label: t('filters.isAllOf') },
+                            { key: 'none', label: t('filters.isNoneOf') },
                           ]}
                         />
-                        <MultiValueFilter
-                          ariaLabel={t('filters.roleValues')}
-                          options={(roles ?? []).map((role) => ({ key: String(role.id), label: roleName(role) }))}
-                          selectedKeys={roleIds.map(String)}
-                          onSelectionChange={(keys) =>
-                            updateFilters((params) => {
-                              params.delete('roleId');
-                              keys.forEach((key) => params.append('roleId', key));
-                              if (keys.length === 0) params.delete('roleMatch');
-                            })
-                          }
-                          dataCy="user-management-role-filter"
-                        />
+                        <div className="col-span-2 min-w-0 border-t border-default-200 sm:col-span-1 sm:border-l sm:border-t-0">
+                          <MultiValueFilter
+                            ariaLabel={t('filters.roleValues')}
+                            selectedCountLabel={(count) => t('filters.selectedCount', { count })}
+                            options={(roles ?? []).map((role) => ({ key: String(role.id), label: roleName(role) }))}
+                            selectedKeys={(roleExcludes ? excludeRoleIds : roleIds).map(String)}
+                            onSelectionChange={(keys) =>
+                              updateFilters((params) => {
+                                const param = roleExcludes ? 'excludeRoleId' : 'roleId';
+                                params.delete(param);
+                                keys.forEach((key) => params.append(param, key));
+                                if (keys.length === 0) params.delete('roleMatch');
+                              })
+                            }
+                            dataCy="user-management-role-filter"
+                          />
+                        </div>
                       </>
                     ) : filter === 'emailVerified' ? (
                       <>
-                        <span className="border-x border-default-200 px-3 py-1.5 text-default-500">
+                        <span className="border-l border-default-200 px-3 py-1.5 text-default-500">
                           {t('filters.is')}
                         </span>
-                        <SingleValueFilter
-                          ariaLabel={t('filters.emailVerificationStatus')}
-                          options={[
-                            { key: 'true', label: t('filters.verified') },
-                            { key: 'false', label: t('filters.notVerified') },
-                          ]}
-                          selectedKey={
-                            emailVerified === 'true' || emailVerified === 'false' ? emailVerified : undefined
-                          }
-                          onSelectionChange={(key) =>
-                            updateFilters((params) =>
-                              key ? params.set('emailVerified', key) : params.delete('emailVerified'),
-                            )
-                          }
-                          dataCy="user-management-email-verified-filter"
-                        />
+                        <div className="col-span-2 min-w-0 border-t border-default-200 sm:col-span-1 sm:border-l sm:border-t-0">
+                          <SingleValueFilter
+                            ariaLabel={t('filters.emailVerificationStatus')}
+                            options={[
+                              { key: 'true', label: t('filters.verified') },
+                              { key: 'false', label: t('filters.notVerified') },
+                            ]}
+                            selectedKey={
+                              emailVerified === 'true' || emailVerified === 'false' ? emailVerified : undefined
+                            }
+                            onSelectionChange={(key) =>
+                              updateFilters((params) =>
+                                key ? params.set('emailVerified', key) : params.delete('emailVerified'),
+                              )
+                            }
+                            dataCy="user-management-email-verified-filter"
+                          />
+                        </div>
                       </>
                     ) : (
                       <>
                         <Select
-                          className="min-w-28"
+                          className="min-w-fit border-l border-default-200 whitespace-nowrap"
                           aria-label={t('filters.ssoProviderMatch')}
-                          value={ssoProviderMatch}
-                          onChange={(value) => updateFilters((params) => params.set('ssoProviderMatch', value))}
+                          value={ssoProviderExcludes ? 'none' : ssoProviderMatch}
+                          onChange={(value) => setSsoProviderCondition(value as MultiValueCondition)}
                           items={[
                             { key: 'any', label: t('filters.isAnyOf') },
                             { key: 'all', label: t('filters.isAllOf') },
+                            { key: 'none', label: t('filters.isNoneOf') },
                           ]}
                         />
-                        <MultiValueFilter
-                          ariaLabel={t('filters.ssoProviderValues')}
-                          options={[
-                            { key: 'none', label: t('filters.none') },
-                            ...(ssoProviders ?? []).map((provider) => ({
-                              key: String(provider.id),
-                              label: provider.name,
-                            })),
-                          ]}
-                          selectedKeys={[...(ssoProviderNone ? ['none'] : []), ...ssoProviderIds.map(String)]}
-                          onSelectionChange={(keys) =>
-                            updateFilters((params) => {
-                              params.delete('ssoProviderId');
-                              params.delete('ssoProviderNone');
-                              if (keys.includes('none')) params.set('ssoProviderNone', 'true');
-                              keys
-                                .filter((key) => key !== 'none')
-                                .forEach((key) => params.append('ssoProviderId', key));
-                              if (keys.length === 0) params.delete('ssoProviderMatch');
-                            })
-                          }
-                          dataCy="user-management-sso-provider-filter"
-                        />
+                        <div className="col-span-2 min-w-0 border-t border-default-200 sm:col-span-1 sm:border-l sm:border-t-0">
+                          <MultiValueFilter
+                            ariaLabel={t('filters.ssoProviderValues')}
+                            selectedCountLabel={(count) => t('filters.selectedCount', { count })}
+                            options={[
+                              { key: 'none', label: t('filters.none') },
+                              ...(ssoProviders ?? []).map((provider) => ({
+                                key: String(provider.id),
+                                label: provider.name,
+                              })),
+                            ]}
+                            selectedKeys={[
+                              ...(ssoProviderNone || hasSsoProvider ? ['none'] : []),
+                              ...(ssoProviderExcludes ? excludeSsoProviderIds : ssoProviderIds).map(String),
+                            ]}
+                            onSelectionChange={(keys) =>
+                              updateFilters((params) => {
+                                const isExcluding = ssoProviderExcludes;
+                                const param = isExcluding ? 'excludeSsoProviderId' : 'ssoProviderId';
+                                params.delete(param);
+                                params.delete('ssoProviderNone');
+                                params.delete('hasSsoProvider');
+                                if (!isExcluding && keys.includes('none')) {
+                                  params.set('ssoProviderNone', 'true');
+                                } else if (isExcluding && keys.includes('none')) {
+                                  params.set('hasSsoProvider', 'true');
+                                } else {
+                                  keys.filter((key) => key !== 'none').forEach((key) => params.append(param, key));
+                                }
+                                if (keys.length === 0) params.delete('ssoProviderMatch');
+                              })
+                            }
+                            dataCy="user-management-sso-provider-filter"
+                          />
+                        </div>
                       </>
                     )}
-                    <Button
-                      isIconOnly
-                      size="sm"
-                      variant="ghost"
+                    <CloseButton
+                      className="self-center justify-self-center"
                       aria-label={t('filters.remove')}
                       onPress={() => removeFilter(filter)}
-                    >
-                      <XIcon size={14} />
-                    </Button>
+                    />
                   </div>
                 ))}
                 {activeFilters.length < FILTER_KEYS.length ? (
                   <Dropdown>
-                    <DropdownTrigger className="inline-flex items-center" aria-label={t('filters.add')}>
-                      <PlusIcon size={14} />
-                      {activeFilters.length === 0 ? t('filters.add') : null}
+                    <DropdownTrigger>
+                      <Button size="sm" variant="ghost" aria-label={t('filters.add')}>
+                        <PlusIcon size={14} />
+                        {activeFilters.length === 0 ? t('filters.add') : null}
+                      </Button>
                     </DropdownTrigger>
                     <DropdownPopover>
                       <DropdownMenu aria-label={t('filters.add')}>

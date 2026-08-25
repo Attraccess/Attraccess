@@ -417,9 +417,7 @@ describe('UsersService', () => {
 
       expect(userRepository.findAndCount).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.arrayContaining([
-            expect.objectContaining({ userRoles: { roleId: 42 } }),
-          ]),
+          where: expect.arrayContaining([expect.objectContaining({ userRoles: { roleId: 42 } })]),
         }),
       );
     });
@@ -451,6 +449,33 @@ describe('UsersService', () => {
       expect(query.andWhere).toHaveBeenCalledWith('user.id IN (SELECT role user IDs)', {
         roleIds: [2, 4],
         roleCount: 2,
+      });
+    });
+
+    it('should exclude users assigned any selected role', async () => {
+      const query = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        subQuery: jest.fn(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      const excludedRoles = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getQuery: jest.fn().mockReturnValue('(SELECT excluded role user IDs)'),
+      };
+      query.subQuery.mockReturnValue(excludedRoles);
+      userRepository.createQueryBuilder.mockReturnValue(query as never);
+
+      await service.findMany({ page: 1, limit: 10, excludeRoleIds: [2, 2, 4] });
+
+      expect(query.andWhere).toHaveBeenCalledWith('NOT EXISTS (SELECT excluded role user IDs)', {
+        excludeRoleIds: [2, 4],
       });
     });
 
@@ -512,13 +537,15 @@ describe('UsersService', () => {
         having: jest.fn().mockReturnThis(),
         getQuery: jest.fn().mockReturnValue('(SELECT selected SSO providers)'),
       };
-      query.subQuery.mockReturnValueOnce({
-        select: jest.fn().mockReturnThis(),
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getQuery: jest.fn().mockReturnValue('(SELECT no SSO provider)'),
-      }).mockReturnValueOnce(ssoProviders);
+      query.subQuery
+        .mockReturnValueOnce({
+          select: jest.fn().mockReturnThis(),
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getQuery: jest.fn().mockReturnValue('(SELECT no SSO provider)'),
+        })
+        .mockReturnValueOnce(ssoProviders);
       userRepository.createQueryBuilder.mockReturnValue(query as never);
 
       await service.findMany({ page: 1, limit: 10, ssoProviderIds: [7, 7], ssoProviderMatch: 'all' });
@@ -528,6 +555,61 @@ describe('UsersService', () => {
         ssoType: 'sso',
         ssoProviderIds: [7],
         ssoProviderCount: 1,
+      });
+    });
+
+    it('should exclude users linked to any selected SSO provider', async () => {
+      const query = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        subQuery: jest.fn(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      const excludedSsoProviders = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getQuery: jest.fn().mockReturnValue('(SELECT excluded SSO providers)'),
+      };
+      query.subQuery.mockReturnValue(excludedSsoProviders);
+      userRepository.createQueryBuilder.mockReturnValue(query as never);
+
+      await service.findMany({ page: 1, limit: 10, excludeSsoProviderIds: [7, 7] });
+
+      expect(query.andWhere).toHaveBeenCalledWith('NOT EXISTS (SELECT excluded SSO providers)', {
+        excludedSsoType: 'sso',
+        excludeSsoProviderIds: [7],
+      });
+    });
+
+    it('should require users with an SSO provider', async () => {
+      const query = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        subQuery: jest.fn(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      const ssoProviderExists = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getQuery: jest.fn().mockReturnValue('(SELECT any SSO provider)'),
+      };
+      query.subQuery.mockReturnValue(ssoProviderExists);
+      userRepository.createQueryBuilder.mockReturnValue(query as never);
+
+      await service.findMany({ page: 1, limit: 10, hasSsoProvider: true });
+
+      expect(query.andWhere).toHaveBeenCalledWith('EXISTS (SELECT any SSO provider)', {
+        anySsoType: 'sso',
       });
     });
 

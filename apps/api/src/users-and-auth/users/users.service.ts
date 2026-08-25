@@ -553,10 +553,13 @@ export class UsersService {
       ids?: number[];
       roleId?: number;
       roleIds?: number[];
+      excludeRoleIds?: number[];
       roleMatch?: 'any' | 'all';
       emailVerified?: boolean;
       ssoProviderIds?: number[];
+      excludeSsoProviderIds?: number[];
       ssoProviderNone?: boolean;
+      hasSsoProvider?: boolean;
       ssoProviderMatch?: 'any' | 'all';
       includeRoles?: boolean;
     },
@@ -578,9 +581,12 @@ export class UsersService {
 
     const hasAdvancedFilters =
       options.roleIds !== undefined ||
+      options.excludeRoleIds !== undefined ||
       options.emailVerified !== undefined ||
       options.ssoProviderIds !== undefined ||
-      options.ssoProviderNone !== undefined;
+      options.excludeSsoProviderIds !== undefined ||
+      options.ssoProviderNone !== undefined ||
+      options.hasSsoProvider !== undefined;
 
     if (hasAdvancedFilters) {
       const query = this.userRepository.createQueryBuilder('user');
@@ -614,6 +620,17 @@ export class UsersService {
         }
       }
 
+      const excludeRoleIds = options.excludeRoleIds ? [...new Set(options.excludeRoleIds)] : undefined;
+      if (excludeRoleIds?.length) {
+        const excludedRoles = query
+          .subQuery()
+          .select('1')
+          .from(UserRole, 'excludedUserRole')
+          .where('excludedUserRole.userId = user.id')
+          .andWhere('excludedUserRole.roleId IN (:...excludeRoleIds)');
+        query.andWhere(`NOT EXISTS ${excludedRoles.getQuery()}`, { excludeRoleIds });
+      }
+
       const ssoProviderIds = options.ssoProviderIds ? [...new Set(options.ssoProviderIds)] : undefined;
       if (ssoProviderIds?.length || options.ssoProviderNone) {
         const noSsoProvider = query
@@ -638,7 +655,11 @@ export class UsersService {
         }
 
         if (ssoProviders && options.ssoProviderNone && options.ssoProviderMatch !== 'all') {
-          query.andWhere(new Brackets((where) => where.where(`user.id IN ${ssoProviders.getQuery()}`).orWhere(`NOT EXISTS ${noSsoProvider}`)));
+          query.andWhere(
+            new Brackets((where) =>
+              where.where(`user.id IN ${ssoProviders.getQuery()}`).orWhere(`NOT EXISTS ${noSsoProvider}`),
+            ),
+          );
         } else if (ssoProviders) {
           query.andWhere(`user.id IN ${ssoProviders.getQuery()}`);
           if (options.ssoProviderNone) {
@@ -651,6 +672,35 @@ export class UsersService {
         query.setParameters({
           ssoType: AuthenticationType.SSO,
           ...(ssoProviderIds?.length ? { ssoProviderIds, ssoProviderCount: ssoProviderIds.length } : {}),
+        });
+      }
+
+      if (options.hasSsoProvider !== undefined) {
+        const ssoProviderExists = query
+          .subQuery()
+          .select('1')
+          .from(AuthenticationDetail, 'anySsoDetail')
+          .where('anySsoDetail.userId = user.id')
+          .andWhere('anySsoDetail.type = :anySsoType');
+        query.andWhere(`${options.hasSsoProvider ? 'EXISTS' : 'NOT EXISTS'} ${ssoProviderExists.getQuery()}`, {
+          anySsoType: AuthenticationType.SSO,
+        });
+      }
+
+      const excludeSsoProviderIds = options.excludeSsoProviderIds
+        ? [...new Set(options.excludeSsoProviderIds)]
+        : undefined;
+      if (excludeSsoProviderIds?.length) {
+        const excludedSsoProviders = query
+          .subQuery()
+          .select('1')
+          .from(AuthenticationDetail, 'excludedSsoDetail')
+          .where('excludedSsoDetail.userId = user.id')
+          .andWhere('excludedSsoDetail.type = :excludedSsoType')
+          .andWhere('excludedSsoDetail.providerId IN (:...excludeSsoProviderIds)');
+        query.andWhere(`NOT EXISTS ${excludedSsoProviders.getQuery()}`, {
+          excludedSsoType: AuthenticationType.SSO,
+          excludeSsoProviderIds,
         });
       }
 
