@@ -129,12 +129,14 @@ export function RolesSection() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="min-h-6 min-w-6 rounded-full px-2"
+                              className="min-h-6 min-w-6 p-0"
                               aria-label={t('table.actions.viewPermissions', { role: roleName(role) })}
                               onPress={() => openForm(role)}
                               data-cy={`roles-table-permissions-${role.key}`}
                             >
-                              {role.rolePermissions?.length ?? 0}
+                              <Chip size="sm" variant="secondary" className="pointer-events-none min-h-6 min-w-6">
+                                {role.rolePermissions?.length ?? 0}
+                              </Chip>
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent showArrow>
@@ -162,14 +164,16 @@ export function RolesSection() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="min-h-6 min-w-6 rounded-full px-2"
+                          className="min-h-6 min-w-6 p-0"
                           aria-label={t('table.actions.viewUsers', { role: roleName(role) })}
                           onPress={() =>
                             navigate(`/users?roleId=${role.id}&roleName=${encodeURIComponent(roleName(role))}`)
                           }
                           data-cy={`roles-table-users-${role.key}`}
                         >
-                          {role.userCount}
+                          <Chip size="sm" variant="secondary" className="pointer-events-none min-h-6 min-w-6">
+                            {role.userCount}
+                          </Chip>
                         </Button>
                       </TableCell>
                       <TableCell>
