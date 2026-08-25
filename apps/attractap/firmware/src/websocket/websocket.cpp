@@ -185,20 +185,22 @@ void Websocket::publishConnectionStatus()
 
 void Websocket::publishNetworkQuality()
 {
-    if (!this->network_quality_mutex)
-    {
-        return;
-    }
-
     uint32_t nowMs = millis();
     uint32_t inboundAgeMs = (this->lastInboundFrameTime == 0) ? 0 : nowMs - this->lastInboundFrameTime;
     uint8_t txDepth = this->tx_queue ? (uint8_t)uxQueueMessagesWaiting(this->tx_queue) : 0;
-    xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
-    uint8_t reconnects = countRecentNetworkQualityEvents(this->reconnectEventTimes, nowMs);
-    uint8_t queueFull = countRecentNetworkQualityEvents(this->txQueueFullEventTimes, nowMs);
-    uint8_t sendFailures = countRecentNetworkQualityEvents(this->sendFailureEventTimes, nowMs);
-    uint8_t livenessTimeouts = countRecentNetworkQualityEvents(this->livenessTimeoutEventTimes, nowMs);
-    xSemaphoreGive(this->network_quality_mutex);
+    uint8_t reconnects = 0;
+    uint8_t queueFull = 0;
+    uint8_t sendFailures = 0;
+    uint8_t livenessTimeouts = 0;
+    if (this->network_quality_mutex)
+    {
+        xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
+        reconnects = countRecentNetworkQualityEvents(this->reconnectEventTimes, nowMs);
+        queueFull = countRecentNetworkQualityEvents(this->txQueueFullEventTimes, nowMs);
+        sendFailures = countRecentNetworkQualityEvents(this->sendFailureEventTimes, nowMs);
+        livenessTimeouts = countRecentNetworkQualityEvents(this->livenessTimeoutEventTimes, nowMs);
+        xSemaphoreGive(this->network_quality_mutex);
+    }
 
     State::NetworkQuality quality = State::NETWORK_QUALITY_GOOD;
     if (!this->network_is_connected || this->_state != CONNECTED)
@@ -560,14 +562,20 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
 
     case WEBSOCKET_EVENT_CLOSED:
         logger.info("WebSocket closed");
-        recordNetworkQualityEvent(this->reconnectEventTimes, this->reconnectEventNextIndex);
+        if (this->_state == CONNECTED)
+        {
+            recordNetworkQualityEvent(this->reconnectEventTimes, this->reconnectEventNextIndex);
+        }
         setState(INIT);
         break;
 
     case WEBSOCKET_EVENT_DISCONNECTED:
     {
         logger.info("WebSocket disconnected");
-        recordNetworkQualityEvent(this->reconnectEventTimes, this->reconnectEventNextIndex);
+        if (this->_state == CONNECTED)
+        {
+            recordNetworkQualityEvent(this->reconnectEventTimes, this->reconnectEventNextIndex);
+        }
         if (apiConfig.useSSL && !this->_certManager.markFailure())
         {
             // Still iterating the certificate list: retry fast so a working cert near
@@ -607,7 +615,10 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
 
     case WEBSOCKET_EVENT_ERROR:
         logger.error("WebSocket error");
-        recordNetworkQualityEvent(this->reconnectEventTimes, this->reconnectEventNextIndex);
+        if (this->_state == CONNECTED)
+        {
+            recordNetworkQualityEvent(this->reconnectEventTimes, this->reconnectEventNextIndex);
+        }
         setState(INIT);
         break;
 
