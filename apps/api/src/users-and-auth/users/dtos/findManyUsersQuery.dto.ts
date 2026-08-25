@@ -90,11 +90,12 @@ export class FindManyUsersQueryDto {
     required: false,
     type: Boolean,
   })
-  @Transform(({ value }) => {
-    if (typeof value === 'boolean') return value;
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    return value;
+  @Transform(({ obj, key }) => {
+    const rawValue = obj[key];
+    if (typeof rawValue === 'boolean') return rawValue;
+    if (rawValue === 'true') return true;
+    if (rawValue === 'false') return false;
+    return rawValue;
   })
   @IsBoolean()
   @IsOptional()
@@ -122,11 +123,12 @@ export class FindManyUsersQueryDto {
     required: false,
     type: Boolean,
   })
-  @Transform(({ value }) => {
-    if (typeof value === 'boolean') return value;
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    return value;
+  @Transform(({ obj, key }) => {
+    const rawValue = obj[key];
+    if (typeof rawValue === 'boolean') return rawValue;
+    if (rawValue === 'true') return true;
+    if (rawValue === 'false') return false;
+    return rawValue;
   })
   @IsBoolean()
   @IsOptional()
