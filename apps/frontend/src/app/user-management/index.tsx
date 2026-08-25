@@ -18,11 +18,16 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownPopover,
+  DropdownTrigger,
   ListBox,
   SearchField,
   useFilter,
 } from '@heroui/react';
-import { KeyIcon, SearchIcon, ShieldCheckIcon, ShieldOffIcon, UserPlusIcon, Users } from 'lucide-react';
+import { KeyIcon, PlusIcon, SearchIcon, ShieldCheckIcon, ShieldOffIcon, UserPlusIcon, Users, XIcon } from 'lucide-react';
 import { TableToolbar } from '../../components/TableToolbar';
 import {
   SSOProvider,
@@ -52,14 +57,18 @@ type FilterOption = {
   label: string;
 };
 
+type FilterKey = 'role' | 'emailVerified' | 'ssoProvider';
+
+const FILTER_KEYS: FilterKey[] = ['role', 'emailVerified', 'ssoProvider'];
+
 function MultiValueFilter({
-  label,
+  ariaLabel,
   options,
   selectedKeys,
   onSelectionChange,
   dataCy,
 }: {
-  label: string;
+  ariaLabel: string;
   options: FilterOption[];
   selectedKeys: string[];
   onSelectionChange: (keys: string[]) => void;
@@ -69,39 +78,30 @@ function MultiValueFilter({
 
   return (
     <Autocomplete
-      className="w-36"
-      placeholder={label}
+      className="min-w-28"
+      placeholder={ariaLabel}
       selectionMode="multiple"
       value={selectedKeys}
       onChange={(keys) => onSelectionChange([...keys].map(String))}
-      aria-label={label}
+      aria-label={ariaLabel}
       data-cy={dataCy}
     >
       <Autocomplete.Trigger>
         <Autocomplete.Value>
-          {() => (
-            <span className="flex min-w-0 items-center gap-1.5">
-              <span className="truncate">{label}</span>
-              {selectedKeys.length > 0 ? (
-                <Chip size="sm" color="accent" variant="secondary" className="min-w-5 justify-center px-1">
-                  {selectedKeys.length}
-                </Chip>
-              ) : null}
-            </span>
-          )}
+          {() => options.filter((option) => selectedKeys.includes(option.key)).map((option) => option.label).join(', ') || ariaLabel}
         </Autocomplete.Value>
         <Autocomplete.Indicator />
       </Autocomplete.Trigger>
       <Autocomplete.Popover>
         <Autocomplete.Filter filter={contains}>
-          <SearchField autoFocus aria-label={label}>
+          <SearchField autoFocus aria-label={ariaLabel}>
             <SearchField.Group>
               <SearchField.SearchIcon />
-              <SearchField.Input placeholder={label} />
+              <SearchField.Input placeholder={ariaLabel} />
               <SearchField.ClearButton />
             </SearchField.Group>
           </SearchField>
-          <ListBox aria-label={label}>
+          <ListBox aria-label={ariaLabel}>
             {options.map((option) => (
               <ListBox.Item key={option.key} id={option.key} textValue={option.label}>
                 {option.label}
@@ -116,13 +116,13 @@ function MultiValueFilter({
 }
 
 function SingleValueFilter({
-  label,
+  ariaLabel,
   options,
   selectedKey,
   onSelectionChange,
   dataCy,
 }: {
-  label: string;
+  ariaLabel: string;
   options: FilterOption[];
   selectedKey?: string;
   onSelectionChange: (key?: string) => void;
@@ -132,38 +132,29 @@ function SingleValueFilter({
 
   return (
     <Autocomplete
-      className="w-36"
-      placeholder={label}
+      className="min-w-28"
+      placeholder={ariaLabel}
       value={selectedKey}
       onChange={(key) => onSelectionChange(key ? String(key) : undefined)}
-      aria-label={label}
+      aria-label={ariaLabel}
       data-cy={dataCy}
     >
       <Autocomplete.Trigger>
         <Autocomplete.Value>
-          {() => (
-            <span className="flex min-w-0 items-center gap-1.5">
-              <span className="truncate">{label}</span>
-              {selectedKey ? (
-                <Chip size="sm" color="accent" variant="secondary" className="min-w-5 justify-center px-1">
-                  1
-                </Chip>
-              ) : null}
-            </span>
-          )}
+          {() => options.find((option) => option.key === selectedKey)?.label ?? ariaLabel}
         </Autocomplete.Value>
         <Autocomplete.Indicator />
       </Autocomplete.Trigger>
       <Autocomplete.Popover>
         <Autocomplete.Filter filter={contains}>
-          <SearchField autoFocus aria-label={label}>
+          <SearchField autoFocus aria-label={ariaLabel}>
             <SearchField.Group>
               <SearchField.SearchIcon />
-              <SearchField.Input placeholder={label} />
+              <SearchField.Input placeholder={ariaLabel} />
               <SearchField.ClearButton />
             </SearchField.Group>
           </SearchField>
-          <ListBox aria-label={label}>
+          <ListBox aria-label={ariaLabel}>
             {options.map((option) => (
               <ListBox.Item key={option.key} id={option.key} textValue={option.label}>
                 {option.label}
@@ -192,6 +183,13 @@ export const UserManagementPage: React.FC = () => {
   const ssoProviderNone = searchParams.get('ssoProviderNone') === 'true';
   const ssoProviderMatch = searchParams.get('ssoProviderMatch') === 'all' ? 'all' : 'any';
   const assignRoleId = Number(searchParams.get('assignRoleId')) || undefined;
+  const activeFilters = FILTER_KEYS.filter(
+    (filter) =>
+      searchParams.getAll('filter').includes(filter) ||
+      (filter === 'role' && roleIds.length > 0) ||
+      (filter === 'emailVerified' && emailVerified !== null) ||
+      (filter === 'ssoProvider' && (ssoProviderIds.length > 0 || ssoProviderNone)),
+  );
 
   const debouncedSearch = useDebounce(search, 500);
 
@@ -218,6 +216,43 @@ export const UserManagementPage: React.FC = () => {
       return next;
     });
     setPage(1);
+  };
+
+  const addFilter = (filter: FilterKey) =>
+    updateFilters((params) => params.append('filter', filter));
+
+  const removeFilter = (filter: FilterKey) =>
+    updateFilters((params) => {
+      params.delete('filter');
+      activeFilters.filter((key) => key !== filter).forEach((key) => params.append('filter', key));
+      if (filter === 'role') {
+        params.delete('roleId');
+        params.delete('roleMatch');
+      }
+      if (filter === 'emailVerified') params.delete('emailVerified');
+      if (filter === 'ssoProvider') {
+        params.delete('ssoProviderId');
+        params.delete('ssoProviderNone');
+        params.delete('ssoProviderMatch');
+      }
+    });
+
+  const replaceFilter = (current: FilterKey, next: FilterKey) => {
+    if (current === next || activeFilters.includes(next)) return;
+    updateFilters((params) => {
+      params.delete('filter');
+      activeFilters.map((key) => (key === current ? next : key)).forEach((key) => params.append('filter', key));
+      if (current === 'role') {
+        params.delete('roleId');
+        params.delete('roleMatch');
+      }
+      if (current === 'emailVerified') params.delete('emailVerified');
+      if (current === 'ssoProvider') {
+        params.delete('ssoProviderId');
+        params.delete('ssoProviderNone');
+        params.delete('ssoProviderMatch');
+      }
+    });
   };
 
   const startRoleAssignment = () => {
@@ -292,64 +327,96 @@ export const UserManagementPage: React.FC = () => {
                   <InputGroup.Input placeholder={t('table.inputs.search')} data-cy="user-management-search-input" />
                 </InputGroup>
               </TextField>
-              <div className="flex flex-wrap gap-2" aria-label={t('filters.label')}>
-                <div className="flex items-end gap-1">
-                  <MultiValueFilter
-                    label={t('filters.role')}
-                    options={(roles ?? []).map((role) => ({ key: String(role.id), label: roleName(role) }))}
-                    selectedKeys={roleIds.map(String)}
-                    onSelectionChange={(keys) => updateFilters((params) => {
-                      params.delete('roleId');
-                      keys.forEach((key) => params.append('roleId', key));
-                      if (keys.length === 0) params.delete('roleMatch');
-                    })}
-                    dataCy="user-management-role-filter"
-                  />
-                  {roleIds.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2" aria-label={t('filters.label')}>
+                {activeFilters.map((filter) => (
+                  <div key={filter} role="group" aria-label={t(`filters.${filter}`)} className="flex max-w-full flex-wrap items-center rounded-medium border border-default-200 bg-content1 text-sm shadow-xs">
                     <Select
-                      className="w-20"
-                      aria-label={t('filters.roleMatch')}
-                      value={roleMatch}
-                      onChange={(value) => updateFilters((params) => params.set('roleMatch', value))}
-                      items={[{ key: 'any', label: t('filters.any') }, { key: 'all', label: t('filters.all') }]}
+                      className="min-w-24"
+                      aria-label={t('filters.category')}
+                      value={filter}
+                      onChange={(value) => replaceFilter(filter, value as FilterKey)}
+                      items={FILTER_KEYS.filter((key) => key === filter || !activeFilters.includes(key)).map((key) => ({ key, label: t(`filters.${key}`) }))}
                     />
-                  ) : null}
-                </div>
-                <div className="flex items-end">
-                  <SingleValueFilter
-                    label={t('filters.emailVerified')}
-                    options={[{ key: 'true', label: t('filters.verified') }, { key: 'false', label: t('filters.notVerified') }]}
-                    selectedKey={emailVerified === 'true' || emailVerified === 'false' ? emailVerified : undefined}
-                    onSelectionChange={(key) => updateFilters((params) => key ? params.set('emailVerified', key) : params.delete('emailVerified'))}
-                    dataCy="user-management-email-verified-filter"
-                  />
-                </div>
-                <div className="flex items-end gap-1">
-                  <MultiValueFilter
-                    label={t('filters.ssoProvider')}
-                    options={[{ key: 'none', label: t('filters.none') }, ...(ssoProviders ?? []).map((provider) => ({ key: String(provider.id), label: provider.name }))]}
-                    selectedKeys={[...(ssoProviderNone ? ['none'] : []), ...ssoProviderIds.map(String)]}
-                    onSelectionChange={(keys) => updateFilters((params) => {
-                      params.delete('ssoProviderId');
-                      params.delete('ssoProviderNone');
-                      if (keys.includes('none')) {
-                        params.set('ssoProviderNone', 'true');
-                      }
-                      keys.filter((key) => key !== 'none').forEach((key) => params.append('ssoProviderId', key));
-                      if (keys.length === 0) params.delete('ssoProviderMatch');
-                    })}
-                    dataCy="user-management-sso-provider-filter"
-                  />
-                  {ssoProviderIds.length > 0 ? (
-                    <Select
-                      className="w-20"
-                      aria-label={t('filters.ssoProviderMatch')}
-                      value={ssoProviderMatch}
-                      onChange={(value) => updateFilters((params) => params.set('ssoProviderMatch', value))}
-                      items={[{ key: 'any', label: t('filters.any') }, { key: 'all', label: t('filters.all') }]}
-                    />
-                  ) : null}
-                </div>
+                    {filter === 'role' ? (
+                      <>
+                        <Select
+                          className="min-w-28"
+                          aria-label={t('filters.roleMatch')}
+                          value={roleMatch}
+                          onChange={(value) => updateFilters((params) => params.set('roleMatch', value))}
+                          items={[{ key: 'any', label: t('filters.isAnyOf') }, { key: 'all', label: t('filters.isAllOf') }]}
+                        />
+                        <MultiValueFilter
+                          ariaLabel={t('filters.roleValues')}
+                          options={(roles ?? []).map((role) => ({ key: String(role.id), label: roleName(role) }))}
+                          selectedKeys={roleIds.map(String)}
+                          onSelectionChange={(keys) => updateFilters((params) => {
+                            params.delete('roleId');
+                            keys.forEach((key) => params.append('roleId', key));
+                            if (keys.length === 0) params.delete('roleMatch');
+                          })}
+                          dataCy="user-management-role-filter"
+                        />
+                      </>
+                    ) : filter === 'emailVerified' ? (
+                      <>
+                        <span className="border-x border-default-200 px-3 py-1.5 text-default-500">{t('filters.is')}</span>
+                        <SingleValueFilter
+                          ariaLabel={t('filters.emailVerificationStatus')}
+                          options={[{ key: 'true', label: t('filters.verified') }, { key: 'false', label: t('filters.notVerified') }]}
+                          selectedKey={emailVerified === 'true' || emailVerified === 'false' ? emailVerified : undefined}
+                          onSelectionChange={(key) => updateFilters((params) => key ? params.set('emailVerified', key) : params.delete('emailVerified'))}
+                          dataCy="user-management-email-verified-filter"
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <Select
+                          className="min-w-28"
+                          aria-label={t('filters.ssoProviderMatch')}
+                          value={ssoProviderMatch}
+                          onChange={(value) => updateFilters((params) => params.set('ssoProviderMatch', value))}
+                          items={[{ key: 'any', label: t('filters.isAnyOf') }, { key: 'all', label: t('filters.isAllOf') }]}
+                        />
+                        <MultiValueFilter
+                          ariaLabel={t('filters.ssoProviderValues')}
+                          options={[{ key: 'none', label: t('filters.none') }, ...(ssoProviders ?? []).map((provider) => ({ key: String(provider.id), label: provider.name }))]}
+                          selectedKeys={[...(ssoProviderNone ? ['none'] : []), ...ssoProviderIds.map(String)]}
+                          onSelectionChange={(keys) => updateFilters((params) => {
+                            params.delete('ssoProviderId');
+                            params.delete('ssoProviderNone');
+                            if (keys.includes('none')) params.set('ssoProviderNone', 'true');
+                            keys.filter((key) => key !== 'none').forEach((key) => params.append('ssoProviderId', key));
+                            if (keys.length === 0) params.delete('ssoProviderMatch');
+                          })}
+                          dataCy="user-management-sso-provider-filter"
+                        />
+                      </>
+                    )}
+                    <Button isIconOnly size="sm" variant="ghost" aria-label={t('filters.remove')} onPress={() => removeFilter(filter)}>
+                      <XIcon size={14} />
+                    </Button>
+                  </div>
+                ))}
+                {activeFilters.length < FILTER_KEYS.length ? (
+                  <Dropdown>
+                    <DropdownTrigger className="inline-flex">
+                      <Button size="sm" variant="ghost" aria-label={t('filters.add')}>
+                        <PlusIcon size={14} />
+                        {activeFilters.length === 0 ? t('filters.add') : null}
+                      </Button>
+                    </DropdownTrigger>
+                    <DropdownPopover>
+                      <DropdownMenu aria-label={t('filters.add')}>
+                        {FILTER_KEYS.filter((filter) => !activeFilters.includes(filter)).map((filter) => (
+                          <DropdownItem key={filter} id={filter} onPress={() => addFilter(filter)}>
+                            {t(`filters.${filter}`)}
+                          </DropdownItem>
+                        ))}
+                      </DropdownMenu>
+                    </DropdownPopover>
+                  </Dropdown>
+                ) : null}
               </div>
             </div>
           }
