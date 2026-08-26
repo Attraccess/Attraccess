@@ -351,7 +351,7 @@ void API::sendHeartbeat()
         return;
     }
     this->logger.info((std::string("pushing heartbeat to websocket queue: ") + json).c_str());
-    this->websocket.sendMessage(json, n);
+    this->websocket.sendHeartbeat(json, n);
 
     this->heartbeat_sent_at = millis();
 }

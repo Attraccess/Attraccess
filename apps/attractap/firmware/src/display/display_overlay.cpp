@@ -82,12 +82,13 @@ void Display::updateNetworkQualityOverlay()
     }
 
     State::NetworkQualityState qualityState = State::getNetworkQualityState();
-    if (qualityState.quality == Display::networkQualityOverlayValue)
+    if (Display::networkQualityOverlayInitialized && qualityState.quality == Display::networkQualityOverlayValue)
     {
         return;
     }
 
     Display::networkQualityOverlayValue = qualityState.quality;
+    Display::networkQualityOverlayInitialized = true;
 
     switch (qualityState.quality)
     {

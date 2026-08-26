@@ -41,6 +41,8 @@ public:
         uint32_t averagePongRttMs;
         int32_t pongRttTrendMs;
         uint8_t pongTimeoutsLastMinute;
+        uint8_t pongProbeLossPercentLastMinute;
+        uint8_t missedHeartbeatsLastMinute;
     };
 
     static void setNetworkQualityState(NetworkQuality quality,
@@ -53,7 +55,9 @@ public:
                                        uint32_t lastPongRttMs,
                                        uint32_t averagePongRttMs,
                                        int32_t pongRttTrendMs,
-                                       uint8_t pongTimeoutsLastMinute);
+                                       uint8_t pongTimeoutsLastMinute,
+                                       uint8_t pongProbeLossPercentLastMinute,
+                                       uint8_t missedHeartbeatsLastMinute);
     static NetworkQualityState getNetworkQualityState();
 
     // Connection phase of the websocket client. Mirrors Websocket::ConnectionState
@@ -120,6 +124,8 @@ private:
     static uint32_t network_quality_average_pong_rtt_ms;
     static int32_t network_quality_pong_rtt_trend_ms;
     static uint8_t network_quality_pong_timeouts_last_minute;
+    static uint8_t network_quality_pong_probe_loss_percent_last_minute;
+    static uint8_t network_quality_missed_heartbeats_last_minute;
 
     static uint16_t websocket_port;
     static bool websocket_use_ssl;

@@ -41,6 +41,7 @@ lv_obj_t *Display::deviceNameLabel = NULL;
 lv_obj_t *Display::networkQualityContainer = NULL;
 lv_obj_t *Display::networkQualityLabel = NULL;
 State::NetworkQuality Display::networkQualityOverlayValue = State::NETWORK_QUALITY_GOOD;
+bool Display::networkQualityOverlayInitialized = false;
 BootScreen Display::bootScreen;
 SetPinScreen Display::setPinScreen;
 ConnectionConfigurationScreen Display::connectionConfigurationScreen;

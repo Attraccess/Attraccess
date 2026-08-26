@@ -128,6 +128,7 @@ private:
     static lv_obj_t *networkQualityContainer;
     static lv_obj_t *networkQualityLabel;
     static State::NetworkQuality networkQualityOverlayValue;
+    static bool networkQualityOverlayInitialized;
 
     static lv_obj_t *activePopup;
     static lv_timer_t *popupAutoCloseTimer;

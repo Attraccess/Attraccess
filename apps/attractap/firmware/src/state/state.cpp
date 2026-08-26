@@ -44,6 +44,8 @@ uint32_t State::network_quality_last_pong_rtt_ms = 0;
 uint32_t State::network_quality_average_pong_rtt_ms = 0;
 int32_t State::network_quality_pong_rtt_trend_ms = 0;
 uint8_t State::network_quality_pong_timeouts_last_minute = 0;
+uint8_t State::network_quality_pong_probe_loss_percent_last_minute = 0;
+uint8_t State::network_quality_missed_heartbeats_last_minute = 0;
 uint16_t State::websocket_port = 0;
 bool State::websocket_use_ssl = false;
 bool State::websocket_connected = false;
@@ -96,7 +98,9 @@ void State::setNetworkQualityState(NetworkQuality quality,
                                    uint32_t lastPongRttMs,
                                    uint32_t averagePongRttMs,
                                    int32_t pongRttTrendMs,
-                                   uint8_t pongTimeoutsLastMinute)
+                                   uint8_t pongTimeoutsLastMinute,
+                                   uint8_t pongProbeLossPercentLastMinute,
+                                   uint8_t missedHeartbeatsLastMinute)
 {
     StateLock lock(state_mutex);
     network_quality = quality;
@@ -110,6 +114,8 @@ void State::setNetworkQualityState(NetworkQuality quality,
     network_quality_average_pong_rtt_ms = averagePongRttMs;
     network_quality_pong_rtt_trend_ms = pongRttTrendMs;
     network_quality_pong_timeouts_last_minute = pongTimeoutsLastMinute;
+    network_quality_pong_probe_loss_percent_last_minute = pongProbeLossPercentLastMinute;
+    network_quality_missed_heartbeats_last_minute = missedHeartbeatsLastMinute;
 }
 
 State::NetworkQualityState State::getNetworkQualityState()
@@ -127,6 +133,8 @@ State::NetworkQualityState State::getNetworkQualityState()
     state.averagePongRttMs = network_quality_average_pong_rtt_ms;
     state.pongRttTrendMs = network_quality_pong_rtt_trend_ms;
     state.pongTimeoutsLastMinute = network_quality_pong_timeouts_last_minute;
+    state.pongProbeLossPercentLastMinute = network_quality_pong_probe_loss_percent_last_minute;
+    state.missedHeartbeatsLastMinute = network_quality_missed_heartbeats_last_minute;
 
     return state;
 }

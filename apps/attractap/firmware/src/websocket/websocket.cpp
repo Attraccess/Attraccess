@@ -228,6 +228,8 @@ void Websocket::sendPongProbe(uint32_t nowMs)
     {
         this->pendingPongProbeTime = sentAtMs;
         this->pendingPongProbeToken = token;
+        this->pongProbeSentEventTimes[this->pongProbeSentEventNextIndex] = sentAtMs;
+        this->pongProbeSentEventNextIndex = (uint8_t)((this->pongProbeSentEventNextIndex + 1) % QUALITY_EVENT_SLOTS);
     }
     xSemaphoreGive(this->network_quality_mutex);
     unlockWsClient();
@@ -260,6 +262,9 @@ void Websocket::publishNetworkQuality()
     uint8_t sendFailures = 0;
     uint8_t livenessTimeouts = 0;
     uint8_t pongTimeouts = 0;
+    uint8_t pongProbesSent = 0;
+    uint8_t pongProbeResponses = 0;
+    uint8_t missedHeartbeats = 0;
     uint32_t lastPongRttMs = 0;
     uint32_t averagePongRttMs = 0;
     int32_t pongRttTrendMs = 0;
@@ -271,12 +276,18 @@ void Websocket::publishNetworkQuality()
         sendFailures = countRecentNetworkQualityEvents(this->sendFailureEventTimes, nowMs);
         livenessTimeouts = countRecentNetworkQualityEvents(this->livenessTimeoutEventTimes, nowMs);
         pongTimeouts = countRecentNetworkQualityEvents(this->pongTimeoutEventTimes, nowMs);
+        pongProbesSent = countRecentNetworkQualityEvents(this->pongProbeSentEventTimes, nowMs);
+        pongProbeResponses = countRecentNetworkQualityEvents(this->pongProbeResponseEventTimes, nowMs);
+        missedHeartbeats = countRecentNetworkQualityEvents(this->missedHeartbeatEventTimes, nowMs);
         lastPongRttMs = this->lastPongRttMs;
         averagePongRttMs = averageRecentPongRtt(nowMs);
         pongRttTrendMs = recentPongRttTrend(nowMs);
         xSemaphoreGive(this->network_quality_mutex);
     }
 
+    uint8_t pongProbeLossPercent = pongProbesSent == 0 || pongProbeResponses >= pongProbesSent
+                                      ? 0
+                                      : (uint8_t)(((pongProbesSent - pongProbeResponses) * 100) / pongProbesSent);
     State::NetworkQuality quality = State::NETWORK_QUALITY_GOOD;
     if (!this->network_is_connected || this->_state != CONNECTED)
     {
@@ -288,6 +299,8 @@ void Websocket::publishNetworkQuality()
               sendFailures > 0 ||
               livenessTimeouts > 0 ||
               pongTimeouts > 0 ||
+               (pongProbesSent >= 3 && pongProbeLossPercent >= this->PONG_PROBE_LOSS_DEGRADED_PERCENT) ||
+               missedHeartbeats > 0 ||
               averagePongRttMs >= this->PONG_RTT_DEGRADED_AFTER_MS ||
               txDepth >= (TX_QUEUE_DEPTH / 2))
     {
@@ -295,7 +308,8 @@ void Websocket::publishNetworkQuality()
     }
 
     State::setNetworkQualityState(quality, inboundAgeMs, reconnects, txDepth, queueFull, sendFailures, livenessTimeouts,
-                                  lastPongRttMs, averagePongRttMs, pongRttTrendMs, pongTimeouts);
+                                  lastPongRttMs, averagePongRttMs, pongRttTrendMs, pongTimeouts, pongProbeLossPercent,
+                                  missedHeartbeats);
 }
 
 void Websocket::recordNetworkQualityEvent(uint32_t *events, uint8_t &nextIndex)
@@ -743,6 +757,8 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
             {
                 uint32_t rttMs = nowMs - this->pendingPongProbeTime;
                 this->pendingPongProbeTime = 0;
+                this->pongProbeResponseEventTimes[this->pongProbeResponseEventNextIndex] = nowMs;
+                this->pongProbeResponseEventNextIndex = (uint8_t)((this->pongProbeResponseEventNextIndex + 1) % QUALITY_EVENT_SLOTS);
                 xSemaphoreGive(this->network_quality_mutex);
                 recordPongRtt(rttMs, nowMs);
             }
@@ -810,7 +826,12 @@ bool Websocket::sendMessage(const char *message, size_t length)
     return enqueueMessage(message, length);
 }
 
-bool Websocket::enqueueMessage(const char *data, size_t length)
+bool Websocket::sendHeartbeat(const char *message, size_t length)
+{
+    return enqueueMessage(message, length, true);
+}
+
+bool Websocket::enqueueMessage(const char *data, size_t length, bool isHeartbeat)
 {
     if (!tx_queue)
     {
@@ -826,11 +847,15 @@ bool Websocket::enqueueMessage(const char *data, size_t length)
     }
     memcpy(copy, data, length);
 
-    TxMessage msg{copy, length};
+    TxMessage msg{copy, length, isHeartbeat};
     if (xQueueSend(tx_queue, &msg, 0) != pdTRUE)
     {
         logger.error("enqueueMessage: tx queue full, dropping message");
         recordNetworkQualityEvent(this->txQueueFullEventTimes, this->txQueueFullEventNextIndex);
+        if (isHeartbeat)
+        {
+            recordNetworkQualityEvent(this->missedHeartbeatEventTimes, this->missedHeartbeatEventNextIndex);
+        }
         free(copy);
         return false;
     }
@@ -857,6 +882,10 @@ void Websocket::txTaskLoop()
         {
             unlockWsClient();
             logger.error("ws tx: ws_client not initialized, dropping message");
+            if (msg.isHeartbeat)
+            {
+                recordNetworkQualityEvent(this->missedHeartbeatEventTimes, this->missedHeartbeatEventNextIndex);
+            }
             free(msg.data);
             continue;
         }
@@ -867,6 +896,10 @@ void Websocket::txTaskLoop()
         {
             logger.error("ws tx: send failed");
             recordNetworkQualityEvent(this->sendFailureEventTimes, this->sendFailureEventNextIndex);
+            if (msg.isHeartbeat)
+            {
+                recordNetworkQualityEvent(this->missedHeartbeatEventTimes, this->missedHeartbeatEventNextIndex);
+            }
         }
         free(msg.data);
     }
