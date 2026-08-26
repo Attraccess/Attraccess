@@ -107,6 +107,59 @@ void webInitiatedFlowDoesNotUnlockLocally() {
            "web-initiated success must not unlock locally");
 }
 
+void readerCardSuccessUnlocksAndResets() {
+    Fixture fixture;
+    fixture.beginReader();
+    const uint8_t uid[] = {1};
+    fixture.flow.onCardDetected(uid, sizeof(uid));
+    fixture.flow.tick(101);
+    expect(fixture.api.cardAuthRequests == 1, "reader card must request authentication data");
+    expect(fixture.api.lastCardAuthResourceId == 42,
+           "reader card authentication must use the reader flow resource");
+
+    API::SupervisorCardAuthenticationResponse cardAuth;
+    cardAuth.keyLen = 16;
+    fixture.flow.onCardAuthentication(cardAuth);
+    expect(fixture.flow.tick(102) == SupervisionFlow::Outcome::UnlockAndStartSession,
+           "reader card success must unlock and start a session");
+    expect(!fixture.flow.active(), "reader card success must reset the flow");
+}
+
+void resolutionWinsOverCardAuthentication() {
+    Fixture fixture;
+    fixture.beginReader();
+    const uint8_t uid[] = {1};
+    fixture.flow.onCardDetected(uid, sizeof(uid));
+    fixture.flow.tick(101);
+
+    API::SupervisorCardAuthenticationResponse cardAuth;
+    cardAuth.keyLen = 16;
+    fixture.flow.onCardAuthentication(cardAuth);
+    fixture.flow.onResolved({.success = true});
+
+    expect(fixture.flow.tick(102) == SupervisionFlow::Outcome::None,
+           "web resolution must win over a concurrent card authentication");
+    expect(fixture.screen.lastView.status == SupervisionScreen::STATUS_SUCCESS,
+           "winning web resolution must show success");
+    expect(fixture.flow.tick(1303) == SupervisionFlow::Outcome::Unlock,
+           "card authentication must not produce a second terminal outcome");
+}
+
+void disconnectClearsActivePendingAndQueuedWork() {
+    Fixture fixture;
+    supervisionTestNowMs = 100;
+    fixture.flow.armWebInitiated({.resourceId = 42, .timeoutMs = 30000, .requesterUsername = "requester"});
+    fixture.flow.onDisconnect();
+    expect(!fixture.flow.takePendingWebStart(101, false), "disconnect must clear pending web starts");
+
+    fixture.beginReader();
+    fixture.flow.onResolved({.success = true});
+    fixture.flow.onDisconnect();
+    expect(!fixture.flow.active(), "disconnect must reset the active flow");
+    expect(fixture.flow.tick(102) == SupervisionFlow::Outcome::None,
+           "disconnect must discard queued terminal outcomes");
+}
+
 void timeoutReturnsToRouting() {
     Fixture fixture;
     fixture.beginReader();
@@ -122,6 +175,9 @@ int main() {
     rejectedCardRecovers();
     terminalFailureReturnsAfterDwell();
     webInitiatedFlowDoesNotUnlockLocally();
+    readerCardSuccessUnlocksAndResets();
+    resolutionWinsOverCardAuthentication();
+    disconnectClearsActivePendingAndQueuedWork();
     timeoutReturnsToRouting();
     return 0;
 }

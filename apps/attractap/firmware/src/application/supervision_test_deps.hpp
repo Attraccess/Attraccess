@@ -57,8 +57,12 @@ public:
     uint32_t cancels = 0;
     uint32_t cardAuthRequests = 0;
     uint32_t confirmations = 0;
+    uint32_t lastCardAuthResourceId = 0;
     void requestSupervision(uint32_t) { ++requests; }
-    void requestSupervisorCardAuthenticationData(uint8_t *, uint8_t, uint32_t) { ++cardAuthRequests; }
+    void requestSupervisorCardAuthenticationData(uint8_t *, uint8_t, uint32_t resourceId) {
+        ++cardAuthRequests;
+        lastCardAuthResourceId = resourceId;
+    }
     void confirmSupervisorCardAuth(uint32_t) { ++confirmations; }
     void cancelSupervision() { ++cancels; }
 };

@@ -359,7 +359,8 @@ SupervisionFlow::Outcome SupervisionFlow::tick(uint32_t now) {
         return Outcome::None;
     }
     if (cardRejected) { cardRejected = false; showError(false, now); return Outcome::None; }
-    if (phase != Phase::Success && static_cast<int32_t>(now - activeDeadlineMs) > 0) {
+    if (phase != Phase::Idle && phase != Phase::Success &&
+        static_cast<int32_t>(now - activeDeadlineMs) > 0) {
         logger.error("Supervision timeout reached"); api.cancelSupervision(); resetActiveTransaction(); return Outcome::ReturnToRouting;
     }
     switch (phase) {
