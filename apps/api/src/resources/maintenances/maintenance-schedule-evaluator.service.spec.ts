@@ -298,6 +298,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       await service.evaluateAll();
 
+      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(1);
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(2);
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledWith(
         1, scheduleId, expect.any(String), expect.anything(),
@@ -305,6 +306,16 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledWith(
         2, scheduleId + 1, expect.any(String), expect.anything(),
       );
+      expect(maintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(
+        { resourceId: 1, scheduleId },
+        expect.anything(),
+      );
+      expect(maintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(
+        { resourceId: 2, scheduleId: scheduleId + 1 },
+        expect.anything(),
+      );
+      const createCalls = (maintenanceService.createMaintenanceFromSchedule as jest.Mock).mock.calls;
+      expect(createCalls[0][3]).toBe(createCalls[1][3]);
     });
 
     it('should not create maintenance when TIME_INTERVAL not yet due', async () => {

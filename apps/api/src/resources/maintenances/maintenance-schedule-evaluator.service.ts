@@ -590,14 +590,10 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
       if (toCreate.length === 0) return;
 
       // --- WRITE PHASE ---
-      // One short transaction per triggered schedule: the re-check guards against races between the
-      // bulk read and now, and a failure (e.g. resource deleted mid-run) only skips its own item.
-      // ponytail: this is O(triggered), not O(resources) — normally a handful per tick, which is the
-      // whole point of the bulk read above. Upgrade path if a mass trigger ever hurts: batch into
-      // chunked transactions.
-      for (const { resourceId, schedule } of toCreate) {
-        try {
-          await this.scheduleRepository.manager.transaction(async (em) => {
+      // Re-check inside one short transaction because the bulk-read active set can be stale.
+      await this.scheduleRepository.manager.transaction(async (em) => {
+        for (const { resourceId, schedule } of toCreate) {
+          try {
             const hasActive = await this.maintenanceService.hasActiveMaintenance(
               { resourceId, scheduleId: schedule.id },
               em,
@@ -609,14 +605,14 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
             this.logger.log(
               `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
             );
-          });
-        } catch (err) {
-          this.logger.error(
-            `Error creating maintenance for resource ${resourceId} from schedule ${schedule.id}: ${err}`,
-            (err as Error)?.stack,
-          );
+          } catch (err) {
+            this.logger.error(
+              `Error creating maintenance for resource ${resourceId} from schedule ${schedule.id}: ${err}`,
+              (err as Error)?.stack,
+            );
+          }
         }
-      }
+      });
     } finally {
       this.evaluationLock = false;
     }
