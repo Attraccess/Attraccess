@@ -115,4 +115,9 @@ describe('HttpSendRequestExecutor', () => {
 
     await expect(executor.execute(node, {}, ctx)).rejects.toThrow('network down');
   });
+
+  it('classifies controller responses separately from transport failures', () => {
+    expect(executor.getFailureKind({ response: { status: 500 } })).toBe('controller-rejection');
+    expect(executor.getFailureKind(new Error('network down'))).toBe('transport-dispatch');
+  });
 });

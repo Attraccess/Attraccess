@@ -1,7 +1,7 @@
 import { ResourceFlowNode, HttpRequestNodeDataSchema } from '@attraccess/database-entities';
 import axios from 'axios';
 import z from 'zod';
-import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
+import { FlowFailureKind, NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 
 export class HttpSendRequestExecutor implements NodeExecutor {
   async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
@@ -24,5 +24,11 @@ export class HttpSendRequestExecutor implements NodeExecutor {
     return {
       payload: response.data,
     };
+  }
+
+  getFailureKind(error: unknown): FlowFailureKind {
+    return typeof error === 'object' && error !== null && 'response' in error
+      ? 'controller-rejection'
+      : 'transport-dispatch';
   }
 }

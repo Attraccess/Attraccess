@@ -609,7 +609,9 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     } catch (error) {
       const processingTime = Date.now() - startTime;
       const failureBehavior = dispatchStarted ? getExternalEffectFailureBehavior(node.type, node.data) : undefined;
-      const failureKind = dispatchStarted ? this.failureKind(node, error) : 'node-failure';
+      const failureKind = dispatchStarted
+        ? (this.nodeExecutors[node.type]?.getFailureKind?.(error) ?? 'node-failure')
+        : 'node-failure';
       const errorMessage = this.errorReason(error);
       this.logger.error(
         `Failed to process flow node ID: ${node.id} (Type: ${node.type}) after ${processingTime}ms`,
@@ -660,26 +662,6 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     } catch {
       return String(error);
     }
-  }
-
-  private failureKind(node: ResourceFlowNode, error: unknown): string {
-    if (node.type === ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE) {
-      return error instanceof Error && error.message.startsWith('Timeout waiting for MQTT message')
-        ? 'acknowledgement-timeout'
-        : 'transport-dispatch';
-    }
-
-    if (node.type === ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE) {
-      return 'transport-dispatch';
-    }
-
-    if (node.type === ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST) {
-      return typeof error === 'object' && error !== null && 'response' in error
-        ? 'controller-rejection'
-        : 'transport-dispatch';
-    }
-
-    return 'node-failure';
   }
 
   private async executeNextNodes(

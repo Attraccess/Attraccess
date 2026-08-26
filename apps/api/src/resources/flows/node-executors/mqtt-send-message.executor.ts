@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import { ResourceFlowNode, MqttSendMessageNodeDataSchema } from '@attraccess/database-entities';
 import z from 'zod';
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
-import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
+import { FlowFailureKind, NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 
 export class MqttSendMessageExecutor implements NodeExecutor {
   private readonly logger = new Logger(MqttSendMessageExecutor.name);
@@ -37,6 +37,10 @@ export class MqttSendMessageExecutor implements NodeExecutor {
     return {
       payload: input,
     };
+  }
+
+  getFailureKind(): FlowFailureKind {
+    return 'transport-dispatch';
   }
 
   private hasDescription(error: unknown): boolean {

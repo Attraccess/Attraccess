@@ -195,4 +195,8 @@ describe('MqttSendMessageExecutor', () => {
       "Failed to publish MQTT message to topic 'devices/state' on server 1: no error details were provided",
     );
   });
+
+  it('classifies publish failures as transport-dispatch failures', () => {
+    expect(executor.getFailureKind(new Error('broker offline'))).toBe('transport-dispatch');
+  });
 });
