@@ -49,33 +49,51 @@ export const ButtonNodeDataSchema = z.object({
   label: z.string().min(1, 'Label is required'),
 });
 
-export const HttpRequestNodeDataSchema = z.object({
-  url: z.string().url('Invalid URL format'),
-  method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']),
-  headers: z.record(z.string(), z.string()).optional().default({}),
-  body: z.string().optional().default('').meta({
-    stringVariant: 'multiline',
-  }),
+export const ExternalEffectFailureBehaviorSchema = z
+  .enum(['fail-flow', 'failure-output', 'log-and-continue'])
+  .default('log-and-continue')
+  .meta({
+    helpText:
+      'fail-flow aborts the triggering operation, failure-output routes the error through the failure handle, and log-and-continue records the error and continues normally.',
+  });
+
+export const ExternalEffectPolicySchema = z.object({
+  failureBehavior: ExternalEffectFailureBehaviorSchema,
 });
+
+export type ExternalEffectFailureBehavior = z.infer<typeof ExternalEffectFailureBehaviorSchema>;
+
+export const HttpRequestNodeDataSchema = z
+  .object({
+    url: z.string().url('Invalid URL format'),
+    method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']),
+    headers: z.record(z.string(), z.string()).optional().default({}),
+    body: z.string().optional().default('').meta({
+      stringVariant: 'multiline',
+    }),
+  })
+  .extend(ExternalEffectPolicySchema.shape);
 
 const MqttServerIdSchema = z.number().int().positive().meta({
   selectFromEntity: 'mqttServer',
   entityProperty: 'id',
 });
 
-export const MqttSendMessageNodeDataSchema = z.object({
-  serverId: MqttServerIdSchema,
-  topic: z.string().min(1, 'Topic is required'),
-  payload: z.string().optional().default('').meta({
-    stringVariant: 'multiline',
-  }),
-  qos: z.number().min(0).max(2).optional().meta({
-    helpText: 'Publish QoS: 0 (at most once), 1 (at least once), 2 (exactly once)',
-  }),
-  retain: z.boolean().optional().meta({
-    helpText: 'Retain publishes: broker stores last message for new subscribers',
-  }),
-});
+export const MqttSendMessageNodeDataSchema = z
+  .object({
+    serverId: MqttServerIdSchema,
+    topic: z.string().min(1, 'Topic is required'),
+    payload: z.string().optional().default('').meta({
+      stringVariant: 'multiline',
+    }),
+    qos: z.number().min(0).max(2).optional().meta({
+      helpText: 'Publish QoS: 0 (at most once), 1 (at least once), 2 (exactly once)',
+    }),
+    retain: z.boolean().optional().meta({
+      helpText: 'Retain publishes: broker stores last message for new subscribers',
+    }),
+  })
+  .extend(ExternalEffectPolicySchema.shape);
 
 export const WaitNodeDataSchema = z.object({
   duration: z.number().int().positive('Duration must be a positive integer'),
@@ -164,15 +182,17 @@ export const VariableChangedNodeDataSchema = z.object({
   source: z.enum(['any', 'exclude-self']).default('any'),
 });
 
-export const MqttWaitForMessageNodeDataSchema = z.object({
-  serverId: MqttServerIdSchema,
-  topic: z.string().min(1, 'Topic is required'),
-  timeoutSeconds: z.number().int().positive('Timeout must be a positive integer (seconds)'),
-  subscribeQos: z.number().min(0).max(2).optional().meta({
-    helpText:
-      'Subscribe QoS sets the maximum delivery level for received messages; effective QoS is the lower of publisher and subscriber QoS.',
-  }),
-});
+export const MqttWaitForMessageNodeDataSchema = z
+  .object({
+    serverId: MqttServerIdSchema,
+    topic: z.string().min(1, 'Topic is required'),
+    timeoutSeconds: z.number().int().positive('Timeout must be a positive integer (seconds)'),
+    subscribeQos: z.number().min(0).max(2).optional().meta({
+      helpText:
+        'Subscribe QoS sets the maximum delivery level for received messages; effective QoS is the lower of publisher and subscriber QoS.',
+    }),
+  })
+  .extend(ExternalEffectPolicySchema.shape);
 
 export const ErrorNodeDataSchema = z.object({
   message: z.string().min(1),
@@ -184,7 +204,30 @@ export const ResourceUsageEndSessionNodeDataSchema = z
       stringVariant: 'multiline',
     }),
   })
+  .extend(ExternalEffectPolicySchema.shape)
   .optional();
+
+export function getExternalEffectFailureBehavior(
+  nodeType: ResourceFlowNodeType,
+  data: unknown,
+): ExternalEffectFailureBehavior | undefined {
+  if (typeof data !== 'object' || data === null || !('failureBehavior' in data)) {
+    return undefined;
+  }
+
+  switch (nodeType) {
+    case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
+      return HttpRequestNodeDataSchema.safeParse(data).data?.failureBehavior;
+    case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
+      return MqttSendMessageNodeDataSchema.safeParse(data).data?.failureBehavior;
+    case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
+      return MqttWaitForMessageNodeDataSchema.safeParse(data).data?.failureBehavior;
+    case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
+      return ResourceUsageEndSessionNodeDataSchema.safeParse(data).data?.failureBehavior;
+    default:
+      return undefined;
+  }
+}
 
 export const HealthStateOptionEnum = z.enum(['healthy', 'unhealthy']);
 

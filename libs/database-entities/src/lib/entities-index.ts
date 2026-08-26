@@ -51,12 +51,9 @@ import {
   CompanionIdleActiveNodeDataSchema,
   CompanionForegroundAppNodeDataSchema,
   CompanionUsbDeviceNodeDataSchema,
+  getExternalEffectFailureBehavior,
 } from './entities/resourceFlowNode';
-import {
-  ResourceHealthState,
-  ResourceHealthStatus,
-  ResourceHealthSource,
-} from './entities/resourceHealthState.entity';
+import { ResourceHealthState, ResourceHealthStatus, ResourceHealthSource } from './entities/resourceHealthState.entity';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
 import { ResourceMaintenance } from './entities/resource.maintenance';
 import { ResourceMaintenanceRequest, MaintenanceRequestStatus } from './entities/resource-maintenance-request.entity';
@@ -64,9 +61,7 @@ import {
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleTriggerType,
 } from './entities/resource-maintenance-schedule.entity';
-import {
-  ResourceMaintenanceScheduleUsageHoursConfig,
-} from './entities/resource-maintenance-schedule-usage-hours-config.entity';
+import { ResourceMaintenanceScheduleUsageHoursConfig } from './entities/resource-maintenance-schedule-usage-hours-config.entity';
 import { UsageDurationUnit } from './types/usageDurationUnit.enum';
 import { ResourceMaintenanceScheduleUsageCountConfig } from './entities/resource-maintenance-schedule-usage-count-config.entity';
 import { ResourceMaintenanceScheduleTimeIntervalConfig } from './entities/resource-maintenance-schedule-time-interval-config.entity';
@@ -91,10 +86,7 @@ import {
   PasswordPolicyRole,
   PASSWORD_POLICY_ROLES,
 } from './entities/password-policy-override.entity';
-import {
-  PasswordPolicyAudit,
-  PasswordPolicyAuditEvent,
-} from './entities/password-policy-audit.entity';
+import { PasswordPolicyAudit, PasswordPolicyAuditEvent } from './entities/password-policy-audit.entity';
 import { Conversation } from './entities/conversation.entity';
 import { ConversationParticipant } from './entities/conversation-participant.entity';
 import { Message, MessageReferenceType } from './entities/message.entity';
@@ -166,6 +158,7 @@ export {
   BillingTransactionItemCreateSchema,
   MqttMessageReceivedNodeDataSchema,
   MqttWaitForMessageNodeDataSchema,
+  getExternalEffectFailureBehavior,
   ResourceUsageEndSessionNodeDataSchema,
   ErrorNodeDataSchema,
   Project,

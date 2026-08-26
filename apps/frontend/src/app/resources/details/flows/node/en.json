@@ -274,7 +274,7 @@
           "title": "Wait for MQTT message",
           "description": "Waits for the next MQTT message matching the topic filter; forwards {topic, payload}.",
           "inputs": { "input": "Input" },
-          "outputs": { "output": "Output" },
+          "outputs": { "output": "Output", "failure": "Failure" },
           "preview": {
             "topic": "Topic",
             "timeoutSeconds": "Timeout (s)"
@@ -289,6 +289,14 @@
                 "0": "0 - At most once (fire and forget)",
                 "1": "1 - At least once (acknowledged)",
                 "2": "2 - Exactly once (two-phase handshake)"
+              }
+            },
+            "failureBehavior": {
+              "label": "On failure",
+              "enum": {
+                "fail-flow": "Fail flow",
+                "failure-output": "Continue through failure output",
+                "log-and-continue": "Log and continue"
               }
             }
           }
@@ -377,7 +385,8 @@
             "input": "Input"
           },
           "outputs": {
-            "output": "Output"
+            "output": "Output",
+            "failure": "Failure"
           },
           "preview": {
             "assignments": "Sets"
@@ -488,6 +497,14 @@
             },
             "body": {
               "label": "Body"
+            },
+            "failureBehavior": {
+              "label": "On failure",
+              "enum": {
+                "fail-flow": "Fail flow",
+                "failure-output": "Continue through failure output",
+                "log-and-continue": "Log and continue"
+              }
             }
           }
         }
@@ -500,7 +517,8 @@
             "input": "Input"
           },
           "outputs": {
-            "output": "Output"
+            "output": "Output",
+            "failure": "Failure"
           },
           "preview": {
             "topic": "Topic"
@@ -523,7 +541,15 @@
                 "2": "2 - Exactly once (two-phase handshake)"
               }
             },
-            "retain": { "label": "Retain message" }
+            "retain": { "label": "Retain message" },
+            "failureBehavior": {
+              "label": "On failure",
+              "enum": {
+                "fail-flow": "Fail flow",
+                "failure-output": "Continue through failure output",
+                "log-and-continue": "Log and continue"
+              }
+            }
           }
         }
       },
@@ -559,9 +585,17 @@
             "title": "End usage session",
             "description": "Ends the active usage session. Optionally sends notes (template or static).",
             "inputs": { "input": "Input" },
-            "outputs": { "output": "Output" },
+            "outputs": { "output": "Output", "failure": "Failure" },
             "config": {
-              "notes": { "label": "Notes (templates allowed)" }
+              "notes": { "label": "Notes (templates allowed)" },
+              "failureBehavior": {
+                "label": "On failure",
+                "enum": {
+                  "fail-flow": "Fail flow",
+                  "failure-output": "Continue through failure output",
+                  "log-and-continue": "Log and continue"
+                }
+              }
             },
             "preview": {
               "notes": "Notes"

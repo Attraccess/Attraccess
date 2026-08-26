@@ -274,7 +274,7 @@
           "title": "Auf MQTT-Nachricht warten",
           "description": "Wartet auf die nächste MQTT-Nachricht, die dem Themen-Filter entspricht; übergibt {topic, payload}.",
           "inputs": { "input": "Eingabe" },
-          "outputs": { "output": "Ausgabe" },
+          "outputs": { "output": "Ausgabe", "failure": "Fehler" },
           "preview": {
             "topic": "Thema",
             "timeoutSeconds": "Timeout (s)"
@@ -289,6 +289,14 @@
                 "0": "0 - Höchstens einmal (Fire-and-Forget)",
                 "1": "1 - Mindestens einmal (Bestätigung)",
                 "2": "2 - Genau einmal (Zwei-Phasen-Austausch)"
+              }
+            },
+            "failureBehavior": {
+              "label": "Bei Fehler",
+              "enum": {
+                "fail-flow": "Flow abbrechen",
+                "failure-output": "Über Fehlerausgang fortsetzen",
+                "log-and-continue": "Protokollieren und fortsetzen"
               }
             }
           }
@@ -377,7 +385,8 @@
             "input": "Eingabe"
           },
           "outputs": {
-            "output": "Ausgabe"
+            "output": "Ausgabe",
+            "failure": "Fehler"
           },
           "preview": {
             "assignments": "Setzt"
@@ -488,6 +497,14 @@
             },
             "body": {
               "label": "Body"
+            },
+            "failureBehavior": {
+              "label": "Bei Fehler",
+              "enum": {
+                "fail-flow": "Flow abbrechen",
+                "failure-output": "Über Fehlerausgang fortsetzen",
+                "log-and-continue": "Protokollieren und fortsetzen"
+              }
             }
           }
         }
@@ -500,7 +517,8 @@
             "input": "Eingabe"
           },
           "outputs": {
-            "output": "Ausgabe"
+            "output": "Ausgabe",
+            "failure": "Fehler"
           },
           "preview": {
             "topic": "Thema"
@@ -523,7 +541,15 @@
                 "2": "2 - Genau einmal (Zwei-Phasen-Austausch)"
               }
             },
-            "retain": { "label": "Nachricht behalten (retain)" }
+            "retain": { "label": "Nachricht behalten (retain)" },
+            "failureBehavior": {
+              "label": "Bei Fehler",
+              "enum": {
+                "fail-flow": "Flow abbrechen",
+                "failure-output": "Über Fehlerausgang fortsetzen",
+                "log-and-continue": "Protokollieren und fortsetzen"
+              }
+            }
           }
         }
       },
@@ -559,9 +585,17 @@
             "title": "Nutzung beenden",
             "description": "Beendet die aktive Nutzungssitzung. Optional mit Notizen (Template oder statisch).",
             "inputs": { "input": "Eingabe" },
-            "outputs": { "output": "Ausgabe" },
+            "outputs": { "output": "Ausgabe", "failure": "Fehler" },
             "config": {
-              "notes": { "label": "Notizen (Templates erlaubt)" }
+              "notes": { "label": "Notizen (Templates erlaubt)" },
+              "failureBehavior": {
+                "label": "Bei Fehler",
+                "enum": {
+                  "fail-flow": "Flow abbrechen",
+                  "failure-output": "Über Fehlerausgang fortsetzen",
+                  "log-and-continue": "Protokollieren und fortsetzen"
+                }
+              }
             },
             "preview": {
               "notes": "Notizen"
