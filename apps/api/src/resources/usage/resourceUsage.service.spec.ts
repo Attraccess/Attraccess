@@ -1975,7 +1975,7 @@ describe('ResourceUsageService', () => {
       jest.useFakeTimers();
       try {
         mockResourceRetrainingService.getResourceRetrainingStatus.mockResolvedValue({
-          blocksAccess: true,
+          blocksAccess: false,
           dueAt: new Date(Date.now() + 1_000),
         });
 
@@ -2034,21 +2034,21 @@ describe('ResourceUsageService', () => {
       expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(1);
     });
 
-    it('does not write to cache when at max size', async () => {
+    it('prunes expired entries before adding a new result to a full cache', async () => {
       // @ts-expect-error access private field for testing
       const MAX = service.ACCESS_CACHE_MAX_SIZE as number;
       // @ts-expect-error access private field for testing
       const cache = service.accessCache as Map<string, unknown>;
 
-      // Fill the cache to the limit with fake entries.
+      // Fill the cache with expired entries so the next result can claim a slot.
       for (let i = 0; i < MAX; i++) {
-        cache.set(`stub:${i}`, { userId: i, resourceId: i, result: true, expiresAt: Date.now() + 30_000 });
+        cache.set(`stub:${i}`, { userId: i, resourceId: i, result: true, expiresAt: Date.now() - 1 });
       }
 
-      // This call should compute the result but NOT write it to the full cache.
-      const result = await service.canControllResource(resourceId, mockUser);
-      expect(result).toBe(true);
-      expect(cache.size).toBe(MAX);
+      await service.canControllResource(resourceId, mockUser);
+
+      expect(cache.size).toBe(1);
+      expect(cache.has(`${mockUser.id}:${resourceId}:restricted`)).toBe(true);
     });
   });
 });

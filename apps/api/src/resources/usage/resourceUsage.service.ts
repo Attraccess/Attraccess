@@ -209,17 +209,18 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     let expiresAt = Date.now() + this.ACCESS_CACHE_TTL_MS;
     if (result && !canUpdateResource) {
       const retrainingStatus = await this.resourceRetrainingService.getResourceRetrainingStatus(resourceId, user.id);
-      if (retrainingStatus.blocksAccess && retrainingStatus.dueAt) {
+      if (retrainingStatus.dueAt) {
         expiresAt = Math.min(expiresAt, retrainingStatus.dueAt.getTime());
       }
     }
-    if (
-      generation === this.accessCacheGeneration &&
-      expiresAt > Date.now() &&
-      this.accessCache.size < this.ACCESS_CACHE_MAX_SIZE
-    ) {
-      this.accessCache.set(key, { userId: user.id, resourceId, result, expiresAt });
-      this.metricsService.authorizationCacheSize.set(this.accessCache.size);
+    if (generation === this.accessCacheGeneration && expiresAt > Date.now()) {
+      if (this.accessCache.size >= this.ACCESS_CACHE_MAX_SIZE) {
+        this.pruneAccessCache();
+      }
+      if (this.accessCache.size < this.ACCESS_CACHE_MAX_SIZE) {
+        this.accessCache.set(key, { userId: user.id, resourceId, result, expiresAt });
+        this.metricsService.authorizationCacheSize.set(this.accessCache.size);
+      }
     }
     return result;
   }
