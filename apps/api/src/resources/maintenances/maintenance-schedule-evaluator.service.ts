@@ -590,29 +590,30 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
       if (toCreate.length === 0) return;
 
       // --- WRITE PHASE ---
-      // Re-check inside one short transaction because the bulk-read active set can be stale.
-      await this.scheduleRepository.manager.transaction(async (em) => {
-        for (const { resourceId, schedule } of toCreate) {
-          try {
+      // Re-check and create each maintenance in its own short transaction. Keeping the catch outside
+      // the callback preserves rollback semantics while allowing later schedules to be evaluated.
+      for (const { resourceId, schedule } of toCreate) {
+        try {
+          await this.scheduleRepository.manager.transaction(async (em) => {
             const hasActive = await this.maintenanceService.hasActiveMaintenance(
               { resourceId, scheduleId: schedule.id },
               em,
             );
-            if (hasActive) continue;
+            if (hasActive) return;
 
             const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
             await this.maintenanceService.createMaintenanceFromSchedule(resourceId, schedule.id, reason, em);
             this.logger.log(
               `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
             );
-          } catch (err) {
-            this.logger.error(
-              `Error creating maintenance for resource ${resourceId} from schedule ${schedule.id}: ${err}`,
-              (err as Error)?.stack,
-            );
-          }
+          });
+        } catch (err) {
+          this.logger.error(
+            `Error creating maintenance for resource ${resourceId} from schedule ${schedule.id}: ${err}`,
+            (err as Error)?.stack,
+          );
         }
-      });
+      }
     } finally {
       this.evaluationLock = false;
     }

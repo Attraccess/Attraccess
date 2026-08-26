@@ -298,7 +298,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       await service.evaluateAll();
 
-      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(1);
+      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(2);
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(2);
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledWith(
         1, scheduleId, expect.any(String), expect.anything(),
@@ -315,7 +315,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         expect.anything(),
       );
       const createCalls = (maintenanceService.createMaintenanceFromSchedule as jest.Mock).mock.calls;
-      expect(createCalls[0][3]).toBe(createCalls[1][3]);
+      expect(createCalls[0][3]).not.toBe(createCalls[1][3]);
     });
 
     it('should continue creating other due maintenances when a stale active check succeeds', async () => {
@@ -350,7 +350,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       await service.evaluateAll();
 
-      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(1);
+      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(2);
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(1);
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledWith(
         2, scheduleId + 1, expect.any(String), expect.anything(),
@@ -656,6 +656,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       await expect(service.evaluateAll()).resolves.toBeUndefined();
 
+      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(2);
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(2);
     });
 
