@@ -8,10 +8,12 @@ RULES:
 
 ## Worktree Bootstrap
 
-New worktrees run `scripts/setup-dev-dependencies.sh` automatically through the
-Git `post-checkout` hook. It installs dependencies, creates `.env`, runs database
-migrations, and installs the project-local ESP-IDF v6.0.2 toolchain at
-`.tools/esp-idf`. If bootstrap failed, rerun that script before reporting a
+Create worktrees with `scripts/create-worktree.sh <worktree-path> <branch>
+[start-point]`. It runs `scripts/setup-dev-dependencies.sh` after `git worktree
+add` succeeds, installing dependencies, creating `.env`, running database
+migrations, and installing the project-local ESP-IDF v6.0.2 toolchain at
+`.tools/esp-idf`. The completion marker is created only after setup succeeds.
+If bootstrap fails, rerun that script from the new worktree before reporting a
 missing toolchain.
 
 ## Dev servers — always use `pnpm serve`
