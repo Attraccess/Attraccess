@@ -110,7 +110,7 @@ jobs:
       - name: Test Attractap firmware version check
         run: ./scripts/attractap-firmware-version-check.spec.sh
       - name: Test Attractap WiFi log diagnostics
-        run: ./scripts/attractap-wifi-log-diagnostics.spec.sh
+        run: bash ./scripts/attractap-wifi-log-diagnostics.spec.sh
       - name: Ensure Attractap firmware version was bumped
         run: ./scripts/check-attractap-firmware-version.sh "${{ env.NX_AFFECTED_BASE }}"
 

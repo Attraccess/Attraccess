@@ -71,6 +71,24 @@ The firmware speaks a line protocol on the USB console (115200 8N1):
 `CMND <topic> <json>` in, `RESP <topic> <json>` out — used by the frontend's
 hardware setup flow. Log lines have the format `[Module] LEVEL: message`.
 
+### WiFi fault-injection verification
+
+Verify production serial logging on a flashed WiFi-capable reader before
+releasing a WiFi logging change. Capture the USB serial output at 115200 8N1
+for each scenario below; the expected diagnostics must be present at `ERROR`
+level, while the ESP-IDF idle message `Haven't to connect to a suitable AP now!`
+must be absent.
+
+| Scenario               | Procedure                                                                                                                                                     | Expected serial output                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Authentication failure | Send `CMND network.wifi.credentials.set {"ssid":"<bench-ssid>","password":"wrong-password"}`.                                                                 | `[WiFi] ERROR: Disconnected: reason ... (AUTH_FAIL)` (or the ESP-IDF authentication-specific reason) |
+| AP not found           | Send the same command with a guaranteed nonexistent SSID.                                                                                                     | `[WiFi] ERROR: Disconnected: reason ... (NO_AP_FOUND)`                                               |
+| DHCP timeout           | On the bench OpenWRT router, run `DHCP_SECTION=lan ./tools/chaos-ap/chaos-ap.sh dhcp-wedge on`, then reconnect the reader. Restore with `... dhcp-wedge off`. | `[WiFi] ERROR: DHCP timeout - no IP acquired, forcing reconnect`                                     |
+| Idle                   | Leave the reader unprovisioned for at least 30 seconds.                                                                                                       | No ESP-IDF `wifi` idle-scan chatter                                                                  |
+
+The chaos AP setup and cleanup instructions are in
+[`tools/chaos-ap/README.md`](../../../tools/chaos-ap/README.md).
+
 ## Attractap Lite LED Animations
 
 The Attractap Lite variant uses a WS2812 LED ring for status feedback. For a user-facing guide to LED states and triggers, see the [Attractap Lite LED Guide](../../../docs/user/resources/iots/attractap-lite-led-guide.md) in the docs.
