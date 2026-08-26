@@ -40,6 +40,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
   let maintenanceRepository: Repository<ResourceMaintenance>;
   let resourceRepository: Repository<Resource>;
   let usageRepository: Repository<ResourceUsage>;
+  let nestedTransaction: jest.Mock;
 
   const resourceId = 1;
   const scheduleId = 10;
@@ -47,6 +48,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
   beforeEach(async () => {
     const qb = createQueryBuilderMock();
+    nestedTransaction = jest.fn();
 
     const scheduleRepoMock = {
       find: jest.fn(),
@@ -61,8 +63,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
           ) => {
             const transactionalEntityManager = {
               getRepository: (entity: unknown) => (entity === ResourceMaintenanceSchedule ? scheduleRepoMock : {}),
-              transaction: async (innerCb: (innerEm: unknown) => Promise<unknown>) =>
-                innerCb(transactionalEntityManager),
+              transaction: nestedTransaction,
             };
             return cb(transactionalEntityManager);
           },
@@ -331,7 +332,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       expect(maintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(2, expect.anything());
     });
 
-    it('should skip a resource that gains an active maintenance between write batches', async () => {
+    it('should use one transaction without nested transactions for all due schedules', async () => {
       const oldCreatedAt = new Date('2024-01-01T00:00:00.000Z');
       const dueSchedules = Array.from(
         { length: 101 },
@@ -358,7 +359,8 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       await service.evaluateAll();
 
-      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(2);
+      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(1);
+      expect(nestedTransaction).not.toHaveBeenCalled();
       expect(maintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(101, expect.anything());
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(100);
       expect(maintenanceService.createMaintenanceFromSchedule).not.toHaveBeenCalledWith(
@@ -675,7 +677,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       );
     });
 
-    it('should isolate failures so one bad schedule does not block the rest', async () => {
+    it('should roll back all writes when creating a maintenance fails', async () => {
       jest.spyOn(scheduleRepository, 'find').mockResolvedValue([
         {
           id: scheduleId,
@@ -710,16 +712,16 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       jest
         .spyOn(maintenanceService, 'createMaintenanceFromSchedule')
-        .mockRejectedValueOnce(new Error('resource vanished mid-run'))
-        .mockResolvedValueOnce({ id: 2 } as ResourceMaintenance);
+        .mockRejectedValueOnce(new Error('resource vanished mid-run'));
 
       await expect(service.evaluateAll()).resolves.toBeUndefined();
 
       expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(1);
-      expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(2);
+      expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(1);
+      expect(maintenanceService.emitScheduledMaintenanceCreated).not.toHaveBeenCalled();
     });
 
-    it('should not emit side effects for a nested transaction that fails to commit', async () => {
+    it('should not emit side effects when the write transaction fails to commit', async () => {
       jest.spyOn(scheduleRepository, 'find').mockResolvedValue([
         {
           id: scheduleId,
@@ -741,13 +743,8 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       ]);
 
       jest.spyOn(scheduleRepository.manager, 'transaction').mockImplementation(async (callback) => {
-        const itemManager = {
-          transaction: async (itemCallback: (em: unknown) => Promise<unknown>) => {
-            await itemCallback(itemManager);
-            throw new Error('savepoint release failed');
-          },
-        };
-        return callback(itemManager as never);
+        await callback({} as never);
+        throw new Error('transaction commit failed');
       });
 
       await expect(service.evaluateAll()).resolves.toBeUndefined();
