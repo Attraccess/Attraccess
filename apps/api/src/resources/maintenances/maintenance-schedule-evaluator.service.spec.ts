@@ -54,6 +54,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         transaction: jest.fn(async (cb: (em: { getRepository: (entity: unknown) => unknown }) => Promise<unknown>) => {
           const transactionalEntityManager = {
             getRepository: (entity: unknown) => (entity === ResourceMaintenanceSchedule ? scheduleRepoMock : {}),
+            query: jest.fn().mockResolvedValue([]),
           };
           return cb(transactionalEntityManager);
         }),
@@ -322,7 +323,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       expect(maintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(2, expect.anything());
     });
 
-    it('should write all due schedules in one transaction without savepoints', async () => {
+    it('should write due schedules in bounded transactions', async () => {
       const oldCreatedAt = new Date('2024-01-01T00:00:00.000Z');
       const dueSchedules = Array.from(
         { length: 101 },
@@ -349,7 +350,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       await service.evaluateAll();
 
-      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(1);
+      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(2);
       expect(maintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(101, expect.anything());
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(100);
       expect(maintenanceService.createMaintenanceFromSchedule).not.toHaveBeenCalledWith(
@@ -425,9 +426,58 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       jest.spyOn(resourceRepository, 'find').mockResolvedValue([{ id: 1, createdAt: recentCreatedAt } as Resource]);
 
+      const querySpy = jest.spyOn(usageRepository, 'query');
+
       await service.evaluateAll();
 
       expect(maintenanceService.createMaintenanceFromSchedule).not.toHaveBeenCalled();
+      expect(querySpy).toHaveBeenCalledTimes(1);
+      expect(querySpy.mock.calls[0][0]).not.toContain('resource_usage');
+    });
+
+    it('should skip orphaned schedules without issuing an invalid empty-pairs query', async () => {
+      jest.spyOn(scheduleRepository, 'find').mockResolvedValue([
+        {
+          id: scheduleId,
+          resourceId: 1,
+          enabled: true,
+          triggerType: ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL,
+          timeIntervalConfig: { duration: 1, unit: 'DAYS' },
+        } as ResourceMaintenanceSchedule,
+      ]);
+      jest.spyOn(resourceRepository, 'find').mockResolvedValue([]);
+      const querySpy = jest.spyOn(usageRepository, 'query');
+
+      await service.evaluateAll();
+
+      expect(querySpy).not.toHaveBeenCalled();
+      expect(maintenanceService.createMaintenanceFromSchedule).not.toHaveBeenCalled();
+    });
+
+    it('should chunk schedule state and usage queries below SQLite bind limits', async () => {
+      const count = 10_922;
+      const oldCreatedAt = new Date('2024-01-01T00:00:00.000Z');
+      const schedules = Array.from(
+        { length: count },
+        (_, index) =>
+          ({
+            id: index + 1,
+            resourceId: index + 1,
+            enabled: true,
+            triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_COUNT,
+            usageCountConfig: { thresholdSessions: 1 },
+          }) as ResourceMaintenanceSchedule,
+      );
+      jest.spyOn(scheduleRepository, 'find').mockResolvedValue(schedules);
+      jest
+        .spyOn(resourceRepository, 'find')
+        .mockResolvedValue(schedules.map(({ resourceId: id }) => ({ id, createdAt: oldCreatedAt }) as Resource));
+      const querySpy = jest.spyOn(usageRepository, 'query').mockResolvedValue([]);
+
+      await service.evaluateAll();
+
+      expect(querySpy).toHaveBeenCalledTimes(4);
+      expect(querySpy.mock.calls.map(([, params]) => (params as unknown[]).length)).toEqual([32_764, 4, 32_763, 3]);
     });
 
     it('should skip resources that already have active maintenance', async () => {
@@ -676,7 +726,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       );
     });
 
-    it('should roll back all scheduled writes when one creation fails', async () => {
+    it('should continue creating scheduled maintenances when one creation fails', async () => {
       jest.spyOn(scheduleRepository, 'find').mockResolvedValue([
         {
           id: scheduleId,
@@ -716,8 +766,8 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       await expect(service.evaluateAll()).resolves.toBeUndefined();
 
       expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(1);
-      expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(1);
-      expect(maintenanceService.emitScheduledMaintenanceCreated).not.toHaveBeenCalled();
+      expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(2);
+      expect(maintenanceService.emitScheduledMaintenanceCreated).toHaveBeenCalledWith(2, 1);
     });
 
     it('should not emit side effects when the write transaction fails to commit', async () => {
@@ -742,7 +792,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         .mockResolvedValue([{ id: 1, createdAt: new Date('2024-01-01T00:00:00.000Z') } as Resource]);
 
       jest.spyOn(scheduleRepository.manager, 'transaction').mockImplementation(async (callback) => {
-        await callback({} as never);
+        await callback({ query: jest.fn().mockResolvedValue([]) } as never);
         throw new Error('transaction commit failed');
       });
 

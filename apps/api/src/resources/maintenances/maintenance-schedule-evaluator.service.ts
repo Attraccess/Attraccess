@@ -73,10 +73,48 @@ export const buildScheduleEvaluationQuery = (
           GROUP BY b.resourceId, b.scheduleId, b.baseline, b.hasActiveMaintenance`;
 };
 
-/**
- * SQLite's 32766 bind-parameter limit supports more than 10k schedules in one evaluation query;
- * the 5k-resource target remains a single bounded query.
- */
+const MAX_PAIRS_PER_QUERY = 10_921;
+const WRITE_TRANSACTION_BATCH_SIZE = 100;
+
+/** Fetch completed-maintenance baselines and active state without scanning resource usage. */
+export const buildScheduleStateQuery = (maintenanceTable: string, pairCount: number): string => {
+  const pairs = Array.from({ length: pairCount }, () => '(?, ?, ?)').join(', ');
+
+  return `WITH pairs(resourceId, scheduleId, createdAt) AS (VALUES ${pairs})
+          SELECT p.resourceId AS resourceId,
+                 p.scheduleId AS scheduleId,
+                 COALESCE(MAX(done.endTime), p.createdAt) AS baseline,
+                 EXISTS(
+                   SELECT 1
+                   FROM "${maintenanceTable}" active
+                   WHERE active.resourceId = p.resourceId
+                     AND active.startTime <= ?
+                     AND active.endTime IS NULL
+                 ) AS hasActiveMaintenance
+          FROM pairs p
+          LEFT JOIN "${maintenanceTable}" done
+            ON done.resourceId = p.resourceId
+           AND done.maintenanceScheduleId = p.scheduleId
+           AND done.endTime IS NOT NULL
+          GROUP BY p.resourceId, p.scheduleId, p.createdAt`;
+};
+
+/** Aggregate only the usage-based schedules after their baselines have been resolved. */
+export const buildScheduleUsageAggregateQuery = (usageTable: string, pairCount: number): string => {
+  const pairs = Array.from({ length: pairCount }, () => '(?, ?, ?)').join(', ');
+
+  return `WITH pairs(resourceId, scheduleId, baseline) AS (VALUES ${pairs})
+          SELECT p.resourceId AS resourceId,
+                 p.scheduleId AS scheduleId,
+                 COALESCE(SUM(u.usageInMinutes), 0) AS totalMinutes,
+                 COUNT(u.id) AS totalCount
+          FROM pairs p
+          LEFT JOIN "${usageTable}" u
+            ON u.resourceId = p.resourceId
+           AND u.endTime IS NOT NULL
+           AND u.endTime >= p.baseline
+          GROUP BY p.resourceId, p.scheduleId`;
+};
 
 /**
  * Evaluates maintenance schedules and creates ResourceMaintenance when a schedule's condition is met.
@@ -443,8 +481,8 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
    * Bulk pre-fetch strategy (O(1) queries instead of O(resources) sequential transactions):
    * 1. Load all enabled schedules + configs in one query.
    * 2. Load resource createdAt dates as fallback baselines.
-   * 3. Load completed-maintenance baselines, active state, and usage aggregates in one CTE query.
-   * 4. Write only the schedules that actually triggered in one transaction.
+   * 3. Load completed-maintenance baselines and active state, then usage totals only for usage schedules.
+   * 4. Write triggered schedules in bounded transactions.
    */
   async evaluateAll(): Promise<void> {
     if (this.evaluationLock) {
@@ -484,8 +522,8 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
         );
       }
 
-      // 3. Fetch per-schedule baselines, active state, and usage totals in one query. The CTE avoids
-      // loading usage rows into memory and keeps each schedule's baseline inside the database.
+      // 3. Fetch per-schedule baselines and active state. This deliberately does not scan usage for
+      // time schedules, whose trigger only depends on the baseline.
       const usageAggBySchedule = new Map<string, { totalMinutes: number; totalCount: number }>();
       const baselineMap = new Map<string, Date>();
       const activeResourceIds = new Set<number>();
@@ -496,36 +534,69 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
           scheduleId: schedule.id,
           createdAt: resourceCreatedAtMap.get(schedule.resourceId) ?? now,
         }));
-      const aggregates: Array<{
+      if (pairs.length === 0) return;
+
+      const stateRows: Array<{
         resourceId: number;
         scheduleId: number;
         baseline?: string | Date;
         hasActiveMaintenance?: number | boolean;
-        totalMinutes: number | string | null;
-        totalCount: number | string | null;
-      }> = await this.usageRepository.query(
-        buildScheduleEvaluationQuery(
-          this.maintenanceRepository.metadata.tableName,
-          this.usageRepository.metadata.tableName,
-          pairs.length,
-        ),
-        [
-          ...pairs.flatMap((pair) => [pair.resourceId, pair.scheduleId, formatDbDate(pair.createdAt)]),
-          formatDbDate(now),
-        ],
-      );
+      }> = [];
+      for (let offset = 0; offset < pairs.length; offset += MAX_PAIRS_PER_QUERY) {
+        const chunk = pairs.slice(offset, offset + MAX_PAIRS_PER_QUERY);
+        stateRows.push(
+          ...(await this.usageRepository.query(
+            buildScheduleStateQuery(this.maintenanceRepository.metadata.tableName, chunk.length),
+            [
+              ...chunk.flatMap((pair) => [pair.resourceId, pair.scheduleId, formatDbDate(pair.createdAt)]),
+              formatDbDate(now),
+            ],
+          )),
+        );
+      }
 
-      for (const row of aggregates) {
+      for (const row of stateRows) {
         const key = `${row.scheduleId}:${row.resourceId}`;
         baselineMap.set(
           key,
           row.baseline ? parseDbDate(row.baseline) : (resourceCreatedAtMap.get(row.resourceId) ?? now),
         );
         if (row.hasActiveMaintenance) activeResourceIds.add(row.resourceId);
-        usageAggBySchedule.set(key, {
-          totalMinutes: Number(row.totalMinutes ?? 0),
-          totalCount: Number(row.totalCount ?? 0),
-        });
+      }
+
+      const getBaseline = (resourceId: number, scheduleId: number): Date =>
+        baselineMap.get(`${scheduleId}:${resourceId}`) ?? resourceCreatedAtMap.get(resourceId) ?? now;
+
+      const usagePairs = allSchedules
+        .filter(
+          (schedule) =>
+            knownResourceIds.has(schedule.resourceId) &&
+            (schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS ||
+              schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT),
+        )
+        .map((schedule) => ({
+          resourceId: schedule.resourceId,
+          scheduleId: schedule.id,
+          baseline: getBaseline(schedule.resourceId, schedule.id),
+        }));
+      for (let offset = 0; offset < usagePairs.length; offset += MAX_PAIRS_PER_QUERY) {
+        const chunk = usagePairs.slice(offset, offset + MAX_PAIRS_PER_QUERY);
+        const aggregates: Array<{
+          resourceId: number;
+          scheduleId: number;
+          totalMinutes: number | string | null;
+          totalCount: number | string | null;
+        }> = await this.usageRepository.query(
+          buildScheduleUsageAggregateQuery(this.usageRepository.metadata.tableName, chunk.length),
+          chunk.flatMap((pair) => [pair.resourceId, pair.scheduleId, formatDbDate(pair.baseline)]),
+        );
+        for (const row of aggregates) {
+          const key = `${row.scheduleId}:${row.resourceId}`;
+          usageAggBySchedule.set(key, {
+            totalMinutes: Number(row.totalMinutes ?? 0),
+            totalCount: Number(row.totalCount ?? 0),
+          });
+        }
       }
 
       // Observe query window sizes so we can alert if they grow unexpectedly large.
@@ -536,9 +607,6 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
         if (baseline)
           this.metricsService.maintenanceUsageQueryWindowDays.observe((now.getTime() - baseline.getTime()) / msPerDay);
       }
-
-      const getBaseline = (resourceId: number, scheduleId: number): Date =>
-        baselineMap.get(`${scheduleId}:${resourceId}`) ?? resourceCreatedAtMap.get(resourceId) ?? now;
 
       // --- IN-MEMORY EVALUATION PHASE ---
 
@@ -567,34 +635,52 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
       if (toCreate.length === 0) return;
 
       // --- WRITE PHASE ---
-      const createdMaintenances: Array<{ resourceId: number; maintenanceId: number }> = [];
-      try {
-        await this.scheduleRepository.manager.transaction(async (em) => {
-          for (const { resourceId, schedule } of toCreate) {
-            // Recheck by resource to prevent a concurrent manual or different-schedule maintenance.
-            if (await this.maintenanceService.hasActiveMaintenance(resourceId, em)) continue;
+      for (let offset = 0; offset < toCreate.length; offset += WRITE_TRANSACTION_BATCH_SIZE) {
+        const batch = toCreate.slice(offset, offset + WRITE_TRANSACTION_BATCH_SIZE);
+        const createdMaintenances: Array<{ resourceId: number; maintenanceId: number }> = [];
+        try {
+          await this.scheduleRepository.manager.transaction(async (em) => {
+            for (const [index, { resourceId, schedule }] of batch.entries()) {
+              const savepoint = `maintenance_schedule_${offset + index}`;
+              await em.query(`SAVEPOINT ${savepoint}`);
+              try {
+                // Recheck by resource to prevent a concurrent manual or different-schedule maintenance.
+                if (await this.maintenanceService.hasActiveMaintenance(resourceId, em)) {
+                  await em.query(`RELEASE SAVEPOINT ${savepoint}`);
+                  continue;
+                }
 
-            const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
-            const maintenance = await this.maintenanceService.createMaintenanceFromSchedule(
-              resourceId,
-              schedule.id,
-              reason,
-              em,
-              false,
-            );
-            createdMaintenances.push({ resourceId, maintenanceId: maintenance.id });
-            this.logger.log(
-              `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
-            );
+                const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
+                const maintenance = await this.maintenanceService.createMaintenanceFromSchedule(
+                  resourceId,
+                  schedule.id,
+                  reason,
+                  em,
+                  false,
+                );
+                await em.query(`RELEASE SAVEPOINT ${savepoint}`);
+                createdMaintenances.push({ resourceId, maintenanceId: maintenance.id });
+                this.logger.log(
+                  `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
+                );
+              } catch (err) {
+                await em.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+                await em.query(`RELEASE SAVEPOINT ${savepoint}`);
+                this.logger.error(
+                  `Error creating scheduled maintenance for resource ${resourceId}: ${err}`,
+                  (err as Error)?.stack,
+                );
+              }
+            }
+          });
+
+          // The batch transaction commits before notifications are emitted.
+          for (const { resourceId, maintenanceId } of createdMaintenances) {
+            this.maintenanceService.emitScheduledMaintenanceCreated(resourceId, maintenanceId);
           }
-        });
-
-        // The transaction commit succeeds before notifications are emitted.
-        for (const { resourceId, maintenanceId } of createdMaintenances) {
-          this.maintenanceService.emitScheduledMaintenanceCreated(resourceId, maintenanceId);
+        } catch (err) {
+          this.logger.error(`Error creating scheduled maintenance batch: ${err}`, (err as Error)?.stack);
         }
-      } catch (err) {
-        this.logger.error(`Error creating scheduled maintenances: ${err}`, (err as Error)?.stack);
       }
     } finally {
       this.evaluationLock = false;
