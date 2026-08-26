@@ -1869,6 +1869,14 @@ describe('ResourceUsageService', () => {
       expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(1);
     });
 
+    it('caches the RBAC lookup for users without request-scoped permissions', async () => {
+      await service.canControllResource(resourceId, mockUser);
+      await service.canControllResource(resourceId, mockUser);
+
+      expect(mockRbacService.getEffectivePermissions).toHaveBeenCalledTimes(1);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(1);
+    });
+
     it('re-queries DB after TTL expires', async () => {
       jest.useFakeTimers();
       try {
@@ -1905,6 +1913,7 @@ describe('ResourceUsageService', () => {
 
       await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
       expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(1);
+      expect(mockRbacService.getEffectivePermissions).toHaveBeenCalledTimes(1);
     });
 
     it('clears cache on ResourceGroupIntroductionChangedEvent', async () => {
@@ -2060,7 +2069,7 @@ describe('ResourceUsageService', () => {
       await service.canControllResource(resourceId, mockUser);
 
       expect(cache.size).toBe(1);
-      expect(cache.has(`${mockUser.id}:${resourceId}:restricted`)).toBe(true);
+      expect(cache.has(`${mockUser.id}:${resourceId}:default`)).toBe(true);
     });
   });
 });

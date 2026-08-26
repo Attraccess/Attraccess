@@ -275,11 +275,12 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     user: User,
     transactionalEntityManager?: EntityManager,
   ): Promise<boolean> {
-    const effectivePermissions =
-      (user as AuthenticatedUser).effectivePermissions ?? (await this.rbacService.getEffectivePermissions(user.id));
-    const canUpdateResource = effectivePermissions.has('resources.update');
+    const requestPermissions = (user as AuthenticatedUser).effectivePermissions;
     // API tokens may have a narrower effective permission set than their owning user session.
-    const key = `${user.id}:${resourceId}:${canUpdateResource ? 'update' : 'restricted'}`;
+    // Keep users without request-scoped permissions separate so their RBAC lookup can be cached too.
+    const key = `${user.id}:${resourceId}:${
+      requestPermissions ? (requestPermissions.has('resources.update') ? 'update' : 'restricted') : 'default'
+    }`;
     const cached = this.accessCache.get(key);
     if (cached && cached.expiresAt > Date.now()) {
       this.metricsService.authorizationCacheRequestsTotal.inc({ result: 'hit' });
@@ -296,14 +297,19 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       return inFlight.result;
     }
 
-    const result = this.resolveAuthorizationCacheMiss(
-      key,
-      resourceId,
-      user,
-      canUpdateResource,
-      transactionalEntityManager,
-      generation,
-    );
+    const result = (async () => {
+      const canUpdateResource = (requestPermissions ?? (await this.rbacService.getEffectivePermissions(user.id))).has(
+        'resources.update',
+      );
+      return this.resolveAuthorizationCacheMiss(
+        key,
+        resourceId,
+        user,
+        canUpdateResource,
+        transactionalEntityManager,
+        generation,
+      );
+    })();
     this.accessCacheInFlight.set(key, { generation, result });
     try {
       return await result;
