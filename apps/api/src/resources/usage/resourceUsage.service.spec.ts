@@ -393,11 +393,11 @@ describe('ResourceUsageService', () => {
       type: ResourceType.Machine,
     } as Resource;
 
-    it('should roll back the start when the start flow fails', async () => {
+    it('should roll back the start when an HTTP transport failure is propagated', async () => {
       const dto: StartUsageSessionDto = { notes: 'Test session' };
 
       flowExecutorService.runFlow.mockRejectedValueOnce(
-        new ExternalEffectFailureError('MQTT authentication failed', new Error('MQTT authentication failed')),
+        new ExternalEffectFailureError('HTTP dispatch failed', new Error('HTTP dispatch failed'), 'transport-dispatch'),
       );
 
       // Mock resourceRepository.findOne to return the resource
@@ -435,7 +435,7 @@ describe('ResourceUsageService', () => {
         mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
       );
 
-      await expect(service.startSession(1, mockUser, dto)).rejects.toThrow('MQTT authentication failed');
+      await expect(service.startSession(1, mockUser, dto)).rejects.toThrow('HTTP dispatch failed');
       expect(transactionalEntityManager.createQueryBuilder).toHaveBeenCalled();
       expect(mockQueryBuilder.insert).toHaveBeenCalled();
       expect(mockQueryBuilder.into).toHaveBeenCalledWith(ResourceUsage);
@@ -525,11 +525,15 @@ describe('ResourceUsageService', () => {
       );
     });
 
-    it('should roll back the takeover when the takeover flow fails', async () => {
+    it('should roll back the takeover when an MQTT controller rejection is propagated', async () => {
       const dto: StartUsageSessionDto = { notes: 'Test session', forceTakeOver: true };
 
       flowExecutorService.runFlow.mockRejectedValueOnce(
-        new ExternalEffectFailureError('MQTT authentication failed', new Error('MQTT authentication failed')),
+        new ExternalEffectFailureError(
+          'MQTT controller rejected takeover',
+          new Error('MQTT controller rejected takeover'),
+          'controller-rejection',
+        ),
       );
 
       // Mock resourceRepository.findOne to return the resource (allowTakeOver: true)
@@ -583,7 +587,7 @@ describe('ResourceUsageService', () => {
         .mockReturnValueOnce(mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>) // For ending session
         .mockReturnValueOnce(mockInsertQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>); // For creating new session
 
-      await expect(service.startSession(1, mockUser, dto)).rejects.toThrow('MQTT authentication failed');
+      await expect(service.startSession(1, mockUser, dto)).rejects.toThrow('MQTT controller rejected takeover');
       expect(mockUpdateQueryBuilder.update).toHaveBeenCalledWith(ResourceUsage);
       expect(mockUpdateQueryBuilder.set).toHaveBeenCalledWith({
         endTime: expect.any(Date),
@@ -1125,7 +1129,7 @@ describe('ResourceUsageService', () => {
       expect(eventPayload.usage).toMatchObject({ id: 1, userId: 1, endNotes: 'Session completed' });
     });
 
-    it('runs the stopped-session flow after committing the usage transaction', async () => {
+    it('runs the stopped-session flow within the usage transaction', async () => {
       const mockActiveSession = {
         id: 1,
         resourceId: 1,
@@ -1150,7 +1154,7 @@ describe('ResourceUsageService', () => {
         calls.push('update');
       });
       flowExecutorService.runFlow.mockImplementation(async () => {
-        expect(usageTransactionCommitted).toBe(true);
+        expect(usageTransactionCommitted).toBe(false);
         calls.push('flow');
         return [];
       });
@@ -1168,11 +1172,11 @@ describe('ResourceUsageService', () => {
         1,
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
         expect.objectContaining({ endNotes: 'Auto-ended' }),
-        resourceUsageRepository.manager,
+        transactionalEntityManager,
       );
     });
 
-    it('keeps the ended session committed and emits no events when the stopped-session flow fails', async () => {
+    it('rolls back the stopped session when an acknowledgement timeout is propagated', async () => {
       const mockActiveSession = {
         id: 1,
         resourceId: 1,
@@ -1187,7 +1191,11 @@ describe('ResourceUsageService', () => {
         .mockResolvedValueOnce(mockActiveSession)
         .mockResolvedValueOnce(mockUpdatedSession);
       flowExecutorService.runFlow.mockRejectedValueOnce(
-        new ExternalEffectFailureError('Controller rejected stop', new Error('Controller rejected stop')),
+        new ExternalEffectFailureError(
+          'MQTT acknowledgement timed out',
+          new Error('MQTT acknowledgement timed out'),
+          'acknowledgement-timeout',
+        ),
       );
       (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
         createMockQueryBuilder(null) as unknown as SelectQueryBuilder<ResourceUsage>,
@@ -1199,18 +1207,18 @@ describe('ResourceUsageService', () => {
       });
 
       await expect(service.endSession(1, mockActiveSession.user, { notes: 'Auto-ended' })).rejects.toThrow(
-        'Controller rejected stop',
+        'MQTT acknowledgement timed out',
       );
 
       expect(eventEmitter.emitAsync).not.toHaveBeenCalled();
       expect(eventEmitter.emit).not.toHaveBeenCalledWith(ResourceUsageSessionEndedEvent.EVENT_NAME, expect.any(Object));
       expect(mockMetricsService.resourceUsageSessionsTotal.inc).not.toHaveBeenCalled();
-      expect(usageTransactionCommitted).toBe(true);
+      expect(usageTransactionCommitted).toBe(false);
       expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
         1,
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
         expect.any(Object),
-        resourceUsageRepository.manager,
+        transactionalEntityManager,
       );
     });
 
