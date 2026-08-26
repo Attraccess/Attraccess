@@ -246,7 +246,8 @@ void SupervisionFlow::processEvents(bool stopWhenWebStart) {
 void SupervisionFlow::processEvent(const Event &event) {
     switch (event.type) {
     case EventType::Cancel:
-        if (phase != Phase::Idle) {
+        if (phase != Phase::Idle && phase != Phase::Success &&
+            !(phase == Phase::Error && errorIsTerminal)) {
             publishTerminalEvent(TerminalEvent::Cancelled);
         }
         break;
