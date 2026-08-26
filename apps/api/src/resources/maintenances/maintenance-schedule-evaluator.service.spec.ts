@@ -714,6 +714,43 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(2);
     });
 
+    it('should not emit side effects for a nested transaction that fails to commit', async () => {
+      jest.spyOn(scheduleRepository, 'find').mockResolvedValue([
+        {
+          id: scheduleId,
+          resourceId: 1,
+          enabled: true,
+          triggerType: ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL,
+          usageHoursConfig: null,
+          usageCountConfig: null,
+          timeIntervalConfig: { duration: 1, unit: 'DAYS' },
+        } as ResourceMaintenanceSchedule,
+      ]);
+
+      const maintenanceQb = createQueryBuilderMock();
+      maintenanceQb.getRawMany.mockResolvedValue([]);
+      jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+      jest.spyOn(resourceRepository, 'find').mockResolvedValue([
+        { id: 1, createdAt: new Date('2024-01-01T00:00:00.000Z') } as Resource,
+      ]);
+
+      jest.spyOn(scheduleRepository.manager, 'transaction').mockImplementation(async (callback) => {
+        const itemManager = {
+          transaction: async (itemCallback: (em: unknown) => Promise<unknown>) => {
+            await itemCallback(itemManager);
+            throw new Error('savepoint release failed');
+          },
+        };
+        return callback(itemManager as never);
+      });
+
+      await expect(service.evaluateAll()).resolves.toBeUndefined();
+
+      expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(1);
+      expect(maintenanceService.emitScheduledMaintenanceCreated).not.toHaveBeenCalled();
+    });
+
     it('should do nothing when no enabled schedules exist', async () => {
       jest.spyOn(scheduleRepository, 'find').mockResolvedValue([]);
 

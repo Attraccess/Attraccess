@@ -602,26 +602,29 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
           await this.scheduleRepository.manager.transaction(async (em) => {
             for (const { resourceId, schedule } of batch) {
               try {
-                await em.transaction(async (itemEm) => {
+                const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
+                const maintenance = await em.transaction(async (itemEm) => {
                   const hasActive = await this.maintenanceService.hasActiveMaintenance(
                     { resourceId, scheduleId: schedule.id },
                     itemEm,
                   );
                   if (hasActive) return;
 
-                  const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
-                  const maintenance = await this.maintenanceService.createMaintenanceFromSchedule(
+                  return this.maintenanceService.createMaintenanceFromSchedule(
                     resourceId,
                     schedule.id,
                     reason,
                     itemEm,
                     false,
                   );
+                });
+
+                if (maintenance) {
                   createdMaintenances.push({ resourceId, maintenanceId: maintenance.id });
                   this.logger.log(
                     `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
                   );
-                });
+                }
               } catch (err) {
                 this.logger.error(
                   `Error creating maintenance for resource ${resourceId} from schedule ${schedule.id}: ${err}`,
