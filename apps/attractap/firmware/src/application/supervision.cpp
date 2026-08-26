@@ -22,6 +22,7 @@ void SupervisionFlow::resetActiveTransaction() {
     terminalEvent = TerminalEvent::None;
     errorIsTerminal = hintReady = false;
     cardUidLength = 0;
+    activeDeadlineMs = 0;
     errorMessage[0] = hintMessage[0] = requesterName[0] = '\0';
 }
 
@@ -31,18 +32,19 @@ void SupervisionFlow::clearPendingWebStart() {
     armedResourceId = requestedAtMs = requestedTimeoutMs = 0;
 }
 
-void SupervisionFlow::enter(const char *requester, const char *hint, uint32_t now) {
+void SupervisionFlow::enter(const char *requester, const char *hint, uint32_t now, uint32_t deadlineMs) {
     phase = Phase::WaitingForCard;
     cardDetected = keyReady = cardRejected = false;
     terminalEvent = TerminalEvent::None;
     errorIsTerminal = hintReady = false;
     errorMessage[0] = '\0';
-    startedAtMs = phaseChangedAtMs = now;
+    phaseChangedAtMs = now;
+    activeDeadlineMs = deadlineMs;
     strlcpy(requesterName, requester, sizeof(requesterName));
     nfc.resetCardPresence();
     nfc.enableCardDetection();
     screen.setRequesterName(requesterName);
-    screen.setTimeoutTime(now + TIMEOUT_MS);
+    screen.setTimeoutTime(activeDeadlineMs);
     screen.setStatus(SupervisionScreen::STATUS_WAITING);
     screen.setSupervisorHint(hint);
     screen.armCancelGuard();
@@ -57,7 +59,9 @@ void SupervisionFlow::beginReaderInitiated(const std::string &requester, uint32_
     clearOverflowEvents();
     resetActiveTransaction();
     resourceId = id;
-    enter(requester.c_str(), "Aufsichts-Karte auflegen oder per\nApp/Web bestaetigen", millis());
+    const uint32_t now = millis();
+    enter(requester.c_str(), "Aufsichts-Karte auflegen oder per\nApp/Web bestaetigen", now,
+          now + TIMEOUT_MS);
     api.requestSupervision(resourceId);
 }
 
@@ -71,10 +75,10 @@ void SupervisionFlow::armWebInitiated(const API::SupervisionStartCommand &comman
     enqueueEvent(event);
 }
 
-void SupervisionFlow::beginWebInitiated(uint32_t id, const char *requester) {
+void SupervisionFlow::beginWebInitiated(uint32_t id, const char *requester, uint32_t deadlineMs) {
     webInitiated = true;
     resourceId = id;
-    enter(requester, "Aufsichts-Karte auflegen", millis());
+    enter(requester, "Aufsichts-Karte auflegen", millis(), deadlineMs);
 }
 
 bool SupervisionFlow::takePendingWebStart(uint32_t now, bool readerBusy) {
@@ -91,7 +95,7 @@ bool SupervisionFlow::takePendingWebStart(uint32_t now, bool readerBusy) {
         clearPendingWebStart();
         return false;
     }
-    beginWebInitiated(armedResourceId, armedRequesterName);
+    beginWebInitiated(armedResourceId, armedRequesterName, requestedAtMs + requestedTimeoutMs);
     clearPendingWebStart();
     return true;
 }
@@ -336,7 +340,7 @@ SupervisionFlow::Outcome SupervisionFlow::tick(uint32_t now) {
         return Outcome::None;
     }
     if (cardRejected) { cardRejected = false; showError(false, now); return Outcome::None; }
-    if (phase != Phase::Success && now - startedAtMs > TIMEOUT_MS) {
+    if (phase != Phase::Success && static_cast<int32_t>(now - activeDeadlineMs) > 0) {
         logger.error("Supervision timeout reached"); api.cancelSupervision(); resetActiveTransaction(); return Outcome::ReturnToRouting;
     }
     switch (phase) {
