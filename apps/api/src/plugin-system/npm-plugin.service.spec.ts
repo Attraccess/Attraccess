@@ -120,6 +120,20 @@ describe('NpmPluginService', () => {
     expect(settings.setPlainSetting).not.toHaveBeenCalled();
   });
 
+  it('permits retrying registry token cleanup after its registry record was removed', async () => {
+    const settings: SettingsMock = {
+      getPlainSetting: jest.fn().mockResolvedValue(null),
+      getSecretSetting: jest.fn(),
+      setPlainSetting: jest.fn(),
+      setSecretSetting: jest.fn(),
+    };
+    const service = new NpmPluginService(settings as unknown as never);
+
+    await service.removeRegistry('orphaned');
+
+    expect(settings.setSecretSetting).toHaveBeenCalledWith('plugin-registry', 'orphaned:token', null);
+  });
+
   it('installs standard package-prefixed tarballs without losing concurrent state updates', async () => {
     const service = new NpmPluginService({} as never);
     const internals = service as unknown as ServiceInternals;

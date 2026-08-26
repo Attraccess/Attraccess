@@ -32,7 +32,7 @@ const packageSchema = z.object({
       frontend: z.string().optional(),
     }).default({}),
   }),
-}).strict();
+}).passthrough();
 
 export type NpmPluginPackage = z.infer<typeof packageSchema>;
 

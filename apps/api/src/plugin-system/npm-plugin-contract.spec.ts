@@ -30,6 +30,18 @@ describe('parseNpmPluginPackage', () => {
     });
   });
 
+  it('accepts unrelated standard npm package manifest fields', () => {
+    expect(() => parseNpmPluginPackage({
+      ...validPackage,
+      main: 'dist/index.js',
+      files: ['dist'],
+      exports: { '.': './dist/index.js' },
+      type: 'commonjs',
+      dependencies: { lodash: '^4.17.21' },
+      engines: { node: '>=20' },
+    }, '1.9.0')).not.toThrow();
+  });
+
   it.each([
     [{ ...validPackage, keywords: [] }],
     [{ ...validPackage, version: '1.2' }],

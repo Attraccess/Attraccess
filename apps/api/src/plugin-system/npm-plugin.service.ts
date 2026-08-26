@@ -83,14 +83,24 @@ export class NpmPluginService {
 
   async removeRegistry(id: string): Promise<void> {
     await this.mutateRegistries(async (registries) => {
-      if (!registries.some((registry) => registry.id === id)) throw new NotFoundException('Registry not found');
-      await this.settings.setPlainSetting(
-        REGISTRY_PARENT,
-        REGISTRIES_KEY,
-        JSON.stringify(registries.filter((registry) => registry.id !== id)),
-      );
+      if (!registries.some((registry) => registry.id === id)) {
+        // A prior removal may have persisted the registry change before token cleanup failed.
+        await this.settings.setSecretSetting(REGISTRY_PARENT, `${id}:token`, null);
+        return;
+      }
+      const { value: token } = await this.settings.getSecretSetting(REGISTRY_PARENT, `${id}:token`);
+      await this.settings.setSecretSetting(REGISTRY_PARENT, `${id}:token`, null);
+      try {
+        await this.settings.setPlainSetting(
+          REGISTRY_PARENT,
+          REGISTRIES_KEY,
+          JSON.stringify(registries.filter((registry) => registry.id !== id)),
+        );
+      } catch (error) {
+        await this.settings.setSecretSetting(REGISTRY_PARENT, `${id}:token`, token);
+        throw error;
+      }
     });
-    await this.settings.setSecretSetting(REGISTRY_PARENT, `${id}:token`, null);
   }
 
   async testRegistry(id: string): Promise<void> {
@@ -151,7 +161,7 @@ export class NpmPluginService {
           await this.rollbackActivation(activation);
           throw error;
         }
-        await rm(activation.backup, { recursive: true, force: true });
+        await rm(activation.backup, { recursive: true, force: true }).catch(() => undefined);
         new PluginService().requestRestart();
         return installed;
       });
