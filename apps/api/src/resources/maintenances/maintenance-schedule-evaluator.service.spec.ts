@@ -454,7 +454,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       expect(maintenanceService.createMaintenanceFromSchedule).not.toHaveBeenCalled();
     });
 
-    it('should chunk schedule state and usage queries below SQLite bind limits', async () => {
+    it('should chunk usage evaluation queries below SQLite bind limits', async () => {
       const count = 10_922;
       const oldCreatedAt = new Date('2024-01-01T00:00:00.000Z');
       const schedules = Array.from(
@@ -476,8 +476,8 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       await service.evaluateAll();
 
-      expect(querySpy).toHaveBeenCalledTimes(4);
-      expect(querySpy.mock.calls.map(([, params]) => (params as unknown[]).length)).toEqual([32_764, 4, 32_763, 3]);
+      expect(querySpy).toHaveBeenCalledTimes(2);
+      expect(querySpy.mock.calls.map(([, params]) => (params as unknown[]).length)).toEqual([32_764, 4]);
     });
 
     it('should skip resources that already have active maintenance', async () => {
@@ -702,6 +702,12 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       ]);
 
       await service.evaluateAll();
+
+      // Baseline resolution and usage aggregation must be one statement so a completed maintenance
+      // cannot change the baseline between the two reads.
+      expect(querySpy).toHaveBeenCalledTimes(1);
+      expect(querySpy.mock.calls[0][0]).toContain('resource_maintenance');
+      expect(querySpy.mock.calls[0][0]).toContain('resource_usage');
 
       // Both schedules must be sent to SQL with their resource-created fallback baseline.
       const params = querySpy.mock.calls[0][1] as unknown[];

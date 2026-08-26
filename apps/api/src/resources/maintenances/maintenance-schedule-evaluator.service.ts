@@ -99,23 +99,6 @@ export const buildScheduleStateQuery = (maintenanceTable: string, pairCount: num
           GROUP BY p.resourceId, p.scheduleId, p.createdAt`;
 };
 
-/** Aggregate only the usage-based schedules after their baselines have been resolved. */
-export const buildScheduleUsageAggregateQuery = (usageTable: string, pairCount: number): string => {
-  const pairs = Array.from({ length: pairCount }, () => '(?, ?, ?)').join(', ');
-
-  return `WITH pairs(resourceId, scheduleId, baseline) AS (VALUES ${pairs})
-          SELECT p.resourceId AS resourceId,
-                 p.scheduleId AS scheduleId,
-                 COALESCE(SUM(u.usageInMinutes), 0) AS totalMinutes,
-                 COUNT(u.id) AS totalCount
-          FROM pairs p
-          LEFT JOIN "${usageTable}" u
-            ON u.resourceId = p.resourceId
-           AND u.endTime IS NOT NULL
-           AND u.endTime >= p.baseline
-          GROUP BY p.resourceId, p.scheduleId`;
-};
-
 /**
  * Evaluates maintenance schedules and creates ResourceMaintenance when a schedule's condition is met.
  * Baseline for all trigger types: when the last maintenance created by this schedule was marked done
@@ -522,8 +505,8 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
         );
       }
 
-      // 3. Fetch per-schedule baselines and active state. This deliberately does not scan usage for
-      // time schedules, whose trigger only depends on the baseline.
+      // 3. Time schedules only need baseline and active state. Usage schedules resolve their
+      // baseline and aggregate usage in one statement below so both values share a DB snapshot.
       const usageAggBySchedule = new Map<string, { totalMinutes: number; totalCount: number }>();
       const baselineMap = new Map<string, Date>();
       const activeResourceIds = new Set<number>();
@@ -533,64 +516,72 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
           resourceId: schedule.resourceId,
           scheduleId: schedule.id,
           createdAt: resourceCreatedAtMap.get(schedule.resourceId) ?? now,
+          triggerType: schedule.triggerType,
         }));
       if (pairs.length === 0) return;
 
-      const stateRows: Array<{
+      const setState = (row: {
         resourceId: number;
         scheduleId: number;
         baseline?: string | Date;
         hasActiveMaintenance?: number | boolean;
-      }> = [];
-      for (let offset = 0; offset < pairs.length; offset += MAX_PAIRS_PER_QUERY) {
-        const chunk = pairs.slice(offset, offset + MAX_PAIRS_PER_QUERY);
-        stateRows.push(
-          ...(await this.usageRepository.query(
-            buildScheduleStateQuery(this.maintenanceRepository.metadata.tableName, chunk.length),
-            [
-              ...chunk.flatMap((pair) => [pair.resourceId, pair.scheduleId, formatDbDate(pair.createdAt)]),
-              formatDbDate(now),
-            ],
-          )),
-        );
-      }
-
-      for (const row of stateRows) {
+      }): void => {
         const key = `${row.scheduleId}:${row.resourceId}`;
         baselineMap.set(
           key,
           row.baseline ? parseDbDate(row.baseline) : (resourceCreatedAtMap.get(row.resourceId) ?? now),
         );
         if (row.hasActiveMaintenance) activeResourceIds.add(row.resourceId);
+      };
+
+      const timePairs = pairs.filter(
+        ({ triggerType }) => triggerType === ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL,
+      );
+      for (let offset = 0; offset < timePairs.length; offset += MAX_PAIRS_PER_QUERY) {
+        const chunk = timePairs.slice(offset, offset + MAX_PAIRS_PER_QUERY);
+        const stateRows: Array<{
+          resourceId: number;
+          scheduleId: number;
+          baseline?: string | Date;
+          hasActiveMaintenance?: number | boolean;
+        }> = await this.usageRepository.query(
+          buildScheduleStateQuery(this.maintenanceRepository.metadata.tableName, chunk.length),
+          [
+            ...chunk.flatMap((pair) => [pair.resourceId, pair.scheduleId, formatDbDate(pair.createdAt)]),
+            formatDbDate(now),
+          ],
+        );
+        for (const row of stateRows) setState(row);
       }
 
-      const getBaseline = (resourceId: number, scheduleId: number): Date =>
-        baselineMap.get(`${scheduleId}:${resourceId}`) ?? resourceCreatedAtMap.get(resourceId) ?? now;
-
-      const usagePairs = allSchedules
-        .filter(
-          (schedule) =>
-            knownResourceIds.has(schedule.resourceId) &&
-            (schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS ||
-              schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT),
-        )
-        .map((schedule) => ({
-          resourceId: schedule.resourceId,
-          scheduleId: schedule.id,
-          baseline: getBaseline(schedule.resourceId, schedule.id),
-        }));
+      const usagePairs = pairs.filter(({ triggerType }) => {
+        return (
+          triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS ||
+          triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT
+        );
+      });
       for (let offset = 0; offset < usagePairs.length; offset += MAX_PAIRS_PER_QUERY) {
         const chunk = usagePairs.slice(offset, offset + MAX_PAIRS_PER_QUERY);
         const aggregates: Array<{
           resourceId: number;
           scheduleId: number;
+          baseline?: string | Date;
+          hasActiveMaintenance?: number | boolean;
           totalMinutes: number | string | null;
           totalCount: number | string | null;
         }> = await this.usageRepository.query(
-          buildScheduleUsageAggregateQuery(this.usageRepository.metadata.tableName, chunk.length),
-          chunk.flatMap((pair) => [pair.resourceId, pair.scheduleId, formatDbDate(pair.baseline)]),
+          buildScheduleEvaluationQuery(
+            this.maintenanceRepository.metadata.tableName,
+            this.usageRepository.metadata.tableName,
+            chunk.length,
+          ),
+          [
+            ...chunk.flatMap((pair) => [pair.resourceId, pair.scheduleId, formatDbDate(pair.createdAt)]),
+            formatDbDate(now),
+          ],
         );
         for (const row of aggregates) {
+          setState(row);
           const key = `${row.scheduleId}:${row.resourceId}`;
           usageAggBySchedule.set(key, {
             totalMinutes: Number(row.totalMinutes ?? 0),
@@ -598,6 +589,9 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
           });
         }
       }
+
+      const getBaseline = (resourceId: number, scheduleId: number): Date =>
+        baselineMap.get(`${scheduleId}:${resourceId}`) ?? resourceCreatedAtMap.get(resourceId) ?? now;
 
       // Observe query window sizes so we can alert if they grow unexpectedly large.
       // No lookback clamp: rarely-used machines need their full history to reach the threshold.
