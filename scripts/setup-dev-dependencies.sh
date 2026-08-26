@@ -237,19 +237,7 @@ setup_project() {
     echo "✓ pnpm install complete"
 
     echo "Running database migrations..."
-    storage_root="$REPO_ROOT/storage"
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        case "$line" in
-            STORAGE_ROOT=*)
-                storage_root=${line#STORAGE_ROOT=}
-                storage_root=${storage_root%$'\r'}
-                storage_root=${storage_root#\"}
-                storage_root=${storage_root%\"}
-                storage_root=${storage_root#\'}
-                storage_root=${storage_root%\'}
-                ;;
-        esac
-    done < "$REPO_ROOT/.env"
+    storage_root=$(node --env-file="$REPO_ROOT/.env" -e 'process.stdout.write(process.env.STORAGE_ROOT || "storage")')
     mkdir -p "$storage_root"
     pnpm nx run api:migrations-run
 }
