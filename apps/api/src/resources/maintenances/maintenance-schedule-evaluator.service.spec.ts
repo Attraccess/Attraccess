@@ -337,7 +337,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       );
     });
 
-    it('should split due writes into bounded transaction batches', async () => {
+    it('should write all due maintenances in one transaction', async () => {
       const oldCreatedAt = new Date('2024-01-01T00:00:00.000Z');
       const dueSchedules = Array.from(
         { length: 101 },
@@ -361,7 +361,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       await service.evaluateAll();
 
-      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(2);
+      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(1);
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(101);
     });
 
