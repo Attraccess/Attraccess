@@ -1971,11 +1971,11 @@ describe('ResourceUsageService', () => {
       expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(1);
     });
 
-    it('does not cache a grant past its retraining deadline', async () => {
+    it('does not cache a grant past a future retraining deadline', async () => {
       jest.useFakeTimers();
       try {
         mockResourceRetrainingService.getResourceRetrainingStatus.mockResolvedValue({
-          blocksAccess: true,
+          blocksAccess: false,
           dueAt: new Date(Date.now() + 1_000),
         });
 
