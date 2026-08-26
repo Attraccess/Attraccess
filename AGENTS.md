@@ -1,9 +1,18 @@
 # AGENTS.md
 
 RULES:
+
 - do not commit auto-generated code (e.g. react-query api client)
 - do not manually modify the CHANGELOG.md, it is auto generated
 - do not commit specs/plan files, repo is code/docs only.
+
+## Worktree Bootstrap
+
+New worktrees run `scripts/setup-dev-dependencies.sh` automatically through the
+Git `post-checkout` hook. It installs dependencies, creates `.env`, runs database
+migrations, and installs the project-local ESP-IDF v6.0.2 toolchain at
+`.tools/esp-idf`. If bootstrap failed, rerun that script before reporting a
+missing toolchain.
 
 ## Dev servers — always use `pnpm serve`
 
