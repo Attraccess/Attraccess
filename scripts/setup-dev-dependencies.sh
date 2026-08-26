@@ -237,6 +237,7 @@ setup_project() {
     echo "✓ pnpm install complete"
 
     echo "Running database migrations..."
+    mkdir -p "${STORAGE_ROOT:-$REPO_ROOT/storage}"
     pnpm nx run api:migrations-run
 }
 

@@ -9,9 +9,19 @@ fi
 
 repo_root=$(git rev-parse --show-toplevel)
 worktree_path=$1
+case "$worktree_path" in
+    /*) ;;
+    *) worktree_path="$repo_root/$worktree_path" ;;
+esac
 shift
 
-git -C "$repo_root" worktree add "$worktree_path" "$@"
+branch=$1
+shift
+if [ "$#" -eq 1 ]; then
+    git -C "$repo_root" worktree add -b "$branch" "$worktree_path" "$1"
+else
+    git -C "$repo_root" worktree add "$worktree_path" "$branch"
+fi
 worktree_root=$(cd "$worktree_path" && pwd)
 
 "$worktree_root/scripts/setup-dev-dependencies.sh"
