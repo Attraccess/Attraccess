@@ -205,6 +205,14 @@ void Websocket::sendPongProbe(uint32_t nowMs)
         unlockWsClient();
         return;
     }
+    if (this->pendingPongProbeTime != 0)
+    {
+        // The application PING is independent from esp_websocket's keepalive, so
+        // account for its timeout here rather than relying on a client error event.
+        this->pongTimeoutEventTimes[this->pongTimeoutEventNextIndex] = nowMs;
+        this->pongTimeoutEventNextIndex = (uint8_t)((this->pongTimeoutEventNextIndex + 1) % QUALITY_EVENT_SLOTS);
+        this->pendingPongProbeTime = 0;
+    }
 
     uint32_t token = this->pendingPongProbeToken + 1;
     uint8_t payload[sizeof(token)];
@@ -242,6 +250,7 @@ void Websocket::publishNetworkQuality()
     uint8_t pongTimeouts = 0;
     uint32_t lastPongRttMs = 0;
     uint32_t averagePongRttMs = 0;
+    int32_t pongRttTrendMs = 0;
     if (this->network_quality_mutex)
     {
         xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
@@ -252,6 +261,7 @@ void Websocket::publishNetworkQuality()
         pongTimeouts = countRecentNetworkQualityEvents(this->pongTimeoutEventTimes, nowMs);
         lastPongRttMs = this->lastPongRttMs;
         averagePongRttMs = averageRecentPongRtt(nowMs);
+        pongRttTrendMs = recentPongRttTrend(nowMs);
         xSemaphoreGive(this->network_quality_mutex);
     }
 
@@ -273,7 +283,7 @@ void Websocket::publishNetworkQuality()
     }
 
     State::setNetworkQualityState(quality, inboundAgeMs, reconnects, txDepth, queueFull, sendFailures, livenessTimeouts,
-                                  lastPongRttMs, averagePongRttMs, pongTimeouts);
+                                  lastPongRttMs, averagePongRttMs, pongRttTrendMs, pongTimeouts);
 }
 
 void Websocket::recordNetworkQualityEvent(uint32_t *events, uint8_t &nextIndex)
@@ -330,6 +340,33 @@ uint32_t Websocket::averageRecentPongRtt(uint32_t nowMs) const
         }
     }
     return count == 0 ? 0 : total / count;
+}
+
+int32_t Websocket::recentPongRttTrend(uint32_t nowMs) const
+{
+    size_t oldestIndex = QUALITY_EVENT_SLOTS;
+    size_t newestIndex = QUALITY_EVENT_SLOTS;
+    for (size_t i = 0; i < QUALITY_EVENT_SLOTS; i++)
+    {
+        if (this->pongRttSampleTimes[i] == 0 || nowMs - this->pongRttSampleTimes[i] > this->QUALITY_EVENT_WINDOW_MS)
+        {
+            continue;
+        }
+        if (oldestIndex == QUALITY_EVENT_SLOTS || this->pongRttSampleTimes[i] < this->pongRttSampleTimes[oldestIndex])
+        {
+            oldestIndex = i;
+        }
+        if (newestIndex == QUALITY_EVENT_SLOTS || this->pongRttSampleTimes[i] > this->pongRttSampleTimes[newestIndex])
+        {
+            newestIndex = i;
+        }
+    }
+
+    if (oldestIndex == QUALITY_EVENT_SLOTS || oldestIndex == newestIndex)
+    {
+        return 0;
+    }
+    return static_cast<int32_t>(this->pongRttSamples[newestIndex]) - static_cast<int32_t>(this->pongRttSamples[oldestIndex]);
 }
 
 void Websocket::connectWebSocket()

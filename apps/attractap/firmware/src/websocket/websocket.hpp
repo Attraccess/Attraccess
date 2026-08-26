@@ -57,6 +57,7 @@ private:
     void recordPongRtt(uint32_t rttMs, uint32_t nowMs);
     uint8_t countRecentNetworkQualityEvents(const uint32_t *events, uint32_t nowMs) const;
     uint32_t averageRecentPongRtt(uint32_t nowMs) const;
+    int32_t recentPongRttTrend(uint32_t nowMs) const;
     void connectWebSocket();
     void connectWebSocketLocked();
     bool shouldReconnect();

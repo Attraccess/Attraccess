@@ -39,6 +39,7 @@ public:
         uint8_t livenessTimeoutsLastMinute;
         uint32_t lastPongRttMs;
         uint32_t averagePongRttMs;
+        int32_t pongRttTrendMs;
         uint8_t pongTimeoutsLastMinute;
     };
 
@@ -51,6 +52,7 @@ public:
                                        uint8_t livenessTimeoutsLastMinute,
                                        uint32_t lastPongRttMs,
                                        uint32_t averagePongRttMs,
+                                       int32_t pongRttTrendMs,
                                        uint8_t pongTimeoutsLastMinute);
     static NetworkQualityState getNetworkQualityState();
 
@@ -116,6 +118,7 @@ private:
     static uint8_t network_quality_liveness_timeouts_last_minute;
     static uint32_t network_quality_last_pong_rtt_ms;
     static uint32_t network_quality_average_pong_rtt_ms;
+    static int32_t network_quality_pong_rtt_trend_ms;
     static uint8_t network_quality_pong_timeouts_last_minute;
 
     static uint16_t websocket_port;
