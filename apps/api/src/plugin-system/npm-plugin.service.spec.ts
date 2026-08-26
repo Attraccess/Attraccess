@@ -1,14 +1,25 @@
 import { createHash } from 'crypto';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { lookup } from 'dns/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import * as tar from 'tar';
+import axios from 'axios';
 import { PluginService } from './plugin.service';
 import { NpmPluginService } from './npm-plugin.service';
+
+jest.mock('dns/promises', () => ({ lookup: jest.fn() }));
 
 type ServiceInternals = {
   download(url: string): Promise<Buffer>;
   hostVersion(): string;
+};
+
+type SettingsMock = {
+  getPlainSetting: jest.Mock;
+  getSecretSetting: jest.Mock;
+  setPlainSetting: jest.Mock;
+  setSecretSetting: jest.Mock;
 };
 
 async function packageTarball(name: string): Promise<Buffer> {
@@ -53,6 +64,60 @@ describe('NpmPluginService', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     rmSync(root, { recursive: true, force: true });
+  });
+
+  it('pins metadata requests to public registry addresses and limits their size', async () => {
+    const settings: SettingsMock = {
+      getPlainSetting: jest.fn(),
+      getSecretSetting: jest.fn(),
+      setPlainSetting: jest.fn(),
+      setSecretSetting: jest.fn(),
+    };
+    const service = new NpmPluginService(settings as unknown as never);
+    const axiosGet = jest.spyOn(axios, 'get').mockResolvedValue({ data: { versions: {} } });
+    jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+
+    await service.packageMetadata('example');
+
+    expect(axiosGet).toHaveBeenCalledWith(
+      'https://registry.npmjs.org/example',
+      expect.objectContaining({ maxContentLength: 10 * 1024 * 1024, maxRedirects: 0 }),
+    );
+    const options = axiosGet.mock.calls[0]?.[1];
+    if (!options?.lookup) throw new Error('Expected metadata request to pin DNS lookup');
+    const callback = jest.fn();
+    options.lookup('registry.npmjs.org', {}, callback);
+    expect(callback).toHaveBeenCalledWith(null, '1.1.1.1', 4);
+  });
+
+  it('rejects metadata requests to private registry addresses', async () => {
+    const settings: SettingsMock = {
+      getPlainSetting: jest.fn().mockResolvedValue(JSON.stringify([{ id: 'private', name: 'private', url: 'http://private.test' }])),
+      getSecretSetting: jest.fn().mockResolvedValue({ value: null, configured: false }),
+      setPlainSetting: jest.fn(),
+      setSecretSetting: jest.fn(),
+    };
+    const service = new NpmPluginService(settings as unknown as never);
+    const axiosGet = jest.spyOn(axios, 'get');
+    jest.mocked(lookup).mockResolvedValue([{ address: '127.0.0.1', family: 4 }]);
+
+    await expect(service.packageMetadata('example', 'private')).rejects.toThrow('public addresses');
+    expect(axiosGet).not.toHaveBeenCalled();
+  });
+
+  it('does not persist a registry when token storage fails', async () => {
+    const settings: SettingsMock = {
+      getPlainSetting: jest.fn().mockResolvedValue(null),
+      getSecretSetting: jest.fn(),
+      setPlainSetting: jest.fn(),
+      setSecretSetting: jest.fn().mockRejectedValue(new Error('encryption failed')),
+    };
+    const service = new NpmPluginService(settings as unknown as never);
+
+    await expect(service.addRegistry({ name: 'private', url: 'https://registry.example.com', token: 'secret' })).rejects.toThrow(
+      'encryption failed',
+    );
+    expect(settings.setPlainSetting).not.toHaveBeenCalled();
   });
 
   it('installs standard package-prefixed tarballs without losing concurrent state updates', async () => {

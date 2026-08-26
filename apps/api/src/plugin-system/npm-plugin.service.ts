@@ -18,6 +18,7 @@ const REGISTRY_PARENT = 'plugin-registry';
 const REGISTRIES_KEY = 'registries';
 const STATE_FILE = '.npm-plugin-state.json';
 const MAX_ARCHIVE_BYTES = 50 * 1024 * 1024;
+const MAX_METADATA_BYTES = 10 * 1024 * 1024;
 const MAX_EXTRACTED_BYTES = 200 * 1024 * 1024;
 const MAX_ARCHIVE_ENTRIES = 10_000;
 
@@ -67,10 +68,16 @@ export class NpmPluginService {
     await this.mutateRegistries(async (registries) => {
       if (registries.some(({ url }) => url === registry.url))
         throw new BadRequestException('Registry URL is already configured');
-      await this.settings.setPlainSetting(REGISTRY_PARENT, REGISTRIES_KEY, JSON.stringify([...registries, registry]));
+      if (input.token !== undefined)
+        await this.settings.setSecretSetting(REGISTRY_PARENT, `${registry.id}:token`, input.token);
+      try {
+        await this.settings.setPlainSetting(REGISTRY_PARENT, REGISTRIES_KEY, JSON.stringify([...registries, registry]));
+      } catch (error) {
+        if (input.token !== undefined)
+          await this.settings.setSecretSetting(REGISTRY_PARENT, `${registry.id}:token`, null);
+        throw error;
+      }
     });
-    if (input.token !== undefined)
-      await this.settings.setSecretSetting(REGISTRY_PARENT, `${registry.id}:token`, input.token);
     return { ...registry, tokenConfigured: input.token != null && input.token.trim().length > 0 };
   }
 
@@ -231,9 +238,17 @@ export class NpmPluginService {
   }
 
   private async getJson(url: string, registry: Registry): Promise<unknown> {
-    const response = await axios.get(url, {
+    const target = new URL(url);
+    const addresses = await validateRegistryDestination(target, registry);
+    const response = await axios.get(target.toString(), {
       headers: registry.token ? { authorization: `Bearer ${registry.token}` } : undefined,
       timeout: 10_000,
+      maxContentLength: MAX_METADATA_BYTES,
+      maxRedirects: 0,
+      lookup: (hostname, _options, callback) => {
+        if (hostname !== target.hostname) return callback(new Error('Unexpected registry host'), '', 4);
+        callback(null, addresses[0].address, addresses[0].family);
+      },
     });
     return response.data;
   }
@@ -241,7 +256,7 @@ export class NpmPluginService {
   private async download(url: string, registry: Registry): Promise<Buffer> {
     let target = new URL(url);
     for (let redirects = 0; redirects <= 5; redirects += 1) {
-      const addresses = await validateTarballDestination(target, registry);
+      const addresses = await validateRegistryDestination(target, registry);
       const response = await axios.get<ArrayBuffer>(target.toString(), {
         responseType: 'arraybuffer',
         timeout: 30_000,
@@ -342,7 +357,7 @@ async function extractTarball(tarball: Buffer, destination: string): Promise<voi
   );
 }
 
-async function validateTarballDestination(
+async function validateRegistryDestination(
   url: URL,
   registry: Registry,
 ): Promise<Array<{ address: string; family: 4 | 6 }>> {
