@@ -29,39 +29,54 @@ const parseDbDate = (value: string | Date): Date =>
 export const formatDbDate = (date: Date): string => date.toISOString().replace('T', ' ').replace('Z', '');
 
 /**
- * Per-(resource, schedule) usage totals in one query. The `(resourceId, scheduleId, baseline)`
- * triples are supplied as bound parameters forming an inline table, so each schedule is filtered by
- * its own baseline inside the DB engine and nothing is interpolated into the SQL text.
- * ponytail: `SELECT ? ... UNION ALL` because SQLite has no `VALUES (...) AS t(col, ...)`.
+ * Per-(resource, schedule) evaluation data in one query. The `(resourceId, scheduleId, createdAt)`
+ * triples are supplied as a CTE, so each schedule is evaluated against its own completed-maintenance
+ * baseline without interpolating application values into SQL text.
  */
-export const buildUsageAggregateQuery = (usageTable: string, pairCount: number): string => {
-  const baselineTable = Array.from(
-    { length: pairCount },
-    () => 'SELECT ? AS resourceId, ? AS scheduleId, ? AS baseline',
-  ).join(' UNION ALL ');
+export const buildScheduleEvaluationQuery = (
+  maintenanceTable: string,
+  usageTable: string,
+  pairCount: number,
+): string => {
+  const pairs = Array.from({ length: pairCount }, () => '(?, ?, ?)').join(', ');
 
-  return `SELECT b.resourceId AS resourceId,
+  return `WITH pairs(resourceId, scheduleId, createdAt) AS (VALUES ${pairs}),
+               baselines AS (
+                 SELECT p.resourceId,
+                        p.scheduleId,
+                        COALESCE(MAX(done.endTime), p.createdAt) AS baseline,
+                        EXISTS(
+                          SELECT 1
+                          FROM "${maintenanceTable}" active
+                          WHERE active.resourceId = p.resourceId
+                            AND active.startTime <= ?
+                            AND active.endTime IS NULL
+                        ) AS hasActiveMaintenance
+                 FROM pairs p
+                 LEFT JOIN "${maintenanceTable}" done
+                   ON done.resourceId = p.resourceId
+                  AND done.maintenanceScheduleId = p.scheduleId
+                  AND done.endTime IS NOT NULL
+                 GROUP BY p.resourceId, p.scheduleId, p.createdAt
+               )
+          SELECT b.resourceId AS resourceId,
                  b.scheduleId AS scheduleId,
+                 b.baseline AS baseline,
+                 b.hasActiveMaintenance AS hasActiveMaintenance,
                  COALESCE(SUM(u.usageInMinutes), 0) AS totalMinutes,
                  COUNT(u.id) AS totalCount
-          FROM (${baselineTable}) b
+          FROM baselines b
           LEFT JOIN "${usageTable}" u
             ON u.resourceId = b.resourceId
            AND u.endTime IS NOT NULL
            AND u.endTime >= b.baseline
-          GROUP BY b.resourceId, b.scheduleId`;
+          GROUP BY b.resourceId, b.scheduleId, b.baseline, b.hasActiveMaintenance`;
 };
 
 /**
- * Pairs per usage-aggregate query. Each pair contributes a `SELECT ? AS ...` clause and 3 bound
- * parameters, so chunking keeps the generated SQL text bounded.
- *
- * ponytail: the bundled sqlite3 (3.44) caps bound parameters at 32766, which is also the ceiling for
- * the unchunked `IN (:...)` lists in the bulk reads below — comfortably above this ticket's 5k target,
- * so they stay unchunked. If an install ever exceeds ~32k schedules, those need chunking too.
+ * SQLite's 32766 bind-parameter limit supports more than 10k schedules in one evaluation query;
+ * the 5k-resource target remains a single bounded query.
  */
-const USAGE_AGG_CHUNK_SIZE = 500;
-const WRITE_TRANSACTION_BATCH_SIZE = 100;
 
 /**
  * Evaluates maintenance schedules and creates ResourceMaintenance when a schedule's condition is met.
@@ -427,12 +442,9 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
    *
    * Bulk pre-fetch strategy (O(1) queries instead of O(resources) sequential transactions):
    * 1. Load all enabled schedules + configs in one query.
-   * 2. Load last-completed-maintenance per (resource, schedule) pair for baseline dates.
-   * 3. Load resource createdAt dates as fallback baselines.
-   * 4. Load active maintenances to skip resources/schedules already under maintenance.
-   * 5. For usage-based triggers: aggregate SUM/COUNT per (resource, schedule) in SQL by joining
-   *    against an inline baseline table — no raw usage rows loaded into memory.
-   * 6. Write only the schedules that actually triggered in one transaction.
+   * 2. Load resource createdAt dates as fallback baselines.
+   * 3. Load completed-maintenance baselines, active state, and usage aggregates in one CTE query.
+   * 4. Write only the schedules that actually triggered in one transaction.
    */
   async evaluateAll(): Promise<void> {
     if (this.evaluationLock) {
@@ -453,31 +465,10 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
 
       if (allSchedules.length === 0) return;
 
-      const scheduleIds = allSchedules.map((s) => s.id);
       // ponytail: reduce+Set avoids intermediate array from map() before Set construction
       const resourceIds = [...allSchedules.reduce((s, a) => s.add(a.resourceId), new Set<number>())];
 
-      // 2. Last completed maintenance per (resource, schedule) — provides baseline dates
-      const lastDoneRaw = await this.maintenanceRepository
-        .createQueryBuilder('m')
-        .select('m.resourceId', 'resourceId')
-        .addSelect('m.maintenanceScheduleId', 'scheduleId')
-        .addSelect('MAX(m.endTime)', 'lastEndTime')
-        .where('m.maintenanceScheduleId IN (:...scheduleIds)', { scheduleIds })
-        .andWhere('m.endTime IS NOT NULL')
-        .groupBy('m.resourceId')
-        .addGroupBy('m.maintenanceScheduleId')
-        .getRawMany<{ resourceId: number; scheduleId: number; lastEndTime: string }>();
-
-      // Map: `${scheduleId}:${resourceId}` -> last done Date
-      const baselineMap = new Map<string, Date>();
-      for (const row of lastDoneRaw) {
-        // getRawMany bypasses TypeORM's column hydration, so the driver's raw datetime string
-        // needs explicit UTC parsing (see parseDbDate).
-        baselineMap.set(`${row.scheduleId}:${row.resourceId}`, parseDbDate(row.lastEndTime));
-      }
-
-      // 3. Resource createdAt — fallback baseline when no prior maintenance for a schedule
+      // 2. Resource createdAt — fallback baseline when no prior maintenance for a schedule
       const resources = await this.resourceRepository.find({
         where: { id: In(resourceIds) },
         select: ['id', 'createdAt'],
@@ -493,75 +484,61 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
         );
       }
 
-      const getBaseline = (resourceId: number, scheduleId: number): Date =>
-        baselineMap.get(`${scheduleId}:${resourceId}`) ?? resourceCreatedAtMap.get(resourceId) ?? now; // unreachable: orphaned resources are filtered out above
-
-      // 4. Active maintenances per (resource, schedule) — skip these in evaluation
-      const activeRaw = await this.maintenanceRepository
-        .createQueryBuilder('m')
-        .select('m.resourceId', 'resourceId')
-        .addSelect('m.maintenanceScheduleId', 'scheduleId')
-        .where('m.resourceId IN (:...resourceIds)', { resourceIds })
-        .andWhere('m.maintenanceScheduleId IN (:...scheduleIds)', { scheduleIds })
-        .andWhere('m.startTime <= :now', { now })
-        .andWhere('m.endTime IS NULL')
-        .getRawMany<{ resourceId: number; scheduleId: number }>();
-
-      // Set of `${scheduleId}:${resourceId}` pairs already in active maintenance
-      const activeSet = new Set(activeRaw.map((m) => `${m.scheduleId}:${m.resourceId}`));
-
-      // 5. Bulk-fetch usage aggregates for resources with usage-based schedules.
-      //    Uses SQL SUM/COUNT with per-resource CASE WHEN baseline filtering so no raw rows are
-      //    loaded into memory and per-resource date accuracy is maintained in the DB engine.
-      const usageCandidates = allSchedules.filter(
-        (s) =>
-          knownResourceIds.has(s.resourceId) &&
-          !activeSet.has(`${s.id}:${s.resourceId}`) &&
-          (s.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS ||
-            s.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT),
+      // 3. Fetch per-schedule baselines, active state, and usage totals in one query. The CTE avoids
+      // loading usage rows into memory and keeps each schedule's baseline inside the database.
+      const usageAggBySchedule = new Map<string, { totalMinutes: number; totalCount: number }>();
+      const baselineMap = new Map<string, Date>();
+      const activeResourceIds = new Set<number>();
+      const pairs = allSchedules
+        .filter((schedule) => knownResourceIds.has(schedule.resourceId))
+        .map((schedule) => ({
+          resourceId: schedule.resourceId,
+          scheduleId: schedule.id,
+          createdAt: resourceCreatedAtMap.get(schedule.resourceId) ?? now,
+        }));
+      const aggregates: Array<{
+        resourceId: number;
+        scheduleId: number;
+        baseline?: string | Date;
+        hasActiveMaintenance?: number | boolean;
+        totalMinutes: number | string | null;
+        totalCount: number | string | null;
+      }> = await this.usageRepository.query(
+        buildScheduleEvaluationQuery(
+          this.maintenanceRepository.metadata.tableName,
+          this.usageRepository.metadata.tableName,
+          pairs.length,
+        ),
+        [
+          ...pairs.flatMap((pair) => [pair.resourceId, pair.scheduleId, formatDbDate(pair.createdAt)]),
+          formatDbDate(now),
+        ],
       );
 
-      // Keyed by `${scheduleId}:${resourceId}` — each schedule has its own baseline, so a resource
-      // with two usage-based schedules on different baselines gets two distinct totals.
-      const usageAggBySchedule = new Map<string, { totalMinutes: number; totalCount: number }>();
-
-      if (usageCandidates.length > 0) {
-        const pairs = usageCandidates.map((s) => ({
-          resourceId: s.resourceId,
-          scheduleId: s.id,
-          baseline: getBaseline(s.resourceId, s.id),
-        }));
-
-        // Observe query window sizes so we can alert if they grow unexpectedly large.
-        // No lookback clamp: rarely-used machines need their full history to reach the threshold.
-        const msPerDay = 24 * 60 * 60 * 1000;
-        for (const { baseline } of pairs) {
-          this.metricsService.maintenanceUsageQueryWindowDays.observe((now.getTime() - baseline.getTime()) / msPerDay);
-        }
-
-        const usageTable = this.usageRepository.metadata.tableName;
-
-        for (let offset = 0; offset < pairs.length; offset += USAGE_AGG_CHUNK_SIZE) {
-          const chunk = pairs.slice(offset, offset + USAGE_AGG_CHUNK_SIZE);
-
-          const aggregates: Array<{
-            resourceId: number;
-            scheduleId: number;
-            totalMinutes: number | string | null;
-            totalCount: number | string | null;
-          }> = await this.usageRepository.query(
-            buildUsageAggregateQuery(usageTable, chunk.length),
-            chunk.flatMap((p) => [p.resourceId, p.scheduleId, formatDbDate(p.baseline)]),
-          );
-
-          for (const row of aggregates) {
-            usageAggBySchedule.set(`${row.scheduleId}:${row.resourceId}`, {
-              totalMinutes: Number(row.totalMinutes ?? 0),
-              totalCount: Number(row.totalCount ?? 0),
-            });
-          }
-        }
+      for (const row of aggregates) {
+        const key = `${row.scheduleId}:${row.resourceId}`;
+        baselineMap.set(
+          key,
+          row.baseline ? parseDbDate(row.baseline) : (resourceCreatedAtMap.get(row.resourceId) ?? now),
+        );
+        if (row.hasActiveMaintenance) activeResourceIds.add(row.resourceId);
+        usageAggBySchedule.set(key, {
+          totalMinutes: Number(row.totalMinutes ?? 0),
+          totalCount: Number(row.totalCount ?? 0),
+        });
       }
+
+      // Observe query window sizes so we can alert if they grow unexpectedly large.
+      // No lookback clamp: rarely-used machines need their full history to reach the threshold.
+      const msPerDay = 24 * 60 * 60 * 1000;
+      for (const schedule of allSchedules) {
+        const baseline = baselineMap.get(`${schedule.id}:${schedule.resourceId}`);
+        if (baseline)
+          this.metricsService.maintenanceUsageQueryWindowDays.observe((now.getTime() - baseline.getTime()) / msPerDay);
+      }
+
+      const getBaseline = (resourceId: number, scheduleId: number): Date =>
+        baselineMap.get(`${scheduleId}:${resourceId}`) ?? resourceCreatedAtMap.get(resourceId) ?? now;
 
       // --- IN-MEMORY EVALUATION PHASE ---
 
@@ -577,7 +554,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
 
       for (const [resourceId, schedules] of schedulesByResource) {
         for (const schedule of schedules) {
-          if (activeSet.has(`${schedule.id}:${resourceId}`)) continue;
+          if (activeResourceIds.has(resourceId)) continue;
 
           const baseline = getBaseline(resourceId, schedule.id);
           if (this.shouldTriggerInMemory(schedule, resourceId, baseline, now, usageAggBySchedule)) {
@@ -590,56 +567,34 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
       if (toCreate.length === 0) return;
 
       // --- WRITE PHASE ---
-      // Bound SQLite's writer lock while preserving atomic creation per item. Nested transactions
-      // become savepoints, so one failed schedule does not roll back the rest of its batch.
-      for (let offset = 0; offset < toCreate.length; offset += WRITE_TRANSACTION_BATCH_SIZE) {
-        const batch = toCreate.slice(offset, offset + WRITE_TRANSACTION_BATCH_SIZE);
-        const createdMaintenances: Array<{ resourceId: number; maintenanceId: number }> = [];
+      const createdMaintenances: Array<{ resourceId: number; maintenanceId: number }> = [];
+      try {
+        await this.scheduleRepository.manager.transaction(async (em) => {
+          for (const { resourceId, schedule } of toCreate) {
+            // Recheck by resource to prevent a concurrent manual or different-schedule maintenance.
+            if (await this.maintenanceService.hasActiveMaintenance(resourceId, em)) continue;
 
-        try {
-          await this.scheduleRepository.manager.transaction(async (em) => {
-            for (const { resourceId, schedule } of batch) {
-              try {
-                const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
-                const maintenance = await em.transaction(async (itemEm) => {
-                  // Recheck by resource to prevent a concurrent manual or different-schedule maintenance.
-                  if (await this.maintenanceService.hasActiveMaintenance(resourceId, itemEm)) return;
-
-                  return this.maintenanceService.createMaintenanceFromSchedule(
-                    resourceId,
-                    schedule.id,
-                    reason,
-                    itemEm,
-                    false,
-                  );
-                });
-
-                // The savepoint has committed, so this entry cannot refer to a rolled-back item.
-                if (maintenance) {
-                  createdMaintenances.push({ resourceId, maintenanceId: maintenance.id });
-                  this.logger.log(
-                    `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
-                  );
-                }
-              } catch (err) {
-                this.logger.error(
-                  `Error creating maintenance for resource ${resourceId} from schedule ${schedule.id}: ${err}`,
-                  (err as Error)?.stack,
-                );
-              }
-            }
-          });
-
-          // An outer transaction commit succeeds before its notifications are emitted.
-          for (const { resourceId, maintenanceId } of createdMaintenances) {
-            this.maintenanceService.emitScheduledMaintenanceCreated(resourceId, maintenanceId);
+            const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
+            const maintenance = await this.maintenanceService.createMaintenanceFromSchedule(
+              resourceId,
+              schedule.id,
+              reason,
+              em,
+              false,
+            );
+            createdMaintenances.push({ resourceId, maintenanceId: maintenance.id });
+            this.logger.log(
+              `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
+            );
           }
-        } catch (err) {
-          this.logger.error(
-            `Error creating scheduled maintenance batch ${offset / WRITE_TRANSACTION_BATCH_SIZE + 1}: ${err}`,
-            (err as Error)?.stack,
-          );
+        });
+
+        // The transaction commit succeeds before notifications are emitted.
+        for (const { resourceId, maintenanceId } of createdMaintenances) {
+          this.maintenanceService.emitScheduledMaintenanceCreated(resourceId, maintenanceId);
         }
+      } catch (err) {
+        this.logger.error(`Error creating scheduled maintenances: ${err}`, (err as Error)?.stack);
       }
     } finally {
       this.evaluationLock = false;

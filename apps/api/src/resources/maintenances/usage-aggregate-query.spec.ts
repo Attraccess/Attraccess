@@ -1,5 +1,5 @@
 import { DataSource, EntitySchema } from 'typeorm';
-import { buildUsageAggregateQuery, formatDbDate } from './maintenance-schedule-evaluator.service';
+import { buildScheduleEvaluationQuery, formatDbDate } from './maintenance-schedule-evaluator.service';
 
 /**
  * Exercises the usage-aggregate SQL against a real SQLite database.
@@ -33,7 +33,24 @@ const UsageSchema = new EntitySchema<{
   },
 });
 
-describe('buildUsageAggregateQuery (real sqlite)', () => {
+const MaintenanceSchema = new EntitySchema<{
+  id: number;
+  resourceId: number;
+  maintenanceScheduleId: number;
+  startTime: Date;
+  endTime: Date | null;
+}>({
+  name: 'resource_maintenance',
+  columns: {
+    id: { type: Number, primary: true, generated: true },
+    resourceId: { type: 'integer' },
+    maintenanceScheduleId: { type: 'integer' },
+    startTime: { type: 'datetime' },
+    endTime: { type: 'datetime', nullable: true },
+  },
+});
+
+describe('buildScheduleEvaluationQuery (real sqlite)', () => {
   let dataSource: DataSource;
 
   const RESOURCE = 1;
@@ -48,7 +65,7 @@ describe('buildUsageAggregateQuery (real sqlite)', () => {
       type: 'sqlite',
       database: ':memory:',
       synchronize: true,
-      entities: [UsageSchema],
+      entities: [UsageSchema, MaintenanceSchema],
     });
     await dataSource.initialize();
 
@@ -58,11 +75,19 @@ describe('buildUsageAggregateQuery (real sqlite)', () => {
     // Saving through TypeORM means endTime is serialised exactly as it is in production.
     await repo.save([
       // 60 min, before the recent baseline -> only SCHEDULE_NEW should see it
-      { resourceId: RESOURCE, startTime: new Date('2025-03-01T10:00:00.000Z'), endTime: new Date('2025-03-01T11:00:00.000Z') },
+      {
+        resourceId: RESOURCE,
+        startTime: new Date('2025-03-01T10:00:00.000Z'),
+        endTime: new Date('2025-03-01T11:00:00.000Z'),
+      },
       // 30 min, exactly at the recent baseline -> boundary must be inclusive for both
       { resourceId: RESOURCE, startTime: new Date('2026-06-01T11:30:00.000Z'), endTime: recentBaseline },
       // 15 min, after both baselines
-      { resourceId: RESOURCE, startTime: new Date('2026-07-01T09:45:00.000Z'), endTime: new Date('2026-07-01T10:00:00.000Z') },
+      {
+        resourceId: RESOURCE,
+        startTime: new Date('2026-07-01T09:45:00.000Z'),
+        endTime: new Date('2026-07-01T10:00:00.000Z'),
+      },
       // still running -> excluded (endTime IS NULL)
       { resourceId: RESOURCE, startTime: new Date('2026-07-02T09:00:00.000Z'), endTime: null },
       // different resource -> never counted
@@ -75,10 +100,10 @@ describe('buildUsageAggregateQuery (real sqlite)', () => {
   });
 
   const runAggregate = (pairs: Array<[number, number, Date]>) =>
-    dataSource.query(
-      buildUsageAggregateQuery('resource_usage', pairs.length),
-      pairs.flatMap(([resourceId, scheduleId, baseline]) => [resourceId, scheduleId, formatDbDate(baseline)]),
-    );
+    dataSource.query(buildScheduleEvaluationQuery('resource_maintenance', 'resource_usage', pairs.length), [
+      ...pairs.flatMap(([resourceId, scheduleId, baseline]) => [resourceId, scheduleId, formatDbDate(baseline)]),
+      formatDbDate(new Date()),
+    ]);
 
   it('aggregates each (resource, schedule) pair against its own baseline', async () => {
     const rows = await runAggregate([
@@ -99,10 +124,42 @@ describe('buildUsageAggregateQuery (real sqlite)', () => {
     expect(bySchedule.get(SCHEDULE_RECENT)?.totalCount).toBe(2);
   });
 
+  it('uses the latest completed maintenance as the schedule baseline', async () => {
+    await dataSource.getRepository('resource_maintenance').save({
+      resourceId: RESOURCE,
+      maintenanceScheduleId: SCHEDULE_RECENT,
+      startTime: new Date('2026-06-01T10:00:00.000Z'),
+      endTime: recentBaseline,
+    });
+
+    const rows = await runAggregate([
+      [RESOURCE, SCHEDULE_NEW, oldBaseline],
+      [RESOURCE, SCHEDULE_RECENT, oldBaseline],
+    ]);
+    const bySchedule = new Map<number, { baseline: string; totalMinutes: number; totalCount: number }>(
+      rows.map((row: { scheduleId: number }) => [row.scheduleId, row]),
+    );
+
+    expect(bySchedule.get(SCHEDULE_RECENT)).toMatchObject({
+      baseline: formatDbDate(recentBaseline),
+      totalMinutes: expect.closeTo(45, 3),
+      totalCount: 2,
+    });
+  });
+
   it('returns zeroes rather than dropping a pair when a resource has no matching usage', async () => {
     const rows = await runAggregate([[999, SCHEDULE_NEW, oldBaseline]]);
 
-    expect(rows).toEqual([{ resourceId: 999, scheduleId: SCHEDULE_NEW, totalMinutes: 0, totalCount: 0 }]);
+    expect(rows).toEqual([
+      {
+        resourceId: 999,
+        scheduleId: SCHEDULE_NEW,
+        baseline: formatDbDate(oldBaseline),
+        hasActiveMaintenance: 0,
+        totalMinutes: 0,
+        totalCount: 0,
+      },
+    ]);
   });
 
   it('matches the stored datetime format, so a baseline in the future excludes everything', async () => {
