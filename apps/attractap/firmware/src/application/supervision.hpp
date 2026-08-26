@@ -89,17 +89,17 @@ private:
     uint32_t armedResourceId = 0;
     uint32_t requestedAtMs = 0;
     uint32_t requestedTimeoutMs = 0;
-    uint32_t startedAtMs = 0;
+    uint32_t activeDeadlineMs = 0;
     uint32_t phaseChangedAtMs = 0;
 
     static constexpr uint32_t TIMEOUT_MS = 30000;
     static constexpr uint32_t SUCCESS_DWELL_MS = 1200;
     static constexpr uint32_t ERROR_DWELL_MS = 1800;
 
-    void enter(const char *requester, const char *hint, uint32_t now);
+    void enter(const char *requester, const char *hint, uint32_t now, uint32_t deadlineMs);
     void resetActiveTransaction();
     void clearPendingWebStart();
-    void beginWebInitiated(uint32_t resourceId, const char *requesterName);
+    void beginWebInitiated(uint32_t resourceId, const char *requesterName, uint32_t deadlineMs);
     void enqueueEvent(const Event &event);
     void clearOverflowEvents();
     void normalizeOverflowEventSequences();
