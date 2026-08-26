@@ -129,6 +129,7 @@ void Websocket::loop()
     case CONNECTING:
         break;
     case CONNECTED:
+        sendPongProbe(nowMs);
         if (millis() - this->lastInboundFrameTime > this->INBOUND_LIVENESS_TIMEOUT_MS)
         {
             logger.error("No inbound frames within liveness timeout, forcing reconnect");
@@ -181,6 +182,46 @@ void Websocket::publishConnectionStatus()
         }
     }
     State::setWebsocketNextAttemptSeconds(secondsUntilNext);
+}
+
+void Websocket::sendPongProbe(uint32_t nowMs)
+{
+    if (!this->network_quality_mutex || nowMs - this->lastPongProbeTime < this->PONG_PROBE_INTERVAL_MS)
+    {
+        return;
+    }
+
+    lockWsClient();
+    if (!ws_client)
+    {
+        unlockWsClient();
+        return;
+    }
+
+    xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
+    if (this->pendingPongProbeTime != 0 && nowMs - this->pendingPongProbeTime < this->PONG_PROBE_TIMEOUT_MS)
+    {
+        xSemaphoreGive(this->network_quality_mutex);
+        unlockWsClient();
+        return;
+    }
+
+    uint32_t token = this->pendingPongProbeToken + 1;
+    uint8_t payload[sizeof(token)];
+    memcpy(payload, &token, sizeof(token));
+
+    // Hold the quality lock until the send completes so a prompt PONG cannot be
+    // processed before its matching PING timestamp and token are published.
+    uint32_t sentAtMs = millis();
+    int ret = esp_websocket_client_send_with_opcode(ws_client, WS_TRANSPORT_OPCODES_PING, payload, sizeof(payload), 0);
+    if (ret == static_cast<int>(sizeof(payload)))
+    {
+        this->lastPongProbeTime = sentAtMs;
+        this->pendingPongProbeTime = sentAtMs;
+        this->pendingPongProbeToken = token;
+    }
+    xSemaphoreGive(this->network_quality_mutex);
+    unlockWsClient();
 }
 
 void Websocket::publishNetworkQuality()
@@ -638,14 +679,22 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
     case WEBSOCKET_EVENT_DATA:
     {
         uint32_t nowMs = millis();
-        uint32_t previousInboundFrameTime = this->lastInboundFrameTime;
-        // The client sends its built-in PING after five idle seconds and propagates
-        // the matching PONG as a data event, so its RTT is the excess idle time.
-        if (data->op_code == WS_TRANSPORT_OPCODES_PONG &&
-            previousInboundFrameTime != 0 &&
-            nowMs - previousInboundFrameTime >= this->PING_INTERVAL_MS)
+        if (data->op_code == WS_TRANSPORT_OPCODES_PONG && this->network_quality_mutex)
         {
-            recordPongRtt(nowMs - previousInboundFrameTime - this->PING_INTERVAL_MS, nowMs);
+            xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
+            if (this->pendingPongProbeTime != 0 &&
+                data->data_len == static_cast<int>(sizeof(this->pendingPongProbeToken)) &&
+                memcmp(data->data_ptr, &this->pendingPongProbeToken, sizeof(this->pendingPongProbeToken)) == 0)
+            {
+                uint32_t rttMs = nowMs - this->pendingPongProbeTime;
+                this->pendingPongProbeTime = 0;
+                xSemaphoreGive(this->network_quality_mutex);
+                recordPongRtt(rttMs, nowMs);
+            }
+            else
+            {
+                xSemaphoreGive(this->network_quality_mutex);
+            }
         }
         this->lastInboundFrameTime = nowMs;
         if (data->op_code == 0x01)

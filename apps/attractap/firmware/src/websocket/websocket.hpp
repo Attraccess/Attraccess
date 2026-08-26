@@ -52,6 +52,7 @@ private:
     void updateInfoFromAppState();
     void publishConnectionStatus();
     void publishNetworkQuality();
+    void sendPongProbe(uint32_t nowMs);
     void recordNetworkQualityEvent(uint32_t *events, uint8_t &nextIndex);
     void recordPongRtt(uint32_t rttMs, uint32_t nowMs);
     uint8_t countRecentNetworkQualityEvents(const uint32_t *events, uint32_t nowMs) const;
@@ -132,7 +133,11 @@ private:
     uint8_t pongTimeoutEventNextIndex = 0;
     uint8_t pongRttSampleNextIndex = 0;
     uint32_t lastPongRttMs = 0;
-    const uint32_t PING_INTERVAL_MS = 5000;
+    uint32_t lastPongProbeTime = 0;
+    uint32_t pendingPongProbeTime = 0;
+    uint32_t pendingPongProbeToken = 0;
+    const uint32_t PONG_PROBE_INTERVAL_MS = 5000;
+    const uint32_t PONG_PROBE_TIMEOUT_MS = 10000;
     const uint32_t PONG_RTT_DEGRADED_AFTER_MS = 1000;
     const int PINGPONG_TIMEOUT_SEC = 10;
 
