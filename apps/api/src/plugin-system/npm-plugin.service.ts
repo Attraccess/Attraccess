@@ -17,6 +17,7 @@ import { parseNpmPluginPackage } from './npm-plugin-contract';
 const REGISTRY_PARENT = 'plugin-registry';
 const REGISTRIES_KEY = 'registries';
 const STATE_FILE = '.npm-plugin-state.json';
+const BACKUP_DIRECTORY = '.npm-backups';
 const MAX_ARCHIVE_BYTES = 50 * 1024 * 1024;
 const MAX_METADATA_BYTES = 10 * 1024 * 1024;
 const MAX_EXTRACTED_BYTES = 200 * 1024 * 1024;
@@ -181,7 +182,9 @@ export class NpmPluginService {
 
   private async activate(source: string, name: string): Promise<{ target: string; backup: string }> {
     const target = join(PluginService.PLUGIN_PATH, pluginDirectory(name));
-    const backup = join(PluginService.PLUGIN_PATH, `.npm-backup-${randomUUID()}`);
+    const backupDirectory = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY);
+    const backup = join(backupDirectory, randomUUID());
+    await mkdir(backupDirectory, { recursive: true });
     if (existsSync(target)) await rename(target, backup);
     try {
       await rename(source, target);

@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { lookup } from 'dns/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -214,6 +214,16 @@ describe('NpmPluginService', () => {
     const tarball = await packageTarball(name);
     const target = join(root, `npm-${Buffer.from(name).toString('base64url')}`);
     mkdirSync(target, { recursive: true });
+    writeFileSync(
+      join(target, 'plugin.json'),
+      JSON.stringify({
+        name,
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+        permissions: [],
+      }),
+    );
     const service = new NpmPluginService({} as never);
     const internals = service as unknown as ServiceInternals;
 
@@ -233,5 +243,6 @@ describe('NpmPluginService', () => {
 
     expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
     expect(service.listInstalled()).toEqual([expect.objectContaining({ name, version: '1.2.3' })]);
+    expect(readdirSync(join(root, '.npm-backups'))).toHaveLength(1);
   });
 });
