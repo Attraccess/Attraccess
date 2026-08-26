@@ -634,7 +634,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
           : resultOfPreviousNode.payload;
       responseOfNode = {
         payload,
-        outputHandle: failureBehavior === 'failure-output' ? 'failure' : undefined,
+        outputHandle: failureBehavior === 'failure-output' ? 'failure' : 'output',
       };
     }
 

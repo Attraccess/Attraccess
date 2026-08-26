@@ -452,6 +452,43 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     ).toEqual(expect.objectContaining({ failureKind: 'transport-dispatch', failureBehavior: 'failure-output' }));
   });
 
+  it('routes a logged external-effect failure through its normal output', async () => {
+    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_BUTTON });
+    const mqttNode = createNode({
+      id: 'mqtt-1',
+      type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE,
+      data: { serverId: 1, topic: 'devices/state', failureBehavior: 'log-and-continue' },
+    });
+    const continuationNode = createNode({
+      id: 'continuation-1',
+      type: ResourceFlowNodeType.PROCESSING_SET_PAYLOAD,
+      data: { entries: [] },
+    });
+    [inputNode, mqttNode, continuationNode].forEach((node) => (nodesById[node.id] = node));
+    initialNodes = [inputNode];
+    edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: mqttNode.id }];
+    edgesBySourceAndHandle[`${mqttNode.id}|output`] = [
+      { source: mqttNode.id, target: continuationNode.id, sourceHandle: 'output' },
+    ];
+    edgesBySourceAndHandle[`${mqttNode.id}|failure`] = [];
+    edgesBySourceAndHandle[`${continuationNode.id}|`] = [];
+    mqttClientService.publish = jest.fn().mockRejectedValue(new Error('Broker unavailable'));
+    const processNode = jest.spyOn(
+      service as unknown as { processNode: () => Promise<NodeProcessingResult[]> },
+      'processNode',
+    );
+
+    await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { requestId: 'abc' });
+
+    expect(processNode).toHaveBeenCalledWith(
+      expect.any(String),
+      continuationNode,
+      expect.objectContaining({ outputHandle: 'output' }),
+      undefined,
+      expect.any(Map),
+    );
+  });
+
   it('preserves the legacy flow failure behavior when no policy was saved', async () => {
     const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_BUTTON });
     const mqttNode = createNode({

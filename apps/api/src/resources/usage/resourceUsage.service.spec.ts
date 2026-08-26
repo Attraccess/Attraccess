@@ -1135,6 +1135,7 @@ describe('ResourceUsageService', () => {
       } as ResourceUsage;
       const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: 'Auto-ended' };
       const calls: string[] = [];
+      let usageTransactionCommitted = false;
 
       resourceUsageRepository.findOne
         .mockResolvedValueOnce(mockActiveSession)
@@ -1149,9 +1150,16 @@ describe('ResourceUsageService', () => {
         calls.push('update');
       });
       flowExecutorService.runFlow.mockImplementation(async () => {
+        expect(usageTransactionCommitted).toBe(true);
         calls.push('flow');
         return [];
       });
+      (resourceUsageRepository.manager.transaction as jest.Mock)
+        .mockImplementationOnce(async (callback) => {
+          const result = await callback(transactionalEntityManager);
+          usageTransactionCommitted = true;
+          return result;
+        });
 
       await service.endSession(1, mockActiveSession.user, { notes: 'Auto-ended' });
 

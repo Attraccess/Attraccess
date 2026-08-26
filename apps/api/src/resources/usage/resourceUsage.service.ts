@@ -731,23 +731,25 @@ export class ResourceUsageService {
 
         await this.billingService.chargeForResourceUsage(updatedUsage, transactionalEntityManager);
 
-        endFlowPayload = { ...this.getResourceUsageFlowPayload(activeSession, formSubmissions), ...updateData };
-        await this.runUsageFlow(
-          transactionalEntityManager,
-          resourceId,
-          ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
-          endFlowPayload,
-          'end',
-        );
-
         // Defer event after successful save until after commit
         endedUsageIdToEmit = activeSession.id;
+        endFlowPayload = { ...this.getResourceUsageFlowPayload(activeSession, formSubmissions), ...updateData };
 
         // Fetch the updated record
         return updatedUsage;
       });
 
     const updatedUsage = await this.runSerializedIfSqlite(this.resourceUsageRepository.manager, executeEndSession);
+
+    if (endFlowPayload) {
+      await this.runUsageFlow(
+        this.resourceUsageRepository.manager,
+        resourceId,
+        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+        endFlowPayload,
+        'end',
+      );
+    }
 
     // Emit event after the transaction committed to ensure readers can observe DB state
     try {
