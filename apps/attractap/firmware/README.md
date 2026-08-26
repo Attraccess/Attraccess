@@ -89,6 +89,15 @@ must be absent.
 The chaos AP setup and cleanup instructions are in
 [`tools/chaos-ap/README.md`](../../../tools/chaos-ap/README.md).
 
+Save each capture as `auth-failure.log`, `ap-not-found.log`,
+`dhcp-timeout.log`, and `idle.log`, then verify it before attaching it to the
+change review:
+
+```bash
+bash scripts/verify-attractap-wifi-serial-log.sh \
+  auth-failure.log ap-not-found.log dhcp-timeout.log idle.log
+```
+
 ## Attractap Lite LED Animations
 
 The Attractap Lite variant uses a WS2812 LED ring for status feedback. For a user-facing guide to LED states and triggers, see the [Attractap Lite LED Guide](../../../docs/user/resources/iots/attractap-lite-led-guide.md) in the docs.
