@@ -1,7 +1,13 @@
 import { Injectable, Logger, BadRequestException, NotFoundException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, EntityManager } from 'typeorm';
-import { ResourceMaintenance, ResourceMaintenanceSchedule, Resource, ResourceIntroducer, User } from '@attraccess/database-entities';
+import {
+  ResourceMaintenance,
+  ResourceMaintenanceSchedule,
+  Resource,
+  ResourceIntroducer,
+  User,
+} from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import { CreateMaintenanceDto } from './dtos/createMaintenance.dto';
@@ -26,7 +32,7 @@ export class ResourceMaintenanceService {
     private readonly eventEmitter: EventEmitter2,
     private readonly metricsService: MetricsService,
     private readonly rbacService: RbacService,
-  ) { }
+  ) {}
 
   /**
    * Create a maintenance for a given resource.
@@ -82,6 +88,7 @@ export class ResourceMaintenanceService {
     scheduleId: number,
     reason: string,
     transactionalEntityManager?: EntityManager,
+    notify = true,
   ): Promise<ResourceMaintenance> {
     const resourceRepository = transactionalEntityManager
       ? transactionalEntityManager.getRepository(Resource)
@@ -108,12 +115,17 @@ export class ResourceMaintenanceService {
     });
 
     const savedMaintenance = await maintenanceRepository.save(maintenance);
+    if (notify) this.emitScheduledMaintenanceCreated(resourceId, savedMaintenance.id);
+    return savedMaintenance;
+  }
+
+  /** Emit scheduled-maintenance side effects after the containing transaction commits. */
+  emitScheduledMaintenanceCreated(resourceId: number, maintenanceId: number): void {
     this.eventEmitter.emit(
       ResourceMaintenanceChangedEvent.EVENT_NAME,
-      new ResourceMaintenanceChangedEvent(resourceId, savedMaintenance.id),
+      new ResourceMaintenanceChangedEvent(resourceId, maintenanceId),
     );
     this.metricsService.resourceMaintenanceTotal.inc({ type: 'scheduled' });
-    return savedMaintenance;
   }
 
   /**
@@ -247,8 +259,14 @@ export class ResourceMaintenanceService {
    * manual and schedule-triggered maintenances; both block usage for non–maintenance users.
    */
   async hasActiveMaintenance(resourceId: number, transactionalEntityManager?: EntityManager): Promise<boolean>;
-  async hasActiveMaintenance(filter: { resourceId: number; scheduleId: number }, transactionalEntityManager?: EntityManager): Promise<boolean>;
-  async hasActiveMaintenance(resourceIdOrFilter: number | { resourceId: number; scheduleId?: number }, transactionalEntityManager?: EntityManager): Promise<boolean> {
+  async hasActiveMaintenance(
+    filter: { resourceId: number; scheduleId: number },
+    transactionalEntityManager?: EntityManager,
+  ): Promise<boolean>;
+  async hasActiveMaintenance(
+    resourceIdOrFilter: number | { resourceId: number; scheduleId?: number },
+    transactionalEntityManager?: EntityManager,
+  ): Promise<boolean> {
     const resourceId = typeof resourceIdOrFilter === 'number' ? resourceIdOrFilter : resourceIdOrFilter.resourceId;
     const scheduleId = typeof resourceIdOrFilter === 'number' ? undefined : resourceIdOrFilter.scheduleId;
 
@@ -268,8 +286,7 @@ export class ResourceMaintenanceService {
       query.andWhere('maintenance.maintenanceScheduleId = :scheduleId', { scheduleId });
     }
 
-    const activeMaintenance = await query
-      .getOne();
+    const activeMaintenance = await query.getOne();
 
     return !!activeMaintenance;
   }
@@ -285,8 +302,7 @@ export class ResourceMaintenanceService {
     // Check if the user has system permissions to manage all resources.
     // Fall back to a DB lookup when the entity came from a WebSocket/card path (no effectivePermissions attached).
     const effectivePermissions =
-      (user as AuthenticatedUser).effectivePermissions ??
-      (await this.rbacService.getEffectivePermissions(user.id));
+      (user as AuthenticatedUser).effectivePermissions ?? (await this.rbacService.getEffectivePermissions(user.id));
     if (effectivePermissions.has('resources.maintenance.manage')) {
       return true;
     }

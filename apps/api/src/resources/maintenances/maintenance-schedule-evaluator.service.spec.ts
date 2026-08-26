@@ -52,17 +52,21 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       find: jest.fn(),
       findOne: jest.fn(),
       manager: {
-        transaction: jest.fn(async (cb: (em: {
-          getRepository: (entity: unknown) => unknown;
-          transaction: (innerCb: (innerEm: unknown) => Promise<unknown>) => Promise<unknown>;
-        }) => Promise<unknown>) => {
-          const transactionalEntityManager = {
-            getRepository: (entity: unknown) =>
-              entity === ResourceMaintenanceSchedule ? scheduleRepoMock : {},
-            transaction: async (innerCb: (innerEm: unknown) => Promise<unknown>) => innerCb(transactionalEntityManager),
-          };
-          return cb(transactionalEntityManager);
-        }),
+        transaction: jest.fn(
+          async (
+            cb: (em: {
+              getRepository: (entity: unknown) => unknown;
+              transaction: (innerCb: (innerEm: unknown) => Promise<unknown>) => Promise<unknown>;
+            }) => Promise<unknown>,
+          ) => {
+            const transactionalEntityManager = {
+              getRepository: (entity: unknown) => (entity === ResourceMaintenanceSchedule ? scheduleRepoMock : {}),
+              transaction: async (innerCb: (innerEm: unknown) => Promise<unknown>) =>
+                innerCb(transactionalEntityManager),
+            };
+            return cb(transactionalEntityManager);
+          },
+        ),
       },
     };
 
@@ -103,9 +107,10 @@ describe('MaintenanceScheduleEvaluatorService', () => {
           useValue: {
             hasActiveMaintenance: jest.fn().mockResolvedValue(false),
             createMaintenanceFromSchedule: jest.fn().mockResolvedValue({ id: 1 }),
+            emitScheduledMaintenanceCreated: jest.fn(),
           },
         },
-        { provide: CronTimer, useValue: { time: <T,>(_n: string, fn: () => Promise<T>) => fn() } },
+        { provide: CronTimer, useValue: { time: <T>(_n: string, fn: () => Promise<T>) => fn() } },
         { provide: MetricsService, useValue: { maintenanceUsageQueryWindowDays: { observe: jest.fn() } } },
       ],
     }).compile();
@@ -295,21 +300,33 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
       // Resources with old createdAt (> 30 days) so TIME_INTERVAL triggers
-      jest.spyOn(resourceRepository, 'find').mockResolvedValue([
-        { id: 1, createdAt: oldCreatedAt } as Resource,
-        { id: 2, createdAt: oldCreatedAt } as Resource,
-      ]);
+      jest
+        .spyOn(resourceRepository, 'find')
+        .mockResolvedValue([
+          { id: 1, createdAt: oldCreatedAt } as Resource,
+          { id: 2, createdAt: oldCreatedAt } as Resource,
+        ]);
 
       await service.evaluateAll();
 
       expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(1);
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(2);
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledWith(
-        1, scheduleId, expect.any(String), expect.anything(),
+        1,
+        scheduleId,
+        expect.any(String),
+        expect.anything(),
+        false,
       );
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledWith(
-        2, scheduleId + 1, expect.any(String), expect.anything(),
+        2,
+        scheduleId + 1,
+        expect.any(String),
+        expect.anything(),
+        false,
       );
+      expect(maintenanceService.emitScheduledMaintenanceCreated).toHaveBeenCalledWith(1, 1);
+      expect(maintenanceService.emitScheduledMaintenanceCreated).toHaveBeenCalledWith(2, 1);
       expect(maintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(
         { resourceId: 1, scheduleId },
         expect.anything(),
@@ -322,21 +339,25 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
     it('should split due writes into bounded transaction batches', async () => {
       const oldCreatedAt = new Date('2024-01-01T00:00:00.000Z');
-      const dueSchedules = Array.from({ length: 101 }, (_, index) => ({
-        id: scheduleId + index,
-        resourceId: index + 1,
-        enabled: true,
-        triggerType: ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL,
-        timeIntervalConfig: { duration: 30, unit: 'DAYS' },
-      } as ResourceMaintenanceSchedule));
+      const dueSchedules = Array.from(
+        { length: 101 },
+        (_, index) =>
+          ({
+            id: scheduleId + index,
+            resourceId: index + 1,
+            enabled: true,
+            triggerType: ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL,
+            timeIntervalConfig: { duration: 30, unit: 'DAYS' },
+          }) as ResourceMaintenanceSchedule,
+      );
 
       jest.spyOn(scheduleRepository, 'find').mockResolvedValue(dueSchedules);
       const maintenanceQb = createQueryBuilderMock();
       maintenanceQb.getRawMany.mockResolvedValue([]);
       jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-      jest.spyOn(resourceRepository, 'find').mockResolvedValue(
-        dueSchedules.map(({ resourceId: id }) => ({ id, createdAt: oldCreatedAt } as Resource)),
-      );
+      jest
+        .spyOn(resourceRepository, 'find')
+        .mockResolvedValue(dueSchedules.map(({ resourceId: id }) => ({ id, createdAt: oldCreatedAt }) as Resource));
 
       await service.evaluateAll();
 
@@ -365,21 +386,24 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       const maintenanceQb = createQueryBuilderMock();
       maintenanceQb.getRawMany.mockResolvedValue([]);
       jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-      jest.spyOn(resourceRepository, 'find').mockResolvedValue([
-        { id: 1, createdAt: oldCreatedAt } as Resource,
-        { id: 2, createdAt: oldCreatedAt } as Resource,
-      ]);
       jest
-        .spyOn(maintenanceService, 'hasActiveMaintenance')
-        .mockResolvedValueOnce(true)
-        .mockResolvedValueOnce(false);
+        .spyOn(resourceRepository, 'find')
+        .mockResolvedValue([
+          { id: 1, createdAt: oldCreatedAt } as Resource,
+          { id: 2, createdAt: oldCreatedAt } as Resource,
+        ]);
+      jest.spyOn(maintenanceService, 'hasActiveMaintenance').mockResolvedValueOnce(true).mockResolvedValueOnce(false);
 
       await service.evaluateAll();
 
       expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(1);
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(1);
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledWith(
-        2, scheduleId + 1, expect.any(String), expect.anything(),
+        2,
+        scheduleId + 1,
+        expect.any(String),
+        expect.anything(),
+        false,
       );
     });
 
@@ -403,9 +427,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       maintenanceQb.getRawMany.mockResolvedValue([]);
       jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-      jest.spyOn(resourceRepository, 'find').mockResolvedValue([
-        { id: 1, createdAt: recentCreatedAt } as Resource,
-      ]);
+      jest.spyOn(resourceRepository, 'find').mockResolvedValue([{ id: 1, createdAt: recentCreatedAt } as Resource]);
 
       await service.evaluateAll();
 
@@ -434,9 +456,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         .mockResolvedValueOnce([{ resourceId: 1, scheduleId }]); // second call: active query
       jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-      jest.spyOn(resourceRepository, 'find').mockResolvedValue([
-        { id: 1, createdAt: oldCreatedAt } as Resource,
-      ]);
+      jest.spyOn(resourceRepository, 'find').mockResolvedValue([{ id: 1, createdAt: oldCreatedAt } as Resource]);
 
       await service.evaluateAll();
 
@@ -463,19 +483,21 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       maintenanceQb.getRawMany.mockResolvedValue([]);
       jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-      jest.spyOn(resourceRepository, 'find').mockResolvedValue([
-        { id: 1, createdAt: oldCreatedAt } as Resource,
-      ]);
+      jest.spyOn(resourceRepository, 'find').mockResolvedValue([{ id: 1, createdAt: oldCreatedAt } as Resource]);
 
       // SQL aggregation returns totalMinutes=120 (>= 60 threshold) and totalCount
-      jest.spyOn(usageRepository, 'query').mockResolvedValue([
-        { resourceId: 1, scheduleId, totalMinutes: '120', totalCount: '3' },
-      ]);
+      jest
+        .spyOn(usageRepository, 'query')
+        .mockResolvedValue([{ resourceId: 1, scheduleId, totalMinutes: '120', totalCount: '3' }]);
 
       await service.evaluateAll();
 
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledWith(
-        1, scheduleId, expect.any(String), expect.anything(),
+        1,
+        scheduleId,
+        expect.any(String),
+        expect.anything(),
+        false,
       );
     });
 
@@ -498,14 +520,12 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       maintenanceQb.getRawMany.mockResolvedValue([]);
       jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-      jest.spyOn(resourceRepository, 'find').mockResolvedValue([
-        { id: 1, createdAt: oldCreatedAt } as Resource,
-      ]);
+      jest.spyOn(resourceRepository, 'find').mockResolvedValue([{ id: 1, createdAt: oldCreatedAt } as Resource]);
 
       // 100 minutes < 600 minutes threshold
-      jest.spyOn(usageRepository, 'query').mockResolvedValue([
-        { resourceId: 1, scheduleId, totalMinutes: '100', totalCount: '2' },
-      ]);
+      jest
+        .spyOn(usageRepository, 'query')
+        .mockResolvedValue([{ resourceId: 1, scheduleId, totalMinutes: '100', totalCount: '2' }]);
 
       await service.evaluateAll();
 
@@ -531,19 +551,21 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       maintenanceQb.getRawMany.mockResolvedValue([]);
       jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-      jest.spyOn(resourceRepository, 'find').mockResolvedValue([
-        { id: 1, createdAt: oldCreatedAt } as Resource,
-      ]);
+      jest.spyOn(resourceRepository, 'find').mockResolvedValue([{ id: 1, createdAt: oldCreatedAt } as Resource]);
 
       // SQL aggregation returns totalCount=7 (>= 5 threshold)
-      jest.spyOn(usageRepository, 'query').mockResolvedValue([
-        { resourceId: 1, scheduleId, totalMinutes: '0', totalCount: '7' },
-      ]);
+      jest
+        .spyOn(usageRepository, 'query')
+        .mockResolvedValue([{ resourceId: 1, scheduleId, totalMinutes: '0', totalCount: '7' }]);
 
       await service.evaluateAll();
 
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledWith(
-        1, scheduleId, expect.any(String), expect.anything(),
+        1,
+        scheduleId,
+        expect.any(String),
+        expect.anything(),
+        false,
       );
       const reason = (maintenanceService.createMaintenanceFromSchedule as jest.Mock).mock.calls[0][2];
       expect(JSON.parse(reason).i18nKey).toBe('reason.auto.usageCount');
@@ -568,14 +590,12 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       maintenanceQb.getRawMany.mockResolvedValue([]);
       jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-      jest.spyOn(resourceRepository, 'find').mockResolvedValue([
-        { id: 1, createdAt: oldCreatedAt } as Resource,
-      ]);
+      jest.spyOn(resourceRepository, 'find').mockResolvedValue([{ id: 1, createdAt: oldCreatedAt } as Resource]);
 
       // 3 sessions < 10 threshold
-      jest.spyOn(usageRepository, 'query').mockResolvedValue([
-        { resourceId: 1, scheduleId, totalMinutes: '0', totalCount: '3' },
-      ]);
+      jest
+        .spyOn(usageRepository, 'query')
+        .mockResolvedValue([{ resourceId: 1, scheduleId, totalMinutes: '0', totalCount: '3' }]);
 
       await service.evaluateAll();
 
@@ -618,9 +638,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         .mockResolvedValueOnce([]);
       jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-      jest.spyOn(resourceRepository, 'find').mockResolvedValue([
-        { id: 1, createdAt: resourceCreatedAt } as Resource,
-      ]);
+      jest.spyOn(resourceRepository, 'find').mockResolvedValue([{ id: 1, createdAt: resourceCreatedAt } as Resource]);
 
       // Same resource, different per-schedule windows: 900 min since createdAt, 30 min since service
       const querySpy = jest.spyOn(usageRepository, 'query').mockResolvedValue([
@@ -633,14 +651,22 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       // Both schedules must be sent to SQL with their own baseline
       const params = querySpy.mock.calls[0][1] as unknown[];
       expect(params).toEqual([
-        1, scheduleId, formatDbDate(resourceCreatedAt),
-        1, otherScheduleId, formatDbDate(recentlyServiced),
+        1,
+        scheduleId,
+        formatDbDate(resourceCreatedAt),
+        1,
+        otherScheduleId,
+        formatDbDate(recentlyServiced),
       ]);
 
       // Only the never-serviced schedule crossed its threshold
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(1);
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledWith(
-        1, scheduleId, expect.any(String), expect.anything(),
+        1,
+        scheduleId,
+        expect.any(String),
+        expect.anything(),
+        false,
       );
     });
 
@@ -670,10 +696,12 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       maintenanceQb.getRawMany.mockResolvedValue([]);
       jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-      jest.spyOn(resourceRepository, 'find').mockResolvedValue([
-        { id: 1, createdAt: new Date('2024-01-01T00:00:00.000Z') } as Resource,
-        { id: 2, createdAt: new Date('2024-01-01T00:00:00.000Z') } as Resource,
-      ]);
+      jest
+        .spyOn(resourceRepository, 'find')
+        .mockResolvedValue([
+          { id: 1, createdAt: new Date('2024-01-01T00:00:00.000Z') } as Resource,
+          { id: 2, createdAt: new Date('2024-01-01T00:00:00.000Z') } as Resource,
+        ]);
 
       jest
         .spyOn(maintenanceService, 'createMaintenanceFromSchedule')
@@ -715,15 +743,11 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       // first call (last done query): returns the recent last-done date
       // second call (active query): no active maintenance
       maintenanceQb.getRawMany
-        .mockResolvedValueOnce([
-          { resourceId: 1, scheduleId, lastEndTime: lastDoneEndTime.toISOString() },
-        ])
+        .mockResolvedValueOnce([{ resourceId: 1, scheduleId, lastEndTime: lastDoneEndTime.toISOString() }])
         .mockResolvedValueOnce([]);
       jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-      jest.spyOn(resourceRepository, 'find').mockResolvedValue([
-        { id: 1, createdAt: resourceCreatedAt } as Resource,
-      ]);
+      jest.spyOn(resourceRepository, 'find').mockResolvedValue([{ id: 1, createdAt: resourceCreatedAt } as Resource]);
 
       await service.evaluateAll();
 
@@ -735,7 +759,9 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       // Use a pending Promise so the first call holds the lock across microtask boundaries,
       // ensuring the second call observes the lock before the first finishes.
       let resolveFind!: (val: ResourceMaintenanceSchedule[]) => void;
-      const pendingFind = new Promise<ResourceMaintenanceSchedule[]>((res) => { resolveFind = res; });
+      const pendingFind = new Promise<ResourceMaintenanceSchedule[]>((res) => {
+        resolveFind = res;
+      });
       jest.spyOn(scheduleRepository, 'find').mockReturnValue(pendingFind);
 
       const firstCall = service.evaluateAll();

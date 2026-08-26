@@ -97,7 +97,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
     private readonly maintenanceService: ResourceMaintenanceService,
     private readonly cronTimer: CronTimer,
     private readonly metricsService: MetricsService,
-  ) { }
+  ) {}
 
   /** Drop pending debounce timers so shutdown isn't held up (and they don't fire against a closed DB). */
   onModuleDestroy(): void {
@@ -257,7 +257,10 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
 
       for (const schedule of schedules) {
         // Re-check active maintenance (another schedule might have just created one)
-        const hasActiveMaintenanceOfThisSchedule = await this.maintenanceService.hasActiveMaintenance({ resourceId, scheduleId: schedule.id }, transactionalEntityManager);
+        const hasActiveMaintenanceOfThisSchedule = await this.maintenanceService.hasActiveMaintenance(
+          { resourceId, scheduleId: schedule.id },
+          transactionalEntityManager,
+        );
         if (hasActiveMaintenanceOfThisSchedule) {
           continue;
         }
@@ -493,9 +496,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
       }
 
       const getBaseline = (resourceId: number, scheduleId: number): Date =>
-        baselineMap.get(`${scheduleId}:${resourceId}`) ??
-        resourceCreatedAtMap.get(resourceId) ??
-        now; // unreachable: orphaned resources are filtered out above
+        baselineMap.get(`${scheduleId}:${resourceId}`) ?? resourceCreatedAtMap.get(resourceId) ?? now; // unreachable: orphaned resources are filtered out above
 
       // 4. Active maintenances per (resource, schedule) — skip these in evaluation
       const activeRaw = await this.maintenanceRepository
@@ -537,9 +538,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
         // No lookback clamp: rarely-used machines need their full history to reach the threshold.
         const msPerDay = 24 * 60 * 60 * 1000;
         for (const { baseline } of pairs) {
-          this.metricsService.maintenanceUsageQueryWindowDays.observe(
-            (now.getTime() - baseline.getTime()) / msPerDay,
-          );
+          this.metricsService.maintenanceUsageQueryWindowDays.observe((now.getTime() - baseline.getTime()) / msPerDay);
         }
 
         const usageTable = this.usageRepository.metadata.tableName;
@@ -598,6 +597,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
       // of its batch can proceed without adding a begin/commit cycle per resource.
       for (let offset = 0; offset < toCreate.length; offset += WRITE_TRANSACTION_BATCH_SIZE) {
         const batch = toCreate.slice(offset, offset + WRITE_TRANSACTION_BATCH_SIZE);
+        const createdMaintenances: Array<{ resourceId: number; maintenanceId: number }> = [];
         try {
           await this.scheduleRepository.manager.transaction(async (em) => {
             for (const { resourceId, schedule } of batch) {
@@ -610,7 +610,14 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
                   if (hasActive) return;
 
                   const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
-                  await this.maintenanceService.createMaintenanceFromSchedule(resourceId, schedule.id, reason, itemEm);
+                  const maintenance = await this.maintenanceService.createMaintenanceFromSchedule(
+                    resourceId,
+                    schedule.id,
+                    reason,
+                    itemEm,
+                    false,
+                  );
+                  createdMaintenances.push({ resourceId, maintenanceId: maintenance.id });
                   this.logger.log(
                     `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
                   );
@@ -623,6 +630,9 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
               }
             }
           });
+          for (const { resourceId, maintenanceId } of createdMaintenances) {
+            this.maintenanceService.emitScheduledMaintenanceCreated(resourceId, maintenanceId);
+          }
         } catch (err) {
           this.logger.error(
             `Error creating maintenance batch ${offset / WRITE_TRANSACTION_BATCH_SIZE + 1}: ${err}`,
