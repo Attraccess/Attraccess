@@ -57,7 +57,7 @@ private:
     void clearPendingPongProbe();
     void recordNetworkQualityEvent(uint32_t *events, uint8_t &nextIndex);
     void recordPongRtt(uint32_t rttMs, uint32_t nowMs);
-    uint8_t countRecentNetworkQualityEvents(const uint32_t *events, uint32_t nowMs) const;
+    uint8_t countRecentNetworkQualityEvents(const uint32_t *events, size_t eventSlots, uint32_t nowMs) const;
     uint32_t averageRecentPongRtt(uint32_t nowMs) const;
     int32_t recentPongRttTrend(uint32_t nowMs) const;
     void connectWebSocket();
@@ -120,6 +120,7 @@ private:
     const uint32_t INBOUND_LIVENESS_TIMEOUT_MS = 20000;
     const uint32_t QUALITY_EVENT_WINDOW_MS = 60000;
     static constexpr size_t QUALITY_EVENT_SLOTS = 8;
+    static constexpr size_t PONG_PROBE_EVENT_SLOTS = (60000 / 5000) + 1;
     // Event rings are written by the main loop, websocket callback, and TX task.
     SemaphoreHandle_t network_quality_mutex = nullptr;
     uint32_t reconnectEventTimes[QUALITY_EVENT_SLOTS] = {};
@@ -127,8 +128,8 @@ private:
     uint32_t sendFailureEventTimes[QUALITY_EVENT_SLOTS] = {};
     uint32_t livenessTimeoutEventTimes[QUALITY_EVENT_SLOTS] = {};
     uint32_t pongTimeoutEventTimes[QUALITY_EVENT_SLOTS] = {};
-    uint32_t pongProbeSentEventTimes[QUALITY_EVENT_SLOTS] = {};
-    uint32_t pongProbeResponseEventTimes[QUALITY_EVENT_SLOTS] = {};
+    uint32_t pongProbeSentEventTimes[PONG_PROBE_EVENT_SLOTS] = {};
+    uint32_t pongProbeResponseEventTimes[PONG_PROBE_EVENT_SLOTS] = {};
     uint32_t missedHeartbeatEventTimes[QUALITY_EVENT_SLOTS] = {};
     uint32_t pongRttSampleTimes[QUALITY_EVENT_SLOTS] = {};
     uint32_t pongRttSamples[QUALITY_EVENT_SLOTS] = {};

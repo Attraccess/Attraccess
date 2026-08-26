@@ -229,7 +229,7 @@ void Websocket::sendPongProbe(uint32_t nowMs)
         this->pendingPongProbeTime = sentAtMs;
         this->pendingPongProbeToken = token;
         this->pongProbeSentEventTimes[this->pongProbeSentEventNextIndex] = sentAtMs;
-        this->pongProbeSentEventNextIndex = (uint8_t)((this->pongProbeSentEventNextIndex + 1) % QUALITY_EVENT_SLOTS);
+        this->pongProbeSentEventNextIndex = (uint8_t)((this->pongProbeSentEventNextIndex + 1) % PONG_PROBE_EVENT_SLOTS);
     }
     xSemaphoreGive(this->network_quality_mutex);
     unlockWsClient();
@@ -264,6 +264,7 @@ void Websocket::publishNetworkQuality()
     uint8_t pongTimeouts = 0;
     uint8_t pongProbesSent = 0;
     uint8_t pongProbeResponses = 0;
+    bool pongProbePending = false;
     uint8_t missedHeartbeats = 0;
     uint32_t lastPongRttMs = 0;
     uint32_t averagePongRttMs = 0;
@@ -271,23 +272,25 @@ void Websocket::publishNetworkQuality()
     if (this->network_quality_mutex)
     {
         xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
-        reconnects = countRecentNetworkQualityEvents(this->reconnectEventTimes, nowMs);
-        queueFull = countRecentNetworkQualityEvents(this->txQueueFullEventTimes, nowMs);
-        sendFailures = countRecentNetworkQualityEvents(this->sendFailureEventTimes, nowMs);
-        livenessTimeouts = countRecentNetworkQualityEvents(this->livenessTimeoutEventTimes, nowMs);
-        pongTimeouts = countRecentNetworkQualityEvents(this->pongTimeoutEventTimes, nowMs);
-        pongProbesSent = countRecentNetworkQualityEvents(this->pongProbeSentEventTimes, nowMs);
-        pongProbeResponses = countRecentNetworkQualityEvents(this->pongProbeResponseEventTimes, nowMs);
-        missedHeartbeats = countRecentNetworkQualityEvents(this->missedHeartbeatEventTimes, nowMs);
+        reconnects = countRecentNetworkQualityEvents(this->reconnectEventTimes, QUALITY_EVENT_SLOTS, nowMs);
+        queueFull = countRecentNetworkQualityEvents(this->txQueueFullEventTimes, QUALITY_EVENT_SLOTS, nowMs);
+        sendFailures = countRecentNetworkQualityEvents(this->sendFailureEventTimes, QUALITY_EVENT_SLOTS, nowMs);
+        livenessTimeouts = countRecentNetworkQualityEvents(this->livenessTimeoutEventTimes, QUALITY_EVENT_SLOTS, nowMs);
+        pongTimeouts = countRecentNetworkQualityEvents(this->pongTimeoutEventTimes, QUALITY_EVENT_SLOTS, nowMs);
+        pongProbesSent = countRecentNetworkQualityEvents(this->pongProbeSentEventTimes, PONG_PROBE_EVENT_SLOTS, nowMs);
+        pongProbeResponses = countRecentNetworkQualityEvents(this->pongProbeResponseEventTimes, PONG_PROBE_EVENT_SLOTS, nowMs);
+        pongProbePending = this->pendingPongProbeTime != 0;
+        missedHeartbeats = countRecentNetworkQualityEvents(this->missedHeartbeatEventTimes, QUALITY_EVENT_SLOTS, nowMs);
         lastPongRttMs = this->lastPongRttMs;
         averagePongRttMs = averageRecentPongRtt(nowMs);
         pongRttTrendMs = recentPongRttTrend(nowMs);
         xSemaphoreGive(this->network_quality_mutex);
     }
 
-    uint8_t pongProbeLossPercent = pongProbesSent == 0 || pongProbeResponses >= pongProbesSent
-                                      ? 0
-                                      : (uint8_t)(((pongProbesSent - pongProbeResponses) * 100) / pongProbesSent);
+    uint8_t completedPongProbes = pongProbesSent - (pongProbePending && pongProbesSent > 0 ? 1 : 0);
+    uint8_t pongProbeLossPercent = completedPongProbes == 0 || pongProbeResponses >= completedPongProbes
+                                       ? 0
+                                       : (uint8_t)(((completedPongProbes - pongProbeResponses) * 100) / completedPongProbes);
     State::NetworkQuality quality = State::NETWORK_QUALITY_GOOD;
     if (!this->network_is_connected || this->_state != CONNECTED)
     {
@@ -299,7 +302,7 @@ void Websocket::publishNetworkQuality()
               sendFailures > 0 ||
               livenessTimeouts > 0 ||
               pongTimeouts > 0 ||
-               (pongProbesSent >= 3 && pongProbeLossPercent >= this->PONG_PROBE_LOSS_DEGRADED_PERCENT) ||
+               (completedPongProbes >= 3 && pongProbeLossPercent >= this->PONG_PROBE_LOSS_DEGRADED_PERCENT) ||
                missedHeartbeats > 0 ||
               averagePongRttMs >= this->PONG_RTT_DEGRADED_AFTER_MS ||
               txDepth >= (TX_QUEUE_DEPTH / 2))
@@ -340,10 +343,10 @@ void Websocket::recordPongRtt(uint32_t rttMs, uint32_t nowMs)
     xSemaphoreGive(this->network_quality_mutex);
 }
 
-uint8_t Websocket::countRecentNetworkQualityEvents(const uint32_t *events, uint32_t nowMs) const
+uint8_t Websocket::countRecentNetworkQualityEvents(const uint32_t *events, size_t eventSlots, uint32_t nowMs) const
 {
     uint8_t count = 0;
-    for (size_t i = 0; i < QUALITY_EVENT_SLOTS; i++)
+    for (size_t i = 0; i < eventSlots; i++)
     {
         if (events[i] != 0 && nowMs - events[i] <= this->QUALITY_EVENT_WINDOW_MS)
         {
@@ -758,7 +761,7 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
                 uint32_t rttMs = nowMs - this->pendingPongProbeTime;
                 this->pendingPongProbeTime = 0;
                 this->pongProbeResponseEventTimes[this->pongProbeResponseEventNextIndex] = nowMs;
-                this->pongProbeResponseEventNextIndex = (uint8_t)((this->pongProbeResponseEventNextIndex + 1) % QUALITY_EVENT_SLOTS);
+                this->pongProbeResponseEventNextIndex = (uint8_t)((this->pongProbeResponseEventNextIndex + 1) % PONG_PROBE_EVENT_SLOTS);
                 xSemaphoreGive(this->network_quality_mutex);
                 recordPongRtt(rttMs, nowMs);
             }
