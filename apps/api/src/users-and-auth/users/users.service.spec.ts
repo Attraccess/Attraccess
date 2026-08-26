@@ -443,7 +443,7 @@ describe('UsersService', () => {
       query.subQuery.mockReturnValue(roleFilter);
       userRepository.createQueryBuilder.mockReturnValue(query as never);
 
-      await service.findMany({ page: 1, limit: 10, roleIds: [2, 4], roleMatch: 'all' });
+      await service.findMany({ page: 1, limit: 10, roleIds: [2, 2, 4], roleMatch: 'all' });
 
       expect(roleFilter.having).toHaveBeenCalledWith('COUNT(DISTINCT userRole.roleId) = :roleCount');
       expect(query.andWhere).toHaveBeenCalledWith('user.id IN (SELECT role user IDs)', {

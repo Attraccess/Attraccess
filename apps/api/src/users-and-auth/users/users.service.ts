@@ -604,7 +604,8 @@ export class UsersService {
         query.andWhere('user.isEmailVerified = :emailVerified', { emailVerified: options.emailVerified });
       }
 
-      const roleIds = options.roleIds ?? (options.roleId === undefined ? undefined : [options.roleId]);
+      const requestedRoleIds = options.roleIds ?? (options.roleId === undefined ? undefined : [options.roleId]);
+      const roleIds = requestedRoleIds ? [...new Set(requestedRoleIds)] : undefined;
       if (roleIds?.length) {
         const roleFilter = query
           .subQuery()
