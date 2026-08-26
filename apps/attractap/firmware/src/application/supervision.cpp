@@ -115,9 +115,9 @@ void SupervisionFlow::onCardDetected(const uint8_t *uid, uint8_t uidLength) {
 }
 
 void SupervisionFlow::publishTerminalEvent(TerminalEvent event) {
-    // Terminal outcomes are mutually exclusive. A local cancellation wins over
-    // a concurrent websocket event because it represents an explicit user action.
-    if (event == TerminalEvent::Cancelled || terminalEvent == TerminalEvent::None) {
+    // The first terminal event settles the transaction until its dwell period
+    // completes, so a later callback cannot replace its outcome.
+    if (terminalEvent == TerminalEvent::None) {
         terminalEvent = event;
     }
 }
@@ -246,7 +246,10 @@ void SupervisionFlow::processEvents(bool stopWhenWebStart) {
 void SupervisionFlow::processEvent(const Event &event) {
     switch (event.type) {
     case EventType::Cancel:
-        if (phase != Phase::Idle) publishTerminalEvent(TerminalEvent::Cancelled);
+        if (phase != Phase::Idle && phase != Phase::Success &&
+            !(phase == Phase::Error && errorIsTerminal)) {
+            publishTerminalEvent(TerminalEvent::Cancelled);
+        }
         break;
     case EventType::CardDetected:
         if (phase == Phase::WaitingForCard) {
