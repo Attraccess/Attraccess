@@ -100,6 +100,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
     // recoverable in-flow: the supervision screen surfaces them and either keeps waiting or aborts
     // cleanly. Route them to the dedicated handlers instead of the generic error dialog (ATT-493).
     bool isSupervisionEvent = strcmp(eventType, "SUPERVISION_REQUEST") == 0 ||
+                              strcmp(eventType, "SUPERVISION_START") == 0 ||
                               strcmp(eventType, "SUPERVISOR_CARD_AUTHENTICATION_DATA") == 0 ||
                               strcmp(eventType, "SUPERVISION_RESOLVED") == 0;
 
@@ -165,6 +166,10 @@ void API::processIncomingMessage(const char *buf, size_t len)
     else if (strcmp(eventType, "SUPERVISION_REQUEST") == 0)
     {
         this->onSupervisionRequestResult(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strcmp(eventType, "SUPERVISION_START") == 0)
+    {
+        this->onSupervisionStart(inboundDoc["data"].as<JsonObject>());
     }
     else if (strcmp(eventType, "SUPERVISOR_CARD_AUTHENTICATION_DATA") == 0)
     {

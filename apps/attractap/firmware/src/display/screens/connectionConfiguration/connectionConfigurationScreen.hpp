@@ -6,6 +6,7 @@
 #include "../../screens/IScreen.hpp"
 #include "../../../settings/settings.hpp"
 #include "../../shared/pinInput/pinInputPage.hpp"
+#include "../../shared/powerOff/powerOffButton.hpp"
 
 class ConnectionConfigurationScreen : public IScreen
 {
@@ -30,12 +31,20 @@ public:
     void setOnSaveCallback(std::function<void(const ConnectionConfig &)> onSaveCallback);
     void setOnCancelPinLockCallback(std::function<void()> onCancelPinLockCallback);
     void setOnResetCertificateCallback(std::function<void()> onResetCertificateCallback);
+#ifdef HAS_POWER_BUTTON
+    // Application wires this to IOExpander::powerOff(). Invoked after the user
+    // confirms the power-off dialog on the "Geraet" tab.
+    void setOnPowerOffCallback(std::function<void()> cb) { onPowerOffCallback = cb; }
+#endif
     void disablePinLock();
     void enablePinLock();
 
 private:
     std::function<void(const ConnectionConfig &)> onSaveCallback;
     std::function<void()> onResetCertificateCallback;
+#ifdef HAS_POWER_BUTTON
+    std::function<void()> onPowerOffCallback;
+#endif
 
     PinInputPage pinInputPage;
     lv_obj_t *screen = nullptr;

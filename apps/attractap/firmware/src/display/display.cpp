@@ -35,11 +35,6 @@ uint32_t Display::screenHeight = 0;
 IDisplayDriver *Display::driver = nullptr;
 lv_display_t *Display::disp = NULL;
 lv_indev_t *Display::indev = NULL;
-IScreen *Display::activeScreen = NULL;
-std::vector<IScreen *> Display::pendingDestroyScreens;
-uint32_t Display::transitionStartTime = 0;
-bool Display::transitionComplete = true;
-std::function<void()> Display::onTransitionComplete = nullptr;
 std::string Display::deviceNameInitValue = "Attractap";
 
 lv_obj_t *Display::deviceNameLabel = NULL;
@@ -90,6 +85,13 @@ void Display::logFromLvgl(lv_log_level_t level, const char *buf)
     case LV_LOG_LEVEL_INFO:
         Display::logger.info(buf);
         break;
+#ifdef ATTRACTAP_LV_PERF_MONITOR
+    case LV_LOG_LEVEL_USER:
+        /* LVGL sysmon perf logs arrive as USER level; surface them as info so
+         * FPS / render / flush timing is visible on serial (PERFORMANCE_ANALYSIS.md A-4). */
+        Display::logger.info(buf);
+        break;
+#endif
     case LV_LOG_LEVEL_TRACE:
     default:
         Display::logger.debug(buf);
@@ -187,25 +189,65 @@ void Display::setup()
     /* Set LVGL tick source (v9) */
     lv_tick_set_cb(Display::tick_cb);
 
-    /* Allocate draw buffers in bytes for LVGL v9 */
-    const uint32_t buf_pixels = Display::screenWidth * 20; /* eighth of screen to save RAM */
-    const uint32_t buf_size_bytes = buf_pixels * (LV_COLOR_DEPTH / 8);
-    uint8_t *buf1 = (uint8_t *)heap_caps_malloc(buf_size_bytes, MALLOC_CAP_DMA);
-    uint8_t *buf2 = NULL; /* single buffering to further reduce RAM usage */
+    /* Allocate draw buffers in bytes for LVGL v9.
+     * Was 480x20 (1/24 of the frame) in internal DRAM, forcing 24 serialized
+     * partial render+flush passes per full screen (~150ms/frame, "Bildaufbau
+     * sehr langsam"). Enlarged to 480x120 (1/4) then 480x240 (1/2) double-
+     * buffered in PSRAM: a full-screen first paint drops from 24 to 2 passes,
+     * and the panel flushes concurrently (PERFORMANCE_ANALYSIS.md A-4). The
+     * RGB panel framebuffer is also in PSRAM, so flush is PSRAM->PSRAM. */
+    uint32_t buf_pixels = Display::screenWidth * 240; /* half of screen */
+    uint32_t buf_size_bytes = buf_pixels * (LV_COLOR_DEPTH / 8);
+    uint8_t *buf1 = (uint8_t *)heap_caps_malloc(buf_size_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA);
+    uint8_t *buf2 = (uint8_t *)heap_caps_malloc(buf_size_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA);
+    if (buf1 == nullptr || buf2 == nullptr)
+    {
+        /* Fall back to the old small single buffer if PSRAM is tight; log a
+         * warning so a degraded rendering config is diagnosable on devices
+         * with constrained PSRAM (Sourcery PR #1694). */
+        if (buf1) heap_caps_free(buf1);
+        if (buf2) heap_caps_free(buf2);
+        buf_pixels = Display::screenWidth * 20;
+        buf_size_bytes = buf_pixels * (LV_COLOR_DEPTH / 8);
+        buf1 = (uint8_t *)heap_caps_malloc(buf_size_bytes, MALLOC_CAP_DMA);
+        buf2 = NULL;
+        if (buf1 == nullptr)
+        {
+            Display::logger.error("Draw-buffer allocation failed even for fallback; restarting");
+            delay(100); // let the serial buffer flush before reset
+            esp_restart();
+        }
+        Display::logger.warn("PSRAM draw-buffer alloc failed — falling back to 480x20 single buffer (degraded rendering)");
+    }
 
     /* Create display and set buffers/callbacks (v9) */
     Display::disp = lv_display_create((int32_t)Display::screenWidth, (int32_t)Display::screenHeight);
     lv_display_set_flush_cb(Display::disp, Display::flush);
     lv_display_set_buffers(Display::disp, buf1, buf2, buf_size_bytes, LV_DISPLAY_RENDER_MODE_PARTIAL);
 
+#ifdef ATTRACTAP_LV_PERF_MONITOR
+    /* Log FPS / render / flush timing to serial (LV_USE_PERF_MONITOR_LOG_MODE)
+     * so Bildaufbau cost is measurable on hardware (PERFORMANCE_ANALYSIS.md A-4). */
+    lv_sysmon_show_performance(Display::disp);
+#endif
+
     /* Initialize input device (v9) */
     Display::indev = lv_indev_create();
     lv_indev_set_type(Display::indev, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(Display::indev, Display::touchpad_read);
+    /* Touch sampling decoupled from refresh: LVGL defaults the indev read
+     * timer to LV_DEF_REFR_PERIOD (24 ms), so a tap waits up to that before
+     * the press is even seen — on top of the GT911 scan + render that feels
+     * sluggish. Sample touch at 10 ms (100 Hz); refresh stays at 24 ms
+     * (PERFORMANCE_ANALYSIS.md, measured: system ~90% idle, latency-bound). */
+    lv_timer_set_period(lv_indev_get_read_timer(Display::indev), 10);
 
     const esp_timer_create_args_t reboot_timer_args = {
         .callback = &Display::increase_reboot,
-        .name = "reboot"};
+        .arg = nullptr,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "reboot",
+        .skip_unhandled_events = false};
 
     lv_theme_t *base_theme = lv_theme_default_init(
         disp,
@@ -301,42 +343,7 @@ void Display::loop()
                                 "Touch panel not detected.\nCheck hardware and reboot.");
     }
 
-    if (Display::activeScreen)
-    {
-        Display::activeScreen->loop();
-    }
-
-    if (!Display::transitionComplete)
-    {
-        uint32_t currentTime = millis();
-        if (Display::transitionStartTime + Display::TRANSITION_DURATION + 500 < currentTime)
-        {
-            Display::transitionComplete = true;
-            if (Display::onTransitionComplete)
-            {
-                Display::onTransitionComplete();
-                Display::onTransitionComplete = nullptr;
-            }
-            if (!Display::pendingDestroyScreens.empty())
-            {
-                for (IScreen *scr : Display::pendingDestroyScreens)
-                {
-                    // Never tear down the screen that is currently active: a
-                    // re-transition during the destroy window can make a queued
-                    // screen active again, and freeing its LVGL tree would null
-                    // its widget pointers (-> lv_obj_get_screen(NULL) assert ->
-                    // loopTask hang -> task watchdog). transitionToScreen already
-                    // dequeues reused screens; this is a final safety net.
-                    if (scr && scr != Display::activeScreen)
-                    {
-                        Display::logger.debugf("Destroying screen: %s", scr->getName().c_str());
-                        scr->destroy();
-                    }
-                }
-                Display::pendingDestroyScreens.clear();
-            }
-        }
-    }
+    Display::advanceScreenRouter();
 
     lv_unlock();
 }

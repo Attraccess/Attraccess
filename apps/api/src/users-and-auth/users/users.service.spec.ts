@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuthenticationDetail, ResourceUsage, Session, User } from '@attraccess/database-entities';
-import { DataSource, Repository, UpdateResult } from 'typeorm';
+import { DataSource, EntityManager, Repository, UpdateResult } from 'typeorm';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { LicenseService } from '../../license/license.service';
@@ -22,19 +22,20 @@ const mockMetricsService = {
 const mockRbacService = {
   assignRoleByKey: jest.fn().mockResolvedValue(undefined),
   assignDefaultRoles: jest.fn().mockResolvedValue(undefined),
-  isLastOwner: jest.fn().mockResolvedValue(false),
+  isLastAdministrator: jest.fn().mockResolvedValue(false),
 };
 
 describe('UsersService', () => {
   let service: UsersService;
   let userRepository: jest.Mocked<Repository<User>>;
+  let dataSource: jest.Mocked<DataSource>;
   let emailService: { sendUsernameChangedEmail: jest.Mock };
 
   beforeEach(async () => {
     mockRbacService.assignRoleByKey.mockClear();
     mockRbacService.assignDefaultRoles.mockClear();
-    mockRbacService.isLastOwner.mockClear();
-    mockRbacService.isLastOwner.mockResolvedValue(false);
+    mockRbacService.isLastAdministrator.mockClear();
+    mockRbacService.isLastAdministrator.mockResolvedValue(false);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -112,6 +113,7 @@ describe('UsersService', () => {
 
     service = module.get<UsersService>(UsersService);
     userRepository = module.get(getRepositoryToken(User)) as jest.Mocked<Repository<User>>;
+    dataSource = module.get(DataSource) as jest.Mocked<DataSource>;
     emailService = module.get(EmailService) as unknown as { sendUsernameChangedEmail: jest.Mock };
   });
 
@@ -153,20 +155,37 @@ describe('UsersService', () => {
     });
   });
 
+  describe('rollbackFailedRegistration', () => {
+    it('hard-deletes the unregistered user without updating user metrics', async () => {
+      const manager = { delete: jest.fn().mockResolvedValue(undefined) };
+      dataSource.transaction.mockImplementation(async (callback) => callback(manager as EntityManager));
+
+      await service.rollbackFailedRegistration(14);
+
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+      expect(manager.delete).toHaveBeenCalledWith(User, 14);
+      expect(mockMetricsService.usersTotal.dec).not.toHaveBeenCalled();
+      expect(mockMetricsService.usersPerLocale.dec).not.toHaveBeenCalled();
+    });
+  });
+
   describe('createOne', () => {
-    it('the first created user should be assigned the owner role via RBAC', async () => {
+    it('the first created user should be assigned the administrator role via RBAC', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(userRepository, 'save').mockImplementation(async (data) => ({
-        id: 1,
-        username: 'test',
-        email: 'test@example.com',
-        externalIdentifier: null,
-        ...data,
-      } as User));
+      jest.spyOn(userRepository, 'save').mockImplementation(
+        async (data) =>
+          ({
+            id: 1,
+            username: 'test',
+            email: 'test@example.com',
+            externalIdentifier: null,
+            ...data,
+          }) as User,
+      );
       jest.spyOn(userRepository, 'count').mockResolvedValue(0);
 
       await service.createOne({ username: 'test', email: 'test@example.com', externalIdentifier: null });
-      expect(mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'owner', expect.anything());
+      expect(mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'administrator', expect.anything());
     });
 
     it('a subsequent user should be assigned default roles via RBAC', async () => {
@@ -274,7 +293,6 @@ describe('UsersService', () => {
 
       await expect(service.updateOne(1, { externalIdentifier: 'value' })).rejects.toThrow(UserNotFoundException);
     });
-
   });
 
   describe('findMany', () => {
@@ -378,9 +396,7 @@ describe('UsersService', () => {
 
       await service.findMany({ page: 1, limit: 10 });
 
-      expect(userRepository.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({ order: { username: 'ASC' } }),
-      );
+      expect(userRepository.findAndCount).toHaveBeenCalledWith(expect.objectContaining({ order: { username: 'ASC' } }));
     });
 
     it('should throw error for invalid pagination options', async () => {
@@ -548,17 +564,98 @@ describe('UsersService', () => {
   describe('confirmSelfDeletion', () => {
     const futureDate = new Date(Date.now() + 86_400_000);
 
-    it('throws ForbiddenException when user is the last owner', async () => {
+    it('throws ForbiddenException when user is the last administrator', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue({
         id: 1,
-        email: 'owner@example.com',
+        email: 'admin@example.com',
         deletedAt: null,
         deleteAccountToken: 'hashed:tok',
         deleteAccountTokenExpiresAt: futureDate,
       } as unknown as User);
-      mockRbacService.isLastOwner.mockResolvedValue(true);
+      mockRbacService.isLastAdministrator.mockResolvedValue(true);
 
-      await expect(service.confirmSelfDeletion('owner@example.com', 'tok')).rejects.toThrow(ForbiddenException);
+      await expect(service.confirmSelfDeletion('admin@example.com', 'tok')).rejects.toThrow(ForbiddenException);
+    });
+
+    it('treats a repeated confirmation as success after the email has been reused', async () => {
+      const reusedEmailUser = {
+        id: 2,
+        deletedAt: null,
+        deleteAccountToken: 'hashed:different-token',
+        deleteAccountTokenExpiresAt: futureDate,
+      } as User;
+      const deletedUser = {
+        id: 1,
+        deletedAt: new Date(),
+        deleteAccountToken: 'hashed:tok',
+        deleteAccountTokenExpiresAt: futureDate,
+      } as User;
+      userRepository.findOne.mockResolvedValueOnce(reusedEmailUser).mockResolvedValueOnce(deletedUser);
+
+      await expect(service.confirmSelfDeletion('deleted@example.com', 'tok')).resolves.toBeUndefined();
+
+      expect(userRepository.findOne).toHaveBeenNthCalledWith(2, {
+        where: expect.objectContaining({
+          deleteAccountToken: expect.anything(),
+          deletedAt: expect.anything(),
+        }),
+        withDeleted: true,
+      });
+    });
+
+    it('rejects an expired confirmation token for a deleted account', async () => {
+      const deletedUser = {
+        id: 1,
+        deletedAt: new Date(),
+        deleteAccountToken: 'hashed:tok',
+        deleteAccountTokenExpiresAt: new Date(Date.now() - 1_000),
+      } as User;
+      userRepository.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(deletedUser);
+
+      await expect(service.confirmSelfDeletion('deleted@example.com', 'tok')).rejects.toThrow(
+        'DeleteAccountTokenExpiredException',
+      );
+    });
+
+    it('retains confirmation token evidence while confirming an account deletion', async () => {
+      const user = {
+        id: 1,
+        locale: 'en',
+        deletedAt: null,
+        deleteAccountToken: 'hashed:tok',
+        deleteAccountTokenExpiresAt: futureDate,
+        deleteAccountRequestedAt: new Date(),
+      } as User;
+      const userRepo = {
+        findOne: jest.fn().mockResolvedValue(user),
+        update: jest.fn().mockResolvedValue({ affected: 1 }),
+        softDelete: jest.fn().mockResolvedValue({ affected: 1 }),
+      };
+      const usageRepo = { findOne: jest.fn().mockResolvedValue(null) };
+      const authRepo = { delete: jest.fn().mockResolvedValue({ affected: 1 }) };
+      const sessionRepo = { delete: jest.fn().mockResolvedValue({ affected: 1 }) };
+      const manager = {
+        getRepository: jest.fn((entity) => {
+          if (entity === User) return userRepo;
+          if (entity === ResourceUsage) return usageRepo;
+          if (entity === AuthenticationDetail) return authRepo;
+          return sessionRepo;
+        }),
+      } as unknown as EntityManager;
+      dataSource.transaction.mockImplementation(async (callback) => callback(manager));
+
+      userRepository.findOne.mockResolvedValue(user);
+
+      await service.confirmSelfDeletion('deleted@example.com', 'tok');
+
+      expect(userRepo.update).toHaveBeenCalledWith(
+        1,
+        expect.not.objectContaining({
+          deleteAccountToken: expect.anything(),
+          deleteAccountTokenExpiresAt: expect.anything(),
+          deleteAccountRequestedAt: expect.anything(),
+        }),
+      );
     });
   });
 });

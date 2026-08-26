@@ -16,14 +16,15 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { Chip, Separator } from '@heroui/react';
+import { useRbacCatalogTranslations } from '../../../../../hooks/useRbacCatalogTranslations';
 
 import en from './en.json';
 import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 
-// 'user' is auto-assigned to all users; 'owner' is the initial system owner — neither should be toggled manually
-const NON_MANAGEABLE_ROLE_KEYS = ['user', 'owner'];
+// 'user' is auto-assigned to all users; 'administrator' is the initial system administrator — neither should be toggled manually
+const NON_MANAGEABLE_ROLE_KEYS = ['user', 'administrator'];
 
 interface UserPermissionFormProps {
   user: User;
@@ -45,10 +46,10 @@ function SsoAssignmentBadges({
   return (
     <div className="flex flex-wrap gap-1 mt-1 ml-1">
       {assignments.map((ur) => {
-        const providerName = ur.ssoProviderId ? (providersById?.get(ur.ssoProviderId)?.name ?? `#${ur.ssoProviderId}`) : ur.ssoProviderType ?? 'SSO';
-        const label = ur.externalValue
-          ? `${providerName} · ${ur.externalValue}`
-          : providerName;
+        const providerName = ur.ssoProviderId
+          ? (providersById?.get(ur.ssoProviderId)?.name ?? `#${ur.ssoProviderId}`)
+          : (ur.ssoProviderType ?? 'SSO');
+        const label = ur.externalValue ? `${providerName} · ${ur.externalValue}` : providerName;
         return (
           <Chip key={`${ur.ssoProviderId}-${ur.externalValue}`} size="sm" color="warning" variant="soft">
             {t('ssoAssignment.assignedBy')}: {label}
@@ -69,6 +70,7 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
   });
+  const { roleName } = useRbacCatalogTranslations();
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   const isSsoManaged = (ssoManagedProviders?.length ?? 0) > 0;
@@ -77,9 +79,7 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({
     if (ssoManagedPermissionKeys === undefined) return true;
     return ssoManagedPermissionKeys.has(roleKey);
   };
-  const ssoProvidersLabel = isSsoManaged
-    ? (ssoManagedProviders ?? []).join(', ')
-    : t('ssoManaged.providerFallback');
+  const ssoProvidersLabel = isSsoManaged ? (ssoManagedProviders ?? []).join(', ') : t('ssoManaged.providerFallback');
 
   const { data: allRoles, isLoading: isLoadingRoles } = useRbacServiceListRoles();
   const { data: userRoles, isLoading: isLoadingUserRoles } = useUsersServiceGetUserRoleAssignments({ id: user.id });
@@ -108,7 +108,7 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({
     ssoAssignmentsByRoleId.set(ur.roleId, existing);
   }
 
-  // Roles that are SSO-assigned but NOT in the manageable list (e.g. owner, user)
+  // Roles that are SSO-assigned but NOT in the manageable list (e.g. administrator, user)
   const ssoOnlyRoles = (userRoles ?? [])
     .filter((ur) => ur.source === 'sso' && !manageableRoleIds.has(ur.roleId))
     .reduce<{ role: UserRole['role']; assignments: UserRole[] }[]>((acc, ur) => {
@@ -174,9 +174,7 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({
   }
 
   return (
-    <section className="w-full flex flex-col gap-4" data-cy="user-permission-form-section">
-      <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('title')}</h3>
-
+    <div className="w-full flex flex-col gap-4" data-cy="user-permission-form-section">
       {isSsoManaged ? (
         <div
           className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-warning-700"
@@ -199,7 +197,7 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({
                 isDisabled={isRoleSsoManaged(role.key)}
                 data-cy={`user-permission-form-${role.key}-checkbox`}
               >
-                {tExists(`permissions.${role.key}`) ? t(`permissions.${role.key}`) : role.name}
+                {roleName(role)}
               </LabeledSwitch>
               <SsoAssignmentBadges assignments={ssoAssignments} providersById={providersById} t={t} />
             </div>
@@ -212,15 +210,13 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({
         <>
           <Separator />
           <div className="flex flex-col gap-2" data-cy="user-permission-form-sso-only-roles">
-            <p className="text-xs font-semibold text-default-500 uppercase tracking-wide">
-              {t('ssoOnlyRoles.title')}
-            </p>
+            <p className="text-xs font-semibold text-default-500 uppercase tracking-wide">{t('ssoOnlyRoles.title')}</p>
             <p className="text-xs text-default-400">{t('ssoOnlyRoles.subtitle')}</p>
             {ssoOnlyRoles.map(({ role, assignments }) => {
-              const roleName = role?.name ?? role?.key ?? `Role #${assignments[0]?.roleId}`;
+              const label = role ? roleName(role) : `Role #${assignments[0]?.roleId}`;
               return (
                 <div key={role?.id ?? assignments[0]?.roleId} className="flex flex-col gap-1">
-                  <span className="text-sm text-default-700 font-medium">{roleName}</span>
+                  <span className="text-sm text-default-700 font-medium">{label}</span>
                   <SsoAssignmentBadges assignments={assignments} providersById={providersById} t={t} />
                 </div>
               );
@@ -240,6 +236,6 @@ export const UserPermissionForm: React.FC<UserPermissionFormProps> = ({
           {t('actions.save')}
         </Button>
       </div>
-    </section>
+    </div>
   );
 };

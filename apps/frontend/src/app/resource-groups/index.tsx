@@ -43,7 +43,6 @@ export function ResourceGroupEditPage() {
           target={{ type: 'group', id: numericGroupId }}
           canManageIntroducers
           canManageIntroductions
-          flat
           className="flex-1 min-w-80"
           data-cy="manage-resource-group-people"
         />

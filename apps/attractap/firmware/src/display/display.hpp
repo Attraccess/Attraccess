@@ -91,9 +91,16 @@ private:
     // shares the main application loop with blocking work.
     static void renderTask(void *parameter);
     static std::function<void(int16_t, int16_t)> touchCallback;
-    static const int TRANSITION_DURATION = 500;
-    // static const int TRANSITION_DURATION = 50;
-    static const lv_scr_load_anim_t TRANSITION_ANIMATION = LV_SCR_LOAD_ANIM_FADE_IN;
+    // Instant transition: every fade frame is a full-screen software render
+    // (70-90ms each at 480x480), so even a 50ms fade stalls the UI for
+    // ~3 frames. Direct load removes the animation entirely — the screen
+    // swap itself is free; only the single first frame renders
+    // (PERFORMANCE_ANALYSIS.md A-3, measured on hardware).
+    static const int TRANSITION_DURATION = 0;
+    static const lv_scr_load_anim_t TRANSITION_ANIMATION = LV_SCR_LOAD_ANIM_NONE;
+
+    // The router owns the complete transition transaction. Starting another
+    // transition before this one advances cancels its completion callback.
     static uint32_t transitionStartTime;
     static bool transitionComplete;
     static std::function<void()> onTransitionComplete;
@@ -107,6 +114,8 @@ private:
     static std::vector<IScreen *> pendingDestroyScreens;
     static void increase_reboot(void *arg);
     static uint8_t reboot_count;
+
+    static void advanceScreenRouter();
 
     static void flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map);
     static void touchpad_read(lv_indev_t *indev_driver, lv_indev_data_t *data);

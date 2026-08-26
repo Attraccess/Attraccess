@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Accordion,
+  AccordionBody,
+  AccordionHeading,
+  AccordionItem,
+  AccordionPanel,
+  AccordionTrigger,
   Alert,
   AlertContent,
   AlertDescription,
@@ -7,16 +13,19 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
+  Label,
   Spinner,
 } from '@heroui/react';
 import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { X } from 'lucide-react';
+import { Nfc, X } from 'lucide-react';
 import {
   ApiError,
+  Attractap,
   RequestSupervisedSessionDto,
   ResourceIntroducerType,
   ResourceUsage,
   useAccessControlServiceResourceIntroducersGetMany,
+  useAttractapServiceGetReaders,
   useResourcesServiceResourceUsageRequestSupervisedSession,
 } from '@attraccess/react-query-client';
 import { Button } from '../../../../../components/button';
@@ -29,14 +38,14 @@ import de from './translations/de.json';
 /** The 30s supervisor-approval window, mirrored from the backend. */
 const APPROVAL_TIMEOUT_SECONDS = 30;
 
-type Phase = 'select' | 'waiting' | 'timeout' | 'rejected';
+type Phase = 'select' | 'waiting' | 'timeout' | 'rejected' | 'error';
 
 export interface SupervisedStartModalProps {
   isOpen: boolean;
   onClose: () => void;
   resourceId: number;
-  /** The start payload gathered from the normal start flow, minus the supervisor. */
-  requestBody: Omit<RequestSupervisedSessionDto, 'supervisorUserId'>;
+  /** The start payload gathered from the normal start flow, minus the approval channel. */
+  requestBody: Omit<RequestSupervisedSessionDto, 'supervisorUserId' | 'readerId'>;
   onApproved: (session: ResourceUsage) => void;
 }
 
@@ -52,17 +61,31 @@ export function SupervisedStartModal({
 
   const [phase, setPhase] = useState<Phase>('select');
   const [secondsLeft, setSecondsLeft] = useState(APPROVAL_TIMEOUT_SECONDS);
+  const [waitingAtReader, setWaitingAtReader] = useState<string | null>(null);
 
-  // Authorized supervisors are the resource's introducers and maintainers,
-  // excluding the requester themselves (self-supervision is rejected by the backend).
+  // Only introducers may supervise, excluding the requester themselves.
   const { data: candidates, isLoading: isLoadingCandidates } = useAccessControlServiceResourceIntroducersGetMany({
     resourceId,
   });
 
   const supervisors = useMemo(
-    () => (candidates ?? []).filter((candidate) => candidate.userId !== user?.id),
+    () =>
+      (candidates ?? []).filter(
+        (candidate) =>
+          candidate.type === ResourceIntroducerType.INTRODUCER && candidate.userId !== user?.id && candidate.user,
+      ),
     [candidates, user?.id],
   );
+
+  const { data: allReaders } = useAttractapServiceGetReaders();
+
+  const { resourceReaders, otherReaders } = useMemo(() => {
+    const capable = (allReaders ?? []).filter((reader) => reader.firmware?.capabilities?.cardEnrollment);
+    return {
+      resourceReaders: capable.filter((reader) => reader.resources?.some((r) => r.id === resourceId)),
+      otherReaders: capable.filter((reader) => !reader.resources?.some((r) => r.id === resourceId)),
+    };
+  }, [allReaders, resourceId]);
 
   const { mutate: requestSupervisedSession } = useResourcesServiceResourceUsageRequestSupervisedSession();
 
@@ -71,6 +94,7 @@ export function SupervisedStartModal({
     if (isOpen) {
       setPhase('select');
       setSecondsLeft(APPROVAL_TIMEOUT_SECONDS);
+      setWaitingAtReader(null);
     }
   }, [isOpen]);
 
@@ -88,22 +112,26 @@ export function SupervisedStartModal({
     return () => clearInterval(interval);
   }, [phase]);
 
-  const handleSelectSupervisor = useCallback(
-    (supervisorUserId: number) => {
+  const submitRequest = useCallback(
+    (channel: { supervisorUserId: number } | { readerId: number }, readerName?: string) => {
+      setWaitingAtReader(readerName ?? null);
       setPhase('waiting');
       requestSupervisedSession(
-        { resourceId, requestBody: { ...requestBody, supervisorUserId } },
+        { resourceId, requestBody: { ...requestBody, ...channel } },
         {
           onSuccess: (session) => {
             onApproved(session as ResourceUsage);
           },
           onError: (error) => {
-            if (error instanceof ApiError && error.status === 408) {
+            const status = error instanceof ApiError ? error.status : 0;
+            if (status === 408) {
               setPhase('timeout');
               return;
             }
-            // 403 covers both an explicit rejection and an unauthorized supervisor.
-            setPhase('rejected');
+            // 403 covers both an explicit rejection and an unauthorized supervisor. Everything else
+            // — offline, busy or unsupported reader, and anything unexpected — is the request
+            // failing to land, which is a different story from a supervisor saying no.
+            setPhase(status === 403 ? 'rejected' : 'error');
           },
         },
       );
@@ -111,26 +139,48 @@ export function SupervisedStartModal({
     [onApproved, requestBody, requestSupervisedSession, resourceId],
   );
 
+  const handleSelectSupervisor = useCallback(
+    (supervisorUserId: number) => submitRequest({ supervisorUserId }),
+    [submitRequest],
+  );
+
+  const handleSelectReader = useCallback(
+    (reader: Attractap) => submitRequest({ readerId: reader.id }, reader.name),
+    [submitRequest],
+  );
+
+  const renderReaderButton = (reader: Attractap) => (
+    <Button
+      key={reader.id}
+      variant="outline"
+      className="h-auto w-full justify-start py-2"
+      onPress={() => handleSelectReader(reader)}
+    >
+      <Nfc size={16} className="shrink-0" />
+      <span className="truncate">{reader.name}</span>
+    </Button>
+  );
+
   const renderBody = () => {
     if (phase === 'waiting') {
       return (
         <div className="flex flex-col items-center gap-4 py-4 text-center">
           <Spinner color="accent" />
-          <Description>{t('waiting.description')}</Description>
+          <Description>
+            {waitingAtReader ? t('waiting.atReader', { reader: waitingAtReader }) : t('waiting.description')}
+          </Description>
           <p className="text-3xl font-semibold tabular-nums">{t('waiting.countdown', { seconds: secondsLeft })}</p>
         </div>
       );
     }
 
-    if (phase === 'timeout' || phase === 'rejected') {
+    if (phase === 'timeout' || phase === 'rejected' || phase === 'error') {
       return (
         <div className="space-y-4">
           <Alert status="warning">
             <AlertStatusIcon status="warning" />
             <AlertContent>
-              <AlertDescription>
-                {phase === 'timeout' ? t('timeout.description') : t('rejected.description')}
-              </AlertDescription>
+              <AlertDescription>{t(`${phase}.description`)}</AlertDescription>
             </AlertContent>
           </Alert>
         </div>
@@ -150,27 +200,51 @@ export function SupervisedStartModal({
     }
 
     return (
-      <div className="space-y-3">
+      <div className="space-y-5">
         <Description>{t('select.description')}</Description>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {supervisors.map((supervisor) => (
-            <Button
-              key={supervisor.id}
-              variant="outline"
-              className="h-auto w-full justify-start py-2"
-              onPress={() => handleSelectSupervisor(supervisor.userId)}
-            >
-              <AttraccessUser
-                user={supervisor.user}
-                description={
-                  supervisor.type === ResourceIntroducerType.INTRODUCER
-                    ? t('select.role.introducer')
-                    : t('select.role.maintainer')
-                }
-              />
-            </Button>
-          ))}
+
+        <div className="space-y-2">
+          <Label>{t('select.people')}</Label>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {supervisors.map((supervisor) => (
+              <Button
+                key={supervisor.id}
+                variant="outline"
+                className="h-auto w-full justify-start py-2"
+                onPress={() => handleSelectSupervisor(supervisor.userId)}
+              >
+                <AttraccessUser
+                  user={supervisor.user}
+                  description={t('select.role.introducer')}
+                />
+              </Button>
+            ))}
+          </div>
         </div>
+
+        {resourceReaders.length + otherReaders.length > 0 && (
+          <div className="space-y-2">
+            <Label>{t('select.readers')}</Label>
+            <Description>{t('select.readerHint')}</Description>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{resourceReaders.map(renderReaderButton)}</div>
+            {otherReaders.length > 0 && (
+              <Accordion>
+                <AccordionItem id="other-readers" aria-label={t('select.otherReaders')}>
+                  <AccordionHeading>
+                    <AccordionTrigger>{t('select.otherReaders')}</AccordionTrigger>
+                  </AccordionHeading>
+                  <AccordionPanel>
+                    <AccordionBody>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {otherReaders.map(renderReaderButton)}
+                      </div>
+                    </AccordionBody>
+                  </AccordionPanel>
+                </AccordionItem>
+              </Accordion>
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -200,7 +274,7 @@ export function SupervisedStartModal({
       <DrawerBody>{renderBody()}</DrawerBody>
 
       <DrawerFooter>
-        {(phase === 'timeout' || phase === 'rejected') && (
+        {(phase === 'timeout' || phase === 'rejected' || phase === 'error') && (
           <Button variant="primary" onPress={() => setPhase('select')}>
             {t('retry')}
           </Button>

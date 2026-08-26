@@ -1,0 +1,44 @@
+{
+  "title": "Plugins",
+  "description": "Plugins installed on this instance, and what each of them loaded.",
+  "uploadButton": "Upload plugin",
+  "docsButton": "Documentation",
+  "columns": {
+    "name": "Name",
+    "version": "Version",
+    "directory": "Directory",
+    "permissions": "Permissions",
+    "status": "Status",
+    "actions": "Actions"
+  },
+  "status": {
+    "loaded": "Loaded",
+    "error": "Failed to load",
+    "unknown": "Frontend only",
+    "errorTooltip": "This plugin failed to load on the server: {{message}}"
+  },
+  "noPermissions": "None requested",
+  "deleteTooltip": "Remove plugin",
+  "aside": {
+    "title": "Writing a plugin",
+    "description": "Plugins extend the API and the frontend from a single bundle. The developer guide covers the manifest, the permission model and local development."
+  },
+  "deleteConfirmation": {
+    "title": "Remove plugin?",
+    "message": "Remove the plugin {{pluginName}}? This cannot be undone, and the app will reload once it is gone.",
+    "cancel": "Cancel",
+    "delete": "Remove"
+  },
+  "error": {
+    "delete": {
+      "title": "Could not remove the plugin",
+      "description": "The plugin is still installed. Please try again."
+    }
+  },
+  "success": {
+    "delete": {
+      "title": "Plugin removed",
+      "description": "The app will reload in a few seconds to drop the plugin's code."
+    }
+  }
+}

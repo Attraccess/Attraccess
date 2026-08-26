@@ -394,7 +394,7 @@
                 },
                 "value": {
                   "label": "Wert-Vorlage",
-                  "helpText": "Handlebars-Vorlage. Nutzlast referenzieren mit \\{{path.to.field}}, vorhandene Variablen mit \\{{variables.KEY}}. Reiner Text ohne \\{{ }} wird unverändert übernommen.",
+                  "helpText": "Handlebars-Vorlage. Nutzlast referenzieren mit \\{{path.to.field}}, vorhandene Variablen mit \\{{variables.KEY}}. Mit \\{{json payload}} werden Objekte oder Arrays als JSON serialisiert. Reiner Text ohne \\{{ }} wird unverändert übernommen.",
                   "docsUrl": "https://handlebarsjs.com/guide/expressions.html",
                   "docsLabel": "Handlebars-Syntax-Referenz"
                 },

@@ -8,6 +8,7 @@
     "de": "Deutsch"
   },
   "account": "Account",
+  "userMenu": "User menu",
   "groups": {
     "##default##": {
       "items": {
@@ -15,40 +16,23 @@
         "projects": "Projects",
         "messages": "Messages",
         "billing": "Billing",
-        "attractap": "NFC-Cards"
-      }
-    },
-    "users": {
-      "label": "Users",
-      "items": {
-        "userList": "User List",
-        "userSecurity": "Security",
-        "sso": "Single Sign-On"
+        "csvExport": "CSV Export",
+        "attractap": "NFC-Cards",
+        "users": "Users",
+        "settings": "Settings"
       }
     },
     "devices": {
       "label": "Devices",
       "items": {
+        "attractapReaders": "Attractap Readers",
         "mqttServers": "MQTT Servers",
-        "companion": "Companion App"
-      }
-    },
-    "system": {
-      "label": "System",
-      "items": {
-        "plugins": "Plugins",
-        "emails": "Emails",
-        "messagingSettings": "Messaging Settings",
-        "csvExport": "CSV Export",
-        "balena": "Balena",
-        "settings": "Settings",
-        "monitoring": "Monitoring",
-        "roles": "Roles"
+        "companion": "Companion App",
+        "balena": "Balena"
       }
     }
   },
   "endItems": {
-    "docs": "Documentation",
     "dependencies": "Dependencies",
     "changelog": "Changelog",
     "groups": {
@@ -57,6 +41,13 @@
         "items": {
           "reportBug": "Report a Bug",
           "requestFeature": "Request a Feature"
+        }
+      },
+      "docsAndTools": {
+        "label": "Docs & Tools",
+        "items": {
+          "docs": "Documentation",
+          "printables": "3D Models"
         }
       }
     }

@@ -9,6 +9,12 @@
     "label": "Email"
   },
   "actions": {
-    "save": "Save"
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Change email"
+  },
+  "modal": {
+    "title": "Confirm email change",
+    "warning": "Changing your email address will prevent you from signing in until you verify the new address using the link sent by email."
   }
 }

@@ -13,6 +13,7 @@ vitest.config.*.timestamp*
 .DS_Store
 .parcel-cache/
 .superpowers/
+.tools/
 
 storage/
 storage-docker/

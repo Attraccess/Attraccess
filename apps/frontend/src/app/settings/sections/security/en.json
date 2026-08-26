@@ -1,0 +1,214 @@
+{
+  "title": "Security",
+  "description": "Who may sign in, on what terms, and how hard it is to guess their way in.",
+  "loading": "Loading security settings…",
+  "access": {
+    "heading": "Access",
+    "description": "Who can reach this instance, and what they must present to do it."
+  },
+  "twoFactor": {
+    "label": "Two-factor requirement",
+    "hint": "When 2FA is required, users without it are prompted to set it up the next time they sign in.",
+    "warning": "Applies on next login. Users without 2FA will be sent through setup before they can continue.",
+    "options": {
+      "optional": {
+        "label": "Optional",
+        "description": "Users can enable 2FA from their account settings."
+      },
+      "privileged": {
+        "label": "Required for admins",
+        "description": "Require 2FA for users with elevated permissions."
+      },
+      "all": {
+        "label": "Required for all users",
+        "description": "Everyone must enable 2FA to continue."
+      }
+    },
+    "saved": {
+      "title": "2FA policy updated",
+      "description": "The new requirement applies on the next login."
+    },
+    "error": {
+      "title": "Could not save the 2FA policy",
+      "description": "Please try again."
+    }
+  },
+  "domains": {
+    "label": "Allowed signup domains",
+    "hint": "Domains new users may self-register with. Leave the list empty to disable self-registration; a single * allows any domain.",
+    "addLabel": "Add domain",
+    "addButton": "Add this domain",
+    "addPlaceholder": "example.org",
+    "empty": "No domains listed — self-registration is disabled.",
+    "loading": "Loading the domain list…",
+    "loadFailed": "The domain list could not be loaded, so it cannot be edited from here. Reload the page to try again — saving would replace the whole list, and this view does not know what is in it.",
+    "remove": "Remove {{domain}}",
+    "saved": {
+      "title": "Signup domains saved",
+      "description": "New registrations are checked against this list."
+    },
+    "error": {
+      "title": "Could not save the signup domains",
+      "description": "Please try again."
+    }
+  },
+  "rateLimit": {
+    "heading": "Sign-in throttling",
+    "description": "Throttle failed authentication attempts per IP and lock accounts after repeated failures.",
+    "loadFailed": "The throttling settings could not be loaded, so they cannot be edited from here. Reload the page to try again — the other groups on this page are unaffected.",
+    "fields": {
+      "maxAttempts": {
+        "label": "Max attempts",
+        "description": "Failed attempts allowed within the window before triggering throttle or lockout."
+      },
+      "windowSeconds": {
+        "label": "Window (seconds)",
+        "description": "Time window during which failed attempts are counted."
+      },
+      "lockoutDurationSeconds": {
+        "label": "Lockout duration (seconds)",
+        "description": "Base lockout duration when the threshold is reached."
+      },
+      "exponentialBackoff": {
+        "label": "Exponential backoff",
+        "description": "Extend the lockout exponentially on consecutive lockouts."
+      },
+      "backoffMultiplier": {
+        "label": "Backoff multiplier",
+        "description": "Multiplier applied to lockout duration when exponential backoff is on."
+      }
+    },
+    "saved": {
+      "title": "Throttling saved",
+      "description": "New thresholds take effect immediately."
+    },
+    "error": {
+      "title": "Could not save throttling",
+      "description": "Check the values and try again."
+    }
+  },
+  "policy": {
+    "heading": "Password policy",
+    "description": "What counts as an acceptable password. Changes apply at the next password validation, not retroactively.",
+    "loadFailed": "The password policy could not be loaded, so it and the per-role overrides cannot be edited from here. Reload the page to try again — the other groups on this page are unaffected."
+  },
+  "fields": {
+    "minLength": {
+      "label": "Minimum length",
+      "description": "Reject passwords shorter than this. Range 8-1024 (NIST 800-63B floor)."
+    },
+    "maxLength": { "label": "Maximum length", "description": "Reject passwords longer than this. Range 8-1024." },
+    "allowAllUnicode": {
+      "label": "Allow all Unicode characters",
+      "description": "When off, only ASCII printable characters are accepted."
+    },
+    "requireUppercase": {
+      "label": "Require an uppercase letter",
+      "description": "Reject passwords without at least one uppercase letter."
+    },
+    "requireLowercase": {
+      "label": "Require a lowercase letter",
+      "description": "Reject passwords without at least one lowercase letter."
+    },
+    "requireDigit": { "label": "Require a digit", "description": "Reject passwords without at least one digit." },
+    "requireSpecial": {
+      "label": "Require a special character",
+      "description": "Reject passwords without at least one non-alphanumeric character."
+    },
+    "checkHIBP": {
+      "label": "Check against HIBP breach database",
+      "description": "Reject passwords that have appeared in known breaches."
+    },
+    "checkCommonPasswords": {
+      "label": "Reject common passwords",
+      "description": "Block passwords from the bundled common-password list."
+    },
+    "minZxcvbnScore": {
+      "label": "Minimum zxcvbn score (0-4)",
+      "description": "Strength estimator. 0 = very weak, 4 = very strong."
+    },
+    "historySize": {
+      "label": "Password history size",
+      "description": "Block reuse of the last N passwords. 0 disables history."
+    },
+    "rotationDays": {
+      "label": "Forced rotation (days)",
+      "description": "Force password change after this many days. 0 disables rotation."
+    }
+  },
+  "preview": {
+    "title": "Live preview",
+    "subtitle": "Type a candidate password and the server evaluates it against the unsaved values on the left — including HIBP, zxcvbn and the common-password list.",
+    "passwordLabel": "Candidate password",
+    "pass": "Would pass",
+    "fail": "Would fail",
+    "noErrors": "All checks pass.",
+    "loading": "Evaluating with full server checks…",
+    "reveal": "Show password",
+    "hide": "Hide password",
+    "disclosure": "Evaluated server-side against the draft policy. The password is sent over TLS and never stored.",
+    "errors": {
+      "MIN_LENGTH": "Too short (min {{min}}, got {{actual}}).",
+      "MAX_LENGTH": "Too long (max {{max}}, got {{actual}}).",
+      "MISSING_UPPER": "Missing uppercase letter.",
+      "MISSING_LOWER": "Missing lowercase letter.",
+      "MISSING_DIGIT": "Missing digit.",
+      "MISSING_SPECIAL": "Missing special character.",
+      "DISALLOWED_CHARACTER": "Contains disallowed character.",
+      "SIMILAR_TO_EMAIL": "Too similar to email.",
+      "SIMILAR_TO_USERNAME": "Too similar to username.",
+      "COMMON_PASSWORD": "Is a common password.",
+      "HIBP_PWNED": "Found in {{count}} known breaches.",
+      "ZXCVBN_SCORE": "Strength score {{score}} below required {{required}}.",
+      "PASSWORD_REUSED": "Matches one of the last {{historySize}} passwords."
+    }
+  },
+  "diff": {
+    "title": "Confirm password policy changes",
+    "subtitle": "These rules apply to every password validated from now on. Review what is changing.",
+    "field": "Field",
+    "before": "Before",
+    "after": "After",
+    "confirm": "Save changes",
+    "cancel": "Cancel"
+  },
+  "overrides": {
+    "title": "Per-role overrides",
+    "subtitle": "Override individual password rules for a role. Anything left inherited follows the policy above.",
+    "role": "Role",
+    "status": "Status",
+    "actions": "Actions",
+    "statusInherits": "Inherits the global policy",
+    "statusCustom": "{{count}} field(s) overridden",
+    "edit": "Edit",
+    "save": "Save override",
+    "cancel": "Cancel",
+    "inherit": "Inherit",
+    "override": "Override",
+    "enabled": "On",
+    "disabled": "Off",
+    "removed": {
+      "title": "Override removed",
+      "description": "Role {{role}} now follows the global policy."
+    },
+    "saved": {
+      "title": "Override saved",
+      "description": "Role {{role}} now uses the customized policy."
+    },
+    "modal": {
+      "title": "Password overrides for {{role}}",
+      "subtitle": "Turn a field on to override it; leave it off to inherit from the global policy. Turning every field off removes the override."
+    },
+    "roles": {
+      "admin": "Admin"
+    }
+  },
+  "savedToast": {
+    "title": "Password policy updated",
+    "description": "New rules apply at the next password validation."
+  },
+  "errorToast": {
+    "title": "Could not save the password policy",
+    "description": "Please review the values and try again."
+  }
+}

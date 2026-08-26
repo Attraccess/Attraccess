@@ -1,9 +1,10 @@
 import { Body, Controller, Get, Patch, Post, Req, UseInterceptors } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { User } from '@attraccess/database-entities';
-import { AuthenticatedRequest, Auth, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, AuthenticatedUser, SessionAuth } from '@attraccess/plugins-backend-sdk';
 import { plainToInstance } from 'class-transformer';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
+import { AuthRateLimit } from '../rate-limiting/rate-limit.decorator';
 import { UsersService } from './users.service';
 import { ChangeUsernameDto } from './dtos/changeUsername.dto';
 import { ChangeEmailDto } from './dtos/changeEmail.dto';
@@ -18,7 +19,7 @@ import { CurrentUserDto } from './dtos/current-user.dto';
 export class UserProfileController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Auth()
+  @SessionAuth()
   @Get('me')
   @ApiOperation({ summary: 'Get the current authenticated user', operationId: 'getCurrent' })
   @ApiResponse({
@@ -38,7 +39,7 @@ export class UserProfileController {
     });
   }
 
-  @Auth()
+  @SessionAuth()
   @Post('me/delete-request')
   @ApiOperation({ summary: 'Request account deletion email', operationId: 'requestDeleteAccount' })
   @ApiResponse({
@@ -54,6 +55,7 @@ export class UserProfileController {
   }
 
   @Post('me/delete-confirm')
+  @AuthRateLimit('delete_account_confirm', { clearFailuresOnSuccess: false })
   @ApiOperation({ summary: 'Confirm account deletion via email token', operationId: 'confirmDeleteAccount' })
   @ApiResponse({
     status: 200,
@@ -67,7 +69,7 @@ export class UserProfileController {
     await this.usersService.confirmSelfDeletion(body.email, body.token);
   }
 
-  @Auth()
+  @SessionAuth()
   @Patch('me/username')
   @ApiOperation({ summary: 'Change current user username (limit once per day)', operationId: 'changeMyUsername' })
   @ApiResponse({ status: 200, description: 'Username changed.', type: User })
@@ -75,7 +77,7 @@ export class UserProfileController {
     return await this.usersService.changeUsername(request.user.id, body.username, request.user);
   }
 
-  @Auth()
+  @SessionAuth()
   @Patch('me/email')
   @ApiOperation({ summary: 'Change current user email address', operationId: 'changeMyEmail' })
   @ApiResponse({ status: 200, description: 'Email changed.', type: User })
@@ -87,7 +89,7 @@ export class UserProfileController {
     }
   }
 
-  @Auth()
+  @SessionAuth()
   @Patch('me/locale')
   @ApiOperation({
     summary: 'Update preferred locale',

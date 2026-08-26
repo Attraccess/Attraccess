@@ -394,7 +394,7 @@
                 },
                 "value": {
                   "label": "Value template",
-                  "helpText": "Handlebars template. Reference payload as \\{{path.to.field}} and existing variables as \\{{variables.KEY}}. Plain text without \\{{ }} is stored as-is.",
+                  "helpText": "Handlebars template. Reference payload as \\{{path.to.field}} and existing variables as \\{{variables.KEY}}. Use \\{{json payload}} to serialize an object or array as JSON. Plain text without \\{{ }} is stored as-is.",
                   "docsUrl": "https://handlebarsjs.com/guide/expressions.html",
                   "docsLabel": "Handlebars syntax reference"
                 },

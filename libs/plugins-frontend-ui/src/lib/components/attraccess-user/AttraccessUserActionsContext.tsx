@@ -1,10 +1,10 @@
 // React context injecting optional user actions into AttraccessUser display
 // FEATURE: User identity display using HeroUI v3 Avatar compound
-import { User } from '@attraccess/react-query-client';
 import { createContext, useContext, ReactNode } from 'react';
+import { UserIdentity } from './AttraccessUser';
 
 interface AttraccessUserActions {
-  onStartDirectMessage?: (user: User) => void;
+  onStartDirectMessage?: (user: UserIdentity) => void;
 }
 
 interface AttraccessUserActionsProviderProps extends AttraccessUserActions {

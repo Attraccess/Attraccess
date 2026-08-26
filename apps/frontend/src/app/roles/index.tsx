@@ -22,12 +22,14 @@ import { EmptyState } from '../../components/emptyState';
 import { TableDataLoadingIndicator } from '../../components/tableComponents';
 import { RoleFormDrawer } from './role-form-drawer';
 import { DeleteRoleModal } from './delete-role-modal';
+import { useRbacCatalogTranslations } from '../../hooks/useRbacCatalogTranslations';
 
 import en from './en.json';
 import de from './de.json';
 
 export const RolesPage: React.FC = () => {
   const { t } = useTranslations({ en, de });
+  const { roleName, roleDescription } = useRbacCatalogTranslations();
 
   const { data: roles, isLoading } = useRbacServiceListRoles();
 
@@ -94,9 +96,9 @@ export const RolesPage: React.FC = () => {
                     >
                       <TableCell>
                         <div className="flex flex-col">
-                          <span className="font-medium">{role.name}</span>
+                          <span className="font-medium">{roleName(role)}</span>
                           {role.description ? (
-                            <span className="text-xs text-default-400 line-clamp-1">{role.description}</span>
+                            <span className="text-xs text-default-400 line-clamp-1">{roleDescription(role)}</span>
                           ) : null}
                         </div>
                       </TableCell>
@@ -104,7 +106,12 @@ export const RolesPage: React.FC = () => {
                         {role.isSystemManaged ? (
                           <Tooltip>
                             <TooltipTrigger tabIndex={0}>
-                              <Chip size="sm" color="default" variant="secondary" data-cy={`role-source-chip-${role.key}`}>
+                              <Chip
+                                size="sm"
+                                color="default"
+                                variant="secondary"
+                                data-cy={`role-source-chip-${role.key}`}
+                              >
                                 <LockIcon className="w-3 h-3 mr-1" />
                                 {t('table.source.system')}
                               </Chip>

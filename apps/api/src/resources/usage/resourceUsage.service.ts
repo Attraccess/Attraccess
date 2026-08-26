@@ -62,7 +62,7 @@ export interface EndSessionOptions {
 export interface StartSessionOptions {
   /**
    * When set, the session is started as a supervised session attributed to this supervisor.
-   * The supervisor is validated against the resource (introducer/maintainer or `resources.update` permission).
+   * The supervisor is validated as an introducer for the resource.
    */
   supervisorUserId?: number;
 }
@@ -91,6 +91,23 @@ export class ResourceUsageService {
       this.logger.warn('Serial endSession chain failed; continuing queue', error);
     });
     return next;
+  }
+
+  private async runUsageFlow(
+    manager: EntityManager,
+    resourceId: number,
+    triggerNodeType: ResourceFlowNodeType,
+    payload: object,
+    description: string,
+  ): Promise<void> {
+    try {
+      await manager.transaction(async (flowEntityManager) => {
+        await this.flowExecutorService.runFlow(resourceId, triggerNodeType, payload, flowEntityManager);
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Usage ${description} flow failed for resource ${resourceId}: ${message}`, error);
+    }
   }
 
   constructor(
@@ -190,7 +207,7 @@ export class ResourceUsageService {
    * - the resource does not allow supervision (supervisionMode is INTRODUCTION_REQUIRED),
    * - the requester selected themselves as supervisor,
    * - the supervisor does not exist,
-   * - the supervisor is neither an introducer/maintainer for the resource nor a global resource manager.
+   * - the supervisor is not an introducer for the resource.
    *
    * Does NOT check the requester's own introduction status: a supervised start exists precisely to
    * let a non-introduced user start under a qualified supervisor.
@@ -202,6 +219,43 @@ export class ResourceUsageService {
     transactionalEntityManager?: EntityManager,
     preloadedResource?: Resource,
   ): Promise<void> {
+    await this.assertSupportsSupervision(resourceId, transactionalEntityManager, preloadedResource);
+
+    if (supervisorUserId === requester.id) {
+      throw new BadRequestException('You cannot supervise your own session');
+    }
+
+    const userRepository = transactionalEntityManager
+      ? transactionalEntityManager.getRepository(User)
+      : this.userRepository;
+
+    const supervisor = await userRepository.findOne({ where: { id: supervisorUserId } });
+    if (!supervisor) {
+      throw new NotFoundException(`Supervisor with ID ${supervisorUserId} not found`);
+    }
+
+    const supervisorIsIntroducer = await this.resourceIntroducersService.isIntroducer(
+      resourceId,
+      supervisorUserId,
+      true,
+      transactionalEntityManager,
+    );
+
+    if (!supervisorIsIntroducer) {
+      throw new ForbiddenException('The selected supervisor is not authorized to supervise this resource');
+    }
+  }
+
+  /**
+   * Resolves the resource and asserts its supervisionMode permits supervised sessions at all.
+   * Split out of {@link validateSupervisedStart} because the reader-armed flow (ATT-816) has no
+   * named supervisor to validate yet — any eligible one may show up and tap.
+   */
+  public async assertSupportsSupervision(
+    resourceId: number,
+    transactionalEntityManager?: EntityManager,
+    preloadedResource?: Resource,
+  ): Promise<Resource> {
     const resourceRepository = transactionalEntityManager
       ? transactionalEntityManager.getRepository(Resource)
       : this.resourceRepository;
@@ -218,31 +272,7 @@ export class ResourceUsageService {
       throw new BadRequestException('This resource does not support supervised sessions');
     }
 
-    if (supervisorUserId === requester.id) {
-      throw new BadRequestException('You cannot supervise your own session');
-    }
-
-    const userRepository = transactionalEntityManager
-      ? transactionalEntityManager.getRepository(User)
-      : this.userRepository;
-
-    const supervisor = await userRepository.findOne({ where: { id: supervisorUserId } });
-    if (!supervisor) {
-      throw new NotFoundException(`Supervisor with ID ${supervisorUserId} not found`);
-    }
-
-    const supervisorPermissions = await this.rbacService.getEffectivePermissions(supervisor.id);
-    const supervisorCanManage = supervisorPermissions.has('resources.update');
-    const supervisorCanMaintain = await this.resourceIntroducersService.canMaintain(
-      resourceId,
-      supervisorUserId,
-      true,
-      transactionalEntityManager,
-    );
-
-    if (!supervisorCanManage && !supervisorCanMaintain) {
-      throw new ForbiddenException('The selected supervisor is not authorized to supervise this resource');
-    }
+    return resource;
   }
 
   private async getResource(
@@ -527,7 +557,8 @@ export class ResourceUsageService {
       if (existingActiveSession) {
         const now = new Date();
 
-        await this.flowExecutorService.runFlow(
+        await this.runUsageFlow(
+          transactionalEntityManager,
           existingActiveSession.resourceId,
           ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
           {
@@ -536,7 +567,7 @@ export class ResourceUsageService {
             newUser: user,
             oldUser: existingActiveSession.user,
           },
-          transactionalEntityManager,
+          'takeover',
         );
 
         // Emit event for the takeover
@@ -548,11 +579,12 @@ export class ResourceUsageService {
         // Defer event for the newly started session until after commit
         startedUsageIdToEmit = createdSession.id;
 
-        await this.flowExecutorService.runFlow(
+        await this.runUsageFlow(
+          transactionalEntityManager,
           createdSession.resourceId,
           ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
           this.getResourceUsageFlowPayload(createdSession, formSubmissions),
-          transactionalEntityManager,
+          'start',
         );
       }
 
@@ -623,6 +655,7 @@ export class ResourceUsageService {
     let activeSession: ResourceUsage | null = null;
     let endedUsageIdToEmit: number | null = null;
     let formSubmissions: FormSubmission[] = [];
+    let endFlowPayload: object | null = null;
     const executeEndSession = async () =>
       await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
         activeSession = await this.getActiveSession(resourceId, true, transactionalEntityManager);
@@ -671,14 +704,6 @@ export class ResourceUsageService {
           });
         }
 
-        this.logger.debug(`Running flow for resource ${activeSession.resourceId} on end session`, { updateData });
-        await this.flowExecutorService.runFlow(
-          activeSession.resourceId,
-          ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
-          { ...this.getResourceUsageFlowPayload(activeSession, formSubmissions), ...updateData },
-          transactionalEntityManager,
-        );
-
         this.logger.debug(`Updating session ${activeSession.id} with end time and notes`, { updateData });
 
         // Update session with end time and notes - using explicit update to avoid the generated column
@@ -700,12 +725,23 @@ export class ResourceUsageService {
 
         // Defer event after successful save until after commit
         endedUsageIdToEmit = activeSession.id;
+        endFlowPayload = { ...this.getResourceUsageFlowPayload(activeSession, formSubmissions), ...updateData };
 
         // Fetch the updated record
         return updatedUsage;
       });
 
     const updatedUsage = await this.runSerializedIfSqlite(this.resourceUsageRepository.manager, executeEndSession);
+
+    if (endFlowPayload) {
+      await this.runUsageFlow(
+        this.resourceUsageRepository.manager,
+        resourceId,
+        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+        endFlowPayload,
+        'end',
+      );
+    }
 
     // Emit event after the transaction committed to ensure readers can observe DB state
     try {

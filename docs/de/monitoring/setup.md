@@ -8,8 +8,8 @@ Diese Anleitung erklärt, wie Sie den Metriken-Endpunkt in Attraccess aktivieren
 
 ## Metriken aktivieren
 
-1. Navigieren Sie zu **Einstellungen** in der Seitenleiste
-2. Finden Sie die Karte **Metriken & Monitoring**
+1. Öffnen Sie **Einstellungen** in der Seitenleiste
+2. Wählen Sie den Bereich **Überwachung**
 3. Klicken Sie auf **API-Schlüssel generieren**
 4. Kopieren Sie den angezeigten API-Schlüssel und speichern Sie ihn sicher
 
@@ -54,9 +54,9 @@ http_requests_total{method="GET",route="/api/resources",status_code="200"} 42
 
 | Aktion | Vorgehensweise |
 |--------|----------------|
-| **Generieren** | Einstellungen > Metriken & Monitoring > API-Schlüssel generieren |
-| **Neu generieren** | Einstellungen > Metriken & Monitoring > Neu generieren (macht den alten Schlüssel ungültig) |
-| **Entfernen** | Einstellungen > Metriken & Monitoring > API-Schlüssel entfernen (deaktiviert den Endpunkt) |
+| **Generieren** | Einstellungen > Überwachung > API-Schlüssel generieren |
+| **Neu generieren** | Einstellungen > Überwachung > API-Schlüssel neu generieren (macht den alten Schlüssel ungültig) |
+| **Entfernen** | Einstellungen > Überwachung > API-Schlüssel entfernen (deaktiviert den Endpunkt) |
 
 > [!NOTE]
 > Das Entfernen des API-Schlüssels deaktiviert den Metriken-Endpunkt vollständig. Prometheus kann keine Metriken mehr abrufen, bis ein neuer Schlüssel generiert wird.

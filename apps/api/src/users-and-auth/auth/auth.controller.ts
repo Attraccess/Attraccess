@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Post, Query, Req, Res, UseGuards } from 
 import { Response } from 'express';
 import { SessionService } from './session.service';
 import { LoginRateLimitGuard } from '../rate-limiting/login.rate-limit.guard';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk';
 import { CreateSessionResponse } from './auth.types';
 import { ApiBody, ApiOkResponse, ApiResponse, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CookieConfigService } from '../../common/services/cookie-config.service';
@@ -12,7 +12,7 @@ import { CookieConfigService } from '../../common/services/cookie-config.service
 export class AuthController {
   constructor(
     private readonly sessionService: SessionService,
-    private readonly cookieConfigService: CookieConfigService
+    private readonly cookieConfigService: CookieConfigService,
   ) {}
 
   @Post('/session/local')
@@ -41,7 +41,7 @@ export class AuthController {
   async createSession(
     @Req() request: AuthenticatedRequest,
     @Res({ passthrough: true }) response: Response,
-    @Body() body: { tokenLocation: 'cookie' | 'body'; twoFactorCode?: string }
+    @Body() body: { tokenLocation: 'cookie' | 'body'; twoFactorCode?: string },
   ): Promise<CreateSessionResponse> {
     // Create session token using SessionService
     const sessionToken = await this.sessionService.createSession(request.user, {
@@ -68,7 +68,7 @@ export class AuthController {
   }
 
   @Get('/session/refresh')
-  @Auth()
+  @SessionAuth()
   @ApiOperation({ summary: 'Refresh the current session', operationId: 'refreshSession' })
   @ApiOkResponse({
     description: 'The session has been refreshed',
@@ -77,7 +77,7 @@ export class AuthController {
   async refreshSession(
     @Req() request: AuthenticatedRequest,
     @Res({ passthrough: true }) response: Response,
-    @Query('tokenLocation') tokenLocation: 'cookie' | 'body'
+    @Query('tokenLocation') tokenLocation: 'cookie' | 'body',
   ): Promise<CreateSessionResponse> {
     // Get current session token from cookie or header
     const cookieToken = request.cookies?.[this.cookieConfigService.getCookieName()];
@@ -141,7 +141,7 @@ export class AuthController {
   }
 
   @Delete('/session')
-  @Auth()
+  @SessionAuth()
   @ApiOperation({ summary: 'Logout and invalidate the current session', operationId: 'endSession' })
   @ApiOkResponse({
     description: 'The session has been deleted',
@@ -156,7 +156,7 @@ export class AuthController {
   })
   async endSession(
     @Req() request: AuthenticatedRequest,
-    @Res({ passthrough: true }) response: Response
+    @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
     // Get session token from cookie or header
     const cookieToken = request.cookies?.[this.cookieConfigService.getCookieName()];

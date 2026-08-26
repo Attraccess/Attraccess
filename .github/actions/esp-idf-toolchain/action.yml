@@ -1,0 +1,91 @@
+name: 'ESP-IDF Toolchain'
+description: >
+  Restore (or build) the ESP-IDF v6.0.2 esp32s3 toolchain at ~/esp/esp-idf +
+  ~/.espressif. Single source of the cache key: two copies of it drifting apart
+  is how a poisoned entry stayed poisoned. Requires Python to already be set up;
+  its version goes in the cache key, since the IDF virtualenv is named after it.
+
+runs:
+  using: 'composite'
+  steps:
+    # The venv is named idf6.0_py<major>.<minor>_env, so the interpreter version
+    # is part of what the cache holds. Read it rather than hand-asserting it:
+    # `setup/action.yml` records `3.x` once drifting to 3.14 and breaking the
+    # build against idf6.0_py3.13_env. A hardcoded version would let a caller on
+    # a different Python save an entry under a key claiming 3.13 — permanently,
+    # since keys are immutable and the save below is skipped on an exact hit.
+    # Deriving it turns that drift into a cache miss, which self-heals.
+    - name: Resolve Python version for the cache key
+      id: py
+      run: python -c "import sys; print(f'v={sys.version_info.major}.{sys.version_info.minor}')" >> "$GITHUB_OUTPUT"
+      shell: bash
+
+    # restore/save are split (rather than one `actions/cache`) so the save can
+    # be gated on `install.sh` succeeding. `actions/cache` saves unconditionally
+    # in its post step, so an install that dies partway — a dl.espressif.com or
+    # PyPI 503 — persists a tree with the toolchain present and the venv
+    # missing. That is the entry that broke the firmware build: the key is
+    # constant and `actions/cache` skips its post-save on an exact hit, so
+    # nothing could ever overwrite it. Bumping the key suffix abandons a
+    # poisoned entry; the v6.0.2 upgrade rotates the key for the same reason.
+    - name: Restore ESP-IDF cache
+      id: cache-esp-idf
+      uses: actions/cache/restore@v6
+      with:
+        path: |
+          ~/esp/esp-idf
+          ~/.espressif
+        key: esp-idf-v6.0.2-esp32s3-py${{ steps.py.outputs.v }}-v1-${{ runner.os }}
+
+    # The venv's name carries <major>.<minor>, which is why that is what the key
+    # above derives — but its *contents* are pinned harder than that: bin/python3
+    # is a symlink to the exact interpreter that built it,
+    # /opt/hostedtoolcache/Python/<major>.<minor>.<patch>/x64/bin/python3. When the
+    # runner image moves across a patch release the symlink dangles, and
+    # `python -m venv` onto a directory holding a dangling bin/python3 fails outright
+    # rather than rebuilding it:
+    #
+    #   Error: [Errno 2] No such file or directory: '.../idf6.0_py3.13_env/bin/python3'
+    #
+    # so install.sh's idempotence does not cover this one. Observed going *backwards*,
+    # 3.13.15 -> 3.13.14, so pinning a floor would not have helped either.
+    #
+    # Dropping just the venv is deliberate: putting the patch version in the cache key
+    # would also discard the toolchains, which are hundreds of megabytes and entirely
+    # patch-independent. install.sh rebuilds the venv alone in about a minute. On a
+    # cache hit that repair is not saved (the save step is gated on a miss), so this
+    # re-runs each time until the key rotates — still far cheaper than re-downloading
+    # the toolchain on every patch bump.
+    - name: Discard an IDF virtualenv left dangling by a Python patch bump
+      run: |
+        shopt -s nullglob
+        for env in ~/.espressif/python_env/*/; do
+          if [ ! -e "$env/bin/python3" ]; then
+            echo "Discarding stale IDF virtualenv (interpreter symlink dangles): $env"
+            rm -rf "$env"
+          fi
+        done
+      shell: bash
+
+    - name: Install ESP-IDF v6.0.2
+      # Always run, not just on cache miss: `install.sh` is idempotent and
+      # repairs a cache restore that is missing the Python virtualenv.
+      run: |
+        if [ ! -d ~/esp/esp-idf/.git ]; then
+          mkdir -p ~/esp
+          git clone --depth 1 --shallow-submodules --recursive -b v6.0.2 \
+            https://github.com/espressif/esp-idf.git ~/esp/esp-idf
+        fi
+        ~/esp/esp-idf/install.sh esp32s3
+      shell: bash
+
+    - name: Save ESP-IDF cache
+      # No explicit success() needed — a step's default `if` already skips this
+      # when a prior step (i.e. install.sh) failed.
+      if: steps.cache-esp-idf.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: |
+          ~/esp/esp-idf
+          ~/.espressif
+        key: esp-idf-v6.0.2-esp32s3-py${{ steps.py.outputs.v }}-v1-${{ runner.os }}

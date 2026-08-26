@@ -1,8 +1,0 @@
-{
-  "title": "Application",
-  "subtitle": "Base URLs and license configuration",
-  "licenseStatus": {
-    "configured": "License configured",
-    "missing": "License missing"
-  }
-}

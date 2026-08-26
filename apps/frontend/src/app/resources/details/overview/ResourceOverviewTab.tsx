@@ -30,7 +30,6 @@ export function ResourceOverviewTab() {
       />
       <ResourceBillingInfo
         className={CARD_CLASS}
-        variant="flat"
         resourceId={resourceId}
         onExampleAmountChange={(value) => setInsufficientBalanceDesiredAmount(Math.ceil(value))}
       />

@@ -4,6 +4,7 @@
 
 #include <ArduinoJson.h>
 #include <string>
+#include <vector>
 #include "../settings/settings.hpp"
 #include "state/state.hpp"
 #include "../logger/logger.hpp"
@@ -66,8 +67,7 @@ public:
         char activeUser[MAX_USERNAME_LEN];
         uint32_t activeStartEpoch;          // seconds since epoch (UTC)
         int16_t activeStartUtcOffsetMinutes; // server tz offset (minutes east of UTC) for that instant
-        uint8_t introducerCount;
-        char introducers[MAX_INTRODUCERS][MAX_USERNAME_LEN];
+        std::vector<std::string> introducers;
         uint8_t flowButtonCount;
         FlowButton flowButtons[MAX_FLOW_BUTTONS];
     };
@@ -256,9 +256,21 @@ public:
         std::string supervisorUsername;
     };
 
+    // Server-pushed arming (ATT-816): the requester started in the web UI and picked this reader,
+    // so there is no first card tap. The reader waits for a supervisor card exactly as usual, but
+    // must not start the session itself — it confirms the card auth and the server does the rest.
+    struct SupervisionStartCommand
+    {
+        uint32_t resourceId = 0;
+        uint32_t timeoutMs = 0;
+        std::string requesterUsername;
+    };
+
     void requestSupervision(uint32_t resourceId);
     void requestSupervisorCardAuthenticationData(uint8_t *uid, uint8_t uidLength, uint32_t resourceId);
+    void confirmSupervisorCardAuth(uint32_t resourceId);
     void cancelSupervision();
+    void setSupervisionStartCallback(std::function<void(SupervisionStartCommand)> callback);
     void setSupervisionRequestResultCallback(std::function<void(SupervisionRequestResult)> callback);
     void setSupervisorCardAuthenticationResponseCallback(std::function<void(SupervisorCardAuthenticationResponse)> callback);
     void setSupervisionResolvedCallback(std::function<void(SupervisionResolvedResult)> callback);
@@ -333,6 +345,8 @@ private:
 
     std::function<void(const ResourceList &)> resourceListUpdateCallback;
     std::function<void(CardAuthenticationDetailsResponse)> cardAuthenticationDetailsResponseCallback;
+    std::function<void(SupervisionStartCommand)> supervisionStartCallback;
+    void onSupervisionStart(JsonObject data);
     std::function<void(SupervisionRequestResult)> supervisionRequestResultCallback;
     std::function<void(SupervisorCardAuthenticationResponse)> supervisorCardAuthenticationResponseCallback;
     std::function<void(SupervisionResolvedResult)> supervisionResolvedCallback;

@@ -1,5 +1,6 @@
-import { ForbiddenException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
-import { AuthenticationDetail, AuthenticationType, User } from '@attraccess/database-entities';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+import { AuthenticationType, User } from '@attraccess/database-entities';
+import { EntityManager } from 'typeorm';
 import { UsersService } from './users.service';
 import { AuthService } from '../auth/auth.service';
 import { EmailService } from '../../email/email.service';
@@ -16,6 +17,7 @@ import { mapEmailSendError } from './email-send-error.util';
 @Injectable()
 export class UserRegistrationService {
   private readonly logger = new Logger(UserRegistrationService.name);
+  private firstTimeSetupOverwriteLock = Promise.resolve();
 
   constructor(
     private readonly usersService: UsersService,
@@ -29,10 +31,6 @@ export class UserRegistrationService {
   public async createOne(body: CreateUserDto, locale?: string): Promise<User> {
     this.logger.debug(`Creating new user with username: ${body.username} and email: ${body.email}`);
 
-    if (body.overwriteFirstTimeAdmin) {
-      await this.ensureFirstTimeSetupIncompleteAndDeleteAdmin();
-    }
-
     await this.signupDomainService.assertEmailDomainAllowed(body.email);
 
     const policyResult = await this.passwordPolicyService.validate(body.password, {
@@ -43,63 +41,126 @@ export class UserRegistrationService {
       throw new PasswordPolicyViolationException(policyResult.errors);
     }
 
-    const user = await this.usersService.createOne({
-      username: body.username,
-      email: body.email,
-      externalIdentifier: null,
-      locale,
-    });
-    this.logger.debug(`User created with ID: ${user.id}`);
-
-    let authenticationDetails: AuthenticationDetail | null = null;
     try {
-      this.logger.debug(`Adding authentication details for user ID: ${user.id}, strategy: ${body.strategy}`);
-      authenticationDetails = await this.authService.addAuthenticationDetails(user.id, {
-        type: body.strategy,
-        details: {
-          password: body.password,
-        },
-      });
-      this.logger.debug(`Authentication details added with ID: ${authenticationDetails.id}`);
-    } catch (e) {
-      this.logger.error(`Error adding authentication details for user ID: ${user.id}`, e.stack);
-      await this.usersService.deleteOne(user.id);
-      throw e;
+      await this.emailService.assertSmtpConfigured();
+    } catch (error) {
+      throw mapEmailSendError(error);
     }
 
-    try {
+    const hashedPassword =
+      body.strategy === AuthenticationType.LOCAL_PASSWORD
+        ? await this.authService.hashPassword(body.password)
+        : undefined;
+
+    const register = () => this.registerUser(body, locale, hashedPassword, body.overwriteFirstTimeAdmin);
+    return body.overwriteFirstTimeAdmin ? await this.withFirstTimeSetupOverwriteLock(register) : await register();
+  }
+
+  private async registerUser(
+    body: CreateUserDto,
+    locale: string | undefined,
+    hashedPassword: string | undefined,
+    overwriteFirstTimeAdmin: boolean | undefined,
+  ): Promise<User> {
+    let existingAdmin: User | undefined;
+
+    const { user, verificationToken } = await this.usersService.withTransaction(async (manager: EntityManager) => {
+      existingAdmin = overwriteFirstTimeAdmin
+        ? await this.usersService.releaseFirstTimeSetupAdminIdentifiers(manager)
+        : undefined;
+      const user = await this.usersService.createOne(
+        {
+          username: body.username,
+          email: body.email,
+          externalIdentifier: null,
+          locale,
+          isFirstTimeSetupAdmin: !!existingAdmin,
+        },
+        manager,
+        { excludedUserIdFromLicenseUsage: existingAdmin?.id },
+      );
+      this.logger.debug(`User created with ID: ${user.id}`);
+
+      this.logger.debug(`Adding authentication details for user ID: ${user.id}, strategy: ${body.strategy}`);
+      const authenticationDetails = await this.authService.addAuthenticationDetails(
+        user.id,
+        {
+          type: body.strategy,
+          details: {
+            password: body.password,
+          },
+        },
+        manager,
+        hashedPassword,
+      );
+      this.logger.debug(`Authentication details added with ID: ${authenticationDetails.id}`);
+
       this.logger.debug(`Generating email verification token for user ID: ${user.id}`);
-      const verificationToken = await this.authService.generateEmailVerificationToken(user);
+      const verificationToken = await this.authService.generateEmailVerificationToken(user, manager);
+      return { user, verificationToken };
+    });
+
+    try {
       this.logger.debug(`Sending verification email to user ID: ${user.id}`);
       await this.emailService.sendVerificationEmail(user, verificationToken);
       this.logger.debug(`Verification email sent to user ID: ${user.id}`);
-    } catch (e) {
-      this.logger.error(`Error sending verification email for user ID: ${user.id}`, e.stack);
-      if (authenticationDetails) {
-        await this.authService.removeAuthenticationDetails(authenticationDetails.id);
+    } catch (error) {
+      this.logger.error(
+        `Error sending verification email for ${body.email}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      try {
+        if (existingAdmin) {
+          await this.usersService.rollbackFirstTimeSetupAdminReplacement(user.id, existingAdmin);
+        } else {
+          await this.usersService.rollbackFailedRegistration(user.id);
+        }
+      } catch (rollbackError) {
+        this.logger.error(
+          `Error rolling back failed registration for user ID: ${user.id}`,
+          rollbackError instanceof Error ? rollbackError.stack : String(rollbackError),
+        );
+        throw rollbackError;
       }
-      await this.usersService.deleteOne(user.id);
-      throw e;
+      throw mapEmailSendError(error);
     }
 
+    if (existingAdmin) {
+      this.logger.debug(`Overwriting first-time-setup admin with ID: ${existingAdmin.id}`);
+      try {
+        await this.usersService.deleteOne(existingAdmin.id);
+      } catch (error) {
+        try {
+          await this.usersService.rollbackFirstTimeSetupAdminReplacement(user.id, existingAdmin);
+        } catch (rollbackError) {
+          this.logger.error(
+            `Error rolling back failed first-time-setup replacement for user ID: ${user.id}`,
+            rollbackError instanceof Error ? rollbackError.stack : String(rollbackError),
+          );
+          throw rollbackError;
+        }
+        throw error;
+      }
+    }
+
+    this.usersService.recordCreatedUser(user);
     this.logger.debug(`User creation completed successfully for ID: ${user.id}`);
     return user;
   }
 
-  private async ensureFirstTimeSetupIncompleteAndDeleteAdmin(): Promise<void> {
-    const totalUsers = await this.usersService.countUsers();
-    if (totalUsers !== 1) {
-      throw new ForbiddenException('First-time setup is already complete');
-    }
+  private async withFirstTimeSetupOverwriteLock<T>(handler: () => Promise<T>): Promise<T> {
+    const previous = this.firstTimeSetupOverwriteLock;
+    let release!: () => void;
+    this.firstTimeSetupOverwriteLock = new Promise((resolve) => {
+      release = resolve;
+    });
 
-    const { data: firstPage } = await this.usersService.findMany({ page: 1, limit: 1 });
-    const existingAdmin = firstPage[0];
-    if (!existingAdmin || existingAdmin.isEmailVerified) {
-      throw new ForbiddenException('First-time setup is already complete');
+    await previous;
+    try {
+      return await handler();
+    } finally {
+      release();
     }
-
-    this.logger.debug(`Overwriting first-time-setup admin with ID: ${existingAdmin.id}`);
-    await this.usersService.deleteOne(existingAdmin.id);
   }
 
   public async verifyEmail(email: string, token: string): Promise<void> {

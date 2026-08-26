@@ -15,7 +15,6 @@ export function ResourcePeopleTab() {
       target={{ type: 'resource', id: resourceId }}
       canManageIntroducers={canManageAccess}
       canManageIntroductions={isIntroducer || canManageAccess}
-      flat
       hideHeader
       data-cy="manage-resource-people"
     />

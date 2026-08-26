@@ -36,9 +36,9 @@ export class RbacService {
     private readonly rolePermissionRepository: Repository<RolePermission>,
   ) {}
 
-  async getEffectivePermissions(userId: number): Promise<Set<string>> {
+  async getEffectivePermissions(userId: number, bypassCache = false): Promise<Set<string>> {
     const entry = this.permissionsCache.get(userId);
-    if (entry && Date.now() - entry.ts < this.CACHE_TTL_MS) return new Set(entry.permissions);
+    if (!bypassCache && entry && Date.now() - entry.ts < this.CACHE_TTL_MS) return new Set(entry.permissions);
 
     const rows = await this.userRoleRepository
       .createQueryBuilder('ur')
@@ -153,7 +153,7 @@ export class RbacService {
       this.assertActorHolds(actorPermissions, removed, 'revoke');
 
       await this.roleRepository.manager.transaction(async (manager) => {
-        const ownersBefore = removed.length > 0 ? await this.countOwnerEquivalentUsers(undefined, manager) : 0;
+        const adminsBefore = removed.length > 0 ? await this.countAdministratorEquivalentUsers(undefined, manager) : 0;
         await manager.save(Role, { id: role.id, name: role.name, description: role.description });
         if (removed.length > 0) {
           await manager.delete(RolePermission, { roleId: role.id, permissionKey: In(removed) });
@@ -162,8 +162,8 @@ export class RbacService {
           await manager.save(RolePermission, manager.create(RolePermission, { roleId: role.id, permissionKey }));
         }
         // same lockout guard as deleteRole: a permission removal must not drop the
-        // owner-equivalent user count from >0 to 0 (rolls back via the thrown exception)
-        if (ownersBefore > 0 && (await this.countOwnerEquivalentUsers(undefined, manager)) === 0) {
+        // administrator-equivalent user count from >0 to 0 (rolls back via the thrown exception)
+        if (adminsBefore > 0 && (await this.countAdministratorEquivalentUsers(undefined, manager)) === 0) {
           throw new ForbiddenException(
             'Updating this role would leave no active user with full administrative permissions',
           );
@@ -181,7 +181,7 @@ export class RbacService {
 
   // pass `manager` to count against uncommitted in-transaction state (permissions table itself is never
   // modified by role CRUD, so the total always comes from the plain repository)
-  private async countOwnerEquivalentUsers(excludeRoleId?: number, manager?: EntityManager): Promise<number> {
+  private async countAdministratorEquivalentUsers(excludeRoleId?: number, manager?: EntityManager): Promise<number> {
     const totalPermissions = await this.permissionRepository.count();
     if (totalPermissions === 0) return 0;
     const qb = (manager ? manager.createQueryBuilder(UserRole, 'ur') : this.userRoleRepository.createQueryBuilder('ur'))
@@ -228,10 +228,10 @@ export class RbacService {
       );
     }
 
-    // ponytail: conservative — ignores that a reassignment target could restore owner-equivalence.
-    // Delete blocks only if it would reduce the owner-equivalent user count from >0 to 0.
-    const ownersWithoutRole = await this.countOwnerEquivalentUsers(roleId);
-    if (ownersWithoutRole === 0 && (await this.countOwnerEquivalentUsers()) > 0) {
+    // ponytail: conservative — ignores that a reassignment target could restore administrator-equivalence.
+    // Delete blocks only if it would reduce the administrator-equivalent user count from >0 to 0.
+    const adminsWithoutRole = await this.countAdministratorEquivalentUsers(roleId);
+    if (adminsWithoutRole === 0 && (await this.countAdministratorEquivalentUsers()) > 0) {
       throw new ForbiddenException('Deleting this role would leave no active user with full administrative permissions');
     }
 
@@ -268,26 +268,30 @@ export class RbacService {
     });
   }
 
-  async isLastOwner(userId: number, manager?: EntityManager): Promise<boolean> {
+  async isLastAdministrator(userId: number, manager?: EntityManager): Promise<boolean> {
     const roleRepo = manager ? manager.getRepository(Role) : this.roleRepository;
     const urRepo = manager ? manager.getRepository(UserRole) : this.userRoleRepository;
-    const ownerRole = await roleRepo.findOne({ where: { key: 'owner' } });
-    if (!ownerRole) return false;
-    const isOwner = await urRepo.findOne({ where: { userId, roleId: ownerRole.id } });
-    if (!isOwner) return false;
+    const administratorRole = await roleRepo.findOne({ where: { key: 'administrator' } });
+    if (!administratorRole) return false;
+    const isAdministrator = await urRepo.findOne({ where: { userId, roleId: administratorRole.id } });
+    if (!isAdministrator) return false;
     const qb = manager ? manager.createQueryBuilder(UserRole, 'ur') : this.userRoleRepository.createQueryBuilder('ur');
-    const otherOwnerCount = await qb
+    const otherAdministratorCount = await qb
       .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
-      .where('ur.roleId = :roleId', { roleId: ownerRole.id })
+      .where('ur.roleId = :roleId', { roleId: administratorRole.id })
       .andWhere('ur.userId != :userId', { userId })
       .getCount();
-    return otherOwnerCount === 0;
+    return otherAdministratorCount === 0;
   }
 
   async getUserIdsWithPermission(permissionKey: string): Promise<number[]> {
     const rows = await this.userRoleRepository
       .createQueryBuilder('ur')
       .innerJoin('role_permission', 'rp', 'rp.roleId = ur.roleId')
+      // Soft-deleted users keep their user_role rows (anonymizeAndSoftDelete only drops auth
+      // details and sessions), so without this a deleted admin still counts as a permission
+      // holder forever — e.g. as a supervisor who provably cannot supervise (ATT-867).
+      .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
       .select('DISTINCT ur.userId', 'userId')
       .where('rp.permissionKey = :permKey', { permKey: permissionKey })
       .getRawMany<{ userId: number }>();
@@ -383,17 +387,17 @@ export class RbacService {
       throw new ForbiddenException('You cannot revoke a role whose permissions exceed your own');
     }
 
-    if (role.key === 'owner') {
+    if (role.key === 'administrator') {
       // ponytail: wrap count+delete in a transaction to close the TOCTOU race where two concurrent
-      // revocations could both see ownerCount=2, both pass the guard, and both proceed to delete
+      // revocations could both see administratorCount=2, both pass the guard, and both proceed to delete
       await this.userRoleRepository.manager.transaction(async (manager) => {
-        const ownerCount = await manager
+        const administratorCount = await manager
           .createQueryBuilder(UserRole, 'ur')
           .innerJoin('ur.user', 'u', 'u.deletedAt IS NULL')
           .where('ur.roleId = :roleId', { roleId })
           .getCount();
-        if (ownerCount <= 1) {
-          throw new ForbiddenException('Cannot remove the last owner from the system');
+        if (administratorCount <= 1) {
+          throw new ForbiddenException('Cannot remove the last administrator from the system');
         }
         const result = await manager.delete(UserRole, { userId, roleId, source: UserRoleSource.MANUAL });
         if (!result.affected) {
@@ -427,15 +431,15 @@ export class RbacService {
 
     for (const ur of currentSsoRoles) {
       if (!targetByKey.has(ur.role.key)) {
-        // ponytail: last-owner guardrail — transient IdP claim omission must not silently strip the last owner
-        if (ur.role.key === 'owner') {
-          const otherOwnerCount = await this.userRoleRepository
+        // ponytail: last-administrator guardrail — transient IdP claim omission must not silently strip the last administrator
+        if (ur.role.key === 'administrator') {
+          const otherAdministratorCount = await this.userRoleRepository
             .createQueryBuilder('ur2')
             .innerJoin('ur2.user', 'u', 'u.deletedAt IS NULL')
             .where('ur2.roleId = :roleId', { roleId: ur.roleId })
             .andWhere('ur2.id != :id', { id: ur.id })
             .getCount();
-          if (otherOwnerCount === 0) {
+          if (otherAdministratorCount === 0) {
             continue;
           }
         }

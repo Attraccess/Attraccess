@@ -1,19 +1,17 @@
 import { ResourceFlowsExecutorService } from './resource-flows-executor.service';
-import { ConfigService } from '@nestjs/config';
+import { FlowLogRecorderService } from './flow-log-recorder.service';
 import { Logger } from '@nestjs/common';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import {
   Resource,
   ResourceFlowNode,
   ResourceFlowNodeType,
-  ResourceFlowLog,
   ResourceFlowEdge,
   BillingTransactionItem,
   ResourceType,
 } from '@attraccess/database-entities';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import { ResourceUsageService } from '../usage/resourceUsage.service';
-import { FlowConfigType } from './flow.config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../mqtt/mqtt-message.event';
 import { NoUsageSessionError } from './errors/no-usage-session.error';
@@ -47,9 +45,8 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   // Repositories and dependencies
   let flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
   let flowEdgeRepository: Partial<Repository<Edge>>;
-  let flowLogRepository: Partial<Repository<ResourceFlowLog>>;
+  let flowLogs: FlowLogRecorderService;
   let resourceRepository: Partial<Repository<Resource>>;
-  let configService: Partial<ConfigService>;
   let mqttClientService: MqttClientService;
   let resourceUsageService: ResourceUsageService;
   let eventEmitter: EventEmitter2;
@@ -99,10 +96,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       }),
     } as unknown as Repository<ResourceFlowEdge>;
 
-    flowLogRepository = {
-      create: jest.fn((data) => ({ id: Math.random().toString(36), ...data })),
-      save: jest.fn(async (data) => data),
-    } as unknown as Repository<ResourceFlowLog>;
+    flowLogs = new FlowLogRecorderService();
 
     resourceRepository = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -113,10 +107,6 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         metadata: { zone: 'A' },
       })),
     } as unknown as Repository<Resource>;
-
-    configService = {
-      get: jest.fn(() => ({ FLOW_LOG_TTL_DAYS: 7 }) as unknown as FlowConfigType),
-    } as unknown as ConfigService;
 
     mqttClientService = {
       publish: jest.fn(async () => undefined),
@@ -157,9 +147,8 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     service = new ResourceFlowsExecutorService(
       flowNodeRepository as Repository<ResourceFlowNode>,
       flowEdgeRepository as unknown as Repository<ResourceFlowEdge>,
-      flowLogRepository as Repository<ResourceFlowLog>,
       resourceRepository as Repository<Resource>,
-      configService as ConfigService,
+      flowLogs,
       mqttClientService,
       resourceUsageService,
       billingItemRepoMock,
@@ -401,6 +390,29 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       quantity: 1,
       resource: { id: 1, name: 'Resource 1', type: ResourceType.Machine, metadata: { zone: 'A' } },
     });
+  });
+
+  it('rejects when a parallel flow branch fails without waiting for stalled siblings', async () => {
+    const firstNode = createNode({ id: 'first-node' });
+    const secondNode = createNode({ id: 'second-node' });
+    let finishSecondBranch: (() => void) | undefined;
+    const processNode = jest
+      .spyOn(service as unknown as { processNode: () => Promise<NodeProcessingResult[]> }, 'processNode')
+      .mockRejectedValueOnce(new Error('first branch failed'))
+      .mockReturnValueOnce(
+        new Promise<NodeProcessingResult[]>((resolve) => {
+          finishSecondBranch = () => resolve([]);
+        }),
+      );
+
+    const flow = service.startFlow([firstNode, secondNode], { payload: {} });
+    await expect(flow).rejects.toThrow('first branch failed');
+
+    if (!finishSecondBranch) {
+      throw new Error('Second branch was not started');
+    }
+    finishSecondBranch();
+    expect(processNode).toHaveBeenCalledTimes(2);
   });
 
   it('ends the active usage session with templated notes and passes payload through', async () => {
@@ -842,6 +854,28 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       expect(variablesService.set).toHaveBeenNthCalledWith(2, 'resource', 1, 'note', 'hello world', 1);
     });
 
+    it('serializes an object payload for a downstream MQTT message using {{json payload}}', async () => {
+      const inputNode = createNode({ id: 'trigger-1', type: ResourceFlowNodeType.INPUT_BUTTON, resourceId: 1 });
+      const mqttNode = createNode({
+        id: 'mqtt-1',
+        type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE,
+        resourceId: 1,
+        data: { serverId: 42, topic: 'devices/update', payload: '{{json payload}}', qos: 1, retain: false },
+      });
+      nodesById[inputNode.id] = inputNode;
+      nodesById[mqttNode.id] = mqttNode;
+      initialNodes = [inputNode];
+      edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: mqttNode.id }];
+      edgesBySourceAndHandle[`${mqttNode.id}|`] = [];
+
+      await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { payload: { enabled: true } });
+
+      expect(mqttClientService.publish).toHaveBeenCalledWith(42, 'devices/update', '{"enabled":true}', {
+        qos: 1,
+        retain: false,
+      });
+    });
+
     it('PROCESSING_GET_VARIABLES writes lodash-set into payload', async () => {
       (variablesService.get as jest.Mock).mockImplementation(async (_scope, _rid, key) =>
         key === 'sessionId' ? 99 : undefined,
@@ -900,9 +934,8 @@ describe('ResourceFlowsExecutorService MQTT', () => {
   let service: ResourceFlowsExecutorService;
   let flowNodeRepository: Partial<Repository<ResourceFlowNode>>;
   let flowEdgeRepository: Partial<Repository<ResourceFlowEdge>>;
-  let flowLogRepository: Partial<Repository<ResourceFlowLog>>;
+  let flowLogs: FlowLogRecorderService;
   let resourceRepository: Partial<Repository<Resource>>;
-  let configService: Partial<ConfigService>;
   let mqttClientService: MqttClientService;
   let resourceUsageService: ResourceUsageService;
   let eventEmitter: EventEmitter2;
@@ -946,10 +979,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       }),
     } as unknown as Repository<ResourceFlowEdge>;
 
-    flowLogRepository = {
-      create: jest.fn((data) => ({ id: Math.random().toString(36), ...data })),
-      save: jest.fn(async (data) => data),
-    } as unknown as Repository<ResourceFlowLog>;
+    flowLogs = new FlowLogRecorderService();
 
     resourceRepository = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -960,10 +990,6 @@ describe('ResourceFlowsExecutorService MQTT', () => {
         metadata: { zone: 'A' },
       })),
     } as unknown as Repository<Resource>;
-
-    configService = {
-      get: jest.fn(() => ({ FLOW_LOG_TTL_DAYS: 7 }) as unknown as FlowConfigType),
-    } as unknown as ConfigService;
 
     mqttClientService = {
       publish: jest.fn(async () => undefined),
@@ -1003,9 +1029,8 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     service = new ResourceFlowsExecutorService(
       flowNodeRepository as Repository<ResourceFlowNode>,
       flowEdgeRepository as unknown as Repository<ResourceFlowEdge>,
-      flowLogRepository as Repository<ResourceFlowLog>,
       resourceRepository as Repository<Resource>,
-      configService as ConfigService,
+      flowLogs,
       mqttClientService,
       resourceUsageService,
       billingItemRepoMock,
@@ -1125,9 +1150,41 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     nodesById = { [inputNode.id]: inputNode, [waitNode.id]: waitNode } as unknown as Record<string, ResourceFlowNode>;
     edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: waitNode.id }];
     edgesBySourceAndHandle[`${waitNode.id}|`] = [];
+    flowLogs.start(1);
 
     await expect(service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {})).rejects.toThrow(
       /Timeout waiting for MQTT message/,
     );
+
+    const failedLog = flowLogs.getLogs(1).logs.find((log) => log.type === 'node.processing.failed');
+    expect(failedLog).toBeDefined();
+    expect(JSON.parse(failedLog?.payload ?? '')).toEqual({
+      error: "Timeout waiting for MQTT message on topic 'foo/#' (server 8)",
+    });
+  });
+
+  it('records MQTT context when publishing rejects without an error message', async () => {
+    const inputNode = createNode({ id: 'in-1' });
+    const outputNode = createNode({
+      id: 'output-1',
+      type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE,
+      data: { serverId: 1, topic: 'devices/state', payload: 'on' },
+    });
+
+    initialNodes = [inputNode];
+    nodesById = { [inputNode.id]: inputNode, [outputNode.id]: outputNode };
+    edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: outputNode.id }];
+    mqttClientService.publish = jest.fn().mockRejectedValue({});
+    flowLogs.start(1);
+
+    await expect(service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {})).rejects.toThrow(
+      "Failed to publish MQTT message to topic 'devices/state' on server 1: no error details were provided",
+    );
+
+    const failedLog = flowLogs.getLogs(1).logs.find((log) => log.type === 'node.processing.failed');
+    expect(failedLog).toBeDefined();
+    expect(JSON.parse(failedLog?.payload ?? '')).toEqual({
+      error: "Failed to publish MQTT message to topic 'devices/state' on server 1: no error details were provided",
+    });
   });
 });

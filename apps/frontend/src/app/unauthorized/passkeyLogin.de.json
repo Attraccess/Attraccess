@@ -1,0 +1,8 @@
+{
+  "signInButton": "Mit Passkey anmelden",
+  "signingIn": "Warte auf deinen Passkey...",
+  "error": {
+    "title": "Passkey-Anmeldung fehlgeschlagen",
+    "description": "Dieser Passkey konnte nicht überprüft werden. Versuche es erneut oder melde dich mit deinem Passwort an."
+  }
+}

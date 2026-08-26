@@ -10,7 +10,6 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { SSOProvidersTable } from './SSOProvidersTable';
 import { useToastMessage } from '../../../components/toastProvider';
-import { SSO_PROVIDERS_PATH } from './useSSOProviderForm';
 import en from './en.json';
 import de from './de.json';
 
@@ -31,7 +30,7 @@ export const SSOProvidersList = () => {
 
   const handleEdit = useCallback(
     (provider: SSOProvider) => {
-      navigate(`${SSO_PROVIDERS_PATH}/${provider.id}`);
+      navigate(`/settings/sso/providers/${provider.id}`);
     },
     [navigate],
   );

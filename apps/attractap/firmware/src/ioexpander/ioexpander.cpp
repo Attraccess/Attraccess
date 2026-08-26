@@ -4,6 +4,13 @@
 
 void IOExpander::setup()
 {
+    outputMutex = xSemaphoreCreateMutex();
+    if (outputMutex == nullptr)
+    {
+        logger.error("Failed to create IO expander output mutex");
+        return;
+    }
+
     i2cAddress = IOEXPANDER_I2C_ADDR;
     delay(10); // Allow IO expander to complete power-on reset
     logger.infof("Using IO expander at 0x%02X", i2cAddress);
@@ -38,7 +45,7 @@ void IOExpander::setup()
 
 void IOExpander::setPin(uint8_t bit, bool high)
 {
-    if (!initialized)
+    if (!initialized || outputMutex == nullptr || xSemaphoreTake(outputMutex, portMAX_DELAY) != pdTRUE)
     {
         return;
     }
@@ -49,6 +56,7 @@ void IOExpander::setPin(uint8_t bit, bool high)
     if (bit > 7)
     {
         logger.warnf("setPin: bit=%d is out of range for port 0 (0–7) — port 1 pins cannot be set individually", bit);
+        xSemaphoreGive(outputMutex);
         return;
     }
 #endif
@@ -64,6 +72,7 @@ void IOExpander::setPin(uint8_t bit, bool high)
 
     logger.debugf("setPin: bit=%d high=%d → outputState=0x%02X", bit, high, outputState);
     writeRegister(IOEXP_REG_OUTPUT, outputState);
+    xSemaphoreGive(outputMutex);
 }
 
 void IOExpander::resetTouchPanel()
@@ -84,7 +93,7 @@ void IOExpander::resetTouchPanel()
 void IOExpander::powerOff()
 {
 #ifdef IO_EXPANDER_16BIT
-    if (!initialized)
+    if (!initialized || outputMutex == nullptr || xSemaphoreTake(outputMutex, portMAX_DELAY) != pdTRUE)
     {
         logger.warn("powerOff: called before init — ignoring power-off request");
         return;
@@ -92,6 +101,7 @@ void IOExpander::powerOff()
     logger.info("Power off: driving SYS_EN low (reg 0x03 bit 5)");
     outputState1 &= ~(uint8_t(1 << IOEXP_BIT_SYS_EN));
     writeRegister(IOEXP_REG_OUTPUT_1, outputState1);
+    xSemaphoreGive(outputMutex);
 #else
     logger.warn("powerOff: no SYS_EN latch on this hardware — ignoring");
 #endif

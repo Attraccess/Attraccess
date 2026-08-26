@@ -104,6 +104,48 @@ describe('UsersAdminController', () => {
       expect(result).toBeDefined();
     });
 
+    it('should return only id and username without users.read', async () => {
+      jest.spyOn(usersService, 'findMany').mockResolvedValue({
+        ...paginated(1, 10, 1),
+        data: [
+          {
+            id: 1,
+            username: 'member',
+            creditBalance: 100,
+            billingFactor: 2,
+            isEmailVerified: false,
+            authenticationDetails: [{ providerType: 'local_password' }],
+          } as User,
+        ],
+      });
+
+      const result = await controller.findMany({ page: 1, limit: 10 }, makeRequest());
+
+      expect(result).toEqual({
+        data: [{ id: 1, username: 'member' }],
+        total: 1,
+        page: 1,
+        limit: 10,
+        nextPage: undefined,
+      });
+    });
+
+    it('should return the full user shape with users.read', async () => {
+      const user = {
+        id: 1,
+        username: 'admin',
+        creditBalance: 100,
+        billingFactor: 2,
+        isEmailVerified: true,
+        authenticationDetails: [{ providerType: 'sso' }],
+      } as User;
+      jest.spyOn(usersService, 'findMany').mockResolvedValue({ ...paginated(1, 10, 1), data: [user] });
+
+      const result = await controller.findMany({ page: 1, limit: 10 }, makeRequest(['users.read']));
+
+      expect(result.data).toEqual([user]);
+    });
+
     it('should throw ForbiddenException when includeRoles=true without users.read', async () => {
       await expect(
         controller.findMany({ page: 1, limit: 10, includeRoles: true }, makeRequest()),

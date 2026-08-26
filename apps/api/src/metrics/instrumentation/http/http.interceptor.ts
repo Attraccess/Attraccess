@@ -34,20 +34,25 @@ export class HttpMetricsInterceptor implements NestInterceptor {
       tap({
         next: () => {
           const response = httpCtx.getResponse<Response>();
-          this.record(method, route, response.statusCode, startTime);
+          this.record(method, route, response.statusCode, startTime, authenticationMethod(request));
         },
         error: (error) => {
           const statusCode = error?.status || error?.statusCode || 500;
-          this.record(method, route, statusCode, startTime);
+          this.record(method, route, statusCode, startTime, authenticationMethod(request));
         },
       }),
     );
   }
 
-  private record(method: string, route: string, statusCode: number, startTime: bigint): void {
+  private record(method: string, route: string, statusCode: number, startTime: bigint, authMethod: string): void {
     const seconds = Number(process.hrtime.bigint() - startTime) / 1e9;
-    const labels = { method, route, status_code: String(statusCode) };
+    const labels = { method, route, status_code: String(statusCode), auth_method: authMethod };
     this.metrics.duration.observe(labels, seconds);
     this.metrics.total.inc(labels);
   }
+}
+
+function authenticationMethod(request: Request): 'api-token' | 'session' | 'anonymous' {
+  const method = (request.user as { authenticationMethod?: string } | undefined)?.authenticationMethod;
+  return method === 'api-token' || method === 'session' ? method : 'anonymous';
 }

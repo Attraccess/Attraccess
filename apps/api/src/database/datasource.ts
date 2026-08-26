@@ -16,6 +16,7 @@ const dbConfig: Partial<DataSourceOptions> = {
   synchronize: false,
   migrations: Object.values(migrations),
   migrationsTableName: 'migrations',
+  // Providers access database-backed settings while Nest constructs AppModule.
   migrationsRun: true,
   entities: Object.values(entities),
   type: 'sqlite',

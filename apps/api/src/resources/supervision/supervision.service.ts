@@ -1,7 +1,17 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException, RequestTimeoutException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  RequestTimeoutException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { ResourceUsage, User } from '@attraccess/database-entities';
+import { ResourceIntroducerType, ResourceUsage, User } from '@attraccess/database-entities';
 import { ResourceUsageService } from '../usage/resourceUsage.service';
+import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { StartUsageSessionDto } from '../usage/dtos/startUsageSession.dto';
 import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto';
 import { SupervisionRequestDto } from './dtos/supervisionRequest.dto';
@@ -15,8 +25,8 @@ interface PendingSupervisionRequest {
   requester: User;
   /**
    * The single supervisor whose approval is required (web flow, ATT-487), or `null` for a
-   * reader-originated request (ATT-493) that any eligible supervisor in `eligibleSupervisorIds`
-   * may approve — by tapping their card at the reader or approving the web popup.
+   * reader-originated request (ATT-493) that any currently authorized introducer may approve — by
+   * tapping their card at the reader or approving the web popup.
    */
   supervisorUserId: number | null;
   /** Supervisors the request was broadcast to (reader flow); used to fan out resolution/expiry events. */
@@ -30,6 +40,11 @@ interface PendingSupervisionRequest {
   settled: boolean;
   /** Present for reader-originated requests (ATT-493); drives reader-websocket notifications. */
   readerCallbacks?: ReaderSupervisionCallbacks;
+  /**
+   * The reader this request armed from the web (ATT-816). Set synchronously at registration, before
+   * arming, so the one-armed-reader-per-requester scan sees concurrent requests.
+   */
+  readerId?: number;
 }
 
 /**
@@ -39,6 +54,27 @@ interface PendingSupervisionRequest {
 export interface ReaderSupervisionCallbacks {
   onResolved: (session: ResourceUsage, supervisor: { id: number; username: string }) => void;
   onFailed: (error: Error) => void;
+}
+
+/**
+ * Port for arming a reader to wait for a supervisor card on behalf of a web requester (ATT-816).
+ *
+ * Implemented in the Attractap module and registered via {@link SupervisionService.setReaderArmer}.
+ * A registration hook rather than an injected dependency, because the Attractap module already
+ * depends on this service — injecting the gateway here would close the cycle.
+ */
+export interface ReaderSupervisionArmer {
+  /**
+   * Puts the reader into its supervisor-card wait state. Throws if the reader is unknown, offline
+   * or busy with another flow, so the requester fails fast instead of watching a doomed countdown.
+   * Returns the callbacks that report the request's outcome back to that reader.
+   */
+  arm(params: {
+    readerId: number;
+    resourceId: number;
+    requester: User;
+    requestId: string;
+  }): Promise<ReaderSupervisionCallbacks>;
 }
 
 /**
@@ -57,69 +93,165 @@ export class SupervisionService {
 
   private readonly logger = new Logger(SupervisionService.name);
   private readonly pending = new Map<string, PendingSupervisionRequest>();
+  private readerArmer: ReaderSupervisionArmer | null = null;
 
   constructor(
     private readonly resourceUsageService: ResourceUsageService,
+    private readonly resourceIntroducersService: ResourceIntroducersService,
     private readonly supervisionLive: SupervisionLiveService,
   ) {}
 
+  /** Registered by the Attractap module at startup; see {@link ReaderSupervisionArmer}. */
+  public setReaderArmer(armer: ReaderSupervisionArmer): void {
+    this.readerArmer = armer;
+  }
+
   /**
    * Creates a supervision request and returns a promise that resolves with the started session once
-   * the supervisor approves, or rejects with a timeout/rejection error.
+   * a supervisor approves, or rejects with a timeout/rejection error.
+   *
+   * Two approval channels, selected by the dto: a single named supervisor who gets a popup, or a
+   * reader armed to accept any eligible supervisor's card (ATT-816).
    */
   public async requestSupervisedSession(
     resourceId: number,
     requester: User,
     dto: RequestSupervisedSessionDto,
   ): Promise<ResourceUsage> {
+    const { supervisorUserId, readerId } = dto;
+
+    if ((supervisorUserId == null) === (readerId == null)) {
+      throw new BadRequestException('Provide exactly one of supervisorUserId or readerId');
+    }
+
+    return readerId == null
+      ? this.requestFromSupervisor(resourceId, requester, dto, supervisorUserId)
+      : this.requestAtReader(resourceId, requester, dto, readerId);
+  }
+
+  /** Web flow (ATT-487): one named supervisor, notified over SSE, approves from their own device. */
+  private async requestFromSupervisor(
+    resourceId: number,
+    requester: User,
+    dto: RequestSupervisedSessionDto,
+    supervisorUserId: number,
+  ): Promise<ResourceUsage> {
     // Validate eagerly so the requester gets immediate, meaningful feedback instead of waiting 30s
     // for a request that could never have been approved (wrong supervisor, self-supervision, ...).
-    await this.resourceUsageService.validateSupervisedStart(resourceId, requester, dto.supervisorUserId);
+    await this.resourceUsageService.validateSupervisedStart(resourceId, requester, supervisorUserId);
 
-    const id = randomUUID();
-    const createdAt = new Date();
-    const expiresAt = new Date(createdAt.getTime() + SupervisionService.APPROVAL_TTL_MS);
-
-    const sessionPromise = new Promise<ResourceUsage>((resolve, reject) => {
-      const timeout = setTimeout(() => this.expire(id), SupervisionService.APPROVAL_TTL_MS);
-      // Don't keep the process alive solely for a pending approval.
-      if (typeof timeout.unref === 'function') {
-        timeout.unref();
-      }
-
-      this.pending.set(id, {
-        id,
-        resourceId,
-        requester,
-        supervisorUserId: dto.supervisorUserId,
-        eligibleSupervisorIds: [dto.supervisorUserId],
-        dto,
-        createdAt,
-        expiresAt,
-        timeout,
-        resolve,
-        reject,
-        settled: false,
-      });
+    const { id, promise } = this.createPending({
+      resourceId,
+      requester,
+      dto,
+      supervisorUserId,
+      eligibleSupervisorIds: [supervisorUserId],
     });
 
-    const stored = this.pending.get(id);
     this.logger.debug(
-      `Supervision request ${id} created for resource ${resourceId} (requester ${requester.id}, supervisor ${dto.supervisorUserId})`,
+      `Supervision request ${id} created for resource ${resourceId} (requester ${requester.id}, supervisor ${supervisorUserId})`,
     );
-    this.supervisionLive.emitToSupervisor(dto.supervisorUserId, {
-      type: SupervisionLiveEventType.REQUESTED,
-      requestId: id,
-      request: this.toDto(stored, dto.supervisorUserId),
+    this.emitRequested(id);
+    return promise;
+  }
+
+  /**
+   * Reader flow (ATT-816): the requester picks a reader instead of a person. The reader is armed to
+   * wait for a card while the request is simultaneously broadcast to every eligible supervisor over
+   * SSE, so either channel can approve — same race as the reader-originated flow.
+   */
+  private async requestAtReader(
+    resourceId: number,
+    requester: User,
+    dto: RequestSupervisedSessionDto,
+    readerId: number,
+  ): Promise<ResourceUsage> {
+    if (!this.readerArmer) {
+      throw new ServiceUnavailableException('Reader-based supervision is unavailable');
+    }
+
+    await this.resourceUsageService.assertSupportsSupervision(resourceId);
+
+    const eligibleSupervisorIds = await this.getEligibleSupervisorIds(resourceId, requester.id);
+    if (eligibleSupervisorIds.length === 0) {
+      throw new BadRequestException('Nobody else can supervise on this resource');
+    }
+
+    // --- no awaits from here until the request is registered ---
+
+    // One armed reader per requester at a time. Arming claims a shared physical screen for 30s, so
+    // without this a single user could hold several readers hostage, or re-arm one in a loop. The
+    // scan and the registration below must stay in the same synchronous run, or N parallel requests
+    // all see an empty map and all arm — which is exactly what someone abusing this would do.
+    for (const pending of this.pending.values()) {
+      if (pending.readerId !== undefined && pending.requester.id === requester.id) {
+        throw new ConflictException('You already have a supervision request waiting at a reader');
+      }
+    }
+
+    // Registered before arming, so the id the reader is about to carry is already resolvable. Arming
+    // can take seconds (ACK retries); a disconnect or a card tap in that window used to hit
+    // `pending.get(id) === undefined` and no-op, leaving the requester to wait out the full TTL.
+    const { id, promise } = this.createPending({
+      resourceId,
+      requester,
+      dto,
+      supervisorUserId: null,
+      eligibleSupervisorIds,
+      readerId,
     });
-    return sessionPromise;
+    const request = this.pending.get(id);
+
+    let callbacks: ReaderSupervisionCallbacks;
+    try {
+      callbacks = await this.readerArmer.arm({ readerId, resourceId, requester, requestId: id });
+    } catch (error) {
+      // A rejected reader (offline, busy, unresponsive) fails the caller immediately rather than
+      // leaving them watching a countdown nobody can answer. Unwind the registration.
+      this.clear(request);
+      this.fail(request, error as Error);
+      promise.catch(() => undefined);
+      throw error;
+    }
+
+    // Settled while we were arming — the reader disconnected, or a card tap started a session. The
+    // requester's promise already carries that outcome; just make sure the reader stops waiting.
+    if (this.pending.get(id) !== request) {
+      callbacks.onFailed(new RequestTimeoutException('The supervision request ended before the reader was ready'));
+      return promise;
+    }
+
+    request.readerCallbacks = callbacks;
+
+    this.logger.debug(
+      `Supervision request ${id} created for resource ${resourceId} at reader ${readerId} ` +
+        `(requester ${requester.id}, ${eligibleSupervisorIds.length} eligible supervisors)`,
+    );
+    this.emitRequested(id);
+    return promise;
+  }
+
+  /**
+   * The users who may supervise on this resource: its introducers (including group-level), minus
+   * the requester. An empty list means no supervision is possible.
+   */
+  public async getEligibleSupervisorIds(resourceId: number, requesterId: number): Promise<number[]> {
+    const introducers = await this.resourceIntroducersService.getMany(resourceId, ResourceIntroducerType.INTRODUCER);
+    const ids = new Set<number>();
+    for (const introducer of introducers) {
+      if (introducer.userId !== requesterId && introducer.user) {
+        ids.add(introducer.userId);
+      }
+    }
+    return Array.from(ids);
   }
 
   /**
    * Creates a reader-originated supervision request (ATT-493). The non-introduced requester has
-   * already tapped at the reader; this fans the request out to every eligible supervisor via SSE so
-   * any of them can approve from their phone/PC, while the reader simultaneously waits for one of
-   * them to tap their card. The first channel to resolve wins; the other is cancelled.
+   * already tapped at the reader; this fans the request out to every eligible supervisor via SSE.
+   * Any currently authorized introducer can approve from their phone/PC, while the reader
+   * simultaneously waits for one to tap their card. The first channel to resolve wins; the other
+   * is cancelled.
    *
    * Unlike {@link requestSupervisedSession} there is no blocking HTTP caller — resolution is
    * surfaced through `callbacks` (which notify the reader websocket).
@@ -131,49 +263,89 @@ export class SupervisionService {
     eligibleSupervisorIds: number[];
     callbacks: ReaderSupervisionCallbacks;
   }): { requestId: string; expiresAt: Date } {
-    const { resourceId, requester, dto, eligibleSupervisorIds, callbacks } = params;
+    const { callbacks, ...rest } = params;
 
-    const id = randomUUID();
+    const { id, expiresAt, promise } = this.createPending({
+      ...rest,
+      supervisorUserId: null,
+      readerCallbacks: callbacks,
+    });
+
+    // This flow has no HTTP caller — the outcome travels via readerCallbacks — so nothing awaits the
+    // promise and its rejection would surface as an unhandled one. Swallowed here rather than inside
+    // createPending, so the flows that *are* awaited keep propagating normally.
+    promise.catch(() => undefined);
+
+    this.logger.debug(
+      `Reader supervision request ${id} created for resource ${params.resourceId} (requester ${params.requester.id}, ${params.eligibleSupervisorIds.length} eligible supervisors)`,
+    );
+    this.emitRequested(id);
+
+    return { requestId: id, expiresAt };
+  }
+
+  /**
+   * Registers a pending request and arms its expiry timer.
+   *
+   * The returned promise is what the blocking HTTP callers await. Reader-originated requests
+   * (ATT-493) have no HTTP caller and simply ignore it — their outcome travels via readerCallbacks —
+   * but it is still settled, so the two flows share one lifecycle instead of two.
+   */
+  private createPending(params: {
+    id?: string;
+    resourceId: number;
+    requester: User;
+    dto: StartUsageSessionDto;
+    supervisorUserId: number | null;
+    eligibleSupervisorIds: number[];
+    readerCallbacks?: ReaderSupervisionCallbacks;
+    readerId?: number;
+  }): { id: string; expiresAt: Date; promise: Promise<ResourceUsage> } {
+    const id = params.id ?? randomUUID();
     const createdAt = new Date();
     const expiresAt = new Date(createdAt.getTime() + SupervisionService.APPROVAL_TTL_MS);
 
-    const timeout = setTimeout(() => this.expire(id), SupervisionService.APPROVAL_TTL_MS);
-    if (typeof timeout.unref === 'function') {
-      timeout.unref();
+    const promise = new Promise<ResourceUsage>((resolve, reject) => {
+      const timeout = setTimeout(() => this.expire(id), SupervisionService.APPROVAL_TTL_MS);
+      // Don't keep the process alive solely for a pending approval.
+      if (typeof timeout.unref === 'function') {
+        timeout.unref();
+      }
+
+      this.pending.set(id, {
+        id,
+        resourceId: params.resourceId,
+        requester: params.requester,
+        supervisorUserId: params.supervisorUserId,
+        eligibleSupervisorIds: params.eligibleSupervisorIds,
+        dto: params.dto,
+        createdAt,
+        expiresAt,
+        timeout,
+        resolve,
+        reject,
+        settled: false,
+        readerCallbacks: params.readerCallbacks,
+        readerId: params.readerId,
+      });
+    });
+
+    return { id, expiresAt, promise };
+  }
+
+  /** Fans the initial REQUESTED event out to every supervisor who may approve the request. */
+  private emitRequested(requestId: string): void {
+    const request = this.pending.get(requestId);
+    if (!request) {
+      return;
     }
-
-    const stored: PendingSupervisionRequest = {
-      id,
-      resourceId,
-      requester,
-      supervisorUserId: null,
-      eligibleSupervisorIds,
-      dto,
-      createdAt,
-      expiresAt,
-      timeout,
-      // No HTTP promise to settle for the reader flow; side effects run via readerCallbacks.
-      resolve: () => undefined,
-      reject: () => undefined,
-      settled: false,
-      readerCallbacks: callbacks,
-    };
-    this.pending.set(id, stored);
-
-    this.logger.debug(
-      `Reader supervision request ${id} created for resource ${resourceId} (requester ${requester.id}, ${eligibleSupervisorIds.length} eligible supervisors)`,
-    );
-
-    // Fan the request out to every eligible supervisor so any of them can approve from the web.
-    for (const supervisorUserId of eligibleSupervisorIds) {
+    for (const supervisorUserId of request.eligibleSupervisorIds) {
       this.supervisionLive.emitToSupervisor(supervisorUserId, {
         type: SupervisionLiveEventType.REQUESTED,
-        requestId: id,
-        request: this.toDto(stored, supervisorUserId),
+        requestId,
+        request: this.toDto(request, supervisorUserId),
       });
     }
-
-    return { requestId: id, expiresAt };
   }
 
   /**
@@ -186,8 +358,12 @@ export class SupervisionService {
     if (!request) {
       return;
     }
-    request.settled = true;
     this.clear(request);
+    // Fail rather than mark settled: `clear()` has just dropped the expiry timer, so a web-initiated
+    // request (ATT-816) with an HTTP caller would otherwise never settle and hold the connection.
+    // Failing is also the honest answer — the session that started belongs to whoever tapped at the
+    // reader, not to the requester waiting here.
+    this.fail(request, new ForbiddenException('Another user started a session at the reader first'));
     this.emitToEligible(request, SupervisionLiveEventType.RESOLVED);
   }
 
@@ -195,13 +371,16 @@ export class SupervisionService {
    * Cancels a reader request because the reader timed out, was disconnected, or the requester
    * aborted. Dismisses the web popups; does not invoke the reader callbacks (the reader already knows).
    */
-  public cancelReaderRequest(requestId: string): void {
+  public cancelReaderRequest(requestId: string, reason?: string): void {
     const request = this.pending.get(requestId);
     if (!request) {
       return;
     }
-    request.settled = true;
     this.clear(request);
+    // Fail rather than just mark settled: a web-initiated request (ATT-816) has a caller blocked on
+    // this promise, and its expiry timer has just been cleared — marking it settled would hang them.
+    // `reason` lets the caller hear what actually killed it instead of a generic timeout.
+    this.fail(request, new RequestTimeoutException(reason ?? 'The supervision request was cancelled at the reader'));
     this.emitToEligible(request, SupervisionLiveEventType.EXPIRED);
   }
 
@@ -210,7 +389,16 @@ export class SupervisionService {
    * supervisor attached, then resolves the waiting requester.
    */
   public async approve(requestId: string, supervisor: User): Promise<ResourceUsage> {
-    const request = this.getPendingForSupervisorOrThrow(requestId, supervisor);
+    const request = this.getPendingForSupervisorOrThrow(requestId, supervisor, { allowAnyAuthorized: true });
+    await this.assertMayApprove(request, supervisor);
+
+    // assertMayApprove can hit the DB, which is long enough for the 30s timer to fire underneath us.
+    // Without this the request would already be failed and reported as such to both the requester
+    // and the reader, while startSession below still opened a real session on a physical machine.
+    if (this.pending.get(requestId) !== request || request.settled) {
+      throw new NotFoundException('Supervision request not found or already expired');
+    }
+
     this.clear(request);
 
     try {
@@ -261,22 +449,39 @@ export class SupervisionService {
     return requests;
   }
 
-  private getPendingForSupervisorOrThrow(requestId: string, supervisor: User): PendingSupervisionRequest {
+  private getPendingForSupervisorOrThrow(
+    requestId: string,
+    supervisor: User,
+    opts: { allowAnyAuthorized?: boolean } = {},
+  ): PendingSupervisionRequest {
     const request = this.pending.get(requestId);
     if (!request) {
       throw new NotFoundException('Supervision request not found or already expired');
     }
-    // Web flow: a single named supervisor. Reader flow (supervisorUserId === null): any of the
-    // supervisors the request was broadcast to. Eligibility against the resource is re-checked by
-    // startSession/validateSupervisedStart when the session actually starts.
     const allowed =
       request.supervisorUserId === null
-        ? request.eligibleSupervisorIds.includes(supervisor.id)
+        ? opts.allowAnyAuthorized || request.eligibleSupervisorIds.includes(supervisor.id)
         : request.supervisorUserId === supervisor.id;
     if (!allowed) {
       throw new ForbiddenException('You are not the requested supervisor for this session');
     }
     return request;
+  }
+
+  /**
+   * Broadcast requests are revalidated against the current introducer grants. This admits an
+   * introducer granted access after the request was broadcast, without admitting maintainers or
+   * resource managers. Named requests are revalidated by startSession immediately before creation.
+   */
+  private async assertMayApprove(request: PendingSupervisionRequest, supervisor: User): Promise<void> {
+    if (request.supervisorUserId !== null) {
+      return;
+    }
+    try {
+      await this.resourceUsageService.validateSupervisedStart(request.resourceId, request.requester, supervisor.id);
+    } catch {
+      throw new ForbiddenException('You are not authorized to supervise this session');
+    }
   }
 
   private expire(requestId: string): void {

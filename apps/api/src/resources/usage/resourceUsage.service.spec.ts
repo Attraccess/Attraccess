@@ -81,6 +81,7 @@ describe('ResourceUsageService', () => {
     getRepository: jest.Mock;
     findOne: jest.Mock;
     update: jest.Mock;
+    transaction: jest.Mock;
   };
 
   const mockRepository = () => ({
@@ -309,6 +310,9 @@ describe('ResourceUsageService', () => {
         execute: jest.fn().mockResolvedValue({}),
       })),
       update: jest.fn().mockResolvedValue(undefined),
+      transaction: jest.fn(async (cb: (em: typeof transactionalEntityManager) => Promise<unknown>) =>
+        cb(transactionalEntityManager),
+      ),
       // Ensure code paths that use getRepository(Entity).findOne work in tests
       getRepository: jest.fn((entity) => {
         if (entity === Resource) {
@@ -332,7 +336,13 @@ describe('ResourceUsageService', () => {
         }
         return null;
       }),
-    } as unknown as { createQueryBuilder: jest.Mock; getRepository: jest.Mock; findOne: jest.Mock; update: jest.Mock };
+    } as unknown as {
+      createQueryBuilder: jest.Mock;
+      getRepository: jest.Mock;
+      findOne: jest.Mock;
+      update: jest.Mock;
+      transaction: jest.Mock;
+    };
 
     // @ts-expect-error augment mock with manager
     resourceUsageRepository.manager = {
@@ -382,8 +392,10 @@ describe('ResourceUsageService', () => {
       type: ResourceType.Machine,
     } as Resource;
 
-    it('should start a session successfully when no active session exists', async () => {
+    it('should start a session when the start flow fails', async () => {
       const dto: StartUsageSessionDto = { notes: 'Test session' };
+
+      flowExecutorService.runFlow.mockRejectedValueOnce(new Error('MQTT authentication failed'));
 
       // Mock resourceRepository.findOne to return the resource
       resourceRepository.findOne.mockResolvedValue(mockResource);
@@ -458,6 +470,13 @@ describe('ResourceUsageService', () => {
       });
       expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledTimes(1);
       expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledWith(createdSession.resourceId);
+      expect(transactionalEntityManager.transaction).toHaveBeenCalledTimes(1);
+      expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
+        createdSession.resourceId,
+        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+        expect.any(Object),
+        transactionalEntityManager,
+      );
     });
 
     it('should throw error when resource does not exist', async () => {
@@ -525,8 +544,10 @@ describe('ResourceUsageService', () => {
       );
     });
 
-    it('should successfully takeover when resource allows it', async () => {
+    it('should takeover when the takeover flow fails', async () => {
       const dto: StartUsageSessionDto = { notes: 'Test session', forceTakeOver: true };
+
+      flowExecutorService.runFlow.mockRejectedValueOnce(new Error('MQTT authentication failed'));
 
       // Mock resourceRepository.findOne to return the resource (allowTakeOver: true)
       resourceRepository.findOne.mockResolvedValue(mockResourceWithTakeOver);
@@ -625,6 +646,13 @@ describe('ResourceUsageService', () => {
       expect(chargedIds).not.toContain(mockNewUsage.id);
       expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledTimes(1);
       expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledWith(mockNewUsage.resourceId);
+      expect(transactionalEntityManager.transaction).toHaveBeenCalledTimes(1);
+      expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
+        mockActiveSession.resourceId,
+        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
+        expect.any(Object),
+        transactionalEntityManager,
+      );
     });
 
     it('should trigger only TAKEOVER flow on takeover and not STARTED/STOPPED; billing unchanged', async () => {
@@ -958,7 +986,7 @@ describe('ResourceUsageService', () => {
       resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_ALLOWED));
       resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
       userRepository.findOne.mockResolvedValue(supervisor);
-      resourceIntroducersService.canMaintain.mockResolvedValue(true);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(true);
 
       const { finalizedSession, mockQueryBuilder } = mockSuccessfulSessionCreation(2);
 
@@ -974,20 +1002,18 @@ describe('ResourceUsageService', () => {
       expect(payload).toMatchObject({ resourceId: 1, userId: 1, supervisorUserId: 2 });
     });
 
-    it('accepts a supervisor authorized via resources.update permission even without an introducer role', async () => {
+    it('rejects a resource manager who is not also an introducer', async () => {
       const dto: StartUsageSessionDto = {};
       const adminSupervisor = { id: 2, username: 'admin' } as User;
       resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_ALLOWED));
       resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
       userRepository.findOne.mockResolvedValue(adminSupervisor);
-      resourceIntroducersService.canMaintain.mockResolvedValue(false);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(false);
       mockRbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.update']));
 
-      mockSuccessfulSessionCreation(2);
-
-      await expect(service.startSession(1, requester, dto, { supervisorUserId: 2 })).resolves.toMatchObject({
-        supervisorUserId: 2,
-      });
+      await expect(service.startSession(1, requester, dto, { supervisorUserId: 2 })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
     });
 
     it('allows a supervised start on SUPERVISION_REQUIRED even for an introduced user', async () => {
@@ -995,7 +1021,7 @@ describe('ResourceUsageService', () => {
       resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_REQUIRED));
       resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
       userRepository.findOne.mockResolvedValue(supervisor);
-      resourceIntroducersService.canMaintain.mockResolvedValue(true);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(true);
 
       mockSuccessfulSessionCreation(2);
 
@@ -1013,15 +1039,28 @@ describe('ResourceUsageService', () => {
       );
     });
 
-    it('rejects a supervisor that is neither introducer/maintainer nor resource manager', async () => {
+    it('rejects a maintainer who is not also an introducer', async () => {
       resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_ALLOWED));
       resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
       userRepository.findOne.mockResolvedValue(supervisor);
-      resourceIntroducersService.canMaintain.mockResolvedValue(false);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(false);
 
       await expect(service.startSession(1, requester, {}, { supervisorUserId: 2 })).rejects.toBeInstanceOf(
         ForbiddenException,
       );
+    });
+
+    it('accepts an applicable Resource Group introducer', async () => {
+      resourceRepository.findOne.mockResolvedValue(supervisedResource(SupervisionMode.SUPERVISION_ALLOWED));
+      resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+      userRepository.findOne.mockResolvedValue(supervisor);
+      resourceIntroducersService.isIntroducer.mockResolvedValue(true);
+      mockSuccessfulSessionCreation(2);
+
+      await expect(service.startSession(1, requester, {}, { supervisorUserId: 2 })).resolves.toMatchObject({
+        supervisorUserId: 2,
+      });
+      expect(resourceIntroducersService.isIntroducer).toHaveBeenCalledWith(1, 2, true, expect.anything());
     });
 
     it('rejects a supervised start when the resource does not allow supervision', async () => {
@@ -1119,6 +1158,111 @@ describe('ResourceUsageService', () => {
       const eventPayload = emitted?.[1] as ResourceSessionStartedEvent;
       expect(eventPayload).toBeInstanceOf(ResourceSessionStartedEvent);
       expect(eventPayload.usage).toMatchObject({ id: 1, userId: 1, endNotes: 'Session completed' });
+    });
+
+    it('persists the end notes before running the stopped-session flow', async () => {
+      const mockActiveSession = {
+        id: 1,
+        resourceId: 1,
+        userId: 1,
+        startTime: new Date(),
+        user: { id: 1 } as User,
+      } as ResourceUsage;
+      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: 'Auto-ended' };
+      const calls: string[] = [];
+      let committed = false;
+
+      resourceUsageRepository.findOne
+        .mockResolvedValueOnce(mockActiveSession)
+        .mockResolvedValueOnce(mockUpdatedSession)
+        .mockResolvedValueOnce(mockUpdatedSession);
+
+      const mockUpdateQueryBuilder = createMockQueryBuilder(null);
+      (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
+        mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
+      );
+      (mockUpdateQueryBuilder.execute as jest.Mock).mockImplementation(async () => {
+        calls.push('update');
+      });
+      flowExecutorService.runFlow.mockImplementation(async () => {
+        expect(committed).toBe(true);
+        calls.push('flow');
+        return [];
+      });
+      (resourceUsageRepository.manager.transaction as jest.Mock).mockImplementationOnce(async (callback) => {
+        const result = await callback(transactionalEntityManager);
+        committed = true;
+        return result;
+      });
+
+      await service.endSession(1, mockActiveSession.user, { notes: 'Auto-ended' });
+
+      expect(calls).toEqual(['update', 'flow']);
+      expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
+        1,
+        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+        expect.objectContaining({ endNotes: 'Auto-ended' }),
+        expect.anything(),
+      );
+    });
+
+    it('returns the no-activity-ended session with its configured end notes in usage history immediately', async () => {
+      const configuredEndNotes = 'Ended automatically after 5 minutes of inactivity';
+      const usage = {
+        id: 42,
+        resourceId: 1,
+        userId: 1,
+        startTime: new Date(),
+        endTime: null,
+        endNotes: null,
+        user: { id: 1, username: 'member' } as User,
+        resource: { id: 1, type: ResourceType.Machine } as Resource,
+      } as ResourceUsage;
+      const updateQueryBuilder = createMockQueryBuilder(null);
+
+      resourceUsageRepository.findOne.mockImplementation(async ({ where }) => {
+        if (where?.id === usage.id || (where?.resourceId === usage.resourceId && usage.endTime === null)) {
+          return usage;
+        }
+        return null;
+      });
+      resourceUsageRepository.findAndCount = jest.fn().mockResolvedValue([[usage], 1]);
+      (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(updateQueryBuilder);
+      (updateQueryBuilder.execute as jest.Mock).mockImplementation(async () => {
+        Object.assign(usage, (updateQueryBuilder.set as jest.Mock).mock.calls[0][0]);
+      });
+
+      // No-activity flows end a session with configured notes and skip interactive end forms.
+      await service.endSession(
+        usage.resourceId,
+        usage.user,
+        { notes: configuredEndNotes },
+        { skipFormSubmissions: true, skipNoteNotification: true },
+      );
+      const history = await service.getResourceUsageHistory(usage.resourceId, 1, 10, usage.userId);
+
+      expect(history.data).toEqual([expect.objectContaining({ id: usage.id, endNotes: configuredEndNotes })]);
+    });
+
+    it('rolls back ending the session when billing fails', async () => {
+      const mockActiveSession = {
+        id: 1,
+        resourceId: 1,
+        userId: 1,
+        startTime: new Date(),
+        user: { id: 1 } as User,
+      } as ResourceUsage;
+      const mockUpdatedSession = { ...mockActiveSession, endTime: new Date(), endNotes: 'Auto-ended' };
+      const billingError = new Error('Billing failed');
+
+      resourceUsageRepository.findOne.mockResolvedValueOnce(mockActiveSession).mockResolvedValueOnce(mockUpdatedSession);
+      billingService.chargeForResourceUsage.mockRejectedValueOnce(billingError);
+
+      await expect(service.endSession(1, mockActiveSession.user, { notes: 'Auto-ended' })).rejects.toThrow(billingError);
+
+      expect(billingService.chargeForResourceUsage).toHaveBeenCalledWith(mockUpdatedSession, transactionalEntityManager);
+      expect(flowExecutorService.runFlow).not.toHaveBeenCalled();
+      expect(eventEmitter.emitAsync).not.toHaveBeenCalled();
     });
 
     it("emits a resource session ended notification event after ending someone else's session", async () => {
@@ -1321,7 +1465,7 @@ describe('ResourceUsageService', () => {
       expect(result).toBe(mockUpdatedSession);
       expect(resourceIntroducersService.canMaintain).not.toHaveBeenCalled();
       expect(mockUpdateQueryBuilder.update).toHaveBeenCalledWith(ResourceUsage);
-      expect(billingService.chargeForResourceUsage).toHaveBeenCalledWith(mockUpdatedSession, expect.anything());
+      expect(billingService.chargeForResourceUsage).toHaveBeenCalledWith(mockUpdatedSession, transactionalEntityManager);
       expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceSessionStartedEvent.EVENT_NAME, expect.any(Object));
       expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
         mockActiveSession.resourceId,

@@ -212,8 +212,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         this.logger.error(
           `Client did not send ACK for ${message.data.type} after ${RETRY_COUNT} attempts. Won't try again.`,
         );
-        return;
+        return false;
       }
+
+      return true;
     };
 
     const sendBinaryData = (data: Buffer) => {
@@ -437,6 +439,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       case AttractapEventType.REQUEST_SUPERVISOR_CARD_AUTHENTICATION_DATA:
         await this.supervisionHandler.handleSupervisorCardAuthRequest(socket, eventData);
         break;
+      case AttractapEventType.SUPERVISOR_CARD_AUTH_CONFIRMED:
+        await this.supervisionHandler.handleSupervisorCardAuthConfirmed(socket, eventData);
+        break;
       case AttractapEventType.SUPERVISION_CANCEL:
         await this.supervisionHandler.handleSupervisionCancel(socket);
         break;
@@ -504,6 +509,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       case AttractapEventType.CARD_AUTHENTICATION_DATA:
       case AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA:
       case AttractapEventType.SUPERVISION_RESOLVED:
+      case AttractapEventType.SUPERVISION_START:
       case AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO:
       case AttractapEventType.RESOURCE_USAGE_FORM_REQUEST:
       case AttractapEventType.RESOURCE_USAGE_FORM_FIELDS:
@@ -523,8 +529,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     return this.resourceListService.sendResourceList(readerId);
   }
 
-  public async sendResourceListToReadersWithResource(resourceId: number) {
-    return this.resourceListService.sendResourceListToReadersWithResource(resourceId);
+  public async sendResourceListToReadersWithResources(resourceIds: number[]) {
+    return this.resourceListService.sendResourceListToReadersWithResources(resourceIds);
   }
 
   public async disconnectReader(readerId: number) {

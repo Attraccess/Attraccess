@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Button,
+  Description,
   Label,
   ModalBody,
   ModalFooter,
@@ -20,6 +21,7 @@ import {
 import { StandardModal } from '../../../components/standardModal';
 import { Select } from '../../../components/select';
 import { useToastMessage } from '../../../components/toastProvider';
+import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
 import en from './en.json';
 import de from './de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
@@ -39,6 +41,7 @@ export function DeleteRoleModal({ isOpen, onClose, role, allRoles }: Props) {
     en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
   });
+  const { roleName } = useRbacCatalogTranslations();
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
@@ -68,7 +71,7 @@ export function DeleteRoleModal({ isOpen, onClose, role, allRoles }: Props) {
   const userCount = role.userCount;
   const reassignOptions = allRoles
     .filter((r) => r.id !== role.id)
-    .map((r) => ({ key: String(r.id), label: r.name }));
+    .map((r) => ({ key: String(r.id), label: roleName(r) }));
 
   const handleConfirm = () => {
     deleteRole({
@@ -92,7 +95,7 @@ export function DeleteRoleModal({ isOpen, onClose, role, allRoles }: Props) {
           </ModalHeader>
           <ModalBody>
             <div className="flex flex-col gap-4">
-              <p data-cy="delete-role-modal-message">{t('message', { roleName: role.name })}</p>
+              <p data-cy="delete-role-modal-message">{t('message', { roleName: roleName(role) })}</p>
               <p
                 className={
                   userCount > 0
@@ -114,13 +117,13 @@ export function DeleteRoleModal({ isOpen, onClose, role, allRoles }: Props) {
                     <Label className="sr-only">{t('title')}</Label>
                     {(['remove', 'reassign'] as DeleteMode[]).map((option) => (
                       <Radio key={option} value={option} data-cy={`delete-role-modal-mode-${option}`}>
-                        <Radio.Control>
-                          <Radio.Indicator />
-                        </Radio.Control>
-                        <Radio.Content className="flex flex-col">
-                          <span className="text-small">{t(`options.${option}.label`)}</span>
-                          <span className="text-xs text-default-400">{t(`options.${option}.description`)}</span>
+                        <Radio.Content>
+                          <Radio.Control>
+                            <Radio.Indicator />
+                          </Radio.Control>
+                          <Label>{t(`options.${option}.label`)}</Label>
                         </Radio.Content>
+                        <Description>{t(`options.${option}.description`)}</Description>
                       </Radio>
                     ))}
                   </RadioGroup>

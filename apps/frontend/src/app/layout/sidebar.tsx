@@ -7,7 +7,7 @@ import {
   ExternalLink,
   Languages,
   Check,
-  PackageIcon,
+  PuzzleIcon,
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react';
@@ -32,6 +32,7 @@ import {
 } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { useAllRoutes } from '../routes';
+import { hasRequiredPermissions } from '../routes/routeAccess';
 import de from './sidebar.de.json';
 import en from './sidebar.en.json';
 import { Logo } from '../../components/logo';
@@ -187,11 +188,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
         return true;
       }
 
-      const requiredPermissions = (
-        Array.isArray(routeOfItem?.authRequired) ? routeOfItem?.authRequired : [routeOfItem?.authRequired]
-      ) as string[];
-
-      return requiredPermissions.every(hasPermission);
+      return hasRequiredPermissions(routeOfItem.authRequired, hasPermission);
     },
     [user, hasPermission, routes],
   );
@@ -236,21 +233,30 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
 
   const sidebarEndItems = useSidebarEndItems();
 
+  // Filtered through showNavItem exactly like navigationGroups above. The end items
+  // were all public routes until an authRequired one was added here, at which point
+  // an unfiltered list would advertise links that land on Unauthorized for logged-out
+  // visitors on public in-layout pages such as /dependencies. Filtering the whole list
+  // keeps that from recurring with the next gated entry.
   const { groups: sidebarEndGroups, soloItems: sidebarEndSoloItems } = useMemo(() => {
     const groups: SidebarItemGroup[] = [];
     const soloItems: SidebarItem[] = [];
 
     sidebarEndItems.forEach((item) => {
       if ((item as SidebarItemGroup).isGroup) {
-        groups.push(item as SidebarItemGroup);
+        const group = item as SidebarItemGroup;
+        const items = (group.items ?? []).filter(showNavItem);
+        // Drop a group whose every entry was filtered out, rather than render an
+        // empty heading.
+        if (items.length > 0) groups.push({ ...group, items });
         return;
       }
 
-      soloItems.push(item as SidebarItem);
+      if (showNavItem(item as SidebarItem)) soloItems.push(item as SidebarItem);
     });
 
     return { groups, soloItems };
-  }, [sidebarEndItems]);
+  }, [sidebarEndItems, showNavItem]);
 
   return (
     <>
@@ -305,7 +311,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
               <NavLink
                 key={item.path}
                 href={item.path}
-                icon={<item.icon size={16} />}
+                icon={<item.icon size={16} aria-hidden />}
                 label={t('groups.##default##.items.' + item.translationKey)}
                 data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
                 badgeCount={item.badgeCount}
@@ -316,7 +322,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
               <NavLink
                 key={item.path}
                 href={item.path}
-                icon={item.icon ?? <PackageIcon size={16} />}
+                icon={item.icon ?? <PuzzleIcon size={16} aria-hidden />}
                 label={item.label}
                 data-cy={`sidebar-plugin-nav-${item.path?.replace(/\//g, '-')}`}
                 collapsed={isCollapsed}
@@ -327,12 +333,12 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
                 <CollapsedGroupDropdown
                   key={group.translationKey}
                   label={t('groups.' + group.translationKey + '.label')}
-                  icon={<group.icon size={16} />}
+                  icon={<group.icon size={16} aria-hidden />}
                   data-cy={`sidebar-group-${group.translationKey}`}
                   items={group.items.map((item) => ({
                     key: item.path,
                     path: item.path,
-                    icon: <item.icon size={16} />,
+                    icon: <item.icon size={16} aria-hidden />,
                     label: t('groups.' + group.translationKey + '.items.' + item.translationKey),
                   }))}
                 />
@@ -347,7 +353,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
                       <AccordionTrigger className="px-2 py-2 text-sm font-normal rounded-md">
                         <span className="flex items-center">
                           <span className="mr-3 flex items-center">
-                            <group.icon size={16} />
+                            <group.icon size={16} aria-hidden />
                           </span>
                           {t('groups.' + group.translationKey + '.label')}
                         </span>
@@ -360,7 +366,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
                           <NavLink
                             key={item.path}
                             href={item.path}
-                            icon={<item.icon size={16} />}
+                            icon={<item.icon size={16} aria-hidden />}
                             label={t('groups.' + group.translationKey + '.items.' + item.translationKey)}
                             data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
                             indent
@@ -383,12 +389,12 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
                 <CollapsedGroupDropdown
                   key={group.translationKey}
                   label={t('endItems.groups.' + group.translationKey + '.label')}
-                  icon={<group.icon size={16} />}
+                  icon={<group.icon size={16} aria-hidden />}
                   data-cy={`sidebar-group-${group.translationKey}`}
                   items={group.items.map((item) => ({
                     key: item.path,
                     path: item.path,
-                    icon: <item.icon size={16} />,
+                    icon: <item.icon size={16} aria-hidden />,
                     label: t('endItems.groups.' + group.translationKey + '.items.' + item.translationKey),
                     isExternal: item.isExternal,
                   }))}
@@ -405,7 +411,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
                       <AccordionTrigger className="px-2 py-2 text-sm font-normal rounded-md">
                         <span className="flex items-center">
                           <span className="mr-3 flex items-center">
-                            <group.icon size={16} />
+                            <group.icon size={16} aria-hidden />
                           </span>
                           {t('endItems.groups.' + group.translationKey + '.label')}
                         </span>
@@ -418,7 +424,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
                           <NavLink
                             key={item.path}
                             href={item.path}
-                            icon={<item.icon size={16} />}
+                            icon={<item.icon size={16} aria-hidden />}
                             label={t('endItems.groups.' + group.translationKey + '.items.' + item.translationKey)}
                             isExternal={item.isExternal}
                             indent
@@ -434,7 +440,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
               <NavLink
                 key={item.path}
                 href={item.path}
-                icon={<item.icon size={16} />}
+                icon={<item.icon size={16} aria-hidden />}
                 label={t('endItems.' + item.translationKey)}
                 data-cy={`sidebar-nav-${item.path?.replace('/', '')}`}
                 isExternal={item.isExternal}
@@ -458,7 +464,9 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
               )}
               <Dropdown data-cy="sidebar-settings-dropdown">
                 <DropdownTrigger
-                  aria-label="Settings"
+                  // Not "Settings": that name now belongs to the nav entry two rows up. This menu
+                  // is language, account and logout.
+                  aria-label={t('userMenu')}
                   data-cy="sidebar-settings-button"
                   className={`${buttonVariants({ variant: 'ghost', isIconOnly: true })} !inline-flex items-center justify-center`}
                 >

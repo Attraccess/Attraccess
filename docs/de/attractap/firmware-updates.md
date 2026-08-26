@@ -1,54 +1,38 @@
 # Firmware-Updates
 
-Attractap-Leser unterstuetzen OTA-Firmware-Updates (Over-The-Air). Das bedeutet, dass Sie die Leser-Firmware ueber das Attraccess-Backend aus der Ferne aktualisieren koennen, ohne physisch auf das Geraet zugreifen zu muessen.
+Attractap-Leser unterstuetzen OTA-Firmware-Updates (Over-The-Air). Das bedeutet, dass die Leser-Firmware ueber das Attraccess-Backend aus der Ferne aktualisiert wird, ohne physisch auf das Geraet zugreifen zu muessen.
 
 ## Wie Firmware-Updates funktionieren
 
-1. Eine neue Firmware-Version wird in das Attraccess-Backend hochgeladen
-2. Die Firmware wird einem oder mehreren Lesegeraeten zugewiesen
-3. Der Leser laedt das Update ueber das Netzwerk herunter und installiert es
-4. Der Leser startet mit der neuen Firmware neu
+Die Leser-Firmware wird mit Attraccess selbst ausgeliefert: Jedes Attraccess-Release enthaelt den Firmware-Build fuer jede Hardware-Variante. Es gibt nichts hochzuladen und kein Update zu planen.
+
+1. Ein Leser verbindet sich mit dem Backend und meldet Name, Variante und Version seiner Firmware
+2. Das Backend vergleicht diese Version mit der im laufenden Attraccess-Release enthaltenen
+3. Unterscheiden sich die beiden, sendet das Backend das mitgelieferte Image ueber dieselbe Verbindung an den Leser
+4. Der Leser installiert das Update und startet mit der neuen Firmware neu
+
+Sie aktualisieren Ihre Leser also, indem Sie Attraccess aktualisieren. Sobald das Backend ein Release mit neuerer Leser-Firmware ausfuehrt, uebernimmt jeder Leser sie bei seiner naechsten Verbindung.
 
 > [!NOTE]
 > Waehrend eines Firmware-Updates ist der Leser voruebergehend nicht verfuegbar. Das Update dauert in der Regel weniger als eine Minute.
 
-## Firmware verwalten
+## Leser-Firmware pruefen
 
-### Verfuegbare Firmware anzeigen
+1. Oeffnen Sie die Gruppe **Geraete** in der Seitenleiste
+2. Klicken Sie auf **Attractap-Lesegeraete**
+3. Jede Leser-Zeile nennt Firmware und Variante und traegt einen Versions-Chip
 
-1. Navigieren Sie zu **Attractap** in der Seitenleiste
-2. Klicken Sie auf **Firmware**
-3. Sie sehen eine Liste aller hochgeladenen Firmware-Versionen
+Dieser Chip ist die gesamte Firmware-Anzeige:
 
-<!-- TODO: Screenshot der Firmware-Liste -->
+| Chip | Bedeutung |
+|------|-----------|
+| `v1.2.0` | Der Leser laeuft mit der Firmware dieses Attraccess-Releases |
+| `v1.1.0 -> v1.2.0`, hervorgehoben | Es ist eine andere Version enthalten; der Leser uebernimmt sie bei seiner naechsten Verbindung |
 
-### Neue Firmware hochladen
-
-1. Navigieren Sie zu **Attractap** > **Firmware**
-2. Klicken Sie auf **Firmware hochladen**
-3. Fuellen Sie die Firmware-Details aus:
-
-| Feld | Beschreibung |
-|------|-------------|
-| **Version** | Versionsnummer der Firmware (z.B. "1.2.0") |
-| **Variante** | Hardware-Variante, fuer die diese Firmware bestimmt ist (Lite, Touch etc.) |
-| **Datei** | Die Firmware-Binaerdatei (.bin) |
-| **Release Notes** | Optionale Beschreibung der Aenderungen in dieser Version |
-
-4. Klicken Sie auf **Hochladen**
+<!-- TODO: Screenshot der Leserliste mit einem verfuegbaren Firmware-Update -->
 
 > [!NOTE]
-> Verschiedene Hardware-Varianten erfordern unterschiedliche Firmware-Dateien. Stellen Sie sicher, dass Sie beim Hochladen die richtige Variante auswaehlen.
-
-### Updates an Leser uebertragen
-
-1. Navigieren Sie zu **Attractap** > **Leser**
-2. Waehlen Sie den/die Leser aus, die Sie aktualisieren moechten
-3. Waehlen Sie die Ziel-Firmware-Version
-4. Klicken Sie auf **Firmware aktualisieren**
-5. Das Update wird an die ausgewaehlten Leser uebertragen
-
-<!-- TODO: Screenshot des Firmware-Update-Dialogs -->
+> Die Weboberflaeche bietet keinen Firmware-Upload und keine Schaltflaeche, um einen einzelnen Leser manuell zu aktualisieren. Beides waere ein Weg, einen Leser mit einer Firmware zu betreiben, die nicht zum Backend passt -- genau das verhindert die Auslieferung der Firmware mit dem Release.
 
 ## Firmware-Varianten
 
@@ -60,26 +44,17 @@ Jede Hardware-Variante erfordert ihren eigenen Firmware-Build:
 | Attractap Touch WiFi | `touch-wifi` |
 | Attractap Touch Ethernet | `touch-ethernet` |
 
+Einem Leser wird immer nur der Build zu der Variante angeboten, die er meldet -- ein Leser kann also nicht mit dem falschen Image aktualisiert werden.
+
 > [!TIP]
-> Testen Sie ein Firmware-Update immer erst an einem einzelnen Leser, bevor Sie es an alle Geraete verteilen.
-
-## Update-Status
-
-Nach dem Uebertragen eines Updates koennen Sie den Fortschritt in der Leserliste verfolgen:
-
-| Status | Beschreibung |
-|--------|-------------|
-| **Aktuell** | Der Leser laeuft mit der neuesten zugewiesenen Firmware |
-| **Update ausstehend** | Das Update wurde uebertragen, aber noch nicht installiert |
-| **Wird aktualisiert** | Der Leser laedt das Update gerade herunter und installiert es |
-| **Update fehlgeschlagen** | Das Update konnte nicht installiert werden -- pruefen Sie die Konnektivitaet des Lesers |
+> Alle Leser einer Variante folgen dem Release gemeinsam -- es gibt keinen Rollout pro Geraet. Um eine neue Firmware vorab auszuprobieren, verbinden Sie einen einzelnen Ersatzleser mit einer Testinstanz, auf der die neue Attraccess-Version laeuft.
 
 ## Fehlerbehebung
 
 | Problem | Loesung |
 |---------|---------|
-| Update bleibt im Status "ausstehend" | Ueberpruefen Sie, ob der Leser mit dem Netzwerk verbunden ist und das Backend erreichen kann |
-| Update schlaegt wiederholt fehl | Stellen Sie sicher, dass Sie die richtige Firmware-Variante fuer die Leser-Hardware hochgeladen haben |
+| Ein Leser zeigt dauerhaft ein verfuegbares Update | Ueberpruefen Sie, ob er mit dem Netzwerk verbunden ist und das Backend erreichen kann -- das Update wird nur waehrend einer Verbindung angeboten |
+| Das Update wird nie fertig | Stellen Sie sicher, dass die Verbindung des Lesers waehrend der gesamten Uebertragung steht; der Leser versucht es bei der naechsten Verbindung erneut |
 | Leser reagiert nach dem Update nicht | Warten Sie einige Minuten, bis der Leser neu startet. Falls er sich nicht erholt, kann ein manuelles Flashen erforderlich sein |
 
 ## Siehe auch

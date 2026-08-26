@@ -2,6 +2,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 
 import de from './de.json';
 import en from './en.json';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, Link, Skeleton } from '@heroui/react';
 import { PageHeader } from '../../components/pageHeader';
@@ -13,6 +14,33 @@ interface Dependency {
   license: string;
   url: string;
 }
+
+/**
+ * `dependencies.json` is generated from the root package.json by
+ * apps/frontend/extract-dependencies.cjs, so it only covers npm packages. Anything vendored
+ * into `public/` by hand has to be listed here by hand. See
+ * apps/frontend/public/openscad/NOTICE.md.
+ */
+const VENDORED_DEPENDENCIES: Dependency[] = [
+  {
+    name: 'OpenSCAD',
+    version: '2025.07.18',
+    author: 'Marius Kintel, Clifford Wolf and contributors',
+    license: 'GPL-2.0-or-later',
+    // Our build, carrying the FT_LOAD_NO_HINTING patch; also where the
+    // corresponding source lives, per the GPL.
+    url: 'https://github.com/Attraccess/openscad-wasm',
+  },
+  {
+    name: 'Sansation',
+    version: '1.31',
+    author: 'Bernd Montag',
+    // Not OFL, despite what font aggregator sites claim: the author's own ReadMe
+    // grants redistribution as freeware. See NOTICE.md.
+    license: 'Freeware (redistributable)',
+    url: 'https://www.dafont.com/sansation.font',
+  },
+];
 
 function getDomainFromUrl(url: string): string {
   try {
@@ -66,6 +94,11 @@ export function Dependencies() {
 
   const isLoading = fetchStatus === 'pending';
 
+  const allDependencies = useMemo(
+    () => [...VENDORED_DEPENDENCIES, ...(dependencies ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
+    [dependencies],
+  );
+
   return (
     <div>
       <PageHeader title={t('title')} subtitle={t('subtitle')} />
@@ -78,7 +111,7 @@ export function Dependencies() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
-          {dependencies?.map((dependency) => (
+          {allDependencies.map((dependency) => (
             <Card key={dependency.name} className="w-full">
               <Card.Content className="p-4">
                 <div className="space-y-3">

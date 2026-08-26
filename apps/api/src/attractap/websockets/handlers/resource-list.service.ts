@@ -1,12 +1,12 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceHealthStatus, ResourceIntroducerType } from '@attraccess/database-entities';
 import { WebsocketService } from '../websocket.service';
 import { AttractapService } from '../../attractap.service';
 import { ResourceUsageService } from '../../../resources/usage/resourceUsage.service';
 import { ResourceMaintenanceService } from '../../../resources/maintenances/maintenance.service';
 import { ResourceHealthService } from '../../../resources/health/resource-health.service';
 import { ResourceFlowsService } from '../../../resources/flows/resource-flows.service';
-import { ResourceHealthStatus } from '@attraccess/database-entities';
+import { ResourceIntroducersService } from '../../../resources/introducers/resourceIntroducers.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
 
 @Injectable()
@@ -31,45 +31,77 @@ export class ResourceListService {
   @Inject(ResourceFlowsService)
   private resourceFlowsService: ResourceFlowsService;
 
+  @Inject(ResourceIntroducersService)
+  private resourceIntroducersService: ResourceIntroducersService;
+
   public async sendResourceList(readerId: number) {
     const sockets = Array.from(this.websocketService.sockets.values()).filter((socket) => socket.readerId === readerId);
     if (sockets.length === 0) {
       return;
     }
 
-    await Promise.all(sockets.map((socket) => this.sendResourceListToSocket(socket)));
+    await this.sendResourceListToSockets(sockets);
   }
 
-  public async sendResourceListToReadersWithResource(resourceId: number) {
-    const allSockets = Array.from(this.websocketService.sockets.values());
-    await Promise.all(allSockets.map((socket) => this.sendResourceListToSocket(socket, { resourceId })));
+  public async sendResourceListToReadersWithResources(resourceIds: number[]) {
+    if (resourceIds.length === 0) {
+      return;
+    }
+
+    const socketsByReaderId = new Map<number, AuthenticatedWebSocket[]>();
+    for (const socket of this.websocketService.sockets.values()) {
+      const sockets = socketsByReaderId.get(socket.readerId) ?? [];
+      sockets.push(socket);
+      socketsByReaderId.set(socket.readerId, sockets);
+    }
+
+    await Promise.all(
+      Array.from(socketsByReaderId.values()).map((sockets) => this.sendResourceListToSockets(sockets, { resourceIds })),
+    );
   }
 
   public async sendResourceListToSocket(
     socket: AuthenticatedWebSocket,
-    onlyIfResourceMatches?: { resourceId?: number },
+    onlyIfResourceMatches?: { resourceIds?: number[] },
   ) {
-    const reader = await this.attractapService.findReaderById(socket.readerId);
+    await this.sendResourceListToSockets([socket], onlyIfResourceMatches);
+  }
+
+  private async sendResourceListToSockets(
+    sockets: AuthenticatedWebSocket[],
+    onlyIfResourceMatches?: { resourceIds?: number[] },
+  ) {
+    const reader = await this.attractapService.findReaderById(sockets[0].readerId);
     if (!reader) {
-      throw new Error(`Reader not found: ${socket.readerId}`);
+      throw new Error(`Reader not found: ${sockets[0].readerId}`);
     }
 
     const resources = [...reader.resources].sort((a, b) => a.name.localeCompare(b.name));
 
-    if (onlyIfResourceMatches?.resourceId) {
-      if (!resources.some((resource) => resource.id === onlyIfResourceMatches.resourceId)) {
+    const resourceIdsToMatch = onlyIfResourceMatches?.resourceIds ?? [];
+    if (resourceIdsToMatch.length > 0) {
+      if (!resources.some((resource) => resourceIdsToMatch.includes(resource.id))) {
         return;
       }
     }
 
+    const introducersByResourceId = await this.resourceIntroducersService.getManyForResources(
+      resources.map((resource) => resource.id),
+      ResourceIntroducerType.INTRODUCER,
+    );
     const resourcesWithUsageSession = await Promise.all(
       resources.map(async (resource) => {
-        const healthEntries = await this.resourceHealthService.listForResource(resource.id);
+        const [healthEntries, activeUsageSession, isUnderMaintenance] = await Promise.all([
+          this.resourceHealthService.listForResource(resource.id),
+          this.resourceUsageService.getActiveSession(resource.id, true),
+          this.resourceMaintenanceService.hasActiveMaintenance(resource.id),
+        ]);
         const unhealthyEntries = healthEntries.filter((entry) => entry.status === ResourceHealthStatus.UNHEALTHY);
         return {
           ...resource,
-          activeUsageSession: await this.resourceUsageService.getActiveSession(resource.id, true),
-          isUnderMaintenance: await this.resourceMaintenanceService.hasActiveMaintenance(resource.id),
+          activeUsageSession,
+          introducers: introducersByResourceId.get(resource.id) ?? [],
+          isUnderMaintenance,
           isHealthy: unhealthyEntries.length === 0,
           healthReason: this.buildHealthReason(unhealthyEntries),
         };
@@ -91,7 +123,7 @@ export class ResourceListService {
       })),
     );
 
-    const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, {
+    const resourceListPayload = {
       readerName: reader.name,
       ledBrightness: reader.ledBrightness,
       resources: resourcesWithFlowButtons.map((resource) => ({
@@ -101,7 +133,7 @@ export class ResourceListService {
         separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch,
         description: resource.description,
         allowTakeOver: resource.allowTakeOver,
-        introducers: resource.introducers.map((introducer) => introducer.user.username),
+        introducers: resource.introducers.flatMap((introducer) => (introducer.user ? [introducer.user.username] : [])),
         isUnderMaintenance: resource.isUnderMaintenance,
         isHealthy: resource.isHealthy,
         healthReason: resource.healthReason,
@@ -119,9 +151,14 @@ export class ResourceListService {
           : null,
         flowButtons: resource.flowButtons,
       })),
-    });
-    this.logger.debug(`Sending resource list to socket ${socket.id}`, resourceListResponse);
-    await socket.sendMessage(resourceListResponse);
+    };
+    await Promise.all(
+      sockets.map(async (socket) => {
+        const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, resourceListPayload);
+        this.logger.debug(`Sending resource list to socket ${socket.id}`, resourceListResponse);
+        await socket.sendMessage(resourceListResponse);
+      }),
+    );
   }
 
   private buildHealthReason(unhealthyEntries: { identifier: string; reason: string | null }[]): string {

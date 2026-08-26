@@ -38,6 +38,7 @@ import * as deTranslationsFile from './de.json';
 
 export function EditEmailTemplatePage() {
   const navigate = useNavigate();
+  const basePath = '/settings/email';
   const { t, language } = useTranslations({ en: enTranslationsFile, de: deTranslationsFile });
   const { type: templateType } = useParams<{ type: EmailTemplateType }>();
   const toast = useToastMessage();
@@ -156,7 +157,7 @@ export function EditEmailTemplatePage() {
           isIconOnly
           variant="ghost"
           size="sm"
-          onPress={() => navigate('/emails/templates')}
+          onPress={() => navigate(`${basePath}/templates`)}
           aria-label={t('actions.back')}
           data-cy="edit-email-template-back-button"
         >

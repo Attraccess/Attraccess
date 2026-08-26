@@ -43,7 +43,9 @@ These hooks handle data fetching, caching, and state management automatically.
 
 ## Authentication
 
-The API uses **session cookies** for authentication. When you log in through the `/api/auth/login` endpoint, a session cookie is set. This cookie is sent with all subsequent requests.
+The API accepts either a **session cookie** or a self-managed API token. When you log in through `/api/auth/login`, a session cookie is set and sent with subsequent requests. Create API tokens from the Account security page, then send them with `Authorization: Bearer <token>`.
+
+Each API token has an explicit permission allow-list. Requests receive only the intersection of that allow-list and the token owner's current permissions, so removing an owner permission takes effect immediately.
 
 > [!NOTE]
 > In the Vite development setup, the frontend proxies all `/api` requests to the backend, so cookies work seamlessly on the same origin.

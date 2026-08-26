@@ -22,17 +22,22 @@ import { ChangeEmailForm } from './components/changeEmail';
 
 import en from './en.json';
 import de from './de.json';
-import { Card, Chip, ModalBody, ModalFooter, ModalHeader, Separator, useOverlayState } from '@heroui/react';
+import { Chip, ModalBody, ModalFooter, ModalHeader, Separator, useOverlayState } from '@heroui/react';
+import { AlertTriangleIcon, KeyRoundIcon, LinkIcon, ListChecksIcon, ShieldIcon, UserIcon } from 'lucide-react';
+import { FlatSection } from '../../../components/flatSection';
 import { Button } from '../../../components/button';
 import { StandardModal } from '../../../components/standardModal';
 import { useToastMessage } from '../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 import { useAuth } from '../../../hooks/useAuth';
+import { useRbacCatalogTranslations } from '../../../hooks/useRbacCatalogTranslations';
 import { useMemo } from 'react';
 import { getSsoManagedPermissionKeys, hasConfiguredPermissionMapping } from '@attraccess/shared';
+import { NotFound } from '../../not-found';
 
 function EffectivePermissionsSection({ userId, t }: { userId: number; t: ReturnType<typeof useTranslations>['t'] }) {
+  const { permissionLabel, permissionDescription, permissionCategory } = useRbacCatalogTranslations();
   const { data: allRoles, isLoading: isLoadingRoles } = useRbacServiceListRoles();
   const { data: allPermissions, isLoading: isLoadingPerms } = useRbacServiceListPermissions();
   const { data: userRoles, isLoading: isLoadingUserRoles } = useUsersServiceGetUserRoleAssignments({ id: userId });
@@ -75,11 +80,13 @@ function EffectivePermissionsSection({ userId, t }: { userId: number; t: ReturnT
     <div className="flex flex-col gap-3">
       {[...permsByCategory.entries()].map(([category, perms], idx, arr) => (
         <div key={category} className="flex flex-col gap-1.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-default-500">{category}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-default-500">
+            {permissionCategory(category)}
+          </p>
           <div className="flex flex-wrap gap-1">
             {perms.map((p) => (
-              <Chip key={p.key} size="sm" color="accent" variant="secondary" title={p.description}>
-                {p.label}
+              <Chip key={p.key} size="sm" color="accent" variant="secondary" title={permissionDescription(p)}>
+                {permissionLabel(p)}
               </Chip>
             ))}
           </div>
@@ -90,9 +97,19 @@ function EffectivePermissionsSection({ userId, t }: { userId: number; t: ReturnT
   );
 }
 
+// `/users/:id` also matches paths like `/users/security`, which used to render a detail page for a
+// user that cannot exist — heading `(ID: )`, empty body. A non-numeric segment is not a user (ATT-869).
 export function UserManagementDetailsPage() {
-  const { id: idParam } = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>();
 
+  if (!/^\d+$/.test(id ?? '')) {
+    return <NotFound />;
+  }
+
+  return <UserDetails id={Number(id)} />;
+}
+
+function UserDetails({ id }: { id: number }) {
   const { t, tExists } = useTranslations({
     en: { ...en, apiErrors: API_ERROR_TRANSLATIONS_EN },
     de: { ...de, apiErrors: API_ERROR_TRANSLATIONS_DE },
@@ -102,8 +119,6 @@ export function UserManagementDetailsPage() {
   const toast = useToastMessage();
   const { isOpen, open, setOpen } = useOverlayState();
   const { user: me } = useAuth();
-
-  const id = parseInt(idParam || '', 10);
 
   const { data: user } = useUsersServiceGetOneUserById({ id });
   const { data: license } = useLicenseServiceGetLicenseInformation();
@@ -222,66 +237,56 @@ export function UserManagementDetailsPage() {
           className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 items-start"
           data-cy="user-details-sections"
         >
-          <Card className="w-full" data-cy="user-details-permissions-card">
-            <Card.Content className="flex flex-col gap-4">
-              <UserPermissionForm
-                user={user}
-                ssoManagedProviders={ssoManagedProviders}
-                ssoManagedPermissionKeys={ssoManagedPermissionKeys}
-                providersById={providersById}
-              />
-            </Card.Content>
-          </Card>
-
-          <Card className="w-full" data-cy="user-details-effective-permissions-card">
-            <Card.Content className="flex flex-col gap-4">
-              <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-                {t('effectivePermissions.title')}
-              </h3>
-              <EffectivePermissionsSection userId={id} t={t} />
-            </Card.Content>
-          </Card>
-
-          <Card className="w-full" data-cy="user-details-username-section">
-            <Card.Content className="flex flex-col gap-4">
-              <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-                {t('profile.usernameTitle')}
-              </h3>
+          <FlatSection icon={<UserIcon size={16} />} title={t('profile.title')} data-cy="user-details-profile-section">
+            <div className="flex flex-col gap-6">
               <ChangeUsernameForm userId={user.id} />
-            </Card.Content>
-          </Card>
-
-          <Card className="w-full" data-cy="user-details-email-section">
-            <Card.Content className="flex flex-col gap-4">
-              <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-                {t('profile.emailTitle')}
-              </h3>
               <ChangeEmailForm userId={user.id} />
-            </Card.Content>
-          </Card>
+            </div>
+          </FlatSection>
 
-          <Card className="w-full" data-cy="user-details-password-section">
-            <Card.Content className="flex flex-col gap-4">
-              <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-                {t('profile.passwordTitle')}
-              </h3>
-              <SetPasswordForm userId={user.id} username={user.username} />
-            </Card.Content>
-          </Card>
+          <FlatSection
+            icon={<ShieldIcon size={16} />}
+            title={t('security.title')}
+            data-cy="user-details-security-section"
+          >
+            <SetPasswordForm userId={user.id} username={user.username} />
+          </FlatSection>
 
-          <Card className="w-full" data-cy="user-details-sso-section">
-            <Card.Content className="flex flex-col gap-4">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-                  {t('sso.title')}
-                </h3>
-                <Chip
-                  color={ssoDetails.length > 0 ? 'accent' : 'default'}
-                  variant={ssoDetails.length > 0 ? 'secondary' : 'primary'}
-                >
-                  {ssoDetails.length > 0 ? t('sso.linked', { count: ssoDetails.length }) : t('sso.notLinkedChip')}
-                </Chip>
-              </div>
+          <FlatSection
+            icon={<KeyRoundIcon size={16} />}
+            title={t('permissions.title')}
+            data-cy="user-details-permissions-section"
+          >
+            <UserPermissionForm
+              user={user}
+              ssoManagedProviders={ssoManagedProviders}
+              ssoManagedPermissionKeys={ssoManagedPermissionKeys}
+              providersById={providersById}
+            />
+          </FlatSection>
+
+          <FlatSection
+            icon={<ListChecksIcon size={16} />}
+            title={t('effectivePermissions.title')}
+            data-cy="user-details-effective-permissions-section"
+          >
+            <EffectivePermissionsSection userId={id} t={t} />
+          </FlatSection>
+
+          <FlatSection
+            icon={<LinkIcon size={16} />}
+            title={t('sso.title')}
+            data-cy="user-details-sso-section"
+            actions={
+              <Chip
+                color={ssoDetails.length > 0 ? 'accent' : 'default'}
+                variant={ssoDetails.length > 0 ? 'secondary' : 'primary'}
+              >
+                {ssoDetails.length > 0 ? t('sso.linked', { count: ssoDetails.length }) : t('sso.notLinkedChip')}
+              </Chip>
+            }
+          >
+            <div className="flex flex-col gap-4">
               {ssoDetails.length === 0 ? (
                 <div className="flex items-center gap-2">
                   <Chip color="default" variant="soft">
@@ -304,17 +309,13 @@ export function UserManagementDetailsPage() {
                     return (
                       <div key={itemKey} className="flex flex-col gap-2">
                         <div className="flex flex-col gap-1">
-                          <span className="text-xs uppercase tracking-wide text-default-500">
-                            {t('sso.provider')}
-                          </span>
+                          <span className="text-xs uppercase tracking-wide text-default-500">{t('sso.provider')}</span>
                           <div className="text-sm font-semibold text-default-900 break-words">{providerLabel}</div>
                           <div className="text-xs text-default-500">{detail.providerType ?? '-'}</div>
                         </div>
                         <div className="flex flex-col gap-1">
                           <span className="text-xs uppercase tracking-wide text-default-500">{t('sso.userId')}</span>
-                          <div className="font-mono text-xs text-default-800 break-all">
-                            {detail.ssoSubject ?? '-'}
-                          </div>
+                          <div className="font-mono text-xs text-default-800 break-all">{detail.ssoSubject ?? '-'}</div>
                         </div>
                         {index < ssoDetails.length - 1 ? <Separator /> : null}
                       </div>
@@ -322,28 +323,24 @@ export function UserManagementDetailsPage() {
                   })}
                 </div>
               )}
-            </Card.Content>
-          </Card>
+            </div>
+          </FlatSection>
 
-          <Card className="w-full" data-cy="user-details-delete-section">
-            <Card.Content className="flex flex-col gap-4">
-              <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
-                {t('delete.title')}
-              </h3>
+          <FlatSection
+            icon={<AlertTriangleIcon size={16} className="text-danger" />}
+            title={t('delete.title')}
+            data-cy="user-details-delete-section"
+          >
+            <div className="flex flex-col gap-4">
               <p className="text-sm text-default-500">{t('delete.description')}</p>
               <div className="flex w-full justify-end">
-                <Button
-                  variant="danger-soft"
-                  onPress={open}
-                  isDisabled={isSelf}
-                  data-cy="admin-delete-user-open-modal"
-                >
+                <Button variant="danger-soft" onPress={open} isDisabled={isSelf} data-cy="admin-delete-user-open-modal">
                   {t('delete.actions.open')}
                 </Button>
               </div>
               {isSelf ? <p className="text-xs text-default-400">{t('delete.selfDisabled')}</p> : null}
-            </Card.Content>
-          </Card>
+            </div>
+          </FlatSection>
         </div>
       )}
 

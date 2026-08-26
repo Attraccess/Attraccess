@@ -18,19 +18,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@heroui/react';
-import {
-  KeyIcon,
-  SearchIcon,
-  ShieldCheckIcon,
-  ShieldOffIcon,
-  UserPlusIcon,
-  Users,
-} from 'lucide-react';
+import { KeyIcon, SearchIcon, ShieldCheckIcon, ShieldOffIcon, UserPlusIcon, Users } from 'lucide-react';
 import { TableToolbar } from '../../components/TableToolbar';
 import {
   SSOProvider,
   User,
   UserRole,
+  PaginatedUsersResponseDto,
   useAuthenticationServiceGetAllSsoProviders,
   useLicenseServiceGetLicenseInformation,
   useUsersServiceFindMany,
@@ -42,12 +36,14 @@ import de from './de.json';
 import { InviteUserModal } from './invite-user-modal';
 import { useNavigate } from 'react-router-dom';
 import { SimplePagination } from '../../components/simplePagination';
+import { useRbacCatalogTranslations } from '../../hooks/useRbacCatalogTranslations';
 
 // Role keys that are considered "default" and not worth showing in the list
 const DEFAULT_ROLE_KEYS = new Set(['user']);
 
 export const UserManagementPage: React.FC = () => {
   const { t } = useTranslations({ en, de });
+  const { roleName } = useRbacCatalogTranslations();
 
   const [limit] = useState(10);
   const [page, setPage] = useState(1);
@@ -57,7 +53,7 @@ export const UserManagementPage: React.FC = () => {
 
   const navigate = useNavigate();
 
-  const { data: searchResult, isFetched: isFetchedSearchResult } = useUsersServiceFindMany({
+  const { data: searchResult, isFetched: isFetchedSearchResult } = useUsersServiceFindMany<PaginatedUsersResponseDto>({
     limit,
     page,
     search: debouncedSearch,
@@ -91,6 +87,8 @@ export const UserManagementPage: React.FC = () => {
   type UserWithAuthDetails = Omit<User, 'authenticationDetails'> & {
     authenticationDetails?: AuthenticationDetailSummary[];
   };
+  // includeRoles is restricted to users.read and the API returns full user records in that case.
+  const users = (searchResult?.data ?? []) as User[];
 
   return (
     <div data-cy="user-management-page">
@@ -145,7 +143,7 @@ export const UserManagementPage: React.FC = () => {
                 </TableColumn>
               </TableHeader>
 
-              <TableBody items={searchResult?.data ?? []} renderEmptyState={() => <EmptyState />}>
+              <TableBody items={(searchResult?.data ?? []) as User[]} renderEmptyState={() => <EmptyState />}>
                 {(user) => {
                   const ssoDetails =
                     (user as UserWithAuthDetails).authenticationDetails?.filter(
@@ -167,9 +165,11 @@ export const UserManagementPage: React.FC = () => {
                     .filter((value) => value.length > 0)
                     .join(', ');
                   const isSsoLinked = ssoDetails.length > 0;
+                  // This view only receives the detailed response because it requires users.read.
+                  const detailedUser = user as User;
 
                   // Elevated roles (non-default) for display
-                  const elevatedRoles = ((user.userRoles ?? []) as UserRole[])
+                  const elevatedRoles = ((detailedUser.userRoles ?? []) as UserRole[])
                     .filter((ur) => ur.role && !DEFAULT_ROLE_KEYS.has(ur.role.key))
                     .reduce<{ id: number; name: string; key: string }[]>((acc, ur) => {
                       if (ur.role && !acc.some((r) => r.id === ur.role?.id)) {
@@ -186,19 +186,25 @@ export const UserManagementPage: React.FC = () => {
                       onAction={() => navigate(`/users/${user.id}`)}
                     >
                       <TableCell className="hidden md:table-cell">
-                        {user.isEmailVerified ? <ShieldCheckIcon /> : <ShieldOffIcon />}
+                        {detailedUser.isEmailVerified ? <ShieldCheckIcon /> : <ShieldOffIcon />}
                       </TableCell>
                       <TableCell>{user.id}</TableCell>
                       <TableCell>
-                        <AttraccessUser user={user} />
+                          <AttraccessUser user={detailedUser} />
                       </TableCell>
-                      <TableCell className="hidden md:table-cell">{user.externalIdentifier}</TableCell>
+                      <TableCell className="hidden md:table-cell">{detailedUser.externalIdentifier}</TableCell>
                       <TableCell className="hidden lg:table-cell">
                         {elevatedRoles.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {elevatedRoles.map((role) => (
-                              <Chip key={role.id} size="sm" color="accent" variant="secondary" data-cy={`user-role-chip-${role.key}`}>
-                                {role.name}
+                              <Chip
+                                key={role.id}
+                                size="sm"
+                                color="accent"
+                                variant="secondary"
+                                data-cy={`user-role-chip-${role.key}`}
+                              >
+                                {roleName(role)}
                               </Chip>
                             ))}
                           </div>
