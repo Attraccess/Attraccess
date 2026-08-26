@@ -238,6 +238,10 @@ export class PluginService {
     process.exit();
   }
 
+  public requestRestart(): void {
+    setTimeout(() => this.restartApp(), 1000);
+  }
+
   public async deletePlugin(pluginId: string) {
     const plugin = PluginService.getPlugins().find((plugin) => plugin.id === pluginId);
 

@@ -7,6 +7,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
   StreamableFile,
   UploadedFile,
   UseInterceptors,
@@ -20,13 +21,70 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { FileUpload } from '../common/types/file-upload.types';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { UploadPluginDto } from './dto/uploadPlugin.dto';
+import { NpmPluginService } from './npm-plugin.service';
 
 @ApiTags('Plugins')
 @Controller('plugins')
 export class PluginController {
   private readonly logger = new Logger(PluginController.name);
 
-  constructor(private readonly pluginService: PluginService) {}
+  constructor(
+    private readonly pluginService: PluginService,
+    private readonly npmPluginService: NpmPluginService,
+  ) {}
+
+  @Get('registries')
+  @Auth('system.plugins.manage')
+  listRegistries() {
+    return this.npmPluginService.listRegistries();
+  }
+
+  @Post('registries')
+  @Auth('system.plugins.manage')
+  addRegistry(@Body() body: { name: string; url: string; token?: string | null }) {
+    return this.npmPluginService.addRegistry(body);
+  }
+
+  @Post('registries/:registryId/test')
+  @Auth('system.plugins.manage')
+  async testRegistry(@Param('registryId') registryId: string) {
+    await this.npmPluginService.testRegistry(registryId);
+    return { ok: true };
+  }
+
+  @Delete('registries/:registryId')
+  @Auth('system.plugins.manage')
+  removeRegistry(@Param('registryId') registryId: string) {
+    return this.npmPluginService.removeRegistry(registryId);
+  }
+
+  @Get('npm/:packageName/metadata')
+  @Auth('system.plugins.manage')
+  packageMetadata(@Param('packageName') packageName: string, @Query('registryId') registryId?: string) {
+    return this.npmPluginService.packageMetadata(packageName, registryId);
+  }
+
+  @Get('npm/:packageName/versions')
+  @Auth('system.plugins.manage')
+  packageVersions(@Param('packageName') packageName: string, @Query('registryId') registryId?: string) {
+    return this.npmPluginService.packageVersions(packageName, registryId);
+  }
+
+  @Post('npm/:packageName/versions/:version')
+  @Auth('system.plugins.manage')
+  installPackage(
+    @Param('packageName') packageName: string,
+    @Param('version') version: string,
+    @Body('registryId') registryId?: string,
+  ) {
+    return this.npmPluginService.install(packageName, version, registryId);
+  }
+
+  @Get('installed')
+  @Auth('system.plugins.manage')
+  installedPackages() {
+    return this.npmPluginService.listInstalled();
+  }
 
   @Get()
   @ApiOperation({ summary: 'Get all plugins', operationId: 'getPlugins' })
