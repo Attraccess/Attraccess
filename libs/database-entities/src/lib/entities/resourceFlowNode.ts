@@ -63,9 +63,15 @@ export const ExternalEffectPolicySchema = z.object({
 
 export type ExternalEffectFailureBehavior = z.infer<typeof ExternalEffectFailureBehaviorSchema>;
 
-const AcknowledgementTimeoutSecondsSchema = z.number().int().positive().optional().meta({
-  helpText: 'Maximum time to wait for an acknowledgement, in seconds. Leave empty to use the integration default.',
-});
+const AcknowledgementTimeoutSecondsSchema = z
+  .number()
+  .int()
+  .positive()
+  .max(2_147_483, 'Timeout exceeds the supported timer limit')
+  .optional()
+  .meta({
+    helpText: 'Maximum time to wait for an acknowledgement, in seconds. Leave empty to use the integration default.',
+  });
 
 export const HttpRequestNodeDataSchema = z
   .object({

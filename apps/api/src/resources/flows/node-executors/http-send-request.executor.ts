@@ -28,6 +28,10 @@ export class HttpSendRequestExecutor implements NodeExecutor {
   }
 
   getFailureKind(error: unknown): FlowFailureKind {
+    if (axios.isAxiosError(error) && (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT')) {
+      return 'acknowledgement-timeout';
+    }
+
     return typeof error === 'object' && error !== null && 'response' in error
       ? 'controller-rejection'
       : 'transport-dispatch';

@@ -214,48 +214,48 @@ export class MqttClientService implements OnModuleDestroy {
 
       const qos: 0 | 1 | 2 = (options?.qos ?? (server.defaultPublishQos as 0 | 1 | 2) ?? 0) as 0 | 1 | 2;
       const retain: boolean = options?.retain ?? Boolean(server.defaultPublishRetain ?? false);
-      const publish = new Promise<void>((resolve, reject) => {
-        client.publish(topic, message, { qos, retain }, (error) => {
-          if (error) {
-            this.logger.error(`Failed to publish to topic ${topic}: ${error.message}`);
-            reject(error);
-          } else {
-            this.logger.debug(`Published to topic ${topic}: ${message}`);
-            resolve();
-          }
+      const startPublish = () =>
+        new Promise<void>((resolve, reject) => {
+          client.publish(topic, message, { qos, retain }, (error) => {
+            if (error) {
+              this.logger.error(`Failed to publish to topic ${topic}: ${error.message}`);
+              reject(error);
+            } else {
+              this.logger.debug(`Published to topic ${topic}: ${message}`);
+              resolve();
+            }
+          });
         });
-      });
 
       if (completion?.awaitAcknowledgement === false) {
-        // The MQTT client has accepted the publish; later callback errors are logged but cannot affect this flow.
-        void publish.catch(() => undefined);
+        // The flow continues after dispatch, while the background operation still records metrics.
+        void this.externalCallTimer.time('mqtt', 'publish', startPublish).catch(() => undefined);
         return;
       }
 
       const completionTimeout = completion?.acknowledgementTimeoutSeconds;
-      let acknowledgementTimeout: ReturnType<typeof setTimeout> | undefined;
-      const acknowledgedPublish = completionTimeout
-        ? Promise.race([
-            publish,
-            new Promise<never>((_resolve, reject) => {
-              acknowledgementTimeout = setTimeout(() => {
-                const error = new Error(`MQTT publish acknowledgement timed out after ${completionTimeout} seconds`);
-                error.name = 'MqttAcknowledgementTimeoutError';
-                reject(error);
-              }, completionTimeout * 1000);
-            }),
-          ]).finally(() => {
-            if (acknowledgementTimeout) {
-              clearTimeout(acknowledgementTimeout);
-            }
-          })
-        : publish;
+      return this.externalCallTimer.time('mqtt', 'publish', () => {
+        const publish = startPublish();
+        if (!completionTimeout) {
+          return publish;
+        }
 
-      return this.externalCallTimer.time(
-        'mqtt',
-        'publish',
-        () => acknowledgedPublish,
-      );
+        let acknowledgementTimeout: ReturnType<typeof setTimeout> | undefined;
+        return Promise.race([
+          publish,
+          new Promise<never>((_resolve, reject) => {
+            acknowledgementTimeout = setTimeout(() => {
+              const error = new Error(`MQTT publish acknowledgement timed out after ${completionTimeout} seconds`);
+              error.name = 'MqttAcknowledgementTimeoutError';
+              reject(error);
+            }, completionTimeout * 1000);
+          }),
+        ]).finally(() => {
+          if (acknowledgementTimeout) {
+            clearTimeout(acknowledgementTimeout);
+          }
+        });
+      });
     } catch (error) {
       this.logger.error(`Failed to publish to MQTT server ${serverId}`, error);
       throw error;

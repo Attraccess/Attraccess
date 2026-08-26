@@ -11,7 +11,7 @@ describe('HttpSendRequestExecutor', () => {
   let ctx: NodeExecutionContext;
 
   const makeNode = (data: object): ResourceFlowNode =>
-    ({ id: 'n1', type: 'OUTPUT_HTTP_SEND_REQUEST', resourceId: 1, data } as unknown as ResourceFlowNode);
+    ({ id: 'n1', type: 'OUTPUT_HTTP_SEND_REQUEST', resourceId: 1, data }) as unknown as ResourceFlowNode;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -127,5 +127,12 @@ describe('HttpSendRequestExecutor', () => {
   it('classifies controller responses separately from transport failures', () => {
     expect(executor.getFailureKind({ response: { status: 500 } })).toBe('controller-rejection');
     expect(executor.getFailureKind(new Error('network down'))).toBe('transport-dispatch');
+  });
+
+  it.each(['ECONNABORTED', 'ETIMEDOUT'])('classifies Axios %s response timeouts separately', (code) => {
+    const error = Object.assign(new Error('timeout'), { code });
+    (axios.isAxiosError as jest.Mock).mockReturnValue(true);
+
+    expect(executor.getFailureKind(error)).toBe('acknowledgement-timeout');
   });
 });
