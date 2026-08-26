@@ -209,7 +209,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     let expiresAt = Date.now() + this.ACCESS_CACHE_TTL_MS;
     if (result && !canUpdateResource) {
       const retrainingStatus = await this.resourceRetrainingService.getResourceRetrainingStatus(resourceId, user.id);
-      if (retrainingStatus.dueAt) {
+      if (retrainingStatus.blocksAccess && retrainingStatus.dueAt) {
         expiresAt = Math.min(expiresAt, retrainingStatus.dueAt.getTime());
       }
     }

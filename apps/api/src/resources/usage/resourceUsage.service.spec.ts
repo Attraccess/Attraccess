@@ -1975,7 +1975,7 @@ describe('ResourceUsageService', () => {
       jest.useFakeTimers();
       try {
         mockResourceRetrainingService.getResourceRetrainingStatus.mockResolvedValue({
-          blocksAccess: false,
+          blocksAccess: true,
           dueAt: new Date(Date.now() + 1_000),
         });
 
@@ -1987,6 +1987,18 @@ describe('ResourceUsageService', () => {
       } finally {
         jest.useRealTimers();
       }
+    });
+
+    it('caches a grant with an overdue non-blocking retraining policy', async () => {
+      mockResourceRetrainingService.getResourceRetrainingStatus.mockResolvedValue({
+        blocksAccess: false,
+        dueAt: new Date(Date.now() - 1_000),
+      });
+
+      await service.canControllResource(resourceId, mockUser);
+      await service.canControllResource(resourceId, mockUser);
+
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(1);
     });
 
     it('does not cache a lookup that completed after an invalidation', async () => {
