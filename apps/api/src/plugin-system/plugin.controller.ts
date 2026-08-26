@@ -111,6 +111,9 @@ export class PluginController {
     if (!plugin) {
       throw new NotFoundException(`Plugin ${pluginName} not found`);
     }
+    if (!plugin.main.frontend) {
+      throw new NotFoundException(`Plugin ${pluginName} has no frontend assets`);
+    }
 
     const fileName = join(...filePath.split(','));
 
