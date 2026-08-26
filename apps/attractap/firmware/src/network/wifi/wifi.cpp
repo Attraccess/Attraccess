@@ -233,7 +233,7 @@ void Wifi::wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t even
     case WIFI_EVENT_STA_DISCONNECTED:
     {
         auto *ev = (wifi_event_sta_disconnected_t *)event_data;
-        logger.warnf("Disconnected: reason %u (%s)", ev->reason, getDisconnectReasonName(ev->reason));
+        logger.errorf("Disconnected: reason %u (%s)", ev->reason, getDisconnectReasonName(ev->reason));
         setState(WIFI_STATE_DISCONNECTED);
         break;
     }
@@ -565,7 +565,7 @@ void Wifi::handleTimeout()
     {
         if (millis() - waiting_for_ip_since_ms > WAITING_FOR_IP_TIMEOUT_MS)
         {
-            logger.warn("DHCP timeout - no IP acquired, forcing reconnect");
+            logger.error("DHCP timeout - no IP acquired, forcing reconnect");
             esp_wifi_disconnect();
             setState(WIFI_STATE_CONNECT_FAILED);
         }
@@ -582,7 +582,7 @@ void Wifi::handleTimeout()
 
     if (elapsed > 15000)
     { // 15 second timeout
-        logger.warn("Connection timeout - stopping connection attempt");
+        logger.error("Connection timeout - stopping connection attempt");
         esp_wifi_disconnect();
         setState(WIFI_STATE_CONNECT_FAILED);
         return;
