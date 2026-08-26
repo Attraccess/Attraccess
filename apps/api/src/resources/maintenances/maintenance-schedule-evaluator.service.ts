@@ -61,6 +61,7 @@ export const buildUsageAggregateQuery = (usageTable: string, pairCount: number):
  * so they stay unchunked. If an install ever exceeds ~32k schedules, those need chunking too.
  */
 const USAGE_AGG_CHUNK_SIZE = 500;
+const WRITE_TRANSACTION_BATCH_SIZE = 100;
 
 /**
  * Evaluates maintenance schedules and creates ResourceMaintenance when a schedule's condition is met.
@@ -589,34 +590,56 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
       if (toCreate.length === 0) return;
 
       // --- WRITE PHASE ---
-      // Re-check active maintenance while holding the single write transaction. Emit side effects
-      // only after it commits, so listeners never observe a rolled-back maintenance.
-      const createdMaintenances: Array<{ resourceId: number; maintenanceId: number }> = [];
-      try {
-        await this.scheduleRepository.manager.transaction(async (em) => {
-          for (const { resourceId, schedule } of toCreate) {
-            const hasActive = await this.maintenanceService.hasActiveMaintenance(resourceId, em);
-            if (hasActive) continue;
+      // Bound SQLite's writer lock while preserving atomic creation per item. Nested transactions
+      // become savepoints, so one failed schedule does not roll back the rest of its batch.
+      for (let offset = 0; offset < toCreate.length; offset += WRITE_TRANSACTION_BATCH_SIZE) {
+        const batch = toCreate.slice(offset, offset + WRITE_TRANSACTION_BATCH_SIZE);
+        const createdMaintenances: Array<{ resourceId: number; maintenanceId: number }> = [];
 
-            const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
-            const maintenance = await this.maintenanceService.createMaintenanceFromSchedule(
-              resourceId,
-              schedule.id,
-              reason,
-              em,
-              false,
-            );
-            createdMaintenances.push({ resourceId, maintenanceId: maintenance.id });
-            this.logger.log(
-              `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
-            );
+        try {
+          await this.scheduleRepository.manager.transaction(async (em) => {
+            for (const { resourceId, schedule } of batch) {
+              try {
+                const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
+                const maintenance = await em.transaction(async (itemEm) => {
+                  // Recheck by resource to prevent a concurrent manual or different-schedule maintenance.
+                  if (await this.maintenanceService.hasActiveMaintenance(resourceId, itemEm)) return;
+
+                  return this.maintenanceService.createMaintenanceFromSchedule(
+                    resourceId,
+                    schedule.id,
+                    reason,
+                    itemEm,
+                    false,
+                  );
+                });
+
+                // The savepoint has committed, so this entry cannot refer to a rolled-back item.
+                if (maintenance) {
+                  createdMaintenances.push({ resourceId, maintenanceId: maintenance.id });
+                  this.logger.log(
+                    `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
+                  );
+                }
+              } catch (err) {
+                this.logger.error(
+                  `Error creating maintenance for resource ${resourceId} from schedule ${schedule.id}: ${err}`,
+                  (err as Error)?.stack,
+                );
+              }
+            }
+          });
+
+          // An outer transaction commit succeeds before its notifications are emitted.
+          for (const { resourceId, maintenanceId } of createdMaintenances) {
+            this.maintenanceService.emitScheduledMaintenanceCreated(resourceId, maintenanceId);
           }
-        });
-        for (const { resourceId, maintenanceId } of createdMaintenances) {
-          this.maintenanceService.emitScheduledMaintenanceCreated(resourceId, maintenanceId);
+        } catch (err) {
+          this.logger.error(
+            `Error creating scheduled maintenance batch ${offset / WRITE_TRANSACTION_BATCH_SIZE + 1}: ${err}`,
+            (err as Error)?.stack,
+          );
         }
-      } catch (err) {
-        this.logger.error(`Error creating scheduled maintenances: ${err}`, (err as Error)?.stack);
       }
     } finally {
       this.evaluationLock = false;

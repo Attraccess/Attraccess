@@ -65,6 +65,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
               getRepository: (entity: unknown) => (entity === ResourceMaintenanceSchedule ? scheduleRepoMock : {}),
               transaction: nestedTransaction,
             };
+            nestedTransaction.mockImplementation((innerCallback) => innerCallback(transactionalEntityManager));
             return cb(transactionalEntityManager);
           },
         ),
@@ -332,7 +333,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       expect(maintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(2, expect.anything());
     });
 
-    it('should use one transaction without nested transactions for all due schedules', async () => {
+    it('should write due schedules in bounded transactions with a savepoint per item', async () => {
       const oldCreatedAt = new Date('2024-01-01T00:00:00.000Z');
       const dueSchedules = Array.from(
         { length: 101 },
@@ -351,16 +352,16 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       maintenanceQb.getRawMany.mockResolvedValue([]);
       jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
       jest
-       .spyOn(resourceRepository, 'find')
-       .mockResolvedValue(dueSchedules.map(({ resourceId: id }) => ({ id, createdAt: oldCreatedAt }) as Resource));
+        .spyOn(resourceRepository, 'find')
+        .mockResolvedValue(dueSchedules.map(({ resourceId: id }) => ({ id, createdAt: oldCreatedAt }) as Resource));
       (maintenanceService.hasActiveMaintenance as jest.Mock).mockImplementation((id: number) =>
         Promise.resolve(id === 101),
       );
 
       await service.evaluateAll();
 
-      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(1);
-      expect(nestedTransaction).not.toHaveBeenCalled();
+      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(2);
+      expect(nestedTransaction).toHaveBeenCalledTimes(101);
       expect(maintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(101, expect.anything());
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(100);
       expect(maintenanceService.createMaintenanceFromSchedule).not.toHaveBeenCalledWith(
@@ -677,7 +678,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       );
     });
 
-    it('should roll back all writes when creating a maintenance fails', async () => {
+    it('should isolate a failed schedule creation and continue the batch', async () => {
       jest.spyOn(scheduleRepository, 'find').mockResolvedValue([
         {
           id: scheduleId,
@@ -712,13 +713,14 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       jest
         .spyOn(maintenanceService, 'createMaintenanceFromSchedule')
-        .mockRejectedValueOnce(new Error('resource vanished mid-run'));
+        .mockRejectedValueOnce(new Error('resource vanished mid-run'))
+        .mockResolvedValueOnce({ id: 2 } as ResourceMaintenance);
 
       await expect(service.evaluateAll()).resolves.toBeUndefined();
 
       expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(1);
-      expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(1);
-      expect(maintenanceService.emitScheduledMaintenanceCreated).not.toHaveBeenCalled();
+      expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(2);
+      expect(maintenanceService.emitScheduledMaintenanceCreated).toHaveBeenCalledWith(2, 2);
     });
 
     it('should not emit side effects when the write transaction fails to commit', async () => {
@@ -738,12 +740,15 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       maintenanceQb.getRawMany.mockResolvedValue([]);
       jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-      jest.spyOn(resourceRepository, 'find').mockResolvedValue([
-        { id: 1, createdAt: new Date('2024-01-01T00:00:00.000Z') } as Resource,
-      ]);
+      jest
+        .spyOn(resourceRepository, 'find')
+        .mockResolvedValue([{ id: 1, createdAt: new Date('2024-01-01T00:00:00.000Z') } as Resource]);
 
       jest.spyOn(scheduleRepository.manager, 'transaction').mockImplementation(async (callback) => {
-        await callback({} as never);
+        const itemManager = {
+          transaction: async (itemCallback: (em: unknown) => Promise<unknown>) => itemCallback(itemManager),
+        };
+        await callback(itemManager as never);
         throw new Error('transaction commit failed');
       });
 
