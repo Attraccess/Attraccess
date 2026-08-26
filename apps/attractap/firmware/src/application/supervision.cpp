@@ -1,8 +1,10 @@
 #include "supervision.hpp"
 
 #ifdef HAS_LVGL_DISPLAY
+#ifndef SUPERVISION_FLOW_TEST
 #include "platform.hpp"
 #include "../display/display.hpp"
+#endif
 
 SupervisionFlow::SupervisionFlow(API &api, NFC &nfc, Beeper &beeper, Logger &logger,
                                  SupervisionScreen &screen)

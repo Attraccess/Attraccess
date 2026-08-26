@@ -5,13 +5,19 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 
+#ifdef SUPERVISION_FLOW_TEST
+#include "supervision_test_deps.hpp"
+#else
 #include "../api/api.hpp"
 #include "../beeper/beeper.hpp"
 #include "../logger/logger.hpp"
 #include "../nfc/nfc.hpp"
+#endif
 
 #ifdef HAS_LVGL_DISPLAY
+#ifndef SUPERVISION_FLOW_TEST
 #include "../display/screens/supervision/supervisionScreen.hpp"
+#endif
 
 // Owns one supervision transaction. Websocket callbacks only enqueue events here;
 // NFC and UI work is performed by tick() on the main loop.
