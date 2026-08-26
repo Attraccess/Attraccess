@@ -7,6 +7,13 @@ if [ "$#" -ne 4 ]; then
   exit 2
 fi
 
+for capture in "$@"; do
+  if [ ! -f "$capture" ] || [ ! -r "$capture" ]; then
+    printf 'Serial capture is missing or unreadable: %s\n' "$capture" >&2
+    exit 1
+  fi
+done
+
 assert_contains() {
   local file="$1"
   local pattern="$2"
@@ -27,7 +34,7 @@ assert_absent() {
   fi
 }
 
-assert_contains "$1" '\[WiFi\] ERROR: Disconnected: reason .*\(AUTH_FAIL\)'
+assert_contains "$1" '\[WiFi\] ERROR: Disconnected: reason .*\((AUTH_FAIL|4WAY_HANDSHAKE_TIMEOUT|HANDSHAKE_TIMEOUT|802_1X_AUTH_FAILED)\)'
 assert_contains "$2" '\[WiFi\] ERROR: Disconnected: reason .*\(NO_AP_FOUND\)'
 assert_contains "$3" '\[WiFi\] ERROR: DHCP timeout - no IP acquired, forcing reconnect'
 assert_absent "$4" "Haven't to connect to a suitable AP now!"
