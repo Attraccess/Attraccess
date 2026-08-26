@@ -53,7 +53,9 @@ private:
     void publishConnectionStatus();
     void publishNetworkQuality();
     void recordNetworkQualityEvent(uint32_t *events, uint8_t &nextIndex);
+    void recordPongRtt(uint32_t rttMs, uint32_t nowMs);
     uint8_t countRecentNetworkQualityEvents(const uint32_t *events, uint32_t nowMs) const;
+    uint32_t averageRecentPongRtt(uint32_t nowMs) const;
     void connectWebSocket();
     void connectWebSocketLocked();
     bool shouldReconnect();
@@ -120,10 +122,18 @@ private:
     uint32_t txQueueFullEventTimes[QUALITY_EVENT_SLOTS] = {};
     uint32_t sendFailureEventTimes[QUALITY_EVENT_SLOTS] = {};
     uint32_t livenessTimeoutEventTimes[QUALITY_EVENT_SLOTS] = {};
+    uint32_t pongTimeoutEventTimes[QUALITY_EVENT_SLOTS] = {};
+    uint32_t pongRttSampleTimes[QUALITY_EVENT_SLOTS] = {};
+    uint32_t pongRttSamples[QUALITY_EVENT_SLOTS] = {};
     uint8_t reconnectEventNextIndex = 0;
     uint8_t txQueueFullEventNextIndex = 0;
     uint8_t sendFailureEventNextIndex = 0;
     uint8_t livenessTimeoutEventNextIndex = 0;
+    uint8_t pongTimeoutEventNextIndex = 0;
+    uint8_t pongRttSampleNextIndex = 0;
+    uint32_t lastPongRttMs = 0;
+    const uint32_t PING_INTERVAL_MS = 5000;
+    const uint32_t PONG_RTT_DEGRADED_AFTER_MS = 1000;
     const int PINGPONG_TIMEOUT_SEC = 10;
 
     bool network_is_connected = false;

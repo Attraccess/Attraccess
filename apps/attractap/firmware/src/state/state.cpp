@@ -40,6 +40,9 @@ uint8_t State::network_quality_tx_queue_depth = 0;
 uint8_t State::network_quality_tx_queue_full_events_last_minute = 0;
 uint8_t State::network_quality_send_failures_last_minute = 0;
 uint8_t State::network_quality_liveness_timeouts_last_minute = 0;
+uint32_t State::network_quality_last_pong_rtt_ms = 0;
+uint32_t State::network_quality_average_pong_rtt_ms = 0;
+uint8_t State::network_quality_pong_timeouts_last_minute = 0;
 uint16_t State::websocket_port = 0;
 bool State::websocket_use_ssl = false;
 bool State::websocket_connected = false;
@@ -88,7 +91,10 @@ void State::setNetworkQualityState(NetworkQuality quality,
                                    uint8_t txQueueDepth,
                                    uint8_t txQueueFullEventsLastMinute,
                                    uint8_t sendFailuresLastMinute,
-                                   uint8_t livenessTimeoutsLastMinute)
+                                   uint8_t livenessTimeoutsLastMinute,
+                                   uint32_t lastPongRttMs,
+                                   uint32_t averagePongRttMs,
+                                   uint8_t pongTimeoutsLastMinute)
 {
     StateLock lock(state_mutex);
     network_quality = quality;
@@ -98,6 +104,9 @@ void State::setNetworkQualityState(NetworkQuality quality,
     network_quality_tx_queue_full_events_last_minute = txQueueFullEventsLastMinute;
     network_quality_send_failures_last_minute = sendFailuresLastMinute;
     network_quality_liveness_timeouts_last_minute = livenessTimeoutsLastMinute;
+    network_quality_last_pong_rtt_ms = lastPongRttMs;
+    network_quality_average_pong_rtt_ms = averagePongRttMs;
+    network_quality_pong_timeouts_last_minute = pongTimeoutsLastMinute;
 }
 
 State::NetworkQualityState State::getNetworkQualityState()
@@ -111,6 +120,9 @@ State::NetworkQualityState State::getNetworkQualityState()
     state.txQueueFullEventsLastMinute = network_quality_tx_queue_full_events_last_minute;
     state.sendFailuresLastMinute = network_quality_send_failures_last_minute;
     state.livenessTimeoutsLastMinute = network_quality_liveness_timeouts_last_minute;
+    state.lastPongRttMs = network_quality_last_pong_rtt_ms;
+    state.averagePongRttMs = network_quality_average_pong_rtt_ms;
+    state.pongTimeoutsLastMinute = network_quality_pong_timeouts_last_minute;
 
     return state;
 }

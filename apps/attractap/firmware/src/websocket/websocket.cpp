@@ -192,6 +192,9 @@ void Websocket::publishNetworkQuality()
     uint8_t queueFull = 0;
     uint8_t sendFailures = 0;
     uint8_t livenessTimeouts = 0;
+    uint8_t pongTimeouts = 0;
+    uint32_t lastPongRttMs = 0;
+    uint32_t averagePongRttMs = 0;
     if (this->network_quality_mutex)
     {
         xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
@@ -199,6 +202,9 @@ void Websocket::publishNetworkQuality()
         queueFull = countRecentNetworkQualityEvents(this->txQueueFullEventTimes, nowMs);
         sendFailures = countRecentNetworkQualityEvents(this->sendFailureEventTimes, nowMs);
         livenessTimeouts = countRecentNetworkQualityEvents(this->livenessTimeoutEventTimes, nowMs);
+        pongTimeouts = countRecentNetworkQualityEvents(this->pongTimeoutEventTimes, nowMs);
+        lastPongRttMs = this->lastPongRttMs;
+        averagePongRttMs = averageRecentPongRtt(nowMs);
         xSemaphoreGive(this->network_quality_mutex);
     }
 
@@ -210,14 +216,17 @@ void Websocket::publishNetworkQuality()
     else if ((this->lastInboundFrameTime != 0 && inboundAgeMs >= this->INBOUND_DEGRADED_AFTER_MS) ||
              reconnects >= 2 ||
              queueFull > 0 ||
-             sendFailures > 0 ||
-             livenessTimeouts > 0 ||
-             txDepth >= (TX_QUEUE_DEPTH / 2))
+              sendFailures > 0 ||
+              livenessTimeouts > 0 ||
+              pongTimeouts > 0 ||
+              averagePongRttMs >= this->PONG_RTT_DEGRADED_AFTER_MS ||
+              txDepth >= (TX_QUEUE_DEPTH / 2))
     {
         quality = State::NETWORK_QUALITY_DEGRADED;
     }
 
-    State::setNetworkQualityState(quality, inboundAgeMs, reconnects, txDepth, queueFull, sendFailures, livenessTimeouts);
+    State::setNetworkQualityState(quality, inboundAgeMs, reconnects, txDepth, queueFull, sendFailures, livenessTimeouts,
+                                  lastPongRttMs, averagePongRttMs, pongTimeouts);
 }
 
 void Websocket::recordNetworkQualityEvent(uint32_t *events, uint8_t &nextIndex)
@@ -233,6 +242,21 @@ void Websocket::recordNetworkQualityEvent(uint32_t *events, uint8_t &nextIndex)
     xSemaphoreGive(this->network_quality_mutex);
 }
 
+void Websocket::recordPongRtt(uint32_t rttMs, uint32_t nowMs)
+{
+    if (!this->network_quality_mutex)
+    {
+        return;
+    }
+
+    xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
+    this->lastPongRttMs = rttMs;
+    this->pongRttSamples[this->pongRttSampleNextIndex] = rttMs;
+    this->pongRttSampleTimes[this->pongRttSampleNextIndex] = nowMs;
+    this->pongRttSampleNextIndex = (uint8_t)((this->pongRttSampleNextIndex + 1) % QUALITY_EVENT_SLOTS);
+    xSemaphoreGive(this->network_quality_mutex);
+}
+
 uint8_t Websocket::countRecentNetworkQualityEvents(const uint32_t *events, uint32_t nowMs) const
 {
     uint8_t count = 0;
@@ -244,6 +268,21 @@ uint8_t Websocket::countRecentNetworkQualityEvents(const uint32_t *events, uint3
         }
     }
     return count;
+}
+
+uint32_t Websocket::averageRecentPongRtt(uint32_t nowMs) const
+{
+    uint32_t total = 0;
+    uint8_t count = 0;
+    for (size_t i = 0; i < QUALITY_EVENT_SLOTS; i++)
+    {
+        if (this->pongRttSampleTimes[i] != 0 && nowMs - this->pongRttSampleTimes[i] <= this->QUALITY_EVENT_WINDOW_MS)
+        {
+            total += this->pongRttSamples[i];
+            count++;
+        }
+    }
+    return count == 0 ? 0 : total / count;
 }
 
 void Websocket::connectWebSocket()
@@ -597,7 +636,18 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
     }
 
     case WEBSOCKET_EVENT_DATA:
-        this->lastInboundFrameTime = millis();
+    {
+        uint32_t nowMs = millis();
+        uint32_t previousInboundFrameTime = this->lastInboundFrameTime;
+        // The client sends its built-in PING after five idle seconds and propagates
+        // the matching PONG as a data event, so its RTT is the excess idle time.
+        if (data->op_code == WS_TRANSPORT_OPCODES_PONG &&
+            previousInboundFrameTime != 0 &&
+            nowMs - previousInboundFrameTime >= this->PING_INTERVAL_MS)
+        {
+            recordPongRtt(nowMs - previousInboundFrameTime - this->PING_INTERVAL_MS, nowMs);
+        }
+        this->lastInboundFrameTime = nowMs;
         if (data->op_code == 0x01)
         { // Text frame
             if (this->messageCallbackRaw)
@@ -615,9 +665,14 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
             }
         }
         break;
+    }
 
     case WEBSOCKET_EVENT_ERROR:
         logger.error("WebSocket error");
+        if (data && data->error_handle.error_type == WEBSOCKET_ERROR_TYPE_PONG_TIMEOUT)
+        {
+            recordNetworkQualityEvent(this->pongTimeoutEventTimes, this->pongTimeoutEventNextIndex);
+        }
         if (this->_state == CONNECTED || this->_state == CONNECTING)
         {
             recordNetworkQualityEvent(this->reconnectEventTimes, this->reconnectEventNextIndex);

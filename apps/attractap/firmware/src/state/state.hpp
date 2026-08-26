@@ -37,6 +37,9 @@ public:
         uint8_t txQueueFullEventsLastMinute;
         uint8_t sendFailuresLastMinute;
         uint8_t livenessTimeoutsLastMinute;
+        uint32_t lastPongRttMs;
+        uint32_t averagePongRttMs;
+        uint8_t pongTimeoutsLastMinute;
     };
 
     static void setNetworkQualityState(NetworkQuality quality,
@@ -45,7 +48,10 @@ public:
                                        uint8_t txQueueDepth,
                                        uint8_t txQueueFullEventsLastMinute,
                                        uint8_t sendFailuresLastMinute,
-                                       uint8_t livenessTimeoutsLastMinute);
+                                       uint8_t livenessTimeoutsLastMinute,
+                                       uint32_t lastPongRttMs,
+                                       uint32_t averagePongRttMs,
+                                       uint8_t pongTimeoutsLastMinute);
     static NetworkQualityState getNetworkQualityState();
 
     // Connection phase of the websocket client. Mirrors Websocket::ConnectionState
@@ -108,6 +114,9 @@ private:
     static uint8_t network_quality_tx_queue_full_events_last_minute;
     static uint8_t network_quality_send_failures_last_minute;
     static uint8_t network_quality_liveness_timeouts_last_minute;
+    static uint32_t network_quality_last_pong_rtt_ms;
+    static uint32_t network_quality_average_pong_rtt_ms;
+    static uint8_t network_quality_pong_timeouts_last_minute;
 
     static uint16_t websocket_port;
     static bool websocket_use_ssl;
