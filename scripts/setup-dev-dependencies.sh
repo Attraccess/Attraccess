@@ -237,9 +237,9 @@ setup_project() {
     echo "✓ pnpm install complete"
 
     echo "Running database migrations..."
-    pnpm nx run api:migrations-run || {
-        echo "  (migrations may fail if DB not configured - that's OK for initial setup)"
-    }
+    storage_root=$(node --env-file="$REPO_ROOT/.env" -e 'process.stdout.write(process.env.STORAGE_ROOT || "storage")')
+    mkdir -p "$storage_root"
+    pnpm nx run api:migrations-run
 }
 
 # --- Main ---
@@ -280,7 +280,7 @@ main() {
 
     # ESP-IDF (Attractap firmware)
     if ! check_esp_idf; then
-        install_esp_idf || echo "⚠ ESP-IDF install failed. See https://docs.espressif.com/projects/esp-idf/en/v6.0.2/esp32s3/get-started/"
+        install_esp_idf
     fi
     echo ""
 
