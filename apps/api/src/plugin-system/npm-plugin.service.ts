@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import axios from 'axios';
 import { createHash, randomUUID } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
@@ -39,6 +39,7 @@ export type InstalledNpmPlugin = {
 
 @Injectable()
 export class NpmPluginService {
+  private readonly logger = new Logger(NpmPluginService.name);
   private registryMutation = Promise.resolve();
   private installMutation = Promise.resolve();
 
@@ -155,7 +156,11 @@ export class NpmPluginService {
           await this.rollbackActivation(activation);
           throw error;
         }
-        await rm(activation.backup, { recursive: true, force: true });
+        try {
+          await this.removeBackup(activation.backup);
+        } catch (error) {
+          this.logger.error(`Failed to remove backup for ${name}`, error);
+        }
         new PluginService().requestRestart();
         return installed;
       });
@@ -190,6 +195,10 @@ export class NpmPluginService {
   private async rollbackActivation({ target, backup }: { target: string; backup: string }): Promise<void> {
     await rm(target, { recursive: true, force: true });
     if (existsSync(backup)) await rename(backup, target);
+  }
+
+  private removeBackup(backup: string): Promise<void> {
+    return rm(backup, { recursive: true, force: true });
   }
 
   private async writeState(installed: InstalledNpmPlugin): Promise<void> {

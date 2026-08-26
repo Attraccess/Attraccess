@@ -13,6 +13,7 @@ jest.mock('dns/promises', () => ({ lookup: jest.fn() }));
 type ServiceInternals = {
   download(url: string): Promise<Buffer>;
   hostVersion(): string;
+  removeBackup(backup: string): Promise<void>;
 };
 
 type SettingsMock = {
@@ -206,5 +207,31 @@ describe('NpmPluginService', () => {
       ]),
     );
     expect(existsSync(join(root, 'npm-QGF0dHJhY2Nlc3Mvb25l', 'dist', 'index.js'))).toBe(true);
+  });
+
+  it('restarts after backup cleanup fails following a successful install', async () => {
+    const name = '@attraccess/plugin';
+    const tarball = await packageTarball(name);
+    const target = join(root, `npm-${Buffer.from(name).toString('base64url')}`);
+    mkdirSync(target, { recursive: true });
+    const service = new NpmPluginService({} as never);
+    const internals = service as unknown as ServiceInternals;
+
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      versions: {
+        '1.2.3': {
+          version: '1.2.3',
+          dist: { tarball: 'plugin', shasum: createHash('sha1').update(tarball).digest('hex') },
+        },
+      },
+    });
+    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+    jest.spyOn(internals, 'removeBackup').mockRejectedValue(new Error('cleanup failed'));
+
+    await expect(service.install(name, '1.2.3')).resolves.toMatchObject({ name, version: '1.2.3' });
+
+    expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
+    expect(service.listInstalled()).toEqual([expect.objectContaining({ name, version: '1.2.3' })]);
   });
 });
