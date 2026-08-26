@@ -104,6 +104,49 @@ describe('UsersAdminController', () => {
       expect(result).toBeDefined();
     });
 
+    it('should forward roleId to the users service', async () => {
+      jest.spyOn(usersService, 'findMany').mockResolvedValue(paginated(1, 10, 1));
+
+      await controller.findMany({ page: 1, limit: 10, roleId: 42 }, makeRequest(['users.read']));
+
+      expect(usersService.findMany).toHaveBeenCalledWith(expect.objectContaining({ roleId: 42 }));
+    });
+
+    it('should forward advanced user filters to the users service', async () => {
+      jest.spyOn(usersService, 'findMany').mockResolvedValue(paginated(1, 10, 1));
+
+      await controller.findMany(
+        {
+          page: 1,
+          limit: 10,
+          roleIds: [2, 4],
+          excludeRoleIds: [5],
+          roleMatch: 'all',
+          emailVerified: true,
+          ssoProviderIds: [7],
+          excludeSsoProviderIds: [8],
+          ssoProviderNone: true,
+          hasSsoProvider: false,
+          ssoProviderMatch: 'any',
+        },
+        makeRequest(['users.read']),
+      );
+
+      expect(usersService.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          roleIds: [2, 4],
+          excludeRoleIds: [5],
+          roleMatch: 'all',
+          emailVerified: true,
+          ssoProviderIds: [7],
+          excludeSsoProviderIds: [8],
+          ssoProviderNone: true,
+          hasSsoProvider: false,
+          ssoProviderMatch: 'any',
+        }),
+      );
+    });
+
     it('should return only id and username without users.read', async () => {
       jest.spyOn(usersService, 'findMany').mockResolvedValue({
         ...paginated(1, 10, 1),
@@ -147,9 +190,23 @@ describe('UsersAdminController', () => {
     });
 
     it('should throw ForbiddenException when includeRoles=true without users.read', async () => {
-      await expect(
-        controller.findMany({ page: 1, limit: 10, includeRoles: true }, makeRequest()),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(controller.findMany({ page: 1, limit: 10, includeRoles: true }, makeRequest())).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('should throw ForbiddenException when roleId is supplied without users.read', async () => {
+      await expect(controller.findMany({ page: 1, limit: 10, roleId: 42 }, makeRequest())).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(usersService.findMany).not.toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException when advanced filters are supplied without users.read', async () => {
+      await expect(controller.findMany({ page: 1, limit: 10, emailVerified: true }, makeRequest())).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(usersService.findMany).not.toHaveBeenCalled();
     });
   });
 

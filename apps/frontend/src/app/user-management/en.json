@@ -23,5 +23,39 @@
     "inviteUser": "Invite user",
     "sso": "SSO Providers",
     "twoFactorPolicy": "Two-factor policy"
+  },
+  "filters": {
+    "label": "User filters",
+    "add": "Filter",
+    "remove": "Remove filter",
+    "category": "Filter category",
+    "selectValues": "Select values",
+    "roleValues": "Role values",
+    "emailVerificationStatus": "Email verification status",
+    "ssoProviderValues": "SSO provider values",
+    "is": "is",
+    "isAnyOf": "is any of",
+    "isAllOf": "is all of",
+    "isNoneOf": "is none of",
+    "selectedCount": "{{count}} selected",
+    "role": "Role",
+    "roleMatch": "Role matching",
+    "emailVerified": "Email verified",
+    "ssoProvider": "SSO provider",
+    "ssoProviderMatch": "SSO provider matching",
+    "verified": "Verified",
+    "notVerified": "Not verified",
+    "none": "None",
+    "allRoles": "All roles",
+    "multipleRoles": "Multiple roles selected",
+    "allEmailVerification": "Any verification status",
+    "allSsoProviders": "All SSO providers",
+    "multipleSsoProviders": "Multiple SSO providers selected",
+    "any": "Match any",
+    "all": "Match all"
+  },
+  "empty": {
+    "role": "No users are assigned to {{role}}.",
+    "assignRole": "Choose a user to assign this role"
   }
 }
