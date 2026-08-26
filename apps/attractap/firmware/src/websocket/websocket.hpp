@@ -53,6 +53,7 @@ private:
     void publishConnectionStatus();
     void publishNetworkQuality();
     void sendPongProbe(uint32_t nowMs);
+    void clearPendingPongProbe();
     void recordNetworkQualityEvent(uint32_t *events, uint8_t &nextIndex);
     void recordPongRtt(uint32_t rttMs, uint32_t nowMs);
     uint8_t countRecentNetworkQualityEvents(const uint32_t *events, uint32_t nowMs) const;

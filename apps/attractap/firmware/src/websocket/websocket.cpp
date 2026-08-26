@@ -238,6 +238,18 @@ void Websocket::sendPongProbe(uint32_t nowMs)
     }
 }
 
+void Websocket::clearPendingPongProbe()
+{
+    if (!this->network_quality_mutex)
+    {
+        return;
+    }
+
+    xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
+    this->pendingPongProbeTime = 0;
+    xSemaphoreGive(this->network_quality_mutex);
+}
+
 void Websocket::publishNetworkQuality()
 {
     uint32_t nowMs = millis();
@@ -875,6 +887,11 @@ void Websocket::drainTxQueue()
 
 void Websocket::setState(ConnectionState state)
 {
+    if (this->_state == CONNECTED && state != CONNECTED)
+    {
+        // A PONG from the old socket must not time out after a new socket connects.
+        clearPendingPongProbe();
+    }
     _state = state;
 
     State::WebsocketPhase phase = State::WS_INIT;
