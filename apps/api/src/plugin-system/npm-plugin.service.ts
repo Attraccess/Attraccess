@@ -39,34 +39,49 @@ export type InstalledNpmPlugin = {
 @Injectable()
 export class NpmPluginService {
   private registryMutation = Promise.resolve();
+  private installMutation = Promise.resolve();
 
-  constructor(
-    private readonly settings: SettingsStoreService,
-  ) {}
+  constructor(private readonly settings: SettingsStoreService) {}
 
   async listRegistries(): Promise<Array<StoredRegistry & { tokenConfigured: boolean }>> {
     const registries = await this.storedRegistries();
-    return Promise.all(registries.map(async (registry) => ({
-      ...registry,
-      tokenConfigured: (await this.settings.getSecretSetting(REGISTRY_PARENT, `${registry.id}:token`)).configured,
-    })));
+    return Promise.all(
+      registries.map(async (registry) => ({
+        ...registry,
+        tokenConfigured: (await this.settings.getSecretSetting(REGISTRY_PARENT, `${registry.id}:token`)).configured,
+      })),
+    );
   }
 
-  async addRegistry(input: { name: string; url: string; token?: string | null }): Promise<StoredRegistry & { tokenConfigured: boolean }> {
-    const registry: StoredRegistry = { id: randomUUID(), name: input.name.trim(), url: normalizeRegistryUrl(input.url) };
+  async addRegistry(input: {
+    name: string;
+    url: string;
+    token?: string | null;
+  }): Promise<StoredRegistry & { tokenConfigured: boolean }> {
+    const registry: StoredRegistry = {
+      id: randomUUID(),
+      name: input.name.trim(),
+      url: normalizeRegistryUrl(input.url),
+    };
     if (!registry.name) throw new BadRequestException('Registry name is required');
     await this.mutateRegistries(async (registries) => {
-      if (registries.some(({ url }) => url === registry.url)) throw new BadRequestException('Registry URL is already configured');
+      if (registries.some(({ url }) => url === registry.url))
+        throw new BadRequestException('Registry URL is already configured');
       await this.settings.setPlainSetting(REGISTRY_PARENT, REGISTRIES_KEY, JSON.stringify([...registries, registry]));
     });
-    if (input.token !== undefined) await this.settings.setSecretSetting(REGISTRY_PARENT, `${registry.id}:token`, input.token);
+    if (input.token !== undefined)
+      await this.settings.setSecretSetting(REGISTRY_PARENT, `${registry.id}:token`, input.token);
     return { ...registry, tokenConfigured: input.token != null && input.token.trim().length > 0 };
   }
 
   async removeRegistry(id: string): Promise<void> {
     await this.mutateRegistries(async (registries) => {
       if (!registries.some((registry) => registry.id === id)) throw new NotFoundException('Registry not found');
-      await this.settings.setPlainSetting(REGISTRY_PARENT, REGISTRIES_KEY, JSON.stringify(registries.filter((registry) => registry.id !== id)));
+      await this.settings.setPlainSetting(
+        REGISTRY_PARENT,
+        REGISTRIES_KEY,
+        JSON.stringify(registries.filter((registry) => registry.id !== id)),
+      );
     });
     await this.settings.setSecretSetting(REGISTRY_PARENT, `${id}:token`, null);
   }
@@ -82,16 +97,17 @@ export class NpmPluginService {
   }
 
   async packageVersions(name: string, registryId?: string): Promise<string[]> {
-    const metadata = await this.packageMetadata(name, registryId) as { versions?: Record<string, unknown> };
+    const metadata = (await this.packageMetadata(name, registryId)) as { versions?: Record<string, unknown> };
     return Object.keys(metadata.versions ?? {}).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
   }
 
   async install(name: string, version: string, registryId?: string): Promise<InstalledNpmPlugin> {
     const registry = await this.registry(registryId);
-    const metadata = await this.packageMetadata(name, registry.id) as { versions?: Record<string, PackageVersion> };
+    const metadata = (await this.packageMetadata(name, registry.id)) as { versions?: Record<string, PackageVersion> };
     const packageVersion = metadata.versions?.[version];
     if (!packageVersion || packageVersion.version !== version) throw new NotFoundException('Package version not found');
-    if (!packageVersion.dist.integrity && !packageVersion.dist.shasum) throw new BadRequestException('Registry did not provide tarball integrity metadata');
+    if (!packageVersion.dist.integrity && !packageVersion.dist.shasum)
+      throw new BadRequestException('Registry did not provide tarball integrity metadata');
 
     const tarball = await this.download(packageVersion.dist.tarball, registry);
     verifyIntegrity(tarball, packageVersion.dist);
@@ -99,11 +115,12 @@ export class NpmPluginService {
     const staging = await mkdtemp(join(PluginService.PLUGIN_PATH, '.npm-staging-'));
     try {
       await extractTarball(tarball, staging);
-      const source = staging;
+      const source = join(staging, 'package');
       const packageJsonPath = join(source, 'package.json');
       if (!existsSync(packageJsonPath)) throw new BadRequestException('Tarball does not contain package/package.json');
       const { manifest } = parseNpmPluginPackage(JSON.parse(readFileSync(packageJsonPath, 'utf8')), this.hostVersion());
-      if (manifest.name !== name || manifest.version !== version) throw new BadRequestException('Tarball package identity does not match the requested package');
+      if (manifest.name !== name || manifest.version !== version)
+        throw new BadRequestException('Tarball package identity does not match the requested package');
       validateEntries(source, manifest);
       await writeFile(join(source, 'plugin.json'), JSON.stringify(manifest));
 
@@ -117,16 +134,20 @@ export class NpmPluginService {
         permissions: manifest.permissions,
         lastError: null,
       };
-      const activation = await this.activate(source, name);
-      try {
-        await this.writeState(installed);
-      } catch (error) {
-        await this.rollbackActivation(activation);
-        throw error;
-      }
-      await rm(activation.backup, { recursive: true, force: true });
-      new PluginService().requestRestart();
-      return installed;
+      // Activation and its state update must commit together so a rollback cannot
+      // remove another install's target or overwrite its state entry.
+      return this.mutateInstalls(async () => {
+        const activation = await this.activate(source, name);
+        try {
+          await this.writeState(installed);
+        } catch (error) {
+          await this.rollbackActivation(activation);
+          throw error;
+        }
+        await rm(activation.backup, { recursive: true, force: true });
+        new PluginService().requestRestart();
+        return installed;
+      });
     } finally {
       await rm(staging, { recursive: true, force: true });
     }
@@ -135,7 +156,11 @@ export class NpmPluginService {
   listInstalled(): InstalledNpmPlugin[] {
     const statePath = join(PluginService.PLUGIN_PATH, STATE_FILE);
     if (!existsSync(statePath)) return [];
-    try { return JSON.parse(readFileSync(statePath, 'utf8')); } catch { return []; }
+    try {
+      return JSON.parse(readFileSync(statePath, 'utf8'));
+    } catch {
+      return [];
+    }
   }
 
   private async activate(source: string, name: string): Promise<{ target: string; backup: string }> {
@@ -180,17 +205,36 @@ export class NpmPluginService {
   private async storedRegistries(): Promise<StoredRegistry[]> {
     const raw = await this.settings.getPlainSetting(REGISTRY_PARENT, REGISTRIES_KEY);
     if (!raw) return [];
-    try { return zodRegistries(JSON.parse(raw)); } catch { return []; }
+    try {
+      return zodRegistries(JSON.parse(raw));
+    } catch {
+      return [];
+    }
   }
 
   private async mutateRegistries(operation: (registries: StoredRegistry[]) => Promise<void>): Promise<void> {
     const mutation = this.registryMutation.then(async () => operation(await this.storedRegistries()));
-    this.registryMutation = mutation.then(() => undefined, () => undefined);
+    this.registryMutation = mutation.then(
+      () => undefined,
+      () => undefined,
+    );
+    return mutation;
+  }
+
+  private async mutateInstalls<T>(operation: () => Promise<T>): Promise<T> {
+    const mutation = this.installMutation.then(operation);
+    this.installMutation = mutation.then(
+      () => undefined,
+      () => undefined,
+    );
     return mutation;
   }
 
   private async getJson(url: string, registry: Registry): Promise<unknown> {
-    const response = await axios.get(url, { headers: registry.token ? { authorization: `Bearer ${registry.token}` } : undefined, timeout: 10_000 });
+    const response = await axios.get(url, {
+      headers: registry.token ? { authorization: `Bearer ${registry.token}` } : undefined,
+      timeout: 10_000,
+    });
     return response.data;
   }
 
@@ -199,7 +243,10 @@ export class NpmPluginService {
     for (let redirects = 0; redirects <= 5; redirects += 1) {
       const addresses = await validateTarballDestination(target, registry);
       const response = await axios.get<ArrayBuffer>(target.toString(), {
-        responseType: 'arraybuffer', timeout: 30_000, maxContentLength: MAX_ARCHIVE_BYTES, maxRedirects: 0,
+        responseType: 'arraybuffer',
+        timeout: 30_000,
+        maxContentLength: MAX_ARCHIVE_BYTES,
+        maxRedirects: 0,
         validateStatus: (status) => status >= 200 && status < 400,
         headers: registry.token ? { authorization: `Bearer ${registry.token}` } : undefined,
         lookup: (hostname, _options, callback) => {
@@ -215,32 +262,103 @@ export class NpmPluginService {
     throw new BadRequestException('Tarball exceeded the redirect limit');
   }
 
-  private hostVersion(): string { return resolveAppVersion(); }
+  private hostVersion(): string {
+    return resolveAppVersion();
+  }
 }
 
-function normalizeRegistryUrl(value: string): string { const url = new URL(value); if (!['http:', 'https:'].includes(url.protocol)) throw new BadRequestException('Registry URL must use HTTP(S)'); return url.toString().replace(/\/$/, ''); }
-function pluginDirectory(name: string): string { return `npm-${Buffer.from(name).toString('base64url')}`; }
-function zodRegistries(value: unknown): StoredRegistry[] { if (!Array.isArray(value)) throw new Error(); return value.map((entry) => { if (!entry || typeof entry !== 'object') throw new Error(); const item = entry as StoredRegistry; return { id: item.id, name: item.name, url: normalizeRegistryUrl(item.url) }; }); }
-function validateEntries(root: string, manifest: { main: { backend?: { directory: string; entryPoint: string }; frontend?: { directory: string; entryPoint: string; styles?: string }; migrations?: { directory: string; entryPoint: string } } }): void { for (const entry of [manifest.main.backend, manifest.main.frontend, manifest.main.migrations]) { if (entry && !existsSync(join(root, entry.directory, entry.entryPoint))) throw new BadRequestException('Package declares an entry point that is not present'); } if (manifest.main.frontend?.styles && !existsSync(join(root, manifest.main.frontend.directory, manifest.main.frontend.styles))) throw new BadRequestException('Package declares styles that are not present'); }
-function verifyIntegrity(buffer: Buffer, dist: PackageVersion['dist']): void { if (dist.integrity) { const match = /^(sha(?:256|384|512))-(.+)$/.exec(dist.integrity); if (!match || createHash(match[1]).update(buffer).digest('base64') !== match[2]) throw new BadRequestException('Tarball integrity check failed'); return; } if (createHash('sha1').update(buffer).digest('hex') !== dist.shasum) throw new BadRequestException('Tarball integrity check failed'); }
+function normalizeRegistryUrl(value: string): string {
+  const url = new URL(value);
+  if (!['http:', 'https:'].includes(url.protocol)) throw new BadRequestException('Registry URL must use HTTP(S)');
+  return url.toString().replace(/\/$/, '');
+}
+function pluginDirectory(name: string): string {
+  return `npm-${Buffer.from(name).toString('base64url')}`;
+}
+function zodRegistries(value: unknown): StoredRegistry[] {
+  if (!Array.isArray(value)) throw new Error();
+  return value.map((entry) => {
+    if (!entry || typeof entry !== 'object') throw new Error();
+    const item = entry as StoredRegistry;
+    return { id: item.id, name: item.name, url: normalizeRegistryUrl(item.url) };
+  });
+}
+function validateEntries(
+  root: string,
+  manifest: {
+    main: {
+      backend?: { directory: string; entryPoint: string };
+      frontend?: { directory: string; entryPoint: string; styles?: string };
+      migrations?: { directory: string; entryPoint: string };
+    };
+  },
+): void {
+  for (const entry of [manifest.main.backend, manifest.main.frontend, manifest.main.migrations]) {
+    if (entry && !existsSync(join(root, entry.directory, entry.entryPoint)))
+      throw new BadRequestException('Package declares an entry point that is not present');
+  }
+  if (
+    manifest.main.frontend?.styles &&
+    !existsSync(join(root, manifest.main.frontend.directory, manifest.main.frontend.styles))
+  )
+    throw new BadRequestException('Package declares styles that are not present');
+}
+function verifyIntegrity(buffer: Buffer, dist: PackageVersion['dist']): void {
+  if (dist.integrity) {
+    const match = /^(sha(?:256|384|512))-(.+)$/.exec(dist.integrity);
+    if (!match || createHash(match[1]).update(buffer).digest('base64') !== match[2])
+      throw new BadRequestException('Tarball integrity check failed');
+    return;
+  }
+  if (createHash('sha1').update(buffer).digest('hex') !== dist.shasum)
+    throw new BadRequestException('Tarball integrity check failed');
+}
 
 async function extractTarball(tarball: Buffer, destination: string): Promise<void> {
   let extractedBytes = 0;
   let entries = 0;
-  await pipeline(Readable.from(tarball), tar.x({ cwd: destination, gzip: true, strict: true, preservePaths: false, filter: (path, entry) => {
-    if (!path.startsWith('package/') || !safeArchivePath(path) || !('type' in entry) || !['File', 'Directory'].includes(entry.type)) throw new BadRequestException('Tarball contains an unsafe entry');
-    entries += 1;
-    extractedBytes += entry.size;
-    if (entries > MAX_ARCHIVE_ENTRIES || extractedBytes > MAX_EXTRACTED_BYTES) throw new BadRequestException('Tarball exceeds extraction limits');
-    return true;
-  } }));
+  await pipeline(
+    Readable.from(tarball),
+    tar.x({
+      cwd: destination,
+      gzip: true,
+      strict: true,
+      preservePaths: false,
+      filter: (path, entry) => {
+        if (
+          !path.startsWith('package/') ||
+          !safeArchivePath(path) ||
+          !('type' in entry) ||
+          !['File', 'Directory'].includes(entry.type)
+        )
+          throw new BadRequestException('Tarball contains an unsafe entry');
+        entries += 1;
+        extractedBytes += entry.size;
+        if (entries > MAX_ARCHIVE_ENTRIES || extractedBytes > MAX_EXTRACTED_BYTES)
+          throw new BadRequestException('Tarball exceeds extraction limits');
+        return true;
+      },
+    }),
+  );
 }
 
-async function validateTarballDestination(url: URL, registry: Registry): Promise<Array<{ address: string; family: 4 | 6 }>> {
-  if (url.protocol !== new URL(registry.url).protocol || url.host !== new URL(registry.url).host || url.username || url.password) throw new BadRequestException('Tarball URL must use the configured registry origin');
+async function validateTarballDestination(
+  url: URL,
+  registry: Registry,
+): Promise<Array<{ address: string; family: 4 | 6 }>> {
+  if (
+    url.protocol !== new URL(registry.url).protocol ||
+    url.host !== new URL(registry.url).host ||
+    url.username ||
+    url.password
+  )
+    throw new BadRequestException('Tarball URL must use the configured registry origin');
   const addresses = await lookup(url.hostname, { all: true, verbatim: true });
-  if (addresses.length === 0 || addresses.some(({ address }) => ipaddr.parse(address).range() !== 'unicast')) throw new BadRequestException('Tarball URL must resolve only to public addresses');
+  if (addresses.length === 0 || addresses.some(({ address }) => ipaddr.parse(address).range() !== 'unicast'))
+    throw new BadRequestException('Tarball URL must resolve only to public addresses');
   return addresses.map(({ address, family }) => ({ address, family: family as 4 | 6 }));
 }
 
-function safeArchivePath(value: string): boolean { return !value.startsWith('/') && !value.split('/').includes('..'); }
+function safeArchivePath(value: string): boolean {
+  return !value.startsWith('/') && !value.split('/').includes('..');
+}
