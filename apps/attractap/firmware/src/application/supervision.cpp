@@ -43,10 +43,8 @@ void SupervisionFlow::enter(const char *requester, const char *hint, uint32_t no
     strlcpy(requesterName, requester, sizeof(requesterName));
     nfc.resetCardPresence();
     nfc.enableCardDetection();
-    screen.setRequesterName(requesterName);
-    screen.setTimeoutTime(activeDeadlineMs);
-    screen.setStatus(SupervisionScreen::STATUS_WAITING);
-    screen.setSupervisorHint(hint);
+    strlcpy(hintMessage, hint, sizeof(hintMessage));
+    renderScreen(SupervisionScreen::STATUS_WAITING);
     screen.armCancelGuard();
     Display::transitionToScreen(&screen);
 }
@@ -310,11 +308,20 @@ void SupervisionFlow::processEvent(const Event &event) {
 
 void SupervisionFlow::showError(bool terminal, uint32_t now) {
     beeper.errorBeep();
-    screen.setStatus(SupervisionScreen::STATUS_ERROR);
-    screen.setStatusMessage(errorMessage);
     phase = Phase::Error;
     errorIsTerminal = terminal;
     phaseChangedAtMs = now;
+    renderScreen(SupervisionScreen::STATUS_ERROR);
+}
+
+void SupervisionFlow::renderScreen(SupervisionScreen::Status status) {
+    SupervisionScreen::View view;
+    view.deadlineMs = activeDeadlineMs;
+    view.requesterName = requesterName;
+    view.statusMessage = errorMessage;
+    view.supervisorHint = hintMessage;
+    view.status = status;
+    screen.render(view);
 }
 
 SupervisionFlow::Outcome SupervisionFlow::tick(uint32_t now) {
@@ -325,14 +332,14 @@ SupervisionFlow::Outcome SupervisionFlow::tick(uint32_t now) {
         logger.debug("Supervision cancelled by user");
         api.cancelSupervision(); resetActiveTransaction(); return Outcome::ReturnToRouting;
     }
-    if (hintReady) { hintReady = false; screen.setSupervisorHint(hintMessage); }
+    if (hintReady) { hintReady = false; renderScreen(SupervisionScreen::STATUS_WAITING); }
     if (event == TerminalEvent::Resolved) {
         // The server resolution settles the transaction. Discard card-path
         // events that raced it so a subsequent tick cannot replace success.
         terminalEvent = TerminalEvent::None;
         cardRejected = keyReady = cardDetected = false;
         beeper.successBeep(); nfc.disableCardDetection();
-        screen.setStatus(SupervisionScreen::STATUS_SUCCESS); phase = Phase::Success; phaseChangedAtMs = now; return Outcome::None;
+        phase = Phase::Success; phaseChangedAtMs = now; renderScreen(SupervisionScreen::STATUS_SUCCESS); return Outcome::None;
     }
     if (event == TerminalEvent::Failed) {
         terminalEvent = TerminalEvent::None;
@@ -349,7 +356,7 @@ SupervisionFlow::Outcome SupervisionFlow::tick(uint32_t now) {
         break;
     case Phase::RequestedAuth:
         if (keyReady) {
-            keyReady = false; screen.setStatus(SupervisionScreen::STATUS_VERIFYING);
+            keyReady = false; renderScreen(SupervisionScreen::STATUS_VERIFYING);
             if (nfc.authenticate(keyNo, keyBytes)) {
                 beeper.successBeep();
                 if (webInitiated) { api.confirmSupervisorCardAuth(resourceId); phase = Phase::Starting; phaseChangedAtMs = now; }
@@ -363,7 +370,7 @@ SupervisionFlow::Outcome SupervisionFlow::tick(uint32_t now) {
     case Phase::Error:
         if (now - phaseChangedAtMs > ERROR_DWELL_MS) {
             if (errorIsTerminal) { resetActiveTransaction(); return Outcome::ReturnToRouting; }
-            screen.setStatus(SupervisionScreen::STATUS_WAITING); phase = Phase::WaitingForCard; cardDetected = false; nfc.resetCardPresence(); nfc.enableCardDetection();
+            phase = Phase::WaitingForCard; cardDetected = false; nfc.resetCardPresence(); nfc.enableCardDetection(); renderScreen(SupervisionScreen::STATUS_WAITING);
         }
         break;
     default: break;

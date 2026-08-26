@@ -107,6 +107,7 @@ private:
     void processEvents(bool stopWhenWebStart = false);
     void processEvent(const Event &event);
     void publishTerminalEvent(TerminalEvent event);
+    void renderScreen(SupervisionScreen::Status status);
     void showError(bool terminal, uint32_t now);
 };
 #endif
