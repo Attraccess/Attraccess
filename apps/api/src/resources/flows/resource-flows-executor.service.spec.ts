@@ -517,7 +517,11 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: mqttNode.id }];
     mqttClientService.publish = jest.fn().mockRejectedValue(new Error('Broker unavailable'));
 
-    await expect(service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {})).rejects.toThrow('Broker unavailable');
+    await expect(service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {})).rejects.toMatchObject({
+      message: 'Broker unavailable',
+      failureKind: 'transport-dispatch',
+      status: 503,
+    });
   });
 
   it('ends the active usage session with templated notes and passes payload through', async () => {

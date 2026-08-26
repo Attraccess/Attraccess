@@ -627,7 +627,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       });
 
       if (!failureBehavior || failureBehavior === 'fail-flow') {
-        throw failureBehavior === 'fail-flow' ? new ExternalEffectFailureError(errorMessage, error) : error;
+        throw failureBehavior === 'fail-flow' ? new ExternalEffectFailureError(errorMessage, error, failureKind) : error;
       }
 
       const payload =

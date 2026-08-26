@@ -293,6 +293,7 @@
             },
             "failureBehavior": {
               "label": "On failure",
+              "helpText": "Fail flow logs the failure and stops the triggering operation. Continue through failure output logs the failure and sends the original input plus flowError {kind, message} through Failure. Log and continue logs the failure and sends the unchanged input through Output.",
               "enum": {
                 "fail-flow": "Fail flow",
                 "failure-output": "Continue through failure output",
@@ -498,8 +499,13 @@
             "body": {
               "label": "Body"
             },
+            "timeoutSeconds": {
+              "label": "Response timeout (seconds)",
+              "helpText": "Maximum time to wait for the controller response. Leave empty to wait without a node-specific timeout."
+            },
             "failureBehavior": {
               "label": "On failure",
+              "helpText": "Fail flow logs the failure and stops the triggering operation. Continue through failure output logs the failure and sends the original input plus flowError {kind, message} through Failure. Log and continue logs the failure and sends the unchanged input through Output.",
               "enum": {
                 "fail-flow": "Fail flow",
                 "failure-output": "Continue through failure output",
@@ -542,8 +548,21 @@
               }
             },
             "retain": { "label": "Retain message" },
+            "completionBehavior": {
+              "label": "Completion",
+              "helpText": "Dispatch continues after MQTT accepts the publish call. Acknowledged waits for the broker publish callback.",
+              "enum": {
+                "dispatch": "Dispatch only",
+                "acknowledged": "Wait for acknowledgement"
+              }
+            },
+            "acknowledgementTimeoutSeconds": {
+              "label": "Acknowledgement timeout (seconds)",
+              "helpText": "Maximum time to wait for the MQTT publish acknowledgement. Leave empty to use the integration default."
+            },
             "failureBehavior": {
               "label": "On failure",
+              "helpText": "Fail flow logs the failure and stops the triggering operation. Continue through failure output logs the failure and sends the original input plus flowError {kind, message} through Failure. Log and continue logs the failure and sends the unchanged input through Output.",
               "enum": {
                 "fail-flow": "Fail flow",
                 "failure-output": "Continue through failure output",
@@ -590,6 +609,7 @@
               "notes": { "label": "Notes (templates allowed)" },
               "failureBehavior": {
                 "label": "On failure",
+                "helpText": "Fail flow logs the failure and stops the triggering operation. Continue through failure output logs the failure and sends the original input plus flowError {kind, message} through Failure. Log and continue logs the failure and sends the unchanged input through Output.",
                 "enum": {
                   "fail-flow": "Fail flow",
                   "failure-output": "Continue through failure output",

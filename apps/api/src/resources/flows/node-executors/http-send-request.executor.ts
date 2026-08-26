@@ -19,6 +19,7 @@ export class HttpSendRequestExecutor implements NodeExecutor {
       method,
       headers,
       data: body,
+      ...(data.timeoutSeconds ? { timeout: data.timeoutSeconds * 1000 } : {}),
     });
 
     return {

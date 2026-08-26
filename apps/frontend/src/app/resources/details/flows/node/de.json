@@ -293,6 +293,7 @@
             },
             "failureBehavior": {
               "label": "Bei Fehler",
+              "helpText": "Flow abbrechen protokolliert den Fehler und stoppt die auslösende Operation. Über Fehlerausgang fortsetzen protokolliert den Fehler und sendet die ursprüngliche Eingabe plus flowError {kind, message} über Fehler. Protokollieren und fortsetzen protokolliert den Fehler und sendet die unveränderte Eingabe über Ausgabe.",
               "enum": {
                 "fail-flow": "Flow abbrechen",
                 "failure-output": "Über Fehlerausgang fortsetzen",
@@ -498,8 +499,13 @@
             "body": {
               "label": "Body"
             },
+            "timeoutSeconds": {
+              "label": "Antwort-Timeout (Sekunden)",
+              "helpText": "Maximale Wartezeit auf die Controller-Antwort. Leer lassen, um ohne knotenspezifisches Timeout zu warten."
+            },
             "failureBehavior": {
               "label": "Bei Fehler",
+              "helpText": "Flow abbrechen protokolliert den Fehler und stoppt die auslösende Operation. Über Fehlerausgang fortsetzen protokolliert den Fehler und sendet die ursprüngliche Eingabe plus flowError {kind, message} über Fehler. Protokollieren und fortsetzen protokolliert den Fehler und sendet die unveränderte Eingabe über Ausgabe.",
               "enum": {
                 "fail-flow": "Flow abbrechen",
                 "failure-output": "Über Fehlerausgang fortsetzen",
@@ -542,8 +548,21 @@
               }
             },
             "retain": { "label": "Nachricht behalten (retain)" },
+            "completionBehavior": {
+              "label": "Abschluss",
+              "helpText": "Nur senden fährt fort, nachdem MQTT den Publish-Aufruf akzeptiert hat. Bestätigt wartet auf den MQTT-Publish-Callback.",
+              "enum": {
+                "dispatch": "Nur senden",
+                "acknowledged": "Auf Bestätigung warten"
+              }
+            },
+            "acknowledgementTimeoutSeconds": {
+              "label": "Bestätigungs-Timeout (Sekunden)",
+              "helpText": "Maximale Wartezeit auf die MQTT-Publish-Bestätigung. Leer lassen, um die Standardvorgabe der Integration zu verwenden."
+            },
             "failureBehavior": {
               "label": "Bei Fehler",
+              "helpText": "Flow abbrechen protokolliert den Fehler und stoppt die auslösende Operation. Über Fehlerausgang fortsetzen protokolliert den Fehler und sendet die ursprüngliche Eingabe plus flowError {kind, message} über Fehler. Protokollieren und fortsetzen protokolliert den Fehler und sendet die unveränderte Eingabe über Ausgabe.",
               "enum": {
                 "fail-flow": "Flow abbrechen",
                 "failure-output": "Über Fehlerausgang fortsetzen",
@@ -590,6 +609,7 @@
               "notes": { "label": "Notizen (Templates erlaubt)" },
               "failureBehavior": {
                 "label": "Bei Fehler",
+                "helpText": "Flow abbrechen protokolliert den Fehler und stoppt die auslösende Operation. Über Fehlerausgang fortsetzen protokolliert den Fehler und sendet die ursprüngliche Eingabe plus flowError {kind, message} über Fehler. Protokollieren und fortsetzen protokolliert den Fehler und sendet die unveränderte Eingabe über Ausgabe.",
                 "enum": {
                   "fail-flow": "Flow abbrechen",
                   "failure-output": "Über Fehlerausgang fortsetzen",

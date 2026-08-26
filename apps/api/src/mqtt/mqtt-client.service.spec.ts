@@ -240,6 +240,17 @@ describe('MqttClientService', () => {
       await expect(service.publish(1, 'test/topic', 'test message')).rejects.toThrow('Publish error');
     });
 
+    it('does not wait for the publish callback when dispatch completion is selected', async () => {
+      const getOrCreateClientSpy = jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient');
+      const mockClient = mqtt.connect({});
+      getOrCreateClientSpy.mockResolvedValue(mockClient);
+      mockClient.publish = jest.fn();
+
+      await expect(
+        service.publish(1, 'test/topic', 'test message', undefined, { awaitAcknowledgement: false }),
+      ).resolves.toBeUndefined();
+    });
+
     it('should use server defaults when no options are provided', async () => {
       // Arrange
       (mockRepository.findOneBy as jest.Mock).mockResolvedValue({

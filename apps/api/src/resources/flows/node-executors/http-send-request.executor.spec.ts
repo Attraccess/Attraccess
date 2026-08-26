@@ -116,6 +116,14 @@ describe('HttpSendRequestExecutor', () => {
     await expect(executor.execute(node, {}, ctx)).rejects.toThrow('network down');
   });
 
+  it('uses the configured response timeout', async () => {
+    (axios.request as jest.Mock).mockResolvedValue({ data: {} });
+
+    await executor.execute(makeNode({ url: 'https://example.com', method: 'GET', timeoutSeconds: 12 }), {}, ctx);
+
+    expect(axios.request).toHaveBeenCalledWith(expect.objectContaining({ timeout: 12000 }));
+  });
+
   it('classifies controller responses separately from transport failures', () => {
     expect(executor.getFailureKind({ response: { status: 500 } })).toBe('controller-rejection');
     expect(executor.getFailureKind(new Error('network down'))).toBe('transport-dispatch');

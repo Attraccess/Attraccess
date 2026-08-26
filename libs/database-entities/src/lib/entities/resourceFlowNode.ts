@@ -63,6 +63,10 @@ export const ExternalEffectPolicySchema = z.object({
 
 export type ExternalEffectFailureBehavior = z.infer<typeof ExternalEffectFailureBehaviorSchema>;
 
+const AcknowledgementTimeoutSecondsSchema = z.number().int().positive().optional().meta({
+  helpText: 'Maximum time to wait for an acknowledgement, in seconds. Leave empty to use the integration default.',
+});
+
 export const HttpRequestNodeDataSchema = z
   .object({
     url: z.string().url('Invalid URL format'),
@@ -71,6 +75,7 @@ export const HttpRequestNodeDataSchema = z
     body: z.string().optional().default('').meta({
       stringVariant: 'multiline',
     }),
+    timeoutSeconds: AcknowledgementTimeoutSecondsSchema,
   })
   .extend(ExternalEffectPolicySchema.shape);
 
@@ -92,6 +97,11 @@ export const MqttSendMessageNodeDataSchema = z
     retain: z.boolean().optional().meta({
       helpText: 'Retain publishes: broker stores last message for new subscribers',
     }),
+    completionBehavior: z.enum(['dispatch', 'acknowledged']).default('acknowledged').meta({
+      helpText:
+        'Dispatch continues after the broker accepts the publish call. Acknowledged waits for the MQTT publish callback.',
+    }),
+    acknowledgementTimeoutSeconds: AcknowledgementTimeoutSecondsSchema,
   })
   .extend(ExternalEffectPolicySchema.shape);
 

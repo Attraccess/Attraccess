@@ -20,10 +20,23 @@ export class MqttSendMessageExecutor implements NodeExecutor {
     );
 
     try {
-      await this.mqttClientService.publish(serverId, topic, payload, {
+      const options = {
         qos: data.qos as 0 | 1 | 2,
         retain: data.retain as boolean,
-      });
+      };
+      const completion =
+        data.completionBehavior || data.acknowledgementTimeoutSeconds
+          ? {
+              awaitAcknowledgement: data.completionBehavior !== 'dispatch',
+              acknowledgementTimeoutSeconds: data.acknowledgementTimeoutSeconds,
+            }
+          : undefined;
+
+      if (completion) {
+        await this.mqttClientService.publish(serverId, topic, payload, options, completion);
+      } else {
+        await this.mqttClientService.publish(serverId, topic, payload, options);
+      }
     } catch (error) {
       if (this.hasDescription(error)) {
         throw error;
@@ -39,8 +52,10 @@ export class MqttSendMessageExecutor implements NodeExecutor {
     };
   }
 
-  getFailureKind(): FlowFailureKind {
-    return 'transport-dispatch';
+  getFailureKind(error: unknown): FlowFailureKind {
+    return error instanceof Error && error.name === 'MqttAcknowledgementTimeoutError'
+      ? 'acknowledgement-timeout'
+      : 'transport-dispatch';
   }
 
   private hasDescription(error: unknown): boolean {
