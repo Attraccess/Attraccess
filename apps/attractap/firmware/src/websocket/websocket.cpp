@@ -214,14 +214,20 @@ void Websocket::sendPongProbe(uint32_t nowMs)
     // processed before its matching PING timestamp and token are published.
     uint32_t sentAtMs = millis();
     int ret = esp_websocket_client_send_with_opcode(ws_client, WS_TRANSPORT_OPCODES_PING, payload, sizeof(payload), 0);
+    this->lastPongProbeTime = sentAtMs;
+    bool probeSendFailed = ret != static_cast<int>(sizeof(payload));
     if (ret == static_cast<int>(sizeof(payload)))
     {
-        this->lastPongProbeTime = sentAtMs;
         this->pendingPongProbeTime = sentAtMs;
         this->pendingPongProbeToken = token;
     }
     xSemaphoreGive(this->network_quality_mutex);
     unlockWsClient();
+
+    if (probeSendFailed)
+    {
+        recordNetworkQualityEvent(this->sendFailureEventTimes, this->sendFailureEventNextIndex);
+    }
 }
 
 void Websocket::publishNetworkQuality()
