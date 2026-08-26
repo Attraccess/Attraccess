@@ -362,7 +362,10 @@ void Websocket::connectWebSocketLocked()
     websocket_cfg.port = serverPort;
 
     // Configure buffer sizes to prevent ENOBUFS errors
-    websocket_cfg.task_stack = 9830;  // Increase task stack size for stability
+    // WebSocket event callbacks parse API payloads and invoke application
+    // callbacks on this task. The 9.8 KB stack overflowed on the initial
+    // resource-list payload after adding network-quality reporting.
+    websocket_cfg.task_stack = 16384;
     websocket_cfg.buffer_size = 4096; // Increase buffer size (default is typically 1024)
     // Below the LVGL render task (prio 4): TLS work must not preempt UI refresh
     // (default was 5, unpinned) - ATT-554 item 7.
@@ -744,7 +747,6 @@ void Websocket::setState(ConnectionState state)
     State::setWebsocketPhase(phase);
 
     State::setWebsocketState(state == CONNECTED, this->_lastApiConfig.hostname, this->_lastApiConfig.port, this->_lastApiConfig.useSSL);
-    publishNetworkQuality();
 }
 
 void Websocket::setMessageCallbackRaw(std::function<void(const char *, size_t)> callback)
