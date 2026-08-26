@@ -562,7 +562,7 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
 
     case WEBSOCKET_EVENT_CLOSED:
         logger.info("WebSocket closed");
-        if (this->_state == CONNECTED)
+        if (this->_state == CONNECTED || this->_state == CONNECTING)
         {
             recordNetworkQualityEvent(this->reconnectEventTimes, this->reconnectEventNextIndex);
         }
@@ -572,7 +572,7 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
     case WEBSOCKET_EVENT_DISCONNECTED:
     {
         logger.info("WebSocket disconnected");
-        if (this->_state == CONNECTED)
+        if (this->_state == CONNECTED || this->_state == CONNECTING)
         {
             recordNetworkQualityEvent(this->reconnectEventTimes, this->reconnectEventNextIndex);
         }
@@ -615,7 +615,7 @@ void Websocket::processWebSocketEvent(esp_event_base_t base, int32_t event_id, v
 
     case WEBSOCKET_EVENT_ERROR:
         logger.error("WebSocket error");
-        if (this->_state == CONNECTED)
+        if (this->_state == CONNECTED || this->_state == CONNECTING)
         {
             recordNetworkQualityEvent(this->reconnectEventTimes, this->reconnectEventNextIndex);
         }
