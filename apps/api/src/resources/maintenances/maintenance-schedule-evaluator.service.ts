@@ -603,7 +603,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
                 const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
                 const maintenance = await em.transaction(async (itemEm) => {
                   const hasActive = await this.maintenanceService.hasActiveMaintenance(
-                    { resourceId, scheduleId: schedule.id },
+                    resourceId,
                     itemEm,
                   );
                   if (hasActive) return;

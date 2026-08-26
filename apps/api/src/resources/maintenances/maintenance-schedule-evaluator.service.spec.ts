@@ -327,17 +327,11 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       );
       expect(maintenanceService.emitScheduledMaintenanceCreated).toHaveBeenCalledWith(1, 1);
       expect(maintenanceService.emitScheduledMaintenanceCreated).toHaveBeenCalledWith(2, 1);
-      expect(maintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(
-        { resourceId: 1, scheduleId },
-        expect.anything(),
-      );
-      expect(maintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(
-        { resourceId: 2, scheduleId: scheduleId + 1 },
-        expect.anything(),
-      );
+      expect(maintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(1, expect.anything());
+      expect(maintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(2, expect.anything());
     });
 
-    it('should split due maintenances into bounded write transactions', async () => {
+    it('should skip a resource that gains an active maintenance between write batches', async () => {
       const oldCreatedAt = new Date('2024-01-01T00:00:00.000Z');
       const dueSchedules = Array.from(
         { length: 101 },
@@ -356,13 +350,24 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       maintenanceQb.getRawMany.mockResolvedValue([]);
       jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
       jest
-        .spyOn(resourceRepository, 'find')
-        .mockResolvedValue(dueSchedules.map(({ resourceId: id }) => ({ id, createdAt: oldCreatedAt }) as Resource));
+       .spyOn(resourceRepository, 'find')
+       .mockResolvedValue(dueSchedules.map(({ resourceId: id }) => ({ id, createdAt: oldCreatedAt }) as Resource));
+      (maintenanceService.hasActiveMaintenance as jest.Mock).mockImplementation((id: number) =>
+        Promise.resolve(id === 101),
+      );
 
       await service.evaluateAll();
 
       expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(2);
-      expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(101);
+      expect(maintenanceService.hasActiveMaintenance).toHaveBeenCalledWith(101, expect.anything());
+      expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(100);
+      expect(maintenanceService.createMaintenanceFromSchedule).not.toHaveBeenCalledWith(
+        101,
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        false,
+      );
     });
 
     it('should continue creating other due maintenances when a stale active check succeeds', async () => {
