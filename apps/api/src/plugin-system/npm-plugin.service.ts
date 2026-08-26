@@ -88,18 +88,12 @@ export class NpmPluginService {
         await this.settings.setSecretSetting(REGISTRY_PARENT, `${id}:token`, null);
         return;
       }
-      const { value: token } = await this.settings.getSecretSetting(REGISTRY_PARENT, `${id}:token`);
+      await this.settings.setPlainSetting(
+        REGISTRY_PARENT,
+        REGISTRIES_KEY,
+        JSON.stringify(registries.filter((registry) => registry.id !== id)),
+      );
       await this.settings.setSecretSetting(REGISTRY_PARENT, `${id}:token`, null);
-      try {
-        await this.settings.setPlainSetting(
-          REGISTRY_PARENT,
-          REGISTRIES_KEY,
-          JSON.stringify(registries.filter((registry) => registry.id !== id)),
-        );
-      } catch (error) {
-        await this.settings.setSecretSetting(REGISTRY_PARENT, `${id}:token`, token);
-        throw error;
-      }
     });
   }
 
@@ -161,7 +155,7 @@ export class NpmPluginService {
           await this.rollbackActivation(activation);
           throw error;
         }
-        await rm(activation.backup, { recursive: true, force: true }).catch(() => undefined);
+        await rm(activation.backup, { recursive: true, force: true });
         new PluginService().requestRestart();
         return installed;
       });

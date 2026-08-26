@@ -92,7 +92,9 @@ describe('NpmPluginService', () => {
 
   it('rejects metadata requests to private registry addresses', async () => {
     const settings: SettingsMock = {
-      getPlainSetting: jest.fn().mockResolvedValue(JSON.stringify([{ id: 'private', name: 'private', url: 'http://private.test' }])),
+      getPlainSetting: jest
+        .fn()
+        .mockResolvedValue(JSON.stringify([{ id: 'private', name: 'private', url: 'http://private.test' }])),
       getSecretSetting: jest.fn().mockResolvedValue({ value: null, configured: false }),
       setPlainSetting: jest.fn(),
       setSecretSetting: jest.fn(),
@@ -114,9 +116,9 @@ describe('NpmPluginService', () => {
     };
     const service = new NpmPluginService(settings as unknown as never);
 
-    await expect(service.addRegistry({ name: 'private', url: 'https://registry.example.com', token: 'secret' })).rejects.toThrow(
-      'encryption failed',
-    );
+    await expect(
+      service.addRegistry({ name: 'private', url: 'https://registry.example.com', token: 'secret' }),
+    ).rejects.toThrow('encryption failed');
     expect(settings.setPlainSetting).not.toHaveBeenCalled();
   });
 
@@ -132,6 +134,40 @@ describe('NpmPluginService', () => {
     await service.removeRegistry('orphaned');
 
     expect(settings.setSecretSetting).toHaveBeenCalledWith('plugin-registry', 'orphaned:token', null);
+  });
+
+  it('preserves a registry token when removing its record fails', async () => {
+    const settings: SettingsMock = {
+      getPlainSetting: jest
+        .fn()
+        .mockResolvedValue(JSON.stringify([{ id: 'private', name: 'private', url: 'https://registry.example.com' }])),
+      getSecretSetting: jest.fn(),
+      setPlainSetting: jest.fn().mockRejectedValue(new Error('database unavailable')),
+      setSecretSetting: jest.fn(),
+    };
+    const service = new NpmPluginService(settings as unknown as never);
+
+    await expect(service.removeRegistry('private')).rejects.toThrow('database unavailable');
+
+    expect(settings.setSecretSetting).not.toHaveBeenCalled();
+  });
+
+  it('removes the registry record before deleting its token', async () => {
+    const settings: SettingsMock = {
+      getPlainSetting: jest
+        .fn()
+        .mockResolvedValue(JSON.stringify([{ id: 'private', name: 'private', url: 'https://registry.example.com' }])),
+      getSecretSetting: jest.fn(),
+      setPlainSetting: jest.fn(),
+      setSecretSetting: jest.fn(),
+    };
+    const service = new NpmPluginService(settings as unknown as never);
+
+    await service.removeRegistry('private');
+
+    expect(settings.setPlainSetting.mock.invocationCallOrder[0]).toBeLessThan(
+      settings.setSecretSetting.mock.invocationCallOrder[0],
+    );
   });
 
   it('installs standard package-prefixed tarballs without losing concurrent state updates', async () => {
