@@ -137,7 +137,7 @@ describe('ResourceUsageService', () => {
   const mockResourceRetrainingService = {
     isResourceIntroductionBlocked: jest.fn().mockResolvedValue(false),
     isGroupIntroductionBlocked: jest.fn().mockResolvedValue(false),
-    getResourceRetrainingStatus: jest.fn(),
+    getResourceRetrainingStatus: jest.fn().mockResolvedValue({ blocksAccess: false, dueAt: null }),
   };
 
   const mockResourceMaintenanceService = {
@@ -1854,7 +1854,10 @@ describe('ResourceUsageService', () => {
 
     beforeEach(() => {
       resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+      resourceIntroducersService.canMaintain.mockResolvedValue(false);
+      resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
       resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
+      mockResourceRetrainingService.getResourceRetrainingStatus.mockResolvedValue({ blocksAccess: false, dueAt: null });
     });
 
     it('returns cached result on repeated call without hitting DB again', async () => {
@@ -1870,7 +1873,7 @@ describe('ResourceUsageService', () => {
       jest.useFakeTimers();
       try {
         await service.canControllResource(resourceId, mockUser);
-        jest.advanceTimersByTime(301_000);
+        jest.advanceTimersByTime(30_001);
         await service.canControllResource(resourceId, mockUser);
 
         expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
@@ -1889,6 +1892,21 @@ describe('ResourceUsageService', () => {
       expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
     });
 
+    it('coalesces concurrent cache misses', async () => {
+      let resolveIntroduction!: (value: boolean) => void;
+      resourceIntroductionService.hasValidIntroduction.mockImplementationOnce(
+        () => new Promise<boolean>((resolve) => (resolveIntroduction = resolve)),
+      );
+
+      const first = service.canControllResource(resourceId, mockUser);
+      const second = service.canControllResource(resourceId, mockUser);
+      await Promise.resolve();
+      resolveIntroduction(true);
+
+      await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(1);
+    });
+
     it('clears cache on ResourceGroupIntroductionChangedEvent', async () => {
       await service.canControllResource(resourceId, mockUser);
       expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(1);
@@ -1905,7 +1923,10 @@ describe('ResourceUsageService', () => {
       await service.canControllResource(resourceId, otherUser);
       expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
 
-      service.handleIntroducerChanged({ introducerUserId: mockUser.id, resourceId } as import('../introducers/events/resource-introducer-changed.event').ResourceIntroducerChangedEvent);
+      service.handleIntroducerChanged({
+        introducerUserId: mockUser.id,
+        resourceId,
+      } as import('../introducers/events/resource-introducer-changed.event').ResourceIntroducerChangedEvent);
 
       await service.canControllResource(resourceId, mockUser);
       // mockUser's entry was cleared; otherUser's entry should still be cached.
@@ -1913,11 +1934,85 @@ describe('ResourceUsageService', () => {
       expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(3);
     });
 
+    it('clears cache on ResourceGroupIntroducerChangedEvent', async () => {
+      await service.canControllResource(resourceId, mockUser);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(1);
+
+      service.handleGroupIntroducerChanged();
+
+      await service.canControllResource(resourceId, mockUser);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
+    });
+
+    it('clears resource entries on ResourceChangedEvent', async () => {
+      await service.canControllResource(resourceId, mockUser);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(1);
+
+      service.handleResourceChanged({ resourceId } as import('../events/resource-changed.event').ResourceChangedEvent);
+
+      await service.canControllResource(resourceId, mockUser);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not share privileged results with a restricted principal', async () => {
+      const privilegedUser = {
+        ...mockUser,
+        effectivePermissions: new Set(['resources.update']),
+      } as User;
+      const restrictedUser = {
+        ...mockUser,
+        effectivePermissions: new Set<string>(),
+      } as User;
+      resourceIntroductionService.hasValidIntroduction.mockResolvedValue(false);
+      resourceIntroducersService.canMaintain.mockResolvedValue(false);
+
+      await expect(service.canControllResource(resourceId, privilegedUser)).resolves.toBe(true);
+      await expect(service.canControllResource(resourceId, restrictedUser)).resolves.toBe(false);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not cache a grant past its retraining deadline', async () => {
+      jest.useFakeTimers();
+      try {
+        mockResourceRetrainingService.getResourceRetrainingStatus.mockResolvedValue({
+          blocksAccess: true,
+          dueAt: new Date(Date.now() + 1_000),
+        });
+
+        await service.canControllResource(resourceId, mockUser);
+        jest.advanceTimersByTime(1_001);
+        await service.canControllResource(resourceId, mockUser);
+
+        expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('does not cache a lookup that completed after an invalidation', async () => {
+      let resolveIntroduction!: (value: boolean) => void;
+      resourceIntroductionService.hasValidIntroduction.mockImplementationOnce(
+        () => new Promise<boolean>((resolve) => (resolveIntroduction = resolve)),
+      );
+
+      const authorization = service.canControllResource(resourceId, {
+        ...mockUser,
+        effectivePermissions: new Set<string>(),
+      } as User);
+      await Promise.resolve();
+      service.handleIntroductionChanged();
+      resolveIntroduction(true);
+      await authorization;
+
+      await service.canControllResource(resourceId, mockUser);
+      expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
+    });
+
     it('pruneAccessCache evicts expired entries', async () => {
       jest.useFakeTimers();
       try {
         await service.canControllResource(resourceId, mockUser);
-        jest.advanceTimersByTime(301_000);
+        jest.advanceTimersByTime(30_001);
         // @ts-expect-error access private method for testing
         service.pruneAccessCache();
         // @ts-expect-error access private field for testing
@@ -1947,7 +2042,7 @@ describe('ResourceUsageService', () => {
 
       // Fill the cache to the limit with fake entries.
       for (let i = 0; i < MAX; i++) {
-        cache.set(`stub:${i}`, { result: true, expiresAt: Date.now() + 30_000 });
+        cache.set(`stub:${i}`, { userId: i, resourceId: i, result: true, expiresAt: Date.now() + 30_000 });
       }
 
       // This call should compute the result but NOT write it to the full cache.
