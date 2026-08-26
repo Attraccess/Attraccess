@@ -52,10 +52,14 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       find: jest.fn(),
       findOne: jest.fn(),
       manager: {
-        transaction: jest.fn(async (cb: (em: { getRepository: (entity: unknown) => unknown }) => Promise<unknown>) => {
+        transaction: jest.fn(async (cb: (em: {
+          getRepository: (entity: unknown) => unknown;
+          transaction: (innerCb: (innerEm: unknown) => Promise<unknown>) => Promise<unknown>;
+        }) => Promise<unknown>) => {
           const transactionalEntityManager = {
             getRepository: (entity: unknown) =>
               entity === ResourceMaintenanceSchedule ? scheduleRepoMock : {},
+            transaction: async (innerCb: (innerEm: unknown) => Promise<unknown>) => innerCb(transactionalEntityManager),
           };
           return cb(transactionalEntityManager);
         }),
@@ -298,7 +302,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       await service.evaluateAll();
 
-      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(2);
+      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(1);
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(2);
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledWith(
         1, scheduleId, expect.any(String), expect.anything(),
@@ -314,8 +318,30 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         { resourceId: 2, scheduleId: scheduleId + 1 },
         expect.anything(),
       );
-      const createCalls = (maintenanceService.createMaintenanceFromSchedule as jest.Mock).mock.calls;
-      expect(createCalls[0][3]).not.toBe(createCalls[1][3]);
+    });
+
+    it('should split due writes into bounded transaction batches', async () => {
+      const oldCreatedAt = new Date('2024-01-01T00:00:00.000Z');
+      const dueSchedules = Array.from({ length: 101 }, (_, index) => ({
+        id: scheduleId + index,
+        resourceId: index + 1,
+        enabled: true,
+        triggerType: ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL,
+        timeIntervalConfig: { duration: 30, unit: 'DAYS' },
+      } as ResourceMaintenanceSchedule));
+
+      jest.spyOn(scheduleRepository, 'find').mockResolvedValue(dueSchedules);
+      const maintenanceQb = createQueryBuilderMock();
+      maintenanceQb.getRawMany.mockResolvedValue([]);
+      jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+      jest.spyOn(resourceRepository, 'find').mockResolvedValue(
+        dueSchedules.map(({ resourceId: id }) => ({ id, createdAt: oldCreatedAt } as Resource)),
+      );
+
+      await service.evaluateAll();
+
+      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(2);
+      expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(101);
     });
 
     it('should continue creating other due maintenances when a stale active check succeeds', async () => {
@@ -350,7 +376,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       await service.evaluateAll();
 
-      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(2);
+      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(1);
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(1);
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledWith(
         2, scheduleId + 1, expect.any(String), expect.anything(),
@@ -656,7 +682,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       await expect(service.evaluateAll()).resolves.toBeUndefined();
 
-      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(2);
+      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(1);
       expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(2);
     });
 

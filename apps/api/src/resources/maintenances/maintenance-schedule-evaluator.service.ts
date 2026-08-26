@@ -62,6 +62,9 @@ export const buildUsageAggregateQuery = (usageTable: string, pairCount: number):
  */
 const USAGE_AGG_CHUNK_SIZE = 500;
 
+// Keep SQLite write locks short while avoiding a begin/commit round trip for every due schedule.
+const WRITE_TRANSACTION_BATCH_SIZE = 100;
+
 /**
  * Evaluates maintenance schedules and creates ResourceMaintenance when a schedule's condition is met.
  * Baseline for all trigger types: when the last maintenance created by this schedule was marked done
@@ -428,7 +431,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
    * 4. Load active maintenances to skip resources/schedules already under maintenance.
    * 5. For usage-based triggers: aggregate SUM/COUNT per (resource, schedule) in SQL by joining
    *    against an inline baseline table — no raw usage rows loaded into memory.
-   * 6. Write only the schedules that actually triggered, one short transaction each.
+   * 6. Write only the schedules that actually triggered in bounded transactions.
    */
   async evaluateAll(): Promise<void> {
     if (this.evaluationLock) {
@@ -590,26 +593,39 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
       if (toCreate.length === 0) return;
 
       // --- WRITE PHASE ---
-      // Re-check and create each maintenance in its own short transaction. Keeping the catch outside
-      // the callback preserves rollback semantics while allowing later schedules to be evaluated.
-      for (const { resourceId, schedule } of toCreate) {
+      // Bound transaction length to avoid holding SQLite's writer lock for the full batch. Each item
+      // uses a nested transaction (a SQLite savepoint), so a failed create rolls back while the rest
+      // of its batch can proceed without adding a begin/commit cycle per resource.
+      for (let offset = 0; offset < toCreate.length; offset += WRITE_TRANSACTION_BATCH_SIZE) {
+        const batch = toCreate.slice(offset, offset + WRITE_TRANSACTION_BATCH_SIZE);
         try {
           await this.scheduleRepository.manager.transaction(async (em) => {
-            const hasActive = await this.maintenanceService.hasActiveMaintenance(
-              { resourceId, scheduleId: schedule.id },
-              em,
-            );
-            if (hasActive) return;
+            for (const { resourceId, schedule } of batch) {
+              try {
+                await em.transaction(async (itemEm) => {
+                  const hasActive = await this.maintenanceService.hasActiveMaintenance(
+                    { resourceId, scheduleId: schedule.id },
+                    itemEm,
+                  );
+                  if (hasActive) return;
 
-            const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
-            await this.maintenanceService.createMaintenanceFromSchedule(resourceId, schedule.id, reason, em);
-            this.logger.log(
-              `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
-            );
+                  const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
+                  await this.maintenanceService.createMaintenanceFromSchedule(resourceId, schedule.id, reason, itemEm);
+                  this.logger.log(
+                    `Schedule ${schedule.id} triggered for resource ${resourceId}: created maintenance. Reason: ${reason}`,
+                  );
+                });
+              } catch (err) {
+                this.logger.error(
+                  `Error creating maintenance for resource ${resourceId} from schedule ${schedule.id}: ${err}`,
+                  (err as Error)?.stack,
+                );
+              }
+            }
           });
         } catch (err) {
           this.logger.error(
-            `Error creating maintenance for resource ${resourceId} from schedule ${schedule.id}: ${err}`,
+            `Error creating maintenance batch ${offset / WRITE_TRANSACTION_BATCH_SIZE + 1}: ${err}`,
             (err as Error)?.stack,
           );
         }
