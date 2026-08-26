@@ -332,7 +332,14 @@ SupervisionFlow::Outcome SupervisionFlow::tick(uint32_t now) {
         logger.debug("Supervision cancelled by user");
         api.cancelSupervision(); resetActiveTransaction(); return Outcome::ReturnToRouting;
     }
-    if (hintReady) { hintReady = false; renderScreen(SupervisionScreen::STATUS_WAITING); }
+    if (hintReady) {
+        hintReady = false;
+        const auto status = phase == Phase::Error      ? SupervisionScreen::STATUS_ERROR
+                            : phase == Phase::Success  ? SupervisionScreen::STATUS_SUCCESS
+                            : phase == Phase::Starting ? SupervisionScreen::STATUS_VERIFYING
+                                                       : SupervisionScreen::STATUS_WAITING;
+        renderScreen(status);
+    }
     if (event == TerminalEvent::Resolved) {
         // The server resolution settles the transaction. Discard card-path
         // events that raced it so a subsequent tick cannot replace success.
