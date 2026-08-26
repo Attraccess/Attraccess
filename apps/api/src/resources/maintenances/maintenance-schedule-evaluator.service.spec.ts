@@ -318,6 +318,45 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       expect(createCalls[0][3]).toBe(createCalls[1][3]);
     });
 
+    it('should continue creating other due maintenances when a stale active check succeeds', async () => {
+      const oldCreatedAt = new Date('2024-01-01T00:00:00.000Z');
+      jest.spyOn(scheduleRepository, 'find').mockResolvedValue([
+        {
+          id: scheduleId,
+          resourceId: 1,
+          enabled: true,
+          triggerType: ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL,
+          timeIntervalConfig: { duration: 30, unit: 'DAYS' },
+        } as ResourceMaintenanceSchedule,
+        {
+          id: scheduleId + 1,
+          resourceId: 2,
+          enabled: true,
+          triggerType: ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL,
+          timeIntervalConfig: { duration: 30, unit: 'DAYS' },
+        } as ResourceMaintenanceSchedule,
+      ]);
+      const maintenanceQb = createQueryBuilderMock();
+      maintenanceQb.getRawMany.mockResolvedValue([]);
+      jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(maintenanceQb as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+      jest.spyOn(resourceRepository, 'find').mockResolvedValue([
+        { id: 1, createdAt: oldCreatedAt } as Resource,
+        { id: 2, createdAt: oldCreatedAt } as Resource,
+      ]);
+      jest
+        .spyOn(maintenanceService, 'hasActiveMaintenance')
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false);
+
+      await service.evaluateAll();
+
+      expect(scheduleRepository.manager.transaction).toHaveBeenCalledTimes(1);
+      expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledTimes(1);
+      expect(maintenanceService.createMaintenanceFromSchedule).toHaveBeenCalledWith(
+        2, scheduleId + 1, expect.any(String), expect.anything(),
+      );
+    });
+
     it('should not create maintenance when TIME_INTERVAL not yet due', async () => {
       // Schedule due in 30 days, resource created 1 day ago
       const recentCreatedAt = new Date(Date.now() - 24 * 60 * 60 * 1000);

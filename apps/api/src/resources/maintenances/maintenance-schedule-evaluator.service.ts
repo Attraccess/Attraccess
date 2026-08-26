@@ -598,7 +598,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
               { resourceId, scheduleId: schedule.id },
               em,
             );
-            if (hasActive) return;
+            if (hasActive) continue;
 
             const reason = this.buildMaintenanceReasonFromScheduleDefinition(schedule);
             await this.maintenanceService.createMaintenanceFromSchedule(resourceId, schedule.id, reason, em);
