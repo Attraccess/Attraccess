@@ -180,6 +180,7 @@ void Application::processState() {
       this->unlocked = outcome == SupervisionFlow::Outcome::Unlock ||
                        outcome == SupervisionFlow::Outcome::UnlockAndStartSession;
       if (outcome == SupervisionFlow::Outcome::UnlockAndStartSession) {
+        Display::resourceDetailsScreen.showActionProgress("Starte Sitzung");
         this->beginActionPause();
         this->pendingActionType = PENDING_ACTION_START_SESSION;
         this->pendingActionResourceId = this->selectedResourceId;
