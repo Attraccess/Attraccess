@@ -1129,7 +1129,7 @@ describe('ResourceUsageService', () => {
       expect(eventPayload.usage).toMatchObject({ id: 1, userId: 1, endNotes: 'Session completed' });
     });
 
-    it('runs the stopped-session flow within the usage transaction', async () => {
+    it('runs the stopped-session flow after committing the usage transaction', async () => {
       const mockActiveSession = {
         id: 1,
         resourceId: 1,
@@ -1154,16 +1154,15 @@ describe('ResourceUsageService', () => {
         calls.push('update');
       });
       flowExecutorService.runFlow.mockImplementation(async () => {
-        expect(usageTransactionCommitted).toBe(false);
+        expect(usageTransactionCommitted).toBe(true);
         calls.push('flow');
         return [];
       });
-      (resourceUsageRepository.manager.transaction as jest.Mock)
-        .mockImplementationOnce(async (callback) => {
-          const result = await callback(transactionalEntityManager);
-          usageTransactionCommitted = true;
-          return result;
-        });
+      (resourceUsageRepository.manager.transaction as jest.Mock).mockImplementationOnce(async (callback) => {
+        const result = await callback(transactionalEntityManager);
+        usageTransactionCommitted = true;
+        return result;
+      });
 
       await service.endSession(1, mockActiveSession.user, { notes: 'Auto-ended' });
 
@@ -1172,11 +1171,11 @@ describe('ResourceUsageService', () => {
         1,
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
         expect.objectContaining({ endNotes: 'Auto-ended' }),
-        transactionalEntityManager,
+        resourceUsageRepository.manager,
       );
     });
 
-    it('rolls back the stopped session when an acknowledgement timeout is propagated', async () => {
+    it('keeps the ended session committed when the stopped-session flow fails', async () => {
       const mockActiveSession = {
         id: 1,
         resourceId: 1,
@@ -1213,12 +1212,12 @@ describe('ResourceUsageService', () => {
       expect(eventEmitter.emitAsync).not.toHaveBeenCalled();
       expect(eventEmitter.emit).not.toHaveBeenCalledWith(ResourceUsageSessionEndedEvent.EVENT_NAME, expect.any(Object));
       expect(mockMetricsService.resourceUsageSessionsTotal.inc).not.toHaveBeenCalled();
-      expect(usageTransactionCommitted).toBe(false);
+      expect(usageTransactionCommitted).toBe(true);
       expect(flowExecutorService.runFlow).toHaveBeenCalledWith(
         1,
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
         expect.any(Object),
-        transactionalEntityManager,
+        resourceUsageRepository.manager,
       );
     });
 
