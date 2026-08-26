@@ -35,14 +35,16 @@ public:
         STATUS_ERROR,     // something went wrong (e.g. card not authorised)
     };
 
-    void setTimeoutTime(uint32_t timeoutTime);
-    void setRequesterName(std::string requesterName);
-    void setStatus(Status status);
-    // Override the status line text (used for specific error messages). Cleared automatically on the
-    // next setStatus() call that isn't STATUS_ERROR.
-    void setStatusMessage(const std::string &message);
-    // Secondary hint listing who may approve (supervisor names) plus the web fallback note.
-    void setSupervisorHint(const std::string &hint);
+    struct View
+    {
+        uint32_t deadlineMs = 0;
+        std::string requesterName;
+        std::string statusMessage;
+        std::string supervisorHint;
+        Status status = STATUS_WAITING;
+    };
+
+    void render(const View &view);
     void setOnCancelCallback(std::function<void()> callback);
     // Call right before showing the screen. This is the only sticky screen opened by an on-screen
     // button press, so the finger that pressed "Sitzung starten" is usually still down while it
@@ -63,10 +65,7 @@ private:
     lv_obj_t *statusLabel = nullptr;
     lv_obj_t *hintLabel = nullptr;
     lv_obj_t *cancelButton = nullptr;
-    std::string requesterNameCache;
-    std::string statusMessageOverride;
-    std::string hintCache;
-    Status status = STATUS_WAITING;
+    View view;
 
     std::function<void()> onCancelCallback;
     static void onCancelButtonEvent(lv_event_t *e);
