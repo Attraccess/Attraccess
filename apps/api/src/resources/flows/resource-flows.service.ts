@@ -520,23 +520,14 @@ export class ResourceFlowsService {
     });
 
     // Append plugin-contributed node schemas.
-    const pluginSchemas = await Promise.all(
-      getRegisteredPluginFlowNodes().map(async (definition) => {
-        let configSchema = definition.configSchema;
-        if (definition.resolveConfigSchema) {
-          try {
-            configSchema = await definition.resolveConfigSchema({});
-          } catch (error) {
-            this.logger.warn(`Unable to resolve initial schema for plugin flow node "${definition.type}": ${error}`);
-            configSchema ??= { dynamic: true, properties: {} };
-          }
-        }
+    const pluginSchemas = getRegisteredPluginFlowNodes().map((definition) => {
+      const configSchema = definition.configSchema ??
+        (definition.resolveConfigSchema ? { dynamic: true, properties: {} } : undefined);
         if (!configSchema) {
           throw new Error(`Plugin flow node type "${definition.type}" does not provide a configuration schema.`);
         }
         return this.pluginNodeSchema(definition, configSchema);
-      }),
-    );
+    });
 
     return [...coreSchemas, ...pluginSchemas];
   }

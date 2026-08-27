@@ -111,6 +111,8 @@ export function NodeEditor(props: Props) {
   }, [resourceId, schema.type]);
 
   const scheduleSchemaResolution = useCallback((config: Record<string, unknown>) => {
+    schemaAbortController.current?.abort();
+    schemaRequest.current += 1;
     if (schemaResolutionTimeout.current) {
       clearTimeout(schemaResolutionTimeout.current);
     }

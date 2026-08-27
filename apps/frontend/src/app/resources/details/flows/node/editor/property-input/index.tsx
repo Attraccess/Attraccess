@@ -281,7 +281,13 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           value={Number(parsedValue)}
           defaultValue={schema.default ? Number(schema.default) : undefined}
           onChange={(newValue) => setValue(newValue as TValue)}
-          minValue={schema.exclusiveMinimum !== undefined ? schema.exclusiveMinimum + 1 : schema.minimum}
+          minValue={
+            schema.exclusiveMinimum !== undefined
+              ? schema.type === 'integer'
+                ? schema.exclusiveMinimum + 1
+                : schema.exclusiveMinimum + (schema.multipleOf ?? Number.EPSILON)
+              : schema.minimum
+          }
           maxValue={schema.maximum}
           step={schema.multipleOf}
         >
