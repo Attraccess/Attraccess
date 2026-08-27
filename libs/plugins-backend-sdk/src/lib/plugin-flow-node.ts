@@ -28,7 +28,7 @@ export interface PluginNodeExecutionContext {
  * Node type naming convention: use "plugin.<pluginName>.<nodeName>" to
  * guarantee no collision with core node types, e.g. "plugin.shelly.send-on".
  */
-export interface PluginFlowNodeDefinition {
+interface PluginFlowNodeDefinitionBase {
   /**
    * Unique type string. Must be stable across plugin versions — it is stored
    * in the database alongside saved flows. Convention: "plugin.<name>.<node>".
@@ -63,10 +63,10 @@ export interface PluginFlowNodeDefinition {
   resolveConfigSchema?(currentConfig: Record<string, unknown>): Promise<Record<string, unknown>>;
 
   /** Handle IDs accepted as inputs (e.g. ['input']). Empty for trigger nodes. */
-  readonly inputs: string[];
+  readonly inputs: readonly string[];
 
   /** Handle IDs produced as outputs (e.g. ['output']). Empty for terminal nodes. */
-  readonly outputs: string[];
+  readonly outputs: readonly string[];
 
   /**
    * Whether the node is available for all resource types.
@@ -79,6 +79,23 @@ export interface PluginFlowNodeDefinition {
    * expected). Controls the direction indicator in the catalog UI.
    */
   readonly isOutput?: boolean;
+}
+
+/** A plugin node that starts a flow when the plugin calls context.flows.trigger(). */
+export interface PluginFlowTriggerNodeDefinition extends PluginFlowNodeDefinitionBase {
+  /** Marks this node as a flow trigger rather than an executable node. */
+  readonly isInput: true;
+
+  /** Trigger nodes do not consume a preceding node's output. */
+  readonly inputs: readonly [];
+
+  /** Trigger nodes are passthrough nodes, so the host never calls execute(). */
+  readonly execute?: never;
+}
+
+/** A plugin node executed after a flow has already started. */
+export interface PluginFlowExecutionNodeDefinition extends PluginFlowNodeDefinitionBase {
+  readonly isInput?: false;
 
   /**
    * Execute the node. Called by the host flow engine when this node is reached
@@ -95,3 +112,5 @@ export interface PluginFlowNodeDefinition {
     ctx: PluginNodeExecutionContext,
   ): Promise<{ payload: object; outputHandle?: string }>;
 }
+
+export type PluginFlowNodeDefinition = PluginFlowTriggerNodeDefinition | PluginFlowExecutionNodeDefinition;

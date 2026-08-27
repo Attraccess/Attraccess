@@ -16,6 +16,7 @@ import {
   MqttCredentialProvisioningHostProvider,
   MqttServerConnectionConfig,
   MqttServerHostProvider,
+  PluginFlowsContext,
   EntityTarget,
   ObjectLiteral,
   Repository,
@@ -32,6 +33,7 @@ import { loadPluginEntryExports } from './plugin-loader';
 import { registerPluginFlowNodes } from './plugin-flow-node-registry';
 import { MqttCredentialProvisioningService } from '../mqtt/mqtt-credential-provisioning.service';
 import { join } from 'path';
+import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
 
 @Global()
 @Module({})
@@ -224,6 +226,14 @@ export class PluginModule {
           MQTT_CREDENTIAL_PROVISIONING_HOST_PROVIDER,
           { strict: false },
         );
+      },
+      get flows(): PluginFlowsContext {
+        const executor = PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get(ResourceFlowsExecutorService, {
+          strict: false,
+        });
+        return {
+          trigger: (nodeType, matches, payload) => executor.triggerPluginFlows(nodeType, matches, payload),
+        };
       },
     };
 

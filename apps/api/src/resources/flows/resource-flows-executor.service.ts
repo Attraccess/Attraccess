@@ -477,6 +477,37 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     return results.map((r) => r.payload);
   }
 
+  /**
+   * Starts every plugin trigger node whose saved configuration matches an
+   * external plugin event. Each node is started independently so its run logs
+   * remain attributed to that node's resource.
+   */
+  public async triggerPluginFlows(
+    nodeType: string,
+    matches: (config: Record<string, unknown>) => boolean,
+    payload: object,
+  ): Promise<void> {
+    const definition = getPluginFlowNode(nodeType);
+    if (!definition?.isInput) {
+      throw new Error(`Plugin flow node type "${nodeType}" is not a registered trigger node.`);
+    }
+
+    const nodes = await this.flowNodeRepository.find({ where: { type: nodeType as ResourceFlowNodeType } });
+    const matchingNodes = nodes.filter((node) => {
+      try {
+        return matches(node.data as Record<string, unknown>);
+      } catch (error) {
+        this.logger.error(
+          `Failed to match plugin flow trigger node ID: ${node.id} (Type: ${nodeType})`,
+          error instanceof Error ? error.stack : undefined,
+        );
+        return false;
+      }
+    });
+
+    await Promise.all(matchingNodes.map((node) => this.startFlow(node, { payload })));
+  }
+
   public async startFlow(
     node: ResourceFlowNode | ResourceFlowNode[],
     data: NodeProcessingResult,
@@ -551,6 +582,9 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     // Plugin-contributed node types fall through to the plugin registry.
     const pluginNode = getPluginFlowNode(node.type);
     if (pluginNode) {
+      if (pluginNode.isInput) {
+        return { payload: input, outputHandle: 'output' };
+      }
       return pluginNode.execute(
         { id: node.id, type: node.type, data: node.data as Record<string, unknown> },
         input,

@@ -42,6 +42,9 @@ function buildBaseContext(events: EventEmitter2): PluginContext {
         password: 'secret',
         clientId: null,
       }),
+    flows: {
+      trigger: jest.fn(async () => undefined),
+    },
   };
 }
 
@@ -230,6 +233,17 @@ describe('PluginSandboxService', () => {
         PluginPermission.RESOLVE_HOST_PROVIDERS,
       ]);
       expect(() => ctx.getMqttServerConfig(1)).toThrow(/ACCESS_MQTT_SERVERS/);
+    });
+
+    it('gates flows.trigger() behind TRIGGER_FLOWS', async () => {
+      const base = buildBaseContext(events);
+      const denied = PluginSandboxService.createGuardedContext(base, []);
+      expect(() => denied.flows.trigger('plugin.test.trigger', () => true, {})).toThrow(PluginPermissionError);
+      expect(() => denied.flows.trigger('plugin.test.trigger', () => true, {})).toThrow(/TRIGGER_FLOWS/);
+
+      const granted = PluginSandboxService.createGuardedContext(base, [PluginPermission.TRIGGER_FLOWS]);
+      await granted.flows.trigger('plugin.test.trigger', () => true, {});
+      expect(base.flows.trigger).toHaveBeenCalledWith('plugin.test.trigger', expect.any(Function), {});
     });
   });
 });

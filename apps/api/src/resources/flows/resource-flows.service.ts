@@ -351,6 +351,7 @@ export class ResourceFlowsService {
         outputs: [],
         supportedByResource: false,
         isOutput: false,
+        isInput: false,
       };
 
       switch (type) {
@@ -549,10 +550,10 @@ export class ResourceFlowsService {
     const pluginSchemas = getRegisteredPluginFlowNodes().map((definition) => {
       const configSchema = definition.configSchema ??
         (definition.resolveConfigSchema ? { dynamic: true, properties: {} } : undefined);
-        if (!configSchema) {
-          throw new Error(`Plugin flow node type "${definition.type}" does not provide a configuration schema.`);
-        }
-        return this.pluginNodeSchema(definition, configSchema);
+      if (!configSchema) {
+        throw new Error(`Plugin flow node type "${definition.type}" does not provide a configuration schema.`);
+      }
+      return this.pluginNodeSchema(definition, configSchema);
     });
 
     return [...coreSchemas, ...pluginSchemas];
@@ -567,10 +568,11 @@ export class ResourceFlowsService {
       label: definition.label,
       description: definition.description,
       configSchema,
-      inputs: definition.inputs,
-      outputs: definition.outputs,
+      inputs: [...definition.inputs],
+      outputs: [...definition.outputs],
       supportedByResource: definition.supportedByAllResources !== false,
       isOutput: definition.isOutput ?? false,
+      isInput: definition.isInput ?? false,
     };
   }
 }

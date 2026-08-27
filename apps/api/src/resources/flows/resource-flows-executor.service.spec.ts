@@ -20,6 +20,7 @@ import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { FlowTimer } from '../../metrics/instrumentation/flow/flow.helper';
 import { CompanionGatewayService } from '../../companion/companion-gateway.service';
 import axios from 'axios';
+import { registerPluginFlowNodes } from '../../plugin-system/plugin-flow-node-registry';
 
 jest.mock('axios');
 
@@ -81,7 +82,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       find: jest.fn(async ({ where }: any) => {
         const { resourceId, type } = where || {};
-        return initialNodes.filter((n) => n.resourceId === resourceId && n.type === type);
+        return initialNodes.filter((n) => n.type === type && (resourceId === undefined || n.resourceId === resourceId));
       }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       findOne: jest.fn(async ({ where }: any) => {
@@ -176,6 +177,40 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     });
     expect(result).toEqual([]);
     expect(flowNodeRepository.find as jest.Mock).toHaveBeenCalled();
+  });
+
+  it('starts every matching plugin trigger while isolating matcher failures', async () => {
+    registerPluginFlowNodes([
+      {
+        type: 'plugin.executor-test.trigger',
+        label: 'Executor test trigger',
+        configSchema: {},
+        inputs: [],
+        outputs: ['output'],
+        isInput: true,
+      },
+    ]);
+    initialNodes = [
+      createNode({ id: 'matching', type: 'plugin.executor-test.trigger' as ResourceFlowNodeType, resourceId: 1, data: { match: true } }),
+      createNode({ id: 'throws', type: 'plugin.executor-test.trigger' as ResourceFlowNodeType, resourceId: 2, data: { throws: true } }),
+      createNode({ id: 'skipped', type: 'plugin.executor-test.trigger' as ResourceFlowNodeType, resourceId: 3, data: { match: false } }),
+    ];
+
+    await service.triggerPluginFlows(
+      'plugin.executor-test.trigger',
+      (config) => {
+        if (config.throws) throw new Error('bad config');
+        return config.match === true;
+      },
+      { source: 'plugin' },
+    );
+
+    expect(flowEdgeRepository.find as jest.Mock).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ source: 'matching' }) }),
+    );
+    expect(flowEdgeRepository.find as jest.Mock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ source: 'throws' }) }),
+    );
   });
 
   it('returns initial data when a single input node has no outgoing edges (terminal)', async () => {

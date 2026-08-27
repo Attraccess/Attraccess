@@ -8,6 +8,7 @@
   "loading": "Knoten werden geladen…",
   "error": "Knoten konnten nicht geladen werden. Bitte versuche es erneut.",
   "domains": {
+    "triggers": "Auslöser",
     "manual": "Manuell",
     "resource": "Ressource",
     "door": "Tür",

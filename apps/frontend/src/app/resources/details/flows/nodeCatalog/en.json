@@ -8,6 +8,7 @@
   "loading": "Loading nodes…",
   "error": "Failed to load nodes. Please try again.",
   "domains": {
+    "triggers": "Triggers",
     "manual": "Manual",
     "resource": "Resource",
     "door": "Door",

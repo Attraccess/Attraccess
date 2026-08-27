@@ -14,9 +14,9 @@ import {
 } from 'lucide-react';
 
 // Static (core) domains only — plugin domains are derived at runtime from node types.
-export type Domain = 'manual' | 'resource' | 'door' | 'mqtt' | 'http' | 'logic' | 'health' | 'companion';
+export type Domain = 'triggers' | 'manual' | 'resource' | 'door' | 'mqtt' | 'http' | 'logic' | 'health' | 'companion';
 
-export const DOMAIN_ORDER: Domain[] = ['manual', 'resource', 'door', 'mqtt', 'http', 'logic', 'health', 'companion'];
+export const DOMAIN_ORDER: Domain[] = ['triggers', 'manual', 'resource', 'door', 'mqtt', 'http', 'logic', 'health', 'companion'];
 
 interface DomainDef {
   color: string;
@@ -26,6 +26,7 @@ interface DomainDef {
 }
 
 export const DOMAINS: Record<Domain, DomainDef> = {
+  triggers: { color: 'blue',   iconBg: 'bg-blue-100 dark:bg-blue-900/30',     iconFg: 'text-blue-700 dark:text-blue-300',     icon: CircleDotIcon },
   manual:   { color: 'blue',   iconBg: 'bg-blue-100 dark:bg-blue-900/30',     iconFg: 'text-blue-700 dark:text-blue-300',     icon: CircleDotIcon },
   resource: { color: 'green',  iconBg: 'bg-green-100 dark:bg-green-900/30',   iconFg: 'text-green-700 dark:text-green-300',   icon: CogIcon },
   door:     { color: 'amber',  iconBg: 'bg-amber-100 dark:bg-amber-900/30',   iconFg: 'text-amber-700 dark:text-amber-300',   icon: DoorOpenIcon },
