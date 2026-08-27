@@ -143,9 +143,13 @@ export function AttraccessNode(props: Props) {
       return false;
     }
 
-    const properties = schema.configSchema.properties as Record<string, unknown>;
+    if (schema.configSchema.dynamic === true) {
+      return true;
+    }
 
-    if (Object.keys(properties).length === 0) {
+    const properties = schema.configSchema.properties as Record<string, unknown> | undefined;
+
+    if (!properties || Object.keys(properties).length === 0) {
       return false;
     }
 

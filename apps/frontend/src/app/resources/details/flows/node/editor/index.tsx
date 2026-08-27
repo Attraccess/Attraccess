@@ -36,6 +36,8 @@ export function NodeEditor(props: Props) {
   const [schemaError, setSchemaError] = useState<string>();
   const [isResolvingSchema, setIsResolvingSchema] = useState(false);
   const schemaRequest = useRef(0);
+  const schemaAbortController = useRef<AbortController | undefined>(undefined);
+  const schemaResolutionTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const dataRef = useRef(data);
 
   useEffect(() => {
@@ -68,6 +70,9 @@ export function NodeEditor(props: Props) {
   }, [onSave]);
 
   const resolveSchema = useCallback(async (config: Record<string, unknown>) => {
+    schemaAbortController.current?.abort();
+    const abortController = new AbortController();
+    schemaAbortController.current = abortController;
     const request = ++schemaRequest.current;
     setIsResolvingSchema(true);
     setSchemaError(undefined);
@@ -80,6 +85,7 @@ export function NodeEditor(props: Props) {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ config }),
           credentials: 'include',
+          signal: abortController.signal,
         },
       );
       if (!response.ok) {
@@ -95,8 +101,8 @@ export function NodeEditor(props: Props) {
       );
       dataRef.current = nextData;
       setData(nextData);
-    } catch {
-      if (request === schemaRequest.current) {
+    } catch (error) {
+      if (request === schemaRequest.current && !(error instanceof Error && error.name === 'AbortError')) {
         setSchemaError('Unable to refresh this plugin configuration. Please try again.');
       }
     } finally {
@@ -104,21 +110,37 @@ export function NodeEditor(props: Props) {
     }
   }, [resourceId, schema.type]);
 
+  const scheduleSchemaResolution = useCallback((config: Record<string, unknown>) => {
+    if (schemaResolutionTimeout.current) {
+      clearTimeout(schemaResolutionTimeout.current);
+    }
+    schemaResolutionTimeout.current = setTimeout(() => {
+      schemaResolutionTimeout.current = undefined;
+      void resolveSchema(config);
+    }, 300);
+  }, [resolveSchema]);
+
+  useEffect(() => () => {
+    if (schemaResolutionTimeout.current) {
+      clearTimeout(schemaResolutionTimeout.current);
+    }
+    schemaAbortController.current?.abort();
+  }, []);
+
   useEffect(() => {
     if (isOpen && schema.configSchema.dynamic === true) {
       void resolveSchema(dataRef.current);
     }
   }, [isOpen, resolveSchema, schema]);
 
-  const onInputChange = useCallback((propertyName: string, value: unknown) => {
+  const onInputChange = useCallback((propertyName: string, value: unknown, refreshesSchema?: boolean) => {
     const next = { ...dataRef.current, [propertyName]: value };
     dataRef.current = next;
     setData(next);
-    const property = resolvedSchema.configSchema.properties as Record<string, Property<unknown>>;
-    if (resolvedSchema.configSchema.dynamic === true && property[propertyName]?.refreshesSchema) {
-      void resolveSchema(next);
+    if (resolvedSchema.configSchema.dynamic === true && refreshesSchema) {
+      scheduleSchemaResolution(next);
     }
-  }, [resolvedSchema, resolveSchema]);
+  }, [resolvedSchema.configSchema.dynamic, scheduleSchemaResolution]);
 
   const titleKey = 'nodes.' + resolvedSchema.type + '.title';
   const descriptionKey = 'nodes.' + resolvedSchema.type + '.description';
@@ -151,7 +173,7 @@ export function NodeEditor(props: Props) {
                   name={propertyName}
                   schema={property}
                   value={data[propertyName]}
-                  onChange={(value) => onInputChange(propertyName, value)}
+                  onChange={(value, refreshesSchema) => onInputChange(propertyName, value, refreshesSchema)}
                 />
               ),
             )}

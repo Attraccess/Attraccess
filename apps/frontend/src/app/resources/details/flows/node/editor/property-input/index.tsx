@@ -49,13 +49,17 @@ interface Props<TValue> {
   tNodeTranslations: TFunction;
   tNodeExists?: TExists;
   value: TValue;
-  onChange: (value: TValue) => void;
+  onChange: (value: TValue, refreshesSchema?: boolean) => void;
   isRequired: boolean;
   hideLabel?: boolean;
 }
 
 export function PropertyInput<TValue>(props: Props<TValue>) {
-  const { name, isRequired, schema, tNodeTranslations: t, tNodeExists, nodeType, value, onChange, hideLabel } = props;
+  const { name, isRequired, schema, tNodeTranslations: t, tNodeExists, nodeType, value, onChange: onChangeProp, hideLabel } = props;
+  const onChange = useCallback(
+    (newValue: TValue, refreshesSchema = schema.refreshesSchema) => onChangeProp(newValue, refreshesSchema),
+    [onChangeProp, schema.refreshesSchema],
+  );
   const label = schema.title ?? t('nodes.' + nodeType + '.config.' + name + '.label');
 
   const helpTextKey = `nodes.${nodeType}.config.${name}.helpText`;
@@ -365,7 +369,8 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
                 name={`${name}.${propertyName}`}
                 schema={property}
                 value={objectValue[propertyName]}
-                onChange={(newValue) => onChange({ ...objectValue, [propertyName]: newValue } as TValue)}
+                onChange={(newValue, refreshesSchema) =>
+                  onChange({ ...objectValue, [propertyName]: newValue } as TValue, refreshesSchema)}
                 isRequired={schema.required?.includes(propertyName) ?? false}
               />
             ))}
@@ -401,13 +406,13 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
                           name={name + '.items.' + propName}
                           schema={propSchema as Property<unknown>}
                           value={(row as Record<string, unknown>)?.[propName]}
-                          onChange={(newItemPropValue) => {
+                          onChange={(newItemPropValue, refreshesSchema) => {
                             const newArrayValue = [...arrayValue] as Array<Record<string, unknown>>;
                             newArrayValue[index] = {
                               ...(newArrayValue[index] ?? {}),
                               [propName]: newItemPropValue,
                             };
-                            onChange(newArrayValue as TValue);
+                            onChange(newArrayValue as TValue, refreshesSchema);
                           }}
                           isRequired={false}
                           hideLabel
@@ -422,10 +427,10 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
                       name={name + '.items'}
                       schema={items as unknown as Property<unknown>}
                       value={row as unknown}
-                      onChange={(newItemValue) => {
+                      onChange={(newItemValue, refreshesSchema) => {
                         const newArrayValue = [...arrayValue];
                         newArrayValue[index] = newItemValue as unknown;
-                        onChange(newArrayValue as TValue);
+                        onChange(newArrayValue as TValue, refreshesSchema);
                       }}
                       isRequired={false}
                       hideLabel
