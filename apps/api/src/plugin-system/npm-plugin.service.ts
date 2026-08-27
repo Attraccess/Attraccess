@@ -3,7 +3,7 @@ import axios from 'axios';
 import { createHash, randomUUID } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
 import { lookup } from 'dns/promises';
-import { mkdir, mkdtemp, rename, rm, writeFile } from 'fs/promises';
+import { mkdir, mkdtemp, readdir, rename, rm, writeFile } from 'fs/promises';
 import ipaddr from 'ipaddr.js';
 import { join } from 'path';
 import { Readable } from 'stream';
@@ -63,17 +63,54 @@ export type InstalledNpmPlugin = {
 @Injectable()
 export class NpmPluginService implements OnModuleInit {
   private readonly logger = new Logger(NpmPluginService.name);
+  private static readonly recoveryLogger = new Logger(NpmPluginService.name);
   private registryMutation = Promise.resolve();
   private installMutation = Promise.resolve();
 
   constructor(private readonly settings: SettingsStoreService) {}
 
   async onModuleInit(): Promise<void> {
+    await NpmPluginService.recoverBackups();
+  }
+
+  static async recoverBackups(): Promise<void> {
     const backupDirectory = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY);
+    if (!existsSync(backupDirectory)) return;
     try {
-      await rm(backupDirectory, { recursive: true, force: true });
+      for (const entry of await readdir(backupDirectory, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const installPath = backupInstallPath(entry.name);
+        if (!installPath) continue;
+
+        const backup = join(backupDirectory, entry.name);
+        const installed = readInstalledNpmPlugins().find((plugin) => plugin.installPath === installPath);
+        if (!installed) {
+          await rm(backup, { recursive: true, force: true });
+          continue;
+        }
+
+        const target = join(PluginService.PLUGIN_PATH, installPath);
+        const backupVersion = packageVersion(backup);
+        const targetVersion = packageVersion(target);
+        if (targetVersion === installed.version) {
+          await rm(backup, { recursive: true, force: true });
+        } else if (backupVersion !== installed.version) {
+          NpmPluginService.recoveryLogger.error(
+            `Cannot recover npm plugin backup for ${installed.name}: version does not match installation state`,
+          );
+        } else if (!existsSync(target)) {
+          await rename(backup, target);
+        } else {
+          // State still references the backup version, so an interrupted replacement
+          // must restore it instead of allowing newly activated code to take over.
+          await rm(target, { recursive: true, force: true });
+          await rename(backup, target);
+        }
+      }
+      if ((await readdir(backupDirectory)).length === 0) await rm(backupDirectory, { recursive: true, force: true });
     } catch (error) {
-      this.logger.error('Failed to remove orphaned npm plugin backups', error);
+      // A backup is deliberately retained if reconciliation cannot prove it stale.
+      NpmPluginService.recoveryLogger.error('Failed to reconcile npm plugin backups', error);
     }
   }
 
@@ -158,7 +195,7 @@ export class NpmPluginService implements OnModuleInit {
     await this.mutateInstalls(async () => {
       const installed = this.installed(name);
       const target = join(PluginService.PLUGIN_PATH, installed.installPath);
-      const backup = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY, randomUUID());
+      const backup = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY, backupDirectoryName(installed.installPath));
 
       if (existsSync(target)) {
         await mkdir(join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY), { recursive: true });
@@ -194,7 +231,8 @@ export class NpmPluginService implements OnModuleInit {
       .map(([version, pkg]) => {
         try {
           const { manifest } = parseNpmPluginPackage(pkg, this.hostVersion());
-          if (manifest.name !== name) throw new BadRequestException('Package identity does not match the installed package');
+          if (manifest.name !== name)
+            throw new BadRequestException('Package identity does not match the installed package');
           return this.versionCandidate(installed, version, metadata.time?.[version] ?? null, manifest.permissions);
         } catch (error) {
           return {
@@ -240,7 +278,11 @@ export class NpmPluginService implements OnModuleInit {
     return {
       version,
       publishedAt,
-      direction: semver.eq(version, installed.version) ? 'current' : semver.gt(version, installed.version) ? 'newer' : 'older',
+      direction: semver.eq(version, installed.version)
+        ? 'current'
+        : semver.gt(version, installed.version)
+          ? 'newer'
+          : 'older',
       compatible: true,
       reason: null,
       permissions,
@@ -264,7 +306,9 @@ export class NpmPluginService implements OnModuleInit {
     requestedSpec = version,
     resolvedMetadata?: { versions?: Record<string, PackageVersion> },
   ): Promise<InstalledNpmPlugin> {
-    const metadata = resolvedMetadata ?? ((await this.packageMetadata(name, registry.id)) as { versions?: Record<string, PackageVersion> });
+    const metadata =
+      resolvedMetadata ??
+      ((await this.packageMetadata(name, registry.id)) as { versions?: Record<string, PackageVersion> });
     const packageVersion = metadata.versions?.[version];
     if (!packageVersion || packageVersion.version !== version) throw new NotFoundException('Package version not found');
     if (!packageVersion.dist.integrity && !packageVersion.dist.shasum)
@@ -279,7 +323,10 @@ export class NpmPluginService implements OnModuleInit {
       const source = join(staging, 'package');
       const packageJsonPath = join(source, 'package.json');
       if (!existsSync(packageJsonPath)) throw new BadRequestException('Tarball does not contain package/package.json');
-      const { pkg, manifest } = parseNpmPluginPackage(JSON.parse(readFileSync(packageJsonPath, 'utf8')), this.hostVersion());
+      const { pkg, manifest } = parseNpmPluginPackage(
+        JSON.parse(readFileSync(packageJsonPath, 'utf8')),
+        this.hostVersion(),
+      );
       if (manifest.name !== name || manifest.version !== version)
         throw new BadRequestException('Tarball package identity does not match the requested package');
       validateEntries(source, manifest);
@@ -339,23 +386,7 @@ export class NpmPluginService implements OnModuleInit {
   }
 
   listInstalled(): InstalledNpmPlugin[] {
-    const statePath = join(PluginService.PLUGIN_PATH, STATE_FILE);
-    if (!existsSync(statePath)) return [];
-    try {
-      const records = JSON.parse(readFileSync(statePath, 'utf8'));
-      if (!Array.isArray(records)) return [];
-      return records.map((record) => ({
-        ...record,
-        requestedSpec: record.requestedSpec ?? record.version,
-        compatibility: record.compatibility ?? { host: 'unknown', sdk: {} },
-        state: record.state ?? 'active',
-        installedAt: record.installedAt ?? new Date(0).toISOString(),
-        activatedAt: record.activatedAt ?? new Date(0).toISOString(),
-        lastError: record.lastError ?? null,
-      }));
-    } catch {
-      return [];
-    }
+    return readInstalledNpmPlugins();
   }
 
   findInstalledByPluginId(pluginId: string): InstalledNpmPlugin | undefined {
@@ -367,7 +398,7 @@ export class NpmPluginService implements OnModuleInit {
   private async activate(source: string, name: string): Promise<{ target: string; backup: string }> {
     const target = join(PluginService.PLUGIN_PATH, pluginDirectory(name));
     const backupDirectory = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY);
-    const backup = join(backupDirectory, randomUUID());
+    const backup = join(backupDirectory, backupDirectoryName(pluginDirectory(name)));
     await mkdir(backupDirectory, { recursive: true });
     if (existsSync(target)) await rename(target, backup);
     try {
@@ -417,14 +448,17 @@ export class NpmPluginService implements OnModuleInit {
     name: string,
     spec: string,
     registry: Registry,
-  ): Promise<{ version: string; metadata: { versions?: Record<string, PackageVersion>; 'dist-tags'?: Record<string, string> } }> {
+  ): Promise<{
+    version: string;
+    metadata: { versions?: Record<string, PackageVersion>; 'dist-tags'?: Record<string, string> };
+  }> {
     const metadata = (await this.packageMetadata(name, registry.id)) as {
       versions?: Record<string, PackageVersion>;
       'dist-tags'?: Record<string, string>;
     };
     const version = metadata.versions?.[spec]
       ? spec
-      : metadata['dist-tags']?.[spec] ?? semver.maxSatisfying(Object.keys(metadata.versions ?? {}), spec);
+      : (metadata['dist-tags']?.[spec] ?? semver.maxSatisfying(Object.keys(metadata.versions ?? {}), spec));
     if (!version || !metadata.versions?.[version]) throw new NotFoundException('Package version not found');
     return { version, metadata };
   }
@@ -517,6 +551,40 @@ function normalizeRegistryUrl(value: string): string {
 }
 function pluginDirectory(name: string): string {
   return `npm-${Buffer.from(name).toString('base64url')}`;
+}
+function backupDirectoryName(installPath: string): string {
+  return `${installPath}-${randomUUID()}`;
+}
+function backupInstallPath(backupName: string): string | undefined {
+  const match = /^(npm-[A-Za-z0-9_-]+)-[0-9a-f-]{36}$/.exec(backupName);
+  return match?.[1];
+}
+function packageVersion(directory: string): string | undefined {
+  try {
+    const pkg = JSON.parse(readFileSync(join(directory, 'plugin.json'), 'utf8'));
+    return typeof pkg.version === 'string' ? pkg.version : undefined;
+  } catch {
+    return undefined;
+  }
+}
+function readInstalledNpmPlugins(): InstalledNpmPlugin[] {
+  const statePath = join(PluginService.PLUGIN_PATH, STATE_FILE);
+  if (!existsSync(statePath)) return [];
+  try {
+    const records = JSON.parse(readFileSync(statePath, 'utf8'));
+    if (!Array.isArray(records)) return [];
+    return records.map((record) => ({
+      ...record,
+      requestedSpec: record.requestedSpec ?? record.version,
+      compatibility: record.compatibility ?? { host: 'unknown', sdk: {} },
+      state: record.state ?? 'active',
+      installedAt: record.installedAt ?? new Date(0).toISOString(),
+      activatedAt: record.activatedAt ?? new Date(0).toISOString(),
+      lastError: record.lastError ?? null,
+    }));
+  } catch {
+    return [];
+  }
 }
 function zodRegistries(value: unknown): StoredRegistry[] {
   if (!Array.isArray(value)) throw new Error();

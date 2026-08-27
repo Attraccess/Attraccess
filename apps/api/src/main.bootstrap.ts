@@ -9,6 +9,7 @@ import appConfiguration, { AppConfigType } from './config/app.config';
 import { DataSource } from 'typeorm';
 import { PluginService } from './plugin-system/plugin.service';
 import { PluginModule } from './plugin-system/plugin.module';
+import { NpmPluginService } from './plugin-system/npm-plugin.service';
 import { PluginMigrationService } from './plugin-system/plugin-migration.service';
 import { HttpsOptions } from '@nestjs/common/interfaces/external/https-options.interface';
 import { readFile, writeFile } from 'fs/promises';
@@ -83,6 +84,9 @@ export async function bootstrap() {
   PluginModule.configure({
     DISABLE_PLUGINS: earlyConfig.DISABLE_PLUGINS,
   });
+  // Restore a known-good package before migrations or module discovery can load
+  // code left behind by an interrupted npm plugin replacement.
+  await NpmPluginService.recoverBackups();
   bootstrapLogger.log('PluginSystem configured.');
 
   // Run plugin-shipped up-migrations BEFORE AppModule is imported, so every
