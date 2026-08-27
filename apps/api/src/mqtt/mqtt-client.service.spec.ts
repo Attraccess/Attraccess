@@ -14,7 +14,7 @@ import { ExternalCallTimer } from '../metrics/instrumentation/external/external.
 interface MqttClientServicePrivate {
   getOrCreateClient: (serverId: number, keepTryingToConnect?: boolean) => Promise<mqtt.MqttClient>;
   clients: Map<number, mqtt.MqttClient>;
-  subscriptions: Map<number, Map<string, { qos?: 0 | 1 | 2; count: number }>>;
+  subscriptions: Map<number, Map<string, { qosCounts: Map<0 | 1 | 2 | undefined, number>; effectiveQos?: 0 | 1 | 2 }>>;
 }
 
 // Mock mqtt module thoroughly to avoid actual connections and timers
@@ -370,7 +370,9 @@ describe('MqttClientService', () => {
       await service.subscribe(1, 'sensors/+', 1);
 
       expect(mockClient.subscribe).not.toHaveBeenCalled();
-      expect((service as unknown as MqttClientServicePrivate).subscriptions.get(1)?.get('sensors/+')?.qos).toBe(2);
+      expect(
+        (service as unknown as MqttClientServicePrivate).subscriptions.get(1)?.get('sensors/+')?.effectiveQos,
+      ).toBe(2);
     });
   });
 
@@ -400,6 +402,21 @@ describe('MqttClientService', () => {
 
       await service.unsubscribe(1, 'sensors/+');
       expect(mockClient.unsubscribe).toHaveBeenCalledWith('sensors/+', expect.any(Function));
+    });
+
+    it('lowers a shared subscription QoS when its highest-QoS consumer unsubscribes', async () => {
+      const mockClient = mqtt.connect({});
+      (service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
+      await service.subscribe(1, 'sensors/+', 0);
+      await service.subscribe(1, 'sensors/+', 2);
+      (mockClient.subscribe as jest.Mock).mockClear();
+
+      await service.unsubscribe(1, 'sensors/+', 2);
+
+      expect(mockClient.subscribe).toHaveBeenCalledWith('sensors/+', { qos: 0 }, expect.any(Function));
+      expect(
+        (service as unknown as MqttClientServicePrivate).subscriptions.get(1)?.get('sensors/+')?.effectiveQos,
+      ).toBe(0);
     });
 
     it('removes the topic from reconnect subscriptions and the active client', async () => {
