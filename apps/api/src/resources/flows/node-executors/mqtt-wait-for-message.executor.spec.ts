@@ -128,4 +128,11 @@ describe('MqttWaitForMessageExecutor', () => {
     // no listener should have been registered when subscribe failed
     expect(eventEmitter.listenerCount(MqttMessageEvent.EVENT_NAME)).toBe(0);
   });
+
+  it('distinguishes acknowledgement timeouts from subscription failures', () => {
+    expect(executor.getFailureKind(new Error("Timeout waiting for MQTT message on topic 'a/b' (server 7)"))).toBe(
+      'acknowledgement-timeout',
+    );
+    expect(executor.getFailureKind(new Error('broker unreachable'))).toBe('transport-dispatch');
+  });
 });

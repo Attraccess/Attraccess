@@ -51,6 +51,7 @@ import { MetricsService } from '../../metrics/metrics.service';
 import { AuthenticatedUser, SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { PluginEventsService } from '../../plugin-system/plugin-events.service';
 import { RbacService } from '../../users-and-auth/rbac/rbac.service';
+import { ExternalEffectFailureError } from '../flows/errors/external-effect-failure.error';
 
 export interface EndSessionOptions {
   /** Skip persisting required END-action form submissions (used by automated/flow paths). */
@@ -101,12 +102,13 @@ export class ResourceUsageService {
     description: string,
   ): Promise<void> {
     try {
-      await manager.transaction(async (flowEntityManager) => {
-        await this.flowExecutorService.runFlow(resourceId, triggerNodeType, payload, flowEntityManager);
-      });
+      await this.flowExecutorService.runFlow(resourceId, triggerNodeType, payload, manager);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Usage ${description} flow failed for resource ${resourceId}: ${message}`, error);
+      if (error instanceof ExternalEffectFailureError) {
+        throw error;
+      }
     }
   }
 
@@ -157,7 +159,8 @@ export class ResourceUsageService {
   ): Promise<boolean> {
     // Prefer already-populated effectivePermissions on the request-bound user (set by SessionStrategy)
     // to avoid a redundant DB query on every resource start/stop.
-    const effectivePermissions = (user as AuthenticatedUser).effectivePermissions ?? await this.rbacService.getEffectivePermissions(user.id);
+    const effectivePermissions =
+      (user as AuthenticatedUser).effectivePermissions ?? (await this.rbacService.getEffectivePermissions(user.id));
     if (effectivePermissions.has('resources.update')) {
       return true;
     }
@@ -664,14 +667,19 @@ export class ResourceUsageService {
         }
 
         // Prefer already-populated effectivePermissions on the request-bound user (set by SessionStrategy)
-        const userPermissions = (user as AuthenticatedUser).effectivePermissions ?? await this.rbacService.getEffectivePermissions(user.id);
+        const userPermissions =
+          (user as AuthenticatedUser).effectivePermissions ?? (await this.rbacService.getEffectivePermissions(user.id));
         const canUpdateResources = userPermissions.has('resources.update');
         const isSessionOwner = activeSession.user.id === user.id;
         // The supervisor of a supervised session may end it as well.
         const isSupervisor = activeSession.supervisorUserId != null && activeSession.supervisorUserId === user.id;
 
         if (!isSessionOwner && !isSupervisor && !canUpdateResources) {
-          const canMaintain = await this.resourceIntroducersService.canMaintain(activeSession.resourceId, user.id, true);
+          const canMaintain = await this.resourceIntroducersService.canMaintain(
+            activeSession.resourceId,
+            user.id,
+            true,
+          );
           if (!canMaintain) {
             this.logger.warn(
               `User ${user.id} not authorized to end session ${activeSession.id} owned by user ${activeSession.user.id}`,

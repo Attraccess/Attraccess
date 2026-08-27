@@ -274,7 +274,7 @@
           "title": "Wait for MQTT message",
           "description": "Waits for the next MQTT message matching the topic filter; forwards {topic, payload}.",
           "inputs": { "input": "Input" },
-          "outputs": { "output": "Output" },
+          "outputs": { "output": "Output", "failure": "Failure" },
           "preview": {
             "topic": "Topic",
             "timeoutSeconds": "Timeout (s)"
@@ -289,6 +289,15 @@
                 "0": "0 - At most once (fire and forget)",
                 "1": "1 - At least once (acknowledged)",
                 "2": "2 - Exactly once (two-phase handshake)"
+              }
+            },
+            "failureBehavior": {
+              "label": "On failure",
+              "helpText": "Fail flow logs the failure and stops the triggering operation. Continue through failure output logs the failure and sends the original input plus flowError {kind, message} through Failure. Log and continue logs the failure and sends the unchanged input through Output.",
+              "enum": {
+                "fail-flow": "Fail flow",
+                "failure-output": "Continue through failure output",
+                "log-and-continue": "Log and continue"
               }
             }
           }
@@ -377,7 +386,8 @@
             "input": "Input"
           },
           "outputs": {
-            "output": "Output"
+            "output": "Output",
+            "failure": "Failure"
           },
           "preview": {
             "assignments": "Sets"
@@ -459,7 +469,8 @@
             "input": "Input"
           },
           "outputs": {
-            "output": "Output"
+            "output": "Output",
+            "failure": "Failure"
           },
           "preview": {
             "method": "Method",
@@ -488,6 +499,27 @@
             },
             "body": {
               "label": "Body"
+            },
+            "timeoutSeconds": {
+              "label": "Response timeout (seconds)",
+              "helpText": "Maximum time to wait for the controller response. Leave empty to wait without a node-specific timeout."
+            },
+            "completionBehavior": {
+              "label": "Completion",
+              "helpText": "Dispatch only continues after the HTTP request is initiated. Wait for response waits for the controller response.",
+              "enum": {
+                "dispatch": "Dispatch only",
+                "acknowledged": "Wait for response"
+              }
+            },
+            "failureBehavior": {
+              "label": "On failure",
+              "helpText": "Fail flow logs the failure and stops the triggering operation. Continue through failure output logs the failure and sends the original input plus flowError {kind, message} through Failure. Log and continue logs the failure and sends the unchanged input through Output.",
+              "enum": {
+                "fail-flow": "Fail flow",
+                "failure-output": "Continue through failure output",
+                "log-and-continue": "Log and continue"
+              }
             }
           }
         }
@@ -500,7 +532,8 @@
             "input": "Input"
           },
           "outputs": {
-            "output": "Output"
+            "output": "Output",
+            "failure": "Failure"
           },
           "preview": {
             "topic": "Topic"
@@ -523,7 +556,28 @@
                 "2": "2 - Exactly once (two-phase handshake)"
               }
             },
-            "retain": { "label": "Retain message" }
+            "retain": { "label": "Retain message" },
+            "completionBehavior": {
+              "label": "Completion",
+              "helpText": "Dispatch continues after MQTT accepts the publish call. Acknowledged waits for the broker publish callback.",
+              "enum": {
+                "dispatch": "Dispatch only",
+                "acknowledged": "Wait for acknowledgement"
+              }
+            },
+            "acknowledgementTimeoutSeconds": {
+              "label": "Acknowledgement timeout (seconds)",
+              "helpText": "Maximum time to wait for the MQTT publish acknowledgement. Leave empty to use the integration default."
+            },
+            "failureBehavior": {
+              "label": "On failure",
+              "helpText": "Fail flow logs the failure and stops the triggering operation. Continue through failure output logs the failure and sends the original input plus flowError {kind, message} through Failure. Log and continue logs the failure and sends the unchanged input through Output.",
+              "enum": {
+                "fail-flow": "Fail flow",
+                "failure-output": "Continue through failure output",
+                "log-and-continue": "Log and continue"
+              }
+            }
           }
         }
       },
@@ -559,9 +613,18 @@
             "title": "End usage session",
             "description": "Ends the active usage session. Optionally sends notes (template or static).",
             "inputs": { "input": "Input" },
-            "outputs": { "output": "Output" },
+            "outputs": { "output": "Output", "failure": "Failure" },
             "config": {
-              "notes": { "label": "Notes (templates allowed)" }
+              "notes": { "label": "Notes (templates allowed)" },
+              "failureBehavior": {
+                "label": "On failure",
+                "helpText": "Fail flow logs the failure and stops the triggering operation. Continue through failure output logs the failure and sends the original input plus flowError {kind, message} through Failure. Log and continue logs the failure and sends the unchanged input through Output.",
+                "enum": {
+                  "fail-flow": "Fail flow",
+                  "failure-output": "Continue through failure output",
+                  "log-and-continue": "Log and continue"
+                }
+              }
             },
             "preview": {
               "notes": "Notes"

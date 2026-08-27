@@ -355,7 +355,7 @@ export class ResourceFlowsService {
         case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
           schema.configSchema = z.toJSONSchema(HttpRequestNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
-          schema.outputs = ['output'];
+          schema.outputs = ['output', 'failure'];
           schema.supportedByResource = true;
           schema.isOutput = true;
           break;
@@ -363,6 +363,7 @@ export class ResourceFlowsService {
         case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
           schema.configSchema = z.toJSONSchema(MqttSendMessageNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
+          schema.outputs = ['output', 'failure'];
           schema.supportedByResource = true;
           schema.isOutput = true;
           break;
@@ -370,6 +371,7 @@ export class ResourceFlowsService {
         case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
           schema.configSchema = z.toJSONSchema(ResourceUsageEndSessionNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
+          schema.outputs = ['output', 'failure'];
           schema.supportedByResource = resource.type === ResourceType.Machine;
           schema.isOutput = true;
           break;
@@ -405,7 +407,7 @@ export class ResourceFlowsService {
         case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
           schema.configSchema = z.toJSONSchema(MqttWaitForMessageNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
-          schema.outputs = ['output'];
+          schema.outputs = ['output', 'failure'];
           schema.supportedByResource = true;
           break;
 
