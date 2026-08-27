@@ -174,14 +174,16 @@ export class NpmPluginService {
             registry,
           )) as { objects?: Array<{ package?: unknown }> };
           return {
-            results: await Promise.all(
-              (search.objects ?? []).map(async ({ package: pkg }) => {
-                const summary = pkg as { name?: unknown };
-                return typeof summary?.name === 'string'
-                  ? this.marketplacePackage(summary.name, registry.id)
-                  : this.marketplacePlugin(pkg, registry);
-              }),
-            ),
+            results: (
+              await Promise.allSettled(
+                (search.objects ?? []).map(async ({ package: pkg }) => {
+                  const summary = pkg as { name?: unknown };
+                  return typeof summary?.name === 'string'
+                    ? this.marketplacePackage(summary.name, registry.id)
+                    : this.marketplacePlugin(pkg, registry);
+                }),
+              )
+            ).flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])),
             error: null,
           };
         } catch {
