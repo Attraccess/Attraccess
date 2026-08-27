@@ -3,6 +3,7 @@ import { Resource, Setting, User } from '@attraccess/database-entities';
 import {
   isPluginPermission,
   MqttServerConnectionConfig,
+  MqttCredentialProvisioningHostProvider,
   PluginContext,
   PluginPermission,
   PluginPermissionError,
@@ -146,6 +147,10 @@ export class PluginSandboxService {
       getMqttServerConfig(serverId: number): Promise<MqttServerConnectionConfig | null> {
         require(PluginPermission.ACCESS_MQTT_SERVERS, `getMqttServerConfig(${serverId})`);
         return base.getMqttServerConfig(serverId);
+      },
+      getMqttCredentialProvisioning(): MqttCredentialProvisioningHostProvider {
+        require(PluginPermission.ACCESS_MQTT_SERVERS, 'getMqttCredentialProvisioning()');
+        return base.getMqttCredentialProvisioning();
       },
     };
   }

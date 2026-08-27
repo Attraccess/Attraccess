@@ -14,6 +14,7 @@ import { RabbitmqDetectionService } from './rabbitmq-detection.service';
 import { RabbitmqManagementClient } from './rabbitmq-management-client';
 import { RabbitmqUsersController } from './rabbitmq-users.controller';
 import { RabbitmqUsersService } from './rabbitmq-users.service';
+import { RabbitmqCredentialProvisioningProvider } from './rabbitmq-credential-provisioning.provider';
 
 // The host hands each plugin its PluginContext under this token. Recreate it
 // locally (do not import the value) so the artifact has no runtime dependency on
@@ -52,6 +53,9 @@ class RabbitmqController {
 class RabbitmqPluginModule {}
 
 const plugin: PluginBackendModule = {
+  credentialProvisioningProvider(context: PluginContext): RabbitmqCredentialProvisioningProvider {
+    return new RabbitmqCredentialProvisioningProvider(context);
+  },
   register(context: PluginContext): DynamicModule {
     return {
       module: RabbitmqPluginModule,

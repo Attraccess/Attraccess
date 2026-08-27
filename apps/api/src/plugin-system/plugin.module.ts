@@ -12,6 +12,8 @@ import {
   SystemEventPayload,
   SystemEventSubscription,
   MQTT_SERVER_HOST_PROVIDER,
+  MQTT_CREDENTIAL_PROVISIONING_HOST_PROVIDER,
+  MqttCredentialProvisioningHostProvider,
   MqttServerConnectionConfig,
   MqttServerHostProvider,
   EntityTarget,
@@ -26,6 +28,7 @@ import { PluginEventsService } from './plugin-events.service';
 import { PluginController } from './plugin.controller';
 import { loadPluginEntryExports } from './plugin-loader';
 import { registerPluginFlowNodes } from './plugin-flow-node-registry';
+import { MqttCredentialProvisioningService } from '../mqtt/mqtt-credential-provisioning.service';
 import { join } from 'path';
 
 @Global()
@@ -128,6 +131,11 @@ export class PluginModule {
     }
 
     const context = PluginModule.createPluginContext(manifest);
+    const credentialProvider = (exported as PluginBackendModule).credentialProvisioningProvider;
+    if (credentialProvider) {
+      MqttCredentialProvisioningService.register(credentialProvider(context));
+      this.logger.log(`Registered MQTT credential provider from plugin ${manifest.name}.`);
+    }
     return (exported as PluginBackendModule).register(context);
   }
 
@@ -204,6 +212,12 @@ export class PluginModule {
           { strict: false }
         );
         return provider.getServerConfig(serverId);
+      },
+      getMqttCredentialProvisioning(): MqttCredentialProvisioningHostProvider {
+        return PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get<MqttCredentialProvisioningHostProvider>(
+          MQTT_CREDENTIAL_PROVISIONING_HOST_PROVIDER,
+          { strict: false }
+        );
       },
     };
 
