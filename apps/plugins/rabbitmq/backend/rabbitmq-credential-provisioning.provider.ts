@@ -23,12 +23,17 @@ interface RabbitmqTopicPermissions {
   read: string;
 }
 
+interface VhostLock {
+  mutex: Mutex;
+  users: number;
+}
+
 /**
  * Translates the generic per-device MQTT policy to RabbitMQ's vhost and topic
  * permissions. Passwords are created in memory and never logged or retained.
  */
 export class RabbitmqCredentialProvisioningProvider implements MqttCredentialProvisioningProvider {
-  private static readonly vhostLocks = new Map<string, Mutex>();
+  private static readonly vhostLocks = new Map<string, VhostLock>();
 
   readonly id = 'rabbitmq';
   readonly displayName = 'RabbitMQ Management API';
@@ -68,11 +73,19 @@ export class RabbitmqCredentialProvisioningProvider implements MqttCredentialPro
     const lockKey = `${config.id}:${request.vhost}`;
     let lock = RabbitmqCredentialProvisioningProvider.vhostLocks.get(lockKey);
     if (!lock) {
-      lock = new Mutex();
+      lock = { mutex: new Mutex(), users: 0 };
       RabbitmqCredentialProvisioningProvider.vhostLocks.set(lockKey, lock);
     }
+    lock.users += 1;
 
-    return lock.runExclusive(() => this.writeCredentialLocked(request, config));
+    try {
+      return await lock.mutex.runExclusive(() => this.writeCredentialLocked(request, config));
+    } finally {
+      lock.users -= 1;
+      if (lock.users === 0 && RabbitmqCredentialProvisioningProvider.vhostLocks.get(lockKey) === lock) {
+        RabbitmqCredentialProvisioningProvider.vhostLocks.delete(lockKey);
+      }
+    }
   }
 
   private async writeCredentialLocked(
@@ -288,7 +301,7 @@ function mqttFilterToRegex(filter: string): string {
     .split('/')
     .map((segment) => {
       if (segment === '+') {
-        return '[^/]+';
+        return '[^.]+';
       }
       if (segment === '#') {
         return '.*';

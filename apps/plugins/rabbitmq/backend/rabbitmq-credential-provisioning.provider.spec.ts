@@ -20,6 +20,14 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
     expect(regex.test('devices.controller-b.heartbeat')).toBe(false);
   });
 
+  it('limits a single-level wildcard to one RabbitMQ routing-key level', () => {
+    const regex = new RegExp(mqttFiltersToRegex(['devices/+/reported']));
+
+    expect(regex.test('devices.controller-a.reported')).toBe(true);
+    expect(regex.test('devices.controller-a.internal.reported')).toBe(false);
+    expect(regex.test('devices.controller-a.reported.state')).toBe(false);
+  });
+
   it('rejects malformed wildcard policies instead of widening broker permissions', async () => {
     const provider = new RabbitmqCredentialProvisioningProvider(context);
 
@@ -196,6 +204,13 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
     finishFirst();
     await Promise.all([first, second]);
     expect(write).toHaveBeenCalledTimes(2);
+    expect(
+      (
+        RabbitmqCredentialProvisioningProvider as unknown as {
+          vhostLocks: Map<string, unknown>;
+        }
+      ).vhostLocks.has('4:/'),
+    ).toBe(false);
   });
 
   it('refuses to alter the configured management identity', async () => {
