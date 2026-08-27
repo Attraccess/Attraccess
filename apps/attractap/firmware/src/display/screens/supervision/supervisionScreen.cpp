@@ -63,7 +63,7 @@ void SupervisionScreen::init()
    lv_obj_set_width(this->requesterNameLabel, lv_pct(100));
    lv_obj_set_height(this->requesterNameLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->requesterNameLabel, LV_LABEL_LONG_WRAP);
-   const char *initialName = this->requesterNameCache.length() > 0 ? this->requesterNameCache.c_str() : "...";
+   const char *initialName = this->view.requesterName.length() > 0 ? this->view.requesterName.c_str() : "...";
    lv_label_set_text(this->requesterNameLabel, initialName);
    lv_obj_set_style_text_align(this->requesterNameLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->requesterNameLabel, lv_color_hex(SUPERVISION_COLOR_TEXT), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -82,7 +82,7 @@ void SupervisionScreen::init()
    lv_obj_set_width(this->hintLabel, lv_pct(100));
    lv_obj_set_height(this->hintLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->hintLabel, LV_LABEL_LONG_WRAP);
-   lv_label_set_text(this->hintLabel, this->hintCache.c_str());
+   lv_label_set_text(this->hintLabel, this->view.supervisorHint.c_str());
    lv_obj_set_style_text_align(this->hintLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->hintLabel, lv_color_hex(SUPERVISION_COLOR_HINT), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(this->hintLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -143,7 +143,7 @@ void SupervisionScreen::applyStatus()
 
    const char *text = "";
    uint32_t color = SUPERVISION_COLOR_WAITING;
-   switch (this->status)
+   switch (this->view.status)
    {
    case STATUS_WAITING:
       text = "Aufsichts-Karte auflegen";
@@ -158,7 +158,7 @@ void SupervisionScreen::applyStatus()
       color = SUPERVISION_COLOR_SUCCESS;
       break;
    case STATUS_ERROR:
-      text = this->statusMessageOverride.length() > 0 ? this->statusMessageOverride.c_str() : "Fehler";
+      text = this->view.statusMessage.length() > 0 ? this->view.statusMessage.c_str() : "Fehler";
       color = SUPERVISION_COLOR_ERROR;
       break;
    }
@@ -169,7 +169,7 @@ void SupervisionScreen::applyStatus()
    // Hide the cancel button once approved — nothing left to cancel.
    if (this->cancelButton)
    {
-      if (this->status == STATUS_SUCCESS)
+      if (this->view.status == STATUS_SUCCESS)
       {
          lv_obj_add_flag(this->cancelButton, LV_OBJ_FLAG_HIDDEN);
       }
@@ -185,44 +185,20 @@ lv_obj_t *SupervisionScreen::getScreen()
    return this->screen;
 }
 
-void SupervisionScreen::setTimeoutTime(uint32_t timeoutTime)
+void SupervisionScreen::render(const View &view)
 {
-   this->timeoutTime = timeoutTime;
-   this->updateTimeoutBar();
-}
-
-void SupervisionScreen::setRequesterName(std::string requesterName)
-{
-   this->requesterNameCache = requesterName;
-   if (this->requesterNameLabel)
-   {
-      lv_label_set_text(this->requesterNameLabel, requesterName.c_str());
-   }
-}
-
-void SupervisionScreen::setStatus(Status status)
-{
-   this->status = status;
-   if (status != STATUS_ERROR)
-   {
-      this->statusMessageOverride = "";
-   }
-   this->applyStatus();
-}
-
-void SupervisionScreen::setStatusMessage(const std::string &message)
-{
-   this->statusMessageOverride = message;
-   this->applyStatus();
-}
-
-void SupervisionScreen::setSupervisorHint(const std::string &hint)
-{
-   this->hintCache = hint;
+   this->view = view;
+   this->timeoutTime = view.deadlineMs;
    if (this->hintLabel)
    {
-      lv_label_set_text(this->hintLabel, hint.c_str());
+       lv_label_set_text(this->hintLabel, this->view.supervisorHint.c_str());
    }
+   if (this->requesterNameLabel)
+   {
+       lv_label_set_text(this->requesterNameLabel, this->view.requesterName.c_str());
+   }
+   this->updateTimeoutBar();
+   this->applyStatus();
 }
 
 void SupervisionScreen::setOnCancelCallback(std::function<void()> callback)

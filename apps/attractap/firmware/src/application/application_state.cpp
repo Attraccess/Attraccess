@@ -103,19 +103,7 @@ void Application::processState() {
       this->externalState = EXTERNAL_STATE_NONE;
       this->resetPhase = RESET_PHASE_NONE;
     }
-    // Drop any in-progress supervision flow: the server-side request is gone after a disconnect, so
-    // a stale screen/phase would otherwise hang until timeout.
-    if (this->state == APPLICATION_STATE_SUPERVISION ||
-        this->supervisionPhase != SUPERVISION_PHASE_NONE) {
-      this->supervisionPhase = SUPERVISION_PHASE_NONE;
-      this->supervisionCardDetected = false;
-      this->supervisionKeyReady = false;
-      this->supervisionResolvedByWeb = false;
-      this->supervisionFailed = false;
-      this->supervisionCardRejected = false;
-      this->supervisionCancelRequested = false;
-      this->autoStartAfterSupervision = false;
-    }
+    this->supervision.onDisconnect();
 #endif
         if (this->state == APPLICATION_STATE_INIT)
         {
@@ -173,33 +161,34 @@ void Application::processState() {
   // reader in the web UI. Enrollment and reset return before this point, so the flag may sit unread
   // for as long as one of those runs — check it against the server's TTL rather than assuming the
   // request is still live, and tell the server when we cannot serve it.
-  if (this->supervisionStartRequested) {
-    this->supervisionStartRequested = false;
-    bool stale = millis() - this->supervisionRequestedAtMs > this->supervisionRequestedTimeoutMs;
-    if (stale) {
-      this->logger.debug("Ignoring supervision arm that outlived its request");
-    } else if (this->state == APPLICATION_STATE_SUPERVISION ||
-               this->state == APPLICATION_STATE_UNLOCKED ||
-               this->state == APPLICATION_STATE_AUTHENTICATE_CARD) {
-      // Someone is using this reader. UNLOCKED means a user tapped in and is on the details screen —
-      // seizing it would drop them back to the lockscreen with their tap-in gone, and the server
-      // cannot see that state because no session has started yet. AUTHENTICATE_CARD means an auth is
-      // in flight whose response would otherwise land in a different flow. Release the request so
-      // the requester fails immediately rather than watching a countdown they were never going to
-      // get a screen for.
-      this->logger.debug("Reader is in use, releasing the supervision request");
-      this->api.cancelSupervision();
-    } else {
-      this->beginWebInitiatedSupervision();
-    }
+  if (this->supervision.takePendingWebStart(
+          millis(), this->state == APPLICATION_STATE_SUPERVISION ||
+                         this->state == APPLICATION_STATE_UNLOCKED ||
+                         this->state == APPLICATION_STATE_AUTHENTICATE_CARD)) {
+    this->state = APPLICATION_STATE_SUPERVISION;
+    this->externalState = EXTERNAL_STATE_NONE;
     return;
   }
 
   // Two-card supervision is a sticky, self-contained sub-flow like enrollment/reset — it owns the
-  // screen until success, cancel or timeout. beginSupervision() is entered from the card-auth path
-  // (processCardAuthenticationData) rather than via externalState.
+  // screen until success, cancel or timeout.
   if (this->state == APPLICATION_STATE_SUPERVISION) {
-    this->processSupervision();
+    SupervisionFlow::Outcome outcome = this->supervision.tick(millis());
+    if (outcome != SupervisionFlow::Outcome::None) {
+      this->externalState = EXTERNAL_STATE_NONE;
+      this->state = APPLICATION_STATE_INIT;
+      this->unlocked = outcome == SupervisionFlow::Outcome::Unlock ||
+                       outcome == SupervisionFlow::Outcome::UnlockAndStartSession;
+      if (outcome == SupervisionFlow::Outcome::UnlockAndStartSession) {
+        Display::resourceDetailsScreen.showActionProgress("Starte Sitzung");
+        this->beginActionPause();
+        this->pendingActionType = PENDING_ACTION_START_SESSION;
+        this->pendingActionResourceId = this->selectedResourceId;
+        this->pendingActionProjectId = this->selectedProjectId;
+        this->hasPendingFormRequest = false;
+        this->api.startResourceUsageSession(this->selectedResourceId, this->selectedProjectId);
+      }
+    }
     return;
   }
 #endif
@@ -379,21 +368,6 @@ void Application::processState() {
   }
 
   if (this->state == APPLICATION_STATE_UNLOCKED) {
-    // Auto-start the session right after a supervisor approved by tapping their card at the reader
-    // (ATT-493). The web-approval channel starts the session server-side instead, so this only fires
-    // for the on-reader card path.
-    if (this->autoStartAfterSupervision) {
-      this->autoStartAfterSupervision = false;
-      Display::resourceDetailsScreen.showActionProgress("Starte Sitzung");
-      this->beginActionPause();
-      this->pendingActionType = PENDING_ACTION_START_SESSION;
-      this->pendingActionResourceId = this->selectedResourceId;
-      this->pendingActionProjectId = this->selectedProjectId;
-      this->hasPendingFormRequest = false;
-      this->api.startResourceUsageSession(this->selectedResourceId,
-                                          this->selectedProjectId);
-    }
-
     // Subtract any accumulated pause time while actions were in-progress.
     // accumulatedPauseMs only gets the elapsed delta added once an action
     // finishes (endActionPause). While an action is still running -- most
