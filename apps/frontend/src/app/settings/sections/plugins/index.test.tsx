@@ -18,6 +18,14 @@ const hoisted = vi.hoisted(() => ({
   deleteOptions: undefined as DeleteOptions | undefined,
 }));
 
+function deferred<T>() {
+  let resolve: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve: (value: T) => resolve(value) };
+}
+
 vi.mock('@attraccess/react-query-client', () => ({
   usePluginsServiceGetPlugins: () => ({ data: hoisted.plugins }),
   usePluginsServiceDeletePlugin: (options: DeleteOptions) => {
@@ -99,6 +107,63 @@ describe('PluginsSection', () => {
 
     expect(await screen.findByText('Shelly')).toBeInTheDocument();
     expect(screen.getByText('Official')).toBeInTheDocument();
+  });
+
+  it('reports registry search failures alongside partial marketplace results', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ results: [], errors: ['Could not search Private'] }),
+      }),
+    );
+
+    render(<PluginsSection />);
+
+    await waitFor(() =>
+      expect(hoisted.errorToast).toHaveBeenCalledWith(
+        expect.objectContaining({ description: 'Could not search Private' }),
+      ),
+    );
+  });
+
+  it('keeps the most recently opened marketplace plugin details', async () => {
+    const first = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
+    const second = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
+    const plugin = (name: string) => ({
+      name,
+      version: '1.0.0',
+      displayName: name,
+      description: null,
+      permissions: [],
+      registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
+      classification: 'community' as const,
+      classificationReason: 'Unapproved source',
+      installable: true,
+      incompatibilityReason: null,
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ results: [plugin('First'), plugin('Second')], errors: [] }),
+      })
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+
+    const detailButtons = await screen.findAllByRole('button', { name: 'Details' });
+    await user.click(detailButtons[0]);
+    await user.click(detailButtons[1]);
+    second.resolve({ ok: true, json: async () => plugin('Second') });
+    expect(await screen.findByRole('heading', { name: 'Second details' })).toBeInTheDocument();
+    first.resolve({ ok: true, json: async () => plugin('First') });
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Second details' })).toBeInTheDocument());
+    expect(screen.queryByRole('heading', { name: 'First details' })).not.toBeInTheDocument();
   });
 
   it('flags a plugin whose backend failed to load', () => {

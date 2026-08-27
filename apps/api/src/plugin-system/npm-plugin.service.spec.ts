@@ -106,11 +106,20 @@ describe('NpmPluginService', () => {
             package: {
               name: '@example/not-a-plugin',
               version: '1.2.3',
-              keywords: [],
-              attraccess: { displayName: 'Not a plugin', host: '*', official: true },
             },
           },
         ],
+      },
+    });
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      'dist-tags': { latest: '1.2.3' },
+      versions: {
+        '1.2.3': {
+          name: '@example/not-a-plugin',
+          version: '1.2.3',
+          keywords: [],
+          attraccess: { displayName: 'Not a plugin', host: '*', official: true },
+        },
       },
     });
 
@@ -125,6 +134,42 @@ describe('NpmPluginService', () => {
       ],
       errors: [],
     });
+  });
+
+  it('hydrates abbreviated search results before validating marketplace packages', async () => {
+    const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
+    const internals = service as unknown as ServiceInternals;
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+    jest.spyOn(axios, 'get').mockResolvedValue({
+      data: {
+        objects: [{ package: { name: '@example/plugin', version: '1.2.3' } }],
+      },
+    });
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      'dist-tags': { latest: '1.2.3' },
+      versions: {
+        '1.2.3': {
+          name: '@example/plugin',
+          version: '1.2.3',
+          keywords: ['attraccess-plugin'],
+          peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
+          attraccess: {
+            displayName: 'Example Plugin',
+            host: '*',
+            backend: 'dist/index.js',
+            sdk: { backend: '*' },
+            permissions: [],
+          },
+        },
+      },
+    });
+
+    await expect(service.searchMarketplace('example')).resolves.toMatchObject({
+      results: [expect.objectContaining({ name: '@example/plugin', installable: true })],
+      errors: [],
+    });
+    expect(service.packageMetadata).toHaveBeenCalledWith('@example/plugin', 'npm');
   });
 
   it('does not trust a package-declared official flag or a mismatched registry publisher', async () => {
@@ -315,6 +360,31 @@ describe('NpmPluginService', () => {
     expect(existsSync(join(root, 'npm-QGF0dHJhY2Nlc3Mvb25l', 'dist', 'index.js'))).toBe(true);
   });
 
+  it('classifies an installation using the selected version publisher', async () => {
+    const name = '@attraccess-plugins/shelly';
+    const tarball = await packageTarball(name);
+    const service = new NpmPluginService({} as never);
+    const internals = service as unknown as ServiceInternals;
+
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      maintainers: [{ name: 'attraccess' }],
+      versions: {
+        '1.2.3': {
+          version: '1.2.3',
+          _npmUser: { name: 'someone-else' },
+          dist: { tarball: 'plugin', shasum: createHash('sha1').update(tarball).digest('hex') },
+        },
+      },
+    });
+    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+
+    await expect(service.install(name, '1.2.3')).resolves.toMatchObject({
+      classification: 'community',
+      publisher: 'someone-else',
+    });
+  });
+
   it('does not activate concurrent installs of the same package', async () => {
     const name = '@attraccess/plugin';
     const tarball = await packageTarball(name);
@@ -466,20 +536,18 @@ describe('NpmPluginService', () => {
         },
       ]),
     );
-    jest
-      .spyOn(service, 'installedVersionCandidates')
-      .mockResolvedValue([
-        {
-          version: '1.1.0',
-          publishedAt: null,
-          direction: 'newer',
-          compatible: true,
-          reason: null,
-          permissions: ['READ_USERS'],
-          permissionAdditions: ['READ_USERS'],
-          permissionRemovals: [],
-        },
-      ]);
+    jest.spyOn(service, 'installedVersionCandidates').mockResolvedValue([
+      {
+        version: '1.1.0',
+        publishedAt: null,
+        direction: 'newer',
+        compatible: true,
+        reason: null,
+        permissions: ['READ_USERS'],
+        permissionAdditions: ['READ_USERS'],
+        permissionRemovals: [],
+      },
+    ]);
 
     await expect(service.replaceInstalled('@attraccess/plugin', '1.1.0')).rejects.toThrow(
       'Permission approval required for: READ_USERS',

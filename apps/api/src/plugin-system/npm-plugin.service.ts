@@ -174,7 +174,14 @@ export class NpmPluginService {
             registry,
           )) as { objects?: Array<{ package?: unknown }> };
           return {
-            results: (search.objects ?? []).map(({ package: pkg }) => this.marketplacePlugin(pkg, registry)),
+            results: await Promise.all(
+              (search.objects ?? []).map(async ({ package: pkg }) => {
+                const summary = pkg as { name?: unknown };
+                return typeof summary?.name === 'string'
+                  ? this.marketplacePackage(summary.name, registry.id)
+                  : this.marketplacePlugin(pkg, registry);
+              }),
+            ),
             error: null,
           };
         } catch {
@@ -198,7 +205,7 @@ export class NpmPluginService {
     const version = metadata['dist-tags']?.latest;
     const pkg = version ? metadata.versions?.[version] : undefined;
     if (!pkg) throw new NotFoundException('Package has no latest version');
-    return this.marketplacePlugin(pkg, registry, registryPublisher(metadata));
+    return this.marketplacePlugin(pkg, registry, registryPublisher(pkg) ?? registryPublisher(metadata));
   }
 
   async install(name: string, version: string, registryId?: string): Promise<InstalledNpmPlugin> {
@@ -346,7 +353,8 @@ export class NpmPluginService {
         await PluginMigrationService.assertReplacementMigrationHistory(manifest as LoadedPluginManifest, source);
       }
 
-      const classification = this.classification.classify(name, registry.url, registryPublisher(metadata));
+      const publisher = registryPublisher(packageVersion) ?? registryPublisher(metadata);
+      const classification = this.classification.classify(name, registry.url, publisher);
       const installed: InstalledNpmPlugin = {
         name,
         version,
@@ -358,7 +366,7 @@ export class NpmPluginService {
         lastError: null,
         classification: classification.kind,
         classificationReason: classification.reason,
-        publisher: registryPublisher(metadata),
+        publisher,
       };
       // Activation and its state update must commit together so a rollback cannot
       // remove another install's target or overwrite its state entry.
