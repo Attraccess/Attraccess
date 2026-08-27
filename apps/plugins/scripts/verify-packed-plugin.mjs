@@ -78,8 +78,8 @@ function validatePackageContract(pkg, hostVersion) {
       !semver.validRange(sdkRange) ||
       !semver.validRange(peerRange) ||
       !semver.intersects(sdkRange, peerRange) ||
-      !semver.satisfies(hostVersion, sdkRange) ||
-      !semver.satisfies(hostVersion, peerRange)
+      !semver.satisfies(hostVersion, sdkRange, { includePrerelease: true }) ||
+      !semver.satisfies(hostVersion, peerRange, { includePrerelease: true })
     )
       throw new Error(`Packed plugin must declare ${dependency} as a compatible peer dependency`);
   }

@@ -42,6 +42,10 @@ describe('parseNpmPluginPackage', () => {
     }, '1.9.0')).not.toThrow();
   });
 
+  it('accepts prerelease hosts covered by the declared compatibility ranges', () => {
+    expect(() => parseNpmPluginPackage(validPackage, '1.9.1-beta.1')).not.toThrow();
+  });
+
   it.each([
     [{ ...validPackage, keywords: [] }],
     [{ ...validPackage, version: '1.2' }],
