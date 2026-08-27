@@ -4,6 +4,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
 import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscription } from './plugin.interface';
 import type { PluginEntityClass } from './entity';
+import type { MqttCredentialProvisioningProviderFactory } from './mqtt-credential-provisioning';
+import type { MqttCredentialProvisioningHostProvider } from './mqtt-credential-provisioning';
 
 /**
  * DI token under which a plugin's own services can inject the PluginContext.
@@ -104,6 +106,9 @@ export interface PluginContext {
    * stays broker-agnostic (no RabbitMQ awareness).
    */
   getMqttServerConfig(serverId: number): Promise<MqttServerConnectionConfig | null>;
+
+  /** Discover and use the host-selected broker credential provider. Requires ACCESS_MQTT_SERVERS. */
+  getMqttCredentialProvisioning(): MqttCredentialProvisioningHostProvider;
 }
 
 /**
@@ -131,4 +136,7 @@ export interface PluginBackendModule {
    * Type naming convention: "plugin.<pluginName>.<nodeName>".
    */
   flowNodes?: PluginFlowNodeDefinition[];
+
+  /** Optional broker credential provider offered to other integrations by this plugin. */
+  credentialProvisioningProvider?: MqttCredentialProvisioningProviderFactory;
 }

@@ -23,6 +23,8 @@ module.exports = {
       compiler: 'tsc',
       main: './src/database/datasource.ts',
       tsConfig: './tsconfig.app.json',
+      // Migrations seed email defaults from the deployed assets directory.
+      assets: ['./src/assets'],
       optimization: false,
       outputHashing: 'none',
       generatePackageJson: true,

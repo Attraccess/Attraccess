@@ -14,6 +14,7 @@ import { PluginController } from './plugin.controller';
 import { NpmPluginService } from './npm-plugin.service';
 import { SettingsModule } from '../settings/settings.module';
 import { LoadedPluginManifest } from './plugin.manifest';
+import { MqttCredentialProvisioningService } from '../mqtt/mqtt-credential-provisioning.service';
 
 function newPluginDir(): string {
   const dir = mkdtempSync(join(tmpdir(), 'plugin-module-'));
@@ -72,7 +73,7 @@ describe('PluginModule', () => {
           version: '1.0.0',
           main: { backend: { directory: 'dist', entryPoint: 'missing.js' } },
           attraccessVersion: { min: '1.0.0' },
-        })
+        }),
       );
 
       const discovered = PluginService.getPlugins();
@@ -81,6 +82,31 @@ describe('PluginModule', () => {
       const module = PluginModule.forRoot();
       expect(module.imports).toEqual([SettingsModule]);
       expect(PluginService.getManifestById(discovered[0].id)).toBeDefined();
+    });
+
+    it('does not register a credential provider from a plugin whose factory fails', () => {
+      mkdirSync(join(root, 'broken-provider', 'dist'), { recursive: true });
+      writeFileSync(
+        join(root, 'broken-provider', 'plugin.json'),
+        JSON.stringify({
+          name: 'broken-provider',
+          version: '1.0.0',
+          main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+          attraccessVersion: { min: '1.0.0' },
+        }),
+      );
+      writeFileSync(
+        join(root, 'broken-provider', 'dist', 'index.js'),
+        [
+          'module.exports = {',
+          "  default: { register: () => { throw new Error('register failed'); }, credentialProvisioningProvider: () => ({ id: 'orphan' }) }",
+          '};',
+        ].join('\n'),
+      );
+      const register = jest.spyOn(MqttCredentialProvisioningService, 'register');
+
+      expect(PluginModule.forRoot().imports).toEqual([SettingsModule]);
+      expect(register).not.toHaveBeenCalled();
     });
 
     it('loads a plugin whose externalized host-shared requires resolve to the host copy', () => {
@@ -97,7 +123,7 @@ describe('PluginModule', () => {
           version: '1.0.0',
           main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
           attraccessVersion: { min: '1.0.0' },
-        })
+        }),
       );
       writeFileSync(
         join(root, 'needs-host-dep', 'dist', 'index.js'),
@@ -106,7 +132,7 @@ describe('PluginModule', () => {
           'if (typeof nest.Module !== "function") { throw new Error("host @nestjs/common not resolved"); }',
           'class NeedsHostDepModule {}',
           'module.exports = { default: { register: () => ({ module: NeedsHostDepModule }) } };',
-        ].join('\n')
+        ].join('\n'),
       );
 
       const module = PluginModule.forRoot();
@@ -122,13 +148,20 @@ describe('PluginModule', () => {
     function build(permissions: PluginPermission[]) {
       new PluginModule(dataSource, events, moduleRef);
       return (
-        PluginModule as unknown as { createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext }
+        PluginModule as unknown as {
+          createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
+        }
       ).createPluginContext(manifest({ permissions }));
     }
 
     it('projects the manifest down to public info', () => {
       const ctx = build([]);
-      expect(ctx.manifest).toEqual({ id: 'plugin-id', name: 'ctx-plugin', version: '1.0.0', pluginDirectory: 'ctx-plugin' });
+      expect(ctx.manifest).toEqual({
+        id: 'plugin-id',
+        name: 'ctx-plugin',
+        version: '1.0.0',
+        pluginDirectory: 'ctx-plugin',
+      });
     });
 
     it('hands back the live host DataSource when DATABASE_ACCESS is granted', () => {
