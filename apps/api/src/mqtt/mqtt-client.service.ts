@@ -345,14 +345,18 @@ export class MqttClientService implements OnModuleDestroy {
     const client = this.clients.get(serverId);
     if (subscription.qosCounts.size > 0) {
       const server = await this.mqttServerRepository.findOneBy({ id: serverId });
+      const currentSubscription = this.subscriptions.get(serverId)?.get(topic);
+      if (currentSubscription !== subscription || subscription.qosCounts.size === 0) {
+        return;
+      }
       const effectiveQos = this.effectiveQos(subscription, server?.defaultSubscribeQos as SubscriptionQos);
       if (subscription.effectiveQos === effectiveQos || !client?.connected) {
         return;
       }
-      subscription.effectiveQos = effectiveQos;
       await new Promise<void>((resolve, reject) => {
         client.subscribe(topic, { qos: effectiveQos }, (error) => (error ? reject(error) : resolve()));
       });
+      subscription.effectiveQos = effectiveQos;
       return;
     }
 

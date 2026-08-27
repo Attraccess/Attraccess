@@ -419,6 +419,59 @@ describe('MqttClientService', () => {
       ).toBe(0);
     });
 
+    it('preserves the broker QoS when lowering the subscription is rejected', async () => {
+      const mockClient = mqtt.connect({});
+      (service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
+      await service.subscribe(1, 'sensors/+', 0);
+      await service.subscribe(1, 'sensors/+', 2);
+      mockClient.subscribe = jest.fn(
+        (_topic: string, _options: mqtt.IClientSubscribeOptions, callback?: (error?: Error) => void) => {
+          callback?.(new Error('Subscribe error'));
+        },
+      );
+
+      await expect(service.unsubscribe(1, 'sensors/+', 2)).rejects.toThrow('Subscribe error');
+
+      expect(
+        (service as unknown as MqttClientServicePrivate).subscriptions.get(1)?.get('sensors/+')?.effectiveQos,
+      ).toBe(2);
+    });
+
+    it('does not re-subscribe after the final consumer unsubscribes during the server lookup', async () => {
+      const mockClient = mqtt.connect({});
+      let resolveServerLookup!: (server: typeof mockServer) => void;
+      (mockRepository.findOneBy as jest.Mock).mockImplementationOnce(
+        () =>
+          new Promise<typeof mockServer>((resolve) => {
+            resolveServerLookup = resolve;
+          }),
+      );
+      (service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
+      (service as unknown as MqttClientServicePrivate).subscriptions.set(
+        1,
+        new Map([
+          [
+            'sensors/+',
+            {
+              qosCounts: new Map<0 | 1 | 2 | undefined, number>([
+                [0, 1],
+                [2, 1],
+              ]),
+              effectiveQos: 2,
+            },
+          ],
+        ]),
+      );
+
+      const lowerQos = service.unsubscribe(1, 'sensors/+', 2);
+      await service.unsubscribe(1, 'sensors/+', 0);
+      resolveServerLookup(mockServer);
+      await lowerQos;
+
+      expect(mockClient.subscribe).not.toHaveBeenCalled();
+      expect(mockClient.unsubscribe).toHaveBeenCalledWith('sensors/+', expect.any(Function));
+    });
+
     it('removes the topic from reconnect subscriptions and the active client', async () => {
       const mockClient = mqtt.connect({});
       (service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
