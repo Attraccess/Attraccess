@@ -360,7 +360,7 @@ describe('MqttClientService', () => {
       const client = await servicePrivate.getOrCreateClient(1);
       servicePrivate.subscriptions.set(
         1,
-        new Map([['devices/#', { qosCounts: new Map([[0, 1]]), effectiveQos: undefined }]]),
+        new Map([['devices/#', { qosCounts: new Map([[0, 1]]), effectiveQos: 2 }]]),
       );
       client.subscribe = jest.fn(
         (_topic: string, _options: mqtt.IClientSubscribeOptions, callback?: (error?: Error) => void) => {

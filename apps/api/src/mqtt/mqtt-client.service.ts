@@ -139,6 +139,8 @@ export class MqttClientService implements OnModuleDestroy {
         const topics = this.subscriptions.get(serverId);
         if (topics && topics.size > 0) {
           for (const [t, subscription] of topics.entries()) {
+            // A broker connection has no active subscriptions until this request succeeds.
+            subscription.effectiveQos = undefined;
             const effectiveQos = this.effectiveQos(subscription, server.defaultSubscribeQos as SubscriptionQos);
             client.subscribe(t, { qos: effectiveQos }, (err) => {
               if (err) {

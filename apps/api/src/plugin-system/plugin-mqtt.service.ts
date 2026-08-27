@@ -113,7 +113,7 @@ export class PluginMqttService {
       this.enqueue(subscription, {
         serverId: event.serverId,
         topic: event.topic,
-        payload: Buffer.from(event.payloadBuffer),
+        payload: event.payloadBuffer,
       });
     }
   }
@@ -127,7 +127,7 @@ export class PluginMqttService {
       return;
     }
 
-    subscription.queue.push(message);
+    subscription.queue.push({ ...message, payload: Buffer.from(message.payload) });
     subscription.overflowLogged = false;
     if (!subscription.processing) {
       void this.processQueue(subscription);
