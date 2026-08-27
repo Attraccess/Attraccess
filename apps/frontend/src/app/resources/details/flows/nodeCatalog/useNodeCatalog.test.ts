@@ -19,6 +19,7 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
         { type: 'output.http.sendRequest', inputs: ['input'], outputs: [], isOutput: true, supportedByResource: true, configSchema: {} },
         { type: 'processing.wait', inputs: ['input'], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
         { type: 'input.mqtt.message.received', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: false, configSchema: {} },
+        { type: 'plugin.example.trigger', inputs: [], outputs: ['output'], isOutput: false, isInput: true, supportedByResource: true, configSchema: {} },
       ],
     }),
   };
@@ -33,8 +34,9 @@ describe('useNodeCatalog', () => {
   it('groups supported schemas by domain in DOMAIN_ORDER', () => {
     const { result } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
     const domains = result.current.groups.map((g) => g.domain);
-    expect(domains).toEqual(['manual', 'door', 'http', 'logic']);
+    expect(domains).toEqual(['triggers', 'manual', 'door', 'http', 'logic']);
     expect(result.current.groups.find((g) => g.domain === 'manual')?.nodes).toHaveLength(1);
+    expect(result.current.groups.find((g) => g.domain === 'triggers')?.nodes).toHaveLength(1);
   });
 
   it('omits unsupported schemas', () => {

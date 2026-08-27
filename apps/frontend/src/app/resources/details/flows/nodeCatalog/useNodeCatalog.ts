@@ -89,7 +89,7 @@ export function useNodeCatalog({ resourceId }: UseNodeCatalogArgs): UseNodeCatal
     const byDomain = new Map<string, CatalogNode[]>();
     for (const schema of schemas ?? []) {
       if (!schema.supportedByResource) continue;
-      const domain = nodeTypeDomain(schema.type);
+      const domain = schema.isInput ? 'triggers' : nodeTypeDomain(schema.type);
       const list = byDomain.get(domain) ?? [];
       list.push({ schema, direction: getDirection(schema) });
       byDomain.set(domain, list);

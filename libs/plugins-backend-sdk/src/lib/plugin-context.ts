@@ -58,6 +58,15 @@ export interface MqttServerHostProvider {
   getServerConfig(serverId: number): Promise<MqttServerConnectionConfig | null>;
 }
 
+/** Host flow functionality available to plugins with the TRIGGER_FLOWS permission. */
+export interface PluginFlowsContext {
+  /**
+   * Starts a flow from every persisted trigger node of nodeType whose saved
+   * configuration matches the supplied external event.
+   */
+  trigger(nodeType: string, matches: (config: Record<string, unknown>) => boolean, payload: object): Promise<void>;
+}
+
 /**
  * Curated facade handed to a backend plugin at load time. It is the single,
  * versioned seam between plugin code and the host application. Adding a field is
@@ -109,6 +118,9 @@ export interface PluginContext {
 
   /** Discover and use the host-selected broker credential provider. Requires ACCESS_MQTT_SERVERS. */
   getMqttCredentialProvisioning(): MqttCredentialProvisioningHostProvider;
+
+  /** Start matching flows from a plugin-declared trigger node. Requires TRIGGER_FLOWS. */
+  readonly flows: PluginFlowsContext;
 }
 
 /**

@@ -54,4 +54,10 @@ export class ResourceFlowNodeSchemaDto {
     type: 'boolean',
   })
   isOutput: boolean;
+
+  @ApiProperty({
+    description: 'Whether the node starts a flow run',
+    type: 'boolean',
+  })
+  isInput: boolean;
 }

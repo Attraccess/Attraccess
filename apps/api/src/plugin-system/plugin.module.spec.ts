@@ -16,6 +16,7 @@ import { PluginClassificationService } from './plugin-classification.service';
 import { SettingsModule } from '../settings/settings.module';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { MqttCredentialProvisioningService } from '../mqtt/mqtt-credential-provisioning.service';
+import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
 
 function newPluginDir(): string {
   const dir = mkdtempSync(join(tmpdir(), 'plugin-module-'));
@@ -186,6 +187,16 @@ describe('PluginModule', () => {
     it('gates the shared event bus behind EMIT/LISTEN permissions', () => {
       expect(() => build([PluginPermission.EMIT_EVENTS]).events.emit('x')).not.toThrow();
       expect(() => build([]).events.emit('x')).toThrow(/EMIT_EVENTS/);
+    });
+
+    it('delegates permitted flow triggers to the host executor', async () => {
+      const triggerPluginFlows = jest.fn(async () => undefined);
+      (moduleRef.get as jest.Mock).mockImplementation((token: unknown) =>
+        token === ResourceFlowsExecutorService ? { triggerPluginFlows } : { token },
+      );
+
+      await build([PluginPermission.TRIGGER_FLOWS]).flows.trigger('plugin.test.trigger', () => true, { event: 'x' });
+      expect(triggerPluginFlows).toHaveBeenCalledWith('ctx-plugin', 'plugin.test.trigger', expect.any(Function), { event: 'x' });
     });
   });
 

@@ -15,5 +15,5 @@
   "attraccessVersion": {
     "min": "1.0.0"
   },
-  "permissions": ["READ_USERS", "LISTEN_EVENTS"]
+  "permissions": ["READ_USERS", "LISTEN_EVENTS", "TRIGGER_FLOWS"]
 }
