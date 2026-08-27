@@ -66,7 +66,6 @@ export class RabbitmqCredentialProvisioningProvider implements MqttCredentialPro
     const vhost = encodeURIComponent(request.vhost);
     const username = encodeURIComponent(request.username);
     const existing = await this.userExists(config, username);
-    const vhostExisted = await this.vhostExists(config, vhost);
     await this.client.request(config, 'PUT', `/vhosts/${vhost}`);
 
     let previousPermissions: RabbitmqPermissions | null = null;
@@ -90,7 +89,6 @@ export class RabbitmqCredentialProvisioningProvider implements MqttCredentialPro
           : !existing
             ? [() => this.client.request(config, 'DELETE', `/users/${username}`)]
             : []),
-        ...(!vhostExisted ? [() => this.client.request(config, 'DELETE', `/vhosts/${vhost}`)] : []),
       ];
       await this.failAfterRollback(error, rollback);
     }
@@ -125,10 +123,6 @@ export class RabbitmqCredentialProvisioningProvider implements MqttCredentialPro
 
   private async userExists(config: MqttServerConnectionConfig, username: string): Promise<boolean> {
     return this.exists(config, `/users/${username}`);
-  }
-
-  private async vhostExists(config: MqttServerConnectionConfig, vhost: string): Promise<boolean> {
-    return this.exists(config, `/vhosts/${vhost}`);
   }
 
   private async exists(config: MqttServerConnectionConfig, path: string): Promise<boolean> {
