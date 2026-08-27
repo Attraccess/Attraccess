@@ -11,6 +11,9 @@ describe('mqttTopicMatches', () => {
     ['sensors/#', 'sensors', true],
     ['sensors/#/temperature', 'sensors/kitchen/temperature', false],
     ['sensors/kitchen', 'sensors/bedroom', false],
+    ['#', '$SYS/broker/uptime', false],
+    ['+/broker/uptime', '$SYS/broker/uptime', false],
+    ['$SYS/#', '$SYS/broker/uptime', true],
   ])('matches %s against %s: %s', (filter, topic, expected) => {
     expect(mqttTopicMatches(filter, topic)).toBe(expected);
   });
@@ -63,6 +66,22 @@ describe('PluginMqttService', () => {
 
     expect(logError).toHaveBeenCalledWith('MQTT handler for "events/#" failed', expect.any(String));
     expect(working).toHaveBeenCalled();
+  });
+
+  it('gives every subscriber an isolated payload buffer', async () => {
+    const mutatingHandler = jest.fn(({ payload }: { payload: Buffer }) => payload.fill(0));
+    const receivingHandler = jest.fn();
+    service.subscribe('mutating', 'mutating', new Logger('Plugin:mutating'), 1, 'events/#', mutatingHandler);
+    service.subscribe('receiving', 'receiving', new Logger('Plugin:receiving'), 1, 'events/#', receivingHandler);
+
+    events.emit(MqttMessageEvent.EVENT_NAME, new MqttMessageEvent(1, 'events/open', {}, Buffer.from('message')));
+    await new Promise(setImmediate);
+
+    expect(receivingHandler).toHaveBeenCalledWith({
+      serverId: 1,
+      topic: 'events/open',
+      payload: Buffer.from('message'),
+    });
   });
 
   it('serializes handler execution and drops new messages when its queue is full', async () => {

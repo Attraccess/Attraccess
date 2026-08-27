@@ -140,10 +140,20 @@ export class MqttClientService implements OnModuleDestroy {
         if (topics && topics.size > 0) {
           for (const [t, subscription] of topics.entries()) {
             const effectiveQos = this.effectiveQos(subscription, server.defaultSubscribeQos as SubscriptionQos);
-            subscription.effectiveQos = effectiveQos;
             client.subscribe(t, { qos: effectiveQos }, (err) => {
               if (err) {
                 this.logger.warn(`Failed to (re)subscribe to ${t} on server ${server.name}: ${err.message}`);
+                return;
+              }
+              if (this.subscriptions.get(serverId)?.get(t) !== subscription) {
+                return;
+              }
+              if (this.effectiveQos(subscription, server.defaultSubscribeQos as SubscriptionQos) === effectiveQos) {
+                subscription.effectiveQos = effectiveQos;
+              } else {
+                void this.reconcileSubscription(serverId, t, true).catch((error) => {
+                  this.logger.warn(`Failed to reconcile MQTT subscription ${t} on server ${server.name}: ${error.message}`);
+                });
               }
             });
             this.logger.debug(`(re)subscribed to ${t} on server ${server.name} with qos=${effectiveQos}`);

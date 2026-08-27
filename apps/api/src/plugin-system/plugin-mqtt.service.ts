@@ -22,6 +22,10 @@ export function mqttTopicMatches(topicFilter: string, topic: string): boolean {
   const filterLevels = topicFilter.split('/');
   const topicLevels = topic.split('/');
 
+  if (topic.startsWith('$') && !topicFilter.startsWith('$') && ['#', '+'].includes(filterLevels[0])) {
+    return false;
+  }
+
   return (
     filterLevels.every((filterLevel, index) => {
       if (filterLevel === '#') {
@@ -106,7 +110,11 @@ export class PluginMqttService {
       if (subscription.serverId !== event.serverId || !mqttTopicMatches(subscription.topicFilter, event.topic)) {
         continue;
       }
-      this.enqueue(subscription, { serverId: event.serverId, topic: event.topic, payload: event.payloadBuffer });
+      this.enqueue(subscription, {
+        serverId: event.serverId,
+        topic: event.topic,
+        payload: Buffer.from(event.payloadBuffer),
+      });
     }
   }
 
