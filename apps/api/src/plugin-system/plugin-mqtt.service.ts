@@ -72,10 +72,11 @@ export class PluginMqttService {
     try {
       await this.mqtt.subscribe(serverId, topicFilter, undefined, true);
     } catch (error) {
-      this.subscriptions.delete(subscription);
-      await this.mqtt.unsubscribe(serverId, topicFilter).catch((unsubscribeError) => {
-        logger.error(`Failed to unsubscribe from MQTT topic "${topicFilter}"`, (unsubscribeError as Error).stack);
-      });
+      if (this.subscriptions.delete(subscription)) {
+        await this.mqtt.unsubscribe(serverId, topicFilter).catch((unsubscribeError) => {
+          logger.error(`Failed to unsubscribe from MQTT topic "${topicFilter}"`, (unsubscribeError as Error).stack);
+        });
+      }
       throw error;
     }
 

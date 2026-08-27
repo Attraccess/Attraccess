@@ -71,6 +71,27 @@ describe('PluginMqttService', () => {
     await expect(subscription).resolves.toEqual({ unsubscribe: expect.any(Function) });
   });
 
+  it('does not release a shared topic twice when teardown races with a failed acknowledgement', async () => {
+    let rejectAcknowledgement!: (error: Error) => void;
+    await service.subscribe('live', 'live', new Logger('Plugin:live'), 1, 'events/#', () => undefined);
+    mqtt.subscribe.mockImplementationOnce(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectAcknowledgement = reject;
+        }),
+    );
+
+    const pending = service.subscribe('pending', 'pending', new Logger('Plugin:pending'), 1, 'events/#', () => undefined);
+    await Promise.resolve();
+
+    service.clearPlugin('pending');
+    rejectAcknowledgement(new Error('broker rejected subscription'));
+
+    await expect(pending).rejects.toThrow('broker rejected subscription');
+    expect(mqtt.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(mqtt.unsubscribe).toHaveBeenCalledWith(1, 'events/#');
+  });
+
   it('logs a throwing handler and continues delivering to other subscribers', async () => {
     const logger = new Logger('Plugin:broken');
     const logError = jest.spyOn(logger, 'error').mockImplementation();
