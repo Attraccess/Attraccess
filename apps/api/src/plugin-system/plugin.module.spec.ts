@@ -105,7 +105,7 @@ describe('PluginModule', () => {
       );
       const register = jest.spyOn(MqttCredentialProvisioningService, 'register');
 
-      expect(PluginModule.forRoot().imports).toEqual([]);
+      expect(PluginModule.forRoot().imports).toEqual([SettingsModule]);
       expect(register).not.toHaveBeenCalled();
     });
 

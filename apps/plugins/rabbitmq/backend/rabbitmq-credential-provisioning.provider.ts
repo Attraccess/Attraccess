@@ -7,6 +7,7 @@ import type {
   ProvisionedMqttCredential,
 } from '@attraccess/plugins-backend-sdk';
 import { BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
+import { Mutex } from 'async-mutex';
 import { RabbitmqDetectionService } from './rabbitmq-detection.service';
 import { RabbitmqManagementClient } from './rabbitmq-management-client';
 
@@ -27,6 +28,8 @@ interface RabbitmqTopicPermissions {
  * permissions. Passwords are created in memory and never logged or retained.
  */
 export class RabbitmqCredentialProvisioningProvider implements MqttCredentialProvisioningProvider {
+  private static readonly vhostLocks = new Map<string, Mutex>();
+
   readonly id = 'rabbitmq';
   readonly displayName = 'RabbitMQ Management API';
 
@@ -62,10 +65,25 @@ export class RabbitmqCredentialProvisioningProvider implements MqttCredentialPro
     this.assertRequest(request);
     const config = await this.requireConfig(request.mqttServerId);
     this.assertNotManagementUser(config, request.username);
+    const lockKey = `${config.id}:${request.vhost}`;
+    let lock = RabbitmqCredentialProvisioningProvider.vhostLocks.get(lockKey);
+    if (!lock) {
+      lock = new Mutex();
+      RabbitmqCredentialProvisioningProvider.vhostLocks.set(lockKey, lock);
+    }
+
+    return lock.runExclusive(() => this.writeCredentialLocked(request, config));
+  }
+
+  private async writeCredentialLocked(
+    request: MqttCredentialRequest,
+    config: MqttServerConnectionConfig,
+  ): Promise<ProvisionedMqttCredential> {
     const password = randomBytes(24).toString('base64url');
     const vhost = encodeURIComponent(request.vhost);
     const username = encodeURIComponent(request.username);
     const existing = await this.userExists(config, username);
+    const vhostExisted = await this.exists(config, `/vhosts/${vhost}`);
     await this.client.request(config, 'PUT', `/vhosts/${vhost}`);
 
     let previousPermissions: RabbitmqPermissions | null = null;
@@ -89,6 +107,7 @@ export class RabbitmqCredentialProvisioningProvider implements MqttCredentialPro
           : !existing
             ? [() => this.client.request(config, 'DELETE', `/users/${username}`)]
             : []),
+        ...(!vhostExisted ? [() => this.client.request(config, 'DELETE', `/vhosts/${vhost}`)] : []),
       ];
       await this.failAfterRollback(error, rollback);
     }
