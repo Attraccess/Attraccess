@@ -8,7 +8,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, EntityManager, EntityTarget } from 'typeorm';
+import { Repository, EntityManager, EntityTarget, MoreThan } from 'typeorm';
 import {
   ResourceFlowNode,
   ResourceFlowEdge,
@@ -489,22 +489,32 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     payload: object,
   ): Promise<void> {
     const definition = getPluginFlowNode(nodeType);
-    if (!definition?.isInput || getPluginFlowNodeOwner(nodeType) !== pluginName) {
+    if (
+      !nodeType.startsWith(`plugin.${pluginName}.`) ||
+      !definition?.isInput ||
+      getPluginFlowNodeOwner(nodeType) !== pluginName
+    ) {
       throw new Error(`Plugin flow node type "${nodeType}" is not a registered trigger node.`);
     }
 
     const pageSize = 100;
     const concurrency = 10;
-    for (let skip = 0; ; skip += pageSize) {
+    let lastId: string | undefined;
+    for (;;) {
       const nodes = await this.flowNodeRepository.find({
-        where: { type: nodeType as ResourceFlowNodeType },
+        where: {
+          type: nodeType as ResourceFlowNodeType,
+          ...(lastId ? { id: MoreThan(lastId) } : {}),
+        },
         order: { id: 'ASC' },
-        skip,
         take: pageSize,
       });
 
+      if (nodes.length === 0) return;
+      lastId = nodes[nodes.length - 1].id;
+
       for (let offset = 0; offset < nodes.length; offset += concurrency) {
-        await Promise.all(nodes.slice(offset, offset + concurrency).map(async (node) => {
+        await Promise.allSettled(nodes.slice(offset, offset + concurrency).map(async (node) => {
           let isMatch: boolean;
           try {
             isMatch = matches(node.data as Record<string, unknown>);

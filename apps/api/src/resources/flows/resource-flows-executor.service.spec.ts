@@ -80,10 +80,13 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     flowNodeRepository = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      find: jest.fn(async ({ where, skip, take }: any) => {
-        const { resourceId, type } = where || {};
-        const nodes = initialNodes.filter((n) => n.type === type && (resourceId === undefined || n.resourceId === resourceId));
-        return take === undefined ? nodes : nodes.slice(skip, skip + take);
+      find: jest.fn(async ({ where, take }: any) => {
+        const { resourceId, type, id } = where || {};
+        const nodes = initialNodes.filter((node) => {
+          const isAfterLastId = id === undefined || node.id > id._value;
+          return node.type === type && (resourceId === undefined || node.resourceId === resourceId) && isAfterLastId;
+        });
+        return take === undefined ? nodes : nodes.slice(0, take);
       }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       findOne: jest.fn(async ({ where }: any) => {
@@ -245,13 +248,14 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     expect(flowNodeRepository.find as jest.Mock).toHaveBeenNthCalledWith(1, {
       where: { type: 'plugin.pagination-test.trigger' },
       order: { id: 'ASC' },
-      skip: 0,
       take: 100,
     });
     expect(flowNodeRepository.find as jest.Mock).toHaveBeenNthCalledWith(2, {
-      where: { type: 'plugin.pagination-test.trigger' },
+      where: {
+        type: 'plugin.pagination-test.trigger',
+        id: expect.objectContaining({ _value: 'node-099' }),
+      },
       order: { id: 'ASC' },
-      skip: 100,
       take: 100,
     });
     expect(maxInFlight).toBeLessThanOrEqual(10);
@@ -273,6 +277,45 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     await expect(service.triggerPluginFlows('other-plugin', 'plugin.owner-test.trigger', () => true, {})).rejects.toThrow(
       /not a registered trigger node/,
     );
+  });
+
+  it('rejects a plugin trigger type that collides with a built-in flow node', async () => {
+    registerPluginFlowNodes('colliding-plugin', [
+      {
+        type: ResourceFlowNodeType.INPUT_BUTTON,
+        label: 'Colliding trigger',
+        configSchema: {},
+        inputs: [],
+        outputs: ['output'],
+        isInput: true,
+      },
+    ]);
+
+    await expect(
+      service.triggerPluginFlows('colliding-plugin', ResourceFlowNodeType.INPUT_BUTTON, () => true, {}),
+    ).rejects.toThrow(/not a registered trigger node/);
+  });
+
+  it('continues starting matching plugin flows after a flow fails', async () => {
+    registerPluginFlowNodes('failure-test', [
+      {
+        type: 'plugin.failure-test.trigger',
+        label: 'Failure test trigger',
+        configSchema: {},
+        inputs: [],
+        outputs: ['output'],
+        isInput: true,
+      },
+    ]);
+    initialNodes = [
+      createNode({ id: 'first', type: 'plugin.failure-test.trigger' as ResourceFlowNodeType }),
+      createNode({ id: 'second', type: 'plugin.failure-test.trigger' as ResourceFlowNodeType }),
+    ];
+    jest.spyOn(service, 'startFlow').mockRejectedValueOnce(new Error('flow failed')).mockResolvedValueOnce([]);
+
+    await service.triggerPluginFlows('failure-test', 'plugin.failure-test.trigger', () => true, {});
+
+    expect(service.startFlow).toHaveBeenCalledTimes(2);
   });
 
   it('returns initial data when a single input node has no outgoing edges (terminal)', async () => {
