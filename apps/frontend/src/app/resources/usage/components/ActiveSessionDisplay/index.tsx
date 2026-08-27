@@ -1,12 +1,5 @@
 import { useState, useCallback } from 'react';
-import {
-  ButtonGroup,
-  Dropdown,
-  DropdownTrigger,
-  DropdownMenu,
-  DropdownItem,
-  DropdownPopover,
-} from '@heroui/react';
+import { ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownPopover } from '@heroui/react';
 import { SessionStatusCard } from '../SessionStatusCard';
 import { Button } from '../../../../../components/button';
 import { buttonVariants } from '@heroui/styles';
@@ -30,13 +23,16 @@ import { FlowButtons } from './flowButtons';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
+import { PluginSlot } from '../../../../plugins/PluginSlot';
+import { RESOURCE_ACTIVE_SESSION_SLOT, ResourceActiveSessionSlotContext } from '@attraccess/plugins-frontend-sdk';
 
 interface ActiveSessionDisplayProps {
   resourceId: number;
+  usageId: number;
   startTime: string;
 }
 
-export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDisplayProps) {
+export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveSessionDisplayProps) {
   const { t, tExists } = useTranslations({
     en: {
       ...en,
@@ -131,51 +127,49 @@ export function ActiveSessionDisplay({ resourceId, startTime }: ActiveSessionDis
         data-cy="active-session-card"
         chipDataCy="active-session-live-chip"
       >
-          <SessionTimer startTime={startTime} variant="hero" />
+        <SessionTimer startTime={startTime} variant="hero" />
 
-          {(activeSession?.usage?.project || activeSession?.usage?.supervisorUser) && (
-            <div className="border-t border-divider pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {activeSession?.usage?.project && (
-                <div className="min-w-0">
-                  <p className="text-xs uppercase tracking-wide text-default-500">{t('project')}</p>
-                  <p className="font-medium text-foreground truncate">{activeSession.usage.project.name}</p>
-                </div>
-              )}
-              {activeSession?.usage?.supervisorUser && (
-                <div className="min-w-0">
-                  <p className="text-xs uppercase tracking-wide text-default-500 mb-1">{t('supervisedBy')}</p>
-                  <AttraccessUser user={activeSession.usage.supervisorUser} />
-                </div>
-              )}
-            </div>
-          )}
+        {(activeSession?.usage?.project || activeSession?.usage?.supervisorUser) && (
+          <div className="border-t border-divider pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {activeSession?.usage?.project && (
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-wide text-default-500">{t('project')}</p>
+                <p className="font-medium text-foreground truncate">{activeSession.usage.project.name}</p>
+              </div>
+            )}
+            {activeSession?.usage?.supervisorUser && (
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-wide text-default-500 mb-1">{t('supervisedBy')}</p>
+                <AttraccessUser user={activeSession.usage.supervisorUser} />
+              </div>
+            )}
+          </div>
+        )}
 
-          <FlowButtons resourceId={resourceId} />
+        <FlowButtons resourceId={resourceId} />
+        <PluginSlot<ResourceActiveSessionSlotContext>
+          slotId={RESOURCE_ACTIVE_SESSION_SLOT}
+          context={{ resourceId, usageId }}
+        />
 
-          <ButtonGroup className="w-full">
-            <Button
-              variant="danger"
-              isPending={endSession.isPending}
-              onPress={immediatelyEndSession}
-            ><StopCircle className="w-4 h-4" />
-              {t('endSession')}
-            </Button>
-            <Dropdown>
-              <DropdownTrigger className={buttonVariants({ isIconOnly: true, variant: 'danger' })}>
-                <ChevronDownIcon />
-              </DropdownTrigger>
-              <DropdownPopover>
-                <DropdownMenu aria-label={t('alternativeEndSessionOptionsMenu.label')}>
-                  <DropdownItem
-                    key="endWithNotes" id="endWithNotes"
-                    onPress={handleOpenEndSessionModal}
-                  >
-                    {t('alternativeEndSessionOptionsMenu.endWithNotes.label')}
-                  </DropdownItem>
-                </DropdownMenu>
-              </DropdownPopover>
-            </Dropdown>
-          </ButtonGroup>
+        <ButtonGroup className="w-full">
+          <Button variant="danger" isPending={endSession.isPending} onPress={immediatelyEndSession}>
+            <StopCircle className="w-4 h-4" />
+            {t('endSession')}
+          </Button>
+          <Dropdown>
+            <DropdownTrigger className={buttonVariants({ isIconOnly: true, variant: 'danger' })}>
+              <ChevronDownIcon />
+            </DropdownTrigger>
+            <DropdownPopover>
+              <DropdownMenu aria-label={t('alternativeEndSessionOptionsMenu.label')}>
+                <DropdownItem key="endWithNotes" id="endWithNotes" onPress={handleOpenEndSessionModal}>
+                  {t('alternativeEndSessionOptionsMenu.endWithNotes.label')}
+                </DropdownItem>
+              </DropdownMenu>
+            </DropdownPopover>
+          </Dropdown>
+        </ButtonGroup>
       </SessionStatusCard>
 
       <SessionNotesModal

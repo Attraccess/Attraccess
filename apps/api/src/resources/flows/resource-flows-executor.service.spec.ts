@@ -166,6 +166,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         sendLockCommand: jest.fn(() => true),
         sendUnlockCommand: jest.fn(() => true),
       } as unknown as CompanionGatewayService,
+      { transition: jest.fn() } as never,
     );
   });
 
@@ -1219,6 +1220,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
         sendLockCommand: jest.fn(() => true),
         sendUnlockCommand: jest.fn(() => true),
       } as unknown as CompanionGatewayService,
+      { transition: jest.fn() } as never,
     );
   });
 

@@ -23,7 +23,7 @@ type SettingsMock = {
   setSecretSetting: jest.Mock;
 };
 
-async function packageTarball(name: string): Promise<Buffer> {
+async function packageTarball(name: string, permissions: string[] = []): Promise<Buffer> {
   const root = mkdtempSync(join(tmpdir(), 'npm-plugin-package-'));
   try {
     mkdirSync(join(root, 'package', 'dist'), { recursive: true });
@@ -38,6 +38,7 @@ async function packageTarball(name: string): Promise<Buffer> {
           displayName: name,
           host: '*',
           backend: 'dist/index.js',
+          permissions,
           sdk: { backend: '*' },
         },
       }),
@@ -209,6 +210,34 @@ describe('NpmPluginService', () => {
     expect(existsSync(join(root, 'npm-QGF0dHJhY2Nlc3Mvb25l', 'dist', 'index.js'))).toBe(true);
   });
 
+  it('does not activate concurrent installs of the same package', async () => {
+    const name = '@attraccess/plugin';
+    const tarball = await packageTarball(name);
+    const service = new NpmPluginService({} as never);
+    const internals = service as unknown as ServiceInternals;
+
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      versions: {
+        '1.2.3': {
+          version: '1.2.3',
+          dist: { tarball: 'plugin', shasum: createHash('sha1').update(tarball).digest('hex') },
+        },
+      },
+    });
+    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+
+    const results = await Promise.allSettled([service.install(name, '1.2.3'), service.install(name, '1.2.3')]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toEqual([
+      expect.objectContaining({
+        reason: expect.objectContaining({ message: 'Package is already installed; use the replacement endpoint' }),
+      }),
+    ]);
+    expect(service.listInstalled()).toEqual([expect.objectContaining({ name, version: '1.2.3' })]);
+  });
+
   it('restarts after backup cleanup fails following a successful install', async () => {
     const name = '@attraccess/plugin';
     const tarball = await packageTarball(name);
@@ -244,5 +273,112 @@ describe('NpmPluginService', () => {
     expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
     expect(service.listInstalled()).toEqual([expect.objectContaining({ name, version: '1.2.3' })]);
     expect(readdirSync(join(root, '.npm-backups'))).toHaveLength(1);
+  });
+
+  it('classifies installed versions and calculates their permission delta', async () => {
+    const service = new NpmPluginService({} as never);
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name: '@attraccess/plugin',
+          version: '1.2.0',
+          registryId: 'private',
+          registryUrl: 'https://registry.example.com',
+          integrity: 'sha512-test',
+          installPath: 'npm-plugin',
+          permissions: ['DATABASE_ACCESS'],
+          lastError: null,
+        },
+      ]),
+    );
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      time: { '1.1.0': '2026-01-01T00:00:00.000Z', '1.2.0': '2026-02-01T00:00:00.000Z', '1.3.0': '2026-03-01T00:00:00.000Z' },
+      versions: {
+        '1.1.0': { name: '@attraccess/plugin', version: '1.1.0', keywords: ['attraccess-plugin'], peerDependencies: { '@attraccess/plugins-backend-sdk': '*' }, attraccess: { displayName: 'Plugin', host: '*', backend: 'index.js', permissions: [], sdk: { backend: '*' } } },
+        '1.2.0': { name: '@attraccess/plugin', version: '1.2.0', keywords: ['attraccess-plugin'], peerDependencies: { '@attraccess/plugins-backend-sdk': '*' }, attraccess: { displayName: 'Plugin', host: '*', backend: 'index.js', permissions: ['DATABASE_ACCESS'], sdk: { backend: '*' } } },
+        '1.3.0': { name: '@attraccess/plugin', version: '1.3.0', keywords: ['attraccess-plugin'], peerDependencies: { '@attraccess/plugins-backend-sdk': '*' }, attraccess: { displayName: 'Plugin', host: '*', backend: 'index.js', permissions: ['DATABASE_ACCESS', 'READ_USERS'], sdk: { backend: '*' } } },
+      },
+    });
+    jest.spyOn(service as unknown as ServiceInternals, 'hostVersion').mockReturnValue('1.9.0');
+
+    await expect(service.installedVersionCandidates('@attraccess/plugin')).resolves.toEqual([
+      expect.objectContaining({ version: '1.3.0', direction: 'newer', permissionAdditions: ['READ_USERS'] }),
+      expect.objectContaining({ version: '1.2.0', direction: 'current', permissionAdditions: [] }),
+      expect.objectContaining({ version: '1.1.0', direction: 'older', permissionRemovals: ['DATABASE_ACCESS'] }),
+    ]);
+    expect(service.packageMetadata).toHaveBeenCalledWith('@attraccess/plugin', 'private');
+  });
+
+  it('requires the exact permission additions before replacing an installed package', async () => {
+    const service = new NpmPluginService({} as never);
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([{ name: '@attraccess/plugin', version: '1.0.0', registryId: 'npm', registryUrl: 'https://registry.npmjs.org', integrity: 'sha512-test', installPath: 'npm-plugin', permissions: [], lastError: null }]),
+    );
+    jest.spyOn(service, 'installedVersionCandidates').mockResolvedValue([
+      { version: '1.1.0', publishedAt: null, direction: 'newer', compatible: true, reason: null, permissions: ['READ_USERS'], permissionAdditions: ['READ_USERS'], permissionRemovals: [] },
+    ]);
+
+    await expect(service.replaceInstalled('@attraccess/plugin', '1.1.0')).rejects.toThrow('Permission approval required for: READ_USERS');
+  });
+
+  it('rejects replacing an installed package through the install endpoint', async () => {
+    const service = new NpmPluginService({} as never);
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([{ name: '@attraccess/plugin', version: '1.0.0' }]),
+    );
+
+    await expect(service.install('@attraccess/plugin', '1.1.0')).rejects.toThrow(
+      'Package is already installed; use the replacement endpoint',
+    );
+  });
+
+  it('requires approval for permissions declared by the downloaded replacement tarball', async () => {
+    const name = '@attraccess/plugin';
+    const tarball = await packageTarball(name, ['READ_USERS']);
+    const service = new NpmPluginService({} as never);
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name,
+          version: '1.0.0',
+          registryId: 'npm',
+          registryUrl: 'https://registry.npmjs.org',
+          integrity: 'sha512-test',
+          installPath: 'npm-plugin',
+          permissions: [],
+          lastError: null,
+        },
+      ]),
+    );
+    jest.spyOn(service, 'installedVersionCandidates').mockResolvedValue([
+      {
+        version: '1.2.3',
+        publishedAt: null,
+        direction: 'newer',
+        compatible: true,
+        reason: null,
+        permissions: [],
+        permissionAdditions: [],
+        permissionRemovals: [],
+      },
+    ]);
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      versions: {
+        '1.2.3': {
+          version: '1.2.3',
+          dist: { tarball: 'plugin', shasum: createHash('sha1').update(tarball).digest('hex') },
+        },
+      },
+    });
+    jest.spyOn(service as unknown as ServiceInternals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service as unknown as ServiceInternals, 'download').mockResolvedValue(tarball);
+
+    await expect(service.replaceInstalled(name, '1.2.3', [])).rejects.toThrow(
+      'Permission approval required for: READ_USERS',
+    );
   });
 });

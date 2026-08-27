@@ -151,82 +151,15 @@ jobs:
         with:
           esp-idf: 'false'
 
-      # Only affected plugins are linted/packaged. The `*,!tag:type:plugin`
+      # Only affected plugins are linted, tested, and npm-packed. The `*,!tag:type:plugin`
       # exclude keeps the affected set restricted to plugin apps, so a PR that
       # touches no plugin (or shared global) runs nothing here.
       - name: Lint affected plugin apps
         run: pnpm nx affected --target=lint --parallel=3 --base=${{ env.NX_AFFECTED_BASE }} --exclude='*,!tag:type:plugin'
-      - name: Test affected plugin apps
-        run: pnpm nx affected --target=test,e2e --parallel=3 --base=${{ env.NX_AFFECTED_BASE }} --exclude='*,!tag:type:plugin'
-      - name: Build + zip affected plugin apps
-        run: pnpm nx affected --target=package --parallel=3 --base=${{ env.NX_AFFECTED_BASE }} --exclude='*,!tag:type:plugin'
-
-      - name: Collect plugin ZIPs into a flat directory
-        id: collect
-        if: always()
-        run: |
-          set -euo pipefail
-          shopt -s nullglob globstar
-          mkdir -p dist/plugin-zips
-          for zip in apps/plugins/**/dist/*.zip; do
-            cp "$zip" dist/plugin-zips/
-          done
-          zips=(dist/plugin-zips/*.zip)
-          if [[ ${#zips[@]} -gt 0 ]]; then
-            echo "has_plugins=true" >> "$GITHUB_OUTPUT"
-            echo "Collected ${#zips[@]} plugin ZIP(s)."
-          else
-            echo "has_plugins=false" >> "$GITHUB_OUTPUT"
-            echo "No plugin ZIPs produced — no plugins affected by this PR."
-          fi
-
-      - name: Upload plugin ZIPs
-        uses: actions/upload-artifact@v4
-        if: github.event_name == 'pull_request' && always() && steps.collect.outputs.has_plugins == 'true'
-        with:
-          name: plugins-${{ github.event.pull_request.number }}-${{ github.run_attempt }}
-          path: dist/plugin-zips/*.zip
-          if-no-files-found: warn
-          retention-days: 30
-
-      # Fork PRs only get a read-only GITHUB_TOKEN — the permissions block above
-      # does not apply to them — so posting the comment fails with "Resource not
-      # accessible by integration". Skip the comment on fork PRs.
-      - name: Build PR comment body
-        id: comment-body
-        if: github.event_name == 'pull_request' && always() && github.event.pull_request.head.repo.full_name == github.repository
-        run: |
-          set -euo pipefail
-          shopt -s nullglob globstar
-          out="$(mktemp)"
-          {
-            echo "## Plugin artifacts"
-            echo ""
-            echo "Commit \`${{ github.event.pull_request.head.sha }}\` · workflow run [\`${{ github.run_id }}\`](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-            echo ""
-            if [[ "${{ steps.collect.outputs.has_plugins }}" != "true" ]]; then
-              echo "_No plugin changes detected in this PR — skipped plugin build._"
-            else
-              for zip in dist/plugin-zips/*.zip; do
-                size="$(du -h "$zip" | cut -f1)"
-                echo "- \`$(basename "$zip")\` (${size})"
-              done
-              echo ""
-              echo "Download the ZIPs from the [workflow artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})."
-            fi
-          } > "$out"
-          {
-            echo 'body<<EOF_BODY'
-            cat "$out"
-            echo 'EOF_BODY'
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Post sticky PR comment with plugin artifacts
-        if: github.event_name == 'pull_request' && always() && github.event.pull_request.head.repo.full_name == github.repository
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          header: plugin-artifacts
-          message: ${{ steps.comment-body.outputs.body }}
+      - name: Test and pack affected plugin apps
+        run: pnpm nx affected --target=test,e2e,pack-test --parallel=3 --base=${{ env.NX_AFFECTED_BASE }} --exclude='*,!tag:type:plugin'
+      - name: Test packed Hello World fixture
+        run: pnpm --dir examples/plugin-hello-world run pack-test
 
   fail2ban-smoke:
     runs-on: ubuntu-latest

@@ -13,6 +13,9 @@ import { SettingsStoreService } from '../settings/settings-store.service';
 import { resolveAppVersion } from '../config/app.config';
 import { PluginService } from './plugin.service';
 import { parseNpmPluginPackage } from './npm-plugin-contract';
+import { PluginMigrationService } from './plugin-migration.service';
+import { LoadedPluginManifest } from './plugin.manifest';
+import * as semver from 'semver';
 
 const REGISTRY_PARENT = 'plugin-registry';
 const REGISTRIES_KEY = 'registries';
@@ -26,6 +29,17 @@ const MAX_ARCHIVE_ENTRIES = 10_000;
 type StoredRegistry = { id: string; name: string; url: string };
 type Registry = StoredRegistry & { token: string | null };
 type PackageVersion = { version: string; dist: { tarball: string; integrity?: string; shasum?: string } };
+
+export type InstalledNpmPluginVersion = {
+  version: string;
+  publishedAt: string | null;
+  direction: 'current' | 'newer' | 'older';
+  compatible: boolean;
+  reason: string | null;
+  permissions: string[];
+  permissionAdditions: string[];
+  permissionRemovals: string[];
+};
 
 export type InstalledNpmPlugin = {
   name: string;
@@ -115,7 +129,93 @@ export class NpmPluginService {
   }
 
   async install(name: string, version: string, registryId?: string): Promise<InstalledNpmPlugin> {
+    if (this.listInstalled().some((plugin) => plugin.name === name)) {
+      throw new BadRequestException('Package is already installed; use the replacement endpoint');
+    }
     const registry = await this.registry(registryId);
+    return this.installFromRegistry(name, version, registry);
+  }
+
+  async installedVersionCandidates(name: string): Promise<InstalledNpmPluginVersion[]> {
+    const installed = this.installed(name);
+    const metadata = (await this.packageMetadata(name, installed.registryId)) as {
+      versions?: Record<string, unknown>;
+      time?: Record<string, string>;
+    };
+
+    return Object.entries(metadata.versions ?? {})
+      .filter(([version]) => semver.valid(version))
+      .map(([version, pkg]) => {
+        try {
+          const { manifest } = parseNpmPluginPackage(pkg, this.hostVersion());
+          if (manifest.name !== name) throw new BadRequestException('Package identity does not match the installed package');
+          return this.versionCandidate(installed, version, metadata.time?.[version] ?? null, manifest.permissions);
+        } catch (error) {
+          return {
+            ...this.versionCandidate(installed, version, metadata.time?.[version] ?? null, []),
+            compatible: false,
+            reason: error instanceof Error ? error.message : 'Package metadata is invalid',
+          };
+        }
+      })
+      .sort((a, b) => semver.rcompare(a.version, b.version));
+  }
+
+  async replaceInstalled(
+    name: string,
+    version: string,
+    approvedPermissionAdditions: string[] = [],
+  ): Promise<InstalledNpmPlugin> {
+    const installed = this.installed(name);
+    const candidates = await this.installedVersionCandidates(name);
+    const candidate = candidates.find((item) => item.version === version);
+    if (!candidate) throw new NotFoundException('Package version not found');
+    if (!candidate.compatible) throw new BadRequestException(candidate.reason ?? 'Package version is not compatible');
+    if (!samePermissions(candidate.permissionAdditions, approvedPermissionAdditions)) {
+      throw new BadRequestException(
+        `Permission approval required for: ${candidate.permissionAdditions.join(', ') || 'none'}`,
+      );
+    }
+    return this.installFromRegistry(
+      name,
+      version,
+      await this.registry(installed.registryId),
+      installed,
+      approvedPermissionAdditions,
+    );
+  }
+
+  private versionCandidate(
+    installed: InstalledNpmPlugin,
+    version: string,
+    publishedAt: string | null,
+    permissions: string[],
+  ): InstalledNpmPluginVersion {
+    return {
+      version,
+      publishedAt,
+      direction: semver.eq(version, installed.version) ? 'current' : semver.gt(version, installed.version) ? 'newer' : 'older',
+      compatible: true,
+      reason: null,
+      permissions,
+      permissionAdditions: permissions.filter((permission) => !installed.permissions.includes(permission)),
+      permissionRemovals: installed.permissions.filter((permission) => !permissions.includes(permission)),
+    };
+  }
+
+  private installed(name: string): InstalledNpmPlugin {
+    const installed = this.listInstalled().find((plugin) => plugin.name === name);
+    if (!installed) throw new NotFoundException('Installed npm plugin not found');
+    return installed;
+  }
+
+  private async installFromRegistry(
+    name: string,
+    version: string,
+    registry: Registry,
+    replacing?: InstalledNpmPlugin,
+    approvedPermissionAdditions: string[] = [],
+  ): Promise<InstalledNpmPlugin> {
     const metadata = (await this.packageMetadata(name, registry.id)) as { versions?: Record<string, PackageVersion> };
     const packageVersion = metadata.versions?.[version];
     if (!packageVersion || packageVersion.version !== version) throw new NotFoundException('Package version not found');
@@ -137,6 +237,18 @@ export class NpmPluginService {
       validateEntries(source, manifest);
       await writeFile(join(source, 'plugin.json'), JSON.stringify(manifest));
 
+      if (replacing) {
+        const permissionAdditions = manifest.permissions.filter(
+          (permission) => !replacing.permissions.includes(permission),
+        );
+        if (!samePermissions(permissionAdditions, approvedPermissionAdditions)) {
+          throw new BadRequestException(
+            `Permission approval required for: ${permissionAdditions.join(', ') || 'none'}`,
+          );
+        }
+        await PluginMigrationService.assertReplacementMigrationHistory(manifest as LoadedPluginManifest, source);
+      }
+
       const installed: InstalledNpmPlugin = {
         name,
         version,
@@ -150,6 +262,9 @@ export class NpmPluginService {
       // Activation and its state update must commit together so a rollback cannot
       // remove another install's target or overwrite its state entry.
       return await this.mutateInstalls(async () => {
+        if (!replacing && this.listInstalled().some((plugin) => plugin.name === name)) {
+          throw new BadRequestException('Package is already installed; use the replacement endpoint');
+        }
         const activation = await this.activate(source, name);
         try {
           await this.writeState(installed);
@@ -392,4 +507,8 @@ async function validateRegistryDestination(
 
 function safeArchivePath(value: string): boolean {
   return !value.startsWith('/') && !value.split('/').includes('..');
+}
+
+function samePermissions(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((permission) => right.includes(permission));
 }

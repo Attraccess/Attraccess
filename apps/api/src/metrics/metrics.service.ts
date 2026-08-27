@@ -56,6 +56,8 @@ export class MetricsService implements OnModuleInit {
 
   public readonly companionDownloadsTotal: Counter;
 
+  public readonly authorizationCacheRequestsTotal: Counter;
+  public readonly authorizationCacheSize: Gauge;
   public readonly maintenanceUsageQueryWindowDays: Histogram;
 
   constructor(
@@ -271,6 +273,19 @@ export class MetricsService implements OnModuleInit {
       name: 'attraccess_companion_downloads_total',
       help: 'Total number of companion app binary download attempts',
       labelNames: ['platform', 'arch', 'status'],
+      registers: [this.registry],
+    });
+
+    this.authorizationCacheRequestsTotal = new Counter({
+      name: 'attraccess_authorization_cache_requests_total',
+      help: 'Total number of canControllResource() authorization cache lookups',
+      labelNames: ['result'],
+      registers: [this.registry],
+    });
+
+    this.authorizationCacheSize = new Gauge({
+      name: 'attraccess_authorization_cache_size',
+      help: 'Current number of entries in the authorization cache',
       registers: [this.registry],
     });
 

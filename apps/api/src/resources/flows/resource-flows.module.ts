@@ -18,6 +18,7 @@ import { MqttModule } from '../../mqtt/mqtt.module';
 import { ResourceUsageModule } from '../usage/resourceUsage.module';
 import { ResourceHealthModule } from '../health/resource-health.module';
 import { CompanionModule } from '../../companion/companion.module';
+import { ResourceOperatingIntervalModule } from '../operating-intervals/resource-operating-interval.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { CompanionModule } from '../../companion/companion.module';
     forwardRef(() => ResourceUsageModule),
     ResourceHealthModule,
     CompanionModule,
+    ResourceOperatingIntervalModule,
   ],
   controllers: [ResourceFlowsController, ResourceFlowVariablesController],
   providers: [

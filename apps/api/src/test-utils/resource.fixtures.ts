@@ -27,6 +27,7 @@ export function createMockResource(overrides: Partial<Resource> = {}): Resource 
     deletedAt: null,
     introductions: [],
     usages: [],
+    operatingIntervals: [],
     introducers: [],
     groups: [],
     flowNodes: [],

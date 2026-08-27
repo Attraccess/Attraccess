@@ -1,0 +1,43 @@
+{
+  "name": "@attraccess-plugins/rabbitmq",
+  "version": "0.1.0",
+  "description": "Official Attraccess integration for RabbitMQ.",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Attraccess/Attraccess.git",
+    "directory": "apps/plugins/rabbitmq"
+  },
+  "homepage": "https://attraccess.org",
+  "keywords": [
+    "attraccess-plugin",
+    "attraccess",
+    "rabbitmq"
+  ],
+  "files": [
+    "dist",
+    "frontend"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@attraccess/plugins-backend-sdk": "^1.9.0",
+    "@attraccess/plugins-frontend-sdk": "^1.9.0"
+  },
+  "attraccess": {
+    "displayName": "RabbitMQ",
+    "description": "Connect Attraccess resources to RabbitMQ.",
+    "host": "^1.9.0",
+    "backend": "dist/index.js",
+    "frontend": "frontend/remoteEntry.js",
+    "styles": "frontend/style.css",
+    "permissions": [
+      "ACCESS_MQTT_SERVERS"
+    ],
+    "sdk": {
+      "backend": "^1.9.0",
+      "frontend": "^1.9.0"
+    }
+  }
+}

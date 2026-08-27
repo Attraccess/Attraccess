@@ -3,6 +3,7 @@
   "description": "Plugins installed on this instance, and what each of them loaded.",
   "uploadButton": "Upload plugin",
   "docsButton": "Documentation",
+  "manageVersion": "Manage version",
   "columns": {
     "name": "Name",
     "version": "Version",
@@ -30,15 +31,41 @@
     "delete": "Remove"
   },
   "error": {
+    "versions": {
+      "title": "Could not load versions",
+      "description": "The installed package was not changed. Please try again."
+    },
+    "replace": {
+      "title": "Could not replace the plugin",
+      "description": "The current version is still active. Please try again."
+    },
     "delete": {
       "title": "Could not remove the plugin",
       "description": "The plugin is still installed. Please try again."
     }
   },
   "success": {
+    "replace": {
+      "title": "Plugin version replaced",
+      "description": "The app will restart in a few seconds to activate the selected version."
+    },
     "delete": {
       "title": "Plugin removed",
       "description": "The app will reload in a few seconds to drop the plugin's code."
     }
+  },
+  "versionManagement": {
+    "title": "Manage {{pluginName}} version",
+    "current": "Current version: {{version}}",
+    "loading": "Loading available versions...",
+    "selected": "Selected version: {{version}}",
+    "published": "Published: {{date}}",
+    "permissionApproval": "I approve these new permissions: {{permissions}}",
+    "permissionRemovals": "Removed permissions: {{permissions}}",
+    "downgradeWarning": "Downgrading can affect plugin data and requires an application restart.",
+    "cancel": "Cancel",
+    "update": "Update",
+    "downgrade": "Downgrade",
+    "direction": { "current": "Current", "newer": "Newer", "older": "Older" }
   }
 }

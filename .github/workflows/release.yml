@@ -16,6 +16,7 @@ env:
 
 permissions:
   contents: write
+  id-token: write
   packages: write
 
 jobs:
@@ -72,6 +73,7 @@ jobs:
         run: pnpm nx run-many --target=build --parallel=5 --exclude=tag:scope:hardware,tag:type:plugin,tag:scope:companion
 
   plugins:
+    needs: [lint, typecheck, test, build]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -81,34 +83,30 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
-      - name: Build + zip plugin apps
+      - name: Test and pack official plugin apps
         env:
           NODE_ENV: production
-        run: pnpm nx run-many --target=package --parallel=3 --projects=tag:type:plugin
+        run: pnpm nx run-many --target=test,pack-test --parallel=3 --projects=tag:type:plugin
+      - name: Test packed Hello World fixture
+        run: pnpm --dir examples/plugin-hello-world run pack-test
 
-      - name: Collect plugin ZIPs into a flat directory
+      - name: Publish changed official plugin packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          set -euo pipefail
-          shopt -s nullglob globstar
-          mkdir -p dist/plugin-zips
-          for zip in apps/plugins/**/dist/*.zip; do
-            cp "$zip" dist/plugin-zips/
+          previous_tag=$(git describe --tags --abbrev=0 "${RELEASE_VERSION}^" 2>/dev/null || git rev-list --max-parents=0 HEAD)
+          for plugin in shelly rabbitmq; do
+            if ! git diff --quiet "$previous_tag" "$GITHUB_SHA" -- "apps/plugins/$plugin"; then
+              pnpm nx publish "plugin-$plugin"
+            fi
           done
-
-      - name: Attach plugin ZIPs to release
-        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ env.RELEASE_VERSION }}
-          files: dist/plugin-zips/*.zip
-          fail_on_unmatched_files: true
 
   build-companion:
     uses: ./.github/workflows/build-companion-binaries.yml
     secrets: inherit
 
   containerize:
-    needs: [lint, typecheck, test, build, build-companion]
+    needs: [lint, typecheck, test, build, plugins, build-companion]
     if: always() && !failure() && !cancelled()
     runs-on: ubuntu-latest
     steps:
@@ -176,7 +174,7 @@ jobs:
           append_body: true
 
   balena:
-    needs: [lint, typecheck, test, build, build-companion]
+    needs: [lint, typecheck, test, build, plugins, build-companion]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
