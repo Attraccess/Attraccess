@@ -189,7 +189,7 @@ describe('PluginModule', () => {
       );
 
       await build([PluginPermission.TRIGGER_FLOWS]).flows.trigger('plugin.test.trigger', () => true, { event: 'x' });
-      expect(triggerPluginFlows).toHaveBeenCalledWith('plugin.test.trigger', expect.any(Function), { event: 'x' });
+      expect(triggerPluginFlows).toHaveBeenCalledWith('ctx-plugin', 'plugin.test.trigger', expect.any(Function), { event: 'x' });
     });
   });
 

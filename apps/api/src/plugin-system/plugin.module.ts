@@ -123,7 +123,7 @@ export class PluginModule {
     // Register any custom flow nodes contributed by this plugin.
     const pluginFlowNodes = (exported as PluginBackendModule)?.flowNodes;
     if (pluginFlowNodes?.length) {
-      registerPluginFlowNodes(pluginFlowNodes);
+      registerPluginFlowNodes(manifest.name, pluginFlowNodes);
       this.logger.log(`Registered ${pluginFlowNodes.length} flow node(s) from plugin ${manifest.name}`);
     }
 
@@ -232,7 +232,7 @@ export class PluginModule {
           strict: false,
         });
         return {
-          trigger: (nodeType, matches, payload) => executor.triggerPluginFlows(nodeType, matches, payload),
+          trigger: (nodeType, matches, payload) => executor.triggerPluginFlows(manifest.name, nodeType, matches, payload),
         };
       },
     };

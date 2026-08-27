@@ -44,7 +44,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceHealthService } from '../health/resource-health.service';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { FlowTimer } from '../../metrics/instrumentation/flow/flow.helper';
-import { getPluginFlowNode } from '../../plugin-system/plugin-flow-node-registry';
+import { getPluginFlowNode, getPluginFlowNodeOwner } from '../../plugin-system/plugin-flow-node-registry';
 import {
   ActivityTrackExecutor,
   BillingSetAdditionalItemsExecutor,
@@ -483,29 +483,47 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
    * remain attributed to that node's resource.
    */
   public async triggerPluginFlows(
+    pluginName: string,
     nodeType: string,
     matches: (config: Record<string, unknown>) => boolean,
     payload: object,
   ): Promise<void> {
     const definition = getPluginFlowNode(nodeType);
-    if (!definition?.isInput) {
+    if (!definition?.isInput || getPluginFlowNodeOwner(nodeType) !== pluginName) {
       throw new Error(`Plugin flow node type "${nodeType}" is not a registered trigger node.`);
     }
 
-    const nodes = await this.flowNodeRepository.find({ where: { type: nodeType as ResourceFlowNodeType } });
-    const matchingNodes = nodes.filter((node) => {
-      try {
-        return matches(node.data as Record<string, unknown>);
-      } catch (error) {
-        this.logger.error(
-          `Failed to match plugin flow trigger node ID: ${node.id} (Type: ${nodeType})`,
-          error instanceof Error ? error.stack : undefined,
-        );
-        return false;
-      }
-    });
+    const pageSize = 100;
+    const concurrency = 10;
+    for (let skip = 0; ; skip += pageSize) {
+      const nodes = await this.flowNodeRepository.find({
+        where: { type: nodeType as ResourceFlowNodeType },
+        order: { id: 'ASC' },
+        skip,
+        take: pageSize,
+      });
 
-    await Promise.all(matchingNodes.map((node) => this.startFlow(node, { payload })));
+      for (let offset = 0; offset < nodes.length; offset += concurrency) {
+        await Promise.all(nodes.slice(offset, offset + concurrency).map(async (node) => {
+          let isMatch: boolean;
+          try {
+            isMatch = matches(node.data as Record<string, unknown>);
+          } catch (error) {
+            this.logger.error(
+              `Failed to match plugin flow trigger node ID: ${node.id} (Type: ${nodeType})`,
+              error instanceof Error ? error.stack : undefined,
+            );
+            return;
+          }
+
+          if (isMatch) {
+            await this.startFlow(node, { payload });
+          }
+        }));
+      }
+
+      if (nodes.length < pageSize) return;
+    }
   }
 
   public async startFlow(

@@ -80,9 +80,10 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     flowNodeRepository = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      find: jest.fn(async ({ where }: any) => {
+      find: jest.fn(async ({ where, skip, take }: any) => {
         const { resourceId, type } = where || {};
-        return initialNodes.filter((n) => n.type === type && (resourceId === undefined || n.resourceId === resourceId));
+        const nodes = initialNodes.filter((n) => n.type === type && (resourceId === undefined || n.resourceId === resourceId));
+        return take === undefined ? nodes : nodes.slice(skip, skip + take);
       }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       findOne: jest.fn(async ({ where }: any) => {
@@ -180,7 +181,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
   });
 
   it('starts every matching plugin trigger while isolating matcher failures', async () => {
-    registerPluginFlowNodes([
+    registerPluginFlowNodes('executor-test', [
       {
         type: 'plugin.executor-test.trigger',
         label: 'Executor test trigger',
@@ -197,6 +198,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     ];
 
     await service.triggerPluginFlows(
+      'executor-test',
       'plugin.executor-test.trigger',
       (config) => {
         if (config.throws) throw new Error('bad config');
@@ -210,6 +212,66 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     );
     expect(flowEdgeRepository.find as jest.Mock).not.toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ source: 'throws' }) }),
+    );
+  });
+
+  it('pages plugin trigger nodes and limits concurrent flow runs', async () => {
+    registerPluginFlowNodes('pagination-test', [
+      {
+        type: 'plugin.pagination-test.trigger',
+        label: 'Pagination test trigger',
+        configSchema: {},
+        inputs: [],
+        outputs: ['output'],
+        isInput: true,
+      },
+    ]);
+    initialNodes = Array.from({ length: 101 }, (_, index) =>
+      createNode({ id: `node-${String(index).padStart(3, '0')}`, type: 'plugin.pagination-test.trigger' as ResourceFlowNodeType }),
+    );
+
+    let inFlight = 0;
+    let maxInFlight = 0;
+    jest.spyOn(service, 'startFlow').mockImplementation(async () => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      inFlight--;
+      return [];
+    });
+
+    await service.triggerPluginFlows('pagination-test', 'plugin.pagination-test.trigger', () => true, {});
+
+    expect(flowNodeRepository.find as jest.Mock).toHaveBeenNthCalledWith(1, {
+      where: { type: 'plugin.pagination-test.trigger' },
+      order: { id: 'ASC' },
+      skip: 0,
+      take: 100,
+    });
+    expect(flowNodeRepository.find as jest.Mock).toHaveBeenNthCalledWith(2, {
+      where: { type: 'plugin.pagination-test.trigger' },
+      order: { id: 'ASC' },
+      skip: 100,
+      take: 100,
+    });
+    expect(maxInFlight).toBeLessThanOrEqual(10);
+    expect(service.startFlow).toHaveBeenCalledTimes(101);
+  });
+
+  it('rejects a plugin attempting to trigger a node owned by another plugin', async () => {
+    registerPluginFlowNodes('owner-plugin', [
+      {
+        type: 'plugin.owner-test.trigger',
+        label: 'Owner test trigger',
+        configSchema: {},
+        inputs: [],
+        outputs: ['output'],
+        isInput: true,
+      },
+    ]);
+
+    await expect(service.triggerPluginFlows('other-plugin', 'plugin.owner-test.trigger', () => true, {})).rejects.toThrow(
+      /not a registered trigger node/,
     );
   });
 

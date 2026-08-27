@@ -89,6 +89,9 @@ export interface PluginFlowTriggerNodeDefinition extends PluginFlowNodeDefinitio
   /** Trigger nodes do not consume a preceding node's output. */
   readonly inputs: readonly [];
 
+  /** Trigger nodes always continue from the standard output handle. */
+  readonly outputs: readonly ['output'];
+
   /** Trigger nodes are passthrough nodes, so the host never calls execute(). */
   readonly execute?: never;
 }
