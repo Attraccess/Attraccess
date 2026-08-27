@@ -10,6 +10,18 @@ import { BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { RabbitmqDetectionService } from './rabbitmq-detection.service';
 import { RabbitmqManagementClient } from './rabbitmq-management-client';
 
+interface RabbitmqPermissions {
+  configure: string;
+  write: string;
+  read: string;
+}
+
+interface RabbitmqTopicPermissions {
+  exchange: string;
+  write: string;
+  read: string;
+}
+
 /**
  * Translates the generic per-device MQTT policy to RabbitMQ's vhost and topic
  * permissions. Passwords are created in memory and never logged or retained.
@@ -37,7 +49,9 @@ export class RabbitmqCredentialProvisioningProvider implements MqttCredentialPro
     return this.writeCredential(request);
   }
 
-  async revoke(request: Pick<MqttCredentialRequest, 'mqttServerId' | 'identity' | 'username' | 'vhost'>): Promise<void> {
+  async revoke(
+    request: Pick<MqttCredentialRequest, 'mqttServerId' | 'identity' | 'username' | 'vhost'>,
+  ): Promise<void> {
     this.assertName(request.username, 'Username');
     const config = await this.requireConfig(request.mqttServerId);
     this.assertNotManagementUser(config, request.username);
@@ -52,10 +66,18 @@ export class RabbitmqCredentialProvisioningProvider implements MqttCredentialPro
     const vhost = encodeURIComponent(request.vhost);
     const username = encodeURIComponent(request.username);
     const existing = await this.userExists(config, username);
+    await this.client.request(config, 'PUT', `/vhosts/${vhost}`);
 
     if (existing) {
-      await this.writePermissions(config, request, vhost, username);
-      await this.client.request(config, 'PUT', `/users/${username}`, { password, tags: '' });
+      const previousPermissions = await this.getPermissions(config, vhost, username);
+      const previousTopicPermissions = await this.getTopicPermissions(config, vhost, username);
+      try {
+        await this.writePermissions(config, request, vhost, username);
+        await this.client.request(config, 'PUT', `/users/${username}`, { password, tags: '' });
+      } catch (error) {
+        await this.restorePermissions(config, vhost, username, previousPermissions, previousTopicPermissions);
+        throw error;
+      }
     } else {
       await this.client.request(config, 'PUT', `/users/${username}`, { password, tags: '' });
       try {
@@ -79,7 +101,7 @@ export class RabbitmqCredentialProvisioningProvider implements MqttCredentialPro
     config: MqttServerConnectionConfig,
     request: MqttCredentialRequest,
     vhost: string,
-    username: string
+    username: string,
   ): Promise<void> {
     const subscriptionQueue = `mqtt-subscription-${escapeRegex(request.identity)}.*`;
     await this.client.request(config, 'PUT', `/permissions/${vhost}/${username}`, {
@@ -106,6 +128,54 @@ export class RabbitmqCredentialProvisioningProvider implements MqttCredentialPro
     }
   }
 
+  private async getPermissions(
+    config: MqttServerConnectionConfig,
+    vhost: string,
+    username: string,
+  ): Promise<RabbitmqPermissions | null> {
+    return this.getOptional(config, `/permissions/${vhost}/${username}`);
+  }
+
+  private async getTopicPermissions(
+    config: MqttServerConnectionConfig,
+    vhost: string,
+    username: string,
+  ): Promise<RabbitmqTopicPermissions | null> {
+    return this.getOptional(config, `/topic-permissions/${vhost}/${username}`);
+  }
+
+  private async getOptional<T>(config: MqttServerConnectionConfig, path: string): Promise<T | null> {
+    try {
+      return await this.client.request<T>(config, 'GET', path);
+    } catch (error) {
+      if (error instanceof HttpException && error.getStatus() === HttpStatus.NOT_FOUND) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  private async restorePermissions(
+    config: MqttServerConnectionConfig,
+    vhost: string,
+    username: string,
+    permissions: RabbitmqPermissions | null,
+    topicPermissions: RabbitmqTopicPermissions | null,
+  ): Promise<void> {
+    await this.restorePermission(config, `/permissions/${vhost}/${username}`, permissions);
+    await this.restorePermission(config, `/topic-permissions/${vhost}/${username}`, topicPermissions);
+  }
+
+  private async restorePermission<T>(
+    config: MqttServerConnectionConfig,
+    path: string,
+    permissions: T | null,
+  ): Promise<void> {
+    await this.client
+      .request(config, permissions ? 'PUT' : 'DELETE', path, permissions ?? undefined)
+      .catch(() => undefined);
+  }
+
   private async requireConfig(mqttServerId: number): Promise<MqttServerConnectionConfig> {
     const config = await this.context.getMqttServerConfig(mqttServerId);
     if (!config) {
@@ -124,6 +194,21 @@ export class RabbitmqCredentialProvisioningProvider implements MqttCredentialPro
     for (const filter of [...request.topicPolicy.publish, ...request.topicPolicy.subscribe]) {
       if (typeof filter !== 'string' || filter.length === 0 || filter.length > 1024) {
         throw new BadRequestException('MQTT topic filters must be non-empty strings no longer than 1024 characters.');
+      }
+      this.assertTopicFilter(filter);
+    }
+  }
+
+  private assertTopicFilter(filter: string): void {
+    const segments = filter.split('/');
+    for (const [index, segment] of segments.entries()) {
+      if (
+        (segment.includes('+') && segment !== '+') ||
+        (segment.includes('#') && (segment !== '#' || index !== segments.length - 1))
+      ) {
+        throw new BadRequestException(
+          'MQTT wildcards must occupy a complete topic level, and # must be the final level.',
+        );
       }
     }
   }
@@ -151,7 +236,9 @@ export function mqttFiltersToRegex(filters: readonly string[]): string {
 }
 
 function mqttFilterToRegex(filter: string): string {
-  return filter
+  const terminalMultiLevel = filter.endsWith('/#');
+  const prefix = terminalMultiLevel ? filter.slice(0, -2) : filter;
+  const translated = prefix
     .split('/')
     .map((segment) => {
       if (segment === '+') {
@@ -163,6 +250,7 @@ function mqttFilterToRegex(filter: string): string {
       return segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     })
     .join('/');
+  return terminalMultiLevel ? `${translated}(?:/.*)?` : translated;
 }
 
 function escapeRegex(value: string): string {

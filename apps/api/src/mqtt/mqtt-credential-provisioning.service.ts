@@ -36,22 +36,24 @@ export class MqttCredentialProvisioningService implements MqttCredentialProvisio
     return providers.map(({ id, displayName }) => ({ providerId: id, displayName }));
   }
 
-  async provision(request: MqttCredentialRequest): Promise<ProvisionedMqttCredential | ManualMqttCredentialInstructions> {
+  async provision(
+    request: MqttCredentialRequest,
+  ): Promise<ProvisionedMqttCredential | ManualMqttCredentialInstructions> {
     const provider = await this.providerFor(request.mqttServerId);
-    return provider ? provider.provision(request) : this.manualInstructions(request);
+    return provider ? provider.provision(request) : this.manualInstructions('provision', request);
   }
 
   async rotate(request: MqttCredentialRequest): Promise<ProvisionedMqttCredential | ManualMqttCredentialInstructions> {
     const provider = await this.providerFor(request.mqttServerId);
-    return provider ? provider.rotate(request) : this.manualInstructions(request);
+    return provider ? provider.rotate(request) : this.manualInstructions('rotate', request);
   }
 
   async revoke(
-    request: Pick<MqttCredentialRequest, 'mqttServerId' | 'identity' | 'username' | 'vhost'>
+    request: Pick<MqttCredentialRequest, 'mqttServerId' | 'identity' | 'username' | 'vhost'>,
   ): Promise<void | ManualMqttCredentialInstructions> {
     const provider = await this.providerFor(request.mqttServerId);
     if (!provider) {
-      return this.manualInstructions({ ...request, topicPolicy: { publish: [], subscribe: [] } });
+      return this.manualInstructions('revoke', { ...request, topicPolicy: { publish: [], subscribe: [] } });
     }
     await provider.revoke(request);
   }
@@ -59,7 +61,9 @@ export class MqttCredentialProvisioningService implements MqttCredentialProvisio
   private async providerFor(mqttServerId: number): Promise<MqttCredentialProvisioningProvider | null> {
     const providers = await this.compatibleProviders(await this.requireServer(mqttServerId));
     if (providers.length > 1) {
-      throw new Error(`Multiple MQTT credential providers support server ${mqttServerId}; provider selection is ambiguous.`);
+      throw new Error(
+        `Multiple MQTT credential providers support server ${mqttServerId}; provider selection is ambiguous.`,
+      );
     }
     return providers[0] ?? null;
   }
@@ -67,8 +71,8 @@ export class MqttCredentialProvisioningService implements MqttCredentialProvisio
   private async compatibleProviders(config: MqttServerConnectionConfig): Promise<MqttCredentialProvisioningProvider[]> {
     const supported = await Promise.all(
       [...MqttCredentialProvisioningService.providers.values()].map(async (provider) =>
-        (await provider.supports(config)) ? provider : null
-      )
+        (await provider.supports(config)) ? provider : null,
+      ),
     );
     return supported.filter((provider): provider is MqttCredentialProvisioningProvider => provider !== null);
   }
@@ -81,7 +85,25 @@ export class MqttCredentialProvisioningService implements MqttCredentialProvisio
     return server;
   }
 
-  private manualInstructions(request: MqttCredentialRequest): ManualMqttCredentialInstructions {
+  private manualInstructions(
+    operation: 'provision' | 'rotate' | 'revoke',
+    request: MqttCredentialRequest,
+  ): ManualMqttCredentialInstructions {
+    const instructions =
+      operation === 'provision'
+        ? [
+            `Create MQTT user "${request.username}" in vhost "${request.vhost}" with a newly generated password.`,
+            `Allow publish only to: ${request.topicPolicy.publish.join(', ') || '(none)'}.`,
+            `Allow subscribe only to: ${request.topicPolicy.subscribe.join(', ') || '(none)'}.`,
+          ]
+        : operation === 'rotate'
+          ? [
+              `Replace the password for MQTT user "${request.username}" in vhost "${request.vhost}".`,
+              `Reconcile publish access to only: ${request.topicPolicy.publish.join(', ') || '(none)'}.`,
+              `Reconcile subscribe access to only: ${request.topicPolicy.subscribe.join(', ') || '(none)'}.`,
+            ]
+          : [`Remove or disable MQTT user "${request.username}" and its ACLs in vhost "${request.vhost}".`];
+
     return {
       mqttServerId: request.mqttServerId,
       username: request.username,
@@ -89,11 +111,11 @@ export class MqttCredentialProvisioningService implements MqttCredentialProvisio
       publishTopics: request.topicPolicy.publish,
       subscribeTopics: request.topicPolicy.subscribe,
       instructions: [
-        `Create MQTT user "${request.username}" in vhost "${request.vhost}" with a newly generated password.`,
-        `Allow publish only to: ${request.topicPolicy.publish.join(', ') || '(none)'}.`,
-        `Allow subscribe only to: ${request.topicPolicy.subscribe.join(', ') || '(none)'}.`,
+        ...instructions,
         'Do not grant wildcard, administrator, configure, or cross-device permissions.',
-        'Deliver the generated password once to the device installer; do not persist it in Attraccess.',
+        ...(operation === 'revoke'
+          ? []
+          : ['Deliver the generated password once to the device installer; do not persist it in Attraccess.']),
       ],
     };
   }
