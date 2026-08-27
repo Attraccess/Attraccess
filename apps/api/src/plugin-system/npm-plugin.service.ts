@@ -261,7 +261,10 @@ export class NpmPluginService {
       };
       // Activation and its state update must commit together so a rollback cannot
       // remove another install's target or overwrite its state entry.
-      return this.mutateInstalls(async () => {
+      return await this.mutateInstalls(async () => {
+        if (!replacing && this.listInstalled().some((plugin) => plugin.name === name)) {
+          throw new BadRequestException('Package is already installed; use the replacement endpoint');
+        }
         const activation = await this.activate(source, name);
         try {
           await this.writeState(installed);
