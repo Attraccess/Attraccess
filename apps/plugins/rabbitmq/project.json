@@ -8,24 +8,26 @@
     "lint": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": [
-        "{projectRoot}/backend/**/*",
-        "{projectRoot}/frontend/src/**/*",
-        "{workspaceRoot}/eslint.config.cjs"
-      ],
+      "inputs": ["{projectRoot}/backend/**/*", "{projectRoot}/frontend/src/**/*", "{workspaceRoot}/eslint.config.cjs"],
       "outputs": [],
       "options": {
         "cwd": "apps/plugins/rabbitmq",
         "command": "eslint backend frontend/src"
       }
     },
+    "test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "outputs": [],
+      "options": {
+        "cwd": "apps/plugins/rabbitmq",
+        "command": "pnpm exec vitest run --passWithNoTests"
+      }
+    },
     "build-backend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": [
-        "{projectRoot}/backend/**/*",
-        "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"
-      ],
+      "inputs": ["{projectRoot}/backend/**/*", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/rabbitmq",
@@ -35,10 +37,7 @@
     "build-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": [
-        "{projectRoot}/frontend/**/*",
-        "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"
-      ],
+      "inputs": ["{projectRoot}/frontend/**/*", "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"],
       "outputs": ["{projectRoot}/package/frontend"],
       "options": {
         "cwd": "apps/plugins/rabbitmq",
@@ -49,25 +48,40 @@
       "executor": "nx:run-commands",
       "cache": true,
       "dependsOn": ["build-backend", "build-frontend"],
-      "inputs": ["{projectRoot}/plugin.json"],
+      "inputs": ["{projectRoot}/package.json"],
       "outputs": ["{projectRoot}/package"],
       "options": {
         "cwd": "apps/plugins/rabbitmq",
-        "command": "node -e \"require('fs').copyFileSync('plugin.json','package/plugin.json')\""
+        "command": "node -e \"require('fs').copyFileSync('package.json','package/package.json')\""
       }
     },
-    "package": {
+    "pack": {
       "executor": "nx:run-commands",
       "cache": true,
       "dependsOn": ["build"],
-      "inputs": [
-        "{projectRoot}/package/**/*",
-        "{workspaceRoot}/apps/plugins/scripts/zip-plugin.mjs"
-      ],
+      "inputs": ["{projectRoot}/package/**/*"],
       "outputs": ["{projectRoot}/dist"],
       "options": {
         "cwd": "apps/plugins/rabbitmq",
-        "command": "node ../scripts/zip-plugin.mjs --src package --out dist/plugin-rabbitmq.zip"
+        "command": "mkdir -p dist && (cd package && npm pack --pack-destination ../dist)"
+      }
+    },
+    "pack-test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["pack", "plugins-backend-sdk:build"],
+      "options": {
+        "cwd": "apps/plugins/rabbitmq",
+        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js frontend/remoteEntry.js frontend/style.css"
+      }
+    },
+    "publish": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["pack-test"],
+      "options": {
+        "cwd": "apps/plugins/rabbitmq",
+        "command": "node ../scripts/publish-plugin.mjs package dist"
       }
     }
   }

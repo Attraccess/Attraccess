@@ -2,15 +2,42 @@
   "name": "@attraccess-example/plugin-hello-world",
   "version": "1.0.0",
   "private": true,
-  "description": "Working example plugin: backend controller + injected repository + event handler, and a frontend route. Build it, ZIP it, and upload it through the Plugins admin page.",
+  "description": "Working Attraccess npm plugin example: backend controller, event handler, and frontend route.",
   "type": "module",
   "scripts": {
     "build": "node build.mjs"
   },
+  "keywords": [
+    "attraccess-plugin",
+    "attraccess",
+    "example"
+  ],
+  "files": [
+    "dist",
+    "frontend"
+  ],
   "peerDependencies": {
+    "@attraccess/plugins-backend-sdk": "^1.9.0",
+    "@attraccess/plugins-frontend-sdk": "^1.9.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/event-emitter": "^3.0.0",
     "typeorm": "^0.3.0"
+  },
+  "attraccess": {
+    "displayName": "Hello World",
+    "description": "Example Attraccess plugin.",
+    "host": "^1.9.0",
+    "backend": "dist/index.js",
+    "frontend": "frontend/remoteEntry.js",
+    "styles": "frontend/style.css",
+    "permissions": [
+      "READ_USERS",
+      "LISTEN_EVENTS"
+    ],
+    "sdk": {
+      "backend": "^1.9.0",
+      "frontend": "^1.9.0"
+    }
   },
   "devDependencies": {
     "@attraccess/plugins-backend-sdk": "^1.0.0",
