@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import axios from 'axios';
 import { createHash, randomUUID } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
@@ -12,7 +12,8 @@ import * as tar from 'tar';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { resolveAppVersion } from '../config/app.config';
 import { PluginService } from './plugin.service';
-import { parseNpmPluginPackage } from './npm-plugin-contract';
+import { NpmPluginPackage, parseNpmPluginPackage } from './npm-plugin-contract';
+import { PluginClassificationService } from './plugin-classification.service';
 
 const REGISTRY_PARENT = 'plugin-registry';
 const REGISTRIES_KEY = 'registries';
@@ -23,7 +24,7 @@ const MAX_METADATA_BYTES = 10 * 1024 * 1024;
 const MAX_EXTRACTED_BYTES = 200 * 1024 * 1024;
 const MAX_ARCHIVE_ENTRIES = 10_000;
 
-type StoredRegistry = { id: string; name: string; url: string };
+export type StoredRegistry = { id: string; name: string; url: string };
 type Registry = StoredRegistry & { token: string | null };
 type PackageVersion = { version: string; dist: { tarball: string; integrity?: string; shasum?: string } };
 
@@ -38,13 +39,40 @@ export type InstalledNpmPlugin = {
   lastError: string | null;
 };
 
+export type MarketplacePlugin = {
+  name: string;
+  version: string | null;
+  displayName: string | null;
+  description: string | null;
+  permissions: string[];
+  hostRange: string | null;
+  repository: string | null;
+  homepage: string | null;
+  license: string | null;
+  publisher: string | null;
+  deprecated: boolean;
+  registry: StoredRegistry;
+  classification: 'official' | 'community';
+  classificationReason: string;
+  installable: boolean;
+  incompatibilityReason: string | null;
+  integrity: string | null;
+};
+
 @Injectable()
 export class NpmPluginService {
   private readonly logger = new Logger(NpmPluginService.name);
   private registryMutation = Promise.resolve();
   private installMutation = Promise.resolve();
 
-  constructor(private readonly settings: SettingsStoreService) {}
+  constructor(
+    private readonly settings: SettingsStoreService,
+    @Optional() classification?: PluginClassificationService,
+  ) {
+    this.classification = classification ?? new PluginClassificationService();
+  }
+
+  private readonly classification: PluginClassificationService;
 
   async listRegistries(): Promise<Array<StoredRegistry & { tokenConfigured: boolean }>> {
     const registries = await this.storedRegistries();
@@ -114,6 +142,40 @@ export class NpmPluginService {
     return Object.keys(metadata.versions ?? {}).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
   }
 
+  async searchMarketplace(query: string, registryId?: string): Promise<{ results: MarketplacePlugin[]; errors: string[] }> {
+    const registries = registryId ? [await this.registry(registryId)] : await this.searchRegistries();
+    const responses = await Promise.all(
+      registries.map(async (registry) => {
+        try {
+          const search = (await this.getJson(
+            `${registry.url}/-/v1/search?text=${encodeURIComponent(`keywords:attraccess-plugin ${query.trim()}`)}&size=20`,
+            registry,
+          )) as { objects?: Array<{ package?: unknown }> };
+          return { results: (search.objects ?? []).map(({ package: pkg }) => this.marketplacePlugin(pkg, registry)), error: null };
+        } catch {
+          return { results: [], error: `Could not search ${registry.name}` };
+        }
+      }),
+    );
+    return {
+      results: responses.flatMap(({ results }) => results),
+      errors: responses.flatMap(({ error }) => (error ? [error] : [])),
+    };
+  }
+
+  async marketplacePackage(name: string, registryId?: string): Promise<MarketplacePlugin> {
+    const registry = await this.registry(registryId);
+    const metadata = (await this.packageMetadata(name, registry.id)) as {
+      name?: string;
+      'dist-tags'?: { latest?: string };
+      versions?: Record<string, unknown>;
+    };
+    const version = metadata['dist-tags']?.latest;
+    const pkg = version ? metadata.versions?.[version] : undefined;
+    if (!pkg) throw new NotFoundException('Package has no latest version');
+    return this.marketplacePlugin(pkg, registry);
+  }
+
   async install(name: string, version: string, registryId?: string): Promise<InstalledNpmPlugin> {
     const registry = await this.registry(registryId);
     const metadata = (await this.packageMetadata(name, registry.id)) as { versions?: Record<string, PackageVersion> };
@@ -149,7 +211,7 @@ export class NpmPluginService {
       };
       // Activation and its state update must commit together so a rollback cannot
       // remove another install's target or overwrite its state entry.
-      return this.mutateInstalls(async () => {
+      return await this.mutateInstalls(async () => {
         const activation = await this.activate(source, name);
         try {
           await this.writeState(installed);
@@ -177,6 +239,60 @@ export class NpmPluginService {
       return JSON.parse(readFileSync(statePath, 'utf8'));
     } catch {
       return [];
+    }
+  }
+
+  private async searchRegistries(): Promise<Registry[]> {
+    const registries = await this.storedRegistries();
+    return Promise.all([this.registry(), ...registries.map((registry) => this.registry(registry.id))]);
+  }
+
+  private marketplacePlugin(value: unknown, registry: Registry): MarketplacePlugin {
+    const fallback = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+    const name = typeof fallback.name === 'string' ? fallback.name : 'Unknown package';
+    const version = typeof fallback.version === 'string' ? fallback.version : null;
+    const classified = this.classification.classify(name, registry.url);
+    try {
+      const { pkg } = parseNpmPluginPackage(value, this.hostVersion());
+      return {
+        name: pkg.name,
+        version: pkg.version,
+        displayName: pkg.attraccess.displayName,
+        description: pkg.attraccess.description ?? null,
+        permissions: pkg.attraccess.permissions,
+        hostRange: pkg.attraccess.host,
+        repository: repositoryUrl(pkg.repository),
+        homepage: pkg.homepage ?? null,
+        license: pkg.license ?? null,
+        publisher: publisherName(pkg.author),
+        deprecated: Boolean((pkg as { deprecated?: unknown }).deprecated),
+        registry: { id: registry.id, name: registry.name, url: registry.url },
+        classification: classified.kind,
+        classificationReason: classified.reason,
+        installable: true,
+        incompatibilityReason: null,
+        integrity: distIntegrity(pkg),
+      };
+    } catch (error) {
+      return {
+        name,
+        version,
+        displayName: null,
+        description: null,
+        permissions: [],
+        hostRange: null,
+        repository: null,
+        homepage: null,
+        license: null,
+        publisher: null,
+        deprecated: Boolean(fallback.deprecated),
+        registry: { id: registry.id, name: registry.name, url: registry.url },
+        classification: classified.kind,
+        classificationReason: classified.reason,
+        installable: false,
+        incompatibilityReason: error instanceof Error ? error.message : 'Package metadata is invalid',
+        integrity: null,
+      };
     }
   }
 
@@ -392,4 +508,18 @@ async function validateRegistryDestination(
 
 function safeArchivePath(value: string): boolean {
   return !value.startsWith('/') && !value.split('/').includes('..');
+}
+
+function repositoryUrl(value: string | { url: string } | undefined): string | null {
+  return typeof value === 'string' ? value : value?.url ?? null;
+}
+
+function publisherName(value: string | { name?: string } | undefined): string | null {
+  return typeof value === 'string' ? value : value?.name ?? null;
+}
+
+function distIntegrity(pkg: NpmPluginPackage): string | null {
+  const dist = (pkg as NpmPluginPackage & { dist?: { integrity?: unknown; shasum?: unknown } }).dist;
+  if (typeof dist?.integrity === 'string') return dist.integrity;
+  return typeof dist?.shasum === 'string' ? `sha1-${dist.shasum}` : null;
 }

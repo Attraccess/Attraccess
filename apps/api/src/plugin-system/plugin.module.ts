@@ -25,6 +25,7 @@ import { PluginSandboxService } from './plugin-sandbox.service';
 import { PluginEventsService } from './plugin-events.service';
 import { PluginController } from './plugin.controller';
 import { NpmPluginService } from './npm-plugin.service';
+import { PluginClassificationService } from './plugin-classification.service';
 import { SettingsModule } from '../settings/settings.module';
 import { loadPluginEntryExports } from './plugin-loader';
 import { registerPluginFlowNodes } from './plugin-flow-node-registry';
@@ -63,7 +64,7 @@ export class PluginModule {
       return {
         module: PluginModule,
         imports: [SettingsModule],
-        providers: [PluginService, PluginSandboxService, PluginEventsService, NpmPluginService],
+        providers: [PluginService, PluginSandboxService, PluginEventsService, NpmPluginService, PluginClassificationService],
         exports: [PluginEventsService],
         controllers: [PluginController],
       };
@@ -88,7 +89,7 @@ export class PluginModule {
     return {
       module: PluginModule,
       imports: [SettingsModule, ...pluginModules],
-      providers: [PluginService, PluginSandboxService, PluginEventsService, NpmPluginService],
+      providers: [PluginService, PluginSandboxService, PluginEventsService, NpmPluginService, PluginClassificationService],
       exports: [PluginEventsService],
       controllers: [PluginController],
     };

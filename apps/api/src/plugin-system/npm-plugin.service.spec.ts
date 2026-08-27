@@ -91,6 +91,74 @@ describe('NpmPluginService', () => {
     expect(callback).toHaveBeenCalledWith(null, '1.1.1.1', 4);
   });
 
+  it('returns invalid search candidates with an actionable incompatibility reason', async () => {
+    const service = new NpmPluginService({
+      getPlainSetting: jest.fn().mockResolvedValue(null),
+    } as never);
+    const internals = service as unknown as ServiceInternals;
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+    jest.spyOn(axios, 'get').mockResolvedValue({
+      data: {
+        objects: [
+          {
+            package: {
+              name: '@example/not-a-plugin',
+              version: '1.2.3',
+              keywords: [],
+              attraccess: { displayName: 'Not a plugin', host: '*' },
+            },
+          },
+        ],
+      },
+    });
+
+    await expect(service.searchMarketplace('example')).resolves.toEqual({
+      results: [
+        expect.objectContaining({
+          name: '@example/not-a-plugin',
+          installable: false,
+          incompatibilityReason: 'Package must include the attraccess-plugin keyword',
+          classification: 'community',
+        }),
+      ],
+      errors: [],
+    });
+  });
+
+  it('uses the selected registry for direct marketplace lookup', async () => {
+    const settings: SettingsMock = {
+      getPlainSetting: jest
+        .fn()
+        .mockResolvedValue(JSON.stringify([{ id: 'private', name: 'Private', url: 'https://registry.example.com' }])),
+      getSecretSetting: jest.fn().mockResolvedValue({ value: null, configured: false }),
+      setPlainSetting: jest.fn(),
+      setSecretSetting: jest.fn(),
+    };
+    const service = new NpmPluginService(settings as unknown as never);
+    const internals = service as unknown as ServiceInternals;
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      'dist-tags': { latest: '1.2.3' },
+      versions: {
+        '1.2.3': {
+          name: '@private/plugin',
+          version: '1.2.3',
+          keywords: ['attraccess-plugin'],
+          peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
+          attraccess: { displayName: 'Private Plugin', host: '*', backend: 'dist/index.js', sdk: { backend: '*' }, permissions: [] },
+        },
+      },
+    });
+
+    await expect(service.marketplacePackage('@private/plugin', 'private')).resolves.toMatchObject({
+      name: '@private/plugin',
+      registry: { id: 'private', name: 'Private' },
+      installable: true,
+    });
+    expect(service.packageMetadata).toHaveBeenCalledWith('@private/plugin', 'private');
+  });
+
   it('rejects metadata requests to private registry addresses', async () => {
     const settings: SettingsMock = {
       getPlainSetting: jest
