@@ -112,6 +112,29 @@ void webInitiatedFlowDoesNotUnlockLocally() {
            "web-initiated success must not unlock locally");
 }
 
+void duplicateWebStartsDoNotCancelAcceptedFlow() {
+    Fixture fixture;
+    supervisionTestNowMs = 100;
+    fixture.flow.armWebInitiated({.resourceId = 41, .timeoutMs = 30000, .requesterUsername = "first"});
+    supervisionTestNowMs = 101;
+    fixture.flow.armWebInitiated({.resourceId = 42, .timeoutMs = 30000, .requesterUsername = "second"});
+
+    expect(fixture.flow.takePendingWebStart(102, false), "a queued web arm must start the flow");
+    expect(!fixture.flow.takePendingWebStart(103, true),
+           "duplicate web arms must not remain queued after the flow starts");
+    expect(fixture.api.cancels == 0, "a stale duplicate must not cancel the accepted web flow");
+}
+
+void readerInitiationReleasesRacingWebArm() {
+    Fixture fixture;
+    supervisionTestNowMs = 100;
+    fixture.flow.armWebInitiated({.resourceId = 42, .timeoutMs = 30000, .requesterUsername = "requester"});
+    fixture.beginReader();
+
+    expect(fixture.api.cancels == 1, "reader initiation must release a queued web arm");
+    expect(fixture.api.requests == 1, "reader initiation must still request supervision");
+}
+
 void readerCardSuccessUnlocksAndResets() {
     Fixture fixture;
     fixture.beginReader();
@@ -180,6 +203,8 @@ int main() {
     rejectedCardRecovers();
     terminalFailureReturnsAfterDwell();
     webInitiatedFlowDoesNotUnlockLocally();
+    duplicateWebStartsDoNotCancelAcceptedFlow();
+    readerInitiationReleasesRacingWebArm();
     readerCardSuccessUnlocksAndResets();
     resolutionWinsOverCardAuthentication();
     disconnectClearsActivePendingAndQueuedWork();

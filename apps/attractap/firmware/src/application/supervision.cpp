@@ -52,8 +52,11 @@ void SupervisionFlow::enter(const char *requester, const char *hint, uint32_t no
 }
 
 void SupervisionFlow::beginReaderInitiated(const std::string &requester, uint32_t id) {
-    // A web arm is for a separate transaction. Drop arms and callbacks that
-    // arrived before this reader-owned transaction can become active.
+    // Release a queued web transaction before the reader flow takes ownership.
+    processEvents();
+    if (pendingWebStart) {
+        api.cancelSupervision();
+    }
     clearPendingWebStart();
     if (eventQueue != nullptr) xQueueReset(eventQueue);
     clearOverflowEvents();
@@ -82,7 +85,9 @@ void SupervisionFlow::beginWebInitiated(uint32_t id, const char *requester, uint
 }
 
 bool SupervisionFlow::takePendingWebStart(uint32_t now, bool readerBusy) {
-    processEvents(true);
+    // Coalesce duplicate websocket starts so stale events cannot later cancel
+    // the web transaction that this invocation accepts.
+    processEvents();
     if (!pendingWebStart) return false;
     if (now - requestedAtMs > requestedTimeoutMs) {
         logger.debug("Ignoring supervision arm that outlived its request");
