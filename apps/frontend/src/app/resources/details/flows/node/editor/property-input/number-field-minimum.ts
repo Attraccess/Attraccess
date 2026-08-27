@@ -6,34 +6,82 @@ interface NumericSchema {
 }
 
 interface Decimal {
-  coefficient: number;
+  coefficient: bigint;
   scale: number;
 }
+
+const ZERO = BigInt(0);
+const ONE = BigInt(1);
+const TEN = BigInt(10);
 
 function asDecimal(value: number): Decimal {
   const [mantissa, exponentText] = value.toString().toLowerCase().split('e');
   const exponent = Number(exponentText ?? 0);
   const [integer, fraction = ''] = mantissa.split('.');
-  let coefficient = Number(`${integer}${fraction}`);
+  let coefficient = BigInt(`${integer}${fraction}`);
   let scale = fraction.length - exponent;
 
   if (scale < 0) {
-    coefficient *= 10 ** -scale;
+    coefficient *= powerOfTen(-scale);
     scale = 0;
   }
 
   return { coefficient, scale };
 }
 
+function powerOfTen(exponent: number): bigint {
+  let result = ONE;
+  for (let index = 0; index < exponent; index += 1) result *= TEN;
+  return result;
+}
+
+function floorDivide(dividend: bigint, divisor: bigint): bigint {
+  if (dividend >= ZERO) return dividend / divisor;
+  return -((-dividend + divisor - ONE) / divisor);
+}
+
+function ceilDivide(dividend: bigint, divisor: bigint): bigint {
+  return -floorDivide(-dividend, divisor);
+}
+
+function decimalToNumber(coefficient: bigint, scale: number): number {
+  const sign = coefficient < ZERO ? '-' : '';
+  const digits = (coefficient < ZERO ? -coefficient : coefficient).toString().padStart(scale + 1, '0');
+  if (scale === 0) return Number(`${sign}${digits}`);
+
+  return Number(`${sign}${digits.slice(0, -scale)}.${digits.slice(-scale)}`);
+}
+
 function nextMultipleStrictlyGreaterThan(bound: number, multipleOf: number): number {
   const decimalBound = asDecimal(bound);
   const decimalMultiple = asDecimal(multipleOf);
   const scale = Math.max(decimalBound.scale, decimalMultiple.scale);
-  const boundCoefficient = decimalBound.coefficient * 10 ** (scale - decimalBound.scale);
-  const multipleCoefficient = decimalMultiple.coefficient * 10 ** (scale - decimalMultiple.scale);
-  const nextMultiplier = Math.floor(boundCoefficient / multipleCoefficient) + 1;
+  const boundCoefficient = decimalBound.coefficient * powerOfTen(scale - decimalBound.scale);
+  const multipleCoefficient = decimalMultiple.coefficient * powerOfTen(scale - decimalMultiple.scale);
+  const nextMultiplier = floorDivide(boundCoefficient, multipleCoefficient) + ONE;
+  const minimum = decimalToNumber(nextMultiplier * multipleCoefficient, scale);
 
-  return Number(nextMultiplier * multipleCoefficient) / 10 ** scale;
+  return minimum > bound ? minimum : nextRepresentableNumber(bound);
+}
+
+function greatestCommonDivisor(left: bigint, right: bigint): bigint {
+  let a = left < ZERO ? -left : left;
+  let b = right < ZERO ? -right : right;
+  while (b !== ZERO) {
+    [a, b] = [b, a % b];
+  }
+  return a;
+}
+
+function nextValidIntegerStrictlyGreaterThan(bound: number, multipleOf: number): number {
+  const decimalBound = asDecimal(bound);
+  const decimalMultiple = asDecimal(multipleOf);
+  const denominator = powerOfTen(decimalMultiple.scale);
+  const increment = decimalMultiple.coefficient / greatestCommonDivisor(decimalMultiple.coefficient, denominator);
+  const firstInteger = floorDivide(decimalBound.coefficient, powerOfTen(decimalBound.scale)) + ONE;
+  const minimum = ceilDivide(firstInteger, increment) * increment;
+
+  return Number(minimum);
 }
 
 function nextRepresentableNumber(value: number): number {
@@ -66,9 +114,15 @@ export function getNumberFieldMinimum(schema: NumericSchema): number | undefined
     return schema.minimum;
   }
 
+  if (schema.type === 'integer') {
+    return schema.multipleOf === undefined
+      ? Math.floor(schema.exclusiveMinimum) + 1
+      : nextValidIntegerStrictlyGreaterThan(schema.exclusiveMinimum, schema.multipleOf);
+  }
+
   if (schema.multipleOf !== undefined) {
     return nextMultipleStrictlyGreaterThan(schema.exclusiveMinimum, schema.multipleOf);
   }
 
-  return schema.type === 'integer' ? schema.exclusiveMinimum + 1 : nextRepresentableNumber(schema.exclusiveMinimum);
+  return nextRepresentableNumber(schema.exclusiveMinimum);
 }

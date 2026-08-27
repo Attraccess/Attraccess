@@ -14,4 +14,16 @@ describe('getNumberFieldMinimum', () => {
   it('keeps integer exclusive minima on the next integer when no multiple is specified', () => {
     expect(getNumberFieldMinimum({ type: 'integer', exclusiveMinimum: 5 })).toBe(6);
   });
+
+  it('returns an integer that satisfies fractional multipleOf values', () => {
+    expect(getNumberFieldMinimum({ type: 'integer', exclusiveMinimum: 1, multipleOf: 0.3 })).toBe(3);
+    expect(getNumberFieldMinimum({ type: 'integer', exclusiveMinimum: 1, multipleOf: 0.5 })).toBe(2);
+  });
+
+  it('does not round a high-precision increment back to the exclusive bound', () => {
+    const exclusiveMinimum = Number('0.12345678901234567');
+    const minimum = getNumberFieldMinimum({ type: 'number', exclusiveMinimum, multipleOf: 0.00000000000000001 });
+
+    expect(minimum).toBeGreaterThan(exclusiveMinimum);
+  });
 });
