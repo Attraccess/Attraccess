@@ -87,6 +87,8 @@ jobs:
         env:
           NODE_ENV: production
         run: pnpm nx run-many --target=test,pack-test --parallel=3 --projects=tag:type:plugin
+      - name: Test packed Hello World fixture
+        run: pnpm --dir examples/plugin-hello-world run pack-test
 
       - name: Publish changed official plugin packages
         env:

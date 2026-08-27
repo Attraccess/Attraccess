@@ -3,9 +3,16 @@
   "version": "1.0.0",
   "private": true,
   "description": "Working Attraccess npm plugin example: backend controller, event handler, and frontend route.",
-  "type": "module",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Attraccess/Attraccess.git",
+    "directory": "examples/plugin-hello-world"
+  },
+  "homepage": "https://attraccess.org",
   "scripts": {
-    "build": "node build.mjs"
+    "build": "node build.mjs",
+    "pack-test": "pnpm --dir=../.. exec nx run plugins-backend-sdk:build && npm run build && node ../../apps/plugins/scripts/verify-packed-plugin.mjs package package.json dist/index.js frontend/remoteEntry.js frontend/style.css"
   },
   "keywords": [
     "attraccess-plugin",
