@@ -12,6 +12,7 @@ interface Decimal {
 
 const ZERO = BigInt(0);
 const ONE = BigInt(1);
+const TWO = BigInt(2);
 const TEN = BigInt(10);
 
 function asDecimal(value: number): Decimal {
@@ -59,9 +60,40 @@ function nextMultipleStrictlyGreaterThan(bound: number, multipleOf: number): num
   const boundCoefficient = decimalBound.coefficient * powerOfTen(scale - decimalBound.scale);
   const multipleCoefficient = decimalMultiple.coefficient * powerOfTen(scale - decimalMultiple.scale);
   const nextMultiplier = floorDivide(boundCoefficient, multipleCoefficient) + ONE;
-  const minimum = decimalToNumber(nextMultiplier * multipleCoefficient, scale);
 
-  return minimum > bound ? minimum : nextRepresentableNumber(bound);
+  return firstRepresentableValueAbove(bound, nextMultiplier * multipleCoefficient, multipleCoefficient, scale);
+}
+
+function firstRepresentableValueAbove(
+  bound: number,
+  initialCoefficient: bigint,
+  increment: bigint,
+  scale: number,
+): number {
+  const toNumber = (coefficient: bigint) => decimalToNumber(coefficient, scale);
+  if (toNumber(initialCoefficient) > bound) return toNumber(initialCoefficient);
+
+  // Several exact decimal values can round to the exclusive bound. Find the
+  // first valid value whose Number representation is strictly greater instead.
+  let lower = initialCoefficient;
+  let upper = initialCoefficient + increment;
+  let step = ONE;
+  while (toNumber(upper) <= bound) {
+    lower = upper;
+    step *= TWO;
+    upper = initialCoefficient + increment * step;
+  }
+
+  while (upper - lower > increment) {
+    const middle = lower + increment * ((upper - lower) / increment / TWO);
+    if (toNumber(middle) > bound) {
+      upper = middle;
+    } else {
+      lower = middle;
+    }
+  }
+
+  return toNumber(upper);
 }
 
 function greatestCommonDivisor(left: bigint, right: bigint): bigint {
@@ -81,7 +113,7 @@ function nextValidIntegerStrictlyGreaterThan(bound: number, multipleOf: number):
   const firstInteger = floorDivide(decimalBound.coefficient, powerOfTen(decimalBound.scale)) + ONE;
   const minimum = ceilDivide(firstInteger, increment) * increment;
 
-  return Number(minimum);
+  return firstRepresentableValueAbove(bound, minimum, increment, 0);
 }
 
 function nextRepresentableNumber(value: number): number {

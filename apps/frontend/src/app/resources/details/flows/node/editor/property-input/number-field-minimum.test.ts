@@ -26,4 +26,16 @@ describe('getNumberFieldMinimum', () => {
 
     expect(minimum).toBeGreaterThan(exclusiveMinimum);
   });
+
+  it('keeps a decimal multiple when its first conversion rounds to the exclusive bound', () => {
+    const exclusiveMinimum = 10000000000000002;
+    const minimum = getNumberFieldMinimum({ type: 'number', exclusiveMinimum, multipleOf: 0.3 });
+
+    expect(minimum).toBeGreaterThan(exclusiveMinimum);
+  });
+
+  it('advances integer multiples that round to the exclusive bound', () => {
+    expect(getNumberFieldMinimum({ type: 'integer', exclusiveMinimum: 9007199254740992, multipleOf: 1 }))
+      .toBe(9007199254740994);
+  });
 });
