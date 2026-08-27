@@ -13,11 +13,11 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
   it('translates exact MQTT filters without widening another device namespace', () => {
     const regex = new RegExp(mqttFiltersToRegex(['devices/controller-a/reported/#', 'devices/controller-a/heartbeat']));
 
-    expect(regex.test('devices/controller-a/reported/state')).toBe(true);
-    expect(regex.test('devices/controller-a/reported')).toBe(true);
-    expect(regex.test('devices/controller-b/reported/state')).toBe(false);
-    expect(regex.test('devices/controller-a/heartbeat')).toBe(true);
-    expect(regex.test('devices/controller-b/heartbeat')).toBe(false);
+    expect(regex.test('devices.controller-a.reported.state')).toBe(true);
+    expect(regex.test('devices.controller-a.reported')).toBe(true);
+    expect(regex.test('devices.controller-b.reported.state')).toBe(false);
+    expect(regex.test('devices.controller-a.heartbeat')).toBe(true);
+    expect(regex.test('devices.controller-b.heartbeat')).toBe(false);
   });
 
   it('rejects malformed wildcard policies instead of widening broker permissions', async () => {
@@ -62,8 +62,8 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
     );
     expect(request).toHaveBeenNthCalledWith(6, expect.anything(), 'PUT', '/topic-permissions/%2F/wago-controller-a', {
       exchange: 'amq.topic',
-      write: '^(?:devices/controller-a/reported(?:/.*)?)$',
-      read: '^(?:devices/controller-a/desired(?:/.*)?)$',
+      write: '^(?:devices\\.controller-a\\.reported(?:\\..*)?)$',
+      read: '^(?:devices\\.controller-a\\.desired(?:\\..*)?)$',
     });
   });
 

@@ -271,8 +271,9 @@ export class RabbitmqCredentialProvisioningProvider implements MqttCredentialPro
   }
 }
 
-// RabbitMQ topic permissions use regular expressions while integrations speak
-// MQTT filters. Escape literal segments and translate only MQTT's + and #.
+// RabbitMQ topic permissions evaluate AMQP routing keys, where rabbitmq_mqtt
+// maps MQTT's / topic levels to dots. Escape literal segments and translate
+// MQTT's + and # wildcards without widening a level boundary.
 export function mqttFiltersToRegex(filters: readonly string[]): string {
   if (filters.length === 0) {
     return '$(?!)';
@@ -294,8 +295,8 @@ function mqttFilterToRegex(filter: string): string {
       }
       return segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     })
-    .join('/');
-  return terminalMultiLevel ? `${translated}(?:/.*)?` : translated;
+    .join('\\.');
+  return terminalMultiLevel ? `${translated}(?:\\..*)?` : translated;
 }
 
 function escapeRegex(value: string): string {
