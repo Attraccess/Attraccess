@@ -23,5 +23,40 @@
     "inviteUser": "Benutzer einladen",
     "sso": "SSO Anbieter verwalten",
     "twoFactorPolicy": "Zwei-Faktor-Richtlinie"
+  },
+  "filters": {
+    "label": "Benutzerfilter",
+    "add": "Filter",
+    "done": "Fertig",
+    "remove": "Filter entfernen",
+    "category": "Filterkategorie",
+    "selectValues": "Werte auswählen",
+    "roleValues": "Rollenwerte",
+    "emailVerificationStatus": "E-Mail-Bestätigungsstatus",
+    "ssoProviderValues": "SSO-Anbieterwerte",
+    "is": "ist",
+    "isAnyOf": "ist eines von",
+    "isAllOf": "enthält alle von",
+    "isNoneOf": "ist keines von",
+    "selectedCount": "{{count}} ausgewählt",
+    "role": "Rolle",
+    "roleMatch": "Rollenabgleich",
+    "emailVerified": "E-Mail bestätigt",
+    "ssoProvider": "SSO-Anbieter",
+    "ssoProviderMatch": "SSO-Anbieterabgleich",
+    "verified": "Bestätigt",
+    "notVerified": "Nicht bestätigt",
+    "none": "Keine",
+    "allRoles": "Alle Rollen",
+    "multipleRoles": "Mehrere Rollen ausgewählt",
+    "allEmailVerification": "Jeder Bestätigungsstatus",
+    "allSsoProviders": "Alle SSO-Anbieter",
+    "multipleSsoProviders": "Mehrere SSO-Anbieter ausgewählt",
+    "any": "Beliebige",
+    "all": "Alle"
+  },
+  "empty": {
+    "role": "{{role}} ist keinem Benutzer zugewiesen.",
+    "assignRole": "Benutzer auswählen, um diese Rolle zuzuweisen"
   }
 }

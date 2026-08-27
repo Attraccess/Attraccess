@@ -81,6 +81,12 @@ describe('PluginController', () => {
       expect(() => controller.getFrontendPluginFile('ghost', 'index.js')).toThrow(NotFoundException);
     });
 
+    it('throws when the plugin has no frontend entry', () => {
+      const plugin = { ...frontendPlugin('backend-only'), main: { backend: { directory: 'backend', entryPoint: 'index.js' } } };
+      jest.spyOn(PluginService, 'getPlugins').mockReturnValue([plugin as LoadedPluginManifest]);
+      expect(() => controller.getFrontendPluginFile('backend-only', 'index.js')).toThrow(NotFoundException);
+    });
+
     it('throws when the requested file is missing', () => {
       jest.spyOn(PluginService, 'getPlugins').mockReturnValue([frontendPlugin('present')]);
       expect(() => controller.getFrontendPluginFile('present', 'missing.js')).toThrow(NotFoundException);

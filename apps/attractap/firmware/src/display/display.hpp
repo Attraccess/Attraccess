@@ -122,8 +122,13 @@ private:
     static uint32_t tick_cb();
 
     static void initDeviceOverlay();
+    static void updateNetworkQualityOverlay();
     static lv_obj_t *deviceNameLabel;
     static std::string deviceNameInitValue;
+    static lv_obj_t *networkQualityContainer;
+    static lv_obj_t *networkQualityLabel;
+    static State::NetworkQuality networkQualityOverlayValue;
+    static bool networkQualityOverlayInitialized;
 
     static lv_obj_t *activePopup;
     static lv_timer_t *popupAutoCloseTimer;

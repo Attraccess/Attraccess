@@ -21,6 +21,7 @@ public:
     void loop();
     bool sendMessage(const std::string &message);
     bool sendMessage(const char *message, size_t length);
+    bool sendHeartbeat(const char *message, size_t length);
     void setMessageCallbackRaw(std::function<void(const char *, size_t)> callback);
 
     void enableConnectionAttempts() {}

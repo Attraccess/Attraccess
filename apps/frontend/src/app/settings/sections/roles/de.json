@@ -18,9 +18,12 @@
       "custom": "Eigene"
     },
     "systemRoleTooltip": "Systemrollen werden von Attraccess verwaltet und können nicht geändert werden",
+    "noPermissions": "Keine Berechtigungen zugewiesen",
     "actions": {
       "edit": "Rolle bearbeiten",
       "view": "Rolle ansehen",
+      "viewPermissions": "Berechtigungen für {{role}} anzeigen",
+      "viewUsers": "Benutzer mit der Rolle {{role}} anzeigen",
       "delete": "Rolle löschen"
     }
   }

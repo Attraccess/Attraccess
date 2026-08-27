@@ -58,6 +58,7 @@ export class MetricsService implements OnModuleInit {
 
   public readonly authorizationCacheRequestsTotal: Counter;
   public readonly authorizationCacheSize: Gauge;
+  public readonly maintenanceUsageQueryWindowDays: Histogram;
 
   constructor(
     @InjectRepository(User)
@@ -288,6 +289,12 @@ export class MetricsService implements OnModuleInit {
       registers: [this.registry],
     });
 
+    this.maintenanceUsageQueryWindowDays = new Histogram({
+      name: 'attraccess_maintenance_usage_query_window_days',
+      help: 'Lookback window in days for usage data fetched per resource during bulk maintenance schedule evaluation; watch for unexpectedly large values',
+      buckets: [1, 7, 30, 90, 180, 365, 730, 1825],
+      registers: [this.registry],
+    });
   }
 
   async onModuleInit(): Promise<void> {
