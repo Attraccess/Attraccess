@@ -392,6 +392,12 @@ describe('NpmPluginService', () => {
     expect(existsSync(backup)).toBe(false);
   });
 
+  it('skips backup recovery when plugins are not configured', async () => {
+    PluginService.configure({ PLUGIN_DIR: '', RESTART_BY_EXIT: true });
+
+    await expect(NpmPluginService.recoverBackups()).resolves.toBeUndefined();
+  });
+
   it('classifies installed versions and calculates their permission delta', async () => {
     const service = new NpmPluginService({} as never);
     writeFileSync(

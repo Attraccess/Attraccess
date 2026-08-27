@@ -74,6 +74,7 @@ export class NpmPluginService implements OnModuleInit {
   }
 
   static async recoverBackups(): Promise<void> {
+    if (!PluginService.PLUGIN_PATH) return;
     const backupDirectory = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY);
     if (!existsSync(backupDirectory)) return;
     try {
