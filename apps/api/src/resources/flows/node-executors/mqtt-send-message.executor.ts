@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import { ResourceFlowNode, MqttSendMessageNodeDataSchema } from '@attraccess/database-entities';
 import z from 'zod';
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
-import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
+import { FlowFailureKind, NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 
 export class MqttSendMessageExecutor implements NodeExecutor {
   private readonly logger = new Logger(MqttSendMessageExecutor.name);
@@ -20,10 +20,23 @@ export class MqttSendMessageExecutor implements NodeExecutor {
     );
 
     try {
-      await this.mqttClientService.publish(serverId, topic, payload, {
+      const options = {
         qos: data.qos as 0 | 1 | 2,
         retain: data.retain as boolean,
-      });
+      };
+      const completion =
+        data.completionBehavior || data.acknowledgementTimeoutSeconds
+          ? {
+              awaitAcknowledgement: data.completionBehavior !== 'dispatch',
+              acknowledgementTimeoutSeconds: data.acknowledgementTimeoutSeconds,
+            }
+          : undefined;
+
+      if (completion) {
+        await this.mqttClientService.publish(serverId, topic, payload, options, completion);
+      } else {
+        await this.mqttClientService.publish(serverId, topic, payload, options);
+      }
     } catch (error) {
       if (this.hasDescription(error)) {
         throw error;
@@ -37,6 +50,12 @@ export class MqttSendMessageExecutor implements NodeExecutor {
     return {
       payload: input,
     };
+  }
+
+  getFailureKind(error: unknown): FlowFailureKind {
+    return error instanceof Error && error.name === 'MqttAcknowledgementTimeoutError'
+      ? 'acknowledgement-timeout'
+      : 'transport-dispatch';
   }
 
   private hasDescription(error: unknown): boolean {

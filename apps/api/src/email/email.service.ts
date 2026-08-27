@@ -21,6 +21,13 @@ import { MetricsService } from '../metrics/metrics.service';
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+
+const EMAIL_LOGO_CID = 'attraccess-logo';
+const EMAIL_LOGO_PATH =
+  [join(__dirname, 'assets', 'logo.png'), join(__dirname, '..', 'assets', 'logo.png')].find(existsSync) ??
+  join(__dirname, 'assets', 'logo.png');
 
 @Injectable()
 export class EmailService {
@@ -87,6 +94,14 @@ export class EmailService {
           from,
           subject,
           html: body,
+          attachments: [
+            {
+              filename: 'logo.png',
+              path: EMAIL_LOGO_PATH,
+              contentType: 'image/png',
+              cid: EMAIL_LOGO_CID,
+            },
+          ],
         }),
       );
       if (typeof transporter.close === 'function') {
@@ -116,8 +131,7 @@ export class EmailService {
         frontend: url,
         backend: url,
         notificationPreferencesUrl: `${url}/account`,
-        // ponytail: /api is the fixed global prefix (also what the frontend proxies); no need to plumb GLOBAL_PREFIX here
-        logoUrl: `${url}/api/logo.png`,
+        logoUrl: `cid:${EMAIL_LOGO_CID}`,
       },
       url,
     } as const;

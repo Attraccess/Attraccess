@@ -26,6 +26,7 @@ import {
   CompanionIdleActiveNodeDataSchema,
   CompanionForegroundAppNodeDataSchema,
   CompanionUsbDeviceNodeDataSchema,
+  getExternalEffectFailureBehavior,
 } from '@attraccess/database-entities';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 import { OnEvent } from '@nestjs/event-emitter';
@@ -71,6 +72,7 @@ import {
 } from './node-executors';
 import { CompanionGatewayService } from '../../companion/companion-gateway.service';
 import { CompanionUsbDeviceDto } from '../../companion/companion.types';
+import { ExternalEffectFailureError } from './errors/external-effect-failure.error';
 
 // Handlebars helpers
 Handlebars.registerHelper('json', (value: unknown) => {
@@ -563,6 +565,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     const startTime = Date.now();
 
     let responseOfNode: NodeProcessingResult = { payload: {} };
+    let dispatchStarted = false;
 
     try {
       // Log the start of node processing
@@ -581,6 +584,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
         payload: () => ({ input }),
       });
 
+      dispatchStarted = true;
       responseOfNode = await this.flowTimer.timeNode(node.type, () =>
         this.dispatchNode(node, input, transactionManager),
       );
@@ -604,6 +608,11 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       });
     } catch (error) {
       const processingTime = Date.now() - startTime;
+      const failureBehavior = dispatchStarted ? getExternalEffectFailureBehavior(node.type, node.data) : undefined;
+      const failureKind = dispatchStarted
+        ? (this.nodeExecutors[node.type]?.getFailureKind?.(error) ?? 'node-failure')
+        : 'node-failure';
+      const errorMessage = this.errorReason(error);
       this.logger.error(
         `Failed to process flow node ID: ${node.id} (Type: ${node.type}) after ${processingTime}ms`,
         error instanceof Error ? error.stack : undefined,
@@ -614,10 +623,21 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
         nodeId: node.id,
         resourceId: node.resourceId,
         type: ResourceFlowLogType.NODE_PROCESSING_FAILED,
-        payload: () => ({ error: this.errorReason(error) }),
+        payload: () => ({ error: errorMessage, failureKind, failureBehavior: failureBehavior ?? 'fail-flow' }),
       });
 
-      throw error;
+      if (!failureBehavior || failureBehavior === 'fail-flow') {
+        throw failureBehavior === 'fail-flow' ? new ExternalEffectFailureError(errorMessage, error, failureKind) : error;
+      }
+
+      const payload =
+        failureBehavior === 'failure-output'
+          ? { ...resultOfPreviousNode.payload, flowError: { kind: failureKind, message: errorMessage } }
+          : resultOfPreviousNode.payload;
+      responseOfNode = {
+        payload,
+        outputHandle: failureBehavior === 'failure-output' ? 'failure' : 'output',
+      };
     }
 
     return await this.executeNextNodes(flowRunId, node, responseOfNode, transactionManager, resourceContextCache);
@@ -827,30 +847,58 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
 
   @OnEvent('companion.idle')
   async handleCompanionIdle(event: { deviceId: number; payload: object }): Promise<void> {
-    await this.triggerCompanionEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_IDLE, event.payload, CompanionIdleActiveNodeDataSchema);
+    await this.triggerCompanionEvent(
+      event.deviceId,
+      ResourceFlowNodeType.INPUT_COMPANION_IDLE,
+      event.payload,
+      CompanionIdleActiveNodeDataSchema,
+    );
   }
 
   @OnEvent('companion.active')
   async handleCompanionActive(event: { deviceId: number; payload: object }): Promise<void> {
-    await this.triggerCompanionEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_ACTIVE, event.payload, CompanionIdleActiveNodeDataSchema);
+    await this.triggerCompanionEvent(
+      event.deviceId,
+      ResourceFlowNodeType.INPUT_COMPANION_ACTIVE,
+      event.payload,
+      CompanionIdleActiveNodeDataSchema,
+    );
   }
 
   @OnEvent('companion.foreground_app')
   async handleCompanionForegroundApp(event: { deviceId: number; payload: object }): Promise<void> {
-    await this.triggerCompanionEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED, event.payload, CompanionForegroundAppNodeDataSchema);
+    await this.triggerCompanionEvent(
+      event.deviceId,
+      ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED,
+      event.payload,
+      CompanionForegroundAppNodeDataSchema,
+    );
   }
 
   @OnEvent('companion.usb_connected')
   async handleCompanionUsbConnected(event: { deviceId: number; payload: CompanionUsbDeviceDto }): Promise<void> {
-    await this.triggerUsbDeviceEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED, event.payload);
+    await this.triggerUsbDeviceEvent(
+      event.deviceId,
+      ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED,
+      event.payload,
+    );
   }
 
   @OnEvent('companion.usb_disconnected')
   async handleCompanionUsbDisconnected(event: { deviceId: number; payload: CompanionUsbDeviceDto }): Promise<void> {
-    await this.triggerUsbDeviceEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED, event.payload);
+    await this.triggerUsbDeviceEvent(
+      event.deviceId,
+      ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED,
+      event.payload,
+    );
   }
 
-  private async triggerCompanionEvent(deviceId: number, type: ResourceFlowNodeType, payload: object, schema: { safeParse: (d: unknown) => { success: boolean; data?: { deviceId: number } } }): Promise<void> {
+  private async triggerCompanionEvent(
+    deviceId: number,
+    type: ResourceFlowNodeType,
+    payload: object,
+    schema: { safeParse: (d: unknown) => { success: boolean; data?: { deviceId: number } } },
+  ): Promise<void> {
     const allNodes = await this.flowNodeRepository.find({ where: { type } });
     const matching = allNodes.filter((node) => {
       const parsed = schema.safeParse(node.data ?? {});
@@ -860,7 +908,11 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     await this.startFlow(matching, { payload });
   }
 
-  private async triggerUsbDeviceEvent(deviceId: number, type: ResourceFlowNodeType, payload: CompanionUsbDeviceDto): Promise<void> {
+  private async triggerUsbDeviceEvent(
+    deviceId: number,
+    type: ResourceFlowNodeType,
+    payload: CompanionUsbDeviceDto,
+  ): Promise<void> {
     const allNodes = await this.flowNodeRepository.find({ where: { type } });
     const matching = allNodes.filter((node) => {
       const parsed = CompanionUsbDeviceNodeDataSchema.safeParse(node.data ?? {});
