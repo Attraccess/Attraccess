@@ -39,6 +39,7 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
     const request = jest
       .spyOn((provider as unknown as { client: { request: jest.Mock } }).client, 'request')
       .mockRejectedValueOnce(new HttpException('not found', HttpStatus.NOT_FOUND))
+      .mockRejectedValueOnce(new HttpException('not found', HttpStatus.NOT_FOUND))
       .mockResolvedValue(null);
 
     const credential = await provider.provision({
@@ -51,15 +52,15 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
 
     expect(credential).toMatchObject({ identity: 'controller-a', username: 'wago-controller-a', vhost: '/' });
     expect(credential.password).toEqual(expect.any(String));
-    expect(request).toHaveBeenNthCalledWith(2, expect.anything(), 'PUT', '/vhosts/%2F');
+    expect(request).toHaveBeenNthCalledWith(3, expect.anything(), 'PUT', '/vhosts/%2F');
     expect(request).toHaveBeenNthCalledWith(
-      3,
+      4,
       expect.anything(),
       'PUT',
       '/users/wago-controller-a',
       expect.objectContaining({ password: credential.password }),
     );
-    expect(request).toHaveBeenNthCalledWith(5, expect.anything(), 'PUT', '/topic-permissions/%2F/wago-controller-a', {
+    expect(request).toHaveBeenNthCalledWith(6, expect.anything(), 'PUT', '/topic-permissions/%2F/wago-controller-a', {
       exchange: 'amq.topic',
       write: '^(?:devices/controller-a/reported(?:/.*)?)$',
       read: '^(?:devices/controller-a/desired(?:/.*)?)$',
@@ -70,6 +71,7 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
     const provider = new RabbitmqCredentialProvisioningProvider(context);
     const request = jest
       .spyOn((provider as unknown as { client: { request: jest.Mock } }).client, 'request')
+      .mockResolvedValueOnce({})
       .mockResolvedValueOnce({})
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ configure: '^old$', write: '^old$', read: '^old$' })
@@ -88,16 +90,72 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
       }),
     ).rejects.toThrow('topic permissions failed');
 
-    expect(request).toHaveBeenNthCalledWith(7, expect.anything(), 'PUT', '/permissions/%2F/wago-controller-a', {
+    expect(request).toHaveBeenNthCalledWith(8, expect.anything(), 'PUT', '/permissions/%2F/wago-controller-a', {
       configure: '^old$',
       write: '^old$',
       read: '^old$',
     });
-    expect(request).toHaveBeenNthCalledWith(8, expect.anything(), 'PUT', '/topic-permissions/%2F/wago-controller-a', {
+    expect(request).toHaveBeenNthCalledWith(9, expect.anything(), 'PUT', '/topic-permissions/%2F/wago-controller-a', {
       exchange: 'amq.topic',
       write: '^old-write$',
       read: '^old-read$',
     });
+  });
+
+  it('surfaces incomplete rollback after attempting to restore every existing-user permission', async () => {
+    const provider = new RabbitmqCredentialProvisioningProvider(context);
+    const request = jest
+      .spyOn((provider as unknown as { client: { request: jest.Mock } }).client, 'request')
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ configure: '^old$', write: '^old$', read: '^old$' })
+      .mockResolvedValueOnce({ exchange: 'amq.topic', write: '^old-write$', read: '^old-read$' })
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error('topic permissions failed'))
+      .mockRejectedValueOnce(new Error('generic permission restore failed'))
+      .mockResolvedValueOnce(null);
+
+    await expect(
+      provider.rotate({
+        mqttServerId: 4,
+        identity: 'controller-a',
+        username: 'wago-controller-a',
+        vhost: '/',
+        topicPolicy: { publish: ['devices/controller-a/reported/#'], subscribe: ['devices/controller-a/desired/#'] },
+      }),
+    ).rejects.toThrow('rollback was incomplete');
+
+    expect(request).toHaveBeenNthCalledWith(9, expect.anything(), 'PUT', '/topic-permissions/%2F/wago-controller-a', {
+      exchange: 'amq.topic',
+      write: '^old-write$',
+      read: '^old-read$',
+    });
+  });
+
+  it('removes a vhost created for a failed new credential write', async () => {
+    const provider = new RabbitmqCredentialProvisioningProvider(context);
+    const request = jest
+      .spyOn((provider as unknown as { client: { request: jest.Mock } }).client, 'request')
+      .mockRejectedValueOnce(new HttpException('not found', HttpStatus.NOT_FOUND))
+      .mockRejectedValueOnce(new HttpException('not found', HttpStatus.NOT_FOUND))
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error('permissions failed'))
+      .mockResolvedValue(null);
+
+    await expect(
+      provider.provision({
+        mqttServerId: 4,
+        identity: 'controller-a',
+        username: 'wago-controller-a',
+        vhost: '/',
+        topicPolicy: { publish: ['devices/controller-a/reported/#'], subscribe: ['devices/controller-a/desired/#'] },
+      }),
+    ).rejects.toThrow('permissions failed');
+
+    expect(request).toHaveBeenNthCalledWith(6, expect.anything(), 'DELETE', '/users/wago-controller-a');
+    expect(request).toHaveBeenNthCalledWith(7, expect.anything(), 'DELETE', '/vhosts/%2F');
   });
 
   it('refuses to alter the configured management identity', async () => {

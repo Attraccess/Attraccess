@@ -66,26 +66,33 @@ export class RabbitmqCredentialProvisioningProvider implements MqttCredentialPro
     const vhost = encodeURIComponent(request.vhost);
     const username = encodeURIComponent(request.username);
     const existing = await this.userExists(config, username);
+    const vhostExisted = await this.vhostExists(config, vhost);
     await this.client.request(config, 'PUT', `/vhosts/${vhost}`);
 
-    if (existing) {
-      const previousPermissions = await this.getPermissions(config, vhost, username);
-      const previousTopicPermissions = await this.getTopicPermissions(config, vhost, username);
-      try {
+    let previousPermissions: RabbitmqPermissions | null = null;
+    let previousTopicPermissions: RabbitmqTopicPermissions | null = null;
+    let permissionsCaptured = false;
+    try {
+      if (existing) {
+        previousPermissions = await this.getPermissions(config, vhost, username);
+        previousTopicPermissions = await this.getTopicPermissions(config, vhost, username);
+        permissionsCaptured = true;
         await this.writePermissions(config, request, vhost, username);
         await this.client.request(config, 'PUT', `/users/${username}`, { password, tags: '' });
-      } catch (error) {
-        await this.restorePermissions(config, vhost, username, previousPermissions, previousTopicPermissions);
-        throw error;
-      }
-    } else {
-      await this.client.request(config, 'PUT', `/users/${username}`, { password, tags: '' });
-      try {
+      } else {
+        await this.client.request(config, 'PUT', `/users/${username}`, { password, tags: '' });
         await this.writePermissions(config, request, vhost, username);
-      } catch (error) {
-        await this.client.request(config, 'DELETE', `/users/${username}`).catch(() => undefined);
-        throw error;
       }
+    } catch (error) {
+      const rollback = [
+        ...(existing && permissionsCaptured
+          ? [() => this.restorePermissions(config, vhost, username, previousPermissions, previousTopicPermissions)]
+          : !existing
+            ? [() => this.client.request(config, 'DELETE', `/users/${username}`)]
+            : []),
+        ...(!vhostExisted ? [() => this.client.request(config, 'DELETE', `/vhosts/${vhost}`)] : []),
+      ];
+      await this.failAfterRollback(error, rollback);
     }
 
     return {
@@ -117,8 +124,16 @@ export class RabbitmqCredentialProvisioningProvider implements MqttCredentialPro
   }
 
   private async userExists(config: MqttServerConnectionConfig, username: string): Promise<boolean> {
+    return this.exists(config, `/users/${username}`);
+  }
+
+  private async vhostExists(config: MqttServerConnectionConfig, vhost: string): Promise<boolean> {
+    return this.exists(config, `/vhosts/${vhost}`);
+  }
+
+  private async exists(config: MqttServerConnectionConfig, path: string): Promise<boolean> {
     try {
-      await this.client.request(config, 'GET', `/users/${username}`);
+      await this.client.request(config, 'GET', path);
       return true;
     } catch (error) {
       if (error instanceof HttpException && error.getStatus() === HttpStatus.NOT_FOUND) {
@@ -162,8 +177,16 @@ export class RabbitmqCredentialProvisioningProvider implements MqttCredentialPro
     permissions: RabbitmqPermissions | null,
     topicPermissions: RabbitmqTopicPermissions | null,
   ): Promise<void> {
-    await this.restorePermission(config, `/permissions/${vhost}/${username}`, permissions);
-    await this.restorePermission(config, `/topic-permissions/${vhost}/${username}`, topicPermissions);
+    const results = await Promise.allSettled([
+      this.restorePermission(config, `/permissions/${vhost}/${username}`, permissions),
+      this.restorePermission(config, `/topic-permissions/${vhost}/${username}`, topicPermissions),
+    ]);
+    const failures = results
+      .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+      .map((result) => result.reason);
+    if (failures.length > 0) {
+      throw new AggregateError(failures, 'Failed to restore RabbitMQ permissions.');
+    }
   }
 
   private async restorePermission<T>(
@@ -171,9 +194,18 @@ export class RabbitmqCredentialProvisioningProvider implements MqttCredentialPro
     path: string,
     permissions: T | null,
   ): Promise<void> {
-    await this.client
-      .request(config, permissions ? 'PUT' : 'DELETE', path, permissions ?? undefined)
-      .catch(() => undefined);
+    await this.client.request(config, permissions ? 'PUT' : 'DELETE', path, permissions ?? undefined);
+  }
+
+  private async failAfterRollback(error: unknown, rollback: Array<() => Promise<unknown>>): Promise<never> {
+    const results = await Promise.allSettled(rollback.map((operation) => operation()));
+    const failures = results
+      .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+      .map((result) => result.reason);
+    if (failures.length > 0) {
+      throw new AggregateError([error, ...failures], 'Credential provisioning failed and rollback was incomplete.');
+    }
+    throw error;
   }
 
   private async requireConfig(mqttServerId: number): Promise<MqttServerConnectionConfig> {
