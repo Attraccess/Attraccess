@@ -82,6 +82,11 @@
       "executor": "nx:run-commands",
       "cache": true,
       "dependsOn": ["pack", "plugins-backend-sdk:build"],
+      "inputs": [
+        "{projectRoot}/package/**/*",
+        "{workspaceRoot}/apps/plugins/scripts/verify-packed-plugin.mjs",
+        "{workspaceRoot}/package.json"
+      ],
       "options": {
         "cwd": "apps/plugins/shelly",
         "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js dist/migrations.js frontend/remoteEntry.js frontend/style.css"

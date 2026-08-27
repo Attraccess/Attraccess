@@ -54,7 +54,8 @@ try {
 
 function validatePackageContract(pkg, hostVersion) {
   if (typeof pkg.name !== 'string' || !pkg.name) throw new Error('Packed plugin is missing its npm name');
-  if (typeof pkg.version !== 'string' || !pkg.version) throw new Error('Packed plugin is missing its version');
+  if (typeof pkg.version !== 'string' || !semver.valid(pkg.version))
+    throw new Error('Packed plugin is missing a strict semver version');
   if (!pkg.keywords?.includes('attraccess-plugin'))
     throw new Error('Packed plugin is missing the attraccess-plugin keyword');
   if (!pkg.repository || !pkg.homepage || !pkg.license)
