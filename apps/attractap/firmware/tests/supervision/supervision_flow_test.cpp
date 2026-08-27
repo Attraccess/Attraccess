@@ -125,6 +125,19 @@ void duplicateWebStartsDoNotCancelAcceptedFlow() {
     expect(fixture.api.cancels == 0, "a stale duplicate must not cancel the accepted web flow");
 }
 
+void webStartPreservesFollowingResolution() {
+    Fixture fixture;
+    supervisionTestNowMs = 100;
+    fixture.flow.armWebInitiated({.resourceId = 42, .timeoutMs = 30000, .requesterUsername = "requester"});
+    fixture.flow.onResolved({.success = true});
+
+    expect(fixture.flow.takePendingWebStart(101, false), "web arm must start the flow");
+    expect(fixture.flow.tick(102) == SupervisionFlow::Outcome::None,
+           "resolution queued after a web start must be retained");
+    expect(fixture.screen.lastView.status == SupervisionScreen::STATUS_SUCCESS,
+           "retained resolution must settle the web flow");
+}
+
 void readerInitiationReleasesRacingWebArm() {
     Fixture fixture;
     supervisionTestNowMs = 100;
@@ -173,6 +186,20 @@ void resolutionWinsOverCardAuthentication() {
            "card authentication must not produce a second terminal outcome");
 }
 
+void terminalFailureWinsOverCardRejection() {
+    Fixture fixture;
+    fixture.beginReader();
+    const uint8_t uid[] = {1};
+    fixture.flow.onCardDetected(uid, sizeof(uid));
+    fixture.flow.tick(101);
+    fixture.flow.onCardAuthentication({.error = "SUPERVISOR_NOT_AUTHORIZED"});
+    fixture.flow.onResolved({.success = false, .error = "SUPERVISION_FAILED"});
+
+    fixture.flow.tick(102);
+    expect(fixture.flow.tick(1903) == SupervisionFlow::Outcome::ReturnToRouting,
+           "terminal failure must not be replaced by a recoverable card rejection");
+}
+
 void disconnectClearsActivePendingAndQueuedWork() {
     Fixture fixture;
     supervisionTestNowMs = 100;
@@ -204,9 +231,11 @@ int main() {
     terminalFailureReturnsAfterDwell();
     webInitiatedFlowDoesNotUnlockLocally();
     duplicateWebStartsDoNotCancelAcceptedFlow();
+    webStartPreservesFollowingResolution();
     readerInitiationReleasesRacingWebArm();
     readerCardSuccessUnlocksAndResets();
     resolutionWinsOverCardAuthentication();
+    terminalFailureWinsOverCardRejection();
     disconnectClearsActivePendingAndQueuedWork();
     timeoutReturnsToRouting();
     return 0;

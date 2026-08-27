@@ -85,9 +85,9 @@ void SupervisionFlow::beginWebInitiated(uint32_t id, const char *requester, uint
 }
 
 bool SupervisionFlow::takePendingWebStart(uint32_t now, bool readerBusy) {
-    // Coalesce duplicate websocket starts so stale events cannot later cancel
-    // the web transaction that this invocation accepts.
-    processEvents();
+    // Stop at the first start so terminal events queued after it are consumed
+    // only after the flow has become active.
+    processEvents(true);
     if (!pendingWebStart) return false;
     if (now - requestedAtMs > requestedTimeoutMs) {
         logger.debug("Ignoring supervision arm that outlived its request");
@@ -306,6 +306,10 @@ void SupervisionFlow::processEvent(const Event &event) {
         }
         break;
     case EventType::WebStart:
+        if (phase != Phase::Idle || pendingWebStart) {
+            logger.debug("Ignoring duplicate supervision start");
+            break;
+        }
         strlcpy(armedRequesterName, event.requesterName, sizeof(armedRequesterName));
         armedResourceId = event.resourceId;
         requestedAtMs = event.receivedAtMs;
@@ -361,6 +365,7 @@ SupervisionFlow::Outcome SupervisionFlow::tick(uint32_t now) {
     }
     if (event == TerminalEvent::Failed) {
         terminalEvent = TerminalEvent::None;
+        cardRejected = keyReady = cardDetected = false;
         showError(true, now);
         return Outcome::None;
     }
