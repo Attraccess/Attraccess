@@ -1,5 +1,5 @@
 import { ResourceOperatingInterval } from '@attraccess/database-entities';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, QueryFailedError, Repository } from 'typeorm';
 import { ResourceOperatingIntervalService } from './resource-operating-interval.service';
 
 describe('ResourceOperatingIntervalService', () => {
@@ -20,6 +20,7 @@ describe('ResourceOperatingIntervalService', () => {
     const manager = {
       getRepository: jest.fn(() => repository),
       transaction: jest.fn((callback) => callback(manager)),
+      query: jest.fn(),
     } as unknown as EntityManager;
     service = new ResourceOperatingIntervalService({ manager } as Repository<ResourceOperatingInterval>);
   });
@@ -39,6 +40,19 @@ describe('ResourceOperatingIntervalService', () => {
 
     expect(repository.create).toHaveBeenCalledWith({ resourceId: 3, startTime: now, endTime: null });
     expect(repository.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses a supplied transaction manager without starting a nested transaction', async () => {
+    const manager = {
+      getRepository: jest.fn(() => repository),
+      query: jest.fn(),
+      transaction: jest.fn(),
+    } as unknown as EntityManager;
+
+    await service.transition(3, 'operating', manager);
+
+    expect(manager.transaction).not.toHaveBeenCalled();
+    expect(manager.query).toHaveBeenCalledWith('UPDATE "resource" SET "id" = "id" WHERE "id" = ?', [3]);
   });
 
   it('is idempotent for duplicate operating transitions', async () => {
@@ -83,5 +97,13 @@ describe('ResourceOperatingIntervalService', () => {
     await service.transition(9, 'idle');
 
     expect(repository.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats an open-interval unique conflict as a duplicate operating transition', async () => {
+    repository.save.mockRejectedValueOnce(
+      Object.assign(new QueryFailedError('', [], new Error('UNIQUE constraint failed')), { code: 'SQLITE_CONSTRAINT' }),
+    );
+
+    await expect(service.transition(3, 'operating')).resolves.toBeNull();
   });
 });
