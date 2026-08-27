@@ -4,6 +4,8 @@ import { MqttClientService } from '../mqtt/mqtt-client.service';
 import { MqttMessageEvent } from '../mqtt/mqtt-message.event';
 import type { PluginMqttMessage, PluginMqttSubscription } from '@attraccess/plugins-backend-sdk';
 
+const MAX_QUEUED_MESSAGES_PER_SUBSCRIPTION = 100;
+
 interface Subscription {
   pluginId: string;
   pluginName: string;
@@ -11,6 +13,9 @@ interface Subscription {
   topicFilter: string;
   handler: (message: PluginMqttMessage) => void | Promise<void>;
   logger: LoggerService;
+  queue: PluginMqttMessage[];
+  processing: boolean;
+  overflowLogged: boolean;
 }
 
 export function mqttTopicMatches(topicFilter: string, topic: string): boolean {
@@ -48,7 +53,17 @@ export class PluginMqttService {
     topicFilter: string,
     handler: Subscription['handler'],
   ): PluginMqttSubscription {
-    const subscription = { pluginId, pluginName, logger, serverId, topicFilter, handler };
+    const subscription = {
+      pluginId,
+      pluginName,
+      logger,
+      serverId,
+      topicFilter,
+      handler,
+      queue: [],
+      processing: false,
+      overflowLogged: false,
+    };
     this.subscriptions.add(subscription);
     void this.mqtt.subscribe(serverId, topicFilter);
 
@@ -76,6 +91,7 @@ export class PluginMqttService {
     if (!this.subscriptions.delete(subscription)) {
       return;
     }
+    subscription.queue.length = 0;
     // MqttClientService reference-counts topic filters across plugins.
     void this.mqtt.unsubscribe(subscription.serverId, subscription.topicFilter).catch((error) => {
       subscription.logger.error(
@@ -90,13 +106,42 @@ export class PluginMqttService {
       if (subscription.serverId !== event.serverId || !mqttTopicMatches(subscription.topicFilter, event.topic)) {
         continue;
       }
-      Promise.resolve()
-        .then(() =>
-          subscription.handler({ serverId: event.serverId, topic: event.topic, payload: event.payloadBuffer }),
-        )
-        .catch((error) => {
+      this.enqueue(subscription, { serverId: event.serverId, topic: event.topic, payload: event.payloadBuffer });
+    }
+  }
+
+  private enqueue(subscription: Subscription, message: PluginMqttMessage): void {
+    if (subscription.queue.length >= MAX_QUEUED_MESSAGES_PER_SUBSCRIPTION) {
+      if (!subscription.overflowLogged) {
+        subscription.overflowLogged = true;
+        subscription.logger.warn(`MQTT handler queue for "${subscription.topicFilter}" is full; dropping new messages`);
+      }
+      return;
+    }
+
+    subscription.queue.push(message);
+    subscription.overflowLogged = false;
+    if (!subscription.processing) {
+      void this.processQueue(subscription);
+    }
+  }
+
+  private async processQueue(subscription: Subscription): Promise<void> {
+    subscription.processing = true;
+    try {
+      while (subscription.queue.length > 0) {
+        const message = subscription.queue.shift();
+        if (!message) {
+          continue;
+        }
+        try {
+          await subscription.handler(message);
+        } catch (error) {
           subscription.logger.error(`MQTT handler for "${subscription.topicFilter}" failed`, (error as Error).stack);
-        });
+        }
+      }
+    } finally {
+      subscription.processing = false;
     }
   }
 }

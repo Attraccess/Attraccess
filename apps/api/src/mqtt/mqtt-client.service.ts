@@ -274,10 +274,16 @@ export class MqttClientService implements OnModuleDestroy {
     const existingSubscription = serverTopics.get(topic);
     if (existingSubscription) {
       existingSubscription.count++;
-      return;
+      if (existingSubscription.qos !== undefined && (qos === undefined || qos <= existingSubscription.qos)) {
+        return;
+      }
+      if (qos !== undefined) {
+        existingSubscription.qos = qos;
+      }
+    } else {
+      // The effective QoS is resolved from the server default after connecting.
+      serverTopics.set(topic, { qos, count: 1 });
     }
-    // Leave qos undefined to allow resolution from server defaults on (re)subscribe.
-    serverTopics.set(topic, { qos, count: 1 });
 
     try {
       const [client, server] = await Promise.all([
@@ -287,10 +293,13 @@ export class MqttClientService implements OnModuleDestroy {
       // A plugin can be destroyed while the connection is still being
       // established. In that case unsubscribe() has already removed this topic
       // from the desired state, so do not add it to the broker once connected.
-      if (!this.subscriptions.get(serverId)?.has(topic)) {
+      const subscription = this.subscriptions.get(serverId)?.get(topic);
+      if (!subscription) {
         return;
       }
-      const effectiveQos: 0 | 1 | 2 = (qos ?? (server?.defaultSubscribeQos as 0 | 1 | 2) ?? 0) as 0 | 1 | 2;
+      const effectiveQos = Math.max(subscription.qos ?? 0, (server?.defaultSubscribeQos as 0 | 1 | 2) ?? 0) as
+        0 | 1 | 2;
+      subscription.qos = effectiveQos;
       await this.externalCallTimer.time(
         'mqtt',
         'subscribe',

@@ -71,7 +71,9 @@ export interface PluginMqttSubscription {
 export interface PluginMqttClient {
   /**
    * Subscribe through the host's shared MQTT connection. MQTT wildcards `+`
-   * and `#` are supported. The returned handle detaches the handler.
+   * and `#` are supported. Handlers run serially; each subscription buffers up
+   * to 100 messages and drops new messages while full. The returned handle
+   * detaches the handler.
    */
   subscribe(
     serverId: number,

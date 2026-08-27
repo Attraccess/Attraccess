@@ -65,6 +65,32 @@ describe('PluginMqttService', () => {
     expect(working).toHaveBeenCalled();
   });
 
+  it('serializes handler execution and drops new messages when its queue is full', async () => {
+    const logger = new Logger('Plugin:slow');
+    const logWarn = jest.spyOn(logger, 'warn').mockImplementation();
+    let releaseHandler!: () => void;
+    const handler = jest.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseHandler = resolve;
+        }),
+    );
+    service.subscribe('slow', 'slow', logger, 1, 'events/#', handler);
+
+    for (let index = 0; index < 102; index++) {
+      events.emit(MqttMessageEvent.EVENT_NAME, new MqttMessageEvent(1, `events/${index}`, {}, Buffer.from('message')));
+    }
+    await Promise.resolve();
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(logWarn).toHaveBeenCalledWith('MQTT handler queue for "events/#" is full; dropping new messages');
+
+    releaseHandler();
+    await new Promise(setImmediate);
+
+    expect(handler).toHaveBeenCalledTimes(2);
+  });
+
   it('releases every plugin subscription to the shared MQTT client', async () => {
     const first = service.subscribe('one', 'one', new Logger('Plugin:one'), 1, 'events/#', () => undefined);
     const second = service.subscribe('two', 'two', new Logger('Plugin:two'), 1, 'events/#', () => undefined);

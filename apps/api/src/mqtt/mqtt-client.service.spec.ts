@@ -14,6 +14,7 @@ import { ExternalCallTimer } from '../metrics/instrumentation/external/external.
 interface MqttClientServicePrivate {
   getOrCreateClient: (serverId: number, keepTryingToConnect?: boolean) => Promise<mqtt.MqttClient>;
   clients: Map<number, mqtt.MqttClient>;
+  subscriptions: Map<number, Map<string, { qos?: 0 | 1 | 2; count: number }>>;
 }
 
 // Mock mqtt module thoroughly to avoid actual connections and timers
@@ -346,6 +347,30 @@ describe('MqttClientService', () => {
       client.emit('connect');
 
       expect(client.subscribe).toHaveBeenCalledWith('devices/#', { qos: 0 }, expect.any(Function));
+    });
+
+    it('promotes a shared topic to the highest requested QoS', async () => {
+      const mockClient = mqtt.connect({});
+      jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient').mockResolvedValue(mockClient);
+
+      await service.subscribe(1, 'sensors/+', 0);
+      (mockClient.subscribe as jest.Mock).mockClear();
+      await service.subscribe(1, 'sensors/+', 2);
+
+      expect(mockClient.subscribe).toHaveBeenCalledWith('sensors/+', { qos: 2 }, expect.any(Function));
+    });
+
+    it('retains a server default QoS that is higher than a later request', async () => {
+      (mockRepository.findOneBy as jest.Mock).mockResolvedValue({ ...mockServer, defaultSubscribeQos: 2 });
+      const mockClient = mqtt.connect({});
+      jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient').mockResolvedValue(mockClient);
+
+      await service.subscribe(1, 'sensors/+');
+      (mockClient.subscribe as jest.Mock).mockClear();
+      await service.subscribe(1, 'sensors/+', 1);
+
+      expect(mockClient.subscribe).not.toHaveBeenCalled();
+      expect((service as unknown as MqttClientServicePrivate).subscriptions.get(1)?.get('sensors/+')?.qos).toBe(2);
     });
   });
 
