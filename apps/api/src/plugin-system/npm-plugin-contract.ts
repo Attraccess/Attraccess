@@ -64,7 +64,7 @@ export function parseNpmPluginPackage(value: unknown, hostVersion: string): { pk
 function validateSdkPeerDependency(pkg: NpmPluginPackage, name: string, declaredRange: string | undefined, required: boolean, hostVersion: string): void {
   if (!required) return;
   const peerRange = pkg.peerDependencies[name];
-  if (!peerRange || !declaredRange || !semver.validRange(peerRange) || !semver.validRange(declaredRange) || !semver.intersects(peerRange, declaredRange) || !semver.satisfies(hostVersion, peerRange) || !semver.satisfies(hostVersion, declaredRange)) {
+  if (!peerRange || !declaredRange || !semver.validRange(peerRange) || !semver.validRange(declaredRange) || !semver.intersects(peerRange, declaredRange) || !semver.satisfies(hostVersion, peerRange, { includePrerelease: true }) || !semver.satisfies(hostVersion, declaredRange, { includePrerelease: true })) {
     throw new BadRequestException(`Package must declare ${name} as a compatible peer dependency`);
   }
 }

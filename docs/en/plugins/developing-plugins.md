@@ -2,8 +2,8 @@
 
 Attraccess plugins extend the platform with new API endpoints, background
 behaviour, and UI pages — without forking the core. A plugin can ship a
-**backend** half, a **frontend** half, or both, packaged as a single ZIP and
-uploaded through the admin [Plugins](plugins/installing-plugins.md) page.
+**backend** half, a **frontend** half, or both, published as an npm package and
+installed through the admin [Plugins](plugins/installing-plugins.md) page.
 
 This guide is a complete walkthrough. It follows a working example —
 **`plugin-hello-world`** — that exercises every core capability: a backend
@@ -12,58 +12,67 @@ controller, an injected repository, a typed event handler, and a frontend route.
 > [!TIP]
 > The full source is in the repository at
 > [`examples/plugin-hello-world`](https://github.com/Attraccess/Attraccess/tree/main/examples/plugin-hello-world).
-> Clone it, run `npm install && npm run build`, and upload the resulting ZIP to
-> see it running before you write your own.
+> Clone it, run `npm install && npm run build && npm pack ./package`, and use
+> the resulting npm tarball to see it running before you write your own.
 
 ## Plugin SDKs
 
-| SDK | Install Command | Purpose |
-|-----|----------------|---------|
-| `@attraccess/plugins-backend-sdk` | `npm install -D @attraccess/plugins-backend-sdk` | Backend modules, `PluginContext`, typed events, permissions |
-| `@attraccess/plugins-frontend-sdk` | `npm install -D @attraccess/plugins-frontend-sdk` | Frontend plugin contract and route types |
+| SDK                                | Install Command                                   | Purpose                                                     |
+| ---------------------------------- | ------------------------------------------------- | ----------------------------------------------------------- |
+| `@attraccess/plugins-backend-sdk`  | `npm install -D @attraccess/plugins-backend-sdk`  | Backend modules, `PluginContext`, typed events, permissions |
+| `@attraccess/plugins-frontend-sdk` | `npm install -D @attraccess/plugins-frontend-sdk` | Frontend plugin contract and route types                    |
 
 Both SDKs are needed only at build time (types). They are not bundled into the
 shipped artifact.
 
 ## Anatomy of a plugin
 
-Every plugin is a directory with a `plugin.json` manifest at its root and one or
+Every npm plugin has a `package.json` at its root and one or
 both build outputs:
 
 ```
 my-plugin/
-├── plugin.json                 # manifest (required)
+├── package.json                # npm and Attraccess metadata (required)
 ├── dist/index.js               # backend entry (CommonJS) — optional
 └── frontend/remoteEntry.js     # frontend entry (ESM federation remote) — optional
 ```
 
-### The manifest
+### Package metadata
 
-`plugin.json` declares the plugin's name, version, entry points, the host
-versions it supports, and the permissions it needs:
+`package.json` declares the plugin's identity, version, entry points, host
+versions, SDK peers, and permissions. It must include the `attraccess-plugin`
+keyword and an `attraccess` object:
 
 ```json
 {
-  "name": "plugin-hello-world",
+  "name": "@example/plugin-hello-world",
   "version": "1.0.0",
-  "main": {
-    "backend": { "directory": "dist", "entryPoint": "index.js" },
-    "frontend": { "directory": "frontend", "entryPoint": "remoteEntry.js", "styles": "style.css" }
+  "keywords": ["attraccess-plugin"],
+  "peerDependencies": {
+    "@attraccess/plugins-backend-sdk": "^1.9.0",
+    "@attraccess/plugins-frontend-sdk": "^1.9.0"
   },
-  "attraccessVersion": { "min": "1.0.0" },
-  "permissions": ["READ_USERS", "LISTEN_EVENTS"]
+  "attraccess": {
+    "displayName": "Hello World",
+    "host": "^1.9.0",
+    "backend": "dist/index.js",
+    "frontend": "frontend/remoteEntry.js",
+    "styles": "frontend/style.css",
+    "permissions": ["READ_USERS", "LISTEN_EVENTS"],
+    "sdk": { "backend": "^1.9.0", "frontend": "^1.9.0" }
+  }
 }
 ```
 
-| Field | Required | Notes |
-|-------|----------|-------|
-| `name` | yes | Unique identifier; also the on-disk folder name. |
-| `version` | yes | Your plugin's semantic version. |
-| `main.backend` / `main.frontend` | at least one | `directory` + `entryPoint`, relative to the ZIP root. |
-| `main.frontend.styles` | no | Stylesheet relative to the frontend directory; the host injects it as a `<link>` when the plugin loads. See [Styling](#styling-bundle-your-own-css). |
-| `main.migrations` | no | `directory` + `entryPoint` of a module exporting TypeORM migration classes. See [Database Migrations](plugins/database-migrations.md). |
-| `attraccessVersion` | yes | Compatibility range — at least one of `min`, `max`, `exact`. |
-| `permissions` | no | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`. |
+| Field                                        | Required     | Notes                                                                                                  |
+| -------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------ |
+| `name`                                       | yes          | Immutable npm package identifier.                                                                      |
+| `version`                                    | yes          | Your plugin's semantic version.                                                                        |
+| `attraccess.backend` / `attraccess.frontend` | at least one | Relative package entry point.                                                                          |
+| `attraccess.styles`                          | no           | Stylesheet alongside the frontend entry point.                                                         |
+| `attraccess.migrations`                      | no           | Module exporting TypeORM migration classes. See [Database Migrations](plugins/database-migrations.md). |
+| `attraccess.host`                            | yes          | Compatible Attraccess host semver range.                                                               |
+| `attraccess.permissions`                     | no           | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`.      |
 
 ## Backend plugins
 
@@ -142,17 +151,17 @@ export default plugin;
 
 `register(context)` receives a `PluginContext` — your gateway to the host:
 
-| Member | Purpose | Permission |
-|--------|---------|------------|
-| `context.manifest` | Your plugin's name, version, id, directory. | none |
-| `context.logger` | Logger prefixed with your plugin name. | none |
-| `context.getRepository(entity)` | TypeORM repository over the shared connection. | per-entity (see below) |
-| `context.dataSource` | The raw shared TypeORM `DataSource`. | `DATABASE_ACCESS` |
-| `context.onEvent(event, handler)` | Subscribe to a typed `SystemEvent`. | `LISTEN_EVENTS` |
-| `context.emitEvent(event, payload)` | Emit a typed `SystemEvent`. | `EMIT_EVENTS` |
-| `context.events` | The raw shared event bus (restricted surface). | per-method |
-| `context.get(token)` | Resolve an arbitrary host provider by token. | `RESOLVE_HOST_PROVIDERS` |
-| `context.getMqttServerConfig(serverId)` | Resolve an MQTT server's connection config + resolved (decrypted) credentials. | `ACCESS_MQTT_SERVERS` |
+| Member                                  | Purpose                                                                        | Permission               |
+| --------------------------------------- | ------------------------------------------------------------------------------ | ------------------------ |
+| `context.manifest`                      | Your plugin's name, version, id, directory.                                    | none                     |
+| `context.logger`                        | Logger prefixed with your plugin name.                                         | none                     |
+| `context.getRepository(entity)`         | TypeORM repository over the shared connection.                                 | per-entity (see below)   |
+| `context.dataSource`                    | The raw shared TypeORM `DataSource`.                                           | `DATABASE_ACCESS`        |
+| `context.onEvent(event, handler)`       | Subscribe to a typed `SystemEvent`.                                            | `LISTEN_EVENTS`          |
+| `context.emitEvent(event, payload)`     | Emit a typed `SystemEvent`.                                                    | `EMIT_EVENTS`            |
+| `context.events`                        | The raw shared event bus (restricted surface).                                 | per-method               |
+| `context.get(token)`                    | Resolve an arbitrary host provider by token.                                   | `RESOLVE_HOST_PROVIDERS` |
+| `context.getMqttServerConfig(serverId)` | Resolve an MQTT server's connection config + resolved (decrypted) credentials. | `ACCESS_MQTT_SERVERS`    |
 
 > [!IMPORTANT]
 > Resolve services and repositories through `context`, never by re-initialising
@@ -167,16 +176,16 @@ array. At runtime the host hands your plugin a **guarded** `PluginContext`:
 accessing a capability whose permission you did not declare throws a clear error
 naming the missing permission.
 
-| Permission | Grants access to |
-|-----------|------------------|
-| `READ_USERS` | `context.getRepository('User')` — read user accounts. |
-| `ACCESS_RESOURCES` | `context.getRepository('Resource')` — read and write resources. |
-| `READ_SETTINGS` | `context.getRepository('Setting')` — read application settings. |
-| `DATABASE_ACCESS` | `context.dataSource` and `context.getRepository(...)` for any other entity. |
-| `EMIT_EVENTS` | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`. |
-| `LISTEN_EVENTS` | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ... |
-| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token. |
-| `ACCESS_MQTT_SERVERS` | `context.getMqttServerConfig(serverId)` — read an MQTT server's connection config and resolved credentials. |
+| Permission               | Grants access to                                                                                            |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `READ_USERS`             | `context.getRepository('User')` — read user accounts.                                                       |
+| `ACCESS_RESOURCES`       | `context.getRepository('Resource')` — read and write resources.                                             |
+| `READ_SETTINGS`          | `context.getRepository('Setting')` — read application settings.                                             |
+| `DATABASE_ACCESS`        | `context.dataSource` and `context.getRepository(...)` for any other entity.                                 |
+| `EMIT_EVENTS`            | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`.                                 |
+| `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                     |
+| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                            |
+| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)` — read an MQTT server's connection config and resolved credentials. |
 
 A few notes on the boundary:
 
@@ -227,13 +236,13 @@ the core flow that emitted the event.
 
 A backend plugin shares the host's NestJS runtime, event bus and database
 connection. For dependency-injection identities to line up, your build must use
-the *same* copies of those packages the host already loaded — it must **not**
+the _same_ copies of those packages the host already loaded — it must **not**
 bundle its own. Split dependencies into two groups:
 
-| Dependency | How to declare it | Why |
-|-----------|-------------------|-----|
-| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata` | `peerDependencies`, **externalized** at build time | They carry the DI identities, the shared event bus and the single DB connection. A bundled copy is a *different* type and silently fails to connect. |
-| `@attraccess/plugins-backend-sdk` and your own code | bundle normally | Safe — the SDK's runtime surface is `Symbol.for()`, identity-safe across copies. |
+| Dependency                                                                                                | How to declare it                                  | Why                                                                                                                                                  |
+| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata` | `peerDependencies`, **externalized** at build time | They carry the DI identities, the shared event bus and the single DB connection. A bundled copy is a _different_ type and silently fails to connect. |
+| `@attraccess/plugins-backend-sdk` and your own code                                                       | bundle normally                                    | Safe — the SDK's runtime surface is `Symbol.for()`, identity-safe across copies.                                                                     |
 
 Ship a **CommonJS** entry point (`index.js`), not an ES module. A minimal
 [esbuild](https://esbuild.github.io/) build that follows the rule:
@@ -257,7 +266,7 @@ esbuild backend/plugin.ts \
 A frontend plugin is an ES module that **default-exports a class** implementing
 `AttraccessFrontendPlugin`. The host loads it at runtime as a
 [Vite module federation](https://github.com/originjs/vite-plugin-federation)
-*remote* (exposing `./plugin`), instantiates the class, and calls `getRoutes()`
+_remote_ (exposing `./plugin`), instantiates the class, and calls `getRoutes()`
 to merge your pages into the app router.
 
 > [!TIP]
@@ -268,11 +277,11 @@ to merge your pages into the app router.
 > hand-rolling styles and your pages look native, stay consistent, and inherit
 > the host's **light/dark theme automatically** — HeroUI components read the
 > active theme from the host because your page renders inside the host DOM.
-> Because these packages are *shared*, the host serves its single copy at
+> Because these packages are _shared_, the host serves its single copy at
 > runtime, so your plugin bundle only carries its own code.
 >
 > Raw Tailwind utility classes (`flex`, `gap-6`, `text-default-500`, …) are
-> **not** covered by the host stylesheet — the host only ships the classes *it*
+> **not** covered by the host stylesheet — the host only ships the classes _it_
 > uses. Bundle your own prefixed utilities as described in
 > [Styling](#styling-bundle-your-own-css).
 
@@ -315,7 +324,9 @@ function HelloWorldPage() {
             <ul className="hw:flex hw:flex-col hw:gap-2">
               {greetings.map((g) => (
                 <li key={g}>
-                  <Chip color="accent" variant="soft">{g}</Chip>
+                  <Chip color="accent" variant="soft">
+                    {g}
+                  </Chip>
                 </li>
               ))}
             </ul>
@@ -359,17 +370,17 @@ import { createPluginApiClient, PluginApiError } from '@attraccess/plugins-front
 // Your backend routes are mounted under `/api/<plugin-name>`.
 const api = createPluginApiClient('/api/hello-world');
 
-await api.request<Greeting[]>('/greetings');                                  // GET, parsed JSON
+await api.request<Greeting[]>('/greetings'); // GET, parsed JSON
 await api.request<Greeting>('/greetings', { method: 'POST', body: { text } }); // JSON body
-await api.request<void>('/greetings/1', { method: 'DELETE' });                 // empty body → null
-await api.request<Result>('/detection/7', { query: { refresh: true } });       // query string
+await api.request<void>('/greetings/1', { method: 'DELETE' }); // empty body → null
+await api.request<Result>('/detection/7', { query: { refresh: true } }); // query string
 ```
 
-| Member | Purpose |
-|--------|---------|
+| Member                       | Purpose                                                                                                                                                                                                          |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `request<T>(path, options?)` | JSON in, JSON out. `options` takes any `RequestInit` field plus `body` (serialised automatically) and `query`. Throws `PluginApiError` (with `.status`) on a non-2xx response; an empty body resolves to `null`. |
-| `fetch(path, init?)` | Escape hatch for non-JSON responses (downloads, streams). Still resolves the base URL and sends credentials. |
-| `url(path, query?)` | The absolute URL, e.g. for an `<a href>` or an `EventSource`. |
+| `fetch(path, init?)`         | Escape hatch for non-JSON responses (downloads, streams). Still resolves the base URL and sends credentials.                                                                                                     |
+| `url(path, query?)`          | The absolute URL, e.g. for an `<a href>` or an `EventSource`.                                                                                                                                                    |
 
 Omit `basePath` to address the host API directly (`api.request('/api/users/me')`).
 
@@ -378,11 +389,11 @@ Omit `basePath` to address the host API directly (`api.request('/api/users/me')`
 `getRoutes()` returns an array of `RouteConfig`. Each extends React Router's
 route props (`path`, `element`, ...) with an `authRequired` field:
 
-| `authRequired` | Meaning |
-|----------------|---------|
-| `false` | Public route, no authentication. |
-| `true` | Any logged-in user. |
-| `"resources.update"` | A single required RBAC permission key. |
+| `authRequired`                             | Meaning                                  |
+| ------------------------------------------ | ---------------------------------------- |
+| `false`                                    | Public route, no authentication.         |
+| `true`                                     | Any logged-in user.                      |
+| `"resources.update"`                       | A single required RBAC permission key.   |
 | `["resources.update", "resources.create"]` | Any one of several RBAC permission keys. |
 
 See [Permissions](../user-management/permissions.md) for the full list of available permission keys.
@@ -392,7 +403,7 @@ core routes, so a route that throws cannot take down the rest of the app.
 
 ### Slots (embedded extension points)
 
-Routes give a plugin its own pages. **Slots** let a plugin inject UI *into* a
+Routes give a plugin its own pages. **Slots** let a plugin inject UI _into_ a
 host page at a well-known point, without the host knowing anything about the
 plugin. A slot is identified by a string id the host documents (just like a
 route `path`), and the host hands each contribution a small context object
@@ -431,10 +442,10 @@ getSlotContributions(): PluginSlotContribution[] {
 The slot contract is intentionally generic — the SDK carries no domain
 knowledge. Host slot ids available today:
 
-| Slot id | Where it renders | Context |
-|---------|------------------|---------|
-| `mqtt.server.detail` | MQTT server detail/edit view (extensions section) | `{ mqttServerId }` |
-| `mqtt.server.list.row` | MQTT server list, per-row action area | `{ mqttServerId }` |
+| Slot id                | Where it renders                                  | Context            |
+| ---------------------- | ------------------------------------------------- | ------------------ |
+| `mqtt.server.detail`   | MQTT server detail/edit view (extensions section) | `{ mqttServerId }` |
+| `mqtt.server.list.row` | MQTT server list, per-row action area             | `{ mqttServerId }` |
 
 ### Packaging the frontend
 
@@ -488,7 +499,7 @@ This emits `frontend/remoteEntry.js` (plus chunks) — point your manifest's
 ### Styling: bundle your own CSS
 
 Your plugin renders inside the host DOM, but the host's stylesheet only
-contains the Tailwind utility classes used by the *host's own* sources. Any
+contains the Tailwind utility classes used by the _host's own_ sources. Any
 class your plugin uses beyond that set would silently render unstyled — so
 every plugin bundles its own CSS and declares it in the manifest via
 `main.frontend.styles`. The host then injects it as a `<link>` when it loads
@@ -533,18 +544,18 @@ variants:
 
 With `cssCodeSplit: false` and the `assetFileNames` shown above, the build
 emits a single `frontend/style.css` — point `main.frontend.styles` at it.
-HeroUI *components* need none of this (they are styled by the host), only the
+HeroUI _components_ need none of this (they are styled by the host), only the
 utility classes in your own markup do.
 
-## Build, ZIP and upload
+## Build, pack, and install
 
-A combined plugin needs both halves built and zipped together. The example's
+A combined plugin needs both halves built into an npm package. The example's
 [`build.mjs`](https://github.com/Attraccess/Attraccess/blob/main/examples/plugin-hello-world/build.mjs)
-does this end to end; the resulting ZIP must look like:
+does this end to end; the package contents must look like:
 
 ```
-plugin-hello-world.zip
-├── plugin.json                 # at the ZIP root
+package/
+├── package.json                # npm and Attraccess metadata
 ├── dist/index.js               # backend (CommonJS)
 └── frontend/                   # frontend federation remote
     ├── remoteEntry.js
@@ -553,13 +564,15 @@ plugin-hello-world.zip
 ```
 
 > [!IMPORTANT]
-> Zip the **contents**, not the containing folder — `plugin.json` must sit at the
-> ZIP root: `cd package && zip -r ../plugin.zip .`
+> [!IMPORTANT]
+> Run `npm pack ./package` and distribute the resulting `.tgz` file. Package
+> lifecycle scripts are not run by Attraccess during installation.
 
-Then upload it:
+Then install it:
 
-1. Open **Settings** > **Plugins** and click **Upload Plugin**.
-2. Select your ZIP. The server validates the manifest, unpacks it, and
+1. Publish the package to an npm-compatible registry.
+2. Open **Settings** > **Plugins**, select the registry package and version.
+   The server validates its package metadata, downloads and unpacks it, and
    **restarts** to load the plugin.
 3. After the restart, your backend endpoints are live and your frontend routes
    are reachable. Verify the requested permissions are listed on the Plugins
@@ -578,10 +591,10 @@ so they share the workspace toolchain, caching and CI.
 **Convention:**
 
 - **Location:** one directory per plugin under `apps/plugins/<name>/`, with the
-  same anatomy as any plugin (`plugin.json`, `backend/plugin.ts`,
+  same anatomy as any plugin (`package.json`, `backend/plugin.ts`,
   `frontend/src/plugin.tsx`, …).
 - **nx tag:** every plugin app is tagged **`type:plugin`** in its `project.json`.
-  CI targets the set with `--projects=tag:type:plugin` (build + zip the plugins)
+  CI targets the set with `--projects=tag:type:plugin` (test + pack the plugins)
   and the generic lint/typecheck/test/build jobs exclude it with
   `--exclude=...,tag:type:plugin`, exactly mirroring how `scope:hardware` is
   handled. List the plugin apps any time with:
@@ -590,28 +603,30 @@ so they share the workspace toolchain, caching and CI.
   pnpm nx show projects --projects=tag:type:plugin
   ```
 
-- **Build recipe:** the esbuild/Vite/zip recipe described above is shared across
+- **Build recipe:** the esbuild/Vite/npm-pack recipe described above is shared across
   plugin apps via `apps/plugins/scripts/` (`esbuild-backend.mjs`,
-  `vite-federation.config.mjs`, `zip-plugin.mjs`). Each plugin's `project.json`
+  `vite-federation.config.mjs`, `verify-packed-plugin.mjs`). Each plugin's `project.json`
   wires them into nx targets:
 
-  | Target | Produces |
-  |--------|----------|
-  | `build-backend` | `package/dist/index.js` (esbuild, CommonJS, host packages externalized) |
-  | `build-frontend` | `package/frontend/remoteEntry.js` (Vite federation remote) |
-  | `build` | copies `plugin.json` into `package/` (depends on the two builds) |
-  | `package` | `dist/plugin-<name>.zip` — the uploadable artifact (depends on `build`) |
+  | Target           | Produces                                                                |
+  | ---------------- | ----------------------------------------------------------------------- |
+  | `build-backend`  | `package/dist/index.js` (esbuild, CommonJS, host packages externalized) |
+  | `build-frontend` | `package/frontend/remoteEntry.js` (Vite federation remote)              |
+  | `build`          | copies `package.json` into `package/` (depends on the two builds)       |
+  | `pack`           | `dist/*.tgz` — the npm package artifact (depends on `build`)            |
+  | `pack-test`      | validates the packed tarball and loads its backend                      |
+  | `publish`        | publishes a new package version to npm                                  |
 
   ```bash
-  # Build and zip a single plugin app:
-  pnpm nx package plugin-rabbitmq
+   # Build and pack a single plugin app:
+   pnpm nx pack plugin-rabbitmq
   # …or every plugin app at once:
-  pnpm nx run-many --target=package --projects=tag:type:plugin
+   pnpm nx run-many --target=pack --projects=tag:type:plugin
   ```
 
-- **CI:** pull-request builds zip all `tag:type:plugin` apps, upload the ZIPs as
-  workflow artifacts, and post a sticky PR comment listing them. Releases attach
-  the same ZIPs as release assets.
+- **CI:** pull requests test and pack affected plugin apps. Release CI publishes
+  changed plugins only when their `package.json` version is new on npm; stable
+  versions use `latest`, prereleases use `next`.
 
 ## See Also
 
@@ -620,4 +635,3 @@ so they share the workspace toolchain, caching and CI.
 - [Example plugin source](https://github.com/Attraccess/Attraccess/tree/main/examples/plugin-hello-world) — the `plugin-hello-world` walkthrough code
 - [Developer Guide](developer/overview.md) — Attraccess architecture and development
 - [API Reference](developer/api-reference.md) — Attraccess REST API
-```

@@ -2,15 +2,49 @@
   "name": "@attraccess-example/plugin-hello-world",
   "version": "1.0.0",
   "private": true,
-  "description": "Working example plugin: backend controller + injected repository + event handler, and a frontend route. Build it, ZIP it, and upload it through the Plugins admin page.",
-  "type": "module",
-  "scripts": {
-    "build": "node build.mjs"
+  "description": "Working Attraccess npm plugin example: backend controller, event handler, and frontend route.",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Attraccess/Attraccess.git",
+    "directory": "examples/plugin-hello-world"
   },
+  "homepage": "https://attraccess.org",
+  "scripts": {
+    "build": "node build.mjs",
+    "pack-test": "pnpm --dir=../.. exec nx run plugins-backend-sdk:build && npm run build && node ../../apps/plugins/scripts/verify-packed-plugin.mjs package package.json dist/index.js frontend/remoteEntry.js frontend/style.css"
+  },
+  "keywords": [
+    "attraccess-plugin",
+    "attraccess",
+    "example"
+  ],
+  "files": [
+    "dist",
+    "frontend"
+  ],
   "peerDependencies": {
+    "@attraccess/plugins-backend-sdk": "^1.9.0",
+    "@attraccess/plugins-frontend-sdk": "^1.9.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/event-emitter": "^3.0.0",
     "typeorm": "^0.3.0"
+  },
+  "attraccess": {
+    "displayName": "Hello World",
+    "description": "Example Attraccess plugin.",
+    "host": "^1.9.0",
+    "backend": "dist/index.js",
+    "frontend": "frontend/remoteEntry.js",
+    "styles": "frontend/style.css",
+    "permissions": [
+      "READ_USERS",
+      "LISTEN_EVENTS"
+    ],
+    "sdk": {
+      "backend": "^1.9.0",
+      "frontend": "^1.9.0"
+    }
   },
   "devDependencies": {
     "@attraccess/plugins-backend-sdk": "^1.0.0",
