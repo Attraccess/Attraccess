@@ -52,6 +52,28 @@ beforeEach(() => {
   hoisted.errorToast.mockReset();
   hoisted.plugins = [];
   hoisted.deleteOptions = undefined;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        results: [
+          {
+            name: '@attraccess-plugins/shelly',
+            version: '1.0.0',
+            displayName: 'Shelly',
+            description: 'Official integration',
+            permissions: [],
+            registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
+            classification: 'official',
+            classificationReason: 'Approved Attraccess package source',
+            installable: true,
+            incompatibilityReason: null,
+          },
+        ],
+      }),
+    }),
+  );
 });
 
 afterEach(() => {
@@ -70,6 +92,13 @@ describe('PluginsSection', () => {
     expect(screen.getByText('Permissions')).toBeInTheDocument();
     expect(screen.getByText('Status')).toBeInTheDocument();
     expect(screen.getByText('Actions')).toBeInTheDocument();
+  });
+
+  it('renders the official marketplace classification', async () => {
+    render(<PluginsSection />);
+
+    expect(await screen.findByText('Shelly')).toBeInTheDocument();
+    expect(screen.getByText('Official')).toBeInTheDocument();
   });
 
   it('flags a plugin whose backend failed to load', () => {
@@ -166,9 +195,7 @@ describe('PluginsSection', () => {
 
     hoisted.deleteOptions?.onError?.(new Error('boom'));
 
-    expect(hoisted.errorToast).toHaveBeenCalledWith(
-      expect.objectContaining({ title: 'Could not remove the plugin' }),
-    );
+    expect(hoisted.errorToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Could not remove the plugin' }));
   });
 
   it('cancels the delete without calling the mutation', async () => {

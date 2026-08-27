@@ -12,6 +12,7 @@ import { PluginSandboxService } from './plugin-sandbox.service';
 import { PluginEventsService } from './plugin-events.service';
 import { PluginController } from './plugin.controller';
 import { NpmPluginService } from './npm-plugin.service';
+import { PluginClassificationService } from './plugin-classification.service';
 import { SettingsModule } from '../settings/settings.module';
 import { LoadedPluginManifest } from './plugin.manifest';
 
@@ -51,7 +52,13 @@ describe('PluginModule', () => {
     it('exposes only the host providers and controller when plugins are disabled', () => {
       PluginModule.configure({ DISABLE_PLUGINS: true });
       const module = PluginModule.forRoot();
-      expect(module.providers).toEqual([PluginService, PluginSandboxService, PluginEventsService, NpmPluginService]);
+      expect(module.providers).toEqual([
+        PluginService,
+        PluginSandboxService,
+        PluginEventsService,
+        NpmPluginService,
+        PluginClassificationService,
+      ]);
       expect(module.exports).toEqual([PluginEventsService]);
       expect(module.controllers).toEqual([PluginController]);
       expect(module.imports).toEqual([SettingsModule]);
@@ -72,7 +79,7 @@ describe('PluginModule', () => {
           version: '1.0.0',
           main: { backend: { directory: 'dist', entryPoint: 'missing.js' } },
           attraccessVersion: { min: '1.0.0' },
-        })
+        }),
       );
 
       const discovered = PluginService.getPlugins();
@@ -97,7 +104,7 @@ describe('PluginModule', () => {
           version: '1.0.0',
           main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
           attraccessVersion: { min: '1.0.0' },
-        })
+        }),
       );
       writeFileSync(
         join(root, 'needs-host-dep', 'dist', 'index.js'),
@@ -106,7 +113,7 @@ describe('PluginModule', () => {
           'if (typeof nest.Module !== "function") { throw new Error("host @nestjs/common not resolved"); }',
           'class NeedsHostDepModule {}',
           'module.exports = { default: { register: () => ({ module: NeedsHostDepModule }) } };',
-        ].join('\n')
+        ].join('\n'),
       );
 
       const module = PluginModule.forRoot();
@@ -122,13 +129,20 @@ describe('PluginModule', () => {
     function build(permissions: PluginPermission[]) {
       new PluginModule(dataSource, events, moduleRef);
       return (
-        PluginModule as unknown as { createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext }
+        PluginModule as unknown as {
+          createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
+        }
       ).createPluginContext(manifest({ permissions }));
     }
 
     it('projects the manifest down to public info', () => {
       const ctx = build([]);
-      expect(ctx.manifest).toEqual({ id: 'plugin-id', name: 'ctx-plugin', version: '1.0.0', pluginDirectory: 'ctx-plugin' });
+      expect(ctx.manifest).toEqual({
+        id: 'plugin-id',
+        name: 'ctx-plugin',
+        version: '1.0.0',
+        pluginDirectory: 'ctx-plugin',
+      });
     });
 
     it('hands back the live host DataSource when DATABASE_ACCESS is granted', () => {

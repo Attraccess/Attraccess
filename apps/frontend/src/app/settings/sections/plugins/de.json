@@ -4,6 +4,37 @@
   "uploadButton": "Plugin hochladen",
   "docsButton": "Dokumentation",
   "manageVersion": "Version verwalten",
+  "classification": {
+    "official": {
+      "label": "Offiziell",
+      "tooltip": "Von Attraccess gepflegt oder freigegeben. Dieses Label bedeutet nicht, dass das Plugin isoliert oder garantiert sicher ist."
+    },
+    "community": {
+      "label": "Community",
+      "tooltip": "Nicht in der freigegebenen Paketquellen-Whitelist von Attraccess. Prüfen Sie Quelle und angeforderte Berechtigungen vor der Installation."
+    }
+  },
+  "marketplace": {
+    "title": "Plugin-Marktplatz",
+    "description": "Kompatible Plugins aus konfigurierten Paket-Registries finden.",
+    "search": "Plugins suchen",
+    "searchPlaceholder": "Nach Name oder Funktion suchen",
+    "details": "Details",
+    "installed": "Installiert",
+    "install": "Installieren",
+    "noResults": "Keine kompatiblen Plugins gefunden.",
+    "loadError": "Der Marktplatz konnte nicht geladen werden.",
+    "detailTitle": "Details zu {{pluginName}}",
+    "source": "Quelle: {{registry}}",
+    "version": "Version: {{version}}",
+    "permissions": "Angeforderte Berechtigungen: {{permissions}}",
+    "installTitle": "{{pluginName}} installieren?",
+    "installDescription": "Prüfen Sie die Paketquelle und die angeforderten Berechtigungen vor der Installation. Die App startet zur Aktivierung des Plugins neu.",
+    "cancel": "Abbrechen",
+    "confirmInstall": "Plugin installieren",
+    "installSuccess": "Plugin installiert. Die App startet in wenigen Sekunden zur Aktivierung neu.",
+    "installError": "Das Plugin wurde nicht installiert. Bitte erneut versuchen."
+  },
   "columns": {
     "name": "Name",
     "version": "Version",
