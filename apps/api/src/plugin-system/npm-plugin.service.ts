@@ -204,10 +204,14 @@ export class NpmPluginService {
       'dist-tags'?: { latest?: string };
       versions?: Record<string, unknown>;
     };
+    if (metadata.name && metadata.name !== name)
+      throw new BadRequestException('Registry metadata identity does not match the requested package');
     const version = metadata['dist-tags']?.latest;
     const pkg = version ? metadata.versions?.[version] : undefined;
     if (!pkg) throw new NotFoundException('Package has no latest version');
-    return this.marketplacePlugin(pkg, registry, registryPublisher(pkg) ?? registryPublisher(metadata));
+    if (packageName(pkg) !== name)
+      throw new BadRequestException('Registry metadata identity does not match the requested package');
+    return this.marketplacePlugin(pkg, registry, registryPublisher(pkg) ?? registryPublisher(metadata), name);
   }
 
   async install(name: string, version: string, registryId?: string): Promise<InstalledNpmPlugin> {
@@ -418,9 +422,10 @@ export class NpmPluginService {
     value: unknown,
     registry: Registry,
     publisher = registryPublisher(value),
+    resolvedName?: string,
   ): MarketplacePlugin {
     const fallback = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
-    const name = typeof fallback.name === 'string' ? fallback.name : 'Unknown package';
+    const name = resolvedName ?? packageName(fallback) ?? 'Unknown package';
     const version = typeof fallback.version === 'string' ? fallback.version : null;
     const classified = this.classification.classify(name, registry.url, publisher);
     try {
@@ -709,4 +714,10 @@ function distIntegrity(pkg: NpmPluginPackage): string | null {
   const dist = (pkg as NpmPluginPackage & { dist?: { integrity?: unknown; shasum?: unknown } }).dist;
   if (typeof dist?.integrity === 'string') return dist.integrity;
   return typeof dist?.shasum === 'string' ? `sha1-${dist.shasum}` : null;
+}
+
+function packageName(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return null;
+  const { name } = value as { name?: unknown };
+  return typeof name === 'string' ? name : null;
 }

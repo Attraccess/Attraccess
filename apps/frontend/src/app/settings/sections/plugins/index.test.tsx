@@ -109,7 +109,7 @@ describe('PluginsSection', () => {
     expect(screen.getByText('Official')).toBeInTheDocument();
   });
 
-  it('does not render a community badge while installed plugin classification is loading', () => {
+  it('renders community for an installed plugin until its npm classification is available', () => {
     hoisted.plugins = [makePlugin({ name: '@attraccess-plugins/shelly' })];
     const installedResponse = {
       ok: true,
@@ -136,7 +136,7 @@ describe('PluginsSection', () => {
 
     render(<PluginsSection />);
 
-    expect(screen.queryByTestId('plugin-classification-community')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-cy="plugin-classification-community"]')).toBeInTheDocument();
   });
 
   it('reports registry search failures alongside partial marketplace results', async () => {

@@ -293,7 +293,7 @@ export function PluginsSection() {
                       <div className="flex flex-wrap items-center gap-2">
                         <span>{plugin.name}</span>
                         <PluginClassificationBadge
-                          classification={installedNpmPlugins.get(plugin.name)?.classification}
+                          classification={installedNpmPlugins.get(plugin.name)?.classification ?? 'community'}
                         />
                       </div>
                     </TableCell>

@@ -5,6 +5,13 @@ export type PluginClassification = {
   reason: string;
 };
 
+export type OfficialPluginPackage = {
+  name: string;
+  registryUrl: string;
+  publisher: string;
+  repositoryUrl?: string;
+};
+
 const OFFICIAL_PACKAGES = [
   {
     name: '@attraccess-plugins/shelly',
@@ -16,7 +23,7 @@ const OFFICIAL_PACKAGES = [
     registryUrl: 'https://registry.npmjs.org',
     publisher: 'attraccess',
   },
-] as const;
+] as const satisfies ReadonlyArray<OfficialPluginPackage>;
 
 @Injectable()
 export class PluginClassificationService {
@@ -33,7 +40,7 @@ export class PluginClassificationService {
     }
   }
 
-  officialPackages(): ReadonlyArray<{ name: string; registryUrl: string; publisher: string }> {
+  officialPackages(): ReadonlyArray<OfficialPluginPackage> {
     return OFFICIAL_PACKAGES;
   }
 }

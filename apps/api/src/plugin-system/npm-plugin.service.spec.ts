@@ -241,6 +241,25 @@ describe('NpmPluginService', () => {
     });
   });
 
+  it('rejects marketplace metadata that claims an allowlisted package identity for a different request', async () => {
+    const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      name: '@example/community-plugin',
+      'dist-tags': { latest: '1.2.3' },
+      versions: {
+        '1.2.3': {
+          name: '@attraccess-plugins/shelly',
+          version: '1.2.3',
+          keywords: ['attraccess-plugin'],
+        },
+      },
+    });
+
+    await expect(service.marketplacePackage('@example/community-plugin')).rejects.toThrow(
+      'Registry metadata identity does not match the requested package',
+    );
+  });
+
   it('uses the selected registry for direct marketplace lookup', async () => {
     const settings: SettingsMock = {
       getPlainSetting: jest
