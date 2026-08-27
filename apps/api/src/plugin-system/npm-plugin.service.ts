@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import axios from 'axios';
 import { createHash, randomUUID } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
@@ -61,12 +61,21 @@ export type InstalledNpmPlugin = {
 };
 
 @Injectable()
-export class NpmPluginService {
+export class NpmPluginService implements OnModuleInit {
   private readonly logger = new Logger(NpmPluginService.name);
   private registryMutation = Promise.resolve();
   private installMutation = Promise.resolve();
 
   constructor(private readonly settings: SettingsStoreService) {}
+
+  async onModuleInit(): Promise<void> {
+    const backupDirectory = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY);
+    try {
+      await rm(backupDirectory, { recursive: true, force: true });
+    } catch (error) {
+      this.logger.error('Failed to remove orphaned npm plugin backups', error);
+    }
+  }
 
   async listRegistries(): Promise<Array<StoredRegistry & { tokenConfigured: boolean }>> {
     const registries = await this.storedRegistries();
@@ -347,6 +356,12 @@ export class NpmPluginService {
     } catch {
       return [];
     }
+  }
+
+  findInstalledByPluginId(pluginId: string): InstalledNpmPlugin | undefined {
+    return this.listInstalled().find(
+      ({ installPath }) => createHash('sha256').update(installPath).digest('base64url').slice(0, 21) === pluginId,
+    );
   }
 
   private async activate(source: string, name: string): Promise<{ target: string; backup: string }> {

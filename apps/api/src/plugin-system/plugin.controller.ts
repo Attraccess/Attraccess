@@ -190,9 +190,10 @@ export class PluginController {
   @Auth('system.plugins.manage')
   async deletePlugin(@Param('pluginId') pluginId: string) {
     const plugin = PluginService.getManifestById(pluginId);
-    const installed = plugin
-      ? this.npmPluginService.listInstalled().find(({ installPath }) => installPath === plugin.pluginDirectory)
-      : undefined;
+    const installed = this.npmPluginService.findInstalledByPluginId(pluginId) ??
+      (plugin
+        ? this.npmPluginService.listInstalled().find(({ installPath }) => installPath === plugin.pluginDirectory)
+        : undefined);
     if (installed) {
       await this.npmPluginService.removeInstalled(installed.name);
       return;

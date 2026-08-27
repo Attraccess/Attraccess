@@ -22,14 +22,18 @@ function frontendPlugin(name: string): LoadedPluginManifest {
 describe('PluginController', () => {
   let root: string;
   let service: { uploadPlugin: jest.Mock; deletePlugin: jest.Mock };
-  let npmService: { listInstalled: jest.Mock; removeInstalled: jest.Mock };
+  let npmService: { findInstalledByPluginId: jest.Mock; listInstalled: jest.Mock; removeInstalled: jest.Mock };
   let controller: PluginController;
 
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'plugin-controller-'));
     PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
     service = { uploadPlugin: jest.fn(), deletePlugin: jest.fn() };
-    npmService = { listInstalled: jest.fn().mockReturnValue([]), removeInstalled: jest.fn() };
+    npmService = {
+      findInstalledByPluginId: jest.fn(),
+      listInstalled: jest.fn().mockReturnValue([]),
+      removeInstalled: jest.fn(),
+    };
     controller = new PluginController(service as unknown as PluginService, npmService as never);
   });
 
@@ -113,6 +117,15 @@ describe('PluginController', () => {
     npmService.listInstalled.mockReturnValue([{ name: '@attraccess/plugin', installPath: plugin.pluginDirectory }]);
 
     await controller.deletePlugin(plugin.id);
+
+    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin');
+    expect(service.deletePlugin).not.toHaveBeenCalled();
+  });
+
+  it('uses the data-preserving npm removal flow when npm manifest discovery fails', async () => {
+    npmService.findInstalledByPluginId.mockReturnValue({ name: '@attraccess/plugin' });
+
+    await controller.deletePlugin('npm-plugin-id');
 
     expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin');
     expect(service.deletePlugin).not.toHaveBeenCalled();

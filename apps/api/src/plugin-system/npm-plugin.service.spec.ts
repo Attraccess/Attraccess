@@ -307,6 +307,10 @@ describe('NpmPluginService', () => {
     expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
     expect(service.listInstalled()).toEqual([expect.objectContaining({ name, version: '1.2.3' })]);
     expect(readdirSync(join(root, '.npm-backups'))).toHaveLength(1);
+
+    await service.onModuleInit();
+
+    expect(existsSync(join(root, '.npm-backups'))).toBe(false);
   });
 
   it('classifies installed versions and calculates their permission delta', async () => {
