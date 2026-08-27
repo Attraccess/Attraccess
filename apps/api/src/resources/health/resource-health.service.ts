@@ -2,7 +2,7 @@
 // FEATURE: Resource health monitoring system for subsystem-level status tracking
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
   Resource,
   ResourceHealthSource,
@@ -96,6 +96,20 @@ export class ResourceHealthService {
       where: { resourceId },
       order: { identifier: 'ASC' },
     });
+  }
+
+  async listForResources(resourceIds: number[]): Promise<Map<number, ResourceHealthState[]>> {
+    const map = new Map<number, ResourceHealthState[]>(resourceIds.map((id) => [id, []]));
+    if (resourceIds.length === 0) return map;
+    const entries = await this.healthRepository.find({
+      where: { resourceId: In(resourceIds) },
+      order: { identifier: 'ASC' },
+    });
+    for (const entry of entries) {
+      const bucket = map.get(entry.resourceId);
+      if (bucket) bucket.push(entry);
+    }
+    return map;
   }
 
   async getSummary(resourceId: number): Promise<ResourceHealthSummaryDto> {

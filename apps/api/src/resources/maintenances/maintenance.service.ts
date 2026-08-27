@@ -291,6 +291,19 @@ export class ResourceMaintenanceService {
     return !!activeMaintenance;
   }
 
+  async getActiveMaintenanceResourceIds(resourceIds: number[]): Promise<Set<number>> {
+    if (resourceIds.length === 0) return new Set();
+    const now = new Date();
+    const active = await this.maintenanceRepository
+      .createQueryBuilder('maintenance')
+      .select('DISTINCT maintenance.resourceId', 'resourceId')
+      .where('maintenance.resourceId IN (:...resourceIds)', { resourceIds })
+      .andWhere('maintenance.startTime <= :now', { now })
+      .andWhere('maintenance.endTime IS NULL')
+      .getRawMany<{ resourceId: number }>();
+    return new Set(active.map((r) => Number(r.resourceId)));
+  }
+
   /**
    * Check if a user can manage maintenance for a specific resource
    */

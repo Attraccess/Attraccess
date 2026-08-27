@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
   ResourceFlowNode,
   ResourceFlowEdge,
@@ -316,6 +316,22 @@ export class ResourceFlowsService {
     return await this.flowNodeRepository.find({
       where: { resourceId, type },
     });
+  }
+
+  public async getNodesForResources(
+    resourceIds: number[],
+    type: ResourceFlowNodeType,
+  ): Promise<Map<number, ResourceFlowNode[]>> {
+    const map = new Map<number, ResourceFlowNode[]>(resourceIds.map((id) => [id, []]));
+    if (resourceIds.length === 0) return map;
+    const nodes = await this.flowNodeRepository.find({
+      where: { resourceId: In(resourceIds), type },
+    });
+    for (const node of nodes) {
+      const bucket = map.get(node.resourceId);
+      if (bucket) bucket.push(node);
+    }
+    return map;
   }
 
   public async getNodeSchemas(resourceId: number): Promise<ResourceFlowNodeSchemaDto[]> {
