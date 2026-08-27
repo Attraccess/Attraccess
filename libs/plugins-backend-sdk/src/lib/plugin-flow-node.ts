@@ -53,7 +53,14 @@ export interface PluginFlowNodeDefinition {
    *   { stringVariant: 'multiline' }
    *   { helpText: '...' }
    */
-  readonly configSchema: Record<string, unknown>;
+  readonly configSchema?: Record<string, unknown>;
+
+  /**
+   * Builds a configuration schema from the values selected so far. The returned
+   * schema must set `dynamic: true`; fields that should trigger a refresh set
+   * `refreshesSchema: true`.
+   */
+  resolveConfigSchema?(currentConfig: Record<string, unknown>): Promise<Record<string, unknown>>;
 
   /** Handle IDs accepted as inputs (e.g. ['input']). Empty for trigger nodes. */
   readonly inputs: string[];
