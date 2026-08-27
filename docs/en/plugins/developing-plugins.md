@@ -5,6 +5,12 @@ behaviour, and UI pages — without forking the core. A plugin can ship a
 **backend** half, a **frontend** half, or both, published as an npm package and
 installed through the admin [Plugins](plugins/installing-plugins.md) page.
 
+## Official plugin classification
+
+Plugin packages are Community by default. Attraccess marks a package Official only when its exact npm package name and registry source are listed in the core-owned allowlist at `apps/api/src/plugin-system/plugin-classification.service.ts`. Package metadata cannot grant this label.
+
+To add or remove an Official package, update that allowlist in a normal pull request. The review must confirm the exact registry host, package identity, and expected registry publisher when that metadata is available. Include tests for the approved source and for the same name from another registry. Official means maintained or approved by Attraccess; it does not imply a security sandbox or guarantee of safety. Installers must still review the source and requested permissions.
+
 This guide is a complete walkthrough. It follows a working example —
 **`plugin-hello-world`** — that exercises every core capability: a backend
 controller, an injected repository, a typed event handler, and a frontend route.

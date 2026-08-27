@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
   Chip,
+  Input,
   ModalBody,
   ModalFooter,
   ModalHeader,
@@ -13,10 +14,11 @@ import {
   TableHeader,
   TableRow,
   TableScrollContainer,
+  TextField,
   Tooltip,
   TooltipContent,
 } from '@heroui/react';
-import { AlertTriangle, BookOpen, CheckCircle2, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, BookOpen, CheckCircle2, Search, Trash2, Upload } from 'lucide-react';
 import { usePluginsServiceDeletePlugin, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { SettingsSection } from '../../components/SettingsSection';
@@ -28,6 +30,7 @@ import { UploadPluginModal } from '../../../plugins/UploadPluginModal';
 import { getBaseUrl } from '../../../../api';
 import en from './en.json';
 import de from './de.json';
+import { PluginClassificationBadge } from './PluginClassificationBadge';
 
 const DOCS_URL = 'https://docs.attraccess.org/#/plugins/developing-plugins';
 
@@ -42,7 +45,27 @@ type VersionCandidate = {
   permissionRemovals: string[];
 };
 
-type InstalledNpmPlugin = { name: string; version: string };
+type InstalledNpmPlugin = {
+  name: string;
+  version: string;
+  classification: 'official' | 'community';
+  classificationReason: string;
+};
+
+type VersionPlugin = Pick<InstalledNpmPlugin, 'name' | 'version'>;
+
+type MarketplacePlugin = {
+  name: string;
+  version: string | null;
+  displayName: string | null;
+  description: string | null;
+  permissions: string[];
+  registry: { id: string; name: string; url: string };
+  classification: 'official' | 'community';
+  classificationReason: string;
+  installable: boolean;
+  incompatibilityReason: string | null;
+};
 
 /**
  * Installed plugins. This is the one section on `system.plugins.manage` rather than
@@ -58,22 +81,107 @@ export function PluginsSection() {
   const { data: plugins } = usePluginsServiceGetPlugins();
   const [pluginToDelete, setPluginToDelete] = useState<string | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [versionPlugin, setVersionPlugin] = useState<InstalledNpmPlugin | null>(null);
+  const [versionPlugin, setVersionPlugin] = useState<VersionPlugin | null>(null);
   const [versions, setVersions] = useState<VersionCandidate[]>([]);
   const [selectedVersion, setSelectedVersion] = useState<VersionCandidate | null>(null);
   const [permissionApproved, setPermissionApproved] = useState(false);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const [isReplacing, setIsReplacing] = useState(false);
   const [npmPluginNames, setNpmPluginNames] = useState<Set<string>>(new Set());
+  const [installedNpmPlugins, setInstalledNpmPlugins] = useState<Map<string, InstalledNpmPlugin>>(new Map());
+  const [marketplaceQuery, setMarketplaceQuery] = useState('');
+  const [marketplacePlugins, setMarketplacePlugins] = useState<MarketplacePlugin[]>([]);
+  const [isLoadingMarketplace, setIsLoadingMarketplace] = useState(false);
+  const [marketplacePlugin, setMarketplacePlugin] = useState<MarketplacePlugin | null>(null);
+  const [pluginToInstall, setPluginToInstall] = useState<MarketplacePlugin | null>(null);
+  const [isInstalling, setIsInstalling] = useState(false);
   const versionRequest = useRef(0);
+  const marketplaceRequest = useRef(0);
+  const marketplaceDetailRequest = useRef(0);
 
   useEffect(() => {
     if (!globalThis.fetch) return;
     void fetch(`${getBaseUrl()}/api/plugins/installed`, { credentials: 'include' })
       .then(async (response) => (response.ok ? (response.json() as Promise<InstalledNpmPlugin[]>) : []))
-      .then((installed) => setNpmPluginNames(new Set(installed.map(({ name }) => name))))
+      .then((installed) => {
+        setNpmPluginNames(new Set(installed.map(({ name }) => name)));
+        setInstalledNpmPlugins(
+          new Map<string, InstalledNpmPlugin>(installed.map((plugin) => [plugin.name, plugin] as const)),
+        );
+      })
       .catch(() => undefined);
   }, []);
+
+  const loadMarketplace = async (query = marketplaceQuery) => {
+    const request = ++marketplaceRequest.current;
+    setIsLoadingMarketplace(true);
+    try {
+      const response = await fetch(
+        `${getBaseUrl()}/api/plugins/marketplace/search?query=${encodeURIComponent(query)}`,
+        {
+          credentials: 'include',
+        },
+      );
+      if (!response.ok) throw new Error();
+      const result = (await response.json()) as { results: MarketplacePlugin[]; errors: string[] };
+      if (marketplaceRequest.current === request) {
+        setMarketplacePlugins(result.results);
+        if (result.errors.length > 0)
+          toast.error({ title: t('marketplace.loadError'), description: result.errors.join(', ') });
+      }
+    } catch {
+      if (marketplaceRequest.current === request) toast.error({ title: t('marketplace.loadError') });
+    } finally {
+      if (marketplaceRequest.current === request) setIsLoadingMarketplace(false);
+    }
+  };
+
+  const loadInitialMarketplace = useEffectEvent(() => {
+    void loadMarketplace('');
+  });
+
+  useEffect(() => {
+    if (globalThis.fetch) loadInitialMarketplace();
+  }, []);
+
+  const openMarketplacePlugin = async (plugin: MarketplacePlugin) => {
+    const request = ++marketplaceDetailRequest.current;
+    try {
+      const response = await fetch(
+        `${getBaseUrl()}/api/plugins/marketplace/${encodeURIComponent(plugin.name)}?registryId=${encodeURIComponent(plugin.registry.id)}`,
+        { credentials: 'include' },
+      );
+      if (!response.ok) throw new Error();
+      const details = (await response.json()) as MarketplacePlugin;
+      if (marketplaceDetailRequest.current === request) setMarketplacePlugin(details);
+    } catch {
+      if (marketplaceDetailRequest.current === request) toast.error({ title: t('marketplace.loadError') });
+    }
+  };
+
+  const installMarketplacePlugin = async () => {
+    if (!pluginToInstall?.version) return;
+    setIsInstalling(true);
+    try {
+      const response = await fetch(
+        `${getBaseUrl()}/api/plugins/npm/${encodeURIComponent(pluginToInstall.name)}/versions/${pluginToInstall.version}`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ registryId: pluginToInstall.registry.id }),
+        },
+      );
+      if (!response.ok) throw new Error();
+      toast.success({ title: t('marketplace.installSuccess') });
+      setTimeout(() => window.location.reload(), 5000);
+      setPluginToInstall(null);
+    } catch {
+      toast.error({ title: t('marketplace.installError') });
+    } finally {
+      setIsInstalling(false);
+    }
+  };
 
   const { mutate: deletePlugin, isPending: isDeleting } = usePluginsServiceDeletePlugin({
     onSuccess: () => {
@@ -88,7 +196,7 @@ export function PluginsSection() {
     },
   });
 
-  const openVersionManagement = async (plugin: InstalledNpmPlugin) => {
+  const openVersionManagement = async (plugin: VersionPlugin) => {
     const request = ++versionRequest.current;
     setVersionPlugin(plugin);
     setVersions([]);
@@ -96,9 +204,12 @@ export function PluginsSection() {
     setPermissionApproved(false);
     setIsLoadingVersions(true);
     try {
-      const response = await fetch(`${getBaseUrl()}/api/plugins/installed/${encodeURIComponent(plugin.name)}/versions`, {
-        credentials: 'include',
-      });
+      const response = await fetch(
+        `${getBaseUrl()}/api/plugins/installed/${encodeURIComponent(plugin.name)}/versions`,
+        {
+          credentials: 'include',
+        },
+      );
       if (!response.ok) throw new Error();
       const candidates = (await response.json()) as VersionCandidate[];
       if (versionRequest.current === request) setVersions(candidates);
@@ -178,7 +289,14 @@ export function PluginsSection() {
               <TableBody items={plugins ?? []} renderEmptyState={() => <EmptyState />}>
                 {(plugin) => (
                   <TableRow key={plugin.name} id={plugin.name}>
-                    <TableCell>{plugin.name}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span>{plugin.name}</span>
+                        <PluginClassificationBadge
+                          classification={installedNpmPlugins.get(plugin.name)?.classification ?? 'community'}
+                        />
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Chip variant="soft" color="accent">
                         {plugin.version}
@@ -222,19 +340,19 @@ export function PluginsSection() {
                         </Chip>
                       )}
                     </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end">
-                          {npmPluginNames.has(plugin.name) ? (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onPress={() => void openVersionManagement({ name: plugin.name, version: plugin.version })}
-                              data-cy={`plugins-list-manage-version-button-${plugin.id}`}
-                            >
-                              {t('manageVersion')}
-                            </Button>
-                          ) : null}
-                          <Tooltip>
+                    <TableCell>
+                      <div className="flex justify-end">
+                        {npmPluginNames.has(plugin.name) ? (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onPress={() => void openVersionManagement({ name: plugin.name, version: plugin.version })}
+                            data-cy={`plugins-list-manage-version-button-${plugin.id}`}
+                          >
+                            {t('manageVersion')}
+                          </Button>
+                        ) : null}
+                        <Tooltip>
                           <Button
                             variant="danger-soft"
                             size="sm"
@@ -255,7 +373,149 @@ export function PluginsSection() {
             </TableContent>
           </TableScrollContainer>
         </Table>
+
+        <section
+          className="flex flex-col gap-4 border-t border-divider pt-6"
+          aria-labelledby="plugin-marketplace-title"
+        >
+          <div>
+            <h3 id="plugin-marketplace-title" className="text-base font-semibold text-foreground">
+              {t('marketplace.title')}
+            </h3>
+            <p className="text-sm text-muted">{t('marketplace.description')}</p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <TextField value={marketplaceQuery} onChange={setMarketplaceQuery} className="w-full">
+              <Input placeholder={t('marketplace.searchPlaceholder')} aria-label={t('marketplace.search')} />
+            </TextField>
+            <Button variant="secondary" onPress={() => void loadMarketplace()} isPending={isLoadingMarketplace}>
+              <Search size={16} />
+              {t('marketplace.search')}
+            </Button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {marketplacePlugins.map((plugin) => (
+              <article
+                key={`${plugin.registry.id}:${plugin.name}`}
+                className="flex flex-col gap-3 rounded-medium border border-divider p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 className="font-medium text-foreground">{plugin.displayName ?? plugin.name}</h4>
+                    <p className="text-xs text-muted">{plugin.name}</p>
+                  </div>
+                  <PluginClassificationBadge classification={plugin.classification} />
+                </div>
+                {plugin.description ? <p className="text-sm text-muted">{plugin.description}</p> : null}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-muted">{plugin.registry.name}</span>
+                  <Button variant="secondary" size="sm" onPress={() => void openMarketplacePlugin(plugin)}>
+                    {t('marketplace.details')}
+                  </Button>
+                </div>
+              </article>
+            ))}
+          </div>
+          {!isLoadingMarketplace && marketplacePlugins.length === 0 ? (
+            <p className="text-sm text-muted">{t('marketplace.noResults')}</p>
+          ) : null}
+        </section>
       </div>
+
+      <StandardModal
+        isOpen={marketplacePlugin !== null}
+        onOpenChange={(open) => !open && setMarketplacePlugin(null)}
+        size="lg"
+      >
+        {({ close }) => (
+          <>
+            <ModalHeader>
+              <ModalHeading>
+                {t('marketplace.detailTitle', {
+                  pluginName: marketplacePlugin?.displayName ?? marketplacePlugin?.name ?? '',
+                })}
+              </ModalHeading>
+            </ModalHeader>
+            <ModalBody>
+              {marketplacePlugin ? (
+                <div className="flex flex-col gap-3">
+                  <PluginClassificationBadge classification={marketplacePlugin.classification} />
+                  {marketplacePlugin.description ? <p>{marketplacePlugin.description}</p> : null}
+                  <p>{t('marketplace.source', { registry: marketplacePlugin.registry.url })}</p>
+                  <p>{t('marketplace.version', { version: marketplacePlugin.version ?? '-' })}</p>
+                  <p>
+                    {t('marketplace.permissions', {
+                      permissions: marketplacePlugin.permissions.join(', ') || t('noPermissions'),
+                    })}
+                  </p>
+                  {marketplacePlugin.incompatibilityReason ? (
+                    <p className="text-danger">{marketplacePlugin.incompatibilityReason}</p>
+                  ) : null}
+                </div>
+              ) : null}
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" onPress={close}>
+                {t('marketplace.cancel')}
+              </Button>
+              <Button
+                variant="primary"
+                isDisabled={!marketplacePlugin?.installable || npmPluginNames.has(marketplacePlugin?.name ?? '')}
+                onPress={() => {
+                  if (marketplacePlugin) {
+                    setPluginToInstall(marketplacePlugin);
+                    close();
+                  }
+                }}
+              >
+                {npmPluginNames.has(marketplacePlugin?.name ?? '')
+                  ? t('marketplace.installed')
+                  : t('marketplace.install')}
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </StandardModal>
+
+      <StandardModal
+        isOpen={pluginToInstall !== null}
+        onOpenChange={(open) => !open && !isInstalling && setPluginToInstall(null)}
+        size="sm"
+      >
+        {({ close }) => (
+          <>
+            <ModalHeader>
+              <ModalHeading>
+                {t('marketplace.installTitle', {
+                  pluginName: pluginToInstall?.displayName ?? pluginToInstall?.name ?? '',
+                })}
+              </ModalHeading>
+            </ModalHeader>
+            <ModalBody>
+              {pluginToInstall ? (
+                <div className="flex flex-col gap-3">
+                  <PluginClassificationBadge classification={pluginToInstall.classification} />
+                  <p>{t('marketplace.installDescription')}</p>
+                  <p>{t('marketplace.source', { registry: pluginToInstall.registry.url })}</p>
+                  <p>
+                    {t('marketplace.permissions', {
+                      permissions: pluginToInstall.permissions.join(', ') || t('noPermissions'),
+                    })}
+                  </p>
+                </div>
+              ) : null}
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" onPress={close} isDisabled={isInstalling}>
+                {t('marketplace.cancel')}
+              </Button>
+              <Button variant="primary" onPress={() => void installMarketplacePlugin()} isPending={isInstalling}>
+                {t('marketplace.confirmInstall')}
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </StandardModal>
 
       <StandardModal
         isOpen={pluginToDelete !== null}
@@ -330,23 +590,49 @@ export function PluginsSection() {
               {selectedVersion ? (
                 <div className="flex flex-col gap-2 rounded-medium border border-divider p-3">
                   <p>{t('versionManagement.selected', { version: selectedVersion.version })}</p>
-                  {selectedVersion.publishedAt ? <p>{t('versionManagement.published', { date: new Date(selectedVersion.publishedAt).toLocaleDateString() })}</p> : null}
+                  {selectedVersion.publishedAt ? (
+                    <p>
+                      {t('versionManagement.published', {
+                        date: new Date(selectedVersion.publishedAt).toLocaleDateString(),
+                      })}
+                    </p>
+                  ) : null}
                   {selectedVersion.permissionAdditions.length > 0 ? (
                     <label className="flex gap-2 text-sm">
-                      <input type="checkbox" checked={permissionApproved} onChange={(event) => setPermissionApproved(event.target.checked)} />
-                      {t('versionManagement.permissionApproval', { permissions: selectedVersion.permissionAdditions.join(', ') })}
+                      <input
+                        type="checkbox"
+                        checked={permissionApproved}
+                        onChange={(event) => setPermissionApproved(event.target.checked)}
+                      />
+                      {t('versionManagement.permissionApproval', {
+                        permissions: selectedVersion.permissionAdditions.join(', '),
+                      })}
                     </label>
                   ) : null}
-                  {selectedVersion.permissionRemovals.length > 0 ? <p>{t('versionManagement.permissionRemovals', { permissions: selectedVersion.permissionRemovals.join(', ') })}</p> : null}
-                  {selectedVersion.direction === 'older' ? <p className="text-warning">{t('versionManagement.downgradeWarning')}</p> : null}
+                  {selectedVersion.permissionRemovals.length > 0 ? (
+                    <p>
+                      {t('versionManagement.permissionRemovals', {
+                        permissions: selectedVersion.permissionRemovals.join(', '),
+                      })}
+                    </p>
+                  ) : null}
+                  {selectedVersion.direction === 'older' ? (
+                    <p className="text-warning">{t('versionManagement.downgradeWarning')}</p>
+                  ) : null}
                 </div>
               ) : null}
-              {versions.filter((candidate) => !candidate.compatible).map((candidate) => (
-                <p key={candidate.version} className="text-danger text-sm">{candidate.version}: {candidate.reason}</p>
-              ))}
+              {versions
+                .filter((candidate) => !candidate.compatible)
+                .map((candidate) => (
+                  <p key={candidate.version} className="text-danger text-sm">
+                    {candidate.version}: {candidate.reason}
+                  </p>
+                ))}
             </ModalBody>
             <ModalFooter>
-              <Button variant="ghost" onPress={close} isDisabled={isReplacing}>{t('versionManagement.cancel')}</Button>
+              <Button variant="ghost" onPress={close} isDisabled={isReplacing}>
+                {t('versionManagement.cancel')}
+              </Button>
               <Button
                 variant={selectedVersion?.direction === 'older' ? 'danger' : 'primary'}
                 onPress={() => void replaceVersion()}
@@ -354,7 +640,9 @@ export function PluginsSection() {
                 isDisabled={!selectedVersion || (selectedVersion.permissionAdditions.length > 0 && !permissionApproved)}
                 data-cy="plugins-list-replace-version-button"
               >
-                {selectedVersion?.direction === 'older' ? t('versionManagement.downgrade') : t('versionManagement.update')}
+                {selectedVersion?.direction === 'older'
+                  ? t('versionManagement.downgrade')
+                  : t('versionManagement.update')}
               </Button>
             </ModalFooter>
           </>

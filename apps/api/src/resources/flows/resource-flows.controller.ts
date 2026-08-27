@@ -8,6 +8,7 @@ import {
   ResourceFlowLogsResponseDto,
   FlowLogRecordingDto,
   StartFlowLogRecordingDto,
+  ResolveResourceFlowNodeSchemaDto,
 } from './dto';
 import { ResourceFlowsExecutorService } from './resource-flows-executor.service';
 import { FlowLogRecorderService, ResourceFlowLogEvent } from './flow-log-recorder.service';
@@ -45,6 +46,21 @@ export class ResourceFlowsController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
   ): Promise<ResourceFlowNodeSchemaDto[]> {
     return await this.resourceFlowsService.getNodeSchemas(resourceId);
+  }
+
+  @Post('node-schemas/:nodeType')
+  @ApiOperation({
+    summary: 'Resolve a plugin flow-node schema',
+    description: 'Build a plugin flow-node configuration schema from the current configuration.',
+    operationId: 'resolveNodeSchema',
+  })
+  @ApiResponse({ status: 201, description: 'Node schema resolved successfully', type: ResourceFlowNodeSchemaDto })
+  public async resolveNodeSchema(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Param('nodeType') nodeType: string,
+    @Body() body: ResolveResourceFlowNodeSchemaDto,
+  ): Promise<ResourceFlowNodeSchemaDto> {
+    return await this.resourceFlowsService.resolveNodeSchema(resourceId, nodeType, body.config);
   }
 
   @Get()

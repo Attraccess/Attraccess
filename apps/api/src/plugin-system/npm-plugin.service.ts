@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import axios from 'axios';
 import { createHash, randomUUID } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
@@ -12,10 +12,11 @@ import * as tar from 'tar';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { resolveAppVersion } from '../config/app.config';
 import { PluginService } from './plugin.service';
-import { parseNpmPluginPackage } from './npm-plugin-contract';
+import { NpmPluginPackage, parseNpmPluginPackage } from './npm-plugin-contract';
 import { PluginMigrationService } from './plugin-migration.service';
 import { LoadedPluginManifest } from './plugin.manifest';
 import * as semver from 'semver';
+import { PluginClassificationService } from './plugin-classification.service';
 
 const REGISTRY_PARENT = 'plugin-registry';
 const REGISTRIES_KEY = 'registries';
@@ -26,7 +27,7 @@ const MAX_METADATA_BYTES = 10 * 1024 * 1024;
 const MAX_EXTRACTED_BYTES = 200 * 1024 * 1024;
 const MAX_ARCHIVE_ENTRIES = 10_000;
 
-type StoredRegistry = { id: string; name: string; url: string };
+export type StoredRegistry = { id: string; name: string; url: string };
 type Registry = StoredRegistry & { token: string | null };
 type PackageVersion = { version: string; dist: { tarball: string; integrity?: string; shasum?: string } };
 
@@ -39,6 +40,8 @@ export type InstalledNpmPluginVersion = {
   permissions: string[];
   permissionAdditions: string[];
   permissionRemovals: string[];
+  classification: 'official' | 'community';
+  classificationReason: string;
 };
 
 export type InstalledNpmPlugin = {
@@ -50,6 +53,29 @@ export type InstalledNpmPlugin = {
   installPath: string;
   permissions: string[];
   lastError: string | null;
+  classification: 'official' | 'community';
+  classificationReason: string;
+  publisher: string | null;
+};
+
+export type MarketplacePlugin = {
+  name: string;
+  version: string | null;
+  displayName: string | null;
+  description: string | null;
+  permissions: string[];
+  hostRange: string | null;
+  repository: string | null;
+  homepage: string | null;
+  license: string | null;
+  publisher: string | null;
+  deprecated: boolean;
+  registry: StoredRegistry;
+  classification: 'official' | 'community';
+  classificationReason: string;
+  installable: boolean;
+  incompatibilityReason: string | null;
+  integrity: string | null;
 };
 
 @Injectable()
@@ -58,7 +84,14 @@ export class NpmPluginService {
   private registryMutation = Promise.resolve();
   private installMutation = Promise.resolve();
 
-  constructor(private readonly settings: SettingsStoreService) {}
+  constructor(
+    private readonly settings: SettingsStoreService,
+    @Optional() classification?: PluginClassificationService,
+  ) {
+    this.classification = classification ?? new PluginClassificationService();
+  }
+
+  private readonly classification: PluginClassificationService;
 
   async listRegistries(): Promise<Array<StoredRegistry & { tokenConfigured: boolean }>> {
     const registries = await this.storedRegistries();
@@ -128,6 +161,59 @@ export class NpmPluginService {
     return Object.keys(metadata.versions ?? {}).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
   }
 
+  async searchMarketplace(
+    query: string,
+    registryId?: string,
+  ): Promise<{ results: MarketplacePlugin[]; errors: string[] }> {
+    const registries = registryId ? [await this.registry(registryId)] : await this.searchRegistries();
+    const responses = await Promise.all(
+      registries.map(async (registry) => {
+        try {
+          const search = (await this.getJson(
+            `${registry.url}/-/v1/search?text=${encodeURIComponent(`keywords:attraccess-plugin ${query.trim()}`)}&size=20`,
+            registry,
+          )) as { objects?: Array<{ package?: unknown }> };
+          return {
+            results: (
+              await Promise.allSettled(
+                (search.objects ?? []).map(async ({ package: pkg }) => {
+                  const summary = pkg as { name?: unknown };
+                  return typeof summary?.name === 'string'
+                    ? this.marketplacePackage(summary.name, registry.id)
+                    : this.marketplacePlugin(pkg, registry);
+                }),
+              )
+            ).flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])),
+            error: null,
+          };
+        } catch {
+          return { results: [], error: `Could not search ${registry.name}` };
+        }
+      }),
+    );
+    return {
+      results: responses.flatMap(({ results }) => results),
+      errors: responses.flatMap(({ error }) => (error ? [error] : [])),
+    };
+  }
+
+  async marketplacePackage(name: string, registryId?: string): Promise<MarketplacePlugin> {
+    const registry = await this.registry(registryId);
+    const metadata = (await this.packageMetadata(name, registry.id)) as {
+      name?: string;
+      'dist-tags'?: { latest?: string };
+      versions?: Record<string, unknown>;
+    };
+    if (metadata.name && metadata.name !== name)
+      throw new BadRequestException('Registry metadata identity does not match the requested package');
+    const version = metadata['dist-tags']?.latest;
+    const pkg = version ? metadata.versions?.[version] : undefined;
+    if (!pkg) throw new NotFoundException('Package has no latest version');
+    if (packageName(pkg) !== name)
+      throw new BadRequestException('Registry metadata identity does not match the requested package');
+    return this.marketplacePlugin(pkg, registry, registryPublisher(pkg) ?? registryPublisher(metadata), name);
+  }
+
   async install(name: string, version: string, registryId?: string): Promise<InstalledNpmPlugin> {
     if (this.listInstalled().some((plugin) => plugin.name === name)) {
       throw new BadRequestException('Package is already installed; use the replacement endpoint');
@@ -141,18 +227,28 @@ export class NpmPluginService {
     const metadata = (await this.packageMetadata(name, installed.registryId)) as {
       versions?: Record<string, unknown>;
       time?: Record<string, string>;
+      publisher?: unknown;
+      _npmUser?: unknown;
+      maintainers?: unknown;
     };
-
     return Object.entries(metadata.versions ?? {})
       .filter(([version]) => semver.valid(version))
       .map(([version, pkg]) => {
+        const publisher = registryPublisher(pkg) ?? registryPublisher(metadata) ?? installed.publisher;
         try {
           const { manifest } = parseNpmPluginPackage(pkg, this.hostVersion());
-          if (manifest.name !== name) throw new BadRequestException('Package identity does not match the installed package');
-          return this.versionCandidate(installed, version, metadata.time?.[version] ?? null, manifest.permissions);
+          if (manifest.name !== name)
+            throw new BadRequestException('Package identity does not match the installed package');
+          return this.versionCandidate(
+            installed,
+            version,
+            metadata.time?.[version] ?? null,
+            manifest.permissions,
+            publisher,
+          );
         } catch (error) {
           return {
-            ...this.versionCandidate(installed, version, metadata.time?.[version] ?? null, []),
+            ...this.versionCandidate(installed, version, metadata.time?.[version] ?? null, [], publisher),
             compatible: false,
             reason: error instanceof Error ? error.message : 'Package metadata is invalid',
           };
@@ -190,16 +286,24 @@ export class NpmPluginService {
     version: string,
     publishedAt: string | null,
     permissions: string[],
+    publisher: string | null,
   ): InstalledNpmPluginVersion {
+    const classification = this.classification.classify(installed.name, installed.registryUrl, publisher);
     return {
       version,
       publishedAt,
-      direction: semver.eq(version, installed.version) ? 'current' : semver.gt(version, installed.version) ? 'newer' : 'older',
+      direction: semver.eq(version, installed.version)
+        ? 'current'
+        : semver.gt(version, installed.version)
+          ? 'newer'
+          : 'older',
       compatible: true,
       reason: null,
       permissions,
       permissionAdditions: permissions.filter((permission) => !installed.permissions.includes(permission)),
       permissionRemovals: installed.permissions.filter((permission) => !permissions.includes(permission)),
+      classification: classification.kind,
+      classificationReason: classification.reason,
     };
   }
 
@@ -216,7 +320,12 @@ export class NpmPluginService {
     replacing?: InstalledNpmPlugin,
     approvedPermissionAdditions: string[] = [],
   ): Promise<InstalledNpmPlugin> {
-    const metadata = (await this.packageMetadata(name, registry.id)) as { versions?: Record<string, PackageVersion> };
+    const metadata = (await this.packageMetadata(name, registry.id)) as {
+      versions?: Record<string, PackageVersion>;
+      publisher?: unknown;
+      _npmUser?: unknown;
+      maintainers?: unknown;
+    };
     const packageVersion = metadata.versions?.[version];
     if (!packageVersion || packageVersion.version !== version) throw new NotFoundException('Package version not found');
     if (!packageVersion.dist.integrity && !packageVersion.dist.shasum)
@@ -249,6 +358,8 @@ export class NpmPluginService {
         await PluginMigrationService.assertReplacementMigrationHistory(manifest as LoadedPluginManifest, source);
       }
 
+      const publisher = registryPublisher(packageVersion) ?? registryPublisher(metadata);
+      const classification = this.classification.classify(name, registry.url, publisher);
       const installed: InstalledNpmPlugin = {
         name,
         version,
@@ -258,6 +369,9 @@ export class NpmPluginService {
         installPath: pluginDirectory(name),
         permissions: manifest.permissions,
         lastError: null,
+        classification: classification.kind,
+        classificationReason: classification.reason,
+        publisher,
       };
       // Activation and its state update must commit together so a rollback cannot
       // remove another install's target or overwrite its state entry.
@@ -289,9 +403,72 @@ export class NpmPluginService {
     const statePath = join(PluginService.PLUGIN_PATH, STATE_FILE);
     if (!existsSync(statePath)) return [];
     try {
-      return JSON.parse(readFileSync(statePath, 'utf8'));
+      return (JSON.parse(readFileSync(statePath, 'utf8')) as InstalledNpmPlugin[]).map((plugin) => ({
+        ...plugin,
+        classification: this.classification.classify(plugin.name, plugin.registryUrl, plugin.publisher).kind,
+        classificationReason: this.classification.classify(plugin.name, plugin.registryUrl, plugin.publisher).reason,
+      }));
     } catch {
       return [];
+    }
+  }
+
+  private async searchRegistries(): Promise<Registry[]> {
+    const registries = await this.storedRegistries();
+    return Promise.all([this.registry(), ...registries.map((registry) => this.registry(registry.id))]);
+  }
+
+  private marketplacePlugin(
+    value: unknown,
+    registry: Registry,
+    publisher = registryPublisher(value),
+    resolvedName?: string,
+  ): MarketplacePlugin {
+    const fallback = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+    const name = resolvedName ?? packageName(fallback) ?? 'Unknown package';
+    const version = typeof fallback.version === 'string' ? fallback.version : null;
+    const classified = this.classification.classify(name, registry.url, publisher);
+    try {
+      const { pkg } = parseNpmPluginPackage(value, this.hostVersion());
+      return {
+        name: pkg.name,
+        version: pkg.version,
+        displayName: pkg.attraccess.displayName,
+        description: pkg.attraccess.description ?? null,
+        permissions: pkg.attraccess.permissions,
+        hostRange: pkg.attraccess.host,
+        repository: repositoryUrl(pkg.repository),
+        homepage: pkg.homepage ?? null,
+        license: pkg.license ?? null,
+        publisher,
+        deprecated: Boolean((pkg as { deprecated?: unknown }).deprecated),
+        registry: { id: registry.id, name: registry.name, url: registry.url },
+        classification: classified.kind,
+        classificationReason: classified.reason,
+        installable: true,
+        incompatibilityReason: null,
+        integrity: distIntegrity(pkg),
+      };
+    } catch (error) {
+      return {
+        name,
+        version,
+        displayName: null,
+        description: null,
+        permissions: [],
+        hostRange: null,
+        repository: null,
+        homepage: null,
+        license: null,
+        publisher,
+        deprecated: Boolean(fallback.deprecated),
+        registry: { id: registry.id, name: registry.name, url: registry.url },
+        classification: classified.kind,
+        classificationReason: classified.reason,
+        installable: false,
+        incompatibilityReason: error instanceof Error ? error.message : 'Package metadata is invalid',
+        integrity: null,
+      };
     }
   }
 
@@ -511,4 +688,36 @@ function safeArchivePath(value: string): boolean {
 
 function samePermissions(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((permission) => right.includes(permission));
+}
+
+function repositoryUrl(value: string | { url: string } | undefined): string | null {
+  return typeof value === 'string' ? value : (value?.url ?? null);
+}
+
+function registryPublisher(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return null;
+  const metadata = value as { publisher?: unknown; _npmUser?: unknown; maintainers?: unknown };
+  const publisher = publisherName(metadata.publisher) ?? publisherName(metadata._npmUser);
+  if (publisher) return publisher;
+  if (!Array.isArray(metadata.maintainers)) return null;
+  return metadata.maintainers.map(publisherName).find((name): name is string => name !== null) ?? null;
+}
+
+function publisherName(value: unknown): string | null {
+  if (typeof value === 'string') return value;
+  if (!value || typeof value !== 'object') return null;
+  const { name, username } = value as { name?: unknown; username?: unknown };
+  return typeof username === 'string' ? username : typeof name === 'string' ? name : null;
+}
+
+function distIntegrity(pkg: NpmPluginPackage): string | null {
+  const dist = (pkg as NpmPluginPackage & { dist?: { integrity?: unknown; shasum?: unknown } }).dist;
+  if (typeof dist?.integrity === 'string') return dist.integrity;
+  return typeof dist?.shasum === 'string' ? `sha1-${dist.shasum}` : null;
+}
+
+function packageName(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return null;
+  const { name } = value as { name?: unknown };
+  return typeof name === 'string' ? name : null;
 }

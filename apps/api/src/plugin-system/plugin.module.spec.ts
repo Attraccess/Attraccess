@@ -13,6 +13,7 @@ import { PluginEventsService } from './plugin-events.service';
 import { PluginMqttService } from './plugin-mqtt.service';
 import { PluginController } from './plugin.controller';
 import { NpmPluginService } from './npm-plugin.service';
+import { PluginClassificationService } from './plugin-classification.service';
 import { SettingsModule } from '../settings/settings.module';
 import { MqttModule } from '../mqtt/mqtt.module';
 import { LoadedPluginManifest } from './plugin.manifest';
@@ -60,6 +61,7 @@ describe('PluginModule', () => {
         PluginEventsService,
         PluginMqttService,
         NpmPluginService,
+        PluginClassificationService,
       ]);
       expect(module.exports).toEqual([PluginEventsService]);
       expect(module.controllers).toEqual([PluginController]);

@@ -10,7 +10,7 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, FindOneOptions, EntityManager } from 'typeorm';
+import { Repository, IsNull, In, FindOneOptions, EntityManager } from 'typeorm';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   FormSubmission,
@@ -1187,6 +1187,19 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       },
       relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
     });
+  }
+
+  async getActiveSessions(resourceIds: number[]): Promise<Map<number, ResourceUsage | null>> {
+    const map = new Map<number, ResourceUsage | null>(resourceIds.map((id) => [id, null]));
+    if (resourceIds.length === 0) return map;
+    const sessions = await this.resourceUsageRepository.find({
+      where: { resourceId: In(resourceIds), endTime: IsNull(), isFinalized: true },
+      relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
+    });
+    for (const session of sessions) {
+      map.set(session.resourceId, session);
+    }
+    return map;
   }
 
   async getResourceUsageHistory(
