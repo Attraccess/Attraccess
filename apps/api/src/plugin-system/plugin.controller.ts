@@ -86,6 +86,22 @@ export class PluginController {
     return this.npmPluginService.listInstalled();
   }
 
+  @Get('installed/:packageName/versions')
+  @Auth('system.plugins.manage')
+  installedPackageVersions(@Param('packageName') packageName: string) {
+    return this.npmPluginService.installedVersionCandidates(packageName);
+  }
+
+  @Post('installed/:packageName/versions/:version')
+  @Auth('system.plugins.manage')
+  replaceInstalledPackage(
+    @Param('packageName') packageName: string,
+    @Param('version') version: string,
+    @Body('approvedPermissionAdditions') approvedPermissionAdditions?: string[],
+  ) {
+    return this.npmPluginService.replaceInstalled(packageName, version, approvedPermissionAdditions);
+  }
+
   @Get()
   @ApiOperation({ summary: 'Get all plugins', operationId: 'getPlugins' })
   @ApiResponse({

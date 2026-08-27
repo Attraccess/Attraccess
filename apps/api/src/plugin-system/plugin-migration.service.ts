@@ -144,6 +144,48 @@ export class PluginMigrationService {
   }
 
   /**
+   * A replacement may only activate when its migration bundle still knows every
+   * migration already applied for the plugin. Running down migrations here would
+   * discard data, so versions that need a schema rollback are deliberately blocked.
+   */
+  public static async assertReplacementMigrationHistory(
+    manifest: LoadedPluginManifest,
+    sourceDirectory: string,
+  ): Promise<void> {
+    const dataSource = PluginMigrationService.buildDataSource(manifest, []);
+    await dataSource.initialize();
+
+    try {
+      await PluginMigrationService.relaxBusyTimeout(dataSource);
+      const executed = await new MigrationExecutor(dataSource).getExecutedMigrations();
+      if (executed.length === 0) return;
+
+      if (!PluginMigrationService.hasMigrations(manifest)) {
+        throw new Error(
+          `Replacement blocked: target package does not contain applied migrations: ${executed
+            .map(({ name }) => name)
+            .join(', ')}.`,
+        );
+      }
+
+      const entry = join(sourceDirectory, manifest.main.migrations.directory, manifest.main.migrations.entryPoint);
+      const exports = loadPluginEntryExports(entry);
+      const candidates = Array.isArray(exports.default) ? exports.default : Object.values(exports);
+      const targetMigrationNames = new Set(
+        candidates.filter((value): value is PluginMigrationClass => typeof value === 'function').map(({ name }) => name),
+      );
+      const missing = executed.map(({ name }) => name).filter((name) => !targetMigrationNames.has(name));
+      if (missing.length > 0) {
+        throw new Error(
+          `Replacement blocked: target package does not contain applied migrations: ${missing.join(', ')}.`,
+        );
+      }
+    } finally {
+      await dataSource.destroy();
+    }
+  }
+
+  /**
    * Reverts every applied migration for a single plugin, in reverse order, then
    * drops the plugin's tracking table. Returns the count reverted.
    */
