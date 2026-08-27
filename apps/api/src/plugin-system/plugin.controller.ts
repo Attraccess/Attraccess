@@ -6,6 +6,7 @@ import {
   Logger,
   NotFoundException,
   Param,
+  ParseArrayPipe,
   Post,
   Query,
   StreamableFile,
@@ -84,6 +85,23 @@ export class PluginController {
   @Auth('system.plugins.manage')
   installedPackages() {
     return this.npmPluginService.listInstalled();
+  }
+
+  @Get('installed/:packageName/versions')
+  @Auth('system.plugins.manage')
+  installedPackageVersions(@Param('packageName') packageName: string) {
+    return this.npmPluginService.installedVersionCandidates(packageName);
+  }
+
+  @Post('installed/:packageName/versions/:version')
+  @Auth('system.plugins.manage')
+  replaceInstalledPackage(
+    @Param('packageName') packageName: string,
+    @Param('version') version: string,
+    @Body('approvedPermissionAdditions', new ParseArrayPipe({ items: String, optional: true }))
+    approvedPermissionAdditions?: string[],
+  ) {
+    return this.npmPluginService.replaceInstalled(packageName, version, approvedPermissionAdditions ?? []);
   }
 
   @Get()
