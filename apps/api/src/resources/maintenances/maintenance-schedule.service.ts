@@ -7,6 +7,7 @@ import {
   ResourceMaintenanceScheduleUsageHoursConfig,
   ResourceMaintenanceScheduleUsageCountConfig,
   ResourceMaintenanceScheduleTimeIntervalConfig,
+  ResourceMaintenance,
   Resource,
   UsageDurationUnit,
 } from '@attraccess/database-entities';
@@ -110,7 +111,16 @@ export class MaintenanceScheduleService {
     if (!schedule) {
       throw new NotFoundException('Maintenance schedule not found');
     }
-    await this.scheduleRepository.remove(schedule);
+    await this.scheduleRepository.manager.transaction(async (manager) => {
+      await manager.getRepository(ResourceMaintenance).update(
+        { maintenanceSchedule: { id: scheduleId } },
+        { maintenanceSchedule: null },
+      );
+      await manager.getRepository(ResourceMaintenanceScheduleUsageHoursConfig).delete({ scheduleId });
+      await manager.getRepository(ResourceMaintenanceScheduleUsageCountConfig).delete({ scheduleId });
+      await manager.getRepository(ResourceMaintenanceScheduleTimeIntervalConfig).delete({ scheduleId });
+      await manager.getRepository(ResourceMaintenanceSchedule).remove(schedule);
+    });
   }
 
   private async ensureResourceExists(resourceId: number): Promise<void> {
