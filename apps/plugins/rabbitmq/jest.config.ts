@@ -3,6 +3,7 @@ module.exports = {
   preset: '../../../jest.preset.js',
   testEnvironment: 'node',
   testMatch: ['<rootDir>/backend/**/*.spec.ts'],
+  testPathIgnorePatterns: ['\\.e2e\\.spec\\.ts$'],
   transform: {
     '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json', isolatedModules: true }],
   },

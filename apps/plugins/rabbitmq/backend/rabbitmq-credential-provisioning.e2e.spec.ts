@@ -1,4 +1,3 @@
-import { execFileSync } from 'child_process';
 import * as mqtt from 'mqtt';
 import type { MqttClient } from 'mqtt';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
@@ -13,7 +12,6 @@ const ADMIN_PASSWORD = 'admin-password';
 
 describe('RabbitMQ credential provisioning isolation (e2e)', () => {
   let container: StartedTestContainer | null = null;
-  let skipSuite = false;
   let provider: RabbitmqCredentialProvisioningProvider;
   let mqttUrl: string;
   let adminUrl: string;
@@ -23,28 +21,12 @@ describe('RabbitMQ credential provisioning isolation (e2e)', () => {
   const clients: MqttClient[] = [];
 
   beforeAll(async () => {
-    try {
-      execFileSync('docker', ['info'], { timeout: 5000, stdio: 'ignore' });
-    } catch {
-      // eslint-disable-next-line no-console
-      console.warn('[rabbitmq provisioning e2e] Docker not available - skipping container tests');
-      skipSuite = true;
-      return;
-    }
-
-    try {
-      container = await new GenericContainer(RABBITMQ_IMAGE)
-        .withEnvironment({ RABBITMQ_DEFAULT_USER: ADMIN_USERNAME, RABBITMQ_DEFAULT_PASS: ADMIN_PASSWORD })
-        .withCommand(['bash', '-c', 'rabbitmq-plugins enable --offline rabbitmq_mqtt; rabbitmq-server'])
-        .withExposedPorts(1883, 15672)
-        .withWaitStrategy(Wait.forLogMessage('Server startup complete'))
-        .start();
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.warn('[rabbitmq provisioning e2e] Failed to start container - skipping:', (error as Error).message);
-      skipSuite = true;
-      return;
-    }
+    container = await new GenericContainer(RABBITMQ_IMAGE)
+      .withEnvironment({ RABBITMQ_DEFAULT_USER: ADMIN_USERNAME, RABBITMQ_DEFAULT_PASS: ADMIN_PASSWORD })
+      .withCommand(['bash', '-c', 'rabbitmq-plugins enable --offline rabbitmq_mqtt; rabbitmq-server'])
+      .withExposedPorts(1883, 15672)
+      .withWaitStrategy(Wait.forLogMessage('Server startup complete'))
+      .start();
 
     const host = container.getHost();
     mqttUrl = `mqtt://${host}:${container.getMappedPort(1883)}`;
@@ -79,7 +61,7 @@ describe('RabbitMQ credential provisioning isolation (e2e)', () => {
         username: controllerA.username,
         vhost,
         topicPolicy: {
-          publish: [`devices/${controllerA.identity}/reported/#`],
+          publish: [`devices/${controllerA.identity}/reported/+/value`],
           subscribe: [`devices/${controllerA.identity}/desired/#`],
         },
       }),
@@ -112,8 +94,7 @@ describe('RabbitMQ credential provisioning isolation (e2e)', () => {
   });
 
   it('prevents one controller from writing or reading another controller namespace', async () => {
-    if (skipSuite) return;
-    const reportedA = `devices/${controllerA.identity}/reported/state`;
+    const reportedA = `devices/${controllerA.identity}/reported/state/value`;
     const reportedB = `devices/${controllerB.identity}/reported/state`;
     const desiredA = `devices/${controllerA.identity}/desired/configuration`;
     const desiredB = `devices/${controllerB.identity}/desired/configuration`;
@@ -139,6 +120,22 @@ describe('RabbitMQ credential provisioning isolation (e2e)', () => {
     const otherReported = nextMessage(observer, reportedB, 1_000);
     await publishIgnoringAuthorizationFailure(a, reportedB, 'forbidden');
     await expect(otherReported).resolves.toBeNull();
+  });
+
+  it('keeps + within one MQTT topic level', async () => {
+    const allowed = `devices/${controllerA.identity}/reported/telemetry/value`;
+    const nested = `devices/${controllerA.identity}/reported/telemetry/current/value`;
+    const observer = await connect(mqttUrl, clients, ADMIN_USERNAME, ADMIN_PASSWORD, 'wildcard-observer');
+    const a = await connect(mqttUrl, clients, controllerA.username, controllerA.password, `${controllerA.identity}-wildcard`);
+    await subscribe(observer, [allowed, nested]);
+
+    const allowedMessage = nextMessage(observer, allowed);
+    await publish(a, allowed, 'allowed');
+    await expect(allowedMessage).resolves.toBe('allowed');
+
+    const nestedMessage = nextMessage(observer, nested, 1_000);
+    await publishIgnoringAuthorizationFailure(a, nested, 'forbidden');
+    await expect(nestedMessage).resolves.toBeNull();
   });
 });
 

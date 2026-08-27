@@ -156,6 +156,8 @@ jobs:
       # touches no plugin (or shared global) runs nothing here.
       - name: Lint affected plugin apps
         run: pnpm nx affected --target=lint --parallel=3 --base=${{ env.NX_AFFECTED_BASE }} --exclude='*,!tag:type:plugin'
+      - name: Test affected plugin apps
+        run: pnpm nx affected --target=test,e2e --parallel=3 --base=${{ env.NX_AFFECTED_BASE }} --exclude='*,!tag:type:plugin'
       - name: Build + zip affected plugin apps
         run: pnpm nx affected --target=package --parallel=3 --base=${{ env.NX_AFFECTED_BASE }} --exclude='*,!tag:type:plugin'
 
