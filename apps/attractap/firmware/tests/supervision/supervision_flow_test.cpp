@@ -82,10 +82,15 @@ void terminalFailureReturnsAfterDwell() {
            "failed resolution must show a terminal error");
     fixture.flow.requestCancel();
     expect(fixture.flow.tick(102) == SupervisionFlow::Outcome::None,
-           "late cancellation must not replace a terminal failure");
+            "late cancellation must not replace a terminal failure");
     expect(fixture.api.cancels == 0, "terminal failure must not send a cancellation");
+    fixture.flow.onResolved({.success = true});
+    expect(fixture.flow.tick(103) == SupervisionFlow::Outcome::None,
+            "late success must not replace a terminal failure");
+    expect(fixture.screen.lastView.status == SupervisionScreen::STATUS_ERROR,
+            "terminal failure must remain visible after a late success");
     expect(fixture.flow.tick(1902) == SupervisionFlow::Outcome::ReturnToRouting,
-           "terminal failure must return to routing after its dwell");
+            "terminal failure must return to routing after its dwell");
 }
 
 void webInitiatedFlowDoesNotUnlockLocally() {

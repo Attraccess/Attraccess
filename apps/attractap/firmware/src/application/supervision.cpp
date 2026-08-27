@@ -290,7 +290,8 @@ void SupervisionFlow::processEvent(const Event &event) {
         keyReady = true;
         break;
     case EventType::Resolved:
-        if (phase == Phase::Idle || phase == Phase::Success) break;
+        if (phase == Phase::Idle || phase == Phase::Success ||
+            (phase == Phase::Error && errorIsTerminal)) break;
         if (event.success) {
             publishTerminalEvent(TerminalEvent::Resolved);
         } else {
