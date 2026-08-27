@@ -129,6 +129,9 @@ export class NpmPluginService {
   }
 
   async install(name: string, version: string, registryId?: string): Promise<InstalledNpmPlugin> {
+    if (this.listInstalled().some((plugin) => plugin.name === name)) {
+      throw new BadRequestException('Package is already installed; use the replacement endpoint');
+    }
     const registry = await this.registry(registryId);
     return this.installFromRegistry(name, version, registry);
   }
@@ -173,7 +176,13 @@ export class NpmPluginService {
         `Permission approval required for: ${candidate.permissionAdditions.join(', ') || 'none'}`,
       );
     }
-    return this.installFromRegistry(name, version, await this.registry(installed.registryId), installed);
+    return this.installFromRegistry(
+      name,
+      version,
+      await this.registry(installed.registryId),
+      installed,
+      approvedPermissionAdditions,
+    );
   }
 
   private versionCandidate(
@@ -205,6 +214,7 @@ export class NpmPluginService {
     version: string,
     registry: Registry,
     replacing?: InstalledNpmPlugin,
+    approvedPermissionAdditions: string[] = [],
   ): Promise<InstalledNpmPlugin> {
     const metadata = (await this.packageMetadata(name, registry.id)) as { versions?: Record<string, PackageVersion> };
     const packageVersion = metadata.versions?.[version];
@@ -228,6 +238,14 @@ export class NpmPluginService {
       await writeFile(join(source, 'plugin.json'), JSON.stringify(manifest));
 
       if (replacing) {
+        const permissionAdditions = manifest.permissions.filter(
+          (permission) => !replacing.permissions.includes(permission),
+        );
+        if (!samePermissions(permissionAdditions, approvedPermissionAdditions)) {
+          throw new BadRequestException(
+            `Permission approval required for: ${permissionAdditions.join(', ') || 'none'}`,
+          );
+        }
         await PluginMigrationService.assertReplacementMigrationHistory(manifest as LoadedPluginManifest, source);
       }
 

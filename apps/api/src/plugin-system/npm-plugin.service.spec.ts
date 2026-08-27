@@ -23,7 +23,7 @@ type SettingsMock = {
   setSecretSetting: jest.Mock;
 };
 
-async function packageTarball(name: string): Promise<Buffer> {
+async function packageTarball(name: string, permissions: string[] = []): Promise<Buffer> {
   const root = mkdtempSync(join(tmpdir(), 'npm-plugin-package-'));
   try {
     mkdirSync(join(root, 'package', 'dist'), { recursive: true });
@@ -38,6 +38,7 @@ async function packageTarball(name: string): Promise<Buffer> {
           displayName: name,
           host: '*',
           backend: 'dist/index.js',
+          permissions,
           sdk: { backend: '*' },
         },
       }),
@@ -292,5 +293,64 @@ describe('NpmPluginService', () => {
     ]);
 
     await expect(service.replaceInstalled('@attraccess/plugin', '1.1.0')).rejects.toThrow('Permission approval required for: READ_USERS');
+  });
+
+  it('rejects replacing an installed package through the install endpoint', async () => {
+    const service = new NpmPluginService({} as never);
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([{ name: '@attraccess/plugin', version: '1.0.0' }]),
+    );
+
+    await expect(service.install('@attraccess/plugin', '1.1.0')).rejects.toThrow(
+      'Package is already installed; use the replacement endpoint',
+    );
+  });
+
+  it('requires approval for permissions declared by the downloaded replacement tarball', async () => {
+    const name = '@attraccess/plugin';
+    const tarball = await packageTarball(name, ['READ_USERS']);
+    const service = new NpmPluginService({} as never);
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name,
+          version: '1.0.0',
+          registryId: 'npm',
+          registryUrl: 'https://registry.npmjs.org',
+          integrity: 'sha512-test',
+          installPath: 'npm-plugin',
+          permissions: [],
+          lastError: null,
+        },
+      ]),
+    );
+    jest.spyOn(service, 'installedVersionCandidates').mockResolvedValue([
+      {
+        version: '1.2.3',
+        publishedAt: null,
+        direction: 'newer',
+        compatible: true,
+        reason: null,
+        permissions: [],
+        permissionAdditions: [],
+        permissionRemovals: [],
+      },
+    ]);
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      versions: {
+        '1.2.3': {
+          version: '1.2.3',
+          dist: { tarball: 'plugin', shasum: createHash('sha1').update(tarball).digest('hex') },
+        },
+      },
+    });
+    jest.spyOn(service as unknown as ServiceInternals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service as unknown as ServiceInternals, 'download').mockResolvedValue(tarball);
+
+    await expect(service.replaceInstalled(name, '1.2.3', [])).rejects.toThrow(
+      'Permission approval required for: READ_USERS',
+    );
   });
 });

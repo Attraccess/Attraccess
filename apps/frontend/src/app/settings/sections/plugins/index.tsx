@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Chip,
   ModalBody,
@@ -65,6 +65,7 @@ export function PluginsSection() {
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const [isReplacing, setIsReplacing] = useState(false);
   const [npmPluginNames, setNpmPluginNames] = useState<Set<string>>(new Set());
+  const versionRequest = useRef(0);
 
   useEffect(() => {
     if (!globalThis.fetch) return;
@@ -88,6 +89,7 @@ export function PluginsSection() {
   });
 
   const openVersionManagement = async (plugin: InstalledNpmPlugin) => {
+    const request = ++versionRequest.current;
     setVersionPlugin(plugin);
     setVersions([]);
     setSelectedVersion(null);
@@ -98,11 +100,13 @@ export function PluginsSection() {
         credentials: 'include',
       });
       if (!response.ok) throw new Error();
-      setVersions(await response.json());
+      const candidates = (await response.json()) as VersionCandidate[];
+      if (versionRequest.current === request) setVersions(candidates);
     } catch {
-      toast.error({ title: t('error.versions.title'), description: t('error.versions.description') });
+      if (versionRequest.current === request)
+        toast.error({ title: t('error.versions.title'), description: t('error.versions.description') });
     } finally {
-      setIsLoadingVersions(false);
+      if (versionRequest.current === request) setIsLoadingVersions(false);
     }
   };
 
