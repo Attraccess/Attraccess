@@ -195,4 +195,48 @@ describe('MqttSendMessageExecutor', () => {
       "Failed to publish MQTT message to topic 'devices/state' on server 1: no error details were provided",
     );
   });
+
+  it('classifies publish failures as transport-dispatch failures', () => {
+    expect(executor.getFailureKind(new Error('broker offline'))).toBe('transport-dispatch');
+  });
+
+  it('can continue after dispatch without waiting for a broker acknowledgement', async () => {
+    const node = makeNode({
+      serverId: 1,
+      topic: 'devices/state',
+      payload: 'on',
+      completionBehavior: 'dispatch',
+    });
+
+    await executor.execute(node, {}, ctx);
+
+    expect(mqttClientService.publish).toHaveBeenCalledWith(
+      1,
+      'devices/state',
+      'on',
+      { qos: undefined, retain: undefined },
+      { awaitAcknowledgement: false, acknowledgementTimeoutSeconds: undefined },
+    );
+  });
+
+  it('uses the configured acknowledgement timeout', async () => {
+    const node = makeNode({ serverId: 1, topic: 'devices/state', acknowledgementTimeoutSeconds: 5 });
+
+    await executor.execute(node, {}, ctx);
+
+    expect(mqttClientService.publish).toHaveBeenCalledWith(
+      1,
+      'devices/state',
+      '',
+      { qos: undefined, retain: undefined },
+      { awaitAcknowledgement: true, acknowledgementTimeoutSeconds: 5 },
+    );
+  });
+
+  it('classifies a publish acknowledgement timeout separately', () => {
+    const error = new Error('timed out');
+    error.name = 'MqttAcknowledgementTimeoutError';
+
+    expect(executor.getFailureKind(error)).toBe('acknowledgement-timeout');
+  });
 });

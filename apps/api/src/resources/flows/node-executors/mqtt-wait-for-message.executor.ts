@@ -4,7 +4,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import z from 'zod';
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
 import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../../mqtt/mqtt-message.event';
-import { NodeExecutor, NodeProcessingResult } from './node-executor.interface';
+import { FlowFailureKind, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 import { topicMatches } from './flow.utils';
 
 export class MqttWaitForMessageExecutor implements NodeExecutor {
@@ -57,5 +57,11 @@ export class MqttWaitForMessageExecutor implements NodeExecutor {
     });
 
     return { payload: { topic: result.topic, payload: result.payload } };
+  }
+
+  getFailureKind(error: unknown): FlowFailureKind {
+    return error instanceof Error && error.message.startsWith('Timeout waiting for MQTT message')
+      ? 'acknowledgement-timeout'
+      : 'transport-dispatch';
   }
 }

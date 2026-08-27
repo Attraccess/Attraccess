@@ -54,6 +54,7 @@ describe('MqttClientService', () => {
   let moduleRef: TestingModule;
   let mockRepository: Partial<Repository<MqttServer>>;
   let mockMetricsService: { mqttServersHealthy: { set: jest.Mock } };
+  let mockExternalCallTimer: { time: jest.Mock };
 
   const mockServer = {
     id: 1,
@@ -85,6 +86,9 @@ describe('MqttClientService', () => {
     mockMetricsService = {
       mqttServersHealthy: { set: jest.fn() },
     };
+    mockExternalCallTimer = {
+      time: jest.fn(<T>(_target: string, _operation: string, fn: () => Promise<T>) => fn()),
+    };
 
     moduleRef = await Test.createTestingModule({
       providers: [
@@ -111,7 +115,7 @@ describe('MqttClientService', () => {
         },
         {
           provide: ExternalCallTimer,
-          useValue: { time: <T,>(_t: string, _o: string, fn: () => Promise<T>) => fn() },
+          useValue: mockExternalCallTimer,
         },
       ],
     }).compile();
@@ -238,6 +242,25 @@ describe('MqttClientService', () => {
 
       // Act & Assert
       await expect(service.publish(1, 'test/topic', 'test message')).rejects.toThrow('Publish error');
+    });
+
+    it('does not wait for the publish callback when dispatch completion is selected', async () => {
+      const getOrCreateClientSpy = jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient');
+      const mockClient = mqtt.connect({});
+      getOrCreateClientSpy.mockResolvedValue(mockClient);
+      mockClient.publish = jest.fn();
+
+      await expect(
+        service.publish(1, 'test/topic', 'test message', undefined, { awaitAcknowledgement: false }),
+      ).resolves.toBeUndefined();
+
+      expect(mockExternalCallTimer.time).toHaveBeenCalledWith('mqtt', 'publish', expect.any(Function));
+      expect(mockClient.publish).toHaveBeenCalledWith(
+        'test/topic',
+        'test message',
+        expect.any(Object),
+        expect.any(Function),
+      );
     });
 
     it('should use server defaults when no options are provided', async () => {

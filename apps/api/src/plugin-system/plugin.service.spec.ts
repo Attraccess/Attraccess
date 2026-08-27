@@ -138,6 +138,17 @@ describe('PluginService', () => {
       expect(PluginService.getPlugins()).toEqual([]);
     });
 
+    it('excludes internal npm backup storage from discovery', () => {
+      writePlugin(root, '.npm-backups', {
+        name: 'stale-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+
+      expect(PluginService.getPlugins()).toEqual([]);
+    });
+
     it('excludes a plugin whose declared permissions are invalid', () => {
       writePlugin(root, 'bad-perms', {
         name: 'bad-perms',

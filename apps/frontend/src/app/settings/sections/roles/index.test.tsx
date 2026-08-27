@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { render } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RolesSection } from './index';
 
@@ -19,6 +20,7 @@ const hoisted = vi.hoisted(() => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
+  useRbacServiceListPermissions: () => ({ data: [] }),
   useRbacServiceListRoles: () => ({ data: hoisted.roles, isLoading: false }),
 }));
 
@@ -57,13 +59,18 @@ describe('RolesSection', () => {
   });
 
   it('updates collection row cells when the UI language changes', () => {
-    const { rerender } = render(<RolesSection />);
+    const renderRolesSection = () => (
+      <MemoryRouter>
+        <RolesSection />
+      </MemoryRouter>
+    );
+    const { rerender } = render(renderRolesSection());
     const sourceChip = () => document.querySelector('[data-cy="role-source-chip-custom-role"]');
 
     expect(sourceChip()).toHaveTextContent('Custom');
 
     hoisted.locale = 'de';
-    rerender(<RolesSection />);
+    rerender(renderRolesSection());
 
     expect(sourceChip()).toHaveTextContent('Eigene');
   });

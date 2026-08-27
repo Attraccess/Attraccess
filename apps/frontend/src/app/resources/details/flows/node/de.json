@@ -274,7 +274,7 @@
           "title": "Auf MQTT-Nachricht warten",
           "description": "Wartet auf die nächste MQTT-Nachricht, die dem Themen-Filter entspricht; übergibt {topic, payload}.",
           "inputs": { "input": "Eingabe" },
-          "outputs": { "output": "Ausgabe" },
+          "outputs": { "output": "Ausgabe", "failure": "Fehler" },
           "preview": {
             "topic": "Thema",
             "timeoutSeconds": "Timeout (s)"
@@ -289,6 +289,15 @@
                 "0": "0 - Höchstens einmal (Fire-and-Forget)",
                 "1": "1 - Mindestens einmal (Bestätigung)",
                 "2": "2 - Genau einmal (Zwei-Phasen-Austausch)"
+              }
+            },
+            "failureBehavior": {
+              "label": "Bei Fehler",
+              "helpText": "Flow abbrechen protokolliert den Fehler und stoppt die auslösende Operation. Über Fehlerausgang fortsetzen protokolliert den Fehler und sendet die ursprüngliche Eingabe plus flowError {kind, message} über Fehler. Protokollieren und fortsetzen protokolliert den Fehler und sendet die unveränderte Eingabe über Ausgabe.",
+              "enum": {
+                "fail-flow": "Flow abbrechen",
+                "failure-output": "Über Fehlerausgang fortsetzen",
+                "log-and-continue": "Protokollieren und fortsetzen"
               }
             }
           }
@@ -377,7 +386,8 @@
             "input": "Eingabe"
           },
           "outputs": {
-            "output": "Ausgabe"
+            "output": "Ausgabe",
+            "failure": "Fehler"
           },
           "preview": {
             "assignments": "Setzt"
@@ -459,7 +469,8 @@
             "input": "Eingabe"
           },
           "outputs": {
-            "output": "Ausgabe"
+            "output": "Ausgabe",
+            "failure": "Fehler"
           },
           "preview": {
             "method": "Methode",
@@ -488,6 +499,27 @@
             },
             "body": {
               "label": "Body"
+            },
+            "timeoutSeconds": {
+              "label": "Antwort-Timeout (Sekunden)",
+              "helpText": "Maximale Wartezeit auf die Controller-Antwort. Leer lassen, um ohne knotenspezifisches Timeout zu warten."
+            },
+            "completionBehavior": {
+              "label": "Abschluss",
+              "helpText": "Nur senden fährt fort, nachdem die HTTP-Anfrage gestartet wurde. Auf Antwort warten wartet auf die Controller-Antwort.",
+              "enum": {
+                "dispatch": "Nur senden",
+                "acknowledged": "Auf Antwort warten"
+              }
+            },
+            "failureBehavior": {
+              "label": "Bei Fehler",
+              "helpText": "Flow abbrechen protokolliert den Fehler und stoppt die auslösende Operation. Über Fehlerausgang fortsetzen protokolliert den Fehler und sendet die ursprüngliche Eingabe plus flowError {kind, message} über Fehler. Protokollieren und fortsetzen protokolliert den Fehler und sendet die unveränderte Eingabe über Ausgabe.",
+              "enum": {
+                "fail-flow": "Flow abbrechen",
+                "failure-output": "Über Fehlerausgang fortsetzen",
+                "log-and-continue": "Protokollieren und fortsetzen"
+              }
             }
           }
         }
@@ -500,7 +532,8 @@
             "input": "Eingabe"
           },
           "outputs": {
-            "output": "Ausgabe"
+            "output": "Ausgabe",
+            "failure": "Fehler"
           },
           "preview": {
             "topic": "Thema"
@@ -523,7 +556,28 @@
                 "2": "2 - Genau einmal (Zwei-Phasen-Austausch)"
               }
             },
-            "retain": { "label": "Nachricht behalten (retain)" }
+            "retain": { "label": "Nachricht behalten (retain)" },
+            "completionBehavior": {
+              "label": "Abschluss",
+              "helpText": "Nur senden fährt fort, nachdem MQTT den Publish-Aufruf akzeptiert hat. Bestätigt wartet auf den MQTT-Publish-Callback.",
+              "enum": {
+                "dispatch": "Nur senden",
+                "acknowledged": "Auf Bestätigung warten"
+              }
+            },
+            "acknowledgementTimeoutSeconds": {
+              "label": "Bestätigungs-Timeout (Sekunden)",
+              "helpText": "Maximale Wartezeit auf die MQTT-Publish-Bestätigung. Leer lassen, um die Standardvorgabe der Integration zu verwenden."
+            },
+            "failureBehavior": {
+              "label": "Bei Fehler",
+              "helpText": "Flow abbrechen protokolliert den Fehler und stoppt die auslösende Operation. Über Fehlerausgang fortsetzen protokolliert den Fehler und sendet die ursprüngliche Eingabe plus flowError {kind, message} über Fehler. Protokollieren und fortsetzen protokolliert den Fehler und sendet die unveränderte Eingabe über Ausgabe.",
+              "enum": {
+                "fail-flow": "Flow abbrechen",
+                "failure-output": "Über Fehlerausgang fortsetzen",
+                "log-and-continue": "Protokollieren und fortsetzen"
+              }
+            }
           }
         }
       },
@@ -559,9 +613,18 @@
             "title": "Nutzung beenden",
             "description": "Beendet die aktive Nutzungssitzung. Optional mit Notizen (Template oder statisch).",
             "inputs": { "input": "Eingabe" },
-            "outputs": { "output": "Ausgabe" },
+            "outputs": { "output": "Ausgabe", "failure": "Fehler" },
             "config": {
-              "notes": { "label": "Notizen (Templates erlaubt)" }
+              "notes": { "label": "Notizen (Templates erlaubt)" },
+              "failureBehavior": {
+                "label": "Bei Fehler",
+                "helpText": "Flow abbrechen protokolliert den Fehler und stoppt die auslösende Operation. Über Fehlerausgang fortsetzen protokolliert den Fehler und sendet die ursprüngliche Eingabe plus flowError {kind, message} über Fehler. Protokollieren und fortsetzen protokolliert den Fehler und sendet die unveränderte Eingabe über Ausgabe.",
+                "enum": {
+                  "fail-flow": "Flow abbrechen",
+                  "failure-output": "Über Fehlerausgang fortsetzen",
+                  "log-and-continue": "Protokollieren und fortsetzen"
+                }
+              }
             },
             "preview": {
               "notes": "Notizen"
