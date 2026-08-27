@@ -238,6 +238,40 @@ describe('NpmPluginService', () => {
     expect(service.listInstalled()).toEqual([expect.objectContaining({ name, version: '1.2.3' })]);
   });
 
+  it('resolves semver ranges while persisting the requested spec', async () => {
+    const name = '@attraccess/plugin';
+    const tarball = await packageTarball(name);
+    const service = new NpmPluginService({} as never);
+    const internals = service as unknown as ServiceInternals;
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      versions: {
+        '1.0.0': { version: '1.0.0', dist: { tarball: 'older', shasum: createHash('sha1').update(tarball).digest('hex') } },
+        '1.2.3': { version: '1.2.3', dist: { tarball: 'plugin', shasum: createHash('sha1').update(tarball).digest('hex') } },
+      },
+    });
+    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+
+    await expect(service.install(name, '^1.0.0')).resolves.toMatchObject({ version: '1.2.3', requestedSpec: '^1.0.0' });
+  });
+
+  it('removes npm package code and its installation record without reverting migrations', async () => {
+    const name = '@attraccess/plugin';
+    const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
+    mkdirSync(join(root, installPath), { recursive: true });
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([{ name, version: '1.2.3', registryId: 'npm', registryUrl: 'https://registry.npmjs.org', integrity: 'sha512-test', installPath, permissions: [], lastError: null }]),
+    );
+    const service = new NpmPluginService({} as never);
+
+    await service.removeInstalled(name);
+
+    expect(existsSync(join(root, installPath))).toBe(false);
+    expect(service.listInstalled()).toEqual([]);
+    expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
+  });
+
   it('restarts after backup cleanup fails following a successful install', async () => {
     const name = '@attraccess/plugin';
     const tarball = await packageTarball(name);

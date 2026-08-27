@@ -22,13 +22,15 @@ function frontendPlugin(name: string): LoadedPluginManifest {
 describe('PluginController', () => {
   let root: string;
   let service: { uploadPlugin: jest.Mock; deletePlugin: jest.Mock };
+  let npmService: { listInstalled: jest.Mock; removeInstalled: jest.Mock };
   let controller: PluginController;
 
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'plugin-controller-'));
     PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
     service = { uploadPlugin: jest.fn(), deletePlugin: jest.fn() };
-    controller = new PluginController(service as unknown as PluginService);
+    npmService = { listInstalled: jest.fn().mockReturnValue([]), removeInstalled: jest.fn() };
+    controller = new PluginController(service as unknown as PluginService, npmService as never);
   });
 
   afterEach(() => {
@@ -100,8 +102,19 @@ describe('PluginController', () => {
     expect(service.uploadPlugin).toHaveBeenCalledWith(file);
   });
 
-  it('delegates delete to the plugin service', () => {
-    controller.deletePlugin('plugin-id');
+  it('delegates non-npm plugin deletion to the plugin service', async () => {
+    await controller.deletePlugin('plugin-id');
     expect(service.deletePlugin).toHaveBeenCalledWith('plugin-id');
+  });
+
+  it('uses the data-preserving npm removal flow for an installed npm package', async () => {
+    const plugin = frontendPlugin('@attraccess/plugin');
+    jest.spyOn(PluginService, 'getPlugins').mockReturnValue([plugin]);
+    npmService.listInstalled.mockReturnValue([{ name: '@attraccess/plugin' }]);
+
+    await controller.deletePlugin(plugin.id);
+
+    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin');
+    expect(service.deletePlugin).not.toHaveBeenCalled();
   });
 });

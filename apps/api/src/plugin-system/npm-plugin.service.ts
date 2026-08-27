@@ -44,11 +44,19 @@ export type InstalledNpmPluginVersion = {
 export type InstalledNpmPlugin = {
   name: string;
   version: string;
+  requestedSpec: string;
   registryId: string;
   registryUrl: string;
   integrity: string;
   installPath: string;
   permissions: string[];
+  compatibility: {
+    host: string;
+    sdk: { backend?: string; frontend?: string };
+  };
+  state: 'active';
+  installedAt: string;
+  activatedAt: string;
   lastError: string | null;
 };
 
@@ -128,12 +136,41 @@ export class NpmPluginService {
     return Object.keys(metadata.versions ?? {}).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
   }
 
-  async install(name: string, version: string, registryId?: string): Promise<InstalledNpmPlugin> {
+  async install(name: string, spec: string, registryId?: string): Promise<InstalledNpmPlugin> {
     if (this.listInstalled().some((plugin) => plugin.name === name)) {
       throw new BadRequestException('Package is already installed; use the replacement endpoint');
     }
     const registry = await this.registry(registryId);
-    return this.installFromRegistry(name, version, registry);
+    const { version, metadata } = await this.resolveVersion(name, spec, registry);
+    return this.installFromRegistry(name, version, registry, undefined, [], spec, metadata);
+  }
+
+  async removeInstalled(name: string): Promise<void> {
+    await this.mutateInstalls(async () => {
+      const installed = this.installed(name);
+      const target = join(PluginService.PLUGIN_PATH, installed.installPath);
+      const backup = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY, randomUUID());
+
+      if (existsSync(target)) {
+        await mkdir(join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY), { recursive: true });
+        await rename(target, backup);
+      }
+      try {
+        await this.writeStateWithout(name);
+      } catch (error) {
+        if (existsSync(backup) && !existsSync(target)) await rename(backup, target);
+        throw error;
+      }
+
+      try {
+        await rm(backup, { recursive: true, force: true });
+      } catch (error) {
+        this.logger.error(`Failed to remove uninstalled package files for ${name}`, error);
+      }
+      // Data and secrets are deliberately retained. Removing them is a separate,
+      // destructive recovery operation rather than part of package deactivation.
+      new PluginService().requestRestart();
+    });
   }
 
   async installedVersionCandidates(name: string): Promise<InstalledNpmPluginVersion[]> {
@@ -215,8 +252,10 @@ export class NpmPluginService {
     registry: Registry,
     replacing?: InstalledNpmPlugin,
     approvedPermissionAdditions: string[] = [],
+    requestedSpec = version,
+    resolvedMetadata?: { versions?: Record<string, PackageVersion> },
   ): Promise<InstalledNpmPlugin> {
-    const metadata = (await this.packageMetadata(name, registry.id)) as { versions?: Record<string, PackageVersion> };
+    const metadata = resolvedMetadata ?? ((await this.packageMetadata(name, registry.id)) as { versions?: Record<string, PackageVersion> });
     const packageVersion = metadata.versions?.[version];
     if (!packageVersion || packageVersion.version !== version) throw new NotFoundException('Package version not found');
     if (!packageVersion.dist.integrity && !packageVersion.dist.shasum)
@@ -231,7 +270,7 @@ export class NpmPluginService {
       const source = join(staging, 'package');
       const packageJsonPath = join(source, 'package.json');
       if (!existsSync(packageJsonPath)) throw new BadRequestException('Tarball does not contain package/package.json');
-      const { manifest } = parseNpmPluginPackage(JSON.parse(readFileSync(packageJsonPath, 'utf8')), this.hostVersion());
+      const { pkg, manifest } = parseNpmPluginPackage(JSON.parse(readFileSync(packageJsonPath, 'utf8')), this.hostVersion());
       if (manifest.name !== name || manifest.version !== version)
         throw new BadRequestException('Tarball package identity does not match the requested package');
       validateEntries(source, manifest);
@@ -252,11 +291,16 @@ export class NpmPluginService {
       const installed: InstalledNpmPlugin = {
         name,
         version,
+        requestedSpec,
         registryId: registry.id,
         registryUrl: registry.url,
         integrity: packageVersion.dist.integrity ?? `sha1-${packageVersion.dist.shasum}`,
         installPath: pluginDirectory(name),
         permissions: manifest.permissions,
+        compatibility: { host: pkg.attraccess.host, sdk: pkg.attraccess.sdk },
+        state: 'active',
+        installedAt: replacing?.installedAt ?? new Date().toISOString(),
+        activatedAt: new Date().toISOString(),
         lastError: null,
       };
       // Activation and its state update must commit together so a rollback cannot
@@ -289,7 +333,17 @@ export class NpmPluginService {
     const statePath = join(PluginService.PLUGIN_PATH, STATE_FILE);
     if (!existsSync(statePath)) return [];
     try {
-      return JSON.parse(readFileSync(statePath, 'utf8'));
+      const records = JSON.parse(readFileSync(statePath, 'utf8'));
+      if (!Array.isArray(records)) return [];
+      return records.map((record) => ({
+        ...record,
+        requestedSpec: record.requestedSpec ?? record.version,
+        compatibility: record.compatibility ?? { host: 'unknown', sdk: {} },
+        state: record.state ?? 'active',
+        installedAt: record.installedAt ?? new Date(0).toISOString(),
+        activatedAt: record.activatedAt ?? new Date(0).toISOString(),
+        lastError: record.lastError ?? null,
+      }));
     } catch {
       return [];
     }
@@ -330,6 +384,34 @@ export class NpmPluginService {
       await rm(temporaryPath, { force: true });
       throw error;
     }
+  }
+
+  private async writeStateWithout(name: string): Promise<void> {
+    const statePath = join(PluginService.PLUGIN_PATH, STATE_FILE);
+    const temporaryPath = `${statePath}.${randomUUID()}.tmp`;
+    try {
+      await writeFile(temporaryPath, JSON.stringify(this.listInstalled().filter((plugin) => plugin.name !== name)));
+      await rename(temporaryPath, statePath);
+    } catch (error) {
+      await rm(temporaryPath, { force: true });
+      throw error;
+    }
+  }
+
+  private async resolveVersion(
+    name: string,
+    spec: string,
+    registry: Registry,
+  ): Promise<{ version: string; metadata: { versions?: Record<string, PackageVersion>; 'dist-tags'?: Record<string, string> } }> {
+    const metadata = (await this.packageMetadata(name, registry.id)) as {
+      versions?: Record<string, PackageVersion>;
+      'dist-tags'?: Record<string, string>;
+    };
+    const version = metadata.versions?.[spec]
+      ? spec
+      : metadata['dist-tags']?.[spec] ?? semver.maxSatisfying(Object.keys(metadata.versions ?? {}), spec);
+    if (!version || !metadata.versions?.[version]) throw new NotFoundException('Package version not found');
+    return { version, metadata };
   }
 
   private async registry(id?: string): Promise<Registry> {

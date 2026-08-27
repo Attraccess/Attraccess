@@ -77,7 +77,7 @@ describe('PluginService', () => {
       expect(PluginService.getPlugins()).toEqual([]);
     });
 
-    it('discovers a manifest and assigns an id and prefixed backend directory', () => {
+    it('discovers a manifest and assigns a stable id and prefixed backend directory', () => {
       writePlugin(root, 'my-plugin', {
         name: 'my-plugin',
         version: '1.0.0',
@@ -91,6 +91,20 @@ describe('PluginService', () => {
       expect(plugins[0].pluginDirectory).toBe('my-plugin');
       expect(plugins[0].id).toEqual(expect.any(String));
       expect(plugins[0].main.backend.directory).toBe(join('my-plugin', 'dist'));
+    });
+
+    it('keeps a plugin id stable across discovery scans', () => {
+      writePlugin(root, 'stable-plugin', {
+        name: 'stable-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+
+      const first = PluginService.getPlugins()[0].id;
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+
+      expect(PluginService.getPlugins()[0].id).toBe(first);
     });
 
     it('reports per-plugin backend load status (loaded / error / unknown)', () => {
