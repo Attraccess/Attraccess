@@ -258,6 +258,11 @@ export class RabbitmqCredentialProvisioningProvider implements MqttCredentialPro
   }
 
   private assertTopicFilter(filter: string): void {
+    // rabbitmq_mqtt maps both MQTT separators and literal dots to AMQP dots,
+    // so dot-bearing levels cannot be authorized without widening access.
+    if (filter.includes('.')) {
+      throw new BadRequestException('RabbitMQ MQTT topic policies cannot contain dots.');
+    }
     const segments = filter.split('/');
     for (const [index, segment] of segments.entries()) {
       if (
@@ -301,6 +306,8 @@ function mqttFilterToRegex(filter: string): string {
     .split('/')
     .map((segment) => {
       if (segment === '+') {
+        // Dot-bearing MQTT levels are rejected above because RabbitMQ cannot
+        // distinguish them from additional slash-separated levels here.
         return '[^.]+';
       }
       if (segment === '#') {

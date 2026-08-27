@@ -24,6 +24,7 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
     const regex = new RegExp(mqttFiltersToRegex(['devices/+/reported']));
 
     expect(regex.test('devices.controller-a.reported')).toBe(true);
+    expect(regex.test('devices.controller.a.reported')).toBe(false);
     expect(regex.test('devices.controller-a.internal.reported')).toBe(false);
     expect(regex.test('devices.controller-a.reported.state')).toBe(false);
   });
@@ -40,6 +41,20 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
         topicPolicy: { publish: ['devices/controller-a/#/state'], subscribe: [] },
       }),
     ).rejects.toThrow('MQTT wildcards must occupy a complete topic level');
+  });
+
+  it('rejects dot-bearing policies that RabbitMQ cannot distinguish from extra topic levels', async () => {
+    const provider = new RabbitmqCredentialProvisioningProvider(context);
+
+    await expect(
+      provider.provision({
+        mqttServerId: 4,
+        identity: 'controller-a',
+        username: 'wago-controller-a',
+        vhost: '/',
+        topicPolicy: { publish: ['devices/controller.a/reported'], subscribe: [] },
+      }),
+    ).rejects.toThrow('RabbitMQ MQTT topic policies cannot contain dots');
   });
 
   it('creates user, vhost, and topic permissions and returns the password only to the caller', async () => {
