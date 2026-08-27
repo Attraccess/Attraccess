@@ -658,7 +658,6 @@ export class ResourceUsageService {
     let activeSession: ResourceUsage | null = null;
     let endedUsageIdToEmit: number | null = null;
     let formSubmissions: FormSubmission[] = [];
-    let endFlowPayload: object | null = null;
     const executeEndSession = async () =>
       await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
         activeSession = await this.getActiveSession(resourceId, true, transactionalEntityManager);
@@ -731,7 +730,13 @@ export class ResourceUsageService {
 
         await this.billingService.chargeForResourceUsage(updatedUsage, transactionalEntityManager);
 
-        endFlowPayload = { ...this.getResourceUsageFlowPayload(activeSession, formSubmissions), ...updateData };
+        await this.runUsageFlow(
+          transactionalEntityManager,
+          resourceId,
+          ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+          { ...this.getResourceUsageFlowPayload(activeSession, formSubmissions), ...updateData },
+          'end',
+        );
 
         // Defer event after successful save until after commit
         endedUsageIdToEmit = activeSession.id;
@@ -741,16 +746,6 @@ export class ResourceUsageService {
       });
 
     const updatedUsage = await this.runSerializedIfSqlite(this.resourceUsageRepository.manager, executeEndSession);
-
-    if (endFlowPayload) {
-      await this.runUsageFlow(
-        this.resourceUsageRepository.manager,
-        resourceId,
-        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
-        endFlowPayload,
-        'end',
-      );
-    }
 
     // Emit event after the transaction committed to ensure readers can observe DB state
     try {
