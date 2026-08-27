@@ -14,6 +14,7 @@ import { CreateMqttServerForm } from '../../../../../../mqtt/servers/CreateMqttS
 export interface Property<TValue> {
   type: 'string' | 'integer' | 'number' | 'object' | 'boolean' | 'array';
   enum?: Array<string | number>;
+  oneOf?: Array<{ const: string | number; title?: string }>;
   default?: TValue;
   additionalProperties?: {
     type: Property<unknown>['type'];
@@ -22,14 +23,24 @@ export interface Property<TValue> {
     type: 'object' | 'string' | 'number' | 'integer' | 'boolean';
     properties?: Record<string, Property<unknown>>;
   };
+  properties?: Record<string, Property<unknown>>;
+  required?: string[];
   stringVariant?: 'multiline';
   exclusiveMinimum?: number;
+  minimum?: number;
   maximum?: number;
+  multipleOf?: number;
+  unit?: string;
+  title?: string;
+  description?: string;
+  refreshesSchema?: boolean;
   selectFromEntity?: 'mqttServer' | 'companionDevice';
   selectFromEntityProperty?: string;
   overrideWithInput?: string;
   isCurrency?: boolean;
 }
+
+type EnumValue = { const: string | number; title?: string };
 
 interface Props<TValue> {
   nodeType: ResourceFlowNodeDto['type'];
@@ -45,6 +56,7 @@ interface Props<TValue> {
 
 export function PropertyInput<TValue>(props: Props<TValue>) {
   const { name, isRequired, schema, tNodeTranslations: t, tNodeExists, nodeType, value, onChange, hideLabel } = props;
+  const label = schema.title ?? t('nodes.' + nodeType + '.config.' + name + '.label');
 
   const helpTextKey = `nodes.${nodeType}.config.${name}.helpText`;
   const docsUrlKey = `nodes.${nodeType}.config.${name}.docsUrl`;
@@ -53,7 +65,9 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
   const docsUrl = tNodeExists?.(docsUrlKey) ? t(docsUrlKey) : undefined;
   const docsLabel = tNodeExists?.(docsLabelKey) ? t(docsLabelKey) : docsUrl;
 
-  let description: React.ReactNode = undefined;
+  let description: React.ReactNode = schema.description
+    ? `${schema.description}${schema.unit ? ` (${schema.unit})` : ''}`
+    : schema.unit;
   if (schema.overrideWithInput) {
     description = t('nodes.genericConfig.overridableByInput', { fieldName: schema.overrideWithInput });
   }
@@ -104,7 +118,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
   const [isCreateServerOpen, setIsCreateServerOpen] = useState(false);
 
   if (!configuration && schema.isCurrency) {
-    const currencyLabel = t('nodes.' + nodeType + '.config.' + name + '.label');
+    const currencyLabel = label;
     return (
       <TextField isDisabled isRequired={isRequired}>
         {!hideLabel && <Label>{currencyLabel}</Label>}
@@ -121,8 +135,8 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
             <MqttServerSelect
               selectedId={value as number}
               onSelectionChange={(id) => onChange(id as TValue)}
-              label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
-              ariaLabel={t('nodes.' + nodeType + '.config.' + name + '.label')}
+              label={!hideLabel ? label : undefined}
+              ariaLabel={label}
               isRequired={isRequired}
               className="w-full"
             />
@@ -166,8 +180,8 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
       <CompanionDeviceSelect
         selectedId={value as number}
         onSelectionChange={(id) => onChange(id as TValue)}
-        label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
-        ariaLabel={t('nodes.' + nodeType + '.config.' + name + '.label')}
+        label={!hideLabel ? label : undefined}
+        ariaLabel={label}
         placeholder={t('nodes.' + nodeType + '.config.' + name + '.placeholder')}
         isRequired={isRequired}
         className="w-full"
@@ -177,24 +191,25 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
 
   switch (schema.type) {
     case 'string':
-      if (schema.enum) {
+      if (schema.enum || schema.oneOf) {
+        const enumValues: EnumValue[] = schema.oneOf ?? schema.enum?.map((enumValue) => ({ const: enumValue })) ?? [];
         return (
           <Select
-            label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
-            aria-label={t('nodes.' + nodeType + '.config.' + name + '.label')}
+            label={!hideLabel ? label : undefined}
+            aria-label={label}
             value={String(value ?? schema.default ?? '')}
             onChange={(newValue) => onChange(newValue as TValue)}
             description={description}
-            items={schema.enum.map((enumValue) => ({
-              key: String(enumValue),
-              label: t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue),
+            items={enumValues.map((enumValue) => ({
+              key: String(enumValue.const),
+              label: enumValue.title ?? t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue.const),
             }))}
           />
         );
       }
 
       if (schema.stringVariant === 'multiline') {
-        const multilineLabel = t('nodes.' + nodeType + '.config.' + name + '.label');
+        const multilineLabel = label;
         const multilineId = `property-input-${nodeType}-${name}`;
         return (
           <div className="flex flex-col gap-2 w-full">
@@ -219,18 +234,19 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           value={value ? String(value) : ''}
           onChange={(newValue) => onChange(newValue as TValue)}
         >
-          {!hideLabel && <Label>{t('nodes.' + nodeType + '.config.' + name + '.label')}</Label>}
+          {!hideLabel && <Label>{label}</Label>}
           {description && <Description>{description}</Description>}
           <Input
             type="text"
-            placeholder={hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
+            placeholder={hideLabel ? label : undefined}
             defaultValue={schema.default ? String(schema.default) : undefined}
           />
         </TextField>
       );
     case 'integer':
     case 'number': {
-      const enumValues = schema.enum ?? (isQosField ? [0, 1, 2] : undefined);
+      const enumValues: EnumValue[] | undefined = schema.oneOf ?? schema.enum?.map((enumValue) => ({ const: enumValue })) ??
+        (isQosField ? [0, 1, 2].map((enumValue) => ({ const: enumValue })) : undefined);
 
       if (enumValues) {
         const selectedValue =
@@ -238,8 +254,8 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
 
         return (
           <Select
-            label={!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : undefined}
-            aria-label={t('nodes.' + nodeType + '.config.' + name + '.label')}
+            label={!hideLabel ? label : undefined}
+            aria-label={label}
             value={selectedValue}
             onChange={(newValue) => {
               if (newValue == null) return;
@@ -247,8 +263,8 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
             }}
             description={description}
             items={enumValues.map((enumValue) => ({
-              key: String(enumValue),
-              label: t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue),
+              key: String(enumValue.const),
+              label: enumValue.title ?? t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue.const),
             }))}
           />
         );
@@ -257,14 +273,15 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
       return (
         <NumberField
           isRequired={isRequired}
-          aria-label={t('nodes.' + nodeType + '.config.' + name + '.label')}
+          aria-label={label}
           value={Number(parsedValue)}
           defaultValue={schema.default ? Number(schema.default) : undefined}
           onChange={(newValue) => setValue(newValue as TValue)}
-          minValue={schema.exclusiveMinimum !== undefined ? schema.exclusiveMinimum + 1 : undefined}
+          minValue={schema.exclusiveMinimum !== undefined ? schema.exclusiveMinimum + 1 : schema.minimum}
           maxValue={schema.maximum}
+          step={schema.multipleOf}
         >
-          {!hideLabel && <Label>{t('nodes.' + nodeType + '.config.' + name + '.label')}</Label>}
+          {!hideLabel && <Label>{label}</Label>}
           {description && <Description>{description}</Description>}
           <NumberFieldGroup>
             <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
@@ -324,12 +341,34 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
 
         return (
           <div className="flex flex-col gap-2">
-            {!hideLabel && <small>{t('nodes.' + nodeType + '.config.' + name + '.label')}</small>}
+            {!hideLabel && <small>{label}</small>}
             {content}
             <Button variant="secondary" onPress={() => onChange({ ...value, '': '' })}>
               <PlusIcon size={16} />
               {t('nodes.' + nodeType + '.config.' + name + '.add')}
             </Button>
+          </div>
+        );
+      }
+      if (schema.properties) {
+        const objectValue = (value as Record<string, unknown>) ?? {};
+        return (
+          <div className="flex flex-col gap-4 w-full">
+            {!hideLabel && <small>{label}</small>}
+            {description && <Description>{description}</Description>}
+            {Object.entries(schema.properties).map(([propertyName, property]) => (
+              <PropertyInput
+                key={propertyName}
+                nodeType={nodeType}
+                tNodeTranslations={t}
+                tNodeExists={tNodeExists}
+                name={`${name}.${propertyName}`}
+                schema={property}
+                value={objectValue[propertyName]}
+                onChange={(newValue) => onChange({ ...objectValue, [propertyName]: newValue } as TValue)}
+                isRequired={schema.required?.includes(propertyName) ?? false}
+              />
+            ))}
           </div>
         );
       }
@@ -431,7 +470,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
 
       return (
         <div className="flex flex-col gap-2 w-full">
-          {!hideLabel && <small>{t('nodes.' + nodeType + '.config.' + name + '.label')}</small>}
+          {!hideLabel && <small>{label}</small>}
           {content}
           <Button variant="secondary" onPress={handleAdd}>
             <PlusIcon size={16} />
@@ -444,7 +483,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
     case 'boolean':
       return (
         <LabeledSwitch isSelected={value as boolean} onChange={(newValue) => onChange(newValue as TValue)}>
-          {!hideLabel ? t('nodes.' + nodeType + '.config.' + name + '.label') : null}
+          {!hideLabel ? label : null}
         </LabeledSwitch>
       );
   }

@@ -4,7 +4,7 @@ import type { DragEvent } from 'react';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { ArrowDownIcon, ArrowUpIcon, ArrowUpDownIcon } from 'lucide-react';
 import { CatalogNode, Direction } from './useNodeCatalog';
-import { DOMAINS, nodeTypeDomain } from './domains';
+import { getDomainDef, nodeTypeDomain } from './domains';
 
 interface Props {
   node: CatalogNode;
@@ -20,7 +20,7 @@ const DIRECTION_ICON: Record<Direction, { icon: typeof ArrowDownIcon; label: str
 
 export function CatalogRow({ node, tNodeTranslations, onSelect }: Props) {
   const domain = nodeTypeDomain(node.schema.type);
-  const def = DOMAINS[domain];
+  const def = getDomainDef(domain);
   const Icon = def.icon;
   const { icon: DirIcon, label: dirLabel } = DIRECTION_ICON[node.direction];
 
@@ -42,10 +42,10 @@ export function CatalogRow({ node, tNodeTranslations, onSelect }: Props) {
       </span>
       <span className="flex-1 min-w-0">
         <span className="block text-sm font-medium truncate">
-          {tNodeTranslations('nodes.' + node.schema.type + '.title')}
+          {node.schema.label ?? tNodeTranslations('nodes.' + node.schema.type + '.title')}
         </span>
         <span className="block text-xs text-default-500 truncate">
-          {tNodeTranslations('nodes.' + node.schema.type + '.description')}
+          {node.schema.description ?? tNodeTranslations('nodes.' + node.schema.type + '.description')}
         </span>
       </span>
       <span aria-label={dirLabel} className="flex-none text-default-400">

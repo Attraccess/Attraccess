@@ -31,7 +31,7 @@ interface FlowContextType {
   onNodesChange: OnNodesChange<Node>;
   onEdgesChange: OnEdgesChange<Edge>;
   onConnect: (params: Edge | Connection) => void;
-  updateNodeData: (nodeId: string, data: object) => void;
+  updateNodeData: (nodeId: string, data: Record<string, unknown>) => void;
   addNode: (node: Node) => void;
   removeNode: (nodeId: string) => void;
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
@@ -79,9 +79,9 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
   );
 
   const updateNodeData = useCallback(
-    (nodeId: string, data: object) => {
+    (nodeId: string, data: Record<string, unknown>) => {
       setNodes((nodes) =>
-        nodes.map((node) => (node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node)),
+        nodes.map((node) => (node.id === nodeId ? { ...node, data } : node)),
       );
     },
     [setNodes],

@@ -25,6 +25,23 @@ describe('CatalogRow', () => {
     expect(screen.getByText('User-triggered start')).toBeInTheDocument();
   });
 
+  it('renders a plugin-provided name and description without i18n', () => {
+    const pluginNode: CatalogNode = {
+      ...node,
+      schema: {
+        ...node.schema,
+        type: 'plugin.example.action',
+        label: 'Control device',
+        description: 'Select a capability to control.',
+      },
+    };
+
+    render(<CatalogRow node={pluginNode} tNodeTranslations={tStub} onSelect={vi.fn()} />);
+
+    expect(screen.getByText('Control device')).toBeInTheDocument();
+    expect(screen.getByText('Select a capability to control.')).toBeInTheDocument();
+  });
+
   it('calls onSelect with node type on click', async () => {
     const onSelect = vi.fn();
     const user = userEvent.setup();

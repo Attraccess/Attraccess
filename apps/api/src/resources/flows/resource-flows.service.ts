@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -91,6 +91,31 @@ export class ResourceFlowsService {
     ]);
 
     return { nodes, edges };
+  }
+
+  async resolveNodeSchema(
+    resourceId: number,
+    nodeType: string,
+    config: Record<string, unknown>,
+  ): Promise<ResourceFlowNodeSchemaDto> {
+    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    if (!resource) {
+      throw new ResourceNotFoundException(resourceId);
+    }
+
+    const definition = getPluginFlowNode(nodeType);
+    if (!definition) {
+      throw new NotFoundException(`Plugin flow node type "${nodeType}" was not found.`);
+    }
+
+    const configSchema = definition.resolveConfigSchema
+      ? await definition.resolveConfigSchema(config)
+      : definition.configSchema;
+    if (!configSchema) {
+      throw new Error(`Plugin flow node type "${nodeType}" does not provide a configuration schema.`);
+    }
+
+    return this.pluginNodeSchema(definition, configSchema);
   }
 
   private validateNodeData(nodeData: { id: string; type: string; data: unknown }): ValidationError[] {
@@ -495,17 +520,40 @@ export class ResourceFlowsService {
     });
 
     // Append plugin-contributed node schemas.
-    const pluginSchemas: ResourceFlowNodeSchemaDto[] = getRegisteredPluginFlowNodes().map((def) => ({
-      type: def.type,
-      label: def.label,
-      description: def.description,
-      configSchema: def.configSchema,
-      inputs: def.inputs,
-      outputs: def.outputs,
-      supportedByResource: def.supportedByAllResources !== false,
-      isOutput: def.isOutput ?? false,
-    }));
+    const pluginSchemas = await Promise.all(
+      getRegisteredPluginFlowNodes().map(async (definition) => {
+        let configSchema = definition.configSchema;
+        if (definition.resolveConfigSchema) {
+          try {
+            configSchema = await definition.resolveConfigSchema({});
+          } catch (error) {
+            this.logger.warn(`Unable to resolve initial schema for plugin flow node "${definition.type}": ${error}`);
+            configSchema ??= { dynamic: true, properties: {} };
+          }
+        }
+        if (!configSchema) {
+          throw new Error(`Plugin flow node type "${definition.type}" does not provide a configuration schema.`);
+        }
+        return this.pluginNodeSchema(definition, configSchema);
+      }),
+    );
 
     return [...coreSchemas, ...pluginSchemas];
+  }
+
+  private pluginNodeSchema(
+    definition: NonNullable<ReturnType<typeof getPluginFlowNode>>,
+    configSchema: Record<string, unknown>,
+  ): ResourceFlowNodeSchemaDto {
+    return {
+      type: definition.type,
+      label: definition.label,
+      description: definition.description,
+      configSchema,
+      inputs: definition.inputs,
+      outputs: definition.outputs,
+      supportedByResource: definition.supportedByAllResources !== false,
+      isOutput: definition.isOutput ?? false,
+    };
   }
 }
