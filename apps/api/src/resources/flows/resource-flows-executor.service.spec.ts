@@ -14,12 +14,14 @@ import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import { ResourceUsageService } from '../usage/resourceUsage.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../mqtt/mqtt-message.event';
-import { NoUsageSessionError } from './errors/no-usage-session.error';
 import { ResourceHealthService } from '../health/resource-health.service';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { FlowTimer } from '../../metrics/instrumentation/flow/flow.helper';
 import { CompanionGatewayService } from '../../companion/companion-gateway.service';
+import axios from 'axios';
+
+jest.mock('axios');
 
 // Minimal edge shape for our mocks
 type Edge = { source: string; target: string; sourceHandle?: string | null };
@@ -157,10 +159,13 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       variablesService,
       { time: (_n, fn) => fn() } as unknown as CronTimer,
       {
-        timeFlow: <T,>(_t: string, fn: () => Promise<T>) => fn(),
-        timeNode: <T,>(_n: string, fn: () => Promise<T>) => fn(),
+        timeFlow: <T>(_t: string, fn: () => Promise<T>) => fn(),
+        timeNode: <T>(_n: string, fn: () => Promise<T>) => fn(),
       } as unknown as FlowTimer,
-      { sendLockCommand: jest.fn(() => true), sendUnlockCommand: jest.fn(() => true) } as unknown as CompanionGatewayService,
+      {
+        sendLockCommand: jest.fn(() => true),
+        sendUnlockCommand: jest.fn(() => true),
+      } as unknown as CompanionGatewayService,
     );
   });
 
@@ -415,6 +420,162 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     expect(processNode).toHaveBeenCalledTimes(2);
   });
 
+  it('routes an external-effect failure through its failure output', async () => {
+    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_BUTTON });
+    const mqttNode = createNode({
+      id: 'mqtt-1',
+      type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE,
+      data: { serverId: 1, topic: 'devices/state', failureBehavior: 'failure-output' },
+    });
+    const failureNode = createNode({
+      id: 'failure-1',
+      type: ResourceFlowNodeType.PROCESSING_SET_PAYLOAD,
+      data: { entries: [] },
+    });
+    [inputNode, mqttNode, failureNode].forEach((node) => (nodesById[node.id] = node));
+    initialNodes = [inputNode];
+    edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: mqttNode.id }];
+    edgesBySourceAndHandle[`${mqttNode.id}|failure`] = [
+      { source: mqttNode.id, target: failureNode.id, sourceHandle: 'failure' },
+    ];
+    edgesBySourceAndHandle[`${failureNode.id}|`] = [];
+    mqttClientService.publish = jest.fn().mockRejectedValue(new Error('Broker unavailable'));
+    flowLogs.start(1);
+
+    const result = await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { requestId: 'abc' });
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        requestId: 'abc',
+        flowError: { kind: 'transport-dispatch', message: 'Broker unavailable' },
+      }),
+    ]);
+    expect(
+      JSON.parse(flowLogs.getLogs(1).logs.find((log) => log.type === 'node.processing.failed')?.payload ?? ''),
+    ).toEqual(expect.objectContaining({ failureKind: 'transport-dispatch', failureBehavior: 'failure-output' }));
+  });
+
+  it('routes a logged external-effect failure through its normal output', async () => {
+    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_BUTTON });
+    const mqttNode = createNode({
+      id: 'mqtt-1',
+      type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE,
+      data: { serverId: 1, topic: 'devices/state', failureBehavior: 'log-and-continue' },
+    });
+    const continuationNode = createNode({
+      id: 'continuation-1',
+      type: ResourceFlowNodeType.PROCESSING_SET_PAYLOAD,
+      data: { entries: [] },
+    });
+    [inputNode, mqttNode, continuationNode].forEach((node) => (nodesById[node.id] = node));
+    initialNodes = [inputNode];
+    edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: mqttNode.id }];
+    edgesBySourceAndHandle[`${mqttNode.id}|output`] = [
+      { source: mqttNode.id, target: continuationNode.id, sourceHandle: 'output' },
+    ];
+    edgesBySourceAndHandle[`${mqttNode.id}|failure`] = [];
+    edgesBySourceAndHandle[`${continuationNode.id}|`] = [];
+    mqttClientService.publish = jest.fn().mockRejectedValue(new Error('Broker unavailable'));
+    const processNode = jest.spyOn(
+      service as unknown as { processNode: () => Promise<NodeProcessingResult[]> },
+      'processNode',
+    );
+
+    await service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { requestId: 'abc' });
+
+    expect(processNode).toHaveBeenCalledWith(
+      expect.any(String),
+      continuationNode,
+      expect.objectContaining({ outputHandle: 'output' }),
+      undefined,
+      expect.any(Map),
+    );
+  });
+
+  it('preserves the legacy flow failure behavior when no policy was saved', async () => {
+    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_BUTTON });
+    const mqttNode = createNode({
+      id: 'mqtt-1',
+      type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE,
+      data: { serverId: 1, topic: 'devices/state' },
+    });
+    [inputNode, mqttNode].forEach((node) => (nodesById[node.id] = node));
+    initialNodes = [inputNode];
+    edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: mqttNode.id }];
+    edgesBySourceAndHandle[`${mqttNode.id}|`] = [];
+    mqttClientService.publish = jest.fn().mockRejectedValue(new Error('Broker unavailable'));
+
+    await expect(service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {})).rejects.toThrow('Broker unavailable');
+  });
+
+  it.each([
+    ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+    ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+    ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
+  ])('preserves no-policy external-effect failures for the %s lifecycle flow', async (triggerNodeType) => {
+    const inputNode = createNode({ id: 'in-1', type: triggerNodeType });
+    initialNodes = [inputNode];
+
+    const expectLegacyFailure = async (
+      node: ResourceFlowNode,
+      setup: () => void,
+      message: string | RegExp,
+    ): Promise<void> => {
+      nodesById = { [inputNode.id]: inputNode, [node.id]: node };
+      edgesBySourceAndHandle = {
+        [`${inputNode.id}|`]: [{ source: inputNode.id, target: node.id }],
+        [`${node.id}|`]: [],
+      };
+      setup();
+
+      await expect(service.runFlow(1, triggerNodeType, {})).rejects.toThrow(message);
+    };
+
+    await expectLegacyFailure(
+      createNode({ id: 'http-1', type: ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST, data: { url: 'https://example.com', method: 'POST' } }),
+      () => (axios.request as jest.Mock).mockRejectedValueOnce(new Error('HTTP unavailable')),
+      'HTTP unavailable',
+    );
+    await expectLegacyFailure(
+      createNode({ id: 'mqtt-1', type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE, data: { serverId: 1, topic: 'devices/state' } }),
+      () => (mqttClientService.publish as jest.Mock).mockRejectedValueOnce(new Error('MQTT unavailable')),
+      'MQTT unavailable',
+    );
+    await expectLegacyFailure(
+      createNode({ id: 'end-1', type: ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION, data: {} }),
+      () => (resourceUsageService.getActiveSession as jest.Mock).mockResolvedValueOnce(null),
+      'NO_USAGE_SESSION',
+    );
+    await expectLegacyFailure(
+      createNode({
+        id: 'wait-1',
+        type: ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE,
+        data: { serverId: 1, topic: 'devices/state', timeoutSeconds: 1 },
+      }),
+      () => undefined,
+      /Timeout waiting for MQTT message/,
+    );
+  });
+
+  it('propagates an external-effect failure when configured to fail the flow', async () => {
+    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_BUTTON });
+    const mqttNode = createNode({
+      id: 'mqtt-1',
+      type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE,
+      data: { serverId: 1, topic: 'devices/state', failureBehavior: 'fail-flow' },
+    });
+    [inputNode, mqttNode].forEach((node) => (nodesById[node.id] = node));
+    initialNodes = [inputNode];
+    edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: mqttNode.id }];
+    mqttClientService.publish = jest.fn().mockRejectedValue(new Error('Broker unavailable'));
+
+    await expect(service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {})).rejects.toMatchObject({
+      message: 'Broker unavailable',
+      failureKind: 'transport-dispatch',
+      status: 503,
+    });
+  });
+
   it('ends the active usage session with templated notes and passes payload through', async () => {
     // Arrange nodes: INPUT -> END_SESSION (terminal)
     const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
@@ -463,9 +624,17 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     );
   });
 
-  it('throws NoUsageSessionError when no active session exists', async () => {
-    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
-    const endNode = createNode({ id: 'end-1', type: ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION, data: {} });
+  it.each([
+    ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+    ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+    ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
+  ])('propagates explicit termination failures from the %s lifecycle flow', async (triggerNodeType) => {
+    const inputNode = createNode({ id: 'in-1', type: triggerNodeType });
+    const endNode = createNode({
+      id: 'end-1',
+      type: ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION,
+      data: { failureBehavior: 'fail-flow' },
+    });
     nodesById[inputNode.id] = inputNode;
     nodesById[endNode.id] = endNode;
     initialNodes = [inputNode];
@@ -474,9 +643,11 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     (resourceUsageService.getActiveSession as jest.Mock).mockResolvedValue(null);
 
-    await expect(service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {})).rejects.toBeInstanceOf(
-      NoUsageSessionError,
-    );
+    await expect(service.runFlow(1, triggerNodeType, {})).rejects.toMatchObject({
+      message: 'NO_USAGE_SESSION',
+      failureKind: 'node-failure',
+      status: 503,
+    });
   });
 
   it('updates resource activity when track-activity node executes and passes payload through', async () => {
@@ -914,7 +1085,9 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         type: ResourceFlowNodeType.PROCESSING_SET_VARIABLES,
         resourceId: 1,
         data: {
-          variables: [{ key: 'rendered', value: '{{variables.resource.foo}}-{{variables.global.bar}}', scope: 'resource' }],
+          variables: [
+            { key: 'rendered', value: '{{variables.resource.foo}}-{{variables.global.bar}}', scope: 'resource' },
+          ],
         },
       });
       nodesById[inputNode.id] = inputNode;
@@ -1039,10 +1212,13 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       variablesService,
       { time: (_n, fn) => fn() } as unknown as CronTimer,
       {
-        timeFlow: <T,>(_t: string, fn: () => Promise<T>) => fn(),
-        timeNode: <T,>(_n: string, fn: () => Promise<T>) => fn(),
+        timeFlow: <T>(_t: string, fn: () => Promise<T>) => fn(),
+        timeNode: <T>(_n: string, fn: () => Promise<T>) => fn(),
       } as unknown as FlowTimer,
-      { sendLockCommand: jest.fn(() => true), sendUnlockCommand: jest.fn(() => true) } as unknown as CompanionGatewayService,
+      {
+        sendLockCommand: jest.fn(() => true),
+        sendUnlockCommand: jest.fn(() => true),
+      } as unknown as CompanionGatewayService,
     );
   });
 
@@ -1141,7 +1317,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       type: ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE,
       resourceId: 1,
       position: { x: 0, y: 0 },
-      data: { serverId: 8, topic: 'foo/#', timeoutSeconds: 1 },
+      data: { serverId: 8, topic: 'foo/#', timeoutSeconds: 1, failureBehavior: 'fail-flow' },
       createdAt: new Date(),
       updatedAt: new Date(),
     } as unknown as ResourceFlowNode;
@@ -1160,6 +1336,8 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     expect(failedLog).toBeDefined();
     expect(JSON.parse(failedLog?.payload ?? '')).toEqual({
       error: "Timeout waiting for MQTT message on topic 'foo/#' (server 8)",
+      failureKind: 'acknowledgement-timeout',
+      failureBehavior: 'fail-flow',
     });
   });
 
@@ -1185,6 +1363,8 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     expect(failedLog).toBeDefined();
     expect(JSON.parse(failedLog?.payload ?? '')).toEqual({
       error: "Failed to publish MQTT message to topic 'devices/state' on server 1: no error details were provided",
+      failureKind: 'transport-dispatch',
+      failureBehavior: 'fail-flow',
     });
   });
 });

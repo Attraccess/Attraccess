@@ -1,6 +1,8 @@
 #include "wifi.hpp"
 #include "platform.hpp"
 
+#include "esp_log.h"
+
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -127,6 +129,9 @@ void Wifi::setup()
         return;
     }
 
+    // Suppress ESP-IDF idle scan chatter while retaining WiFi warnings.
+    esp_log_level_set("wifi", ESP_LOG_WARN);
+
     wifi_interface = esp_netif_create_default_wifi_sta();
     if (wifi_interface == NULL)
     {
@@ -228,7 +233,7 @@ void Wifi::wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t even
     case WIFI_EVENT_STA_DISCONNECTED:
     {
         auto *ev = (wifi_event_sta_disconnected_t *)event_data;
-        logger.infof("Disconnected: reason %u (%s)", ev->reason, getDisconnectReasonName(ev->reason));
+        logger.errorf("Disconnected: reason %u (%s)", ev->reason, getDisconnectReasonName(ev->reason));
         setState(WIFI_STATE_DISCONNECTED);
         break;
     }
@@ -560,7 +565,7 @@ void Wifi::handleTimeout()
     {
         if (millis() - waiting_for_ip_since_ms > WAITING_FOR_IP_TIMEOUT_MS)
         {
-            logger.info("DHCP timeout - no IP acquired, forcing reconnect");
+            logger.error("DHCP timeout - no IP acquired, forcing reconnect");
             esp_wifi_disconnect();
             setState(WIFI_STATE_CONNECT_FAILED);
         }
@@ -577,7 +582,7 @@ void Wifi::handleTimeout()
 
     if (elapsed > 15000)
     { // 15 second timeout
-        logger.info("Connection timeout - stopping connection attempt");
+        logger.error("Connection timeout - stopping connection attempt");
         esp_wifi_disconnect();
         setState(WIFI_STATE_CONNECT_FAILED);
         return;
