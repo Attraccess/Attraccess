@@ -12,7 +12,7 @@ import {
   isWellFormedXml,
   splitHead,
   unwrapFragment,
-  withCidEmailLogo,
+  withLogoPlaceholder,
   withPreviewEmailLogo,
   wrapFragment,
 } from './mjmlLayout';
@@ -206,7 +206,7 @@ export function MjmlVisualEditor(props: MjmlVisualEditorProps) {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           if (cancelled) return;
-          const mjml = withCidEmailLogo(e.getHtml(), previewLogoUrl);
+          const mjml = withLogoPlaceholder(e.getHtml(), previewLogoUrl);
           propsRef.current.onChange(propsRef.current.exportFullDocument ? mjml : unwrapFragment(mjml));
         }, 300);
       });

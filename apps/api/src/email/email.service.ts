@@ -131,6 +131,7 @@ export class EmailService {
         frontend: url,
         backend: url,
         notificationPreferencesUrl: `${url}/account`,
+        logoUrl: `cid:${EMAIL_LOGO_CID}`,
       },
       url,
     } as const;

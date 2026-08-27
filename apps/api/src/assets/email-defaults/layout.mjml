@@ -21,7 +21,7 @@
     <mj-section background-color="#FFFFFF" padding="24px 0 16px 0">
       <mj-column>
         <mj-image
-          src="cid:attraccess-logo"
+          src="{{host.logoUrl}}"
           width="200px"
           href="https://attraccess.org"
           alt="Attraccess"

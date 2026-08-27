@@ -53,19 +53,17 @@ describe('EmailLayoutService', () => {
   });
 
   describe('resetToDefault', () => {
-    it('restores the CID-based default layout', async () => {
+    it('restores the default layout with its logo placeholder', async () => {
       const defaultLayout = readDefaultLayoutBody();
       (settingsStore.setPlainSetting as jest.Mock).mockResolvedValue(undefined);
       (settingsStore.getPlainSetting as jest.Mock).mockResolvedValue(defaultLayout);
 
       await expect(service.resetToDefault()).resolves.toEqual({ body: defaultLayout });
       expect(settingsStore.setPlainSetting).toHaveBeenCalledWith('email_layout', 'body', defaultLayout);
-      expect(defaultLayout).toContain('src="cid:attraccess-logo"');
-      expect(defaultLayout).not.toContain('{{host.logoUrl}}');
-      expect(defaultLayout).not.toContain('/api/logo.png');
+      expect(defaultLayout).toContain('src="{{host.logoUrl}}"');
     });
 
-    it('renders the default logo with its CID source', async () => {
+    it('keeps the default logo source as a placeholder until delivery', async () => {
       const mjmlService = new MjmlService();
       const defaultLayout = readDefaultLayoutBody();
       const html = await mjmlService.validateAndConvert(
@@ -75,8 +73,7 @@ describe('EmailLayoutService', () => {
         ),
       );
 
-      expect(html).toContain('src="cid:attraccess-logo"');
-      expect(html).not.toContain('/api/logo.png');
+      expect(html).toContain('src="{{host.logoUrl}}"');
     });
   });
 });
