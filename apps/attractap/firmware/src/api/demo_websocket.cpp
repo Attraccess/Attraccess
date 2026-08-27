@@ -104,6 +104,11 @@ bool DemoWebsocket::sendMessage(const char *data, size_t len)
     return true;
 }
 
+bool DemoWebsocket::sendHeartbeat(const char *message, size_t length)
+{
+    return sendMessage(message, length);
+}
+
 void DemoWebsocket::setMessageCallbackRaw(std::function<void(const char *, size_t)> cb)
 {
     _messageCallback = cb;
