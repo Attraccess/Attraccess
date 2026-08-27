@@ -59,6 +59,7 @@ import {
   IfExecutor,
   MqttSendMessageExecutor,
   MqttWaitForMessageExecutor,
+  OperatingTransitionExecutor,
   NodeExecutionContext,
   NodeExecutor,
   NodeProcessingResult,
@@ -70,6 +71,7 @@ import {
   heartbeatKey,
   topicMatches,
 } from './node-executors';
+import { ResourceOperatingIntervalService } from '../operating-intervals/resource-operating-interval.service';
 import { CompanionGatewayService } from '../../companion/companion-gateway.service';
 import { CompanionUsbDeviceDto } from '../../companion/companion.types';
 import { ExternalEffectFailureError } from './errors/external-effect-failure.error';
@@ -150,6 +152,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     private readonly cronTimer: CronTimer,
     private readonly flowTimer: FlowTimer,
     private readonly companionGatewayService: CompanionGatewayService,
+    private readonly operatingIntervals: ResourceOperatingIntervalService,
   ) {
     this.nodeExecutors = this.buildNodeExecutorRegistry();
   }
@@ -187,6 +190,11 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       [ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE]: new MqttSendMessageExecutor(this.mqttClientService),
       [ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION]: new EndUsageSessionExecutor(this.resourceUsageService),
       [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY]: new ActivityTrackExecutor(this.resourceActivity),
+      [ResourceFlowNodeType.OUTPUT_RESOURCE_OPERATING]: new OperatingTransitionExecutor(
+        this.operatingIntervals,
+        'operating',
+      ),
+      [ResourceFlowNodeType.OUTPUT_RESOURCE_IDLE]: new OperatingTransitionExecutor(this.operatingIntervals, 'idle'),
 
       [ResourceFlowNodeType.PROCESSING_WAIT]: new WaitExecutor(),
       [ResourceFlowNodeType.PROCESSING_IF]: new IfExecutor(),

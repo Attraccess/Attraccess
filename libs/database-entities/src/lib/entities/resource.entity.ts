@@ -27,6 +27,7 @@ import { ResourceType } from './resource.type';
 import { SupervisionMode, AutoIntroductionTarget } from './resource.supervision';
 import { ResourceBillingConfiguration } from './resource-billing-configuration.entity';
 import { Form } from './form';
+import { ResourceOperatingInterval } from './resource-operating-interval.entity';
 
 @Entity()
 export class Resource {
@@ -230,6 +231,9 @@ export class Resource {
 
   @OneToMany(() => ResourceUsage, (usage) => usage.resource)
   usages!: ResourceUsage[];
+
+  @OneToMany(() => ResourceOperatingInterval, (interval) => interval.resource)
+  operatingIntervals!: ResourceOperatingInterval[];
 
   @OneToMany(() => ResourceFlowNode, (node) => node.resource)
   flowNodes!: ResourceFlowNode[];

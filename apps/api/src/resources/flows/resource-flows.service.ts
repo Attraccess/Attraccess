@@ -22,6 +22,7 @@ import {
   ErrorNodeDataSchema,
   InputResourceActivityNoActivityNodeDataSchema,
   ResourceActivityTrackActivityNodeDataSchema,
+  ResourceOperatingTransitionNodeDataSchema,
   ResourceHealthHeartbeatNodeDataSchema,
   ResourceHealthSetNodeDataSchema,
   SetVariablesNodeDataSchema,
@@ -379,6 +380,15 @@ export class ResourceFlowsService {
         case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
           schema.configSchema = z.toJSONSchema(ResourceActivityTrackActivityNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
+          schema.supportedByResource = resource.type === ResourceType.Machine;
+          schema.isOutput = true;
+          break;
+
+        case ResourceFlowNodeType.OUTPUT_RESOURCE_OPERATING:
+        case ResourceFlowNodeType.OUTPUT_RESOURCE_IDLE:
+          schema.configSchema = z.toJSONSchema(ResourceOperatingTransitionNodeDataSchema, { io: 'input' });
+          schema.inputs = ['input'];
+          schema.outputs = ['output'];
           schema.supportedByResource = resource.type === ResourceType.Machine;
           schema.isOutput = true;
           break;
