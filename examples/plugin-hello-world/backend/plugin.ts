@@ -41,8 +41,8 @@ class HelloWorldService implements OnModuleInit {
   onModuleInit(): void {
     this.context.onEvent(RESOURCE_USAGE_STARTED, ({ resource, user }) => {
       this.context.logger.log(`Resource ${resource.id} usage started by user ${user.id} — hello!`);
-      void this.context.flows.trigger(
-        'plugin.hello-world.usage-started',
+      return this.context.flows.trigger(
+        'plugin.plugin-hello-world.usage-started',
         (config) => config.userId === user.id,
         { resource: { id: resource.id }, user: { id: user.id, username: user.username } },
       );
@@ -82,7 +82,7 @@ class HelloWorldPluginModule {}
 const plugin: PluginBackendModule = {
   flowNodes: [
     {
-      type: 'plugin.hello-world.usage-started',
+      type: 'plugin.plugin-hello-world.usage-started',
       label: 'Hello World usage started',
       description: 'Starts when the configured user starts using a resource.',
       configSchema: {
