@@ -24,6 +24,7 @@ import { DataSource } from 'typeorm';
 import type { Repository } from 'typeorm';
 import type { ModuleRef } from '@nestjs/core';
 import type { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { AppConfigType } from '../config/app.config';
 import {
   User,
@@ -33,6 +34,7 @@ import {
   UserRole,
   Role,
   Permission,
+  RolePermission,
   SSOProviderType,
   entities,
 } from '@attraccess/database-entities';
@@ -124,6 +126,7 @@ beforeAll(async () => {
   const userRoleRepo = dataSource.getRepository(UserRole);
   const roleRepo = dataSource.getRepository(Role);
   const permissionRepo = dataSource.getRepository(Permission);
+  const rolePermissionRepo = dataSource.getRepository(RolePermission);
 
   const mockConfigService = {
     get: (key: string): AppConfigType | undefined => {
@@ -157,7 +160,15 @@ beforeAll(async () => {
   } as unknown as LicenseService;
 
   const tokenHashService = new TokenHashService(mockConfigService);
-  rbacService = new RbacService(userRoleRepo, roleRepo, permissionRepo);
+  rbacService = new RbacService(
+    userRoleRepo,
+    roleRepo,
+    permissionRepo,
+    userRepo,
+    rolePermissionRepo,
+    new EventEmitter2(),
+    null,
+  );
   usersService = new UsersService(
     userRepo,
     authDetailRepo,
