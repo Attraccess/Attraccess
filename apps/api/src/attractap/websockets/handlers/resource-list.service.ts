@@ -9,6 +9,8 @@ import { ResourceFlowsService } from '../../../resources/flows/resource-flows.se
 import { ResourceIntroducersService } from '../../../resources/introducers/resourceIntroducers.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
 
+const DEBOUNCE_MS = 200;
+
 @Injectable()
 export class ResourceListService {
   private readonly logger = new Logger(ResourceListService.name);
@@ -34,42 +36,64 @@ export class ResourceListService {
   @Inject(ResourceIntroducersService)
   private resourceIntroducersService: ResourceIntroducersService;
 
-  public async sendResourceList(readerId: number) {
+  private readonly pendingSends = new Map<number, { timer: ReturnType<typeof setTimeout>; resourceIds: Set<number> }>();
+
+  public async sendResourceList(readerId: number, resourceIds?: Set<number>) {
     const sockets = Array.from(this.websocketService.sockets.values()).filter((socket) => socket.readerId === readerId);
     if (sockets.length === 0) {
       return;
     }
 
-    await this.sendResourceListToSockets(sockets);
+    if (resourceIds) {
+      await this.sendResourceListToSockets(sockets, { resourceIds });
+    } else {
+      await this.sendResourceListToSockets(sockets);
+    }
   }
 
-  public async sendResourceListToReadersWithResources(resourceIds: number[]) {
+  public sendResourceListToReadersWithResources(resourceIds: number[]): void {
     if (resourceIds.length === 0) {
       return;
     }
 
-    const socketsByReaderId = new Map<number, AuthenticatedWebSocket[]>();
+    const readerIds = new Set<number>();
     for (const socket of this.websocketService.sockets.values()) {
-      const sockets = socketsByReaderId.get(socket.readerId) ?? [];
-      sockets.push(socket);
-      socketsByReaderId.set(socket.readerId, sockets);
+      readerIds.add(socket.readerId);
     }
 
-    await Promise.all(
-      Array.from(socketsByReaderId.values()).map((sockets) => this.sendResourceListToSockets(sockets, { resourceIds })),
-    );
+    for (const readerId of readerIds) {
+      this.scheduleSend(readerId, resourceIds);
+    }
+  }
+
+  private scheduleSend(readerId: number, resourceIds: number[]): void {
+    const pending = this.pendingSends.get(readerId);
+    if (pending) {
+      resourceIds.forEach((resourceId) => pending.resourceIds.add(resourceId));
+      return;
+    }
+
+    const pendingResourceIds = new Set(resourceIds);
+    const timer = setTimeout(() => {
+      this.pendingSends.delete(readerId);
+      this.sendResourceList(readerId, pendingResourceIds).catch((err) => {
+        this.logger.error(`Failed to send debounced resource list to reader ${readerId}`, err);
+      });
+    }, DEBOUNCE_MS);
+
+    this.pendingSends.set(readerId, { timer, resourceIds: pendingResourceIds });
   }
 
   public async sendResourceListToSocket(
     socket: AuthenticatedWebSocket,
-    onlyIfResourceMatches?: { resourceIds?: number[] },
+    onlyIfResourceMatches?: { resourceIds?: Set<number> },
   ) {
     await this.sendResourceListToSockets([socket], onlyIfResourceMatches);
   }
 
   private async sendResourceListToSockets(
     sockets: AuthenticatedWebSocket[],
-    onlyIfResourceMatches?: { resourceIds?: number[] },
+    onlyIfResourceMatches?: { resourceIds?: Set<number> },
   ) {
     const reader = await this.attractapService.findReaderById(sockets[0].readerId);
     if (!reader) {
@@ -78,79 +102,58 @@ export class ResourceListService {
 
     const resources = [...reader.resources].sort((a, b) => a.name.localeCompare(b.name));
 
-    const resourceIdsToMatch = onlyIfResourceMatches?.resourceIds ?? [];
-    if (resourceIdsToMatch.length > 0) {
-      if (!resources.some((resource) => resourceIdsToMatch.includes(resource.id))) {
+    const resourceIdsToMatch = onlyIfResourceMatches?.resourceIds;
+    if (resourceIdsToMatch?.size) {
+      if (!resources.some((resource) => resourceIdsToMatch.has(resource.id))) {
         return;
       }
     }
 
-    const introducersByResourceId = await this.resourceIntroducersService.getManyForResources(
-      resources.map((resource) => resource.id),
-      ResourceIntroducerType.INTRODUCER,
-    );
-    const resourcesWithUsageSession = await Promise.all(
-      resources.map(async (resource) => {
-        const [healthEntries, activeUsageSession, isUnderMaintenance] = await Promise.all([
-          this.resourceHealthService.listForResource(resource.id),
-          this.resourceUsageService.getActiveSession(resource.id, true),
-          this.resourceMaintenanceService.hasActiveMaintenance(resource.id),
-        ]);
-        const unhealthyEntries = healthEntries.filter((entry) => entry.status === ResourceHealthStatus.UNHEALTHY);
-        return {
-          ...resource,
-          activeUsageSession,
-          introducers: introducersByResourceId.get(resource.id) ?? [],
-          isUnderMaintenance,
-          isHealthy: unhealthyEntries.length === 0,
-          healthReason: this.buildHealthReason(unhealthyEntries),
-        };
-      }),
-    );
-
-    const getFlowButtons = async (resourceId: number) => {
-      const nodes = await this.resourceFlowsService.getNodes(resourceId, ResourceFlowNodeType.INPUT_BUTTON);
-      return nodes.map((node) => ({
-        id: node.id,
-        label: node.data.label || node.id,
-      }));
-    };
-
-    const resourcesWithFlowButtons = await Promise.all(
-      resourcesWithUsageSession.map(async (resource) => ({
-        ...resource,
-        flowButtons: await getFlowButtons(resource.id),
-      })),
-    );
+    const resourceIds = resources.map((resource) => resource.id);
+    const [introducersByResourceId, healthMap, activeSessionMap, activeMaintenanceIds, flowButtonMap] = await Promise.all([
+      this.resourceIntroducersService.getManyForResources(resourceIds, ResourceIntroducerType.INTRODUCER),
+      this.resourceHealthService.listForResources(resourceIds),
+      this.resourceUsageService.getActiveSessions(resourceIds),
+      this.resourceMaintenanceService.getActiveMaintenanceResourceIds(resourceIds),
+      this.resourceFlowsService.getNodesForResources(resourceIds, ResourceFlowNodeType.INPUT_BUTTON),
+    ]);
 
     const resourceListPayload = {
       readerName: reader.name,
       ledBrightness: reader.ledBrightness,
-      resources: resourcesWithFlowButtons.map((resource) => ({
-        id: resource.id,
-        name: resource.name,
-        type: resource.type,
-        separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch,
-        description: resource.description,
-        allowTakeOver: resource.allowTakeOver,
-        introducers: resource.introducers.flatMap((introducer) => (introducer.user ? [introducer.user.username] : [])),
-        isUnderMaintenance: resource.isUnderMaintenance,
-        isHealthy: resource.isHealthy,
-        healthReason: resource.healthReason,
-        activeUsageSession: resource.activeUsageSession
+      resources: resources.map((resource) => {
+        const healthEntries = healthMap.get(resource.id) ?? [];
+        const unhealthyEntries = healthEntries.filter((entry) => entry.status === ResourceHealthStatus.UNHEALTHY);
+        const activeUsageSession = activeSessionMap.get(resource.id) ?? null;
+        const flowNodes = flowButtonMap.get(resource.id) ?? [];
+
+        return {
+          id: resource.id,
+          name: resource.name,
+          type: resource.type,
+          separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch,
+          description: resource.description,
+          allowTakeOver: resource.allowTakeOver,
+          introducers: (introducersByResourceId.get(resource.id) ?? []).flatMap((introducer) =>
+            introducer.user ? [introducer.user.username] : []),
+          isUnderMaintenance: activeMaintenanceIds.has(resource.id),
+          isHealthy: unhealthyEntries.length === 0,
+          healthReason: this.buildHealthReason(unhealthyEntries),
+          activeUsageSession: activeUsageSession
           ? {
             user: {
-              username: resource.activeUsageSession.user.username,
+              username: activeUsageSession.user.username,
             },
-            startTime: resource.activeUsageSession.startTime.toISOString(),
+            startTime: activeUsageSession.startTime.toISOString(),
             // Offset (minutes east of UTC) of the API's effective timezone for this
             // specific instant, so the reader can render local wall-clock time without
             // a tz database. Computed per-timestamp, so it stays DST-correct.
-            startTimeUtcOffsetMinutes: -resource.activeUsageSession.startTime.getTimezoneOffset(),
+            startTimeUtcOffsetMinutes: -activeUsageSession.startTime.getTimezoneOffset(),
           }
           : null,
-        flowButtons: resource.flowButtons,
-      })),
+          flowButtons: flowNodes.map((node) => ({ id: node.id, label: node.data.label || node.id })),
+        };
+      }),
     };
     await Promise.all(
       sockets.map(async (socket) => {

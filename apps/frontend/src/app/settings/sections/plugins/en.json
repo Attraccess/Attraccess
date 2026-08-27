@@ -4,6 +4,37 @@
   "uploadButton": "Upload plugin",
   "docsButton": "Documentation",
   "manageVersion": "Manage version",
+  "classification": {
+    "official": {
+      "label": "Official",
+      "tooltip": "Maintained or approved by Attraccess. This label does not mean the plugin is sandboxed or guaranteed safe."
+    },
+    "community": {
+      "label": "Community",
+      "tooltip": "Not on Attraccess's approved package-source allowlist. Review the source and requested permissions before installing."
+    }
+  },
+  "marketplace": {
+    "title": "Plugin marketplace",
+    "description": "Find compatible plugins from configured package registries.",
+    "search": "Search plugins",
+    "searchPlaceholder": "Search by name or capability",
+    "details": "Details",
+    "installed": "Installed",
+    "install": "Install",
+    "noResults": "No compatible plugins found.",
+    "loadError": "Could not load the marketplace.",
+    "detailTitle": "{{pluginName}} details",
+    "source": "Source: {{registry}}",
+    "version": "Version: {{version}}",
+    "permissions": "Requested permissions: {{permissions}}",
+    "installTitle": "Install {{pluginName}}?",
+    "installDescription": "Review the package source and requested permissions before installing. The app will restart to activate the plugin.",
+    "cancel": "Cancel",
+    "confirmInstall": "Install plugin",
+    "installSuccess": "Plugin installed. The app will restart in a few seconds to activate it.",
+    "installError": "The plugin was not installed. Please try again."
+  },
   "columns": {
     "name": "Name",
     "version": "Version",

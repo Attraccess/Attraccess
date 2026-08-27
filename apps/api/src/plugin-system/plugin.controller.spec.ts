@@ -22,7 +22,13 @@ function frontendPlugin(name: string): LoadedPluginManifest {
 describe('PluginController', () => {
   let root: string;
   let service: { uploadPlugin: jest.Mock; deletePlugin: jest.Mock };
-  let npmService: { findInstalledByPluginId: jest.Mock; listInstalled: jest.Mock; removeInstalled: jest.Mock };
+  let npmService: {
+    findInstalledByPluginId: jest.Mock;
+    listInstalled: jest.Mock;
+    removeInstalled: jest.Mock;
+    searchMarketplace: jest.Mock;
+    marketplacePackage: jest.Mock;
+  };
   let controller: PluginController;
 
   beforeEach(() => {
@@ -33,6 +39,8 @@ describe('PluginController', () => {
       findInstalledByPluginId: jest.fn(),
       listInstalled: jest.fn().mockReturnValue([]),
       removeInstalled: jest.fn(),
+      searchMarketplace: jest.fn(),
+      marketplacePackage: jest.fn(),
     };
     controller = new PluginController(service as unknown as PluginService, npmService as never);
   });
@@ -45,7 +53,9 @@ describe('PluginController', () => {
   it('returns every discovered plugin enriched with load status', () => {
     const plugins = [frontendPlugin('a'), frontendPlugin('b')];
     jest.spyOn(PluginService, 'getPlugins').mockReturnValue(plugins);
-    expect(controller.getAllPlugins()).toEqual(plugins.map((plugin) => ({ ...plugin, status: 'unknown', error: null })));
+    expect(controller.getAllPlugins()).toEqual(
+      plugins.map((plugin) => ({ ...plugin, status: 'unknown', error: null })),
+    );
   });
 
   describe('getFrontendPluginFile', () => {
@@ -88,7 +98,10 @@ describe('PluginController', () => {
     });
 
     it('throws when the plugin has no frontend entry', () => {
-      const plugin = { ...frontendPlugin('backend-only'), main: { backend: { directory: 'backend', entryPoint: 'index.js' } } };
+      const plugin = {
+        ...frontendPlugin('backend-only'),
+        main: { backend: { directory: 'backend', entryPoint: 'index.js' } },
+      };
       jest.spyOn(PluginService, 'getPlugins').mockReturnValue([plugin as LoadedPluginManifest]);
       expect(() => controller.getFrontendPluginFile('backend-only', 'index.js')).toThrow(NotFoundException);
     });
@@ -109,6 +122,16 @@ describe('PluginController', () => {
   it('delegates non-npm plugin deletion to the plugin service', async () => {
     await controller.deletePlugin('plugin-id');
     expect(service.deletePlugin).toHaveBeenCalledWith('plugin-id');
+  });
+
+  it('delegates marketplace search with an optional registry', () => {
+    controller.searchMarketplace('shelly', 'private');
+    expect(npmService.searchMarketplace).toHaveBeenCalledWith('shelly', 'private');
+  });
+
+  it('delegates direct marketplace lookup with its selected registry', () => {
+    controller.marketplacePackage('@private/plugin', 'private');
+    expect(npmService.marketplacePackage).toHaveBeenCalledWith('@private/plugin', 'private');
   });
 
   it('uses the data-preserving npm removal flow for an installed npm package', async () => {
@@ -134,7 +157,9 @@ describe('PluginController', () => {
   it('deletes an uploaded plugin when it shares a manifest name with an npm package', async () => {
     const plugin = { ...frontendPlugin('@attraccess/plugin'), pluginDirectory: 'uploaded-plugin' };
     jest.spyOn(PluginService, 'getPlugins').mockReturnValue([plugin]);
-    npmService.listInstalled.mockReturnValue([{ name: '@attraccess/plugin', installPath: 'npm-QGF0dHJhY2Nlc3MvcGx1Z2lu' }]);
+    npmService.listInstalled.mockReturnValue([
+      { name: '@attraccess/plugin', installPath: 'npm-QGF0dHJhY2Nlc3MvcGx1Z2lu' },
+    ]);
 
     await controller.deletePlugin(plugin.id);
 

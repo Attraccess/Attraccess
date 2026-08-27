@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
   ResourceFlowNode,
   ResourceFlowEdge,
@@ -92,6 +92,31 @@ export class ResourceFlowsService {
     ]);
 
     return { nodes, edges };
+  }
+
+  async resolveNodeSchema(
+    resourceId: number,
+    nodeType: string,
+    config: Record<string, unknown>,
+  ): Promise<ResourceFlowNodeSchemaDto> {
+    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    if (!resource) {
+      throw new ResourceNotFoundException(resourceId);
+    }
+
+    const definition = getPluginFlowNode(nodeType);
+    if (!definition) {
+      throw new NotFoundException(`Plugin flow node type "${nodeType}" was not found.`);
+    }
+
+    const configSchema = definition.resolveConfigSchema
+      ? await definition.resolveConfigSchema(config)
+      : definition.configSchema;
+    if (!configSchema) {
+      throw new Error(`Plugin flow node type "${nodeType}" does not provide a configuration schema.`);
+    }
+
+    return this.pluginNodeSchema(definition, configSchema);
   }
 
   private validateNodeData(nodeData: { id: string; type: string; data: unknown }): ValidationError[] {
@@ -291,6 +316,22 @@ export class ResourceFlowsService {
     return await this.flowNodeRepository.find({
       where: { resourceId, type },
     });
+  }
+
+  public async getNodesForResources(
+    resourceIds: number[],
+    type: ResourceFlowNodeType,
+  ): Promise<Map<number, ResourceFlowNode[]>> {
+    const map = new Map<number, ResourceFlowNode[]>(resourceIds.map((id) => [id, []]));
+    if (resourceIds.length === 0) return map;
+    const nodes = await this.flowNodeRepository.find({
+      where: { resourceId: In(resourceIds), type },
+    });
+    for (const node of nodes) {
+      const bucket = map.get(node.resourceId);
+      if (bucket) bucket.push(node);
+    }
+    return map;
   }
 
   public async getNodeSchemas(resourceId: number): Promise<ResourceFlowNodeSchemaDto[]> {
@@ -505,17 +546,31 @@ export class ResourceFlowsService {
     });
 
     // Append plugin-contributed node schemas.
-    const pluginSchemas: ResourceFlowNodeSchemaDto[] = getRegisteredPluginFlowNodes().map((def) => ({
-      type: def.type,
-      label: def.label,
-      description: def.description,
-      configSchema: def.configSchema,
-      inputs: def.inputs,
-      outputs: def.outputs,
-      supportedByResource: def.supportedByAllResources !== false,
-      isOutput: def.isOutput ?? false,
-    }));
+    const pluginSchemas = getRegisteredPluginFlowNodes().map((definition) => {
+      const configSchema = definition.configSchema ??
+        (definition.resolveConfigSchema ? { dynamic: true, properties: {} } : undefined);
+        if (!configSchema) {
+          throw new Error(`Plugin flow node type "${definition.type}" does not provide a configuration schema.`);
+        }
+        return this.pluginNodeSchema(definition, configSchema);
+    });
 
     return [...coreSchemas, ...pluginSchemas];
+  }
+
+  private pluginNodeSchema(
+    definition: NonNullable<ReturnType<typeof getPluginFlowNode>>,
+    configSchema: Record<string, unknown>,
+  ): ResourceFlowNodeSchemaDto {
+    return {
+      type: definition.type,
+      label: definition.label,
+      description: definition.description,
+      configSchema,
+      inputs: definition.inputs,
+      outputs: definition.outputs,
+      supportedByResource: definition.supportedByAllResources !== false,
+      isOutput: definition.isOutput ?? false,
+    };
   }
 }

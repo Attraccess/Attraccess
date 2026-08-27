@@ -211,7 +211,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
         await Promise.resolve();
 
         expect(mockResourceListService.sendResourceListToSocket).toHaveBeenCalledWith(mockSocket, {
-          resourceIds: [10],
+          resourceIds: new Set([10]),
         });
       });
     });

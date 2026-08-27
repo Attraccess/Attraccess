@@ -99,7 +99,7 @@ export class AttractapSessionHandler {
     } catch (error) {
       if (error instanceof ResourceInUseError) {
         setTimeout(async () => {
-          await this.resourceListService.sendResourceListToSocket(socket, { resourceIds: [resourceId] });
+          await this.resourceListService.sendResourceListToSocket(socket, { resourceIds: new Set([resourceId]) });
         }, 1000);
         return;
       }
