@@ -3,8 +3,10 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Inject,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -15,6 +17,12 @@ import { CreateRoleDto } from './dtos/create-role.dto';
 import { UpdateRoleDto } from './dtos/update-role.dto';
 import { RoleWithUsageDto } from './dtos/role-with-usage.dto';
 import { UserPermissionsChangedEvent } from './events/user-permissions-changed.event';
+import {
+  AUTHORIZATION_CACHE_INVALIDATION_CHANNEL,
+  authorizationCacheInvalidationSource,
+} from './authorization-cache-invalidation';
+import { VALKEY_CLIENT } from '../../valkey/valkey.module';
+import type { Redis } from 'ioredis';
 
 @Injectable()
 export class RbacService {
@@ -37,10 +45,22 @@ export class RbacService {
     @InjectRepository(RolePermission)
     private readonly rolePermissionRepository: Repository<RolePermission>,
     private readonly eventEmitter: EventEmitter2,
+    @Optional() @Inject(VALKEY_CLIENT) private readonly valkeyClient: Redis | null,
   ) {}
 
-  private permissionsChanged(userId?: number): void {
+  private async permissionsChanged(userId?: number): Promise<void> {
     this.eventEmitter.emit(UserPermissionsChangedEvent.EVENT_NAME, new UserPermissionsChangedEvent(userId));
+    if (!this.valkeyClient) {
+      return;
+    }
+    try {
+      await this.valkeyClient.publish(
+        AUTHORIZATION_CACHE_INVALIDATION_CHANNEL,
+        JSON.stringify({ source: authorizationCacheInvalidationSource, userId }),
+      );
+    } catch (error) {
+      this.logger.error('Failed to publish authorization cache invalidation', error);
+    }
   }
 
   async getEffectivePermissions(userId: number, bypassCache = false): Promise<Set<string>> {
@@ -178,7 +198,7 @@ export class RbacService {
       });
       // a role's permission set changed — every user holding it is affected
       this.permissionsCache.clear();
-      this.permissionsChanged();
+      await this.permissionsChanged();
     } else {
       await this.roleRepository.save({ id: role.id, name: role.name, description: role.description });
     }
@@ -263,7 +283,7 @@ export class RbacService {
       await manager.delete(Role, { id: roleId });
     });
     this.permissionsCache.clear();
-    this.permissionsChanged();
+    await this.permissionsChanged();
   }
 
   async getPermissions(): Promise<Permission[]> {
@@ -320,8 +340,10 @@ export class RbacService {
     const result = await urRepo.save(
       urRepo.create({ userId, roleId: role.id, source: UserRoleSource.MANUAL }),
     );
-    this.permissionsCache.delete(userId);
-    this.permissionsChanged(userId);
+    if (!em) {
+      this.permissionsCache.delete(userId);
+      await this.permissionsChanged(userId);
+    }
     return result;
   }
 
@@ -338,8 +360,10 @@ export class RbacService {
         await urRepo.save(urRepo.create({ userId, roleId: role.id, source: UserRoleSource.MANUAL }));
       }
     }
-    this.permissionsCache.delete(userId);
-    this.permissionsChanged(userId);
+    if (!em) {
+      this.permissionsCache.delete(userId);
+      await this.permissionsChanged(userId);
+    }
   }
 
   async assignRole(userId: number, roleId: number, actorPermissions: Set<string>): Promise<UserRole> {
@@ -376,7 +400,7 @@ export class RbacService {
     });
     const saved = await this.userRoleRepository.save(userRole);
     this.permissionsCache.delete(userId);
-    this.permissionsChanged(userId);
+    await this.permissionsChanged(userId);
     return saved;
   }
 
@@ -417,7 +441,7 @@ export class RbacService {
         }
       });
       this.permissionsCache.delete(userId);
-      this.permissionsChanged(userId);
+      await this.permissionsChanged(userId);
       return;
     }
 
@@ -426,7 +450,7 @@ export class RbacService {
       throw new ConflictException('Role is not manually assigned to this user and cannot be revoked via this endpoint');
     }
     this.permissionsCache.delete(userId);
-    this.permissionsChanged(userId);
+    await this.permissionsChanged(userId);
   }
 
   async syncSsoRoles(
@@ -503,6 +527,6 @@ export class RbacService {
       }
     }
     this.permissionsCache.delete(userId);
-    this.permissionsChanged(userId);
+    await this.permissionsChanged(userId);
   }
 }

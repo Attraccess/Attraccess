@@ -60,6 +60,13 @@ import { AuthenticatedUser, SystemEvent } from '@attraccess/plugins-backend-sdk'
 import { PluginEventsService } from '../../plugin-system/plugin-events.service';
 import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import { UserPermissionsChangedEvent } from '../../users-and-auth/rbac/events/user-permissions-changed.event';
+import {
+  AUTHORIZATION_CACHE_INVALIDATION_CHANNEL,
+  authorizationCacheInvalidationSource,
+  type AuthorizationCacheInvalidationMessage,
+} from '../../users-and-auth/rbac/authorization-cache-invalidation';
+import { VALKEY_CLIENT } from '../../valkey/valkey.module';
+import type { Redis } from 'ioredis';
 
 export interface EndSessionOptions {
   /** Skip persisting required END-action form submissions (used by automated/flow paths). */
@@ -85,10 +92,12 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     string,
     { userId: number; resourceId: number; result: boolean; expiresAt: number }
   >();
+  private readonly accessCacheKeysByUser = new Map<number, Set<string>>();
   private readonly accessCacheInFlight = new Map<string, { generation: number; result: Promise<boolean> }>();
   private readonly ACCESS_CACHE_TTL_MS = 30_000;
   private readonly ACCESS_CACHE_MAX_SIZE = 5_000;
   private cacheCleanupInterval: ReturnType<typeof setInterval> | null = null;
+  private authorizationCacheSubscriber: Redis | null = null;
   private accessCacheGeneration = 0;
 
   private isSqliteDriver(manager: EntityManager | undefined = this.resourceUsageRepository.manager): boolean {
@@ -152,10 +161,35 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     private readonly resourceHealthService: ResourceHealthService,
     private readonly pluginEvents: PluginEventsService,
     private readonly rbacService: RbacService,
+    @Inject(VALKEY_CLIENT) private readonly valkeyClient: Redis | null,
   ) {}
 
-  onModuleInit(): void {
+  async onModuleInit(): Promise<void> {
     this.cacheCleanupInterval = setInterval(() => this.pruneAccessCache(), 60_000);
+    if (!this.valkeyClient) {
+      return;
+    }
+    this.authorizationCacheSubscriber = this.valkeyClient.duplicate();
+    this.authorizationCacheSubscriber.on('message', (channel, message) => {
+      if (channel !== AUTHORIZATION_CACHE_INVALIDATION_CHANNEL) {
+        return;
+      }
+      try {
+        const event = JSON.parse(message) as AuthorizationCacheInvalidationMessage;
+        if (event.source !== authorizationCacheInvalidationSource) {
+          this.eventEmitter.emit(UserPermissionsChangedEvent.EVENT_NAME, new UserPermissionsChangedEvent(event.userId));
+        }
+      } catch (error) {
+        this.logger.warn('Ignoring invalid authorization cache invalidation message', error);
+      }
+    });
+    try {
+      await this.authorizationCacheSubscriber.subscribe(AUTHORIZATION_CACHE_INVALIDATION_CHANNEL);
+    } catch (error) {
+      this.logger.error('Failed to subscribe to authorization cache invalidations', error);
+      this.authorizationCacheSubscriber.disconnect();
+      this.authorizationCacheSubscriber = null;
+    }
   }
 
   onModuleDestroy(): void {
@@ -163,6 +197,28 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       clearInterval(this.cacheCleanupInterval);
       this.cacheCleanupInterval = null;
     }
+    this.authorizationCacheSubscriber?.disconnect();
+    this.authorizationCacheSubscriber = null;
+  }
+
+  private deleteAccessCacheEntry(key: string): void {
+    const entry = this.accessCache.get(key);
+    if (!entry) {
+      return;
+    }
+    this.accessCache.delete(key);
+    const keys = this.accessCacheKeysByUser.get(entry.userId);
+    keys?.delete(key);
+    if (keys?.size === 0) {
+      this.accessCacheKeysByUser.delete(entry.userId);
+    }
+  }
+
+  private setAccessCacheEntry(key: string, entry: { userId: number; resourceId: number; result: boolean; expiresAt: number }): void {
+    this.accessCache.set(key, entry);
+    const keys = this.accessCacheKeysByUser.get(entry.userId) ?? new Set<string>();
+    keys.add(key);
+    this.accessCacheKeysByUser.set(entry.userId, keys);
   }
 
   private pruneAccessCache(): void {
@@ -170,7 +226,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     let changed = false;
     for (const [key, entry] of this.accessCache) {
       if (entry.expiresAt <= now) {
-        this.accessCache.delete(key);
+        this.deleteAccessCacheEntry(key);
         changed = true;
       }
     }
@@ -189,6 +245,15 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       }
     } else {
       this.accessCache.clear();
+      this.accessCacheKeysByUser.clear();
+    }
+    this.metricsService.authorizationCacheSize.set(this.accessCache.size);
+  }
+
+  private invalidateUserAccessCache(userId: number): void {
+    this.accessCacheGeneration += 1;
+    for (const key of this.accessCacheKeysByUser.get(userId) ?? []) {
+      this.deleteAccessCacheEntry(key);
     }
     this.metricsService.authorizationCacheSize.set(this.accessCache.size);
   }
@@ -219,7 +284,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
         this.pruneAccessCache();
       }
       if (this.accessCache.size < this.ACCESS_CACHE_MAX_SIZE) {
-        this.accessCache.set(key, { userId: user.id, resourceId, result, expiresAt });
+        this.setAccessCacheEntry(key, { userId: user.id, resourceId, result, expiresAt });
         this.metricsService.authorizationCacheSize.set(this.accessCache.size);
       }
     }
@@ -258,7 +323,11 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
 
   @OnEvent(UserPermissionsChangedEvent.EVENT_NAME)
   handleUserPermissionsChanged(event: UserPermissionsChangedEvent): void {
-    this.invalidateAccessCache(event.userId === undefined ? undefined : (entry) => entry.userId === event.userId);
+    if (event.userId === undefined) {
+      this.invalidateAccessCache();
+      return;
+    }
+    this.invalidateUserAccessCache(event.userId);
   }
 
   private emitSystemUsageEvent(
@@ -293,7 +362,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       return cached.result;
     }
     if (cached) {
-      this.accessCache.delete(key);
+      this.deleteAccessCacheEntry(key);
     }
 
     this.metricsService.authorizationCacheRequestsTotal.inc({ result: 'miss' });

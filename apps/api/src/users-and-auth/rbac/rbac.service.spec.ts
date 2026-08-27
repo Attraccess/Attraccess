@@ -554,6 +554,18 @@ describe('RbacService', () => {
 
       expect(userRoleRepo.save).not.toHaveBeenCalled();
     });
+
+    it('does not invalidate before a caller-owned transaction commits', async () => {
+      roleRepo.find.mockResolvedValue([makeRole({ id: 1, key: 'basic', isDefault: true })]);
+      userRoleRepo.findOne.mockResolvedValue(null);
+      const manager = {
+        getRepository: jest.fn((entity) => (entity === Role ? roleRepo : userRoleRepo)),
+      };
+
+      await service.assignDefaultRoles(10, manager as any);
+
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
+    });
   });
 
   // ───────────────────────── role CRUD (ATT-728) ─────────────────────────────

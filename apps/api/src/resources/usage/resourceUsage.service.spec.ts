@@ -44,6 +44,7 @@ import { MetricsService } from '../../metrics/metrics.service';
 import { PluginEventsService } from '../../plugin-system/plugin-events.service';
 import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import { UserPermissionsChangedEvent } from '../../users-and-auth/rbac/events/user-permissions-changed.event';
+import { VALKEY_CLIENT } from '../../valkey/valkey.module';
 
 const mockRbacService = {
   getEffectivePermissions: jest.fn().mockResolvedValue(new Set<string>()),
@@ -244,6 +245,10 @@ describe('ResourceUsageService', () => {
         {
           provide: EventEmitter2,
           useValue: mockEventEmitter,
+        },
+        {
+          provide: VALKEY_CLIENT,
+          useValue: null,
         },
         {
           provide: BillingService,
@@ -1976,6 +1981,19 @@ describe('ResourceUsageService', () => {
 
       await expect(service.canControllResource(resourceId, mockUser)).resolves.toBe(false);
       expect(mockRbacService.getEffectivePermissions).toHaveBeenCalledTimes(2);
+    });
+
+    it('evicts only the changed user without scanning other authorization entries', async () => {
+      const otherUser: User = { id: 2, systemPermissions: { canManageResources: false } } as User;
+      await service.canControllResource(resourceId, mockUser);
+      await service.canControllResource(resourceId, otherUser);
+
+      service.handleUserPermissionsChanged(new UserPermissionsChangedEvent(mockUser.id));
+
+      // @ts-expect-error access private field for testing
+      expect(service.accessCacheKeysByUser.has(mockUser.id)).toBe(false);
+      // @ts-expect-error access private field for testing
+      expect(service.accessCacheKeysByUser.has(otherUser.id)).toBe(true);
     });
 
     it('does not share privileged results with a restricted principal', async () => {
