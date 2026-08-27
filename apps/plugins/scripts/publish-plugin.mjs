@@ -7,8 +7,11 @@ const distDir = process.argv[3];
 if (!packageDir || !distDir) throw new Error('usage: publish-plugin.mjs <package-dir> <dist-dir>');
 
 const pkg = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8'));
-const archive = readdirSync(distDir).find((file) => file.endsWith('.tgz'));
-if (!archive) throw new Error(`No npm tarball found in ${distDir}`);
+const archives = readdirSync(distDir).filter((file) => file.endsWith('.tgz'));
+if (archives.length !== 1) {
+  throw new Error(`Expected exactly one npm tarball in ${distDir}, found ${archives.length}`);
+}
+const [archive] = archives;
 
 try {
   execFileSync('npm', ['view', `${pkg.name}@${pkg.version}`, 'version'], { stdio: 'ignore' });

@@ -75,7 +75,7 @@
       "outputs": ["{projectRoot}/dist"],
       "options": {
         "cwd": "apps/plugins/shelly",
-        "command": "mkdir -p dist && (cd package && npm pack --pack-destination ../dist)"
+        "command": "rm -rf dist && mkdir dist && (cd package && npm pack --pack-destination ../dist)"
       }
     },
     "pack-test": {
