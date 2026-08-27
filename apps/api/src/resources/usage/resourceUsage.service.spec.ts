@@ -395,6 +395,7 @@ describe('ResourceUsageService', () => {
 
     it('should roll back the start when an HTTP transport failure is propagated', async () => {
       const dto: StartUsageSessionDto = { notes: 'Test session' };
+      let transactionCommitted = false;
 
       flowExecutorService.runFlow.mockRejectedValueOnce(
         new ExternalEffectFailureError('HTTP dispatch failed', new Error('HTTP dispatch failed'), 'transport-dispatch'),
@@ -434,8 +435,14 @@ describe('ResourceUsageService', () => {
       (transactionalEntityManager.createQueryBuilder as jest.Mock).mockReturnValue(
         mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
       );
+      (resourceUsageRepository.manager.transaction as jest.Mock).mockImplementationOnce(async (callback) => {
+        const result = await callback(transactionalEntityManager);
+        transactionCommitted = true;
+        return result;
+      });
 
       await expect(service.startSession(1, mockUser, dto)).rejects.toThrow('HTTP dispatch failed');
+      expect(transactionCommitted).toBe(false);
       expect(transactionalEntityManager.createQueryBuilder).toHaveBeenCalled();
       expect(mockQueryBuilder.insert).toHaveBeenCalled();
       expect(mockQueryBuilder.into).toHaveBeenCalledWith(ResourceUsage);
@@ -527,6 +534,7 @@ describe('ResourceUsageService', () => {
 
     it('should roll back the takeover when an MQTT controller rejection is propagated', async () => {
       const dto: StartUsageSessionDto = { notes: 'Test session', forceTakeOver: true };
+      let transactionCommitted = false;
 
       flowExecutorService.runFlow.mockRejectedValueOnce(
         new ExternalEffectFailureError(
@@ -586,8 +594,14 @@ describe('ResourceUsageService', () => {
       (transactionalEntityManager.createQueryBuilder as jest.Mock)
         .mockReturnValueOnce(mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>) // For ending session
         .mockReturnValueOnce(mockInsertQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>); // For creating new session
+      (resourceUsageRepository.manager.transaction as jest.Mock).mockImplementationOnce(async (callback) => {
+        const result = await callback(transactionalEntityManager);
+        transactionCommitted = true;
+        return result;
+      });
 
       await expect(service.startSession(1, mockUser, dto)).rejects.toThrow('MQTT controller rejected takeover');
+      expect(transactionCommitted).toBe(false);
       expect(mockUpdateQueryBuilder.update).toHaveBeenCalledWith(ResourceUsage);
       expect(mockUpdateQueryBuilder.set).toHaveBeenCalledWith({
         endTime: expect.any(Date),

@@ -572,8 +572,12 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     );
   });
 
-  it('throws NoUsageSessionError when no active session exists', async () => {
-    const inputNode = createNode({ id: 'in-1', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
+  it.each([
+    ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+    ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+    ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
+  ])('propagates explicit termination failures from the %s lifecycle flow', async (triggerNodeType) => {
+    const inputNode = createNode({ id: 'in-1', type: triggerNodeType });
     const endNode = createNode({
       id: 'end-1',
       type: ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION,
@@ -587,9 +591,11 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     (resourceUsageService.getActiveSession as jest.Mock).mockResolvedValue(null);
 
-    await expect(service.runFlow(1, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {})).rejects.toThrow(
-      'NO_USAGE_SESSION',
-    );
+    await expect(service.runFlow(1, triggerNodeType, {})).rejects.toMatchObject({
+      message: 'NO_USAGE_SESSION',
+      failureKind: 'node-failure',
+      status: 503,
+    });
   });
 
   it('updates resource activity when track-activity node executes and passes payload through', async () => {
