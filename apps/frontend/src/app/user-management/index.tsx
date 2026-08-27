@@ -26,7 +26,11 @@ import {
   DropdownTrigger,
   ListBox,
   SearchField,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   useFilter,
+  useOverlayState,
 } from '@heroui/react';
 import { KeyIcon, PlusIcon, SearchIcon, ShieldCheckIcon, ShieldOffIcon, UserPlusIcon, Users } from 'lucide-react';
 import { TableToolbar } from '../../components/TableToolbar';
@@ -49,6 +53,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SimplePagination } from '../../components/simplePagination';
 import { useRbacCatalogTranslations } from '../../hooks/useRbacCatalogTranslations';
 import { Select } from '../../components/select';
+import { StandardDrawer } from '../../components/standardDrawer';
 
 // Role keys that are considered "default" and not worth showing in the list
 const DEFAULT_ROLE_KEYS = new Set(['user']);
@@ -63,6 +68,80 @@ type MultiValueCondition = 'any' | 'all' | 'none';
 
 const FILTER_KEYS: FilterKey[] = ['role', 'emailVerified', 'ssoProvider'];
 
+function MobileValueFilter({
+  ariaLabel,
+  options,
+  selectedKeys,
+  onSelectionChange,
+  selectionMode,
+  dataCy,
+  doneLabel,
+  selectedCountLabel,
+}: {
+  ariaLabel: string;
+  options: FilterOption[];
+  selectedKeys: string[];
+  onSelectionChange: (keys: string[]) => void;
+  selectionMode: 'single' | 'multiple';
+  dataCy: string;
+  doneLabel: string;
+  selectedCountLabel?: (count: number) => string;
+}) {
+  const { isOpen, open, setOpen } = useOverlayState();
+  const [query, setQuery] = useState('');
+  const filteredOptions = options.filter((option) => option.label.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+  const selectedOptions = options.filter((option) => selectedKeys.includes(option.key));
+  const label = selectedOptions.length
+    ? selectionMode === 'multiple'
+      ? selectedCountLabel?.(selectedOptions.length) ?? ariaLabel
+      : selectedOptions[0].label
+    : ariaLabel;
+
+  return (
+    <>
+      <Button className="w-full justify-between sm:hidden" variant="ghost" onPress={open} data-cy={`${dataCy}-drawer-trigger`}>
+        {label}
+      </Button>
+      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen} contentProps={{ placement: 'bottom' }}>
+        <DrawerHeader>{ariaLabel}</DrawerHeader>
+        <DrawerBody className="flex flex-col gap-3">
+          <SearchField value={query} onChange={setQuery} autoFocus aria-label={ariaLabel}>
+            <SearchField.Group>
+              <SearchField.SearchIcon />
+              <SearchField.Input placeholder={ariaLabel} />
+              <SearchField.ClearButton />
+            </SearchField.Group>
+          </SearchField>
+          <ListBox
+            aria-label={ariaLabel}
+            selectionMode={selectionMode}
+            selectedKeys={selectedKeys}
+            onSelectionChange={(keys) => {
+              const nextKeys = [...keys].map(String);
+              onSelectionChange(nextKeys);
+              if (selectionMode !== 'multiple') setOpen(false);
+            }}
+          >
+            {filteredOptions.map((option) => (
+              <ListBox.Item key={option.key} id={option.key} textValue={option.label}>
+                {option.label}
+                <ListBox.ItemIndicator />
+              </ListBox.Item>
+            ))}
+          </ListBox>
+        </DrawerBody>
+        {selectionMode === 'multiple' ? (
+          <DrawerFooter>
+            <Button className="w-full" variant="primary" onPress={() => setOpen(false)}>
+              {doneLabel}
+            </Button>
+          </DrawerFooter>
+        ) : null}
+      </StandardDrawer>
+    </>
+  );
+}
+
 function MultiValueFilter({
   ariaLabel,
   selectedCountLabel,
@@ -70,6 +149,7 @@ function MultiValueFilter({
   selectedKeys,
   onSelectionChange,
   dataCy,
+  doneLabel,
 }: {
   ariaLabel: string;
   selectedCountLabel: (count: number) => string;
@@ -77,48 +157,63 @@ function MultiValueFilter({
   selectedKeys: string[];
   onSelectionChange: (keys: string[]) => void;
   dataCy: string;
+  doneLabel: string;
 }) {
   const { contains } = useFilter({ sensitivity: 'base' });
   const selectedOptions = options.filter((option) => selectedKeys.includes(option.key));
 
   return (
-    <Autocomplete
-      className="min-w-0"
-      placeholder={ariaLabel}
-      selectionMode="multiple"
-      value={selectedKeys}
-      onChange={(keys) => onSelectionChange([...keys].map(String))}
-      aria-label={
-        selectedOptions.length ? `${ariaLabel}: ${selectedOptions.map((option) => option.label).join(', ')}` : ariaLabel
-      }
-      data-cy={dataCy}
-    >
-      <Autocomplete.Trigger>
-        <Autocomplete.Value>
-          {() => (selectedOptions.length ? selectedCountLabel(selectedOptions.length) : ariaLabel)}
-        </Autocomplete.Value>
-        <Autocomplete.Indicator />
-      </Autocomplete.Trigger>
-      <Autocomplete.Popover>
-        <Autocomplete.Filter filter={contains}>
-          <SearchField autoFocus aria-label={ariaLabel}>
-            <SearchField.Group>
-              <SearchField.SearchIcon />
-              <SearchField.Input placeholder={ariaLabel} />
-              <SearchField.ClearButton />
-            </SearchField.Group>
-          </SearchField>
-          <ListBox aria-label={ariaLabel}>
-            {options.map((option) => (
-              <ListBox.Item key={option.key} id={option.key} textValue={option.label}>
-                {option.label}
-                <ListBox.ItemIndicator />
-              </ListBox.Item>
-            ))}
-          </ListBox>
-        </Autocomplete.Filter>
-      </Autocomplete.Popover>
-    </Autocomplete>
+    <>
+      <div className="hidden sm:block">
+        <Autocomplete
+          className="min-w-0"
+          placeholder={ariaLabel}
+          selectionMode="multiple"
+          value={selectedKeys}
+          onChange={(keys) => onSelectionChange([...keys].map(String))}
+          aria-label={
+            selectedOptions.length ? `${ariaLabel}: ${selectedOptions.map((option) => option.label).join(', ')}` : ariaLabel
+          }
+          data-cy={dataCy}
+        >
+          <Autocomplete.Trigger>
+            <Autocomplete.Value>
+              {() => (selectedOptions.length ? selectedCountLabel(selectedOptions.length) : ariaLabel)}
+            </Autocomplete.Value>
+            <Autocomplete.Indicator />
+          </Autocomplete.Trigger>
+          <Autocomplete.Popover>
+            <Autocomplete.Filter filter={contains}>
+              <SearchField autoFocus aria-label={ariaLabel}>
+                <SearchField.Group>
+                  <SearchField.SearchIcon />
+                  <SearchField.Input placeholder={ariaLabel} />
+                  <SearchField.ClearButton />
+                </SearchField.Group>
+              </SearchField>
+              <ListBox aria-label={ariaLabel}>
+                {options.map((option) => (
+                  <ListBox.Item key={option.key} id={option.key} textValue={option.label}>
+                    {option.label}
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>
+                ))}
+              </ListBox>
+            </Autocomplete.Filter>
+          </Autocomplete.Popover>
+        </Autocomplete>
+      </div>
+      <MobileValueFilter
+        ariaLabel={ariaLabel}
+        options={options}
+        selectedKeys={selectedKeys}
+        onSelectionChange={onSelectionChange}
+        selectionMode="multiple"
+        dataCy={dataCy}
+        doneLabel={doneLabel}
+        selectedCountLabel={selectedCountLabel}
+      />
+    </>
   );
 }
 
@@ -128,50 +223,65 @@ function SingleValueFilter({
   selectedKey,
   onSelectionChange,
   dataCy,
+  doneLabel,
 }: {
   ariaLabel: string;
   options: FilterOption[];
   selectedKey?: string;
   onSelectionChange: (key?: string) => void;
   dataCy: string;
+  doneLabel: string;
 }) {
   const { contains } = useFilter({ sensitivity: 'base' });
 
   return (
-    <Autocomplete
-      className="min-w-28"
-      placeholder={ariaLabel}
-      value={selectedKey}
-      onChange={(key) => onSelectionChange(key ? String(key) : undefined)}
-      aria-label={ariaLabel}
-      data-cy={dataCy}
-    >
-      <Autocomplete.Trigger>
-        <Autocomplete.Value>
-          {() => options.find((option) => option.key === selectedKey)?.label ?? ariaLabel}
-        </Autocomplete.Value>
-        <Autocomplete.Indicator />
-      </Autocomplete.Trigger>
-      <Autocomplete.Popover>
-        <Autocomplete.Filter filter={contains}>
-          <SearchField autoFocus aria-label={ariaLabel}>
-            <SearchField.Group>
-              <SearchField.SearchIcon />
-              <SearchField.Input placeholder={ariaLabel} />
-              <SearchField.ClearButton />
-            </SearchField.Group>
-          </SearchField>
-          <ListBox aria-label={ariaLabel}>
-            {options.map((option) => (
-              <ListBox.Item key={option.key} id={option.key} textValue={option.label}>
-                {option.label}
-                <ListBox.ItemIndicator />
-              </ListBox.Item>
-            ))}
-          </ListBox>
-        </Autocomplete.Filter>
-      </Autocomplete.Popover>
-    </Autocomplete>
+    <>
+      <div className="hidden sm:block">
+        <Autocomplete
+          className="min-w-28"
+          placeholder={ariaLabel}
+          value={selectedKey}
+          onChange={(key) => onSelectionChange(key ? String(key) : undefined)}
+          aria-label={ariaLabel}
+          data-cy={dataCy}
+        >
+          <Autocomplete.Trigger>
+            <Autocomplete.Value>
+              {() => options.find((option) => option.key === selectedKey)?.label ?? ariaLabel}
+            </Autocomplete.Value>
+            <Autocomplete.Indicator />
+          </Autocomplete.Trigger>
+          <Autocomplete.Popover>
+            <Autocomplete.Filter filter={contains}>
+              <SearchField autoFocus aria-label={ariaLabel}>
+                <SearchField.Group>
+                  <SearchField.SearchIcon />
+                  <SearchField.Input placeholder={ariaLabel} />
+                  <SearchField.ClearButton />
+                </SearchField.Group>
+              </SearchField>
+              <ListBox aria-label={ariaLabel}>
+                {options.map((option) => (
+                  <ListBox.Item key={option.key} id={option.key} textValue={option.label}>
+                    {option.label}
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>
+                ))}
+              </ListBox>
+            </Autocomplete.Filter>
+          </Autocomplete.Popover>
+        </Autocomplete>
+      </div>
+      <MobileValueFilter
+        ariaLabel={ariaLabel}
+        options={options}
+        selectedKeys={selectedKey ? [selectedKey] : []}
+        onSelectionChange={(keys) => onSelectionChange(keys[0])}
+        selectionMode="single"
+        dataCy={dataCy}
+        doneLabel={doneLabel}
+      />
+    </>
   );
 }
 
@@ -353,9 +463,6 @@ export const UserManagementPage: React.FC = () => {
   type UserWithAuthDetails = Omit<User, 'authenticationDetails'> & {
     authenticationDetails?: AuthenticationDetailSummary[];
   };
-  // includeRoles is restricted to users.read and the API returns full user records in that case.
-  const users = (searchResult?.data ?? []) as User[];
-
   return (
     <div data-cy="user-management-page">
       <PageHeader
@@ -441,6 +548,7 @@ export const UserManagementPage: React.FC = () => {
                               })
                             }
                             dataCy="user-management-role-filter"
+                            doneLabel={t('filters.done')}
                           />
                         </div>
                       </>
@@ -465,6 +573,7 @@ export const UserManagementPage: React.FC = () => {
                               )
                             }
                             dataCy="user-management-email-verified-filter"
+                            doneLabel={t('filters.done')}
                           />
                         </div>
                       </>
@@ -511,6 +620,7 @@ export const UserManagementPage: React.FC = () => {
                               })
                             }
                             dataCy="user-management-sso-provider-filter"
+                            doneLabel={t('filters.done')}
                           />
                         </div>
                       </>

@@ -27,6 +27,7 @@
   "filters": {
     "label": "User filters",
     "add": "Filter",
+    "done": "Done",
     "remove": "Remove filter",
     "category": "Filter category",
     "selectValues": "Select values",
