@@ -113,7 +113,7 @@ export class UsersAdminController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - includeRoles requires users.read permission.',
+    description: 'Forbidden - user filters and role data require users.read permission.',
   })
   async findMany(
     @Query() query: FindManyUsersQueryDto,
@@ -121,8 +121,19 @@ export class UsersAdminController {
   ): Promise<PaginatedUserSummariesResponseDto | PaginatedUsersResponseDto> {
     const canReadUsers = request.user.effectivePermissions?.has('users.read') ?? false;
 
-    // Role data is sensitive; only expose it to users.read holders.
-    if (query.includeRoles && !canReadUsers) {
+    // User filter criteria and role data are sensitive; only expose them to users.read holders.
+    if (
+      (query.includeRoles ||
+        query.roleId !== undefined ||
+        query.roleIds !== undefined ||
+        query.excludeRoleIds !== undefined ||
+        query.emailVerified !== undefined ||
+        query.ssoProviderIds !== undefined ||
+        query.excludeSsoProviderIds !== undefined ||
+        query.ssoProviderNone !== undefined ||
+        query.hasSsoProvider !== undefined) &&
+      !canReadUsers
+    ) {
       throw new ForbiddenException();
     }
     const result = await this.usersService.findMany({
@@ -130,6 +141,16 @@ export class UsersAdminController {
       limit: query.limit,
       search: query.search,
       ids: query.ids,
+      roleId: query.roleId,
+      roleIds: query.roleIds,
+      excludeRoleIds: query.excludeRoleIds,
+      roleMatch: query.roleMatch,
+      emailVerified: query.emailVerified,
+      ssoProviderIds: query.ssoProviderIds,
+      excludeSsoProviderIds: query.excludeSsoProviderIds,
+      ssoProviderNone: query.ssoProviderNone,
+      hasSsoProvider: query.hasSsoProvider,
+      ssoProviderMatch: query.ssoProviderMatch,
       includeRoles: query.includeRoles,
     });
     this.logger.debug(`Found ${result.total} users total, returning ${result.data.length} users`);

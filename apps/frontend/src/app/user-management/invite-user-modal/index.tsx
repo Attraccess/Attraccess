@@ -128,6 +128,7 @@ export function InviteUserModal(props: Props) {
         onOpenChange={(o) => {
           if (!o) close();
         }}
+        dialogProps={{ 'aria-label': t('title') }}
       >
         <DrawerHeader>
           <h2 className="text-lg font-semibold">{t('title')}</h2>
