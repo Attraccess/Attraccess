@@ -114,7 +114,11 @@ export function ResourceUsageSession({
       if (activeSession.userId === user?.id) {
         return (
           <>
-            <ActiveSessionDisplay resourceId={resourceId} startTime={activeSession.startTime} />
+            <ActiveSessionDisplay
+              resourceId={resourceId}
+              usageId={activeSession.id}
+              startTime={activeSession.startTime}
+            />
             {!canStartSession && <IntroductionRequiredDisplay resourceId={resourceId} />}
           </>
         );

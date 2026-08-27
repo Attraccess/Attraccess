@@ -8,7 +8,7 @@ import { SupervisionMode } from '@attraccess/react-query-client';
 const { canControl, hasPermission, activeSession, loading } = vi.hoisted(() => ({
   canControl: { value: true },
   hasPermission: { value: false },
-  activeSession: { value: null as { userId: number; startTime: string } | null },
+  activeSession: { value: null as { id: number; userId: number; startTime: string } | null },
   loading: { activeSession: false, canControl: false, introducers: false },
 }));
 
@@ -31,7 +31,11 @@ vi.mock('../StartSessionControls', () => ({
 vi.mock('../IntroductionRequiredDisplay', () => ({
   IntroductionRequiredDisplay: () => <div data-testid="introduction-required" />,
 }));
-vi.mock('../ActiveSessionDisplay', () => ({ ActiveSessionDisplay: () => null }));
+vi.mock('../ActiveSessionDisplay', () => ({
+  ActiveSessionDisplay: ({ usageId }: { usageId: number }) => (
+    <div data-testid="active-session" data-usage-id={usageId} />
+  ),
+}));
 vi.mock('../OtherUserSessionDisplay', () => ({
   OtherUserSessionDisplay: () => <div data-testid="other-user-session" />,
 }));
@@ -129,7 +133,7 @@ describe('ResourceUsageSession routing', () => {
 
   it("shows the introduction gate alongside another user's active session when supervision is allowed", () => {
     canControl.value = false;
-    activeSession.value = { userId: 2, startTime: '2026-08-20T10:00:00.000Z' };
+    activeSession.value = { id: 8, userId: 2, startTime: '2026-08-20T10:00:00.000Z' };
 
     renderSession(SupervisionMode.SUPERVISION_ALLOWED);
 
@@ -139,10 +143,11 @@ describe('ResourceUsageSession routing', () => {
 
   it('shows the introduction gate alongside the current user’s active session', () => {
     canControl.value = false;
-    activeSession.value = { userId: 1, startTime: '2026-08-20T10:00:00.000Z' };
+    activeSession.value = { id: 8, userId: 1, startTime: '2026-08-20T10:00:00.000Z' };
 
     renderSession(SupervisionMode.SUPERVISION_ALLOWED);
 
     expect(screen.getByTestId('introduction-required')).toBeInTheDocument();
+    expect(screen.getByTestId('active-session')).toHaveAttribute('data-usage-id', '8');
   });
 });
