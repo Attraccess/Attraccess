@@ -16,12 +16,23 @@
       }
     },
     "test": {
-      "executor": "nx:run-commands",
+      "executor": "@nx/jest:jest",
       "cache": true,
-      "outputs": [],
+      "inputs": ["default", "^production", "{workspaceRoot}/jest.preset.js", { "externalDependencies": ["jest"] }],
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/rabbitmq"],
       "options": {
-        "cwd": "apps/plugins/rabbitmq",
-        "command": "pnpm exec vitest run --passWithNoTests"
+        "jestConfig": "apps/plugins/rabbitmq/jest.config.ts",
+        "passWithNoTests": true
+      }
+    },
+    "e2e": {
+      "executor": "@nx/jest:jest",
+      "cache": false,
+      "inputs": ["default", "^production", "{workspaceRoot}/jest.preset.js", { "externalDependencies": ["jest", "testcontainers", "mqtt"] }],
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/rabbitmq-e2e"],
+      "options": {
+        "jestConfig": "apps/plugins/rabbitmq/jest.e2e.config.ts",
+        "passWithNoTests": true
       }
     },
     "build-backend": {

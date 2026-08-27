@@ -10,6 +10,7 @@ export * from './mqtt-wait-for-message.executor';
 export * from './error.executor';
 export * from './end-usage-session.executor';
 export * from './activity-track.executor';
+export * from './operating-transition.executor';
 export * from './billing-set-additional-items.executor';
 export * from './health-heartbeat.executor';
 export * from './health-set.executor';

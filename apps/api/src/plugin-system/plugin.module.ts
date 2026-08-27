@@ -12,6 +12,8 @@ import {
   SystemEventPayload,
   SystemEventSubscription,
   MQTT_SERVER_HOST_PROVIDER,
+  MQTT_CREDENTIAL_PROVISIONING_HOST_PROVIDER,
+  MqttCredentialProvisioningHostProvider,
   MqttServerConnectionConfig,
   MqttServerHostProvider,
   EntityTarget,
@@ -30,6 +32,7 @@ import { loadPluginEntryExports } from './plugin-loader';
 import { registerPluginFlowNodes } from './plugin-flow-node-registry';
 import { PluginMqttService } from './plugin-mqtt.service';
 import { MqttModule } from '../mqtt/mqtt.module';
+import { MqttCredentialProvisioningService } from '../mqtt/mqtt-credential-provisioning.service';
 import { join } from 'path';
 
 @Global()
@@ -56,7 +59,6 @@ export class PluginModule {
     PluginModule.DISABLE_PLUGINS_FLAG = config.DISABLE_PLUGINS;
     PluginModule.logger.log(`PluginModule configured. DisablePlugins: ${PluginModule.DISABLE_PLUGINS_FLAG}`);
   }
-
 
   public static forRoot(): DynamicModule {
     if (PluginModule.DISABLE_PLUGINS_FLAG) {
@@ -105,7 +107,7 @@ export class PluginModule {
     this.logger.log(`Loading plugin ${manifest.name} from ${manifest.main.backend.directory}`);
 
     const importedModule = loadPluginEntryExports(
-      join(PluginService.PLUGIN_PATH, manifest.main.backend.directory, manifest.main.backend.entryPoint)
+      join(PluginService.PLUGIN_PATH, manifest.main.backend.directory, manifest.main.backend.entryPoint),
     );
 
     this.logger.log(`Imported module: ${manifest.name}`);
@@ -127,13 +129,18 @@ export class PluginModule {
 
     if (typeof (exported as PluginBackendModule)?.register !== 'function') {
       this.logger.warn(
-        `Plugin ${manifest.name} does not export a register(context) factory; loading its default export as a static module.`
+        `Plugin ${manifest.name} does not export a register(context) factory; loading its default export as a static module.`,
       );
       return exported as DynamicModule;
     }
 
     const context = PluginModule.createPluginContext(manifest);
     const pluginModule = (exported as PluginBackendModule).register(context);
+    const credentialProvider = (exported as PluginBackendModule).credentialProvisioningProvider;
+    if (credentialProvider) {
+      MqttCredentialProvisioningService.register(credentialProvider(context));
+      this.logger.log(`Registered MQTT credential provider from plugin ${manifest.name}.`);
+    }
     return {
       ...pluginModule,
       providers: [
@@ -163,7 +170,7 @@ export class PluginModule {
    */
   private static registerPluginEntities(
     manifest: LoadedPluginManifest,
-    entities: PluginEntityClass[] | undefined
+    entities: PluginEntityClass[] | undefined,
   ): void {
     if (!entities || entities.length === 0) {
       return;
@@ -172,7 +179,7 @@ export class PluginModule {
     if (!(manifest.permissions ?? []).includes(PluginPermission.DATABASE_ACCESS)) {
       this.logger.warn(
         `Plugin ${manifest.name} declares ${entities.length} entit(y/ies) but lacks the DATABASE_ACCESS ` +
-          `permission; skipping entity registration (getRepository would be denied anyway).`
+          `permission; skipping entity registration (getRepository would be denied anyway).`,
       );
       return;
     }
@@ -207,7 +214,10 @@ export class PluginModule {
         return PluginModule.requireRef(PluginModule.eventsRef, 'EventEmitter2');
       },
       get dataSource(): PluginContext['dataSource'] {
-        return PluginModule.requireRef(PluginModule.dataSourceRef, 'DataSource') as unknown as PluginContext['dataSource'];
+        return PluginModule.requireRef(
+          PluginModule.dataSourceRef,
+          'DataSource',
+        ) as unknown as PluginContext['dataSource'];
       },
       getRepository<T extends ObjectLiteral>(entity: EntityTarget<T>): Repository<T> {
         return PluginModule.requireRef(PluginModule.dataSourceRef, 'DataSource').getRepository(
@@ -226,9 +236,15 @@ export class PluginModule {
       getMqttServerConfig(serverId: number): Promise<MqttServerConnectionConfig | null> {
         const provider = PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get<MqttServerHostProvider>(
           MQTT_SERVER_HOST_PROVIDER,
-          { strict: false }
+          { strict: false },
         );
         return provider.getServerConfig(serverId);
+      },
+      getMqttCredentialProvisioning(): MqttCredentialProvisioningHostProvider {
+        return PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get<MqttCredentialProvisioningHostProvider>(
+          MQTT_CREDENTIAL_PROVISIONING_HOST_PROVIDER,
+          { strict: false },
+        );
       },
     };
 
