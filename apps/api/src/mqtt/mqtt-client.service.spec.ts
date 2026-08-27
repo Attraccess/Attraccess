@@ -398,6 +398,18 @@ describe('MqttClientService', () => {
         (service as unknown as MqttClientServicePrivate).subscriptions.get(1)?.get('sensors/+')?.effectiveQos,
       ).toBe(2);
     });
+
+    it('rejects acknowledgement-required subscriptions when the broker rejects them', async () => {
+      const mockClient = mqtt.connect({});
+      mockClient.subscribe = jest.fn(
+        (_topic: string, _options: mqtt.IClientSubscribeOptions, callback?: (error?: Error) => void) => {
+          callback?.(new Error('Subscribe error'));
+        },
+      );
+      jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient').mockResolvedValue(mockClient);
+
+      await expect(service.subscribe(1, 'sensors/+', undefined, true)).rejects.toThrow('Subscribe error');
+    });
   });
 
   describe('onModuleDestroy', () => {

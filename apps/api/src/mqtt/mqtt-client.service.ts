@@ -287,7 +287,7 @@ export class MqttClientService implements OnModuleDestroy {
     }
   }
 
-  async subscribe(serverId: number, topic: string, qos?: 0 | 1 | 2): Promise<void> {
+  async subscribe(serverId: number, topic: string, qos?: 0 | 1 | 2, requireAcknowledgement = false): Promise<void> {
     // Track desired subscriptions so they can be (re)applied on connect/reconnect
     if (!this.subscriptions.has(serverId)) {
       this.subscriptions.set(serverId, new Map());
@@ -303,7 +303,10 @@ export class MqttClientService implements OnModuleDestroy {
     try {
       await this.reconcileSubscription(serverId, topic, true);
     } catch (error) {
-      // Do not throw: the client will keep trying to connect and will subscribe on next connect
+      if (requireAcknowledgement) {
+        throw error;
+      }
+      // The client will keep trying to connect and will subscribe on next connect.
       this.logger.warn(
         `Will subscribe to topic ${topic} for server ${serverId} once connection is available: ${error?.message ?? error}`,
       );

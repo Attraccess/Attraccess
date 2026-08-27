@@ -36,7 +36,7 @@ describe('PluginMqttService', () => {
 
   it('delivers only matching messages from the requested server', async () => {
     const handler = jest.fn();
-    service.subscribe('plugin-id', 'test-plugin', new Logger('Plugin:test-plugin'), 1, 'sensors/+', handler);
+    await service.subscribe('plugin-id', 'test-plugin', new Logger('Plugin:test-plugin'), 1, 'sensors/+', handler);
 
     events.emit(
       MqttMessageEvent.EVENT_NAME,
@@ -52,14 +52,33 @@ describe('PluginMqttService', () => {
     expect(handler).toHaveBeenCalledWith({ serverId: 1, topic: 'sensors/kitchen', payload: Buffer.from('delivered') });
   });
 
+  it('waits for broker subscription acknowledgement', async () => {
+    let acknowledge!: () => void;
+    mqtt.subscribe.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          acknowledge = resolve;
+        }),
+    );
+
+    const subscription = service.subscribe('plugin-id', 'test-plugin', new Logger('Plugin:test-plugin'), 1, 'events/#', () => undefined);
+    await Promise.resolve();
+
+    expect(mqtt.subscribe).toHaveBeenCalledWith(1, 'events/#', undefined, true);
+    await expect(Promise.race([subscription, Promise.resolve('pending')])).resolves.toBe('pending');
+
+    acknowledge();
+    await expect(subscription).resolves.toEqual({ unsubscribe: expect.any(Function) });
+  });
+
   it('logs a throwing handler and continues delivering to other subscribers', async () => {
     const logger = new Logger('Plugin:broken');
     const logError = jest.spyOn(logger, 'error').mockImplementation();
     const working = jest.fn();
-    service.subscribe('broken', 'broken', logger, 1, 'events/#', () => {
+    await service.subscribe('broken', 'broken', logger, 1, 'events/#', () => {
       throw new Error('broken handler');
     });
-    service.subscribe('working', 'working', new Logger('Plugin:working'), 1, 'events/#', working);
+    await service.subscribe('working', 'working', new Logger('Plugin:working'), 1, 'events/#', working);
 
     events.emit(MqttMessageEvent.EVENT_NAME, new MqttMessageEvent(1, 'events/open', {}, Buffer.from('message')));
     await new Promise(setImmediate);
@@ -71,8 +90,8 @@ describe('PluginMqttService', () => {
   it('gives every subscriber an isolated payload buffer', async () => {
     const mutatingHandler = jest.fn(({ payload }: { payload: Buffer }) => payload.fill(0));
     const receivingHandler = jest.fn();
-    service.subscribe('mutating', 'mutating', new Logger('Plugin:mutating'), 1, 'events/#', mutatingHandler);
-    service.subscribe('receiving', 'receiving', new Logger('Plugin:receiving'), 1, 'events/#', receivingHandler);
+    await service.subscribe('mutating', 'mutating', new Logger('Plugin:mutating'), 1, 'events/#', mutatingHandler);
+    await service.subscribe('receiving', 'receiving', new Logger('Plugin:receiving'), 1, 'events/#', receivingHandler);
 
     events.emit(MqttMessageEvent.EVENT_NAME, new MqttMessageEvent(1, 'events/open', {}, Buffer.from('message')));
     await new Promise(setImmediate);
@@ -94,7 +113,7 @@ describe('PluginMqttService', () => {
           releaseHandler = resolve;
         }),
     );
-    service.subscribe('slow', 'slow', logger, 1, 'events/#', handler);
+    await service.subscribe('slow', 'slow', logger, 1, 'events/#', handler);
 
     for (let index = 0; index < 102; index++) {
       events.emit(MqttMessageEvent.EVENT_NAME, new MqttMessageEvent(1, `events/${index}`, {}, Buffer.from('message')));
@@ -112,7 +131,7 @@ describe('PluginMqttService', () => {
 
   it('does not clone payloads dropped from a full queue', async () => {
     let releaseHandler!: () => void;
-    service.subscribe(
+    await service.subscribe(
       'slow',
       'slow',
       new Logger('Plugin:slow'),
@@ -137,8 +156,8 @@ describe('PluginMqttService', () => {
   });
 
   it('releases every plugin subscription to the shared MQTT client', async () => {
-    const first = service.subscribe('one', 'one', new Logger('Plugin:one'), 1, 'events/#', () => undefined);
-    const second = service.subscribe('two', 'two', new Logger('Plugin:two'), 1, 'events/#', () => undefined);
+    const first = await service.subscribe('one', 'one', new Logger('Plugin:one'), 1, 'events/#', () => undefined);
+    const second = await service.subscribe('two', 'two', new Logger('Plugin:two'), 1, 'events/#', () => undefined);
 
     first.unsubscribe();
     second.unsubscribe();
@@ -149,8 +168,8 @@ describe('PluginMqttService', () => {
   });
 
   it('tears down all subscriptions for a destroyed plugin', async () => {
-    service.subscribe('plugin-id', 'test-plugin', new Logger('Plugin:test-plugin'), 1, 'one', () => undefined);
-    service.subscribe('plugin-id', 'test-plugin', new Logger('Plugin:test-plugin'), 1, 'two', () => undefined);
+    await service.subscribe('plugin-id', 'test-plugin', new Logger('Plugin:test-plugin'), 1, 'one', () => undefined);
+    await service.subscribe('plugin-id', 'test-plugin', new Logger('Plugin:test-plugin'), 1, 'two', () => undefined);
 
     service.clearPlugin('plugin-id');
     await Promise.resolve();

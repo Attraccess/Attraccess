@@ -28,7 +28,7 @@ function buildBaseContext(events: EventEmitter2): PluginContext {
     dataSource,
     logger: new Logger('test-plugin'),
     mqtt: {
-      subscribe: () => ({ unsubscribe: () => undefined }),
+      subscribe: () => Promise.resolve({ unsubscribe: () => undefined }),
       publish: () => Promise.resolve(),
     },
     getRepository: (entity) => ({ entity } as never),
@@ -242,7 +242,9 @@ describe('PluginSandboxService', () => {
       expect(() => denied.mqtt.publish(1, 'sensors/kitchen', 'on')).toThrow(PluginPermissionError);
 
       const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [PluginPermission.ACCESS_MQTT_SERVERS]);
-      expect(() => granted.mqtt.subscribe(1, 'sensors/+', () => undefined)).not.toThrow();
+      await expect(granted.mqtt.subscribe(1, 'sensors/+', () => undefined)).resolves.toEqual({
+        unsubscribe: expect.any(Function),
+      });
       await expect(granted.mqtt.publish(1, 'sensors/kitchen', 'on')).resolves.toBeUndefined();
     });
   });

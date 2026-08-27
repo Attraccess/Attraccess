@@ -162,7 +162,7 @@ export default plugin;
 | `context.events`                                          | The raw shared event bus (restricted surface).                                 | per-method               |
 | `context.get(token)`                                      | Resolve an arbitrary host provider by token.                                   | `RESOLVE_HOST_PROVIDERS` |
 | `context.getMqttServerConfig(serverId)`                   | Resolve an MQTT server's connection config + resolved (decrypted) credentials. | `ACCESS_MQTT_SERVERS`    |
-| `context.mqtt.subscribe(serverId, topicFilter, handler)`  | Subscribe through the host's shared MQTT connection.                           | `ACCESS_MQTT_SERVERS`    |
+| `context.mqtt.subscribe(serverId, topicFilter, handler)`  | Subscribe through the host's shared MQTT connection; resolves after broker acknowledgement. | `ACCESS_MQTT_SERVERS`    |
 | `context.mqtt.publish(serverId, topic, payload, options)` | Publish through the host's shared MQTT connection.                             | `ACCESS_MQTT_SERVERS`    |
 
 > [!IMPORTANT]
@@ -198,7 +198,7 @@ support MQTT `+` and `#` wildcards. The handler receives the raw payload as a
 subscription.
 
 ```ts
-const subscription = context.mqtt.subscribe(1, 'devices/+/state', ({ topic, payload }) => {
+const subscription = await context.mqtt.subscribe(1, 'devices/+/state', ({ topic, payload }) => {
   context.logger.log(`${topic}: ${payload.toString()}`);
 });
 

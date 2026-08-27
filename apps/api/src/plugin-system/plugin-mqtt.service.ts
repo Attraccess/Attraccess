@@ -49,14 +49,14 @@ export class PluginMqttService {
     events.on(MqttMessageEvent.EVENT_NAME, (event: MqttMessageEvent) => this.deliver(event));
   }
 
-  subscribe(
+  async subscribe(
     pluginId: string,
     pluginName: string,
     logger: LoggerService,
     serverId: number,
     topicFilter: string,
     handler: Subscription['handler'],
-  ): PluginMqttSubscription {
+  ): Promise<PluginMqttSubscription> {
     const subscription = {
       pluginId,
       pluginName,
@@ -69,7 +69,15 @@ export class PluginMqttService {
       overflowLogged: false,
     };
     this.subscriptions.add(subscription);
-    void this.mqtt.subscribe(serverId, topicFilter);
+    try {
+      await this.mqtt.subscribe(serverId, topicFilter, undefined, true);
+    } catch (error) {
+      this.subscriptions.delete(subscription);
+      await this.mqtt.unsubscribe(serverId, topicFilter).catch((unsubscribeError) => {
+        logger.error(`Failed to unsubscribe from MQTT topic "${topicFilter}"`, (unsubscribeError as Error).stack);
+      });
+      throw error;
+    }
 
     return { unsubscribe: () => this.unsubscribe(subscription) };
   }
