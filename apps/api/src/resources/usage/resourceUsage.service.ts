@@ -59,6 +59,7 @@ import { MetricsService } from '../../metrics/metrics.service';
 import { AuthenticatedUser, SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { PluginEventsService } from '../../plugin-system/plugin-events.service';
 import { RbacService } from '../../users-and-auth/rbac/rbac.service';
+import { UserPermissionsChangedEvent } from '../../users-and-auth/rbac/events/user-permissions-changed.event';
 
 export interface EndSessionOptions {
   /** Skip persisting required END-action form submissions (used by automated/flow paths). */
@@ -253,6 +254,11 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
   @OnEvent(ResourceChangedEvent.EVENT_NAME)
   handleResourceChanged(event: ResourceChangedEvent): void {
     this.invalidateAccessCache((entry) => entry.resourceId === event.resourceId);
+  }
+
+  @OnEvent(UserPermissionsChangedEvent.EVENT_NAME)
+  handleUserPermissionsChanged(event: UserPermissionsChangedEvent): void {
+    this.invalidateAccessCache(event.userId === undefined ? undefined : (entry) => entry.userId === event.userId);
   }
 
   private emitSystemUsageEvent(

@@ -3,10 +3,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { QueryFailedError, Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { BadRequestException } from '@nestjs/common';
 import { Permission, Role, RolePermission, User, UserRole, UserRoleSource } from '@attraccess/database-entities';
 import { RbacService } from './rbac.service';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
+import { UserPermissionsChangedEvent } from './events/user-permissions-changed.event';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -63,6 +65,7 @@ describe('RbacService', () => {
   let permissionRepo: jest.Mocked<Repository<Permission>>;
   let userRepo: jest.Mocked<Repository<User>>;
   let rolePermissionRepo: jest.Mocked<Repository<RolePermission>>;
+  let eventEmitter: { emit: jest.Mock };
   let roleManager: {
     save: jest.Mock;
     delete: jest.Mock;
@@ -127,6 +130,7 @@ describe('RbacService', () => {
       save: jest.fn(),
       create: jest.fn((data) => ({ ...data } as RolePermission)),
     } as unknown as jest.Mocked<Repository<RolePermission>>;
+    eventEmitter = { emit: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -136,6 +140,7 @@ describe('RbacService', () => {
         { provide: getRepositoryToken(Permission), useValue: permissionRepo },
         { provide: getRepositoryToken(User), useValue: userRepo },
         { provide: getRepositoryToken(RolePermission), useValue: rolePermissionRepo },
+        { provide: EventEmitter2, useValue: eventEmitter },
       ],
     }).compile();
 
@@ -327,6 +332,10 @@ describe('RbacService', () => {
 
       await expect(service.revokeRole(10, 1, new Set(['resources.read']))).resolves.toBeUndefined();
       expect(userRoleRepo.delete).toHaveBeenCalled();
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        UserPermissionsChangedEvent.EVENT_NAME,
+        new UserPermissionsChangedEvent(10),
+      );
     });
 
     it('allows revoking administrator role when multiple administrators exist', async () => {

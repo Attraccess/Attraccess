@@ -7,12 +7,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EntityManager, In, QueryFailedError, Repository } from 'typeorm';
 import { Permission, Role, RolePermission, User, UserRole, UserRoleSource } from '@attraccess/database-entities';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { CreateRoleDto } from './dtos/create-role.dto';
 import { UpdateRoleDto } from './dtos/update-role.dto';
 import { RoleWithUsageDto } from './dtos/role-with-usage.dto';
+import { UserPermissionsChangedEvent } from './events/user-permissions-changed.event';
 
 @Injectable()
 export class RbacService {
@@ -34,7 +36,12 @@ export class RbacService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(RolePermission)
     private readonly rolePermissionRepository: Repository<RolePermission>,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
+
+  private permissionsChanged(userId?: number): void {
+    this.eventEmitter.emit(UserPermissionsChangedEvent.EVENT_NAME, new UserPermissionsChangedEvent(userId));
+  }
 
   async getEffectivePermissions(userId: number, bypassCache = false): Promise<Set<string>> {
     const entry = this.permissionsCache.get(userId);
@@ -171,6 +178,7 @@ export class RbacService {
       });
       // a role's permission set changed — every user holding it is affected
       this.permissionsCache.clear();
+      this.permissionsChanged();
     } else {
       await this.roleRepository.save({ id: role.id, name: role.name, description: role.description });
     }
@@ -255,6 +263,7 @@ export class RbacService {
       await manager.delete(Role, { id: roleId });
     });
     this.permissionsCache.clear();
+    this.permissionsChanged();
   }
 
   async getPermissions(): Promise<Permission[]> {
@@ -312,6 +321,7 @@ export class RbacService {
       urRepo.create({ userId, roleId: role.id, source: UserRoleSource.MANUAL }),
     );
     this.permissionsCache.delete(userId);
+    this.permissionsChanged(userId);
     return result;
   }
 
@@ -329,6 +339,7 @@ export class RbacService {
       }
     }
     this.permissionsCache.delete(userId);
+    this.permissionsChanged(userId);
   }
 
   async assignRole(userId: number, roleId: number, actorPermissions: Set<string>): Promise<UserRole> {
@@ -365,6 +376,7 @@ export class RbacService {
     });
     const saved = await this.userRoleRepository.save(userRole);
     this.permissionsCache.delete(userId);
+    this.permissionsChanged(userId);
     return saved;
   }
 
@@ -405,6 +417,7 @@ export class RbacService {
         }
       });
       this.permissionsCache.delete(userId);
+      this.permissionsChanged(userId);
       return;
     }
 
@@ -413,6 +426,7 @@ export class RbacService {
       throw new ConflictException('Role is not manually assigned to this user and cannot be revoked via this endpoint');
     }
     this.permissionsCache.delete(userId);
+    this.permissionsChanged(userId);
   }
 
   async syncSsoRoles(
@@ -489,5 +503,6 @@ export class RbacService {
       }
     }
     this.permissionsCache.delete(userId);
+    this.permissionsChanged(userId);
   }
 }

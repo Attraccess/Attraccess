@@ -43,6 +43,7 @@ import { ResourceFormsService } from '../forms/forms.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { PluginEventsService } from '../../plugin-system/plugin-events.service';
 import { RbacService } from '../../users-and-auth/rbac/rbac.service';
+import { UserPermissionsChangedEvent } from '../../users-and-auth/rbac/events/user-permissions-changed.event';
 
 const mockRbacService = {
   getEffectivePermissions: jest.fn().mockResolvedValue(new Set<string>()),
@@ -1961,6 +1962,20 @@ describe('ResourceUsageService', () => {
 
       await service.canControllResource(resourceId, mockUser);
       expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
+    });
+
+    it('evicts a plain user authorization grant when their RBAC permissions are revoked', async () => {
+      resourceIntroductionService.hasValidIntroduction.mockResolvedValue(false);
+      mockRbacService.getEffectivePermissions
+        .mockResolvedValueOnce(new Set(['resources.update']))
+        .mockResolvedValueOnce(new Set<string>());
+
+      await expect(service.canControllResource(resourceId, mockUser)).resolves.toBe(true);
+
+      service.handleUserPermissionsChanged(new UserPermissionsChangedEvent(mockUser.id));
+
+      await expect(service.canControllResource(resourceId, mockUser)).resolves.toBe(false);
+      expect(mockRbacService.getEffectivePermissions).toHaveBeenCalledTimes(2);
     });
 
     it('does not share privileged results with a restricted principal', async () => {
