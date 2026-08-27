@@ -4,6 +4,8 @@ import axios from 'axios';
 import z from 'zod';
 import { FlowFailureKind, NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 
+const DEFAULT_DISPATCH_TIMEOUT_MS = 30_000;
+
 export class HttpSendRequestExecutor implements NodeExecutor {
   private readonly logger = new Logger(HttpSendRequestExecutor.name);
 
@@ -16,13 +18,19 @@ export class HttpSendRequestExecutor implements NodeExecutor {
       Object.entries(data.headers ?? {}).map(([key, value]) => [key, ctx.compileTemplate(value, input)]),
     );
     const body = ctx.compileTemplate(data.body ?? '', input);
+    const timeout =
+      data.timeoutSeconds !== undefined
+        ? data.timeoutSeconds * 1000
+        : data.completionBehavior === 'dispatch'
+          ? DEFAULT_DISPATCH_TIMEOUT_MS
+          : undefined;
 
     const request = axios.request({
       url,
       method,
       headers,
       data: body,
-      ...(data.timeoutSeconds ? { timeout: data.timeoutSeconds * 1000 } : {}),
+      ...(timeout !== undefined ? { timeout } : {}),
     });
 
     if (data.completionBehavior === 'dispatch') {

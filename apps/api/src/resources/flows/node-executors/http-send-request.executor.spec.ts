@@ -134,10 +134,26 @@ describe('HttpSendRequestExecutor', () => {
     const input = { requestId: 'abc' };
 
     await expect(
-      executor.execute(makeNode({ url: 'https://example.com', method: 'POST', completionBehavior: 'dispatch' }), input, ctx),
+      executor.execute(
+        makeNode({ url: 'https://example.com', method: 'POST', completionBehavior: 'dispatch' }),
+        input,
+        ctx,
+      ),
     ).resolves.toEqual({ payload: input });
 
     resolveRequest({ data: { ignored: true } });
+  });
+
+  it('uses a finite timeout for dispatch requests without a configured timeout', async () => {
+    (axios.request as jest.Mock).mockResolvedValue({ data: {} });
+
+    await executor.execute(
+      makeNode({ url: 'https://example.com', method: 'POST', completionBehavior: 'dispatch' }),
+      {},
+      ctx,
+    );
+
+    expect(axios.request).toHaveBeenCalledWith(expect.objectContaining({ timeout: 30_000 }));
   });
 
   it('logs asynchronous dispatch failures without failing the continued flow', async () => {
@@ -146,7 +162,11 @@ describe('HttpSendRequestExecutor', () => {
     const logger = jest.spyOn(Logger.prototype, 'error');
 
     await expect(
-      executor.execute(makeNode({ url: 'https://example.com', method: 'POST', completionBehavior: 'dispatch' }), {}, ctx),
+      executor.execute(
+        makeNode({ url: 'https://example.com', method: 'POST', completionBehavior: 'dispatch' }),
+        {},
+        ctx,
+      ),
     ).resolves.toEqual({ payload: {} });
     await Promise.resolve();
 
