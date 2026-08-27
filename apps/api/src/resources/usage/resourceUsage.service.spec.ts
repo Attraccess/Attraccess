@@ -1965,6 +1965,9 @@ describe('ResourceUsageService', () => {
 
       service.handleResourceChanged({ resourceId } as import('../events/resource-changed.event').ResourceChangedEvent);
 
+      // @ts-expect-error access private field for testing
+      expect(service.accessCacheKeysByUser.has(mockUser.id)).toBe(false);
+
       await service.canControllResource(resourceId, mockUser);
       expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
     });

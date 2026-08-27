@@ -240,7 +240,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     if (predicate) {
       for (const [key, entry] of this.accessCache) {
         if (predicate(entry)) {
-          this.accessCache.delete(key);
+          this.deleteAccessCacheEntry(key);
         }
       }
     } else {
