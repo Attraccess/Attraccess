@@ -163,6 +163,20 @@ describe('ResourceListService', () => {
 
       expect(spy).toHaveBeenCalledWith(42, new Set([10, 11, 12]));
     });
+
+    it('sends at the first debounce deadline while events continue arriving', async () => {
+      const socket = createMockSocket({ readerId: 42 });
+      websocketService.sockets.set('socket', socket);
+      const spy = jest.spyOn(service, 'sendResourceList').mockResolvedValue(undefined);
+
+      service.sendResourceListToReadersWithResources([10]);
+      await jest.advanceTimersByTimeAsync(100);
+      service.sendResourceListToReadersWithResources([11]);
+      await jest.advanceTimersByTimeAsync(100);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith(42, new Set([10, 11]));
+    });
   });
 
   describe('sendResourceListToSocket', () => {

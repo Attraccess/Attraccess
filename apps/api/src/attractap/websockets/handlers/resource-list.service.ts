@@ -69,11 +69,11 @@ export class ResourceListService {
   private scheduleSend(readerId: number, resourceIds: number[]): void {
     const pending = this.pendingSends.get(readerId);
     if (pending) {
-      clearTimeout(pending.timer);
       resourceIds.forEach((resourceId) => pending.resourceIds.add(resourceId));
+      return;
     }
 
-    const pendingResourceIds = pending?.resourceIds ?? new Set(resourceIds);
+    const pendingResourceIds = new Set(resourceIds);
     const timer = setTimeout(() => {
       this.pendingSends.delete(readerId);
       this.sendResourceList(readerId, pendingResourceIds).catch((err) => {
