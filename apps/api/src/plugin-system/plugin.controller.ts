@@ -71,6 +71,18 @@ export class PluginController {
     return this.npmPluginService.packageVersions(packageName, registryId);
   }
 
+  @Get('marketplace/search')
+  @Auth('system.plugins.manage')
+  searchMarketplace(@Query('query') query = '', @Query('registryId') registryId?: string) {
+    return this.npmPluginService.searchMarketplace(query, registryId);
+  }
+
+  @Get('marketplace/:packageName')
+  @Auth('system.plugins.manage')
+  marketplacePackage(@Param('packageName') packageName: string, @Query('registryId') registryId?: string) {
+    return this.npmPluginService.marketplacePackage(packageName, registryId);
+  }
+
   @Post('npm/:packageName/versions/:version')
   @Auth('system.plugins.manage')
   installPackage(

@@ -12,6 +12,7 @@ import { PluginSandboxService } from './plugin-sandbox.service';
 import { PluginEventsService } from './plugin-events.service';
 import { PluginController } from './plugin.controller';
 import { NpmPluginService } from './npm-plugin.service';
+import { PluginClassificationService } from './plugin-classification.service';
 import { SettingsModule } from '../settings/settings.module';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { MqttCredentialProvisioningService } from '../mqtt/mqtt-credential-provisioning.service';
@@ -52,7 +53,13 @@ describe('PluginModule', () => {
     it('exposes only the host providers and controller when plugins are disabled', () => {
       PluginModule.configure({ DISABLE_PLUGINS: true });
       const module = PluginModule.forRoot();
-      expect(module.providers).toEqual([PluginService, PluginSandboxService, PluginEventsService, NpmPluginService]);
+      expect(module.providers).toEqual([
+        PluginService,
+        PluginSandboxService,
+        PluginEventsService,
+        NpmPluginService,
+        PluginClassificationService,
+      ]);
       expect(module.exports).toEqual([PluginEventsService]);
       expect(module.controllers).toEqual([PluginController]);
       expect(module.imports).toEqual([SettingsModule]);
