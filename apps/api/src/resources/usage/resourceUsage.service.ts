@@ -6,9 +6,12 @@ import {
   NotFoundException,
   Inject,
   forwardRef,
+  OnModuleInit,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, FindOneOptions, EntityManager } from 'typeorm';
+import { OnEvent } from '@nestjs/event-emitter';
 import {
   FormSubmission,
   Resource,
@@ -39,6 +42,11 @@ import { ResourceIntroductionsService } from '../introductions/resouceIntroducti
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { ResourceGroupsIntroductionsService } from '../groups/introductions/resourceGroups.introductions.service';
 import { ResourceGroupsService } from '../groups/resourceGroups.service';
+import { ResourceIntroductionChangedEvent } from '../introductions/events/resource-introduction-changed.event';
+import { ResourceGroupIntroductionChangedEvent } from '../groups/introductions/events/resource-group-introduction-changed.event';
+import { ResourceIntroducerChangedEvent } from '../introducers/events/resource-introducer-changed.event';
+import { ResourceGroupIntroducerChangedEvent } from '../groups/introducers/events/resource-group-introducer-changed.event';
+import { ResourceChangedEvent } from '../events/resource-changed.event';
 import { ResourceRetrainingService } from '../retraining/resourceRetraining.service';
 import { ResourceMaintenanceService } from '../maintenances/maintenance.service';
 import { BillingService } from '../../billing/billing.service';
@@ -51,6 +59,14 @@ import { MetricsService } from '../../metrics/metrics.service';
 import { AuthenticatedUser, SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { PluginEventsService } from '../../plugin-system/plugin-events.service';
 import { RbacService } from '../../users-and-auth/rbac/rbac.service';
+import { UserPermissionsChangedEvent } from '../../users-and-auth/rbac/events/user-permissions-changed.event';
+import {
+  AUTHORIZATION_CACHE_INVALIDATION_CHANNEL,
+  authorizationCacheInvalidationSource,
+  type AuthorizationCacheInvalidationMessage,
+} from '../../users-and-auth/rbac/authorization-cache-invalidation';
+import { VALKEY_CLIENT } from '../../valkey/valkey.module';
+import type { Redis } from 'ioredis';
 import { ExternalEffectFailureError } from '../flows/errors/external-effect-failure.error';
 
 export interface EndSessionOptions {
@@ -69,9 +85,21 @@ export interface StartSessionOptions {
 }
 
 @Injectable()
-export class ResourceUsageService {
+export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ResourceUsageService.name);
   private sqliteEndSessionChain: Promise<unknown> = Promise.resolve();
+
+  private readonly accessCache = new Map<
+    string,
+    { userId: number; resourceId: number; result: boolean; expiresAt: number }
+  >();
+  private readonly accessCacheKeysByUser = new Map<number, Set<string>>();
+  private readonly accessCacheInFlight = new Map<string, { generation: number; result: Promise<boolean> }>();
+  private readonly ACCESS_CACHE_TTL_MS = 30_000;
+  private readonly ACCESS_CACHE_MAX_SIZE = 5_000;
+  private cacheCleanupInterval: ReturnType<typeof setInterval> | null = null;
+  private authorizationCacheSubscriber: Redis | null = null;
+  private accessCacheGeneration = 0;
 
   private isSqliteDriver(manager: EntityManager | undefined = this.resourceUsageRepository.manager): boolean {
     const type = manager?.connection?.options?.type;
@@ -135,7 +163,174 @@ export class ResourceUsageService {
     private readonly resourceHealthService: ResourceHealthService,
     private readonly pluginEvents: PluginEventsService,
     private readonly rbacService: RbacService,
+    @Inject(VALKEY_CLIENT) private readonly valkeyClient: Redis | null,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    this.cacheCleanupInterval = setInterval(() => this.pruneAccessCache(), 60_000);
+    if (!this.valkeyClient) {
+      return;
+    }
+    this.authorizationCacheSubscriber = this.valkeyClient.duplicate();
+    this.authorizationCacheSubscriber.on('message', (channel, message) => {
+      if (channel !== AUTHORIZATION_CACHE_INVALIDATION_CHANNEL) {
+        return;
+      }
+      try {
+        const event = JSON.parse(message) as AuthorizationCacheInvalidationMessage;
+        if (event.source !== authorizationCacheInvalidationSource) {
+          this.eventEmitter.emit(UserPermissionsChangedEvent.EVENT_NAME, new UserPermissionsChangedEvent(event.userId));
+        }
+      } catch (error) {
+        this.logger.warn('Ignoring invalid authorization cache invalidation message', error);
+      }
+    });
+    try {
+      await this.authorizationCacheSubscriber.subscribe(AUTHORIZATION_CACHE_INVALIDATION_CHANNEL);
+    } catch (error) {
+      this.logger.error('Failed to subscribe to authorization cache invalidations', error);
+      this.authorizationCacheSubscriber.disconnect();
+      this.authorizationCacheSubscriber = null;
+    }
+  }
+
+  onModuleDestroy(): void {
+    if (this.cacheCleanupInterval) {
+      clearInterval(this.cacheCleanupInterval);
+      this.cacheCleanupInterval = null;
+    }
+    this.authorizationCacheSubscriber?.disconnect();
+    this.authorizationCacheSubscriber = null;
+  }
+
+  private deleteAccessCacheEntry(key: string): void {
+    const entry = this.accessCache.get(key);
+    if (!entry) {
+      return;
+    }
+    this.accessCache.delete(key);
+    const keys = this.accessCacheKeysByUser.get(entry.userId);
+    keys?.delete(key);
+    if (keys?.size === 0) {
+      this.accessCacheKeysByUser.delete(entry.userId);
+    }
+  }
+
+  private setAccessCacheEntry(key: string, entry: { userId: number; resourceId: number; result: boolean; expiresAt: number }): void {
+    this.accessCache.set(key, entry);
+    const keys = this.accessCacheKeysByUser.get(entry.userId) ?? new Set<string>();
+    keys.add(key);
+    this.accessCacheKeysByUser.set(entry.userId, keys);
+  }
+
+  private pruneAccessCache(): void {
+    const now = Date.now();
+    let changed = false;
+    for (const [key, entry] of this.accessCache) {
+      if (entry.expiresAt <= now) {
+        this.deleteAccessCacheEntry(key);
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.metricsService.authorizationCacheSize.set(this.accessCache.size);
+    }
+  }
+
+  private invalidateAccessCache(predicate?: (entry: { userId: number; resourceId: number }) => boolean): void {
+    this.accessCacheGeneration += 1;
+    if (predicate) {
+      for (const [key, entry] of this.accessCache) {
+        if (predicate(entry)) {
+          this.deleteAccessCacheEntry(key);
+        }
+      }
+    } else {
+      this.accessCache.clear();
+      this.accessCacheKeysByUser.clear();
+    }
+    this.metricsService.authorizationCacheSize.set(this.accessCache.size);
+  }
+
+  private invalidateUserAccessCache(userId: number): void {
+    this.accessCacheGeneration += 1;
+    for (const key of this.accessCacheKeysByUser.get(userId) ?? []) {
+      this.deleteAccessCacheEntry(key);
+    }
+    this.metricsService.authorizationCacheSize.set(this.accessCache.size);
+  }
+
+  private async resolveAuthorizationCacheMiss(
+    key: string,
+    resourceId: number,
+    user: User,
+    canUpdateResource: boolean,
+    transactionalEntityManager: EntityManager | undefined,
+    generation: number,
+  ): Promise<boolean> {
+    const result = await this.canControllResourceUncached(
+      resourceId,
+      user,
+      canUpdateResource,
+      transactionalEntityManager,
+    );
+    let expiresAt = Date.now() + this.ACCESS_CACHE_TTL_MS;
+    if (result && !canUpdateResource) {
+      const retrainingStatus = await this.resourceRetrainingService.getResourceRetrainingStatus(resourceId, user.id);
+      if (retrainingStatus.dueAt && retrainingStatus.dueAt.getTime() > Date.now()) {
+        expiresAt = Math.min(expiresAt, retrainingStatus.dueAt.getTime());
+      }
+    }
+    if (generation === this.accessCacheGeneration && expiresAt > Date.now()) {
+      if (this.accessCache.size >= this.ACCESS_CACHE_MAX_SIZE) {
+        this.pruneAccessCache();
+      }
+      if (this.accessCache.size < this.ACCESS_CACHE_MAX_SIZE) {
+        this.setAccessCacheEntry(key, { userId: user.id, resourceId, result, expiresAt });
+        this.metricsService.authorizationCacheSize.set(this.accessCache.size);
+      }
+    }
+    return result;
+  }
+
+  @OnEvent(ResourceIntroductionChangedEvent.EVENT_NAME)
+  handleIntroductionChanged(): void {
+    // Cannot cheaply map introductionId → (userId, resourceId) without a DB query, so clear all.
+    this.invalidateAccessCache();
+  }
+
+  @OnEvent(ResourceGroupIntroductionChangedEvent.EVENT_NAME)
+  handleGroupIntroductionChanged(): void {
+    // Cannot cheaply map resourceGroupId → affected (userId, resourceId) pairs, so clear all.
+    this.invalidateAccessCache();
+  }
+
+  @OnEvent(ResourceGroupIntroducerChangedEvent.EVENT_NAME)
+  handleGroupIntroducerChanged(): void {
+    // A group-level role applies to every resource in the group.
+    this.invalidateAccessCache();
+  }
+
+  @OnEvent(ResourceIntroducerChangedEvent.EVENT_NAME)
+  handleIntroducerChanged(event: ResourceIntroducerChangedEvent): void {
+    this.invalidateAccessCache(
+      (entry) => entry.userId === event.introducerUserId && entry.resourceId === event.resourceId,
+    );
+  }
+
+  @OnEvent(ResourceChangedEvent.EVENT_NAME)
+  handleResourceChanged(event: ResourceChangedEvent): void {
+    this.invalidateAccessCache((entry) => entry.resourceId === event.resourceId);
+  }
+
+  @OnEvent(UserPermissionsChangedEvent.EVENT_NAME)
+  handleUserPermissionsChanged(event: UserPermissionsChangedEvent): void {
+    if (event.userId === undefined) {
+      this.invalidateAccessCache();
+      return;
+    }
+    this.invalidateUserAccessCache(event.userId);
+  }
 
   private emitSystemUsageEvent(
     event: SystemEvent.RESOURCE_USAGE_STARTED | SystemEvent.RESOURCE_USAGE_ENDED,
@@ -157,11 +352,58 @@ export class ResourceUsageService {
     user: User,
     transactionalEntityManager?: EntityManager,
   ): Promise<boolean> {
-    // Prefer already-populated effectivePermissions on the request-bound user (set by SessionStrategy)
-    // to avoid a redundant DB query on every resource start/stop.
-    const effectivePermissions =
-      (user as AuthenticatedUser).effectivePermissions ?? (await this.rbacService.getEffectivePermissions(user.id));
-    if (effectivePermissions.has('resources.update')) {
+    const requestPermissions = (user as AuthenticatedUser).effectivePermissions;
+    // API tokens may have a narrower effective permission set than their owning user session.
+    // Keep users without request-scoped permissions separate so their RBAC lookup can be cached too.
+    const key = `${user.id}:${resourceId}:${
+      requestPermissions ? (requestPermissions.has('resources.update') ? 'update' : 'restricted') : 'default'
+    }`;
+    const cached = this.accessCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) {
+      this.metricsService.authorizationCacheRequestsTotal.inc({ result: 'hit' });
+      return cached.result;
+    }
+    if (cached) {
+      this.deleteAccessCacheEntry(key);
+    }
+
+    this.metricsService.authorizationCacheRequestsTotal.inc({ result: 'miss' });
+    const generation = this.accessCacheGeneration;
+    const inFlight = this.accessCacheInFlight.get(key);
+    if (inFlight?.generation === generation) {
+      return inFlight.result;
+    }
+
+    const result = (async () => {
+      const canUpdateResource = (requestPermissions ?? (await this.rbacService.getEffectivePermissions(user.id))).has(
+        'resources.update',
+      );
+      return this.resolveAuthorizationCacheMiss(
+        key,
+        resourceId,
+        user,
+        canUpdateResource,
+        transactionalEntityManager,
+        generation,
+      );
+    })();
+    this.accessCacheInFlight.set(key, { generation, result });
+    try {
+      return await result;
+    } finally {
+      if (this.accessCacheInFlight.get(key)?.result === result) {
+        this.accessCacheInFlight.delete(key);
+      }
+    }
+  }
+
+  private async canControllResourceUncached(
+    resourceId: number,
+    user: User,
+    canUpdateResource: boolean,
+    transactionalEntityManager?: EntityManager,
+  ): Promise<boolean> {
+    if (canUpdateResource) {
       return true;
     }
 
