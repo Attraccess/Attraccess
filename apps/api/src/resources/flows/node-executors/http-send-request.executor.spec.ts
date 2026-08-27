@@ -124,6 +124,35 @@ describe('HttpSendRequestExecutor', () => {
     expect(axios.request).toHaveBeenCalledWith(expect.objectContaining({ timeout: 12000 }));
   });
 
+  it('continues with the input after dispatch without waiting for a response', async () => {
+    let resolveRequest: (value: { data: unknown }) => void = () => undefined;
+    (axios.request as jest.Mock).mockReturnValue(
+      new Promise((resolve) => {
+        resolveRequest = resolve;
+      }),
+    );
+    const input = { requestId: 'abc' };
+
+    await expect(
+      executor.execute(makeNode({ url: 'https://example.com', method: 'POST', completionBehavior: 'dispatch' }), input, ctx),
+    ).resolves.toEqual({ payload: input });
+
+    resolveRequest({ data: { ignored: true } });
+  });
+
+  it('logs asynchronous dispatch failures without failing the continued flow', async () => {
+    const error = new Error('network down');
+    (axios.request as jest.Mock).mockRejectedValue(error);
+    const logger = jest.spyOn(Logger.prototype, 'error');
+
+    await expect(
+      executor.execute(makeNode({ url: 'https://example.com', method: 'POST', completionBehavior: 'dispatch' }), {}, ctx),
+    ).resolves.toEqual({ payload: {} });
+    await Promise.resolve();
+
+    expect(logger).toHaveBeenCalledWith('HTTP request dispatch failed: https://example.com', error);
+  });
+
   it('classifies controller responses separately from transport failures', () => {
     expect(executor.getFailureKind({ response: { status: 500 } })).toBe('controller-rejection');
     expect(executor.getFailureKind(new Error('network down'))).toBe('transport-dispatch');

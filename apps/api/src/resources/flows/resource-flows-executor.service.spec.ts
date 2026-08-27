@@ -19,6 +19,9 @@ import { ResourceFlowVariablesService } from './resource-flow-variables.service'
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { FlowTimer } from '../../metrics/instrumentation/flow/flow.helper';
 import { CompanionGatewayService } from '../../companion/companion-gateway.service';
+import axios from 'axios';
+
+jest.mock('axios');
 
 // Minimal edge shape for our mocks
 type Edge = { source: string; target: string; sourceHandle?: string | null };
@@ -503,6 +506,55 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     mqttClientService.publish = jest.fn().mockRejectedValue(new Error('Broker unavailable'));
 
     await expect(service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {})).rejects.toThrow('Broker unavailable');
+  });
+
+  it.each([
+    ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+    ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+    ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
+  ])('preserves no-policy external-effect failures for the %s lifecycle flow', async (triggerNodeType) => {
+    const inputNode = createNode({ id: 'in-1', type: triggerNodeType });
+    initialNodes = [inputNode];
+
+    const expectLegacyFailure = async (
+      node: ResourceFlowNode,
+      setup: () => void,
+      message: string | RegExp,
+    ): Promise<void> => {
+      nodesById = { [inputNode.id]: inputNode, [node.id]: node };
+      edgesBySourceAndHandle = {
+        [`${inputNode.id}|`]: [{ source: inputNode.id, target: node.id }],
+        [`${node.id}|`]: [],
+      };
+      setup();
+
+      await expect(service.runFlow(1, triggerNodeType, {})).rejects.toThrow(message);
+    };
+
+    await expectLegacyFailure(
+      createNode({ id: 'http-1', type: ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST, data: { url: 'https://example.com', method: 'POST' } }),
+      () => (axios.request as jest.Mock).mockRejectedValueOnce(new Error('HTTP unavailable')),
+      'HTTP unavailable',
+    );
+    await expectLegacyFailure(
+      createNode({ id: 'mqtt-1', type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE, data: { serverId: 1, topic: 'devices/state' } }),
+      () => (mqttClientService.publish as jest.Mock).mockRejectedValueOnce(new Error('MQTT unavailable')),
+      'MQTT unavailable',
+    );
+    await expectLegacyFailure(
+      createNode({ id: 'end-1', type: ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION, data: {} }),
+      () => (resourceUsageService.getActiveSession as jest.Mock).mockResolvedValueOnce(null),
+      'NO_USAGE_SESSION',
+    );
+    await expectLegacyFailure(
+      createNode({
+        id: 'wait-1',
+        type: ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE,
+        data: { serverId: 1, topic: 'devices/state', timeoutSeconds: 1 },
+      }),
+      () => undefined,
+      /Timeout waiting for MQTT message/,
+    );
   });
 
   it('propagates an external-effect failure when configured to fail the flow', async () => {

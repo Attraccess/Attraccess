@@ -73,6 +73,8 @@ const AcknowledgementTimeoutSecondsSchema = z
     helpText: 'Maximum time to wait for an acknowledgement, in seconds. Leave empty to use the integration default.',
   });
 
+const CompletionBehaviorSchema = z.enum(['dispatch', 'acknowledged']).default('acknowledged');
+
 export const HttpRequestNodeDataSchema = z
   .object({
     url: z.string().url('Invalid URL format'),
@@ -82,6 +84,10 @@ export const HttpRequestNodeDataSchema = z
       stringVariant: 'multiline',
     }),
     timeoutSeconds: AcknowledgementTimeoutSecondsSchema,
+    completionBehavior: CompletionBehaviorSchema.meta({
+      helpText:
+        'Dispatch continues after the HTTP request is initiated. Acknowledged waits for the HTTP response.',
+    }),
   })
   .extend(ExternalEffectPolicySchema.shape);
 
@@ -103,7 +109,7 @@ export const MqttSendMessageNodeDataSchema = z
     retain: z.boolean().optional().meta({
       helpText: 'Retain publishes: broker stores last message for new subscribers',
     }),
-    completionBehavior: z.enum(['dispatch', 'acknowledged']).default('acknowledged').meta({
+    completionBehavior: CompletionBehaviorSchema.meta({
       helpText:
         'Dispatch continues after the broker accepts the publish call. Acknowledged waits for the MQTT publish callback.',
     }),

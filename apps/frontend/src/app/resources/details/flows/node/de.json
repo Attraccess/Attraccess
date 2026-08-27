@@ -469,7 +469,8 @@
             "input": "Eingabe"
           },
           "outputs": {
-            "output": "Ausgabe"
+            "output": "Ausgabe",
+            "failure": "Fehler"
           },
           "preview": {
             "method": "Methode",
@@ -502,6 +503,14 @@
             "timeoutSeconds": {
               "label": "Antwort-Timeout (Sekunden)",
               "helpText": "Maximale Wartezeit auf die Controller-Antwort. Leer lassen, um ohne knotenspezifisches Timeout zu warten."
+            },
+            "completionBehavior": {
+              "label": "Abschluss",
+              "helpText": "Nur senden fährt fort, nachdem die HTTP-Anfrage gestartet wurde. Auf Antwort warten wartet auf die Controller-Antwort.",
+              "enum": {
+                "dispatch": "Nur senden",
+                "acknowledged": "Auf Antwort warten"
+              }
             },
             "failureBehavior": {
               "label": "Bei Fehler",

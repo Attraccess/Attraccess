@@ -469,7 +469,8 @@
             "input": "Input"
           },
           "outputs": {
-            "output": "Output"
+            "output": "Output",
+            "failure": "Failure"
           },
           "preview": {
             "method": "Method",
@@ -502,6 +503,14 @@
             "timeoutSeconds": {
               "label": "Response timeout (seconds)",
               "helpText": "Maximum time to wait for the controller response. Leave empty to wait without a node-specific timeout."
+            },
+            "completionBehavior": {
+              "label": "Completion",
+              "helpText": "Dispatch only continues after the HTTP request is initiated. Wait for response waits for the controller response.",
+              "enum": {
+                "dispatch": "Dispatch only",
+                "acknowledged": "Wait for response"
+              }
             },
             "failureBehavior": {
               "label": "On failure",
