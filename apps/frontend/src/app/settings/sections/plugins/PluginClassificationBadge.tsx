@@ -3,8 +3,9 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
 
-export function PluginClassificationBadge({ classification }: { classification: 'official' | 'community' }) {
+export function PluginClassificationBadge({ classification }: { classification?: 'official' | 'community' }) {
   const { t } = useTranslations({ en, de });
+  if (!classification) return null;
   const key = classification === 'official' ? 'official' : 'community';
   return (
     <Tooltip>

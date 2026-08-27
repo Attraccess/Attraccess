@@ -109,6 +109,36 @@ describe('PluginsSection', () => {
     expect(screen.getByText('Official')).toBeInTheDocument();
   });
 
+  it('does not render a community badge while installed plugin classification is loading', () => {
+    hoisted.plugins = [makePlugin({ name: '@attraccess-plugins/shelly' })];
+    const installedResponse = {
+      ok: true,
+      json: async () => [
+        {
+          name: '@attraccess-plugins/shelly',
+          version: '1.0.0',
+          classification: 'official',
+          classificationReason: 'Approved Attraccess package source',
+        },
+      ],
+    };
+    const marketplaceResponse = { ok: true, json: async () => ({ results: [], errors: [] }) };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: { url?: string } | string) =>
+        Promise.resolve(
+          (typeof input === 'string' ? input : input.url)?.includes('/api/plugins/installed')
+            ? installedResponse
+            : marketplaceResponse,
+        ),
+      ),
+    );
+
+    render(<PluginsSection />);
+
+    expect(screen.queryByTestId('plugin-classification-community')).not.toBeInTheDocument();
+  });
+
   it('reports registry search failures alongside partial marketplace results', async () => {
     vi.stubGlobal(
       'fetch',

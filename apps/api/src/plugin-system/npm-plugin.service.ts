@@ -227,11 +227,10 @@ export class NpmPluginService {
       _npmUser?: unknown;
       maintainers?: unknown;
     };
-    const publisher = registryPublisher(metadata) ?? installed.publisher;
-
     return Object.entries(metadata.versions ?? {})
       .filter(([version]) => semver.valid(version))
       .map(([version, pkg]) => {
+        const publisher = registryPublisher(pkg) ?? registryPublisher(metadata) ?? installed.publisher;
         try {
           const { manifest } = parseNpmPluginPackage(pkg, this.hostVersion());
           if (manifest.name !== name)

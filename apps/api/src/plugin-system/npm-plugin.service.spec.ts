@@ -557,6 +557,48 @@ describe('NpmPluginService', () => {
     expect(service.packageMetadata).toHaveBeenCalledWith('@attraccess/plugin', 'private');
   });
 
+  it('classifies each version using its own publisher metadata', async () => {
+    const service = new NpmPluginService({} as never);
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name: '@attraccess-plugins/shelly',
+          version: '1.0.0',
+          registryId: 'npm',
+          registryUrl: 'https://registry.npmjs.org',
+          integrity: 'sha512-test',
+          installPath: 'npm-plugin',
+          permissions: [],
+          lastError: null,
+          publisher: 'attraccess',
+        },
+      ]),
+    );
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      publisher: { name: 'attraccess' },
+      versions: {
+        '1.1.0': {
+          name: '@attraccess-plugins/shelly',
+          version: '1.1.0',
+          _npmUser: { name: 'unapproved-publisher' },
+          keywords: ['attraccess-plugin'],
+          peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
+          attraccess: { displayName: 'Shelly', host: '*', backend: 'index.js', permissions: [], sdk: { backend: '*' } },
+        },
+      },
+    });
+    jest.spyOn(service as unknown as ServiceInternals, 'hostVersion').mockReturnValue('1.9.0');
+
+    await expect(service.installedVersionCandidates('@attraccess-plugins/shelly')).resolves.toEqual([
+      expect.objectContaining({
+        version: '1.1.0',
+        classification: 'community',
+        classificationReason: 'Registry publisher does not match the approved package source',
+      }),
+    ]);
+  });
+
   it('requires the exact permission additions before replacing an installed package', async () => {
     const service = new NpmPluginService({} as never);
     writeFileSync(
