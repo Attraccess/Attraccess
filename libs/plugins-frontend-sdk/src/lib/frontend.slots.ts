@@ -21,6 +21,25 @@ export type PluginSlotId = string;
 // host documents the keys it provides per slot; plugins narrow as needed.
 export type PluginSlotContext = Record<string, unknown>;
 
+// Resource detail overview body. Use this for resource-level status or controls.
+export const RESOURCE_OVERVIEW_SLOT = 'resource.overview';
+
+// Active resource usage panel, directly after the host flow controls.
+export const RESOURCE_ACTIVE_SESSION_SLOT = 'resource.active-session';
+
+// Compact resource list-row status area.
+export const RESOURCE_LIST_ROW_SLOT = 'resource.list.row';
+
+// Context supplied to RESOURCE_OVERVIEW_SLOT and RESOURCE_LIST_ROW_SLOT.
+export interface ResourceSlotContext extends PluginSlotContext {
+  resourceId: number;
+}
+
+// Context supplied to RESOURCE_ACTIVE_SESSION_SLOT.
+export interface ResourceActiveSessionSlotContext extends ResourceSlotContext {
+  usageId: number;
+}
+
 // A single contribution into a host slot. `Context` lets a plugin type its
 // `render` against the exact shape the host documents for that slot (e.g. the
 // MQTT slots' `{ mqttServerId: number }`), so no runtime casting is needed. It
