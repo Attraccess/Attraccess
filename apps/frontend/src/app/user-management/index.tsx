@@ -463,9 +463,6 @@ export const UserManagementPage: React.FC = () => {
   type UserWithAuthDetails = Omit<User, 'authenticationDetails'> & {
     authenticationDetails?: AuthenticationDetailSummary[];
   };
-  // includeRoles is restricted to users.read and the API returns full user records in that case.
-  const users = (searchResult?.data ?? []) as User[];
-
   return (
     <div data-cy="user-management-page">
       <PageHeader
