@@ -37,6 +37,23 @@ jest.mock('mqtt', () => {
           callback();
         }
       }),
+      subscribe: jest.fn(
+        (
+          topic: string,
+          optsOrCb: mqtt.IClientSubscribeOptions | ((error?: Error) => void),
+          cb?: (error?: Error) => void,
+        ) => {
+          const callback = typeof optsOrCb === 'function' ? optsOrCb : cb;
+          if (typeof callback === 'function') {
+            callback();
+          }
+        },
+      ),
+      unsubscribe: jest.fn((topic: string, cb?: (error?: Error) => void) => {
+        if (typeof cb === 'function') {
+          cb();
+        }
+      }),
       emit: emitter.emit.bind(emitter),
     };
     // Simulate successful connect asynchronously
@@ -313,6 +330,25 @@ describe('MqttClientService', () => {
     });
   });
 
+  describe('subscribe', () => {
+    it('re-subscribes tracked topics after reconnecting', async () => {
+      jest.restoreAllMocks();
+      jest.spyOn(Logger.prototype, 'log').mockImplementation(jest.fn());
+      jest.spyOn(Logger.prototype, 'error').mockImplementation(jest.fn());
+      jest.spyOn(Logger.prototype, 'debug').mockImplementation(jest.fn());
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation(jest.fn());
+
+      const servicePrivate = service as unknown as MqttClientServicePrivate;
+      const client = await servicePrivate.getOrCreateClient(1);
+      await service.subscribe(1, 'devices/#');
+      (client.subscribe as jest.Mock).mockClear();
+
+      client.emit('connect');
+
+      expect(client.subscribe).toHaveBeenCalledWith('devices/#', { qos: 0 }, expect.any(Function));
+    });
+  });
+
   describe('onModuleDestroy', () => {
     it('should disconnect all clients', async () => {
       // Arrange - mock the clients map to have a client
@@ -325,5 +361,46 @@ describe('MqttClientService', () => {
       // Assert
       expect(mockClient.end).toHaveBeenCalled();
     }, 10000);
+  });
+
+  describe('unsubscribe', () => {
+    it('keeps a shared broker subscription until its final consumer unsubscribes', async () => {
+      const mockClient = mqtt.connect({});
+      (service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
+      await service.subscribe(1, 'sensors/+');
+      await service.subscribe(1, 'sensors/+');
+
+      await service.unsubscribe(1, 'sensors/+');
+      expect(mockClient.unsubscribe).not.toHaveBeenCalled();
+
+      await service.unsubscribe(1, 'sensors/+');
+      expect(mockClient.unsubscribe).toHaveBeenCalledWith('sensors/+', expect.any(Function));
+    });
+
+    it('removes the topic from reconnect subscriptions and the active client', async () => {
+      const mockClient = mqtt.connect({});
+      (service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
+      await service.subscribe(1, 'sensors/+');
+
+      await service.unsubscribe(1, 'sensors/+');
+
+      expect(mockClient.unsubscribe).toHaveBeenCalledWith('sensors/+', expect.any(Function));
+    });
+
+    it('does not subscribe after a pending connection is unsubscribed', async () => {
+      const mockClient = mqtt.connect({});
+      let connect!: (client: mqtt.MqttClient) => void;
+      const pendingClient = new Promise<mqtt.MqttClient>((resolve) => {
+        connect = resolve;
+      });
+      jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient').mockReturnValue(pendingClient);
+
+      const subscribe = service.subscribe(1, 'sensors/+');
+      await service.unsubscribe(1, 'sensors/+');
+      connect(mockClient);
+      await subscribe;
+
+      expect(mockClient.subscribe).not.toHaveBeenCalled();
+    });
   });
 });

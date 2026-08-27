@@ -42,6 +42,11 @@ class HelloWorldService implements OnModuleInit {
     this.context.onEvent(RESOURCE_USAGE_STARTED, ({ resource, user }) => {
       this.context.logger.log(`Resource ${resource.id} usage started by user ${user.id} — hello!`);
     });
+
+    this.context.mqtt.subscribe(1, 'hello-world/ping', ({ payload }) => {
+      this.context.logger.log(`Received MQTT greeting: ${payload.toString()}`);
+    });
+    void this.context.mqtt.publish(1, 'hello-world/ping', 'Hello from the plugin!');
   }
 
   // Read from the host DB through an injected repository. We address the entity

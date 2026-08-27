@@ -16,6 +16,8 @@ import { PluginService } from './plugin.service';
 import { PluginModule } from './plugin.module';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { zipFileUpload } from './__test__/make-zip';
+import { MqttClientService } from '../mqtt/mqtt-client.service';
+import { MqttServerService } from '../mqtt/servers/mqtt-server.service';
 
 let hostDataSource: DataSource;
 
@@ -144,6 +146,10 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
     })
       .overrideProvider(EventEmitter2)
       .useValue(events)
+      .overrideProvider(MqttClientService)
+      .useValue({ subscribe: jest.fn(), unsubscribe: jest.fn(), publish: jest.fn() })
+      .overrideProvider(MqttServerService)
+      .useValue({ findOne: jest.fn() })
       .compile();
 
     app = moduleRef.createNestApplication();

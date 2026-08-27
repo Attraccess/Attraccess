@@ -1,0 +1,98 @@
+import { Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { MqttMessageEvent } from '../mqtt/mqtt-message.event';
+import { PluginMqttService, mqttTopicMatches } from './plugin-mqtt.service';
+
+describe('mqttTopicMatches', () => {
+  it.each([
+    ['sensors/+', 'sensors/kitchen', true],
+    ['sensors/+', 'sensors/kitchen/temperature', false],
+    ['sensors/#', 'sensors/kitchen/temperature', true],
+    ['sensors/#', 'sensors', true],
+    ['sensors/#/temperature', 'sensors/kitchen/temperature', false],
+    ['sensors/kitchen', 'sensors/bedroom', false],
+  ])('matches %s against %s: %s', (filter, topic, expected) => {
+    expect(mqttTopicMatches(filter, topic)).toBe(expected);
+  });
+});
+
+describe('PluginMqttService', () => {
+  let events: EventEmitter2;
+  let mqtt: { subscribe: jest.Mock; unsubscribe: jest.Mock; publish: jest.Mock };
+  let service: PluginMqttService;
+
+  beforeEach(() => {
+    events = new EventEmitter2();
+    mqtt = {
+      subscribe: jest.fn().mockResolvedValue(undefined),
+      unsubscribe: jest.fn().mockResolvedValue(undefined),
+      publish: jest.fn(),
+    };
+    service = new PluginMqttService(mqtt as never, events);
+  });
+
+  it('delivers only matching messages from the requested server', async () => {
+    const handler = jest.fn();
+    service.subscribe('plugin-id', 'test-plugin', new Logger('Plugin:test-plugin'), 1, 'sensors/+', handler);
+
+    events.emit(
+      MqttMessageEvent.EVENT_NAME,
+      new MqttMessageEvent(2, 'sensors/kitchen', {}, Buffer.from('wrong-server')),
+    );
+    events.emit(
+      MqttMessageEvent.EVENT_NAME,
+      new MqttMessageEvent(1, 'sensors/kitchen/temp', {}, Buffer.from('wrong-topic')),
+    );
+    events.emit(MqttMessageEvent.EVENT_NAME, new MqttMessageEvent(1, 'sensors/kitchen', {}, Buffer.from('delivered')));
+    await new Promise(setImmediate);
+
+    expect(handler).toHaveBeenCalledWith({ serverId: 1, topic: 'sensors/kitchen', payload: Buffer.from('delivered') });
+  });
+
+  it('logs a throwing handler and continues delivering to other subscribers', async () => {
+    const logger = new Logger('Plugin:broken');
+    const logError = jest.spyOn(logger, 'error').mockImplementation();
+    const working = jest.fn();
+    service.subscribe('broken', 'broken', logger, 1, 'events/#', () => {
+      throw new Error('broken handler');
+    });
+    service.subscribe('working', 'working', new Logger('Plugin:working'), 1, 'events/#', working);
+
+    events.emit(MqttMessageEvent.EVENT_NAME, new MqttMessageEvent(1, 'events/open', {}, Buffer.from('message')));
+    await new Promise(setImmediate);
+
+    expect(logError).toHaveBeenCalledWith('MQTT handler for "events/#" failed', expect.any(String));
+    expect(working).toHaveBeenCalled();
+  });
+
+  it('releases every plugin subscription to the shared MQTT client', async () => {
+    const first = service.subscribe('one', 'one', new Logger('Plugin:one'), 1, 'events/#', () => undefined);
+    const second = service.subscribe('two', 'two', new Logger('Plugin:two'), 1, 'events/#', () => undefined);
+
+    first.unsubscribe();
+    second.unsubscribe();
+    await new Promise(setImmediate);
+
+    expect(mqtt.unsubscribe).toHaveBeenCalledTimes(2);
+    expect(mqtt.unsubscribe).toHaveBeenLastCalledWith(1, 'events/#');
+  });
+
+  it('tears down all subscriptions for a destroyed plugin', async () => {
+    service.subscribe('plugin-id', 'test-plugin', new Logger('Plugin:test-plugin'), 1, 'one', () => undefined);
+    service.subscribe('plugin-id', 'test-plugin', new Logger('Plugin:test-plugin'), 1, 'two', () => undefined);
+
+    service.clearPlugin('plugin-id');
+    await Promise.resolve();
+
+    expect(mqtt.unsubscribe).toHaveBeenCalledWith(1, 'one');
+    expect(mqtt.unsubscribe).toHaveBeenCalledWith(1, 'two');
+  });
+
+  it('preserves binary publish payloads', async () => {
+    const payload = Buffer.from([0, 255, 1]);
+
+    await service.publish(1, 'binary', payload, { qos: 2, retain: true });
+
+    expect(mqtt.publish).toHaveBeenCalledWith(1, 'binary', payload, { qos: 2, retain: true });
+  });
+});

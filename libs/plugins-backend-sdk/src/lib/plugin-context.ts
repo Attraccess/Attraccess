@@ -56,6 +56,38 @@ export interface MqttServerHostProvider {
   getServerConfig(serverId: number): Promise<MqttServerConnectionConfig | null>;
 }
 
+/** A message delivered to a plugin's MQTT subscription. */
+export interface PluginMqttMessage {
+  readonly serverId: number;
+  readonly topic: string;
+  readonly payload: Buffer;
+}
+
+/** Handle returned from an MQTT subscription. */
+export interface PluginMqttSubscription {
+  unsubscribe(): void;
+}
+
+export interface PluginMqttClient {
+  /**
+   * Subscribe through the host's shared MQTT connection. MQTT wildcards `+`
+   * and `#` are supported. The returned handle detaches the handler.
+   */
+  subscribe(
+    serverId: number,
+    topicFilter: string,
+    handler: (message: PluginMqttMessage) => void | Promise<void>,
+  ): PluginMqttSubscription;
+
+  /** Publish through the host's shared MQTT connection. */
+  publish(
+    serverId: number,
+    topic: string,
+    payload: string | Buffer,
+    options?: { qos?: 0 | 1 | 2; retain?: boolean },
+  ): Promise<void>;
+}
+
 /**
  * Curated facade handed to a backend plugin at load time. It is the single,
  * versioned seam between plugin code and the host application. Adding a field is
@@ -73,6 +105,9 @@ export interface PluginContext {
 
   /** Scoped logger, prefixed with the plugin name. */
   readonly logger: LoggerService;
+
+  /** Shared MQTT connection access. Requires ACCESS_MQTT_SERVERS. */
+  readonly mqtt: PluginMqttClient;
 
   /** Typed repository accessor over the shared DataSource. */
   getRepository<T extends ObjectLiteral>(entity: EntityTarget<T>): Repository<T>;
