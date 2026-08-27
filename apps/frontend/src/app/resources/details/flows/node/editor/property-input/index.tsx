@@ -10,6 +10,7 @@ import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useMemo, useState } from 'react';
 import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
 import { CreateMqttServerForm } from '../../../../../../mqtt/servers/CreateMqttServerPage';
+import { getNumberFieldMinimum } from './number-field-minimum';
 
 export interface Property<TValue> {
   type: 'string' | 'integer' | 'number' | 'object' | 'boolean' | 'array';
@@ -281,13 +282,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           value={Number(parsedValue)}
           defaultValue={schema.default ? Number(schema.default) : undefined}
           onChange={(newValue) => setValue(newValue as TValue)}
-          minValue={
-            schema.exclusiveMinimum !== undefined
-              ? schema.type === 'integer'
-                ? schema.exclusiveMinimum + 1
-                : schema.exclusiveMinimum + (schema.multipleOf ?? Number.EPSILON)
-              : schema.minimum
-          }
+          minValue={getNumberFieldMinimum(schema)}
           maxValue={schema.maximum}
           step={schema.multipleOf}
         >
