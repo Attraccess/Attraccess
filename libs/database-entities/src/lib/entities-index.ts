@@ -40,6 +40,7 @@ import {
   ErrorNodeDataSchema,
   InputResourceActivityNoActivityNodeDataSchema,
   ResourceActivityTrackActivityNodeDataSchema,
+  ResourceOperatingTransitionNodeDataSchema,
   ResourceHealthHeartbeatNodeDataSchema,
   ResourceHealthSetNodeDataSchema,
   HealthStateOptionEnum,
@@ -101,6 +102,7 @@ import { RolePermission } from './entities/role-permission.entity';
 import { UserRole, UserRoleSource } from './entities/user-role.entity';
 import { ApiToken } from './entities/api-token.entity';
 import { ApiTokenPermission } from './entities/api-token-permission.entity';
+import { ResourceOperatingInterval } from './entities/resource-operating-interval.entity';
 
 // Export all entities individually
 export {
@@ -173,6 +175,7 @@ export {
   ResourceFormAction,
   InputResourceActivityNoActivityNodeDataSchema,
   ResourceActivityTrackActivityNodeDataSchema,
+  ResourceOperatingTransitionNodeDataSchema,
   ResourceHealthHeartbeatNodeDataSchema,
   ResourceHealthSetNodeDataSchema,
   HealthStateOptionEnum,
@@ -216,6 +219,7 @@ export {
   UserRoleSource,
   ApiToken,
   ApiTokenPermission,
+  ResourceOperatingInterval,
 };
 
 // Export the entities object
@@ -276,4 +280,5 @@ export const entities = {
   UserRole,
   ApiToken,
   ApiTokenPermission,
+  ResourceOperatingInterval,
 };

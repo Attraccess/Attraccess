@@ -608,6 +608,18 @@
         }
       },
       "resource": {
+        "operating": {
+          "title": "Ressource als in Betrieb markieren",
+          "description": "Zeichnet auf, dass die Maschine zur Serverzeit in Betrieb ist.",
+          "inputs": { "input": "Eingang" },
+          "outputs": { "output": "Ausgang" }
+        },
+        "idle": {
+          "title": "Ressource als inaktiv markieren",
+          "description": "Zeichnet auf, dass die Maschine zur Serverzeit den Betrieb beendet hat.",
+          "inputs": { "input": "Eingang" },
+          "outputs": { "output": "Ausgang" }
+        },
         "usage": {
           "end-session": {
             "title": "Nutzung beenden",

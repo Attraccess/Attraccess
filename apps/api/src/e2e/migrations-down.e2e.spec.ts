@@ -63,6 +63,7 @@ import {
   ResourceMaintenanceScheduleTimeIntervalConfig,
   ResourceMaintenanceScheduleUsageCountConfig,
   ResourceMaintenanceScheduleUsageHoursConfig,
+  ResourceOperatingInterval,
   ResourceType,
   ResourceUsage,
   ResourceUsageAction,
@@ -140,6 +141,7 @@ const seedDatabase = async (dataSource: DataSource) => {
 
   const resourceGroupRepo = dataSource.getRepository(ResourceGroup);
   const resourceRepo = dataSource.getRepository(Resource);
+  const operatingIntervalRepo = dataSource.getRepository(ResourceOperatingInterval);
   const projectRepo = dataSource.getRepository(Project);
   const mqttRepo = dataSource.getRepository(MqttServer);
   const ssoProviderRepo = dataSource.getRepository(SSOProvider);
@@ -203,6 +205,12 @@ const seedDatabase = async (dataSource: DataSource) => {
     description: 'Seed resource',
     allowTakeOver: false,
     separateUnlockAndUnlatch: false,
+  }));
+
+  await ensureEntity(operatingIntervalRepo, () => ({
+    resourceId: resource.id,
+    startTime: new Date(),
+    endTime: null,
   }));
 
   const project = await ensureEntity(projectRepo, () => ({

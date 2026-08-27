@@ -608,6 +608,18 @@
         }
       },
       "resource": {
+        "operating": {
+          "title": "Mark resource operating",
+          "description": "Records that the machine is operating at the server time.",
+          "inputs": { "input": "Input" },
+          "outputs": { "output": "Output" }
+        },
+        "idle": {
+          "title": "Mark resource idle",
+          "description": "Records that the machine stopped operating at the server time.",
+          "inputs": { "input": "Input" },
+          "outputs": { "output": "Output" }
+        },
         "usage": {
           "end-session": {
             "title": "End usage session",
