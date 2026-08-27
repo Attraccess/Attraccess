@@ -398,6 +398,12 @@ describe('NpmPluginService', () => {
     await expect(NpmPluginService.recoverBackups()).resolves.toBeUndefined();
   });
 
+  it('fails recovery when it cannot reconcile a package backup', async () => {
+    writeFileSync(join(root, '.npm-backups'), 'not a directory');
+
+    await expect(NpmPluginService.recoverBackups()).rejects.toThrow();
+  });
+
   it('classifies installed versions and calculates their permission delta', async () => {
     const service = new NpmPluginService({} as never);
     writeFileSync(

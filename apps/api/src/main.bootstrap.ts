@@ -86,7 +86,7 @@ export async function bootstrap() {
   });
   // Restore a known-good package before migrations or module discovery can load
   // code left behind by an interrupted npm plugin replacement.
-  await NpmPluginService.recoverBackups();
+  if (earlyConfig.PLUGIN_DIR) await NpmPluginService.recoverBackups();
   bootstrapLogger.log('PluginSystem configured.');
 
   // Run plugin-shipped up-migrations BEFORE AppModule is imported, so every

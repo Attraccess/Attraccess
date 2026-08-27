@@ -112,6 +112,7 @@ export class NpmPluginService implements OnModuleInit {
     } catch (error) {
       // A backup is deliberately retained if reconciliation cannot prove it stale.
       NpmPluginService.recoveryLogger.error('Failed to reconcile npm plugin backups', error);
+      throw error;
     }
   }
 
