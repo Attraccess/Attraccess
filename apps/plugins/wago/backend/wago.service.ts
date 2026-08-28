@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import type { PluginContext, PluginMqttSubscription, Repository } from '@attraccess/plugins-backend-sdk';
 import {
+  CONFIGURATION_PROTOCOL_VERSION,
   DISCOVERY_ROOT,
   compatibilityError,
   configurationDesiredTopic,
@@ -346,7 +347,11 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
         await this.context.mqtt.publish(
           prepared.mqttServerId,
           `${discoveryTopic(prepared.controller.hardwareId)}/claim`,
-          JSON.stringify({ username: prepared.credential.username, password: prepared.credential.password }),
+          JSON.stringify({
+            username: prepared.credential.username,
+            password: prepared.credential.password,
+            configuration: prepared.configuration,
+          }),
           { qos: 1 },
         );
         prepared.credentialDelivered = true;
@@ -376,6 +381,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     controller: WagoController;
     mqttServerId: number;
     credential: { username: string; password: string };
+    configuration: { protocolVersion: number; namespace: string; desiredTopic: string; reportedTopic: string };
     identity: string;
     previousController: Pick<WagoController, 'trustState' | 'name' | 'mqttServerId' | 'updatedAt'>;
     credentialDelivered: boolean;
@@ -401,6 +407,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
 
     const identity = `wago-controller-${controller.hardwareId}`;
     const settings = await this.getSettings();
+    const namespace = normalizeOperationalPrefix(settings.operationalPrefix);
     const credential = await this.context.getMqttCredentialProvisioning().provision({
       mqttServerId: selectedServerId,
       identity,
@@ -409,9 +416,9 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       topicPolicy: {
         publish: [
           `attraccess/wago/controllers/${controller.hardwareId}/#`,
-          configurationReportedTopic(settings.operationalPrefix ?? 'attraccess/wago', controller.hardwareId),
+          configurationReportedTopic(namespace, controller.hardwareId),
         ],
-        subscribe: [configurationDesiredTopic(settings.operationalPrefix, controller.hardwareId)],
+        subscribe: [configurationDesiredTopic(namespace, controller.hardwareId)],
       },
     });
     if (!('password' in credential)) {
@@ -436,6 +443,12 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
         controller,
         mqttServerId: selectedServerId,
         credential,
+        configuration: {
+          protocolVersion: CONFIGURATION_PROTOCOL_VERSION,
+          namespace,
+          desiredTopic: configurationDesiredTopic(namespace, controller.hardwareId),
+          reportedTopic: configurationReportedTopic(namespace, controller.hardwareId),
+        },
         identity,
         previousController,
         credentialDelivered: false,
@@ -690,11 +703,17 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     revision: WagoConfigurationRevision,
   ): Promise<WagoConfigurationRevision> {
     if (!controller.mqttServerId) throw new ConflictException(`WAGO controller ${controller.id} has no MQTT server`);
+    const incompatibility = compatibilityError({
+      protocolVersion: controller.protocolVersion,
+      capabilities: JSON.parse(controller.capabilities) as string[],
+    });
+    if (incompatibility) throw new ConflictException(`Cannot publish configuration: ${incompatibility}`);
     const settings = await this.getSettings();
     await this.context.mqtt.publish(
       controller.mqttServerId,
       configurationDesiredTopic(settings.operationalPrefix ?? 'attraccess/wago', controller.hardwareId),
       JSON.stringify({
+        protocolVersion: CONFIGURATION_PROTOCOL_VERSION,
         revision: revision.revision,
         contentHash: revision.contentHash,
         snapshot: JSON.parse(revision.snapshot),

@@ -5,6 +5,7 @@ import { WagoService } from './wago.service';
 import { WagoSettings } from './wago-settings.entity';
 import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
+import { configurationHash } from './configuration';
 
 describe('WagoService', () => {
   const controller = (): WagoController => ({
@@ -18,7 +19,7 @@ describe('WagoService', () => {
     fingerprint: '',
     protocolVersion: '1.0.0',
     runtimeVersion: '1.0.0',
-    capabilities: '["claim","heartbeat"]',
+    capabilities: '["claim","heartbeat","configuration-v1"]',
     lastSequence: 4,
     lastHeartbeatAt: null,
     lastSeenAt: '2026-01-01T00:00:00.000Z',
@@ -195,7 +196,7 @@ describe('WagoService', () => {
           pairingCode: '482931',
           protocolVersion: '1.0.0',
           runtimeVersion: '1.0.0',
-          capabilities: ['claim', 'heartbeat'],
+          capabilities: ['claim', 'heartbeat', 'configuration-v1'],
         }),
       ),
     );
@@ -214,8 +215,17 @@ describe('WagoService', () => {
     });
 
     await service.saveDraft(claimed.id, {
-      physicalPoints: [{ id: 'point-a' }],
-      logicalChannels: [{ id: 'channel-a', physicalPointId: 'point-a' }],
+      version: 1,
+      physicalPoints: [{ id: 'point-a', hardwareProfile: '751-9301', channel: 0 }],
+      logicalChannels: [
+        {
+          id: 'channel-a',
+          physicalPointId: 'point-a',
+          profile: 'generic-digital-output',
+          capabilities: ['output'],
+          disconnectPolicy: { mode: 'hold' },
+        },
+      ],
     });
     await service.reviewDraft(claimed.id);
     const revision = await service.publishDraft(claimed.id);
@@ -228,10 +238,54 @@ describe('WagoService', () => {
     expect(context.mqtt.publish).toHaveBeenCalledWith(
       2,
       'attraccess/wago/v1/controllers/cc100-01/configuration/desired',
-      expect.stringContaining('"revision":1'),
+      expect.stringContaining('"protocolVersion":1'),
       { qos: 1, retain: true },
     );
     expect(revisionRepository.save).toHaveBeenCalledWith(expect.objectContaining({ revision: 1 }));
+  });
+
+  it('rejects publication for a claimed runtime without the configuration contract', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const, capabilities: '["claim","heartbeat"]' };
+    const { service, draftRepository } = createService([claimed]);
+    const snapshot = { version: 1, physicalPoints: [], logicalChannels: [] };
+    draftRepository.findOneBy.mockResolvedValue({
+      controllerId: claimed.id,
+      reviewedHash: configurationHash(snapshot),
+      snapshot: JSON.stringify(snapshot),
+    });
+
+    await expect(service.publishDraft(claimed.id)).rejects.toThrow('configuration-v1');
+  });
+
+  it('delivers the controller-scoped configuration namespace with claim credentials', async () => {
+    const enrollment = {
+      id: 3,
+      mqttServerId: 2,
+      hardwareId: 'cc100-01',
+      secretHash: 'secret-hash',
+      identity: 'wago-enrollment-test',
+      createdAt: '',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      revokedAt: null,
+      consumedAt: null,
+    };
+    const candidate = { ...controller(), fingerprint: 'fingerprint' };
+    const { service, context, enrollmentRepository } = createService([candidate], [enrollment]);
+    (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = jest.fn().mockResolvedValue({});
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({
+      provision: jest.fn().mockResolvedValue({ username: 'wago-controller-cc100-01', password: 'secret' }),
+      revoke: jest.fn().mockResolvedValue(undefined),
+    });
+    enrollmentRepository.findOneBy.mockResolvedValue(enrollment);
+
+    await service.claim(candidate.id, 'Controller', 'fingerprint');
+
+    expect(context.mqtt.publish).toHaveBeenCalledWith(
+      2,
+      'attraccess/wago/discovery/cc100-01/claim',
+      expect.stringContaining('"desiredTopic":"attraccess/wago/v1/controllers/cc100-01/configuration/desired"'),
+      { qos: 1 },
+    );
   });
 
   it('records structured controller rejection without changing the published snapshot', async () => {

@@ -14,7 +14,7 @@ describe('WAGO protocol', () => {
     pairingCode: '482931',
     protocolVersion: '1.2.0',
     runtimeVersion: '0.4.0',
-    capabilities: ['claim', 'heartbeat'],
+    capabilities: ['claim', 'heartbeat', 'configuration-v1'],
     sequence: 3,
   };
 
@@ -54,6 +54,9 @@ describe('WAGO protocol', () => {
       'supports protocol 1.x',
     );
     expect(compatibilityError({ protocolVersion: '1.0.0', capabilities: ['claim'] })).toContain('heartbeat');
+    expect(compatibilityError({ protocolVersion: '1.0.0', capabilities: ['claim', 'heartbeat'] })).toContain(
+      'configuration-v1',
+    );
     expect(compatibilityError({ protocolVersion: '1.0.0', capabilities: valid.capabilities })).toBeNull();
   });
 });
