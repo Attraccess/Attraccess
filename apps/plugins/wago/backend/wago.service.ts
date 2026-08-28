@@ -158,7 +158,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       expiresAt,
       manualInstructions:
         'instructions' in provisionedCredential
-          ? provisionedCredential.instructions.map((instruction) => instruction.replaceAll(identity, credential.username))
+          ? provisionedCredential.instructions.map((instruction) => instruction.replaceAll(identity, () => credential.username))
           : undefined,
     };
   }

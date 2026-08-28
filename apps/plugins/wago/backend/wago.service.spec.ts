@@ -170,12 +170,12 @@ describe('WagoService', () => {
     });
 
     const enrollment = await service.createEnrollment('cc100-01', undefined, {
-      username: 'manual-cc100-01',
+      username: 'manual-$&',
       password: 'secret',
     });
 
-    expect(enrollment).toMatchObject({ username: 'manual-cc100-01', password: 'secret' });
-    expect(enrollment.manualInstructions).toEqual(['Create a scoped broker user named manual-cc100-01 manually.']);
+    expect(enrollment).toMatchObject({ username: 'manual-$&', password: 'secret' });
+    expect(enrollment.manualInstructions).toEqual(['Create a scoped broker user named manual-$& manually.']);
   });
 
   it('keeps replacement subscriptions inert until they replace the active generation', async () => {
