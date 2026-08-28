@@ -429,6 +429,50 @@ describe('PluginsSection', () => {
     expect(await screen.findByRole('heading', { name: 'Shelly details' })).toBeInTheDocument();
   });
 
+  it('keeps the marketplace loading indicator visible while details are pending after a search completes', async () => {
+    const detail = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
+    const refreshedSearch = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
+    const plugin = {
+      name: '@attraccess-plugins/shelly',
+      version: '1.0.0',
+      displayName: 'Shelly',
+      description: null,
+      permissions: [],
+      registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
+      classification: 'official' as const,
+      classificationReason: 'Approved Attraccess package source',
+      installable: true,
+      incompatibilityReason: null,
+    };
+    let searches = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: { url?: string } | string) => {
+        const url = typeof input === 'string' ? input : (input.url ?? '');
+        if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+        if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+        if (url.includes('/marketplace/search')) {
+          searches += 1;
+          return searches === 1
+            ? Promise.resolve({ ok: true, json: async () => ({ results: [plugin], errors: [] }) })
+            : refreshedSearch.promise;
+        }
+        return detail.promise;
+      }),
+    );
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+    await openMarketplace(user);
+
+    await user.click(await screen.findByRole('button', { name: 'Details' }));
+    await user.type(screen.getByLabelText('Search plugins'), 's');
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    refreshedSearch.resolve({ ok: true, json: async () => ({ results: [plugin], errors: [] }) });
+
+    expect(await screen.findByText('Searching plugins...')).toBeInTheDocument();
+    detail.resolve({ ok: true, json: async () => plugin });
+  });
+
   it('flags a plugin whose backend failed to load', () => {
     hoisted.plugins = [makePlugin({ status: 'error', error: "Cannot find module '@nestjs/common'" })];
     render(<PluginsSection />);

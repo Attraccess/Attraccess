@@ -132,7 +132,8 @@ export function PluginsSection() {
   const [marketplaceQuery, setMarketplaceQuery] = useState('');
   const [selectedRegistryId, setSelectedRegistryId] = useState('');
   const [marketplacePlugins, setMarketplacePlugins] = useState<MarketplacePlugin[]>([]);
-  const [isLoadingMarketplace, setIsLoadingMarketplace] = useState(false);
+  const [isLoadingMarketplaceSearch, setIsLoadingMarketplaceSearch] = useState(false);
+  const [isLoadingMarketplaceDetail, setIsLoadingMarketplaceDetail] = useState(false);
   const [marketplacePlugin, setMarketplacePlugin] = useState<MarketplacePlugin | null>(null);
   const [pluginToInstall, setPluginToInstall] = useState<MarketplacePlugin | null>(null);
   const [isInstalling, setIsInstalling] = useState(false);
@@ -150,6 +151,7 @@ export function PluginsSection() {
   const marketplaceSearchRequest = useRef(0);
   const marketplaceDetailRequest = useRef(0);
   const registryRequest = useRef(0);
+  const isLoadingMarketplace = isLoadingMarketplaceSearch || isLoadingMarketplaceDetail;
 
   useEffect(() => {
     if (!globalThis.fetch) return;
@@ -187,7 +189,7 @@ export function PluginsSection() {
 
   const loadMarketplace = async (query = marketplaceQuery) => {
     const request = ++marketplaceSearchRequest.current;
-    setIsLoadingMarketplace(true);
+    setIsLoadingMarketplaceSearch(true);
     let result: { results: MarketplacePlugin[]; errors: string[] } = { results: [], errors: [] };
     let searchFailed = false;
     try {
@@ -228,7 +230,7 @@ export function PluginsSection() {
       else if (result.errors.length > 0)
         toast.error({ title: t('marketplace.loadError'), description: result.errors.join(', ') });
     }
-    if (marketplaceSearchRequest.current === request) setIsLoadingMarketplace(false);
+    if (marketplaceSearchRequest.current === request) setIsLoadingMarketplaceSearch(false);
   };
 
   const addRegistry = async () => {
@@ -291,7 +293,7 @@ export function PluginsSection() {
 
   const openMarketplacePlugin = async (plugin: MarketplacePlugin, closeMarketplace = false) => {
     const request = ++marketplaceDetailRequest.current;
-    setIsLoadingMarketplace(true);
+    setIsLoadingMarketplaceDetail(true);
     try {
       const response = await fetch(
         `${getBaseUrl()}/api/plugins/marketplace/${encodeURIComponent(plugin.name)}?registryId=${encodeURIComponent(plugin.registry.id)}`,
@@ -306,7 +308,7 @@ export function PluginsSection() {
     } catch {
       if (marketplaceDetailRequest.current === request) toast.error({ title: t('marketplace.loadError') });
     } finally {
-      if (marketplaceDetailRequest.current === request) setIsLoadingMarketplace(false);
+      if (marketplaceDetailRequest.current === request) setIsLoadingMarketplaceDetail(false);
     }
   };
 
