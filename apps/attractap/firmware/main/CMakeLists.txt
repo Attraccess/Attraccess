@@ -41,6 +41,7 @@ idf_component_register(
         esp_rom
         lwip
         vfs
+        bt
 )
 
 target_compile_definitions(${COMPONENT_LIB} PUBLIC

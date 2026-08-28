@@ -43,7 +43,8 @@ void Websocket::setup()
     }
     if (!connect_task)
     {
-        xTaskCreate(connectTaskEntry, "ws_conn", CONNECT_TASK_STACK, this, CONNECT_TASK_PRIORITY, &connect_task);
+        xTaskCreateWithCaps(connectTaskEntry, "ws_conn", CONNECT_TASK_STACK, this, CONNECT_TASK_PRIORITY, &connect_task,
+                            MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT); // ATT-1031 bench-only RAM relief.
     }
     this->_certManager.begin();
 }
@@ -517,8 +518,8 @@ void Websocket::connectWebSocketLocked()
     // WebSocket event callbacks parse API payloads and invoke application
     // callbacks on this task. The 9.8 KB stack overflowed on the initial
     // resource-list payload after adding network-quality reporting.
-    websocket_cfg.task_stack = 16384;
-    websocket_cfg.buffer_size = 4096; // Increase buffer size (default is typically 1024)
+    websocket_cfg.task_stack = 8192; // ATT-1031 bench-only: local database has no resource-list payload.
+    websocket_cfg.buffer_size = 1024; // ATT-1031 bench-only: local database has no resource-list payload.
     // Below the LVGL render task (prio 4): TLS work must not preempt UI refresh
     // (default was 5, unpinned) - ATT-554 item 7.
     websocket_cfg.task_prio = 3;

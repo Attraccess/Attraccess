@@ -27,6 +27,7 @@ import { EnrollNfcCardResponseDto } from './dtos/enroll-nfc-card-response.dto';
 import { ResetNfcCardResponseDto } from './dtos/reset-nfc-card-response.dto';
 import { UpdateReaderDto } from './dtos/update-reader.dto';
 import { AttractapCrashReportDto } from './dtos/crash-report.dto';
+import { BleProxyCommandDto, BleProxyResult } from './dtos/ble-proxy.dto';
 import { RequiresLicense } from '../license/require-license.decorator';
 import { LicenseModuleType } from '../license/license.service';
 
@@ -122,6 +123,22 @@ export class AttractapController {
       }
       throw error;
     }
+  }
+
+  @Post(':readerId/ble-proxy')
+  @Auth('resources.update')
+  @ApiOperation({ summary: 'ATT-1031 prototype: execute a raw BLE GATT operation', operationId: 'bleProxyCommand' })
+  @ApiParam({
+    name: 'readerId',
+    description: 'The connected reader which should perform the BLE operation',
+    example: 1,
+  })
+  @ApiBody({ type: BleProxyCommandDto })
+  async bleProxyCommand(
+    @Param('readerId', ParseIntPipe) readerId: number,
+    @Body() command: BleProxyCommandDto,
+  ): Promise<BleProxyResult> {
+    return await this.attractapGateway.sendBleProxyCommand(readerId, command);
   }
 
   @Get()

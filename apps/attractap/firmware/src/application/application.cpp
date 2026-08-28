@@ -83,6 +83,10 @@ void Application::setup() {
 
   this->api.setup();
 
+  std::printf("[DEBUG-att1031] after api setup: internal_free=%u largest=%u\n",
+              static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+              static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)));
+
 #ifdef HAS_LVGL_DISPLAY
   this->supervision.setup();
   this->api.onDeviceName(
@@ -588,8 +592,13 @@ void Application::setup() {
 #endif
 
 #ifndef DEMO_MODE
-  xTaskCreate(Application::networkTask, "NetworkTask", 4096, nullptr,
-              tskIDLE_PRIORITY, nullptr);
+  const BaseType_t networkTaskResult =
+      xTaskCreate(Application::networkTask, "NetworkTask", 4096, nullptr,
+                  tskIDLE_PRIORITY, nullptr);
+  std::printf("[DEBUG-att1031] network task result=%d internal_free=%u largest=%u\n",
+              static_cast<int>(networkTaskResult),
+              static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+              static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)));
 #endif
 
 #ifdef ESP_PLATFORM

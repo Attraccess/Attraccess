@@ -11,12 +11,7 @@ import { Server } from 'ws';
 import { closeSync } from 'fs';
 import { Inject, Logger, UseInterceptors } from '@nestjs/common';
 import { WebsocketService } from './websocket.service';
-import {
-  AuthenticatedWebSocket,
-  AttractapEvent,
-  AttractapMessage,
-  AttractapEventType,
-} from './websocket.types';
+import { AuthenticatedWebSocket, AttractapEvent, AttractapMessage, AttractapEventType } from './websocket.types';
 import { AttractapService } from '../attractap.service';
 import { randomBytes } from 'crypto';
 import { Mutex } from 'async-mutex';
@@ -36,6 +31,7 @@ import { AttractapSessionHandler } from './handlers/session.handler';
 import { AttractapBillingHandler } from './handlers/billing.handler';
 import { AttractapProjectsHandler } from './handlers/projects.handler';
 import { AttractapSupervisionHandler } from './handlers/supervision.handler';
+import { BleProxyCommandDto, BleProxyResult } from '../dtos/ble-proxy.dto';
 
 @WebSocketGateway({ path: '/api/attractap/websocket' })
 @UseInterceptors(WsMetricsInterceptor)
@@ -95,6 +91,15 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   private supervisionHandler: AttractapSupervisionHandler;
 
   private readonly connectedAt = new WeakMap<object, bigint>();
+  private readonly bleProxyResponseAwaiters = new Map<
+    string,
+    {
+      readerId: number;
+      resolve: (result: BleProxyResult) => void;
+      reject: (error: Error) => void;
+      timeoutId: NodeJS.Timeout;
+    }
+  >();
 
   private makeStringLVGLReady(input: string): string {
     if (!input) return input;
@@ -341,6 +346,13 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     const readerId = socket.readerId;
     const readerName = socket.readerName;
     if (readerId) {
+      for (const [requestId, awaiter] of this.bleProxyResponseAwaiters) {
+        if (awaiter.readerId === readerId) {
+          clearTimeout(awaiter.timeoutId);
+          awaiter.reject(new Error(`Reader ${readerId} disconnected during BLE proxy operation`));
+          this.bleProxyResponseAwaiters.delete(requestId);
+        }
+      }
       this.logger.log(`Client for reader ${readerId} disconnected.`);
       // ponytail: only zero gauge when no other socket for this reader exists —
       // prevents a stale-socket disconnect from marking a reconnected reader offline.
@@ -499,6 +511,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         await this.formsHandler.handleResourceUsageFormSubmitPage(socket, eventData);
         break;
 
+      case AttractapEventType.BLE_PROXY_RESULT:
+        this.handleBleProxyResult(socket, eventData.payload as BleProxyResult);
+        break;
+
       case AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED:
         // no-op on server; metadata-only event sent by server
         break;
@@ -514,6 +530,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       case AttractapEventType.RESOURCE_USAGE_FORM_REQUEST:
       case AttractapEventType.RESOURCE_USAGE_FORM_FIELDS:
       case AttractapEventType.RESOURCE_USAGE_FORM_PAGE_RESULT:
+      case AttractapEventType.BLE_PROXY_COMMAND:
         this.logger.error(
           `Received event of type ${eventData.type} from client ${socket.id}, this is a server side only event, clients should not send this event`,
         );
@@ -540,6 +557,63 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     }
 
     await Promise.all(sockets.map((socket) => socket.close()));
+  }
+
+  public async sendBleProxyCommand(readerId: number, command: BleProxyCommandDto): Promise<BleProxyResult> {
+    const socket = Array.from(this.websocketService.sockets.values()).find(
+      (candidate) => candidate.readerId === readerId,
+    );
+    if (!socket) {
+      throw new Error(`Reader not connected: ${readerId}`);
+    }
+
+    const requestId = randomBytes(8).toString('hex');
+    const resultPromise = new Promise<BleProxyResult>((resolve, reject) => {
+      const timeoutId = setTimeout(
+        () => {
+          this.bleProxyResponseAwaiters.delete(requestId);
+          reject(new Error(`Timeout waiting for BLE proxy result from reader ${readerId}`));
+        },
+        command.operation === 'scan' ? 15_000 : 10_000,
+      );
+
+      this.bleProxyResponseAwaiters.set(requestId, { readerId, resolve, reject, timeoutId });
+    });
+
+    void socket
+      .sendMessage(new AttractapEvent(AttractapEventType.BLE_PROXY_COMMAND, { requestId, ...command }))
+      .then((delivered) => {
+        if (delivered) return;
+
+        const awaiter = this.bleProxyResponseAwaiters.get(requestId);
+        if (awaiter) {
+          clearTimeout(awaiter.timeoutId);
+          this.bleProxyResponseAwaiters.delete(requestId);
+          awaiter.reject(new Error(`Reader ${readerId} did not acknowledge BLE proxy command`));
+        }
+      })
+      .catch((error: unknown) => {
+        const awaiter = this.bleProxyResponseAwaiters.get(requestId);
+        if (awaiter) {
+          clearTimeout(awaiter.timeoutId);
+          this.bleProxyResponseAwaiters.delete(requestId);
+          awaiter.reject(error instanceof Error ? error : new Error(String(error)));
+        }
+      });
+
+    return resultPromise;
+  }
+
+  private handleBleProxyResult(socket: AuthenticatedWebSocket, result: BleProxyResult) {
+    const awaiter = this.bleProxyResponseAwaiters.get(result.requestId);
+    if (!awaiter || awaiter.readerId !== socket.readerId) {
+      this.logger.warn(`Ignoring unexpected BLE proxy result ${result.requestId} from reader ${socket.readerId}`);
+      return;
+    }
+
+    clearTimeout(awaiter.timeoutId);
+    this.bleProxyResponseAwaiters.delete(result.requestId);
+    awaiter.resolve(result);
   }
 
   public async startEnrollOfNewNfcCard(data: { readerId: number; userId: number }) {

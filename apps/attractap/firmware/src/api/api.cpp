@@ -29,6 +29,28 @@ void API::updateSateInfo()
 
 void API::setup()
 {
+    this->bleProxy.setup([this](const char *requestId,
+                                const char *operation,
+                                bool success,
+                                const char *error,
+                                const char *address,
+                                int addressType,
+                                int rssi,
+                                const char *name,
+                                const char *valueHex)
+                         {
+        JsonDocument doc;
+        JsonObject payload = doc.to<JsonObject>();
+        payload["requestId"] = requestId;
+        payload["operation"] = operation;
+        payload["success"] = success;
+        if (error) payload["error"] = error;
+        if (address) payload["address"] = address;
+        if (addressType >= 0) payload["addressType"] = addressType;
+        if (rssi != 0) payload["rssi"] = rssi;
+        if (name && name[0] != '\0') payload["name"] = name;
+        if (valueHex) payload["valueHex"] = valueHex;
+        this->sendMessage("BLE_PROXY_RESULT", payload); });
     this->websocket.setup();
     this->websocket.setMessageCallbackRaw([this](const char *buf, size_t len)
                                           { this->processIncomingMessage(buf, len); });
@@ -250,6 +272,10 @@ void API::processIncomingMessage(const char *buf, size_t len)
     else if (strcmp(eventType, "RESOURCE_USAGE_FORM_PAGE_RESULT") == 0)
     {
         this->onResourceUsageFormPageResult(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strcmp(eventType, "BLE_PROXY_COMMAND") == 0)
+    {
+        this->bleProxy.execute(inboundDoc["data"]["payload"].as<JsonObjectConst>());
     }
     else
     {

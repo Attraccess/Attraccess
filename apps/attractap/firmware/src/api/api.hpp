@@ -15,6 +15,7 @@
 #endif
 #include "../utils.hpp"
 #include "ota/ota_updater.hpp"
+#include "../ble_proxy/ble_proxy.hpp"
 
 class API
 {
@@ -330,6 +331,7 @@ public:
 
 private:
     Logger logger;
+    BleProxy bleProxy;
 #ifdef DEMO_MODE
     DemoWebsocket websocket;
 #else
