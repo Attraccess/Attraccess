@@ -33,6 +33,7 @@ void ResourceDetailsScreen::resetFormsModalState()
    this->formsBackButton = nullptr;
    this->formsNextButton = nullptr;
    this->formsNextLabel = nullptr;
+   this->formsNextSpinner = nullptr;
    this->formsEditorOverlay = nullptr;
    this->formsEditorTitleLabel = nullptr;
    this->formsEditorTextarea = nullptr;
@@ -310,6 +311,11 @@ void ResourceDetailsScreen::ensureFormsModal()
    this->formsNextLabel = lv_label_create(nextBtn);
    lv_label_set_text(this->formsNextLabel, "Weiter");
    lv_obj_set_align(this->formsNextLabel, LV_ALIGN_CENTER);
+   this->formsNextSpinner = lv_spinner_create(nextBtn);
+   const lv_coord_t nextLabelHeight = lv_obj_get_height(this->formsNextLabel);
+   lv_obj_set_size(this->formsNextSpinner, nextLabelHeight, nextLabelHeight);
+   lv_obj_set_align(this->formsNextSpinner, LV_ALIGN_CENTER);
+   lv_obj_add_flag(this->formsNextSpinner, LV_OBJ_FLAG_HIDDEN);
    lv_obj_add_event_cb(nextBtn, &ResourceDetailsScreen::onFormsNext, LV_EVENT_CLICKED, this);
 
    // Fullscreen text editor overlay: opened when a text/number preview box is
@@ -388,7 +394,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_add_event_cb(this->formsEditorKeyboard, &ResourceDetailsScreen::onFormsEditorKeyboardEvent, LV_EVENT_ALL, this);
 
 }
-void ResourceDetailsScreen::setFormsBusy(bool busy, const char *text)
+void ResourceDetailsScreen::setFormsBusy(bool busy, const char *)
 {
    this->formsBusy = busy;
    if (busy)
@@ -433,14 +439,17 @@ void ResourceDetailsScreen::setFormsBusy(bool busy, const char *text)
    {
       lv_obj_add_state(this->formsBackButton, LV_STATE_DISABLED);
    }
-   if (this->formsNextLabel)
+   if (this->formsNextLabel && this->formsNextSpinner)
    {
       if (busy)
       {
-         lv_label_set_text(this->formsNextLabel, text ? text : "Laden...");
+         lv_obj_add_flag(this->formsNextLabel, LV_OBJ_FLAG_HIDDEN);
+         lv_obj_clear_flag(this->formsNextSpinner, LV_OBJ_FLAG_HIDDEN);
       }
       else
       {
+         lv_obj_clear_flag(this->formsNextLabel, LV_OBJ_FLAG_HIDDEN);
+         lv_obj_add_flag(this->formsNextSpinner, LV_OBJ_FLAG_HIDDEN);
          lv_label_set_text(this->formsNextLabel, this->formsIsLastField ? "Absenden" : "Weiter");
       }
    }
