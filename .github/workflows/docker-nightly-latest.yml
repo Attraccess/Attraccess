@@ -86,6 +86,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_DIST_TAG: next
+          NPM_NIGHTLY: 'true'
         run: pnpm nx run-many --target=publish --parallel=3 --projects=tag:type:plugin
 
   build-companion:

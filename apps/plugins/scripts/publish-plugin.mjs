@@ -10,7 +10,7 @@ const packageJsonPath = join(packageDir, 'package.json');
 const pkg = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
 const tag = process.env.NPM_DIST_TAG ?? (pkg.version.includes('-') ? 'next' : 'latest');
 
-if (tag === 'next') {
+if (process.env.NPM_NIGHTLY === 'true') {
   const runNumber = process.env.GITHUB_RUN_NUMBER;
   if (!runNumber) throw new Error('GITHUB_RUN_NUMBER is required to publish a nightly plugin package.');
 
