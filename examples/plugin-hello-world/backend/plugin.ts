@@ -41,6 +41,11 @@ class HelloWorldService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     this.context.onEvent(RESOURCE_USAGE_STARTED, ({ resource, user }) => {
       this.context.logger.log(`Resource ${resource.id} usage started by user ${user.id} — hello!`);
+      return this.context.flows.trigger(
+        'plugin.plugin-hello-world.usage-started',
+        (config) => config.userId === user.id,
+        { resource: { id: resource.id }, user: { id: user.id, username: user.username } },
+      );
     });
 
     await this.context.mqtt.subscribe(1, 'hello-world/ping', ({ payload }) => {
@@ -80,6 +85,21 @@ class HelloWorldController {
 class HelloWorldPluginModule {}
 
 const plugin: PluginBackendModule = {
+  flowNodes: [
+    {
+      type: 'plugin.plugin-hello-world.usage-started',
+      label: 'Hello World usage started',
+      description: 'Starts when the configured user starts using a resource.',
+      configSchema: {
+        type: 'object',
+        properties: { userId: { type: 'number', title: 'User ID' } },
+        required: ['userId'],
+      },
+      inputs: [],
+      outputs: ['output'],
+      isInput: true,
+    },
+  ],
   register(context: PluginContext): DynamicModule {
     return {
       module: HelloWorldPluginModule,

@@ -5,6 +5,7 @@ import {
   MqttServerConnectionConfig,
   MqttCredentialProvisioningHostProvider,
   PluginContext,
+  PluginFlowsContext,
   PluginPermission,
   PluginPermissionError,
   SystemEvent,
@@ -161,6 +162,10 @@ export class PluginSandboxService {
       getMqttCredentialProvisioning(): MqttCredentialProvisioningHostProvider {
         require(PluginPermission.ACCESS_MQTT_SERVERS, 'getMqttCredentialProvisioning()');
         return base.getMqttCredentialProvisioning();
+      },
+      get flows(): PluginFlowsContext {
+        require(PluginPermission.TRIGGER_FLOWS, 'flows.trigger()');
+        return base.flows;
       },
     };
   }

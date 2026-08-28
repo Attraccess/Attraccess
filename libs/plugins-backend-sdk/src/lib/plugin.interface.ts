@@ -54,6 +54,8 @@ export enum PluginPermission {
   RESOLVE_HOST_PROVIDERS = 'RESOLVE_HOST_PROVIDERS',
   /** Read an MQTT server's connection config + resolved credentials via getMqttServerConfig(). */
   ACCESS_MQTT_SERVERS = 'ACCESS_MQTT_SERVERS',
+  /** Start flows from plugin-declared trigger nodes via flows.trigger(). */
+  TRIGGER_FLOWS = 'TRIGGER_FLOWS',
 }
 
 /**
@@ -69,6 +71,7 @@ export const PLUGIN_PERMISSION_DESCRIPTIONS: Record<PluginPermission, string> = 
   [PluginPermission.LISTEN_EVENTS]: 'Subscribe to events on the shared application event bus.',
   [PluginPermission.RESOLVE_HOST_PROVIDERS]: 'Resolve arbitrary host services by injection token.',
   [PluginPermission.ACCESS_MQTT_SERVERS]: "Read an MQTT server's connection configuration and resolved credentials.",
+  [PluginPermission.TRIGGER_FLOWS]: 'Start flows from plugin-declared trigger nodes.',
 };
 
 /**
