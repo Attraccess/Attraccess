@@ -95,6 +95,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     string,
     {
       readerId: number;
+      socketId: string;
       resolve: (result: BleProxyResult) => void;
       reject: (error: Error) => void;
       timeoutId: NodeJS.Timeout;
@@ -347,7 +348,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     const readerName = socket.readerName;
     if (readerId) {
       for (const [requestId, awaiter] of this.bleProxyResponseAwaiters) {
-        if (awaiter.readerId === readerId) {
+        if (awaiter.socketId === socket.id) {
           clearTimeout(awaiter.timeoutId);
           awaiter.reject(new Error(`Reader ${readerId} disconnected during BLE proxy operation`));
           this.bleProxyResponseAwaiters.delete(requestId);
@@ -560,9 +561,11 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   public async sendBleProxyCommand(readerId: number, command: BleProxyCommandDto): Promise<BleProxyResult> {
-    const socket = Array.from(this.websocketService.sockets.values()).find(
-      (candidate) => candidate.readerId === readerId,
-    );
+    // A reconnect can briefly overlap a stale socket until TCP notices the old
+    // connection is gone. Prefer the newest connection for reader commands.
+    const socket = Array.from(this.websocketService.sockets.values())
+      .reverse()
+      .find((candidate) => candidate.readerId === readerId);
     if (!socket) {
       throw new Error(`Reader not connected: ${readerId}`);
     }
@@ -577,7 +580,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         command.operation === 'scan' ? 15_000 : 10_000,
       );
 
-      this.bleProxyResponseAwaiters.set(requestId, { readerId, resolve, reject, timeoutId });
+      this.bleProxyResponseAwaiters.set(requestId, { readerId, socketId: socket.id, resolve, reject, timeoutId });
     });
 
     void socket

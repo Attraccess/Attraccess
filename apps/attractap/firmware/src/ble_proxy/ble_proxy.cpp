@@ -178,7 +178,7 @@ void BleProxy::scan()
 
     ble_gap_disc_params parameters{};
     parameters.filter_duplicates = 1;
-    parameters.passive = 1;
+    parameters.passive = 0;
     result = ble_gap_disc(ownAddressType, 5000, &parameters, onGapEvent, this);
     if (result != 0)
     {
@@ -219,7 +219,9 @@ void BleProxy::connect(JsonObjectConst payload)
     }
     if (result != 0)
     {
-        finish(false, "CONNECT_START_FAILED");
+        char error[32];
+        std::snprintf(error, sizeof(error), "CONNECT_START_FAILED:%d", result);
+        finish(false, error);
     }
 }
 
@@ -277,12 +279,28 @@ int BleProxy::onGapEvent(struct ble_gap_event *event, void *arg)
             return 0;
         }
         bool matches = false;
+        std::string advertisementHex;
         for (int i = 0; i < fields.num_uuids128; ++i)
         {
             if (ble_uuid_cmp(&fields.uuids128[i].u, &self->serviceUuid.u) == 0)
             {
                 matches = true;
                 break;
+            }
+        }
+        // The service UUID and name are sent in an optional scan response. The
+        // primary PS Locks frame uses the documented 0xffff manufacturer ID.
+        if (!matches && fields.mfg_data_len == 23 && fields.mfg_data[0] == 0xff && fields.mfg_data[1] == 0xff)
+        {
+            const uint8_t battery = fields.mfg_data[2];
+            matches = battery <= 100 || battery == 200;
+            for (size_t i = 0; matches && i < 5; ++i)
+            {
+                matches = fields.mfg_data[13 + i] == event->disc.addr.val[4 - i];
+            }
+            if (matches)
+            {
+                advertisementHex = bytesToHex(fields.mfg_data, fields.mfg_data_len);
             }
         }
         if (!matches)
@@ -297,12 +315,17 @@ int BleProxy::onGapEvent(struct ble_gap_event *event, void *arg)
         {
             name.assign(reinterpret_cast<const char *>(fields.name), fields.name_len);
         }
+        else
+        {
+            name = "PSLOCK";
+        }
         self->finish(true,
                      nullptr,
                      address.c_str(),
                      event->disc.addr.type,
                      event->disc.rssi,
-                     name.c_str());
+                     name.c_str(),
+                     advertisementHex.empty() ? nullptr : advertisementHex.c_str());
         return 0;
     }
     case BLE_GAP_EVENT_DISC_COMPLETE:

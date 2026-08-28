@@ -291,4 +291,37 @@ describe('AttractapGateway', () => {
       expect(socket2.close).toHaveBeenCalled();
     });
   });
+
+  describe('sendBleProxyCommand', () => {
+    it('uses the newest reader socket and ignores an overlapping stale disconnect', async () => {
+      const stale = createMockSocket({ id: 'ble-stale', readerId: 5 });
+      const fresh = createMockSocket({
+        id: 'ble-fresh',
+        readerId: 5,
+        sendMessage: jest.fn().mockResolvedValue(true),
+      });
+      websocketService.sockets.set(stale.id, stale);
+      websocketService.sockets.set(fresh.id, fresh);
+
+      const resultPromise = gateway.sendBleProxyCommand(5, { operation: 'scan' });
+      await Promise.resolve();
+
+      expect(stale.sendMessage).not.toHaveBeenCalled();
+      expect(fresh.sendMessage).toHaveBeenCalledTimes(1);
+      const command = (fresh.sendMessage as jest.Mock).mock.calls[0][0] as AttractapEvent;
+
+      await gateway.handleDisconnect(stale);
+      await gateway.onClientEvent(
+        new AttractapEvent(AttractapEventType.BLE_PROXY_RESULT, {
+          requestId: command.data.payload.requestId,
+          operation: 'scan',
+          success: false,
+          error: 'LOCK_NOT_FOUND',
+        }).data,
+        fresh,
+      );
+
+      await expect(resultPromise).resolves.toMatchObject({ error: 'LOCK_NOT_FOUND' });
+    });
+  });
 });

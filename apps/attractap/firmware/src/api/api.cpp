@@ -6,6 +6,7 @@
 #include "../utils.hpp"
 #include "platform.hpp"
 #include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "freertos/task.h"
 #include <cstring>
 #include <memory>
@@ -29,6 +30,12 @@ void API::updateSateInfo()
 
 void API::setup()
 {
+    this->incomingMessageQueue = xQueueCreate(INCOMING_MESSAGE_QUEUE_DEPTH, sizeof(IncomingMessage));
+    if (!this->incomingMessageQueue)
+    {
+        this->logger.error("Failed to create incoming websocket message queue");
+    }
+
     this->bleProxy.setup([this](const char *requestId,
                                 const char *operation,
                                 bool success,
@@ -53,7 +60,7 @@ void API::setup()
         this->sendMessage("BLE_PROXY_RESULT", payload); });
     this->websocket.setup();
     this->websocket.setMessageCallbackRaw([this](const char *buf, size_t len)
-                                          { this->processIncomingMessage(buf, len); });
+                                           { this->enqueueIncomingMessage(buf, len); });
 #ifndef DEMO_MODE
     this->websocket.setBinaryDataCallback([this](esp_websocket_event_data_t data)
                                           { this->firmware.onChunk(data); });
@@ -72,6 +79,14 @@ void API::setFirmwareUpdateMetaCallback(std::function<void(std::string available
 void API::loop()
 {
     this->websocket.loop();
+
+    IncomingMessage message;
+    while (this->incomingMessageQueue && xQueueReceive(this->incomingMessageQueue, &message, 0) == pdTRUE)
+    {
+        this->processIncomingMessage(message.data, message.length);
+        free(message.data);
+    }
+
     this->updateSateInfo();
 
     // Only send heartbeat when connection is usable
@@ -83,9 +98,33 @@ void API::loop()
     this->firmware.tick();
 }
 
+void API::enqueueIncomingMessage(const char *data, size_t length)
+{
+    if (!this->incomingMessageQueue)
+    {
+        this->logger.error("Incoming websocket message queue is unavailable");
+        return;
+    }
+
+    char *copy = static_cast<char *>(malloc(length));
+    if (!copy)
+    {
+        this->logger.error("Failed to allocate incoming websocket message");
+        return;
+    }
+    memcpy(copy, data, length);
+
+    IncomingMessage message{copy, length};
+    if (xQueueSend(this->incomingMessageQueue, &message, 0) != pdTRUE)
+    {
+        this->logger.error("Incoming websocket message queue full, dropping message");
+        free(copy);
+    }
+}
+
 void API::processIncomingMessage(const char *buf, size_t len)
 {
-    // Parse into persistent inboundDoc to avoid deep stack usage in websocket task (no filter; server sends only needed fields)
+    // Parse into persistent inboundDoc on the main application task.
     inboundDoc.clear();
     auto err = deserializeJson(inboundDoc, buf, len);
     if (err)

@@ -3,6 +3,8 @@
 #include <functional>
 
 #include <ArduinoJson.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include <string>
 #include <vector>
 #include "../settings/settings.hpp"
@@ -369,11 +371,20 @@ private:
     static constexpr size_t JSON_OUTBUF_SMALL = 256;
     static constexpr size_t JSON_OUTBUF_AUTH = 1024;
 
+    struct IncomingMessage
+    {
+        char *data;
+        size_t length;
+    };
+    static constexpr size_t INCOMING_MESSAGE_QUEUE_DEPTH = 8;
+    QueueHandle_t incomingMessageQueue = nullptr;
+    void enqueueIncomingMessage(const char *data, size_t length);
+
     uint32_t resourceListMessageCounter = 0;
 
     // Persistent scratch buffer to avoid large stack allocations when parsing resource lists
     ResourceList resourceListScratch;
-    // Persistent inbound JSON document to avoid large stack usage in websocket task
+    // Persistent inbound JSON document used by the main application task.
     StaticJsonDocument<6144> inboundDoc;
     void sendHeartbeat();
 

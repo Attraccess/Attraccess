@@ -7,7 +7,6 @@
 #include <cstring>
 #include <string>
 #ifdef ESP_PLATFORM
-#include "esp_heap_caps.h"
 #include "esp_task_wdt.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -82,10 +81,6 @@ void Application::setup() {
   this->nfc.setup();
 
   this->api.setup();
-
-  std::printf("[DEBUG-att1031] after api setup: internal_free=%u largest=%u\n",
-              static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
-              static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)));
 
 #ifdef HAS_LVGL_DISPLAY
   this->supervision.setup();
@@ -592,13 +587,8 @@ void Application::setup() {
 #endif
 
 #ifndef DEMO_MODE
-  const BaseType_t networkTaskResult =
-      xTaskCreate(Application::networkTask, "NetworkTask", 4096, nullptr,
-                  tskIDLE_PRIORITY, nullptr);
-  std::printf("[DEBUG-att1031] network task result=%d internal_free=%u largest=%u\n",
-              static_cast<int>(networkTaskResult),
-              static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
-              static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)));
+  xTaskCreate(Application::networkTask, "NetworkTask", 4096, nullptr,
+              tskIDLE_PRIORITY, nullptr);
 #endif
 
 #ifdef ESP_PLATFORM
