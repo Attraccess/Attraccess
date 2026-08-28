@@ -207,6 +207,44 @@ describe('NpmPluginService', () => {
     });
   });
 
+  it('filters official fallback packages by query and deduplicates npm search results', async () => {
+    const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
+    const internals = service as unknown as ServiceInternals;
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+    jest.spyOn(axios, 'get').mockResolvedValue({
+      data: { objects: [{ package: { name: '@attraccess-plugins/shelly' } }] },
+    });
+    const packageMetadata = jest.spyOn(service, 'packageMetadata').mockImplementation(async (name) => ({
+      name,
+      publisher: { username: 'attraccess' },
+      'dist-tags': { latest: '1.2.3' },
+      versions: {
+        '1.2.3': {
+          name,
+          version: '1.2.3',
+          keywords: ['attraccess-plugin'],
+          peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
+          attraccess: {
+            displayName: name,
+            host: '*',
+            backend: 'dist/index.js',
+            sdk: { backend: '*' },
+            permissions: [],
+          },
+        },
+      },
+    }));
+
+    const result = await service.searchMarketplace('shelly');
+
+    expect(result).toMatchObject({ errors: [] });
+    expect(result.results).toEqual([
+      expect.objectContaining({ name: '@attraccess-plugins/shelly', classification: 'official' }),
+    ]);
+    expect(packageMetadata).not.toHaveBeenCalledWith('@attraccess-plugins/rabbitmq', 'npm');
+  });
+
   it('retains hydrated marketplace packages when another result no longer has metadata', async () => {
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
     const internals = service as unknown as ServiceInternals;
