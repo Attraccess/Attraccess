@@ -17,12 +17,14 @@ class InMemoryMqttBroker {
   }
 
   publish(credentials: Credentials, topic: string, payload: string): void {
-    if (!credentials.publish.some((allowed) => topicMatches(allowed, topic))) throw new Error(`publish denied: ${topic}`);
+    if (!credentials.publish.some((allowed) => topicMatches(allowed, topic)))
+      throw new Error(`publish denied: ${topic}`);
     this.listeners.get(topic)?.forEach((listener) => listener(payload));
   }
 
   subscribe(credentials: Credentials, topic: string, listener: (payload: string) => void): void {
-    if (!credentials.subscribe.some((allowed) => topicMatches(allowed, topic))) throw new Error(`subscribe denied: ${topic}`);
+    if (!credentials.subscribe.some((allowed) => topicMatches(allowed, topic)))
+      throw new Error(`subscribe denied: ${topic}`);
     this.listeners.set(topic, [...(this.listeners.get(topic) ?? []), listener]);
   }
 }
@@ -37,19 +39,34 @@ class WagoProtocolEmulator {
     this.broker.publish(
       this.credentials,
       discoveryTopic(hardwareId),
-      JSON.stringify({ hardwareId, pairingCode, protocolVersion: '1.0.0', runtimeVersion: '1.0.0', capabilities: ['claim', 'heartbeat'] }),
+      JSON.stringify({
+        hardwareId,
+        pairingCode,
+        protocolVersion: '1.0.0',
+        runtimeVersion: '1.0.0',
+        capabilities: ['claim', 'heartbeat'],
+      }),
     );
   }
 
   receiveClaim(hardwareId: string, receive: (credentials: { username: string; password: string }) => void): void {
-    this.broker.subscribe(this.credentials, `${discoveryTopic(hardwareId)}/claim`, (payload) => receive(JSON.parse(payload)));
+    this.broker.subscribe(this.credentials, `${discoveryTopic(hardwareId)}/claim`, (payload) =>
+      receive(JSON.parse(payload)),
+    );
   }
 
   heartbeat(hardwareId: string, sequence: number): void {
     this.broker.publish(
       this.credentials,
       heartbeatTopic(hardwareId),
-      JSON.stringify({ hardwareId, pairingCode: '482931', protocolVersion: '1.0.0', runtimeVersion: '1.0.0', capabilities: ['claim', 'heartbeat'], sequence }),
+      JSON.stringify({
+        hardwareId,
+        pairingCode: '482931',
+        protocolVersion: '1.0.0',
+        runtimeVersion: '1.0.0',
+        capabilities: ['claim', 'heartbeat'],
+        sequence,
+      }),
     );
   }
 }
@@ -57,14 +74,26 @@ class WagoProtocolEmulator {
 describe('WAGO protocol emulator', () => {
   it('covers discovery, claim, reconnect, heartbeat, rejected credentials, and controller isolation', () => {
     const broker = new InMemoryMqttBroker();
-    const firstDiscovery = { password: 'enroll-1', publish: [discoveryTopic('cc100-01')], subscribe: [`${discoveryTopic('cc100-01')}/claim`] };
-    const secondDiscovery = { password: 'enroll-2', publish: [discoveryTopic('cc100-02')], subscribe: [`${discoveryTopic('cc100-02')}/claim`] };
+    const firstDiscovery = {
+      password: 'enroll-1',
+      publish: [discoveryTopic('cc100-01')],
+      subscribe: [`${discoveryTopic('cc100-01')}/claim`],
+    };
+    const secondDiscovery = {
+      password: 'enroll-2',
+      publish: [discoveryTopic('cc100-02')],
+      subscribe: [`${discoveryTopic('cc100-02')}/claim`],
+    };
     broker.allow('enrollment-1', firstDiscovery);
     broker.allow('enrollment-2', secondDiscovery);
     const first = broker.connect('enrollment-1', 'enroll-1');
     const second = broker.connect('enrollment-2', 'enroll-2');
     const discoveries: string[] = [];
-    const server = { password: 'server', publish: [`${discoveryTopic('cc100-01')}/claim`], subscribe: [discoveryTopic('cc100-01'), discoveryTopic('cc100-02'), heartbeatTopic('cc100-01')] };
+    const server = {
+      password: 'server',
+      publish: [`${discoveryTopic('cc100-01')}/claim`],
+      subscribe: [discoveryTopic('cc100-01'), discoveryTopic('cc100-02'), heartbeatTopic('cc100-01')],
+    };
     broker.allow('server', server);
     broker.connect('server', 'server');
     broker.subscribe(server, discoveryTopic('cc100-01'), () => discoveries.push('cc100-01'));
@@ -81,7 +110,11 @@ describe('WAGO protocol emulator', () => {
       permanentCredentials = credentials;
     });
     broker.allow('controller-1', { password: 'permanent-1', publish: [heartbeatTopic('cc100-01')], subscribe: [] });
-    broker.publish(server, `${discoveryTopic('cc100-01')}/claim`, JSON.stringify({ username: 'controller-1', password: 'permanent-1' }));
+    broker.publish(
+      server,
+      `${discoveryTopic('cc100-01')}/claim`,
+      JSON.stringify({ username: 'controller-1', password: 'permanent-1' }),
+    );
     expect(permanentCredentials).toEqual({ username: 'controller-1', password: 'permanent-1' });
     if (!permanentCredentials) throw new Error('permanent credentials were not received');
 

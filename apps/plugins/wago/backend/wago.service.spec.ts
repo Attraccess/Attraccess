@@ -47,7 +47,10 @@ describe('WagoService', () => {
       save: jest.fn().mockImplementation(async (value) => value),
       createQueryBuilder: jest.fn().mockReturnValue(enrollmentQuery),
     };
-    const settingsRepository = { findOneBy: jest.fn().mockResolvedValue({ id: 1, defaultMqttServerId }), save: jest.fn() };
+    const settingsRepository = {
+      findOneBy: jest.fn().mockResolvedValue({ id: 1, defaultMqttServerId }),
+      save: jest.fn(),
+    };
     const subscriptions: Array<{ unsubscribe: jest.Mock }> = [];
     const context = {
       getRepository: jest.fn((entity) => {
@@ -89,9 +92,9 @@ describe('WagoService', () => {
   it('accepts a heartbeat that omits the optional sequence', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
     const { service, controllerRepository } = createService([claimed]);
-    const onHeartbeat = (Reflect.get(service, 'onHeartbeat') as (hardwareId: string, payload: Buffer) => Promise<void>).bind(
-      service,
-    );
+    const onHeartbeat = (
+      Reflect.get(service, 'onHeartbeat') as (hardwareId: string, payload: Buffer) => Promise<void>
+    ).bind(service);
 
     await onHeartbeat(
       claimed.hardwareId,
@@ -111,10 +114,9 @@ describe('WagoService', () => {
 
   it('serializes concurrent claims for the same controller', async () => {
     const { service } = createService();
-    const withClaimLock = (Reflect.get(service, 'withClaimLock') as <T>(
-      id: number,
-      operation: () => Promise<T>,
-    ) => Promise<T>).bind(service);
+    const withClaimLock = (
+      Reflect.get(service, 'withClaimLock') as <T>(id: number, operation: () => Promise<T>) => Promise<T>
+    ).bind(service);
     const started: number[] = [];
     let release!: () => void;
     const first = withClaimLock(1, async () => {
@@ -180,7 +182,9 @@ describe('WagoService', () => {
 
   it('keeps replacement subscriptions inert until they replace the active generation', async () => {
     const { service, context, subscriptions } = createService([], [], 2);
-    const subscribeConfiguredServers = (Reflect.get(service, 'subscribeConfiguredServers') as () => Promise<void>).bind(service);
+    const subscribeConfiguredServers = (Reflect.get(service, 'subscribeConfiguredServers') as () => Promise<void>).bind(
+      service,
+    );
 
     await subscribeConfiguredServers();
     const firstCallback = (context.mqtt.subscribe as jest.Mock).mock.calls[0][2] as (message: {
@@ -228,7 +232,9 @@ describe('WagoService', () => {
           };
         }),
     );
-    const subscribeConfiguredServers = (Reflect.get(service, 'subscribeConfiguredServers') as () => Promise<void>).bind(service);
+    const subscribeConfiguredServers = (Reflect.get(service, 'subscribeConfiguredServers') as () => Promise<void>).bind(
+      service,
+    );
 
     const rebuild = subscribeConfiguredServers();
     await new Promise<void>((resolve) => setImmediate(resolve));
@@ -248,9 +254,13 @@ describe('WagoService', () => {
       consumedAt: null,
     } as WagoEnrollment;
     const { service, enrollmentRepository, context } = createService([], [enrollment]);
-    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({ revoke: jest.fn().mockResolvedValue(undefined) });
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({
+      revoke: jest.fn().mockResolvedValue(undefined),
+    });
     (enrollmentRepository.save as jest.Mock).mockRejectedValue(new Error('database unavailable'));
-    const revokeEnrollment = (Reflect.get(service, 'revokeEnrollment') as (item: WagoEnrollment) => Promise<void>).bind(service);
+    const revokeEnrollment = (Reflect.get(service, 'revokeEnrollment') as (item: WagoEnrollment) => Promise<void>).bind(
+      service,
+    );
 
     await expect(revokeEnrollment(enrollment)).rejects.toThrow('database unavailable');
 
@@ -269,7 +279,9 @@ describe('WagoService', () => {
     const { service, enrollmentRepository, context } = createService([], [enrollment]);
     const revoke = jest.fn();
     (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({ revoke });
-    const revokeEnrollment = (Reflect.get(service, 'revokeEnrollment') as (item: WagoEnrollment) => Promise<void>).bind(service);
+    const revokeEnrollment = (Reflect.get(service, 'revokeEnrollment') as (item: WagoEnrollment) => Promise<void>).bind(
+      service,
+    );
 
     await revokeEnrollment(enrollment);
 

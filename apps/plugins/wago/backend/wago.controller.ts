@@ -18,9 +18,10 @@ export class WagoControllerApi {
   @Post('enrollments') enrollment(
     @Body() body: { hardwareId?: string; mqttServerId?: number; manualUsername?: string; manualPassword?: string },
   ) {
-    const manualCredentials = body?.manualUsername || body?.manualPassword
-      ? { username: body.manualUsername ?? '', password: body.manualPassword ?? '' }
-      : undefined;
+    const manualCredentials =
+      body?.manualUsername || body?.manualPassword
+        ? { username: body.manualUsername ?? '', password: body.manualPassword ?? '' }
+        : undefined;
     return this.wago.createEnrollment(body?.hardwareId ?? '', body?.mqttServerId, manualCredentials);
   }
   @Post('controllers/:id/claim') claim(

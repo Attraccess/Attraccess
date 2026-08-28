@@ -158,7 +158,9 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       expiresAt,
       manualInstructions:
         'instructions' in provisionedCredential
-          ? provisionedCredential.instructions.map((instruction) => instruction.replaceAll(identity, () => credential.username))
+          ? provisionedCredential.instructions.map((instruction) =>
+              instruction.replaceAll(identity, () => credential.username),
+            )
           : undefined,
     };
   }
@@ -167,7 +169,12 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     return this.withClaimLock(id, () => this.claimController(id, name, verifier, mqttServerId));
   }
 
-  private async claimController(id: number, name: string, verifier: string, mqttServerId?: number): Promise<WagoController> {
+  private async claimController(
+    id: number,
+    name: string,
+    verifier: string,
+    mqttServerId?: number,
+  ): Promise<WagoController> {
     const controller = await this.controllers.findOneBy({ id });
     if (!controller) throw new NotFoundException(`WAGO controller ${id} not found`);
     if (controller.trustState === 'claimed') throw new ConflictException('controller has already been claimed');
@@ -183,7 +190,9 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       throw new NotFoundException(`MQTT server ${selectedServerId} not found`);
     const enrollment = await this.activeEnrollment(controller.enrollmentId);
     if (!enrollment)
-      throw new ConflictException('the controller enrollment package has expired or was already consumed; create a new one');
+      throw new ConflictException(
+        'the controller enrollment package has expired or was already consumed; create a new one',
+      );
 
     const identity = `wago-controller-${controller.hardwareId}`;
     const credential = await this.context.getMqttCredentialProvisioning().provision({
@@ -423,23 +432,29 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   private isActiveEnrollment(enrollment: WagoEnrollment): boolean {
     return !enrollment.consumedAt && Date.parse(enrollment.expiresAt) > Date.now();
   }
-  private scheduleEnrollmentExpiry(enrollment: WagoEnrollment, delay = Date.parse(enrollment.expiresAt) - Date.now()): void {
+  private scheduleEnrollmentExpiry(
+    enrollment: WagoEnrollment,
+    delay = Date.parse(enrollment.expiresAt) - Date.now(),
+  ): void {
     if (enrollment.consumedAt) return;
     const existing = this.enrollmentExpiryTimers.get(enrollment.id);
     if (existing) clearTimeout(existing);
     this.enrollmentExpiryTimers.set(
       enrollment.id,
-      setTimeout(() => {
-        this.enrollmentExpiryTimers.delete(enrollment.id);
-        if (this.destroyed) return;
-        void this.revokeEnrollment(enrollment)
-          .then(() => this.subscribeConfiguredServers())
-          .catch((error) => {
-            this.context.logger.warn(`Could not revoke expired WAGO enrollment ${enrollment.id}: ${String(error)}`);
-            if (!enrollment.consumedAt) this.scheduleEnrollmentExpiry(enrollment, ENROLLMENT_RETRY_MS);
-            this.scheduleSubscriptionRetry();
-          });
-      }, Math.max(0, delay)),
+      setTimeout(
+        () => {
+          this.enrollmentExpiryTimers.delete(enrollment.id);
+          if (this.destroyed) return;
+          void this.revokeEnrollment(enrollment)
+            .then(() => this.subscribeConfiguredServers())
+            .catch((error) => {
+              this.context.logger.warn(`Could not revoke expired WAGO enrollment ${enrollment.id}: ${String(error)}`);
+              if (!enrollment.consumedAt) this.scheduleEnrollmentExpiry(enrollment, ENROLLMENT_RETRY_MS);
+              this.scheduleSubscriptionRetry();
+            });
+        },
+        Math.max(0, delay),
+      ),
     );
   }
   private async revokeEnrollment(enrollment: WagoEnrollment): Promise<void> {
