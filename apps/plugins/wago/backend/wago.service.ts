@@ -38,6 +38,8 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   private readonly claimLocks = new Map<number, Promise<void>>();
   private subscriptionRebuild = Promise.resolve();
   private subscriptionRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private activeSubscriptionGeneration = 0;
+  private destroyed = false;
 
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {
     this.controllers = context.getRepository(WagoController);
@@ -51,6 +53,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     await this.subscribeConfiguredServers();
   }
   onModuleDestroy(): void {
+    this.destroyed = true;
     this.unsubscribe();
     this.enrollmentExpiryTimers.forEach((timer) => clearTimeout(timer));
     this.enrollmentExpiryTimers.clear();
@@ -219,12 +222,14 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async subscribeConfiguredServers(): Promise<void> {
+    if (this.destroyed) return;
     const rebuild = this.subscriptionRebuild.then(() => this.rebuildSubscriptions());
     this.subscriptionRebuild = rebuild.catch(() => undefined);
     return rebuild;
   }
 
   private async rebuildSubscriptions(): Promise<void> {
+    if (this.destroyed) return;
     const settings = await this.getSettings();
     const [controllers, enrollments] = await Promise.all([this.controllers.find(), this.activeEnrollments()]);
     const serverIds = new Set<number>();
@@ -238,21 +243,24 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     enrollments.forEach((enrollment) => {
       serverIds.add(enrollment.mqttServerId);
     });
+    const generation = this.activeSubscriptionGeneration + 1;
     const replacements: PluginMqttSubscription[] = [];
     try {
       for (const serverId of serverIds) {
         replacements.push(
-          await this.context.mqtt.subscribe(serverId, `${DISCOVERY_ROOT}/+`, (message) =>
-            this.onDiscovery(serverId, message.topic, message.payload),
-          ),
+          await this.context.mqtt.subscribe(serverId, `${DISCOVERY_ROOT}/+`, async (message) => {
+            if (!this.isActiveSubscriptionGeneration(generation)) return;
+            await this.onDiscovery(serverId, message.topic, message.payload);
+          }),
         );
         for (const controller of controllers.filter(
           (item) => item.trustState === 'claimed' && (item.mqttServerId ?? settings.defaultMqttServerId) === serverId,
         )) {
           replacements.push(
-            await this.context.mqtt.subscribe(serverId, heartbeatTopic(controller.hardwareId), (message) =>
-              this.onHeartbeat(controller.hardwareId, message.payload),
-            ),
+            await this.context.mqtt.subscribe(serverId, heartbeatTopic(controller.hardwareId), async (message) => {
+              if (!this.isActiveSubscriptionGeneration(generation)) return;
+              await this.onHeartbeat(controller.hardwareId, message.payload);
+            }),
           );
         }
       }
@@ -260,12 +268,22 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       replacements.forEach((subscription) => subscription.unsubscribe());
       throw error;
     }
+    if (this.destroyed) {
+      replacements.forEach((subscription) => subscription.unsubscribe());
+      return;
+    }
+    // New handlers are inert until this synchronous generation swap disables the old set.
+    this.activeSubscriptionGeneration = generation;
     this.unsubscribe();
     this.subscriptions.push(...replacements);
   }
 
   private unsubscribe(): void {
     this.subscriptions.splice(0).forEach((subscription) => subscription.unsubscribe());
+  }
+
+  private isActiveSubscriptionGeneration(generation: number): boolean {
+    return !this.destroyed && generation === this.activeSubscriptionGeneration;
   }
 
   private async onDiscovery(serverId: number, topic: string, payload: Buffer): Promise<void> {
@@ -402,6 +420,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       enrollment.id,
       setTimeout(() => {
         this.enrollmentExpiryTimers.delete(enrollment.id);
+        if (this.destroyed) return;
         void this.revokeEnrollment(enrollment)
           .then(() => this.subscribeConfiguredServers())
           .catch((error) => {
@@ -421,8 +440,14 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     });
     if (manual)
       throw new ConflictException(`Manual credential revocation is required: ${manual.instructions.join(' ')}`);
+    const consumedAt = enrollment.consumedAt;
     enrollment.consumedAt = new Date().toISOString();
-    await this.enrollments.save(enrollment);
+    try {
+      await this.enrollments.save(enrollment);
+    } catch (error) {
+      enrollment.consumedAt = consumedAt;
+      throw error;
+    }
     const timer = this.enrollmentExpiryTimers.get(enrollment.id);
     if (timer) clearTimeout(timer);
     this.enrollmentExpiryTimers.delete(enrollment.id);
@@ -443,9 +468,10 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     }
   }
   private scheduleSubscriptionRetry(): void {
-    if (this.subscriptionRetryTimer) return;
+    if (this.destroyed || this.subscriptionRetryTimer) return;
     this.subscriptionRetryTimer = setTimeout(() => {
       this.subscriptionRetryTimer = null;
+      if (this.destroyed) return;
       void this.subscribeConfiguredServers().catch((error) => {
         this.context.logger.warn(`Could not refresh WAGO MQTT subscriptions: ${String(error)}`);
         this.scheduleSubscriptionRetry();

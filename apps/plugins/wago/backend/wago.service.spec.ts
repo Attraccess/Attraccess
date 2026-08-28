@@ -25,7 +25,11 @@ describe('WagoService', () => {
     updatedAt: '2026-01-01T00:00:00.000Z',
   });
 
-  function createService(controllers = [controller()], enrollments: WagoEnrollment[] = []) {
+  function createService(
+    controllers = [controller()],
+    enrollments: WagoEnrollment[] = [],
+    defaultMqttServerId: number | null = null,
+  ) {
     const controllerRepository = {
       find: jest.fn().mockResolvedValue(controllers),
       findOneBy: jest.fn().mockResolvedValue(controllers[0] ?? null),
@@ -42,7 +46,8 @@ describe('WagoService', () => {
       save: jest.fn(),
       createQueryBuilder: jest.fn().mockReturnValue(enrollmentQuery),
     };
-    const settingsRepository = { findOneBy: jest.fn().mockResolvedValue({ id: 1, defaultMqttServerId: null }), save: jest.fn() };
+    const settingsRepository = { findOneBy: jest.fn().mockResolvedValue({ id: 1, defaultMqttServerId }), save: jest.fn() };
+    const subscriptions: Array<{ unsubscribe: jest.Mock }> = [];
     const context = {
       getRepository: jest.fn((entity) => {
         if (entity === WagoController) return controllerRepository;
@@ -51,10 +56,17 @@ describe('WagoService', () => {
         throw new Error('unexpected repository');
       }),
       logger: { warn: jest.fn() },
-      mqtt: { subscribe: jest.fn(), publish: jest.fn() },
+      mqtt: {
+        subscribe: jest.fn().mockImplementation(async () => {
+          const subscription = { unsubscribe: jest.fn() };
+          subscriptions.push(subscription);
+          return subscription;
+        }),
+        publish: jest.fn(),
+      },
       getMqttCredentialProvisioning: jest.fn(),
     } as unknown as PluginContext;
-    return { service: new WagoService(context), controllerRepository, enrollmentRepository, context };
+    return { service: new WagoService(context), controllerRepository, enrollmentRepository, context, subscriptions };
   }
 
   it('does not expose physical-verification secrets in controller listings', async () => {
@@ -112,7 +124,7 @@ describe('WagoService', () => {
     });
     const second = withClaimLock(1, async () => started.push(2));
 
-    await Promise.resolve();
+    await new Promise<void>((resolve) => setImmediate(resolve));
     expect(started).toEqual([1]);
     release();
     await Promise.all([first, second]);
@@ -142,5 +154,78 @@ describe('WagoService', () => {
 
     expect(enrollment.consumedAt).toBeNull();
     expect(enrollmentRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('keeps replacement subscriptions inert until they replace the active generation', async () => {
+    const { service, context, subscriptions } = createService([], [], 2);
+    const subscribeConfiguredServers = (Reflect.get(service, 'subscribeConfiguredServers') as () => Promise<void>).bind(service);
+
+    await subscribeConfiguredServers();
+    const firstCallback = (context.mqtt.subscribe as jest.Mock).mock.calls[0][2] as (message: {
+      topic: string;
+      payload: Buffer;
+    }) => Promise<void>;
+    let finishSubscription!: () => void;
+    let secondCallback!: (message: { topic: string; payload: Buffer }) => Promise<void>;
+    (context.mqtt.subscribe as jest.Mock).mockImplementationOnce((_serverId, _topic, callback) => {
+      secondCallback = callback;
+      return new Promise((resolve) => {
+        finishSubscription = () => {
+          const subscription = { unsubscribe: jest.fn() };
+          subscriptions.push(subscription);
+          resolve(subscription);
+        };
+      });
+    });
+    const rebuild = subscribeConfiguredServers();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const message = { topic: 'attraccess/wago/discovery/cc100-01', payload: Buffer.from('{}') };
+
+    const onDiscovery = jest.spyOn(service as never, 'onDiscovery').mockResolvedValue(undefined);
+    await secondCallback(message);
+    expect(onDiscovery).not.toHaveBeenCalled();
+
+    finishSubscription();
+    await rebuild;
+    await firstCallback(message);
+    await secondCallback(message);
+    expect(onDiscovery).toHaveBeenCalledTimes(1);
+    expect(subscriptions[0].unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it('unsubscribes an in-flight replacement when the module is destroyed', async () => {
+    let finishSubscribe!: () => void;
+    const { service, context, subscriptions } = createService([], [], 2);
+    (context.mqtt.subscribe as jest.Mock).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishSubscribe = () => {
+            const subscription = { unsubscribe: jest.fn() };
+            subscriptions.push(subscription);
+            resolve(subscription);
+          };
+        }),
+    );
+    const subscribeConfiguredServers = (Reflect.get(service, 'subscribeConfiguredServers') as () => Promise<void>).bind(service);
+
+    const rebuild = subscribeConfiguredServers();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    service.onModuleDestroy();
+    finishSubscribe();
+    await rebuild;
+
+    expect(subscriptions[0].unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores enrollment state when recording a revocation fails', async () => {
+    const enrollment = { id: 3, mqttServerId: 2, identity: 'wago-enrollment-test', consumedAt: null } as WagoEnrollment;
+    const { service, enrollmentRepository, context } = createService([], [enrollment]);
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({ revoke: jest.fn().mockResolvedValue(undefined) });
+    (enrollmentRepository.save as jest.Mock).mockRejectedValue(new Error('database unavailable'));
+    const revokeEnrollment = (Reflect.get(service, 'revokeEnrollment') as (item: WagoEnrollment) => Promise<void>).bind(service);
+
+    await expect(revokeEnrollment(enrollment)).rejects.toThrow('database unavailable');
+
+    expect(enrollment.consumedAt).toBeNull();
   });
 });
