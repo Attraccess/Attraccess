@@ -308,6 +308,44 @@ describe('PluginsSection', () => {
     expect(hoisted.successToast).not.toHaveBeenCalledWith(expect.objectContaining({ title: 'Registry added.' }));
   });
 
+  it('keeps the latest registry test pending when an earlier test completes', async () => {
+    const firstTest = deferred<{ ok: boolean }>();
+    const secondTest = deferred<{ ok: boolean }>();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: { url?: string } | string, init?: { method?: string }) => {
+        const request = typeof input === 'string' ? { url: input, method: init?.method } : input;
+        if (request.url?.endsWith('/api/plugins/registries'))
+          return Promise.resolve({
+            ok: true,
+            json: async () => [
+              { id: 'first', name: 'First', url: 'https://first.example.test', tokenConfigured: false },
+              { id: 'second', name: 'Second', url: 'https://second.example.test', tokenConfigured: false },
+            ],
+          });
+        if (request.url?.endsWith('/registries/first/test')) return firstTest.promise;
+        if (request.url?.endsWith('/registries/second/test')) return secondTest.promise;
+        if (request.url?.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+        return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
+      }),
+    );
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+    await openMarketplace(user);
+
+    await user.click(screen.getByText('Manage registries'));
+    const testButtons = await screen.findAllByRole('button', { name: 'Test' });
+    await user.click(testButtons[0]);
+    await user.click(testButtons[1]);
+    expect(testButtons[1]).toHaveAttribute('aria-disabled', 'true');
+
+    firstTest.resolve({ ok: true });
+    await waitFor(() => expect(testButtons[1]).toHaveAttribute('aria-disabled', 'true'));
+
+    secondTest.resolve({ ok: true });
+    await waitFor(() => expect(testButtons[1]).not.toHaveAttribute('aria-disabled', 'true'));
+  });
+
   it('renders community for an installed plugin until its npm classification is available', () => {
     hoisted.plugins = [makePlugin({ name: '@attraccess-plugins/shelly' })];
     const installedResponse = {

@@ -268,7 +268,7 @@ export function PluginsSection() {
     } catch {
       toast.error({ title: t('marketplace.registryTestError') });
     } finally {
-      setTestingRegistryId(null);
+      setTestingRegistryId((current) => (current === registryId ? null : current));
     }
   };
 
