@@ -63,6 +63,9 @@ public:
         bool hasActiveUsage;
         bool isUnderMaintenance;
         bool isHealthy;
+        bool hasIntroduction;
+        bool isIntroducer;
+        bool requiresSupervisor;
         char healthReason[MAX_HEALTH_REASON_LEN];
         char activeUser[MAX_USERNAME_LEN];
         uint32_t activeStartEpoch;          // seconds since epoch (UTC)

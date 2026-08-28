@@ -10,6 +10,7 @@ import { ResourceIntroducersService } from '../../../resources/introducers/resou
 import { MetricsService } from '../../../metrics/metrics.service';
 import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
+import { ResourceListService } from './resource-list.service';
 
 @Injectable()
 export class AttractapCardHandler {
@@ -38,6 +39,9 @@ export class AttractapCardHandler {
 
   @InjectRepository(Resource)
   private resourceRepository: Repository<Resource>;
+
+  @Inject(ResourceListService)
+  private resourceListService: ResourceListService;
 
   public async startEnrollOfNewNfcCard(data: { readerId: number; userId: number }) {
     const reader = await this.attractapService.findReaderById(data.readerId);
@@ -304,6 +308,10 @@ export class AttractapCardHandler {
     const requiresSupervisor =
       supervisionMode === SupervisionMode.SUPERVISION_REQUIRED ||
       (supervisionMode === SupervisionMode.SUPERVISION_ALLOWED && !hasIntroduction);
+
+    // The list is personalized after each card tap so row actions use the
+    // selected resource's authorization instead of the authentication resource.
+    await this.resourceListService.sendResourceListToSocket(socket);
 
     await socket.sendMessage(
       new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, {

@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ResourceFlowNodeType, ResourceHealthStatus, ResourceIntroducerType } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceHealthStatus, ResourceIntroducerType, SupervisionMode, User } from '@attraccess/database-entities';
 import { WebsocketService } from '../websocket.service';
 import { AttractapService } from '../../attractap.service';
 import { ResourceUsageService } from '../../../resources/usage/resourceUsage.service';
@@ -7,6 +7,7 @@ import { ResourceMaintenanceService } from '../../../resources/maintenances/main
 import { ResourceHealthService } from '../../../resources/health/resource-health.service';
 import { ResourceFlowsService } from '../../../resources/flows/resource-flows.service';
 import { ResourceIntroducersService } from '../../../resources/introducers/resourceIntroducers.service';
+import { UsersService } from '../../../users-and-auth/users/users.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
 
 const DEBOUNCE_MS = 200;
@@ -35,6 +36,9 @@ export class ResourceListService {
 
   @Inject(ResourceIntroducersService)
   private resourceIntroducersService: ResourceIntroducersService;
+
+  @Inject(UsersService)
+  private usersService: UsersService;
 
   private readonly pendingSends = new Map<number, { timer: ReturnType<typeof setTimeout>; resourceIds: Set<number> }>();
 
@@ -121,47 +125,74 @@ export class ResourceListService {
     const resourceListPayload = {
       readerName: reader.name,
       ledBrightness: reader.ledBrightness,
-      resources: resources.map((resource) => {
-        const healthEntries = healthMap.get(resource.id) ?? [];
-        const unhealthyEntries = healthEntries.filter((entry) => entry.status === ResourceHealthStatus.UNHEALTHY);
-        const activeUsageSession = activeSessionMap.get(resource.id) ?? null;
-        const flowNodes = flowButtonMap.get(resource.id) ?? [];
-
-        return {
-          id: resource.id,
-          name: resource.name,
-          type: resource.type,
-          separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch,
-          description: resource.description,
-          allowTakeOver: resource.allowTakeOver,
-          introducers: (introducersByResourceId.get(resource.id) ?? []).flatMap((introducer) =>
-            introducer.user ? [introducer.user.username] : []),
-          isUnderMaintenance: activeMaintenanceIds.has(resource.id),
-          isHealthy: unhealthyEntries.length === 0,
-          healthReason: this.buildHealthReason(unhealthyEntries),
-          activeUsageSession: activeUsageSession
-          ? {
-            user: {
-              username: activeUsageSession.user.username,
-            },
-            startTime: activeUsageSession.startTime.toISOString(),
-            // Offset (minutes east of UTC) of the API's effective timezone for this
-            // specific instant, so the reader can render local wall-clock time without
-            // a tz database. Computed per-timestamp, so it stays DST-correct.
-            startTimeUtcOffsetMinutes: -activeUsageSession.startTime.getTimezoneOffset(),
-          }
-          : null,
-          flowButtons: flowNodes.map((node) => ({ id: node.id, label: node.data.label || node.id })),
-        };
-      }),
     };
     await Promise.all(
       sockets.map(async (socket) => {
-        const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, resourceListPayload);
+        const user = await this.getAuthenticatedUser(socket);
+        const accessByResourceId = new Map<number, { hasIntroduction: boolean; isIntroducer: boolean }>();
+        if (user) {
+          await Promise.all(
+            resources.map(async (resource) => {
+              const [hasIntroduction, isIntroducer] = await Promise.all([
+                this.resourceUsageService.canControllResource(resource.id, user),
+                this.resourceIntroducersService.isIntroducer(resource.id, user.id, true),
+              ]);
+              accessByResourceId.set(resource.id, { hasIntroduction, isIntroducer });
+            }),
+          );
+        }
+
+        const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, {
+          ...resourceListPayload,
+          resources: resources.map((resource) => {
+            const access = accessByResourceId.get(resource.id) ?? { hasIntroduction: false, isIntroducer: false };
+            const healthEntries = healthMap.get(resource.id) ?? [];
+            const unhealthyEntries = healthEntries.filter((entry) => entry.status === ResourceHealthStatus.UNHEALTHY);
+            const activeUsageSession = activeSessionMap.get(resource.id) ?? null;
+            const flowNodes = flowButtonMap.get(resource.id) ?? [];
+
+            return {
+              id: resource.id,
+              name: resource.name,
+              type: resource.type,
+              separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch,
+              description: resource.description,
+              allowTakeOver: resource.allowTakeOver,
+              introducers: (introducersByResourceId.get(resource.id) ?? []).flatMap((introducer) =>
+                introducer.user ? [introducer.user.username] : []),
+              isUnderMaintenance: activeMaintenanceIds.has(resource.id),
+              isHealthy: unhealthyEntries.length === 0,
+              healthReason: this.buildHealthReason(unhealthyEntries),
+              hasIntroduction: access.hasIntroduction,
+              isIntroducer: access.isIntroducer,
+              requiresSupervisor:
+                resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED ||
+                (resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED && !access.hasIntroduction),
+              activeUsageSession: activeUsageSession
+                ? {
+                    user: {
+                      username: activeUsageSession.user.username,
+                    },
+                    startTime: activeUsageSession.startTime.toISOString(),
+                    // Offset (minutes east of UTC) of the API's effective timezone for this
+                    // specific instant, so the reader can render local wall-clock time without
+                    // a tz database. Computed per-timestamp, so it stays DST-correct.
+                    startTimeUtcOffsetMinutes: -activeUsageSession.startTime.getTimezoneOffset(),
+                  }
+                : null,
+              flowButtons: flowNodes.map((node) => ({ id: node.id, label: node.data.label || node.id })),
+            };
+          }),
+        });
         this.logger.debug(`Sending resource list to socket ${socket.id}`, resourceListResponse);
         await socket.sendMessage(resourceListResponse);
       }),
     );
+  }
+
+  private async getAuthenticatedUser(socket: AuthenticatedWebSocket): Promise<User | null> {
+    const userId = socket.state.lastAuthenticatedUserId;
+    return userId === null ? null : this.usersService.findOne({ id: userId });
   }
 
   private buildHealthReason(unhealthyEntries: { identifier: string; reason: string | null }[]): string {

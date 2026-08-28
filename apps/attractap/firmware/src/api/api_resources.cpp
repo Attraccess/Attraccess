@@ -98,6 +98,9 @@ void API::onResourceList(JsonObject data)
 
         // Health state: default to healthy when the field is absent (backwards compatible)
         dst.isHealthy = resource["isHealthy"].is<bool>() ? resource["isHealthy"].as<bool>() : true;
+        dst.hasIntroduction = resource["hasIntroduction"].is<bool>() ? resource["hasIntroduction"].as<bool>() : false;
+        dst.isIntroducer = resource["isIntroducer"].is<bool>() ? resource["isIntroducer"].as<bool>() : false;
+        dst.requiresSupervisor = resource["requiresSupervisor"].is<bool>() ? resource["requiresSupervisor"].as<bool>() : false;
         const char *healthReason = resource["healthReason"].as<const char *>();
         strlcpy(dst.healthReason, healthReason ? healthReason : "", sizeof(dst.healthReason));
 

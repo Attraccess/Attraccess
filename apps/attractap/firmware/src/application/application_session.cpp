@@ -118,7 +118,7 @@ bool Application::canPerformResourceListAction(
     return false;
   }
 
-  bool isMaintainer = this->cardAuthenticationData.isIntroducer ||
+  bool isMaintainer = resource.isIntroducer ||
                        this->cardAuthenticationData.canManageResource;
   bool blocked = resource.isUnderMaintenance || !resource.isHealthy;
   if (blocked) {
@@ -135,8 +135,7 @@ bool Application::canPerformResourceListAction(
   }
 
   // Mirrors the details screen's start-button gate, including supervised starts.
-  return this->cardAuthenticationData.hasIntroduction || isMaintainer ||
-         this->cardAuthenticationData.requiresSupervisor;
+  return resource.hasIntroduction || isMaintainer || resource.requiresSupervisor;
 }
 
 void Application::requestProjectsPage(uint32_t page) {
