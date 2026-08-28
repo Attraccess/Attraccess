@@ -350,6 +350,16 @@ function resolveExport(file: string, name: string, seen = new Set<string>()): Ex
     // `export * as ns from './X'` does not re-export `name` directly; skip.
   }
 
+  // `import X from './x'; export default X;` is the default-export counterpart
+  // to the locally imported named re-export handled below.
+  if (name === 'default') {
+    for (const statement of source.statements as Node[]) {
+      if (!ts.isExportAssignment(statement) || statement.isExportEquals || !ts.isIdentifier(statement.expression)) continue;
+      const imported = imports.get((statement.expression as Node).text as string);
+      if (imported) results.push(...resolveExport(imported.file, imported.name, seen));
+    }
+  }
+
   // `import { X } from './x'; export { X };` is a re-export just like
   // `export { X } from './x'`, despite its export declaration lacking a module specifier.
   for (const statement of source.statements as Node[]) {
@@ -920,9 +930,14 @@ describe('form fields are not wrapped in Cards (ATT-294 / ATT-834)', () => {
        export default memo(SectionCardBase);`,
     );
     fs.writeFileSync(
+      path.join(dir, 'barrel.ts'),
+      `import Form from './Form';
+       export default Form;`,
+    );
+    fs.writeFileSync(
       path.join(dir, 'page.tsx'),
       `import { Card, TextField } from '@heroui/react';
-       import Form from './Form';
+       import Form from './barrel';
        import SectionCard from './SectionCard';
        export const Page = () => <>
          <Card><Card.Content><Form /></Card.Content></Card>
