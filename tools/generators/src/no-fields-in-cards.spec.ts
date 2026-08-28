@@ -537,8 +537,9 @@ function wrapsChildrenInCard(
   const imports = localImports(source);
 
   let found = false;
-  if (ts.isCallExpression(declaration)) {
-    for (const identifier of callArgumentIdentifiers(declaration)) {
+  const initializer = (declaration.initializer as Node | undefined) ?? (ts.isCallExpression(declaration) ? declaration : undefined);
+  if (initializer && ts.isCallExpression(initializer)) {
+    for (const identifier of callArgumentIdentifiers(initializer)) {
       const childTruncated = { hit: false };
       for (const leaf of resolveComponent(file, source, imports, identifier)) {
         if (wrapsChildrenInCard(leaf.file, leaf.name, seen, childTruncated)) {
@@ -913,7 +914,7 @@ describe('form fields are not wrapped in Cards (ATT-294 / ATT-834)', () => {
     expect(violations[0].detail).toContain('<Form>');
   });
 
-  it('follows default exports for field components and Card wrappers', () => {
+  it('follows default-exported fields and named HOC Card wrappers', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
     fs.writeFileSync(
       path.join(dir, 'Form.tsx'),
@@ -927,7 +928,7 @@ describe('form fields are not wrapped in Cards (ATT-294 / ATT-834)', () => {
       `import { memo } from 'react';
        import { Card } from '@heroui/react';
        const SectionCardBase = ({ children }) => <Card><Card.Content>{children}</Card.Content></Card>;
-       export default memo(SectionCardBase);`,
+       export const SectionCard = memo(SectionCardBase);`,
     );
     fs.writeFileSync(
       path.join(dir, 'barrel.ts'),
@@ -938,7 +939,7 @@ describe('form fields are not wrapped in Cards (ATT-294 / ATT-834)', () => {
       path.join(dir, 'page.tsx'),
       `import { Card, TextField } from '@heroui/react';
        import Form from './barrel';
-       import SectionCard from './SectionCard';
+       import { SectionCard } from './SectionCard';
        export const Page = () => <>
          <Card><Card.Content><Form /></Card.Content></Card>
          <SectionCard><TextField /></SectionCard>
