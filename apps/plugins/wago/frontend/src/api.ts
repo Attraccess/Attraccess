@@ -18,10 +18,21 @@ export interface WagoController {
 export interface WagoSettings {
   defaultMqttServerId: number | null;
 }
+
+export interface ClaimControllerInput {
+  name: string;
+  verifier: string;
+  mqttServerId?: number;
+}
+
 const api = createPluginApiClient('/api/wago');
+
 export const listControllers = () => api.request<WagoController[]>('/controllers');
+
 export const getSettings = () => api.request<WagoSettings>('/settings');
+
 export const setSettings = (defaultMqttServerId: number | null) =>
   api.request<WagoSettings>('/settings', { method: 'POST', body: { defaultMqttServerId } });
-export const claimController = (id: number, input: { name: string; verifier: string; mqttServerId?: number }) =>
+
+export const claimController = (id: number, input: ClaimControllerInput) =>
   api.request<WagoController>(`/controllers/${id}/claim`, { method: 'POST', body: input });
