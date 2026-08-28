@@ -325,6 +325,38 @@ describe('WagoService', () => {
     );
   });
 
+  it.each(['applied', 'rejected'] as const)('ignores reports for a terminal %s revision state', async (state) => {
+    const { service, revisionRepository } = createService([{ ...controller(), trustState: 'claimed' as const }]);
+    const revision = {
+      id: 1,
+      controllerId: 1,
+      revision: 2,
+      snapshot: '{}',
+      contentHash: 'a'.repeat(64),
+      state,
+      rejectionErrors: state === 'rejected' ? '[]' : null,
+      publishedAt: '2026-01-01T00:00:00.000Z',
+      reportedAt: '2026-01-01T00:01:00.000Z',
+    };
+    revisionRepository.findOneBy.mockResolvedValue(revision);
+    const onConfigurationReported = (
+      Reflect.get(service, 'onConfigurationReported') as (controllerId: number, payload: Buffer) => Promise<void>
+    ).bind(service);
+
+    await onConfigurationReported(
+      1,
+      Buffer.from(
+        JSON.stringify({
+          revision: revision.revision,
+          contentHash: revision.contentHash,
+          errors: state === 'applied' ? [{ path: 'logicalChannels[0]', code: 'invalid', message: 'invalid' }] : [],
+        }),
+      ),
+    );
+
+    expect(revisionRepository.save).not.toHaveBeenCalled();
+  });
+
   it('ignores controller rejections without field-level error details', async () => {
     const { service, revisionRepository, context } = createService([
       { ...controller(), trustState: 'claimed' as const },

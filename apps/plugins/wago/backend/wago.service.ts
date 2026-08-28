@@ -727,6 +727,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     await this.withConfigurationLock(controllerId, async () => {
       const revision = await this.revisions.findOneBy({ controllerId, revision: report.revision });
       if (!revision || revision.contentHash !== report.contentHash) return;
+      if (revision.state !== 'published') return;
       revision.state = report.errors.length ? 'rejected' : 'applied';
       revision.rejectionErrors = report.errors.length ? JSON.stringify(report.errors) : null;
       revision.reportedAt = new Date().toISOString();
