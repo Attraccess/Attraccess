@@ -25,6 +25,7 @@ public:
     void setAuthenticated(bool authenticated);
     void setResourceDetailsCallback(std::function<void(const API::ResourceBrief &)> callback);
     void setResourceActionCallback(std::function<void(const API::ResourceBrief &)> callback);
+    void setResourceActionAvailableCallback(std::function<bool(const API::ResourceBrief &)> callback);
 
 private:
     Logger logger;
@@ -36,6 +37,7 @@ private:
 
     std::function<void(const API::ResourceBrief &)> resourceDetailsCallback;
     std::function<void(const API::ResourceBrief &)> resourceActionCallback;
+    std::function<bool(const API::ResourceBrief &)> resourceActionAvailableCallback;
     void addResourceListItem(const API::ResourceBrief &resource);
     void setNoResourcesMessage();
     static void onResourceClicked(lv_event_t *e);

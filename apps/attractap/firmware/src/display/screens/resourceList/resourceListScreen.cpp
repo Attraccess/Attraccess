@@ -81,7 +81,9 @@ void ResourceListScreen::setAuthenticated(bool authenticated)
 
 void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
 {
-    lv_obj_t *resourceButton = this->authenticated
+   const bool hasDirectAction = this->authenticated && this->resourceActionAvailableCallback &&
+                                this->resourceActionAvailableCallback(resource);
+   lv_obj_t *resourceButton = hasDirectAction
                                     ? lv_obj_create(this->resourceContainer)
                                     : lv_button_create(this->resourceContainer);
    lv_obj_set_width(resourceButton, lv_pct(100));
@@ -89,13 +91,13 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
    // lv_obj_set_x(resourceButton, -18);
    // lv_obj_set_y(resourceButton, 24);
    lv_obj_set_align(resourceButton, LV_ALIGN_CENTER);
-    lv_obj_set_flex_flow(resourceButton, this->authenticated ? LV_FLEX_FLOW_ROW : LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_flow(resourceButton, hasDirectAction ? LV_FLEX_FLOW_ROW : LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(resourceButton, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
    lv_obj_add_flag(resourceButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(resourceButton, LV_OBJ_FLAG_SCROLLABLE);
 
    lv_obj_set_style_border_opa(resourceButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(resourceButton, this->authenticated ? 0 : 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(resourceButton, hasDirectAction ? 0 : 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_border_side(resourceButton, LV_BORDER_SIDE_RIGHT, LV_PART_MAIN | LV_STATE_DEFAULT);
    // Status priority mirrors the web resource list: in use > maintenance > available.
    if (resource.hasActiveUsage)
@@ -112,7 +114,7 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
    }
 
     lv_obj_t *detailsButton = resourceButton;
-    if (this->authenticated)
+    if (hasDirectAction)
     {
        detailsButton = lv_button_create(resourceButton);
        lv_obj_set_width(detailsButton, lv_pct(68));
@@ -202,6 +204,11 @@ void ResourceListScreen::setResourceDetailsCallback(std::function<void(const API
 void ResourceListScreen::setResourceActionCallback(std::function<void(const API::ResourceBrief &)> callback)
 {
     this->resourceActionCallback = callback;
+}
+
+void ResourceListScreen::setResourceActionAvailableCallback(std::function<bool(const API::ResourceBrief &)> callback)
+{
+    this->resourceActionAvailableCallback = callback;
 }
 
 void ResourceListScreen::onResourceClicked(lv_event_t *e)

@@ -369,6 +369,10 @@ void Application::setup() {
       [this](const API::ResourceBrief &resource) {
         this->handleResourceListAction(resource);
       });
+  Display::resourceListScreen.setResourceActionAvailableCallback(
+      [this](const API::ResourceBrief &resource) {
+        return this->canPerformResourceListAction(resource);
+      });
 
   Display::setTouchCallback(
       [this](int16_t x, int16_t y) { this->handleTouch(x, y); });

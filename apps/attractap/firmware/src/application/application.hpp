@@ -320,6 +320,7 @@ private:
 
     void selectResource(const API::ResourceBrief &resource);
     void handleResourceListAction(const API::ResourceBrief &resource);
+    bool canPerformResourceListAction(const API::ResourceBrief &resource) const;
 
     void requestProjectsPage(uint32_t page);
     void clearProjectSelection();

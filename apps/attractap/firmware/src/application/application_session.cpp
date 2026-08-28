@@ -65,13 +65,18 @@ void Application::selectResource(const API::ResourceBrief &resource) {
   this->restartResourceSelectionTimeout();
   this->selectedResourceChanged = true;
   this->state = APPLICATION_STATE_UNLOCKED;
+  // Resource-list updates arrive on the websocket task, while LVGL renders on
+  // its own task. The mutex is recursive for callbacks originating in LVGL.
+  lv_lock();
   this->restartSessionTimeout();
   Display::resourceDetailsScreen.setResourceAndUsageDetails(resource);
   Display::transitionToScreen(&Display::resourceDetailsScreen);
+  lv_unlock();
 }
 
 void Application::handleResourceListAction(const API::ResourceBrief &resource) {
-  if (!this->unlocked || this->actionInProgressCount > 0) {
+  if (!this->unlocked || this->actionInProgressCount > 0 ||
+      !this->canPerformResourceListAction(resource)) {
     return;
   }
 
@@ -103,6 +108,35 @@ void Application::handleResourceListAction(const API::ResourceBrief &resource) {
   this->logger.infof("Starting resource from list: %s", resource.name);
   this->pendingActionType = PENDING_ACTION_START_SESSION;
   this->api.startResourceUsageSession(resource.id);
+}
+
+bool Application::canPerformResourceListAction(
+    const API::ResourceBrief &resource) const {
+  // Direct actions only cover machine sessions. Door controls retain their
+  // dedicated permission and action flow on the details screen.
+  if (resource.type == 1) {
+    return false;
+  }
+
+  bool isMaintainer = this->cardAuthenticationData.isIntroducer ||
+                       this->cardAuthenticationData.canManageResource;
+  bool blocked = resource.isUnderMaintenance || !resource.isHealthy;
+  if (blocked) {
+    return isMaintainer;
+  }
+
+  bool ownsActiveUsage = resource.hasActiveUsage &&
+                          strcmp(resource.activeUser,
+                                 this->cardAuthenticationData.username.c_str()) == 0;
+  if (resource.hasActiveUsage) {
+    // Mirrors the details screen's stop-button rule: a user can stop their
+    // own session, while foreign sessions require introducer/manager access.
+    return ownsActiveUsage || isMaintainer;
+  }
+
+  // Mirrors the details screen's start-button gate, including supervised starts.
+  return this->cardAuthenticationData.hasIntroduction || isMaintainer ||
+         this->cardAuthenticationData.requiresSupervisor;
 }
 
 void Application::requestProjectsPage(uint32_t page) {
@@ -141,7 +175,8 @@ void Application::handleProjectSelection(uint32_t projectId,
 }
 
 void Application::handleTouch(int16_t x, int16_t y) {
-  if (this->state == APPLICATION_STATE_UNLOCKED) {
+  if (this->state == APPLICATION_STATE_UNLOCKED ||
+      (this->state == APPLICATION_STATE_RESOURCE_LIST && this->unlocked)) {
     this->restartSessionTimeout();
   }
 }
