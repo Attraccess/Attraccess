@@ -3,6 +3,8 @@ import { Request as BaseRequest } from 'express';
 
 export interface AuthenticatedUser extends User {
   jwtTokenId: string;
+  authenticationMethod?: 'session' | 'api-token';
+  apiTokenId?: number;
   /**
    * Effective permissions for this user. Stored as a Set for O(1) has() lookups.
    * Note: A plain Set serializes as {} in JSON — spread to an array before including in any HTTP response.

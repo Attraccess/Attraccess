@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-export type AuthAuditType = 'login' | 'register' | 'password_reset_request' | 'password_reset_complete';
+export type AuthAuditType =
+  'login' | 'register' | 'password_reset_request' | 'password_reset_complete' | 'delete_account_confirm' | 'api_token';
 
 export type AuthAuditOutcome =
   | 'success'
@@ -12,7 +13,8 @@ export type AuthAuditOutcome =
   | 'email_not_verified'
   | 'invalid_token'
   | 'invalid_input'
-  | 'unknown_user';
+  | 'unknown_user'
+  | 'dependency_failure';
 
 export interface AuthAuditFields {
   type: AuthAuditType;
@@ -20,6 +22,8 @@ export interface AuthAuditFields {
   ip: string;
   userId?: number | null;
   username?: string | null;
+  authenticationMethod?: 'session' | 'api-token';
+  apiTokenId?: number | null;
   reason?: string;
 }
 
@@ -46,6 +50,8 @@ function formatLine(fields: AuthAuditFields): string {
   parts.push(`ip=${sanitize(fields.ip)}`);
   parts.push(`user_id=${fields.userId == null ? '-' : String(fields.userId)}`);
   parts.push(`username=${sanitize(fields.username ?? '-')}`);
+  parts.push(`auth_method=${fields.authenticationMethod ?? 'anonymous'}`);
+  parts.push(`api_token_id=${fields.apiTokenId == null ? '-' : String(fields.apiTokenId)}`);
   parts.push(`ts=${new Date().toISOString()}`);
   if (fields.reason) {
     parts.push(`reason=${sanitize(fields.reason)}`);

@@ -11,6 +11,8 @@
 
 #define BOOT_DIAG_NAMESPACE "bootdiag"
 #define BOOT_DIAG_MAGIC 0x41545431
+#define BOOT_DIAG_PENDING_KEY "pending"
+#define BOOT_DIAG_PENDING_VERSION 1
 #define BOOT_DIAG_SNAPSHOT_INTERVAL_MS 60000
 #define BOOT_DIAG_SILENT_HANG_MIN_UPTIME_MS 60000
 
@@ -45,7 +47,7 @@ static const char *resetReasonToString(esp_reset_reason_t reason) {
 
 void Application::setupBootDiagnostics() {
 #ifdef ESP_PLATFORM
-  BootDiagnostics_t prior = {0};
+  BootDiagnostics_t prior = {};
   this->bootDiagPreferences.begin(BOOT_DIAG_NAMESPACE, true);
   size_t read =
       this->bootDiagPreferences.getBytes("record", &prior, sizeof(prior));
@@ -55,12 +57,11 @@ void Application::setupBootDiagnostics() {
   bool havePrior = (read == sizeof(prior) && prior.magic == BOOT_DIAG_MAGIC);
 
   if (havePrior) {
-    // TASK_WDT / SW / panic-class resets => the firmware died -> crash-loop.
+    // Watchdog / panic-class resets => the firmware died -> crash-loop.
     // A clean POWERON after a long pre-freeze uptime => the device hung and
     // had to be power-cycled by hand -> silent hang.
     bool isCrash = (reason == ESP_RST_PANIC || reason == ESP_RST_TASK_WDT ||
-                    reason == ESP_RST_INT_WDT || reason == ESP_RST_WDT ||
-                    reason == ESP_RST_SW);
+                    reason == ESP_RST_INT_WDT || reason == ESP_RST_WDT);
     const char *failureClass = "clean/other";
     if (isCrash) {
       failureClass = "crash-loop";
@@ -76,11 +77,27 @@ void Application::setupBootDiagnostics() {
         prior.largestFreeBlock, prior.websocketConnected, prior.wifiConnected,
         failureClass);
 
-    // Preserve the prior session's last snapshot as a pending crash report so
-    // the API layer can upload it on the next successful connect (ATT-474).
-    // The live "record" key is overwritten with the current session just below.
+    bool shouldReport = isCrash ||
+                        (reason == ESP_RST_POWERON &&
+                         prior.uptimeMs > BOOT_DIAG_SILENT_HANG_MIN_UPTIME_MS);
     this->bootDiagPreferences.begin(BOOT_DIAG_NAMESPACE, false);
-    this->bootDiagPreferences.putBytes("pending", &prior, sizeof(prior));
+    if (shouldReport) {
+      struct PendingBootDiagnostic {
+        BootDiagnostics_t record;
+        uint8_t resetReason;
+        uint8_t version;
+      } pending = {prior, (uint8_t)reason, BOOT_DIAG_PENDING_VERSION};
+
+      // Preserve actual failures for upload after the next successful connect
+      // (ATT-474) as one blob so its reset reason cannot be paired with a
+      // different snapshot after a partial NVS write.
+      this->bootDiagPreferences.putBytes(BOOT_DIAG_PENDING_KEY, &pending,
+                                         sizeof(pending));
+    } else if (reason == ESP_RST_SW) {
+      // The reset is intentionally ignored. Keep a prior unacknowledged crash,
+      // but discard this reboot's marker so it cannot relabel that crash.
+      this->bootDiagPreferences.remove("rebootreason");
+    }
     this->bootDiagPreferences.end();
   } else {
     this->logger.infof("No prior boot record (reset=%s)",

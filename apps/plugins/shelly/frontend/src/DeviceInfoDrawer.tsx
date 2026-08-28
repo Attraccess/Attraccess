@@ -74,8 +74,7 @@ function AuthProtectedForm({
   if (authState !== 'required') return null;
 
   return (
-    <Card className="sh:border-l-4 sh:border-l-warning sh:bg-warning/5">
-      <Card.Content className="sh:p-4">
+    <div className="sh:rounded-md sh:border-l-4 sh:border-l-warning sh:bg-warning/5 sh:p-4">
         <Form
           onSubmit={(e) => {
             e.preventDefault();
@@ -118,8 +117,7 @@ function AuthProtectedForm({
           </div>
           <input type="submit" hidden />
         </Form>
-      </Card.Content>
-    </Card>
+    </div>
   );
 }
 

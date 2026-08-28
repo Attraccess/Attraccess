@@ -4,10 +4,13 @@
     "externalIdentifier": "Externe ID: {{identifier}}"
   },
   "profile": {
-    "title": "Profil",
-    "usernameTitle": "Benutzername",
-    "emailTitle": "E-Mail",
-    "passwordTitle": "Passwort"
+    "title": "Profil"
+  },
+  "security": {
+    "title": "Sicherheit"
+  },
+  "permissions": {
+    "title": "Rollen & Berechtigungen"
   },
   "sso": {
     "title": "SSO",

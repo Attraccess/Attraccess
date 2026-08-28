@@ -125,6 +125,7 @@ def find_idf_export():
     """Locate ESP-IDF's export.sh so the script can bootstrap the IDF
     environment itself (nx invokes this script in a plain shell)."""
     candidates = [
+        os.path.join(FIRMWARE_DIR, "..", "..", "..", ".tools", "esp-idf"),
         os.environ.get("IDF_PATH"),
         os.path.expanduser("~/esp/esp-idf"),
         os.path.expanduser("~/esp-idf"),
@@ -137,7 +138,7 @@ def find_idf_export():
 
 
 def run_idf(args):
-    """Run idf.py, sourcing ESP-IDF's export.sh first when it is not on PATH.
+    """Run idf.py from ESP-IDF's export.sh when it is available.
 
     idf.py refuses to run without cmake and ninja, but ESP-IDF's Linux
     installer marks both "on_request" (tools.json) and never installs them,
@@ -145,12 +146,12 @@ def run_idf(args):
     they are missing after export.sh, fetch them into the IDF tool set
     (~/.espressif) once and re-source.
     """
-    if shutil.which("idf.py") and shutil.which("cmake") and shutil.which("ninja"):
-        return subprocess.run(["idf.py", *args]).returncode
     export_script = find_idf_export()
     if not export_script:
+        if shutil.which("idf.py") and shutil.which("cmake") and shutil.which("ninja"):
+            return subprocess.run(["idf.py", *args]).returncode
         print("Error: idf.py needs cmake and ninja on PATH, and no ESP-IDF "
-              "export.sh was found to install them from")
+               "export.sh was found to install them from")
         return 1
     source_export = "source " + shlex.quote(export_script) + " >/dev/null"
     ensure_tools = (

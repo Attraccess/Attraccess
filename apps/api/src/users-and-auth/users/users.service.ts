@@ -6,6 +6,7 @@ import {
   FindOptionsWhere,
   In,
   EntityManager,
+  Brackets,
 } from 'typeorm';
 import {
   AuthenticationDetail,
@@ -14,6 +15,7 @@ import {
   Role,
   Session,
   User,
+  UserRole,
   SSOProviderType,
 } from '@attraccess/database-entities';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -24,7 +26,7 @@ import { isEmail } from 'class-validator';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { LicenseError, LicenseService } from '../../license/license.service';
 import { EmailService } from '../../email/email.service';
-import { DataSource, IsNull, QueryFailedError } from 'typeorm';
+import { DataSource, IsNull, Not, QueryFailedError } from 'typeorm';
 import { SSOUsernameChangeForbiddenException } from './errors/ssoUsernameChangeForbidden.exception';
 import { addDays } from 'date-fns';
 import { randomBytes } from 'crypto';
@@ -163,8 +165,9 @@ export class UsersService {
       return false;
     }
 
-    const driverError = (error as QueryFailedError & { driverError?: { code?: string | number; errno?: number; message?: string } })
-      .driverError;
+    const driverError = (
+      error as QueryFailedError & { driverError?: { code?: string | number; errno?: number; message?: string } }
+    ).driverError;
     const errorCode = driverError?.code ?? driverError?.errno;
     if (
       errorCode === '23505' ||
@@ -177,7 +180,9 @@ export class UsersService {
     }
 
     const message = driverError?.message ?? '';
-    return typeof message === 'string' && message.toLowerCase().includes('unique') && message.toLowerCase().includes('email');
+    return (
+      typeof message === 'string' && message.toLowerCase().includes('unique') && message.toLowerCase().includes('email')
+    );
   }
 
   async findOne(options: FindOneOptions, relations?: string[], manager?: EntityManager): Promise<User | null> {
@@ -211,14 +216,19 @@ export class UsersService {
     return user || null;
   }
 
-  async createOne(userData: {
-    username: string;
-    email: string;
-    externalIdentifier: string | null;
-    isEmailVerified?: boolean;
-    skipUsernameSanitization?: boolean;
-    locale?: string;
-  }): Promise<User> {
+  async createOne(
+    userData: {
+      username: string;
+      email: string;
+      externalIdentifier: string | null;
+      isEmailVerified?: boolean;
+      skipUsernameSanitization?: boolean;
+      locale?: string;
+      isFirstTimeSetupAdmin?: boolean;
+    },
+    manager?: EntityManager,
+    options: { excludedUserIdFromLicenseUsage?: number } = {},
+  ): Promise<User> {
     const data = {
       username: this.cleanupUsername(userData.username),
       email: userData.email.trim(),
@@ -232,7 +242,12 @@ export class UsersService {
     }
 
     // verifying usage limits
-    const currentAmountOfUsers = await this.userRepository.count();
+    const userRepository = manager ? manager.getRepository(User) : this.userRepository;
+    const currentAmountOfUsers = await userRepository.count(
+      options.excludedUserIdFromLicenseUsage === undefined
+        ? undefined
+        : { where: { id: Not(options.excludedUserIdFromLicenseUsage) } },
+    );
     try {
       await this.licenseService.verifyLicense({
         usageLimits: {
@@ -249,7 +264,7 @@ export class UsersService {
 
     // Check for existing email
     this.logger.debug(`Checking if email already exists: ${data.email}`);
-    const existingEmail = await this.findOne({ email: data.email });
+    const existingEmail = await this.findOne({ email: data.email }, undefined, manager);
     if (existingEmail) {
       this.logger.debug(`Email already exists: ${data.email}`);
       throw new BadRequestException('Email already exists');
@@ -257,7 +272,7 @@ export class UsersService {
 
     // Check for existing username
     this.logger.debug(`Checking if username already exists: ${data.username}`);
-    const existingUsername = await this.findOne({ username: data.username });
+    const existingUsername = await this.findOne({ username: data.username }, undefined, manager);
     if (existingUsername) {
       this.logger.debug(`Username already exists: ${data.username}`);
       throw new BadRequestException('Username already exists');
@@ -274,28 +289,81 @@ export class UsersService {
 
     // Check if this is the first user in the system
     this.logger.debug('Checking if this is the first user in the system');
-    const totalUsers = await this.userRepository.count();
+    const totalUsers = await userRepository.count();
     const isFirstUser = totalUsers === 0;
 
     this.logger.debug('Saving new user to database');
     // Wrap save + role assignment in a single transaction so a role-assignment failure
-    // doesn't leave an ownerless account on a fresh install.
-    const savedUser = await this.dataSource.transaction(async (em) => {
+    // doesn't leave an administrator-less account on a fresh install.
+    const saveUser = async (em: EntityManager) => {
       const saved = await em.save(user);
-      if (isFirstUser) {
-        this.logger.debug('First user in system - assigning owner role');
-        await this.rbacService.assignRoleByKey(saved.id, 'owner', em);
+      if (isFirstUser || userData.isFirstTimeSetupAdmin) {
+        this.logger.debug('First user in system - assigning administrator role');
+        await this.rbacService.assignRoleByKey(saved.id, 'administrator', em);
       } else {
         await this.rbacService.assignDefaultRoles(saved.id, em);
       }
       return saved;
-    });
+    };
+    const savedUser = manager ? await saveUser(manager) : await this.dataSource.transaction(saveUser);
     this.logger.debug(`User saved with ID: ${savedUser.id}`);
 
+    if (!manager) {
+      this.recordCreatedUser(savedUser);
+    }
+    return savedUser;
+  }
+
+  public recordCreatedUser(user: User): void {
     this.metricsService.usersRegisteredTotal.inc();
     this.metricsService.usersTotal.inc();
-    this.metricsService.usersPerLocale.inc({ locale: savedUser.locale ?? 'en' });
-    return savedUser;
+    this.metricsService.usersPerLocale.inc({ locale: user.locale ?? 'en' });
+  }
+
+  public async rollbackFailedRegistration(userId: number): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      // This is only used for a just-created account whose verification email could not be sent.
+      // It bypasses normal account-deletion rules so the first administrator can be retried.
+      await manager.delete(User, userId);
+    });
+  }
+
+  public async releaseFirstTimeSetupAdminIdentifiers(manager: EntityManager): Promise<User> {
+    const repository = manager.getRepository(User);
+    const [existingAdmin] = await repository.find({ take: 1 });
+    if (!existingAdmin || existingAdmin.isEmailVerified) {
+      throw new ForbiddenException('First-time setup is already complete');
+    }
+
+    const suffix = randomBytes(6).toString('base64url').slice(0, 8);
+    // Claim the setup account only while it is the sole active account. The conditional
+    // update is atomic across API instances, unlike an in-process mutex or count-then-update.
+    const claim = await repository
+      .createQueryBuilder()
+      .update(User)
+      .set({
+        username: `first-time-setup-${existingAdmin.id}-${suffix}`,
+        email: `first-time-setup-${existingAdmin.id}-${suffix}@deleted.local`,
+      })
+      .where('id = :id', { id: existingAdmin.id })
+      .andWhere('isEmailVerified = :isEmailVerified', { isEmailVerified: false })
+      .andWhere('NOT EXISTS (SELECT 1 FROM user AS other WHERE other.id != :id AND other.deletedAt IS NULL)')
+      .execute();
+    if (claim.affected !== 1) {
+      throw new ForbiddenException('First-time setup is already complete');
+    }
+
+    return existingAdmin;
+  }
+
+  public async rollbackFirstTimeSetupAdminReplacement(replacementUserId: number, existingAdmin: User): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(User, replacementUserId);
+      await manager.getRepository(User).update(existingAdmin.id, {
+        username: existingAdmin.username,
+        email: existingAdmin.email,
+      });
+    });
   }
 
   async deleteOne(id: number): Promise<void> {
@@ -479,26 +547,186 @@ export class UsersService {
     }
   }
 
-  async findMany(options: PaginationOptions & { search?: string; ids?: number[]; includeRoles?: boolean }): Promise<PaginatedResponse<User>> {
+  async findMany(
+    options: PaginationOptions & {
+      search?: string;
+      ids?: number[];
+      roleId?: number;
+      roleIds?: number[];
+      excludeRoleIds?: number[];
+      roleMatch?: 'any' | 'all';
+      emailVerified?: boolean;
+      ssoProviderIds?: number[];
+      excludeSsoProviderIds?: number[];
+      ssoProviderNone?: boolean;
+      hasSsoProvider?: boolean;
+      ssoProviderMatch?: 'any' | 'all';
+      includeRoles?: boolean;
+    },
+  ): Promise<PaginatedResponse<User>> {
     this.logger.debug(`Finding all users with options: ${JSON.stringify(options)}`);
     const paginationOptions = PaginationOptionsSchema.parse(options);
     const { search } = options;
     const { page, limit } = paginationOptions;
     const skip = (page - 1) * limit;
 
+    if (Array.isArray(options.ids) && options.ids.length === 0) {
+      return {
+        data: [],
+        total: 0,
+        page: paginationOptions.page,
+        limit: paginationOptions.limit,
+      };
+    }
+
+    const hasAdvancedFilters =
+      options.roleIds !== undefined ||
+      options.excludeRoleIds !== undefined ||
+      options.emailVerified !== undefined ||
+      options.ssoProviderIds !== undefined ||
+      options.excludeSsoProviderIds !== undefined ||
+      options.ssoProviderNone !== undefined ||
+      options.hasSsoProvider !== undefined;
+
+    if (hasAdvancedFilters) {
+      const query = this.userRepository.createQueryBuilder('user');
+      query.leftJoinAndSelect('user.authenticationDetails', 'authenticationDetails');
+
+      if (options.includeRoles) {
+        query.leftJoinAndSelect('user.userRoles', 'userRoles').leftJoinAndSelect('userRoles.role', 'role');
+      }
+
+      if (options.ids) {
+        query.andWhere('user.id IN (:...ids)', { ids: options.ids });
+      }
+
+      if (options.emailVerified !== undefined) {
+        query.andWhere('user.isEmailVerified = :emailVerified', { emailVerified: options.emailVerified });
+      }
+
+      const requestedRoleIds = options.roleIds ?? (options.roleId === undefined ? undefined : [options.roleId]);
+      const roleIds = requestedRoleIds ? [...new Set(requestedRoleIds)] : undefined;
+      if (roleIds?.length) {
+        const roleFilter = query
+          .subQuery()
+          .select('userRole.userId')
+          .from(UserRole, 'userRole')
+          .where('userRole.roleId IN (:...roleIds)');
+
+        if (options.roleMatch === 'all') {
+          roleFilter.groupBy('userRole.userId').having('COUNT(DISTINCT userRole.roleId) = :roleCount');
+          query.andWhere(`user.id IN ${roleFilter.getQuery()}`, { roleIds, roleCount: roleIds.length });
+        } else {
+          query.andWhere(`user.id IN ${roleFilter.getQuery()}`, { roleIds });
+        }
+      }
+
+      const excludeRoleIds = options.excludeRoleIds ? [...new Set(options.excludeRoleIds)] : undefined;
+      if (excludeRoleIds?.length) {
+        const excludedRoles = query
+          .subQuery()
+          .select('1')
+          .from(UserRole, 'excludedUserRole')
+          .where('excludedUserRole.userId = user.id')
+          .andWhere('excludedUserRole.roleId IN (:...excludeRoleIds)');
+        query.andWhere(`NOT EXISTS ${excludedRoles.getQuery()}`, { excludeRoleIds });
+      }
+
+      const ssoProviderIds = options.ssoProviderIds ? [...new Set(options.ssoProviderIds)] : undefined;
+      if (ssoProviderIds?.length || options.ssoProviderNone) {
+        const noSsoProvider = query
+          .subQuery()
+          .select('1')
+          .from(AuthenticationDetail, 'ssoDetail')
+          .where('ssoDetail.userId = user.id')
+          .andWhere('ssoDetail.type = :ssoType')
+          .getQuery();
+        const ssoProviders = ssoProviderIds?.length
+          ? query
+              .subQuery()
+              .select('ssoDetail.userId')
+              .from(AuthenticationDetail, 'ssoDetail')
+              .where('ssoDetail.userId = user.id')
+              .andWhere('ssoDetail.type = :ssoType')
+              .andWhere('ssoDetail.providerId IN (:...ssoProviderIds)')
+          : undefined;
+
+        if (ssoProviders && options.ssoProviderMatch === 'all') {
+          ssoProviders.groupBy('ssoDetail.userId').having('COUNT(DISTINCT ssoDetail.providerId) = :ssoProviderCount');
+        }
+
+        if (ssoProviders && options.ssoProviderNone && options.ssoProviderMatch !== 'all') {
+          query.andWhere(
+            new Brackets((where) =>
+              where.where(`user.id IN ${ssoProviders.getQuery()}`).orWhere(`NOT EXISTS ${noSsoProvider}`),
+            ),
+          );
+        } else if (ssoProviders) {
+          query.andWhere(`user.id IN ${ssoProviders.getQuery()}`);
+          if (options.ssoProviderNone) {
+            query.andWhere(`NOT EXISTS ${noSsoProvider}`);
+          }
+        } else {
+          query.andWhere(`NOT EXISTS ${noSsoProvider}`);
+        }
+
+        query.setParameters({
+          ssoType: AuthenticationType.SSO,
+          ...(ssoProviderIds?.length ? { ssoProviderIds, ssoProviderCount: ssoProviderIds.length } : {}),
+        });
+      }
+
+      if (options.hasSsoProvider !== undefined) {
+        const ssoProviderExists = query
+          .subQuery()
+          .select('1')
+          .from(AuthenticationDetail, 'anySsoDetail')
+          .where('anySsoDetail.userId = user.id')
+          .andWhere('anySsoDetail.type = :anySsoType');
+        query.andWhere(`${options.hasSsoProvider ? 'EXISTS' : 'NOT EXISTS'} ${ssoProviderExists.getQuery()}`, {
+          anySsoType: AuthenticationType.SSO,
+        });
+      }
+
+      const excludeSsoProviderIds = options.excludeSsoProviderIds
+        ? [...new Set(options.excludeSsoProviderIds)]
+        : undefined;
+      if (excludeSsoProviderIds?.length) {
+        const excludedSsoProviders = query
+          .subQuery()
+          .select('1')
+          .from(AuthenticationDetail, 'excludedSsoDetail')
+          .where('excludedSsoDetail.userId = user.id')
+          .andWhere('excludedSsoDetail.type = :excludedSsoType')
+          .andWhere('excludedSsoDetail.providerId IN (:...excludeSsoProviderIds)');
+        query.andWhere(`NOT EXISTS ${excludedSsoProviders.getQuery()}`, {
+          excludedSsoType: AuthenticationType.SSO,
+          excludeSsoProviderIds,
+        });
+      }
+
+      if (search) {
+        this.logger.debug(`Searching for users with query: ${search}`);
+        query.andWhere(
+          new Brackets((where) =>
+            where.where('LOWER(user.username) LIKE LOWER(:search)').orWhere('LOWER(user.email) LIKE LOWER(:search)'),
+          ),
+          { search: `%${search}%` },
+        );
+      }
+
+      const [users, total] = await query.orderBy('user.username', 'ASC').skip(skip).take(limit).getManyAndCount();
+      return { data: users, total, page, limit };
+    }
+
     let whereCondition: FindOptionsWhere<User>[] | FindOptionsWhere<User> = {};
 
     if (Array.isArray(options.ids)) {
-      if (options.ids.length === 0) {
-        return {
-          data: [],
-          total: 0,
-          page: paginationOptions.page,
-          limit: paginationOptions.limit,
-        };
-      }
-
       whereCondition = { id: In(options.ids) };
+    }
+
+    if (options.roleId !== undefined) {
+      whereCondition = { ...whereCondition, userRoles: { roleId: options.roleId } };
     }
 
     if (search) {
@@ -514,7 +742,9 @@ export class UsersService {
       skip,
       take: limit,
       where: whereCondition,
-      relations: options.includeRoles ? ['authenticationDetails', 'userRoles', 'userRoles.role'] : ['authenticationDetails'],
+      relations: options.includeRoles
+        ? ['authenticationDetails', 'userRoles', 'userRoles.role']
+        : ['authenticationDetails'],
       order: { username: 'ASC' },
     });
 
@@ -624,10 +854,10 @@ export class UsersService {
 
       const saved = await repo.save(entities);
 
-      // Assign owner role to the first user when bootstrapping; default roles for everyone else.
+      // Assign administrator role to the first user when bootstrapping; default roles for everyone else.
       // Pass the transactional manager so role assignments are part of the same transaction.
       if (options?.grantAllPermissionsToFirst && totalExisting === 0 && saved.length > 0) {
-        await this.rbacService.assignRoleByKey(saved[0].id, 'owner', manager);
+        await this.rbacService.assignRoleByKey(saved[0].id, 'administrator', manager);
         for (const u of saved.slice(1)) {
           await this.rbacService.assignDefaultRoles(u.id, manager);
         }
@@ -709,20 +939,29 @@ export class UsersService {
   }
 
   async confirmSelfDeletion(email: string, token: string): Promise<void> {
-    const user = await this.userRepository.findOne({
+    const expected = this.tokenHashService.hashToken(token);
+    let user = await this.userRepository.findOne({
       where: { email },
       withDeleted: true,
     });
+
+    // The email is anonymized on deletion and may be reused, so use the retained
+    // confirmation token when the email no longer identifies this confirmation.
+    // Raw tokens support confirmations created before tokens were stored as hashes.
+    if (!user || (user.deleteAccountToken !== expected && user.deleteAccountToken !== token)) {
+      user = await this.userRepository.findOne({
+        where: {
+          deleteAccountToken: In([expected, token]),
+          deletedAt: Not(IsNull()),
+        },
+        withDeleted: true,
+      });
+    }
 
     if (!user) {
       throw new DeleteAccountTokenInvalidException();
     }
 
-    if (user.deletedAt) {
-      throw new DeleteAccountTokenInvalidException();
-    }
-
-    const expected = this.tokenHashService.hashToken(token);
     if (user.deleteAccountToken !== expected && user.deleteAccountToken !== token) {
       throw new DeleteAccountTokenInvalidException();
     }
@@ -731,15 +970,19 @@ export class UsersService {
       throw new DeleteAccountTokenExpiredException();
     }
 
+    if (user.deletedAt) {
+      return;
+    }
+
     await this.anonymizeAndSoftDelete(user.id);
   }
 
   private async anonymizeAndSoftDelete(id: number, manager?: EntityManager): Promise<void> {
     // ponytail: wrap check-then-delete in a transaction to close the TOCTOU race where two concurrent
-    // deletions of the last two owners could both pass the isLastOwner guard and both proceed
+    // deletions of the last two administrators could both pass the isLastAdministrator guard and both proceed
     const run = async (em: EntityManager) => {
-      if (await this.rbacService.isLastOwner(id, em)) {
-        throw new ForbiddenException('Cannot delete the last owner');
+      if (await this.rbacService.isLastAdministrator(id, em)) {
+        throw new ForbiddenException('Cannot delete the last administrator');
       }
 
       const repo = em.getRepository(User);
@@ -781,9 +1024,6 @@ export class UsersService {
         externalIdentifier: null,
         nfcKeySeedToken: null,
         lastUsernameChangeAt: null,
-        deleteAccountToken: null,
-        deleteAccountTokenExpiresAt: null,
-        deleteAccountRequestedAt: null,
       });
 
       await repo.softDelete(user.id);

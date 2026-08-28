@@ -1,6 +1,8 @@
 #include "wifi.hpp"
 #include "platform.hpp"
 
+#include "esp_log.h"
+
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -62,14 +64,14 @@ const char *Wifi::getDisconnectReasonName(uint8_t reasonCode)
         return "AUTH_EXPIRE";
     case WIFI_REASON_AUTH_LEAVE:
         return "AUTH_LEAVE";
-    case WIFI_REASON_ASSOC_EXPIRE:
-        return "ASSOC_EXPIRE";
+    case WIFI_REASON_DISASSOC_DUE_TO_INACTIVITY:
+        return "DISASSOC_DUE_TO_INACTIVITY";
     case WIFI_REASON_ASSOC_TOOMANY:
         return "ASSOC_TOOMANY";
-    case WIFI_REASON_NOT_AUTHED:
-        return "NOT_AUTHED";
-    case WIFI_REASON_NOT_ASSOCED:
-        return "NOT_ASSOCED";
+    case WIFI_REASON_CLASS2_FRAME_FROM_NONAUTH_STA:
+        return "CLASS2_FRAME_FROM_NONAUTH_STA";
+    case WIFI_REASON_CLASS3_FRAME_FROM_NONASSOC_STA:
+        return "CLASS3_FRAME_FROM_NONASSOC_STA";
     case WIFI_REASON_ASSOC_LEAVE:
         return "ASSOC_LEAVE";
     case WIFI_REASON_ASSOC_NOT_AUTHED:
@@ -126,6 +128,9 @@ void Wifi::setup()
         logger.info("Already initialized");
         return;
     }
+
+    // Suppress ESP-IDF idle scan chatter while retaining WiFi warnings.
+    esp_log_level_set("wifi", ESP_LOG_WARN);
 
     wifi_interface = esp_netif_create_default_wifi_sta();
     if (wifi_interface == NULL)
@@ -189,6 +194,16 @@ void Wifi::setup()
         return;
     }
 
+    // Disable modem sleep: the default WIFI_PS_MIN_MODEM adds ~tens of ms of
+    // latency to every TLS handshake, websocket heartbeat and reconnect.
+    // This device is mains-powered; the RF power saving is not worth the
+    // network latency (PERFORMANCE_ANALYSIS.md quick win Q1).
+    esp_err_t wifi_ps_result = esp_wifi_set_ps(WIFI_PS_NONE);
+    if (wifi_ps_result != ESP_OK)
+    {
+        logger.error((std::string("Failed to disable WiFi modem sleep: ") + esp_err_to_name(wifi_ps_result)).c_str());
+    }
+
     is_setup = true;
 }
 
@@ -218,7 +233,7 @@ void Wifi::wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t even
     case WIFI_EVENT_STA_DISCONNECTED:
     {
         auto *ev = (wifi_event_sta_disconnected_t *)event_data;
-        logger.infof("Disconnected: reason %u (%s)", ev->reason, getDisconnectReasonName(ev->reason));
+        logger.errorf("Disconnected: reason %u (%s)", ev->reason, getDisconnectReasonName(ev->reason));
         setState(WIFI_STATE_DISCONNECTED);
         break;
     }
@@ -550,7 +565,7 @@ void Wifi::handleTimeout()
     {
         if (millis() - waiting_for_ip_since_ms > WAITING_FOR_IP_TIMEOUT_MS)
         {
-            logger.info("DHCP timeout - no IP acquired, forcing reconnect");
+            logger.error("DHCP timeout - no IP acquired, forcing reconnect");
             esp_wifi_disconnect();
             setState(WIFI_STATE_CONNECT_FAILED);
         }
@@ -567,7 +582,7 @@ void Wifi::handleTimeout()
 
     if (elapsed > 15000)
     { // 15 second timeout
-        logger.info("Connection timeout - stopping connection attempt");
+        logger.error("Connection timeout - stopping connection attempt");
         esp_wifi_disconnect();
         setState(WIFI_STATE_CONNECT_FAILED);
         return;

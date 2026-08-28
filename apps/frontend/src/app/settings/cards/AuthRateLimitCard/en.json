@@ -1,4 +1,0 @@
-{
-  "title": "Auth rate limiting",
-  "subtitle": "Throttle failed logins and lock accounts after repeated failures"
-}

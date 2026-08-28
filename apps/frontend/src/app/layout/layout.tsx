@@ -108,7 +108,10 @@ export function Layout({ children }: LayoutProps) {
       />
 
       {/* Main Content */}
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      {/* min-w-0: without it this flex item keeps min-width:auto and wide content
+          (e.g. the resource detail tab bar) pushes the column past the viewport
+          instead of scrolling inside it. */}
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
         {/* Mobile Header */}
         <Header toggleSidebar={toggleSidebar} />
 

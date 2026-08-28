@@ -9,6 +9,12 @@
     "label": "E-Mail"
   },
   "actions": {
-    "save": "Speichern"
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "confirm": "E-Mail-Adresse ändern"
+  },
+  "modal": {
+    "title": "Änderung der E-Mail-Adresse bestätigen",
+    "warning": "Nach der Änderung Ihrer E-Mail-Adresse können Sie sich erst wieder anmelden, nachdem Sie die neue Adresse über den per E-Mail gesendeten Link bestätigt haben."
   }
 }

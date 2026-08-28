@@ -3,7 +3,19 @@ import {
   useUsersServiceChangeUserEmail,
   useUsersServiceFindManyKey,
 } from '@attraccess/react-query-client';
-import { cn, TextField, Label, Input } from '@heroui/react';
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  cn,
+  Input,
+  Label,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  TextField,
+  useOverlayState,
+} from '@heroui/react';
 import { Button } from '../../../../../components/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { HTMLAttributes, useCallback, useState } from 'react';
@@ -13,6 +25,8 @@ import en from './en.json';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { ApiError } from '@attraccess/react-query-client';
+import { AlertStatusIcon } from '../../../../../components/AlertStatusIcon';
+import { StandardModal } from '../../../../../components/standardModal';
 
 interface Props {
   userId: number;
@@ -20,6 +34,7 @@ interface Props {
 
 export function ChangeEmailForm({ userId, ...divProps }: Props & Omit<HTMLAttributes<HTMLDivElement>, 'children'>) {
   const [email, setEmail] = useState('');
+  const { isOpen, open, close } = useOverlayState();
   const queryClient = useQueryClient();
   const trimmedEmail = email.trim();
   const isEmailValid = trimmedEmail.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail);
@@ -56,25 +71,61 @@ export function ChangeEmailForm({ userId, ...divProps }: Props & Omit<HTMLAttrib
     if (!isEmailValid) {
       return;
     }
+    open();
+  }, [isEmailValid, open]);
+
+  const confirmEmailChange = useCallback(() => {
     mutate({
       id: userId,
       requestBody: {
         email: trimmedEmail,
       },
     });
-  }, [isEmailValid, mutate, trimmedEmail, userId]);
+    close();
+  }, [close, mutate, trimmedEmail, userId]);
 
   return (
-    <div {...divProps} className={cn(divProps.className, 'flex flex-col gap-4')}>
-      <TextField value={email} onChange={setEmail}>
-        <Label>{t('email.label')}</Label>
-        <Input type="email" />
-      </TextField>
-      <div className="flex w-full justify-end">
-        <Button variant="primary" isPending={isPending} onPress={onSubmit} isDisabled={!isEmailValid || isPending}>
-          {t('actions.save')}
-        </Button>
+    <>
+      <div {...divProps} className={cn(divProps.className, 'flex flex-col gap-4')}>
+        <TextField value={email} onChange={setEmail}>
+          <Label>{t('email.label')}</Label>
+          <Input type="email" />
+        </TextField>
+        <div className="flex w-full justify-end">
+          <Button variant="primary" isPending={isPending} onPress={onSubmit} isDisabled={!isEmailValid || isPending}>
+            {t('actions.save')}
+          </Button>
+        </div>
       </div>
-    </div>
+      <StandardModal
+        isOpen={isOpen}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) close();
+        }}
+        size="md"
+      >
+        {({ close: modalClose }) => (
+          <>
+            <ModalHeader>{t('modal.title')}</ModalHeader>
+            <ModalBody>
+              <Alert status="warning">
+                <AlertStatusIcon status="warning" />
+                <AlertContent>
+                  <AlertDescription>{t('modal.warning')}</AlertDescription>
+                </AlertContent>
+              </Alert>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" onPress={modalClose}>
+                {t('actions.cancel')}
+              </Button>
+              <Button variant="primary" onPress={confirmEmailChange} isPending={isPending}>
+                {t('actions.confirm')}
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </StandardModal>
+    </>
   );
 }

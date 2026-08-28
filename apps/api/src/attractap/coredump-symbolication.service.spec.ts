@@ -285,6 +285,7 @@ describe('CoredumpSymbolicationService', () => {
     chmodSync(fakeTool, 0o755);
     chmodSync(fakeGdb, 0o755);
     process.env.ESP_COREDUMP_CMD = fakeTool;
+    process.env.ESP_COREDUMP_XTENSA_GDB = fakeGdb;
     process.env.PATH = `${binDir}${process.env.PATH ? `:${process.env.PATH}` : ''}`;
 
     const elfPath = join(binDir, 'fw.elf');

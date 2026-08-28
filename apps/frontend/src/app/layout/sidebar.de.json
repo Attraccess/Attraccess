@@ -8,6 +8,7 @@
     "de": "Deutsch"
   },
   "account": "Konto",
+  "userMenu": "Benutzermenü",
   "groups": {
     "##default##": {
       "items": {
@@ -15,40 +16,23 @@
         "projects": "Projekte",
         "messages": "Nachrichten",
         "billing": "Zahlungen",
-        "attractap": "NFC-Karten"
-      }
-    },
-    "users": {
-      "label": "Benutzer",
-      "items": {
-        "userList": "Benutzerliste",
-        "userSecurity": "Sicherheit",
-        "sso": "Single Sign-On"
+        "csvExport": "CSV-Export",
+        "attractap": "NFC-Karten",
+        "users": "Benutzer",
+        "settings": "Einstellungen"
       }
     },
     "devices": {
       "label": "Geräte",
       "items": {
+        "attractapReaders": "Attractap-Lesegeräte",
         "mqttServers": "MQTT-Server",
-        "companion": "Companion-App"
-      }
-    },
-    "system": {
-      "label": "System",
-      "items": {
-        "plugins": "Plugins",
-        "emails": "E-Mails",
-        "messagingSettings": "Nachrichteneinstellungen",
-        "csvExport": "CSV-Export",
-        "balena": "Balena",
-        "settings": "Einstellungen",
-        "monitoring": "Überwachung",
-        "roles": "Rollen"
+        "companion": "Companion-App",
+        "balena": "Balena"
       }
     }
   },
   "endItems": {
-    "docs": "Dokumentation",
     "dependencies": "Abhängigkeiten",
     "changelog": "Änderungsprotokoll",
     "groups": {
@@ -57,6 +41,13 @@
         "items": {
           "reportBug": "Fehler melden",
           "requestFeature": "Funktion vorschlagen"
+        }
+      },
+      "docsAndTools": {
+        "label": "Doku & Werkzeuge",
+        "items": {
+          "docs": "Dokumentation",
+          "printables": "3D-Modelle"
         }
       }
     }

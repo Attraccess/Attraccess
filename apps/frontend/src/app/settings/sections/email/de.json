@@ -1,0 +1,65 @@
+{
+  "title": "E-Mail",
+  "description": "Der SMTP-Transport, über den Attraccess alle ausgehenden E-Mails versendet.",
+  "loading": "E-Mail-Einstellungen werden geladen …",
+  "service": {
+    "smtp": "SMTP",
+    "outlook": "Outlook 365"
+  },
+  "inputs": {
+    "service": {
+      "label": "Dienst",
+      "description": "Outlook 365 legt Host und Port auf die von Microsoft akzeptierten Werte fest."
+    },
+    "host": {
+      "label": "Host",
+      "description": "Hostname des SMTP-Servers.",
+      "errors": { "required": "Ein Host ist erforderlich." }
+    },
+    "port": {
+      "label": "Port",
+      "description": "Port des SMTP-Servers.",
+      "errors": { "required": "Ein Port ist erforderlich.", "invalid": "Bitte einen Port zwischen 1 und 65535 angeben." }
+    },
+    "secure": {
+      "label": "TLS verwenden",
+      "description": "Direkt über TLS verbinden statt per STARTTLS hochzustufen."
+    },
+    "user": {
+      "label": "Benutzername",
+      "description": "Optionaler Benutzername für die SMTP-Authentifizierung."
+    },
+    "pass": {
+      "label": "Passwort",
+      "description": "Leer lassen, um das aktuelle Passwort beizubehalten."
+    },
+    "from": {
+      "label": "Absenderadresse",
+      "description": "Standard-Absenderadresse für ausgehende E-Mails.",
+      "errors": { "required": "Eine Absenderadresse ist erforderlich." }
+    }
+  },
+  "passwordStatus": {
+    "configured": "Passwort hinterlegt",
+    "missing": "Passwort fehlt"
+  },
+  "aside": {
+    "statusTitle": "Zugangsdaten",
+    "statusHint": "Das gespeicherte Passwort wird nie an den Browser zurückgegeben, deshalb ist das Feld oben immer leer.",
+    "contentTitle": "Inhalte"
+  },
+  "subPages": {
+    "templates": {
+      "title": "Vorlagen",
+      "description": "Die E-Mails, die an Benutzer gehen."
+    },
+    "layout": {
+      "title": "Globales Layout",
+      "description": "Gemeinsame Kopf- und Fußzeile sowie Stile."
+    }
+  },
+  "success": {
+    "title": "E-Mail-Einstellungen gespeichert",
+    "description": "Neue Nachrichten werden über diesen Transport versendet."
+  }
+}

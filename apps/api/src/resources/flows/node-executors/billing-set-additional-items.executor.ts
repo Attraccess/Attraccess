@@ -19,13 +19,16 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
   ) {}
 
   async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
-    const activeUsageSession = await this.resourceUsageService.getActiveSession(
-      node.resourceId,
-      false,
-      ctx.transactionManager,
-    );
+    const candidateUsageId = 'id' in input ? input.id : undefined;
+    const usageId =
+      typeof candidateUsageId === 'number' && Number.isSafeInteger(candidateUsageId) && candidateUsageId > 0
+        ? candidateUsageId
+        : undefined;
+    const activeUsageSession = usageId
+      ? undefined
+      : await this.resourceUsageService.getActiveSession(node.resourceId, false, ctx.transactionManager);
 
-    if (!activeUsageSession) {
+    if (!usageId && !activeUsageSession) {
       throw new NoUsageSessionError();
     }
 
@@ -58,9 +61,14 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
 
     const billingTransaction = await manager.findOne(BillingTransaction, {
       where: {
-        resourceUsageId: activeUsageSession.id,
+        resourceUsageId: usageId ?? activeUsageSession.id,
+        resourceUsage: { resourceId: node.resourceId },
       },
     });
+
+    if (!billingTransaction) {
+      throw new NoUsageSessionError();
+    }
 
     const dedupData = {
       billingTransactionId: billingTransaction.id,

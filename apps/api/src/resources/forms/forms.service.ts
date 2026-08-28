@@ -170,7 +170,7 @@ export class ResourceFormsService {
   ): Promise<{ totalFieldCount: number; fields: FormFieldResponseDto[] }> {
     await this.ensureResourceExists(resourceId);
     const form = await this.getFormOrThrow(resourceId, formId);
-    const fields = (form.fields ?? []).sort((a, b) => a.id - b.id);
+    const fields = (form.fields ?? []).sort((a, b) => a.position - b.position);
     const safeOffset = Math.max(0, offset);
     const safeLimit = Math.max(1, limit);
     const window = fields.slice(safeOffset, safeOffset + safeLimit).map((field) => this.mapFieldResponse(field));
@@ -290,7 +290,7 @@ export class ResourceFormsService {
       order: { createdAt: 'ASC' },
     });
     return forms.map((form) => {
-      form.fields = (form.fields ?? []).sort((a, b) => a.id - b.id);
+      form.fields = (form.fields ?? []).sort((a, b) => a.position - b.position);
       return form;
     });
   }
@@ -315,6 +315,7 @@ export class ResourceFormsService {
       isRequired: field.isRequired,
       description: field.description ?? null,
       options: parseFieldOptions(field.type, field.options),
+      position: field.position,
     };
   }
 
@@ -368,6 +369,7 @@ export class ResourceFormsService {
     fieldDto.isRequired = field.isRequired;
     fieldDto.description = field.description;
     fieldDto.options = field.options;
+    fieldDto.position = field.position;
     return fieldDto;
   }
 
@@ -381,7 +383,7 @@ export class ResourceFormsService {
     response.isRequiredOnResourceUsageTakeOver = form.isRequiredOnResourceUsageTakeOver;
     response.isRequiredOnResourceUsageEnd = form.isRequiredOnResourceUsageEnd;
     response.resourceId = form.resourceId;
-    response.fields = (form.fields ?? []).map((field) => this.mapFieldResponse(field));
+    response.fields = (form.fields ?? []).sort((a, b) => a.position - b.position).map((field) => this.mapFieldResponse(field));
 
     return response;
   }

@@ -1,8 +1,7 @@
 import { DrawerBody, DrawerFooter, DrawerHeader, Label, TextArea, TextField } from '@heroui/react';
 import { useCallback, useState } from 'react';
 import { Button } from '../../../components/button';
-import { TFunction, UserSearch } from '@attraccess/plugins-frontend-ui';
-import { User } from '@attraccess/react-query-client';
+import { TFunction, UserIdentity, UserSearch } from '@attraccess/plugins-frontend-ui';
 import { StandardDrawer } from '../../../components/standardDrawer';
 import { AddMode } from './types';
 
@@ -13,14 +12,14 @@ interface AddPersonDrawerProps {
   comment: string;
   isPending: boolean;
   onCommentChange: (comment: string) => void;
-  onAdd: (user: User) => Promise<void>;
+  onAdd: (user: UserIdentity) => Promise<void>;
   onClose: () => void;
 }
 
 export function AddPersonDrawer(props: Readonly<AddPersonDrawerProps>) {
   const { t, isOpen, mode, comment, isPending, onCommentChange, onAdd, onClose } = props;
 
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserIdentity | null>(null);
 
   const handleClose = useCallback(() => {
     setSelectedUser(null);

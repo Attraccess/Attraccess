@@ -17,7 +17,7 @@ Attraccess supports Single Sign-On (SSO) via two protocols: **OpenID Connect (OI
 
 ## Configuring Providers
 
-1. Navigate to **SSO Providers** in the sidebar
+1. Open **Settings** in the sidebar and select the **Single sign-on** section
 2. Click **Add New Provider**
 3. Select the type (OIDC or SAML)
 4. Fill in the configuration

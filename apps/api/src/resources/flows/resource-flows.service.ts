@@ -5,7 +5,6 @@ import {
   ResourceFlowNode,
   ResourceFlowEdge,
   Resource,
-  ResourceFlowLog,
   getNodeDataSchema,
   ResourceFlowNodeType,
   EventNodeDataSchema,
@@ -35,7 +34,6 @@ import {
 } from '@attraccess/database-entities';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 import { ResourceFlowSaveDto, ResourceFlowResponseDto } from './dto';
-import { PaginatedResponse } from '../../types/response';
 import { ResourceFlowNodeSchemaDto } from './dto/resource-flow-node-schemas-response.dto';
 import { z } from 'zod';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
@@ -68,8 +66,6 @@ export class ResourceFlowsService {
     private readonly flowEdgeRepository: Repository<ResourceFlowEdge>,
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(ResourceFlowLog)
-    private readonly flowLogRepository: Repository<ResourceFlowLog>,
     private readonly mqttClientService: MqttClientService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
@@ -290,35 +286,6 @@ export class ResourceFlowsService {
     return response;
   }
 
-  async getResourceFlowLogs(resourceId: number, page = 1, limit = 50): Promise<PaginatedResponse<ResourceFlowLog>> {
-    // Verify resource exists
-    const resource = await this.resourceRepository.findOne({
-      where: { id: resourceId },
-    });
-
-    if (!resource) {
-      throw new ResourceNotFoundException(resourceId);
-    }
-
-    // Calculate skip value for pagination
-    const skip = (page - 1) * limit;
-
-    // Get logs with pagination, ordered by creation time (newest first)
-    const [logs, total] = await this.flowLogRepository.findAndCount({
-      where: { resourceId },
-      skip,
-      take: limit,
-      order: { createdAt: 'DESC' },
-    });
-
-    return {
-      data: logs,
-      total,
-      page,
-      limit,
-    };
-  }
-
   public async getNodes(resourceId: number, type: ResourceFlowNodeType): Promise<ResourceFlowNode[]> {
     return await this.flowNodeRepository.find({
       where: { resourceId, type },
@@ -404,7 +371,7 @@ export class ResourceFlowsService {
         case ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST:
           schema.configSchema = z.toJSONSchema(HttpRequestNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
-          schema.outputs = ['output'];
+          schema.outputs = ['output', 'failure'];
           schema.supportedByResource = true;
           schema.isOutput = true;
           break;
@@ -412,6 +379,7 @@ export class ResourceFlowsService {
         case ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE:
           schema.configSchema = z.toJSONSchema(MqttSendMessageNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
+          schema.outputs = ['output', 'failure'];
           schema.supportedByResource = true;
           schema.isOutput = true;
           break;
@@ -419,6 +387,7 @@ export class ResourceFlowsService {
         case ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION:
           schema.configSchema = z.toJSONSchema(ResourceUsageEndSessionNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
+          schema.outputs = ['output', 'failure'];
           schema.supportedByResource = resource.type === ResourceType.Machine;
           schema.isOutput = true;
           break;
@@ -454,7 +423,7 @@ export class ResourceFlowsService {
         case ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE:
           schema.configSchema = z.toJSONSchema(MqttWaitForMessageNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
-          schema.outputs = ['output'];
+          schema.outputs = ['output', 'failure'];
           schema.supportedByResource = true;
           break;
 

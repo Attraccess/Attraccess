@@ -16,8 +16,9 @@ export class UpdateAppSettingsDto {
   @IsOptional()
   @IsUrl(urlOptions)
   @ApiPropertyOptional({
-    description: 'Public URL used for external callbacks.',
+    description: 'Public URL used for external callbacks. Set to null to clear it.',
     example: 'https://public.example',
+    nullable: true,
   })
   publicInternetUrl?: string | null;
 

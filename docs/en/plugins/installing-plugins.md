@@ -9,7 +9,7 @@ Plugins are installed by uploading them through the Attraccess web interface. Th
 
 ## Uploading a Plugin
 
-1. Navigate to **Plugins** in the sidebar
+1. Open **Settings** in the sidebar and select the **Plugins** section
 2. Click the **Upload Plugin** button
 3. Select the plugin file from your computer
 4. The plugin is uploaded and appears in the plugin list
@@ -23,7 +23,7 @@ Plugins are installed by uploading them through the Attraccess web interface. Th
 
 Plugins can be toggled on or off without removing them:
 
-1. Navigate to **Plugins** in the sidebar
+1. Open **Settings** in the sidebar and select the **Plugins** section
 2. Find the plugin in the list
 3. Toggle the **Enable/Disable** switch
 4. The plugin becomes active or inactive immediately
@@ -35,7 +35,7 @@ Plugins can be toggled on or off without removing them:
 
 ## Removing a Plugin
 
-1. Navigate to **Plugins** in the sidebar
+1. Open **Settings** in the sidebar and select the **Plugins** section
 2. Find the plugin in the list
 3. Click the **Remove** or **Delete** button
 4. Confirm the removal

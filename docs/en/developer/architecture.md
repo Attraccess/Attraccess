@@ -111,8 +111,10 @@ NestJS (via Express) matches routes in the order they are registered — **first
 ```
 // BROKEN — :id swallows every static path that follows
 controllers: [UsersAdminController,    // has GET :id
-              UserPermissionsController] // has GET with-permission ← unreachable!
+               UserPermissionsController] // has GET with-permission ← unreachable!
 ```
+
+`GET /users/with-permission` was removed with the legacy boolean-permission system in ATT-566. Role assignment queries now use `GET /users?roleId=...`; do not restore the removed route when adding role-related user list behavior.
 
 **Rules to follow when adding or splitting a controller:**
 

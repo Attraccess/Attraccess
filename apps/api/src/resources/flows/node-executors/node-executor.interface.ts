@@ -6,6 +6,9 @@ export interface NodeProcessingResult {
   outputHandle?: string;
 }
 
+export type FlowFailureKind =
+  'transport-dispatch' | 'acknowledgement-timeout' | 'controller-rejection' | 'node-failure';
+
 export interface TemplateVariables {
   resource: Record<string, unknown>;
   global: Record<string, unknown>;
@@ -29,4 +32,5 @@ export interface NodeExecutionContext {
  */
 export interface NodeExecutor {
   execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult>;
+  getFailureKind?(error: unknown): FlowFailureKind;
 }

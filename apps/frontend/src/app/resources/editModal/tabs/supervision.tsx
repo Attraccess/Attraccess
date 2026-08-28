@@ -80,12 +80,16 @@ export function SupervisionTab(props: EditorTabProps) {
         <Label className="sr-only">{t('inputs.supervision.mode.label')}</Label>
         {SUPERVISION_MODES.map((mode) => (
           <Radio key={mode} value={mode} data-cy={`resource-edit-modal-supervision-mode-${mode}`}>
-            <Radio.Control>
-              <Radio.Indicator />
-            </Radio.Control>
             <Radio.Content>
-              <span className="text-small">{t(`inputs.supervision.mode.options.${mode}.label`)}</span>
-              <span className="text-tiny text-default-400">{t(`inputs.supervision.mode.options.${mode}.description`)}</span>
+              <Radio.Control>
+                <Radio.Indicator />
+              </Radio.Control>
+              <span className="flex flex-col">
+                <span className="text-small">{t(`inputs.supervision.mode.options.${mode}.label`)}</span>
+                <span className="text-tiny text-default-400">
+                  {t(`inputs.supervision.mode.options.${mode}.description`)}
+                </span>
+              </span>
             </Radio.Content>
           </Radio>
         ))}
@@ -127,19 +131,23 @@ export function SupervisionTab(props: EditorTabProps) {
                   value={AutoIntroductionTarget.RESOURCE}
                   data-cy="resource-edit-modal-auto-introduction-target-resource"
                 >
-                  <Radio.Control>
-                    <Radio.Indicator />
-                  </Radio.Control>
-                  <Radio.Content>{t('inputs.supervision.autoPromotion.target.options.resource')}</Radio.Content>
+                  <Radio.Content>
+                    <Radio.Control>
+                      <Radio.Indicator />
+                    </Radio.Control>
+                    {t('inputs.supervision.autoPromotion.target.options.resource')}
+                  </Radio.Content>
                 </Radio>
                 <Radio
                   value={AutoIntroductionTarget.GROUP}
                   data-cy="resource-edit-modal-auto-introduction-target-group"
                 >
-                  <Radio.Control>
-                    <Radio.Indicator />
-                  </Radio.Control>
-                  <Radio.Content>{t('inputs.supervision.autoPromotion.target.options.group')}</Radio.Content>
+                  <Radio.Content>
+                    <Radio.Control>
+                      <Radio.Indicator />
+                    </Radio.Control>
+                    {t('inputs.supervision.autoPromotion.target.options.group')}
+                  </Radio.Content>
                 </Radio>
               </RadioGroup>
 

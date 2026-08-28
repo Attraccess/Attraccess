@@ -14,7 +14,7 @@ runs:
       uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
 
     - name: Setup Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v7
       with:
         node-version-file: '.nvmrc'
         cache: 'pnpm'
@@ -25,9 +25,12 @@ runs:
       shell: bash
 
     - name: Setup Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
-        python-version: '3.x'
+        # Pinned: the IDF virtualenv is named after the interpreter
+        # (idf6.0_py3.13_env), so `3.x` drifting to 3.14 no longer matches the
+        # cached env and breaks the firmware build.
+        python-version: '3.13'
 
     - name: Install ESP tools
       run: |
@@ -35,21 +38,5 @@ runs:
         pip install esptool
       shell: bash
 
-    - name: Cache ESP-IDF
+    - uses: ./.github/actions/esp-idf-toolchain
       if: inputs.esp-idf == 'true'
-      id: cache-esp-idf
-      uses: actions/cache@v6
-      with:
-        path: |
-          ~/esp/esp-idf
-          ~/.espressif
-        key: esp-idf-v5.5-esp32s3-${{ runner.os }}
-
-    - name: Install ESP-IDF v5.5
-      if: inputs.esp-idf == 'true' && steps.cache-esp-idf.outputs.cache-hit != 'true'
-      run: |
-        mkdir -p ~/esp
-        git clone --depth 1 --shallow-submodules --recursive -b v5.5 \
-          https://github.com/espressif/esp-idf.git ~/esp/esp-idf
-        ~/esp/esp-idf/install.sh esp32s3
-      shell: bash

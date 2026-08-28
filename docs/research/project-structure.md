@@ -39,19 +39,34 @@
 12. **User Management:** Admin user CRUD, roles
 
 ## Frontend Routes
-- `/` → Resource overview
+- `/` → redirects to `/resources`
+- `/resources` → Resource overview
 - `/resources/:id` → Resource details (tabs: documentation, flows, forms)
 - `/projects` → Project list
 - `/projects/:id` → Project details
+- `/messages` → Messages
 - `/attractap/nfc-cards` → NFC cards
 - `/attractap/readers` → Attractap readers
-- `/mqtt/servers` → MQTT servers
+- `/devices/mqtt/servers` → MQTT servers
+- `/devices/companion` → Companion app
+- `/balena` → Balena fleets
 - `/users` → User management
-- `/settings` → System settings
-- `/sso/providers` → SSO config
 - `/billing` → Billing dashboard
-- `/plugins` → Plugin management
-- `/email-templates` → Email templates
+- `/csv-export` → CSV export
+
+Everything an admin configures lives behind the `/settings` shell, whose section
+rail is driven by `apps/frontend/src/app/settings/layout/settingsSections.ts`:
+
+- `/settings` → section index (phone list; on desktop it redirects to the first permitted section)
+- `/settings/general` → base URLs and license
+- `/settings/email` → SMTP transport (+ `/templates`, `/templates/:type`, `/layout`)
+- `/settings/messaging` → message rate limits and push notifications
+- `/settings/about` → version, updates and system information
+- `/settings/security` → sign-in throttling, password policy, 2FA, signup domains
+- `/settings/roles` → roles and permission sets
+- `/settings/sso` → SSO providers (+ `/providers/new`, `/providers/:providerId`)
+- `/settings/monitoring` → metrics endpoint and instrumentation
+- `/settings/plugins` → plugin management
 
 ## API Modules
 - resources, projects, users-and-auth, attractap, billing, mqtt, settings, email-template, plugin-system, analytics, license, encryption

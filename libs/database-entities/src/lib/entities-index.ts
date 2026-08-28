@@ -51,23 +51,17 @@ import {
   CompanionIdleActiveNodeDataSchema,
   CompanionForegroundAppNodeDataSchema,
   CompanionUsbDeviceNodeDataSchema,
+  getExternalEffectFailureBehavior,
 } from './entities/resourceFlowNode';
-import {
-  ResourceHealthState,
-  ResourceHealthStatus,
-  ResourceHealthSource,
-} from './entities/resourceHealthState.entity';
+import { ResourceHealthState, ResourceHealthStatus, ResourceHealthSource } from './entities/resourceHealthState.entity';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
-import { ResourceFlowLog, ResourceFlowLogType } from './entities/resourceFlowLog';
 import { ResourceMaintenance } from './entities/resource.maintenance';
 import { ResourceMaintenanceRequest, MaintenanceRequestStatus } from './entities/resource-maintenance-request.entity';
 import {
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleTriggerType,
 } from './entities/resource-maintenance-schedule.entity';
-import {
-  ResourceMaintenanceScheduleUsageHoursConfig,
-} from './entities/resource-maintenance-schedule-usage-hours-config.entity';
+import { ResourceMaintenanceScheduleUsageHoursConfig } from './entities/resource-maintenance-schedule-usage-hours-config.entity';
 import { UsageDurationUnit } from './types/usageDurationUnit.enum';
 import { ResourceMaintenanceScheduleUsageCountConfig } from './entities/resource-maintenance-schedule-usage-count-config.entity';
 import { ResourceMaintenanceScheduleTimeIntervalConfig } from './entities/resource-maintenance-schedule-time-interval-config.entity';
@@ -92,21 +86,21 @@ import {
   PasswordPolicyRole,
   PASSWORD_POLICY_ROLES,
 } from './entities/password-policy-override.entity';
-import {
-  PasswordPolicyAudit,
-  PasswordPolicyAuditEvent,
-} from './entities/password-policy-audit.entity';
+import { PasswordPolicyAudit, PasswordPolicyAuditEvent } from './entities/password-policy-audit.entity';
 import { Conversation } from './entities/conversation.entity';
 import { ConversationParticipant } from './entities/conversation-participant.entity';
 import { Message, MessageReferenceType } from './entities/message.entity';
 import { NotificationPreference } from './entities/notification-preference.entity';
 import { PushSubscription } from './entities/push-subscription.entity';
+import { Passkey, PasskeyChallenge } from './entities/passkey.entity';
 import { CompanionDevice } from './entities/companion-device.entity';
 import { EmailLayout, EMAIL_LAYOUT_SINGLETON_ID } from './entities/email-layout.entity';
 import { Permission } from './entities/permission.entity';
 import { Role } from './entities/role.entity';
 import { RolePermission } from './entities/role-permission.entity';
 import { UserRole, UserRoleSource } from './entities/user-role.entity';
+import { ApiToken } from './entities/api-token.entity';
+import { ApiTokenPermission } from './entities/api-token-permission.entity';
 
 // Export all entities individually
 export {
@@ -139,8 +133,6 @@ export {
   HttpRequestNodeDataSchema,
   MqttSendMessageNodeDataSchema,
   WaitNodeDataSchema,
-  ResourceFlowLog,
-  ResourceFlowLogType,
   AttractapFirmwareVersion,
   ResourceMaintenance,
   ResourceMaintenanceRequest,
@@ -166,6 +158,7 @@ export {
   BillingTransactionItemCreateSchema,
   MqttMessageReceivedNodeDataSchema,
   MqttWaitForMessageNodeDataSchema,
+  getExternalEffectFailureBehavior,
   ResourceUsageEndSessionNodeDataSchema,
   ErrorNodeDataSchema,
   Project,
@@ -211,6 +204,8 @@ export {
   MessageReferenceType,
   NotificationPreference,
   PushSubscription,
+  Passkey,
+  PasskeyChallenge,
   CompanionDevice,
   EmailLayout,
   EMAIL_LAYOUT_SINGLETON_ID,
@@ -219,6 +214,8 @@ export {
   RolePermission,
   UserRole,
   UserRoleSource,
+  ApiToken,
+  ApiTokenPermission,
 };
 
 // Export the entities object
@@ -243,7 +240,6 @@ export const entities = {
   EmailTemplateTranslation,
   ResourceFlowNode,
   ResourceFlowEdge,
-  ResourceFlowLog,
   ResourceMaintenance,
   ResourceMaintenanceRequest,
   ResourceMaintenanceSchedule,
@@ -271,9 +267,13 @@ export const entities = {
   Message,
   NotificationPreference,
   PushSubscription,
+  Passkey,
+  PasskeyChallenge,
   CompanionDevice,
   Permission,
   Role,
   RolePermission,
   UserRole,
+  ApiToken,
+  ApiTokenPermission,
 };

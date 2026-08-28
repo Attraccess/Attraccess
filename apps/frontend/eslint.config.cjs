@@ -22,11 +22,27 @@ module.exports = [
   ...baseConfig,
   ...nx.configs['flat/react'],
   {
+    // Vendored, Emscripten-generated output (see tools/vendor-openscad.mjs).
+    // Downloaded verbatim and not authored here, so it is neither linted nor
+    // typechecked. Ignoring the directory rather than one filename, since the
+    // build's output filenames are upstream's to choose.
+    ignores: ['public/openscad/**'],
+  },
+  {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
     ignores: ['**/*.json'],
     rules: {
       'no-console': ['error', { allow: ['warn', 'error', 'info', 'debug', 'trace'] }],
       ...reactCompilerRulesAsWarn,
+    },
+  },
+  {
+    // Web worker entry points run outside a window: `self` is the legitimate global
+    // (there is no `window`), not the confusing-browser-global that this rule guards
+    // against in ordinary app code.
+    files: ['**/*.worker.ts'],
+    rules: {
+      'no-restricted-globals': 'off',
     },
   },
 ];

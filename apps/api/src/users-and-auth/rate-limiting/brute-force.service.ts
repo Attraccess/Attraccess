@@ -10,7 +10,8 @@ export type RateLimitScope =
   | 'login'
   | 'register'
   | 'password_reset_request'
-  | 'password_reset_complete';
+  | 'password_reset_complete'
+  | 'delete_account_confirm';
 
 interface CounterEntry extends WindowCounterEntry {
   lockoutUntil: number;

@@ -14,6 +14,7 @@ import {
   ApiError,
   ResourceType,
   FormSubmissionRequestDto,
+  SupervisionMode,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import en from './translations/en.json';
@@ -34,6 +35,9 @@ interface StartSessionControlsProps {
   /**
    * When true the user is not introduced but the resource allows supervision:
    * starting opens the supervisor-selection popup instead of starting directly.
+   *
+   * Resources whose supervisionMode is SUPERVISION_REQUIRED are handled here regardless of this
+   * prop — see `needsSupervisor` below.
    */
   requiresSupervision?: boolean;
 }
@@ -44,6 +48,12 @@ export function StartSessionControls(
   const { resourceId, insufficientBalanceDesiredAmount, requiresSupervision, ...divProps } = props;
 
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
+
+  // supervision_required forbids a solo start for everyone, introduced or not — the backend rejects
+  // it outright. Deciding that here rather than at the call sites means no caller can forget it:
+  // the maintenance view renders these controls too, with no knowledge of supervision (ATT-815).
+  const needsSupervisor =
+    (requiresSupervision ?? false) || resource?.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED;
 
   const { t, tExists } = useTranslations({
     en: {
@@ -245,7 +255,7 @@ export function StartSessionControls(
 
       // Not introduced but supervision is allowed: defer to supervisor approval
       // instead of starting directly. The user-facing start flow is unchanged.
-      if (requiresSupervision) {
+      if (needsSupervisor) {
         setIsNotesModalOpen(false);
         setSupervisedRequestBody(requestBody);
         return;
@@ -253,7 +263,7 @@ export function StartSessionControls(
 
       submitStartSessionWithRetry(action, requestBody);
     },
-    [gatherFormSubmissions, requiresSupervision, selectedProjectId, submitStartSessionWithRetry],
+    [gatherFormSubmissions, needsSupervisor, selectedProjectId, submitStartSessionWithRetry],
   );
 
   const handleOpenStartSessionModal = () => {

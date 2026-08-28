@@ -48,3 +48,10 @@ target_compile_definitions(${COMPONENT_LIB} PUBLIC
     FIRMWARE_VERSION="${ATTRACTAP_VERSION}"
     LOG_LEVEL=${ATTRACTAP_LOG_LEVEL}
 )
+
+# LVGL's canonical selector idiom `LV_PART_MAIN | LV_STATE_DEFAULT` ORs two
+# distinct enum types. GCC 14 (IDF v6) promotes this to
+# -Wdeprecated-enum-enum-conversion in C++ only (LVGL core is C, so it is
+# unaffected). Suppress for the app like IDF does for the sibling warning
+# (-Wno-enum-conversion in tools/cmake/build.cmake:193).
+target_compile_options(${COMPONENT_LIB} PRIVATE "-Wno-deprecated-enum-enum-conversion")

@@ -5,17 +5,14 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, EntityManager, EntityTarget } from 'typeorm';
+import { Repository, EntityManager, EntityTarget } from 'typeorm';
 import {
   ResourceFlowNode,
   ResourceFlowEdge,
   ResourceFlowNodeType,
-  ResourceFlowLog,
-  ResourceFlowLogType,
   Resource,
   ResourceUsageAction,
   ResourceUsage,
@@ -29,14 +26,14 @@ import {
   CompanionIdleActiveNodeDataSchema,
   CompanionForegroundAppNodeDataSchema,
   CompanionUsbDeviceNodeDataSchema,
+  getExternalEffectFailureBehavior,
 } from '@attraccess/database-entities';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ResourceSessionStartedEvent } from '../usage/events/resource-usage.events';
-import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { FlowConfigType } from './flow.config';
-import { Subject } from 'rxjs';
+import { ResourceFlowLogType } from './dto/flow-log.dto';
+import { FlowLogRecorderService } from './flow-log-recorder.service';
 import { randomBytes } from 'crypto';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import Handlebars from 'handlebars';
@@ -75,6 +72,7 @@ import {
 } from './node-executors';
 import { CompanionGatewayService } from '../../companion/companion-gateway.service';
 import { CompanionUsbDeviceDto } from '../../companion/companion.types';
+import { ExternalEffectFailureError } from './errors/external-effect-failure.error';
 
 // Handlebars helpers
 Handlebars.registerHelper('json', (value: unknown) => {
@@ -84,8 +82,6 @@ Handlebars.registerHelper('json', (value: unknown) => {
     return 'null';
   }
 });
-
-export type ResourceFlowLogEvent = { data: ResourceFlowLog | { keepalive: true } };
 
 interface UsageEventData {
   resource: {
@@ -120,15 +116,11 @@ interface FlowResourceContext {
 }
 
 @Injectable()
-export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestroy {
+export class ResourceFlowsExecutorService implements OnModuleInit {
   private readonly logger = new Logger(ResourceFlowsExecutorService.name);
-  private readonly logTTLDays: number;
-  private keepAliveInterval: NodeJS.Timeout;
 
   private readonly resourceActivity: Map<Resource['id'], Date> = new Map();
   private readonly heartbeatLastSeen: Map<string, Date> = new Map();
-
-  public readonly resourceFlowLogSubjects: Map<Resource['id'], Subject<ResourceFlowLogEvent>> = new Map();
 
   private readonly templateVariables = new WeakMap<object, TemplateVariables>();
 
@@ -144,11 +136,9 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     private readonly flowNodeRepository: Repository<ResourceFlowNode>,
     @InjectRepository(ResourceFlowEdge)
     private readonly flowEdgeRepository: Repository<ResourceFlowEdge>,
-    @InjectRepository(ResourceFlowLog)
-    private readonly flowLogRepository: Repository<ResourceFlowLog>,
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
-    private readonly configService: ConfigService,
+    private readonly flowLogs: FlowLogRecorderService,
     private readonly mqttClientService: MqttClientService,
     @Inject(forwardRef(() => ResourceUsageService))
     private readonly resourceUsageService: ResourceUsageService,
@@ -161,9 +151,6 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     private readonly flowTimer: FlowTimer,
     private readonly companionGatewayService: CompanionGatewayService,
   ) {
-    const flowConfig = this.configService.get<FlowConfigType>('flow');
-    this.logTTLDays = flowConfig.FLOW_LOG_TTL_DAYS;
-
     this.nodeExecutors = this.buildNodeExecutorRegistry();
   }
 
@@ -223,22 +210,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
   }
 
   async onModuleInit() {
-    // Send keep-alive messages every 30 seconds to prevent connection timeouts
-    this.keepAliveInterval = setInterval(() => {
-      this.resourceFlowLogSubjects.forEach((subject) => {
-        subject.next({ data: { keepalive: true } });
-      });
-    }, 10000);
-
     await this.subscribeToMqttTopics();
-  }
-
-  onModuleDestroy() {
-    if (this.keepAliveInterval) {
-      clearInterval(this.keepAliveInterval);
-    }
-
-    this.resourceFlowLogSubjects.forEach((subject) => subject.complete());
   }
 
   private async subscribeToMqttTopics() {
@@ -275,29 +247,6 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
       await this.mqttClientService.subscribe(serverId, topic, qos).catch((error) => {
         this.logger.error(`Failed to subscribe to topic ${topic} for server ID ${serverId}`, error.stack);
       });
-    }
-  }
-
-  private async createFlowLog(
-    data: Omit<ResourceFlowLog, 'id' | 'createdAt' | 'resource'>,
-    transactionManager?: EntityManager,
-  ): Promise<ResourceFlowLog> {
-    const logEntry = this.flowLogRepository.create(data);
-
-    const repository = this.getRepository(ResourceFlowLog, this.flowLogRepository, transactionManager);
-
-    try {
-      const log = await repository.save(logEntry);
-      if (!this.resourceFlowLogSubjects.has(log.resourceId)) {
-        this.resourceFlowLogSubjects.set(log.resourceId, new Subject<ResourceFlowLogEvent>());
-      }
-      const subject = this.resourceFlowLogSubjects.get(log.resourceId);
-      subject.next({ data: log });
-      this.logger.debug(`Created flow log entry: ${log.id} for node: ${log.nodeId} (${log.type})`);
-      return log;
-    } catch (error) {
-      this.logger.error(`Failed to create flow log entry for node: ${logEntry.nodeId}`, error.stack);
-      throw error;
     }
   }
 
@@ -375,29 +324,6 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
     this.templateVariables.set(result, variables);
     return result;
-  }
-
-  @Cron('0 2 * * *') // Daily at 2 AM
-  async cleanupOldFlowLogs() {
-    await this.cronTimer.time('flow_daily_cleanup', async () => {
-      try {
-        const cutoffDate = new Date(Date.now() - this.logTTLDays * 24 * 60 * 60 * 1000);
-
-        this.logger.log(
-          `Starting cleanup of flow logs older than ${this.logTTLDays} days (before ${cutoffDate.toISOString()})`,
-        );
-
-        const result = await this.flowLogRepository.delete({
-          createdAt: LessThan(cutoffDate),
-        });
-
-        const deletedCount = result.affected || 0;
-        this.logger.log(`Successfully cleaned up ${deletedCount} old flow log entries`);
-      } catch (error) {
-        this.logger.error('Failed to cleanup old flow logs', error.stack);
-        throw error;
-      }
-    });
   }
 
   @OnEvent(ResourceSessionStartedEvent.EVENT_NAME)
@@ -558,7 +484,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         .toString('base64url')
         .slice(0, 3)}-${randomBytes(3).toString('base64url').slice(0, 3)}`;
 
-      await this.createFlowLog({
+      this.flowLogs.record({
         flowRunId,
         nodeId: null,
         resourceId: nodes[0].resourceId,
@@ -578,15 +504,12 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         this.logger.error(`Failed to process flow nodes`, error.stack);
         throw error;
       } finally {
-        await this.createFlowLog(
-          {
-            flowRunId,
-            nodeId: null,
-            resourceId: nodes[0].resourceId,
-            type: ResourceFlowLogType.FLOW_COMPLETED,
-          },
-          transactionManager,
-        );
+        this.flowLogs.record({
+          flowRunId,
+          nodeId: null,
+          resourceId: nodes[0].resourceId,
+          type: ResourceFlowLogType.FLOW_COMPLETED,
+        });
       }
       return leafResults;
     });
@@ -642,6 +565,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     const startTime = Date.now();
 
     let responseOfNode: NodeProcessingResult = { payload: {} };
+    let dispatchStarted = false;
 
     try {
       // Log the start of node processing
@@ -652,17 +576,15 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         resourceContextCache,
       )) as object;
 
-      await this.createFlowLog(
-        {
-          flowRunId,
-          nodeId: node.id,
-          resourceId: node.resourceId,
-          type: ResourceFlowLogType.NODE_PROCESSING_STARTED,
-          payload: JSON.stringify({ input }),
-        },
-        transactionManager,
-      );
+      this.flowLogs.record({
+        flowRunId,
+        nodeId: node.id,
+        resourceId: node.resourceId,
+        type: ResourceFlowLogType.NODE_PROCESSING_STARTED,
+        payload: () => ({ input }),
+      });
 
+      dispatchStarted = true;
       responseOfNode = await this.flowTimer.timeNode(node.type, () =>
         this.dispatchNode(node, input, transactionManager),
       );
@@ -677,38 +599,69 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
         resourceContextCache,
       )) as object;
 
-      await this.createFlowLog(
-        {
-          flowRunId,
-          nodeId: node.id,
-          resourceId: node.resourceId,
-          type: ResourceFlowLogType.NODE_PROCESSING_COMPLETED,
-          payload: JSON.stringify({ output: responseOfNode.payload }),
-        },
-        transactionManager,
-      );
+      this.flowLogs.record({
+        flowRunId,
+        nodeId: node.id,
+        resourceId: node.resourceId,
+        type: ResourceFlowLogType.NODE_PROCESSING_COMPLETED,
+        payload: () => ({ output: responseOfNode.payload }),
+      });
     } catch (error) {
       const processingTime = Date.now() - startTime;
+      const failureBehavior = dispatchStarted ? getExternalEffectFailureBehavior(node.type, node.data) : undefined;
+      const failureKind = dispatchStarted
+        ? (this.nodeExecutors[node.type]?.getFailureKind?.(error) ?? 'node-failure')
+        : 'node-failure';
+      const errorMessage = this.errorReason(error);
       this.logger.error(
         `Failed to process flow node ID: ${node.id} (Type: ${node.type}) after ${processingTime}ms`,
-        error.stack,
+        error instanceof Error ? error.stack : undefined,
       );
 
-      await this.createFlowLog(
-        {
-          flowRunId,
-          nodeId: node.id,
-          resourceId: node.resourceId,
-          type: ResourceFlowLogType.NODE_PROCESSING_FAILED,
-          payload: JSON.stringify({ error }),
-        },
-        transactionManager,
-      );
+      this.flowLogs.record({
+        flowRunId,
+        nodeId: node.id,
+        resourceId: node.resourceId,
+        type: ResourceFlowLogType.NODE_PROCESSING_FAILED,
+        payload: () => ({ error: errorMessage, failureKind, failureBehavior: failureBehavior ?? 'fail-flow' }),
+      });
 
-      throw error;
+      if (!failureBehavior || failureBehavior === 'fail-flow') {
+        throw failureBehavior === 'fail-flow' ? new ExternalEffectFailureError(errorMessage, error, failureKind) : error;
+      }
+
+      const payload =
+        failureBehavior === 'failure-output'
+          ? { ...resultOfPreviousNode.payload, flowError: { kind: failureKind, message: errorMessage } }
+          : resultOfPreviousNode.payload;
+      responseOfNode = {
+        payload,
+        outputHandle: failureBehavior === 'failure-output' ? 'failure' : 'output',
+      };
     }
 
     return await this.executeNextNodes(flowRunId, node, responseOfNode, transactionManager, resourceContextCache);
+  }
+
+  private errorReason(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message || error.name;
+    }
+
+    if (typeof error === 'string') {
+      return error || 'Unknown error';
+    }
+
+    if (typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string') {
+      return error.message || 'Unknown error';
+    }
+
+    try {
+      const serialized = JSON.stringify(error);
+      return serialized && serialized !== '{}' ? serialized : 'Unknown error';
+    } catch {
+      return String(error);
+    }
   }
 
   private async executeNextNodes(
@@ -894,30 +847,58 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
 
   @OnEvent('companion.idle')
   async handleCompanionIdle(event: { deviceId: number; payload: object }): Promise<void> {
-    await this.triggerCompanionEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_IDLE, event.payload, CompanionIdleActiveNodeDataSchema);
+    await this.triggerCompanionEvent(
+      event.deviceId,
+      ResourceFlowNodeType.INPUT_COMPANION_IDLE,
+      event.payload,
+      CompanionIdleActiveNodeDataSchema,
+    );
   }
 
   @OnEvent('companion.active')
   async handleCompanionActive(event: { deviceId: number; payload: object }): Promise<void> {
-    await this.triggerCompanionEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_ACTIVE, event.payload, CompanionIdleActiveNodeDataSchema);
+    await this.triggerCompanionEvent(
+      event.deviceId,
+      ResourceFlowNodeType.INPUT_COMPANION_ACTIVE,
+      event.payload,
+      CompanionIdleActiveNodeDataSchema,
+    );
   }
 
   @OnEvent('companion.foreground_app')
   async handleCompanionForegroundApp(event: { deviceId: number; payload: object }): Promise<void> {
-    await this.triggerCompanionEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED, event.payload, CompanionForegroundAppNodeDataSchema);
+    await this.triggerCompanionEvent(
+      event.deviceId,
+      ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED,
+      event.payload,
+      CompanionForegroundAppNodeDataSchema,
+    );
   }
 
   @OnEvent('companion.usb_connected')
   async handleCompanionUsbConnected(event: { deviceId: number; payload: CompanionUsbDeviceDto }): Promise<void> {
-    await this.triggerUsbDeviceEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED, event.payload);
+    await this.triggerUsbDeviceEvent(
+      event.deviceId,
+      ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED,
+      event.payload,
+    );
   }
 
   @OnEvent('companion.usb_disconnected')
   async handleCompanionUsbDisconnected(event: { deviceId: number; payload: CompanionUsbDeviceDto }): Promise<void> {
-    await this.triggerUsbDeviceEvent(event.deviceId, ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED, event.payload);
+    await this.triggerUsbDeviceEvent(
+      event.deviceId,
+      ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED,
+      event.payload,
+    );
   }
 
-  private async triggerCompanionEvent(deviceId: number, type: ResourceFlowNodeType, payload: object, schema: { safeParse: (d: unknown) => { success: boolean; data?: { deviceId: number } } }): Promise<void> {
+  private async triggerCompanionEvent(
+    deviceId: number,
+    type: ResourceFlowNodeType,
+    payload: object,
+    schema: { safeParse: (d: unknown) => { success: boolean; data?: { deviceId: number } } },
+  ): Promise<void> {
     const allNodes = await this.flowNodeRepository.find({ where: { type } });
     const matching = allNodes.filter((node) => {
       const parsed = schema.safeParse(node.data ?? {});
@@ -927,7 +908,11 @@ export class ResourceFlowsExecutorService implements OnModuleInit, OnModuleDestr
     await this.startFlow(matching, { payload });
   }
 
-  private async triggerUsbDeviceEvent(deviceId: number, type: ResourceFlowNodeType, payload: CompanionUsbDeviceDto): Promise<void> {
+  private async triggerUsbDeviceEvent(
+    deviceId: number,
+    type: ResourceFlowNodeType,
+    payload: CompanionUsbDeviceDto,
+  ): Promise<void> {
     const allNodes = await this.flowNodeRepository.find({ where: { type } });
     const matching = allNodes.filter((node) => {
       const parsed = CompanionUsbDeviceNodeDataSchema.safeParse(node.data ?? {});

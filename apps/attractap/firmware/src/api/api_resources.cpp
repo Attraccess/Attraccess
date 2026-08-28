@@ -50,7 +50,7 @@ void API::onResourceList(JsonObject data)
     }
 
     ResourceList &result = this->resourceListScratch;
-    memset(&result, 0, sizeof(ResourceList));
+    result = ResourceList{};
 
     JsonArray arr = data["payload"]["resources"].as<JsonArray>();
     if (arr.isNull())
@@ -121,25 +121,18 @@ void API::onResourceList(JsonObject data)
         }
 
         // Parse introducers: array of strings (usernames)
-        dst.introducerCount = 0;
         JsonArray introducers = resource["introducers"].as<JsonArray>();
         if (!introducers.isNull())
         {
-            uint8_t idx = 0;
+            dst.introducers.reserve(introducers.size());
             for (JsonVariant v : introducers)
             {
-                if (idx >= MAX_INTRODUCERS)
-                {
-                    break;
-                }
                 const char *introName = v.is<const char *>() ? v.as<const char *>() : nullptr;
                 if (introName && introName[0] != '\0')
                 {
-                    strlcpy(dst.introducers[idx], introName, sizeof(dst.introducers[idx]));
-                    idx++;
+                    dst.introducers.emplace_back(introName);
                 }
             }
-            dst.introducerCount = idx;
         }
 
         // Parse flowButtons: array of { id, label }

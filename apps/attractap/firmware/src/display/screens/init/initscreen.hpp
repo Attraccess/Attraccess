@@ -17,6 +17,10 @@ public:
     std::string getName() override;
     void destroy() override;
 
+    /* Boot screen is shown once at startup; keeping it alive is harmless and
+     * avoids a rebuild if the firmware returns to it (PERFORMANCE_ANALYSIS.md M4). */
+    bool shouldAutoUnload() const override { return false; }
+
     void setOnOpenSettingsCallback(std::function<void()> onOpenSettingsCallback);
 
 private:

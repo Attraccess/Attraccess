@@ -26,8 +26,14 @@ export enum AttractapEventType {
   // qualified supervisor either taps their card at the reader OR approves via
   // the web popup (same pending request, two resolution channels).
   SUPERVISION_REQUEST = 'SUPERVISION_REQUEST',
+  // Server-pushed (ATT-816): arms the reader to wait for a supervisor card on behalf of a
+  // requester who started the flow in the web UI, so nobody has to tap a card first.
+  SUPERVISION_START = 'SUPERVISION_START',
   REQUEST_SUPERVISOR_CARD_AUTHENTICATION_DATA = 'REQUEST_SUPERVISOR_CARD_AUTHENTICATION_DATA',
   SUPERVISOR_CARD_AUTHENTICATION_DATA = 'SUPERVISOR_CARD_AUTHENTICATION_DATA',
+  // Reader confirms it crypto-authenticated the supervisor card (ATT-816). Only sent for
+  // web-initiated flows, where the reader must not start the session itself.
+  SUPERVISOR_CARD_AUTH_CONFIRMED = 'SUPERVISOR_CARD_AUTH_CONFIRMED',
   SUPERVISION_RESOLVED = 'SUPERVISION_RESOLVED',
   SUPERVISION_CANCEL = 'SUPERVISION_CANCEL',
   START_RESOURCE_USAGE_SESSION = 'START_RESOURCE_USAGE_SESSION',
@@ -95,7 +101,12 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   id: string;
   readerId: Attractap['id'] | null;
   readerName: string | null;
-  sendMessage: (message: AttractapMessage) => Promise<void>;
+  /**
+   * Resolves `true` once the reader ACKed, `false` when every retry timed out. It never rejects, so
+   * callers that only fire-and-forget stay unaffected — but anything that depends on the reader
+   * having actually received the message (arming supervision, ATT-816) must check the result.
+   */
+  sendMessage: (message: AttractapMessage) => Promise<boolean>;
   sendBinaryData: (data: Buffer) => void;
   state: {
     lastAuthenticatedUserId: number | null;
@@ -122,6 +133,12 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       requestId: string | null;
       /** Set once a supervisor card has been validated at the reader; consumed by the session-start handler. */
       approvedSupervisorUserId: number | null;
+      /**
+       * True when the flow was armed from the web UI (ATT-816) rather than by a card tap. The
+       * requester is not present at the reader, so the reader must not start the session itself —
+       * it confirms the card auth instead and the pending web request is approved server-side.
+       */
+      webInitiated?: boolean;
     } | null;
     ota?: {
       path: string;

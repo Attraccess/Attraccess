@@ -31,7 +31,6 @@ export function createMockResource(overrides: Partial<Resource> = {}): Resource 
     groups: [],
     flowNodes: [],
     flowEdges: [],
-    flowLogs: [],
     flowVariables: [],
     attractapReaders: [],
     maintenances: [],

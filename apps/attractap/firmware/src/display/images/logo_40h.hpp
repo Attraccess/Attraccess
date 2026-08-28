@@ -5,7 +5,8 @@
 #define LV_ATTRIBUTE_MEM_ALIGN
 #endif
 
-const LV_ATTRIBUTE_MEM_ALIGN uint8_t logo_40h_data[] = {
+// C++17 inline: single instance across TUs (PERFORMANCE_ANALYSIS.md A1).
+inline const LV_ATTRIBUTE_MEM_ALIGN uint8_t logo_40h_data[] = {
     0x00,
     0x00,
     0x00,
@@ -15969,12 +15970,17 @@ const LV_ATTRIBUTE_MEM_ALIGN uint8_t logo_40h_data[] = {
     0x00,
 };
 
-const lv_image_dsc_t logo_40h = {
+inline const lv_image_dsc_t logo_40h = {
     .header = {
         .magic = LV_IMAGE_HEADER_MAGIC,
         .cf = LV_COLOR_FORMAT_NATIVE_WITH_ALPHA,
+        .flags = 0,
         .w = 133,
         .h = 40,
+        .stride = 0, /* LVGL infers from cf (RGB565A8 -> w*2); don't hard-code bpp */
+        .reserved_2 = 0,
     },
     .data_size = sizeof(logo_40h_data),
-    .data = logo_40h_data};
+    .data = logo_40h_data,
+    .reserved = nullptr,
+    .reserved_2 = nullptr};

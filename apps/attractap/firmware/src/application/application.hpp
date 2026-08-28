@@ -222,7 +222,21 @@ private:
     // When set, the next entry into APPLICATION_STATE_UNLOCKED auto-starts the session (the supervisor
     // approved by tapping their card; the web channel starts the session server-side instead).
     bool autoStartAfterSupervision = false;
+    // Web-initiated supervision (ATT-816): the server armed this reader for a requester who is not
+    // here, so the reader confirms the card auth instead of starting the session itself.
+    bool supervisionWebInitiated = false;
+    volatile bool supervisionStartRequested = false;
+    char supervisionRequesterName[64] = {0};
+    uint32_t supervisionRequestedResourceId = 0;
+    // Arrival time of the arm command, and the server's own TTL for it. The flag alone cannot tell
+    // "arm me now" from "arm me, five minutes ago" — a sticky sub-flow (enrollment/reset) defers
+    // consumption, potentially well past the point where the server already expired the request.
+    uint32_t supervisionRequestedAtMs = 0;
+    uint32_t supervisionRequestedTimeoutMs = 0;
+    uint32_t supervisionResourceId() const;
+    void enterSupervisionScreen(const std::string &requesterName, const std::string &hint);
     void beginSupervision();
+    void beginWebInitiatedSupervision();
     void processSupervision();
     void exitSupervision(bool unlockResource, bool autoStart);
 #endif

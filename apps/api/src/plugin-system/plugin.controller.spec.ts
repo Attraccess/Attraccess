@@ -70,11 +70,21 @@ describe('PluginController', () => {
 
       const file = controller.getFrontendPluginFile('typed', fileName);
       expect(file.options.type).toBe(contentType);
+      file
+        .getStream()
+        .on('error', () => undefined)
+        .destroy();
     });
 
     it('throws when the plugin is unknown', () => {
       jest.spyOn(PluginService, 'getPlugins').mockReturnValue([]);
       expect(() => controller.getFrontendPluginFile('ghost', 'index.js')).toThrow(NotFoundException);
+    });
+
+    it('throws when the plugin has no frontend entry', () => {
+      const plugin = { ...frontendPlugin('backend-only'), main: { backend: { directory: 'backend', entryPoint: 'index.js' } } };
+      jest.spyOn(PluginService, 'getPlugins').mockReturnValue([plugin as LoadedPluginManifest]);
+      expect(() => controller.getFrontendPluginFile('backend-only', 'index.js')).toThrow(NotFoundException);
     });
 
     it('throws when the requested file is missing', () => {

@@ -44,7 +44,15 @@ private:
     // cadence, so a 15 ms LVGL poll can land before a fresh sample exists.
     // Such "stale" polls hold the last pressed state instead of reporting a
     // release; the cap keeps a wedged controller from leaving a press stuck.
-    static constexpr uint32_t TOUCH_STALE_HOLD_MS = 100;
+    //
+    // Sized above the worst-case I2C hold, not above the GT911 scan period: the
+    // NFC task takes the shared bus for a full NFC::detectionPollTimeoutMs
+    // (100 ms) per card-detection poll, so a 100 ms window was exactly one poll
+    // away from fabricating a release mid-press and splitting a held finger into
+    // two clicks (ATT-867). A genuine release is a fresh empty sample and is
+    // still reported the moment the bus frees up, so the larger cap only delays
+    // the unstick of a permanently wedged controller.
+    static constexpr uint32_t TOUCH_STALE_HOLD_MS = 300;
     TouchPoint lastTouchPoint{};
     bool lastTouchPressed = false;
     uint32_t lastFreshSampleMs = 0;

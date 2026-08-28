@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NestInterceptor,
+  ServiceUnavailableException,
   UnauthorizedException,
   ForbiddenException,
 } from '@nestjs/common';
@@ -13,7 +14,11 @@ import { Request, Response } from 'express';
 import { BruteForceProtectionService, RateLimitScope } from './brute-force.service';
 import { AuthAuditLogger, AuthAuditOutcome, AuthAuditType } from './auth-audit.logger';
 import { AccountLockedException, TooManyAuthAttemptsException } from './exceptions';
-import { AUTH_RATE_LIMIT_METADATA } from './rate-limit.decorator';
+import {
+  AUTH_RATE_LIMIT_METADATA,
+  AUTH_RATE_LIMIT_OPTIONS_METADATA,
+  AuthRateLimitOptions,
+} from './rate-limit.decorator';
 import { resolveIp, setRetryAfter } from './login.rate-limit.guard';
 
 @Injectable()
@@ -31,6 +36,8 @@ export class AuthRateLimitInterceptor implements NestInterceptor {
     if (!scope) {
       return next.handle();
     }
+    const { clearFailuresOnSuccess = true } =
+      this.reflector.get<AuthRateLimitOptions>(AUTH_RATE_LIMIT_OPTIONS_METADATA, context.getHandler()) ?? {};
 
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse<Response>();
@@ -49,9 +56,11 @@ export class AuthRateLimitInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap({
         next: () => {
-          this.bruteForce
-            .recordSuccess(scope, ip, userId)
-            .catch((err) => this.logger.error(`recordSuccess failed for scope=${scope}`, err as Error));
+          if (clearFailuresOnSuccess) {
+            this.bruteForce
+              .recordSuccess(scope, ip, userId)
+              .catch((err) => this.logger.error(`recordSuccess failed for scope=${scope}`, err as Error));
+          }
           this.audit.log({ type: auditType, outcome: 'success', ip, userId });
         },
         error: (err: unknown) => {
@@ -76,7 +85,8 @@ function scopeToAuditType(scope: RateLimitScope): AuthAuditType {
   if (scope === 'login') return 'login';
   if (scope === 'register') return 'register';
   if (scope === 'password_reset_request') return 'password_reset_request';
-  return 'password_reset_complete';
+  if (scope === 'password_reset_complete') return 'password_reset_complete';
+  return 'delete_account_confirm';
 }
 
 function extractUserIdFromRequest(request: Request, scope: RateLimitScope): number | null {
@@ -92,6 +102,7 @@ function classifyOutcome(error: unknown): AuthAuditOutcome {
   if (error instanceof AccountLockedException) return 'account_locked';
   if (error instanceof UnauthorizedException) return 'invalid_credentials';
   if (error instanceof ForbiddenException) return 'invalid_token';
+  if (error instanceof ServiceUnavailableException) return 'dependency_failure';
   return 'invalid_input';
 }
 

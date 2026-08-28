@@ -19,6 +19,10 @@
     "title": "Insufficient balance",
     "description": "The balance is not sufficient for this action."
   },
+  "INVALID_CSV": {
+    "title": "Invalid CSV file",
+    "description": "The CSV file could not be processed. Check its format and try again."
+  },
   "Invalid API key": {
     "title": "Invalid API key",
     "description": "The API key is invalid. Please try again."

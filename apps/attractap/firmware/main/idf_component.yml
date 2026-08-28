@@ -1,5 +1,5 @@
 dependencies:
-  idf: ">=5.5.0"
+  idf: ">=6.0.2"
 
   # UI (touch variants; dead-stripped from the headless lite build)
   lvgl/lvgl: "9.3.0"
@@ -23,3 +23,7 @@ dependencies:
 
   # Attractap Lite: WS2812 LED ring (RMT backend)
   espressif/led_strip: "^3.0.0"
+
+  # W5500 SPI Ethernet MAC (moved out of IDF core into the Component
+  # Registry in IDF v6 and requires the v6 migration baseline).
+  espressif/w5500: "^2.0.0"

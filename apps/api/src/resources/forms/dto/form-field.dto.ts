@@ -7,6 +7,11 @@ export class FormFieldBaseDto {
   @IsString()
   name!: string;
 
+  @ApiProperty({ description: 'Position of the field within the form', example: 0 })
+  @IsInt()
+  @Min(0)
+  position!: number;
+
   @ApiProperty({
     description: 'Field type',
     enum: FormFieldType,

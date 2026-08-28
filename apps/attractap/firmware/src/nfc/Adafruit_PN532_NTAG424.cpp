@@ -1427,15 +1427,21 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
 #endif
       // Only the first AES block is the IV; encrypting sizeof(iv)=32 bytes
       // would overflow ive[16] and smash the stack (crashed changeKey on IDF).
-      Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
-                                      sizeof(ive), iv, ive);
+      if (!Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
+                                           sizeof(ive), iv, ive))
+      {
+        return 0;
+      }
       // encrypt cmd_data using SesAuthENCKey
       // padded_payload_length
       // uint8_t payload_encrypted[32];
       uint8_t payload_encrypted[52];
-      Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc, ive,
-                                      padded_payload_length, payload_padded,
-                                      payload_encrypted);
+      if (!Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc, ive,
+                                           padded_payload_length, payload_padded,
+                                           payload_encrypted))
+      {
+        return 0;
+      }
       memcpy(apdu + offset, payload_encrypted, padded_payload_length);
 #ifdef NTAG424DEBUG
       Serial.println("APDU Payload:");
@@ -1537,14 +1543,10 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     memcpy(checkmacin + 3, ntag424_authresponse_TI,
            NTAG424_AUTHRESPONSE_TI_SIZE);
     uint8_t padded_respdata_length = 0;
-    uint8_t *respdata = (uint8_t *)malloc(response_length - 10);
     if (response_length > 10)
     {
-      memcpy(respdata, response, response_length - 10);
-      // padded_respdata_length =
-      // Adafruit_PN532::ntag424_addpadding(response_length - 10 ,16, respdata);
       padded_respdata_length = response_length - 10;
-      memcpy(checkmacin + 3 + NTAG424_AUTHRESPONSE_TI_SIZE, respdata,
+      memcpy(checkmacin + 3 + NTAG424_AUTHRESPONSE_TI_SIZE, response,
              padded_respdata_length);
     }
     maclength = 3 + NTAG424_AUTHRESPONSE_TI_SIZE + padded_respdata_length;
@@ -1560,7 +1562,6 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     PN532DEBUGPRINT.print(F("checkcmac:"));
     Adafruit_PN532::PrintHex(checkmac, 8);
 #endif
-    free(respdata);
     free(checkmacin);
     for (int i = 0; i < 8; i++)
     {
@@ -1579,7 +1580,9 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     PN532DEBUGPRINT.println(F("Response CMAC ok! (picc == pcd)"));
   }
   // decrypt the response in mode.full
-  if ((response_length >= 10) && (comm_mode == NTAG424_COMM_MODE_FULL))
+  // A successful write can contain only its CMAC and 0x9100 status trailer.
+  // There is no encrypted payload to allocate or decrypt in that case.
+  if ((response_length > 10) && (comm_mode == NTAG424_COMM_MODE_FULL))
   {
     uint8_t ivd[32];
     uint8_t ivde[16];
@@ -1592,15 +1595,26 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     // Serial.println("IV-init:");
     // Adafruit_PN532::PrintHex(iv, 16);
     // Same overflow as the command-IV path: only one block fits in ivde[16].
-    Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
-                                    sizeof(ivde), ivd, ivde);
+    if (!Adafruit_PN532::ntag424_encrypt(ntag424_Session.session_key_enc,
+                                         sizeof(ivde), ivd, ivde))
+    {
+      return 0;
+    }
     uint8_t *respplain = (uint8_t *)malloc(response_length - 10);
+    if (respplain == nullptr)
+    {
+      return 0;
+    }
 #ifdef NTAG424DEBUG
     PN532DEBUGPRINT.println(F("Encrypted Response(pcd < picc)"));
     Adafruit_PN532::PrintHex(response, response_length - 10);
 #endif
-    Adafruit_PN532::ntag424_decrypt(ntag424_Session.session_key_enc, ivde,
-                                    response_length - 10, response, respplain);
+    if (!Adafruit_PN532::ntag424_decrypt(ntag424_Session.session_key_enc, ivde,
+                                         response_length - 10, response, respplain))
+    {
+      free(respplain);
+      return 0;
+    }
 #ifdef NTAG424DEBUG
     PN532DEBUGPRINT.println(F("Decrypted Response(pcd < picc)"));
     Adafruit_PN532::PrintHex(respplain, response_length - 10);
@@ -1611,16 +1625,21 @@ uint8_t Adafruit_PN532::ntag424_apdu_send(
     uint8_t resp_no_padding = response_length - 10;
     if (response_length > 10)
     {
-      for (uint8_t i = response_length - 10 - 1; i >= 0; i--)
+      // Scan from the end for ISO/IEC 7816-4 padding (0x80 … 0x00). Uses
+      // uint8_t (as before the IDF v6 migration) but iterates i>0 with idx=i-1
+      // so the loop terminates correctly: `i >= 0` on an unsigned type is
+      // always true and would wrap 255→0 (OOB read) or trip -Wtype-limits.
+      for (uint8_t i = response_length - 10; i > 0; i--)
       {
-        // Serial.println(i);
-        if (response[i] == 0x00)
+        uint8_t idx = i - 1;
+        // Serial.println(idx);
+        if (response[idx] == 0x00)
         {
-          resp_no_padding = i;
+          resp_no_padding = idx;
         }
-        else if (response[i] == 0x80)
+        else if (response[idx] == 0x80)
         {
-          resp_no_padding = i;
+          resp_no_padding = idx;
           break;
         }
         else
@@ -1705,19 +1724,77 @@ uint8_t Adafruit_PN532::ntag424_encrypt(uint8_t *key, uint8_t *iv,
                                         uint8_t length, uint8_t *input,
                                         uint8_t *output)
 {
-  mbedtls_aes_context ctx;
-  mbedtls_aes_init(&ctx);
-  // Set the key for the AES context
-  if (mbedtls_aes_setkey_dec(&ctx, key, 128) != 0)
+  // PSA_ALG_CBC_NO_PADDING requires the input length to be a multiple of the
+  // AES block size (16 bytes); enforce it explicitly so an unaligned length
+  // fails visibly here instead of as a silent PSA status 0 return
+  // (Sourcery review PR #1691).
+  if ((length % 16u) != 0u)
   {
-    // Error setting key
-    mbedtls_aes_free(&ctx);
     return 0;
   }
-  mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_ENCRYPT, length, iv, (uint8_t *)input,
-                        (uint8_t *)output);
-  mbedtls_aes_free(&ctx);
-  return 1;
+
+  // IDF v6 / mbedTLS 4.x: legacy mbedtls_aes_* moved to private headers, so
+  // the supported interface is the PSA Crypto API (auto-initialized at boot).
+  psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+  psa_set_key_type(&attributes, PSA_KEY_TYPE_AES);
+  psa_set_key_bits(&attributes, 128);
+  psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_ENCRYPT);
+  psa_set_key_algorithm(&attributes, PSA_ALG_CBC_NO_PADDING);
+
+  mbedtls_svc_key_id_t key_id = MBEDTLS_SVC_KEY_ID_INIT;
+  psa_status_t status = psa_import_key(&attributes, key, 16, &key_id);
+  if (status != PSA_SUCCESS)
+  {
+#ifdef NTAG424DEBUG
+    PN532DEBUGPRINT.print(F("psa_import_key failed: "));
+    PN532DEBUGPRINT.println((int)status);
+#endif
+    return 0;
+  }
+
+  psa_cipher_operation_t op = PSA_CIPHER_OPERATION_INIT;
+  size_t olen = 0;
+  status = psa_cipher_encrypt_setup(&op, key_id, PSA_ALG_CBC_NO_PADDING);
+  if (status == PSA_SUCCESS)
+  {
+    status = psa_cipher_set_iv(&op, iv, 16);
+  }
+  if (status == PSA_SUCCESS)
+  {
+    // output buffer must be exactly `length`; CBC-without-padding never
+    // expands, and psa_cipher_update reports back the actual olen so we can
+    // detect truncation instead of silently returning partial data.
+    status = psa_cipher_update(&op, (const uint8_t *)input, length,
+                               (uint8_t *)output, length, &olen);
+  }
+  if (status == PSA_SUCCESS)
+  {
+    size_t flen = 0;
+    if (olen <= length)
+    {
+      status = psa_cipher_finish(&op, (uint8_t *)output + olen, length - olen, &flen);
+    }
+    else
+    {
+      status = PSA_ERROR_BUFFER_TOO_SMALL;
+    }
+    // CBC-without-padding never expands: total output must exactly equal the
+    // input length. Fail explicitly on any mismatch (Sourcery PR #1691).
+    if (status == PSA_SUCCESS && (olen + flen) != length)
+    {
+      status = PSA_ERROR_GENERIC_ERROR;
+    }
+  }
+  psa_cipher_abort(&op);
+  psa_destroy_key(key_id);
+#ifdef NTAG424DEBUG
+  if (status != PSA_SUCCESS)
+  {
+    PN532DEBUGPRINT.print(F("ntag424_encrypt failed: "));
+    PN532DEBUGPRINT.println((int)status);
+  }
+#endif
+  return (status == PSA_SUCCESS) ? 1 : 0;
 }
 
 /**************************************************************************/
@@ -1757,22 +1834,74 @@ uint8_t Adafruit_PN532::ntag424_decrypt(uint8_t *key, uint8_t *iv,
                                         uint8_t length, uint8_t *input,
                                         uint8_t *output)
 {
-  mbedtls_aes_context ctx;
-  mbedtls_aes_init(&ctx);
-  // Set the key for the AES context
-  if (mbedtls_aes_setkey_dec(&ctx, key, 128) != 0)
-  {
-    // Error setting key
-    mbedtls_aes_free(&ctx);
-    return 0;
-  }
-  if (mbedtls_aes_crypt_cbc(&ctx, MBEDTLS_AES_DECRYPT, length, iv,
-                            (uint8_t *)input, (uint8_t *)output) != 0)
+  // PSA_ALG_CBC_NO_PADDING requires block-aligned (16-byte) input length
+  // (Sourcery review PR #1691); fail explicitly, not as a silent PSA error.
+  if ((length % 16u) != 0u)
   {
     return 0;
   }
-  mbedtls_aes_free(&ctx);
-  return 1;
+
+  // IDF v6 / mbedTLS 4.x: PSA Crypto API (see ntag424_encrypt).
+  psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+  psa_set_key_type(&attributes, PSA_KEY_TYPE_AES);
+  psa_set_key_bits(&attributes, 128);
+  psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_DECRYPT);
+  psa_set_key_algorithm(&attributes, PSA_ALG_CBC_NO_PADDING);
+
+  mbedtls_svc_key_id_t key_id = MBEDTLS_SVC_KEY_ID_INIT;
+  psa_status_t status = psa_import_key(&attributes, key, 16, &key_id);
+  if (status != PSA_SUCCESS)
+  {
+#ifdef NTAG424DEBUG
+    PN532DEBUGPRINT.print(F("psa_import_key failed: "));
+    PN532DEBUGPRINT.println((int)status);
+#endif
+    return 0;
+  }
+
+  psa_cipher_operation_t op = PSA_CIPHER_OPERATION_INIT;
+  size_t olen = 0;
+  status = psa_cipher_decrypt_setup(&op, key_id, PSA_ALG_CBC_NO_PADDING);
+  if (status == PSA_SUCCESS)
+  {
+    status = psa_cipher_set_iv(&op, iv, 16);
+  }
+  if (status == PSA_SUCCESS)
+  {
+    // output buffer must be exactly `length`; CBC-without-padding never
+    // expands, and psa_cipher_update reports back the actual olen so we can
+    // detect truncation instead of silently returning partial data.
+    status = psa_cipher_update(&op, (const uint8_t *)input, length,
+                               (uint8_t *)output, length, &olen);
+  }
+  if (status == PSA_SUCCESS)
+  {
+    size_t flen = 0;
+    if (olen <= length)
+    {
+      status = psa_cipher_finish(&op, (uint8_t *)output + olen, length - olen, &flen);
+    }
+    else
+    {
+      status = PSA_ERROR_BUFFER_TOO_SMALL;
+    }
+    // CBC-without-padding never expands: total output must exactly equal the
+    // input length. Fail explicitly on any mismatch (Sourcery PR #1691).
+    if (status == PSA_SUCCESS && (olen + flen) != length)
+    {
+      status = PSA_ERROR_GENERIC_ERROR;
+    }
+  }
+  psa_cipher_abort(&op);
+  psa_destroy_key(key_id);
+#ifdef NTAG424DEBUG
+  if (status != PSA_SUCCESS)
+  {
+    PN532DEBUGPRINT.print(F("ntag424_decrypt failed: "));
+    PN532DEBUGPRINT.println((int)status);
+  }
+#endif
+  return (status == PSA_SUCCESS) ? 1 : 0;
 }
 
 /**************************************************************************/
@@ -1825,47 +1954,30 @@ uint8_t Adafruit_PN532::ntag424_cmac_short(uint8_t *key, uint8_t *input,
 uint8_t Adafruit_PN532::ntag424_cmac(uint8_t *key, uint8_t *input,
                                      uint8_t length, uint8_t *cmac)
 {
-  int ret = 0;
-  const mbedtls_cipher_info_t *cipher_info;
-  cipher_info = mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_128_ECB);
-  mbedtls_cipher_context_t ctx;
-  mbedtls_cipher_init(&ctx);
-  if ((ret = mbedtls_cipher_setup(&ctx, cipher_info)) != 0)
+  // IDF v6 / mbedTLS 4.x: PSA Crypto API (legacy mbedtls_cipher_cmac_* moved
+  // to private headers). AES-128-CMAC via PSA, auto-initialized at boot.
+  psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+  psa_set_key_type(&attributes, PSA_KEY_TYPE_AES);
+  psa_set_key_bits(&attributes, 128);
+  psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_SIGN_MESSAGE);
+  psa_set_key_algorithm(&attributes, PSA_ALG_CMAC);
+
+  mbedtls_svc_key_id_t key_id = MBEDTLS_SVC_KEY_ID_INIT;
+  psa_status_t status = psa_import_key(&attributes, key, 16, &key_id);
+  if (status != PSA_SUCCESS)
   {
-#ifdef NTAG424DEBUG
-    PN532DEBUGPRINT.println(F("could not setup cipher "));
-#endif
-    goto exit;
+    return 0;
   }
-  ret = mbedtls_cipher_cmac_starts(&ctx, key, 128);
-  if (ret != 0)
+
+  size_t mac_length = 0;
+  status = psa_mac_compute(key_id, PSA_ALG_CMAC, input, length,
+                           cmac, 16, &mac_length);
+  psa_destroy_key(key_id);
+  if (status != PSA_SUCCESS || mac_length != 16)
   {
-#ifdef NTAG424DEBUG
-    PN532DEBUGPRINT.println(F("could not start cmac "));
-#endif
-    goto exit;
+    return 0;
   }
-  ret = mbedtls_cipher_cmac_update(&ctx, input, length);
-  if (ret != 0)
-  {
-#ifdef NTAG424DEBUG
-    PN532DEBUGPRINT.println(F("error while updateing cmac "));
-#endif
-    goto exit;
-  }
-  ret = mbedtls_cipher_cmac_finish(&ctx, cmac);
-#ifdef NTAG424DEBUG
-  PN532DEBUGPRINT.print(F("cmac key: "));
-  Adafruit_PN532::PrintHexChar(key, 16);
-  PN532DEBUGPRINT.print(F("cmac input: "));
-  Adafruit_PN532::PrintHexChar(input, length);
-  PN532DEBUGPRINT.print(F("cmac output: "));
-  Adafruit_PN532::PrintHexChar(cmac, 16);
-#endif
   return 1;
-exit:
-  mbedtls_cipher_free(&ctx);
-  return 0;
 }
 
 /**************************************************************************/
@@ -2249,8 +2361,8 @@ uint8_t Adafruit_PN532::ntag424_AuthenticateEV2First(uint8_t *key,
   {
 #ifdef NTAG424DEBUG
     PN532DEBUGPRINT.println(F("Decryption error"));
-    return 0;
 #endif
+    return 0;
   }
   memset(RndBRotl, 0, sizeof(RndBRotl));
   ntag424_rotl(RndB, RndBRotl, blocklength, 1);
@@ -2269,7 +2381,10 @@ uint8_t Adafruit_PN532::ntag424_AuthenticateEV2First(uint8_t *key,
 #endif
   memcpy(&answer, RndA, blocklength);
   memcpy(&answer[blocklength], RndBRotl, blocklength);
-  Adafruit_PN532::ntag424_encrypt(key, sizeof(answer), answer, answer_enc);
+  if (!Adafruit_PN532::ntag424_encrypt(key, sizeof(answer), answer, answer_enc))
+  {
+    return 0;
+  }
 #ifdef NTAG424DEBUG
   PN532DEBUGPRINT.println(F("answer: "));
   Adafruit_PN532::PrintHexChar(answer, blocklength * 2);
@@ -2326,6 +2441,7 @@ uint8_t Adafruit_PN532::ntag424_AuthenticateEV2First(uint8_t *key,
 #ifdef NTAG424DEBUG
     PN532DEBUGPRINT.println(F("Decryption error"));
 #endif
+    return 0;
   }
   // save the authresponse
   memcpy(&ntag424_authresponse_TI,
@@ -2519,7 +2635,10 @@ uint8_t Adafruit_PN532::ntag424_ChangeKey(uint8_t *oldkey, uint8_t *newkey,
   );
   Adafruit_PN532::PrintHex(result, response_length);
 
-  if ((result[0] != 0x91) || (result[1] != 0x00))
+  // A full-mode response can retain its eight-byte CMAC before the status
+  // trailer. The status is always the final two bytes.
+  if (response_length < 2 || result[response_length - 2] != 0x91 ||
+      result[response_length - 1] != 0x00)
   {
     return false;
   }
@@ -3775,7 +3894,7 @@ bool Adafruit_PN532::waitready(uint16_t timeout)
   {
     if (timeout != 0)
     {
-      timer += 10;
+      timer += 2;
       if (timer > timeout)
       {
 #ifdef PN532DEBUG
@@ -3784,7 +3903,7 @@ bool Adafruit_PN532::waitready(uint16_t timeout)
         return false;
       }
     }
-    delay(10);
+    delay(2);
   }
   return true;
 }

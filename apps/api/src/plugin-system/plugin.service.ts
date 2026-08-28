@@ -11,10 +11,10 @@ import decompress from 'decompress';
 import { randomBytes } from 'crypto';
 import { spawn } from 'child_process';
 
+const INTERNAL_PLUGIN_DIRECTORIES = new Set(['.npm-backups']);
 
 
 export class PluginService {
-
   private static plugins: LoadedPluginManifest[] | null = null;
   private static loadedPlugins: Set<string> = new Set();
   private static pluginLoadErrors: Map<string, Error> = new Map();
@@ -95,6 +95,7 @@ export class PluginService {
     PluginService.logger.log(`Found ${potentialPluginFolders.length} folders in ${rootFolder}`);
 
     return potentialPluginFolders
+      .filter((pluginFolder) => !INTERNAL_PLUGIN_DIRECTORIES.has(pluginFolder))
       .map((pluginFolder) => {
         const manifest = PluginService.findPluginManifestInPluginFolder(
           rootFolder,
@@ -236,6 +237,10 @@ export class PluginService {
     subprocess.unref();
     PluginService.logger.log('New process started, exiting current process');
     process.exit();
+  }
+
+  public requestRestart(): void {
+    setTimeout(() => this.restartApp(), 1000);
   }
 
   public async deletePlugin(pluginId: string) {

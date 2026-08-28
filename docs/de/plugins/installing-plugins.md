@@ -9,7 +9,7 @@ Plugins werden durch Hochladen ueber die Attraccess-Weboberflaeche installiert. 
 
 ## Plugin hochladen
 
-1. Navigieren Sie zu **Plugins** in der Seitenleiste
+1. Oeffnen Sie **Einstellungen** in der Seitenleiste und waehlen Sie den Bereich **Plugins**
 2. Klicken Sie auf die Schaltflaeche **Plugin hochladen**
 3. Waehlen Sie die Plugin-Datei von Ihrem Computer aus
 4. Das Plugin wird hochgeladen und erscheint in der Plugin-Liste
@@ -23,7 +23,7 @@ Plugins werden durch Hochladen ueber die Attraccess-Weboberflaeche installiert. 
 
 Plugins koennen ein- oder ausgeschaltet werden, ohne sie zu entfernen:
 
-1. Navigieren Sie zu **Plugins** in der Seitenleiste
+1. Oeffnen Sie **Einstellungen** in der Seitenleiste und waehlen Sie den Bereich **Plugins**
 2. Finden Sie das Plugin in der Liste
 3. Schalten Sie den **Aktivieren/Deaktivieren**-Schalter um
 4. Das Plugin wird sofort aktiv oder inaktiv
@@ -35,7 +35,7 @@ Plugins koennen ein- oder ausgeschaltet werden, ohne sie zu entfernen:
 
 ## Plugin entfernen
 
-1. Navigieren Sie zu **Plugins** in der Seitenleiste
+1. Oeffnen Sie **Einstellungen** in der Seitenleiste und waehlen Sie den Bereich **Plugins**
 2. Finden Sie das Plugin in der Liste
 3. Klicken Sie auf die Schaltflaeche **Entfernen** oder **Loeschen**
 4. Bestaetigen Sie die Entfernung

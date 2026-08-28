@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Req } from '@nestjs/common';
 import { ResourceGroupsIntroductionsService } from './resourceGroups.introductions.service';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ResourceIntroduction, ResourceIntroductionHistoryItem } from '@attraccess/database-entities';
 import { IsResourceGroupIntroducer } from './isIntroducer.decorator';
 import { UpdateResourceGroupIntroductionDto } from './dtos/update.request.dto';
@@ -59,9 +60,12 @@ export class ResourceGroupsIntroductionsController {
   async grant(
     @Param('groupId', ParseIntPipe) groupId: number,
     @Param('userId', ParseIntPipe) userId: number,
-    @Body() data: UpdateResourceGroupIntroductionDto
+    @Body() data: UpdateResourceGroupIntroductionDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem> {
-    return await this.resourceGroupsIntroductionsService.grant(groupId, userId, data);
+    return await this.resourceGroupsIntroductionsService.grant(groupId, userId, data, {
+      performedByUserId: req.user.id,
+    });
   }
 
   @Post('/:userId/revoke')
@@ -80,8 +84,11 @@ export class ResourceGroupsIntroductionsController {
   async revoke(
     @Param('groupId', ParseIntPipe) groupId: number,
     @Param('userId', ParseIntPipe) userId: number,
-    @Body() data: UpdateResourceGroupIntroductionDto
+    @Body() data: UpdateResourceGroupIntroductionDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem> {
-    return await this.resourceGroupsIntroductionsService.revoke(groupId, userId, data);
+    return await this.resourceGroupsIntroductionsService.revoke(groupId, userId, data, {
+      performedByUserId: req.user.id,
+    });
   }
 }

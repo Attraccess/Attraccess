@@ -1,0 +1,25 @@
+{
+  "title": "Passkeys",
+  "description": "Sign in with your fingerprint, face or password manager instead of a password.",
+  "empty": "You have not added a passkey yet.",
+  "neverUsed": "Never",
+  "columns": {
+    "name": "Name",
+    "lastUsed": "Last used",
+    "actions": "Actions"
+  },
+  "nameLabel": "Name",
+  "namePlaceholder": "e.g. MacBook Touch ID",
+  "actions": {
+    "add": "Add a passkey",
+    "delete": "Delete passkey {{name}}"
+  },
+  "success": {
+    "added": "Passkey added",
+    "deleted": "Passkey deleted"
+  },
+  "errors": {
+    "addFailed": "Could not add that passkey",
+    "deleteFailed": "Could not delete that passkey"
+  }
+}

@@ -128,16 +128,25 @@ export function InviteUserModal(props: Props) {
         onOpenChange={(o) => {
           if (!o) close();
         }}
+        dialogProps={{ 'aria-label': t('title') }}
       >
         <DrawerHeader>
           <h2 className="text-lg font-semibold">{t('title')}</h2>
         </DrawerHeader>
         <DrawerBody>
           <Tabs selectedKey={tab} onSelectionChange={(k) => setTab(k as 'single' | 'csv')}>
-            <TabList>
-              <Tab id="single">{t('tabs.single')}</Tab>
-              <Tab id="csv">{t('tabs.csv')}</Tab>
-            </TabList>
+            <Tabs.ListContainer>
+              <TabList>
+                <Tab id="single">
+                  <Tabs.Indicator />
+                  {t('tabs.single')}
+                </Tab>
+                <Tab id="csv">
+                  <Tabs.Indicator />
+                  {t('tabs.csv')}
+                </Tab>
+              </TabList>
+            </Tabs.ListContainer>
             <TabPanel id="single">
               <Form
                 ref={formRef}

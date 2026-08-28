@@ -2,6 +2,8 @@
 #include "platform.hpp"
 #include "esp_system.h"
 #include "esp_mac.h"
+#include "esp_eth_mac_w5500.h"
+#include "esp_eth_phy_w5500.h"
 #include <string>
 
 // Static member definitions
@@ -241,7 +243,11 @@ esp_err_t Ethernet::initSPI()
     }
 
     // Configure W5500 reset pin (if available)
-    if (PIN_W5500_RESET >= 0)
+    // NOTE: guard via preprocessor with an explicit defined() check, not `if`,
+    // because PIN_W5500_RESET is a compile-time constant; `1ULL << -1` would be
+    // UB even under a runtime check, and an undefined macro would be a
+    // preprocessing error on configs that omit it (Sourcery review PR #1691).
+#if defined(PIN_W5500_RESET) && PIN_W5500_RESET >= 0
     {
         logger.info(("Configuring reset pin GPIO" + std::to_string(PIN_W5500_RESET)).c_str());
         uint64_t pin_mask = (1ULL << PIN_W5500_RESET);
@@ -266,11 +272,12 @@ esp_err_t Ethernet::initSPI()
         vTaskDelay(pdMS_TO_TICKS(10)); // Wait for chip to come out of reset
         logger.info("W5500 hardware reset completed");
     }
-    else
+#else
     {
         logger.info("No reset pin configured - relying on power-on reset");
         vTaskDelay(pdMS_TO_TICKS(100)); // Give some time for power-on reset to complete
     }
+#endif
 
     // Initialize SPI bus
     spi_bus_config_t buscfg = {
@@ -279,7 +286,15 @@ esp_err_t Ethernet::initSPI()
         .sclk_io_num = PIN_ETH_SPI_SCK,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
+        .data4_io_num = -1,
+        .data5_io_num = -1,
+        .data6_io_num = -1,
+        .data7_io_num = -1,
+        .data_io_default_level = false,
         .max_transfer_sz = 0,
+        .flags = SPICOMMON_BUSFLAG_MASTER,
+        .isr_cpu_id = ESP_INTR_CPU_AFFINITY_AUTO,
+        .intr_flags = 0,
     };
 
 #ifdef DISPLAY_TOUCHSCREEN_LVGL
@@ -341,12 +356,12 @@ esp_err_t Ethernet::ethernet_init(esp_eth_handle_t *eth_handles, uint8_t *eth_po
     if (PIN_W5500_INT >= 0)
     {
         logger.info(("Configuring interrupt pin GPIO" + std::to_string(PIN_W5500_INT)).c_str());
-        w5500_config.int_gpio_num = PIN_W5500_INT;
+        w5500_config.base.int_gpio_num = PIN_W5500_INT;
     }
     else
     {
         logger.info("No interrupt pin configured - using polling mode");
-        w5500_config.int_gpio_num = -1; // Disable interrupt, use polling
+        w5500_config.base.int_gpio_num = -1; // Disable interrupt, use polling
     }
 
     // Initialize Ethernet MAC

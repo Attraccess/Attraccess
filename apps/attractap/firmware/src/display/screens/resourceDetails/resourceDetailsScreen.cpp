@@ -44,7 +44,7 @@ void ResourceDetailsScreen::init()
    lv_obj_remove_flag(logoutButton, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_style_bg_color(logoutButton, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(logoutButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_add_event_cb(logoutButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_LOGOUT});
+   lv_obj_add_event_cb(logoutButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_LOGOUT, {}});
 
    lv_obj_t *labelForLogoutButton = lv_label_create(logoutButton);
    lv_obj_set_width(labelForLogoutButton, LV_SIZE_CONTENT);
@@ -284,7 +284,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_style_bg_color(this->startSessionButton, lv_color_hex(0x17C964), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(this->startSessionButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN);
-   lv_obj_add_event_cb(this->startSessionButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_START_SESSION});
+   lv_obj_add_event_cb(this->startSessionButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_START_SESSION, {}});
 
    this->startSessionButtonLabel = lv_label_create(this->startSessionButton);
    lv_obj_set_width(this->startSessionButtonLabel, LV_SIZE_CONTENT);
@@ -310,7 +310,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_style_bg_color(this->stopSessionButton, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(this->stopSessionButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_flag(this->stopSessionButton, LV_OBJ_FLAG_HIDDEN);
-   lv_obj_add_event_cb(this->stopSessionButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_STOP_SESSION});
+   lv_obj_add_event_cb(this->stopSessionButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_STOP_SESSION, {}});
 
    this->stopSessionButtonLabel = lv_label_create(this->stopSessionButton);
    lv_obj_set_width(this->stopSessionButtonLabel, LV_SIZE_CONTENT);
@@ -337,7 +337,7 @@ void ResourceDetailsScreen::init()
    lv_obj_remove_flag(lockDoorButton, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_style_bg_color(lockDoorButton, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(lockDoorButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_add_event_cb(lockDoorButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_LOCK_DOOR});
+   lv_obj_add_event_cb(lockDoorButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_LOCK_DOOR, {}});
 
    lv_obj_t *labelForLockDoorButton = lv_label_create(lockDoorButton);
    lv_obj_set_width(labelForLockDoorButton, LV_SIZE_CONTENT);
@@ -353,7 +353,7 @@ void ResourceDetailsScreen::init()
    lv_obj_remove_flag(unlockDoorButton, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_style_bg_color(unlockDoorButton, lv_color_hex(0x17C964), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(unlockDoorButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_add_event_cb(unlockDoorButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_UNLOCK_DOOR});
+   lv_obj_add_event_cb(unlockDoorButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_UNLOCK_DOOR, {}});
 
    lv_obj_t *labelForUnlockDoorButton = lv_label_create(unlockDoorButton);
    lv_obj_set_width(labelForUnlockDoorButton, LV_SIZE_CONTENT);
@@ -369,7 +369,7 @@ void ResourceDetailsScreen::init()
    lv_obj_remove_flag(unlatchDoorButton, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_style_bg_color(unlatchDoorButton, lv_color_hex(0x9353D3), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(unlatchDoorButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_add_event_cb(unlatchDoorButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_UNLATCH_DOOR});
+   lv_obj_add_event_cb(unlatchDoorButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_UNLATCH_DOOR, {}});
 
    lv_obj_t *labelForUnlatchDoorButton = lv_label_create(unlatchDoorButton);
    lv_obj_set_width(labelForUnlatchDoorButton, LV_SIZE_CONTENT);
@@ -557,7 +557,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
       lv_obj_set_style_bg_color(flowButton, lv_color_hex(0x006FEE), LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_obj_set_style_bg_opa(flowButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-      ButtonClickEventData *evt = new ButtonClickEventData{this, BUTTON_CLICK_TYPE_FLOW_BUTTON};
+      ButtonClickEventData *evt = new ButtonClickEventData{this, BUTTON_CLICK_TYPE_FLOW_BUTTON, {}};
       strlcpy(evt->flowButtonId, fb.id, API::MAX_FLOW_BUTTON_ID_LEN);
       lv_obj_add_event_cb(flowButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, evt);
       lv_obj_add_event_cb(flowButton, &ResourceDetailsScreen::onContainerDelete, LV_EVENT_DELETE, evt);
@@ -575,7 +575,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
 std::string ResourceDetailsScreen::buildIntroducersText(const API::ResourceBrief &resource)
 {
    std::string list;
-   for (uint8_t i = 0; i < resource.introducerCount; ++i)
+   for (size_t i = 0; i < resource.introducers.size(); ++i)
    {
       if (i > 0)
       {
@@ -619,13 +619,11 @@ void ResourceDetailsScreen::refreshAccessState()
                           strcmp(this->resourceCache.activeUser, user.username.c_str()) == 0;
    bool supervisedStartAvailable = user.requiresSupervisor && this->resourceCacheValid &&
                                    !this->resourceCache.hasActiveUsage;
-
-   // No-introduction panel is shown only when the user is missing an introduction and has no
-   // supervised start/current-session action available (maintenance/health panels take priority).
+   // Keep the introduction guidance visible alongside any available session action.
    if (this->noIntroductionPanel)
    {
       lv_obj_set_flag(this->noIntroductionPanel, LV_OBJ_FLAG_HIDDEN,
-                      user.hasIntroduction || supervisedStartAvailable || ownsActiveUsage || blocked);
+                       user.hasIntroduction || blocked);
    }
 
    // Session controls require access, an available supervised start, or ownership of the active

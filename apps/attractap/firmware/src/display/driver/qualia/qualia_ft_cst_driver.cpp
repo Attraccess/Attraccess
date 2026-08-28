@@ -132,15 +132,16 @@ bool QualiaFtCstDriver::begin()
     rgbConfig.timings.flags.pclk_active_neg = 0;
     rgbConfig.timings.flags.pclk_idle_high = 0;
     rgbConfig.data_width = 16;
-    rgbConfig.bits_per_pixel = 16;
+    rgbConfig.in_color_format = LCD_COLOR_FMT_RGB565;
+    rgbConfig.out_color_format = LCD_COLOR_FMT_RGB565;
     rgbConfig.num_fbs = 1;
     rgbConfig.bounce_buffer_size_px = 0;
     rgbConfig.dma_burst_size = 64;
-    rgbConfig.hsync_gpio_num = QUALIA_TFT_HSYNC;
-    rgbConfig.vsync_gpio_num = QUALIA_TFT_VSYNC;
-    rgbConfig.de_gpio_num = QUALIA_TFT_DE;
-    rgbConfig.pclk_gpio_num = QUALIA_TFT_PCLK;
-    rgbConfig.disp_gpio_num = -1;
+    rgbConfig.hsync_gpio_num = (gpio_num_t)QUALIA_TFT_HSYNC;
+    rgbConfig.vsync_gpio_num = (gpio_num_t)QUALIA_TFT_VSYNC;
+    rgbConfig.de_gpio_num = (gpio_num_t)QUALIA_TFT_DE;
+    rgbConfig.pclk_gpio_num = (gpio_num_t)QUALIA_TFT_PCLK;
+    rgbConfig.disp_gpio_num = (gpio_num_t)-1;
     // Little-endian lane order (data[0..4]=B, [5..10]=G, [11..15]=R)
     const int dataPins[16] = {
         QUALIA_TFT_B1, QUALIA_TFT_B2, QUALIA_TFT_B3, QUALIA_TFT_B4, QUALIA_TFT_B5,
@@ -148,7 +149,7 @@ bool QualiaFtCstDriver::begin()
         QUALIA_TFT_R1, QUALIA_TFT_R2, QUALIA_TFT_R3, QUALIA_TFT_R4, QUALIA_TFT_R5};
     for (int i = 0; i < 16; i++)
     {
-        rgbConfig.data_gpio_nums[i] = dataPins[i];
+        rgbConfig.data_gpio_nums[i] = (gpio_num_t)dataPins[i];
     }
     rgbConfig.flags.disp_active_low = 1;
     rgbConfig.flags.fb_in_psram = 1;
@@ -162,7 +163,7 @@ bool QualiaFtCstDriver::begin()
     vendorConfig.flags.auto_del_panel_io = 0;
 
     esp_lcd_panel_dev_config_t panelConfig = {};
-    panelConfig.reset_gpio_num = -1; // reset is on the expander, pulsed above
+    panelConfig.reset_gpio_num = (gpio_num_t)-1; // reset is on the expander, pulsed above
     panelConfig.rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB;
     panelConfig.bits_per_pixel = 16;
     panelConfig.vendor_config = &vendorConfig;
