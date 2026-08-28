@@ -590,13 +590,7 @@ export function PluginsSection() {
                                 installable: true,
                                 incompatibilityReason: null,
                                 integrity: installedNpmPlugins.get(plugin.name)?.integrity ?? null,
-                                provenance: installedNpmPlugins.get(plugin.name)
-                                  ? `${installedNpmPlugins.get(plugin.name)?.registryUrl}${
-                                      installedNpmPlugins.get(plugin.name)?.publisher
-                                        ? ` (${installedNpmPlugins.get(plugin.name)?.publisher})`
-                                        : ''
-                                    }`
-                                  : null,
+                                provenance: null,
                               })
                             }
                           >

@@ -755,7 +755,7 @@ export class NpmPluginService implements OnModuleInit {
         installable: true,
         incompatibilityReason: null,
         integrity: distIntegrity(pkg),
-        provenance: null,
+        provenance: packageProvenance(pkg),
       };
     } catch (error) {
       return {
@@ -1168,6 +1168,11 @@ function distIntegrity(pkg: NpmPluginPackage): string | null {
   const dist = (pkg as NpmPluginPackage & { dist?: { integrity?: unknown; shasum?: unknown } }).dist;
   if (typeof dist?.integrity === 'string') return dist.integrity;
   return typeof dist?.shasum === 'string' ? `sha1-${dist.shasum}` : null;
+}
+
+function packageProvenance(pkg: NpmPluginPackage): string | null {
+  const attestations = (pkg as NpmPluginPackage & { dist?: { attestations?: { url?: unknown } } }).dist?.attestations;
+  return typeof attestations?.url === 'string' ? attestations.url : null;
 }
 
 function packageName(value: unknown): string | null {
