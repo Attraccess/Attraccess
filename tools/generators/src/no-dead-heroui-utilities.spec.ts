@@ -217,13 +217,15 @@ function classExpression(node: any, classes: Set<string>, checker: any, seen = n
 }
 
 function classesInSource(file: string, content: string): Set<string> {
-  const host = ts.createCompilerHost({ allowJs: true, jsx: ts.JsxEmit.Preserve });
+  // Local lexical resolution needs a checker, not imported modules or standard libraries.
+  const options = { allowJs: true, jsx: ts.JsxEmit.Preserve, noResolve: true, noLib: true };
+  const host = ts.createCompilerHost(options);
   const getSourceFile = host.getSourceFile.bind(host);
   host.getSourceFile = (name: string, languageVersion: any) =>
     name === file
       ? ts.createSourceFile(file, content, languageVersion, true, ts.ScriptKind.TSX)
       : getSourceFile(name, languageVersion);
-  const program = ts.createProgram([file], { allowJs: true, jsx: ts.JsxEmit.Preserve }, host);
+  const program = ts.createProgram([file], options, host);
   const source = program.getSourceFile(file);
   if (!source) throw new Error(`Cannot parse ${file}`);
   const checker = program.getTypeChecker();
