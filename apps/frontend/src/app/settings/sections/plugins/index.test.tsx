@@ -62,24 +62,33 @@ beforeEach(() => {
   hoisted.deleteOptions = undefined;
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        results: [
-          {
-            name: '@attraccess-plugins/shelly',
-            version: '1.0.0',
-            displayName: 'Shelly',
-            description: 'Official integration',
-            permissions: [],
-            registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
-            classification: 'official',
-            classificationReason: 'Approved Attraccess package source',
-            installable: true,
-            incompatibilityReason: null,
-          },
-        ],
-      }),
+    vi.fn((input: { url?: string } | string) => {
+      const url = typeof input === 'string' ? input : (input.url ?? '');
+      const plugin = {
+        name: '@attraccess-plugins/shelly',
+        version: '1.0.0',
+        displayName: 'Shelly',
+        description: 'Official integration',
+        permissions: [],
+        hostRange: '^1.0.0',
+        repository: null,
+        homepage: null,
+        license: 'MIT',
+        publisher: 'attraccess',
+        deprecated: false,
+        registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
+        classification: 'official' as const,
+        classificationReason: 'Approved Attraccess package source',
+        installable: true,
+        incompatibilityReason: null,
+        integrity: 'sha512-test',
+      };
+      if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+      if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+      return Promise.resolve({
+        ok: true,
+        json: async () => (url.includes('/marketplace/search') ? { results: [plugin], errors: [] } : plugin),
+      });
     }),
   );
 });
@@ -106,7 +115,48 @@ describe('PluginsSection', () => {
     render(<PluginsSection />);
 
     expect(await screen.findByText('Shelly')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Official plugins' })).toBeInTheDocument();
     expect(screen.getByText('Official')).toBeInTheDocument();
+  });
+
+  it('requires source and permission acknowledgement before installing', async () => {
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+
+    await user.click(await screen.findByRole('button', { name: 'Details' }));
+    await user.click(screen.getByRole('button', { name: 'Install' }));
+
+    const confirm = screen.getByRole('button', { name: 'Install plugin' });
+    expect(confirm).toBeDisabled();
+    await user.click(screen.getByRole('checkbox'));
+    expect(confirm).toBeEnabled();
+    expect(
+      screen.getByText('Installing this plugin requires an application restart to activate it.'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows only the configured state for registry tokens', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: { url?: string } | string) => {
+        const url = typeof input === 'string' ? input : (input.url ?? '');
+        if (url.endsWith('/api/plugins/registries'))
+          return Promise.resolve({
+            ok: true,
+            json: async () => [
+              { id: 'private', name: 'Private', url: 'https://packages.example.test/npm', tokenConfigured: true },
+            ],
+          });
+        if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+        return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
+      }),
+    );
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+
+    await user.click(screen.getByText('Manage registries'));
+    expect(await screen.findByText(/Private.*Token configured/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Access token (write-only)')).toHaveAttribute('type', 'password');
   });
 
   it('renders community for an installed plugin until its npm classification is available', () => {
@@ -172,15 +222,17 @@ describe('PluginsSection', () => {
       installable: true,
       incompatibilityReason: null,
     });
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => [] })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ results: [plugin('First'), plugin('Second')], errors: [] }),
-      })
-      .mockReturnValueOnce(first.promise)
-      .mockReturnValueOnce(second.promise);
+    const fetchMock = vi.fn((input: { url?: string } | string) => {
+      const url = typeof input === 'string' ? input : (input.url ?? '');
+      if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+      if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+      if (url.includes('/marketplace/search'))
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ results: [plugin('First'), plugin('Second')], errors: [] }),
+        });
+      return url.includes('First') ? first.promise : second.promise;
+    });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     render(<PluginsSection />);
@@ -231,7 +283,7 @@ describe('PluginsSection', () => {
     hoisted.plugins = [makePlugin({ pluginDirectory: '', permissions: [] })];
     render(<PluginsSection />);
 
-    expect(screen.getByText('-')).toBeInTheDocument();
+    expect(screen.getAllByText('-')).toHaveLength(2);
     expect(screen.getByText('None requested')).toBeInTheDocument();
   });
 
