@@ -1,5 +1,5 @@
 {
-  "name": "@attraccess-plugins/wago",
+  "name": "@attraccess/wago",
   "version": "0.1.0",
   "description": "Official Attraccess integration for WAGO CC100 controllers.",
   "keywords": [

@@ -65,6 +65,15 @@
         "cwd": "apps/plugins/wago",
         "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js dist/migrations.js frontend/remoteEntry.js frontend/style.css"
       }
+    },
+    "publish": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["pack-test"],
+      "options": {
+        "cwd": "apps/plugins/wago",
+        "command": "node ../scripts/publish-plugin.mjs package dist"
+      }
     }
   }
 }

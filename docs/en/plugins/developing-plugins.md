@@ -653,9 +653,10 @@ so they share the workspace toolchain, caching and CI.
    pnpm nx run-many --target=pack --projects=tag:type:plugin
   ```
 
-- **CI:** pull requests test and pack affected plugin apps. Release CI publishes
-  changed plugins only when their `package.json` version is new on npm; stable
-  versions use `latest`, prereleases use `next`.
+- **CI:** pull requests test and pack affected plugin apps. Every main-branch
+  build publishes every plugin app tagged `type:plugin` as a unique
+  `-nightly.<run>` version under npm's `next` tag. Release CI publishes changed
+  tagged plugin apps with a new version under `latest`.
 
 ## See Also
 

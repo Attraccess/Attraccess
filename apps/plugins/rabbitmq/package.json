@@ -1,5 +1,5 @@
 {
-  "name": "@attraccess-plugins/rabbitmq",
+  "name": "@attraccess/rabbitmq",
   "version": "0.1.0",
   "description": "Official Attraccess integration for RabbitMQ.",
   "license": "AGPL-3.0-only",

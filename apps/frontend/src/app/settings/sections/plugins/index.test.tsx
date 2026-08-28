@@ -67,7 +67,7 @@ beforeEach(() => {
       json: async () => ({
         results: [
           {
-            name: '@attraccess-plugins/shelly',
+            name: '@attraccess/shelly',
             version: '1.0.0',
             displayName: 'Shelly',
             description: 'Official integration',
@@ -110,12 +110,12 @@ describe('PluginsSection', () => {
   });
 
   it('renders community for an installed plugin until its npm classification is available', () => {
-    hoisted.plugins = [makePlugin({ name: '@attraccess-plugins/shelly' })];
+    hoisted.plugins = [makePlugin({ name: '@attraccess/shelly' })];
     const installedResponse = {
       ok: true,
       json: async () => [
         {
-          name: '@attraccess-plugins/shelly',
+          name: '@attraccess/shelly',
           version: '1.0.0',
           classification: 'official',
           classificationReason: 'Approved Attraccess package source',

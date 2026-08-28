@@ -14,17 +14,17 @@ export type OfficialPluginPackage = {
 
 const OFFICIAL_PACKAGES = [
   {
-    name: '@attraccess-plugins/shelly',
+    name: '@attraccess/shelly',
     registryUrl: 'https://registry.npmjs.org',
     publisher: 'attraccess',
   },
   {
-    name: '@attraccess-plugins/rabbitmq',
+    name: '@attraccess/rabbitmq',
     registryUrl: 'https://registry.npmjs.org',
     publisher: 'attraccess',
   },
   {
-    name: '@attraccess-plugins/wago',
+    name: '@attraccess/wago',
     registryUrl: 'https://registry.npmjs.org',
     publisher: 'attraccess',
   },
