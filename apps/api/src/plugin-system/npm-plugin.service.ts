@@ -298,7 +298,6 @@ export class NpmPluginService implements OnModuleInit {
       ].map((plugin) => [`${plugin.registry.id}:${plugin.name}`, plugin]),
     );
     return {
-      // The allowlist is queried directly rather than relying on npm's ranked search results.
       results: [...results.values()],
       errors: responses.flatMap(({ error }) => (error ? [error] : [])),
     };

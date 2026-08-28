@@ -65,7 +65,7 @@ beforeEach(() => {
     vi.fn((input: { url?: string } | string) => {
       const url = typeof input === 'string' ? input : (input.url ?? '');
       const plugin = {
-        name: '@attraccess-plugins/shelly',
+        name: '@attraccess/plugin-shelly',
         version: '1.0.0',
         displayName: 'Shelly',
         description: 'Official integration',
@@ -79,7 +79,7 @@ beforeEach(() => {
         deprecated: false,
         registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
         classification: 'official' as const,
-        classificationReason: 'Approved Attraccess package source',
+        classificationReason: 'Published by Attraccess on npm',
         installable: true,
         incompatibilityReason: null,
         integrity: 'sha512-test',
@@ -404,15 +404,15 @@ describe('PluginsSection', () => {
   });
 
   it('renders community for an installed plugin until its npm classification is available', () => {
-    hoisted.plugins = [makePlugin({ name: '@attraccess-plugins/shelly' })];
+    hoisted.plugins = [makePlugin({ name: '@attraccess/plugin-shelly' })];
     const installedResponse = {
       ok: true,
       json: async () => [
         {
-          name: '@attraccess-plugins/shelly',
+          name: '@attraccess/plugin-shelly',
           version: '1.0.0',
           classification: 'official',
-          classificationReason: 'Approved Attraccess package source',
+          classificationReason: 'Published by Attraccess on npm',
         },
       ],
     };

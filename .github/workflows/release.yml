@@ -93,13 +93,8 @@ jobs:
       - name: Publish changed official plugin packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          previous_tag=$(git describe --tags --abbrev=0 "${RELEASE_VERSION}^" 2>/dev/null || git rev-list --max-parents=0 HEAD)
-          for plugin in shelly rabbitmq; do
-            if ! git diff --quiet "$previous_tag" "$GITHUB_SHA" -- "apps/plugins/$plugin"; then
-              pnpm nx publish "plugin-$plugin"
-            fi
-          done
+          NPM_DIST_TAG: ${{ github.event.release.prerelease && 'next' || 'latest' }}
+        run: pnpm nx affected --target=publish --parallel=3 --base="$(git describe --tags --abbrev=0 "${RELEASE_VERSION}^" 2>/dev/null || git rev-list --max-parents=0 HEAD)" --head="$GITHUB_SHA" --exclude='*,!tag:type:plugin'
 
   build-companion:
     uses: ./.github/workflows/build-companion-binaries.yml

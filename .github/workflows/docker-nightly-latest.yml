@@ -15,6 +15,7 @@ env:
 
 permissions:
   contents: read
+  id-token: write
   packages: write
 
 jobs:
@@ -70,12 +71,30 @@ jobs:
           NODE_ENV: production
         run: pnpm nx run-many --target=build --parallel=5 --exclude=tag:scope:hardware,tag:scope:companion
 
+  plugins:
+    needs: [lint, typecheck, test, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
+      - name: Publish nightly official plugin packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_DIST_TAG: next
+          NPM_NIGHTLY: 'true'
+        run: pnpm nx run-many --target=publish --parallel=3 --projects=tag:type:plugin
+
   build-companion:
     uses: ./.github/workflows/build-companion-binaries.yml
     secrets: inherit
 
   containerize:
-    needs: [lint, typecheck, test, build, build-companion]
+    needs: [lint, typecheck, test, build, plugins, build-companion]
     if: always() && !failure() && !cancelled()
     runs-on: ubuntu-latest
     steps:
