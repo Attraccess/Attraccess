@@ -32,6 +32,8 @@ import { PluginClassificationService } from './plugin-classification.service';
 import { SettingsModule } from '../settings/settings.module';
 import { loadPluginEntryExports } from './plugin-loader';
 import { registerPluginFlowNodes } from './plugin-flow-node-registry';
+import { PluginMqttService } from './plugin-mqtt.service';
+import { MqttModule } from '../mqtt/mqtt.module';
 import { MqttCredentialProvisioningService } from '../mqtt/mqtt-credential-provisioning.service';
 import { join } from 'path';
 import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
@@ -67,11 +69,12 @@ export class PluginModule {
 
       return {
         module: PluginModule,
-        imports: [SettingsModule],
+        imports: [SettingsModule, MqttModule],
         providers: [
           PluginService,
           PluginSandboxService,
           PluginEventsService,
+          PluginMqttService,
           NpmPluginService,
           PluginClassificationService,
         ],
@@ -98,11 +101,12 @@ export class PluginModule {
 
     return {
       module: PluginModule,
-      imports: [SettingsModule, ...pluginModules],
+      imports: [SettingsModule, MqttModule, ...pluginModules],
       providers: [
         PluginService,
         PluginSandboxService,
         PluginEventsService,
+        PluginMqttService,
         NpmPluginService,
         PluginClassificationService,
       ],
@@ -154,7 +158,18 @@ export class PluginModule {
       MqttCredentialProvisioningService.register(credentialProvider(context));
       this.logger.log(`Registered MQTT credential provider from plugin ${manifest.name}.`);
     }
-    return pluginModule;
+    return {
+      ...pluginModule,
+      providers: [
+        ...(pluginModule.providers ?? []),
+        {
+          provide: `plugin-mqtt-cleanup:${manifest.id}`,
+          useFactory: () => ({
+            onModuleDestroy: () => PluginModule.pluginMqtt().clearPlugin(manifest.id),
+          }),
+        },
+      ],
+    };
   }
 
   /**
@@ -204,6 +219,14 @@ export class PluginModule {
     const base: PluginContext = {
       manifest: PluginService.toManifestInfo(manifest),
       logger: new Logger(`Plugin:${manifest.name}`),
+      mqtt: {
+        subscribe(serverId, topicFilter, handler) {
+          return PluginModule.pluginMqtt().subscribe(manifest.id, manifest.name, base.logger, serverId, topicFilter, handler);
+        },
+        publish(serverId, topic, payload, options) {
+          return PluginModule.pluginMqtt().publish(serverId, topic, payload, options);
+        },
+      },
       get events(): EventEmitter2 {
         return PluginModule.requireRef(PluginModule.eventsRef, 'EventEmitter2');
       },
@@ -255,6 +278,10 @@ export class PluginModule {
 
   private static pluginEvents(): PluginEventsService {
     return PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get(PluginEventsService, { strict: false });
+  }
+
+  private static pluginMqtt(): PluginMqttService {
+    return PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get(PluginMqttService, { strict: false });
   }
 
   private static requireRef<T>(ref: T | null, name: string): T {

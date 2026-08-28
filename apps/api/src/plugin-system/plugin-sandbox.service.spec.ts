@@ -27,6 +27,10 @@ function buildBaseContext(events: EventEmitter2): PluginContext {
     events,
     dataSource,
     logger: new Logger('test-plugin'),
+    mqtt: {
+      subscribe: () => Promise.resolve({ unsubscribe: () => undefined }),
+      publish: () => Promise.resolve(),
+    },
     getRepository: (entity) => ({ entity } as never),
     get: (token) => ({ token } as never),
     onEvent: () => ({ off: () => undefined }),
@@ -233,6 +237,18 @@ describe('PluginSandboxService', () => {
         PluginPermission.RESOLVE_HOST_PROVIDERS,
       ]);
       expect(() => ctx.getMqttServerConfig(1)).toThrow(/ACCESS_MQTT_SERVERS/);
+    });
+
+    it('gates mqtt subscriptions and publishing behind ACCESS_MQTT_SERVERS', async () => {
+      const denied = PluginSandboxService.createGuardedContext(buildBaseContext(events), []);
+      expect(() => denied.mqtt.subscribe(1, 'sensors/+', () => undefined)).toThrow(PluginPermissionError);
+      expect(() => denied.mqtt.publish(1, 'sensors/kitchen', 'on')).toThrow(PluginPermissionError);
+
+      const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [PluginPermission.ACCESS_MQTT_SERVERS]);
+      await expect(granted.mqtt.subscribe(1, 'sensors/+', () => undefined)).resolves.toEqual({
+        unsubscribe: expect.any(Function),
+      });
+      await expect(granted.mqtt.publish(1, 'sensors/kitchen', 'on')).resolves.toBeUndefined();
     });
 
     it('gates flows.trigger() behind TRIGGER_FLOWS', async () => {

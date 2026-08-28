@@ -19,6 +19,8 @@ import { dirname, join, resolve } from 'path';
 import request from 'supertest';
 import { PluginService } from './plugin.service';
 import { PluginModule } from './plugin.module';
+import { MqttClientService } from '../mqtt/mqtt-client.service';
+import { MqttServerService } from '../mqtt/servers/mqtt-server.service';
 
 let hostDataSource: DataSource;
 
@@ -124,7 +126,12 @@ describe('Shelly plugin REST controller mounts into the host API', () => {
 
     const moduleRef = await Test.createTestingModule({
       imports: [EventEmitterModule.forRoot(), HostModule, PluginModule.forRoot()],
-    }).compile();
+    })
+      .overrideProvider(MqttClientService)
+      .useValue({ subscribe: jest.fn(), unsubscribe: jest.fn(), publish: jest.fn() })
+      .overrideProvider(MqttServerService)
+      .useValue({ findOne: jest.fn() })
+      .compile();
 
     app = moduleRef.createNestApplication();
     await app.init();

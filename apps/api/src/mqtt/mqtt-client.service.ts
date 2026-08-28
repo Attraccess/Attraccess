@@ -10,11 +10,19 @@ import { EncryptionService } from '../encryption/encryption.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
 
+type SubscriptionQos = 0 | 1 | 2;
+
+interface TopicSubscription {
+  qosCounts: Map<SubscriptionQos | undefined, number>;
+  effectiveQos?: SubscriptionQos;
+}
+
 @Injectable()
 export class MqttClientService implements OnModuleDestroy {
   private clients: Map<number, MqttClient> = new Map();
   private connectionPromises: Map<number, Promise<MqttClient>> = new Map();
-  private subscriptions: Map<number, Map<string, 0 | 1 | 2>> = new Map();
+  private subscriptions: Map<number, Map<string, TopicSubscription>> = new Map();
+  private subscriptionOperations: Map<number, Map<string, Promise<void>>> = new Map();
   private readonly logger = new Logger(MqttClientService.name);
 
   constructor(
@@ -117,7 +125,10 @@ export class MqttClientService implements OnModuleDestroy {
         }
         this.logger.debug(`mqtt message: ${topic}: ${payloadString}`);
 
-        this.eventEmitter.emit(MqttMessageEvent.EVENT_NAME, new MqttMessageEvent(serverId, topic, payload));
+        this.eventEmitter.emit(
+          MqttMessageEvent.EVENT_NAME,
+          new MqttMessageEvent(serverId, topic, payload, payloadBuffer),
+        );
       });
 
       client.on('connect', () => {
@@ -127,13 +138,27 @@ export class MqttClientService implements OnModuleDestroy {
         // Re-subscribe to all known topics for this server on each successful connect
         const topics = this.subscriptions.get(serverId);
         if (topics && topics.size > 0) {
-          for (const [t, qos] of topics.entries()) {
-            client.subscribe(t, { qos: qos ?? (server.defaultSubscribeQos as 0 | 1 | 2) ?? 0 }, (err) => {
+          for (const [t, subscription] of topics.entries()) {
+            // A broker connection has no active subscriptions until this request succeeds.
+            subscription.effectiveQos = undefined;
+            const effectiveQos = this.effectiveQos(subscription, server.defaultSubscribeQos as SubscriptionQos);
+            client.subscribe(t, { qos: effectiveQos }, (err) => {
               if (err) {
                 this.logger.warn(`Failed to (re)subscribe to ${t} on server ${server.name}: ${err.message}`);
+                return;
+              }
+              if (this.subscriptions.get(serverId)?.get(t) !== subscription) {
+                return;
+              }
+              if (this.effectiveQos(subscription, server.defaultSubscribeQos as SubscriptionQos) === effectiveQos) {
+                subscription.effectiveQos = effectiveQos;
+              } else {
+                void this.reconcileSubscription(serverId, t, true).catch((error) => {
+                  this.logger.warn(`Failed to reconcile MQTT subscription ${t} on server ${server.name}: ${error.message}`);
+                });
               }
             });
-            this.logger.debug(`(re)subscribed to ${t} on server ${server.name} with qos=${qos ?? 0}`);
+            this.logger.debug(`(re)subscribed to ${t} on server ${server.name} with qos=${effectiveQos}`);
           }
         }
         resolve(client);
@@ -198,7 +223,7 @@ export class MqttClientService implements OnModuleDestroy {
   async publish(
     serverId: number,
     topic: string,
-    message: string,
+    message: string | Buffer,
     options?: { qos?: 0 | 1 | 2; retain?: boolean },
     completion?: { awaitAcknowledgement?: boolean; acknowledgementTimeoutSeconds?: number },
   ): Promise<void> {
@@ -221,7 +246,7 @@ export class MqttClientService implements OnModuleDestroy {
               this.logger.error(`Failed to publish to topic ${topic}: ${error.message}`);
               reject(error);
             } else {
-              this.logger.debug(`Published to topic ${topic}: ${message}`);
+              this.logger.debug(`Published to topic ${topic}: ${message.toString()}`);
               resolve();
             }
           });
@@ -262,44 +287,118 @@ export class MqttClientService implements OnModuleDestroy {
     }
   }
 
-  async subscribe(serverId: number, topic: string, qos?: 0 | 1 | 2): Promise<void> {
+  async subscribe(serverId: number, topic: string, qos?: 0 | 1 | 2, requireAcknowledgement = false): Promise<void> {
     // Track desired subscriptions so they can be (re)applied on connect/reconnect
     if (!this.subscriptions.has(serverId)) {
       this.subscriptions.set(serverId, new Map());
     }
     const serverTopics = this.subscriptions.get(serverId);
-    if (qos !== undefined) {
-      serverTopics.set(topic, qos);
-    } else if (!serverTopics.has(topic)) {
-      // Leave qos undefined to allow resolution from server defaults on (re)subscribe
-      serverTopics.set(topic, undefined as unknown as 0 | 1 | 2);
+    const existingSubscription = serverTopics.get(topic);
+    if (existingSubscription) {
+      existingSubscription.qosCounts.set(qos, (existingSubscription.qosCounts.get(qos) ?? 0) + 1);
+    } else {
+      serverTopics.set(topic, { qosCounts: new Map([[qos, 1]]) });
     }
 
     try {
-      const [client, server] = await Promise.all([
-        this.getOrCreateClient(serverId, true),
-        this.mqttServerRepository.findOneBy({ id: serverId }),
-      ]);
-      const effectiveQos: 0 | 1 | 2 = (qos ?? (server?.defaultSubscribeQos as 0 | 1 | 2) ?? 0) as 0 | 1 | 2;
+      await this.reconcileSubscription(serverId, topic, true);
+    } catch (error) {
+      if (requireAcknowledgement) {
+        throw error;
+      }
+      // The client will keep trying to connect and will subscribe on next connect.
+      this.logger.warn(
+        `Will subscribe to topic ${topic} for server ${serverId} once connection is available: ${error?.message ?? error}`,
+      );
+    }
+  }
+
+  async unsubscribe(serverId: number, topic: string, qos?: SubscriptionQos): Promise<void> {
+    const topics = this.subscriptions.get(serverId);
+    const subscription = topics?.get(topic);
+    if (!subscription) {
+      return;
+    }
+    const qosCount = subscription.qosCounts.get(qos);
+    if (!qosCount) {
+      return;
+    }
+    const client = this.clients.get(serverId);
+    if (qosCount === 1) {
+      subscription.qosCounts.delete(qos);
+    } else {
+      subscription.qosCounts.set(qos, qosCount - 1);
+    }
+
+    if (subscription.qosCounts.size === 0) {
+      topics.delete(topic);
+      if (topics.size === 0) {
+        this.subscriptions.delete(serverId);
+      }
+    }
+
+    // A pending subscribe operation will see the updated desired state.
+    if (!client?.connected) {
+      return;
+    }
+
+    await this.reconcileSubscription(serverId, topic, false);
+  }
+
+  /** Serializes broker changes so the last desired QoS always wins. */
+  private reconcileSubscription(serverId: number, topic: string, connect: boolean): Promise<void> {
+    const operations = this.subscriptionOperations.get(serverId) ?? new Map<string, Promise<void>>();
+    this.subscriptionOperations.set(serverId, operations);
+    const previous = operations.get(topic) ?? Promise.resolve();
+    const operation = previous.catch(() => undefined).then(async () => {
+      const subscription = this.subscriptions.get(serverId)?.get(topic);
+      const client = connect ? await this.getOrCreateClient(serverId, true) : this.clients.get(serverId);
+
+      if (!subscription) {
+        if (!client?.connected) {
+          return;
+        }
+        await new Promise<void>((resolve, reject) => {
+          client.unsubscribe(topic, (error) => (error ? reject(error) : resolve()));
+        });
+        return;
+      }
+
+      const server = await this.mqttServerRepository.findOneBy({ id: serverId });
+      // State may have changed while resolving the server or opening a connection.
+      if (this.subscriptions.get(serverId)?.get(topic) !== subscription) {
+        return;
+      }
+      const effectiveQos = this.effectiveQos(subscription, server?.defaultSubscribeQos as SubscriptionQos);
+      if (subscription.effectiveQos === effectiveQos || !client?.connected) {
+        return;
+      }
       await this.externalCallTimer.time(
         'mqtt',
         'subscribe',
         () =>
           new Promise<void>((resolve, reject) => {
-            client.subscribe(topic, { qos: effectiveQos }, (err) => {
-              if (err) {
-                reject(err);
-              } else {
-                resolve();
-              }
-            });
+            client.subscribe(topic, { qos: effectiveQos }, (error) => (error ? reject(error) : resolve()));
           }),
       );
-    } catch (error) {
-      // Do not throw: the client will keep trying to connect and will subscribe on next connect
-      this.logger.warn(
-        `Will subscribe to topic ${topic} for server ${serverId} once connection is available: ${error?.message ?? error}`,
-      );
-    }
+      subscription.effectiveQos = effectiveQos;
+    });
+    operations.set(topic, operation);
+    void operation.finally(() => {
+      if (operations.get(topic) !== operation) {
+        return;
+      }
+      operations.delete(topic);
+      if (operations.size === 0) {
+        this.subscriptionOperations.delete(serverId);
+      }
+    }).catch(() => undefined);
+    return operation;
+  }
+
+  private effectiveQos(subscription: TopicSubscription, defaultQos?: SubscriptionQos): SubscriptionQos {
+    return Math.max(
+      ...Array.from(subscription.qosCounts.entries(), ([qos, count]) => (count > 0 ? (qos ?? defaultQos ?? 0) : 0)),
+    ) as SubscriptionQos;
   }
 }

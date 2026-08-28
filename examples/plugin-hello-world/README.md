@@ -4,16 +4,17 @@ A complete, working Attraccess plugin you can build, ZIP, and upload. It is the
 companion to the [Developing Plugins](https://docs.attraccess.org/#/plugins/developing-plugins)
 guide and exercises every core capability:
 
-| Part | File | What it shows |
-| --- | --- | --- |
-| Backend controller | [`backend/plugin.ts`](backend/plugin.ts) | Adds `GET /hello-world/greetings` to the host API. |
-| Injected repository | [`backend/plugin.ts`](backend/plugin.ts) | Reads users via `context.getRepository('User')` (needs `READ_USERS`). |
-| Event handler | [`backend/plugin.ts`](backend/plugin.ts) | Subscribes to `RESOURCE_USAGE_STARTED` via `context.onEvent` (needs `LISTEN_EVENTS`). |
-| Frontend routes | [`frontend/src/plugin.tsx`](frontend/src/plugin.tsx) | Registers the `/hello-world` and `/hello-world/capabilities` pages through `getRoutes()`. |
-| Sidebar entry | [`frontend/src/plugin.tsx`](frontend/src/plugin.tsx) | Adds a "Hello World" navigation item through `getSidebarItems()`. |
-| Embedded slots | [`frontend/src/plugin.tsx`](frontend/src/plugin.tsx) | Injects UI into the MQTT server detail + list views through `getSlotContributions()`, scoped to the selected server via slot context. |
-| Host-native UI | [`frontend/src/plugin.tsx`](frontend/src/plugin.tsx) | Builds pages from the host's shared `@heroui/react` components and `lucide-react` icons, so they look native and inherit the host theme. |
-| Shared libraries | [`frontend/vite.config.ts`](frontend/vite.config.ts) | Reuses the host's `react-router-dom`, `@heroui/react` and `lucide-react` so `<Link>`s navigate without a reload and the UI uses a single, themed copy. |
+| Part                | File                                                 | What it shows                                                                                                                                          |
+| ------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Backend controller  | [`backend/plugin.ts`](backend/plugin.ts)             | Adds `GET /hello-world/greetings` to the host API.                                                                                                     |
+| Injected repository | [`backend/plugin.ts`](backend/plugin.ts)             | Reads users via `context.getRepository('User')` (needs `READ_USERS`).                                                                                  |
+| Event handler       | [`backend/plugin.ts`](backend/plugin.ts)             | Subscribes to `RESOURCE_USAGE_STARTED` via `context.onEvent` (needs `LISTEN_EVENTS`).                                                                  |
+| MQTT handler        | [`backend/plugin.ts`](backend/plugin.ts)             | Subscribes and publishes through the host MQTT connection (needs `ACCESS_MQTT_SERVERS`).                                                               |
+| Frontend routes     | [`frontend/src/plugin.tsx`](frontend/src/plugin.tsx) | Registers the `/hello-world` and `/hello-world/capabilities` pages through `getRoutes()`.                                                              |
+| Sidebar entry       | [`frontend/src/plugin.tsx`](frontend/src/plugin.tsx) | Adds a "Hello World" navigation item through `getSidebarItems()`.                                                                                      |
+| Embedded slots      | [`frontend/src/plugin.tsx`](frontend/src/plugin.tsx) | Injects UI into the MQTT server detail + list views through `getSlotContributions()`, scoped to the selected server via slot context.                  |
+| Host-native UI      | [`frontend/src/plugin.tsx`](frontend/src/plugin.tsx) | Builds pages from the host's shared `@heroui/react` components and `lucide-react` icons, so they look native and inherit the host theme.               |
+| Shared libraries    | [`frontend/vite.config.ts`](frontend/vite.config.ts) | Reuses the host's `react-router-dom`, `@heroui/react` and `lucide-react` so `<Link>`s navigate without a reload and the UI uses a single, themed copy. |
 
 ## Layout
 

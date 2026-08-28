@@ -38,7 +38,7 @@ class HelloWorldService implements OnModuleInit {
 
   // Subscribe to a typed host event once the plugin's module is initialised.
   // Handler errors are isolated by the host and never break the core flow.
-  onModuleInit(): void {
+  async onModuleInit(): Promise<void> {
     this.context.onEvent(RESOURCE_USAGE_STARTED, ({ resource, user }) => {
       this.context.logger.log(`Resource ${resource.id} usage started by user ${user.id} — hello!`);
       return this.context.flows.trigger(
@@ -47,6 +47,11 @@ class HelloWorldService implements OnModuleInit {
         { resource: { id: resource.id }, user: { id: user.id, username: user.username } },
       );
     });
+
+    await this.context.mqtt.subscribe(1, 'hello-world/ping', ({ payload }) => {
+      this.context.logger.log(`Received MQTT greeting: ${payload.toString()}`);
+    });
+    await this.context.mqtt.publish(1, 'hello-world/ping', 'Hello from the plugin!');
   }
 
   // Read from the host DB through an injected repository. We address the entity
