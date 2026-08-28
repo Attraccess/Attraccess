@@ -392,6 +392,43 @@ describe('PluginsSection', () => {
     expect(screen.queryByRole('heading', { name: 'Plugin marketplace' })).not.toBeInTheDocument();
   });
 
+  it('opens details when a debounced search starts after the details click', async () => {
+    const detail = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
+    const plugin = {
+      name: '@attraccess-plugins/shelly',
+      version: '1.0.0',
+      displayName: 'Shelly',
+      description: null,
+      permissions: [],
+      registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
+      classification: 'official' as const,
+      classificationReason: 'Approved Attraccess package source',
+      installable: true,
+      incompatibilityReason: null,
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: { url?: string } | string) => {
+        const url = typeof input === 'string' ? input : (input.url ?? '');
+        if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+        if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+        if (url.includes('/marketplace/search'))
+          return Promise.resolve({ ok: true, json: async () => ({ results: [plugin], errors: [] }) });
+        return detail.promise;
+      }),
+    );
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+    await openMarketplace(user);
+
+    await user.type(screen.getByLabelText('Search plugins'), 's');
+    await user.click(await screen.findByRole('button', { name: 'Details' }));
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    detail.resolve({ ok: true, json: async () => plugin });
+
+    expect(await screen.findByRole('heading', { name: 'Shelly details' })).toBeInTheDocument();
+  });
+
   it('flags a plugin whose backend failed to load', () => {
     hoisted.plugins = [makePlugin({ status: 'error', error: "Cannot find module '@nestjs/common'" })];
     render(<PluginsSection />);

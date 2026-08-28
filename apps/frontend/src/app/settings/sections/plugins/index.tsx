@@ -26,7 +26,6 @@ import {
 import { AlertTriangle, BookOpen, CheckCircle2, ChevronDown, Store, Trash2, Upload } from 'lucide-react';
 import { usePluginsServiceDeletePlugin, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { buttonVariants } from '@heroui/styles';
 import { SettingsSection } from '../../components/SettingsSection';
 import { Button } from '../../../../components/button';
 import { StandardModal } from '../../../../components/standardModal';
@@ -148,7 +147,8 @@ export function PluginsSection() {
   const [isSavingRegistry, setIsSavingRegistry] = useState(false);
   const [testingRegistryId, setTestingRegistryId] = useState<string | null>(null);
   const versionRequest = useRef(0);
-  const marketplaceOperationRequest = useRef(0);
+  const marketplaceSearchRequest = useRef(0);
+  const marketplaceDetailRequest = useRef(0);
   const registryRequest = useRef(0);
 
   useEffect(() => {
@@ -186,7 +186,7 @@ export function PluginsSection() {
   }, []);
 
   const loadMarketplace = async (query = marketplaceQuery) => {
-    const request = ++marketplaceOperationRequest.current;
+    const request = ++marketplaceSearchRequest.current;
     setIsLoadingMarketplace(true);
     let result: { results: MarketplacePlugin[]; errors: string[] } = { results: [], errors: [] };
     let searchFailed = false;
@@ -216,7 +216,7 @@ export function PluginsSection() {
       }
     }
 
-    if (marketplaceOperationRequest.current === request) {
+    if (marketplaceSearchRequest.current === request) {
       const unique = new Map(
         [...result.results, ...(directPackage ? [directPackage] : [])].map((plugin) => [
           `${plugin.registry.id}:${plugin.name}`,
@@ -228,7 +228,7 @@ export function PluginsSection() {
       else if (result.errors.length > 0)
         toast.error({ title: t('marketplace.loadError'), description: result.errors.join(', ') });
     }
-    if (marketplaceOperationRequest.current === request) setIsLoadingMarketplace(false);
+    if (marketplaceSearchRequest.current === request) setIsLoadingMarketplace(false);
   };
 
   const addRegistry = async () => {
@@ -290,7 +290,7 @@ export function PluginsSection() {
   }, [isMarketplaceOpen, marketplaceQuery, selectedRegistryId]);
 
   const openMarketplacePlugin = async (plugin: MarketplacePlugin, closeMarketplace = false) => {
-    const request = ++marketplaceOperationRequest.current;
+    const request = ++marketplaceDetailRequest.current;
     setIsLoadingMarketplace(true);
     try {
       const response = await fetch(
@@ -299,14 +299,14 @@ export function PluginsSection() {
       );
       if (!response.ok) throw new Error();
       const details = (await response.json()) as MarketplacePlugin;
-      if (marketplaceOperationRequest.current === request) {
+      if (marketplaceDetailRequest.current === request) {
         setMarketplacePlugin(details);
         if (closeMarketplace) setIsMarketplaceOpen(false);
       }
     } catch {
-      if (marketplaceOperationRequest.current === request) toast.error({ title: t('marketplace.loadError') });
+      if (marketplaceDetailRequest.current === request) toast.error({ title: t('marketplace.loadError') });
     } finally {
-      if (marketplaceOperationRequest.current === request) setIsLoadingMarketplace(false);
+      if (marketplaceDetailRequest.current === request) setIsLoadingMarketplace(false);
     }
   };
 
@@ -443,10 +443,7 @@ export function PluginsSection() {
       <div data-cy="plugins-list-card" className="flex flex-col gap-4">
         <div className="flex justify-end">
           <Dropdown>
-            <DropdownTrigger
-              className={buttonVariants({ size: 'sm', variant: 'primary' })}
-              data-cy="plugins-list-install-plugin-button"
-            >
+            <DropdownTrigger className="button button--sm button--primary" data-cy="plugins-list-install-plugin-button">
               <Upload size={16} />
               {t('installPlugin')}
               <ChevronDown size={16} />
@@ -635,7 +632,7 @@ export function PluginsSection() {
                     <TextField
                       value={marketplaceQuery}
                       onChange={(value) => {
-                        marketplaceOperationRequest.current++;
+                        marketplaceSearchRequest.current++;
                         setMarketplaceQuery(value);
                       }}
                       className="w-full"
@@ -646,7 +643,7 @@ export function PluginsSection() {
                       aria-label={t('marketplace.registry')}
                       value={selectedRegistryId}
                       onChange={(event) => {
-                        marketplaceOperationRequest.current++;
+                        marketplaceSearchRequest.current++;
                         setSelectedRegistryId(event.target.value);
                       }}
                       className="h-10 rounded-medium border border-divider bg-content1 px-3 text-sm"
