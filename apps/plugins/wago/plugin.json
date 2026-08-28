@@ -1,0 +1,11 @@
+{
+  "name": "wago",
+  "version": "0.1.0",
+  "main": {
+    "backend": { "directory": "dist", "entryPoint": "index.js" },
+    "migrations": { "directory": "dist", "entryPoint": "migrations.js" },
+    "frontend": { "directory": "frontend", "entryPoint": "remoteEntry.js", "styles": "style.css" }
+  },
+  "attraccessVersion": { "min": "1.0.0" },
+  "permissions": ["DATABASE_ACCESS", "ACCESS_MQTT_SERVERS"]
+}
