@@ -30,7 +30,7 @@
     "test": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "cmake -S apps/attractap/firmware/tests/supervision -B /tmp/attractap-supervision-flow-tests && cmake --build /tmp/attractap-supervision-flow-tests && ctest --test-dir /tmp/attractap-supervision-flow-tests --output-on-failure",
+        "command": "cmake -S apps/attractap/firmware/tests/supervision -B apps/attractap/firmware/build/supervision-tests && cmake --build apps/attractap/firmware/build/supervision-tests && ctest --test-dir apps/attractap/firmware/build/supervision-tests --output-on-failure",
         "cwd": "."
       },
       "cache": false

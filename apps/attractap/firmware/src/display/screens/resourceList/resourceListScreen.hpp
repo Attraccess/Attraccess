@@ -37,6 +37,7 @@ public:
 private:
     Logger logger;
     lv_obj_t *screen = nullptr;
+    lv_obj_t *logo = nullptr;
     lv_obj_t *resourceContainer = nullptr;
     lv_obj_t *loginContainer = nullptr;
     lv_obj_t *loginUserLabel = nullptr;

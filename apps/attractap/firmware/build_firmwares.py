@@ -183,16 +183,17 @@ def main():
 
     generate_certificates(python_cmd)
 
-    variant_files = sorted(glob.glob(os.path.join("variants", "*.cmake")))
-    variants = []
-    for path in variant_files:
-        name = os.path.splitext(os.path.basename(path))[0]
-        # -demo variants ship (hidden behind an expandable section in the
-        # frontend flasher); -debug stays out of production/docker builds.
-        if name.endswith("-debug"):
-            print(f"Skipping development variant: {name}")
-            continue
-        variants.append((name, path))
+    # Keep inactive variants here for quick restoration without spending build
+    # resources on hardware that is not currently deployed.
+    variant_names = [
+        # "attractap-lite-ethernet",
+        # "attractap-touch-demo",
+        # "attractap-touch-ethernet",
+        # "attractap-touch-v2-demo",
+        "attractap-touch",
+        "attractap-touch-v2",
+    ]
+    variants = [(name, os.path.join("variants", f"{name}.cmake")) for name in variant_names]
 
     if not variants:
         print("Error: No variant files found in variants/")

@@ -18,50 +18,75 @@ void ResourceListScreen::init()
    lv_obj_set_style_pad_right(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_top(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   lv_obj_t *logo = lv_image_create(this->screen);
-   lv_image_set_src(logo, &logo_40h);
-   lv_obj_set_height(logo, 40);
-   lv_obj_set_width(logo, lv_pct(100));
-   lv_obj_set_align(logo, LV_ALIGN_CENTER);
-    lv_obj_add_flag(logo, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_remove_flag(logo, LV_OBJ_FLAG_SCROLLABLE);
+   this->logo = lv_image_create(this->screen);
+   lv_image_set_src(this->logo, &logo_40h);
+   lv_obj_set_height(this->logo, 40);
+   lv_obj_set_width(this->logo, lv_pct(100));
+   lv_obj_set_align(this->logo, LV_ALIGN_CENTER);
+   lv_obj_add_flag(this->logo, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_remove_flag(this->logo, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_flag(this->logo, LV_OBJ_FLAG_HIDDEN, this->authenticated);
 
-    this->loginContainer = lv_obj_create(this->screen);
-    lv_obj_remove_style_all(this->loginContainer);
-    lv_obj_set_width(this->loginContainer, lv_pct(100));
-    lv_obj_set_height(this->loginContainer, LV_SIZE_CONTENT);
-    lv_obj_set_flex_flow(this->loginContainer, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(this->loginContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
-    lv_obj_set_style_pad_column(this->loginContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->loginContainer = lv_obj_create(this->screen);
+   lv_obj_remove_style_all(this->loginContainer);
+   lv_obj_set_width(this->loginContainer, lv_pct(100));
+   lv_obj_set_height(this->loginContainer, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->loginContainer, LV_ALIGN_CENTER);
+   lv_obj_set_flex_flow(this->loginContainer, LV_FLEX_FLOW_ROW);
+   lv_obj_set_flex_align(this->loginContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+   lv_obj_remove_flag(this->loginContainer, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_remove_flag(this->loginContainer, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_pad_row(this->loginContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_column(this->loginContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    lv_obj_t *logoutButton = lv_button_create(this->loginContainer);
-    lv_obj_set_width(logoutButton, 70);
-    lv_obj_set_style_bg_color(logoutButton, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_t *logoutButton = lv_button_create(this->loginContainer);
+   lv_obj_set_width(logoutButton, 70);
+   lv_obj_set_height(logoutButton, LV_SIZE_CONTENT);
+   lv_obj_set_align(logoutButton, LV_ALIGN_CENTER);
+   lv_obj_add_flag(logoutButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+   lv_obj_remove_flag(logoutButton, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_bg_color(logoutButton, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(logoutButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_add_event_cb(logoutButton, &ResourceListScreen::onLogoutClicked, LV_EVENT_CLICKED, this);
     lv_obj_t *logoutLabel = lv_label_create(logoutButton);
     lv_label_set_text(logoutLabel, "Abmelden");
     lv_obj_set_style_text_font(logoutLabel, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_center(logoutLabel);
 
-    lv_obj_t *userAndTimeoutContainer = lv_obj_create(this->loginContainer);
-    lv_obj_remove_style_all(userAndTimeoutContainer);
-    lv_obj_set_flex_grow(userAndTimeoutContainer, 1);
-    lv_obj_set_flex_flow(userAndTimeoutContainer, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_row(userAndTimeoutContainer, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_t *userAndTimeoutContainer = lv_obj_create(this->loginContainer);
+   lv_obj_remove_style_all(userAndTimeoutContainer);
+   lv_obj_set_width(userAndTimeoutContainer, 340);
+   lv_obj_set_height(userAndTimeoutContainer, LV_SIZE_CONTENT);
+   lv_obj_set_align(userAndTimeoutContainer, LV_ALIGN_CENTER);
+   lv_obj_set_flex_flow(userAndTimeoutContainer, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(userAndTimeoutContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+   lv_obj_remove_flag(userAndTimeoutContainer, LV_OBJ_FLAG_CLICKABLE);
+   lv_obj_remove_flag(userAndTimeoutContainer, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_pad_row(userAndTimeoutContainer, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_column(userAndTimeoutContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    this->loginUserLabel = lv_label_create(userAndTimeoutContainer);
-    lv_obj_set_width(this->loginUserLabel, lv_pct(100));
-    lv_label_set_text(this->loginUserLabel, this->loginUsernameCache.c_str());
-    lv_obj_set_style_text_font(this->loginUserLabel, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(this->loginUserLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->loginUserLabel = lv_label_create(userAndTimeoutContainer);
+   lv_obj_set_width(this->loginUserLabel, lv_pct(100));
+   lv_obj_set_height(this->loginUserLabel, LV_SIZE_CONTENT);
+   lv_obj_set_align(this->loginUserLabel, LV_ALIGN_CENTER);
+   lv_label_set_text(this->loginUserLabel, this->loginUsernameCache.c_str());
+   lv_obj_set_style_text_font(this->loginUserLabel, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->loginUserLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_opa(this->loginUserLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     this->sessionTimeoutIndicator = lv_bar_create(userAndTimeoutContainer);
     lv_bar_set_mode(this->sessionTimeoutIndicator, LV_BAR_MODE_SYMMETRICAL);
     lv_bar_set_range(this->sessionTimeoutIndicator, 0, 30);
     lv_bar_set_value(this->sessionTimeoutIndicator, 30, LV_ANIM_OFF);
     lv_bar_set_start_value(this->sessionTimeoutIndicator, 30, LV_ANIM_OFF);
-    lv_obj_set_size(this->sessionTimeoutIndicator, lv_pct(100), 10);
-    lv_obj_set_style_bg_color(this->sessionTimeoutIndicator, lv_color_hex(0xF31260), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_set_size(this->sessionTimeoutIndicator, lv_pct(100), 10);
+   lv_obj_set_align(this->sessionTimeoutIndicator, LV_ALIGN_CENTER);
+   lv_obj_set_style_bg_color(this->sessionTimeoutIndicator, lv_color_hex(0xF31260), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(this->sessionTimeoutIndicator, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   if (lv_obj_get_style_pad_top(this->sessionTimeoutIndicator, LV_PART_MAIN) > 0)
+      lv_obj_set_style_pad_right(this->sessionTimeoutIndicator,
+                                 lv_obj_get_style_pad_right(this->sessionTimeoutIndicator, LV_PART_MAIN) + 1,
+                                 LV_PART_MAIN);
     if (!this->authenticated)
     {
        lv_obj_add_flag(this->loginContainer, LV_OBJ_FLAG_HIDDEN);
@@ -96,7 +121,7 @@ void ResourceListScreen::setResourceList(const API::ResourceList &resourceList)
    {
       return;
    }
-   // Clear only the resource items while keeping static UI (logo, container) intact
+    // Clear only the resource items while keeping static UI intact.
    if (this->resourceContainer)
    {
       lv_obj_clean(this->resourceContainer);
@@ -117,16 +142,20 @@ void ResourceListScreen::setAuthenticated(bool authenticated)
     this->authenticated = authenticated;
     if (this->loginContainer)
     {
-       if (authenticated)
-       {
-          lv_obj_clear_flag(this->loginContainer, LV_OBJ_FLAG_HIDDEN);
+        if (authenticated)
+        {
+           lv_obj_clear_flag(this->loginContainer, LV_OBJ_FLAG_HIDDEN);
        }
        else
        {
           lv_obj_add_flag(this->loginContainer, LV_OBJ_FLAG_HIDDEN);
-          this->hideActionProgress();
-       }
-    }
+           this->hideActionProgress();
+        }
+     }
+     if (this->logo)
+     {
+        lv_obj_set_flag(this->logo, LV_OBJ_FLAG_HIDDEN, authenticated);
+     }
    if (this->hasCachedResourceList)
    {
       this->setResourceList(this->cachedResourceList);
@@ -151,7 +180,7 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
    lv_obj_remove_flag(resourceButton, LV_OBJ_FLAG_SCROLLABLE);
 
    lv_obj_set_style_border_opa(resourceButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(resourceButton, hasDirectAction ? 0 : 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+     lv_obj_set_style_border_width(resourceButton, hasDirectAction ? 0 : 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_border_side(resourceButton, LV_BORDER_SIDE_RIGHT, LV_PART_MAIN | LV_STATE_DEFAULT);
    // Status priority mirrors the web resource list: in use > maintenance > available.
    if (resource.hasActiveUsage)
@@ -168,21 +197,24 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
    }
 
     lv_obj_t *detailsButton = resourceButton;
-     if (hasDirectAction)
-     {
-        // The row itself is only a layout container. Styling it like a card adds
-        // a white gutter around the two action halves.
-        lv_obj_set_style_bg_opa(resourceButton, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_pad_all(resourceButton, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-        detailsButton = lv_button_create(resourceButton);
-        lv_obj_set_width(detailsButton, lv_pct(75));
-       lv_obj_set_height(detailsButton, lv_pct(100));
-       lv_obj_set_flex_flow(detailsButton, LV_FLEX_FLOW_COLUMN);
-       lv_obj_set_flex_align(detailsButton, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+      if (hasDirectAction)
+      {
+         // The row clips square action halves to one rounded button surface.
+         lv_obj_set_style_bg_color(resourceButton, lv_color_hex(0x006FEE), LV_PART_MAIN | LV_STATE_DEFAULT);
+         lv_obj_set_style_bg_opa(resourceButton, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+         lv_obj_set_style_pad_all(resourceButton, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+         detailsButton = lv_button_create(resourceButton);
+         lv_obj_set_width(detailsButton, lv_pct(50));
+        lv_obj_set_height(detailsButton, lv_pct(100));
+         lv_obj_set_style_bg_opa(detailsButton, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+         lv_obj_set_style_radius(detailsButton, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_flex_flow(detailsButton, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_flex_align(detailsButton, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
-       lv_obj_t *actionButton = lv_button_create(resourceButton);
-        lv_obj_set_width(actionButton, lv_pct(25));
-       lv_obj_set_height(actionButton, lv_pct(100));
+        lv_obj_t *actionButton = lv_button_create(resourceButton);
+         lv_obj_set_width(actionButton, lv_pct(50));
+        lv_obj_set_height(actionButton, lv_pct(100));
+        lv_obj_set_style_radius(actionButton, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
        lv_obj_set_style_bg_color(actionButton,
                                   lv_color_hex(resource.hasActiveUsage ? 0xF31260 : 0x17C964),
                                   LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -299,8 +331,9 @@ void ResourceListScreen::updateSessionTimeoutIndicator()
        return;
     }
     uint32_t now = this->sessionTimeoutPaused ? this->pauseFrozenAtMs : millis();
-    uint32_t remainingMillis = this->sessionTimeoutTime > now
-                                   ? this->sessionTimeoutTime - now + 1000
+    const int32_t untilDeadline = static_cast<int32_t>(this->sessionTimeoutTime - now);
+    uint32_t remainingMillis = untilDeadline > 0
+                                   ? static_cast<uint32_t>(untilDeadline) + 1000
                                    : 0;
     long remainingSeconds = remainingMillis / 1000;
     lv_bar_set_value(this->sessionTimeoutIndicator,
@@ -418,7 +451,13 @@ void ResourceListScreen::destroy()
    {
       return;
    }
-   lv_obj_del(this->screen);
-   this->screen = nullptr;
-   this->resourceContainer = nullptr;
+    lv_obj_del(this->screen);
+    this->screen = nullptr;
+    this->logo = nullptr;
+    this->resourceContainer = nullptr;
+    this->loginContainer = nullptr;
+    this->loginUserLabel = nullptr;
+    this->sessionTimeoutIndicator = nullptr;
+    this->actionOverlay = nullptr;
+    this->actionOverlayLabel = nullptr;
 }

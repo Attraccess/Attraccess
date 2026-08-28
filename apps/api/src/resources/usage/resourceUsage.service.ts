@@ -10,7 +10,7 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, In, FindOneOptions, EntityManager, Not } from 'typeorm';
+import { Repository, IsNull, In, FindOneOptions, EntityManager } from 'typeorm';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   FormSubmission,
@@ -438,11 +438,16 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       ...uniqueResourceIds,
       ...groups.flatMap((group) => group.resources.map((resource) => resource.id)),
     ])];
-    const usages = resourceIdsWithUsage.length
-      ? await this.resourceUsageRepository.find({
-          where: { resourceId: In(resourceIdsWithUsage), userId: user.id, endTime: Not(IsNull()) },
-          select: ['resourceId', 'endTime'],
-        })
+    const latestUsages = resourceIdsWithUsage.length
+      ? await this.resourceUsageRepository
+          .createQueryBuilder('usage')
+          .select('usage.resourceId', 'resourceId')
+          .addSelect('MAX(usage.endTime)', 'endTime')
+          .where('usage.resourceId IN (:...resourceIds)', { resourceIds: resourceIdsWithUsage })
+          .andWhere('usage.userId = :userId', { userId: user.id })
+          .andWhere('usage.endTime IS NOT NULL')
+          .groupBy('usage.resourceId')
+          .getRawMany<{ resourceId: number; endTime: string }>()
       : [];
 
     const latestHistoryByIntroductionId = new Map<number, ResourceIntroductionHistoryItem>();
@@ -459,13 +464,9 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
         }
       }
     }
-    const latestUsageByResourceId = new Map<number, Date>();
-    for (const usage of usages) {
-      const latestUsage = latestUsageByResourceId.get(usage.resourceId);
-      if (usage.endTime && (!latestUsage || latestUsage < usage.endTime)) {
-        latestUsageByResourceId.set(usage.resourceId, usage.endTime);
-      }
-    }
+    const latestUsageByResourceId = new Map(
+      latestUsages.map((usage) => [Number(usage.resourceId), new Date(usage.endTime)]),
+    );
     const directIntroductionByResourceId = new Map(
       directIntroductions
         .filter((introduction) => introduction.resourceId !== null)
