@@ -70,7 +70,14 @@ describe('WagoService', () => {
       },
       getMqttCredentialProvisioning: jest.fn(),
     } as unknown as PluginContext;
-    return { service: new WagoService(context), controllerRepository, enrollmentRepository, context, subscriptions };
+    return {
+      service: new WagoService(context),
+      controllerRepository,
+      enrollmentRepository,
+      settingsRepository,
+      context,
+      subscriptions,
+    };
   }
 
   it('does not expose physical-verification secrets in controller listings', async () => {
@@ -80,6 +87,14 @@ describe('WagoService', () => {
 
     expect(listed).not.toHaveProperty('fingerprint');
     expect(listed).not.toHaveProperty('pairingCodeHash');
+  });
+
+  it('creates default settings when none have been persisted', async () => {
+    const { service, settingsRepository } = createService();
+    settingsRepository.findOneBy.mockResolvedValue(null);
+    settingsRepository.save.mockResolvedValue({ id: 1, defaultMqttServerId: null });
+
+    await expect(service.getSettings()).resolves.toEqual({ id: 1, defaultMqttServerId: null });
   });
 
   it('requires a non-empty matching fingerprint', () => {
@@ -178,6 +193,63 @@ describe('WagoService', () => {
 
     expect(enrollment).toMatchObject({ username: 'manual-$&', password: 'secret' });
     expect(enrollment.manualInstructions).toEqual(['Create a scoped broker user named manual-$& manually.']);
+  });
+
+  it.each(['cc100/+1', 'cc100/#1'])('rejects MQTT wildcard characters in hardware IDs', async (hardwareId) => {
+    const { service } = createService();
+
+    await expect(service.createEnrollment(hardwareId)).rejects.toThrow('without MQTT separators or wildcards');
+  });
+
+  it('keeps permanent credentials after a post-delivery claim failure', async () => {
+    const enrollment = {
+      id: 3,
+      mqttServerId: 2,
+      hardwareId: 'cc100-01',
+      secretHash: 'secret-hash',
+      identity: 'wago-enrollment-test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      revokedAt: null,
+      consumedAt: null,
+    };
+    const candidate = { ...controller(), fingerprint: 'fingerprint' };
+    const { service, context, controllerRepository, enrollmentRepository } = createService([candidate], [enrollment]);
+    const revoke = jest.fn().mockResolvedValue(undefined);
+    (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = jest.fn().mockResolvedValue({});
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({
+      provision: jest.fn().mockResolvedValue({ username: 'wago-controller-cc100-01', password: 'secret' }),
+      revoke,
+    });
+    (context.mqtt.publish as jest.Mock)
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('cleanup failed'));
+    enrollmentRepository.findOneBy.mockResolvedValue(enrollment);
+
+    await expect(service.claim(candidate.id, 'Controller', 'fingerprint')).rejects.toThrow('cleanup failed');
+
+    expect(controllerRepository.save).toHaveBeenCalledWith(expect.objectContaining({ trustState: 'claimed' }));
+    expect(revoke).toHaveBeenCalledTimes(1);
+    expect(revoke).toHaveBeenCalledWith(expect.objectContaining({ identity: enrollment.identity }));
+  });
+
+  it('does not treat revoked enrollments as active', () => {
+    const { service } = createService();
+    const isActiveEnrollment = Reflect.get(service, 'isActiveEnrollment') as (item: WagoEnrollment) => boolean;
+
+    expect(
+      isActiveEnrollment({
+        id: 3,
+        mqttServerId: 2,
+        hardwareId: 'cc100-01',
+        secretHash: 'secret-hash',
+        identity: 'wago-enrollment-test',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        revokedAt: '2026-01-01T00:00:00.000Z',
+        consumedAt: null,
+      }),
+    ).toBe(false);
   });
 
   it('keeps replacement subscriptions inert until they replace the active generation', async () => {

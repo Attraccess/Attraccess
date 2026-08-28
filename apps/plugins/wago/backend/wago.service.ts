@@ -48,7 +48,10 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit(): Promise<void> {
-    const enrollments = await this.enrollments.find();
+    const enrollments = await this.enrollments
+      .createQueryBuilder('enrollment')
+      .where('enrollment.consumedAt IS NULL')
+      .getMany();
     for (const enrollment of enrollments) this.scheduleEnrollmentExpiry(enrollment);
     await this.subscribeConfiguredServers();
   }
@@ -83,7 +86,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getSettings(): Promise<WagoSettings> {
-    return this.settings.findOneBy({ id: 1 }) ?? this.settings.save({ id: 1, defaultMqttServerId: null });
+    return (await this.settings.findOneBy({ id: 1 })) ?? this.settings.save({ id: 1, defaultMqttServerId: null });
   }
 
   async setDefaultMqttServer(serverId: number | null): Promise<WagoSettings> {
@@ -109,8 +112,8 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     manualInstructions?: readonly string[];
   }> {
     const normalizedHardwareId = hardwareId.trim();
-    if (!normalizedHardwareId || normalizedHardwareId.includes('/'))
-      throw new ConflictException('a valid hardware ID is required');
+    if (!isValidHardwareId(normalizedHardwareId))
+      throw new ConflictException('a valid hardware ID without MQTT separators or wildcards is required');
     const selectedServerId = mqttServerId ?? (await this.getSettings()).defaultMqttServerId;
     if (!selectedServerId) throw new ConflictException('select an MQTT server before creating an enrollment package');
     const server = await this.context.getMqttServerConfig(selectedServerId);
@@ -208,30 +211,43 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     if (!('password' in credential)) {
       throw new ConflictException(`Manual credential provisioning is required: ${credential.instructions.join(' ')}`);
     }
+    let credentialDelivered = false;
+    const previousController = {
+      trustState: controller.trustState,
+      name: controller.name,
+      mqttServerId: controller.mqttServerId,
+      updatedAt: controller.updatedAt,
+    };
     try {
       // Revoke discovery access before sending the permanent password to its one-time topic.
       await this.revokeEnrollment(enrollment);
+      // Persist the claimed state before delivery so post-delivery failures cannot revoke its credentials.
+      controller.trustState = 'claimed';
+      controller.name = name.trim();
+      controller.mqttServerId = selectedServerId;
+      controller.updatedAt = new Date().toISOString();
+      await this.controllers.save(controller);
       await this.context.mqtt.publish(
         selectedServerId,
         `${discoveryTopic(controller.hardwareId)}/claim`,
         JSON.stringify({ username: credential.username, password: credential.password }),
         { qos: 1 },
       );
+      credentialDelivered = true;
       await this.context.mqtt.publish(selectedServerId, discoveryTopic(controller.hardwareId), '', {
         qos: 1,
         retain: true,
       });
-      controller.trustState = 'claimed';
-      controller.name = name.trim();
-      controller.mqttServerId = selectedServerId;
-      controller.updatedAt = new Date().toISOString();
-      await this.controllers.save(controller);
       return controller;
     } catch (error) {
-      await this.context
-        .getMqttCredentialProvisioning()
-        .revoke({ mqttServerId: selectedServerId, identity, username: identity, vhost: '/' })
-        .catch(() => undefined);
+      if (!credentialDelivered) {
+        await this.context
+          .getMqttCredentialProvisioning()
+          .revoke({ mqttServerId: selectedServerId, identity, username: identity, vhost: '/' })
+          .catch(() => undefined);
+        Object.assign(controller, previousController);
+        await this.controllers.save(controller).catch(() => undefined);
+      }
       throw error;
     } finally {
       await this.subscribeConfiguredServers().catch((error) => {
@@ -308,7 +324,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
 
   private async onDiscovery(serverId: number, topic: string, payload: Buffer): Promise<void> {
     const hardwareId = topic.slice(`${DISCOVERY_ROOT}/`.length);
-    if (!hardwareId || hardwareId.includes('/')) return;
+    if (!isValidHardwareId(hardwareId)) return;
     let announcement: WagoAnnouncement;
     try {
       announcement = parseAnnouncement(payload);
@@ -426,11 +442,12 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     return this.enrollments
       .createQueryBuilder('enrollment')
       .where('enrollment.consumedAt IS NULL')
+      .andWhere('enrollment.revokedAt IS NULL')
       .andWhere('enrollment.expiresAt > :now', { now: new Date().toISOString() })
       .getMany();
   }
   private isActiveEnrollment(enrollment: WagoEnrollment): boolean {
-    return !enrollment.consumedAt && Date.parse(enrollment.expiresAt) > Date.now();
+    return !enrollment.consumedAt && !enrollment.revokedAt && Date.parse(enrollment.expiresAt) > Date.now();
   }
   private scheduleEnrollmentExpiry(
     enrollment: WagoEnrollment,
@@ -509,4 +526,7 @@ function hash(value: string): string {
 }
 function safeEqual(left: string, right: string): boolean {
   return left.length === right.length && timingSafeEqual(Buffer.from(left), Buffer.from(right));
+}
+function isValidHardwareId(hardwareId: string): boolean {
+  return Boolean(hardwareId) && !/[/+#]/.test(hardwareId);
 }

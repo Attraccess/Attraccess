@@ -228,12 +228,13 @@ def main():
             sys.exit(1)
 
         build_dir = os.path.join("build", variant)
-        # Per-variant sdkconfig, regenerated from sdkconfig.defaults on every
-        # build: an existing sdkconfig silently shadows the defaults file, so
-        # a stale one drops newly added CONFIG_ flags (bit us on ATT-717).
+        # CMake caches absolute paths to the source tree and ESP-IDF checkout.
+        # Reusing a build directory from another worktree can therefore make
+        # the compiler read a different checkout, or fail with a stale cache.
+        if os.path.exists(build_dir):
+            print(f"Cleaning CMake build directory: {os.path.abspath(build_dir)}")
+            shutil.rmtree(build_dir)
         sdkconfig_path = os.path.abspath(os.path.join(build_dir, "sdkconfig"))
-        if os.path.exists(sdkconfig_path):
-            os.remove(sdkconfig_path)
         build_args = [
             "-B", build_dir,
             f"-DSDKCONFIG={sdkconfig_path}",
