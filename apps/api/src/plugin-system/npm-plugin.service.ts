@@ -66,6 +66,7 @@ export type MarketplacePlugin = {
   description: string | null;
   permissions: string[];
   hostRange: string | null;
+  sdkCompatibility: { backend: string | null; frontend: string | null };
   repository: string | null;
   homepage: string | null;
   license: string | null;
@@ -77,6 +78,7 @@ export type MarketplacePlugin = {
   installable: boolean;
   incompatibilityReason: string | null;
   integrity: string | null;
+  provenance: string | null;
 };
 
 @Injectable()
@@ -194,8 +196,18 @@ export class NpmPluginService {
         }
       }),
     );
+    const officialResults =
+      !registryId || registryId === 'npm'
+        ? await Promise.allSettled(
+            this.classification.officialPackages().map(({ name }) => this.marketplacePackage(name)),
+          )
+        : [];
     return {
-      results: responses.flatMap(({ results }) => results),
+      // The allowlist is queried directly rather than relying on npm's ranked search results.
+      results: [
+        ...responses.flatMap(({ results }) => results),
+        ...officialResults.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])),
+      ],
       errors: responses.flatMap(({ error }) => (error ? [error] : [])),
     };
   }
@@ -440,6 +452,10 @@ export class NpmPluginService {
         description: pkg.attraccess.description ?? null,
         permissions: pkg.attraccess.permissions,
         hostRange: pkg.attraccess.host,
+        sdkCompatibility: {
+          backend: pkg.attraccess.sdk.backend ?? null,
+          frontend: pkg.attraccess.sdk.frontend ?? null,
+        },
         repository: repositoryUrl(pkg.repository),
         homepage: pkg.homepage ?? null,
         license: pkg.license ?? null,
@@ -451,6 +467,7 @@ export class NpmPluginService {
         installable: true,
         incompatibilityReason: null,
         integrity: distIntegrity(pkg),
+        provenance: publisher ? `${registry.name} (${publisher})` : registry.name,
       };
     } catch (error) {
       return {
@@ -460,6 +477,7 @@ export class NpmPluginService {
         description: null,
         permissions: [],
         hostRange: null,
+        sdkCompatibility: { backend: null, frontend: null },
         repository: null,
         homepage: null,
         license: null,
@@ -471,6 +489,7 @@ export class NpmPluginService {
         installable: false,
         incompatibilityReason: error instanceof Error ? error.message : 'Package metadata is invalid',
         integrity: null,
+        provenance: publisher ? `${registry.name} (${publisher})` : registry.name,
       };
     }
   }

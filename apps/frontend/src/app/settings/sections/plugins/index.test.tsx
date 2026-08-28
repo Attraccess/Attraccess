@@ -71,6 +71,7 @@ beforeEach(() => {
         description: 'Official integration',
         permissions: [],
         hostRange: '^1.0.0',
+        sdkCompatibility: { backend: '^1.0.0', frontend: null },
         repository: null,
         homepage: null,
         license: 'MIT',
@@ -82,6 +83,7 @@ beforeEach(() => {
         installable: true,
         incompatibilityReason: null,
         integrity: 'sha512-test',
+        provenance: 'npm (attraccess)',
       };
       if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
       if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
@@ -117,6 +119,38 @@ describe('PluginsSection', () => {
     expect(await screen.findByText('Shelly')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Official plugins' })).toBeInTheDocument();
     expect(screen.getByText('Official')).toBeInTheDocument();
+    expect(screen.getByText('Version: 1.0.0')).toBeInTheDocument();
+  });
+
+  it('keeps incompatible marketplace packages visible with their reason', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: { url?: string } | string) => {
+        const url = typeof input === 'string' ? input : (input.url ?? '');
+        if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+        if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            results: [
+              {
+                name: '@example/incompatible',
+                version: '1.0.0',
+                displayName: 'Incompatible Plugin',
+                registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
+                classification: 'community',
+                installable: false,
+                incompatibilityReason: 'Plugin is not compatible with Attraccess 1.0.0',
+              },
+            ],
+            errors: [],
+          }),
+        });
+      }),
+    );
+    render(<PluginsSection />);
+
+    expect(await screen.findByText('Plugin is not compatible with Attraccess 1.0.0')).toBeInTheDocument();
   });
 
   it('requires source and permission acknowledgement before installing', async () => {
