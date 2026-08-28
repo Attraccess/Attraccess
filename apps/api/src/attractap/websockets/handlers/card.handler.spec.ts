@@ -20,6 +20,7 @@ describe('AttractapCardHandler', () => {
   let metricsService: { attractapNfcTapsTotal: { inc: jest.Mock } };
   let resourceRepository: { findOne: jest.Mock };
   let rbacService: { getEffectivePermissions: jest.Mock };
+  let resourceListService: { sendResourceListToSocket: jest.Mock };
 
   const mockUser = { id: 1, username: 'testuser' };
   const mockReaderWithEnrollment = {
@@ -71,6 +72,7 @@ describe('AttractapCardHandler', () => {
     // Default: a resource that does not support supervision (introduction_required).
     resourceRepository = { findOne: jest.fn().mockResolvedValue({ id: 10, supervisionMode: 'introduction_required' }) };
     rbacService = { getEffectivePermissions: jest.fn().mockResolvedValue(new Set<string>()) };
+    resourceListService = { sendResourceListToSocket: jest.fn().mockResolvedValue(undefined) };
 
     (handler as any).websocketService = websocketService;
     (handler as any).attractapService = attractapService;
@@ -80,6 +82,7 @@ describe('AttractapCardHandler', () => {
     (handler as any).metricsService = metricsService;
     (handler as any).resourceRepository = resourceRepository;
     (handler as any).rbacService = rbacService;
+    (handler as any).resourceListService = resourceListService;
   });
 
   describe('startEnrollOfNewNfcCard', () => {

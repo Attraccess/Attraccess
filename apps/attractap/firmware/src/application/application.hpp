@@ -236,6 +236,7 @@ private:
     void restartSessionTimeout();
     void resetPauseAccounting();
     void resetSessionOnDisconnect();
+    void logout();
 
     uint32_t timeOfResourceSelectionMs;
     const uint32_t RESOURCE_SELECTION_TIMEOUT_MS = 10000;
@@ -246,7 +247,7 @@ private:
 #else
     bool resourceIsDoor = false;
 #endif
-    uint32_t selectedResourceId;
+    uint32_t selectedResourceId = 0;
 
 #ifndef HAS_LVGL_DISPLAY
     bool cardDetected = false;
@@ -319,6 +320,8 @@ private:
     void prefetchNextFormField();
 
     void selectResource(const API::ResourceBrief &resource);
+    void handleResourceListAction(const API::ResourceBrief &resource);
+    bool canPerformResourceListAction(const API::ResourceBrief &resource) const;
 
     void requestProjectsPage(uint32_t page);
     void clearProjectSelection();

@@ -163,6 +163,7 @@ void Application::setup() {
           }
           p->self->endActionPause();
           Display::resourceDetailsScreen.hideActionProgress();
+          Display::resourceListScreen.hideActionProgress();
           if (p->enabled) {
             Display::showInsufficientBalancePopup(
                 [self = p->self](uint32_t amountCents) {
@@ -183,7 +184,8 @@ void Application::setup() {
     this->beeper.errorBeep();
 
 #ifdef HAS_LVGL_DISPLAY
-    if (this->state == APPLICATION_STATE_LOCKED)
+    if (this->state == APPLICATION_STATE_LOCKED ||
+        (this->state == APPLICATION_STATE_RESOURCE_LIST && !this->unlocked))
 #else
     if (this->state == APPLICATION_STATE_WAIT_FOR_CARD)
 #endif
@@ -214,6 +216,7 @@ void Application::setup() {
           }
           pl->self->endActionPause();
           Display::resourceDetailsScreen.hideActionProgress();
+          Display::resourceListScreen.hideActionProgress();
           Display::showErrorPopup(pl->t, pl->m);
           if (pl && pl->self) {
             pl->self->pendingActionType = PENDING_ACTION_NONE;
@@ -251,6 +254,7 @@ void Application::setup() {
             pl->self->endActionPause();
           }
           Display::resourceDetailsScreen.hideActionProgress();
+          Display::resourceListScreen.hideActionProgress();
           if (pl && pl->ok) {
             Display::resourceDetailsScreen.showSuccessToast("Erfolgreich");
           }
@@ -360,10 +364,19 @@ void Application::setup() {
 #endif
 #endif
 
-  Display::resourceListScreen.setResourceSelectionCallback(
+  Display::resourceListScreen.setResourceDetailsCallback(
       [this](const API::ResourceBrief &resource) {
-        this->selectResource(resource);
+         this->selectResource(resource);
       });
+  Display::resourceListScreen.setResourceActionCallback(
+      [this](const API::ResourceBrief &resource) {
+        this->handleResourceListAction(resource);
+      });
+  Display::resourceListScreen.setResourceActionAvailableCallback(
+      [this](const API::ResourceBrief &resource) {
+        return this->canPerformResourceListAction(resource);
+      });
+  Display::resourceListScreen.setLogoutCallback([this]() { this->logout(); });
 
   Display::setTouchCallback(
       [this](int16_t x, int16_t y) { this->handleTouch(x, y); });
@@ -532,13 +545,14 @@ void Application::setup() {
 #endif
 
 #ifdef HAS_LVGL_DISPLAY
-    if (this->state == APPLICATION_STATE_LOCKED)
+    if (this->state == APPLICATION_STATE_LOCKED ||
+        (this->state == APPLICATION_STATE_RESOURCE_LIST && !this->unlocked))
 #else
     if (this->state == APPLICATION_STATE_WAIT_FOR_CARD)
 #endif
     {
       this->api.requestCardAuthenticationData(uid, uidLength,
-                                              this->selectedResourceId);
+                                              this->unlocked ? this->selectedResourceId : 0);
       return;
     }
 

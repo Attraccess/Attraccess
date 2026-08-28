@@ -2,6 +2,7 @@
 // FEATURE: application-card-flow
 
 #include "application.hpp"
+#include "platform.hpp"
 
 void Application::processCardAuthenticationData() {
   this->logger.infof("Trying to authenticate with keyNo: %u",
@@ -41,6 +42,10 @@ void Application::processCardAuthenticationData() {
   this->externalState = EXTERNAL_STATE_NONE;
 
   this->unlocked = true;
+
+#ifdef HAS_LVGL_DISPLAY
+  this->timeOfUnlockedMs = millis();
+#endif
 
 #ifndef HAS_LVGL_DISPLAY
   // Enable card detection to detect card removal in non-display mode

@@ -178,15 +178,18 @@ void Application::processState() {
       this->externalState = EXTERNAL_STATE_NONE;
       this->state = APPLICATION_STATE_INIT;
       this->unlocked = outcome == SupervisionFlow::Outcome::Unlock ||
-                       outcome == SupervisionFlow::Outcome::UnlockAndStartSession;
+                        outcome == SupervisionFlow::Outcome::UnlockAndStartSession;
+      if (this->unlocked) {
+        this->restartSessionTimeout();
+      }
       if (outcome == SupervisionFlow::Outcome::UnlockAndStartSession) {
         Display::resourceDetailsScreen.showActionProgress("Starte Sitzung");
         this->beginActionPause();
         this->pendingActionType = PENDING_ACTION_START_SESSION;
         this->pendingActionResourceId = this->selectedResourceId;
-        this->pendingActionProjectId = this->selectedProjectId;
+        this->pendingActionProjectId = 0;
         this->hasPendingFormRequest = false;
-        this->api.startResourceUsageSession(this->selectedResourceId, this->selectedProjectId);
+        this->api.startResourceUsageSession(this->selectedResourceId);
       }
     }
     return;
@@ -234,6 +237,8 @@ void Application::processState() {
             .hasIntroduction = this->cardAuthenticationData.hasIntroduction,
             .isIntroducer = this->cardAuthenticationData.isIntroducer,
             .requiresSupervisor = this->cardAuthenticationData.requiresSupervisor});
+    Display::resourceListScreen.setLoginUsername(
+        this->cardAuthenticationData.username);
 #endif
 
     this->state = APPLICATION_STATE_AUTHENTICATE_CARD;
@@ -279,6 +284,7 @@ void Application::processState() {
   }
 
 #ifdef HAS_LVGL_DISPLAY
+  uint32_t now = millis();
   if (this->resourceCount == 0) {
     if (this->state == APPLICATION_STATE_NO_RESOURCES) {
       return;
@@ -291,29 +297,37 @@ void Application::processState() {
     return;
   }
 
-  if (this->resourceCount == 1 && !this->resourceIsSelected) {
-    this->logger.debug(
-        "Resource count is 1 and resource is not selected, selecting resource");
-    this->selectResource(resourceList.items[0]);
-    return;
-  }
-
   if (this->resourceCount > 0 && !this->resourceIsSelected) {
+    Display::resourceListScreen.setAuthenticated(this->unlocked);
     if (this->resourceListUpdated) {
-// Update UI with the list
-#ifdef HAS_LVGL_DISPLAY
+      // Update UI with the list.
       Display::resourceListScreen.setResourceList(this->resourceList);
-#endif
       this->resourceListUpdated = false;
     }
 
     if (this->state == APPLICATION_STATE_RESOURCE_LIST) {
+      if (this->unlocked) {
+        uint32_t effectivePause = this->accumulatedPauseMs;
+        if (this->actionInProgressCount > 0) {
+          effectivePause += (now >= this->pauseStartMs) ? now - this->pauseStartMs : 0;
+        }
+        uint32_t effectiveElapsed = now - this->timeOfUnlockedMs;
+        effectiveElapsed = effectiveElapsed > effectivePause
+                               ? effectiveElapsed - effectivePause
+                               : 0;
+        if (effectiveElapsed > this->UNLOCKED_TIMEOUT_MS) {
+          this->logger.debug("Unlocked timeout reached, locking");
+          this->unlocked = false;
+          this->selectedResourceId = 0;
+          Display::resourceListScreen.setAuthenticated(false);
+        }
+      }
       return;
     }
 
-    this->logger.debug("Resource count is greater than 0 and resource is not "
-                       "selected, showing resource list");
+    this->logger.debug("Showing resource list");
     this->state = APPLICATION_STATE_RESOURCE_LIST;
+    this->nfc.enableCardDetection();
 #ifdef HAS_LVGL_DISPLAY
     Display::transitionToScreen(&Display::resourceListScreen);
 #endif
@@ -340,14 +354,12 @@ void Application::processState() {
     this->selectedResourceChanged = false;
   }
 
-  uint32_t now = millis();
   if (!this->unlocked) {
     if (this->state == APPLICATION_STATE_LOCKED) {
 
       if (now - this->timeOfResourceSelectionMs >
           this->RESOURCE_SELECTION_TIMEOUT_MS) {
-        this->logger.debug(
-            "Resource selection timeout reached, showing resource list");
+        this->logger.debug("Resource details timeout reached, showing resource list");
         this->resourceIsSelected = false;
       }
       return;
@@ -388,7 +400,7 @@ void Application::processState() {
     if (effectiveElapsed > this->UNLOCKED_TIMEOUT_MS) {
       this->logger.debug("Unlocked timeout reached, locking");
       this->unlocked = false;
-      this->resourceIsSelected = this->resourceCount == 1;
+       this->resourceIsSelected = false;
     }
 
     if (this->projectsOfUserResponseUpdated) {
@@ -403,11 +415,11 @@ void Application::processState() {
     return;
   }
 
-  this->logger.debug("Resource is unlocked, showing resource details screen");
-  this->state = APPLICATION_STATE_UNLOCKED;
+  this->logger.debug("Card authenticated, enabling resource list actions");
+  this->state = APPLICATION_STATE_RESOURCE_LIST;
   this->restartSessionTimeout();
-
-  Display::transitionToScreen(&Display::resourceDetailsScreen);
+  Display::resourceListScreen.setAuthenticated(true);
+  Display::transitionToScreen(&Display::resourceListScreen);
 #else
 
   // Process unlocked card actions for non-display mode
