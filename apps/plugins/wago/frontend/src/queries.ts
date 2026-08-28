@@ -10,7 +10,6 @@ export function useControllersQuery() {
   return useQuery({
     queryKey: queryKeys.controllers,
     queryFn: listControllers,
-    refetchInterval: 10_000,
   });
 }
 

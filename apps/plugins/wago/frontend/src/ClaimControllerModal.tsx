@@ -14,7 +14,7 @@ import {
   ModalHeading,
   TextField,
 } from '@heroui/react';
-import { useState } from 'react';
+import { useEffectEvent, useState } from 'react';
 import { useClaimControllerMutation } from './queries';
 
 interface ClaimControllerModalProps {
@@ -34,10 +34,18 @@ export function ClaimControllerModal({ controllerId, onOpenChange }: ClaimContro
     onOpenChange(false);
   }
 
+  const closeClaimedController = useEffectEvent((claimedControllerId: number) => {
+    if (controllerId === claimedControllerId) close();
+  });
+
   function submitClaim() {
     if (controllerId === null) return;
 
-    claimMutation.mutate({ id: controllerId, input: { name, verifier } }, { onSuccess: close });
+    const claimedControllerId = controllerId;
+    claimMutation.mutate(
+      { id: claimedControllerId, input: { name, verifier } },
+      { onSuccess: () => closeClaimedController(claimedControllerId) },
+    );
   }
 
   return (
