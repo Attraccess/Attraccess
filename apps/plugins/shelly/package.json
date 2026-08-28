@@ -1,5 +1,5 @@
 {
-  "name": "@attraccess/shelly",
+  "name": "@attraccess/plugin-shelly",
   "version": "0.1.0",
   "description": "Official Attraccess integration for Shelly devices.",
   "license": "AGPL-3.0-only",

@@ -219,7 +219,7 @@ describe('NpmPluginService', () => {
       'dist-tags': { latest: '1.2.3' },
       versions: {
         '1.2.3': {
-          name: '@attraccess/shelly',
+          name: '@attraccess/plugin-shelly',
           version: '1.2.3',
           keywords: ['attraccess-plugin'],
           peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
@@ -235,9 +235,9 @@ describe('NpmPluginService', () => {
       },
     });
 
-    await expect(service.marketplacePackage('@attraccess/shelly')).resolves.toMatchObject({
+    await expect(service.marketplacePackage('@attraccess/plugin-shelly')).resolves.toMatchObject({
       classification: 'community',
-      classificationReason: 'Registry publisher does not match the approved package source',
+      classificationReason: 'Not published by Attraccess on npm',
     });
   });
 
@@ -248,7 +248,7 @@ describe('NpmPluginService', () => {
       'dist-tags': { latest: '1.2.3' },
       versions: {
         '1.2.3': {
-          name: '@attraccess/shelly',
+          name: '@attraccess/plugin-shelly',
           version: '1.2.3',
           keywords: ['attraccess-plugin'],
         },
@@ -418,7 +418,7 @@ describe('NpmPluginService', () => {
   });
 
   it('classifies an installation using the selected version publisher', async () => {
-    const name = '@attraccess/shelly';
+    const name = '@attraccess/plugin-shelly';
     const tarball = await packageTarball(name);
     const service = new NpmPluginService({} as never);
     const internals = service as unknown as ServiceInternals;
@@ -711,7 +711,7 @@ describe('NpmPluginService', () => {
       join(root, '.npm-plugin-state.json'),
       JSON.stringify([
         {
-          name: '@attraccess/shelly',
+          name: '@attraccess/plugin-shelly',
           version: '1.0.0',
           registryId: 'npm',
           registryUrl: 'https://registry.npmjs.org',
@@ -727,7 +727,7 @@ describe('NpmPluginService', () => {
       publisher: { name: 'attraccess' },
       versions: {
         '1.1.0': {
-          name: '@attraccess/shelly',
+          name: '@attraccess/plugin-shelly',
           version: '1.1.0',
           _npmUser: { name: 'unapproved-publisher' },
           keywords: ['attraccess-plugin'],
@@ -738,11 +738,11 @@ describe('NpmPluginService', () => {
     });
     jest.spyOn(service as unknown as ServiceInternals, 'hostVersion').mockReturnValue('1.9.0');
 
-    await expect(service.installedVersionCandidates('@attraccess/shelly')).resolves.toEqual([
+    await expect(service.installedVersionCandidates('@attraccess/plugin-shelly')).resolves.toEqual([
       expect.objectContaining({
         version: '1.1.0',
         classification: 'community',
-        classificationReason: 'Registry publisher does not match the approved package source',
+        classificationReason: 'Not published by Attraccess on npm',
       }),
     ]);
   });

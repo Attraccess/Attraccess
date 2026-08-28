@@ -5,47 +5,21 @@ export type PluginClassification = {
   reason: string;
 };
 
-export type OfficialPluginPackage = {
-  name: string;
-  registryUrl: string;
-  publisher: string;
-  repositoryUrl?: string;
-};
-
-const OFFICIAL_PACKAGES = [
-  {
-    name: '@attraccess/shelly',
-    registryUrl: 'https://registry.npmjs.org',
-    publisher: 'attraccess',
-  },
-  {
-    name: '@attraccess/rabbitmq',
-    registryUrl: 'https://registry.npmjs.org',
-    publisher: 'attraccess',
-  },
-  {
-    name: '@attraccess/wago',
-    registryUrl: 'https://registry.npmjs.org',
-    publisher: 'attraccess',
-  },
-] as const satisfies ReadonlyArray<OfficialPluginPackage>;
+const NPM_REGISTRY_URL = 'https://registry.npmjs.org';
+const OFFICIAL_PLUGIN_PREFIX = '@attraccess/plugin-';
+const OFFICIAL_PUBLISHER = 'attraccess';
 
 @Injectable()
 export class PluginClassificationService {
   classify(name: string, registryUrl: string, publisher?: string | null): PluginClassification {
-    const approved = OFFICIAL_PACKAGES.find((plugin) => plugin.name === name && plugin.registryUrl === registryUrl);
-    if (!approved) {
-      return { kind: 'community', reason: 'Not listed as an approved Attraccess package source' };
+    if (
+      registryUrl === NPM_REGISTRY_URL &&
+      name.startsWith(OFFICIAL_PLUGIN_PREFIX) &&
+      publisher?.toLowerCase() === OFFICIAL_PUBLISHER
+    ) {
+      return { kind: 'official', reason: 'Published by Attraccess on npm' };
     }
-    if (publisher && publisher.toLowerCase() !== approved.publisher) {
-      return { kind: 'community', reason: 'Registry publisher does not match the approved package source' };
-    }
-    if (approved) {
-      return { kind: 'official', reason: 'Approved Attraccess package source' };
-    }
-  }
 
-  officialPackages(): ReadonlyArray<OfficialPluginPackage> {
-    return OFFICIAL_PACKAGES;
+    return { kind: 'community', reason: 'Not published by Attraccess on npm' };
   }
 }
