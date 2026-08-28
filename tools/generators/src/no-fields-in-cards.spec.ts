@@ -669,6 +669,14 @@ function findViolations(file: string): Violation[] {
             } else if (ts.isConditionalExpression(expression)) {
               followRenderedExpression(expression.whenTrue as Node);
               followRenderedExpression(expression.whenFalse as Node);
+            } else if (ts.isBinaryExpression(expression)) {
+              const operator = (expression.operatorToken as Node).kind;
+              if (operator === ts.SyntaxKind.AmpersandAmpersandToken) {
+                followRenderedExpression(expression.right as Node);
+              } else if (operator === ts.SyntaxKind.BarBarToken || operator === ts.SyntaxKind.QuestionQuestionToken) {
+                followRenderedExpression(expression.left as Node);
+                followRenderedExpression(expression.right as Node);
+              }
             } else if (ts.isParenthesizedExpression(expression)) {
               followRenderedExpression(expression.expression as Node);
             }
@@ -1005,6 +1013,32 @@ describe('form fields are not wrapped in Cards (ATT-294 / ATT-834)', () => {
     fs.rmSync(dir, { recursive: true, force: true });
 
     expect(violations).toHaveLength(3);
+    expect(violations.map((violation) => violation.detail).join()).toContain('<TextField>');
+    expect(violations.map((violation) => violation.detail).join()).toContain('<Form>');
+  });
+
+  it('follows rendered values through logical JSX expressions', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'page.tsx'),
+      `import { Card, TextField } from '@heroui/react';
+       const Form = () => <TextField />;
+       export const Page = ({ show, fallback }) => {
+         const body = <TextField />;
+         const renderBody = () => <Form />;
+         return <Card><Card.Content>
+           {show && body}
+           {show && renderBody()}
+           {fallback || body}
+           {fallback ?? renderBody()}
+         </Card.Content></Card>;
+       };`,
+    );
+
+    const violations = findViolations(path.join(dir, 'page.tsx'));
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(violations).toHaveLength(2);
     expect(violations.map((violation) => violation.detail).join()).toContain('<TextField>');
     expect(violations.map((violation) => violation.detail).join()).toContain('<Form>');
   });
