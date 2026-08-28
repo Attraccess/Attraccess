@@ -462,11 +462,11 @@ export class NpmPluginService implements OnModuleInit {
   async checkInstalled(name: string): Promise<InstalledNpmPlugin> {
     const installed = this.installed(name);
     let policy: PluginUpdatePolicy | undefined;
-    const snapshotChanged = (current: InstalledNpmPlugin, currentPolicy: PluginUpdatePolicy) =>
+    const snapshotChanged = (current: InstalledNpmPlugin, currentPolicy?: PluginUpdatePolicy) =>
       current.version !== installed.version ||
       current.requestedSpec !== installed.requestedSpec ||
       current.registryId !== installed.registryId ||
-      (policy !== undefined && !sameUpdatePolicy(currentPolicy, policy));
+      (policy !== undefined && currentPolicy !== undefined && !sameUpdatePolicy(currentPolicy, policy));
     try {
       policy = await this.getUpdatePolicy();
       if (!policy.checksEnabled) return installed;
@@ -507,7 +507,7 @@ export class NpmPluginService implements OnModuleInit {
       };
       const failed = await this.mutateInstalls(async () => {
         const current = this.installed(name);
-        if (snapshotChanged(current, await this.getUpdatePolicy())) return null;
+        if (snapshotChanged(current, policy === undefined ? undefined : await this.getUpdatePolicy())) return null;
         const updated = {
           ...current,
           updateCheck,

@@ -1132,6 +1132,32 @@ describe('NpmPluginService', () => {
     expect(candidates).not.toHaveBeenCalled();
   });
 
+  it('records a failed update check when reading the update policy fails', async () => {
+    const name = '@attraccess/plugin';
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name,
+          version: '1.0.0',
+          registryId: 'npm',
+          registryUrl: 'https://registry.npmjs.org',
+          integrity: 'sha512-test',
+          installPath: 'npm-plugin',
+          permissions: [],
+          lastError: null,
+        },
+      ]),
+    );
+    const service = new NpmPluginService({
+      getPlainSetting: jest.fn().mockRejectedValue(new Error('Settings unavailable')),
+    } as never);
+
+    await expect(service.checkInstalled(name)).resolves.toMatchObject({
+      updateCheck: { state: 'failed', error: 'Settings unavailable' },
+    });
+  });
+
   it('preserves concurrent install policy changes while recording an update check', async () => {
     const name = '@attraccess/plugin';
     writeFileSync(
