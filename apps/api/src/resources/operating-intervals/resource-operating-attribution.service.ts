@@ -16,6 +16,7 @@ export interface ResourceOperatingAttribution {
 
 export interface ResourceOperatingAttributionSummary {
   asOf: Date;
+  windowStart: Date | null;
   operatingDurationMs: number;
   attributedOperatingDurationMs: number;
   unattributedOperatingDurationMs: number;
@@ -112,7 +113,9 @@ export class ResourceOperatingAttributionService {
     });
     const activeOperatingRanges = new Set<OperatingRange>();
     const activeUsageRanges = new Set<UsageRange>();
-    let isProvisional = operatingRanges.some(({ interval }) => this.isOpenAt(interval, asOf));
+    let isProvisional =
+      operatingRanges.some(({ interval }) => this.isOpenAt(interval, asOf)) ||
+      usageRanges.some(({ usage }) => this.isOpenAt(usage, asOf));
 
     const addAttribution = (operatingRange: OperatingRange, usageRange: UsageRange) => {
       const intersection = this.intersection(operatingRange.range, usageRange.range);
@@ -159,6 +162,7 @@ export class ResourceOperatingAttributionService {
     const attributedOperatingDurationMs = this.unionDuration(attributedRanges);
     return {
       asOf,
+      windowStart: windowStart ?? null,
       operatingDurationMs,
       attributedOperatingDurationMs,
       unattributedOperatingDurationMs: operatingDurationMs - attributedOperatingDurationMs,

@@ -164,10 +164,23 @@ describe('ResourceOperatingAttributionService', () => {
 
     expect(result).toEqual({
       asOf,
+      windowStart: null,
       operatingDurationMs: 0,
       attributedOperatingDurationMs: 0,
       unattributedOperatingDurationMs: 0,
       isProvisional: false,
+      attributions: [],
+    });
+  });
+
+  it('marks a snapshot provisional for an unmatched open usage session', () => {
+    const result = service.derive([], [usage(2, '10:00:00', null)], asOf);
+
+    expect(result).toMatchObject({
+      operatingDurationMs: 0,
+      attributedOperatingDurationMs: 0,
+      unattributedOperatingDurationMs: 0,
+      isProvisional: true,
       attributions: [],
     });
   });
@@ -188,7 +201,9 @@ describe('ResourceOperatingAttributionService', () => {
     intervalRepository.find.mockResolvedValue([] as ResourceOperatingInterval[]);
     usageRepository.find.mockResolvedValue([] as ResourceUsage[]);
 
-    await service.getForResource(1, asOf);
+    const result = await service.getForResource(1, asOf);
+
+    expect(result.windowStart).toEqual(new Date('2026-07-28T12:00:00.000Z'));
 
     expect(intervalRepository.find).toHaveBeenCalledWith(
       expect.objectContaining({
