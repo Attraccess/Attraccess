@@ -23,6 +23,7 @@ import {
   Tooltip,
   TooltipContent,
 } from '@heroui/react';
+import { buttonVariants } from '@heroui/styles';
 import { AlertTriangle, BookOpen, CheckCircle2, ChevronDown, Store, Trash2, Upload } from 'lucide-react';
 import { usePluginsServiceDeletePlugin, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -445,7 +446,10 @@ export function PluginsSection() {
       <div data-cy="plugins-list-card" className="flex flex-col gap-4">
         <div className="flex justify-end">
           <Dropdown>
-            <DropdownTrigger className="button button--sm button--primary" data-cy="plugins-list-install-plugin-button">
+            <DropdownTrigger
+              className={`${buttonVariants({ variant: 'primary', size: 'sm' })} !inline-flex items-center gap-2`}
+              data-cy="plugins-list-install-plugin-button"
+            >
               <Upload size={16} />
               {t('installPlugin')}
               <ChevronDown size={16} />
