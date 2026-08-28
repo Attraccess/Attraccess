@@ -72,7 +72,12 @@ export function configurationReportedTopic(prefix: string, hardwareId: string): 
 }
 
 export function normalizeOperationalPrefix(prefix: string): string {
-  const normalized = prefix.trim().replace(/^\/+|\/+$/g, '');
+  const trimmed = prefix.trim();
+  let start = 0;
+  let end = trimmed.length;
+  while (trimmed[start] === '/') start += 1;
+  while (trimmed[end - 1] === '/') end -= 1;
+  const normalized = trimmed.slice(start, end);
   if (!normalized || normalized.split('/').some((segment) => !segment || /[+#]/.test(segment)))
     throw new Error('MQTT prefix must contain non-empty segments without wildcards');
   return normalized;

@@ -33,6 +33,15 @@ describe('WAGO protocol', () => {
     );
   });
 
+  it.each(['', '/', 'customer//wago', 'customer/+/wago', 'customer/#/wago'])(
+    'rejects invalid operational prefix %j',
+    (prefix) => {
+      expect(() => configurationDesiredTopic(prefix, valid.hardwareId)).toThrow(
+        'MQTT prefix must contain non-empty segments without wildcards',
+      );
+    },
+  );
+
   it.each([
     ['invalid JSON', Buffer.from('{')],
     ['missing pairing code', Buffer.from(JSON.stringify({ ...valid, pairingCode: '' }))],
