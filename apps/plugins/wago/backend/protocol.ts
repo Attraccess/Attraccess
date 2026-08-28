@@ -72,6 +72,10 @@ export function configurationReportedTopic(prefix: string, hardwareId: string): 
   return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${hardwareId}/configuration/reported`;
 }
 
+export function configurationReportedWildcardTopic(prefix: string): string {
+  return configurationReportedTopic(prefix, '+');
+}
+
 export function normalizeOperationalPrefix(prefix: string): string {
   const trimmed = prefix.trim();
   let start = 0;

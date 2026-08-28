@@ -325,6 +325,61 @@ describe('WagoService', () => {
     );
   });
 
+  it('serializes configuration reports with publication for the same controller', async () => {
+    const { service, revisionRepository } = createService([{ ...controller(), trustState: 'claimed' as const }]);
+    const revision = {
+      id: 1,
+      controllerId: 1,
+      revision: 2,
+      snapshot: '{}',
+      contentHash: 'a'.repeat(64),
+      state: 'published' as const,
+      rejectionErrors: null,
+      publishedAt: '2026-01-01T00:00:00.000Z',
+      reportedAt: null,
+    };
+    revisionRepository.findOneBy.mockResolvedValue(revision);
+    const withConfigurationLock = (
+      Reflect.get(service, 'withConfigurationLock') as <T>(id: number, operation: () => Promise<T>) => Promise<T>
+    ).bind(service);
+    const onConfigurationReported = (
+      Reflect.get(service, 'onConfigurationReported') as (controllerId: number, payload: Buffer) => Promise<void>
+    ).bind(service);
+    let releasePublish!: () => void;
+    const publish = withConfigurationLock(1, () => new Promise<void>((resolve) => (releasePublish = resolve)));
+    const report = onConfigurationReported(
+      1,
+      Buffer.from(JSON.stringify({ revision: 2, contentHash: revision.contentHash })),
+    );
+
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(revisionRepository.save).not.toHaveBeenCalled();
+    releasePublish();
+    await Promise.all([publish, report]);
+    expect(revisionRepository.save).toHaveBeenCalledWith(expect.objectContaining({ state: 'applied' }));
+  });
+
+  it('subscribes once per MQTT server for configuration reports and routes by hardware ID', async () => {
+    const first = { ...controller(), trustState: 'claimed' as const };
+    const second = { ...controller(), id: 2, hardwareId: 'cc100-02', trustState: 'claimed' as const };
+    const { service, context } = createService([first, second]);
+    const onConfigurationReported = jest
+      .spyOn(service as never, 'onConfigurationReported')
+      .mockResolvedValue(undefined);
+
+    await service.onModuleInit();
+
+    const reportSubscriptions = (context.mqtt.subscribe as jest.Mock).mock.calls.filter(
+      ([, topic]) => topic === 'attraccess/wago/v1/controllers/+/configuration/reported',
+    );
+    expect(reportSubscriptions).toHaveLength(1);
+    await reportSubscriptions[0][2]({
+      topic: 'attraccess/wago/v1/controllers/cc100-02/configuration/reported',
+      payload: Buffer.from('{}'),
+    });
+    expect(onConfigurationReported).toHaveBeenCalledWith(second.id, expect.any(Buffer));
+  });
+
   it('returns bounded revision metadata pages without snapshots', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
     const { service, revisionRepository } = createService([claimed]);

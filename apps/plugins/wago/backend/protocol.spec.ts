@@ -2,6 +2,7 @@ import {
   compatibilityError,
   configurationDesiredTopic,
   configurationReportedTopic,
+  configurationReportedWildcardTopic,
   DISCOVERY_ROOT,
   discoveryTopic,
   heartbeatTopic,
@@ -30,6 +31,9 @@ describe('WAGO protocol', () => {
     );
     expect(configurationReportedTopic('customer/wago', 'cc100-01')).toBe(
       'customer/wago/v1/controllers/cc100-01/configuration/reported',
+    );
+    expect(configurationReportedWildcardTopic('customer/wago')).toBe(
+      'customer/wago/v1/controllers/+/configuration/reported',
     );
   });
 

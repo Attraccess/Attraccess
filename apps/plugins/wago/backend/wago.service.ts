@@ -14,6 +14,7 @@ import {
   compatibilityError,
   configurationDesiredTopic,
   configurationReportedTopic,
+  configurationReportedWildcardTopic,
   discoveryTopic,
   heartbeatTopic,
   normalizeOperationalPrefix,
@@ -540,25 +541,43 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
             await this.onDiscovery(serverId, message.topic, message.payload);
           }),
         );
-        for (const controller of controllers.filter(
+        if (this.destroyed) {
+          replacements.forEach((subscription) => subscription.unsubscribe());
+          return;
+        }
+        const claimedControllers = controllers.filter(
           (item) => item.trustState === 'claimed' && (item.mqttServerId ?? settings.defaultMqttServerId) === serverId,
-        )) {
+        );
+        const controllersByHardwareId = new Map(
+          claimedControllers.map((controller) => [controller.hardwareId, controller]),
+        );
+        replacements.push(
+          await this.context.mqtt.subscribe(
+            serverId,
+            configurationReportedWildcardTopic(settings.operationalPrefix),
+            async (message) => {
+              if (!this.isActiveSubscriptionGeneration(generation)) return;
+              const hardwareId = configurationReportedHardwareId(settings.operationalPrefix, message.topic);
+              const controller = hardwareId ? controllersByHardwareId.get(hardwareId) : undefined;
+              if (controller) await this.onConfigurationReported(controller.id, message.payload);
+            },
+          ),
+        );
+        if (this.destroyed) {
+          replacements.forEach((subscription) => subscription.unsubscribe());
+          return;
+        }
+        for (const controller of claimedControllers) {
           replacements.push(
             await this.context.mqtt.subscribe(serverId, heartbeatTopic(controller.hardwareId), async (message) => {
               if (!this.isActiveSubscriptionGeneration(generation)) return;
               await this.onHeartbeat(controller.hardwareId, message.payload);
             }),
           );
-          replacements.push(
-            await this.context.mqtt.subscribe(
-              serverId,
-              configurationReportedTopic(settings.operationalPrefix, controller.hardwareId),
-              async (message) => {
-                if (!this.isActiveSubscriptionGeneration(generation)) return;
-                await this.onConfigurationReported(controller.id, message.payload);
-              },
-            ),
-          );
+          if (this.destroyed) {
+            replacements.forEach((subscription) => subscription.unsubscribe());
+            return;
+          }
         }
       }
     } catch (error) {
@@ -689,13 +708,15 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       this.context.logger.warn(`Ignoring malformed WAGO configuration report for controller ${controllerId}`);
       return;
     }
-    const revision = await this.revisions.findOneBy({ controllerId, revision: report.revision as number });
-    if (!revision || revision.contentHash !== report.contentHash) return;
-    const errors = Array.isArray(report.errors) ? report.errors : [];
-    revision.state = errors.length ? 'rejected' : 'applied';
-    revision.rejectionErrors = errors.length ? JSON.stringify(errors) : null;
-    revision.reportedAt = new Date().toISOString();
-    await this.revisions.save(revision);
+    await this.withConfigurationLock(controllerId, async () => {
+      const revision = await this.revisions.findOneBy({ controllerId, revision: report.revision as number });
+      if (!revision || revision.contentHash !== report.contentHash) return;
+      const errors = Array.isArray(report.errors) ? report.errors : [];
+      revision.state = errors.length ? 'rejected' : 'applied';
+      revision.rejectionErrors = errors.length ? JSON.stringify(errors) : null;
+      revision.reportedAt = new Date().toISOString();
+      await this.revisions.save(revision);
+    });
   }
 
   private async publishRevision(
@@ -878,4 +899,20 @@ function safeEqual(left: string, right: string): boolean {
 }
 function isValidHardwareId(hardwareId: string): boolean {
   return Boolean(hardwareId) && !/[/+#]/.test(hardwareId);
+}
+
+function configurationReportedHardwareId(prefix: string, topic: string): string | null {
+  const prefixParts = normalizeOperationalPrefix(prefix).split('/');
+  const topicParts = topic.split('/');
+  if (
+    topicParts.length !== prefixParts.length + 5 ||
+    !prefixParts.every((part, index) => topicParts[index] === part) ||
+    topicParts[prefixParts.length] !== `v${CONFIGURATION_PROTOCOL_VERSION}` ||
+    topicParts[prefixParts.length + 1] !== 'controllers' ||
+    topicParts[prefixParts.length + 3] !== 'configuration' ||
+    topicParts[prefixParts.length + 4] !== 'reported'
+  )
+    return null;
+  const hardwareId = topicParts[prefixParts.length + 2];
+  return isValidHardwareId(hardwareId) ? hardwareId : null;
 }
