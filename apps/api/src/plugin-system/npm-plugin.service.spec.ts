@@ -166,7 +166,7 @@ describe('NpmPluginService', () => {
     });
 
     await expect(service.searchMarketplace('example')).resolves.toMatchObject({
-      results: [expect.objectContaining({ name: '@example/plugin', installable: true })],
+      results: [expect.objectContaining({ name: '@example/plugin', installable: true, provenance: null })],
       errors: [],
     });
     expect(service.packageMetadata).toHaveBeenCalledWith('@example/plugin', 'npm');

@@ -755,7 +755,7 @@ export class NpmPluginService implements OnModuleInit {
         installable: true,
         incompatibilityReason: null,
         integrity: distIntegrity(pkg),
-        provenance: publisher ? `${registry.name} (${publisher})` : registry.name,
+        provenance: null,
       };
     } catch (error) {
       return {
@@ -777,7 +777,7 @@ export class NpmPluginService implements OnModuleInit {
         installable: false,
         incompatibilityReason: error instanceof Error ? error.message : 'Package metadata is invalid',
         integrity: null,
-        provenance: publisher ? `${registry.name} (${publisher})` : registry.name,
+        provenance: null,
       };
     }
   }

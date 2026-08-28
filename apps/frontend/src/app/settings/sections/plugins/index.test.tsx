@@ -83,7 +83,7 @@ beforeEach(() => {
         installable: true,
         incompatibilityReason: null,
         integrity: 'sha512-test',
-        provenance: 'npm (attraccess)',
+        provenance: null,
       };
       if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
       if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
@@ -214,6 +214,53 @@ describe('PluginsSection', () => {
     expect(
       screen.getByText('Installing this plugin requires an application restart to activate it.'),
     ).toBeInTheDocument();
+  });
+
+  it('installs an exact private package version from its selected registry', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: { url?: string } | string, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : (input.url ?? '');
+      if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+      if (url.endsWith('/api/plugins/registries'))
+        return Promise.resolve({
+          ok: true,
+          json: async () => [{ id: 'private', name: 'Private', url: 'https://packages.example.com' }],
+        });
+      if (url.includes('/marketplace/search')) return Promise.resolve({ ok: false });
+      if (url.includes('/marketplace/'))
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            name: '@private/plugin',
+            version: '2.3.4',
+            displayName: 'Private plugin',
+            permissions: ['read:resources'],
+            registry: { id: 'private', name: 'Private', url: 'https://packages.example.com' },
+            classification: 'community',
+            installable: true,
+          }),
+        });
+      return Promise.resolve({ ok: true });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<PluginsSection />);
+    await openMarketplace(user);
+
+    await user.selectOptions(screen.getByLabelText('Registry'), 'private');
+    await user.type(screen.getByLabelText('Search plugins'), '@private/plugin');
+    await user.click(await screen.findByRole('button', { name: 'Details' }));
+    await user.click(await screen.findByRole('button', { name: 'Install' }));
+    await user.click(screen.getByRole('checkbox'));
+    const installDialog = screen.getByRole('heading', { name: 'Install Private plugin?' }).closest('[role="dialog"]');
+    expect(installDialog).not.toBeNull();
+    await user.click(within(installDialog as HTMLElement).getByRole('button', { name: 'Install plugin' }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/api/plugins/npm/%40private%2Fplugin/versions/2.3.4'),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ registryId: 'private' }) }),
+      ),
+    );
   });
 
   it('shows only the configured state for registry tokens', async () => {
