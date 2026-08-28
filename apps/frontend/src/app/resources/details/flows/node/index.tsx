@@ -223,7 +223,7 @@ export function AttraccessNode(props: Props) {
                   </Tooltip>
                 )}
               </div>
-              {previewMode && (
+              {(previewMode || !isEditable) && nodeDescription && (
                 <span className="text-xs text-default-500 text-wrap">{nodeDescription}</span>
               )}
             </Card.Header>
