@@ -795,8 +795,6 @@ importers:
         specifier: ^4.20.3
         version: 4.23.11
 
-  apps/frontend: {}
-
   libs/attractap-hw-shared:
     dependencies:
       tscircuit:
