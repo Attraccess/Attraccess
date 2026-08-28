@@ -359,7 +359,7 @@ describe('WagoService', () => {
     expect(revisionRepository.save).toHaveBeenCalledWith(expect.objectContaining({ state: 'applied' }));
   });
 
-  it('dispatches configuration reports through independent controller subscriptions', async () => {
+  it('routes configuration reports from one wildcard subscription', async () => {
     const first = { ...controller(), trustState: 'claimed' as const };
     const second = { ...controller(), id: 2, hardwareId: 'cc100-02', trustState: 'claimed' as const };
     const { service, context } = createService([first, second]);
@@ -375,30 +375,23 @@ describe('WagoService', () => {
     const reportSubscriptions = (context.mqtt.subscribe as jest.Mock).mock.calls.filter(([, topic]) =>
       topic.endsWith('/configuration/reported'),
     );
-    expect(reportSubscriptions).toHaveLength(2);
-    const handlersByTopic = new Map(
-      reportSubscriptions.map(([, topic, handler]) => [
-        topic,
-        handler as (message: { topic: string; payload: Buffer }) => Promise<void>,
-      ]),
-    );
-    const firstHandler = handlersByTopic.get('attraccess/wago/v1/controllers/cc100-01/configuration/reported');
-    const secondHandler = handlersByTopic.get('attraccess/wago/v1/controllers/cc100-02/configuration/reported');
-    if (!firstHandler || !secondHandler) throw new Error('configuration report handlers are missing');
-    const firstResult = firstHandler({
+    expect(reportSubscriptions).toHaveLength(1);
+    expect(reportSubscriptions[0][1]).toBe('attraccess/wago/v1/controllers/+/configuration/reported');
+    const handler = reportSubscriptions[0][2] as (message: { topic: string; payload: Buffer }) => void;
+    const firstResult = handler({
       topic: 'attraccess/wago/v1/controllers/cc100-01/configuration/reported',
       payload: Buffer.from('{}'),
     });
-    const secondResult = secondHandler({
+    const secondResult = handler({
       topic: 'attraccess/wago/v1/controllers/cc100-02/configuration/reported',
       payload: Buffer.from('{}'),
     });
 
-    expect(firstResult).toBeInstanceOf(Promise);
-    await secondResult;
+    expect(firstResult).toBeUndefined();
+    expect(secondResult).toBeUndefined();
+    await new Promise<void>((resolve) => setImmediate(resolve));
     expect(onConfigurationReported).toHaveBeenCalledWith(second.id, expect.any(Buffer));
     releaseFirst();
-    await firstResult;
   });
 
   it('returns bounded revision metadata pages without snapshots', async () => {

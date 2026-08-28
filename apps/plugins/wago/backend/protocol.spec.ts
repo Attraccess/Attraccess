@@ -1,7 +1,9 @@
 import {
   compatibilityError,
   configurationDesiredTopic,
+  configurationReportedHardwareId,
   configurationReportedTopic,
+  configurationReportedWildcardTopic,
   DISCOVERY_ROOT,
   discoveryTopic,
   heartbeatTopic,
@@ -31,6 +33,16 @@ describe('WAGO protocol', () => {
     expect(configurationReportedTopic('customer/wago', 'cc100-01')).toBe(
       'customer/wago/v1/controllers/cc100-01/configuration/reported',
     );
+    expect(configurationReportedWildcardTopic('customer/wago')).toBe(
+      'customer/wago/v1/controllers/+/configuration/reported',
+    );
+    expect(
+      configurationReportedHardwareId(
+        'customer/wago',
+        'customer/wago/v1/controllers/cc100-01/configuration/reported',
+      ),
+    ).toBe('cc100-01');
+    expect(configurationReportedHardwareId('customer/wago', 'customer/wago/v1/controllers/+/configuration/reported')).toBeNull();
   });
 
   it.each(['', '/', 'customer//wago', 'customer/+/wago', 'customer/#/wago'])(
