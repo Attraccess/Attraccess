@@ -111,6 +111,26 @@ describe('ResourceOperatingAttributionService', () => {
     expect(result.attributions).toHaveLength(2);
   });
 
+  it('sweeps interval endpoints without revisiting expired sessions', () => {
+    const intersection = jest.spyOn(
+      service as unknown as { intersection: (left: unknown, right: unknown) => unknown },
+      'intersection',
+    );
+    const operatingIntervals = Array.from({ length: 10 }, (_, index) => {
+      const minute = String(index + 10).padStart(2, '0');
+      return operating(index + 1, `10:${minute}:00`, `10:${String(index + 11).padStart(2, '0')}:00`);
+    });
+
+    const result = service.derive(
+      operatingIntervals,
+      [usage(1, '10:00:00', '11:00:00'), usage(2, '10:00:00', '10:05:00')],
+      asOf,
+    );
+
+    expect(result.attributions).toHaveLength(10);
+    expect(intersection).toHaveBeenCalledTimes(10);
+  });
+
   it('does not report overlap between operating intervals as unattributed', () => {
     const result = service.derive(
       [operating(1, '10:00:00', '11:00:00'), operating(2, '10:30:00', '11:30:00')],

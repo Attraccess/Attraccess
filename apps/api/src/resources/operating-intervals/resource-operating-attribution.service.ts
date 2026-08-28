@@ -28,6 +28,20 @@ interface TimeRange {
   endTime: Date;
 }
 
+interface OperatingRange {
+  interval: ResourceOperatingInterval;
+  range: TimeRange;
+}
+
+interface UsageRange {
+  usage: ResourceUsage;
+  range: TimeRange;
+}
+
+type SweepEvent =
+  | { type: 'operatingStart' | 'operatingEnd'; range: OperatingRange }
+  | { type: 'usageStart' | 'usageEnd'; range: UsageRange };
+
 @Injectable()
 export class ResourceOperatingAttributionService {
   constructor(
@@ -74,44 +88,70 @@ export class ResourceOperatingAttributionService {
     const attributedRanges: TimeRange[] = [];
     const operatingRanges = operatingIntervals
       .map((interval) => ({ interval, range: this.toRange(interval, asOf, windowStart) }))
-      .filter((entry): entry is { interval: ResourceOperatingInterval; range: TimeRange } => entry.range !== null)
-      .sort((left, right) => left.range.startTime.getTime() - right.range.startTime.getTime());
+      .filter((entry): entry is OperatingRange => entry.range !== null);
     const usageRanges = usages
       .filter((usage) => usage.usageAction === ResourceUsageAction.Usage)
       .map((usage) => ({ usage, range: this.toRange(usage, asOf, windowStart) }))
-      .filter((entry): entry is { usage: ResourceUsage; range: TimeRange } => entry.range !== null)
-      .sort((left, right) => left.range.startTime.getTime() - right.range.startTime.getTime());
-    let isProvisional = false;
-    let usageIndex = 0;
+      .filter((entry): entry is UsageRange => entry.range !== null);
+    const events: SweepEvent[] = [
+      ...operatingRanges.flatMap((range) => [
+        { type: 'operatingStart' as const, range },
+        { type: 'operatingEnd' as const, range },
+      ]),
+      ...usageRanges.flatMap((range) => [
+        { type: 'usageStart' as const, range },
+        { type: 'usageEnd' as const, range },
+      ]),
+    ].sort((left, right) => {
+      const leftTime = left.type.endsWith('Start') ? left.range.range.startTime : left.range.range.endTime;
+      const rightTime = right.type.endsWith('Start') ? right.range.range.startTime : right.range.range.endTime;
+      return (
+        leftTime.getTime() - rightTime.getTime() ||
+        Number(left.type.endsWith('Start')) - Number(right.type.endsWith('Start'))
+      );
+    });
+    const activeOperatingRanges = new Set<OperatingRange>();
+    const activeUsageRanges = new Set<UsageRange>();
+    let isProvisional = operatingRanges.some(({ interval }) => this.isOpenAt(interval, asOf));
 
-    for (const { interval: operatingInterval, range: operatingRange } of operatingRanges) {
-      isProvisional ||= this.isOpenAt(operatingInterval, asOf);
-
-      while (usageRanges[usageIndex]?.range.endTime <= operatingRange.startTime) {
-        usageIndex++;
+    const addAttribution = (operatingRange: OperatingRange, usageRange: UsageRange) => {
+      const intersection = this.intersection(operatingRange.range, usageRange.range);
+      if (!intersection) {
+        return;
       }
 
-      // Every range visited below produces an attribution, so work grows with the response size.
-      for (let index = usageIndex; index < usageRanges.length; index++) {
-        const { usage, range: usageRange } = usageRanges[index];
-        if (usageRange.startTime >= operatingRange.endTime) {
-          break;
-        }
-        const intersection = this.intersection(operatingRange, usageRange);
-        if (!intersection) {
-          continue;
-        }
+      const provisional = this.isOpenAt(operatingRange.interval, asOf) || this.isOpenAt(usageRange.usage, asOf);
+      attributions.push({
+        operatingIntervalId: operatingRange.interval.id,
+        usageId: usageRange.usage.id,
+        ...intersection,
+        durationMs: this.duration(intersection),
+        isProvisional: provisional,
+      });
+      attributedRanges.push(intersection);
+      isProvisional ||= provisional;
+    };
 
-        const provisional = this.isOpenAt(operatingInterval, asOf) || this.isOpenAt(usage, asOf);
-        attributions.push({
-          operatingIntervalId: operatingInterval.id,
-          usageId: usage.id,
-          ...intersection,
-          durationMs: this.duration(intersection),
-          isProvisional: provisional,
-        });
-        attributedRanges.push(intersection);
-        isProvisional ||= provisional;
+    for (const event of events) {
+      switch (event.type) {
+        case 'operatingStart':
+          for (const usageRange of activeUsageRanges) {
+            addAttribution(event.range, usageRange);
+          }
+          activeOperatingRanges.add(event.range);
+          break;
+        case 'operatingEnd':
+          activeOperatingRanges.delete(event.range);
+          break;
+        case 'usageStart':
+          for (const operatingRange of activeOperatingRanges) {
+            addAttribution(operatingRange, event.range);
+          }
+          activeUsageRanges.add(event.range);
+          break;
+        case 'usageEnd':
+          activeUsageRanges.delete(event.range);
+          break;
       }
     }
 
