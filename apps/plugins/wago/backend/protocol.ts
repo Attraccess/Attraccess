@@ -1,6 +1,7 @@
 export const DISCOVERY_ROOT = 'attraccess/wago/discovery';
 export const REQUIRED_CAPABILITIES = ['claim', 'heartbeat'] as const;
 export const SUPPORTED_PROTOCOL_MAJOR = 1;
+export const CONFIGURATION_PROTOCOL_VERSION = 1;
 
 export interface WagoAnnouncement {
   hardwareId: string;
@@ -60,4 +61,19 @@ export function discoveryTopic(hardwareId: string): string {
 }
 export function heartbeatTopic(hardwareId: string): string {
   return `attraccess/wago/controllers/${hardwareId}/heartbeat`;
+}
+
+export function configurationDesiredTopic(prefix: string, hardwareId: string): string {
+  return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${hardwareId}/configuration/desired`;
+}
+
+export function configurationReportedTopic(prefix: string, hardwareId: string): string {
+  return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${hardwareId}/configuration/reported`;
+}
+
+export function normalizeOperationalPrefix(prefix: string): string {
+  const normalized = prefix.trim().replace(/^\/+|\/+$/g, '');
+  if (!normalized || normalized.split('/').some((segment) => !segment || /[+#]/.test(segment)))
+    throw new Error('MQTT prefix must contain non-empty segments without wildcards');
+  return normalized;
 }

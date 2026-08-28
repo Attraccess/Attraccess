@@ -1,4 +1,12 @@
-import { compatibilityError, DISCOVERY_ROOT, discoveryTopic, heartbeatTopic, parseAnnouncement } from './protocol';
+import {
+  compatibilityError,
+  configurationDesiredTopic,
+  configurationReportedTopic,
+  DISCOVERY_ROOT,
+  discoveryTopic,
+  heartbeatTopic,
+  parseAnnouncement,
+} from './protocol';
 
 describe('WAGO protocol', () => {
   const valid = {
@@ -14,6 +22,15 @@ describe('WAGO protocol', () => {
     expect(parseAnnouncement(Buffer.from(JSON.stringify(valid)))).toEqual(valid);
     expect(discoveryTopic(valid.hardwareId)).toBe(`${DISCOVERY_ROOT}/cc100-01`);
     expect(heartbeatTopic(valid.hardwareId)).toBe('attraccess/wago/controllers/cc100-01/heartbeat');
+  });
+
+  it('uses a versioned configuration protocol below the configurable operational prefix', () => {
+    expect(configurationDesiredTopic('customer/wago/', 'cc100-01')).toBe(
+      'customer/wago/v1/controllers/cc100-01/configuration/desired',
+    );
+    expect(configurationReportedTopic('customer/wago', 'cc100-01')).toBe(
+      'customer/wago/v1/controllers/cc100-01/configuration/reported',
+    );
   });
 
   it.each([

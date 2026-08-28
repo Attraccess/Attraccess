@@ -3,6 +3,8 @@ import { WagoController } from './wago-controller.entity';
 import { WagoEnrollment } from './wago-enrollment.entity';
 import { WagoService } from './wago.service';
 import { WagoSettings } from './wago-settings.entity';
+import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
+import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 
 describe('WagoService', () => {
   const controller = (): WagoController => ({
@@ -48,10 +50,21 @@ describe('WagoService', () => {
       createQueryBuilder: jest.fn().mockReturnValue(enrollmentQuery),
     };
     const settingsRepository = {
-      findOneBy: jest.fn().mockResolvedValue({ id: 1, defaultMqttServerId }),
+      findOneBy: jest.fn().mockResolvedValue({ id: 1, defaultMqttServerId, operationalPrefix: 'attraccess/wago' }),
       save: jest.fn(),
       findOneByOrFail: jest.fn(),
       createQueryBuilder: jest.fn(),
+    };
+    const draftRepository = {
+      findOneBy: jest.fn().mockResolvedValue(null),
+      create: jest.fn((value) => value),
+      save: jest.fn().mockImplementation(async (value) => value),
+    };
+    const revisionRepository = {
+      find: jest.fn().mockResolvedValue([]),
+      findOneBy: jest.fn().mockResolvedValue(null),
+      create: jest.fn((value) => value),
+      save: jest.fn().mockImplementation(async (value) => value),
     };
     const settingsQuery = {
       insert: jest.fn().mockReturnThis(),
@@ -66,6 +79,8 @@ describe('WagoService', () => {
         if (entity === WagoController) return controllerRepository;
         if (entity === WagoEnrollment) return enrollmentRepository;
         if (entity === WagoSettings) return settingsRepository;
+        if (entity === WagoConfigurationDraft) return draftRepository;
+        if (entity === WagoConfigurationRevision) return revisionRepository;
         throw new Error('unexpected repository');
       }),
       logger: { warn: jest.fn() },
@@ -85,6 +100,8 @@ describe('WagoService', () => {
       enrollmentRepository,
       settingsRepository,
       settingsQuery,
+      draftRepository,
+      revisionRepository,
       context,
       subscriptions,
     };
@@ -102,10 +119,10 @@ describe('WagoService', () => {
   it('creates default settings when none have been persisted', async () => {
     const { service, settingsRepository, settingsQuery } = createService();
     settingsRepository.findOneBy.mockResolvedValue(null);
-    settingsRepository.findOneByOrFail.mockResolvedValue({ id: 1, defaultMqttServerId: null });
+    settingsRepository.findOneByOrFail.mockResolvedValue({ id: 1, defaultMqttServerId: null, operationalPrefix: 'attraccess/wago' });
 
-    await expect(service.getSettings()).resolves.toEqual({ id: 1, defaultMqttServerId: null });
-    expect(settingsQuery.values).toHaveBeenCalledWith({ id: 1, defaultMqttServerId: null });
+    await expect(service.getSettings()).resolves.toEqual({ id: 1, defaultMqttServerId: null, operationalPrefix: 'attraccess/wago' });
+    expect(settingsQuery.values).toHaveBeenCalledWith({ id: 1, defaultMqttServerId: null, operationalPrefix: 'attraccess/wago' });
     expect(settingsQuery.orIgnore).toHaveBeenCalled();
   });
 
@@ -113,10 +130,10 @@ describe('WagoService', () => {
     const { service, settingsRepository, settingsQuery } = createService();
     settingsRepository.findOneBy.mockResolvedValue(null);
     settingsQuery.execute.mockImplementation(async () => {
-      settingsRepository.findOneByOrFail.mockResolvedValue({ id: 1, defaultMqttServerId: 2 });
+      settingsRepository.findOneByOrFail.mockResolvedValue({ id: 1, defaultMqttServerId: 2, operationalPrefix: 'attraccess/wago' });
     });
 
-    await expect(service.getSettings()).resolves.toEqual({ id: 1, defaultMqttServerId: 2 });
+    await expect(service.getSettings()).resolves.toEqual({ id: 1, defaultMqttServerId: 2, operationalPrefix: 'attraccess/wago' });
     expect(settingsQuery.orIgnore).toHaveBeenCalled();
   });
 
@@ -148,6 +165,55 @@ describe('WagoService', () => {
     );
 
     expect(controllerRepository.save).toHaveBeenCalledWith(expect.objectContaining({ lastSequence: 4 }));
+  });
+
+  it('publishes a retained, content-addressed revision only after validation', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, draftRepository, revisionRepository, context } = createService([claimed]);
+    let draft: { controllerId: number; snapshot: string; reviewedHash: string | null; updatedAt: string } | null = null;
+    draftRepository.findOneBy.mockImplementation(async () => draft);
+    draftRepository.save.mockImplementation(async (value) => {
+      draft = value;
+      return value;
+    });
+
+    await service.saveDraft(claimed.id, { physicalPoints: [{ id: 'point-a' }], logicalChannels: [{ id: 'channel-a', physicalPointId: 'point-a' }] });
+    await service.reviewDraft(claimed.id);
+    const revision = await service.publishDraft(claimed.id);
+
+    expect(revision).toMatchObject({ revision: 1, state: 'published', contentHash: expect.stringMatching(/^[a-f0-9]{64}$/) });
+    expect(context.mqtt.publish).toHaveBeenCalledWith(
+      2,
+      'attraccess/wago/v1/controllers/cc100-01/configuration/desired',
+      expect.stringContaining('"revision":1'),
+      { qos: 1, retain: true },
+    );
+    expect(revisionRepository.save).toHaveBeenCalledWith(expect.objectContaining({ revision: 1 }));
+  });
+
+  it('records structured controller rejection without changing the published snapshot', async () => {
+    const { service, revisionRepository } = createService([{ ...controller(), trustState: 'claimed' as const }]);
+    const revision = {
+      id: 1,
+      controllerId: 1,
+      revision: 2,
+      snapshot: '{}',
+      contentHash: 'a'.repeat(64),
+      state: 'published' as const,
+      rejectionErrors: null,
+      publishedAt: '2026-01-01T00:00:00.000Z',
+      reportedAt: null,
+    };
+    revisionRepository.findOneBy.mockResolvedValue(revision);
+    const onConfigurationReported = (
+      Reflect.get(service, 'onConfigurationReported') as (controllerId: number, payload: Buffer) => Promise<void>
+    ).bind(service);
+
+    await onConfigurationReported(1, Buffer.from(JSON.stringify({ revision: 2, contentHash: revision.contentHash, errors: [{ path: 'logicalChannels[0]', code: 'unsupported_capability' }] })));
+
+    expect(revisionRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ state: 'rejected', rejectionErrors: expect.stringContaining('unsupported_capability') }),
+    );
   });
 
   it('serializes concurrent claims for the same controller', async () => {
