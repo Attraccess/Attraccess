@@ -6,7 +6,8 @@
     "updateFailed": "E-Mail konnte nicht aktualisiert werden"
   },
   "email": {
-    "label": "E-Mail"
+    "label": "Neue E-Mail-Adresse",
+    "privacyHint": "Die aktuelle E-Mail-Adresse wird zum Schutz der Privatsphäre dieses Benutzers nicht angezeigt."
   },
   "actions": {
     "save": "Speichern",

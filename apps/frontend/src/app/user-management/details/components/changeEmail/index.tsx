@@ -91,6 +91,7 @@ export function ChangeEmailForm({ userId, ...divProps }: Props & Omit<HTMLAttrib
           <Label>{t('email.label')}</Label>
           <Input type="email" />
         </TextField>
+        <p className="text-sm text-default-500">{t('email.privacyHint')}</p>
         <div className="flex w-full justify-end">
           <Button variant="primary" isPending={isPending} onPress={onSubmit} isDisabled={!isEmailValid || isPending}>
             {t('actions.save')}

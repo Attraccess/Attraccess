@@ -1,4 +1,9 @@
-import { ApiError, useUsersServiceChangeMyEmail, useUsersServiceGetCurrentKey } from '@attraccess/react-query-client';
+import {
+  ApiError,
+  useUsersServiceChangeMyEmail,
+  useUsersServiceGetCurrent,
+  useUsersServiceGetCurrentKey,
+} from '@attraccess/react-query-client';
 import {
   Alert,
   AlertContent,
@@ -24,6 +29,7 @@ import { StandardModal } from '../../../components/standardModal';
 export function EmailForm() {
   const { t } = useTranslations({ en, de });
 
+  const { data: me, isLoading: isLoadingMe } = useUsersServiceGetCurrent();
   const [email, setEmail] = useState('');
   const { isOpen, open, close } = useOverlayState();
   const queryClient = useQueryClient();
@@ -70,8 +76,12 @@ export function EmailForm() {
   return (
     <>
       <div className="flex flex-col gap-4">
+        <TextField value={me?.email ?? ''} isDisabled={isLoadingMe} isReadOnly>
+          <Label>{t('email.currentLabel')}</Label>
+          <Input type="email" />
+        </TextField>
         <TextField value={email} onChange={setEmail}>
-          <Label>{t('email.label')}</Label>
+          <Label>{t('email.newLabel')}</Label>
           <Input type="email" />
         </TextField>
         <Button variant="primary" isPending={isPending} onPress={onSubmit} isDisabled={!isEmailValid || isPending}>

@@ -6,7 +6,8 @@
     "updateFailed": "E-Mail konnte nicht aktualisiert werden"
   },
   "email": {
-    "label": "E-Mail"
+    "currentLabel": "Aktuelle E-Mail-Adresse",
+    "newLabel": "Neue E-Mail-Adresse"
   },
   "actions": {
     "save": "Speichern",
