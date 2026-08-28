@@ -30,3 +30,7 @@ runs:
         cd apps/attractap/firmware
         python3 build_firmwares.py
       shell: bash
+
+    - name: Copy firmware into API assets
+      run: node apps/api/copy-attractap-firmware-into-assets.js
+      shell: bash

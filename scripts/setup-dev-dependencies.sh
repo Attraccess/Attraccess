@@ -274,12 +274,15 @@ main() {
     fi
     echo ""
 
+    # Python is also required by node-gyp when native module prebuilds are unavailable.
+    if ! check_python; then
+        install_python
+    fi
+    echo ""
+
     # ESP-IDF is only needed for Attractap firmware work. Keeping it opt-in
     # avoids a large toolchain install for routine API/frontend worktrees.
     if [[ "$INSTALL_ESP_IDF" == "true" ]]; then
-        if ! check_python; then
-            install_python
-        fi
         if ! check_esp_idf; then
             install_esp_idf
         fi
