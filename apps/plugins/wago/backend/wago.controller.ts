@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Param, ParseIntPipe, Post } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { WagoService } from './wago.service';
 
@@ -13,7 +13,7 @@ export class WagoControllerApi {
     return this.wago.getSettings();
   }
   @Post('settings') setSettings(@Body() body: { defaultMqttServerId?: number | null; operationalPrefix?: string }) {
-    return this.wago.setSettings(body?.defaultMqttServerId ?? null, body?.operationalPrefix);
+    return this.wago.setSettings(body?.defaultMqttServerId, body?.operationalPrefix);
   }
   @Post('enrollments') enrollment(
     @Body() body: { hardwareId?: string; mqttServerId?: number; manualUsername?: string; manualPassword?: string },
@@ -45,8 +45,12 @@ export class WagoControllerApi {
   @Post('controllers/:id/configuration/review') reviewDraft(@Param('id', ParseIntPipe) id: number) {
     return this.wago.reviewDraft(id);
   }
-  @Get('controllers/:id/configuration/revisions') revisions(@Param('id', ParseIntPipe) id: number) {
-    return this.wago.revisionsFor(id);
+  @Get('controllers/:id/configuration/revisions') revisions(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('offset') offset?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.wago.revisionsFor(id, Number(offset), Number(limit));
   }
   @Post('controllers/:id/configuration/publish') publishDraft(@Param('id', ParseIntPipe) id: number) {
     return this.wago.publishDraft(id);

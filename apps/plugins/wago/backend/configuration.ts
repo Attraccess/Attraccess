@@ -46,12 +46,45 @@ export function validateSnapshot(snapshot: unknown): ConfigurationValidationErro
   validateCollection(value.logicalChannels, 'logicalChannels', errors);
   validateCollection(value.localPolicies, 'localPolicies', errors);
 
+  if (Array.isArray(value.physicalPoints)) {
+    value.physicalPoints.forEach((point, index) => {
+      if (!point || typeof point !== 'object' || point.hardwareProfileId === undefined) return;
+      if (typeof point.hardwareProfileId !== 'string' || !point.hardwareProfileId.trim()) {
+        errors.push({
+          path: `physicalPoints[${index}].hardwareProfileId`,
+          code: 'invalid_reference',
+          message: 'hardwareProfileId must be a non-empty string',
+        });
+      } else if (!hardwareProfiles.has(point.hardwareProfileId)) {
+        errors.push(referenceError(`physicalPoints[${index}].hardwareProfileId`, 'hardware profile', point.hardwareProfileId));
+      }
+    });
+  }
+
   logicalChannels.forEach((channel, index) => {
     if (!channel || typeof channel !== 'object') return;
-    if (channel.physicalPointId && !physicalPoints.has(channel.physicalPointId))
-      errors.push(referenceError(`logicalChannels[${index}].physicalPointId`, 'physical point', channel.physicalPointId));
-    if (channel.hardwareProfileId && !hardwareProfiles.has(channel.hardwareProfileId))
-      errors.push(referenceError(`logicalChannels[${index}].hardwareProfileId`, 'hardware profile', channel.hardwareProfileId));
+    if (channel.physicalPointId !== undefined) {
+      if (typeof channel.physicalPointId !== 'string' || !channel.physicalPointId.trim()) {
+        errors.push({
+          path: `logicalChannels[${index}].physicalPointId`,
+          code: 'invalid_reference',
+          message: 'physicalPointId must be a non-empty string',
+        });
+      } else if (!physicalPoints.has(channel.physicalPointId)) {
+        errors.push(referenceError(`logicalChannels[${index}].physicalPointId`, 'physical point', channel.physicalPointId));
+      }
+    }
+    if (channel.hardwareProfileId !== undefined) {
+      if (typeof channel.hardwareProfileId !== 'string' || !channel.hardwareProfileId.trim()) {
+        errors.push({
+          path: `logicalChannels[${index}].hardwareProfileId`,
+          code: 'invalid_reference',
+          message: 'hardwareProfileId must be a non-empty string',
+        });
+      } else if (!hardwareProfiles.has(channel.hardwareProfileId)) {
+        errors.push(referenceError(`logicalChannels[${index}].hardwareProfileId`, 'hardware profile', channel.hardwareProfileId));
+      }
+    }
     if (channel.capabilities && (!Array.isArray(channel.capabilities) || channel.capabilities.some((item) => typeof item !== 'string' || !item)))
       errors.push({ path: `logicalChannels[${index}].capabilities`, code: 'invalid_capabilities', message: 'capabilities must be non-empty strings' });
     if (channel.policy !== undefined && (!channel.policy || typeof channel.policy !== 'object' || Array.isArray(channel.policy)))

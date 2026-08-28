@@ -137,6 +137,16 @@ describe('WagoService', () => {
     expect(settingsQuery.orIgnore).toHaveBeenCalled();
   });
 
+  it('preserves the MQTT server during a prefix-only settings update', async () => {
+    const { service, settingsRepository } = createService([], [], 2);
+
+    await service.setSettings(undefined, 'customer/wago');
+
+    expect(settingsRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ defaultMqttServerId: 2, operationalPrefix: 'customer/wago' }),
+    );
+  });
+
   it('requires a non-empty matching fingerprint', () => {
     const { service } = createService();
     const matchesVerifier = Reflect.get(service, 'matchesVerifier') as (item: WagoController, value: string) => boolean;
@@ -213,6 +223,20 @@ describe('WagoService', () => {
 
     expect(revisionRepository.save).toHaveBeenCalledWith(
       expect.objectContaining({ state: 'rejected', rejectionErrors: expect.stringContaining('unsupported_capability') }),
+    );
+  });
+
+  it('returns bounded revision metadata pages without snapshots', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, revisionRepository } = createService([claimed]);
+
+    await expect(service.revisionsFor(claimed.id, 5, 200)).resolves.toEqual({ revisions: [], offset: 5, limit: 100 });
+    expect(revisionRepository.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 5,
+        take: 100,
+        select: expect.not.arrayContaining(['snapshot']),
+      }),
     );
   });
 

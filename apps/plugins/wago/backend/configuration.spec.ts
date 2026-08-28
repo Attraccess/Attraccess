@@ -21,4 +21,17 @@ describe('WAGO configuration snapshots', () => {
       expect.objectContaining({ path: 'logicalChannels[1].hardwareProfileId', code: 'missing_reference' }),
     ]);
   });
+
+  it('validates physical point profile references and empty channel references', () => {
+    expect(
+      validateSnapshot({
+        physicalPoints: [{ id: 'point-a', hardwareProfileId: 'missing-profile' }],
+        logicalChannels: [{ id: 'channel-a', physicalPointId: '' }, { id: 'channel-b', hardwareProfileId: false }],
+      }),
+    ).toEqual([
+      expect.objectContaining({ path: 'physicalPoints[0].hardwareProfileId', code: 'missing_reference' }),
+      expect.objectContaining({ path: 'logicalChannels[0].physicalPointId', code: 'invalid_reference' }),
+      expect.objectContaining({ path: 'logicalChannels[1].hardwareProfileId', code: 'invalid_reference' }),
+    ]);
+  });
 });

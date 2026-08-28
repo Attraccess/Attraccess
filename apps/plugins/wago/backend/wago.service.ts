@@ -45,6 +45,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   private readonly enrollmentExpiryTimers = new Map<number, ReturnType<typeof setTimeout>>();
   private readonly claimLocks = new Map<number, Promise<void>>();
   private readonly configurationLocks = new Map<number, Promise<void>>();
+  private claimConfigurationLock = Promise.resolve();
   private subscriptionRebuild = Promise.resolve();
   private subscriptionRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private activeSubscriptionGeneration = 0;
@@ -108,21 +109,25 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     return this.settings.findOneByOrFail({ id: 1 });
   }
 
-  async setSettings(serverId: number | null, operationalPrefix?: string): Promise<WagoSettings> {
-    if (serverId !== null && !(await this.context.getMqttServerConfig(serverId)))
+  async setSettings(serverId?: number | null, operationalPrefix?: string): Promise<WagoSettings> {
+    if (serverId !== undefined && serverId !== null && !(await this.context.getMqttServerConfig(serverId)))
       throw new NotFoundException(`MQTT server ${serverId} not found`);
-    const settings = await this.getSettings();
-    settings.defaultMqttServerId = serverId;
-    if (operationalPrefix !== undefined) {
-      const normalizedPrefix = normalizeOperationalPrefix(operationalPrefix);
-      if (normalizedPrefix !== settings.operationalPrefix) {
-        const controllers = await this.controllers.find({ where: { trustState: 'claimed' } });
-        if (controllers.length)
-          throw new ConflictException('operational MQTT prefix cannot change after a controller has been claimed');
-        settings.operationalPrefix = normalizedPrefix;
+    const save = async (): Promise<WagoSettings> => {
+      const settings = await this.getSettings();
+      if (serverId !== undefined) settings.defaultMqttServerId = serverId;
+      if (operationalPrefix !== undefined) {
+        const normalizedPrefix = normalizeOperationalPrefix(operationalPrefix);
+        if (normalizedPrefix !== settings.operationalPrefix) {
+          const controllers = await this.controllers.find({ where: { trustState: 'claimed' } });
+          if (controllers.length)
+            throw new ConflictException('operational MQTT prefix cannot change after a controller has been claimed');
+          settings.operationalPrefix = normalizedPrefix;
+        }
       }
-    }
-    await this.settings.save(settings);
+      await this.settings.save(settings);
+      return settings;
+    };
+    const settings = operationalPrefix === undefined ? await save() : await this.withClaimConfigurationLock(save);
     await this.subscribeConfiguredServers();
     return settings;
   }
@@ -137,6 +142,61 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   }
 
   async saveDraft(controllerId: number, snapshot: unknown): Promise<WagoConfigurationDraft> {
+    return this.withConfigurationLock(controllerId, () => this.saveDraftWhileLocked(controllerId, snapshot));
+  }
+
+  async validateDraft(controllerId: number): Promise<{ valid: boolean; errors: ConfigurationValidationError[] }> {
+    const draft = await this.getDraft(controllerId);
+    if (!draft) throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
+    const errors = validateSnapshot(JSON.parse(draft.snapshot));
+    return { valid: errors.length === 0, errors };
+  }
+
+  async revisionsFor(
+    controllerId: number,
+    offset = 0,
+    limit = 20,
+  ): Promise<{ revisions: Array<Omit<WagoConfigurationRevision, 'snapshot'>>; offset: number; limit: number }> {
+    await this.claimedController(controllerId);
+    const pageOffset = Number.isSafeInteger(offset) && offset > 0 ? offset : 0;
+    const pageLimit = Number.isSafeInteger(limit) && limit > 0 ? Math.min(limit, 100) : 20;
+    const revisions = await this.revisions.find({
+      where: { controllerId },
+      order: { revision: 'DESC' },
+      select: ['id', 'controllerId', 'revision', 'contentHash', 'state', 'rejectionErrors', 'publishedAt', 'reportedAt'],
+      skip: pageOffset,
+      take: pageLimit,
+    });
+    return { revisions, offset: pageOffset, limit: pageLimit };
+  }
+
+  async reviewDraft(controllerId: number): Promise<{ draft: WagoConfigurationDraft; previous: WagoConfigurationRevision | null; changed: boolean }> {
+    return this.withConfigurationLock(controllerId, () => this.reviewDraftWhileLocked(controllerId));
+  }
+
+  async publishDraft(controllerId: number): Promise<WagoConfigurationRevision> {
+    return this.withConfigurationLock(controllerId, () => this.publishDraftWhileLocked(controllerId));
+  }
+
+  async rollback(controllerId: number, revision: number): Promise<WagoConfigurationRevision> {
+    return this.withConfigurationLock(controllerId, async () => {
+      const source = await this.revisions.findOneBy({ controllerId, revision });
+      if (!source) throw new NotFoundException(`WAGO configuration revision ${revision} not found`);
+      await this.saveDraftWhileLocked(controllerId, JSON.parse(source.snapshot));
+      await this.reviewDraftWhileLocked(controllerId);
+      return this.publishDraftWhileLocked(controllerId);
+    });
+  }
+
+  async previewRevision(controllerId: number, revision: number): Promise<{ revision: WagoConfigurationRevision; current: WagoConfigurationRevision | null }> {
+    await this.claimedController(controllerId);
+    const selected = await this.revisions.findOneBy({ controllerId, revision });
+    if (!selected) throw new NotFoundException(`WAGO configuration revision ${revision} not found`);
+    const [current] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
+    return { revision: selected, current: current ?? null };
+  }
+
+  private async saveDraftWhileLocked(controllerId: number, snapshot: unknown): Promise<WagoConfigurationDraft> {
     await this.claimedController(controllerId);
     const serialized = canonicalSnapshot(snapshot);
     const existing = await this.drafts.findOneBy({ controllerId });
@@ -147,67 +207,45 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     return this.drafts.save(draft);
   }
 
-  async validateDraft(controllerId: number): Promise<{ valid: boolean; errors: ConfigurationValidationError[] }> {
-    const draft = await this.getDraft(controllerId);
-    if (!draft) throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
-    const errors = validateSnapshot(JSON.parse(draft.snapshot));
-    return { valid: errors.length === 0, errors };
-  }
-
-  async revisionsFor(controllerId: number): Promise<WagoConfigurationRevision[]> {
+  private async reviewDraftWhileLocked(
+    controllerId: number,
+  ): Promise<{ draft: WagoConfigurationDraft; previous: WagoConfigurationRevision | null; changed: boolean }> {
     await this.claimedController(controllerId);
-    return this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' } });
-  }
-
-  async reviewDraft(controllerId: number): Promise<{ draft: WagoConfigurationDraft; previous: WagoConfigurationRevision | null; changed: boolean }> {
-    const draft = await this.getDraft(controllerId);
+    const draft = await this.drafts.findOneBy({ controllerId });
     if (!draft) throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
-    const [previous] = await this.revisionsFor(controllerId);
+    const previous = await this.latestRevision(controllerId);
     draft.reviewedHash = configurationHash(JSON.parse(draft.snapshot));
     await this.drafts.save(draft);
-    return { draft, previous: previous ?? null, changed: !previous || previous.snapshot !== draft.snapshot };
+    return { draft, previous, changed: !previous || previous.snapshot !== draft.snapshot };
   }
 
-  async publishDraft(controllerId: number): Promise<WagoConfigurationRevision> {
-    return this.withConfigurationLock(controllerId, async () => {
-      const controller = await this.claimedController(controllerId);
-      const draft = await this.drafts.findOneBy({ controllerId });
-      if (!draft) throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
-      const validation = validateSnapshot(JSON.parse(draft.snapshot));
-      if (validation.length) throw new ConflictException({ message: 'configuration draft is invalid', errors: validation });
-      const contentHash = configurationHash(JSON.parse(draft.snapshot));
-      if (draft.reviewedHash !== contentHash) throw new ConflictException('review the current configuration draft before publishing it');
-      const [previous] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
-      if (previous?.state === 'pending') return this.publishRevision(controller, previous);
-      const revision = this.revisions.create({
-        controllerId,
-        revision: (previous?.revision ?? 0) + 1,
-        snapshot: draft.snapshot,
-        contentHash,
-        state: 'pending',
-        rejectionErrors: null,
-        publishedAt: new Date().toISOString(),
-        reportedAt: null,
-      });
-      const saved = await this.revisions.save(revision);
-      return this.publishRevision(controller, saved);
+  private async publishDraftWhileLocked(controllerId: number): Promise<WagoConfigurationRevision> {
+    const controller = await this.claimedController(controllerId);
+    const draft = await this.drafts.findOneBy({ controllerId });
+    if (!draft) throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
+    const validation = validateSnapshot(JSON.parse(draft.snapshot));
+    if (validation.length) throw new ConflictException({ message: 'configuration draft is invalid', errors: validation });
+    const contentHash = configurationHash(JSON.parse(draft.snapshot));
+    if (draft.reviewedHash !== contentHash) throw new ConflictException('review the current configuration draft before publishing it');
+    const previous = await this.latestRevision(controllerId);
+    if (previous?.state === 'pending' && previous.contentHash === contentHash)
+      return this.publishRevision(controller, previous);
+    const revision = this.revisions.create({
+      controllerId,
+      revision: (previous?.revision ?? 0) + 1,
+      snapshot: draft.snapshot,
+      contentHash,
+      state: 'pending',
+      rejectionErrors: null,
+      publishedAt: new Date().toISOString(),
+      reportedAt: null,
     });
+    return this.publishRevision(controller, await this.revisions.save(revision));
   }
 
-  async rollback(controllerId: number, revision: number): Promise<WagoConfigurationRevision> {
-    const source = await this.revisions.findOneBy({ controllerId, revision });
-    if (!source) throw new NotFoundException(`WAGO configuration revision ${revision} not found`);
-    await this.saveDraft(controllerId, JSON.parse(source.snapshot));
-    await this.reviewDraft(controllerId);
-    return this.publishDraft(controllerId);
-  }
-
-  async previewRevision(controllerId: number, revision: number): Promise<{ revision: WagoConfigurationRevision; current: WagoConfigurationRevision | null }> {
-    await this.claimedController(controllerId);
-    const selected = await this.revisions.findOneBy({ controllerId, revision });
-    if (!selected) throw new NotFoundException(`WAGO configuration revision ${revision} not found`);
-    const [current] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
-    return { revision: selected, current: current ?? null };
+  private async latestRevision(controllerId: number): Promise<WagoConfigurationRevision | null> {
+    const [revision] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
+    return revision ?? null;
   }
 
   async createEnrollment(
@@ -280,7 +318,9 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   }
 
   async claim(id: number, name: string, verifier: string, mqttServerId?: number): Promise<WagoController> {
-    return this.withClaimLock(id, () => this.claimController(id, name, verifier, mqttServerId));
+    return this.withClaimLock(id, () =>
+      this.withClaimConfigurationLock(() => this.claimController(id, name, verifier, mqttServerId)),
+    );
   }
 
   private async claimController(
@@ -665,6 +705,21 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     } finally {
       release();
       if (this.claimLocks.get(id) === lock) this.claimLocks.delete(id);
+    }
+  }
+  private async withClaimConfigurationLock<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = this.claimConfigurationLock;
+    let release!: () => void;
+    const lock = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.claimConfigurationLock = lock;
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (this.claimConfigurationLock === lock) this.claimConfigurationLock = Promise.resolve();
     }
   }
   private async claimedController(id: number): Promise<WagoController> {
