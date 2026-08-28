@@ -20,6 +20,13 @@ void Application::handleFormsRequest(
   this->formCursorOffset = 0;
   this->clearFormPageCache();
   this->awaitingFieldRender = false;
+  // List actions normally stay on the resource list. A required form needs the
+  // existing details-screen modal, so reveal it only when the server requests one.
+  if (this->state == APPLICATION_STATE_RESOURCE_LIST) {
+    this->resourceIsSelected = true;
+    this->state = APPLICATION_STATE_UNLOCKED;
+    Display::transitionToScreen(&Display::resourceDetailsScreen);
+  }
   Display::resourceDetailsScreen.hideActionProgress();
   Display::resourceDetailsScreen.showFormsModal(this->pendingFormRequest);
   this->requestCurrentFormField();

@@ -246,7 +246,7 @@ private:
 #else
     bool resourceIsDoor = false;
 #endif
-    uint32_t selectedResourceId;
+    uint32_t selectedResourceId = 0;
 
 #ifndef HAS_LVGL_DISPLAY
     bool cardDetected = false;
@@ -319,6 +319,7 @@ private:
     void prefetchNextFormField();
 
     void selectResource(const API::ResourceBrief &resource);
+    void handleResourceListAction(const API::ResourceBrief &resource);
 
     void requestProjectsPage(uint32_t page);
     void clearProjectSelection();

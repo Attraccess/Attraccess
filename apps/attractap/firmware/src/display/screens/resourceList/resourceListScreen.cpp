@@ -66,21 +66,36 @@ void ResourceListScreen::setResourceList(const API::ResourceList &resourceList)
    }
 }
 
+void ResourceListScreen::setAuthenticated(bool authenticated)
+{
+   if (this->authenticated == authenticated)
+   {
+      return;
+   }
+   this->authenticated = authenticated;
+   if (this->hasCachedResourceList)
+   {
+      this->setResourceList(this->cachedResourceList);
+   }
+}
+
 void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
 {
-   lv_obj_t *resourceButton = lv_button_create(this->resourceContainer);
+    lv_obj_t *resourceButton = this->authenticated
+                                    ? lv_obj_create(this->resourceContainer)
+                                    : lv_button_create(this->resourceContainer);
    lv_obj_set_width(resourceButton, lv_pct(100));
    lv_obj_set_height(resourceButton, LV_SIZE_CONTENT);
    // lv_obj_set_x(resourceButton, -18);
    // lv_obj_set_y(resourceButton, 24);
    lv_obj_set_align(resourceButton, LV_ALIGN_CENTER);
-   lv_obj_set_flex_flow(resourceButton, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_flow(resourceButton, this->authenticated ? LV_FLEX_FLOW_ROW : LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(resourceButton, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
    lv_obj_add_flag(resourceButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(resourceButton, LV_OBJ_FLAG_SCROLLABLE);
 
    lv_obj_set_style_border_opa(resourceButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_border_width(resourceButton, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(resourceButton, this->authenticated ? 0 : 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_border_side(resourceButton, LV_BORDER_SIDE_RIGHT, LV_PART_MAIN | LV_STATE_DEFAULT);
    // Status priority mirrors the web resource list: in use > maintenance > available.
    if (resource.hasActiveUsage)
@@ -96,7 +111,32 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
       lv_obj_set_style_border_color(resourceButton, lv_color_hex(0x00FF00), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 
-   lv_obj_t *resourceNameLabel = lv_label_create(resourceButton);
+    lv_obj_t *detailsButton = resourceButton;
+    if (this->authenticated)
+    {
+       detailsButton = lv_button_create(resourceButton);
+       lv_obj_set_width(detailsButton, lv_pct(68));
+       lv_obj_set_height(detailsButton, lv_pct(100));
+       lv_obj_set_flex_flow(detailsButton, LV_FLEX_FLOW_COLUMN);
+       lv_obj_set_flex_align(detailsButton, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+
+       lv_obj_t *actionButton = lv_button_create(resourceButton);
+       lv_obj_set_width(actionButton, lv_pct(32));
+       lv_obj_set_height(actionButton, lv_pct(100));
+       lv_obj_set_style_bg_color(actionButton,
+                                  lv_color_hex(resource.hasActiveUsage ? 0xF31260 : 0x17C964),
+                                  LV_PART_MAIN | LV_STATE_DEFAULT);
+       lv_obj_t *actionLabel = lv_label_create(actionButton);
+       lv_obj_center(actionLabel);
+       lv_label_set_text(actionLabel, resource.hasActiveUsage ? "Stop" : "Start");
+       lv_obj_set_style_text_font(actionLabel, &lv_font_montserrat_20, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+       ResourceEventData *actionEvent = new ResourceEventData{this, resource, false};
+       lv_obj_add_event_cb(actionButton, &ResourceListScreen::onResourceClicked, LV_EVENT_CLICKED, actionEvent);
+       lv_obj_add_event_cb(actionButton, &ResourceListScreen::onContainerDelete, LV_EVENT_DELETE, actionEvent);
+    }
+
+    lv_obj_t *resourceNameLabel = lv_label_create(detailsButton);
    lv_obj_set_width(resourceNameLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(resourceNameLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(resourceNameLabel, LV_ALIGN_CENTER);
@@ -110,7 +150,7 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
    lv_obj_set_style_max_width(resourceNameLabel, 370, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_label_set_long_mode(resourceNameLabel, LV_LABEL_LONG_SCROLL);
 
-   lv_obj_t *resourceDescriptionContainer = lv_label_create(resourceButton);
+    lv_obj_t *resourceDescriptionContainer = lv_label_create(detailsButton);
    lv_obj_set_height(resourceDescriptionContainer, 14);
    lv_obj_set_width(resourceDescriptionContainer, LV_SIZE_CONTENT);
    lv_obj_set_align(resourceDescriptionContainer, LV_ALIGN_CENTER);
@@ -125,9 +165,12 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
    lv_label_set_long_mode(resourceDescriptionContainer, LV_LABEL_LONG_DOT);
 
    // Prepare event data with a copy of the resource brief (small fixed struct)
-   ResourceEventData *evt = new ResourceEventData{this, resourceButton, resource};
-   lv_obj_add_event_cb(resourceButton, &ResourceListScreen::onResourceClicked, LV_EVENT_CLICKED, evt);
-   lv_obj_add_event_cb(resourceButton, &ResourceListScreen::onContainerDelete, LV_EVENT_DELETE, evt);
+    if (this->authenticated)
+    {
+       ResourceEventData *detailsEvent = new ResourceEventData{this, resource, true};
+       lv_obj_add_event_cb(detailsButton, &ResourceListScreen::onResourceClicked, LV_EVENT_CLICKED, detailsEvent);
+       lv_obj_add_event_cb(detailsButton, &ResourceListScreen::onContainerDelete, LV_EVENT_DELETE, detailsEvent);
+    }
 }
 
 void ResourceListScreen::setNoResourcesMessage()
@@ -151,9 +194,14 @@ void ResourceListScreen::loop()
    // nothing to do
 }
 
-void ResourceListScreen::setResourceSelectionCallback(std::function<void(const API::ResourceBrief &)> callback)
+void ResourceListScreen::setResourceDetailsCallback(std::function<void(const API::ResourceBrief &)> callback)
 {
-   this->resourceSelectionCallback = callback;
+    this->resourceDetailsCallback = callback;
+}
+
+void ResourceListScreen::setResourceActionCallback(std::function<void(const API::ResourceBrief &)> callback)
+{
+    this->resourceActionCallback = callback;
 }
 
 void ResourceListScreen::onResourceClicked(lv_event_t *e)
@@ -168,11 +216,16 @@ void ResourceListScreen::onResourceClicked(lv_event_t *e)
       if (!evt->self)
          return;
 
-      if (evt->self->resourceSelectionCallback)
-      {
-         evt->self->logger.infof("Resource selected: %s", evt->resource.name);
-         evt->self->resourceSelectionCallback(evt->resource);
-      }
+       if (evt->opensDetails && evt->self->resourceDetailsCallback)
+       {
+          evt->self->logger.infof("Opening resource details: %s", evt->resource.name);
+          evt->self->resourceDetailsCallback(evt->resource);
+       }
+       else if (!evt->opensDetails && evt->self->resourceActionCallback)
+       {
+          evt->self->logger.infof("Starting or stopping resource: %s", evt->resource.name);
+          evt->self->resourceActionCallback(evt->resource);
+       }
    }
 }
 

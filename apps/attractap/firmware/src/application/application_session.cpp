@@ -59,11 +59,50 @@ void Application::handleResourceListUpdate(
 }
 
 void Application::selectResource(const API::ResourceBrief &resource) {
-  this->logger.infof("Resource selected: %s", resource.name);
+  this->logger.infof("Opening resource details: %s", resource.name);
   this->resourceIsSelected = true;
   this->selectedResourceId = resource.id;
   this->restartResourceSelectionTimeout();
   this->selectedResourceChanged = true;
+  this->state = APPLICATION_STATE_UNLOCKED;
+  this->restartSessionTimeout();
+  Display::resourceDetailsScreen.setResourceAndUsageDetails(resource);
+  Display::transitionToScreen(&Display::resourceDetailsScreen);
+}
+
+void Application::handleResourceListAction(const API::ResourceBrief &resource) {
+  if (!this->unlocked || this->actionInProgressCount > 0) {
+    return;
+  }
+
+  // A list action operates on the row that was tapped, not a pre-selected resource.
+  this->selectedResourceId = resource.id;
+  this->resourceIsSelected = false;
+  Display::resourceDetailsScreen.setResourceAndUsageDetails(resource);
+  this->pendingActionResourceId = resource.id;
+  this->pendingActionProjectId = 0;
+  this->hasPendingFormRequest = false;
+  this->formFlowSubmitted = false;
+  if (resource.hasActiveUsage) {
+    this->beginActionPause();
+    this->logger.infof("Stopping resource from list: %s", resource.name);
+    this->pendingActionType = PENDING_ACTION_STOP_SESSION;
+    this->api.stopResourceUsageSession(resource.id);
+    return;
+  }
+
+  if (this->cardAuthenticationData.requiresSupervisor) {
+    this->supervision.beginReaderInitiated(this->cardAuthenticationData.username,
+                                           resource.id);
+    this->state = APPLICATION_STATE_SUPERVISION;
+    this->externalState = EXTERNAL_STATE_NONE;
+    return;
+  }
+
+  this->beginActionPause();
+  this->logger.infof("Starting resource from list: %s", resource.name);
+  this->pendingActionType = PENDING_ACTION_START_SESSION;
+  this->api.startResourceUsageSession(resource.id);
 }
 
 void Application::requestProjectsPage(uint32_t page) {
@@ -190,10 +229,9 @@ void Application::handleResourceDetailsButtonClick(
     this->api.triggerFlowButton(this->selectedResourceId, evt.flowButtonId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOGOUT:
-    if (this->resourceCount > 1) {
-      this->resourceIsSelected = false;
-    }
+    this->resourceIsSelected = false;
     this->unlocked = false;
+    this->selectedResourceId = 0;
     this->currentProjectsUser = "";
     this->clearProjectSelection();
     this->pendingActionType = PENDING_ACTION_NONE;

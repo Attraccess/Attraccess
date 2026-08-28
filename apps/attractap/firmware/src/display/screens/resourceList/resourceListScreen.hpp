@@ -22,7 +22,9 @@ public:
     void destroy() override;
 
     void setResourceList(const API::ResourceList &resourceList);
-    void setResourceSelectionCallback(std::function<void(const API::ResourceBrief &)> callback);
+    void setAuthenticated(bool authenticated);
+    void setResourceDetailsCallback(std::function<void(const API::ResourceBrief &)> callback);
+    void setResourceActionCallback(std::function<void(const API::ResourceBrief &)> callback);
 
 private:
     Logger logger;
@@ -30,16 +32,18 @@ private:
     lv_obj_t *resourceContainer = nullptr;
     API::ResourceList cachedResourceList{};
     bool hasCachedResourceList = false;
+    bool authenticated = false;
 
-    std::function<void(const API::ResourceBrief &)> resourceSelectionCallback;
+    std::function<void(const API::ResourceBrief &)> resourceDetailsCallback;
+    std::function<void(const API::ResourceBrief &)> resourceActionCallback;
     void addResourceListItem(const API::ResourceBrief &resource);
     void setNoResourcesMessage();
     static void onResourceClicked(lv_event_t *e);
     struct ResourceEventData
     {
         ResourceListScreen *self;
-        lv_obj_t *container;
         API::ResourceBrief resource;
+        bool opensDetails;
     };
     static void onContainerDelete(lv_event_t *e);
 };
