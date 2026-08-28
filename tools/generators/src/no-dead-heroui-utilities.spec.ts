@@ -101,6 +101,12 @@ const BASELINE = new Map(
     'border-primary-500',
     'ring-primary-300',
     'dark:ring-primary-700',
+    'border-primary',
+    'ring-primary/60',
+    'bg-default-300',
+    'ring-default-300/30',
+    'bg-opacity-75',
+    'hover:ring-primary-300',
   ].map((className) => [className, 'HeroUI v2 utility; replace with a deliberate v3 token.']),
 );
 
@@ -128,33 +134,82 @@ function customClasses(dir: string, classes = new Set<string>()): Set<string> {
 }
 
 function addClassTokens(node: any, classes: Set<string>): void {
-  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+  if (
+    ts.isStringLiteral(node) ||
+    ts.isNoSubstitutionTemplateLiteral(node) ||
+    ts.isTemplateHead(node) ||
+    ts.isTemplateMiddle(node) ||
+    ts.isTemplateTail(node)
+  ) {
     for (const token of node.text.split(/\s+/)) if (token) classes.add(token);
   }
 }
 
-function classExpression(node: any, classes: Set<string>, literalClassInitializers: Map<string, any>): void {
+function isLiteralClassExpression(node: any): boolean {
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateExpression(node)) return true;
+  if (ts.isParenthesizedExpression(node)) return isLiteralClassExpression(node.expression);
+  if (ts.isConditionalExpression(node))
+    return isLiteralClassExpression(node.whenTrue) && isLiteralClassExpression(node.whenFalse);
+  if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken)
+    return isLiteralClassExpression(node.right);
+  return false;
+}
+
+function localConstInitializer(identifier: any): any {
+  for (let scope = identifier.parent; scope; scope = scope.parent) {
+    if (!ts.isSourceFile(scope) && !ts.isBlock(scope) && !ts.isModuleBlock(scope)) continue;
+    for (const statement of scope.statements) {
+      if (!ts.isVariableStatement(statement)) continue;
+      const declarations = statement.declarationList;
+      if ((declarations.flags & ts.NodeFlags.Const) === 0) continue;
+      for (const declaration of declarations.declarations) {
+        if (
+          ts.isIdentifier(declaration.name) &&
+          declaration.name.text === identifier.text &&
+          declaration.initializer &&
+          isLiteralClassExpression(declaration.initializer)
+        )
+          return declaration.initializer;
+      }
+    }
+  }
+}
+
+function classExpression(node: any, classes: Set<string>, seen = new Set<any>()): void {
+  if (seen.has(node)) return;
+  seen.add(node);
   if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return addClassTokens(node, classes);
   if (ts.isIdentifier(node)) {
-    const initializer = literalClassInitializers.get(node.text);
-    if (initializer) return addClassTokens(initializer, classes);
+    const initializer = localConstInitializer(node);
+    if (initializer) return classExpression(initializer, classes, seen);
     return;
   }
-  if (ts.isParenthesizedExpression(node)) return classExpression(node.expression, classes, literalClassInitializers);
+  if (ts.isTemplateExpression(node)) {
+    addClassTokens(node.head, classes);
+    for (const span of node.templateSpans) {
+      classExpression(span.expression, classes, seen);
+      addClassTokens(span.literal, classes);
+    }
+    return;
+  }
+  if (ts.isParenthesizedExpression(node)) return classExpression(node.expression, classes, seen);
   if (ts.isConditionalExpression(node)) {
-    classExpression(node.whenTrue, classes, literalClassInitializers);
-    return classExpression(node.whenFalse, classes, literalClassInitializers);
+    classExpression(node.whenTrue, classes, seen);
+    return classExpression(node.whenFalse, classes, seen);
   }
   if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
-    return classExpression(node.right, classes, literalClassInitializers);
+    return classExpression(node.right, classes, seen);
   }
   if (ts.isArrayLiteralExpression(node)) {
-    for (const element of node.elements) classExpression(element, classes, literalClassInitializers);
+    for (const element of node.elements) classExpression(element, classes, seen);
     return;
   }
   if (ts.isObjectLiteralExpression(node)) {
     for (const property of node.properties) {
-      if (ts.isPropertyAssignment(property) && ts.isStringLiteral(property.name)) addClassTokens(property.name, classes);
+      if (ts.isPropertyAssignment(property)) {
+        if (ts.isStringLiteral(property.name)) addClassTokens(property.name, classes);
+        else if (ts.isIdentifier(property.name)) classes.add(property.name.text);
+      } else if (ts.isShorthandPropertyAssignment(property)) classes.add(property.name.text);
     }
     return;
   }
@@ -163,7 +218,7 @@ function classExpression(node: any, classes: Set<string>, literalClassInitialize
     ts.isIdentifier(node.expression) &&
     ['cn', 'clsx', 'twMerge'].includes(node.expression.text)
   ) {
-    for (const argument of node.arguments) classExpression(argument, classes, literalClassInitializers);
+    for (const argument of node.arguments) classExpression(argument, classes, seen);
   }
 }
 
@@ -176,35 +231,19 @@ function classesInSource(file: string, content: string): Set<string> {
     ts.ScriptKind.TSX,
   );
   const classes = new Set<string>();
-  const literalClassInitializers = new Map<string, any>();
-
-  const collectLiteralClassInitializers = (node: any): void => {
-    if (
-      ts.isVariableDeclaration(node) &&
-      ts.isIdentifier(node.name) &&
-      node.initializer &&
-      (ts.isStringLiteral(node.initializer) || ts.isNoSubstitutionTemplateLiteral(node.initializer)) &&
-      ts.isVariableDeclarationList(node.parent) &&
-      (node.parent.flags & ts.NodeFlags.Const) !== 0
-    ) {
-      literalClassInitializers.set(node.name.text, node.initializer);
-    }
-    node.forEachChild(collectLiteralClassInitializers);
-  };
-  collectLiteralClassInitializers(source);
 
   const visit = (node: any): void => {
     if (ts.isJsxAttribute(node) && node.name.text === 'className' && node.initializer) {
       if (ts.isStringLiteral(node.initializer)) addClassTokens(node.initializer, classes);
       else if (ts.isJsxExpression(node.initializer) && node.initializer.expression)
-        classExpression(node.initializer.expression, classes, literalClassInitializers);
+        classExpression(node.initializer.expression, classes);
     }
     if (
       ts.isCallExpression(node) &&
       ts.isIdentifier(node.expression) &&
       ['cn', 'clsx', 'twMerge'].includes(node.expression.text)
     ) {
-      for (const argument of node.arguments) classExpression(argument, classes, literalClassInitializers);
+      for (const argument of node.arguments) classExpression(argument, classes);
     }
     node.forEachChild(visit);
   };
@@ -271,18 +310,36 @@ function emitsCss(compiled: any, className: string): boolean {
 }
 
 describe('HeroUI utility classes emit CSS (ATT-858)', () => {
-  it('finds object-form and local literal class utilities', () => {
+  it('finds object-form and lexically scoped local literal class utilities', () => {
     const classes = classesInSource(
       'example.tsx',
       `
         const valueClass = 'text-primary';
         const dlClass = \`text-danger\`;
+        const conditionalClass = condition ? 'bg-success' : 'bg-default-100';
+        const interpolatedClass = \`border-primary-500 \${conditionalClass}\`;
+        const hidden = condition;
+        const invisible = condition;
         const element = <div className={valueClass} />;
-        cn(dlClass, { 'bg-default-100': condition });
+        const other = <div className={interpolatedClass} />;
+        cn(dlClass, { 'bg-default-100': condition, hidden, invisible: condition });
+        function inner() {
+          const sharedClass = 'text-primary';
+          return <div className={sharedClass} />;
+        }
+        const sharedClass = 'text-danger';
       `,
     );
 
-    expect([...classes]).toEqual(['text-primary', 'text-danger', 'bg-default-100']);
+    expect([...classes]).toEqual([
+      'text-primary',
+      'border-primary-500',
+      'bg-success',
+      'bg-default-100',
+      'text-danger',
+      'hidden',
+      'invisible',
+    ]);
   });
 
   it('accepts valid tokens and variants while rejecting removed v2 tokens', async () => {
