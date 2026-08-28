@@ -6,7 +6,6 @@ export interface WagoController {
   trustState: 'untrusted' | 'claimed';
   name: string | null;
   mqttServerId: number | null;
-  fingerprint: string | null;
   protocolVersion: string;
   runtimeVersion: string;
   capabilities: string;

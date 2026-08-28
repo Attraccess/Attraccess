@@ -30,12 +30,12 @@ export function parseAnnouncement(payload: Buffer): WagoAnnouncement {
   if (input.sequence !== undefined && (!Number.isSafeInteger(input.sequence) || (input.sequence as number) < 0))
     throw new Error('announcement sequence must be a non-negative integer');
   return {
-    hardwareId: input.hardwareId.trim(),
-    pairingCode: input.pairingCode.trim(),
+    hardwareId: (input.hardwareId as string).trim(),
+    pairingCode: (input.pairingCode as string).trim(),
     enrollmentSecret: typeof input.enrollmentSecret === 'string' ? input.enrollmentSecret.trim() : undefined,
     fingerprint: typeof input.fingerprint === 'string' ? input.fingerprint.trim() : undefined,
-    protocolVersion: input.protocolVersion.trim(),
-    runtimeVersion: input.runtimeVersion.trim(),
+    protocolVersion: (input.protocolVersion as string).trim(),
+    runtimeVersion: (input.runtimeVersion as string).trim(),
     capabilities: input.capabilities,
     sequence: input.sequence as number | undefined,
   };
