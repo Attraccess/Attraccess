@@ -53,7 +53,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   private readonly enrollmentExpiryTimers = new Map<number, ReturnType<typeof setTimeout>>();
   private readonly claimLocks = new Map<number, Promise<void>>();
   private readonly configurationLocks = new Map<number, Promise<void>>();
-  private readonly configurationReportQueues = new Map<number, { pending: Buffer | null; processing: boolean }>();
+  private readonly configurationReportQueues = new Map<number, { pending: Map<number, Buffer>; processing: boolean }>();
   private claimConfigurationLock = Promise.resolve();
   private subscriptionRebuild = Promise.resolve();
   private subscriptionRetryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -722,11 +722,13 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   }
 
   private enqueueConfigurationReport(controllerId: number, payload: Buffer): void {
-    const queue = this.configurationReportQueues.get(controllerId) ?? { pending: null, processing: false };
+    const queue = this.configurationReportQueues.get(controllerId) ?? { pending: new Map(), processing: false };
     this.configurationReportQueues.set(controllerId, queue);
     if (queue.processing) {
-      // Only the latest acknowledgement matters while this controller is busy.
-      queue.pending = payload;
+      // Preserve acknowledgements for distinct immutable revisions in arrival order.
+      const revision = this.configurationReportRevision(payload);
+      if (revision === null) queue.pending.set(Number.NaN, payload);
+      else queue.pending.set(revision, payload);
       return;
     }
     queue.processing = true;
@@ -736,7 +738,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   private async processConfigurationReports(
     controllerId: number,
     payload: Buffer,
-    queue: { pending: Buffer | null; processing: boolean },
+    queue: { pending: Map<number, Buffer>; processing: boolean },
   ): Promise<void> {
     let next: Buffer | null = payload;
     while (next) {
@@ -745,11 +747,25 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       } catch (error) {
         this.context.logger.warn(`Could not process WAGO configuration report: ${String(error)}`);
       }
-      next = queue.pending;
-      queue.pending = null;
+      const pending = queue.pending.entries().next();
+      if (pending.done) next = null;
+      else {
+        const [revision, report] = pending.value;
+        queue.pending.delete(revision);
+        next = report;
+      }
     }
     queue.processing = false;
     if (this.configurationReportQueues.get(controllerId) === queue) this.configurationReportQueues.delete(controllerId);
+  }
+
+  private configurationReportRevision(payload: Buffer): number | null {
+    try {
+      const report = JSON.parse(payload.toString('utf8')) as { revision?: unknown };
+      return Number.isSafeInteger(report.revision) && (report.revision as number) >= 1 ? (report.revision as number) : null;
+    } catch {
+      return null;
+    }
   }
 
   private async publishRevision(

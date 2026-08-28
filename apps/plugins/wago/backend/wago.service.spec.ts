@@ -394,7 +394,7 @@ describe('WagoService', () => {
     releaseFirst();
   });
 
-  it('coalesces queued reports for a busy controller', async () => {
+  it('retains queued reports for each revision of a busy controller', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
     const { service, context } = createService([claimed]);
     let releaseFirst!: () => void;
@@ -412,16 +412,16 @@ describe('WagoService', () => {
     const handler = reportSubscription?.[2] as (message: { topic: string; payload: Buffer }) => void;
     const first = Buffer.from('{"revision":1}');
     const second = Buffer.from('{"revision":2}');
-    const latest = Buffer.from('{"revision":3}');
+    const third = Buffer.from('{"revision":3}');
     handler({ topic: 'attraccess/wago/v1/controllers/cc100-01/configuration/reported', payload: first });
     await new Promise<void>((resolve) => setImmediate(resolve));
     handler({ topic: 'attraccess/wago/v1/controllers/cc100-01/configuration/reported', payload: second });
-    handler({ topic: 'attraccess/wago/v1/controllers/cc100-01/configuration/reported', payload: latest });
+    handler({ topic: 'attraccess/wago/v1/controllers/cc100-01/configuration/reported', payload: third });
 
     expect(processed).toEqual([first]);
     releaseFirst();
     await new Promise<void>((resolve) => setImmediate(resolve));
-    expect(processed).toEqual([first, latest]);
+    expect(processed).toEqual([first, second, third]);
   });
 
   it('returns bounded revision metadata pages without snapshots', async () => {
