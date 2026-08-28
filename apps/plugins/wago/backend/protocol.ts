@@ -72,18 +72,6 @@ export function configurationReportedTopic(prefix: string, hardwareId: string): 
   return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${hardwareId}/configuration/reported`;
 }
 
-export function configurationReportedWildcardTopic(prefix: string): string {
-  return configurationReportedTopic(prefix, '+');
-}
-
-export function configurationReportedHardwareId(prefix: string, topic: string): string | null {
-  const topicPrefix = `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/`;
-  const topicSuffix = '/configuration/reported';
-  if (!topic.startsWith(topicPrefix) || !topic.endsWith(topicSuffix)) return null;
-  const hardwareId = topic.slice(topicPrefix.length, -topicSuffix.length);
-  return hardwareId && !/[+/]/.test(hardwareId) ? hardwareId : null;
-}
-
 export function normalizeOperationalPrefix(prefix: string): string {
   const trimmed = prefix.trim();
   let start = 0;
