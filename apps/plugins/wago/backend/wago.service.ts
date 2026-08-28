@@ -27,7 +27,9 @@ import { WagoSettings } from './wago-settings.entity';
 import { WagoEnrollment } from './wago-enrollment.entity';
 import {
   canonicalSnapshot,
+  configurationDiff,
   configurationHash,
+  parseConfigurationReport,
   type ConfigurationValidationError,
   validateSnapshot,
 } from './configuration';
@@ -189,9 +191,12 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     return { revisions, offset: pageOffset, limit: pageLimit };
   }
 
-  async reviewDraft(
-    controllerId: number,
-  ): Promise<{ draft: WagoConfigurationDraft; previous: WagoConfigurationRevision | null; changed: boolean }> {
+  async reviewDraft(controllerId: number): Promise<{
+    draft: WagoConfigurationDraft;
+    previous: WagoConfigurationRevision | null;
+    changed: boolean;
+    diff: ReturnType<typeof configurationDiff>;
+  }> {
     return this.withConfigurationLock(controllerId, () => this.reviewDraftWhileLocked(controllerId));
   }
 
@@ -212,12 +217,20 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   async previewRevision(
     controllerId: number,
     revision: number,
-  ): Promise<{ revision: WagoConfigurationRevision; current: WagoConfigurationRevision | null }> {
+  ): Promise<{
+    revision: WagoConfigurationRevision;
+    current: WagoConfigurationRevision | null;
+    diff: ReturnType<typeof configurationDiff>;
+  }> {
     await this.claimedController(controllerId);
     const selected = await this.revisions.findOneBy({ controllerId, revision });
     if (!selected) throw new NotFoundException(`WAGO configuration revision ${revision} not found`);
     const [current] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
-    return { revision: selected, current: current ?? null };
+    return {
+      revision: selected,
+      current: current ?? null,
+      diff: configurationDiff(current ? JSON.parse(current.snapshot) : null, JSON.parse(selected.snapshot)),
+    };
   }
 
   private async saveDraftWhileLocked(controllerId: number, snapshot: unknown): Promise<WagoConfigurationDraft> {
@@ -232,16 +245,20 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     return this.drafts.save(draft);
   }
 
-  private async reviewDraftWhileLocked(
-    controllerId: number,
-  ): Promise<{ draft: WagoConfigurationDraft; previous: WagoConfigurationRevision | null; changed: boolean }> {
+  private async reviewDraftWhileLocked(controllerId: number): Promise<{
+    draft: WagoConfigurationDraft;
+    previous: WagoConfigurationRevision | null;
+    changed: boolean;
+    diff: ReturnType<typeof configurationDiff>;
+  }> {
     await this.claimedController(controllerId);
     const draft = await this.drafts.findOneBy({ controllerId });
     if (!draft) throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
     const previous = await this.latestRevision(controllerId);
     draft.reviewedHash = configurationHash(JSON.parse(draft.snapshot));
     await this.drafts.save(draft);
-    return { draft, previous, changed: !previous || previous.snapshot !== draft.snapshot };
+    const diff = configurationDiff(previous ? JSON.parse(previous.snapshot) : null, JSON.parse(draft.snapshot));
+    return { draft, previous, changed: diff.length > 0, diff };
   }
 
   private async publishDraftWhileLocked(controllerId: number): Promise<WagoConfigurationRevision> {
@@ -696,27 +713,22 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async onConfigurationReported(controllerId: number, payload: Buffer): Promise<void> {
-    let report: { revision?: unknown; contentHash?: unknown; errors?: unknown };
+    let report: ReturnType<typeof parseConfigurationReport>;
     try {
-      report = JSON.parse(payload.toString('utf8')) as typeof report;
+      report = parseConfigurationReport(JSON.parse(payload.toString('utf8')));
     } catch {
       this.context.logger.warn(`Ignoring invalid WAGO configuration report for controller ${controllerId}`);
       return;
     }
-    if (
-      !Number.isSafeInteger(report.revision) ||
-      (report.revision as number) < 1 ||
-      typeof report.contentHash !== 'string'
-    ) {
+    if (!report) {
       this.context.logger.warn(`Ignoring malformed WAGO configuration report for controller ${controllerId}`);
       return;
     }
     await this.withConfigurationLock(controllerId, async () => {
-      const revision = await this.revisions.findOneBy({ controllerId, revision: report.revision as number });
+      const revision = await this.revisions.findOneBy({ controllerId, revision: report.revision });
       if (!revision || revision.contentHash !== report.contentHash) return;
-      const errors = Array.isArray(report.errors) ? report.errors : [];
-      revision.state = errors.length ? 'rejected' : 'applied';
-      revision.rejectionErrors = errors.length ? JSON.stringify(errors) : null;
+      revision.state = report.errors.length ? 'rejected' : 'applied';
+      revision.rejectionErrors = report.errors.length ? JSON.stringify(report.errors) : null;
       revision.reportedAt = new Date().toISOString();
       await this.revisions.save(revision);
     });

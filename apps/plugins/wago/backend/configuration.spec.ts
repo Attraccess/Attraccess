@@ -1,4 +1,10 @@
-import { canonicalSnapshot, configurationHash, validateSnapshot } from './configuration';
+import {
+  canonicalSnapshot,
+  configurationDiff,
+  configurationHash,
+  parseConfigurationReport,
+  validateSnapshot,
+} from './configuration';
 
 describe('WAGO configuration snapshots', () => {
   it('hashes equivalent snapshots identically regardless of object key order', () => {
@@ -6,6 +12,28 @@ describe('WAGO configuration snapshots', () => {
       configurationHash({ logicalChannels: [], physicalPoints: [], version: 1 }),
     );
     expect(canonicalSnapshot({ b: 1, a: 2 })).toBe('{"a":2,"b":1}');
+  });
+
+  it('returns field-level changes between configuration snapshots', () => {
+    expect(
+      configurationDiff(
+        { version: 1, physicalPoints: [], logicalChannels: [] },
+        { version: 1, physicalPoints: [], logicalChannels: [{ id: 'output-a' }] },
+      ),
+    ).toEqual([{ path: '$.logicalChannels[0]', previous: undefined, current: { id: 'output-a' } }]);
+  });
+
+  it('accepts only structured controller rejection errors', () => {
+    expect(
+      parseConfigurationReport({
+        revision: 3,
+        contentHash: 'a'.repeat(64),
+        errors: [{ path: 'logicalChannels[0].profile', code: 'unsupported_value', message: 'unsupported profile' }],
+      }),
+    ).toEqual(expect.objectContaining({ revision: 3 }));
+    expect(
+      parseConfigurationReport({ revision: 3, contentHash: 'a'.repeat(64), errors: [{ code: 'invalid' }] }),
+    ).toBeNull();
   });
 
   it('reports every broken reference instead of accepting a partial snapshot', () => {

@@ -312,7 +312,7 @@ describe('WagoService', () => {
         JSON.stringify({
           revision: 2,
           contentHash: revision.contentHash,
-          errors: [{ path: 'logicalChannels[0]', code: 'unsupported_capability' }],
+          errors: [{ path: 'logicalChannels[0]', code: 'unsupported_capability', message: 'unsupported capability' }],
         }),
       ),
     );
@@ -323,6 +323,23 @@ describe('WagoService', () => {
         rejectionErrors: expect.stringContaining('unsupported_capability'),
       }),
     );
+  });
+
+  it('ignores controller rejections without field-level error details', async () => {
+    const { service, revisionRepository, context } = createService([
+      { ...controller(), trustState: 'claimed' as const },
+    ]);
+    const onConfigurationReported = (
+      Reflect.get(service, 'onConfigurationReported') as (controllerId: number, payload: Buffer) => Promise<void>
+    ).bind(service);
+
+    await onConfigurationReported(
+      1,
+      Buffer.from(JSON.stringify({ revision: 2, contentHash: 'a'.repeat(64), errors: [{ code: 'invalid' }] })),
+    );
+
+    expect(revisionRepository.save).not.toHaveBeenCalled();
+    expect(context.logger.warn).toHaveBeenCalledWith('Ignoring malformed WAGO configuration report for controller 1');
   });
 
   it('serializes configuration reports with publication for the same controller', async () => {

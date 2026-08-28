@@ -35,6 +35,18 @@ export interface ConfigurationValidationError {
   message: string;
 }
 
+export interface ConfigurationDiff {
+  path: string;
+  previous: unknown;
+  current: unknown;
+}
+
+export interface WagoConfigurationReport {
+  revision: number;
+  contentHash: string;
+  errors: ConfigurationValidationError[];
+}
+
 export function canonicalSnapshot(snapshot: unknown): string {
   if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot))
     throw new Error('configuration snapshot must be an object');
@@ -43,6 +55,28 @@ export function canonicalSnapshot(snapshot: unknown): string {
 
 export function configurationHash(snapshot: unknown): string {
   return createHash('sha256').update(canonicalSnapshot(snapshot)).digest('hex');
+}
+
+export function configurationDiff(previous: unknown, current: unknown): ConfigurationDiff[] {
+  const changes: ConfigurationDiff[] = [];
+  diffValue('$', previous, current, changes);
+  return changes;
+}
+
+export function parseConfigurationReport(value: unknown): WagoConfigurationReport | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const report = value as Record<string, unknown>;
+  if (
+    !Number.isSafeInteger(report.revision) ||
+    (report.revision as number) < 1 ||
+    typeof report.contentHash !== 'string' ||
+    !report.contentHash.trim() ||
+    (report.errors !== undefined && !Array.isArray(report.errors))
+  )
+    return null;
+  const errors = report.errors ?? [];
+  if (!errors.every(isConfigurationValidationError)) return null;
+  return { revision: report.revision as number, contentHash: report.contentHash, errors };
 }
 
 export function validateSnapshot(snapshot: unknown): ConfigurationValidationError[] {
@@ -117,6 +151,38 @@ export function validateSnapshot(snapshot: unknown): ConfigurationValidationErro
     validateProfile(channel.profile, capabilities, path, errors);
   });
   return errors;
+}
+
+function diffValue(path: string, previous: unknown, current: unknown, changes: ConfigurationDiff[]): void {
+  if (Object.is(previous, current)) return;
+  if (Array.isArray(previous) && Array.isArray(current)) {
+    const length = Math.max(previous.length, current.length);
+    for (let index = 0; index < length; index += 1)
+      diffValue(`${path}[${index}]`, previous[index], current[index], changes);
+    return;
+  }
+  if (isRecord(previous) && isRecord(current)) {
+    const keys = new Set([...Object.keys(previous), ...Object.keys(current)]);
+    for (const key of [...keys].sort()) diffValue(`${path}.${key}`, previous[key], current[key], changes);
+    return;
+  }
+  changes.push({ path, previous, current });
+}
+
+function isConfigurationValidationError(value: unknown): value is ConfigurationValidationError {
+  return (
+    isRecord(value) &&
+    typeof value.path === 'string' &&
+    Boolean(value.path.trim()) &&
+    typeof value.code === 'string' &&
+    Boolean(value.code.trim()) &&
+    typeof value.message === 'string' &&
+    Boolean(value.message.trim())
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function collection(value: unknown, path: string, errors: ConfigurationValidationError[]): unknown[] {
