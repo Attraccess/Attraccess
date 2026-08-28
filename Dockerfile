@@ -108,6 +108,7 @@ COPY --from=builder /app/deploy/api /app/dist/apps/api
 COPY --from=builder /app/monitoring /app/share/monitoring
 
 # Set environment variable to tell API about frontend location
+ENV NODE_ENV=production
 ENV STATIC_FRONTEND_FILE_PATH=/app/dist/apps/frontend
 
 # Set environment variable to tell API about docs location
