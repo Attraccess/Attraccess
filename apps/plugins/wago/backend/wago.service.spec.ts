@@ -164,7 +164,9 @@ describe('WagoService', () => {
       .fn()
       .mockResolvedValue({ host: 'mqtt.example.test', port: 8883, useTls: true });
     (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({
-      provision: jest.fn().mockResolvedValue({ instructions: ['Create a scoped broker user manually.'] }),
+      provision: jest.fn().mockImplementation(({ username }) => ({
+        instructions: [`Create a scoped broker user named ${username} manually.`],
+      })),
     });
 
     const enrollment = await service.createEnrollment('cc100-01', undefined, {
@@ -173,7 +175,7 @@ describe('WagoService', () => {
     });
 
     expect(enrollment).toMatchObject({ username: 'manual-cc100-01', password: 'secret' });
-    expect(enrollment.manualInstructions).toEqual(['Create a scoped broker user manually.']);
+    expect(enrollment.manualInstructions).toEqual(['Create a scoped broker user named manual-cc100-01 manually.']);
   });
 
   it('keeps replacement subscriptions inert until they replace the active generation', async () => {

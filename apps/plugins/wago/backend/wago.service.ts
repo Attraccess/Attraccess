@@ -156,7 +156,10 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       password: 'password' in credential ? credential.password : undefined,
       claimSecret,
       expiresAt,
-      manualInstructions: 'instructions' in provisionedCredential ? provisionedCredential.instructions : undefined,
+      manualInstructions:
+        'instructions' in provisionedCredential
+          ? provisionedCredential.instructions.map((instruction) => instruction.replaceAll(identity, credential.username))
+          : undefined,
     };
   }
 
