@@ -30,7 +30,11 @@ export function PermissionsStep({ perms, onGrant }: Props) {
       </div>
       <Separator />
       {!perms?.accessibility && (
-        <p className="text-fg-muted text-xs">After granting in System Settings, this page updates automatically.</p>
+        <p className="text-fg-muted text-xs">
+          After granting in System Settings, this page updates automatically. If Attraccess Companion is already
+          listed there, remove it with the &ldquo;&minus;&rdquo; button and add it again &mdash; an app update
+          invalidates the old entry.
+        </p>
       )}
     </>
   );

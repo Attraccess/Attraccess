@@ -27,6 +27,13 @@ export function promptAccessibilityPermission(): void {
   if (process.platform !== 'darwin') return;
   try {
     const { systemPreferences, shell } = require('electron') as typeof import('electron');
+    // A TCC row survives app updates but its grant does not (the code signature hash
+    // changes), leaving the app listed-and-toggled-on yet untrusted — and re-toggling a
+    // stale row does nothing. Drop it first so the switch the user flips is a fresh grant.
+    // Safe here: this only runs when we are already untrusted, so there is nothing to lose.
+    try {
+      require('child_process').execFileSync('tccutil', ['reset', 'Accessibility', 'org.attraccess.companion'], { stdio: 'ignore' });
+    } catch { /* no row to reset */ }
     // Registers the app in TCC so it appears in the Accessibility list
     systemPreferences.isTrustedAccessibilityClient(true);
     // Open directly to the Accessibility pane — user just needs to toggle the switch

@@ -5,7 +5,10 @@ jest.mock('electron', () => ({
   systemPreferences: {
     isTrustedAccessibilityClient: jest.fn().mockReturnValue(true),
   },
+  shell: { openExternal: jest.fn() },
 }));
+
+jest.mock('child_process', () => ({ execFileSync: jest.fn() }));
 
 jest.mock('fs/promises', () => ({
   mkdir: jest.fn().mockResolvedValue(undefined),
@@ -14,8 +17,11 @@ jest.mock('fs/promises', () => ({
 }));
 
 import * as fsp from 'fs/promises';
+import { execFileSync } from 'child_process';
+import { systemPreferences } from 'electron';
 import {
   hasAccessibilityPermission,
+  promptAccessibilityPermission,
   installLaunchAgent,
   isLaunchAgentInstalled,
 } from './macos-lock';
@@ -32,6 +38,8 @@ function setPlatform(p: NodeJS.Platform) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  (systemPreferences.isTrustedAccessibilityClient as unknown as jest.Mock).mockReset().mockReturnValue(true);
+  (execFileSync as unknown as jest.Mock).mockReset();
   setPlatform('darwin');
 });
 
@@ -49,6 +57,37 @@ describe('hasAccessibilityPermission', () => {
 
   it('delegates to systemPreferences.isTrustedAccessibilityClient on macOS', () => {
     expect(hasAccessibilityPermission()).toBe(true);
+  });
+});
+
+// ─── promptAccessibilityPermission ────────────────────────────────────────────
+
+describe('promptAccessibilityPermission', () => {
+  it('resets the stale TCC row before re-registering the app', () => {
+    const order: string[] = [];
+    (execFileSync as unknown as jest.Mock).mockImplementation(() => order.push('reset'));
+    (systemPreferences.isTrustedAccessibilityClient as unknown as jest.Mock).mockImplementation(() =>
+      order.push('register'),
+    );
+
+    promptAccessibilityPermission();
+
+    expect(execFileSync).toHaveBeenCalledWith(
+      'tccutil',
+      ['reset', 'Accessibility', 'org.attraccess.companion'],
+      expect.anything(),
+    );
+    expect(order).toEqual(['reset', 'register']);
+  });
+
+  it('still registers when there is no TCC row to reset', () => {
+    (execFileSync as unknown as jest.Mock).mockImplementation(() => {
+      throw new Error('no such bundle identifier');
+    });
+    (systemPreferences.isTrustedAccessibilityClient as unknown as jest.Mock).mockReturnValue(false);
+
+    expect(() => promptAccessibilityPermission()).not.toThrow();
+    expect(systemPreferences.isTrustedAccessibilityClient).toHaveBeenCalledWith(true);
   });
 });
 
