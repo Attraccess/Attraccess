@@ -153,6 +153,14 @@ function isLiteralClassExpression(node: any): boolean {
     return isLiteralClassExpression(node.whenTrue) && isLiteralClassExpression(node.whenFalse);
   if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken)
     return isLiteralClassExpression(node.right);
+  if (ts.isArrayLiteralExpression(node)) return node.elements.every(isLiteralClassExpression);
+  if (ts.isObjectLiteralExpression(node))
+    return node.properties.every(
+      (property: any) =>
+        (ts.isPropertyAssignment(property) &&
+          (ts.isStringLiteral(property.name) || ts.isIdentifier(property.name))) ||
+        ts.isShorthandPropertyAssignment(property),
+    );
   return false;
 }
 
@@ -317,11 +325,13 @@ describe('HeroUI utility classes emit CSS (ATT-858)', () => {
         const dlClass = \`text-danger\`;
         const conditionalClass = condition ? 'bg-success' : 'bg-default-100';
         const interpolatedClass = \`border-primary-500 \${conditionalClass}\`;
+        const classList = ['text-default-500'];
+        const classMap = { 'border-default-200': condition };
         const hidden = condition;
         const invisible = condition;
         const element = <div className={valueClass} />;
         const other = <div className={interpolatedClass} />;
-        cn(dlClass, { 'bg-default-100': condition, hidden, invisible: condition });
+        cn(dlClass, classList, classMap, { 'bg-default-100': condition, hidden, invisible: condition });
         function inner() {
           const sharedClass = 'text-primary';
           return <div className={sharedClass} />;
@@ -340,6 +350,8 @@ describe('HeroUI utility classes emit CSS (ATT-858)', () => {
       'bg-success',
       'bg-default-100',
       'text-danger',
+      'text-default-500',
+      'border-default-200',
       'hidden',
       'invisible',
     ]);
