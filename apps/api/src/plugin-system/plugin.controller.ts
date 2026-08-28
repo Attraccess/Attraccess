@@ -116,6 +116,55 @@ export class PluginController {
     return this.npmPluginService.listInstalled();
   }
 
+  @Get('update-policy')
+  @Auth('system.plugins.manage')
+  updatePolicy() {
+    return this.npmPluginService.getUpdatePolicy();
+  }
+
+  @Post('update-policy')
+  @Auth('system.plugins.manage')
+  setUpdatePolicy(@Body() body: Record<string, unknown>) {
+    return this.npmPluginService.setUpdatePolicy(body);
+  }
+
+  @Post('installed/check')
+  @Auth('system.plugins.manage')
+  checkAllInstalledPackages() {
+    return this.npmPluginService.checkAllInstalled();
+  }
+
+  @Post('installed/:packageName/check')
+  @Auth('system.plugins.manage')
+  checkInstalledPackage(@Param('packageName') packageName: string) {
+    return this.npmPluginService.checkInstalled(packageName);
+  }
+
+  @Post('installed/:packageName/spec')
+  @Auth('system.plugins.manage')
+  updateInstalledPackageSpec(@Param('packageName') packageName: string, @Body('requestedSpec') requestedSpec: string) {
+    return this.npmPluginService.updateRequestedSpec(packageName, requestedSpec);
+  }
+
+  @Post('installed/:packageName/update-override')
+  @Auth('system.plugins.manage')
+  updateInstalledPackageOverride(
+    @Param('packageName') packageName: string,
+    @Body('updateOverride') updateOverride: 'inherit' | 'off' | 'patch' | 'minor' | 'follow',
+  ) {
+    return this.npmPluginService.updateOverride(packageName, updateOverride);
+  }
+
+  @Post('installed/:packageName/update-policy')
+  @Auth('system.plugins.manage')
+  updateInstalledPackagePolicy(
+    @Param('packageName') packageName: string,
+    @Body('requestedSpec') requestedSpec: string,
+    @Body('updateOverride') updateOverride: 'inherit' | 'off' | 'patch' | 'minor' | 'follow',
+  ) {
+    return this.npmPluginService.updateVersionPolicy(packageName, requestedSpec, updateOverride);
+  }
+
   @Get('installed/:packageName/versions')
   @Auth('system.plugins.manage')
   installedPackageVersions(@Param('packageName') packageName: string) {
@@ -129,8 +178,14 @@ export class PluginController {
     @Param('version') version: string,
     @Body('approvedPermissionAdditions', new ParseArrayPipe({ items: String, optional: true }))
     approvedPermissionAdditions?: string[],
+    @Body('approvedMajorVersion') approvedMajorVersion?: boolean,
   ) {
-    return this.npmPluginService.replaceInstalled(packageName, version, approvedPermissionAdditions ?? []);
+    return this.npmPluginService.replaceInstalled(
+      packageName,
+      version,
+      approvedPermissionAdditions ?? [],
+      approvedMajorVersion === true,
+    );
   }
 
   @Get()
@@ -202,7 +257,8 @@ export class PluginController {
   @Auth('system.plugins.manage')
   async deletePlugin(@Param('pluginId') pluginId: string) {
     const plugin = PluginService.getManifestById(pluginId);
-    const installed = this.npmPluginService.findInstalledByPluginId(pluginId) ??
+    const installed =
+      this.npmPluginService.findInstalledByPluginId(pluginId) ??
       (plugin
         ? this.npmPluginService.listInstalled().find(({ installPath }) => installPath === plugin.pluginDirectory)
         : undefined);

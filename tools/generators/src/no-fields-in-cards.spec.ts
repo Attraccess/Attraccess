@@ -25,21 +25,11 @@ import * as path from 'path';
  * None of these hides a violation today; they are listed so the next reader does not over-trust
  * a pass. Each is a resolution gap, not a detection one:
  *
- *   - `export default Foo` resolves to nothing (`definesLocally` only considers named exports),
- *     so a component reached that way is never followed. `messaging/index.tsx` uses this form.
- *     This gates Card-wrapper detection too, not just field resolution: a default-exported
- *     `SectionCard` is not recognised as a Card surface either.
- *   - `import { X } from './x'; export { X };` makes `definesLocally` claim the barrel declares
- *     `X`, so resolution stops at the barrel and finds no declaration. The
- *     `export { X } from './x'` form is handled correctly.
- *   - Only a bare identifier in a JSX expression slot is followed. `{renderBody()}` and
- *     `{cond ? <A /> : <B />}` are dropped — `schedules-tab.tsx` passes `{renderBody()}`.
  */
 
 // typescript@7's package exports no longer expose the classic compiler API to the type
 // system, but it is still there at runtime. Require it untyped rather than pull in a
 // second parser just for this check.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const ts = require('typescript');
 
 /** Loose stand-in for ts.Node — the typed API is unavailable, see above. */
@@ -155,9 +145,14 @@ function loadAliasPaths(): Map<string, string> {
   return aliasPaths;
 }
 
-/** Local component name -> resolved absolute file path, for relative and workspace-alias imports. */
-function localImports(source: Node): Map<string, string> {
-  const map = new Map<string, string>();
+interface Import {
+  file: string;
+  name: string;
+}
+
+/** Local component name -> source export, for relative and workspace-alias imports. */
+function localImports(source: Node): Map<string, Import> {
+  const map = new Map<string, Import>();
   for (const statement of source.statements as Node[]) {
     if (!ts.isImportDeclaration(statement) || !statement.importClause) continue;
     const specifier = (statement.moduleSpecifier as Node).text as string;
@@ -165,10 +160,13 @@ function localImports(source: Node): Map<string, string> {
     if (!resolved) continue;
 
     const clause = statement.importClause as Node;
-    if (clause.name) map.set((clause.name as Node).text as string, resolved);
+    if (clause.name) map.set((clause.name as Node).text as string, { file: resolved, name: 'default' });
     if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
       for (const element of (clause.namedBindings as Node).elements as Node[]) {
-        map.set((element.name as Node).text as string, resolved);
+        map.set((element.name as Node).text as string, {
+          file: resolved,
+          name: element.propertyName ? ((element.propertyName as Node).text as string) : ((element.name as Node).text as string),
+        });
       }
     }
   }
@@ -264,6 +262,17 @@ function declarationOf(source: Node, name: string): Node | null {
   const direct = findLocalDeclaration(source, name);
   if (direct) return direct;
   for (const statement of source.statements as Node[]) {
+    if (name === 'default' && ts.isExportAssignment(statement) && !statement.isExportEquals) {
+      const expression = statement.expression as Node;
+      return ts.isIdentifier(expression) ? findLocalDeclaration(source, expression.text as string) : expression;
+    }
+    if (
+      name === 'default' &&
+      (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
+      (statement.modifiers as Node[] | undefined)?.some((modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword)
+    ) {
+      return statement;
+    }
     if (
       !ts.isExportDeclaration(statement) ||
       statement.moduleSpecifier ||
@@ -285,6 +294,14 @@ function declarationOf(source: Node, name: string): Node | null {
 /** Does `source` declare `name` as a local export, as opposed to re-exporting it? */
 function definesLocally(source: Node, name: string): boolean {
   for (const statement of source.statements as Node[]) {
+    if (
+      name === 'default' &&
+      ((ts.isExportAssignment(statement) && !statement.isExportEquals) ||
+        ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
+          (statement.modifiers as Node[] | undefined)?.some((modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword)))
+    ) {
+      return true;
+    }
     if (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) {
       if (hasExportModifier(statement) && statement.name && (statement.name as Node).text === name) return true;
     } else if (ts.isVariableStatement(statement)) {
@@ -292,15 +309,6 @@ function definesLocally(source: Node, name: string): boolean {
         for (const decl of (statement.declarationList as Node).declarations as Node[]) {
           if (ts.isIdentifier(decl.name) && (decl.name as Node).text === name) return true;
         }
-      }
-    } else if (
-      ts.isExportDeclaration(statement) &&
-      !statement.moduleSpecifier &&
-      statement.exportClause &&
-      ts.isNamedExports(statement.exportClause)
-    ) {
-      for (const element of (statement.exportClause as Node).elements as Node[]) {
-        if ((element.name as Node).text === name) return true;
       }
     }
   }
@@ -319,6 +327,7 @@ function resolveExport(file: string, name: string, seen = new Set<string>()): Ex
   seen.add(key);
   const source = parse(file);
   const fromDir = path.dirname(file);
+  const imports = localImports(source);
   const results: Export[] = [];
 
   for (const statement of source.statements as Node[]) {
@@ -341,6 +350,36 @@ function resolveExport(file: string, name: string, seen = new Set<string>()): Ex
     // `export * as ns from './X'` does not re-export `name` directly; skip.
   }
 
+  // `import X from './x'; export default X;` is the default-export counterpart
+  // to the locally imported named re-export handled below.
+  if (name === 'default') {
+    for (const statement of source.statements as Node[]) {
+      if (!ts.isExportAssignment(statement) || statement.isExportEquals || !ts.isIdentifier(statement.expression)) continue;
+      const imported = imports.get((statement.expression as Node).text as string);
+      if (imported) results.push(...resolveExport(imported.file, imported.name, seen));
+    }
+  }
+
+  // `import { X } from './x'; export { X };` is a re-export just like
+  // `export { X } from './x'`, despite its export declaration lacking a module specifier.
+  for (const statement of source.statements as Node[]) {
+    if (
+      !ts.isExportDeclaration(statement) ||
+      statement.moduleSpecifier ||
+      !statement.exportClause ||
+      !ts.isNamedExports(statement.exportClause)
+    ) {
+      continue;
+    }
+    for (const element of (statement.exportClause as Node).elements as Node[]) {
+      if ((element.name as Node).text !== name) continue;
+      const localName = element.propertyName ? ((element.propertyName as Node).text as string) : name;
+      const imported = imports.get(localName);
+      if (imported) results.push(...resolveExport(imported.file, imported.name, seen));
+      else if (findLocalDeclaration(source, localName)) results.push({ file, name });
+    }
+  }
+
   if (definesLocally(source, name)) results.push({ file, name });
   return results;
 }
@@ -353,9 +392,9 @@ function resolveExport(file: string, name: string, seen = new Set<string>()): Ex
  * separately and drifted twice — each time leaving one side blind to a shape the other
  * handled (a same-file component under a Card; an imported component behind `memo`).
  */
-function resolveComponent(file: string, source: Node, imports: Map<string, string>, name: string): Export[] {
+function resolveComponent(file: string, source: Node, imports: Map<string, Import>, name: string): Export[] {
   const imported = imports.get(name);
-  if (imported) return resolveExport(imported, name);
+  if (imported) return resolveExport(imported.file, imported.name);
   return findLocalDeclaration(source, name) ? [{ file, name }] : [];
 }
 
@@ -409,7 +448,7 @@ function rendersField(
 
   // `export const Form = memo(FormBase)` — the declaration holds a call, not JSX, so the
   // wrapped component is reachable only through the call's arguments.
-  const initializer = declaration.initializer as Node | undefined;
+  const initializer = (declaration.initializer as Node | undefined) ?? (ts.isCallExpression(declaration) ? declaration : undefined);
   if (initializer && ts.isCallExpression(initializer)) {
     for (const identifier of callArgumentIdentifiers(initializer)) follow(identifier);
   }
@@ -498,6 +537,20 @@ function wrapsChildrenInCard(
   const imports = localImports(source);
 
   let found = false;
+  const initializer = (declaration.initializer as Node | undefined) ?? (ts.isCallExpression(declaration) ? declaration : undefined);
+  if (initializer && ts.isCallExpression(initializer)) {
+    for (const identifier of callArgumentIdentifiers(initializer)) {
+      const childTruncated = { hit: false };
+      for (const leaf of resolveComponent(file, source, imports, identifier)) {
+        if (wrapsChildrenInCard(leaf.file, leaf.name, seen, childTruncated)) {
+          found = true;
+          break;
+        }
+      }
+      if (childTruncated.hit) truncated.hit = true;
+      if (found) break;
+    }
+  }
   const visit = (node: Node): void => {
     if (found) return;
     if (isJsx(node) && containsChildrenSlot(node)) {
@@ -540,6 +593,7 @@ function lookupVariable(node: Node, name: string): Node | null {
     const statements = scope.statements as Node[] | undefined;
     if (!statements) continue;
     for (const statement of statements) {
+      if (ts.isFunctionDeclaration(statement) && statement.name && (statement.name as Node).text === name) return statement;
       if (!ts.isVariableStatement(statement)) continue;
       for (const declaration of (statement.declarationList as Node).declarations as Node[]) {
         if (ts.isIdentifier(declaration.name) && (declaration.name as Node).text === name && declaration.initializer) {
@@ -579,20 +633,55 @@ function findViolations(file: string): Violation[] {
 
     walkJsx(node, checkElement);
 
-    // `{body}`, where body is a same-file variable holding JSX. `walkJsx` visits only
-    // children, so a variable that holds a bare field is its own root and is checked here
-    // before descending.
+    // JSX tags are discovered by `walkJsx`, but JSX expression slots can also call a helper
+    // or select one branch. Follow only expressions that can provide the rendered value.
     const expandExpressions = (current: Node): void => {
       current.forEachChild((child) => {
         if (isJsx(child) && isPortal(tagOf(child))) return;
-        if (ts.isJsxExpression(child) && child.expression && ts.isIdentifier(child.expression)) {
-          const name = (child.expression as Node).text as string;
-          const initializer = lookupVariable(child, name);
-          if (initializer && !expanded.has(name)) {
-            expanded.add(name);
-            if (isJsx(initializer)) checkElement(initializer);
-            scanCardSubtree(initializer, expanded);
+        if (ts.isJsxExpression(child) && child.expression) {
+          const followRenderedExpression = (expression: Node): void => {
+            // Nested JSX is handled by `walkJsx`; only its containing expression needs help.
+            if (isJsx(expression)) return;
+            if (ts.isIdentifier(expression)) {
+              const name = expression.text as string;
+              const initializer = lookupVariable(child, name);
+              if (initializer && !expanded.has(name)) {
+                expanded.add(name);
+                // A JSX value needs its root checked before its children. A local helper
+                // declaration is scanned in place so its returned JSX is included too.
+                if (isJsx(initializer)) {
+                  checkElement(initializer);
+                  scanCardSubtree(initializer, expanded);
+                  return;
+                }
+                scanCardSubtree(initializer, expanded);
+              }
+              if (!initializer) {
+                for (const leaf of resolveComponent(file, source, imports, name)) {
+                  if (rendersField(leaf.file, leaf.name)) {
+                    const where = leaf.file === file ? 'same file' : path.relative(ROOT, leaf.file);
+                    report(child, `{${name}} (${where}) renders a field inside a <Card>`);
+                  }
+                }
+              }
+            } else if (ts.isCallExpression(expression)) {
+              followRenderedExpression(expression.expression as Node);
+            } else if (ts.isConditionalExpression(expression)) {
+              followRenderedExpression(expression.whenTrue as Node);
+              followRenderedExpression(expression.whenFalse as Node);
+            } else if (ts.isBinaryExpression(expression)) {
+              const operator = (expression.operatorToken as Node).kind;
+              if (operator === ts.SyntaxKind.AmpersandAmpersandToken) {
+                followRenderedExpression(expression.right as Node);
+              } else if (operator === ts.SyntaxKind.BarBarToken || operator === ts.SyntaxKind.QuestionQuestionToken) {
+                followRenderedExpression(expression.left as Node);
+                followRenderedExpression(expression.right as Node);
+              }
+            } else if (ts.isParenthesizedExpression(expression)) {
+              followRenderedExpression(expression.expression as Node);
+            }
           }
+          followRenderedExpression(child.expression as Node);
         }
         expandExpressions(child);
       });
@@ -836,6 +925,147 @@ describe('form fields are not wrapped in Cards (ATT-294 / ATT-834)', () => {
 
     expect(violations).toHaveLength(1);
     expect(violations[0].detail).toContain('<Form>');
+  });
+
+  it('follows default-exported fields and named HOC Card wrappers', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'Form.tsx'),
+      `import { memo } from 'react';
+       import { TextField } from '@heroui/react';
+       const FormBase = () => <TextField />;
+       export default memo(FormBase);`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'SectionCard.tsx'),
+      `import { memo } from 'react';
+       import { Card } from '@heroui/react';
+       const SectionCardBase = ({ children }) => <Card><Card.Content>{children}</Card.Content></Card>;
+       export const SectionCard = memo(SectionCardBase);`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'barrel.ts'),
+      `import Form from './Form';
+       export default Form;`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'page.tsx'),
+      `import { Card, TextField } from '@heroui/react';
+       import Form from './barrel';
+       import { SectionCard } from './SectionCard';
+       export const Page = () => <>
+         <Card><Card.Content><Form /></Card.Content></Card>
+         <SectionCard><TextField /></SectionCard>
+       </>;`,
+    );
+
+    const violations = findViolations(path.join(dir, 'page.tsx'));
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(violations).toHaveLength(2);
+    expect(violations.map((violation) => violation.detail).join()).toContain('<Form>');
+    expect(violations.map((violation) => violation.detail).join()).toContain('<TextField>');
+  });
+
+  it('follows a barrel that re-exports a locally imported component', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'Form.tsx'),
+      `import { TextField } from '@heroui/react';
+       export const Form = () => <TextField />;`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'barrel.ts'),
+      `import { Form } from './Form';
+       export { Form };`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'page.tsx'),
+      `import { Card } from '@heroui/react';
+       import { Form } from './barrel';
+       export const Page = () => <Card><Card.Content><Form /></Card.Content></Card>;`,
+    );
+
+    const violations = findViolations(path.join(dir, 'page.tsx'));
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].detail).toContain('<Form>');
+  });
+
+  it('follows helpers and JSX variables used in non-identifier expression slots', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'page.tsx'),
+      `import { Card, TextField } from '@heroui/react';
+       const Form = () => <TextField />;
+       export const Page = ({ show }) => {
+         const body = <TextField />;
+         const renderBody = () => <Form />;
+         return <Card><Card.Content>
+           {renderBody()}
+           {show ? body : <Form />}
+         </Card.Content></Card>;
+       };`,
+    );
+
+    const violations = findViolations(path.join(dir, 'page.tsx'));
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(violations).toHaveLength(3);
+    expect(violations.map((violation) => violation.detail).join()).toContain('<TextField>');
+    expect(violations.map((violation) => violation.detail).join()).toContain('<Form>');
+  });
+
+  it('follows rendered values through logical JSX expressions', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'page.tsx'),
+      `import { Card, TextField } from '@heroui/react';
+       const Form = () => <TextField />;
+       export const Page = ({ show, fallback }) => {
+         const body = <TextField />;
+         const renderBody = () => <Form />;
+         return <Card><Card.Content>
+           {show && body}
+           {show && renderBody()}
+           {fallback || body}
+           {fallback ?? renderBody()}
+         </Card.Content></Card>;
+       };`,
+    );
+
+    const violations = findViolations(path.join(dir, 'page.tsx'));
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(violations).toHaveLength(2);
+    expect(violations.map((violation) => violation.detail).join()).toContain('<TextField>');
+    expect(violations.map((violation) => violation.detail).join()).toContain('<Form>');
+  });
+
+  it('does not follow field components used outside rendered expression positions', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'Form.tsx'),
+      `import { TextField } from '@heroui/react';
+       export const Form = () => <TextField />;`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'page.tsx'),
+      `import { Card } from '@heroui/react';
+       import { Form } from './Form';
+       const predicate = () => false;
+       export const Page = () => <Card><Card.Content>
+         {predicate(Form)}
+         {Form ? <div /> : <div />}
+         {Form.displayName}
+       </Card.Content></Card>;`,
+    );
+
+    const violations = findViolations(path.join(dir, 'page.tsx'));
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(violations).toEqual([]);
   });
 
   it('does not resolve a JSX variable belonging to a different component in the same file', () => {
