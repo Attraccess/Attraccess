@@ -555,11 +555,15 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
           await this.context.mqtt.subscribe(
             serverId,
             configurationReportedWildcardTopic(settings.operationalPrefix),
-            async (message) => {
+            (message) => {
               if (!this.isActiveSubscriptionGeneration(generation)) return;
               const hardwareId = configurationReportedHardwareId(settings.operationalPrefix, message.topic);
               const controller = hardwareId ? controllersByHardwareId.get(hardwareId) : undefined;
-              if (controller) await this.onConfigurationReported(controller.id, message.payload);
+              if (controller) {
+                void this.onConfigurationReported(controller.id, message.payload).catch((error) => {
+                  this.context.logger.warn(`Could not process WAGO configuration report: ${String(error)}`);
+                });
+              }
             },
           ),
         );

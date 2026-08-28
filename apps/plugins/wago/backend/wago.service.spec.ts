@@ -359,13 +359,16 @@ describe('WagoService', () => {
     expect(revisionRepository.save).toHaveBeenCalledWith(expect.objectContaining({ state: 'applied' }));
   });
 
-  it('subscribes once per MQTT server for configuration reports and routes by hardware ID', async () => {
+  it('dispatches configuration reports without blocking other controllers', async () => {
     const first = { ...controller(), trustState: 'claimed' as const };
     const second = { ...controller(), id: 2, hardwareId: 'cc100-02', trustState: 'claimed' as const };
     const { service, context } = createService([first, second]);
+    let releaseFirst!: () => void;
     const onConfigurationReported = jest
       .spyOn(service as never, 'onConfigurationReported')
-      .mockResolvedValue(undefined);
+      .mockImplementation((controllerId) =>
+        controllerId === first.id ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve(),
+      );
 
     await service.onModuleInit();
 
@@ -373,11 +376,19 @@ describe('WagoService', () => {
       ([, topic]) => topic === 'attraccess/wago/v1/controllers/+/configuration/reported',
     );
     expect(reportSubscriptions).toHaveLength(1);
-    await reportSubscriptions[0][2]({
+    const reportHandler = reportSubscriptions[0][2] as (message: { topic: string; payload: Buffer }) => void;
+    const firstResult = reportHandler({
+      topic: 'attraccess/wago/v1/controllers/cc100-01/configuration/reported',
+      payload: Buffer.from('{}'),
+    });
+    reportHandler({
       topic: 'attraccess/wago/v1/controllers/cc100-02/configuration/reported',
       payload: Buffer.from('{}'),
     });
+
+    expect(firstResult).toBeUndefined();
     expect(onConfigurationReported).toHaveBeenCalledWith(second.id, expect.any(Buffer));
+    releaseFirst();
   });
 
   it('returns bounded revision metadata pages without snapshots', async () => {
