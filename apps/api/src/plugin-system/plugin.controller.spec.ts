@@ -22,14 +22,26 @@ function frontendPlugin(name: string): LoadedPluginManifest {
 describe('PluginController', () => {
   let root: string;
   let service: { uploadPlugin: jest.Mock; deletePlugin: jest.Mock };
-  let npmService: { searchMarketplace: jest.Mock; marketplacePackage: jest.Mock };
+  let npmService: {
+    findInstalledByPluginId: jest.Mock;
+    listInstalled: jest.Mock;
+    removeInstalled: jest.Mock;
+    searchMarketplace: jest.Mock;
+    marketplacePackage: jest.Mock;
+  };
   let controller: PluginController;
 
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'plugin-controller-'));
     PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
     service = { uploadPlugin: jest.fn(), deletePlugin: jest.fn() };
-    npmService = { searchMarketplace: jest.fn(), marketplacePackage: jest.fn() };
+    npmService = {
+      findInstalledByPluginId: jest.fn(),
+      listInstalled: jest.fn().mockReturnValue([]),
+      removeInstalled: jest.fn(),
+      searchMarketplace: jest.fn(),
+      marketplacePackage: jest.fn(),
+    };
     controller = new PluginController(service as unknown as PluginService, npmService as never);
   });
 
@@ -107,8 +119,8 @@ describe('PluginController', () => {
     expect(service.uploadPlugin).toHaveBeenCalledWith(file);
   });
 
-  it('delegates delete to the plugin service', () => {
-    controller.deletePlugin('plugin-id');
+  it('delegates non-npm plugin deletion to the plugin service', async () => {
+    await controller.deletePlugin('plugin-id');
     expect(service.deletePlugin).toHaveBeenCalledWith('plugin-id');
   });
 
@@ -120,5 +132,38 @@ describe('PluginController', () => {
   it('delegates direct marketplace lookup with its selected registry', () => {
     controller.marketplacePackage('@private/plugin', 'private');
     expect(npmService.marketplacePackage).toHaveBeenCalledWith('@private/plugin', 'private');
+  });
+
+  it('uses the data-preserving npm removal flow for an installed npm package', async () => {
+    const plugin = frontendPlugin('@attraccess/plugin');
+    jest.spyOn(PluginService, 'getPlugins').mockReturnValue([plugin]);
+    npmService.listInstalled.mockReturnValue([{ name: '@attraccess/plugin', installPath: plugin.pluginDirectory }]);
+
+    await controller.deletePlugin(plugin.id);
+
+    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin');
+    expect(service.deletePlugin).not.toHaveBeenCalled();
+  });
+
+  it('uses the data-preserving npm removal flow when npm manifest discovery fails', async () => {
+    npmService.findInstalledByPluginId.mockReturnValue({ name: '@attraccess/plugin' });
+
+    await controller.deletePlugin('npm-plugin-id');
+
+    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin');
+    expect(service.deletePlugin).not.toHaveBeenCalled();
+  });
+
+  it('deletes an uploaded plugin when it shares a manifest name with an npm package', async () => {
+    const plugin = { ...frontendPlugin('@attraccess/plugin'), pluginDirectory: 'uploaded-plugin' };
+    jest.spyOn(PluginService, 'getPlugins').mockReturnValue([plugin]);
+    npmService.listInstalled.mockReturnValue([
+      { name: '@attraccess/plugin', installPath: 'npm-QGF0dHJhY2Nlc3MvcGx1Z2lu' },
+    ]);
+
+    await controller.deletePlugin(plugin.id);
+
+    expect(service.deletePlugin).toHaveBeenCalledWith(plugin.id);
+    expect(npmService.removeInstalled).not.toHaveBeenCalled();
   });
 });

@@ -93,6 +93,23 @@ export class PluginController {
     return this.npmPluginService.install(packageName, version, registryId);
   }
 
+  @Post('npm/:packageName')
+  @Auth('system.plugins.manage')
+  installPackageSpec(
+    @Param('packageName') packageName: string,
+    @Body('spec') spec = 'latest',
+    @Body('registryId') registryId?: string,
+  ) {
+    return this.npmPluginService.install(packageName, spec, registryId);
+  }
+
+  @Delete('installed/:packageName')
+  @Auth('system.plugins.manage')
+  async removeInstalledPackage(@Param('packageName') packageName: string) {
+    await this.npmPluginService.removeInstalled(packageName);
+    return { ok: true };
+  }
+
   @Get('installed')
   @Auth('system.plugins.manage')
   installedPackages() {
@@ -183,7 +200,16 @@ export class PluginController {
     description: 'The plugin has been deleted',
   })
   @Auth('system.plugins.manage')
-  deletePlugin(@Param('pluginId') pluginId: string) {
+  async deletePlugin(@Param('pluginId') pluginId: string) {
+    const plugin = PluginService.getManifestById(pluginId);
+    const installed = this.npmPluginService.findInstalledByPluginId(pluginId) ??
+      (plugin
+        ? this.npmPluginService.listInstalled().find(({ installPath }) => installPath === plugin.pluginDirectory)
+        : undefined);
+    if (installed) {
+      await this.npmPluginService.removeInstalled(installed.name);
+      return;
+    }
     return this.pluginService.deletePlugin(pluginId);
   }
 }

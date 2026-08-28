@@ -8,7 +8,7 @@ import { existsSync, readdirSync, readFileSync } from 'fs';
 import { FileUpload } from '../common/types/file-upload.types';
 import { rename, rm } from 'fs/promises';
 import decompress from 'decompress';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { spawn } from 'child_process';
 
 const INTERNAL_PLUGIN_DIRECTORIES = new Set(['.npm-backups']);
@@ -106,7 +106,9 @@ export class PluginService {
         }
 
         manifest.pluginDirectory = pluginFolder;
-        manifest.id = randomBytes(16).toString('base64url').slice(0, 21);
+        // The directory is the installation identity. Keeping its derived ID stable
+        // prevents registrations from changing every time the host restarts.
+        manifest.id = createHash('sha256').update(pluginFolder).digest('base64url').slice(0, 21);
 
         try {
           manifest.permissions = PluginSandboxService.validateDeclaredPermissions(manifest.name, manifest.permissions);

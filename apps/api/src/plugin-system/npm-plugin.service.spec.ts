@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { lookup } from 'dns/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -470,6 +470,57 @@ describe('NpmPluginService', () => {
     expect(service.listInstalled()).toEqual([expect.objectContaining({ name, version: '1.2.3' })]);
   });
 
+  it('resolves semver ranges while persisting the requested spec', async () => {
+    const name = '@attraccess/plugin';
+    const tarball = await packageTarball(name);
+    const service = new NpmPluginService({} as never);
+    const internals = service as unknown as ServiceInternals;
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      versions: {
+        '1.0.0': {
+          version: '1.0.0',
+          dist: { tarball: 'older', shasum: createHash('sha1').update(tarball).digest('hex') },
+        },
+        '1.2.3': {
+          version: '1.2.3',
+          dist: { tarball: 'plugin', shasum: createHash('sha1').update(tarball).digest('hex') },
+        },
+      },
+    });
+    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+
+    await expect(service.install(name, '^1.0.0')).resolves.toMatchObject({ version: '1.2.3', requestedSpec: '^1.0.0' });
+  });
+
+  it('removes npm package code and its installation record without reverting migrations', async () => {
+    const name = '@attraccess/plugin';
+    const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
+    mkdirSync(join(root, installPath), { recursive: true });
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name,
+          version: '1.2.3',
+          registryId: 'npm',
+          registryUrl: 'https://registry.npmjs.org',
+          integrity: 'sha512-test',
+          installPath,
+          permissions: [],
+          lastError: null,
+        },
+      ]),
+    );
+    const service = new NpmPluginService({} as never);
+
+    await service.removeInstalled(name);
+
+    expect(existsSync(join(root, installPath))).toBe(false);
+    expect(service.listInstalled()).toEqual([]);
+    expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
+  });
+
   it('restarts after backup cleanup fails following a successful install', async () => {
     const name = '@attraccess/plugin';
     const tarball = await packageTarball(name);
@@ -505,6 +556,84 @@ describe('NpmPluginService', () => {
     expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
     expect(service.listInstalled()).toEqual([expect.objectContaining({ name, version: '1.2.3' })]);
     expect(readdirSync(join(root, '.npm-backups'))).toHaveLength(1);
+
+    await service.onModuleInit();
+
+    expect(existsSync(join(root, '.npm-backups'))).toBe(false);
+  });
+
+  it('restores the state-matching package after an interrupted replacement', async () => {
+    const name = '@attraccess/plugin';
+    const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
+    const backup = join(root, '.npm-backups', `${installPath}-00000000-0000-0000-0000-000000000000`);
+    mkdirSync(join(backup, 'dist'), { recursive: true });
+    writeFileSync(join(backup, 'plugin.json'), JSON.stringify({ name, version: '1.0.0' }));
+    writeFileSync(join(backup, 'dist', 'index.js'), 'module.exports = {};');
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name,
+          version: '1.0.0',
+          registryId: 'npm',
+          registryUrl: 'https://registry.npmjs.org',
+          integrity: 'sha512-test',
+          installPath,
+          permissions: [],
+          lastError: null,
+        },
+      ]),
+    );
+    const service = new NpmPluginService({} as never);
+
+    await service.onModuleInit();
+
+    expect(existsSync(join(root, installPath, 'dist', 'index.js'))).toBe(true);
+    expect(existsSync(backup)).toBe(false);
+  });
+
+  it('replaces newly activated code with the state-matching backup after a crash', async () => {
+    const name = '@attraccess/plugin';
+    const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
+    const backup = join(root, '.npm-backups', `${installPath}-00000000-0000-0000-0000-000000000000`);
+    mkdirSync(join(backup, 'dist'), { recursive: true });
+    writeFileSync(join(backup, 'plugin.json'), JSON.stringify({ name, version: '1.0.0' }));
+    writeFileSync(join(backup, 'dist', 'index.js'), 'module.exports = "1.0.0";');
+    mkdirSync(join(root, installPath, 'dist'), { recursive: true });
+    writeFileSync(join(root, installPath, 'plugin.json'), JSON.stringify({ name, version: '2.0.0' }));
+    writeFileSync(join(root, installPath, 'dist', 'index.js'), 'module.exports = "2.0.0";');
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name,
+          version: '1.0.0',
+          registryId: 'npm',
+          registryUrl: 'https://registry.npmjs.org',
+          integrity: 'sha512-test',
+          installPath,
+          permissions: [],
+          lastError: null,
+        },
+      ]),
+    );
+
+    await NpmPluginService.recoverBackups();
+
+    expect(readFileSync(join(root, installPath, 'dist', 'index.js'), 'utf8')).toBe('module.exports = "1.0.0";');
+    expect(existsSync(backup)).toBe(false);
+  });
+
+  it('skips backup recovery when plugins are not configured', async () => {
+    PluginService.configure({ PLUGIN_DIR: '', RESTART_BY_EXIT: true });
+
+    await expect(NpmPluginService.recoverBackups()).resolves.toBeUndefined();
+  });
+
+  it('fails recovery when it cannot reconcile a package backup', async () => {
+    writeFileSync(join(root, '.npm-backups'), 'not a directory');
+
+    await expect(NpmPluginService.recoverBackups()).rejects.toThrow();
   });
 
   it('classifies installed versions and calculates their permission delta', async () => {

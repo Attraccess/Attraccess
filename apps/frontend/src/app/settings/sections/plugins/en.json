@@ -57,7 +57,7 @@
   },
   "deleteConfirmation": {
     "title": "Remove plugin?",
-    "message": "Remove the plugin {{pluginName}}? This cannot be undone, and the app will reload once it is gone.",
+    "message": "Remove the plugin {{pluginName}}? Its code and runtime registrations will be removed and the app will reload. Plugin data and secrets are retained for recovery.",
     "cancel": "Cancel",
     "delete": "Remove"
   },

@@ -57,7 +57,7 @@
   },
   "deleteConfirmation": {
     "title": "Plugin entfernen?",
-    "message": "Das Plugin {{pluginName}} entfernen? Das lässt sich nicht rückgängig machen; die App lädt anschließend neu.",
+    "message": "Das Plugin {{pluginName}} entfernen? Sein Code und seine Laufzeitregistrierungen werden entfernt und die App wird neu geladen. Plugin-Daten und Geheimnisse bleiben zur Wiederherstellung erhalten.",
     "cancel": "Abbrechen",
     "delete": "Entfernen"
   },
