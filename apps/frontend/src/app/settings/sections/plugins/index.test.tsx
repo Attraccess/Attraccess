@@ -159,6 +159,71 @@ describe('PluginsSection', () => {
     expect(screen.getByLabelText('Access token (write-only)')).toHaveAttribute('type', 'password');
   });
 
+  it('keeps the latest registry refresh when an earlier load completes late', async () => {
+    const initial = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
+    const refreshed = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
+    let registryLoads = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: { url?: string } | string, init?: { method?: string }) => {
+        const request = typeof input === 'string' ? { url: input, method: init?.method } : input;
+        if (request.url?.endsWith('/api/plugins/registries')) {
+          if (request.method === 'POST') return Promise.resolve({ ok: true });
+          registryLoads += 1;
+          return registryLoads === 1 ? initial.promise : refreshed.promise;
+        }
+        if (request.url?.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+        return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
+      }),
+    );
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+
+    await waitFor(() => expect(registryLoads).toBe(1));
+    await user.click(screen.getByText('Manage registries'));
+    await user.type(screen.getByLabelText('Registry name'), 'Private');
+    await user.type(screen.getByLabelText('Registry URL'), 'https://packages.example.test/npm');
+    await user.click(screen.getByRole('button', { name: 'Add registry' }));
+
+    refreshed.resolve({
+      ok: true,
+      json: async () => [
+        { id: 'private', name: 'Private', url: 'https://packages.example.test/npm', tokenConfigured: false },
+      ],
+    });
+    expect(await screen.findByText(/Private.*No token/)).toBeInTheDocument();
+    initial.resolve({ ok: true, json: async () => [] });
+
+    await waitFor(() => expect(screen.getByText(/Private.*No token/)).toBeInTheDocument());
+  });
+
+  it('does not report a registry add as successful when its refresh fails', async () => {
+    let registryLoads = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: { url?: string } | string, init?: { method?: string }) => {
+        const request = typeof input === 'string' ? { url: input, method: init?.method } : input;
+        if (request.url?.endsWith('/api/plugins/registries')) {
+          if (request.method === 'POST') return Promise.resolve({ ok: true });
+          registryLoads += 1;
+          return Promise.resolve(registryLoads === 1 ? { ok: true, json: async () => [] } : { ok: false });
+        }
+        if (request.url?.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+        return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
+      }),
+    );
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+
+    await user.click(screen.getByText('Manage registries'));
+    await user.type(screen.getByLabelText('Registry name'), 'Private');
+    await user.type(screen.getByLabelText('Registry URL'), 'https://packages.example.test/npm');
+    await user.click(screen.getByRole('button', { name: 'Add registry' }));
+
+    await waitFor(() => expect(hoisted.errorToast).toHaveBeenCalled());
+    expect(hoisted.successToast).not.toHaveBeenCalledWith(expect.objectContaining({ title: 'Registry added.' }));
+  });
+
   it('renders community for an installed plugin until its npm classification is available', () => {
     hoisted.plugins = [makePlugin({ name: '@attraccess-plugins/shelly' })];
     const installedResponse = {
