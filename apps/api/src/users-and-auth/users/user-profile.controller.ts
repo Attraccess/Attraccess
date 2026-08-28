@@ -2,7 +2,6 @@ import { Body, Controller, Get, Patch, Post, Req, UseInterceptors } from '@nestj
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { User } from '@attraccess/database-entities';
 import { AuthenticatedRequest, AuthenticatedUser, SessionAuth } from '@attraccess/plugins-backend-sdk';
-import { plainToInstance } from 'class-transformer';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
 import { AuthRateLimit } from '../rate-limiting/rate-limit.decorator';
 import { UsersService } from './users.service';
@@ -33,10 +32,20 @@ export class UserProfileController {
   })
   async getCurrent(@Req() request: AuthenticatedRequest): Promise<CurrentUserDto> {
     const user = request.user as AuthenticatedUser;
-    return plainToInstance(CurrentUserDto, {
-      ...user,
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      locale: user.locale,
+      isEmailVerified: user.isEmailVerified,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      deletedAt: user.deletedAt,
+      externalIdentifier: user.externalIdentifier,
+      creditBalance: user.creditBalance,
+      billingFactor: user.billingFactor,
       effectivePermissions: user.effectivePermissions ? [...user.effectivePermissions] : [],
-    });
+    };
   }
 
   @SessionAuth()

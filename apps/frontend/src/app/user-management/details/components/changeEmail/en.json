@@ -6,7 +6,8 @@
     "updateFailed": "Failed to update email"
   },
   "email": {
-    "label": "Email"
+    "label": "New email",
+    "privacyHint": "The current email address is not shown to protect this user's privacy."
   },
   "actions": {
     "save": "Save",

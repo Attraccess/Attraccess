@@ -6,7 +6,8 @@
     "updateFailed": "Failed to update email"
   },
   "email": {
-    "label": "Email"
+    "currentLabel": "Current email",
+    "newLabel": "New email"
   },
   "actions": {
     "save": "Save",

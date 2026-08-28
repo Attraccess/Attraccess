@@ -11,6 +11,7 @@ const mutate = vi.fn();
 vi.mock('@attraccess/react-query-client', () => ({
   ApiError: class ApiError extends Error {},
   useUsersServiceChangeMyEmail: () => ({ mutate, isPending: false }),
+  useUsersServiceGetCurrent: () => ({ data: { email: 'current@example.com' }, isLoading: false }),
   useUsersServiceGetCurrentKey: 'current-user',
 }));
 
@@ -18,7 +19,8 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: () => ({
     t: (key: string) =>
       ({
-        'email.label': 'Email',
+        'email.currentLabel': 'Current email',
+        'email.newLabel': 'New email',
         'actions.save': 'Save',
         'actions.cancel': 'Cancel',
         'actions.confirm': 'Change email',
@@ -37,8 +39,18 @@ vi.mock('@heroui/react', () => ({
   ModalBody: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   ModalFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   ModalHeader: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
-  TextField: ({ children, value, onChange }: { children: React.ReactNode; value: string; onChange: (value: string) => void }) => (
-    <div onChange={(event) => onChange((event.target as HTMLInputElement).value)}>{children}</div>
+  TextField: ({
+    children,
+    value,
+    onChange,
+  }: {
+    children: React.ReactNode;
+    value: string;
+    onChange?: (value: string) => void;
+  }) => (
+    <div data-value={value} onChange={(event) => onChange?.((event.target as HTMLInputElement).value)}>
+      {children}
+    </div>
   ),
   useOverlayState: () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -70,7 +82,9 @@ describe('EmailForm', () => {
     const user = userEvent.setup();
     render(<EmailForm />, { wrapper: QueryWrapper });
 
-    await user.type(screen.getByRole('textbox'), 'new@example.com');
+    expect(screen.getByText('Current email').parentElement).toHaveAttribute('data-value', 'current@example.com');
+
+    await user.type(screen.getAllByRole('textbox')[1], 'new@example.com');
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(screen.getByText('Sign-in warning')).toBeInTheDocument();

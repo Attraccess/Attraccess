@@ -20,6 +20,7 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
     t: (key: string) =>
       ({
         'email.label': 'Email',
+        'email.privacyHint': "The current email address is not shown to protect this user's privacy.",
         'actions.save': 'Save',
         'actions.cancel': 'Cancel',
         'actions.confirm': 'Change email',
@@ -71,6 +72,8 @@ describe('ChangeEmailForm', () => {
   it('requires confirmation before changing a user email address', async () => {
     const user = userEvent.setup();
     render(<ChangeEmailForm userId={7} />, { wrapper: QueryWrapper });
+
+    expect(screen.getByText("The current email address is not shown to protect this user's privacy.")).toBeInTheDocument();
 
     await user.type(screen.getByRole('textbox'), 'new@example.com');
     await user.click(screen.getByRole('button', { name: 'Save' }));
