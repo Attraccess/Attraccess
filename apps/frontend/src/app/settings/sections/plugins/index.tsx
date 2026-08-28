@@ -1,6 +1,11 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
   Chip,
+  Dropdown,
+  DropdownItem,
+  DropdownMenu,
+  DropdownPopover,
+  DropdownTrigger,
   Input,
   ModalBody,
   ModalFooter,
@@ -18,9 +23,10 @@ import {
   Tooltip,
   TooltipContent,
 } from '@heroui/react';
-import { AlertTriangle, BookOpen, CheckCircle2, Search, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, BookOpen, CheckCircle2, ChevronDown, Store, Trash2, Upload } from 'lucide-react';
 import { usePluginsServiceDeletePlugin, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { buttonVariants } from '@heroui/styles';
 import { SettingsSection } from '../../components/SettingsSection';
 import { Button } from '../../../../components/button';
 import { StandardModal } from '../../../../components/standardModal';
@@ -123,6 +129,7 @@ export function PluginsSection() {
   const [isReplacing, setIsReplacing] = useState(false);
   const [npmPluginNames, setNpmPluginNames] = useState<Set<string>>(new Set());
   const [installedNpmPlugins, setInstalledNpmPlugins] = useState<Map<string, InstalledNpmPlugin>>(new Map());
+  const [isMarketplaceOpen, setIsMarketplaceOpen] = useState(false);
   const [marketplaceQuery, setMarketplaceQuery] = useState('');
   const [selectedRegistryId, setSelectedRegistryId] = useState('');
   const [marketplacePlugins, setMarketplacePlugins] = useState<MarketplacePlugin[]>([]);
@@ -181,6 +188,8 @@ export function PluginsSection() {
   const loadMarketplace = async (query = marketplaceQuery) => {
     const request = ++marketplaceOperationRequest.current;
     setIsLoadingMarketplace(true);
+    let result: { results: MarketplacePlugin[]; errors: string[] } = { results: [], errors: [] };
+    let searchFailed = false;
     try {
       const response = await fetch(
         `${getBaseUrl()}/api/plugins/marketplace/search?query=${encodeURIComponent(query)}${selectedRegistryId ? `&registryId=${encodeURIComponent(selectedRegistryId)}` : ''}`,
@@ -188,38 +197,38 @@ export function PluginsSection() {
           credentials: 'include',
         },
       );
-      if (!response.ok) throw new Error();
-      const result = (await response.json()) as { results: MarketplacePlugin[]; errors: string[] };
-      if (marketplaceOperationRequest.current === request) {
-        const unique = new Map(result.results.map((plugin) => [`${plugin.registry.id}:${plugin.name}`, plugin]));
-        setMarketplacePlugins([...unique.values()]);
-        if (result.errors.length > 0)
-          toast.error({ title: t('marketplace.loadError'), description: result.errors.join(', ') });
-      }
+      if (!response.ok) searchFailed = true;
+      else result = (await response.json()) as { results: MarketplacePlugin[]; errors: string[] };
     } catch {
-      if (marketplaceOperationRequest.current === request) toast.error({ title: t('marketplace.loadError') });
-    } finally {
-      if (marketplaceOperationRequest.current === request) setIsLoadingMarketplace(false);
+      searchFailed = true;
     }
-  };
 
-  const lookupMarketplacePackage = async () => {
-    if (!marketplaceQuery.trim()) return void loadMarketplace();
-    const request = ++marketplaceOperationRequest.current;
-    setIsLoadingMarketplace(true);
-    try {
-      const response = await fetch(
-        `${getBaseUrl()}/api/plugins/marketplace/${encodeURIComponent(marketplaceQuery.trim())}${selectedRegistryId ? `?registryId=${encodeURIComponent(selectedRegistryId)}` : ''}`,
-        { credentials: 'include' },
-      );
-      if (!response.ok) throw new Error();
-      const detail = (await response.json()) as MarketplacePlugin;
-      if (marketplaceOperationRequest.current === request) setMarketplacePlugin(detail);
-    } catch {
-      if (marketplaceOperationRequest.current === request) toast.error({ title: t('marketplace.lookupError') });
-    } finally {
-      if (marketplaceOperationRequest.current === request) setIsLoadingMarketplace(false);
+    let directPackage: MarketplacePlugin | null = null;
+    if (selectedRegistryId && query.trim()) {
+      try {
+        const packageResponse = await fetch(
+          `${getBaseUrl()}/api/plugins/marketplace/${encodeURIComponent(query.trim())}?registryId=${encodeURIComponent(selectedRegistryId)}`,
+          { credentials: 'include' },
+        );
+        if (packageResponse.ok) directPackage = (await packageResponse.json()) as MarketplacePlugin;
+      } catch {
+        // Registry search results remain useful when an exact package lookup is unavailable.
+      }
     }
+
+    if (marketplaceOperationRequest.current === request) {
+      const unique = new Map(
+        [...result.results, ...(directPackage ? [directPackage] : [])].map((plugin) => [
+          `${plugin.registry.id}:${plugin.name}`,
+          plugin,
+        ]),
+      );
+      setMarketplacePlugins([...unique.values()]);
+      if (searchFailed && !directPackage) toast.error({ title: t('marketplace.loadError') });
+      else if (result.errors.length > 0)
+        toast.error({ title: t('marketplace.loadError'), description: result.errors.join(', ') });
+    }
+    if (marketplaceOperationRequest.current === request) setIsLoadingMarketplace(false);
   };
 
   const addRegistry = async () => {
@@ -274,15 +283,13 @@ export function PluginsSection() {
     }
   };
 
-  const loadInitialMarketplace = useEffectEvent(() => {
-    void loadMarketplace('');
-  });
-
   useEffect(() => {
-    if (globalThis.fetch) loadInitialMarketplace();
-  }, []);
+    if (!isMarketplaceOpen || !globalThis.fetch) return;
+    const timeout = window.setTimeout(() => void loadMarketplace(), marketplaceQuery.trim() ? 300 : 0);
+    return () => window.clearTimeout(timeout);
+  }, [isMarketplaceOpen, marketplaceQuery, selectedRegistryId]);
 
-  const openMarketplacePlugin = async (plugin: MarketplacePlugin) => {
+  const openMarketplacePlugin = async (plugin: MarketplacePlugin, closeMarketplace = false) => {
     const request = ++marketplaceOperationRequest.current;
     setIsLoadingMarketplace(true);
     try {
@@ -292,7 +299,10 @@ export function PluginsSection() {
       );
       if (!response.ok) throw new Error();
       const details = (await response.json()) as MarketplacePlugin;
-      if (marketplaceOperationRequest.current === request) setMarketplacePlugin(details);
+      if (marketplaceOperationRequest.current === request) {
+        setMarketplacePlugin(details);
+        if (closeMarketplace) setIsMarketplaceOpen(false);
+      }
     } catch {
       if (marketplaceOperationRequest.current === request) toast.error({ title: t('marketplace.loadError') });
     } finally {
@@ -431,16 +441,29 @@ export function PluginsSection() {
   return (
     <SettingsSection title={t('title')} description={t('description')} aside={aside}>
       <div data-cy="plugins-list-card" className="flex flex-col gap-4">
-        <div className="flex">
-          <Button
-            variant="primary"
-            size="sm"
-            onPress={() => setIsUploadOpen(true)}
-            data-cy="plugins-list-upload-plugin-button"
-          >
-            <Upload size={16} />
-            {t('uploadButton')}
-          </Button>
+        <div className="flex justify-end">
+          <Dropdown>
+            <DropdownTrigger
+              className={buttonVariants({ size: 'sm', variant: 'primary' })}
+              data-cy="plugins-list-install-plugin-button"
+            >
+              <Upload size={16} />
+              {t('installPlugin')}
+              <ChevronDown size={16} />
+            </DropdownTrigger>
+            <DropdownPopover>
+              <DropdownMenu aria-label={t('installPlugin')}>
+                <DropdownItem id="marketplace" onPress={() => setIsMarketplaceOpen(true)}>
+                  <Store size={16} />
+                  {t('marketplace.open')}
+                </DropdownItem>
+                <DropdownItem id="upload" onPress={() => setIsUploadOpen(true)}>
+                  <Upload size={16} />
+                  {t('uploadButton')}
+                </DropdownItem>
+              </DropdownMenu>
+            </DropdownPopover>
+          </Dropdown>
         </div>
 
         <Table data-cy="plugins-list-table">
@@ -599,143 +622,161 @@ export function PluginsSection() {
           </TableScrollContainer>
         </Table>
 
-        <section
-          className="flex flex-col gap-4 border-t border-divider pt-6"
-          aria-labelledby="plugin-marketplace-title"
-        >
-          <div>
-            <h3 id="plugin-marketplace-title" className="text-base font-semibold text-foreground">
-              {t('marketplace.title')}
-            </h3>
-            <p className="text-sm text-muted">{t('marketplace.description')}</p>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <TextField value={marketplaceQuery} onChange={setMarketplaceQuery} className="w-full">
-              <Input placeholder={t('marketplace.searchPlaceholder')} aria-label={t('marketplace.search')} />
-            </TextField>
-            <select
-              aria-label={t('marketplace.registry')}
-              value={selectedRegistryId}
-              onChange={(event) => setSelectedRegistryId(event.target.value)}
-              className="h-10 rounded-medium border border-divider bg-content1 px-3 text-sm"
-            >
-              <option value="">{t('marketplace.allRegistries')}</option>
-              <option value="npm">npm</option>
-              {registries.map((registry) => (
-                <option key={registry.id} value={registry.id}>
-                  {registry.name}
-                </option>
-              ))}
-            </select>
-            <Button variant="secondary" onPress={() => void loadMarketplace()} isPending={isLoadingMarketplace}>
-              <Search size={16} />
-              {t('marketplace.search')}
-            </Button>
-            <Button
-              variant="secondary"
-              onPress={() => void lookupMarketplacePackage()}
-              isPending={isLoadingMarketplace}
-            >
-              {t('marketplace.lookup')}
-            </Button>
-          </div>
-          {(['official', 'community'] as const).map((classification) => {
-            const pluginsForClassification = marketplacePlugins.filter(
-              (plugin) => plugin.classification === classification,
-            );
-            if (pluginsForClassification.length === 0) return null;
-            return (
-              <div key={classification} className="flex flex-col gap-3">
-                <h4 className="font-medium text-foreground">{t(`marketplace.${classification}`)}</h4>
-                <div className="grid gap-3 md:grid-cols-2">
-                  {pluginsForClassification.map((plugin) => (
-                    <article
-                      key={`${plugin.registry.id}:${plugin.name}`}
-                      className="flex flex-col gap-3 rounded-medium border border-divider p-4"
+        <StandardModal isOpen={isMarketplaceOpen} onOpenChange={setIsMarketplaceOpen} size="lg">
+          {() => (
+            <>
+              <ModalHeader>
+                <ModalHeading>{t('marketplace.title')}</ModalHeading>
+              </ModalHeader>
+              <ModalBody>
+                <div className="flex flex-col gap-4">
+                  <p className="text-sm text-muted">{t('marketplace.description')}</p>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <TextField
+                      value={marketplaceQuery}
+                      onChange={(value) => {
+                        marketplaceOperationRequest.current++;
+                        setMarketplaceQuery(value);
+                      }}
+                      className="w-full"
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <h4 className="font-medium text-foreground">{plugin.displayName ?? plugin.name}</h4>
-                          <p className="text-xs text-muted">{plugin.name}</p>
+                      <Input placeholder={t('marketplace.searchPlaceholder')} aria-label={t('marketplace.search')} />
+                    </TextField>
+                    <select
+                      aria-label={t('marketplace.registry')}
+                      value={selectedRegistryId}
+                      onChange={(event) => {
+                        marketplaceOperationRequest.current++;
+                        setSelectedRegistryId(event.target.value);
+                      }}
+                      className="h-10 rounded-medium border border-divider bg-content1 px-3 text-sm"
+                    >
+                      <option value="">{t('marketplace.allRegistries')}</option>
+                      <option value="npm">npm</option>
+                      {registries.map((registry) => (
+                        <option key={registry.id} value={registry.id}>
+                          {registry.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {isLoadingMarketplace ? (
+                    <p role="status" className="text-sm text-muted">
+                      {t('marketplace.loading')}
+                    </p>
+                  ) : null}
+                  {(['official', 'community'] as const).map((classification) => {
+                    const pluginsForClassification = marketplacePlugins.filter(
+                      (plugin) => plugin.classification === classification,
+                    );
+                    if (pluginsForClassification.length === 0) return null;
+                    return (
+                      <div key={classification} className="flex flex-col gap-3">
+                        <h4 className="font-medium text-foreground">{t(`marketplace.${classification}`)}</h4>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          {pluginsForClassification.map((plugin) => (
+                            <article
+                              key={`${plugin.registry.id}:${plugin.name}`}
+                              className="flex flex-col gap-3 rounded-medium border border-divider p-4"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <h4 className="font-medium text-foreground">{plugin.displayName ?? plugin.name}</h4>
+                                  <p className="text-xs text-muted">{plugin.name}</p>
+                                </div>
+                                <PluginClassificationBadge classification={plugin.classification} />
+                              </div>
+                              {plugin.description ? <p className="text-sm text-muted">{plugin.description}</p> : null}
+                              <p className="text-xs text-muted">
+                                {t('marketplace.version', { version: plugin.version ?? '-' })}
+                              </p>
+                              {plugin.incompatibilityReason ? (
+                                <p className="text-sm text-danger">{plugin.incompatibilityReason}</p>
+                              ) : null}
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs text-muted">
+                                  {plugin.registry.name} · {plugin.publisher ?? '-'}
+                                </span>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onPress={() => void openMarketplacePlugin(plugin, true)}
+                                >
+                                  {npmPluginNames.has(plugin.name)
+                                    ? t('marketplace.installed')
+                                    : t('marketplace.details')}
+                                </Button>
+                              </div>
+                            </article>
+                          ))}
                         </div>
-                        <PluginClassificationBadge classification={plugin.classification} />
                       </div>
-                      {plugin.description ? <p className="text-sm text-muted">{plugin.description}</p> : null}
-                      <p className="text-xs text-muted">
-                        {t('marketplace.version', { version: plugin.version ?? '-' })}
-                      </p>
-                      {plugin.incompatibilityReason ? (
-                        <p className="text-sm text-danger">{plugin.incompatibilityReason}</p>
-                      ) : null}
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs text-muted">
-                          {plugin.registry.name} · {plugin.publisher ?? '-'}
-                        </span>
-                        <Button variant="secondary" size="sm" onPress={() => void openMarketplacePlugin(plugin)}>
-                          {npmPluginNames.has(plugin.name) ? t('marketplace.installed') : t('marketplace.details')}
+                    );
+                  })}
+                  {!isLoadingMarketplace && marketplacePlugins.length === 0 ? (
+                    <p role="status" className="text-sm text-muted">
+                      {t('marketplace.noResults')}
+                    </p>
+                  ) : null}
+                  <details className="border-t border-divider pt-4">
+                    <summary className="cursor-pointer font-medium text-foreground">
+                      {t('marketplace.registryManagement')}
+                    </summary>
+                    <div className="mt-3 flex flex-col gap-3">
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <TextField value={registryName} onChange={setRegistryName}>
+                          <Input
+                            placeholder={t('marketplace.registryName')}
+                            aria-label={t('marketplace.registryName')}
+                          />
+                        </TextField>
+                        <TextField value={registryUrl} onChange={setRegistryUrl}>
+                          <Input placeholder={t('marketplace.registryUrl')} aria-label={t('marketplace.registryUrl')} />
+                        </TextField>
+                        <TextField value={registryToken} onChange={setRegistryToken}>
+                          <Input
+                            type="password"
+                            placeholder={t('marketplace.registryToken')}
+                            aria-label={t('marketplace.registryToken')}
+                          />
+                        </TextField>
+                      </div>
+                      <div>
+                        <Button variant="secondary" onPress={() => void addRegistry()} isPending={isSavingRegistry}>
+                          {t('marketplace.addRegistry')}
                         </Button>
                       </div>
-                    </article>
-                  ))}
+                      {registries.map((registry) => (
+                        <div
+                          key={registry.id}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-medium border border-divider p-3 text-sm"
+                        >
+                          <span>
+                            {registry.name} · {registry.url} ·{' '}
+                            {registry.tokenConfigured ? t('marketplace.tokenConfigured') : t('marketplace.noToken')}
+                          </span>
+                          <span className="flex gap-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onPress={() => void testRegistry(registry.id)}
+                              isPending={testingRegistryId === registry.id}
+                            >
+                              {t('marketplace.testRegistry')}
+                            </Button>
+                            <Button variant="danger-soft" size="sm" onPress={() => void removeRegistry(registry.id)}>
+                              {t('marketplace.removeRegistry')}
+                            </Button>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
                 </div>
-              </div>
-            );
-          })}
-          {!isLoadingMarketplace && marketplacePlugins.length === 0 ? (
-            <p className="text-sm text-muted">{t('marketplace.noResults')}</p>
-          ) : null}
-          <details className="border-t border-divider pt-4">
-            <summary className="cursor-pointer font-medium text-foreground">
-              {t('marketplace.registryManagement')}
-            </summary>
-            <div className="mt-3 flex flex-col gap-3">
-              <div className="grid gap-2 sm:grid-cols-3">
-                <TextField value={registryName} onChange={setRegistryName}>
-                  <Input placeholder={t('marketplace.registryName')} aria-label={t('marketplace.registryName')} />
-                </TextField>
-                <TextField value={registryUrl} onChange={setRegistryUrl}>
-                  <Input placeholder={t('marketplace.registryUrl')} aria-label={t('marketplace.registryUrl')} />
-                </TextField>
-                <TextField value={registryToken} onChange={setRegistryToken}>
-                  <Input
-                    type="password"
-                    placeholder={t('marketplace.registryToken')}
-                    aria-label={t('marketplace.registryToken')}
-                  />
-                </TextField>
-              </div>
-              <div>
-                <Button variant="secondary" onPress={() => void addRegistry()} isPending={isSavingRegistry}>
-                  {t('marketplace.addRegistry')}
-                </Button>
-              </div>
-              {registries.map((registry) => (
-                <div
-                  key={registry.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-medium border border-divider p-3 text-sm"
-                >
-                  <span>
-                    {registry.name} · {registry.url} ·{' '}
-                    {registry.tokenConfigured ? t('marketplace.tokenConfigured') : t('marketplace.noToken')}
-                  </span>
-                  <span className="flex gap-2">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onPress={() => void testRegistry(registry.id)}
-                      isPending={testingRegistryId === registry.id}
-                    >
-                      {t('marketplace.testRegistry')}
-                    </Button>
-                    <Button variant="danger-soft" size="sm" onPress={() => void removeRegistry(registry.id)}>
-                      {t('marketplace.removeRegistry')}
-                    </Button>
-                  </span>
-                </div>
-              ))}
-            </div>
-          </details>
-        </section>
+              </ModalBody>
+            </>
+          )}
+        </StandardModal>
       </div>
 
       <StandardModal

@@ -1,7 +1,8 @@
 {
   "title": "Plugins",
   "description": "Plugins installed on this instance, and what each of them loaded.",
-  "uploadButton": "Upload plugin",
+  "installPlugin": "Install plugin",
+  "uploadButton": "Upload ZIP file",
   "docsButton": "Documentation",
   "manageVersion": "Manage version",
   "classification": {
@@ -21,9 +22,10 @@
     "community": "Community plugins",
     "registry": "Registry",
     "allRegistries": "All registries",
-    "lookup": "Look up package",
+    "open": "Browse marketplace",
     "search": "Search plugins",
-    "searchPlaceholder": "Search by name or capability",
+    "searchPlaceholder": "Search plugins or enter an exact package name",
+    "loading": "Searching plugins...",
     "details": "Details",
     "installed": "Installed",
     "install": "Install",

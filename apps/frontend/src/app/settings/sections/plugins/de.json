@@ -1,7 +1,8 @@
 {
   "title": "Plugins",
   "description": "Auf dieser Instanz installierte Plugins und was davon geladen wurde.",
-  "uploadButton": "Plugin hochladen",
+  "installPlugin": "Plugin installieren",
+  "uploadButton": "ZIP-Datei hochladen",
   "docsButton": "Dokumentation",
   "manageVersion": "Version verwalten",
   "classification": {
@@ -21,9 +22,10 @@
     "community": "Community-Plugins",
     "registry": "Registry",
     "allRegistries": "Alle Registries",
-    "lookup": "Paket suchen",
+    "open": "Marktplatz durchsuchen",
     "search": "Plugins suchen",
-    "searchPlaceholder": "Nach Name oder Funktion suchen",
+    "searchPlaceholder": "Plugins suchen oder genauen Paketnamen eingeben",
+    "loading": "Plugins werden gesucht...",
     "details": "Details",
     "installed": "Installiert",
     "install": "Installieren",
