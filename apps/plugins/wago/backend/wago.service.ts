@@ -14,7 +14,6 @@ import {
   compatibilityError,
   configurationDesiredTopic,
   configurationReportedTopic,
-  configurationReportedWildcardTopic,
   discoveryTopic,
   heartbeatTopic,
   normalizeOperationalPrefix,
@@ -548,30 +547,21 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
         const claimedControllers = controllers.filter(
           (item) => item.trustState === 'claimed' && (item.mqttServerId ?? settings.defaultMqttServerId) === serverId,
         );
-        const controllersByHardwareId = new Map(
-          claimedControllers.map((controller) => [controller.hardwareId, controller]),
-        );
-        replacements.push(
-          await this.context.mqtt.subscribe(
-            serverId,
-            configurationReportedWildcardTopic(settings.operationalPrefix),
-            (message) => {
-              if (!this.isActiveSubscriptionGeneration(generation)) return;
-              const hardwareId = configurationReportedHardwareId(settings.operationalPrefix, message.topic);
-              const controller = hardwareId ? controllersByHardwareId.get(hardwareId) : undefined;
-              if (controller) {
-                void this.onConfigurationReported(controller.id, message.payload).catch((error) => {
-                  this.context.logger.warn(`Could not process WAGO configuration report: ${String(error)}`);
-                });
-              }
-            },
-          ),
-        );
-        if (this.destroyed) {
-          replacements.forEach((subscription) => subscription.unsubscribe());
-          return;
-        }
         for (const controller of claimedControllers) {
+          replacements.push(
+            await this.context.mqtt.subscribe(
+              serverId,
+              configurationReportedTopic(settings.operationalPrefix, controller.hardwareId),
+              async (message) => {
+                if (!this.isActiveSubscriptionGeneration(generation)) return;
+                await this.onConfigurationReported(controller.id, message.payload);
+              },
+            ),
+          );
+          if (this.destroyed) {
+            replacements.forEach((subscription) => subscription.unsubscribe());
+            return;
+          }
           replacements.push(
             await this.context.mqtt.subscribe(serverId, heartbeatTopic(controller.hardwareId), async (message) => {
               if (!this.isActiveSubscriptionGeneration(generation)) return;
@@ -903,20 +893,4 @@ function safeEqual(left: string, right: string): boolean {
 }
 function isValidHardwareId(hardwareId: string): boolean {
   return Boolean(hardwareId) && !/[/+#]/.test(hardwareId);
-}
-
-function configurationReportedHardwareId(prefix: string, topic: string): string | null {
-  const prefixParts = normalizeOperationalPrefix(prefix).split('/');
-  const topicParts = topic.split('/');
-  if (
-    topicParts.length !== prefixParts.length + 5 ||
-    !prefixParts.every((part, index) => topicParts[index] === part) ||
-    topicParts[prefixParts.length] !== `v${CONFIGURATION_PROTOCOL_VERSION}` ||
-    topicParts[prefixParts.length + 1] !== 'controllers' ||
-    topicParts[prefixParts.length + 3] !== 'configuration' ||
-    topicParts[prefixParts.length + 4] !== 'reported'
-  )
-    return null;
-  const hardwareId = topicParts[prefixParts.length + 2];
-  return isValidHardwareId(hardwareId) ? hardwareId : null;
 }
