@@ -50,6 +50,8 @@ describe('WagoService', () => {
     const settingsRepository = {
       findOneBy: jest.fn().mockResolvedValue({ id: 1, defaultMqttServerId }),
       save: jest.fn(),
+      upsert: jest.fn(),
+      findOneByOrFail: jest.fn(),
     };
     const subscriptions: Array<{ unsubscribe: jest.Mock }> = [];
     const context = {
@@ -92,9 +94,10 @@ describe('WagoService', () => {
   it('creates default settings when none have been persisted', async () => {
     const { service, settingsRepository } = createService();
     settingsRepository.findOneBy.mockResolvedValue(null);
-    settingsRepository.save.mockResolvedValue({ id: 1, defaultMqttServerId: null });
+    settingsRepository.findOneByOrFail.mockResolvedValue({ id: 1, defaultMqttServerId: null });
 
     await expect(service.getSettings()).resolves.toEqual({ id: 1, defaultMqttServerId: null });
+    expect(settingsRepository.upsert).toHaveBeenCalledWith({ id: 1, defaultMqttServerId: null }, ['id']);
   });
 
   it('requires a non-empty matching fingerprint', () => {
