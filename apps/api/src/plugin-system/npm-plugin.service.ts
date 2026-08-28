@@ -20,6 +20,7 @@ import { PluginClassificationService } from './plugin-classification.service';
 
 const REGISTRY_PARENT = 'plugin-registry';
 const REGISTRIES_KEY = 'registries';
+const UPDATE_POLICY_KEY = 'update-policy';
 const STATE_FILE = '.npm-plugin-state.json';
 const BACKUP_DIRECTORY = '.npm-backups';
 const MAX_ARCHIVE_BYTES = 50 * 1024 * 1024;
@@ -42,6 +43,26 @@ export type InstalledNpmPluginVersion = {
   permissionRemovals: string[];
   classification: 'official' | 'community';
   classificationReason: string;
+  deprecated: string | null;
+  integrity: string | null;
+  repository: string | null;
+  homepage: string | null;
+  semverImpact: 'major' | 'minor' | 'patch' | 'prerelease' | 'none';
+  matchesRequestedSpec: boolean;
+};
+
+export type PluginUpdatePolicy = {
+  checksEnabled: boolean;
+  mode: 'off' | 'patch' | 'minor' | 'follow';
+  maintenanceWindow: { startMinute: number; durationMinutes: number };
+  prerelease: boolean;
+};
+
+export const DEFAULT_PLUGIN_UPDATE_POLICY: PluginUpdatePolicy = {
+  checksEnabled: true,
+  mode: 'minor',
+  maintenanceWindow: { startMinute: 180, durationMinutes: 120 },
+  prerelease: false,
 };
 
 export type InstalledNpmPlugin = {
@@ -64,6 +85,14 @@ export type InstalledNpmPlugin = {
   classification: 'official' | 'community';
   classificationReason: string;
   publisher: string | null;
+  updateOverride?: 'inherit' | 'off' | 'patch' | 'minor' | 'follow';
+  updateCheck?: {
+    checkedAt: string;
+    candidate: string | null;
+    state: 'up-to-date' | 'available' | 'blocked' | 'failed';
+    error: string | null;
+  };
+  knownGoodVersion?: string | null;
 };
 
 export type MarketplacePlugin = {
@@ -331,10 +360,11 @@ export class NpmPluginService implements OnModuleInit {
             metadata.time?.[version] ?? null,
             manifest.permissions,
             publisher,
+            pkg as NpmPluginPackage,
           );
         } catch (error) {
           return {
-            ...this.versionCandidate(installed, version, metadata.time?.[version] ?? null, [], publisher),
+            ...this.versionCandidate(installed, version, metadata.time?.[version] ?? null, [], publisher, null),
             compatible: false,
             reason: error instanceof Error ? error.message : 'Package metadata is invalid',
           };
@@ -347,12 +377,15 @@ export class NpmPluginService implements OnModuleInit {
     name: string,
     version: string,
     approvedPermissionAdditions: string[] = [],
+    approvedMajorVersion = false,
   ): Promise<InstalledNpmPlugin> {
     const installed = this.installed(name);
     const candidates = await this.installedVersionCandidates(name);
     const candidate = candidates.find((item) => item.version === version);
     if (!candidate) throw new NotFoundException('Package version not found');
     if (!candidate.compatible) throw new BadRequestException(candidate.reason ?? 'Package version is not compatible');
+    if (semver.major(candidate.version) > semver.major(installed.version) && !approvedMajorVersion)
+      throw new BadRequestException('Explicit approval is required for a major version update');
     if (!samePermissions(candidate.permissionAdditions, approvedPermissionAdditions)) {
       throw new BadRequestException(
         `Permission approval required for: ${candidate.permissionAdditions.join(', ') || 'none'}`,
@@ -364,7 +397,83 @@ export class NpmPluginService implements OnModuleInit {
       await this.registry(installed.registryId),
       installed,
       approvedPermissionAdditions,
+      installed.requestedSpec,
     );
+  }
+
+  async updateRequestedSpec(name: string, requestedSpec: string): Promise<InstalledNpmPlugin> {
+    const installed = this.installed(name);
+    const registry = await this.registry(installed.registryId);
+    await this.resolveVersion(name, requestedSpec, registry);
+    return this.mutateInstalls(async () => {
+      const updated = { ...this.installed(name), requestedSpec };
+      await this.writeState(updated);
+      return updated;
+    });
+  }
+
+  async updateOverride(name: string, updateOverride: InstalledNpmPlugin['updateOverride']): Promise<InstalledNpmPlugin> {
+    if (!['inherit', 'off', 'patch', 'minor', 'follow'].includes(updateOverride ?? ''))
+      throw new BadRequestException('Invalid plugin update override');
+    return this.mutateInstalls(async () => {
+      const updated = { ...this.installed(name), updateOverride };
+      await this.writeState(updated);
+      return updated;
+    });
+  }
+
+  async getUpdatePolicy(): Promise<PluginUpdatePolicy> {
+    const raw = await this.settings.getPlainSetting(REGISTRY_PARENT, UPDATE_POLICY_KEY);
+    if (!raw) return DEFAULT_PLUGIN_UPDATE_POLICY;
+    try {
+      return normalizeUpdatePolicy(JSON.parse(raw));
+    } catch {
+      return DEFAULT_PLUGIN_UPDATE_POLICY;
+    }
+  }
+
+  async setUpdatePolicy(patch: Partial<PluginUpdatePolicy>): Promise<PluginUpdatePolicy> {
+    const policy = normalizeUpdatePolicy({ ...(await this.getUpdatePolicy()), ...patch });
+    await this.settings.setPlainSetting(REGISTRY_PARENT, UPDATE_POLICY_KEY, JSON.stringify(policy));
+    return policy;
+  }
+
+  async checkInstalled(name: string): Promise<InstalledNpmPlugin> {
+    const installed = this.installed(name);
+    try {
+      const candidates = await this.installedVersionCandidates(name);
+      const policy = await this.getUpdatePolicy();
+      const candidate = candidates.find((item) => item.direction === 'newer' && item.compatible && eligibleForPolicy(item, installed, policy));
+      const blocked = candidates.some((item) => item.direction === 'newer' && item.compatible) && !candidate;
+      const updated = {
+        ...installed,
+        updateCheck: {
+          checkedAt: new Date().toISOString(),
+          candidate: candidate?.version ?? null,
+          state: candidate ? ('available' as const) : blocked ? ('blocked' as const) : ('up-to-date' as const),
+          error: null,
+        },
+      };
+      await this.mutateInstalls(() => this.writeState(updated));
+      return updated;
+    } catch (error) {
+      const updated = {
+        ...installed,
+        updateCheck: {
+          checkedAt: new Date().toISOString(),
+          candidate: null,
+          state: 'failed' as const,
+          error: error instanceof Error ? error.message : 'Update check failed',
+        },
+      };
+      await this.mutateInstalls(() => this.writeState(updated));
+      return updated;
+    }
+  }
+
+  async checkAllInstalled(): Promise<InstalledNpmPlugin[]> {
+    const results = await Promise.allSettled(this.listInstalled().map(({ name }) => this.checkInstalled(name)));
+    return results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []));
   }
 
   private versionCandidate(
@@ -373,6 +482,7 @@ export class NpmPluginService implements OnModuleInit {
     publishedAt: string | null,
     permissions: string[],
     publisher: string | null,
+    pkg: NpmPluginPackage | null,
   ): InstalledNpmPluginVersion {
     const classification = this.classification.classify(installed.name, installed.registryUrl, publisher);
     return {
@@ -390,6 +500,16 @@ export class NpmPluginService implements OnModuleInit {
       permissionRemovals: installed.permissions.filter((permission) => !permissions.includes(permission)),
       classification: classification.kind,
       classificationReason: classification.reason,
+      deprecated: typeof (pkg as unknown as { deprecated?: unknown } | null)?.deprecated === 'string'
+        ? (pkg as unknown as { deprecated: string }).deprecated
+        : (pkg as unknown as { deprecated?: unknown } | null)?.deprecated === true
+          ? 'Deprecated by publisher'
+          : null,
+      integrity: pkg ? distIntegrity(pkg) : null,
+      repository: pkg ? repositoryUrl(pkg.repository) : null,
+      homepage: pkg?.homepage ?? null,
+      semverImpact: semverImpact(installed.version, version),
+      matchesRequestedSpec: matchesSpec(version, installed.requestedSpec),
     };
   }
 
@@ -475,6 +595,9 @@ export class NpmPluginService implements OnModuleInit {
         classification: classification.kind,
         classificationReason: classification.reason,
         publisher,
+        updateOverride: replacing?.updateOverride ?? 'inherit',
+        updateCheck: null,
+        knownGoodVersion: replacing?.version ?? null,
       };
       // Activation and its state update must commit together so a rollback cannot
       // remove another install's target or overwrite its state entry.
@@ -759,7 +882,10 @@ function readInstalledNpmPlugins(): InstalledNpmPlugin[] {
       state: record.state ?? 'active',
       installedAt: record.installedAt ?? new Date(0).toISOString(),
       activatedAt: record.activatedAt ?? new Date(0).toISOString(),
-      lastError: record.lastError ?? null,
+       lastError: record.lastError ?? null,
+       updateOverride: record.updateOverride ?? 'inherit',
+       updateCheck: record.updateCheck ?? null,
+       knownGoodVersion: record.knownGoodVersion ?? null,
     }));
   } catch {
     return [];
@@ -855,6 +981,52 @@ function safeArchivePath(value: string): boolean {
 
 function samePermissions(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((permission) => right.includes(permission));
+}
+
+function semverImpact(current: string, target: string): InstalledNpmPluginVersion['semverImpact'] {
+  if (!semver.valid(current) || !semver.valid(target) || semver.eq(current, target)) return 'none';
+  if (semver.prerelease(target)) return 'prerelease';
+  const difference = semver.diff(current, target);
+  if (difference === 'major' || difference === 'premajor') return 'major';
+  if (difference === 'minor' || difference === 'preminor') return 'minor';
+  return 'patch';
+}
+
+function matchesSpec(version: string, spec: string): boolean {
+  return version === spec || (!semver.prerelease(version) && semver.satisfies(version, spec, { includePrerelease: false }));
+}
+
+function normalizeUpdatePolicy(value: unknown): PluginUpdatePolicy {
+  const candidate = value as Partial<PluginUpdatePolicy>;
+  const mode = ['off', 'patch', 'minor', 'follow'].includes(candidate?.mode ?? '')
+    ? (candidate.mode as PluginUpdatePolicy['mode'])
+    : DEFAULT_PLUGIN_UPDATE_POLICY.mode;
+  const startMinute = candidate?.maintenanceWindow?.startMinute;
+  const durationMinutes = candidate?.maintenanceWindow?.durationMinutes;
+  if (!Number.isInteger(startMinute) || startMinute < 0 || startMinute >= 24 * 60)
+    throw new BadRequestException('Maintenance window start must be a minute of the day');
+  if (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 24 * 60)
+    throw new BadRequestException('Maintenance window duration must be between 1 and 1440 minutes');
+  return {
+    checksEnabled: typeof candidate?.checksEnabled === 'boolean' ? candidate.checksEnabled : DEFAULT_PLUGIN_UPDATE_POLICY.checksEnabled,
+    mode,
+    prerelease: typeof candidate?.prerelease === 'boolean' ? candidate.prerelease : DEFAULT_PLUGIN_UPDATE_POLICY.prerelease,
+    maintenanceWindow: { startMinute, durationMinutes },
+  };
+}
+
+function eligibleForPolicy(
+  candidate: InstalledNpmPluginVersion,
+  installed: InstalledNpmPlugin,
+  policy: PluginUpdatePolicy,
+): boolean {
+  const mode = installed.updateOverride === 'inherit' || !installed.updateOverride ? policy.mode : installed.updateOverride;
+  if (!policy.checksEnabled || mode === 'off' || candidate.deprecated || candidate.permissionAdditions.length > 0) return false;
+  if (!policy.prerelease && semver.prerelease(candidate.version)) return false;
+  if (candidate.semverImpact === 'major') return false;
+  if (mode === 'patch') return candidate.semverImpact === 'patch';
+  if (mode === 'minor') return candidate.semverImpact === 'patch' || candidate.semverImpact === 'minor';
+  return candidate.matchesRequestedSpec;
 }
 
 function repositoryUrl(value: string | { url: string } | undefined): string | null {

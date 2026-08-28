@@ -380,7 +380,7 @@ describe('NpmPluginService', () => {
   });
 
   it('installs standard package-prefixed tarballs without losing concurrent state updates', async () => {
-    const service = new NpmPluginService({} as never);
+    const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
     const internals = service as unknown as ServiceInternals;
     const packages = await Promise.all(
       ['@attraccess/one', '@attraccess/two'].map(async (name) => [name, await packageTarball(name)] as const),
@@ -838,6 +838,58 @@ describe('NpmPluginService', () => {
 
     await expect(service.replaceInstalled(name, '1.2.3', [])).rejects.toThrow(
       'Permission approval required for: READ_USERS',
+    );
+  });
+
+  it('records an available patch update without changing the requested range', async () => {
+    const name = '@attraccess/plugin';
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name,
+          version: '1.2.0',
+          requestedSpec: '^1.2.0',
+          registryId: 'private',
+          registryUrl: 'https://registry.example.com',
+          integrity: 'sha512-test',
+          installPath: 'npm-plugin',
+          permissions: [],
+          lastError: null,
+        },
+      ]),
+    );
+    const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
+    jest.spyOn(service, 'installedVersionCandidates').mockResolvedValue([
+      {
+        version: '1.2.1', direction: 'newer', compatible: true, reason: null, permissions: [], permissionAdditions: [],
+        permissionRemovals: [], publishedAt: null, classification: 'community', classificationReason: '', deprecated: null,
+        integrity: 'sha512-test', repository: null, homepage: null, semverImpact: 'patch', matchesRequestedSpec: true,
+      },
+    ]);
+
+    await expect(service.checkInstalled(name)).resolves.toMatchObject({
+      requestedSpec: '^1.2.0',
+      updateCheck: { candidate: '1.2.1', state: 'available', error: null },
+    });
+  });
+
+  it('requires explicit approval before replacing an installed package with a major version', async () => {
+    const service = new NpmPluginService({} as never);
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([{ name: '@attraccess/plugin', version: '1.0.0', registryId: 'npm', registryUrl: 'https://registry.npmjs.org', integrity: 'sha512-test', installPath: 'npm-plugin', permissions: [], lastError: null }]),
+    );
+    jest.spyOn(service, 'installedVersionCandidates').mockResolvedValue([
+      {
+        version: '2.0.0', direction: 'newer', compatible: true, reason: null, permissions: [], permissionAdditions: [],
+        permissionRemovals: [], publishedAt: null, classification: 'community', classificationReason: '', deprecated: null,
+        integrity: 'sha512-test', repository: null, homepage: null, semverImpact: 'major', matchesRequestedSpec: true,
+      },
+    ]);
+
+    await expect(service.replaceInstalled('@attraccess/plugin', '2.0.0')).rejects.toThrow(
+      'Explicit approval is required for a major version update',
     );
   });
 });

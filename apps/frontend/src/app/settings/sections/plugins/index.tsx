@@ -31,6 +31,8 @@ import { getBaseUrl } from '../../../../api';
 import en from './en.json';
 import de from './de.json';
 import { PluginClassificationBadge } from './PluginClassificationBadge';
+import { LabeledSwitch } from '../../../../components/labeledSwitch';
+import { Select } from '../../../../components/select';
 
 const DOCS_URL = 'https://docs.attraccess.org/#/plugins/developing-plugins';
 
@@ -43,6 +45,12 @@ type VersionCandidate = {
   permissions: string[];
   permissionAdditions: string[];
   permissionRemovals: string[];
+  deprecated: string | null;
+  integrity: string | null;
+  repository: string | null;
+  homepage: string | null;
+  semverImpact: 'major' | 'minor' | 'patch' | 'prerelease' | 'none';
+  matchesRequestedSpec: boolean;
 };
 
 type InstalledNpmPlugin = {
@@ -50,6 +58,9 @@ type InstalledNpmPlugin = {
   version: string;
   classification: 'official' | 'community';
   classificationReason: string;
+  requestedSpec: string;
+  updateOverride: 'inherit' | 'off' | 'patch' | 'minor' | 'follow';
+  updateCheck?: { checkedAt: string; candidate: string | null; state: 'up-to-date' | 'available' | 'blocked' | 'failed'; error: string | null } | null;
 };
 
 type VersionPlugin = Pick<InstalledNpmPlugin, 'name' | 'version'>;
@@ -95,6 +106,9 @@ export function PluginsSection() {
   const [marketplacePlugin, setMarketplacePlugin] = useState<MarketplacePlugin | null>(null);
   const [pluginToInstall, setPluginToInstall] = useState<MarketplacePlugin | null>(null);
   const [isInstalling, setIsInstalling] = useState(false);
+  const [requestedSpec, setRequestedSpec] = useState('');
+  const [updateOverride, setUpdateOverride] = useState<InstalledNpmPlugin['updateOverride']>('inherit');
+  const [majorApproved, setMajorApproved] = useState(false);
   const versionRequest = useRef(0);
   const marketplaceRequest = useRef(0);
   const marketplaceDetailRequest = useRef(0);
@@ -202,6 +216,10 @@ export function PluginsSection() {
     setVersions([]);
     setSelectedVersion(null);
     setPermissionApproved(false);
+    setMajorApproved(false);
+    const installed = installedNpmPlugins.get(plugin.name);
+    setRequestedSpec(installed?.requestedSpec ?? plugin.version);
+    setUpdateOverride(installed?.updateOverride ?? 'inherit');
     setIsLoadingVersions(true);
     try {
       const response = await fetch(
@@ -231,7 +249,10 @@ export function PluginsSection() {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ approvedPermissionAdditions: selectedVersion.permissionAdditions }),
+          body: JSON.stringify({
+            approvedPermissionAdditions: selectedVersion.permissionAdditions,
+            approvedMajorVersion: majorApproved,
+          }),
         },
       );
       if (!response.ok) throw new Error(await response.text());
@@ -242,6 +263,26 @@ export function PluginsSection() {
       toast.error({ title: t('error.replace.title'), description: t('error.replace.description') });
     } finally {
       setIsReplacing(false);
+    }
+  };
+
+  const saveVersionPolicy = async () => {
+    if (!versionPlugin) return;
+    try {
+      const [specResponse, overrideResponse] = await Promise.all([
+        fetch(`${getBaseUrl()}/api/plugins/installed/${encodeURIComponent(versionPlugin.name)}/spec`, {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requestedSpec }),
+        }),
+        fetch(`${getBaseUrl()}/api/plugins/installed/${encodeURIComponent(versionPlugin.name)}/update-override`, {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ updateOverride }),
+        }),
+      ]);
+      if (!specResponse.ok || !overrideResponse.ok) throw new Error();
+      const installed = (await overrideResponse.json()) as InstalledNpmPlugin;
+      setInstalledNpmPlugins((current) => new Map(current).set(installed.name, installed));
+      toast.success({ title: t('versionManagement.policySaved') });
+    } catch {
+      toast.error({ title: t('versionManagement.policyError') });
     }
   };
 
@@ -298,9 +339,10 @@ export function PluginsSection() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Chip variant="soft" color="accent">
-                        {plugin.version}
-                      </Chip>
+                        <Chip variant="soft" color="accent">
+                          {plugin.version}
+                        </Chip>
+                        {installedNpmPlugins.get(plugin.name)?.updateCheck?.state === 'available' ? <Chip variant="soft" color="warning">{t('updatePolicy.available')}</Chip> : null}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">{plugin.pluginDirectory || '-'}</TableCell>
                     <TableCell className="hidden sm:table-cell">
@@ -568,6 +610,13 @@ export function PluginsSection() {
             </ModalHeader>
             <ModalBody>
               <p>{t('versionManagement.current', { version: versionPlugin?.version ?? '' })}</p>
+              <div className="flex flex-col gap-2 rounded-medium border border-divider p-3">
+                <TextField value={requestedSpec} onChange={setRequestedSpec}>
+                  <Input aria-label={t('versionManagement.spec')} placeholder="^1.2.0 or latest" />
+                </TextField>
+                <Select value={updateOverride} onChange={(value) => setUpdateOverride(value as InstalledNpmPlugin['updateOverride'])} items={['inherit', 'off', 'patch', 'minor', 'follow'].map((value) => ({ key: value, label: t(`versionManagement.overrides.${value}`) }))} aria-label={t('versionManagement.autoUpdate')} />
+                <Button variant="secondary" size="sm" onPress={() => void saveVersionPolicy()}>{t('versionManagement.savePolicy')}</Button>
+              </div>
               {isLoadingVersions ? <p>{t('versionManagement.loading')}</p> : null}
               <div className="flex max-h-64 flex-col gap-2 overflow-y-auto">
                 {versions.map((candidate) => (
@@ -579,6 +628,7 @@ export function PluginsSection() {
                     onPress={() => {
                       setSelectedVersion(candidate);
                       setPermissionApproved(false);
+                      setMajorApproved(false);
                     }}
                     data-cy={`plugins-list-version-${candidate.version}`}
                   >
@@ -609,6 +659,14 @@ export function PluginsSection() {
                       })}
                     </label>
                   ) : null}
+                  {selectedVersion.semverImpact === 'major' ? (
+                    <LabeledSwitch isSelected={majorApproved} onChange={setMajorApproved}>
+                      {t('versionManagement.majorApproval')}
+                    </LabeledSwitch>
+                  ) : null}
+                  {selectedVersion.deprecated ? <p className="text-warning">{t('versionManagement.deprecated', { notice: selectedVersion.deprecated })}</p> : null}
+                  <p>{t('versionManagement.integrity', { integrity: selectedVersion.integrity ?? '-' })}</p>
+                  {selectedVersion.repository ? <a className="text-accent" href={selectedVersion.repository} target="_blank" rel="noreferrer">{t('versionManagement.repository')}</a> : null}
                   {selectedVersion.permissionRemovals.length > 0 ? (
                     <p>
                       {t('versionManagement.permissionRemovals', {
@@ -637,7 +695,7 @@ export function PluginsSection() {
                 variant={selectedVersion?.direction === 'older' ? 'danger' : 'primary'}
                 onPress={() => void replaceVersion()}
                 isPending={isReplacing}
-                isDisabled={!selectedVersion || (selectedVersion.permissionAdditions.length > 0 && !permissionApproved)}
+                isDisabled={!selectedVersion || (selectedVersion.permissionAdditions.length > 0 && !permissionApproved) || (selectedVersion.semverImpact === 'major' && !majorApproved)}
                 data-cy="plugins-list-replace-version-button"
               >
                 {selectedVersion?.direction === 'older'
