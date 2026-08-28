@@ -359,7 +359,7 @@ describe('WagoService', () => {
     expect(revisionRepository.save).toHaveBeenCalledWith(expect.objectContaining({ state: 'applied' }));
   });
 
-  it('routes configuration reports from one wildcard subscription', async () => {
+  it('routes configuration reports through one backpressured wildcard subscription', async () => {
     const first = { ...controller(), trustState: 'claimed' as const };
     const second = { ...controller(), id: 2, hardwareId: 'cc100-02', trustState: 'claimed' as const };
     const { service, context } = createService([first, second]);
@@ -377,7 +377,7 @@ describe('WagoService', () => {
     );
     expect(reportSubscriptions).toHaveLength(1);
     expect(reportSubscriptions[0][1]).toBe('attraccess/wago/v1/controllers/+/configuration/reported');
-    const handler = reportSubscriptions[0][2] as (message: { topic: string; payload: Buffer }) => void;
+    const handler = reportSubscriptions[0][2] as (message: { topic: string; payload: Buffer }) => Promise<void> | undefined;
     const firstResult = handler({
       topic: 'attraccess/wago/v1/controllers/cc100-01/configuration/reported',
       payload: Buffer.from('{}'),
@@ -387,11 +387,11 @@ describe('WagoService', () => {
       payload: Buffer.from('{}'),
     });
 
-    expect(firstResult).toBeUndefined();
-    expect(secondResult).toBeUndefined();
-    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(firstResult).toBeInstanceOf(Promise);
+    expect(secondResult).toBeInstanceOf(Promise);
     expect(onConfigurationReported).toHaveBeenCalledWith(second.id, expect.any(Buffer));
     releaseFirst();
+    await Promise.all([firstResult, secondResult]);
   });
 
   it('returns bounded revision metadata pages without snapshots', async () => {
