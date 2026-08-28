@@ -1,0 +1,149 @@
+import { ResourceOperatingInterval, ResourceUsage, ResourceUsageAction } from '@attraccess/database-entities';
+import { Repository } from 'typeorm';
+import { ResourceOperatingAttributionService } from './resource-operating-attribution.service';
+
+const at = (time: string) => new Date(`2026-08-28T${time}.000Z`);
+
+const operating = (id: number, startTime: string, endTime: string | null): ResourceOperatingInterval =>
+  ({ id, resourceId: 1, startTime: at(startTime), endTime: endTime ? at(endTime) : null }) as ResourceOperatingInterval;
+
+const usage = (id: number, startTime: string, endTime: string | null): ResourceUsage =>
+  ({
+    id,
+    resourceId: 1,
+    usageAction: ResourceUsageAction.Usage,
+    startTime: at(startTime),
+    endTime: endTime ? at(endTime) : null,
+  }) as ResourceUsage;
+
+describe('ResourceOperatingAttributionService', () => {
+  const asOf = at('12:00:00');
+  let service: ResourceOperatingAttributionService;
+
+  beforeEach(() => {
+    const intervalRepository = { find: jest.fn() } as unknown as Repository<ResourceOperatingInterval>;
+    const usageRepository = { find: jest.fn() } as unknown as Repository<ResourceUsage>;
+    service = new ResourceOperatingAttributionService(intervalRepository, usageRepository);
+  });
+
+  it('derives exact closed intersections and the remaining operating duration', () => {
+    const result = service.derive([operating(1, '10:00:00', '11:00:00')], [usage(2, '10:15:00', '10:45:00')], asOf);
+
+    expect(result).toMatchObject({
+      operatingDurationMs: 60 * 60_000,
+      attributedOperatingDurationMs: 30 * 60_000,
+      unattributedOperatingDurationMs: 30 * 60_000,
+      isProvisional: false,
+      attributions: [
+        {
+          operatingIntervalId: 1,
+          usageId: 2,
+          startTime: at('10:15:00'),
+          endTime: at('10:45:00'),
+          durationMs: 30 * 60_000,
+          isProvisional: false,
+        },
+      ],
+    });
+  });
+
+  it('marks intersections provisional while either source interval is open', () => {
+    const result = service.derive([operating(1, '10:00:00', null)], [usage(2, '10:15:00', '11:00:00')], asOf);
+
+    expect(result).toMatchObject({
+      operatingDurationMs: 120 * 60_000,
+      attributedOperatingDurationMs: 45 * 60_000,
+      unattributedOperatingDurationMs: 75 * 60_000,
+      isProvisional: true,
+      attributions: [expect.objectContaining({ durationMs: 45 * 60_000, isProvisional: true })],
+    });
+  });
+
+  it('marks an otherwise closed operating interval provisional while its usage session remains open', () => {
+    const result = service.derive([operating(1, '10:00:00', '11:00:00')], [usage(2, '10:15:00', null)], asOf);
+
+    expect(result).toMatchObject({
+      attributedOperatingDurationMs: 45 * 60_000,
+      isProvisional: true,
+      attributions: [expect.objectContaining({ isProvisional: true })],
+    });
+  });
+
+  it('does not attribute adjacent boundaries', () => {
+    const result = service.derive([operating(1, '10:00:00', '10:30:00')], [usage(2, '10:30:00', '11:00:00')], asOf);
+
+    expect(result).toMatchObject({
+      attributedOperatingDurationMs: 0,
+      unattributedOperatingDurationMs: 30 * 60_000,
+      attributions: [],
+    });
+  });
+
+  it('retains the gap between takeover sessions as unattributed', () => {
+    const result = service.derive(
+      [operating(1, '10:00:00', '11:00:00')],
+      [usage(2, '10:00:00', '10:25:00'), usage(3, '10:35:00', '11:00:00')],
+      asOf,
+    );
+
+    expect(result).toMatchObject({
+      attributedOperatingDurationMs: 50 * 60_000,
+      unattributedOperatingDurationMs: 10 * 60_000,
+    });
+  });
+
+  it('does not double-count operating duration when usage sessions overlap', () => {
+    const result = service.derive(
+      [operating(1, '10:00:00', '11:00:00')],
+      [usage(2, '10:10:00', '10:40:00'), usage(3, '10:30:00', '10:50:00')],
+      asOf,
+    );
+
+    expect(result).toMatchObject({
+      attributedOperatingDurationMs: 40 * 60_000,
+      unattributedOperatingDurationMs: 20 * 60_000,
+    });
+    expect(result.attributions).toHaveLength(2);
+  });
+
+  it('does not report overlap between operating intervals as unattributed', () => {
+    const result = service.derive(
+      [operating(1, '10:00:00', '11:00:00'), operating(2, '10:30:00', '11:30:00')],
+      [usage(3, '10:00:00', '11:30:00')],
+      asOf,
+    );
+
+    expect(result).toMatchObject({
+      operatingDurationMs: 90 * 60_000,
+      attributedOperatingDurationMs: 90 * 60_000,
+      unattributedOperatingDurationMs: 0,
+    });
+  });
+
+  it('ignores door-control audit rows', () => {
+    const doorAction = {
+      ...usage(2, '10:00:00', null),
+      usageAction: ResourceUsageAction.DoorUnlock,
+    };
+    const result = service.derive([operating(1, '10:00:00', '11:00:00')], [doorAction], asOf);
+
+    expect(result).toMatchObject({
+      attributedOperatingDurationMs: 0,
+      unattributedOperatingDurationMs: 60 * 60_000,
+      attributions: [],
+    });
+  });
+
+  it('reports no derived duration for resources without an operating signal', () => {
+    const result = service.derive([], [usage(2, '10:00:00', '11:00:00')], asOf);
+
+    expect(result).toEqual({
+      asOf,
+      operatingDurationMs: 0,
+      attributedOperatingDurationMs: 0,
+      unattributedOperatingDurationMs: 0,
+      isProvisional: false,
+      attributions: [],
+    });
+  });
+});
