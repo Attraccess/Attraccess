@@ -139,8 +139,8 @@ export function PluginsSection() {
   const [isSavingRegistry, setIsSavingRegistry] = useState(false);
   const [testingRegistryId, setTestingRegistryId] = useState<string | null>(null);
   const versionRequest = useRef(0);
-  const marketplaceRequest = useRef(0);
-  const marketplaceDetailRequest = useRef(0);
+  const marketplaceOperationRequest = useRef(0);
+  const registryRequest = useRef(0);
 
   useEffect(() => {
     if (!globalThis.fetch) return;
@@ -156,18 +156,20 @@ export function PluginsSection() {
   }, []);
 
   const loadRegistries = async () => {
+    const request = ++registryRequest.current;
     try {
       const response = await fetch(`${getBaseUrl()}/api/plugins/registries`, { credentials: 'include' });
       if (!response.ok) throw new Error();
       const result = (await response.json()) as unknown;
-      setRegistries(Array.isArray(result) ? (result as Registry[]) : []);
-    } catch {
-      toast.error({ title: t('marketplace.registryLoadError') });
+      if (registryRequest.current === request) setRegistries(Array.isArray(result) ? (result as Registry[]) : []);
+    } catch (error) {
+      if (registryRequest.current === request) toast.error({ title: t('marketplace.registryLoadError') });
+      throw error;
     }
   };
 
   const loadInitialRegistries = useEffectEvent(() => {
-    void loadRegistries();
+    void loadRegistries().catch(() => undefined);
   });
 
   useEffect(() => {
@@ -175,7 +177,7 @@ export function PluginsSection() {
   }, []);
 
   const loadMarketplace = async (query = marketplaceQuery) => {
-    const request = ++marketplaceRequest.current;
+    const request = ++marketplaceOperationRequest.current;
     setIsLoadingMarketplace(true);
     try {
       const response = await fetch(
@@ -186,22 +188,22 @@ export function PluginsSection() {
       );
       if (!response.ok) throw new Error();
       const result = (await response.json()) as { results: MarketplacePlugin[]; errors: string[] };
-      if (marketplaceRequest.current === request) {
+      if (marketplaceOperationRequest.current === request) {
         const unique = new Map(result.results.map((plugin) => [`${plugin.registry.id}:${plugin.name}`, plugin]));
         setMarketplacePlugins([...unique.values()]);
         if (result.errors.length > 0)
           toast.error({ title: t('marketplace.loadError'), description: result.errors.join(', ') });
       }
     } catch {
-      if (marketplaceRequest.current === request) toast.error({ title: t('marketplace.loadError') });
+      if (marketplaceOperationRequest.current === request) toast.error({ title: t('marketplace.loadError') });
     } finally {
-      if (marketplaceRequest.current === request) setIsLoadingMarketplace(false);
+      if (marketplaceOperationRequest.current === request) setIsLoadingMarketplace(false);
     }
   };
 
   const lookupMarketplacePackage = async () => {
     if (!marketplaceQuery.trim()) return void loadMarketplace();
-    const request = ++marketplaceDetailRequest.current;
+    const request = ++marketplaceOperationRequest.current;
     setIsLoadingMarketplace(true);
     try {
       const response = await fetch(
@@ -210,11 +212,11 @@ export function PluginsSection() {
       );
       if (!response.ok) throw new Error();
       const detail = (await response.json()) as MarketplacePlugin;
-      if (marketplaceDetailRequest.current === request) setMarketplacePlugin(detail);
+      if (marketplaceOperationRequest.current === request) setMarketplacePlugin(detail);
     } catch {
-      if (marketplaceDetailRequest.current === request) toast.error({ title: t('marketplace.lookupError') });
+      if (marketplaceOperationRequest.current === request) toast.error({ title: t('marketplace.lookupError') });
     } finally {
-      if (marketplaceDetailRequest.current === request) setIsLoadingMarketplace(false);
+      if (marketplaceOperationRequest.current === request) setIsLoadingMarketplace(false);
     }
   };
 
@@ -279,7 +281,8 @@ export function PluginsSection() {
   }, []);
 
   const openMarketplacePlugin = async (plugin: MarketplacePlugin) => {
-    const request = ++marketplaceDetailRequest.current;
+    const request = ++marketplaceOperationRequest.current;
+    setIsLoadingMarketplace(true);
     try {
       const response = await fetch(
         `${getBaseUrl()}/api/plugins/marketplace/${encodeURIComponent(plugin.name)}?registryId=${encodeURIComponent(plugin.registry.id)}`,
@@ -287,9 +290,11 @@ export function PluginsSection() {
       );
       if (!response.ok) throw new Error();
       const details = (await response.json()) as MarketplacePlugin;
-      if (marketplaceDetailRequest.current === request) setMarketplacePlugin(details);
+      if (marketplaceOperationRequest.current === request) setMarketplacePlugin(details);
     } catch {
-      if (marketplaceDetailRequest.current === request) toast.error({ title: t('marketplace.loadError') });
+      if (marketplaceOperationRequest.current === request) toast.error({ title: t('marketplace.loadError') });
+    } finally {
+      if (marketplaceOperationRequest.current === request) setIsLoadingMarketplace(false);
     }
   };
 

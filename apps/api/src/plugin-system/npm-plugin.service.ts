@@ -27,6 +27,7 @@ const MAX_ARCHIVE_BYTES = 50 * 1024 * 1024;
 const MAX_METADATA_BYTES = 10 * 1024 * 1024;
 const MAX_EXTRACTED_BYTES = 200 * 1024 * 1024;
 const MAX_ARCHIVE_ENTRIES = 10_000;
+export const MAX_CONFIGURED_REGISTRIES = 5;
 
 export type StoredRegistry = { id: string; name: string; url: string };
 type Registry = StoredRegistry & { token: string | null };
@@ -200,6 +201,8 @@ export class NpmPluginService implements OnModuleInit {
     };
     if (!registry.name) throw new BadRequestException('Registry name is required');
     await this.mutateRegistries(async (registries) => {
+      if (registries.length >= MAX_CONFIGURED_REGISTRIES)
+        throw new BadRequestException(`A maximum of ${MAX_CONFIGURED_REGISTRIES} registries can be configured`);
       if (registries.some(({ url }) => url === registry.url))
         throw new BadRequestException('Registry URL is already configured');
       if (input.token !== undefined)
