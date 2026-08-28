@@ -1,6 +1,7 @@
 #!/bin/bash
 # Setup script for Attraccess development environment
-# Installs: Docker, Node.js, pnpm, Python, ESP-IDF, esptool
+# Installs: Docker, Node.js, pnpm, and project dependencies.
+# Set INSTALL_ESP_IDF=true to also install the Attractap firmware toolchain.
 # Run from repo root: ./scripts/setup-dev-dependencies.sh
 
 set -e
@@ -162,6 +163,7 @@ install_python() {
 # --- ESP-IDF & esptool (Attractap firmware toolchain) ---
 ESP_IDF_VERSION="v6.0.2"
 ESP_IDF_PATH="$REPO_ROOT/.tools/esp-idf"
+INSTALL_ESP_IDF="${INSTALL_ESP_IDF:-false}"
 
 check_esp_idf() {
     if [[ -f "$ESP_IDF_PATH/export.sh" ]] && \
@@ -272,15 +274,17 @@ main() {
     fi
     echo ""
 
-    # Python
-    if ! check_python; then
-        install_python
-    fi
-    echo ""
-
-    # ESP-IDF (Attractap firmware)
-    if ! check_esp_idf; then
-        install_esp_idf
+    # ESP-IDF is only needed for Attractap firmware work. Keeping it opt-in
+    # avoids a large toolchain install for routine API/frontend worktrees.
+    if [[ "$INSTALL_ESP_IDF" == "true" ]]; then
+        if ! check_python; then
+            install_python
+        fi
+        if ! check_esp_idf; then
+            install_esp_idf
+        fi
+    else
+        echo "Skipping ESP-IDF. Install it when needed with: INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh"
     fi
     echo ""
 
@@ -295,7 +299,7 @@ main() {
     echo "=== Setup complete ==="
     echo ""
     echo "Next steps:"
-    echo "  1. Ensure PATH includes ~/.local/bin (for pio, esptool)"
+    echo "  1. For Attractap firmware work: INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh"
     echo "  2. If Docker was just installed: log out and back in, or run: newgrp docker"
     echo "  3. Start dev services (optional): pnpm services"
     echo "  4. Run full precommit: pnpm precommit:all"
