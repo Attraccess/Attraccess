@@ -7,11 +7,11 @@ describe('ResourceListService', () => {
   let service: ResourceListService;
   let websocketService: { sockets: Map<string, any> };
   let attractapService: { findReaderById: jest.Mock };
-  let resourceUsageService: { getActiveSessions: jest.Mock; canControllResource: jest.Mock };
+  let resourceUsageService: { getActiveSessions: jest.Mock; canControllResources: jest.Mock };
   let resourceMaintenanceService: { getActiveMaintenanceResourceIds: jest.Mock };
   let resourceHealthService: { listForResources: jest.Mock };
   let resourceFlowsService: { getNodesForResources: jest.Mock };
-  let resourceIntroducersService: { getManyForResources: jest.Mock; isIntroducer: jest.Mock };
+  let resourceIntroducersService: { getManyForResources: jest.Mock };
   let usersService: { findOne: jest.Mock };
 
   function createMockSocket(overrides: Partial<any> = {}): any {
@@ -61,14 +61,13 @@ describe('ResourceListService', () => {
     attractapService = { findReaderById: jest.fn() };
     resourceUsageService = {
       getActiveSessions: jest.fn().mockResolvedValue(new Map([[10, null]])),
-      canControllResource: jest.fn().mockResolvedValue(false),
+      canControllResources: jest.fn().mockResolvedValue(new Map()),
     };
     resourceMaintenanceService = { getActiveMaintenanceResourceIds: jest.fn().mockResolvedValue(new Set()) };
     resourceHealthService = { listForResources: jest.fn().mockResolvedValue(new Map([[10, []]])) };
     resourceFlowsService = { getNodesForResources: jest.fn().mockResolvedValue(new Map([[10, []]])) };
     resourceIntroducersService = {
       getManyForResources: jest.fn().mockResolvedValue(new Map([[10, [{ user: { username: 'introducer-a' } }]]])),
-      isIntroducer: jest.fn().mockResolvedValue(false),
     };
     usersService = { findOne: jest.fn().mockResolvedValue(null) };
 
@@ -282,20 +281,38 @@ describe('ResourceListService', () => {
         }),
       );
       usersService.findOne.mockResolvedValue({ id: 7 });
-      resourceUsageService.canControllResource.mockImplementation((resourceId) => Promise.resolve(resourceId === 10));
-      resourceIntroducersService.isIntroducer.mockImplementation((resourceId) => Promise.resolve(resourceId === 11));
+      resourceUsageService.canControllResources.mockResolvedValue(new Map([[10, true], [11, false]]));
+      resourceIntroducersService.getManyForResources.mockResolvedValue(
+        new Map([
+          [10, [{ user: { username: 'introducer-a' }, userId: 1 }]],
+          [11, [{ user: { username: 'introducer-b' }, userId: 7 }]],
+        ]),
+      );
       const socket = createMockSocket({ state: { lastAuthenticatedUserId: 7 } });
 
       await service.sendResourceListToSocket(socket);
 
-      expect(resourceUsageService.canControllResource).toHaveBeenCalledWith(10, { id: 7 });
-      expect(resourceUsageService.canControllResource).toHaveBeenCalledWith(11, { id: 7 });
+      expect(resourceUsageService.canControllResources).toHaveBeenCalledWith([10, 11], { id: 7 });
       expect((socket.sendMessage as jest.Mock).mock.calls[0][0].data.payload.resources).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ id: 10, hasIntroduction: true, isIntroducer: false, requiresSupervisor: false }),
           expect.objectContaining({ id: 11, hasIntroduction: false, isIntroducer: true, requiresSupervisor: true }),
         ]),
       );
+    });
+
+    it('bulk-resolves authorization once when a user has multiple sockets', async () => {
+      attractapService.findReaderById.mockResolvedValue(createReaderFixture());
+      usersService.findOne.mockResolvedValue({ id: 7 });
+      const socketA = createMockSocket({ id: 'socket-a', state: { lastAuthenticatedUserId: 7 } });
+      const socketB = createMockSocket({ id: 'socket-b', state: { lastAuthenticatedUserId: 7 } });
+      websocketService.sockets.set('socket-a', socketA);
+      websocketService.sockets.set('socket-b', socketB);
+      await service.sendResourceList(42);
+
+      expect(usersService.findOne).toHaveBeenCalledTimes(1);
+      expect(resourceUsageService.canControllResources).toHaveBeenCalledTimes(1);
+      expect(resourceUsageService.canControllResources).toHaveBeenCalledWith([10], { id: 7 });
     });
 
     it('includes introducers inherited from resource groups', async () => {

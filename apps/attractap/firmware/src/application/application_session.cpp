@@ -92,11 +92,12 @@ void Application::handleResourceListAction(const API::ResourceBrief &resource) {
     this->beginActionPause();
     this->logger.infof("Stopping resource from list: %s", resource.name);
     this->pendingActionType = PENDING_ACTION_STOP_SESSION;
+    Display::resourceListScreen.showActionProgress("Beende Sitzung");
     this->api.stopResourceUsageSession(resource.id);
     return;
   }
 
-  if (this->cardAuthenticationData.requiresSupervisor) {
+  if (resource.requiresSupervisor) {
     this->supervision.beginReaderInitiated(this->cardAuthenticationData.username,
                                            resource.id);
     this->state = APPLICATION_STATE_SUPERVISION;
@@ -107,6 +108,7 @@ void Application::handleResourceListAction(const API::ResourceBrief &resource) {
   this->beginActionPause();
   this->logger.infof("Starting resource from list: %s", resource.name);
   this->pendingActionType = PENDING_ACTION_START_SESSION;
+  Display::resourceListScreen.showActionProgress("Starte Sitzung");
   this->api.startResourceUsageSession(resource.id);
 }
 
@@ -183,6 +185,8 @@ void Application::handleTouch(int16_t x, int16_t y) {
 void Application::restartSessionTimeout() {
   uint32_t now = millis();
   Display::resourceDetailsScreen.setSessionTimeoutTime(
+      now + this->UNLOCKED_TIMEOUT_MS);
+  Display::resourceListScreen.setSessionTimeoutTime(
       now + this->UNLOCKED_TIMEOUT_MS);
   this->timeOfUnlockedMs = now;
   this->resetPauseAccounting();
@@ -263,15 +267,7 @@ void Application::handleResourceDetailsButtonClick(
     this->api.triggerFlowButton(this->selectedResourceId, evt.flowButtonId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOGOUT:
-    this->resourceIsSelected = false;
-    this->unlocked = false;
-    this->selectedResourceId = 0;
-    this->currentProjectsUser = "";
-    this->clearProjectSelection();
-    this->pendingActionType = PENDING_ACTION_NONE;
-    this->hasPendingFormRequest = false;
-    this->formFlowSubmitted = false;
-    Display::resourceDetailsScreen.hideFormsModal();
+    this->logout();
     break;
   }
 }
@@ -287,6 +283,7 @@ void Application::beginActionPause() {
     this->pauseStartMs = millis();
     // Freeze the UI indicator
     Display::resourceDetailsScreen.setSessionTimeoutPaused(true);
+    Display::resourceListScreen.setSessionTimeoutPaused(true);
   }
 }
 
@@ -303,6 +300,8 @@ void Application::endActionPause() {
     // Extend the UI deadline by the same delta and unfreeze
     Display::resourceDetailsScreen.extendSessionTimeoutBy(delta);
     Display::resourceDetailsScreen.setSessionTimeoutPaused(false);
+    Display::resourceListScreen.extendSessionTimeoutBy(delta);
+    Display::resourceListScreen.setSessionTimeoutPaused(false);
   }
 }
 
@@ -312,6 +311,20 @@ void Application::resetPauseAccounting() {
   this->actionInProgressCount = 0;
   // Ensure not paused visually
   Display::resourceDetailsScreen.setSessionTimeoutPaused(false);
+  Display::resourceListScreen.setSessionTimeoutPaused(false);
+}
+
+void Application::logout() {
+  this->resourceIsSelected = false;
+  this->unlocked = false;
+  this->selectedResourceId = 0;
+  this->currentProjectsUser = "";
+  this->clearProjectSelection();
+  this->pendingActionType = PENDING_ACTION_NONE;
+  this->hasPendingFormRequest = false;
+  this->formFlowSubmitted = false;
+  Display::resourceDetailsScreen.hideFormsModal();
+  Display::resourceListScreen.setAuthenticated(false);
 }
 
 void Application::resetSessionOnDisconnect() {
@@ -329,6 +342,7 @@ void Application::resetSessionOnDisconnect() {
 
   // Ensure any in-progress UI overlays are dismissed
   Display::resourceDetailsScreen.hideActionProgress();
+  Display::resourceListScreen.hideActionProgress();
   Display::resourceDetailsScreen.hideFormsModal();
   this->resetPauseAccounting();
 

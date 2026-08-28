@@ -126,26 +126,25 @@ export class ResourceListService {
       readerName: reader.name,
       ledBrightness: reader.ledBrightness,
     };
+    const usersById = new Map<number, Promise<User | null>>();
+    const accessByUserId = new Map<number, Promise<Map<number, boolean>>>();
     await Promise.all(
       sockets.map(async (socket) => {
-        const user = await this.getAuthenticatedUser(socket);
-        const accessByResourceId = new Map<number, { hasIntroduction: boolean; isIntroducer: boolean }>();
-        if (user) {
-          await Promise.all(
-            resources.map(async (resource) => {
-              const [hasIntroduction, isIntroducer] = await Promise.all([
-                this.resourceUsageService.canControllResource(resource.id, user),
-                this.resourceIntroducersService.isIntroducer(resource.id, user.id, true),
-              ]);
-              accessByResourceId.set(resource.id, { hasIntroduction, isIntroducer });
-            }),
-          );
-        }
+        const userId = socket.state.lastAuthenticatedUserId;
+        const user = userId === null
+          ? null
+          : await (usersById.get(userId) ?? this.getAndCacheUser(userId, usersById));
+        const accessByResourceId = user
+          ? await (accessByUserId.get(user.id) ?? this.getAndCacheAccess(resourceIds, user, accessByUserId))
+          : new Map<number, boolean>();
 
         const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, {
           ...resourceListPayload,
           resources: resources.map((resource) => {
-            const access = accessByResourceId.get(resource.id) ?? { hasIntroduction: false, isIntroducer: false };
+            const hasIntroduction = accessByResourceId.get(resource.id) ?? false;
+            const isIntroducer = user
+              ? (introducersByResourceId.get(resource.id) ?? []).some((introducer) => introducer.userId === user.id)
+              : false;
             const healthEntries = healthMap.get(resource.id) ?? [];
             const unhealthyEntries = healthEntries.filter((entry) => entry.status === ResourceHealthStatus.UNHEALTHY);
             const activeUsageSession = activeSessionMap.get(resource.id) ?? null;
@@ -163,11 +162,11 @@ export class ResourceListService {
               isUnderMaintenance: activeMaintenanceIds.has(resource.id),
               isHealthy: unhealthyEntries.length === 0,
               healthReason: this.buildHealthReason(unhealthyEntries),
-              hasIntroduction: access.hasIntroduction,
-              isIntroducer: access.isIntroducer,
+              hasIntroduction,
+              isIntroducer,
               requiresSupervisor:
                 resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED ||
-                (resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED && !access.hasIntroduction),
+                (resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED && !hasIntroduction),
               activeUsageSession: activeUsageSession
                 ? {
                     user: {
@@ -190,9 +189,20 @@ export class ResourceListService {
     );
   }
 
-  private async getAuthenticatedUser(socket: AuthenticatedWebSocket): Promise<User | null> {
-    const userId = socket.state.lastAuthenticatedUserId;
-    return userId === null ? null : this.usersService.findOne({ id: userId });
+  private getAndCacheUser(userId: number, usersById: Map<number, Promise<User | null>>): Promise<User | null> {
+    const user = this.usersService.findOne({ id: userId });
+    usersById.set(userId, user);
+    return user;
+  }
+
+  private getAndCacheAccess(
+    resourceIds: number[],
+    user: User,
+    accessByUserId: Map<number, Promise<Map<number, boolean>>>,
+  ): Promise<Map<number, boolean>> {
+    const access = this.resourceUsageService.canControllResources(resourceIds, user);
+    accessByUserId.set(user.id, access);
+    return access;
   }
 
   private buildHealthReason(unhealthyEntries: { identifier: string; reason: string | null }[]): string {

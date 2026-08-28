@@ -10,11 +10,15 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, In, FindOneOptions, EntityManager } from 'typeorm';
+import { Repository, IsNull, In, FindOneOptions, EntityManager, Not } from 'typeorm';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   FormSubmission,
+  IntroductionHistoryAction,
   Resource,
+  ResourceGroup,
+  ResourceIntroduction,
+  ResourceIntroductionHistoryItem,
   ResourceFlowNodeType,
   ResourceType,
   ResourceUsage,
@@ -395,6 +399,121 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
         this.accessCacheInFlight.delete(key);
       }
     }
+  }
+
+  public async canControllResources(resourceIds: number[], user: User): Promise<Map<number, boolean>> {
+    const uniqueResourceIds = [...new Set(resourceIds)];
+    const accessByResourceId = new Map(uniqueResourceIds.map((resourceId) => [resourceId, false]));
+    if (uniqueResourceIds.length === 0) {
+      return accessByResourceId;
+    }
+
+    const requestPermissions = (user as AuthenticatedUser).effectivePermissions;
+    const canUpdateResource = (requestPermissions ?? (await this.rbacService.getEffectivePermissions(user.id))).has(
+      'resources.update',
+    );
+    if (canUpdateResource) {
+      return new Map(uniqueResourceIds.map((resourceId) => [resourceId, true]));
+    }
+
+    const manager = this.resourceRepository.manager;
+    const resourceIntroductionRepository = manager.getRepository(ResourceIntroduction);
+    const resourceIntroductionHistoryRepository = manager.getRepository(ResourceIntroductionHistoryItem);
+    const resourceGroupRepository = manager.getRepository(ResourceGroup);
+    const [resources, groups, directIntroductions, resourceRoles] = await Promise.all([
+      this.resourceRepository.find({ where: { id: In(uniqueResourceIds) } }),
+      resourceGroupRepository.find({ where: { resources: { id: In(uniqueResourceIds) } }, relations: ['resources'] }),
+      resourceIntroductionRepository.find({ where: { receiverUserId: user.id, resourceId: In(uniqueResourceIds) } }),
+      this.resourceIntroducersService.getManyForResources(uniqueResourceIds),
+    ]);
+    const groupIds = groups.map((group) => group.id);
+    const groupIntroductions = groupIds.length
+      ? await resourceIntroductionRepository.find({ where: { receiverUserId: user.id, resourceGroupId: In(groupIds) } })
+      : [];
+    const introductions = [...directIntroductions, ...groupIntroductions];
+    const histories = introductions.length
+      ? await resourceIntroductionHistoryRepository.find({ where: { introductionId: In(introductions.map((item) => item.id)) } })
+      : [];
+    const resourceIdsWithUsage = [...new Set([
+      ...uniqueResourceIds,
+      ...groups.flatMap((group) => group.resources.map((resource) => resource.id)),
+    ])];
+    const usages = resourceIdsWithUsage.length
+      ? await this.resourceUsageRepository.find({
+          where: { resourceId: In(resourceIdsWithUsage), userId: user.id, endTime: Not(IsNull()) },
+          select: ['resourceId', 'endTime'],
+        })
+      : [];
+
+    const latestHistoryByIntroductionId = new Map<number, ResourceIntroductionHistoryItem>();
+    const latestGrantByIntroductionId = new Map<number, ResourceIntroductionHistoryItem>();
+    for (const history of histories) {
+      const latestHistory = latestHistoryByIntroductionId.get(history.introductionId);
+      if (!latestHistory || latestHistory.createdAt < history.createdAt) {
+        latestHistoryByIntroductionId.set(history.introductionId, history);
+      }
+      if (history.action === IntroductionHistoryAction.GRANT) {
+        const latestGrant = latestGrantByIntroductionId.get(history.introductionId);
+        if (!latestGrant || latestGrant.createdAt < history.createdAt) {
+          latestGrantByIntroductionId.set(history.introductionId, history);
+        }
+      }
+    }
+    const latestUsageByResourceId = new Map<number, Date>();
+    for (const usage of usages) {
+      const latestUsage = latestUsageByResourceId.get(usage.resourceId);
+      if (usage.endTime && (!latestUsage || latestUsage < usage.endTime)) {
+        latestUsageByResourceId.set(usage.resourceId, usage.endTime);
+      }
+    }
+    const directIntroductionByResourceId = new Map(
+      directIntroductions
+        .filter((introduction) => introduction.resourceId !== null)
+        .map((introduction) => [introduction.resourceId, introduction]),
+    );
+    const groupIntroductionsByGroupId = new Map(
+      groupIntroductions
+        .filter((introduction) => introduction.resourceGroupId !== null)
+        .map((introduction) => [introduction.resourceGroupId, introduction]),
+    );
+    const groupsByResourceId = new Map<number, ResourceGroup[]>();
+    for (const group of groups) {
+      for (const resource of group.resources) {
+        const groupsForResource = groupsByResourceId.get(resource.id) ?? [];
+        groupsForResource.push(group);
+        groupsByResourceId.set(resource.id, groupsForResource);
+      }
+    }
+
+    const hasUsableIntroduction = (introduction: ResourceIntroduction | undefined, policy: Resource | ResourceGroup, lastUsedAt: Date | null) => {
+      if (!introduction || latestHistoryByIntroductionId.get(introduction.id)?.action !== IntroductionHistoryAction.GRANT) {
+        return false;
+      }
+      const trainedAt = latestGrantByIntroductionId.get(introduction.id)?.createdAt ?? introduction.completedAt ?? introduction.createdAt;
+      const retraining = this.resourceRetrainingService.evaluate(policy, trainedAt, lastUsedAt);
+      return !(retraining.applies && retraining.isDue && retraining.blocksAccess);
+    };
+
+    for (const resource of resources) {
+      if (resourceRoles.get(resource.id)?.some((role) => role.userId === user.id)) {
+        accessByResourceId.set(resource.id, true);
+        continue;
+      }
+      if (hasUsableIntroduction(directIntroductionByResourceId.get(resource.id), resource, latestUsageByResourceId.get(resource.id) ?? null)) {
+        accessByResourceId.set(resource.id, true);
+        continue;
+      }
+      const hasUsableGroupIntroduction = (groupsByResourceId.get(resource.id) ?? []).some((group) => {
+        const lastUsedAt = group.resources.reduce<Date | null>((latestUsage, groupResource) => {
+          const usage = latestUsageByResourceId.get(groupResource.id) ?? null;
+          return usage && (!latestUsage || usage > latestUsage) ? usage : latestUsage;
+        }, null);
+        return hasUsableIntroduction(groupIntroductionsByGroupId.get(group.id), group, lastUsedAt);
+      });
+      accessByResourceId.set(resource.id, hasUsableGroupIntroduction);
+    }
+
+    return accessByResourceId;
   }
 
   private async canControllResourceUncached(

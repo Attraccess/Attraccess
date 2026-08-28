@@ -163,6 +163,7 @@ void Application::setup() {
           }
           p->self->endActionPause();
           Display::resourceDetailsScreen.hideActionProgress();
+          Display::resourceListScreen.hideActionProgress();
           if (p->enabled) {
             Display::showInsufficientBalancePopup(
                 [self = p->self](uint32_t amountCents) {
@@ -215,6 +216,7 @@ void Application::setup() {
           }
           pl->self->endActionPause();
           Display::resourceDetailsScreen.hideActionProgress();
+          Display::resourceListScreen.hideActionProgress();
           Display::showErrorPopup(pl->t, pl->m);
           if (pl && pl->self) {
             pl->self->pendingActionType = PENDING_ACTION_NONE;
@@ -252,6 +254,7 @@ void Application::setup() {
             pl->self->endActionPause();
           }
           Display::resourceDetailsScreen.hideActionProgress();
+          Display::resourceListScreen.hideActionProgress();
           if (pl && pl->ok) {
             Display::resourceDetailsScreen.showSuccessToast("Erfolgreich");
           }
@@ -373,6 +376,7 @@ void Application::setup() {
       [this](const API::ResourceBrief &resource) {
         return this->canPerformResourceListAction(resource);
       });
+  Display::resourceListScreen.setLogoutCallback([this]() { this->logout(); });
 
   Display::setTouchCallback(
       [this](int16_t x, int16_t y) { this->handleTouch(x, y); });

@@ -237,6 +237,8 @@ void Application::processState() {
             .hasIntroduction = this->cardAuthenticationData.hasIntroduction,
             .isIntroducer = this->cardAuthenticationData.isIntroducer,
             .requiresSupervisor = this->cardAuthenticationData.requiresSupervisor});
+    Display::resourceListScreen.setLoginUsername(
+        this->cardAuthenticationData.username);
 #endif
 
     this->state = APPLICATION_STATE_AUTHENTICATE_CARD;

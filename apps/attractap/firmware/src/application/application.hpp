@@ -236,6 +236,7 @@ private:
     void restartSessionTimeout();
     void resetPauseAccounting();
     void resetSessionOnDisconnect();
+    void logout();
 
     uint32_t timeOfResourceSelectionMs;
     const uint32_t RESOURCE_SELECTION_TIMEOUT_MS = 10000;
