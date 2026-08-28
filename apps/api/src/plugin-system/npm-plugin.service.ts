@@ -452,15 +452,23 @@ export class NpmPluginService implements OnModuleInit {
   }
 
   async setUpdatePolicy(patch: Partial<PluginUpdatePolicy>): Promise<PluginUpdatePolicy> {
-    const policy = normalizeUpdatePolicy({ ...(await this.getUpdatePolicy()), ...patch });
-    await this.settings.setPlainSetting(REGISTRY_PARENT, UPDATE_POLICY_KEY, JSON.stringify(policy));
-    return policy;
+    return this.mutateInstalls(async () => {
+      const policy = normalizeUpdatePolicy({ ...(await this.getUpdatePolicy()), ...patch });
+      await this.settings.setPlainSetting(REGISTRY_PARENT, UPDATE_POLICY_KEY, JSON.stringify(policy));
+      return policy;
+    });
   }
 
   async checkInstalled(name: string): Promise<InstalledNpmPlugin> {
     const installed = this.installed(name);
+    let policy: PluginUpdatePolicy | undefined;
+    const snapshotChanged = (current: InstalledNpmPlugin, currentPolicy: PluginUpdatePolicy) =>
+      current.version !== installed.version ||
+      current.requestedSpec !== installed.requestedSpec ||
+      current.registryId !== installed.registryId ||
+      (policy !== undefined && !sameUpdatePolicy(currentPolicy, policy));
     try {
-      const policy = await this.getUpdatePolicy();
+      policy = await this.getUpdatePolicy();
       if (!policy.checksEnabled) return installed;
       const candidates = await this.installedVersionCandidates(name);
       const requested = isDistTag(installed.requestedSpec)
@@ -469,12 +477,7 @@ export class NpmPluginService implements OnModuleInit {
       const updated = await this.mutateInstalls(async () => {
         const current = this.installed(name);
         // Candidates and dist-tag resolutions belong to the snapshot used for the registry request.
-        if (
-          current.version !== installed.version ||
-          current.requestedSpec !== installed.requestedSpec ||
-          current.registryId !== installed.registryId
-        )
-          return null;
+        if (snapshotChanged(current, await this.getUpdatePolicy())) return null;
         const candidate = candidates.find(
           (item) =>
             item.direction === 'newer' &&
@@ -502,14 +505,17 @@ export class NpmPluginService implements OnModuleInit {
         state: 'failed' as const,
         error: error instanceof Error ? error.message : 'Update check failed',
       };
-      return await this.mutateInstalls(async () => {
+      const failed = await this.mutateInstalls(async () => {
+        const current = this.installed(name);
+        if (snapshotChanged(current, await this.getUpdatePolicy())) return null;
         const updated = {
-          ...this.installed(name),
+          ...current,
           updateCheck,
         };
         await this.writeState(updated);
         return updated;
       });
+      return failed ?? this.checkInstalled(name);
     }
   }
 
@@ -1093,6 +1099,16 @@ function effectiveUpdateMode(
 ): PluginUpdatePolicy['mode'] {
   if (override === 'inherit') return globalMode;
   return override;
+}
+
+function sameUpdatePolicy(left: PluginUpdatePolicy, right: PluginUpdatePolicy): boolean {
+  return (
+    left.checksEnabled === right.checksEnabled &&
+    left.mode === right.mode &&
+    left.prerelease === right.prerelease &&
+    left.maintenanceWindow.startMinute === right.maintenanceWindow.startMinute &&
+    left.maintenanceWindow.durationMinutes === right.maintenanceWindow.durationMinutes
+  );
 }
 
 function isDistTag(spec: string): boolean {

@@ -1184,6 +1184,120 @@ describe('NpmPluginService', () => {
     await expect(updateCheck).resolves.toMatchObject({ updateOverride: 'off', updateCheck: { state: 'blocked' } });
   });
 
+  it('retries an update check after the global policy changes', async () => {
+    const name = '@attraccess/plugin';
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name,
+          version: '1.0.0',
+          requestedSpec: '^1.0.0',
+          registryId: 'npm',
+          registryUrl: 'https://registry.npmjs.org',
+          integrity: 'sha512-test',
+          installPath: 'npm-plugin',
+          permissions: [],
+          lastError: null,
+        },
+      ]),
+    );
+    let rawPolicy = JSON.stringify({
+      checksEnabled: true,
+      mode: 'patch',
+      prerelease: false,
+      maintenanceWindow: { startMinute: 0, durationMinutes: 60 },
+    });
+    const service = new NpmPluginService({
+      getPlainSetting: jest.fn().mockImplementation(async () => rawPolicy),
+      setPlainSetting: jest.fn().mockImplementation(async (_parent, _key, value) => {
+        rawPolicy = value;
+      }),
+    } as never);
+    let releaseCandidates: ((value: never[]) => void) | undefined;
+    jest
+      .spyOn(service, 'installedVersionCandidates')
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            releaseCandidates = resolve;
+          }),
+      )
+      .mockResolvedValue([
+        {
+          version: '1.0.1',
+          direction: 'newer',
+          compatible: true,
+          reason: null,
+          permissions: [],
+          permissionAdditions: [],
+          permissionRemovals: [],
+          publishedAt: null,
+          classification: 'community',
+          classificationReason: '',
+          deprecated: null,
+          integrity: 'sha512-test',
+          repository: null,
+          homepage: null,
+          semverImpact: 'patch',
+          matchesRequestedSpec: true,
+        },
+      ] as never);
+
+    const updateCheck = service.checkInstalled(name);
+    await new Promise((resolve) => setImmediate(resolve));
+    await service.setUpdatePolicy({ mode: 'off' });
+    if (!releaseCandidates) throw new Error('Expected update check to request candidates');
+    releaseCandidates([]);
+
+    await expect(updateCheck).resolves.toMatchObject({ updateCheck: { state: 'blocked' } });
+  });
+
+  it('retries a failed update check after the installation spec changes', async () => {
+    const name = '@attraccess/plugin';
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name,
+          version: '1.0.0',
+          requestedSpec: '^1.0.0',
+          registryId: 'npm',
+          registryUrl: 'https://registry.npmjs.org',
+          integrity: 'sha512-test',
+          installPath: 'npm-plugin',
+          permissions: [],
+          lastError: null,
+        },
+      ]),
+    );
+    const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      versions: { '1.1.0': { version: '1.1.0' } },
+    });
+    let rejectCandidates: ((error: Error) => void) | undefined;
+    jest
+      .spyOn(service, 'installedVersionCandidates')
+      .mockImplementationOnce(
+        () =>
+          new Promise((_, reject) => {
+            rejectCandidates = reject;
+          }),
+      )
+      .mockResolvedValue([]);
+
+    const updateCheck = service.checkInstalled(name);
+    await new Promise((resolve) => setImmediate(resolve));
+    await service.updateRequestedSpec(name, '^1.1.0');
+    if (!rejectCandidates) throw new Error('Expected update check to request candidates');
+    rejectCandidates(new Error('Registry unavailable'));
+
+    await expect(updateCheck).resolves.toMatchObject({
+      requestedSpec: '^1.1.0',
+      updateCheck: { state: 'up-to-date', error: null },
+    });
+  });
+
   it('retries a dist-tag update check after its requested spec changes', async () => {
     const name = '@attraccess/plugin';
     writeFileSync(
