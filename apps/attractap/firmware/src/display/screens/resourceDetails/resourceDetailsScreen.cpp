@@ -766,6 +766,7 @@ void ResourceDetailsScreen::destroy()
    this->formsBackButton = nullptr;
    this->formsNextButton = nullptr;
    this->formsNextLabel = nullptr;
+   this->formsNextSpinner = nullptr;
    this->elapsedTime = nullptr;
    this->sessionTimeoutIndicator = nullptr;
    this->noIntroductionPanel = nullptr;
