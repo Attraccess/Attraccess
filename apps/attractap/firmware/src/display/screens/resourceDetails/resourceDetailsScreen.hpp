@@ -142,8 +142,6 @@ private:
     lv_obj_t *formsBackButton = nullptr;
     lv_obj_t *formsNextButton = nullptr;
     lv_obj_t *formsNextLabel = nullptr;
-    lv_obj_t *formsBusyOverlay = nullptr;
-    lv_obj_t *formsBusyLabel = nullptr;
     // Fullscreen text editor overlay: textarea on top, keyboard pinned below.
     lv_obj_t *formsEditorOverlay = nullptr;
     lv_obj_t *formsEditorTitleLabel = nullptr;

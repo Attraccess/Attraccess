@@ -33,8 +33,6 @@ void ResourceDetailsScreen::resetFormsModalState()
    this->formsBackButton = nullptr;
    this->formsNextButton = nullptr;
    this->formsNextLabel = nullptr;
-   this->formsBusyOverlay = nullptr;
-   this->formsBusyLabel = nullptr;
    this->formsEditorOverlay = nullptr;
    this->formsEditorTitleLabel = nullptr;
    this->formsEditorTextarea = nullptr;
@@ -389,30 +387,6 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_height(this->formsEditorKeyboard, lv_pct(45));
    lv_obj_add_event_cb(this->formsEditorKeyboard, &ResourceDetailsScreen::onFormsEditorKeyboardEvent, LV_EVENT_ALL, this);
 
-   // Busy overlay: created last so it floats above the panel + keyboard. While
-   // visible it blocks all input behind it (CLICKABLE) until the server responds.
-   lv_obj_t *busy = lv_obj_create(overlay);
-   this->formsBusyOverlay = busy;
-   lv_obj_remove_style_all(busy);
-   lv_obj_add_flag(busy, LV_OBJ_FLAG_IGNORE_LAYOUT);
-   lv_obj_add_flag(busy, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_add_flag(busy, LV_OBJ_FLAG_HIDDEN);
-   lv_obj_remove_flag(busy, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_size(busy, lv_pct(100), lv_pct(100));
-   lv_obj_set_align(busy, LV_ALIGN_CENTER);
-   lv_obj_set_style_bg_color(busy, lv_color_black(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(busy, 160, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_flex_flow(busy, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_flex_align(busy, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-   lv_obj_set_style_pad_row(busy, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   lv_obj_t *busySpinner = lv_spinner_create(busy);
-   lv_obj_set_size(busySpinner, 48, 48);
-   lv_obj_remove_flag(busySpinner, LV_OBJ_FLAG_CLICKABLE);
-
-   this->formsBusyLabel = lv_label_create(busy);
-   lv_label_set_text(this->formsBusyLabel, "Bitte warten");
-   lv_obj_set_style_text_color(this->formsBusyLabel, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 void ResourceDetailsScreen::setFormsBusy(bool busy, const char *text)
 {
@@ -421,11 +395,7 @@ void ResourceDetailsScreen::setFormsBusy(bool busy, const char *text)
    {
       this->closeFormsEditor(false);
    }
-   if (this->formsBusyLabel && text)
-   {
-      lv_label_set_text(this->formsBusyLabel, text);
-   }
-   // Disable footer buttons as well so they read as inactive behind the overlay.
+   // Disable controls while a request is in flight, without redrawing an overlay.
    lv_obj_t *const buttons[] = {this->formsNextButton, this->formsBackButton, this->formsCancelButton};
    for (lv_obj_t *button : buttons)
    {
@@ -442,21 +412,36 @@ void ResourceDetailsScreen::setFormsBusy(bool busy, const char *text)
          lv_obj_clear_state(button, LV_STATE_DISABLED);
       }
    }
+   for (uint16_t i = 0; i < this->formFieldWidgetCount; ++i)
+   {
+      lv_obj_t *input = this->formFieldWidgets[i].input;
+      if (!input)
+      {
+         continue;
+      }
+      if (busy)
+      {
+         lv_obj_add_state(input, LV_STATE_DISABLED);
+      }
+      else
+      {
+         lv_obj_clear_state(input, LV_STATE_DISABLED);
+      }
+   }
    // Back button stays disabled on the first field even when not busy.
    if (!busy && this->formsBackButton && !this->formsCanGoBack)
    {
       lv_obj_add_state(this->formsBackButton, LV_STATE_DISABLED);
    }
-   if (this->formsBusyOverlay)
+   if (this->formsNextLabel)
    {
       if (busy)
       {
-         lv_obj_clear_flag(this->formsBusyOverlay, LV_OBJ_FLAG_HIDDEN);
-         lv_obj_move_foreground(this->formsBusyOverlay);
+         lv_label_set_text(this->formsNextLabel, text ? text : "Laden...");
       }
       else
       {
-         lv_obj_add_flag(this->formsBusyOverlay, LV_OBJ_FLAG_HIDDEN);
+         lv_label_set_text(this->formsNextLabel, this->formsIsLastField ? "Absenden" : "Weiter");
       }
    }
 }
@@ -943,11 +928,6 @@ void ResourceDetailsScreen::openFormsEditor(uint16_t widgetIndex)
 
    lv_obj_clear_flag(this->formsEditorOverlay, LV_OBJ_FLAG_HIDDEN);
    lv_obj_move_foreground(this->formsEditorOverlay);
-   // Busy overlay must stay above everything when it shows up later.
-   if (this->formsBusyOverlay)
-   {
-      lv_obj_move_foreground(this->formsBusyOverlay);
-   }
 }
 void ResourceDetailsScreen::closeFormsEditor(bool commit)
 {
@@ -1106,6 +1086,10 @@ void ResourceDetailsScreen::onSelectOptionClick(lv_event_t *e)
    }
 
    auto *self = evtData->self;
+   if (self->formsBusy)
+   {
+      return;
+   }
    if (evtData->widgetIndex >= self->formFieldWidgetCount)
    {
       return;
