@@ -27,6 +27,7 @@ const MAX_ARCHIVE_BYTES = 50 * 1024 * 1024;
 const MAX_METADATA_BYTES = 10 * 1024 * 1024;
 const MAX_EXTRACTED_BYTES = 200 * 1024 * 1024;
 const MAX_ARCHIVE_ENTRIES = 10_000;
+export const MAX_CONFIGURED_REGISTRIES = 5;
 
 export type StoredRegistry = { id: string; name: string; url: string };
 type Registry = StoredRegistry & { token: string | null };
@@ -102,6 +103,7 @@ export type MarketplacePlugin = {
   description: string | null;
   permissions: string[];
   hostRange: string | null;
+  sdkCompatibility: { backend: string | null; frontend: string | null };
   repository: string | null;
   homepage: string | null;
   license: string | null;
@@ -113,6 +115,7 @@ export type MarketplacePlugin = {
   installable: boolean;
   incompatibilityReason: string | null;
   integrity: string | null;
+  provenance: string | null;
 };
 
 @Injectable()
@@ -200,6 +203,8 @@ export class NpmPluginService implements OnModuleInit {
     };
     if (!registry.name) throw new BadRequestException('Registry name is required');
     await this.mutateRegistries(async (registries) => {
+      if (registries.length >= MAX_CONFIGURED_REGISTRIES)
+        throw new BadRequestException(`A maximum of ${MAX_CONFIGURED_REGISTRIES} registries can be configured`);
       if (registries.some(({ url }) => url === registry.url))
         throw new BadRequestException('Registry URL is already configured');
       if (input.token !== undefined)
@@ -276,8 +281,25 @@ export class NpmPluginService implements OnModuleInit {
         }
       }),
     );
+    const normalizedQuery = query.trim().toLowerCase();
+    const officialResults =
+      !registryId || registryId === 'npm'
+        ? await Promise.allSettled(
+            this.classification
+              .officialPackages()
+              .filter(({ name }) => !normalizedQuery || name.toLowerCase().includes(normalizedQuery))
+              .map(({ name }) => this.marketplacePackage(name)),
+          )
+        : [];
+    const results = new Map(
+      [
+        ...responses.flatMap(({ results }) => results),
+        ...officialResults.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])),
+      ].map((plugin) => [`${plugin.registry.id}:${plugin.name}`, plugin]),
+    );
     return {
-      results: responses.flatMap(({ results }) => results),
+      // The allowlist is queried directly rather than relying on npm's ranked search results.
+      results: [...results.values()],
       errors: responses.flatMap(({ error }) => (error ? [error] : [])),
     };
   }
@@ -718,6 +740,10 @@ export class NpmPluginService implements OnModuleInit {
         description: pkg.attraccess.description ?? null,
         permissions: pkg.attraccess.permissions,
         hostRange: pkg.attraccess.host,
+        sdkCompatibility: {
+          backend: pkg.attraccess.sdk.backend ?? null,
+          frontend: pkg.attraccess.sdk.frontend ?? null,
+        },
         repository: repositoryUrl(pkg.repository),
         homepage: pkg.homepage ?? null,
         license: pkg.license ?? null,
@@ -729,6 +755,7 @@ export class NpmPluginService implements OnModuleInit {
         installable: true,
         incompatibilityReason: null,
         integrity: distIntegrity(pkg),
+        provenance: packageProvenance(pkg),
       };
     } catch (error) {
       return {
@@ -738,6 +765,7 @@ export class NpmPluginService implements OnModuleInit {
         description: null,
         permissions: [],
         hostRange: null,
+        sdkCompatibility: { backend: null, frontend: null },
         repository: null,
         homepage: null,
         license: null,
@@ -749,6 +777,7 @@ export class NpmPluginService implements OnModuleInit {
         installable: false,
         incompatibilityReason: error instanceof Error ? error.message : 'Package metadata is invalid',
         integrity: null,
+        provenance: null,
       };
     }
   }
@@ -1139,6 +1168,11 @@ function distIntegrity(pkg: NpmPluginPackage): string | null {
   const dist = (pkg as NpmPluginPackage & { dist?: { integrity?: unknown; shasum?: unknown } }).dist;
   if (typeof dist?.integrity === 'string') return dist.integrity;
   return typeof dist?.shasum === 'string' ? `sha1-${dist.shasum}` : null;
+}
+
+function packageProvenance(pkg: NpmPluginPackage): string | null {
+  const attestations = (pkg as NpmPluginPackage & { dist?: { attestations?: { url?: unknown } } }).dist?.attestations;
+  return typeof attestations?.url === 'string' ? attestations.url : null;
 }
 
 function packageName(value: unknown): string | null {
