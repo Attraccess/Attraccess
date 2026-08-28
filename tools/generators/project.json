@@ -11,7 +11,8 @@
     "plugins-frontend-ui",
     "plugins-frontend-sdk",
     "plugin-shelly",
-    "plugin-rabbitmq"
+    "plugin-rabbitmq",
+    "plugin-wago"
   ],
   "targets": {
     "build": {

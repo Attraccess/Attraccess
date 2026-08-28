@@ -63,7 +63,13 @@ export class RabbitmqCredentialProvisioningProvider implements MqttCredentialPro
     this.assertName(request.username, 'Username');
     const config = await this.requireConfig(request.mqttServerId);
     this.assertNotManagementUser(config, request.username);
-    await this.client.request(config, 'DELETE', `/users/${encodeURIComponent(request.username)}`);
+    try {
+      await this.client.request(config, 'DELETE', `/users/${encodeURIComponent(request.username)}`);
+    } catch (error) {
+      // A prior attempt may have removed the credential before its database state was recorded.
+      if (error instanceof HttpException && error.getStatus() === HttpStatus.NOT_FOUND) return;
+      throw error;
+    }
   }
 
   private async writeCredential(request: MqttCredentialRequest): Promise<ProvisionedMqttCredential> {

@@ -57,6 +57,17 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
     ).rejects.toThrow('RabbitMQ MQTT topic policies cannot contain dots');
   });
 
+  it('treats an already deleted credential as revoked', async () => {
+    const provider = new RabbitmqCredentialProvisioningProvider(context);
+    const request = jest
+      .spyOn((provider as unknown as { client: { request: jest.Mock } }).client, 'request')
+      .mockRejectedValue(new HttpException('not found', HttpStatus.NOT_FOUND));
+
+    await expect(provider.revoke({ mqttServerId: 4, identity: 'controller-a', username: 'wago-controller-a', vhost: '/' })).resolves.toBeUndefined();
+
+    expect(request).toHaveBeenCalledWith(expect.anything(), 'DELETE', '/users/wago-controller-a');
+  });
+
   it('creates user, vhost, and topic permissions and returns the password only to the caller', async () => {
     const provider = new RabbitmqCredentialProvisioningProvider(context);
     const request = jest

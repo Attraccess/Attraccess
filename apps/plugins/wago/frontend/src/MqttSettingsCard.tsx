@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Form, Input, Label, Spinner, TextField } from '@heroui/react';
+import { Alert, Button, Form, Input, Label, Spinner, TextField } from '@heroui/react';
 import { useEffect, useState } from 'react';
 import { useSettingsQuery, useUpdateSettingsMutation } from './queries';
 
@@ -28,38 +28,34 @@ export function MqttSettingsCard() {
   }
 
   return (
-    <Card className="wg:max-w-xl">
-      <Card.Header>
-        <Card.Title>MQTT settings</Card.Title>
-        <Card.Description>Select the MQTT server used when claiming controllers.</Card.Description>
-      </Card.Header>
+    <section className="wg:max-w-xl">
+      <header className="wg:mb-4">
+        <h2 className="wg:text-lg wg:font-semibold">MQTT settings</h2>
+        <p className="wg:mt-1 wg:text-sm wg:text-muted">Select the MQTT server used when claiming controllers.</p>
+      </header>
       <Form
         onSubmit={(event) => {
           event.preventDefault();
           updateSettingsMutation.mutate(defaultServerId ? Number(defaultServerId) : null);
         }}
       >
-        <Card.Content>
-          <TextField name="defaultMqttServerId" type="number">
-            <Label>Default MQTT server ID</Label>
-            <Input min="1" value={defaultServerId} onChange={(event) => setDefaultServerId(event.target.value)} />
-          </TextField>
-          {updateSettingsMutation.isError && (
-            <Alert className="wg:mt-4" status="danger">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Description>{getErrorMessage(updateSettingsMutation.error)}</Alert.Description>
-              </Alert.Content>
-            </Alert>
-          )}
-        </Card.Content>
-        <Card.Footer>
-          <Button type="submit" isPending={updateSettingsMutation.isPending}>
-            Save
-          </Button>
-        </Card.Footer>
+        <TextField name="defaultMqttServerId" type="number">
+          <Label>Default MQTT server ID</Label>
+          <Input min="1" value={defaultServerId} onChange={(event) => setDefaultServerId(event.target.value)} />
+        </TextField>
+        {updateSettingsMutation.isError && (
+          <Alert className="wg:mt-4" status="danger">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Description>{getErrorMessage(updateSettingsMutation.error)}</Alert.Description>
+            </Alert.Content>
+          </Alert>
+        )}
+        <Button type="submit" isPending={updateSettingsMutation.isPending}>
+          Save
+        </Button>
       </Form>
-    </Card>
+    </section>
   );
 }
 
