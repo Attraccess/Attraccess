@@ -5,9 +5,16 @@ export type PluginClassification = {
   reason: string;
 };
 
+export type OfficialPluginPackage = { name: string };
+
 const NPM_REGISTRY_URL = 'https://registry.npmjs.org';
 const OFFICIAL_PLUGIN_PREFIX = '@attraccess/plugin-';
 const OFFICIAL_PUBLISHER = 'attraccess';
+const OFFICIAL_PACKAGES = [
+  { name: '@attraccess/plugin-shelly' },
+  { name: '@attraccess/plugin-rabbitmq' },
+  { name: '@attraccess/plugin-wago' },
+] as const satisfies ReadonlyArray<OfficialPluginPackage>;
 
 @Injectable()
 export class PluginClassificationService {
@@ -21,5 +28,9 @@ export class PluginClassificationService {
     }
 
     return { kind: 'community', reason: 'Not published by Attraccess on npm' };
+  }
+
+  officialPackages(): ReadonlyArray<OfficialPluginPackage> {
+    return OFFICIAL_PACKAGES;
   }
 }
