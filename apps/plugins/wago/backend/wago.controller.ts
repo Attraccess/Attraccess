@@ -15,8 +15,13 @@ export class WagoControllerApi {
   @Post('settings') setSettings(@Body() body: { defaultMqttServerId?: number | null }) {
     return this.wago.setDefaultMqttServer(body?.defaultMqttServerId ?? null);
   }
-  @Post('enrollments') enrollment(@Body() body: { hardwareId?: string; mqttServerId?: number }) {
-    return this.wago.createEnrollment(body?.hardwareId ?? '', body?.mqttServerId);
+  @Post('enrollments') enrollment(
+    @Body() body: { hardwareId?: string; mqttServerId?: number; manualUsername?: string; manualPassword?: string },
+  ) {
+    const manualCredentials = body?.manualUsername || body?.manualPassword
+      ? { username: body.manualUsername ?? '', password: body.manualPassword ?? '' }
+      : undefined;
+    return this.wago.createEnrollment(body?.hardwareId ?? '', body?.mqttServerId, manualCredentials);
   }
   @Post('controllers/:id/claim') claim(
     @Param('id', ParseIntPipe) id: number,

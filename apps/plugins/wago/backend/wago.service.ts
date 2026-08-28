@@ -99,6 +99,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   async createEnrollment(
     hardwareId: string,
     mqttServerId?: number,
+    manualCredentials?: { username: string; password: string },
   ): Promise<{
     broker: { host: string; port: number; useTls: boolean };
     username: string;
@@ -117,7 +118,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     const claimSecret = randomBytes(24).toString('base64url');
     const identity = `wago-enrollment-${randomBytes(8).toString('hex')}`;
     const expiresAt = new Date(Date.now() + 15 * 60_000).toISOString();
-    const credential = await this.context.getMqttCredentialProvisioning().provision({
+    const provisionedCredential = await this.context.getMqttCredentialProvisioning().provision({
       mqttServerId: selectedServerId,
       identity,
       username: identity,
@@ -127,12 +128,19 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
         subscribe: [`${discoveryTopic(normalizedHardwareId)}/claim`],
       },
     });
+    if (!('password' in provisionedCredential) && !manualCredentials)
+      throw new ConflictException(
+        `Manual discovery credentials are required: ${provisionedCredential.instructions.join(' ')}`,
+      );
+    const credential = 'password' in provisionedCredential ? provisionedCredential : manualCredentials;
+    if (!credential?.username.trim() || !credential.password)
+      throw new ConflictException('a manual discovery username and password are required');
     const enrollment = await this.enrollments.save(
       this.enrollments.create({
         mqttServerId: selectedServerId,
         hardwareId: normalizedHardwareId,
         secretHash: hash(claimSecret),
-        identity,
+        identity: credential.username,
         createdAt: new Date().toISOString(),
         expiresAt,
       }),
@@ -148,7 +156,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       password: 'password' in credential ? credential.password : undefined,
       claimSecret,
       expiresAt,
-      manualInstructions: 'instructions' in credential ? credential.instructions : undefined,
+      manualInstructions: 'instructions' in provisionedCredential ? provisionedCredential.instructions : undefined,
     };
   }
 
@@ -432,22 +440,20 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     );
   }
   private async revokeEnrollment(enrollment: WagoEnrollment): Promise<void> {
-    const manual = await this.context.getMqttCredentialProvisioning().revoke({
-      mqttServerId: enrollment.mqttServerId,
-      identity: enrollment.identity,
-      username: enrollment.identity,
-      vhost: '/',
-    });
-    if (manual)
-      throw new ConflictException(`Manual credential revocation is required: ${manual.instructions.join(' ')}`);
-    const consumedAt = enrollment.consumedAt;
-    enrollment.consumedAt = new Date().toISOString();
-    try {
+    if (!enrollment.revokedAt) {
+      const manual = await this.context.getMqttCredentialProvisioning().revoke({
+        mqttServerId: enrollment.mqttServerId,
+        identity: enrollment.identity,
+        username: enrollment.identity,
+        vhost: '/',
+      });
+      if (manual)
+        throw new ConflictException(`Manual credential revocation is required: ${manual.instructions.join(' ')}`);
+      enrollment.revokedAt = new Date().toISOString();
       await this.enrollments.save(enrollment);
-    } catch (error) {
-      enrollment.consumedAt = consumedAt;
-      throw error;
     }
+    enrollment.consumedAt = new Date().toISOString();
+    await this.enrollments.save(enrollment);
     const timer = this.enrollmentExpiryTimers.get(enrollment.id);
     if (timer) clearTimeout(timer);
     this.enrollmentExpiryTimers.delete(enrollment.id);

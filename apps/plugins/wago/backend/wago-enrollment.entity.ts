@@ -9,5 +9,6 @@ export class WagoEnrollment {
   @Column({ type: 'varchar' }) identity!: string;
   @Column({ type: 'varchar', name: 'created_at' }) createdAt!: string;
   @Column({ type: 'varchar', name: 'expires_at' }) expiresAt!: string;
+  @Column({ type: 'varchar', name: 'revoked_at', nullable: true }) revokedAt!: string | null;
   @Column({ type: 'varchar', name: 'consumed_at', nullable: true }) consumedAt!: string | null;
 }

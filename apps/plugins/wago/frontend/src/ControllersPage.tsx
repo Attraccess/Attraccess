@@ -2,6 +2,7 @@ import { Alert, Button, Spinner } from '@heroui/react';
 import { RefreshCwIcon } from 'lucide-react';
 import { useState } from 'react';
 import { ClaimControllerModal } from './ClaimControllerModal';
+import { CreateEnrollmentCard } from './CreateEnrollmentCard';
 import { ControllersTable } from './ControllersTable';
 import { MqttSettingsCard } from './MqttSettingsCard';
 import { useControllersQuery } from './queries';
@@ -29,6 +30,7 @@ export function ControllersPage() {
       </header>
 
       <MqttSettingsCard />
+      <CreateEnrollmentCard />
 
       {controllersQuery.isError && (
         <Alert status="danger">

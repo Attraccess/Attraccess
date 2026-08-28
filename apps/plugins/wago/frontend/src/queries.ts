@@ -1,5 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { claimController, getSettings, listControllers, setSettings, type ClaimControllerInput } from './api';
+import {
+  claimController,
+  createEnrollment,
+  getSettings,
+  listControllers,
+  setSettings,
+  type ClaimControllerInput,
+  type CreateEnrollmentInput,
+} from './api';
 
 const queryKeys = {
   controllers: ['wago', 'controllers'] as const,
@@ -41,4 +49,8 @@ export function useClaimControllerMutation() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.controllers });
     },
   });
+}
+
+export function useCreateEnrollmentMutation() {
+  return useMutation({ mutationFn: (input: CreateEnrollmentInput) => createEnrollment(input) });
 }

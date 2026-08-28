@@ -43,7 +43,8 @@ describe('WagoService', () => {
     const enrollmentRepository = {
       find: jest.fn().mockResolvedValue(enrollments),
       findOneBy: jest.fn(),
-      save: jest.fn(),
+      create: jest.fn((value) => value),
+      save: jest.fn().mockImplementation(async (value) => value),
       createQueryBuilder: jest.fn().mockReturnValue(enrollmentQuery),
     };
     const settingsRepository = { findOneBy: jest.fn().mockResolvedValue({ id: 1, defaultMqttServerId }), save: jest.fn() };
@@ -140,6 +141,7 @@ describe('WagoService', () => {
       identity: 'wago-enrollment-test',
       createdAt: '2026-01-01T00:00:00.000Z',
       expiresAt: '2026-01-01T01:00:00.000Z',
+      revokedAt: null,
       consumedAt: null,
     };
     const { service, enrollmentRepository, context } = createService([], [enrollment]);
@@ -154,6 +156,24 @@ describe('WagoService', () => {
 
     expect(enrollment.consumedAt).toBeNull();
     expect(enrollmentRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('returns administrator supplied manual credentials when automatic provisioning is unavailable', async () => {
+    const { service, context } = createService([], [], 2);
+    (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = jest
+      .fn()
+      .mockResolvedValue({ host: 'mqtt.example.test', port: 8883, useTls: true });
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({
+      provision: jest.fn().mockResolvedValue({ instructions: ['Create a scoped broker user manually.'] }),
+    });
+
+    const enrollment = await service.createEnrollment('cc100-01', undefined, {
+      username: 'manual-cc100-01',
+      password: 'secret',
+    });
+
+    expect(enrollment).toMatchObject({ username: 'manual-cc100-01', password: 'secret' });
+    expect(enrollment.manualInstructions).toEqual(['Create a scoped broker user manually.']);
   });
 
   it('keeps replacement subscriptions inert until they replace the active generation', async () => {
@@ -217,8 +237,14 @@ describe('WagoService', () => {
     expect(subscriptions[0].unsubscribe).toHaveBeenCalledTimes(1);
   });
 
-  it('restores enrollment state when recording a revocation fails', async () => {
-    const enrollment = { id: 3, mqttServerId: 2, identity: 'wago-enrollment-test', consumedAt: null } as WagoEnrollment;
+  it('retains revocation progress when recording consumption fails', async () => {
+    const enrollment = {
+      id: 3,
+      mqttServerId: 2,
+      identity: 'wago-enrollment-test',
+      revokedAt: null,
+      consumedAt: null,
+    } as WagoEnrollment;
     const { service, enrollmentRepository, context } = createService([], [enrollment]);
     (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({ revoke: jest.fn().mockResolvedValue(undefined) });
     (enrollmentRepository.save as jest.Mock).mockRejectedValue(new Error('database unavailable'));
@@ -226,6 +252,26 @@ describe('WagoService', () => {
 
     await expect(revokeEnrollment(enrollment)).rejects.toThrow('database unavailable');
 
+    expect(enrollment.revokedAt).not.toBeNull();
     expect(enrollment.consumedAt).toBeNull();
+  });
+
+  it('does not revoke credentials again after revocation was recorded', async () => {
+    const enrollment = {
+      id: 3,
+      mqttServerId: 2,
+      identity: 'wago-enrollment-test',
+      revokedAt: '2026-01-01T00:00:00.000Z',
+      consumedAt: null,
+    } as WagoEnrollment;
+    const { service, enrollmentRepository, context } = createService([], [enrollment]);
+    const revoke = jest.fn();
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({ revoke });
+    const revokeEnrollment = (Reflect.get(service, 'revokeEnrollment') as (item: WagoEnrollment) => Promise<void>).bind(service);
+
+    await revokeEnrollment(enrollment);
+
+    expect(revoke).not.toHaveBeenCalled();
+    expect(enrollmentRepository.save).toHaveBeenCalledWith(expect.objectContaining({ consumedAt: expect.any(String) }));
   });
 });

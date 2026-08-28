@@ -24,6 +24,20 @@ export interface ClaimControllerInput {
   verifier: string;
   mqttServerId?: number;
 }
+export interface EnrollmentPackage {
+  broker: { host: string; port: number; useTls: boolean };
+  username: string;
+  password?: string;
+  claimSecret: string;
+  expiresAt: string;
+  manualInstructions?: readonly string[];
+}
+export interface CreateEnrollmentInput {
+  hardwareId: string;
+  mqttServerId?: number;
+  manualUsername?: string;
+  manualPassword?: string;
+}
 
 const api = createPluginApiClient('/api/wago');
 
@@ -36,3 +50,6 @@ export const setSettings = (defaultMqttServerId: number | null) =>
 
 export const claimController = (id: number, input: ClaimControllerInput) =>
   api.request<WagoController>(`/controllers/${id}/claim`, { method: 'POST', body: input });
+
+export const createEnrollment = (input: CreateEnrollmentInput) =>
+  api.request<EnrollmentPackage>('/enrollments', { method: 'POST', body: input });
