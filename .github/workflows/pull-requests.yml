@@ -141,7 +141,9 @@ jobs:
         run: pnpm nx affected --target=test,e2e --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude=tag:scope:hardware,tag:type:plugin
 
   plugins:
-    runs-on: ubuntu-latest
+    # RabbitMQ plugin E2E tests use Testcontainers and require Docker, which is
+    # available on the stable Ubuntu runner image.
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7

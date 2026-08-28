@@ -1,0 +1,70 @@
+{
+  "name": "plugin-wago",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/plugins/wago",
+  "tags": ["type:plugin"],
+  "targets": {
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": { "cwd": "apps/plugins/wago", "command": "eslint backend frontend/src" }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "options": { "jestConfig": "apps/plugins/wago/jest.config.ts", "passWithNoTests": true }
+    },
+    "build-backend": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["{projectRoot}/backend/**/*", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
+      "outputs": ["{projectRoot}/package/dist"],
+      "options": {
+        "cwd": "apps/plugins/wago",
+        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js"
+      }
+    },
+    "build-frontend": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["{projectRoot}/frontend/**/*", "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"],
+      "outputs": ["{projectRoot}/package/frontend"],
+      "options": { "cwd": "apps/plugins/wago", "command": "pnpm exec vite build --config frontend/vite.config.ts" }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build-backend", "build-frontend"],
+      "inputs": ["{projectRoot}/package.json"],
+      "outputs": ["{projectRoot}/package"],
+      "options": {
+        "cwd": "apps/plugins/wago",
+        "command": "node -e \"require('fs').copyFileSync('package.json','package/package.json')\""
+      }
+    },
+    "pack": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build"],
+      "inputs": ["{projectRoot}/package/**/*"],
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "cwd": "apps/plugins/wago",
+        "command": "rm -rf dist && mkdir dist && (cd package && npm pack --pack-destination ../dist)"
+      }
+    },
+    "pack-test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["pack", "plugins-backend-sdk:build"],
+      "inputs": [
+        "{projectRoot}/package/**/*",
+        "{workspaceRoot}/apps/plugins/scripts/verify-packed-plugin.mjs",
+        "{workspaceRoot}/package.json"
+      ],
+      "options": {
+        "cwd": "apps/plugins/wago",
+        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js dist/migrations.js frontend/remoteEntry.js frontend/style.css"
+      }
+    }
+  }
+}

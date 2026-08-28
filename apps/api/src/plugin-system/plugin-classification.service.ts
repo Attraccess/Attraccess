@@ -23,6 +23,11 @@ const OFFICIAL_PACKAGES = [
     registryUrl: 'https://registry.npmjs.org',
     publisher: 'attraccess',
   },
+  {
+    name: '@attraccess-plugins/wago',
+    registryUrl: 'https://registry.npmjs.org',
+    publisher: 'attraccess',
+  },
 ] as const satisfies ReadonlyArray<OfficialPluginPackage>;
 
 @Injectable()

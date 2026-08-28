@@ -1,0 +1,46 @@
+{
+  "name": "@attraccess-plugins/wago",
+  "version": "0.1.0",
+  "description": "Official Attraccess integration for WAGO CC100 controllers.",
+  "keywords": [
+    "attraccess-plugin",
+    "attraccess",
+    "wago",
+    "cc100"
+  ],
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Attraccess/Attraccess.git",
+    "directory": "apps/plugins/wago"
+  },
+  "homepage": "https://attraccess.org",
+  "files": [
+    "dist",
+    "frontend"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@attraccess/plugins-backend-sdk": "^1.9.0",
+    "@attraccess/plugins-frontend-sdk": "^1.9.0"
+  },
+  "attraccess": {
+    "displayName": "WAGO CC100",
+    "description": "Discover, claim, and monitor WAGO CC100 controllers.",
+    "host": "^1.9.0",
+    "backend": "dist/index.js",
+    "frontend": "frontend/remoteEntry.js",
+    "migrations": "dist/migrations.js",
+    "styles": "frontend/style.css",
+    "permissions": [
+      "DATABASE_ACCESS",
+      "ACCESS_MQTT_SERVERS"
+    ],
+    "sdk": {
+      "backend": "^1.9.0",
+      "frontend": "^1.9.0"
+    }
+  }
+}

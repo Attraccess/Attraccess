@@ -1,0 +1,5 @@
+@import 'tailwindcss/theme.css' prefix(wg);
+@import '@heroui/styles/themes/shared/theme.css' theme(reference);
+@import 'tailwindcss/utilities.css' source(none);
+@source './';
+@custom-variant dark (&:where(.dark, .dark *));
