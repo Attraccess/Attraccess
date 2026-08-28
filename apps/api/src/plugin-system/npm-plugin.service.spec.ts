@@ -862,9 +862,22 @@ describe('NpmPluginService', () => {
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
     jest.spyOn(service, 'installedVersionCandidates').mockResolvedValue([
       {
-        version: '1.2.1', direction: 'newer', compatible: true, reason: null, permissions: [], permissionAdditions: [],
-        permissionRemovals: [], publishedAt: null, classification: 'community', classificationReason: '', deprecated: null,
-        integrity: 'sha512-test', repository: null, homepage: null, semverImpact: 'patch', matchesRequestedSpec: true,
+        version: '1.2.1',
+        direction: 'newer',
+        compatible: true,
+        reason: null,
+        permissions: [],
+        permissionAdditions: [],
+        permissionRemovals: [],
+        publishedAt: null,
+        classification: 'community',
+        classificationReason: '',
+        deprecated: null,
+        integrity: 'sha512-test',
+        repository: null,
+        homepage: null,
+        semverImpact: 'patch',
+        matchesRequestedSpec: true,
       },
     ]);
 
@@ -878,18 +891,187 @@ describe('NpmPluginService', () => {
     const service = new NpmPluginService({} as never);
     writeFileSync(
       join(root, '.npm-plugin-state.json'),
-      JSON.stringify([{ name: '@attraccess/plugin', version: '1.0.0', registryId: 'npm', registryUrl: 'https://registry.npmjs.org', integrity: 'sha512-test', installPath: 'npm-plugin', permissions: [], lastError: null }]),
+      JSON.stringify([
+        {
+          name: '@attraccess/plugin',
+          version: '1.0.0',
+          registryId: 'npm',
+          registryUrl: 'https://registry.npmjs.org',
+          integrity: 'sha512-test',
+          installPath: 'npm-plugin',
+          permissions: [],
+          lastError: null,
+        },
+      ]),
     );
     jest.spyOn(service, 'installedVersionCandidates').mockResolvedValue([
       {
-        version: '2.0.0', direction: 'newer', compatible: true, reason: null, permissions: [], permissionAdditions: [],
-        permissionRemovals: [], publishedAt: null, classification: 'community', classificationReason: '', deprecated: null,
-        integrity: 'sha512-test', repository: null, homepage: null, semverImpact: 'major', matchesRequestedSpec: true,
+        version: '2.0.0',
+        direction: 'newer',
+        compatible: true,
+        reason: null,
+        permissions: [],
+        permissionAdditions: [],
+        permissionRemovals: [],
+        publishedAt: null,
+        classification: 'community',
+        classificationReason: '',
+        deprecated: null,
+        integrity: 'sha512-test',
+        repository: null,
+        homepage: null,
+        semverImpact: 'major',
+        matchesRequestedSpec: true,
       },
     ]);
 
     await expect(service.replaceInstalled('@attraccess/plugin', '2.0.0')).rejects.toThrow(
       'Explicit approval is required for a major version update',
     );
+  });
+
+  it('classifies a major prerelease as a major update', async () => {
+    const service = new NpmPluginService({} as never);
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name: '@attraccess/plugin',
+          version: '1.0.0',
+          registryId: 'npm',
+          registryUrl: 'https://registry.npmjs.org',
+          integrity: 'sha512-test',
+          installPath: 'npm-plugin',
+          permissions: [],
+          lastError: null,
+        },
+      ]),
+    );
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      versions: {
+        '2.0.0-beta.1': {
+          name: '@attraccess/plugin',
+          version: '2.0.0-beta.1',
+          keywords: ['attraccess-plugin'],
+          peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
+          attraccess: { displayName: 'Plugin', host: '*', backend: 'index.js', permissions: [], sdk: { backend: '*' } },
+        },
+      },
+    });
+    jest.spyOn(service as unknown as ServiceInternals, 'hostVersion').mockReturnValue('1.9.0');
+
+    await expect(service.installedVersionCandidates('@attraccess/plugin')).resolves.toEqual([
+      expect.objectContaining({ version: '2.0.0-beta.1', semverImpact: 'major' }),
+    ]);
+  });
+
+  it('allows prerelease candidates that match a follow range when enabled by policy', async () => {
+    const name = '@attraccess/plugin';
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name,
+          version: '2.0.0-beta.1',
+          requestedSpec: '^2.0.0-beta.1',
+          registryId: 'npm',
+          registryUrl: 'https://registry.npmjs.org',
+          integrity: 'sha512-test',
+          installPath: 'npm-plugin',
+          permissions: [],
+          lastError: null,
+        },
+      ]),
+    );
+    const service = new NpmPluginService({
+      getPlainSetting: jest.fn().mockResolvedValue(
+        JSON.stringify({
+          checksEnabled: true,
+          mode: 'follow',
+          prerelease: true,
+          maintenanceWindow: { startMinute: 0, durationMinutes: 60 },
+        }),
+      ),
+    } as never);
+    jest.spyOn(service, 'installedVersionCandidates').mockResolvedValue([
+      {
+        version: '2.0.0-beta.2',
+        direction: 'newer',
+        compatible: true,
+        reason: null,
+        permissions: [],
+        permissionAdditions: [],
+        permissionRemovals: [],
+        publishedAt: null,
+        classification: 'community',
+        classificationReason: '',
+        deprecated: null,
+        integrity: 'sha512-test',
+        repository: null,
+        homepage: null,
+        semverImpact: 'prerelease',
+        matchesRequestedSpec: false,
+      },
+    ]);
+
+    await expect(service.checkInstalled(name)).resolves.toMatchObject({
+      updateCheck: { candidate: '2.0.0-beta.2', state: 'available' },
+    });
+  });
+
+  it('preserves concurrent install policy changes while recording an update check', async () => {
+    const name = '@attraccess/plugin';
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name,
+          version: '1.0.0',
+          registryId: 'npm',
+          registryUrl: 'https://registry.npmjs.org',
+          integrity: 'sha512-test',
+          installPath: 'npm-plugin',
+          permissions: [],
+          lastError: null,
+        },
+      ]),
+    );
+    const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
+    let releaseCandidates: ((value: never[]) => void) | undefined;
+    jest.spyOn(service, 'installedVersionCandidates').mockReturnValue(
+      new Promise((resolve) => {
+        releaseCandidates = resolve;
+      }),
+    );
+
+    const updateCheck = service.checkInstalled(name);
+    await service.updateOverride(name, 'off');
+    if (!releaseCandidates) throw new Error('Expected update check to request candidates');
+    releaseCandidates([]);
+
+    await expect(updateCheck).resolves.toMatchObject({ updateOverride: 'off', updateCheck: { state: 'up-to-date' } });
+  });
+
+  it('limits simultaneous update checks to four installations', async () => {
+    const service = new NpmPluginService({} as never);
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify(
+        Array.from({ length: 5 }, (_, index) => ({ name: `@attraccess/plugin-${index}`, version: '1.0.0' })),
+      ),
+    );
+    let active = 0;
+    let maximum = 0;
+    jest.spyOn(service, 'checkInstalled').mockImplementation(async (name) => {
+      active += 1;
+      maximum = Math.max(maximum, active);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      active -= 1;
+      return { name } as never;
+    });
+
+    await service.checkAllInstalled();
+
+    expect(maximum).toBe(4);
   });
 });

@@ -60,7 +60,12 @@ type InstalledNpmPlugin = {
   classificationReason: string;
   requestedSpec: string;
   updateOverride: 'inherit' | 'off' | 'patch' | 'minor' | 'follow';
-  updateCheck?: { checkedAt: string; candidate: string | null; state: 'up-to-date' | 'available' | 'blocked' | 'failed'; error: string | null } | null;
+  updateCheck?: {
+    checkedAt: string;
+    candidate: string | null;
+    state: 'up-to-date' | 'available' | 'blocked' | 'failed';
+    error: string | null;
+  } | null;
 };
 
 type VersionPlugin = Pick<InstalledNpmPlugin, 'name' | 'version'>;
@@ -269,16 +274,17 @@ export function PluginsSection() {
   const saveVersionPolicy = async () => {
     if (!versionPlugin) return;
     try {
-      const [specResponse, overrideResponse] = await Promise.all([
-        fetch(`${getBaseUrl()}/api/plugins/installed/${encodeURIComponent(versionPlugin.name)}/spec`, {
-          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requestedSpec }),
-        }),
-        fetch(`${getBaseUrl()}/api/plugins/installed/${encodeURIComponent(versionPlugin.name)}/update-override`, {
-          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ updateOverride }),
-        }),
-      ]);
-      if (!specResponse.ok || !overrideResponse.ok) throw new Error();
-      const installed = (await overrideResponse.json()) as InstalledNpmPlugin;
+      const response = await fetch(
+        `${getBaseUrl()}/api/plugins/installed/${encodeURIComponent(versionPlugin.name)}/update-policy`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requestedSpec, updateOverride }),
+        },
+      );
+      if (!response.ok) throw new Error();
+      const installed = (await response.json()) as InstalledNpmPlugin;
       setInstalledNpmPlugins((current) => new Map(current).set(installed.name, installed));
       toast.success({ title: t('versionManagement.policySaved') });
     } catch {
@@ -339,10 +345,14 @@ export function PluginsSection() {
                       </div>
                     </TableCell>
                     <TableCell>
-                        <Chip variant="soft" color="accent">
-                          {plugin.version}
+                      <Chip variant="soft" color="accent">
+                        {plugin.version}
+                      </Chip>
+                      {installedNpmPlugins.get(plugin.name)?.updateCheck?.state === 'available' ? (
+                        <Chip variant="soft" color="warning">
+                          {t('updatePolicy.available')}
                         </Chip>
-                        {installedNpmPlugins.get(plugin.name)?.updateCheck?.state === 'available' ? <Chip variant="soft" color="warning">{t('updatePolicy.available')}</Chip> : null}
+                      ) : null}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">{plugin.pluginDirectory || '-'}</TableCell>
                     <TableCell className="hidden sm:table-cell">
@@ -614,8 +624,18 @@ export function PluginsSection() {
                 <TextField value={requestedSpec} onChange={setRequestedSpec}>
                   <Input aria-label={t('versionManagement.spec')} placeholder="^1.2.0 or latest" />
                 </TextField>
-                <Select value={updateOverride} onChange={(value) => setUpdateOverride(value as InstalledNpmPlugin['updateOverride'])} items={['inherit', 'off', 'patch', 'minor', 'follow'].map((value) => ({ key: value, label: t(`versionManagement.overrides.${value}`) }))} aria-label={t('versionManagement.autoUpdate')} />
-                <Button variant="secondary" size="sm" onPress={() => void saveVersionPolicy()}>{t('versionManagement.savePolicy')}</Button>
+                <Select
+                  value={updateOverride}
+                  onChange={(value) => setUpdateOverride(value as InstalledNpmPlugin['updateOverride'])}
+                  items={['inherit', 'off', 'patch', 'minor', 'follow'].map((value) => ({
+                    key: value,
+                    label: t(`versionManagement.overrides.${value}`),
+                  }))}
+                  aria-label={t('versionManagement.autoUpdate')}
+                />
+                <Button variant="secondary" size="sm" onPress={() => void saveVersionPolicy()}>
+                  {t('versionManagement.savePolicy')}
+                </Button>
               </div>
               {isLoadingVersions ? <p>{t('versionManagement.loading')}</p> : null}
               <div className="flex max-h-64 flex-col gap-2 overflow-y-auto">
@@ -664,9 +684,17 @@ export function PluginsSection() {
                       {t('versionManagement.majorApproval')}
                     </LabeledSwitch>
                   ) : null}
-                  {selectedVersion.deprecated ? <p className="text-warning">{t('versionManagement.deprecated', { notice: selectedVersion.deprecated })}</p> : null}
+                  {selectedVersion.deprecated ? (
+                    <p className="text-warning">
+                      {t('versionManagement.deprecated', { notice: selectedVersion.deprecated })}
+                    </p>
+                  ) : null}
                   <p>{t('versionManagement.integrity', { integrity: selectedVersion.integrity ?? '-' })}</p>
-                  {selectedVersion.repository ? <a className="text-accent" href={selectedVersion.repository} target="_blank" rel="noreferrer">{t('versionManagement.repository')}</a> : null}
+                  {selectedVersion.repository ? (
+                    <a className="text-accent" href={selectedVersion.repository} target="_blank" rel="noreferrer">
+                      {t('versionManagement.repository')}
+                    </a>
+                  ) : null}
                   {selectedVersion.permissionRemovals.length > 0 ? (
                     <p>
                       {t('versionManagement.permissionRemovals', {
@@ -695,7 +723,11 @@ export function PluginsSection() {
                 variant={selectedVersion?.direction === 'older' ? 'danger' : 'primary'}
                 onPress={() => void replaceVersion()}
                 isPending={isReplacing}
-                isDisabled={!selectedVersion || (selectedVersion.permissionAdditions.length > 0 && !permissionApproved) || (selectedVersion.semverImpact === 'major' && !majorApproved)}
+                isDisabled={
+                  !selectedVersion ||
+                  (selectedVersion.permissionAdditions.length > 0 && !permissionApproved) ||
+                  (selectedVersion.semverImpact === 'major' && !majorApproved)
+                }
                 data-cy="plugins-list-replace-version-button"
               >
                 {selectedVersion?.direction === 'older'

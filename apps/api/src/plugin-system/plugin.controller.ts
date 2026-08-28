@@ -155,6 +155,16 @@ export class PluginController {
     return this.npmPluginService.updateOverride(packageName, updateOverride);
   }
 
+  @Post('installed/:packageName/update-policy')
+  @Auth('system.plugins.manage')
+  updateInstalledPackagePolicy(
+    @Param('packageName') packageName: string,
+    @Body('requestedSpec') requestedSpec: string,
+    @Body('updateOverride') updateOverride: 'inherit' | 'off' | 'patch' | 'minor' | 'follow',
+  ) {
+    return this.npmPluginService.updateVersionPolicy(packageName, requestedSpec, updateOverride);
+  }
+
   @Get('installed/:packageName/versions')
   @Auth('system.plugins.manage')
   installedPackageVersions(@Param('packageName') packageName: string) {
@@ -247,7 +257,8 @@ export class PluginController {
   @Auth('system.plugins.manage')
   async deletePlugin(@Param('pluginId') pluginId: string) {
     const plugin = PluginService.getManifestById(pluginId);
-    const installed = this.npmPluginService.findInstalledByPluginId(pluginId) ??
+    const installed =
+      this.npmPluginService.findInstalledByPluginId(pluginId) ??
       (plugin
         ? this.npmPluginService.listInstalled().find(({ installPath }) => installPath === plugin.pluginDirectory)
         : undefined);

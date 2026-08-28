@@ -412,11 +412,30 @@ export class NpmPluginService implements OnModuleInit {
     });
   }
 
-  async updateOverride(name: string, updateOverride: InstalledNpmPlugin['updateOverride']): Promise<InstalledNpmPlugin> {
+  async updateOverride(
+    name: string,
+    updateOverride: InstalledNpmPlugin['updateOverride'],
+  ): Promise<InstalledNpmPlugin> {
     if (!['inherit', 'off', 'patch', 'minor', 'follow'].includes(updateOverride ?? ''))
       throw new BadRequestException('Invalid plugin update override');
     return this.mutateInstalls(async () => {
       const updated = { ...this.installed(name), updateOverride };
+      await this.writeState(updated);
+      return updated;
+    });
+  }
+
+  async updateVersionPolicy(
+    name: string,
+    requestedSpec: string,
+    updateOverride: InstalledNpmPlugin['updateOverride'],
+  ): Promise<InstalledNpmPlugin> {
+    if (!['inherit', 'off', 'patch', 'minor', 'follow'].includes(updateOverride ?? ''))
+      throw new BadRequestException('Invalid plugin update override');
+    const installed = this.installed(name);
+    await this.resolveVersion(name, requestedSpec, await this.registry(installed.registryId));
+    return this.mutateInstalls(async () => {
+      const updated = { ...this.installed(name), requestedSpec, updateOverride };
       await this.writeState(updated);
       return updated;
     });
@@ -443,37 +462,52 @@ export class NpmPluginService implements OnModuleInit {
     try {
       const candidates = await this.installedVersionCandidates(name);
       const policy = await this.getUpdatePolicy();
-      const candidate = candidates.find((item) => item.direction === 'newer' && item.compatible && eligibleForPolicy(item, installed, policy));
+      const candidate = candidates.find(
+        (item) => item.direction === 'newer' && item.compatible && eligibleForPolicy(item, installed, policy),
+      );
       const blocked = candidates.some((item) => item.direction === 'newer' && item.compatible) && !candidate;
-      const updated = {
-        ...installed,
-        updateCheck: {
-          checkedAt: new Date().toISOString(),
-          candidate: candidate?.version ?? null,
-          state: candidate ? ('available' as const) : blocked ? ('blocked' as const) : ('up-to-date' as const),
-          error: null,
-        },
+      const updateCheck = {
+        checkedAt: new Date().toISOString(),
+        candidate: candidate?.version ?? null,
+        state: candidate ? ('available' as const) : blocked ? ('blocked' as const) : ('up-to-date' as const),
+        error: null,
       };
-      await this.mutateInstalls(() => this.writeState(updated));
-      return updated;
+      return await this.mutateInstalls(async () => {
+        const updated = {
+          ...this.installed(name),
+          updateCheck,
+        };
+        await this.writeState(updated);
+        return updated;
+      });
     } catch (error) {
-      const updated = {
-        ...installed,
-        updateCheck: {
-          checkedAt: new Date().toISOString(),
-          candidate: null,
-          state: 'failed' as const,
-          error: error instanceof Error ? error.message : 'Update check failed',
-        },
+      const updateCheck = {
+        checkedAt: new Date().toISOString(),
+        candidate: null,
+        state: 'failed' as const,
+        error: error instanceof Error ? error.message : 'Update check failed',
       };
-      await this.mutateInstalls(() => this.writeState(updated));
-      return updated;
+      return await this.mutateInstalls(async () => {
+        const updated = {
+          ...this.installed(name),
+          updateCheck,
+        };
+        await this.writeState(updated);
+        return updated;
+      });
     }
   }
 
   async checkAllInstalled(): Promise<InstalledNpmPlugin[]> {
-    const results = await Promise.allSettled(this.listInstalled().map(({ name }) => this.checkInstalled(name)));
-    return results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []));
+    const checked: InstalledNpmPlugin[] = [];
+    const installs = this.listInstalled();
+    for (let offset = 0; offset < installs.length; offset += 4) {
+      const results = await Promise.allSettled(
+        installs.slice(offset, offset + 4).map(({ name }) => this.checkInstalled(name)),
+      );
+      checked.push(...results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])));
+    }
+    return checked;
   }
 
   private versionCandidate(
@@ -500,11 +534,12 @@ export class NpmPluginService implements OnModuleInit {
       permissionRemovals: installed.permissions.filter((permission) => !permissions.includes(permission)),
       classification: classification.kind,
       classificationReason: classification.reason,
-      deprecated: typeof (pkg as unknown as { deprecated?: unknown } | null)?.deprecated === 'string'
-        ? (pkg as unknown as { deprecated: string }).deprecated
-        : (pkg as unknown as { deprecated?: unknown } | null)?.deprecated === true
-          ? 'Deprecated by publisher'
-          : null,
+      deprecated:
+        typeof (pkg as unknown as { deprecated?: unknown } | null)?.deprecated === 'string'
+          ? (pkg as unknown as { deprecated: string }).deprecated
+          : (pkg as unknown as { deprecated?: unknown } | null)?.deprecated === true
+            ? 'Deprecated by publisher'
+            : null,
       integrity: pkg ? distIntegrity(pkg) : null,
       repository: pkg ? repositoryUrl(pkg.repository) : null,
       homepage: pkg?.homepage ?? null,
@@ -882,10 +917,10 @@ function readInstalledNpmPlugins(): InstalledNpmPlugin[] {
       state: record.state ?? 'active',
       installedAt: record.installedAt ?? new Date(0).toISOString(),
       activatedAt: record.activatedAt ?? new Date(0).toISOString(),
-       lastError: record.lastError ?? null,
-       updateOverride: record.updateOverride ?? 'inherit',
-       updateCheck: record.updateCheck ?? null,
-       knownGoodVersion: record.knownGoodVersion ?? null,
+      lastError: record.lastError ?? null,
+      updateOverride: record.updateOverride ?? 'inherit',
+      updateCheck: record.updateCheck ?? null,
+      knownGoodVersion: record.knownGoodVersion ?? null,
     }));
   } catch {
     return [];
@@ -985,15 +1020,15 @@ function samePermissions(left: string[], right: string[]): boolean {
 
 function semverImpact(current: string, target: string): InstalledNpmPluginVersion['semverImpact'] {
   if (!semver.valid(current) || !semver.valid(target) || semver.eq(current, target)) return 'none';
-  if (semver.prerelease(target)) return 'prerelease';
   const difference = semver.diff(current, target);
   if (difference === 'major' || difference === 'premajor') return 'major';
   if (difference === 'minor' || difference === 'preminor') return 'minor';
+  if (semver.prerelease(target)) return 'prerelease';
   return 'patch';
 }
 
-function matchesSpec(version: string, spec: string): boolean {
-  return version === spec || (!semver.prerelease(version) && semver.satisfies(version, spec, { includePrerelease: false }));
+function matchesSpec(version: string, spec: string, includePrerelease = false): boolean {
+  return version === spec || semver.satisfies(version, spec, { includePrerelease });
 }
 
 function normalizeUpdatePolicy(value: unknown): PluginUpdatePolicy {
@@ -1008,9 +1043,13 @@ function normalizeUpdatePolicy(value: unknown): PluginUpdatePolicy {
   if (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 24 * 60)
     throw new BadRequestException('Maintenance window duration must be between 1 and 1440 minutes');
   return {
-    checksEnabled: typeof candidate?.checksEnabled === 'boolean' ? candidate.checksEnabled : DEFAULT_PLUGIN_UPDATE_POLICY.checksEnabled,
+    checksEnabled:
+      typeof candidate?.checksEnabled === 'boolean'
+        ? candidate.checksEnabled
+        : DEFAULT_PLUGIN_UPDATE_POLICY.checksEnabled,
     mode,
-    prerelease: typeof candidate?.prerelease === 'boolean' ? candidate.prerelease : DEFAULT_PLUGIN_UPDATE_POLICY.prerelease,
+    prerelease:
+      typeof candidate?.prerelease === 'boolean' ? candidate.prerelease : DEFAULT_PLUGIN_UPDATE_POLICY.prerelease,
     maintenanceWindow: { startMinute, durationMinutes },
   };
 }
@@ -1020,13 +1059,15 @@ function eligibleForPolicy(
   installed: InstalledNpmPlugin,
   policy: PluginUpdatePolicy,
 ): boolean {
-  const mode = installed.updateOverride === 'inherit' || !installed.updateOverride ? policy.mode : installed.updateOverride;
-  if (!policy.checksEnabled || mode === 'off' || candidate.deprecated || candidate.permissionAdditions.length > 0) return false;
+  const mode =
+    installed.updateOverride === 'inherit' || !installed.updateOverride ? policy.mode : installed.updateOverride;
+  if (!policy.checksEnabled || mode === 'off' || candidate.deprecated || candidate.permissionAdditions.length > 0)
+    return false;
   if (!policy.prerelease && semver.prerelease(candidate.version)) return false;
   if (candidate.semverImpact === 'major') return false;
   if (mode === 'patch') return candidate.semverImpact === 'patch';
   if (mode === 'minor') return candidate.semverImpact === 'patch' || candidate.semverImpact === 'minor';
-  return candidate.matchesRequestedSpec;
+  return matchesSpec(candidate.version, installed.requestedSpec, policy.prerelease);
 }
 
 function repositoryUrl(value: string | { url: string } | undefined): string | null {
