@@ -466,8 +466,15 @@ export class NpmPluginService implements OnModuleInit {
       const requested = isDistTag(installed.requestedSpec)
         ? await this.resolveVersion(name, installed.requestedSpec, await this.registry(installed.registryId))
         : undefined;
-      return await this.mutateInstalls(async () => {
+      const updated = await this.mutateInstalls(async () => {
         const current = this.installed(name);
+        // Candidates and dist-tag resolutions belong to the snapshot used for the registry request.
+        if (
+          current.version !== installed.version ||
+          current.requestedSpec !== installed.requestedSpec ||
+          current.registryId !== installed.registryId
+        )
+          return null;
         const candidate = candidates.find(
           (item) =>
             item.direction === 'newer' &&
@@ -487,6 +494,7 @@ export class NpmPluginService implements OnModuleInit {
         await this.writeState(updated);
         return updated;
       });
+      return updated ?? this.checkInstalled(name);
     } catch (error) {
       const updateCheck = {
         checkedAt: new Date().toISOString(),
@@ -1084,10 +1092,7 @@ function effectiveUpdateMode(
   override: NonNullable<InstalledNpmPlugin['updateOverride']>,
 ): PluginUpdatePolicy['mode'] {
   if (override === 'inherit') return globalMode;
-  if (override === 'off' || globalMode === 'off') return 'off';
-  if (globalMode === 'patch' || override === 'patch') return 'patch';
-  if (globalMode === 'minor' || override === 'minor') return 'minor';
-  return 'follow';
+  return override;
 }
 
 function isDistTag(spec: string): boolean {
