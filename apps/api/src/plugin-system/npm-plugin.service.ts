@@ -281,18 +281,25 @@ export class NpmPluginService implements OnModuleInit {
         }
       }),
     );
+    const normalizedQuery = query.trim().toLowerCase();
     const officialResults =
       !registryId || registryId === 'npm'
         ? await Promise.allSettled(
-            this.classification.officialPackages().map(({ name }) => this.marketplacePackage(name)),
+            this.classification
+              .officialPackages()
+              .filter(({ name }) => !normalizedQuery || name.toLowerCase().includes(normalizedQuery))
+              .map(({ name }) => this.marketplacePackage(name)),
           )
         : [];
-    return {
-      // The allowlist is queried directly rather than relying on npm's ranked search results.
-      results: [
+    const results = new Map(
+      [
         ...responses.flatMap(({ results }) => results),
         ...officialResults.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])),
-      ],
+      ].map((plugin) => [`${plugin.registry.id}:${plugin.name}`, plugin]),
+    );
+    return {
+      // The allowlist is queried directly rather than relying on npm's ranked search results.
+      results: [...results.values()],
       errors: responses.flatMap(({ error }) => (error ? [error] : [])),
     };
   }
