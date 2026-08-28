@@ -16,6 +16,8 @@ mapfile -t changed_files < <(git diff --name-only "${BASE}...HEAD" --)
 firmware_source_changed=false
 for file in "${changed_files[@]}"; do
   case "$file" in
+    apps/attractap/firmware/README.md)
+      ;;
     apps/attractap/firmware/*)
       firmware_source_changed=true
       break
@@ -38,6 +40,8 @@ echo "Please bump the version in ${VERSION_FILE} when changing firmware source c
 echo "Changed firmware files:" >&2
 for file in "${changed_files[@]}"; do
   case "$file" in
+    apps/attractap/firmware/README.md)
+      ;;
     apps/attractap/firmware/*)
       echo "  - $file" >&2
       ;;

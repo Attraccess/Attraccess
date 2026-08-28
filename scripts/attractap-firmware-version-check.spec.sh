@@ -90,6 +90,20 @@ else
 fi
 rm -rf "$TMP"
 
+echo "case: firmware documentation change -> pass"
+TMP="$(mktemp -d)"
+make_repo "$TMP"
+BASE="$(git -C "$TMP" rev-parse HEAD)"
+echo 'firmware documentation' >"$TMP/apps/attractap/firmware/README.md"
+git -C "$TMP" add .
+git -C "$TMP" commit --quiet -m 'change firmware documentation'
+if run_check "$TMP" "$BASE" >/dev/null 2>&1; then
+  pass "passes when only firmware documentation changes"
+else
+  fail "expected zero exit when only firmware documentation changes"
+fi
+rm -rf "$TMP"
+
 if [ "$failures" -gt 0 ]; then
   echo "✗ $failures assertion(s) failed"
   exit 1

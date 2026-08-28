@@ -1,11 +1,11 @@
 name: 'Setup Workspace'
-description: 'Install Node.js, pnpm, dependencies, Python, and the ESP-IDF toolchain. Must be called after actions/checkout.'
+description: 'Install Node.js, pnpm, and dependencies. Optionally install the ESP-IDF firmware toolchain. Must be called after actions/checkout.'
 
 inputs:
   esp-idf:
     description: 'Install the ESP-IDF toolchain (needed for jobs that build the Attractap firmware)'
     required: false
-    default: 'true'
+    default: 'false'
 
 runs:
   using: 'composite'
@@ -25,6 +25,7 @@ runs:
       shell: bash
 
     - name: Setup Python
+      if: inputs.esp-idf == 'true'
       uses: actions/setup-python@v7
       with:
         # Pinned: the IDF virtualenv is named after the interpreter
@@ -33,6 +34,7 @@ runs:
         python-version: '3.13'
 
     - name: Install ESP tools
+      if: inputs.esp-idf == 'true'
       run: |
         python -m pip install --upgrade pip
         pip install esptool
