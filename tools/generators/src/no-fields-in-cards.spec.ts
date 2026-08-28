@@ -634,13 +634,12 @@ function findViolations(file: string): Violation[] {
     walkJsx(node, checkElement);
 
     // JSX tags are discovered by `walkJsx`, but JSX expression slots can also call a helper
-    // or select one branch. Follow their identifiers so `{renderBody()}` and conditional
-    // branches receive the same component and variable resolution as JSX tags.
+    // or select one branch. Follow only expressions that can provide the rendered value.
     const expandExpressions = (current: Node): void => {
       current.forEachChild((child) => {
         if (isJsx(child) && isPortal(tagOf(child))) return;
         if (ts.isJsxExpression(child) && child.expression) {
-          const followExpressionIdentifiers = (expression: Node): void => {
+          const followRenderedExpression = (expression: Node): void => {
             // Nested JSX is handled by `walkJsx`; only its containing expression needs help.
             if (isJsx(expression)) return;
             if (ts.isIdentifier(expression)) {
@@ -665,10 +664,16 @@ function findViolations(file: string): Violation[] {
                   }
                 }
               }
+            } else if (ts.isCallExpression(expression)) {
+              followRenderedExpression(expression.expression as Node);
+            } else if (ts.isConditionalExpression(expression)) {
+              followRenderedExpression(expression.whenTrue as Node);
+              followRenderedExpression(expression.whenFalse as Node);
+            } else if (ts.isParenthesizedExpression(expression)) {
+              followRenderedExpression(expression.expression as Node);
             }
-            expression.forEachChild(followExpressionIdentifiers);
           }
-          followExpressionIdentifiers(child.expression as Node);
+          followRenderedExpression(child.expression as Node);
         }
         expandExpressions(child);
       });
@@ -1002,6 +1007,31 @@ describe('form fields are not wrapped in Cards (ATT-294 / ATT-834)', () => {
     expect(violations).toHaveLength(3);
     expect(violations.map((violation) => violation.detail).join()).toContain('<TextField>');
     expect(violations.map((violation) => violation.detail).join()).toContain('<Form>');
+  });
+
+  it('does not follow field components used outside rendered expression positions', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'att834-'));
+    fs.writeFileSync(
+      path.join(dir, 'Form.tsx'),
+      `import { TextField } from '@heroui/react';
+       export const Form = () => <TextField />;`,
+    );
+    fs.writeFileSync(
+      path.join(dir, 'page.tsx'),
+      `import { Card } from '@heroui/react';
+       import { Form } from './Form';
+       const predicate = () => false;
+       export const Page = () => <Card><Card.Content>
+         {predicate(Form)}
+         {Form ? <div /> : <div />}
+         {Form.displayName}
+       </Card.Content></Card>;`,
+    );
+
+    const violations = findViolations(path.join(dir, 'page.tsx'));
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    expect(violations).toEqual([]);
   });
 
   it('does not resolve a JSX variable belonging to a different component in the same file', () => {
