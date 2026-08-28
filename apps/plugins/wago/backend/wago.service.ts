@@ -53,6 +53,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   private readonly enrollmentExpiryTimers = new Map<number, ReturnType<typeof setTimeout>>();
   private readonly claimLocks = new Map<number, Promise<void>>();
   private readonly configurationLocks = new Map<number, Promise<void>>();
+  private readonly configurationReportQueues = new Map<number, { pending: Buffer | null; processing: boolean }>();
   private claimConfigurationLock = Promise.resolve();
   private subscriptionRebuild = Promise.resolve();
   private subscriptionRetryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -560,11 +561,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
               if (!this.isActiveSubscriptionGeneration(generation)) return;
               const hardwareId = configurationReportedHardwareId(settings.operationalPrefix, message.topic);
               const controller = hardwareId ? controllersByHardwareId.get(hardwareId) : undefined;
-              if (controller) {
-                return this.onConfigurationReported(controller.id, message.payload).catch((error) => {
-                  this.context.logger.warn(`Could not process WAGO configuration report: ${String(error)}`);
-                });
-              }
+              if (controller) this.enqueueConfigurationReport(controller.id, message.payload);
             },
           ),
         );
@@ -722,6 +719,37 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       revision.reportedAt = new Date().toISOString();
       await this.revisions.save(revision);
     });
+  }
+
+  private enqueueConfigurationReport(controllerId: number, payload: Buffer): void {
+    const queue = this.configurationReportQueues.get(controllerId) ?? { pending: null, processing: false };
+    this.configurationReportQueues.set(controllerId, queue);
+    if (queue.processing) {
+      // Only the latest acknowledgement matters while this controller is busy.
+      queue.pending = payload;
+      return;
+    }
+    queue.processing = true;
+    void this.processConfigurationReports(controllerId, payload, queue);
+  }
+
+  private async processConfigurationReports(
+    controllerId: number,
+    payload: Buffer,
+    queue: { pending: Buffer | null; processing: boolean },
+  ): Promise<void> {
+    let next: Buffer | null = payload;
+    while (next) {
+      try {
+        await this.onConfigurationReported(controllerId, next);
+      } catch (error) {
+        this.context.logger.warn(`Could not process WAGO configuration report: ${String(error)}`);
+      }
+      next = queue.pending;
+      queue.pending = null;
+    }
+    queue.processing = false;
+    if (this.configurationReportQueues.get(controllerId) === queue) this.configurationReportQueues.delete(controllerId);
   }
 
   private async publishRevision(

@@ -359,7 +359,7 @@ describe('WagoService', () => {
     expect(revisionRepository.save).toHaveBeenCalledWith(expect.objectContaining({ state: 'applied' }));
   });
 
-  it('routes configuration reports through one backpressured wildcard subscription', async () => {
+  it('routes configuration reports through independent bounded controller queues', async () => {
     const first = { ...controller(), trustState: 'claimed' as const };
     const second = { ...controller(), id: 2, hardwareId: 'cc100-02', trustState: 'claimed' as const };
     const { service, context } = createService([first, second]);
@@ -377,7 +377,7 @@ describe('WagoService', () => {
     );
     expect(reportSubscriptions).toHaveLength(1);
     expect(reportSubscriptions[0][1]).toBe('attraccess/wago/v1/controllers/+/configuration/reported');
-    const handler = reportSubscriptions[0][2] as (message: { topic: string; payload: Buffer }) => Promise<void> | undefined;
+    const handler = reportSubscriptions[0][2] as (message: { topic: string; payload: Buffer }) => void;
     const firstResult = handler({
       topic: 'attraccess/wago/v1/controllers/cc100-01/configuration/reported',
       payload: Buffer.from('{}'),
@@ -387,11 +387,41 @@ describe('WagoService', () => {
       payload: Buffer.from('{}'),
     });
 
-    expect(firstResult).toBeInstanceOf(Promise);
-    expect(secondResult).toBeInstanceOf(Promise);
+    expect(firstResult).toBeUndefined();
+    expect(secondResult).toBeUndefined();
+    await new Promise<void>((resolve) => setImmediate(resolve));
     expect(onConfigurationReported).toHaveBeenCalledWith(second.id, expect.any(Buffer));
     releaseFirst();
-    await Promise.all([firstResult, secondResult]);
+  });
+
+  it('coalesces queued reports for a busy controller', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, context } = createService([claimed]);
+    let releaseFirst!: () => void;
+    const processed: Buffer[] = [];
+    jest.spyOn(service as never, 'onConfigurationReported').mockImplementation((_controllerId, payload) => {
+      processed.push(payload);
+      return processed.length === 1 ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve();
+    });
+
+    await service.onModuleInit();
+
+    const reportSubscription = (context.mqtt.subscribe as jest.Mock).mock.calls.find(([, topic]) =>
+      topic.endsWith('/configuration/reported'),
+    );
+    const handler = reportSubscription?.[2] as (message: { topic: string; payload: Buffer }) => void;
+    const first = Buffer.from('{"revision":1}');
+    const second = Buffer.from('{"revision":2}');
+    const latest = Buffer.from('{"revision":3}');
+    handler({ topic: 'attraccess/wago/v1/controllers/cc100-01/configuration/reported', payload: first });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    handler({ topic: 'attraccess/wago/v1/controllers/cc100-01/configuration/reported', payload: second });
+    handler({ topic: 'attraccess/wago/v1/controllers/cc100-01/configuration/reported', payload: latest });
+
+    expect(processed).toEqual([first]);
+    releaseFirst();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(processed).toEqual([first, latest]);
   });
 
   it('returns bounded revision metadata pages without snapshots', async () => {
