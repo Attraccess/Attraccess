@@ -100,11 +100,11 @@ afterEach(() => {
 });
 
 describe('PluginsSection', () => {
-  it('renders the section heading, upload button and table headers', () => {
+  it('renders the section heading, install menu and table headers', () => {
     render(<PluginsSection />);
 
     expect(screen.getByRole('heading', { name: 'Plugins' })).toBeInTheDocument();
-    expect(screen.getByText('Upload plugin')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Install plugin' })).toBeInTheDocument();
     expect(screen.getByText('Name')).toBeInTheDocument();
     expect(screen.getByText('Version')).toBeInTheDocument();
     expect(screen.getByText('Directory')).toBeInTheDocument();
@@ -113,13 +113,55 @@ describe('PluginsSection', () => {
     expect(screen.getByText('Actions')).toBeInTheDocument();
   });
 
+  async function openMarketplace(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: 'Install plugin' }));
+    await user.click(screen.getByText('Browse marketplace'));
+  }
+
   it('renders the official marketplace classification', async () => {
+    const user = userEvent.setup();
     render(<PluginsSection />);
+    await openMarketplace(user);
 
     expect(await screen.findByText('Shelly')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Official plugins' })).toBeInTheDocument();
     expect(screen.getByText('Official')).toBeInTheDocument();
     expect(screen.getByText('Version: 1.0.0')).toBeInTheDocument();
+  });
+
+  it('uses exact package lookup when a selected registry cannot be searched', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: { url?: string } | string) => {
+        const url = typeof input === 'string' ? input : (input.url ?? '');
+        if (url.endsWith('/api/plugins/registries'))
+          return Promise.resolve({
+            ok: true,
+            json: async () => [{ id: 'private', name: 'Private', url: 'https://packages.example.com' }],
+          });
+        if (url.includes('/marketplace/search')) return Promise.resolve({ ok: false });
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            name: '@private/plugin',
+            version: '1.0.0',
+            displayName: 'Private plugin',
+            permissions: [],
+            registry: { id: 'private', name: 'Private', url: 'https://packages.example.com' },
+            classification: 'community',
+            installable: true,
+          }),
+        });
+      }),
+    );
+    render(<PluginsSection />);
+    await openMarketplace(user);
+
+    await user.selectOptions(screen.getByLabelText('Registry'), 'private');
+    await user.type(screen.getByLabelText('Search plugins'), '@private/plugin');
+
+    expect(await screen.findByText('Private plugin')).toBeInTheDocument();
   });
 
   it('keeps incompatible marketplace packages visible with their reason', async () => {
@@ -148,7 +190,9 @@ describe('PluginsSection', () => {
         });
       }),
     );
+    const user = userEvent.setup();
     render(<PluginsSection />);
+    await openMarketplace(user);
 
     expect(await screen.findByText('Plugin is not compatible with Attraccess 1.0.0')).toBeInTheDocument();
   });
@@ -156,11 +200,14 @@ describe('PluginsSection', () => {
   it('requires source and permission acknowledgement before installing', async () => {
     const user = userEvent.setup();
     render(<PluginsSection />);
+    await openMarketplace(user);
 
     await user.click(await screen.findByRole('button', { name: 'Details' }));
     await user.click(screen.getByRole('button', { name: 'Install' }));
 
-    const confirm = screen.getByRole('button', { name: 'Install plugin' });
+    const installDialog = screen.getByRole('heading', { name: 'Install Shelly?' }).closest('[role="dialog"]');
+    expect(installDialog).not.toBeNull();
+    const confirm = within(installDialog as HTMLElement).getByRole('button', { name: 'Install plugin' });
     expect(confirm).toBeDisabled();
     await user.click(screen.getByRole('checkbox'));
     expect(confirm).toBeEnabled();
@@ -187,6 +234,7 @@ describe('PluginsSection', () => {
     );
     const user = userEvent.setup();
     render(<PluginsSection />);
+    await openMarketplace(user);
 
     await user.click(screen.getByText('Manage registries'));
     expect(await screen.findByText(/Private.*Token configured/)).toBeInTheDocument();
@@ -212,6 +260,7 @@ describe('PluginsSection', () => {
     );
     const user = userEvent.setup();
     render(<PluginsSection />);
+    await openMarketplace(user);
 
     await waitFor(() => expect(registryLoads).toBe(1));
     await user.click(screen.getByText('Manage registries'));
@@ -248,6 +297,7 @@ describe('PluginsSection', () => {
     );
     const user = userEvent.setup();
     render(<PluginsSection />);
+    await openMarketplace(user);
 
     await user.click(screen.getByText('Manage registries'));
     await user.type(screen.getByLabelText('Registry name'), 'Private');
@@ -297,7 +347,9 @@ describe('PluginsSection', () => {
       }),
     );
 
+    const user = userEvent.setup();
     render(<PluginsSection />);
+    await openMarketplace(user);
 
     await waitFor(() =>
       expect(hoisted.errorToast).toHaveBeenCalledWith(
@@ -306,9 +358,7 @@ describe('PluginsSection', () => {
     );
   });
 
-  it('keeps the most recently opened marketplace plugin details', async () => {
-    const first = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
-    const second = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
+  it('replaces the marketplace with package details', async () => {
     const plugin = (name: string) => ({
       name,
       version: '1.0.0',
@@ -330,21 +380,16 @@ describe('PluginsSection', () => {
           ok: true,
           json: async () => ({ results: [plugin('First'), plugin('Second')], errors: [] }),
         });
-      return url.includes('First') ? first.promise : second.promise;
+      return Promise.resolve({ ok: true, json: async () => plugin('Second') });
     });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     render(<PluginsSection />);
+    await openMarketplace(user);
 
-    const detailButtons = await screen.findAllByRole('button', { name: 'Details' });
-    await user.click(detailButtons[0]);
-    await user.click(detailButtons[1]);
-    second.resolve({ ok: true, json: async () => plugin('Second') });
+    await user.click((await screen.findAllByRole('button', { name: 'Details' }))[1]);
     expect(await screen.findByRole('heading', { name: 'Second details' })).toBeInTheDocument();
-    first.resolve({ ok: true, json: async () => plugin('First') });
-
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Second details' })).toBeInTheDocument());
-    expect(screen.queryByRole('heading', { name: 'First details' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Plugin marketplace' })).not.toBeInTheDocument();
   });
 
   it('flags a plugin whose backend failed to load', () => {
@@ -392,7 +437,8 @@ describe('PluginsSection', () => {
 
     expect(document.querySelector('[data-cy="upload-plugin-modal"]')).not.toBeInTheDocument();
 
-    await user.click(screen.getByText('Upload plugin'));
+    await user.click(screen.getByRole('button', { name: 'Install plugin' }));
+    await user.click(screen.getByText('Upload ZIP file'));
 
     await waitFor(() => expect(document.querySelector('[data-cy="upload-plugin-modal"]')).toBeInTheDocument());
   });
