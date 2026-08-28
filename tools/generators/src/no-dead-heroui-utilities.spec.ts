@@ -98,6 +98,9 @@ const BASELINE = new Map(
     'hover:bg-default-50',
     'bg-primary/10',
     'rounded-small',
+    'border-primary-500',
+    'ring-primary-300',
+    'dark:ring-primary-700',
   ].map((className) => [className, 'HeroUI v2 utility; replace with a deliberate v3 token.']),
 );
 
@@ -130,18 +133,29 @@ function addClassTokens(node: any, classes: Set<string>): void {
   }
 }
 
-function classExpression(node: any, classes: Set<string>): void {
+function classExpression(node: any, classes: Set<string>, literalClassInitializers: Map<string, any>): void {
   if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return addClassTokens(node, classes);
-  if (ts.isParenthesizedExpression(node)) return classExpression(node.expression, classes);
+  if (ts.isIdentifier(node)) {
+    const initializer = literalClassInitializers.get(node.text);
+    if (initializer) return addClassTokens(initializer, classes);
+    return;
+  }
+  if (ts.isParenthesizedExpression(node)) return classExpression(node.expression, classes, literalClassInitializers);
   if (ts.isConditionalExpression(node)) {
-    classExpression(node.whenTrue, classes);
-    return classExpression(node.whenFalse, classes);
+    classExpression(node.whenTrue, classes, literalClassInitializers);
+    return classExpression(node.whenFalse, classes, literalClassInitializers);
   }
   if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
-    return classExpression(node.right, classes);
+    return classExpression(node.right, classes, literalClassInitializers);
   }
   if (ts.isArrayLiteralExpression(node)) {
-    for (const element of node.elements) classExpression(element, classes);
+    for (const element of node.elements) classExpression(element, classes, literalClassInitializers);
+    return;
+  }
+  if (ts.isObjectLiteralExpression(node)) {
+    for (const property of node.properties) {
+      if (ts.isPropertyAssignment(property) && ts.isStringLiteral(property.name)) addClassTokens(property.name, classes);
+    }
     return;
   }
   if (
@@ -149,37 +163,57 @@ function classExpression(node: any, classes: Set<string>): void {
     ts.isIdentifier(node.expression) &&
     ['cn', 'clsx', 'twMerge'].includes(node.expression.text)
   ) {
-    for (const argument of node.arguments) classExpression(argument, classes);
+    for (const argument of node.arguments) classExpression(argument, classes, literalClassInitializers);
   }
 }
 
-function classesIn(file: string): Set<string> {
+function classesInSource(file: string, content: string): Set<string> {
   const source = ts.createSourceFile(
     file,
-    fs.readFileSync(file, 'utf8'),
+    content,
     ts.ScriptTarget.ESNext,
     true,
     ts.ScriptKind.TSX,
   );
   const classes = new Set<string>();
+  const literalClassInitializers = new Map<string, any>();
+
+  const collectLiteralClassInitializers = (node: any): void => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      (ts.isStringLiteral(node.initializer) || ts.isNoSubstitutionTemplateLiteral(node.initializer)) &&
+      ts.isVariableDeclarationList(node.parent) &&
+      (node.parent.flags & ts.NodeFlags.Const) !== 0
+    ) {
+      literalClassInitializers.set(node.name.text, node.initializer);
+    }
+    node.forEachChild(collectLiteralClassInitializers);
+  };
+  collectLiteralClassInitializers(source);
 
   const visit = (node: any): void => {
     if (ts.isJsxAttribute(node) && node.name.text === 'className' && node.initializer) {
       if (ts.isStringLiteral(node.initializer)) addClassTokens(node.initializer, classes);
       else if (ts.isJsxExpression(node.initializer) && node.initializer.expression)
-        classExpression(node.initializer.expression, classes);
+        classExpression(node.initializer.expression, classes, literalClassInitializers);
     }
     if (
       ts.isCallExpression(node) &&
       ts.isIdentifier(node.expression) &&
       ['cn', 'clsx', 'twMerge'].includes(node.expression.text)
     ) {
-      for (const argument of node.arguments) classExpression(argument, classes);
+      for (const argument of node.arguments) classExpression(argument, classes, literalClassInitializers);
     }
     node.forEachChild(visit);
   };
   visit(source);
   return classes;
+}
+
+function classesIn(file: string): Set<string> {
+  return classesInSource(file, fs.readFileSync(file, 'utf8'));
 }
 
 function stylesheetPath(specifier: string, base: string): string {
@@ -237,6 +271,20 @@ function emitsCss(compiled: any, className: string): boolean {
 }
 
 describe('HeroUI utility classes emit CSS (ATT-858)', () => {
+  it('finds object-form and local literal class utilities', () => {
+    const classes = classesInSource(
+      'example.tsx',
+      `
+        const valueClass = 'text-primary';
+        const dlClass = \`text-danger\`;
+        const element = <div className={valueClass} />;
+        cn(dlClass, { 'bg-default-100': condition });
+      `,
+    );
+
+    expect([...classes]).toEqual(['text-primary', 'text-danger', 'bg-default-100']);
+  });
+
   it('accepts valid tokens and variants while rejecting removed v2 tokens', async () => {
     const compiled = await createCompiler();
     expect(emitsCss(compiled, 'text-danger')).toBe(true);
