@@ -88,7 +88,12 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   async getSettings(): Promise<WagoSettings> {
     const settings = await this.settings.findOneBy({ id: 1 });
     if (settings) return settings;
-    await this.settings.upsert({ id: 1, defaultMqttServerId: null }, ['id']);
+    await this.settings
+      .createQueryBuilder()
+      .insert()
+      .values({ id: 1, defaultMqttServerId: null })
+      .orIgnore()
+      .execute();
     return this.settings.findOneByOrFail({ id: 1 });
   }
 
@@ -249,7 +254,11 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
           .revoke({ mqttServerId: selectedServerId, identity, username: identity, vhost: '/' })
           .catch(() => undefined);
         Object.assign(controller, previousController);
-        await this.controllers.save(controller);
+        await this.controllers.save(controller).catch((rollbackError) => {
+          this.context.logger.warn(
+            `Could not restore WAGO controller ${controller.id} after claim failure: ${String(rollbackError)}`,
+          );
+        });
       }
       throw error;
     } finally {
