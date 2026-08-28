@@ -18,8 +18,12 @@ export class CreateWagoControllers1780000000000 implements MigrationInterface {
       "id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "mqtt_server_id" integer NOT NULL, "hardware_id" varchar NOT NULL,
       "secret_hash" varchar NOT NULL, "identity" varchar NOT NULL, "created_at" varchar NOT NULL,
       "expires_at" varchar NOT NULL, "consumed_at" varchar, CONSTRAINT "UQ_plugin_wago_enrollments_secret_hash" UNIQUE ("secret_hash"))`);
+    await queryRunner.query(
+      'CREATE INDEX IF NOT EXISTS "IDX_plugin_wago_enrollments_active" ON "plugin_wago_enrollments" ("consumed_at", "expires_at")',
+    );
   }
   async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query('DROP INDEX IF EXISTS "IDX_plugin_wago_enrollments_active"');
     await queryRunner.query('DROP TABLE "plugin_wago_enrollments"');
     await queryRunner.query('DROP TABLE "plugin_wago_settings"');
     await queryRunner.query('DROP TABLE "plugin_wago_controllers"');

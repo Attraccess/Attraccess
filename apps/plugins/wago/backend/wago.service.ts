@@ -35,6 +35,9 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   private readonly enrollments: Repository<WagoEnrollment>;
   private readonly subscriptions: PluginMqttSubscription[] = [];
   private readonly enrollmentExpiryTimers = new Map<number, ReturnType<typeof setTimeout>>();
+  private readonly claimLocks = new Map<number, Promise<void>>();
+  private subscriptionRebuild = Promise.resolve();
+  private subscriptionRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {
     this.controllers = context.getRepository(WagoController);
@@ -51,6 +54,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     this.unsubscribe();
     this.enrollmentExpiryTimers.forEach((timer) => clearTimeout(timer));
     this.enrollmentExpiryTimers.clear();
+    if (this.subscriptionRetryTimer) clearTimeout(this.subscriptionRetryTimer);
   }
 
   async list(): Promise<WagoControllerSummary[]> {
@@ -131,7 +135,10 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       }),
     );
     this.scheduleEnrollmentExpiry(enrollment);
-    await this.subscribeConfiguredServers();
+    await this.subscribeConfiguredServers().catch((error) => {
+      this.context.logger.warn(`Could not refresh WAGO MQTT subscriptions after enrollment: ${String(error)}`);
+      this.scheduleSubscriptionRetry();
+    });
     return {
       broker: { host: server.host, port: server.port, useTls: server.useTls },
       username: credential.username,
@@ -143,6 +150,10 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   }
 
   async claim(id: number, name: string, verifier: string, mqttServerId?: number): Promise<WagoController> {
+    return this.withClaimLock(id, () => this.claimController(id, name, verifier, mqttServerId));
+  }
+
+  private async claimController(id: number, name: string, verifier: string, mqttServerId?: number): Promise<WagoController> {
     const controller = await this.controllers.findOneBy({ id });
     if (!controller) throw new NotFoundException(`WAGO controller ${id} not found`);
     if (controller.trustState === 'claimed') throw new ConflictException('controller has already been claimed');
@@ -200,14 +211,22 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
         .catch(() => undefined);
       throw error;
     } finally {
-      await this.subscribeConfiguredServers();
+      await this.subscribeConfiguredServers().catch((error) => {
+        this.context.logger.warn(`Could not refresh WAGO MQTT subscriptions after claim: ${String(error)}`);
+        this.scheduleSubscriptionRetry();
+      });
     }
   }
 
   private async subscribeConfiguredServers(): Promise<void> {
-    this.unsubscribe();
+    const rebuild = this.subscriptionRebuild.then(() => this.rebuildSubscriptions());
+    this.subscriptionRebuild = rebuild.catch(() => undefined);
+    return rebuild;
+  }
+
+  private async rebuildSubscriptions(): Promise<void> {
     const settings = await this.getSettings();
-    const [controllers, enrollments] = await Promise.all([this.controllers.find(), this.enrollments.find()]);
+    const [controllers, enrollments] = await Promise.all([this.controllers.find(), this.activeEnrollments()]);
     const serverIds = new Set<number>();
     if (settings.defaultMqttServerId) serverIds.add(settings.defaultMqttServerId);
     controllers
@@ -216,25 +235,33 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
         const serverId = controller.mqttServerId ?? settings.defaultMqttServerId;
         if (serverId) serverIds.add(serverId);
       });
-    enrollments.filter((enrollment) => this.isActiveEnrollment(enrollment)).forEach((enrollment) => {
+    enrollments.forEach((enrollment) => {
       serverIds.add(enrollment.mqttServerId);
     });
-    for (const serverId of serverIds) {
-      this.subscriptions.push(
-        await this.context.mqtt.subscribe(serverId, `${DISCOVERY_ROOT}/+`, (message) =>
-          this.onDiscovery(serverId, message.topic, message.payload),
-        ),
-      );
-      for (const controller of controllers.filter(
-        (item) => item.trustState === 'claimed' && (item.mqttServerId ?? settings.defaultMqttServerId) === serverId,
-      )) {
-        this.subscriptions.push(
-          await this.context.mqtt.subscribe(serverId, heartbeatTopic(controller.hardwareId), (message) =>
-            this.onHeartbeat(controller.hardwareId, message.payload),
+    const replacements: PluginMqttSubscription[] = [];
+    try {
+      for (const serverId of serverIds) {
+        replacements.push(
+          await this.context.mqtt.subscribe(serverId, `${DISCOVERY_ROOT}/+`, (message) =>
+            this.onDiscovery(serverId, message.topic, message.payload),
           ),
         );
+        for (const controller of controllers.filter(
+          (item) => item.trustState === 'claimed' && (item.mqttServerId ?? settings.defaultMqttServerId) === serverId,
+        )) {
+          replacements.push(
+            await this.context.mqtt.subscribe(serverId, heartbeatTopic(controller.hardwareId), (message) =>
+              this.onHeartbeat(controller.hardwareId, message.payload),
+            ),
+          );
+        }
       }
+    } catch (error) {
+      replacements.forEach((subscription) => subscription.unsubscribe());
+      throw error;
     }
+    this.unsubscribe();
+    this.subscriptions.push(...replacements);
   }
 
   private unsubscribe(): void {
@@ -357,6 +384,13 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     const enrollment = await this.enrollments.findOneBy({ id });
     return enrollment && this.isActiveEnrollment(enrollment) ? enrollment : null;
   }
+  private activeEnrollments(): Promise<WagoEnrollment[]> {
+    return this.enrollments
+      .createQueryBuilder('enrollment')
+      .where('enrollment.consumedAt IS NULL')
+      .andWhere('enrollment.expiresAt > :now', { now: new Date().toISOString() })
+      .getMany();
+  }
   private isActiveEnrollment(enrollment: WagoEnrollment): boolean {
     return !enrollment.consumedAt && Date.parse(enrollment.expiresAt) > Date.now();
   }
@@ -368,28 +402,55 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       enrollment.id,
       setTimeout(() => {
         this.enrollmentExpiryTimers.delete(enrollment.id);
-        void this.revokeEnrollment(enrollment).then(
-          () => this.subscribeConfiguredServers(),
-          (error) => {
+        void this.revokeEnrollment(enrollment)
+          .then(() => this.subscribeConfiguredServers())
+          .catch((error) => {
             this.context.logger.warn(`Could not revoke expired WAGO enrollment ${enrollment.id}: ${String(error)}`);
-            this.scheduleEnrollmentExpiry(enrollment, ENROLLMENT_RETRY_MS);
-          },
-        );
+            if (!enrollment.consumedAt) this.scheduleEnrollmentExpiry(enrollment, ENROLLMENT_RETRY_MS);
+            this.scheduleSubscriptionRetry();
+          });
       }, Math.max(0, delay)),
     );
   }
   private async revokeEnrollment(enrollment: WagoEnrollment): Promise<void> {
-    await this.context.getMqttCredentialProvisioning().revoke({
+    const manual = await this.context.getMqttCredentialProvisioning().revoke({
       mqttServerId: enrollment.mqttServerId,
       identity: enrollment.identity,
       username: enrollment.identity,
       vhost: '/',
     });
+    if (manual)
+      throw new ConflictException(`Manual credential revocation is required: ${manual.instructions.join(' ')}`);
     enrollment.consumedAt = new Date().toISOString();
     await this.enrollments.save(enrollment);
     const timer = this.enrollmentExpiryTimers.get(enrollment.id);
     if (timer) clearTimeout(timer);
     this.enrollmentExpiryTimers.delete(enrollment.id);
+  }
+  private async withClaimLock<T>(id: number, operation: () => Promise<T>): Promise<T> {
+    const previous = this.claimLocks.get(id) ?? Promise.resolve();
+    let release!: () => void;
+    const lock = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.claimLocks.set(id, lock);
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (this.claimLocks.get(id) === lock) this.claimLocks.delete(id);
+    }
+  }
+  private scheduleSubscriptionRetry(): void {
+    if (this.subscriptionRetryTimer) return;
+    this.subscriptionRetryTimer = setTimeout(() => {
+      this.subscriptionRetryTimer = null;
+      void this.subscribeConfiguredServers().catch((error) => {
+        this.context.logger.warn(`Could not refresh WAGO MQTT subscriptions: ${String(error)}`);
+        this.scheduleSubscriptionRetry();
+      });
+    }, ENROLLMENT_RETRY_MS);
   }
 }
 

@@ -25,13 +25,23 @@ describe('WagoService', () => {
     updatedAt: '2026-01-01T00:00:00.000Z',
   });
 
-  function createService(controllers = [controller()]) {
+  function createService(controllers = [controller()], enrollments: WagoEnrollment[] = []) {
     const controllerRepository = {
       find: jest.fn().mockResolvedValue(controllers),
       findOneBy: jest.fn().mockResolvedValue(controllers[0] ?? null),
       save: jest.fn().mockImplementation(async (value) => value),
     };
-    const enrollmentRepository = { find: jest.fn().mockResolvedValue([]), findOneBy: jest.fn(), save: jest.fn() };
+    const enrollmentQuery = {
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue(enrollments),
+    };
+    const enrollmentRepository = {
+      find: jest.fn().mockResolvedValue(enrollments),
+      findOneBy: jest.fn(),
+      save: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnValue(enrollmentQuery),
+    };
     const settingsRepository = { findOneBy: jest.fn().mockResolvedValue({ id: 1, defaultMqttServerId: null }), save: jest.fn() };
     const context = {
       getRepository: jest.fn((entity) => {
@@ -44,7 +54,7 @@ describe('WagoService', () => {
       mqtt: { subscribe: jest.fn(), publish: jest.fn() },
       getMqttCredentialProvisioning: jest.fn(),
     } as unknown as PluginContext;
-    return { service: new WagoService(context), controllerRepository };
+    return { service: new WagoService(context), controllerRepository, enrollmentRepository, context };
   }
 
   it('does not expose physical-verification secrets in controller listings', async () => {
@@ -84,5 +94,53 @@ describe('WagoService', () => {
     );
 
     expect(controllerRepository.save).toHaveBeenCalledWith(expect.objectContaining({ lastSequence: 4 }));
+  });
+
+  it('serializes concurrent claims for the same controller', async () => {
+    const { service } = createService();
+    const withClaimLock = (Reflect.get(service, 'withClaimLock') as <T>(
+      id: number,
+      operation: () => Promise<T>,
+    ) => Promise<T>).bind(service);
+    const started: number[] = [];
+    let release!: () => void;
+    const first = withClaimLock(1, async () => {
+      started.push(1);
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+    });
+    const second = withClaimLock(1, async () => started.push(2));
+
+    await Promise.resolve();
+    expect(started).toEqual([1]);
+    release();
+    await Promise.all([first, second]);
+    expect(started).toEqual([1, 2]);
+  });
+
+  it('keeps a manually revocable enrollment active', async () => {
+    const enrollment = {
+      id: 3,
+      mqttServerId: 2,
+      hardwareId: 'cc100-01',
+      secretHash: 'secret-hash',
+      identity: 'wago-enrollment-test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      expiresAt: '2026-01-01T01:00:00.000Z',
+      consumedAt: null,
+    };
+    const { service, enrollmentRepository, context } = createService([], [enrollment]);
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({
+      revoke: jest.fn().mockResolvedValue({ instructions: ['Remove this account manually.'] }),
+    });
+    const revokeEnrollment = (Reflect.get(service, 'revokeEnrollment') as (item: WagoEnrollment) => Promise<void>).bind(
+      service,
+    );
+
+    await expect(revokeEnrollment(enrollment)).rejects.toThrow('Manual credential revocation is required');
+
+    expect(enrollment.consumedAt).toBeNull();
+    expect(enrollmentRepository.save).not.toHaveBeenCalled();
   });
 });
