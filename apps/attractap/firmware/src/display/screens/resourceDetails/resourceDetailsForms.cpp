@@ -312,6 +312,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_label_set_text(this->formsNextLabel, "Weiter");
    lv_obj_set_align(this->formsNextLabel, LV_ALIGN_CENTER);
    this->formsNextSpinner = lv_spinner_create(nextBtn);
+   lv_obj_update_layout(nextBtn);
    const lv_coord_t nextLabelHeight = lv_obj_get_height(this->formsNextLabel);
    lv_obj_set_size(this->formsNextSpinner, nextLabelHeight, nextLabelHeight);
    lv_obj_set_align(this->formsNextSpinner, LV_ALIGN_CENTER);
