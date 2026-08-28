@@ -10,10 +10,12 @@ import { PluginModule } from './plugin.module';
 import { PluginService } from './plugin.service';
 import { PluginSandboxService } from './plugin-sandbox.service';
 import { PluginEventsService } from './plugin-events.service';
+import { PluginMqttService } from './plugin-mqtt.service';
 import { PluginController } from './plugin.controller';
 import { NpmPluginService } from './npm-plugin.service';
 import { PluginClassificationService } from './plugin-classification.service';
 import { SettingsModule } from '../settings/settings.module';
+import { MqttModule } from '../mqtt/mqtt.module';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { MqttCredentialProvisioningService } from '../mqtt/mqtt-credential-provisioning.service';
 import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
@@ -58,17 +60,18 @@ describe('PluginModule', () => {
         PluginService,
         PluginSandboxService,
         PluginEventsService,
+        PluginMqttService,
         NpmPluginService,
         PluginClassificationService,
       ]);
       expect(module.exports).toEqual([PluginEventsService]);
       expect(module.controllers).toEqual([PluginController]);
-      expect(module.imports).toEqual([SettingsModule]);
+      expect(module.imports).toEqual([SettingsModule, MqttModule]);
     });
 
     it('builds an empty import list when no plugins are present', () => {
       const module = PluginModule.forRoot();
-      expect(module.imports).toEqual([SettingsModule]);
+      expect(module.imports).toEqual([SettingsModule, MqttModule]);
       expect(module.controllers).toEqual([PluginController]);
     });
 
@@ -88,7 +91,7 @@ describe('PluginModule', () => {
       expect(discovered).toHaveLength(1);
 
       const module = PluginModule.forRoot();
-      expect(module.imports).toEqual([SettingsModule]);
+      expect(module.imports).toEqual([SettingsModule, MqttModule]);
       expect(PluginService.getManifestById(discovered[0].id)).toBeDefined();
     });
 
@@ -113,7 +116,7 @@ describe('PluginModule', () => {
       );
       const register = jest.spyOn(MqttCredentialProvisioningService, 'register');
 
-      expect(PluginModule.forRoot().imports).toEqual([SettingsModule]);
+      expect(PluginModule.forRoot().imports).toEqual([SettingsModule, MqttModule]);
       expect(register).not.toHaveBeenCalled();
     });
 
@@ -144,7 +147,7 @@ describe('PluginModule', () => {
       );
 
       const module = PluginModule.forRoot();
-      expect(module.imports).toEqual([SettingsModule, expect.any(Object)]);
+      expect(module.imports).toEqual([SettingsModule, MqttModule, expect.any(Object)]);
     });
   });
 

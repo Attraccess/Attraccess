@@ -10,11 +10,12 @@ RULES:
 
 Create worktrees with `scripts/create-worktree.sh <worktree-path> <branch>
 [start-point]`. It runs `scripts/setup-dev-dependencies.sh` after `git worktree
-add` succeeds, installing dependencies, creating `.env`, running database
-migrations, and installing the project-local ESP-IDF v6.0.2 toolchain at
-`.tools/esp-idf`. The completion marker is created only after setup succeeds.
-If bootstrap fails, rerun that script from the new worktree before reporting a
-missing toolchain.
+add` succeeds, installing dependencies, creating `.env`, and running database
+migrations. For Attractap firmware work, run `INSTALL_ESP_IDF=true
+./scripts/setup-dev-dependencies.sh` in the new worktree to install the
+project-local ESP-IDF v6.0.2 toolchain at `.tools/esp-idf`. The completion
+marker is created only after setup succeeds. If bootstrap fails, rerun that
+script from the new worktree before reporting a missing dependency.
 
 ## Dev servers — always use `pnpm serve`
 

@@ -157,17 +157,19 @@ export default plugin;
 
 `register(context)` receives a `PluginContext` — your gateway to the host:
 
-| Member                                  | Purpose                                                                        | Permission               |
-| --------------------------------------- | ------------------------------------------------------------------------------ | ------------------------ |
-| `context.manifest`                      | Your plugin's name, version, id, directory.                                    | none                     |
-| `context.logger`                        | Logger prefixed with your plugin name.                                         | none                     |
-| `context.getRepository(entity)`         | TypeORM repository over the shared connection.                                 | per-entity (see below)   |
-| `context.dataSource`                    | The raw shared TypeORM `DataSource`.                                           | `DATABASE_ACCESS`        |
-| `context.onEvent(event, handler)`       | Subscribe to a typed `SystemEvent`.                                            | `LISTEN_EVENTS`          |
-| `context.emitEvent(event, payload)`     | Emit a typed `SystemEvent`.                                                    | `EMIT_EVENTS`            |
-| `context.events`                        | The raw shared event bus (restricted surface).                                 | per-method               |
-| `context.get(token)`                    | Resolve an arbitrary host provider by token.                                   | `RESOLVE_HOST_PROVIDERS` |
-| `context.getMqttServerConfig(serverId)` | Resolve an MQTT server's connection config + resolved (decrypted) credentials. | `ACCESS_MQTT_SERVERS`    |
+| Member                                                    | Purpose                                                                        | Permission               |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------ |
+| `context.manifest`                                        | Your plugin's name, version, id, directory.                                    | none                     |
+| `context.logger`                                          | Logger prefixed with your plugin name.                                         | none                     |
+| `context.getRepository(entity)`                           | TypeORM repository over the shared connection.                                 | per-entity (see below)   |
+| `context.dataSource`                                      | The raw shared TypeORM `DataSource`.                                           | `DATABASE_ACCESS`        |
+| `context.onEvent(event, handler)`                         | Subscribe to a typed `SystemEvent`.                                            | `LISTEN_EVENTS`          |
+| `context.emitEvent(event, payload)`                       | Emit a typed `SystemEvent`.                                                    | `EMIT_EVENTS`            |
+| `context.events`                                          | The raw shared event bus (restricted surface).                                 | per-method               |
+| `context.get(token)`                                      | Resolve an arbitrary host provider by token.                                   | `RESOLVE_HOST_PROVIDERS` |
+| `context.getMqttServerConfig(serverId)`                   | Resolve an MQTT server's connection config + resolved (decrypted) credentials. | `ACCESS_MQTT_SERVERS`    |
+| `context.mqtt.subscribe(serverId, topicFilter, handler)`  | Subscribe through the host's shared MQTT connection; resolves after broker acknowledgement. | `ACCESS_MQTT_SERVERS`    |
+| `context.mqtt.publish(serverId, topic, payload, options)` | Publish through the host's shared MQTT connection.                             | `ACCESS_MQTT_SERVERS`    |
 
 > [!IMPORTANT]
 > Resolve services and repositories through `context`, never by re-initialising
@@ -182,16 +184,37 @@ array. At runtime the host hands your plugin a **guarded** `PluginContext`:
 accessing a capability whose permission you did not declare throws a clear error
 naming the missing permission.
 
-| Permission               | Grants access to                                                                                            |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| `READ_USERS`             | `context.getRepository('User')` — read user accounts.                                                       |
-| `ACCESS_RESOURCES`       | `context.getRepository('Resource')` — read and write resources.                                             |
-| `READ_SETTINGS`          | `context.getRepository('Setting')` — read application settings.                                             |
-| `DATABASE_ACCESS`        | `context.dataSource` and `context.getRepository(...)` for any other entity.                                 |
-| `EMIT_EVENTS`            | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`.                                 |
-| `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                     |
-| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                            |
-| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)` — read an MQTT server's connection config and resolved credentials. |
+| Permission               | Grants access to                                                                                                                                                      |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `READ_USERS`             | `context.getRepository('User')` — read user accounts.                                                                                                                 |
+| `ACCESS_RESOURCES`       | `context.getRepository('Resource')` — read and write resources.                                                                                                       |
+| `READ_SETTINGS`          | `context.getRepository('Setting')` — read application settings.                                                                                                       |
+| `DATABASE_ACCESS`        | `context.dataSource` and `context.getRepository(...)` for any other entity.                                                                                           |
+| `EMIT_EVENTS`            | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`.                                                                                           |
+| `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                                                                               |
+| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                                                                                      |
+| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)`, `context.mqtt.subscribe(...)`, and `context.mqtt.publish(...)` — access an MQTT server through the host's pooled connection. |
+
+### MQTT subscriptions
+
+Use `context.mqtt` rather than creating your own MQTT client. The host manages
+the broker connection, reconnects, and broker subscriptions. Topic filters
+support MQTT `+` and `#` wildcards. The handler receives the raw payload as a
+`Buffer`; retained messages are delivered by the broker when it accepts the
+subscription.
+
+```ts
+const subscription = await context.mqtt.subscribe(1, 'devices/+/state', ({ topic, payload }) => {
+  context.logger.log(`${topic}: ${payload.toString()}`);
+});
+
+await context.mqtt.publish(1, 'devices/kitchen/set', '{"on":true}', { qos: 1 });
+subscription.unsubscribe();
+```
+
+Handlers are isolated: an exception is logged with the plugin scope and does
+not interrupt MQTT delivery to other plugins. All remaining subscriptions are
+also removed automatically when the plugin module is destroyed.
 
 A few notes on the boundary:
 

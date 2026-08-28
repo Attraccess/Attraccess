@@ -123,6 +123,16 @@ export class PluginSandboxService {
     return {
       manifest: base.manifest,
       logger: base.logger,
+      mqtt: {
+        subscribe(serverId, topicFilter, handler) {
+          require(PluginPermission.ACCESS_MQTT_SERVERS, `mqtt.subscribe(${serverId}, ${topicFilter})`);
+          return base.mqtt.subscribe(serverId, topicFilter, handler);
+        },
+        publish(serverId, topic, payload, options) {
+          require(PluginPermission.ACCESS_MQTT_SERVERS, `mqtt.publish(${serverId}, ${topic})`);
+          return base.mqtt.publish(serverId, topic, payload, options);
+        },
+      },
       events: guardedEvents,
       get dataSource() {
         require(PluginPermission.DATABASE_ACCESS, 'dataSource');
