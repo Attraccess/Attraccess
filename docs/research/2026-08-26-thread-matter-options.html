@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Thread + Matter for Attraccess</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #17231f;
+        --muted: #5c6c65;
+        --paper: #f5f2e9;
+        --card: #fffdf7;
+        --line: #d9d5c9;
+        --green: #0b6b4b;
+        --green-soft: #dcefe5;
+        --blue: #285f8f;
+        --blue-soft: #e1edf7;
+        --amber: #9a5c0a;
+        --amber-soft: #f7e9ca;
+        --red: #9d3434;
+        --red-soft: #f7dddd;
+        --shadow: 0 16px 45px rgb(32 48 41 / 9%);
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 85% 2%, rgb(34 142 101 / 14%), transparent 28rem),
+          linear-gradient(90deg, transparent 49.8%, rgb(23 35 31 / 3%) 50%, transparent 50.2%),
+          var(--paper);
+        font: 16px/1.62 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      a { color: var(--blue); text-underline-offset: 3px; }
+      h1, h2, h3, p { margin-top: 0; }
+      h1, h2, h3 { line-height: 1.12; letter-spacing: -0.025em; }
+      h1 { max-width: 850px; margin-bottom: 20px; font-size: clamp(2.7rem, 7vw, 5.8rem); }
+      h2 { margin-bottom: 20px; font-size: clamp(1.85rem, 4vw, 3rem); }
+      h3 { margin-bottom: 10px; font-size: 1.18rem; }
+      strong { font-weight: 750; }
+      code {
+        padding: 2px 6px;
+        border-radius: 5px;
+        background: rgb(23 35 31 / 7%);
+        font-size: .9em;
+      }
+
+      .wrap { width: min(1160px, calc(100% - 36px)); margin-inline: auto; }
+      .hero { padding: 84px 0 52px; }
+      .eyebrow {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 20px;
+        color: var(--green);
+        font-size: .76rem;
+        font-weight: 800;
+        letter-spacing: .14em;
+        text-transform: uppercase;
+      }
+      .eyebrow::before { width: 38px; height: 3px; content: ""; background: currentColor; }
+      .lede { max-width: 790px; color: var(--muted); font-size: clamp(1.15rem, 2.2vw, 1.45rem); }
+      .verdict {
+        display: grid;
+        grid-template-columns: 56px 1fr;
+        gap: 18px;
+        max-width: 920px;
+        margin-top: 34px;
+        padding: 24px;
+        border: 1px solid #b8d9ca;
+        border-radius: 16px;
+        background: var(--green-soft);
+      }
+      .verdict-mark {
+        display: grid;
+        width: 56px;
+        height: 56px;
+        place-items: center;
+        border-radius: 50%;
+        color: white;
+        background: var(--green);
+        font: 800 1.8rem/1 Georgia, serif;
+      }
+      .verdict p { margin: 4px 0 0; }
+
+      nav {
+        position: sticky;
+        z-index: 5;
+        top: 0;
+        overflow-x: auto;
+        border-block: 1px solid var(--line);
+        background: rgb(245 242 233 / 92%);
+        backdrop-filter: blur(12px);
+      }
+      nav .wrap { display: flex; gap: 26px; }
+      nav a {
+        flex: 0 0 auto;
+        padding: 14px 0;
+        color: var(--muted);
+        font-size: .84rem;
+        font-weight: 700;
+        text-decoration: none;
+      }
+      nav a:hover { color: var(--green); }
+      section { padding: 76px 0; border-bottom: 1px solid var(--line); scroll-margin-top: 42px; }
+      .section-intro { max-width: 750px; margin-bottom: 34px; color: var(--muted); font-size: 1.08rem; }
+
+      .two-up, .three-up, .option-grid, .glossary { display: grid; gap: 18px; }
+      .two-up { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .three-up { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .glossary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .card {
+        padding: 25px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--card);
+        box-shadow: var(--shadow);
+      }
+      .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+      .card-kicker { margin-bottom: 10px; color: var(--muted); font-size: .74rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+      .matter { border-top: 5px solid var(--blue); }
+      .thread { border-top: 5px solid var(--green); }
+      .ble { border-top: 5px solid var(--amber); }
+      .big-word { margin-bottom: 5px; color: var(--ink); font: 750 clamp(2rem, 5vw, 3.6rem)/1 Georgia, serif; }
+      .plain { color: var(--muted); }
+      .analogy { margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--line); font-weight: 650; }
+
+      .stack {
+        display: grid;
+        grid-template-columns: 1fr 72px 1fr 72px 1fr;
+        align-items: center;
+        gap: 12px;
+        margin: 28px 0;
+      }
+      .stack-box { min-height: 155px; padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+      .stack-box small { display: block; margin-bottom: 8px; color: var(--muted); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+      .arrow { color: var(--muted); text-align: center; font-size: 1.8rem; }
+      .network-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+      .pill { padding: 6px 10px; border-radius: 999px; background: var(--blue-soft); color: #244c6e; font-size: .82rem; font-weight: 750; }
+      .pill.green { color: #15563f; background: var(--green-soft); }
+      .pill.amber { color: #774905; background: var(--amber-soft); }
+
+      .truth-table { width: 100%; border-spacing: 0; border-collapse: separate; overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: var(--card); }
+      .truth-table th, .truth-table td { padding: 15px 17px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      .truth-table tr:last-child td { border-bottom: 0; }
+      .truth-table th { color: var(--muted); background: #ece9df; font-size: .76rem; letter-spacing: .08em; text-transform: uppercase; }
+      .yes { color: var(--green); font-weight: 800; }
+      .no { color: var(--red); font-weight: 800; }
+
+      .option-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .option { position: relative; overflow: hidden; }
+      .option::after {
+        position: absolute;
+        top: 16px;
+        right: 18px;
+        color: rgb(23 35 31 / 8%);
+        content: attr(data-number);
+        font: 800 4.6rem/1 Georgia, serif;
+      }
+      .option > * { position: relative; z-index: 1; }
+      .meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 15px 0; }
+      .tag { padding: 4px 8px; border: 1px solid var(--line); border-radius: 5px; background: #f5f2e9; color: var(--muted); font-size: .74rem; font-weight: 750; }
+      .rating { display: grid; grid-template-columns: 92px 1fr; gap: 8px; margin-top: 8px; font-size: .85rem; }
+      .dots { color: var(--green); letter-spacing: 2px; }
+      ul.clean { padding-left: 19px; }
+      ul.clean li { margin: 6px 0; }
+
+      .recommendation {
+        display: grid;
+        grid-template-columns: 1.1fr .9fr;
+        gap: 0;
+        overflow: hidden;
+        border-radius: 16px;
+        background: var(--ink);
+        box-shadow: var(--shadow);
+      }
+      .recommendation > div { padding: clamp(28px, 5vw, 50px); }
+      .recommendation .main { color: white; }
+      .recommendation .main p { color: #cbd6d1; }
+      .recommendation .side { color: var(--ink); background: var(--green-soft); }
+      .step { display: grid; grid-template-columns: 34px 1fr; gap: 12px; margin: 18px 0; }
+      .step-num { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 50%; color: white; background: var(--green); font-weight: 800; }
+
+      .warning { padding: 22px; border-left: 5px solid var(--red); border-radius: 8px; background: var(--red-soft); }
+      .warning.amber { border-color: var(--amber); background: var(--amber-soft); }
+      .warning p:last-child { margin-bottom: 0; }
+      .role { min-height: 180px; }
+      .role-icon { margin-bottom: 14px; font: 700 1.7rem/1 Georgia, serif; }
+
+      .source-list { columns: 2; column-gap: 38px; padding-left: 20px; }
+      .source-list li { margin-bottom: 10px; break-inside: avoid; }
+      .repo-note { padding: 18px 20px; border-radius: 10px; background: #ebe7dc; color: var(--muted); }
+      footer { padding: 32px 0 55px; color: var(--muted); font-size: .83rem; }
+
+      @media (max-width: 820px) {
+        .hero { padding-top: 58px; }
+        .two-up, .three-up, .option-grid, .glossary, .recommendation { grid-template-columns: 1fr; }
+        .stack { grid-template-columns: 1fr; }
+        .stack-box { min-height: auto; }
+        .arrow { transform: rotate(90deg); }
+        .truth-table { display: block; overflow-x: auto; }
+        .source-list { columns: 1; }
+      }
+      @media (max-width: 520px) {
+        .wrap { width: min(100% - 24px, 1160px); }
+        .verdict { grid-template-columns: 1fr; }
+        section { padding: 56px 0; }
+        .card { padding: 20px; }
+      }
+      @media print {
+        nav { display: none; }
+        body { background: white; font-size: 11pt; }
+        .hero, section { padding: 28px 0; }
+        .card, .recommendation { box-shadow: none; break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="hero">
+      <div class="wrap">
+        <div class="eyebrow">Attraccess technology brief · 26 August 2026</div>
+        <h1>Thread + Matter,<br />without the fog.</h1>
+        <p class="lede">What they are, what they are not, and how Attraccess can support the widest useful range of locks, relays, sensors and existing devices without giving away control of access or safety.</p>
+        <div class="verdict">
+          <div class="verdict-mark">✓</div>
+          <div>
+            <h3>Short answer: yes, Attraccess can integrate both.</h3>
+            <p><strong>Start with Matter; add Thread when a chosen device needs it.</strong> Matter fits behind Attraccess’s existing resource flows as another way to command and observe hardware. Thread is optional network infrastructure, not a replacement for Matter, MQTT, Wi-Fi or Ethernet.</p>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <nav aria-label="Report sections">
+      <div class="wrap">
+        <a href="#simple">Simple explanation</a>
+        <a href="#kinds">The “different kinds”</a>
+        <a href="#fit">Fit with Attraccess</a>
+        <a href="#options">Integration options</a>
+        <a href="#recommendation">Recommendation</a>
+        <a href="#guardrails">Guardrails</a>
+        <a href="#sources">Sources</a>
+      </div>
+    </nav>
+
+    <main>
+      <section id="simple">
+        <div class="wrap">
+          <div class="eyebrow">01 · The simple model</div>
+          <h2>Matter is the language.<br />Thread is one road.</h2>
+          <p class="section-intro">They solve different layers of the same problem. A product may use both, Matter without Thread, or Thread without Matter.</p>
+          <div class="three-up">
+            <article class="card matter">
+              <div class="card-kicker">Device language</div>
+              <div class="big-word">Matter</div>
+              <p class="plain">Defines what a device is and how to securely ask it things: “unlock”, “turn off”, “report battery”, “tell me your state”.</p>
+              <p class="analogy">Like a shared language spoken by locks, plugs, sensors and controllers.</p>
+            </article>
+            <article class="card thread">
+              <div class="card-kicker">Network</div>
+              <div class="big-word">Thread</div>
+              <p class="plain">A low-power, self-healing IPv6 mesh radio network for small devices. It moves messages; it does not define what “unlock” means.</p>
+              <p class="analogy">Like a quiet local road designed for battery-powered devices.</p>
+            </article>
+            <article class="card ble">
+              <div class="card-kicker">Setup helper</div>
+              <div class="big-word">Bluetooth</div>
+              <p class="plain">Usually helps a phone or controller find and set up a new Matter device. Normal control then switches to Thread, Wi-Fi or Ethernet.</p>
+              <p class="analogy">Like the temporary introduction at the front desk, not the road used every day.</p>
+            </article>
+          </div>
+
+          <div class="stack" aria-label="Typical control path">
+            <div class="stack-box">
+              <small>Decision</small>
+              <h3>Attraccess</h3>
+              <p>Checks identity, training, membership, supervision, maintenance and policy.</p>
+            </div>
+            <div class="arrow">→</div>
+            <div class="stack-box">
+              <small>Language</small>
+              <h3>Matter command</h3>
+              <p>A secure, standard request such as lock, unlock, on, off or read state.</p>
+            </div>
+            <div class="arrow">→</div>
+            <div class="stack-box">
+              <small>Road</small>
+              <h3>Any supported IP network</h3>
+              <div class="network-row">
+                <span class="pill">Ethernet</span>
+                <span class="pill">Wi-Fi</span>
+                <span class="pill green">Thread</span>
+              </div>
+            </div>
+          </div>
+          <div class="warning amber">
+            <strong>A Thread Border Router is only a router.</strong>
+            <p>It connects the Thread mesh to Ethernet/Wi-Fi. Attraccess still needs a Matter controller somewhere to understand devices and issue commands. Some consumer hubs contain both roles, which is why the names are often blurred.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="kinds">
+        <div class="wrap">
+          <div class="eyebrow">02 · Untangling the product labels</div>
+          <h2>There are not really “kinds of Matter”.</h2>
+          <p class="section-intro">There are Matter products using different networks and playing different roles. Packaging compresses those facts into labels such as “Matter over Thread”.</p>
+          <table class="truth-table">
+            <thead>
+              <tr><th>Label you see</th><th>What it actually means</th><th>Extra infrastructure</th><th>Good fit</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Matter over Ethernet</strong></td><td>Matter messages over the wired LAN.</td><td>No radio; a Matter controller is still needed.</td><td>Fixed controllers, bridges and powered infrastructure.</td></tr>
+              <tr><td><strong>Matter over Wi-Fi</strong></td><td>Matter messages over normal Wi-Fi.</td><td>Wi-Fi access point + Matter controller.</td><td>Powered relays, plugs and appliances.</td></tr>
+              <tr><td><strong>Matter over Thread</strong></td><td>The same Matter messages over a low-power mesh.</td><td>Thread Border Router + Matter controller.</td><td>Battery locks, contact sensors and small sensors.</td></tr>
+              <tr><td><strong>Native Matter device</strong></td><td>The lock, relay or sensor speaks Matter itself.</td><td>Depends on its chosen network.</td><td>Best standard behavior and fewer translation layers.</td></tr>
+              <tr><td><strong>Matter bridge</strong></td><td>One Matter device represents non-Matter child devices.</td><td>The old Zigbee, Z-Wave or proprietary gateway remains.</td><td>Reusing existing installations.</td></tr>
+              <tr><td><strong>Matter controller / hub</strong></td><td>Software or hardware that commissions and controls devices.</td><td>Must remain online for automation.</td><td>Where Attraccess itself can participate.</td></tr>
+            </tbody>
+          </table>
+
+          <div class="two-up" style="margin-top: 20px">
+            <div class="card">
+              <h3>Can Matter work without Thread?</h3>
+              <p><span class="yes">Yes.</span> It can use Wi-Fi or Ethernet. This is the simplest place for Attraccess to start.</p>
+            </div>
+            <div class="card">
+              <h3>Can Thread work without Matter?</h3>
+              <p><span class="yes">Yes.</span> Thread can carry other application protocols. Thread alone does not guarantee Matter compatibility.</p>
+            </div>
+            <div class="card">
+              <h3>Does Bluetooth control Matter devices?</h3>
+              <p><span class="no">Usually no.</span> BLE is mainly used during commissioning. Day-to-day control moves to IP.</p>
+            </div>
+            <div class="card">
+              <h3>Do Zigbee/Z-Wave devices become Matter?</h3>
+              <p><span class="no">Not natively.</span> A bridge translates selected features and remains a dependency.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="fit">
+        <div class="wrap">
+          <div class="eyebrow">03 · Why it fits Attraccess</div>
+          <h2>Keep policy in Attraccess.<br />Use Matter as an actuator layer.</h2>
+          <p class="section-intro">Attraccess already has the difficult domain logic. Matter should widen hardware compatibility, not take over identity, access policy or machine safety.</p>
+          <div class="three-up">
+            <div class="card role">
+              <div class="role-icon">A</div>
+              <h3>Attraccess remains authority</h3>
+              <p>Users, NFC cards, introductions, retraining, supervision, maintenance, billing and audit remain here.</p>
+            </div>
+            <div class="card role">
+              <div class="role-icon">M</div>
+              <h3>Matter becomes an adapter</h3>
+              <p>Commission devices, send standard commands, subscribe to state and feed faults into resource health.</p>
+            </div>
+            <div class="card role">
+              <div class="role-icon">T</div>
+              <h3>Thread stays infrastructure</h3>
+              <p>Deploy a Border Router when selected locks or sensors require Thread. Do not make every installation require it.</p>
+            </div>
+          </div>
+
+          <table class="truth-table" style="margin-top: 24px">
+            <thead><tr><th>Attraccess capability</th><th>Matter mapping</th><th>Important limit</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Door unlock / lock / unlatch</strong></td><td>Matter Door Lock commands and reported lock state.</td><td>A consumer smart lock is not automatically a certified commercial access-control system.</td></tr>
+              <tr><td><strong>Machine power</strong></td><td>On/Off Plug-in Unit or relay endpoint.</td><td>Matter does not understand training, guards, E-stops or safe startup sequencing.</td></tr>
+              <tr><td><strong>Resource health</strong></td><td>Reachability, faults, battery and attribute/event reports.</td><td>“Command accepted” is not the same as “physical action confirmed”.</td></tr>
+              <tr><td><strong>Resource flows</strong></td><td>Command, read, wait-for-state and device-event nodes.</td><td>Unsolicited Matter event triggers need a clean plugin/flow integration seam.</td></tr>
+              <tr><td><strong>Attractap NFC reader</strong></td><td>Continues identifying the person; a flow then controls Matter hardware.</td><td>NFC card keys and Matter fabric keys must stay separate.</td></tr>
+              <tr><td><strong>Existing Zigbee2MQTT</strong></td><td>Can coexist, or selected devices can later appear through a Matter bridge.</td><td>MQTT integration may expose more vendor detail than a Matter translation.</td></tr>
+            </tbody>
+          </table>
+          <p class="repo-note" style="margin-top: 20px"><strong>Current hardware note:</strong> today’s Attractap uses ESP32-S3. It can be a candidate for Matter over Wi-Fi, but it has no IEEE 802.15.4 radio for Thread. Thread would require different silicon such as an appropriate ESP32-C6/H2 class design, or a separate radio co-processor.</p>
+        </div>
+      </section>
+
+      <section id="options">
+        <div class="wrap">
+          <div class="eyebrow">04 · The option space</div>
+          <h2>Six ways Attraccess can participate.</h2>
+          <p class="section-intro">These are additive, not mutually exclusive. Supporting “as many possibilities as possible” means a layered path, not putting every responsibility into one service.</p>
+          <div class="option-grid">
+            <article class="card option" data-number="1">
+              <div class="card-kicker">Quickest pilot</div>
+              <h3>Connect through an existing controller</h3>
+              <p>Let Home Assistant or another local Matter-capable gateway own commissioning; Attraccess talks to it through MQTT, REST or webhooks.</p>
+              <div class="meta"><span class="tag">Low effort</span><span class="tag">Wi-Fi + Thread</span><span class="tag">Legacy bridges</span></div>
+              <div class="rating"><strong>Coverage</strong><span class="dots">●●●●○</span></div>
+              <div class="rating"><strong>Attraccess control</strong><span class="dots">●●○○○</span></div>
+              <ul class="clean"><li>Best for learning with real devices.</li><li>Adds another product and API dependency.</li></ul>
+            </article>
+
+            <article class="card option" data-number="2">
+              <div class="card-kicker">Recommended foundation</div>
+              <h3>Run an Attraccess Matter controller sidecar</h3>
+              <p>A dedicated local service commissions devices, stores fabric credentials, subscribes to state and exposes a narrow API/MQTT contract to Attraccess.</p>
+              <div class="meta"><span class="tag">Medium effort</span><span class="tag">Neutral</span><span class="tag">Strong isolation</span></div>
+              <div class="rating"><strong>Coverage</strong><span class="dots">●●●●●</span></div>
+              <div class="rating"><strong>Attraccess control</strong><span class="dots">●●●●●</span></div>
+              <ul class="clean"><li><code>matter.js</code> is the closest TypeScript fit.</li><li>A sidecar isolates protocol crashes and native networking needs.</li></ul>
+            </article>
+
+            <article class="card option" data-number="3">
+              <div class="card-kicker">Tighter product UX</div>
+              <h3>Build a native backend plugin</h3>
+              <p>Place commissioning, device inventory, mappings and flow nodes directly in the Attraccess plugin system.</p>
+              <div class="meta"><span class="tag">Medium-high effort</span><span class="tag">Best UX</span><span class="tag">In-process</span></div>
+              <div class="rating"><strong>Coverage</strong><span class="dots">●●●●●</span></div>
+              <div class="rating"><strong>Isolation</strong><span class="dots">●●○○○</span></div>
+              <ul class="clean"><li>Natural fit for resource flow nodes and frontend routes.</li><li>Protocol lifecycle and secret storage become API-process concerns.</li></ul>
+            </article>
+
+            <article class="card option" data-number="4">
+              <div class="card-kicker">Add only when needed</div>
+              <h3>Bundle Thread Border Router support</h3>
+              <p>Offer OTBR as an optional deployment service with a supported 802.15.4 radio, persistent network data and clear LAN/IPv6 requirements.</p>
+              <div class="meta"><span class="tag">Infrastructure</span><span class="tag">Battery devices</span><span class="tag">Optional</span></div>
+              <div class="rating"><strong>New coverage</strong><span class="dots">●●●○○</span></div>
+              <div class="rating"><strong>Operational load</strong><span class="dots">●●●●○</span></div>
+              <ul class="clean"><li>Required for Matter-over-Thread devices.</li><li>Does nothing for Matter-over-Wi-Fi devices by itself.</li></ul>
+            </article>
+
+            <article class="card option" data-number="5">
+              <div class="card-kicker">Future hardware</div>
+              <h3>Make Attraccess hardware native Matter</h3>
+              <p>Use ESP-Matter in future lock interfaces, safe relay endpoints or sensors. Current ESP32-S3 hardware could target Wi-Fi; Thread requires 802.15.4-capable hardware.</p>
+              <div class="meta"><span class="tag">High effort</span><span class="tag">Certification</span><span class="tag">Firmware + manufacturing</span></div>
+              <div class="rating"><strong>Interoperability</strong><span class="dots">●●●●●</span></div>
+              <div class="rating"><strong>Delivery effort</strong><span class="dots">●●●●●</span></div>
+              <ul class="clean"><li>Useful when selling broadly interoperable hardware.</li><li>Requires secure provisioning, attestation, OTA and certification work.</li></ul>
+            </article>
+
+            <article class="card option" data-number="6">
+              <div class="card-kicker">Selective, later</div>
+              <h3>Expose Attraccess as a Matter bridge</h3>
+              <p>Represent approved Attraccess resources to Apple Home, Google Home, Alexa or other controllers as Matter endpoints.</p>
+              <div class="meta"><span class="tag">High risk</span><span class="tag">Multi-admin</span><span class="tag">External control</span></div>
+              <div class="rating"><strong>User reach</strong><span class="dots">●●●●●</span></div>
+              <div class="rating"><strong>Policy risk</strong><span class="dots" style="color: var(--red)">●●●●●</span></div>
+              <ul class="clean"><li>Start with read-only state and safe “off”.</li><li>Unlock or machine-start may bypass the Attraccess user journey.</li></ul>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="recommendation">
+        <div class="wrap">
+          <div class="eyebrow">05 · Recommended direction</div>
+          <h2>Broad compatibility, in controlled layers.</h2>
+          <div class="recommendation">
+            <div class="main">
+              <div class="card-kicker" style="color: #8bd4b5">Target architecture</div>
+              <h2>Attraccess-owned Matter controller, separated from core policy.</h2>
+              <p>Use a sidecar or plugin adapter as the stable boundary. Let it support Matter devices over Ethernet, Wi-Fi and Thread. Keep Thread optional. Keep MQTT and HTTP as parallel adapters for devices Matter does not cover well.</p>
+              <p><strong>Do not replace the current integrations.</strong> Matter becomes one more capability behind resource flows, alongside MQTT, Shelly, Zigbee2MQTT, HTTP and companion devices.</p>
+            </div>
+            <div class="side">
+              <h3>A sensible sequence</h3>
+              <div class="step"><span class="step-num">1</span><div><strong>Prove the behavior</strong><br />Pilot one Wi-Fi/Ethernet Matter relay and one lock through an external controller.</div></div>
+              <div class="step"><span class="step-num">2</span><div><strong>Own the controller</strong><br />Evaluate a dedicated <code>matter.js</code> sidecar and normalized Attraccess contract.</div></div>
+              <div class="step"><span class="step-num">3</span><div><strong>Add Thread</strong><br />Package OTBR only after choosing Thread devices and radio hardware.</div></div>
+              <div class="step"><span class="step-num">4</span><div><strong>Deepen the UX</strong><br />Add commissioning, device mapping, state and health to a plugin UI.</div></div>
+              <div class="step"><span class="step-num">5</span><div><strong>Expose selectively</strong><br />Consider a Matter bridge for read-only/safe actions after multi-admin policy is explicit.</div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="guardrails">
+        <div class="wrap">
+          <div class="eyebrow">06 · Non-negotiable boundaries</div>
+          <h2>Matter is secure transport,<br />not the whole safety system.</h2>
+          <div class="two-up">
+            <div class="warning">
+              <h3>Never let generic Matter “On” equal permission to start a hazardous machine.</h3>
+              <p>Attraccess must re-check authorization, supervision, maintenance and interlocks. Emergency stops and hardwired safety must work independently of Matter, Thread, Wi-Fi and the server.</p>
+            </div>
+            <div class="warning">
+              <h3>Multi-admin creates additional legitimate control paths.</h3>
+              <p>A device shared with Apple, Google or Alexa can receive commands outside Attraccess. Shared state is physical state: an unlock from another fabric still unlocks the door.</p>
+            </div>
+            <div class="warning amber">
+              <h3>Consumer lock compatibility is not building-code approval.</h3>
+              <p>Validate emergency egress, offline operation, fire rules, audit needs, battery behavior, tamper response and local access-control requirements separately.</p>
+            </div>
+            <div class="warning amber">
+              <h3>Fabric credentials are high-value production secrets.</h3>
+              <p>Encrypt controller storage, back it up safely, validate device attestation, plan decommissioning, and keep NFC credentials entirely separate.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="wrap">
+          <div class="eyebrow">07 · Pocket glossary</div>
+          <h2>The six terms worth remembering.</h2>
+          <div class="glossary">
+            <div class="card"><h3>Controller</h3><p>Software that reads and commands commissioned Matter devices.</p></div>
+            <div class="card"><h3>Commissioner</h3><p>The trusted role that adds a new device and gives it operational credentials.</p></div>
+            <div class="card"><h3>Fabric</h3><p>One secure Matter administration domain. A device can belong to several.</p></div>
+            <div class="card"><h3>Border Router</h3><p>The IP router between a Thread mesh and Ethernet/Wi-Fi.</p></div>
+            <div class="card"><h3>Bridge</h3><p>A translator representing non-Matter devices as Matter endpoints.</p></div>
+            <div class="card"><h3>Endpoint / cluster</h3><p>A device part and its standard capabilities, such as Door Lock or On/Off.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="sources">
+        <div class="wrap">
+          <div class="eyebrow">08 · Sources and scope</div>
+          <h2>Primary references.</h2>
+          <p class="section-intro">This is an options report, not an implementation specification. Product and ecosystem support changes over time; verify exact device types and Matter versions during selection.</p>
+          <ul class="source-list">
+            <li><a href="https://csa-iot.org/all-solutions/matter/">Connectivity Standards Alliance: Matter overview</a></li>
+            <li><a href="https://csa-iot.org/all-solutions/matter/matter-faq/">Connectivity Standards Alliance: Matter FAQ</a></li>
+            <li><a href="https://threadgroup.org/what-is-thread/overview">Thread Group: What is Thread?</a></li>
+            <li><a href="https://openthread.io/guides/border-router">OpenThread: Border Router roles</a></li>
+            <li><a href="https://developers.home.google.com/matter/primer">Google: Matter primer</a></li>
+            <li><a href="https://developers.home.google.com/matter/primer/thread-and-ipv6">Google: Thread and IPv6</a></li>
+            <li><a href="https://developers.home.google.com/matter/primer/fabric">Google: fabrics and multi-admin</a></li>
+            <li><a href="https://developers.home.google.com/matter/supported-devices">Google: device and bridge support</a></li>
+            <li><a href="https://project-chip.github.io/connectedhomeip-doc/ids_and_codes/spec_device_types.html">Matter SDK: standard device types</a></li>
+            <li><a href="https://project-chip.github.io/connectedhomeip-doc/examples/bridge-app/linux/README.html">Matter SDK: Linux bridge example</a></li>
+            <li><a href="https://github.com/matter-js/matter.js">matter.js: TypeScript Matter stack</a></li>
+            <li><a href="https://docs.espressif.com/projects/esp-matter/en/latest/esp32/">Espressif: ESP-Matter</a></li>
+          </ul>
+          <p class="repo-note"><strong>Attraccess evidence reviewed:</strong> resource types and flows, door and usage services, MQTT transport, plugin SDK and custom flow nodes, Attractap ESP32-S3 firmware, Shelly discovery, Zigbee2MQTT deployment, companion devices and current Docker/Balena topology. No Matter, OpenThread or ESP-Matter implementation currently exists in the repository.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">Prepared for Attraccess · Architecture/options only · No implementation included</div>
+    </footer>
+  </body>
+</html>
