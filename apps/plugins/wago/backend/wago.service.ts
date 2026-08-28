@@ -441,12 +441,11 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
         credentialDelivered: false,
       };
     } catch (error) {
-      await this.restoreUnclaimedController({
+      await this.restoreUnclaimedControllerWhileLocked({
         controller,
         mqttServerId: selectedServerId,
         identity,
         previousController,
-        credentialDelivered: false,
       });
       throw error;
     }
@@ -462,14 +461,34 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     mqttServerId: number;
     identity: string;
     previousController: Pick<WagoController, 'trustState' | 'name' | 'mqttServerId' | 'updatedAt'>;
-    credentialDelivered: boolean;
+  }): Promise<void> {
+    await this.withClaimConfigurationLock(() =>
+      this.restoreUnclaimedControllerWhileLocked({
+        controller,
+        mqttServerId,
+        identity,
+        previousController,
+      }),
+    );
+  }
+
+  private async restoreUnclaimedControllerWhileLocked({
+    controller,
+    mqttServerId,
+    identity,
+    previousController,
+  }: {
+    controller: WagoController;
+    mqttServerId: number;
+    identity: string;
+    previousController: Pick<WagoController, 'trustState' | 'name' | 'mqttServerId' | 'updatedAt'>;
   }): Promise<void> {
     await this.context
       .getMqttCredentialProvisioning()
       .revoke({ mqttServerId, identity, username: identity, vhost: '/' })
       .catch(() => undefined);
     Object.assign(controller, previousController);
-    await this.withClaimConfigurationLock(() => this.controllers.save(controller)).catch((rollbackError) => {
+    await this.controllers.save(controller).catch((rollbackError) => {
       this.context.logger.warn(
         `Could not restore WAGO controller ${controller.id} after claim failure: ${String(rollbackError)}`,
       );

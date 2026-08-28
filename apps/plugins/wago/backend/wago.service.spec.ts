@@ -491,6 +491,36 @@ describe('WagoService', () => {
     );
   });
 
+  it('releases the claim configuration lock after preparation fails', async () => {
+    const enrollment = {
+      id: 3,
+      mqttServerId: 2,
+      hardwareId: 'cc100-01',
+      secretHash: 'secret-hash',
+      identity: 'wago-enrollment-test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      revokedAt: null,
+      consumedAt: null,
+    };
+    const candidate = { ...controller(), fingerprint: 'fingerprint' };
+    const { service, context, controllerRepository, enrollmentRepository } = createService([candidate], [enrollment]);
+    const claimError = new Error('could not persist claimed controller');
+    (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = jest.fn().mockResolvedValue({});
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({
+      provision: jest.fn().mockResolvedValue({ username: 'wago-controller-cc100-01', password: 'secret' }),
+      revoke: jest.fn().mockResolvedValue(undefined),
+    });
+    controllerRepository.save.mockRejectedValueOnce(claimError);
+    enrollmentRepository.findOneBy.mockResolvedValue(enrollment);
+
+    await expect(service.claim(candidate.id, 'Controller', 'fingerprint')).rejects.toBe(claimError);
+    const withClaimConfigurationLock = (
+      Reflect.get(service, 'withClaimConfigurationLock') as <T>(operation: () => Promise<T>) => Promise<T>
+    ).bind(service);
+    await expect(withClaimConfigurationLock(async () => 'available')).resolves.toBe('available');
+  });
+
   it('does not treat revoked enrollments as active', () => {
     const { service } = createService();
     const isActiveEnrollment = Reflect.get(service, 'isActiveEnrollment') as (item: WagoEnrollment) => boolean;
