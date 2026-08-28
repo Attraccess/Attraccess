@@ -1,6 +1,9 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
   Chip,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   Dropdown,
   DropdownItem,
   DropdownMenu,
@@ -30,6 +33,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { SettingsSection } from '../../components/SettingsSection';
 import { Button } from '../../../../components/button';
 import { StandardModal } from '../../../../components/standardModal';
+import { StandardDrawer } from '../../../../components/standardDrawer';
 import { EmptyState } from '../../../../components/emptyState';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { UploadPluginModal } from '../../../plugins/UploadPluginModal';
@@ -788,98 +792,92 @@ export function PluginsSection() {
         </StandardModal>
       </div>
 
-      <StandardModal
+      <StandardDrawer
         isOpen={marketplacePlugin !== null}
         onOpenChange={(open) => !open && setMarketplacePlugin(null)}
-        size="lg"
+        contentProps={{ placement: 'right' }}
       >
-        {({ close }) => (
-          <>
-            <ModalHeader>
-              <ModalHeading>
-                {t('marketplace.detailTitle', {
-                  pluginName: marketplacePlugin?.displayName ?? marketplacePlugin?.name ?? '',
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">
+            {t('marketplace.detailTitle', {
+              pluginName: marketplacePlugin?.displayName ?? marketplacePlugin?.name ?? '',
+            })}
+          </h2>
+        </DrawerHeader>
+        <DrawerBody>
+          {marketplacePlugin ? (
+            <div className="flex flex-col gap-3">
+              <PluginClassificationBadge classification={marketplacePlugin.classification} />
+              {marketplacePlugin.description ? <p>{marketplacePlugin.description}</p> : null}
+              <p>{t('marketplace.source', { registry: marketplacePlugin.registry.url })}</p>
+              <p>{t('marketplace.version', { version: marketplacePlugin.version ?? '-' })}</p>
+              <p>{t('marketplace.publisher', { publisher: marketplacePlugin.publisher ?? '-' })}</p>
+              <p>{t('marketplace.hostCompatibility', { range: marketplacePlugin.hostRange ?? '-' })}</p>
+              <p>
+                {t('marketplace.sdkCompatibility', {
+                  backend: marketplacePlugin.sdkCompatibility?.backend ?? '-',
+                  frontend: marketplacePlugin.sdkCompatibility?.frontend ?? '-',
                 })}
-              </ModalHeading>
-            </ModalHeader>
-            <ModalBody>
-              {marketplacePlugin ? (
-                <div className="flex flex-col gap-3">
-                  <PluginClassificationBadge classification={marketplacePlugin.classification} />
-                  {marketplacePlugin.description ? <p>{marketplacePlugin.description}</p> : null}
-                  <p>{t('marketplace.source', { registry: marketplacePlugin.registry.url })}</p>
-                  <p>{t('marketplace.version', { version: marketplacePlugin.version ?? '-' })}</p>
-                  <p>{t('marketplace.publisher', { publisher: marketplacePlugin.publisher ?? '-' })}</p>
-                  <p>{t('marketplace.hostCompatibility', { range: marketplacePlugin.hostRange ?? '-' })}</p>
-                  <p>
-                    {t('marketplace.sdkCompatibility', {
-                      backend: marketplacePlugin.sdkCompatibility?.backend ?? '-',
-                      frontend: marketplacePlugin.sdkCompatibility?.frontend ?? '-',
-                    })}
-                  </p>
-                  <p>{t('marketplace.license', { license: marketplacePlugin.license ?? '-' })}</p>
-                  {marketplacePlugin.repository ? (
-                    <a
-                      className="text-primary underline"
-                      href={marketplacePlugin.repository}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {t('marketplace.repository')}
-                    </a>
-                  ) : null}
-                  {marketplacePlugin.homepage ? (
-                    <a
-                      className="text-primary underline"
-                      href={marketplacePlugin.homepage}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {t('marketplace.homepage')}
-                    </a>
-                  ) : null}
-                  <p>{t('marketplace.integrity', { integrity: marketplacePlugin.integrity ?? '-' })}</p>
-                  {marketplacePlugin.provenance ? (
-                    <p>{t('marketplace.provenance', { provenance: marketplacePlugin.provenance })}</p>
-                  ) : null}
-                  {marketplacePlugin.deprecated ? <p className="text-warning">{t('marketplace.deprecated')}</p> : null}
-                  <p>
-                    {t('marketplace.permissions', {
-                      permissions: marketplacePlugin.permissions.join(', ') || t('noPermissions'),
-                    })}
-                  </p>
-                  {marketplacePlugin.incompatibilityReason ? (
-                    <p className="text-danger">{marketplacePlugin.incompatibilityReason}</p>
-                  ) : null}
-                  <p className="text-warning text-sm">{t('marketplace.restartWarning')}</p>
-                </div>
+              </p>
+              <p>{t('marketplace.license', { license: marketplacePlugin.license ?? '-' })}</p>
+              {marketplacePlugin.repository ? (
+                <a
+                  className="text-primary underline"
+                  href={marketplacePlugin.repository}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t('marketplace.repository')}
+                </a>
               ) : null}
-            </ModalBody>
-            <ModalFooter>
-              <Button variant="ghost" onPress={close}>
-                {t('marketplace.cancel')}
-              </Button>
-              <Button
-                variant="primary"
-                isDisabled={!marketplacePlugin?.installable || npmPluginNames.has(marketplacePlugin?.name ?? '')}
-                onPress={() => {
-                  if (marketplacePlugin) {
-                    setInstallApproved(false);
-                    setPluginToInstall(marketplacePlugin);
-                    close();
-                  }
-                }}
-              >
-                {npmPluginNames.has(marketplacePlugin?.name ?? '')
-                  ? t('marketplace.installed')
-                  : t('marketplace.install')}
-              </Button>
-            </ModalFooter>
-          </>
-        )}
-      </StandardModal>
+              {marketplacePlugin.homepage ? (
+                <a
+                  className="text-primary underline"
+                  href={marketplacePlugin.homepage}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t('marketplace.homepage')}
+                </a>
+              ) : null}
+              <p>{t('marketplace.integrity', { integrity: marketplacePlugin.integrity ?? '-' })}</p>
+              {marketplacePlugin.provenance ? (
+                <p>{t('marketplace.provenance', { provenance: marketplacePlugin.provenance })}</p>
+              ) : null}
+              {marketplacePlugin.deprecated ? <p className="text-warning">{t('marketplace.deprecated')}</p> : null}
+              <p>
+                {t('marketplace.permissions', {
+                  permissions: marketplacePlugin.permissions.join(', ') || t('noPermissions'),
+                })}
+              </p>
+              {marketplacePlugin.incompatibilityReason ? (
+                <p className="text-danger">{marketplacePlugin.incompatibilityReason}</p>
+              ) : null}
+              <p className="text-warning text-sm">{t('marketplace.restartWarning')}</p>
+            </div>
+          ) : null}
+        </DrawerBody>
+        <DrawerFooter>
+          <Button variant="ghost" onPress={() => setMarketplacePlugin(null)}>
+            {t('marketplace.cancel')}
+          </Button>
+          <Button
+            variant="primary"
+            isDisabled={!marketplacePlugin?.installable || npmPluginNames.has(marketplacePlugin?.name ?? '')}
+            onPress={() => {
+              if (marketplacePlugin) {
+                setInstallApproved(false);
+                setPluginToInstall(marketplacePlugin);
+                setMarketplacePlugin(null);
+              }
+            }}
+          >
+            {npmPluginNames.has(marketplacePlugin?.name ?? '') ? t('marketplace.installed') : t('marketplace.install')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
 
-      <StandardModal
+      <StandardDrawer
         isOpen={pluginToInstall !== null}
         onOpenChange={(open) => {
           if (!open && !isInstalling) {
@@ -887,57 +885,60 @@ export function PluginsSection() {
             setInstallApproved(false);
           }
         }}
-        size="sm"
+        contentProps={{ placement: 'right' }}
       >
-        {({ close }) => (
-          <>
-            <ModalHeader>
-              <ModalHeading>
-                {t('marketplace.installTitle', {
-                  pluginName: pluginToInstall?.displayName ?? pluginToInstall?.name ?? '',
+        <DrawerHeader>
+          <h2 className="text-lg font-semibold">
+            {t('marketplace.installTitle', {
+              pluginName: pluginToInstall?.displayName ?? pluginToInstall?.name ?? '',
+            })}
+          </h2>
+        </DrawerHeader>
+        <DrawerBody>
+          {pluginToInstall ? (
+            <div className="flex flex-col gap-3">
+              <PluginClassificationBadge classification={pluginToInstall.classification} />
+              <p>{t('marketplace.installDescription')}</p>
+              <p>{t('marketplace.source', { registry: pluginToInstall.registry.url })}</p>
+              <p>{t('marketplace.version', { version: pluginToInstall.version ?? '-' })}</p>
+              <p>
+                {t('marketplace.permissions', {
+                  permissions: pluginToInstall.permissions.join(', ') || t('noPermissions'),
                 })}
-              </ModalHeading>
-            </ModalHeader>
-            <ModalBody>
-              {pluginToInstall ? (
-                <div className="flex flex-col gap-3">
-                  <PluginClassificationBadge classification={pluginToInstall.classification} />
-                  <p>{t('marketplace.installDescription')}</p>
-                  <p>{t('marketplace.source', { registry: pluginToInstall.registry.url })}</p>
-                  <p>{t('marketplace.version', { version: pluginToInstall.version ?? '-' })}</p>
-                  <p>
-                    {t('marketplace.permissions', {
-                      permissions: pluginToInstall.permissions.join(', ') || t('noPermissions'),
-                    })}
-                  </p>
-                  <label className="flex gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={installApproved}
-                      onChange={(event) => setInstallApproved(event.target.checked)}
-                    />
-                    {t('marketplace.installApproval')}
-                  </label>
-                  <p className="text-warning text-sm">{t('marketplace.restartWarning')}</p>
-                </div>
-              ) : null}
-            </ModalBody>
-            <ModalFooter>
-              <Button variant="ghost" onPress={close} isDisabled={isInstalling}>
-                {t('marketplace.cancel')}
-              </Button>
-              <Button
-                variant="primary"
-                onPress={() => void installMarketplacePlugin()}
-                isPending={isInstalling}
-                isDisabled={!installApproved}
-              >
-                {t('marketplace.confirmInstall')}
-              </Button>
-            </ModalFooter>
-          </>
-        )}
-      </StandardModal>
+              </p>
+              <label className="flex gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={installApproved}
+                  onChange={(event) => setInstallApproved(event.target.checked)}
+                />
+                {t('marketplace.installApproval')}
+              </label>
+              <p className="text-warning text-sm">{t('marketplace.restartWarning')}</p>
+            </div>
+          ) : null}
+        </DrawerBody>
+        <DrawerFooter>
+          <Button
+            variant="ghost"
+            onPress={() => {
+              setPluginToInstall(null);
+              setInstallApproved(false);
+            }}
+            isDisabled={isInstalling}
+          >
+            {t('marketplace.cancel')}
+          </Button>
+          <Button
+            variant="primary"
+            onPress={() => void installMarketplacePlugin()}
+            isPending={isInstalling}
+            isDisabled={!installApproved}
+          >
+            {t('marketplace.confirmInstall')}
+          </Button>
+        </DrawerFooter>
+      </StandardDrawer>
 
       <StandardModal
         isOpen={pluginToDelete !== null}

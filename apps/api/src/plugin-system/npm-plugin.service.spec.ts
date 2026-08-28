@@ -404,6 +404,22 @@ describe('NpmPluginService', () => {
     expect(settings.setPlainSetting).not.toHaveBeenCalled();
   });
 
+  it('returns registry metadata without its stored token', async () => {
+    const settings: SettingsMock = {
+      getPlainSetting: jest
+        .fn()
+        .mockResolvedValue(JSON.stringify([{ id: 'private', name: 'Private', url: 'https://registry.example.com' }])),
+      getSecretSetting: jest.fn().mockResolvedValue({ value: 'secret', configured: true }),
+      setPlainSetting: jest.fn(),
+      setSecretSetting: jest.fn(),
+    };
+    const service = new NpmPluginService(settings as unknown as never);
+
+    await expect(service.listRegistries()).resolves.toEqual([
+      { id: 'private', name: 'Private', url: 'https://registry.example.com', tokenConfigured: true },
+    ]);
+  });
+
   it('rejects registry additions beyond the configured registry limit', async () => {
     const settings: SettingsMock = {
       getPlainSetting: jest.fn().mockResolvedValue(
