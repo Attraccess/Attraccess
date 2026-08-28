@@ -146,7 +146,8 @@ function addClassTokens(node: any, classes: Set<string>): void {
 }
 
 function isLiteralClassExpression(node: any): boolean {
-  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateExpression(node)) return true;
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateExpression(node))
+    return true;
   if (ts.isParenthesizedExpression(node)) return isLiteralClassExpression(node.expression);
   if (ts.isConditionalExpression(node))
     return isLiteralClassExpression(node.whenTrue) && isLiteralClassExpression(node.whenFalse);
@@ -155,53 +156,46 @@ function isLiteralClassExpression(node: any): boolean {
   return false;
 }
 
-function localConstInitializer(identifier: any): any {
-  for (let scope = identifier.parent; scope; scope = scope.parent) {
-    if (!ts.isSourceFile(scope) && !ts.isBlock(scope) && !ts.isModuleBlock(scope)) continue;
-    for (const statement of scope.statements) {
-      if (!ts.isVariableStatement(statement)) continue;
-      const declarations = statement.declarationList;
-      if ((declarations.flags & ts.NodeFlags.Const) === 0) continue;
-      for (const declaration of declarations.declarations) {
-        if (
-          ts.isIdentifier(declaration.name) &&
-          declaration.name.text === identifier.text &&
-          declaration.initializer &&
-          isLiteralClassExpression(declaration.initializer)
-        )
-          return declaration.initializer;
-      }
-    }
-  }
+function localConstInitializer(identifier: any, checker: any): any {
+  const declaration = checker.getSymbolAtLocation(identifier)?.valueDeclaration;
+  if (
+    declaration &&
+    ts.isVariableDeclaration(declaration) &&
+    ts.isVariableDeclarationList(declaration.parent) &&
+    (declaration.parent.flags & ts.NodeFlags.Const) !== 0 &&
+    declaration.initializer &&
+    isLiteralClassExpression(declaration.initializer)
+  )
+    return declaration.initializer;
 }
 
-function classExpression(node: any, classes: Set<string>, seen = new Set<any>()): void {
+function classExpression(node: any, classes: Set<string>, checker: any, seen = new Set<any>()): void {
   if (seen.has(node)) return;
   seen.add(node);
   if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return addClassTokens(node, classes);
   if (ts.isIdentifier(node)) {
-    const initializer = localConstInitializer(node);
-    if (initializer) return classExpression(initializer, classes, seen);
+    const initializer = localConstInitializer(node, checker);
+    if (initializer) return classExpression(initializer, classes, checker, seen);
     return;
   }
   if (ts.isTemplateExpression(node)) {
     addClassTokens(node.head, classes);
     for (const span of node.templateSpans) {
-      classExpression(span.expression, classes, seen);
+      classExpression(span.expression, classes, checker, seen);
       addClassTokens(span.literal, classes);
     }
     return;
   }
-  if (ts.isParenthesizedExpression(node)) return classExpression(node.expression, classes, seen);
+  if (ts.isParenthesizedExpression(node)) return classExpression(node.expression, classes, checker, seen);
   if (ts.isConditionalExpression(node)) {
-    classExpression(node.whenTrue, classes, seen);
-    return classExpression(node.whenFalse, classes, seen);
+    classExpression(node.whenTrue, classes, checker, seen);
+    return classExpression(node.whenFalse, classes, checker, seen);
   }
   if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
-    return classExpression(node.right, classes, seen);
+    return classExpression(node.right, classes, checker, seen);
   }
   if (ts.isArrayLiteralExpression(node)) {
-    for (const element of node.elements) classExpression(element, classes, seen);
+    for (const element of node.elements) classExpression(element, classes, checker, seen);
     return;
   }
   if (ts.isObjectLiteralExpression(node)) {
@@ -218,32 +212,35 @@ function classExpression(node: any, classes: Set<string>, seen = new Set<any>())
     ts.isIdentifier(node.expression) &&
     ['cn', 'clsx', 'twMerge'].includes(node.expression.text)
   ) {
-    for (const argument of node.arguments) classExpression(argument, classes, seen);
+    for (const argument of node.arguments) classExpression(argument, classes, checker, seen);
   }
 }
 
 function classesInSource(file: string, content: string): Set<string> {
-  const source = ts.createSourceFile(
-    file,
-    content,
-    ts.ScriptTarget.ESNext,
-    true,
-    ts.ScriptKind.TSX,
-  );
+  const host = ts.createCompilerHost({ allowJs: true, jsx: ts.JsxEmit.Preserve });
+  const getSourceFile = host.getSourceFile.bind(host);
+  host.getSourceFile = (name: string, languageVersion: any) =>
+    name === file
+      ? ts.createSourceFile(file, content, languageVersion, true, ts.ScriptKind.TSX)
+      : getSourceFile(name, languageVersion);
+  const program = ts.createProgram([file], { allowJs: true, jsx: ts.JsxEmit.Preserve }, host);
+  const source = program.getSourceFile(file);
+  if (!source) throw new Error(`Cannot parse ${file}`);
+  const checker = program.getTypeChecker();
   const classes = new Set<string>();
 
   const visit = (node: any): void => {
     if (ts.isJsxAttribute(node) && node.name.text === 'className' && node.initializer) {
       if (ts.isStringLiteral(node.initializer)) addClassTokens(node.initializer, classes);
       else if (ts.isJsxExpression(node.initializer) && node.initializer.expression)
-        classExpression(node.initializer.expression, classes);
+        classExpression(node.initializer.expression, classes, checker);
     }
     if (
       ts.isCallExpression(node) &&
       ts.isIdentifier(node.expression) &&
       ['cn', 'clsx', 'twMerge'].includes(node.expression.text)
     ) {
-      for (const argument of node.arguments) classExpression(argument, classes);
+      for (const argument of node.arguments) classExpression(argument, classes, checker);
     }
     node.forEachChild(visit);
   };
@@ -328,6 +325,10 @@ describe('HeroUI utility classes emit CSS (ATT-858)', () => {
           return <div className={sharedClass} />;
         }
         const sharedClass = 'text-danger';
+        const shadowedClass = 'shadowed-class';
+        function shadowed(shadowedClass: string) {
+          return <div className={shadowedClass} />;
+        }
       `,
     );
 
@@ -340,6 +341,7 @@ describe('HeroUI utility classes emit CSS (ATT-858)', () => {
       'hidden',
       'invisible',
     ]);
+    expect(classes).not.toContain('shadowed-class');
   });
 
   it('accepts valid tokens and variants while rejecting removed v2 tokens', async () => {
