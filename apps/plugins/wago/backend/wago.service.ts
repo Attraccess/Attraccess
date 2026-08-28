@@ -36,6 +36,7 @@ import { WagoConfigurationRevision } from './wago-configuration-revision.entity'
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 const STALE_AFTER_MS = 90_000;
+const MAX_PENDING_CONFIGURATION_REPORTS = 100;
 const ENROLLMENT_RETRY_MS = 60_000;
 
 type WagoControllerSummary = Omit<WagoController, 'fingerprint' | 'pairingCodeHash'> & {
@@ -727,8 +728,10 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     if (queue.processing) {
       // Preserve acknowledgements for distinct immutable revisions in arrival order.
       const revision = this.configurationReportRevision(payload);
-      if (revision === null) queue.pending.set(Number.NaN, payload);
-      else queue.pending.set(revision, payload);
+      const key = revision ?? Number.NaN;
+      if (queue.pending.has(key) || queue.pending.size < MAX_PENDING_CONFIGURATION_REPORTS)
+        queue.pending.set(key, payload);
+      else this.context.logger.warn(`Dropping excess WAGO configuration report for controller ${controllerId}`);
       return;
     }
     queue.processing = true;
@@ -762,7 +765,9 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   private configurationReportRevision(payload: Buffer): number | null {
     try {
       const report = JSON.parse(payload.toString('utf8')) as { revision?: unknown };
-      return Number.isSafeInteger(report.revision) && (report.revision as number) >= 1 ? (report.revision as number) : null;
+      return Number.isSafeInteger(report.revision) && (report.revision as number) >= 1
+        ? (report.revision as number)
+        : null;
     } catch {
       return null;
     }

@@ -424,6 +424,48 @@ describe('WagoService', () => {
     expect(processed).toEqual([first, second, third]);
   });
 
+  it('bounds queued reports for a busy controller while retaining replacements', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, context } = createService([claimed]);
+    let releaseFirst!: () => void;
+    const processed: Buffer[] = [];
+    jest.spyOn(service as never, 'onConfigurationReported').mockImplementation((_controllerId, payload) => {
+      processed.push(payload);
+      return processed.length === 1 ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve();
+    });
+
+    await service.onModuleInit();
+
+    const reportSubscription = (context.mqtt.subscribe as jest.Mock).mock.calls.find(([, topic]) =>
+      topic.endsWith('/configuration/reported'),
+    );
+    const handler = reportSubscription?.[2] as (message: { topic: string; payload: Buffer }) => void;
+    handler({
+      topic: 'attraccess/wago/v1/controllers/cc100-01/configuration/reported',
+      payload: Buffer.from('{"revision":1}'),
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    for (let revision = 2; revision <= 101; revision += 1)
+      handler({
+        topic: 'attraccess/wago/v1/controllers/cc100-01/configuration/reported',
+        payload: Buffer.from(`{"revision":${revision}}`),
+      });
+    const replacement = Buffer.from('{"revision":2,"replacement":true}');
+    handler({ topic: 'attraccess/wago/v1/controllers/cc100-01/configuration/reported', payload: replacement });
+    handler({
+      topic: 'attraccess/wago/v1/controllers/cc100-01/configuration/reported',
+      payload: Buffer.from('{"revision":102}'),
+    });
+
+    releaseFirst();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(processed).toHaveLength(101);
+    expect(processed).toContain(replacement);
+    expect(processed).not.toContainEqual(Buffer.from('{"revision":102}'));
+    expect(context.logger.warn).toHaveBeenCalledWith('Dropping excess WAGO configuration report for controller 1');
+  });
+
   it('returns bounded revision metadata pages without snapshots', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
     const { service, revisionRepository } = createService([claimed]);
