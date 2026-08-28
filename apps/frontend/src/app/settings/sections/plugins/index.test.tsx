@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PluginsSection } from './index';
@@ -308,9 +308,11 @@ describe('PluginsSection', () => {
     expect(hoisted.successToast).not.toHaveBeenCalledWith(expect.objectContaining({ title: 'Registry added.' }));
   });
 
-  it('keeps the latest registry test pending when an earlier test completes', async () => {
+  it('keeps a newer test for the same registry pending when an earlier test completes', async () => {
     const firstTest = deferred<{ ok: boolean }>();
     const secondTest = deferred<{ ok: boolean }>();
+    const latestFirstTest = deferred<{ ok: boolean }>();
+    let firstTestRequests = 0;
     vi.stubGlobal(
       'fetch',
       vi.fn((input: { url?: string } | string, init?: { method?: string }) => {
@@ -323,7 +325,10 @@ describe('PluginsSection', () => {
               { id: 'second', name: 'Second', url: 'https://second.example.test', tokenConfigured: false },
             ],
           });
-        if (request.url?.endsWith('/registries/first/test')) return firstTest.promise;
+        if (request.url?.endsWith('/registries/first/test')) {
+          firstTestRequests += 1;
+          return firstTestRequests === 1 ? firstTest.promise : latestFirstTest.promise;
+        }
         if (request.url?.endsWith('/registries/second/test')) return secondTest.promise;
         if (request.url?.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
         return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
@@ -339,11 +344,16 @@ describe('PluginsSection', () => {
     await user.click(testButtons[1]);
     expect(testButtons[1]).toHaveAttribute('aria-disabled', 'true');
 
-    firstTest.resolve({ ok: true });
-    await waitFor(() => expect(testButtons[1]).toHaveAttribute('aria-disabled', 'true'));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Test' })[0]);
+    await waitFor(() => expect(firstTestRequests).toBe(2));
 
     secondTest.resolve({ ok: true });
-    await waitFor(() => expect(testButtons[1]).not.toHaveAttribute('aria-disabled', 'true'));
+    firstTest.resolve({ ok: true });
+
+    latestFirstTest.resolve({ ok: true });
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: 'Test' })[0]).not.toHaveAttribute('aria-disabled', 'true'),
+    );
   });
 
   it('renders community for an installed plugin until its npm classification is available', () => {

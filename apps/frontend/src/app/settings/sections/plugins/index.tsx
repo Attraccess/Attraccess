@@ -152,6 +152,7 @@ export function PluginsSection() {
   const marketplaceSearchRequest = useRef(0);
   const marketplaceDetailRequest = useRef(0);
   const registryRequest = useRef(0);
+  const latestRegistryTest = useRef<symbol | null>(null);
   const isLoadingMarketplace = isLoadingMarketplaceSearch || isLoadingMarketplaceDetail;
 
   useEffect(() => {
@@ -257,6 +258,8 @@ export function PluginsSection() {
   };
 
   const testRegistry = async (registryId: string) => {
+    const request = Symbol(registryId);
+    latestRegistryTest.current = request;
     setTestingRegistryId(registryId);
     try {
       const response = await fetch(`${getBaseUrl()}/api/plugins/registries/${encodeURIComponent(registryId)}/test`, {
@@ -268,7 +271,10 @@ export function PluginsSection() {
     } catch {
       toast.error({ title: t('marketplace.registryTestError') });
     } finally {
-      setTestingRegistryId((current) => (current === registryId ? null : current));
+      if (latestRegistryTest.current === request) {
+        latestRegistryTest.current = null;
+        setTestingRegistryId(null);
+      }
     }
   };
 
