@@ -1,20 +1,15 @@
 import { Body, Controller, Get, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk';
 import { TwoFactorService } from './two-factor.service';
-import {
-  TwoFactorCodeDto,
-  TwoFactorPolicyDto,
-  TwoFactorSetupResponseDto,
-  TwoFactorStatusDto,
-} from './two-factor.dto';
+import { TwoFactorCodeDto, TwoFactorPolicyDto, TwoFactorSetupResponseDto, TwoFactorStatusDto } from './two-factor.dto';
 
 @ApiTags('Two-Factor Authentication')
 @Controller('/auth/two-factor')
 export class TwoFactorController {
   constructor(private readonly twoFactorService: TwoFactorService) {}
 
-  @Auth()
+  @SessionAuth()
   @Get()
   @ApiOperation({ summary: 'Get 2FA status for the current user', operationId: 'getTwoFactorStatus' })
   @ApiResponse({
@@ -26,7 +21,7 @@ export class TwoFactorController {
     return this.twoFactorService.getStatus(request.user);
   }
 
-  @Auth()
+  @SessionAuth()
   @Post('setup')
   @ApiOperation({ summary: 'Start 2FA setup for the current user', operationId: 'setupTwoFactor' })
   @ApiResponse({
@@ -38,7 +33,7 @@ export class TwoFactorController {
     return this.twoFactorService.createSetup(request.user);
   }
 
-  @Auth()
+  @SessionAuth()
   @Post('verify')
   @ApiOperation({ summary: 'Verify and enable 2FA for the current user', operationId: 'verifyTwoFactor' })
   @ApiResponse({
@@ -51,7 +46,7 @@ export class TwoFactorController {
     return this.twoFactorService.getStatus(request.user);
   }
 
-  @Auth()
+  @SessionAuth()
   @Post('disable')
   @ApiOperation({ summary: 'Disable 2FA for the current user', operationId: 'disableTwoFactor' })
   @ApiResponse({
@@ -62,7 +57,7 @@ export class TwoFactorController {
     await this.twoFactorService.disable(request.user, body.code);
   }
 
-  @Auth('users.update')
+  @SessionAuth('users.update')
   @Get('policy')
   @ApiOperation({ summary: 'Get the configured 2FA policy', operationId: 'getTwoFactorPolicy' })
   @ApiResponse({
@@ -75,7 +70,7 @@ export class TwoFactorController {
     return { policy };
   }
 
-  @Auth('users.update')
+  @SessionAuth('users.update')
   @Post('policy')
   @ApiOperation({ summary: 'Set the configured 2FA policy', operationId: 'setTwoFactorPolicy' })
   @ApiResponse({

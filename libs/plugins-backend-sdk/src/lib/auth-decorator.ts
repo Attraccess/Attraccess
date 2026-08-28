@@ -39,6 +39,15 @@ export function AuthAny(...permissions: SystemPermission[]) {
   );
 }
 
+export function SessionAuth(...permissions: SystemPermission[]) {
+  return applyDecorators(
+    NeedsPermissions(permissions),
+    UseGuards(DualAuthGuard, EffectivePermissionsGuard, SessionOnlyGuard),
+    ApiBearerAuth(),
+    ApiUnauthorizedResponse({ description: 'Unauthorized' }),
+  );
+}
+
 @Injectable()
 export class EffectivePermissionsGuard implements CanActivate {
   private readonly logger = new Logger(EffectivePermissionsGuard.name);
@@ -46,10 +55,7 @@ export class EffectivePermissionsGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
-    const requiredAll = this.reflector.getAllAndOverride(NeedsPermissions, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredAll = this.reflector.getAllAndOverride(NeedsPermissions, [context.getHandler(), context.getClass()]);
     const requiredAny = this.reflector.getAllAndOverride(NeedsAnyPermission, [
       context.getHandler(),
       context.getClass(),
@@ -81,6 +87,20 @@ export class EffectivePermissionsGuard implements CanActivate {
         this.logger.debug(`User ${user.id} has none of the required permissions: ${requiredAny.join(', ')}`);
         throw new ForbiddenException('Insufficient permissions');
       }
+    }
+
+    return true;
+  }
+}
+
+@Injectable()
+export class SessionOnlyGuard implements CanActivate {
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest();
+    const user = request.user as AuthenticatedUser | undefined;
+
+    if (user?.authenticationMethod !== 'session') {
+      throw new ForbiddenException('Session authentication required');
     }
 
     return true;

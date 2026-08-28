@@ -1,0 +1,30 @@
+{
+  "title": "Allgemein",
+  "description": "Die URLs, unter denen diese Instanz erreichbar ist, und ihre Lizenz.",
+  "loading": "Einstellungen werden geladen...",
+  "inputs": {
+    "url": {
+      "label": "Anwendungs-URL",
+      "description": "URL, unter der Benutzer Attraccess erreichen (für Weiterleitungen, Links und API-Callbacks).",
+      "errors": {
+        "required": "Eine Anwendungs-URL ist erforderlich.",
+        "invalid": "Gib eine vollständige URL an, inklusive http:// oder https://."
+      }
+    },
+    "publicInternetUrl": {
+      "label": "Öffentliche Internet-URL",
+      "description": "Optionale URL für externe Callbacks (z. B. SumUp).",
+      "errors": {
+        "invalid": "Gib eine vollständige URL an, inklusive http:// oder https://."
+      }
+    },
+    "licenseKey": {
+      "label": "Lizenzschlüssel",
+      "description": "Füge einen neuen Lizenzschlüssel zum Aktualisieren ein. Leer lassen, um den aktuellen zu behalten."
+    }
+  },
+  "success": {
+    "title": "Einstellungen gespeichert",
+    "description": "Deine Änderungen wurden übernommen."
+  }
+}

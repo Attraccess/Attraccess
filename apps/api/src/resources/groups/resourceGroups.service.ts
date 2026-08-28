@@ -193,7 +193,7 @@ export class ResourceGroupsService {
     const savedResourceGroup = await this.resourceGroupRepository.save(resourceGroup);
     this.eventEmitter.emit(
       ResourceGroupIntroductionChangedEvent.EVENT_NAME,
-      new ResourceGroupIntroductionChangedEvent(savedResourceGroup.id),
+      new ResourceGroupIntroductionChangedEvent(savedResourceGroup.id, [resourceId]),
     );
   }
 
@@ -209,18 +209,22 @@ export class ResourceGroupsService {
     const savedResourceGroup = await this.resourceGroupRepository.save(resourceGroup);
     this.eventEmitter.emit(
       ResourceGroupIntroductionChangedEvent.EVENT_NAME,
-      new ResourceGroupIntroductionChangedEvent(savedResourceGroup.id),
+      new ResourceGroupIntroductionChangedEvent(savedResourceGroup.id, [resourceId]),
     );
   }
 
   public async deleteOne(groupId: number): Promise<void> {
+    const resourceGroup = await this.getOne({ id: groupId }, ['resources']);
     const result = await this.resourceGroupRepository.delete(groupId);
     if (result.affected === 0) {
       throw new ResourceGroupNotFoundException({ id: groupId });
     }
     this.eventEmitter.emit(
       ResourceGroupIntroductionChangedEvent.EVENT_NAME,
-      new ResourceGroupIntroductionChangedEvent(groupId),
+      new ResourceGroupIntroductionChangedEvent(
+        groupId,
+        resourceGroup.resources.map((resource) => resource.id),
+      ),
     );
     this.metricsService.resourceGroupsTotal.dec();
   }

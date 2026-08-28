@@ -14,7 +14,7 @@ import {
   Req,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiExtraModels, ApiOperation, ApiResponse, ApiTags, getSchemaPath } from '@nestjs/swagger';
 import { User } from '@attraccess/database-entities';
 import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
@@ -22,7 +22,7 @@ import { UsersService } from './users.service';
 import { UserPasswordService } from './user-password.service';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { FindManyUsersQueryDto } from './dtos/findManyUsersQuery.dto';
-import { PaginatedUsersResponseDto } from './dtos/paginatedUsersResponse.dto';
+import { PaginatedUserSummariesResponseDto, PaginatedUsersResponseDto } from './dtos/paginatedUsersResponse.dto';
 import { SetUserPasswordDto } from './dtos/setUserPassword.dto';
 import { ChangeUsernameDto } from './dtos/changeUsername.dto';
 import { ChangeEmailDto } from './dtos/changeEmail.dto';
@@ -99,19 +99,41 @@ export class UsersAdminController {
 
   @Get()
   @Auth()
+  @ApiExtraModels(PaginatedUserSummariesResponseDto, PaginatedUsersResponseDto)
   @ApiOperation({ summary: 'Get a paginated list of users', operationId: 'findMany' })
   @ApiResponse({
     status: 200,
     description: 'List of users.',
-    type: PaginatedUsersResponseDto,
+    schema: {
+      oneOf: [
+        { $ref: getSchemaPath(PaginatedUserSummariesResponseDto) },
+        { $ref: getSchemaPath(PaginatedUsersResponseDto) },
+      ],
+    },
   })
   @ApiResponse({
     status: 403,
-    description: 'Forbidden - includeRoles requires users.read permission.',
+    description: 'Forbidden - user filters and role data require users.read permission.',
   })
-  async findMany(@Query() query: FindManyUsersQueryDto, @Req() request: AuthenticatedRequest): Promise<PaginatedUsersResponseDto> {
-    // ponytail: role data is sensitive; only expose it to users.read holders
-    if (query.includeRoles && !request.user.effectivePermissions?.has('users.read')) {
+  async findMany(
+    @Query() query: FindManyUsersQueryDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<PaginatedUserSummariesResponseDto | PaginatedUsersResponseDto> {
+    const canReadUsers = request.user.effectivePermissions?.has('users.read') ?? false;
+
+    // User filter criteria and role data are sensitive; only expose them to users.read holders.
+    if (
+      (query.includeRoles ||
+        query.roleId !== undefined ||
+        query.roleIds !== undefined ||
+        query.excludeRoleIds !== undefined ||
+        query.emailVerified !== undefined ||
+        query.ssoProviderIds !== undefined ||
+        query.excludeSsoProviderIds !== undefined ||
+        query.ssoProviderNone !== undefined ||
+        query.hasSsoProvider !== undefined) &&
+      !canReadUsers
+    ) {
       throw new ForbiddenException();
     }
     const result = await this.usersService.findMany({
@@ -119,11 +141,22 @@ export class UsersAdminController {
       limit: query.limit,
       search: query.search,
       ids: query.ids,
+      roleId: query.roleId,
+      roleIds: query.roleIds,
+      excludeRoleIds: query.excludeRoleIds,
+      roleMatch: query.roleMatch,
+      emailVerified: query.emailVerified,
+      ssoProviderIds: query.ssoProviderIds,
+      excludeSsoProviderIds: query.excludeSsoProviderIds,
+      ssoProviderNone: query.ssoProviderNone,
+      hasSsoProvider: query.hasSsoProvider,
+      ssoProviderMatch: query.ssoProviderMatch,
       includeRoles: query.includeRoles,
     });
     this.logger.debug(`Found ${result.total} users total, returning ${result.data.length} users`);
     return {
       ...result,
+      data: canReadUsers ? result.data : result.data.map(({ id, username }) => ({ id, username })),
       nextPage: computeNextPage(result.page, result.limit, result.total),
     };
   }

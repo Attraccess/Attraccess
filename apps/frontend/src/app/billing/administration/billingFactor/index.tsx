@@ -1,10 +1,10 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Card, CardProps, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput } from '@heroui/react';
+import { cn, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput } from '@heroui/react';
 import { Button } from '../../../../components/button';
 import { PageHeader } from '../../../../components/pageHeader';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { HandCoinsIcon } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { HTMLAttributes, useCallback, useEffect, useState } from 'react';
 import en from './en.json';
 import de from './de.json';
 import { useQueryClient } from '@tanstack/react-query';
@@ -20,7 +20,7 @@ interface Props {
   userId?: number;
 }
 
-export function ManageBillingFactorCard(props: Props & Omit<CardProps, 'children'>) {
+export function ManageBillingFactorCard(props: Props & Omit<HTMLAttributes<HTMLElement>, 'children'>) {
   const { userId, ...cardProps } = props;
 
   const { t, tExists } = useTranslations({
@@ -73,31 +73,22 @@ export function ManageBillingFactorCard(props: Props & Omit<CardProps, 'children
   }, [changeBillingFactor, userId, value]);
 
   return (
-    <Card {...cardProps}>
-      <Card.Header>
-        <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<HandCoinsIcon />} noMargin />
-      </Card.Header>
+    <section {...cardProps} className={cn('flex flex-col gap-4', cardProps.className)}>
+      <PageHeader title={t('title')} subtitle={t('subtitle')} icon={<HandCoinsIcon />} noMargin />
 
-      <Card.Content className="flex flex-col gap-4">
-        <NumberField
-          aria-label={t('inputs.amount')}
-          value={value}
-          onChange={setValue}
-          minValue={0}
-        >
-          <NumberFieldGroup>
-            <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
-            <NumberFieldInput />
-            <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
-          </NumberFieldGroup>
-        </NumberField>
-      </Card.Content>
+      <NumberField aria-label={t('inputs.amount')} value={value} onChange={setValue} minValue={0}>
+        <NumberFieldGroup>
+          <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+          <NumberFieldInput />
+          <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+        </NumberFieldGroup>
+      </NumberField>
 
-      <Card.Footer>
+      <div>
         <Button variant="primary" onPress={handleUpdate} isPending={isChangingBillingFactor}>
           {t('actions.update')}
         </Button>
-      </Card.Footer>
-    </Card>
+      </div>
+    </section>
   );
 }

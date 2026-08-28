@@ -11,6 +11,13 @@
       "groupName": "docker images"
     },
     {
+      "description": "Node base image version is owned by .nvmrc, not Renovate",
+      "matchDatasources": ["docker"],
+      "matchDepNames": ["node"],
+      "matchFileNames": ["Dockerfile", "tools/config-ui/Dockerfile", "tools/hetzner-dns-updater/Dockerfile"],
+      "enabled": false
+    },
+    {
       "description": "Auto-merge patch-level Docker updates",
       "matchDatasources": ["docker"],
       "matchUpdateTypes": ["patch", "digest"],

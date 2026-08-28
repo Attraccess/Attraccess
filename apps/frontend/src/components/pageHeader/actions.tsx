@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import {
+  cn,
   Dropdown,
   DropdownItem,
   DropdownMenu,
@@ -151,8 +152,14 @@ export function PageHeaderActions({ actions, maxVisible = DEFAULT_MAX_VISIBLE, m
       {inline.map(renderInlineAction)}
       {hasOverflow && (
         <Dropdown>
+          {/* HeroUI's .dropdown__trigger sets display:inline-block, which beats the
+              inline-flex from .button and leaves the icon stuck at the left edge.
+              Re-assert the centering as utilities, which do win. */}
           <DropdownTrigger
-            className={buttonVariants({ variant: 'outline', size: 'sm', isIconOnly: true })}
+            className={cn(
+              buttonVariants({ variant: 'outline', size: 'sm', isIconOnly: true }),
+              'inline-flex items-center justify-center',
+            )}
             aria-label={triggerLabel}
             data-cy="page-header-overflow-trigger"
           >

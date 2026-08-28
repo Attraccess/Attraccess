@@ -108,6 +108,10 @@ export class FormField {
   @ApiProperty({ description: 'The description of the form field' })
   description!: string | null;
 
+  @Column({ type: 'integer', default: 0 })
+  @ApiProperty({ description: 'Position of the field within the form' })
+  position!: number;
+
   @Column({ type: 'json', nullable: true })
   @ApiProperty({ description: 'The options of the form field' })
   options!: Record<string, unknown> | string[] | null;

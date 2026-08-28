@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, CardDescription, FieldError, Heading, Input, Label, Switch, TextField } from '@heroui/react';
+import { Button, FieldError, Heading, Input, Label, Switch, TextField } from '@heroui/react';
 import type { CompanionSettings } from '../types';
 
 interface Props {
@@ -28,28 +28,26 @@ export function SettingsStep({ settings, onSave, onBack }: Props) {
     <>
       <div>
         <Heading>Settings</Heading>
-        <CardDescription>Configure companion app behaviour.</CardDescription>
+        <p className="text-sm leading-5 text-muted">Configure companion app behaviour.</p>
       </div>
-      <TextField
-        value={idleTimeout}
-        onChange={setIdleTimeout}
-        type="number"
-        isInvalid={!!error}
-        fullWidth
-      >
+      <TextField value={idleTimeout} onChange={setIdleTimeout} type="number" isInvalid={!!error} fullWidth>
         <Label>Idle timeout (minutes, 0 = disabled)</Label>
         <Input placeholder="15" />
         <FieldError>{error}</FieldError>
       </TextField>
       <Switch isSelected={foregroundApp} onChange={setForegroundApp}>
         <Switch.Content>
-          <Switch.Control><Switch.Thumb /></Switch.Control>
+          <Switch.Control>
+            <Switch.Thumb />
+          </Switch.Control>
           Report foreground app to flow triggers
         </Switch.Content>
       </Switch>
       <Switch isSelected={usbDevices} onChange={setUsbDevices}>
         <Switch.Content>
-          <Switch.Control><Switch.Thumb /></Switch.Control>
+          <Switch.Control>
+            <Switch.Thumb />
+          </Switch.Control>
           Report USB device connect/disconnect to flow triggers
         </Switch.Content>
       </Switch>

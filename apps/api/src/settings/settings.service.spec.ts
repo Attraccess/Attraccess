@@ -1,5 +1,3 @@
-// Unit tests for SettingsService metrics toggle read/write helpers
-// FEATURE: Metrics — admin-controlled timing instrumentation toggles
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { User } from '@attraccess/database-entities';
@@ -15,9 +13,11 @@ import {
 } from './constants';
 import { METRICS_TOGGLE_INVALIDATOR } from './metrics-toggle-invalidator.token';
 
-describe('SettingsService metrics toggles', () => {
+describe('SettingsService', () => {
   let service: SettingsService;
   let store: { getPlainSetting: jest.Mock; setPlainSetting: jest.Mock };
+  let smtpSettings: { getSettings: jest.Mock };
+  let userRepository: { count: jest.Mock };
   let invalidator: { refresh: jest.Mock };
 
   beforeEach(async () => {
@@ -25,19 +25,44 @@ describe('SettingsService metrics toggles', () => {
       getPlainSetting: jest.fn().mockResolvedValue(null),
       setPlainSetting: jest.fn().mockResolvedValue(undefined),
     };
+    smtpSettings = { getSettings: jest.fn() };
+    userRepository = { count: jest.fn() };
     invalidator = { refresh: jest.fn().mockResolvedValue(undefined) };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         SettingsService,
         { provide: SettingsStoreService, useValue: store },
-        { provide: SmtpSettingsService, useValue: {} },
-        { provide: getRepositoryToken(User), useValue: {} },
+        { provide: SmtpSettingsService, useValue: smtpSettings },
+        { provide: getRepositoryToken(User), useValue: userRepository },
         { provide: METRICS_TOGGLE_INVALIDATOR, useValue: invalidator },
       ],
     }).compile();
 
     service = moduleRef.get(SettingsService);
+  });
+
+  describe('getFirstTimeSetupStatus', () => {
+    it('marks unauthenticated SMTP as complete when its required settings are configured', async () => {
+      jest.spyOn(service, 'getAppSettings').mockResolvedValue({
+        url: 'https://attraccess.example',
+        publicInternetUrl: null,
+        licenseKeyConfigured: true,
+      });
+      smtpSettings.getSettings.mockResolvedValue({
+        service: 'SMTP',
+        host: 'smtp.example',
+        port: 587,
+        user: null,
+        passConfigured: false,
+        from: 'noreply@attraccess.example',
+      });
+      userRepository.count.mockResolvedValue(0);
+
+      const status = await service.getFirstTimeSetupStatus();
+
+      expect(status.stepsCompleted.smtp).toBe(true);
+    });
   });
 
   describe('getMetricsToggles', () => {

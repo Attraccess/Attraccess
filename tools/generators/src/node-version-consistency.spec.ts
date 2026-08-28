@@ -83,10 +83,14 @@ describe('Node.js version consistency', () => {
       dockerfileContent = readFile('tools/hetzner-dns-updater/Dockerfile');
     });
 
-    it('should use a FROM image with the same Node.js version as .nvmrc', () => {
-      const match = dockerfileContent.match(/FROM\s+node:(\S+)/);
+    it('should set NODE_VERSION ARG matching .nvmrc', () => {
+      const match = dockerfileContent.match(/ARG\s+NODE_VERSION=(\S+)/);
       expect(match).not.toBeNull();
-      expect(match![1]).toContain(nvmrcVersion);
+      expect(match![1]).toBe(nvmrcVersion);
+    });
+
+    it('should use NODE_VERSION in FROM', () => {
+      expect(dockerfileContent).toContain('FROM node:${NODE_VERSION}-alpine');
     });
 
     it(`should reference Node ${EXPECTED_NODE_MAJOR}+ in comments`, () => {
@@ -108,10 +112,14 @@ describe('Node.js version consistency', () => {
       dockerfileContent = readFile('tools/config-ui/Dockerfile');
     });
 
-    it('should use a FROM image with the same Node.js version as .nvmrc', () => {
-      const match = dockerfileContent.match(/FROM\s+node:(\S+)/);
+    it('should set NODE_VERSION ARG matching .nvmrc', () => {
+      const match = dockerfileContent.match(/ARG\s+NODE_VERSION=(\S+)/);
       expect(match).not.toBeNull();
-      expect(match![1]).toContain(nvmrcVersion);
+      expect(match![1]).toBe(nvmrcVersion);
+    });
+
+    it('should use NODE_VERSION in FROM', () => {
+      expect(dockerfileContent).toContain('FROM node:${NODE_VERSION}-alpine');
     });
 
     it('should not reference an older Node.js major version', () => {
@@ -280,16 +288,16 @@ describe('Node.js version consistency', () => {
       expect(match![1]).toBe(nvmrcVersion);
     });
 
-    it('hetzner Dockerfile FROM version matches .nvmrc exactly', () => {
+    it('hetzner Dockerfile default NODE_VERSION matches .nvmrc exactly', () => {
       const dockerfile = readFile('tools/hetzner-dns-updater/Dockerfile');
-      const match = dockerfile.match(/FROM\s+node:([^\s-]+)/);
+      const match = dockerfile.match(/ARG\s+NODE_VERSION=(\S+)/);
       expect(match).not.toBeNull();
       expect(match![1]).toBe(nvmrcVersion);
     });
 
-    it('config-ui Dockerfile FROM version matches .nvmrc exactly', () => {
+    it('config-ui Dockerfile default NODE_VERSION matches .nvmrc exactly', () => {
       const dockerfile = readFile('tools/config-ui/Dockerfile');
-      const match = dockerfile.match(/FROM\s+node:([^\s-]+)/);
+      const match = dockerfile.match(/ARG\s+NODE_VERSION=(\S+)/);
       expect(match).not.toBeNull();
       expect(match![1]).toBe(nvmrcVersion);
     });

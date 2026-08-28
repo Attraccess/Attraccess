@@ -69,7 +69,7 @@ describe('EmailService', () => {
           return Promise.resolve({
             type,
             subject: 'Username changed for {{user.username}}',
-            body: '<mjml><mj-body><mj-section><mj-column><mj-text>Hello {{user.username}},</mj-text><mj-text>Your username was changed from <strong>{{user.previousUsername}}</strong> to <strong>{{user.newUsername}}</strong>.</mj-text><mj-text>FE {{host.frontend}} BE {{host.backend}}</mj-text><mj-text>URL: {{url}}</mj-text></mj-column></mj-section></mj-body></mjml>',
+            body: '<mjml><mj-body><mj-section><mj-column><mj-image src="{{host.logoUrl}}"/><mj-text>Hello {{user.username}},</mj-text><mj-text>Your username was changed from <strong>{{user.previousUsername}}</strong> to <strong>{{user.newUsername}}</strong>.</mj-text><mj-text>FE {{host.frontend}} BE {{host.backend}}</mj-text><mj-text>URL: {{url}}</mj-text></mj-column></mj-section></mj-body></mjml>',
           });
         }
         if (type === EmailTemplateType.VERIFY_EMAIL) {
@@ -182,6 +182,15 @@ describe('EmailService', () => {
     expect(callArg.html).toContain('alice'); // newUsername also equals current username
     // host.frontend and host.backend both resolve to the single app URL
     expect(callArg.html).toContain('https://frontend.example');
+    expect(callArg.attachments).toEqual([
+      expect.objectContaining({
+        filename: 'logo.png',
+        contentType: 'image/png',
+        cid: 'attraccess-logo',
+        path: expect.stringMatching(/assets\/logo\.png$/),
+      }),
+    ]);
+    expect(callArg.html).toContain('cid:attraccess-logo');
   });
 
   it('sends verification email with correct URL', async () => {

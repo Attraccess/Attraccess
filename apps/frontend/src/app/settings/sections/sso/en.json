@@ -1,0 +1,8 @@
+{
+  "title": "Single sign-on",
+  "description": "External identity providers users can sign in with.",
+  "notLicensed": "Single sign-on is not included in this instance's license.",
+  "actions": {
+    "addNew": "Add provider"
+  }
+}

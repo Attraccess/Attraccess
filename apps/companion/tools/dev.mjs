@@ -23,7 +23,7 @@ const scheduleRelaunch = () => {
   timer = setTimeout(relaunch, 100);
 };
 
-const common = { bundle: true, platform: 'node', format: 'cjs', external: ['electron', 'keytar'] };
+const common = { bundle: true, platform: 'node', format: 'cjs', external: ['electron', 'usb'] };
 const relaunchPlugin = { name: 'relaunch-electron', setup: (b) => b.onEnd(scheduleRelaunch) };
 
 const main = await esbuild.context({

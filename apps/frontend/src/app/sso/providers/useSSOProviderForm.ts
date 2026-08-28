@@ -30,7 +30,11 @@ import {
 import en from './en.json';
 import de from './de.json';
 
-export const SSO_PROVIDERS_PATH = '/sso/providers';
+/**
+ * Where the provider list lives — the Single sign-on settings section, and the target for cancel,
+ * post-save and post-delete. The per-provider form hangs off `${SSO_PROVIDERS_LIST_PATH}/providers`.
+ */
+export const SSO_PROVIDERS_LIST_PATH = '/settings/sso';
 
 export const useSSOProviderForm = (providerId?: number) => {
   const { t } = useTranslations({ en, de });
@@ -254,7 +258,7 @@ export const useSSOProviderForm = (providerId?: number) => {
   }, []);
 
   const handleCancel = useCallback(() => {
-    navigate(SSO_PROVIDERS_PATH);
+    navigate(SSO_PROVIDERS_LIST_PATH);
   }, [navigate]);
 
   const handleSubmit = useCallback(async () => {
@@ -390,7 +394,7 @@ export const useSSOProviderForm = (providerId?: number) => {
           description: t('providerCreatedDesc'),
         });
       }
-      navigate(SSO_PROVIDERS_PATH);
+      navigate(SSO_PROVIDERS_LIST_PATH);
     } catch (err) {
       const errorDescription = isEditing ? t('failedToUpdate') : t('failedToCreate');
       showError({

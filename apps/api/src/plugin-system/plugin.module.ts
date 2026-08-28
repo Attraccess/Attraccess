@@ -24,6 +24,8 @@ import { PluginService } from './plugin.service';
 import { PluginSandboxService } from './plugin-sandbox.service';
 import { PluginEventsService } from './plugin-events.service';
 import { PluginController } from './plugin.controller';
+import { NpmPluginService } from './npm-plugin.service';
+import { SettingsModule } from '../settings/settings.module';
 import { loadPluginEntryExports } from './plugin-loader';
 import { registerPluginFlowNodes } from './plugin-flow-node-registry';
 import { join } from 'path';
@@ -60,7 +62,8 @@ export class PluginModule {
 
       return {
         module: PluginModule,
-        providers: [PluginService, PluginSandboxService, PluginEventsService],
+        imports: [SettingsModule],
+        providers: [PluginService, PluginSandboxService, PluginEventsService, NpmPluginService],
         exports: [PluginEventsService],
         controllers: [PluginController],
       };
@@ -84,20 +87,20 @@ export class PluginModule {
 
     return {
       module: PluginModule,
-      providers: [PluginService, PluginSandboxService, PluginEventsService],
+      imports: [SettingsModule, ...pluginModules],
+      providers: [PluginService, PluginSandboxService, PluginEventsService, NpmPluginService],
       exports: [PluginEventsService],
-      imports: [...pluginModules],
       controllers: [PluginController],
     };
   }
 
   private static loadPluginModule(manifest: LoadedPluginManifest): DynamicModule {
-    this.logger.log(`Loading plugin ${manifest.name} from ${manifest.main.backend.directory}`);
-
     if (!manifest.main.backend?.directory || !manifest.main.backend?.entryPoint) {
       this.logger.error(`Plugin ${manifest.name} has no backend, skipping backend module loading`);
       return null;
     }
+
+    this.logger.log(`Loading plugin ${manifest.name} from ${manifest.main.backend.directory}`);
 
     const importedModule = loadPluginEntryExports(
       join(PluginService.PLUGIN_PATH, manifest.main.backend.directory, manifest.main.backend.entryPoint)

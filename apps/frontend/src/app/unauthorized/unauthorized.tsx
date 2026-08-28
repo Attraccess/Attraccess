@@ -4,6 +4,7 @@ import { RegistrationForm } from './registrationForm';
 import { LoginForm } from './loginForm';
 import { UnauthorizedLayout } from './unauthorized-layout/layout';
 import { SSOLogin } from './ssoLogin';
+import { PasskeyLogin } from './passkeyLogin';
 import { PasswordResetForm } from './password-reset/passwordResetForm';
 import { useSettingsServiceGetFirstTimeSetupStatus } from '@attraccess/react-query-client';
 
@@ -29,6 +30,7 @@ export const Unauthorized = memo(function UnauthorizedComponent() {
       )}
       {formToShow === 'register' && <RegistrationForm onHasAccount={() => setFormToShow('login')} />}
       {formToShow === 'forgotPassword' && <PasswordResetForm onGoBack={() => setFormToShow('login')} />}
+      {formToShow === 'login' && <PasskeyLogin />}
       <SSOLogin />
     </UnauthorizedLayout>
   );

@@ -1,5 +1,16 @@
 import { ApiError, useUsersServiceChangeMyEmail, useUsersServiceGetCurrentKey } from '@attraccess/react-query-client';
-import { TextField, Label, Input } from '@heroui/react';
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  Input,
+  Label,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  TextField,
+  useOverlayState,
+} from '@heroui/react';
 import { Button } from '../../../components/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
@@ -7,11 +18,14 @@ import { useToastMessage } from '../../../components/toastProvider';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
+import { AlertStatusIcon } from '../../../components/AlertStatusIcon';
+import { StandardModal } from '../../../components/standardModal';
 
 export function EmailForm() {
   const { t } = useTranslations({ en, de });
 
   const [email, setEmail] = useState('');
+  const { isOpen, open, close } = useOverlayState();
   const queryClient = useQueryClient();
   const trimmedEmail = email.trim();
   const isEmailValid = trimmedEmail.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail);
@@ -43,20 +57,56 @@ export function EmailForm() {
     if (!isEmailValid) {
       return;
     }
+    open();
+  }, [isEmailValid, open]);
+
+  const confirmEmailChange = useCallback(() => {
     mutate({
       requestBody: { email: trimmedEmail },
     });
-  }, [isEmailValid, mutate, trimmedEmail]);
+    close();
+  }, [close, mutate, trimmedEmail]);
 
   return (
-    <div className="flex flex-col gap-4">
-      <TextField value={email} onChange={setEmail}>
-        <Label>{t('email.label')}</Label>
-        <Input type="email" />
-      </TextField>
-      <Button variant="primary" isPending={isPending} onPress={onSubmit} isDisabled={!isEmailValid || isPending}>
-        {t('actions.save')}
-      </Button>
-    </div>
+    <>
+      <div className="flex flex-col gap-4">
+        <TextField value={email} onChange={setEmail}>
+          <Label>{t('email.label')}</Label>
+          <Input type="email" />
+        </TextField>
+        <Button variant="primary" isPending={isPending} onPress={onSubmit} isDisabled={!isEmailValid || isPending}>
+          {t('actions.save')}
+        </Button>
+      </div>
+      <StandardModal
+        isOpen={isOpen}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) close();
+        }}
+        size="md"
+      >
+        {({ close: modalClose }) => (
+          <>
+            <ModalHeader>{t('modal.title')}</ModalHeader>
+            <ModalBody>
+              <Alert status="warning">
+                <AlertStatusIcon status="warning" />
+                <AlertContent>
+                  <AlertDescription>{t('modal.warning')}</AlertDescription>
+                </AlertContent>
+              </Alert>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" onPress={modalClose}>
+                {t('actions.cancel')}
+              </Button>
+              <Button variant="primary" onPress={confirmEmailChange} isPending={isPending}>
+                {t('actions.confirm')}
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </StandardModal>
+    </>
   );
 }

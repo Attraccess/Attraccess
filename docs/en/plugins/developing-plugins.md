@@ -558,7 +558,7 @@ plugin-hello-world.zip
 
 Then upload it:
 
-1. Open the admin **Plugins** page and click **Upload Plugin**.
+1. Open **Settings** > **Plugins** and click **Upload Plugin**.
 2. Select your ZIP. The server validates the manifest, unpacks it, and
    **restarts** to load the plugin.
 3. After the restart, your backend endpoints are live and your frontend routes

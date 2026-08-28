@@ -28,7 +28,11 @@ import { RequestMaintenanceButton } from '../../../details/maintenance-managemen
 import { InstantMaintenanceButton } from '../../../details/maintenance-management/instant';
 
 // ponytail: only these 3 events affect session/control state; health and other events don't need a refetch
-const SESSION_EVENTS = new Set(['resource.usage.session_started', 'resource.usage.session_ended', 'resource.usage.session_taken_over']);
+const SESSION_EVENTS = new Set([
+  'resource.usage.session_started',
+  'resource.usage.session_ended',
+  'resource.usage.session_taken_over',
+]);
 
 type ResourceUsageSessionProps = Omit<HTMLAttributes<HTMLElement>, 'children' | 'resource'> & {
   resourceId: number;
@@ -77,7 +81,7 @@ export function ResourceUsageSession({
 
   const activeSession = useMemo(() => activeSessionResponse?.usage, [activeSessionResponse]);
 
-  const isLoading = isLoadingSession ?? isLoadingIntroStatus ?? isLoadingIntroducers;
+  const isLoading = isLoadingSession || isLoadingIntroStatus || isLoadingIntroducers;
 
   const isIntroducer = useMemo(() => {
     return introducers?.some((introducer) => introducer.userId === user?.id);
@@ -86,6 +90,8 @@ export function ResourceUsageSession({
   const canStartSession = canUpdateResources || access?.canControl || isIntroducer;
 
   // A not-introduced user may still start via a supervisor when the resource allows it.
+  // The stricter supervision_required case is decided inside StartSessionControls, so that every
+  // call site of those controls gets it — including the maintenance view (ATT-815).
   const supervisionEnabled =
     resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED ||
     resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED;
@@ -106,9 +112,19 @@ export function ResourceUsageSession({
 
     if (activeSession) {
       if (activeSession.userId === user?.id) {
-        return <ActiveSessionDisplay resourceId={resourceId} startTime={activeSession.startTime} />;
+        return (
+          <>
+            <ActiveSessionDisplay resourceId={resourceId} startTime={activeSession.startTime} />
+            {!canStartSession && <IntroductionRequiredDisplay resourceId={resourceId} />}
+          </>
+        );
       } else {
-        return <OtherUserSessionDisplay resourceId={resourceId} />;
+        return (
+          <>
+            <OtherUserSessionDisplay resourceId={resourceId} />
+            {!canStartSession && <IntroductionRequiredDisplay resourceId={resourceId} />}
+          </>
+        );
       }
     }
 
@@ -117,15 +133,23 @@ export function ResourceUsageSession({
     }
 
     if (activeMaintenances?.data?.length && activeMaintenances.data.length > 0) {
-      return <MaintenanceInProgressDisplay resourceId={resourceId} />;
+      return (
+        <>
+          {!canStartSession && <IntroductionRequiredDisplay resourceId={resourceId} />}
+          <MaintenanceInProgressDisplay resourceId={resourceId} />
+        </>
+      );
     }
 
     return (
-      <StartSessionControls
-        resourceId={resourceId}
-        insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
-        requiresSupervision={!canStartSession}
-      />
+      <>
+        {!canStartSession && <IntroductionRequiredDisplay resourceId={resourceId} />}
+        <StartSessionControls
+          resourceId={resourceId}
+          insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
+          requiresSupervision={!canStartSession}
+        />
+      </>
     );
   };
 

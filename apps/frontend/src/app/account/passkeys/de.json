@@ -1,0 +1,25 @@
+{
+  "title": "Passkeys",
+  "description": "Melde dich mit Fingerabdruck, Gesicht oder Passwortmanager an statt mit einem Passwort.",
+  "empty": "Du hast noch keinen Passkey hinzugefügt.",
+  "neverUsed": "Nie",
+  "columns": {
+    "name": "Name",
+    "lastUsed": "Zuletzt genutzt",
+    "actions": "Aktionen"
+  },
+  "nameLabel": "Name",
+  "namePlaceholder": "z.B. MacBook Touch ID",
+  "actions": {
+    "add": "Passkey hinzufügen",
+    "delete": "Passkey {{name}} löschen"
+  },
+  "success": {
+    "added": "Passkey hinzugefügt",
+    "deleted": "Passkey gelöscht"
+  },
+  "errors": {
+    "addFailed": "Passkey konnte nicht hinzugefügt werden",
+    "deleteFailed": "Passkey konnte nicht gelöscht werden"
+  }
+}

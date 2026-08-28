@@ -105,6 +105,13 @@ private:
     // Written by the NFC task, read from the main loop.
     volatile bool foundCard = false;
     uint32_t foundCardTimeMs = 0;
+    // Presence-auth throttle: while a card is held, the full AES handshake
+    // (~150 ms on the bus) used to run on every loop pass. Gate it to every
+    // 250 ms — still well under the ~1 s removal-detection budget, but cuts
+    // bus time ~6x while a card is parked on the reader
+    // (PERFORMANCE_ANALYSIS.md M2).
+    uint32_t lastPresenceCheckMs = 0;
+    static const uint32_t presenceCheckIntervalMs = 250;
 
     // TODO: remove this
     void demo();
@@ -140,8 +147,10 @@ private:
         NFC &nfc;
     };
 
-    // Pre-ATT-554 polling semantics (rate limits reverted for isolation):
-    // blocking 100 ms detection poll and a presence handshake on every loop
-    // pass, exactly like the firmware that was known to run stable.
-    static const uint16_t detectionPollTimeoutMs = 100;
+    // Detection poll timeout. Reduced from the pre-ATT-554 100 ms to 30 ms:
+    // the blocking poll holds I2CBusLock and starves touch+render; 30 ms
+    // stays well above the PN532 command turnaround (~5 ms @ 400 kHz) while
+    // cutting the worst-case bus hold per loop pass by ~3x
+    // (PERFORMANCE_ANALYSIS.md quick win Q4).
+    static const uint16_t detectionPollTimeoutMs = 30;
 };

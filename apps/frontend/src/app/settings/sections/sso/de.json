@@ -1,0 +1,8 @@
+{
+  "title": "Single Sign-on",
+  "description": "Externe Identitätsanbieter, über die sich Benutzer anmelden können.",
+  "notLicensed": "Single Sign-on ist in der Lizenz dieser Instanz nicht enthalten.",
+  "actions": {
+    "addNew": "Anbieter hinzufügen"
+  }
+}

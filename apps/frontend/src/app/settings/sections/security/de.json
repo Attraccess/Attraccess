@@ -1,0 +1,217 @@
+{
+  "title": "Sicherheit",
+  "description": "Wer sich anmelden darf, unter welchen Bedingungen und wie schwer es ist, sich hineinzuraten.",
+  "loading": "Sicherheitseinstellungen werden geladen …",
+  "access": {
+    "heading": "Zugang",
+    "description": "Wer diese Instanz erreichen kann und was dafür vorgelegt werden muss."
+  },
+  "twoFactor": {
+    "label": "Zwei-Faktor-Anforderung",
+    "hint": "Ist 2FA erforderlich, werden Nutzer ohne 2FA bei der nächsten Anmeldung zur Einrichtung aufgefordert.",
+    "warning": "Gilt ab der nächsten Anmeldung. Nutzer ohne 2FA durchlaufen zuerst die Einrichtung.",
+    "options": {
+      "optional": {
+        "label": "Optional",
+        "description": "Nutzer können 2FA in den Kontoeinstellungen aktivieren."
+      },
+      "privileged": {
+        "label": "Erforderlich für Admins",
+        "description": "2FA für Benutzer mit erweiterten Berechtigungen erzwingen."
+      },
+      "all": {
+        "label": "Erforderlich für alle Nutzer",
+        "description": "Alle müssen 2FA aktivieren, um fortzufahren."
+      }
+    },
+    "saved": {
+      "title": "2FA-Richtlinie aktualisiert",
+      "description": "Die neue Anforderung gilt ab der nächsten Anmeldung."
+    },
+    "error": {
+      "title": "2FA-Richtlinie konnte nicht gespeichert werden",
+      "description": "Bitte erneut versuchen."
+    }
+  },
+  "domains": {
+    "label": "Erlaubte Registrierungs-Domains",
+    "hint": "Domains, mit denen sich neue Nutzer selbst registrieren dürfen. Leere Liste deaktiviert die Selbstregistrierung; ein einzelnes * erlaubt jede Domain.",
+    "addLabel": "Domain hinzufügen",
+    "addButton": "Diese Domain hinzufügen",
+    "addPlaceholder": "beispiel.de",
+    "empty": "Keine Domains eingetragen — Selbstregistrierung ist deaktiviert.",
+    "loading": "Domainliste wird geladen …",
+    "loadFailed": "Die Domainliste konnte nicht geladen werden und lässt sich hier nicht bearbeiten. Bitte die Seite neu laden — Speichern würde die gesamte Liste ersetzen, und diese Ansicht kennt ihren Inhalt nicht.",
+    "remove": "{{domain}} entfernen",
+    "saved": {
+      "title": "Registrierungs-Domains gespeichert",
+      "description": "Neue Registrierungen werden gegen diese Liste geprüft."
+    },
+    "error": {
+      "title": "Registrierungs-Domains konnten nicht gespeichert werden",
+      "description": "Bitte erneut versuchen."
+    }
+  },
+  "rateLimit": {
+    "heading": "Anmeldedrosselung",
+    "description": "Fehlgeschlagene Anmeldeversuche pro IP drosseln und Konten nach wiederholten Fehlversuchen sperren.",
+    "loadFailed": "Die Drosselungseinstellungen konnten nicht geladen werden und lassen sich hier nicht bearbeiten. Bitte die Seite neu laden — die übrigen Gruppen auf dieser Seite sind nicht betroffen.",
+    "fields": {
+      "maxAttempts": {
+        "label": "Max. Versuche",
+        "description": "Maximal erlaubte Fehlversuche im Zeitfenster, bevor Drosselung oder Sperre greift."
+      },
+      "windowSeconds": {
+        "label": "Zeitfenster (Sekunden)",
+        "description": "Zeitraum, in dem Fehlversuche gezählt werden."
+      },
+      "lockoutDurationSeconds": {
+        "label": "Sperrdauer (Sekunden)",
+        "description": "Grundsperrdauer beim Erreichen der Schwelle."
+      },
+      "exponentialBackoff": {
+        "label": "Exponentielle Verlängerung",
+        "description": "Sperre bei wiederholten Sperren exponentiell verlängern."
+      },
+      "backoffMultiplier": {
+        "label": "Verlängerungs-Multiplikator",
+        "description": "Multiplikator für die Sperrdauer, wenn die exponentielle Verlängerung aktiv ist."
+      }
+    },
+    "saved": {
+      "title": "Drosselung gespeichert",
+      "description": "Neue Schwellen gelten sofort."
+    },
+    "error": {
+      "title": "Drosselung konnte nicht gespeichert werden",
+      "description": "Werte prüfen und erneut versuchen."
+    }
+  },
+  "policy": {
+    "heading": "Passwortrichtlinie",
+    "description": "Was als zulässiges Passwort gilt. Änderungen greifen bei der nächsten Passwortprüfung, nicht rückwirkend.",
+    "loadFailed": "Die Passwortrichtlinie konnte nicht geladen werden; sie und die rollenspezifischen Ausnahmen lassen sich hier nicht bearbeiten. Bitte die Seite neu laden — die übrigen Gruppen auf dieser Seite sind nicht betroffen."
+  },
+  "fields": {
+    "minLength": {
+      "label": "Mindestlänge",
+      "description": "Passwörter unter diesem Wert werden abgelehnt. Bereich 8–1024 (NIST-800-63B-Untergrenze)."
+    },
+    "maxLength": {
+      "label": "Maximale Länge",
+      "description": "Passwörter über diesem Wert werden abgelehnt. Bereich 8–1024."
+    },
+    "allowAllUnicode": {
+      "label": "Alle Unicode-Zeichen zulassen",
+      "description": "Wenn deaktiviert, sind nur ASCII-Druckzeichen erlaubt."
+    },
+    "requireUppercase": {
+      "label": "Großbuchstaben verlangen",
+      "description": "Passwörter ohne Großbuchstaben werden abgelehnt."
+    },
+    "requireLowercase": {
+      "label": "Kleinbuchstaben verlangen",
+      "description": "Passwörter ohne Kleinbuchstaben werden abgelehnt."
+    },
+    "requireDigit": { "label": "Ziffer verlangen", "description": "Passwörter ohne Ziffer werden abgelehnt." },
+    "requireSpecial": {
+      "label": "Sonderzeichen verlangen",
+      "description": "Passwörter ohne nicht-alphanumerisches Zeichen werden abgelehnt."
+    },
+    "checkHIBP": {
+      "label": "Gegen HIBP-Datenbank prüfen",
+      "description": "Passwörter aus bekannten Datenpannen ablehnen."
+    },
+    "checkCommonPasswords": {
+      "label": "Häufige Passwörter ablehnen",
+      "description": "Passwörter aus der mitgelieferten Liste der häufigen Passwörter blockieren."
+    },
+    "minZxcvbnScore": {
+      "label": "Minimaler zxcvbn-Score (0–4)",
+      "description": "Stärkeeinschätzung. 0 = sehr schwach, 4 = sehr stark."
+    },
+    "historySize": {
+      "label": "Größe der Passwort-Historie",
+      "description": "Wiederverwendung der letzten N Passwörter blockieren. 0 deaktiviert die Historie."
+    },
+    "rotationDays": {
+      "label": "Erzwungene Rotation (Tage)",
+      "description": "Passwortwechsel nach N Tagen erzwingen. 0 deaktiviert die Rotation."
+    }
+  },
+  "preview": {
+    "title": "Live-Vorschau",
+    "subtitle": "Gib ein Kandidatenpasswort ein — der Server prüft es gegen die noch nicht gespeicherten Werte links, inklusive HIBP, zxcvbn und Liste häufiger Passwörter.",
+    "passwordLabel": "Kandidaten-Passwort",
+    "pass": "Würde akzeptiert",
+    "fail": "Würde abgelehnt",
+    "noErrors": "Alle Prüfungen bestanden.",
+    "loading": "Volle Serverprüfung läuft …",
+    "reveal": "Passwort anzeigen",
+    "hide": "Passwort verbergen",
+    "disclosure": "Serverseitig gegen den Entwurf geprüft. Das Passwort wird per TLS gesendet und nicht gespeichert.",
+    "errors": {
+      "MIN_LENGTH": "Zu kurz (min. {{min}}, war {{actual}}).",
+      "MAX_LENGTH": "Zu lang (max. {{max}}, war {{actual}}).",
+      "MISSING_UPPER": "Großbuchstabe fehlt.",
+      "MISSING_LOWER": "Kleinbuchstabe fehlt.",
+      "MISSING_DIGIT": "Ziffer fehlt.",
+      "MISSING_SPECIAL": "Sonderzeichen fehlt.",
+      "DISALLOWED_CHARACTER": "Enthält unzulässiges Zeichen.",
+      "SIMILAR_TO_EMAIL": "Zu ähnlich zur E-Mail.",
+      "SIMILAR_TO_USERNAME": "Zu ähnlich zum Benutzernamen.",
+      "COMMON_PASSWORD": "Häufiges Passwort.",
+      "HIBP_PWNED": "In {{count}} bekannten Datenpannen gefunden.",
+      "ZXCVBN_SCORE": "Stärke-Score {{score}} unter Anforderung {{required}}.",
+      "PASSWORD_REUSED": "Stimmt mit einem der letzten {{historySize}} Passwörter überein."
+    }
+  },
+  "diff": {
+    "title": "Änderungen an der Passwortrichtlinie bestätigen",
+    "subtitle": "Diese Regeln gelten ab sofort für jede Passwortprüfung. Bitte prüfe, was sich ändert.",
+    "field": "Feld",
+    "before": "Vorher",
+    "after": "Nachher",
+    "confirm": "Änderungen speichern",
+    "cancel": "Abbrechen"
+  },
+  "overrides": {
+    "title": "Rollenspezifische Übersteuerungen",
+    "subtitle": "Einzelne Passwortregeln pro Rolle überschreiben. Alles Vererbte folgt der Richtlinie oben.",
+    "role": "Rolle",
+    "status": "Status",
+    "actions": "Aktionen",
+    "statusInherits": "Erbt die globale Richtlinie",
+    "statusCustom": "{{count}} Feld(er) überschrieben",
+    "edit": "Bearbeiten",
+    "save": "Übersteuerung speichern",
+    "cancel": "Abbrechen",
+    "inherit": "Vererben",
+    "override": "Überschreiben",
+    "enabled": "An",
+    "disabled": "Aus",
+    "removed": {
+      "title": "Übersteuerung entfernt",
+      "description": "Rolle {{role}} folgt nun wieder der globalen Richtlinie."
+    },
+    "saved": {
+      "title": "Übersteuerung gespeichert",
+      "description": "Rolle {{role}} nutzt nun die angepasste Richtlinie."
+    },
+    "modal": {
+      "title": "Passwort-Übersteuerungen für {{role}}",
+      "subtitle": "Feld aktivieren, um es zu überschreiben; deaktiviert lassen, um die globale Richtlinie zu erben. Alle Felder deaktiviert entfernt die Übersteuerung."
+    },
+    "roles": {
+      "admin": "Administrator"
+    }
+  },
+  "savedToast": {
+    "title": "Passwortrichtlinie aktualisiert",
+    "description": "Neue Regeln gelten ab der nächsten Passwortprüfung."
+  },
+  "errorToast": {
+    "title": "Passwortrichtlinie konnte nicht gespeichert werden",
+    "description": "Bitte Werte prüfen und erneut versuchen."
+  }
+}

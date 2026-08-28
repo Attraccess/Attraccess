@@ -8,6 +8,7 @@
     "import": "Import",
     "addNode": "Add node",
     "variables": "Variables",
+    "logs": "Flow logs",
     "modePan": "Pan canvas",
     "modeSelect": "Select"
   },

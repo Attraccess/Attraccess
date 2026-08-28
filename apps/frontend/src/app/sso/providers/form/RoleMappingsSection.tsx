@@ -24,6 +24,7 @@ import { Role } from '@attraccess/react-query-client';
 import { Button } from '../../../../components/button';
 import { StandardDrawer } from '../../../../components/standardDrawer';
 import { Select } from '../../../../components/select';
+import { useRbacCatalogTranslations } from '../../../../hooks/useRbacCatalogTranslations';
 import { RoleMappingEntry } from '../formDefaults';
 import en from '../en.json';
 import de from '../de.json';
@@ -36,15 +37,25 @@ interface RoleMappingsSectionProps {
   onChange: (entries: RoleMappingEntry[]) => void;
 }
 
-export const RoleMappingsSection = ({ variant, roles, isLoadingRoles, entries, onChange }: RoleMappingsSectionProps) => {
+export const RoleMappingsSection = ({
+  variant,
+  roles,
+  isLoadingRoles,
+  entries,
+  onChange,
+}: RoleMappingsSectionProps) => {
   const { t } = useTranslations({ en, de });
+  const { roleName } = useRbacCatalogTranslations();
   const { isOpen, open, close } = useOverlayState();
   const [selectedRoleKey, setSelectedRoleKey] = useState<string | undefined>(undefined);
   const [ssoRoleInput, setSsoRoleInput] = useState('');
 
-  const roleName = useCallback(
-    (roleKey: string) => (roles ?? []).find((r) => r.key === roleKey)?.name ?? roleKey,
-    [roles],
+  const roleLabel = useCallback(
+    (roleKey: string) => {
+      const role = (roles ?? []).find((r) => r.key === roleKey);
+      return role ? roleName(role) : roleKey;
+    },
+    [roles, roleName],
   );
 
   const handleOpenChange = useCallback(
@@ -114,7 +125,7 @@ export const RoleMappingsSection = ({ variant, roles, isLoadingRoles, entries, o
               <TableBody>
                 {entries.map((entry, index) => (
                   <TableRow key={`${entry.roleKey}-${entry.ssoRole}`} id={`${entry.roleKey}-${entry.ssoRole}`}>
-                    <TableCell>{roleName(entry.roleKey)}</TableCell>
+                    <TableCell>{roleLabel(entry.roleKey)}</TableCell>
                     <TableCell>
                       <span className="font-mono text-sm">{entry.ssoRole}</span>
                     </TableCell>
@@ -150,7 +161,7 @@ export const RoleMappingsSection = ({ variant, roles, isLoadingRoles, entries, o
             placeholder={t('roleMappingsRolePlaceholder')}
             value={selectedRoleKey}
             onChange={(key) => setSelectedRoleKey(key)}
-            items={(roles ?? []).map((role) => ({ key: role.key, label: role.name ?? role.key }))}
+            items={(roles ?? []).map((role) => ({ key: role.key, label: roleName(role) }))}
             isLoading={isLoadingRoles}
             data-cy={`sso-provider-form-${variant}-role-mapping-role-select`}
           />

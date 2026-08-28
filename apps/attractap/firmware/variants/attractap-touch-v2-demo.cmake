@@ -20,7 +20,7 @@ set(ATTRACTAP_DEFINES
     DEMO_MODE=1
 
     # Show the "power off" button in demo settings — drives SYS_EN low to cut
-    # battery power. V2-demo (V4 hardware with SYS_EN latch) only.
+    # battery power. V4 hardware with SYS_EN latch only.
     HAS_POWER_BUTTON=1
 
     PIN_NFC_I2C_SDA=15

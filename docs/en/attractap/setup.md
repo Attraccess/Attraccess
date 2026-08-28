@@ -32,8 +32,8 @@ Before you begin, make sure:
 ## Step 2: Register the Reader in Attraccess
 
 1. Open Attraccess in your browser
-2. Navigate to **Attractap** in the sidebar
-3. Click on **Readers**
+2. Open the **Devices** group in the sidebar
+3. Click on **Attractap Readers**
 4. Click **Add Reader**
 5. Enter the reader details:
 

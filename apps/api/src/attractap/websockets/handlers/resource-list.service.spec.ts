@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ResourceListService } from './resource-list.service';
 import { AttractapEvent, AttractapEventType } from '../websocket.types';
-import { ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceIntroducerType } from '@attraccess/database-entities';
 
 describe('ResourceListService', () => {
   let service: ResourceListService;
@@ -11,6 +11,7 @@ describe('ResourceListService', () => {
   let resourceMaintenanceService: { getActiveMaintenanceResourceIds: jest.Mock };
   let resourceHealthService: { listForResources: jest.Mock };
   let resourceFlowsService: { getNodesForResources: jest.Mock };
+  let resourceIntroducersService: { getManyForResources: jest.Mock };
 
   function createMockSocket(overrides: Partial<any> = {}): any {
     return {
@@ -62,6 +63,9 @@ describe('ResourceListService', () => {
     resourceMaintenanceService = { getActiveMaintenanceResourceIds: jest.fn().mockResolvedValue(new Set()) };
     resourceHealthService = { listForResources: jest.fn().mockResolvedValue(new Map([[10, []]])) };
     resourceFlowsService = { getNodesForResources: jest.fn().mockResolvedValue(new Map([[10, []]])) };
+    resourceIntroducersService = {
+      getManyForResources: jest.fn().mockResolvedValue(new Map([[10, [{ user: { username: 'introducer-a' } }]]])),
+    };
 
     (service as any).websocketService = websocketService;
     (service as any).attractapService = attractapService;
@@ -69,6 +73,7 @@ describe('ResourceListService', () => {
     (service as any).resourceMaintenanceService = resourceMaintenanceService;
     (service as any).resourceHealthService = resourceHealthService;
     (service as any).resourceFlowsService = resourceFlowsService;
+    (service as any).resourceIntroducersService = resourceIntroducersService;
   });
 
   afterEach(() => {
@@ -88,7 +93,7 @@ describe('ResourceListService', () => {
       expect(attractapService.findReaderById).not.toHaveBeenCalled();
     });
 
-    it('calls sendResourceListToSocket for each matching socket', async () => {
+    it('builds one resource list and sends it to each matching socket', async () => {
       const matchA = createMockSocket({ id: 'a', readerId: 42 });
       const matchB = createMockSocket({ id: 'b', readerId: 42 });
       const other = createMockSocket({ id: 'c', readerId: 7 });
@@ -96,22 +101,24 @@ describe('ResourceListService', () => {
       websocketService.sockets.set('b', matchB);
       websocketService.sockets.set('c', other);
 
-      const spy = jest.spyOn(service, 'sendResourceListToSocket').mockResolvedValue(undefined);
+      attractapService.findReaderById.mockResolvedValue(createReaderFixture());
 
       await service.sendResourceList(42);
 
-      expect(spy).toHaveBeenCalledTimes(2);
-      expect(spy).toHaveBeenCalledWith(matchA);
-      expect(spy).toHaveBeenCalledWith(matchB);
-      expect(spy).not.toHaveBeenCalledWith(other);
+      expect(attractapService.findReaderById).toHaveBeenCalledTimes(1);
+      expect(resourceIntroducersService.getManyForResources).toHaveBeenCalledTimes(1);
+      expect(matchA.sendMessage).toHaveBeenCalledTimes(1);
+      expect(matchB.sendMessage).toHaveBeenCalledTimes(1);
+      expect(other.sendMessage).not.toHaveBeenCalled();
+      expect(matchA.sendMessage.mock.calls[0][0]).not.toBe(matchB.sendMessage.mock.calls[0][0]);
+      expect(matchA.sendMessage.mock.calls[0][0].data.payload).toBe(matchB.sendMessage.mock.calls[0][0].data.payload);
     });
   });
 
-  describe('sendResourceListToReadersWithResource', () => {
+  describe('sendResourceListToReadersWithResources', () => {
     it('schedules a debounced sendResourceList for each unique readerId', () => {
       const s1 = createMockSocket({ id: 's1', readerId: 42 });
       const s2 = createMockSocket({ id: 's2', readerId: 7 });
-      // Two sockets for the same reader should only produce one send
       const s3 = createMockSocket({ id: 's3', readerId: 42 });
       websocketService.sockets.set('s1', s1);
       websocketService.sockets.set('s2', s2);
@@ -119,16 +126,15 @@ describe('ResourceListService', () => {
 
       const spy = jest.spyOn(service, 'sendResourceList').mockResolvedValue(undefined);
 
-      service.sendResourceListToReadersWithResource(10);
+      service.sendResourceListToReadersWithResources([10]);
 
-      // Nothing fired yet — debounce window still open
       expect(spy).not.toHaveBeenCalled();
 
       jest.runAllTimers();
 
       expect(spy).toHaveBeenCalledTimes(2);
-      expect(spy).toHaveBeenCalledWith(42, new Set([10]));
-      expect(spy).toHaveBeenCalledWith(7, new Set([10]));
+      expect(spy).toHaveBeenCalledWith(42, [10]);
+      expect(spy).toHaveBeenCalledWith(7, [10]);
     });
 
     it('coalesces rapid successive calls into a single send per reader', () => {
@@ -137,24 +143,50 @@ describe('ResourceListService', () => {
 
       const spy = jest.spyOn(service, 'sendResourceList').mockResolvedValue(undefined);
 
-      service.sendResourceListToReadersWithResource(10);
-      service.sendResourceListToReadersWithResource(11);
-      service.sendResourceListToReadersWithResource(12);
+      service.sendResourceListToReadersWithResources([10]);
+      service.sendResourceListToReadersWithResources([11, 12]);
 
       jest.runAllTimers();
 
-      // Three calls but the debounce collapses them into one send with all resourceIds accumulated
       expect(spy).toHaveBeenCalledTimes(1);
-      expect(spy).toHaveBeenCalledWith(42, new Set([10, 11, 12]));
+      expect(spy).toHaveBeenCalledWith(42, [10, 11, 12]);
     });
 
-    it('does nothing when there are no sockets', () => {
+    it('does nothing when there are no affected resources', () => {
+      websocketService.sockets.set('s1', createMockSocket({ id: 's1', readerId: 42 }));
       const spy = jest.spyOn(service, 'sendResourceList').mockResolvedValue(undefined);
 
-      service.sendResourceListToReadersWithResource(10);
+      service.sendResourceListToReadersWithResources([]);
       jest.runAllTimers();
 
       expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('builds one resource list per reader when several sockets match', async () => {
+      const s1 = createMockSocket({ id: 's1', readerId: 42 });
+      const s2 = createMockSocket({ id: 's2', readerId: 42 });
+      websocketService.sockets.set('s1', s1);
+      websocketService.sockets.set('s2', s2);
+      attractapService.findReaderById.mockResolvedValue(createReaderFixture());
+
+      service.sendResourceListToReadersWithResources([10]);
+      await jest.runAllTimersAsync();
+
+      expect(attractapService.findReaderById).toHaveBeenCalledTimes(1);
+      expect(resourceIntroducersService.getManyForResources).toHaveBeenCalledTimes(1);
+      expect(s1.sendMessage).toHaveBeenCalledTimes(1);
+      expect(s2.sendMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('refreshes a reader when any of several resources match', async () => {
+      const s1 = createMockSocket({ id: 's1', readerId: 42 });
+      websocketService.sockets.set('s1', s1);
+      attractapService.findReaderById.mockResolvedValue(createReaderFixture());
+
+      service.sendResourceListToReadersWithResources([10, 20]);
+      await jest.runAllTimersAsync();
+
+      expect(s1.sendMessage).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -169,21 +201,21 @@ describe('ResourceListService', () => {
       expect(socket.sendMessage).not.toHaveBeenCalled();
     });
 
-    it('returns without sending when onlyIfResourceMatches.resourceIds has no overlap with reader.resources', async () => {
+    it('returns without sending when onlyIfResourceMatches.resourceIds do not include a reader resource', async () => {
       attractapService.findReaderById.mockResolvedValue(createReaderFixture());
       const socket = createMockSocket();
 
-      await service.sendResourceListToSocket(socket, { resourceIds: new Set([999]) });
+      await service.sendResourceListToSocket(socket, { resourceIds: [999] });
 
       expect(socket.sendMessage).not.toHaveBeenCalled();
       expect(resourceUsageService.getActiveSessions).not.toHaveBeenCalled();
     });
 
-    it('sends the resource list when onlyIfResourceMatches.resourceIds overlaps with reader.resources', async () => {
+    it('sends the resource list when onlyIfResourceMatches.resourceIds include a reader resource', async () => {
       attractapService.findReaderById.mockResolvedValue(createReaderFixture());
       const socket = createMockSocket();
 
-      await service.sendResourceListToSocket(socket, { resourceIds: new Set([10]) });
+      await service.sendResourceListToSocket(socket, { resourceIds: [10] });
 
       expect(socket.sendMessage).toHaveBeenCalledTimes(1);
     });
@@ -204,10 +236,13 @@ describe('ResourceListService', () => {
       await service.sendResourceListToSocket(socket);
 
       expect(attractapService.findReaderById).toHaveBeenCalledWith(42);
-      // Bulk methods called with the resource id array
       expect(resourceUsageService.getActiveSessions).toHaveBeenCalledWith([10]);
       expect(resourceMaintenanceService.getActiveMaintenanceResourceIds).toHaveBeenCalledWith([10]);
       expect(resourceFlowsService.getNodesForResources).toHaveBeenCalledWith([10], ResourceFlowNodeType.INPUT_BUTTON);
+      expect(resourceIntroducersService.getManyForResources).toHaveBeenCalledWith(
+        [10],
+        ResourceIntroducerType.INTRODUCER,
+      );
 
       expect(socket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -242,19 +277,61 @@ describe('ResourceListService', () => {
       );
     });
 
-    it('issues exactly 4 bulk DB queries regardless of resource count', async () => {
+    it('calls each bulk loader once regardless of resource count', async () => {
       const reader = createReaderFixture({
         resources: [
-          { id: 10, name: 'A', type: 'machine', separateUnlockAndUnlatch: false, description: '', allowTakeOver: false, introducers: [] },
-          { id: 11, name: 'B', type: 'machine', separateUnlockAndUnlatch: false, description: '', allowTakeOver: false, introducers: [] },
-          { id: 12, name: 'C', type: 'machine', separateUnlockAndUnlatch: false, description: '', allowTakeOver: false, introducers: [] },
+          {
+            id: 10,
+            name: 'A',
+            type: 'machine',
+            separateUnlockAndUnlatch: false,
+            description: '',
+            allowTakeOver: false,
+            introducers: [],
+          },
+          {
+            id: 11,
+            name: 'B',
+            type: 'machine',
+            separateUnlockAndUnlatch: false,
+            description: '',
+            allowTakeOver: false,
+            introducers: [],
+          },
+          {
+            id: 12,
+            name: 'C',
+            type: 'machine',
+            separateUnlockAndUnlatch: false,
+            description: '',
+            allowTakeOver: false,
+            introducers: [],
+          },
         ],
       });
       attractapService.findReaderById.mockResolvedValue(reader);
-      resourceHealthService.listForResources.mockResolvedValue(new Map([[10, []], [11, []], [12, []]]));
-      resourceUsageService.getActiveSessions.mockResolvedValue(new Map([[10, null], [11, null], [12, null]]));
+      resourceHealthService.listForResources.mockResolvedValue(
+        new Map([
+          [10, []],
+          [11, []],
+          [12, []],
+        ]),
+      );
+      resourceUsageService.getActiveSessions.mockResolvedValue(
+        new Map([
+          [10, null],
+          [11, null],
+          [12, null],
+        ]),
+      );
       resourceMaintenanceService.getActiveMaintenanceResourceIds.mockResolvedValue(new Set());
-      resourceFlowsService.getNodesForResources.mockResolvedValue(new Map([[10, []], [11, []], [12, []]]));
+      resourceFlowsService.getNodesForResources.mockResolvedValue(
+        new Map([
+          [10, []],
+          [11, []],
+          [12, []],
+        ]),
+      );
 
       const socket = createMockSocket();
       await service.sendResourceListToSocket(socket);
@@ -263,17 +340,47 @@ describe('ResourceListService', () => {
       expect(resourceUsageService.getActiveSessions).toHaveBeenCalledTimes(1);
       expect(resourceMaintenanceService.getActiveMaintenanceResourceIds).toHaveBeenCalledTimes(1);
       expect(resourceFlowsService.getNodesForResources).toHaveBeenCalledTimes(1);
+      expect(resourceIntroducersService.getManyForResources).toHaveBeenCalledTimes(1);
+    });
+
+    it('includes introducers inherited from resource groups', async () => {
+      attractapService.findReaderById.mockResolvedValue(createReaderFixture());
+      resourceIntroducersService.getManyForResources.mockResolvedValue(
+        new Map([[10, [{ user: { username: 'direct-introducer' } }, { user: { username: 'group-introducer' } }]]]),
+      );
+
+      const socket = createMockSocket();
+      await service.sendResourceListToSocket(socket);
+
+      const sent = (socket.sendMessage as jest.Mock).mock.calls[0][0] as AttractapEvent;
+      expect((sent.data.payload as any).resources[0].introducers).toEqual(['direct-introducer', 'group-introducer']);
+    });
+
+    it('omits deleted introducers from the resource list', async () => {
+      attractapService.findReaderById.mockResolvedValue(createReaderFixture());
+      resourceIntroducersService.getManyForResources.mockResolvedValue(
+        new Map([[10, [{ user: null }, { user: { username: 'introducer' } }]]]),
+      );
+
+      const socket = createMockSocket();
+      await service.sendResourceListToSocket(socket);
+
+      const sent = (socket.sendMessage as jest.Mock).mock.calls[0][0] as AttractapEvent;
+      expect((sent.data.payload as any).resources[0].introducers).toEqual(['introducer']);
     });
 
     it('reports isHealthy=false with a combined reason when there are unhealthy entries', async () => {
       attractapService.findReaderById.mockResolvedValue(createReaderFixture());
       resourceHealthService.listForResources.mockResolvedValue(
         new Map([
-          [10, [
-            { identifier: 'temp', status: 'unhealthy', reason: 'overheating' },
-            { identifier: '', status: 'unhealthy', reason: 'not connected' },
-            { identifier: 'idle', status: 'healthy', reason: null },
-          ]],
+          [
+            10,
+            [
+              { identifier: 'temp', status: 'unhealthy', reason: 'overheating' },
+              { identifier: '', status: 'unhealthy', reason: 'not connected' },
+              { identifier: 'idle', status: 'healthy', reason: null },
+            ],
+          ],
         ]),
       );
 

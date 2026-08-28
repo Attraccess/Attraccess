@@ -11,6 +11,8 @@ import { PluginService } from './plugin.service';
 import { PluginSandboxService } from './plugin-sandbox.service';
 import { PluginEventsService } from './plugin-events.service';
 import { PluginController } from './plugin.controller';
+import { NpmPluginService } from './npm-plugin.service';
+import { SettingsModule } from '../settings/settings.module';
 import { LoadedPluginManifest } from './plugin.manifest';
 
 function newPluginDir(): string {
@@ -49,15 +51,15 @@ describe('PluginModule', () => {
     it('exposes only the host providers and controller when plugins are disabled', () => {
       PluginModule.configure({ DISABLE_PLUGINS: true });
       const module = PluginModule.forRoot();
-      expect(module.providers).toEqual([PluginService, PluginSandboxService, PluginEventsService]);
+      expect(module.providers).toEqual([PluginService, PluginSandboxService, PluginEventsService, NpmPluginService]);
       expect(module.exports).toEqual([PluginEventsService]);
       expect(module.controllers).toEqual([PluginController]);
-      expect(module.imports).toBeUndefined();
+      expect(module.imports).toEqual([SettingsModule]);
     });
 
     it('builds an empty import list when no plugins are present', () => {
       const module = PluginModule.forRoot();
-      expect(module.imports).toEqual([]);
+      expect(module.imports).toEqual([SettingsModule]);
       expect(module.controllers).toEqual([PluginController]);
     });
 
@@ -77,7 +79,7 @@ describe('PluginModule', () => {
       expect(discovered).toHaveLength(1);
 
       const module = PluginModule.forRoot();
-      expect(module.imports).toEqual([]);
+      expect(module.imports).toEqual([SettingsModule]);
       expect(PluginService.getManifestById(discovered[0].id)).toBeDefined();
     });
 
@@ -108,7 +110,7 @@ describe('PluginModule', () => {
       );
 
       const module = PluginModule.forRoot();
-      expect(module.imports).toHaveLength(1);
+      expect(module.imports).toEqual([SettingsModule, expect.any(Object)]);
     });
   });
 

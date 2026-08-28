@@ -4,9 +4,19 @@
   "sourceRoot": "tools/generators/src",
   "projectType": "library",
   "tags": [],
+  "implicitDependencies": [
+    "frontend",
+    "companion",
+    "ui",
+    "plugins-frontend-ui",
+    "plugins-frontend-sdk",
+    "plugin-shelly",
+    "plugin-rabbitmq"
+  ],
   "targets": {
     "build": {
       "executor": "@nx/js:tsc",
+      "dependsOn": [],
       "outputs": ["{options.outputPath}"],
       "options": {
         "outputPath": "dist/tools/generators",

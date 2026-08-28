@@ -23,14 +23,16 @@ import { useCallback, useMemo } from 'react';
 export function EmailTemplatesPage() {
   const { t } = useTranslations({ en, de });
   const navigate = useNavigate();
+  // The Email settings section — these editors are sub-routes of it and navigate to its siblings.
+  const basePath = '/settings/email';
 
   const { data: emailTemplates } = useEmailTemplatesServiceEmailTemplateControllerFindAll();
 
   const openEditor = useCallback(
     (type: string) => {
-      navigate(`/emails/templates/${type}`);
+      navigate(`${basePath}/templates/${type}`);
     },
-    [navigate],
+    [navigate, basePath],
   );
 
   const tableItems = useMemo(() => {
@@ -52,7 +54,7 @@ export function EmailTemplatesPage() {
         title={t('title')}
         subtitle={t('subtitle')}
         icon={<Mail className="w-6 h-6" />}
-        backTo="/emails"
+        backTo={basePath}
       />
 
       <Table>

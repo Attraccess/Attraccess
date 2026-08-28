@@ -41,7 +41,7 @@ export class ResourceGroupsIntroducersController {
   })
   async isIntroducer(
     @Param('userId', ParseIntPipe) userId: number,
-    @Param('groupId', ParseIntPipe) groupId: number
+    @Param('groupId', ParseIntPipe) groupId: number,
   ): Promise<IsResourceGroupIntroducerResponseDto> {
     return {
       isIntroducer: await this.resourceGroupsIntroducersService.isIntroducer({ groupId, userId }),
@@ -63,7 +63,7 @@ export class ResourceGroupsIntroducersController {
   async grant(
     @Param('userId', ParseIntPipe) userId: number,
     @Param('groupId', ParseIntPipe) groupId: number,
-    @Body() body?: GrantIntroducerDto
+    @Body() body?: GrantIntroducerDto,
   ): Promise<ResourceIntroducer> {
     return await this.resourceGroupsIntroducersService.grant(groupId, userId, body?.type);
   }
@@ -82,8 +82,9 @@ export class ResourceGroupsIntroducersController {
   })
   async revoke(
     @Param('userId', ParseIntPipe) userId: number,
-    @Param('groupId', ParseIntPipe) groupId: number
+    @Param('groupId', ParseIntPipe) groupId: number,
+    @Body() body?: GrantIntroducerDto,
   ): Promise<ResourceIntroducer> {
-    return this.resourceGroupsIntroducersService.revoke(groupId, userId);
+    return this.resourceGroupsIntroducersService.revoke(groupId, userId, body?.type);
   }
 }

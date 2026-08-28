@@ -45,11 +45,16 @@ import {
   Session,
   ResourceUsage,
   Setting,
+  Passkey,
+  PasskeyChallenge,
+  ApiToken,
+  ApiTokenPermission,
+  Permission,
 } from '@attraccess/database-entities';
 import { EmailModule } from '../email/email.module';
 import { SSOService } from './auth/sso/sso.service';
 import { SSOOIDCStrategy } from './auth/sso/oidc/oidc.strategy';
-import { ModuleRef } from '@nestjs/core';
+import { APP_INTERCEPTOR, ModuleRef } from '@nestjs/core';
 import { SSOController } from './auth/sso/sso.controller';
 import { CookieConfigService } from '../common/services/cookie-config.service';
 import { LicenseModule } from '../license/license.module';
@@ -63,6 +68,8 @@ import { EncryptionModule } from '../encryption/encryption.module';
 import { SSOLinkTokenService } from './auth/sso/link-token.service';
 import { AccountLinkingExceptionFilter } from './auth/sso/oidc/account-linking.exception-filter';
 import { TwoFactorService } from './auth/two-factor.service';
+import { PasskeyService } from './auth/passkey/passkey.service';
+import { PasskeyController } from './auth/passkey/passkey.controller';
 import { SettingsModule } from '../settings/settings.module';
 import { SettingsService } from '../settings/settings.service';
 import { BruteForceProtectionService } from './rate-limiting/brute-force.service';
@@ -71,6 +78,10 @@ import { AuthRateLimitInterceptor } from './rate-limiting/auth-rate-limit.interc
 import { LoginRateLimitGuard } from './rate-limiting/login.rate-limit.guard';
 import { PasswordPolicyModule } from './password-policy/password-policy.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ApiTokenService } from './auth/api-token/api-token.service';
+import { ApiTokenController } from './auth/api-token/api-token.controller';
+import { ApiTokenRequestRateLimitService } from './auth/api-token/api-token-request-rate-limit.service';
+import { ApiTokenRequestRateLimitInterceptor } from './auth/api-token/api-token-request-rate-limit.interceptor';
 
 @Module({
   imports: [
@@ -83,6 +94,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
       Session,
       ResourceUsage,
       Setting,
+      Passkey,
+      PasskeyChallenge,
+      ApiToken,
+      ApiTokenPermission,
+      Permission,
     ]),
     PassportModule,
     EmailModule,
@@ -123,6 +139,13 @@ import { NotificationsModule } from '../notifications/notifications.module';
     AuthService,
     SessionService,
     TwoFactorService,
+    PasskeyService,
+    ApiTokenService,
+    ApiTokenRequestRateLimitService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ApiTokenRequestRateLimitInterceptor,
+    },
     LocalStrategy,
     SessionStrategy,
     SSOService,
@@ -170,6 +193,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
     UserPermissionsController,
     AuthController,
     TwoFactorController,
+    PasskeyController,
+    ApiTokenController,
     SSOController,
     RbacController,
   ],

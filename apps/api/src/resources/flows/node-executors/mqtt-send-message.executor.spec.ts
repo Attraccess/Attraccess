@@ -152,4 +152,91 @@ describe('MqttSendMessageExecutor', () => {
 
     await expect(executor.execute(node, {}, ctx)).rejects.toThrow('broker offline');
   });
+
+  it('propagates descriptive string rejections from the mqtt client publish', async () => {
+    mqttClientService.publish.mockRejectedValue('broker offline');
+    const node = makeNode({ serverId: 1, topic: 't', payload: 'p' });
+
+    await expect(executor.execute(node, {}, ctx)).rejects.toBe('broker offline');
+  });
+
+  it('adds MQTT context when publish rejects with a whitespace-only string', async () => {
+    mqttClientService.publish.mockRejectedValue('   ');
+    const node = makeNode({ serverId: 1, topic: 'devices/state', payload: 'p' });
+
+    await expect(executor.execute(node, {}, ctx)).rejects.toThrow(
+      "Failed to publish MQTT message to topic 'devices/state' on server 1: no error details were provided",
+    );
+  });
+
+  it('adds MQTT context when publish rejects with a whitespace-only object message', async () => {
+    mqttClientService.publish.mockRejectedValue({ message: '   ' });
+    const node = makeNode({ serverId: 1, topic: 'devices/state', payload: 'p' });
+
+    await expect(executor.execute(node, {}, ctx)).rejects.toThrow(
+      "Failed to publish MQTT message to topic 'devices/state' on server 1: no error details were provided",
+    );
+  });
+
+  it('propagates named errors without a message from the mqtt client publish', async () => {
+    const error = new Error();
+    error.name = 'MqttConnectionError';
+    mqttClientService.publish.mockRejectedValue(error);
+    const node = makeNode({ serverId: 1, topic: 't', payload: 'p' });
+
+    await expect(executor.execute(node, {}, ctx)).rejects.toBe(error);
+  });
+
+  it('adds MQTT context when publish rejects without an error message', async () => {
+    mqttClientService.publish.mockRejectedValue({});
+    const node = makeNode({ serverId: 1, topic: 'devices/state', payload: 'p' });
+
+    await expect(executor.execute(node, {}, ctx)).rejects.toThrow(
+      "Failed to publish MQTT message to topic 'devices/state' on server 1: no error details were provided",
+    );
+  });
+
+  it('classifies publish failures as transport-dispatch failures', () => {
+    expect(executor.getFailureKind(new Error('broker offline'))).toBe('transport-dispatch');
+  });
+
+  it('can continue after dispatch without waiting for a broker acknowledgement', async () => {
+    const node = makeNode({
+      serverId: 1,
+      topic: 'devices/state',
+      payload: 'on',
+      completionBehavior: 'dispatch',
+    });
+
+    await executor.execute(node, {}, ctx);
+
+    expect(mqttClientService.publish).toHaveBeenCalledWith(
+      1,
+      'devices/state',
+      'on',
+      { qos: undefined, retain: undefined },
+      { awaitAcknowledgement: false, acknowledgementTimeoutSeconds: undefined },
+    );
+  });
+
+  it('uses the configured acknowledgement timeout', async () => {
+    const node = makeNode({ serverId: 1, topic: 'devices/state', acknowledgementTimeoutSeconds: 5 });
+
+    await executor.execute(node, {}, ctx);
+
+    expect(mqttClientService.publish).toHaveBeenCalledWith(
+      1,
+      'devices/state',
+      '',
+      { qos: undefined, retain: undefined },
+      { awaitAcknowledgement: true, acknowledgementTimeoutSeconds: 5 },
+    );
+  });
+
+  it('classifies a publish acknowledgement timeout separately', () => {
+    const error = new Error('timed out');
+    error.name = 'MqttAcknowledgementTimeoutError';
+
+    expect(executor.getFailureKind(error)).toBe('acknowledgement-timeout');
+  });
 });

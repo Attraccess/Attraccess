@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Card } from '@heroui/react';
 import type { Step, Permissions, CompanionSettings } from './types';
 import { LoadingStep } from './steps/LoadingStep';
 import { PermissionsStep } from './steps/PermissionsStep';
@@ -174,67 +173,65 @@ export function WizardApp() {
 
   return (
     <div className="flex items-center justify-center h-full p-6 bg-background">
-      <Card className="w-full max-w-md">
-        <Card.Content className="flex flex-col gap-4 p-8">
-          {step === 'loading' && <LoadingStep />}
-          {step === 'permissions' && <PermissionsStep perms={perms} onGrant={handleGrantAccessibility} />}
-          {step === 'pin-setup' && (
-            <PinSetupStep
-              pinInput={pinInput}
-              pinConfirm={pinConfirm}
-              error={pinSetupError}
-              onPinInputChange={setPinInput}
-              onPinConfirmChange={setPinConfirm}
-              onSubmit={handleSetPin}
+      <section className="w-full max-w-md flex flex-col gap-4 p-8">
+        {step === 'loading' && <LoadingStep />}
+        {step === 'permissions' && <PermissionsStep perms={perms} onGrant={handleGrantAccessibility} />}
+        {step === 'pin-setup' && (
+          <PinSetupStep
+            pinInput={pinInput}
+            pinConfirm={pinConfirm}
+            error={pinSetupError}
+            onPinInputChange={setPinInput}
+            onPinConfirmChange={setPinConfirm}
+            onSubmit={handleSetPin}
+          />
+        )}
+        {step === 'pin-entry' && (() => {
+          const pinCopy = {
+            quit: { title: 'Confirm quit', description: 'Enter your PIN to quit Attraccess Companion.', submitLabel: 'Quit' },
+            'admin-override': { title: 'Admin override', description: 'Enter your admin PIN to unlock the kiosk and ignore server commands.', submitLabel: 'Enable override' },
+            settings: { title: 'Access settings', description: 'Enter your PIN to access settings.', submitLabel: 'Confirm' },
+          }[pendingAction ?? 'settings'] ?? { title: 'Access settings', description: 'Enter your PIN to access settings.', submitLabel: 'Confirm' };
+          return (
+            <PinEntryStep
+              title={pinCopy.title}
+              description={pinCopy.description}
+              submitLabel={pinCopy.submitLabel}
+              pinEntry={pinEntry}
+              error={pinEntryError}
+              onPinEntryChange={setPinEntry}
+              onSubmit={handleVerifyPin}
             />
-          )}
-          {step === 'pin-entry' && (() => {
-            const pinCopy = {
-              quit: { title: 'Confirm quit', description: 'Enter your PIN to quit Attraccess Companion.', submitLabel: 'Quit' },
-              'admin-override': { title: 'Admin override', description: 'Enter your admin PIN to unlock the kiosk and ignore server commands.', submitLabel: 'Enable override' },
-              settings: { title: 'Access settings', description: 'Enter your PIN to access settings.', submitLabel: 'Confirm' },
-            }[pendingAction ?? 'settings'] ?? { title: 'Access settings', description: 'Enter your PIN to access settings.', submitLabel: 'Confirm' };
-            return (
-              <PinEntryStep
-                title={pinCopy.title}
-                description={pinCopy.description}
-                submitLabel={pinCopy.submitLabel}
-                pinEntry={pinEntry}
-                error={pinEntryError}
-                onPinEntryChange={setPinEntry}
-                onSubmit={handleVerifyPin}
-              />
-            );
-          })()}
-          {step === 'url' && (
-            <UrlStep
-              serverUrl={serverUrl}
-              connectError={connectError}
-              connecting={connecting}
-              registered={registered}
-              connected={connected}
-              onServerUrlChange={setServerUrl}
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
-              onChangePin={pendingAction === 'settings' ? () => setStep('pin-setup') : undefined}
-              onOpenSettings={pendingAction === 'settings' ? () => setStep('settings') : undefined}
-            />
-          )}
-          {step === 'settings' && (
-            <SettingsStep
-              settings={appSettings}
-              onSave={async (s) => {
-                await window.companion.saveSettings(s);
-                setAppSettings(s);
-                setStep('url');
-              }}
-              onBack={() => setStep('url')}
-            />
-          )}
-          {step === 'register' && <RegisterStep statusText={statusText} />}
-          {step === 'done' && <DoneStep deviceId={deviceId} />}
-        </Card.Content>
-      </Card>
+          );
+        })()}
+        {step === 'url' && (
+          <UrlStep
+            serverUrl={serverUrl}
+            connectError={connectError}
+            connecting={connecting}
+            registered={registered}
+            connected={connected}
+            onServerUrlChange={setServerUrl}
+            onConnect={handleConnect}
+            onDisconnect={handleDisconnect}
+            onChangePin={pendingAction === 'settings' ? () => setStep('pin-setup') : undefined}
+            onOpenSettings={pendingAction === 'settings' ? () => setStep('settings') : undefined}
+          />
+        )}
+        {step === 'settings' && (
+          <SettingsStep
+            settings={appSettings}
+            onSave={async (s) => {
+              await window.companion.saveSettings(s);
+              setAppSettings(s);
+              setStep('url');
+            }}
+            onBack={() => setStep('url')}
+          />
+        )}
+        {step === 'register' && <RegisterStep statusText={statusText} />}
+        {step === 'done' && <DoneStep deviceId={deviceId} />}
+      </section>
     </div>
   );
 }

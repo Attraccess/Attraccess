@@ -7,6 +7,7 @@
 #include "../IScreen.hpp"
 #include "../../../logger/logger.hpp"
 #include "../../../demo/demo_store.hpp"
+#include "../../shared/powerOff/powerOffButton.hpp"
 
 class DemoSettingsScreen : public IScreen
 {
@@ -55,12 +56,6 @@ private:
 
 #ifdef HAS_POWER_BUTTON
     std::function<void()> _powerOffCb;
-    lv_obj_t *_powerConfirm = nullptr;
-    void showPowerConfirm();
-    void hidePowerConfirm();
-    static void onPowerBtn(lv_event_t *e);
-    static void onPowerConfirmBtn(lv_event_t *e);
-    static void onPowerCancelBtn(lv_event_t *e);
 #endif
 
     // Pre-allocated callback payloads — avoids heap allocation and lifetime issues.

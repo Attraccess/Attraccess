@@ -113,14 +113,18 @@ export function AttractapEditor(props: Readonly<Props>) {
               className="w-full"
               data-cy="attractap-editor-tabs"
             >
-              <TabList>
-                <Tab id="general" data-cy="attractap-editor-general-tab">
-                  {t('tabs.general')}
-                </Tab>
-                <Tab id="resources" data-cy="attractap-editor-resources-tab">
-                  {t('tabs.resources')}
-                </Tab>
-              </TabList>
+              <Tabs.ListContainer>
+                <TabList>
+                  <Tab id="general" data-cy="attractap-editor-general-tab">
+                    <Tabs.Indicator />
+                    {t('tabs.general')}
+                  </Tab>
+                  <Tab id="resources" data-cy="attractap-editor-resources-tab">
+                    <Tabs.Indicator />
+                    {t('tabs.resources')}
+                  </Tab>
+                </TabList>
+              </Tabs.ListContainer>
               <TabPanel id="general" className="pt-4">
                 <div className="flex flex-col gap-4">
                   <TextField value={name} onChange={setName} className="w-full">

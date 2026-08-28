@@ -479,7 +479,7 @@ function FlowsPageInner() {
               </Button>
               <LogViewer resourceId={Number(resourceId)}>
                 {(open) => (
-                  <Button isIconOnly onPress={open}>
+                  <Button isIconOnly onPress={open} aria-label={t('actions.logs')}>
                     <LogsIcon />
                   </Button>
                 )}

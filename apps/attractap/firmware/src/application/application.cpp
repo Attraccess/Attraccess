@@ -313,6 +313,11 @@ void Application::setup() {
   Display::connectionConfigurationScreen.setOnResetCertificateCallback(
       [this]() { this->api.resetCertificateTrust(); });
 
+#ifdef HAS_POWER_BUTTON
+  Display::connectionConfigurationScreen.setOnPowerOffCallback(
+      [this]() { this->ioExpander.powerOff(); });
+#endif
+
   Display::initScreen.setOnOpenSettingsCallback([this]() {
 #ifdef DEMO_MODE
     Display::transitionToScreen(&Display::demoSettingsScreen);
@@ -425,7 +430,7 @@ void Application::setup() {
           // No eligible supervisor / resource doesn't support supervision: abort the flow.
           strlcpy(this->supervisionErrorMessage,
                   result.error == "NO_SUPERVISORS_AVAILABLE"
-                      ? "Kein Tutor verfuegbar"
+                      ? "Keine Aufsicht verfuegbar"
                       : translateReaderError(result.error).c_str(),
                   sizeof(this->supervisionErrorMessage));
           this->supervisionFailed = true;
@@ -434,7 +439,7 @@ void Application::setup() {
 
         // Build the secondary hint: who may approve + the web fallback note. Runs on the websocket
         // task, so write the fixed buffer and publish via the volatile flag (set last).
-        std::string hint = "Tutor-Karte auflegen oder per\nApp/Web bestaetigen";
+        std::string hint = "Aufsichts-Karte auflegen oder per\nApp/Web bestaetigen";
         if (result.supervisorCount > 0) {
           hint += "\n";
           for (uint8_t i = 0; i < result.supervisorCount; i++) {
@@ -454,7 +459,7 @@ void Application::setup() {
         if (response.error.length() > 0 || response.keyLen != 16) {
           strlcpy(this->supervisionErrorMessage,
                   response.error == "SUPERVISOR_NOT_AUTHORIZED"
-                      ? "Karte nicht als Tutor\nberechtigt"
+                      ? "Karte nicht als Aufsicht\nberechtigt"
                       : translateReaderError(response.error).c_str(),
                   sizeof(this->supervisionErrorMessage));
           this->supervisionCardRejected = true;
@@ -466,6 +471,19 @@ void Application::setup() {
         memcpy(this->apiSupervisorCardData.keyBytes, response.keyBytes, 16);
         // Flag readiness; processSupervision() performs the on-card crypto auth on the main loop.
         this->supervisionKeyReady = true;
+      });
+
+  // Server-armed supervision (ATT-816). Runs on the websocket task, so only stage the payload here
+  // and publish via the volatile flag (set last); the main loop enters the screen.
+  this->api.setSupervisionStartCallback(
+      [this](API::SupervisionStartCommand command) {
+        strlcpy(this->supervisionRequesterName, command.requesterUsername.c_str(),
+                sizeof(this->supervisionRequesterName));
+        this->supervisionRequestedResourceId = command.resourceId;
+        this->supervisionRequestedAtMs = millis();
+        this->supervisionRequestedTimeoutMs =
+            command.timeoutMs > 0 ? command.timeoutMs : SUPERVISION_TIMEOUT_MS;
+        this->supervisionStartRequested = true;
       });
 
   this->api.setSupervisionResolvedCallback(

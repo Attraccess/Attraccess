@@ -171,8 +171,8 @@ const mainSchema = z.object({
 export const PluginManifestSchema = z.object({
   name: z.string(),
   main: z.object({
-    frontend: mainSchema.extend({ styles: z.string().optional() }),
-    backend: mainSchema,
+    frontend: mainSchema.extend({ styles: z.string().optional() }).optional(),
+    backend: mainSchema.optional(),
     migrations: mainSchema.optional(),
   }),
   version: z.string(),

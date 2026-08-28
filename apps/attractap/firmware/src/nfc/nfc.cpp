@@ -157,6 +157,17 @@ void NFC::handleCardDetection()
 
     if (this->foundCard)
     {
+        // Presence probe throttled to every 250 ms (see presenceCheckIntervalMs)
+        // so a card parked on the reader doesn't hold the shared I2C bus with a
+        // full AES handshake on every loop pass (PERFORMANCE_ANALYSIS.md M2).
+        uint32_t now = millis();
+        if (now - this->lastPresenceCheckMs < NFC::presenceCheckIntervalMs)
+        {
+            // card still present, wait till removed
+            return;
+        }
+        this->lastPresenceCheckMs = now;
+
         // just try to comminucate with card in any way to check if it is still present
         bool authSuccess = false;
         {

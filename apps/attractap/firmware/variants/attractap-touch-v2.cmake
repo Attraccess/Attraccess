@@ -14,6 +14,10 @@ set(ATTRACTAP_DEFINES
 
     LOGGER_LEVEL_NUM=3
 
+    # Show the "power off" button in settings — drives SYS_EN low to cut
+    # battery power. V4 hardware with SYS_EN latch only.
+    HAS_POWER_BUTTON=1
+
     PIN_NFC_I2C_SDA=15
     PIN_NFC_I2C_SCL=7
     PIN_TOUCH_I2C_SDA=15

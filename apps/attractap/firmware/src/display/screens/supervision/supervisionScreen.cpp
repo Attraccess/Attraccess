@@ -95,6 +95,9 @@ void SupervisionScreen::init()
    lv_obj_set_style_bg_color(this->cancelButton, lv_color_hex(SUPERVISION_COLOR_CANCEL_BG), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(this->cancelButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_radius(this->cancelButton, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   // PRESSED is subscribed alongside CLICKED so the guard can judge when the press *started*: the
+   // release that follows it lands arbitrarily late (see armCancelGuard()).
+   lv_obj_add_event_cb(this->cancelButton, &SupervisionScreen::onCancelButtonEvent, LV_EVENT_PRESSED, this);
    lv_obj_add_event_cb(this->cancelButton, &SupervisionScreen::onCancelButtonEvent, LV_EVENT_CLICKED, this);
 
    lv_obj_t *cancelLabel = lv_label_create(this->cancelButton);
@@ -143,7 +146,7 @@ void SupervisionScreen::applyStatus()
    switch (this->status)
    {
    case STATUS_WAITING:
-      text = "Tutor-Karte auflegen";
+      text = "Aufsichts-Karte auflegen";
       color = SUPERVISION_COLOR_WAITING;
       break;
    case STATUS_VERIFYING:
@@ -227,6 +230,14 @@ void SupervisionScreen::setOnCancelCallback(std::function<void()> callback)
    this->onCancelCallback = callback;
 }
 
+void SupervisionScreen::armCancelGuard()
+{
+   this->cancelGuardStartedMs = millis();
+   // Refuse by default: LVGL can hand this button an already-in-flight press without a PRESSED
+   // event of its own (a finger dragged in from the outgoing screen), and that is never a cancel.
+   this->cancelPressAccepted = false;
+}
+
 void SupervisionScreen::onCancelButtonEvent(lv_event_t *e)
 {
    SupervisionScreen *self = static_cast<SupervisionScreen *>(lv_event_get_user_data(e));
@@ -234,8 +245,20 @@ void SupervisionScreen::onCancelButtonEvent(lv_event_t *e)
    {
       return;
    }
+
+   if (lv_event_get_code(e) == LV_EVENT_PRESSED)
+   {
+      self->cancelPressAccepted = millis() - self->cancelGuardStartedMs >= CANCEL_GUARD_MS;
+      return;
+   }
+
    if (lv_event_get_code(e) != LV_EVENT_CLICKED)
    {
+      return;
+   }
+   if (!self->cancelPressAccepted)
+   {
+      self->logger.debug("Ignoring cancel click from a press that began before this screen");
       return;
    }
    if (self->onCancelCallback)

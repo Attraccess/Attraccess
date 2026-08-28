@@ -19,6 +19,10 @@
     "title": "Nicht genügend Guthaben",
     "description": "Das Guthaben ist für diese Aktion nicht ausreichend."
   },
+  "INVALID_CSV": {
+    "title": "Ungültige CSV-Datei",
+    "description": "Die CSV-Datei konnte nicht verarbeitet werden. Bitte prüfe das Format und versuche es erneut."
+  },
   "Invalid API key": {
     "title": "Ungültiger API-Schlüssel",
     "description": "Der API-Schlüssel ist ungültig. Bitte versuchen Sie es erneut."

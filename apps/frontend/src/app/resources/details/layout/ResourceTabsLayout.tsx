@@ -203,16 +203,19 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
             onSelectionChange={(key) => navigateToTab(key as ResourceTabKey)}
             data-cy="resource-tabs"
           >
-            <TabList>
-              {tabs.map((tab) => (
-                <Tab key={tab.key} id={tab.key}>
-                  <span className="flex items-center gap-2">
-                    {TAB_ICONS[tab.key]}
-                    {t(tab.translationKey)}
-                  </span>
-                </Tab>
-              ))}
-            </TabList>
+            <Tabs.ListContainer>
+              <TabList>
+                {tabs.map((tab) => (
+                  <Tab key={tab.key} id={tab.key}>
+                    <Tabs.Indicator />
+                    <span className="flex items-center gap-2">
+                      {TAB_ICONS[tab.key]}
+                      {t(tab.translationKey)}
+                    </span>
+                  </Tab>
+                ))}
+              </TabList>
+            </Tabs.ListContainer>
           </Tabs>
         </div>
       </div>

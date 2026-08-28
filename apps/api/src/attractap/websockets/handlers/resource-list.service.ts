@@ -1,12 +1,12 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ResourceFlowNodeType } from '@attraccess/database-entities';
+import { ResourceFlowNodeType, ResourceHealthStatus, ResourceIntroducerType } from '@attraccess/database-entities';
 import { WebsocketService } from '../websocket.service';
 import { AttractapService } from '../../attractap.service';
 import { ResourceUsageService } from '../../../resources/usage/resourceUsage.service';
 import { ResourceMaintenanceService } from '../../../resources/maintenances/maintenance.service';
 import { ResourceHealthService } from '../../../resources/health/resource-health.service';
 import { ResourceFlowsService } from '../../../resources/flows/resource-flows.service';
-import { ResourceHealthStatus } from '@attraccess/database-entities';
+import { ResourceIntroducersService } from '../../../resources/introducers/resourceIntroducers.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
 
 const DEBOUNCE_MS = 200;
@@ -35,42 +35,45 @@ export class ResourceListService {
 
   private readonly pendingSends = new Map<number, { timer: ReturnType<typeof setTimeout>; resourceIds: Set<number> }>();
 
-  public async sendResourceList(readerId: number, resourceIds?: Set<number>) {
+  @Inject(ResourceIntroducersService)
+  private resourceIntroducersService: ResourceIntroducersService;
+
+  public async sendResourceList(readerId: number, resourceIds?: number[]) {
     const sockets = Array.from(this.websocketService.sockets.values()).filter((socket) => socket.readerId === readerId);
     if (sockets.length === 0) {
       return;
     }
 
-    await Promise.all(
-      sockets.map((socket) =>
-        resourceIds ? this.sendResourceListToSocket(socket, { resourceIds }) : this.sendResourceListToSocket(socket),
-      ),
-    );
+    await this.sendResourceListToSockets(sockets, resourceIds ? { resourceIds } : undefined);
   }
 
-  public sendResourceListToReadersWithResource(resourceId: number): void {
+  public sendResourceListToReadersWithResources(resourceIds: number[]): void {
+    if (resourceIds.length === 0) {
+      return;
+    }
+
     const readerIds = new Set<number>();
     for (const socket of this.websocketService.sockets.values()) {
       readerIds.add(socket.readerId);
     }
 
     for (const readerId of readerIds) {
-      this.scheduleSend(readerId, resourceId);
+      this.scheduleSend(readerId, resourceIds);
     }
   }
 
-  private scheduleSend(readerId: number, resourceId: number): void {
+  private scheduleSend(readerId: number, changedResourceIds: number[]): void {
     const pending = this.pendingSends.get(readerId);
     if (pending) {
       clearTimeout(pending.timer);
-      pending.resourceIds.add(resourceId);
+      changedResourceIds.forEach((resourceId) => pending.resourceIds.add(resourceId));
     }
 
-    const resourceIds = pending?.resourceIds ?? new Set([resourceId]);
+    const resourceIds = pending?.resourceIds ?? new Set(changedResourceIds);
 
     const timer = setTimeout(() => {
       this.pendingSends.delete(readerId);
-      this.sendResourceList(readerId, resourceIds).catch((err) => {
+      this.sendResourceList(readerId, [...resourceIds]).catch((err) => {
         this.logger.error(`Failed to send debounced resource list to reader ${readerId}`, err);
       });
     }, DEBOUNCE_MS);
@@ -80,32 +83,42 @@ export class ResourceListService {
 
   public async sendResourceListToSocket(
     socket: AuthenticatedWebSocket,
-    onlyIfResourceMatches?: { resourceIds?: Set<number> },
+    onlyIfResourceMatches?: { resourceIds?: number[] },
   ) {
-    const reader = await this.attractapService.findReaderById(socket.readerId);
+    await this.sendResourceListToSockets([socket], onlyIfResourceMatches);
+  }
+
+  private async sendResourceListToSockets(
+    sockets: AuthenticatedWebSocket[],
+    onlyIfResourceMatches?: { resourceIds?: number[] },
+  ) {
+    const reader = await this.attractapService.findReaderById(sockets[0].readerId);
     if (!reader) {
-      throw new Error(`Reader not found: ${socket.readerId}`);
+      throw new Error(`Reader not found: ${sockets[0].readerId}`);
     }
 
     const resources = [...reader.resources].sort((a, b) => a.name.localeCompare(b.name));
 
-    if (onlyIfResourceMatches?.resourceIds?.size) {
-      if (!resources.some((resource) => onlyIfResourceMatches.resourceIds?.has(resource.id))) {
+    const resourceIdsToMatch = onlyIfResourceMatches?.resourceIds ?? [];
+    if (resourceIdsToMatch.length > 0) {
+      if (!resources.some((resource) => resourceIdsToMatch.includes(resource.id))) {
         return;
       }
     }
 
-    const resourceIds = resources.map((r) => r.id);
+    const resourceIds = resources.map((resource) => resource.id);
 
-    // Fetch all per-resource data in 4 bulk queries instead of 4×N individual queries.
-    const [healthMap, activeSessionMap, activeMaintenanceIds, flowButtonMap] = await Promise.all([
-      this.resourceHealthService.listForResources(resourceIds),
-      this.resourceUsageService.getActiveSessions(resourceIds),
-      this.resourceMaintenanceService.getActiveMaintenanceResourceIds(resourceIds),
-      this.resourceFlowsService.getNodesForResources(resourceIds, ResourceFlowNodeType.INPUT_BUTTON),
-    ]);
+    // Fetch all per-resource data in bulk instead of issuing queries for every resource.
+    const [healthMap, activeSessionMap, activeMaintenanceIds, flowButtonMap, introducersByResourceId] =
+      await Promise.all([
+        this.resourceHealthService.listForResources(resourceIds),
+        this.resourceUsageService.getActiveSessions(resourceIds),
+        this.resourceMaintenanceService.getActiveMaintenanceResourceIds(resourceIds),
+        this.resourceFlowsService.getNodesForResources(resourceIds, ResourceFlowNodeType.INPUT_BUTTON),
+        this.resourceIntroducersService.getManyForResources(resourceIds, ResourceIntroducerType.INTRODUCER),
+      ]);
 
-    const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, {
+    const resourceListPayload = {
       readerName: reader.name,
       ledBrightness: reader.ledBrightness,
       resources: resources.map((resource) => {
@@ -113,6 +126,7 @@ export class ResourceListService {
         const unhealthyEntries = healthEntries.filter((entry) => entry.status === ResourceHealthStatus.UNHEALTHY);
         const activeUsageSession = activeSessionMap.get(resource.id) ?? null;
         const flowNodes = flowButtonMap.get(resource.id) ?? [];
+        const introducers = introducersByResourceId.get(resource.id) ?? [];
 
         return {
           id: resource.id,
@@ -121,21 +135,21 @@ export class ResourceListService {
           separateUnlockAndUnlatch: resource.separateUnlockAndUnlatch,
           description: resource.description,
           allowTakeOver: resource.allowTakeOver,
-          introducers: resource.introducers.map((introducer) => introducer.user.username),
+          introducers: introducers.flatMap((introducer) => (introducer.user ? [introducer.user.username] : [])),
           isUnderMaintenance: activeMaintenanceIds.has(resource.id),
           isHealthy: unhealthyEntries.length === 0,
           healthReason: this.buildHealthReason(unhealthyEntries),
           activeUsageSession: activeUsageSession
             ? {
-              user: {
-                username: activeUsageSession.user.username,
-              },
-              startTime: activeUsageSession.startTime.toISOString(),
-              // Offset (minutes east of UTC) of the API's effective timezone for this
-              // specific instant, so the reader can render local wall-clock time without
-              // a tz database. Computed per-timestamp, so it stays DST-correct.
-              startTimeUtcOffsetMinutes: -activeUsageSession.startTime.getTimezoneOffset(),
-            }
+                user: {
+                  username: activeUsageSession.user.username,
+                },
+                startTime: activeUsageSession.startTime.toISOString(),
+                // Offset (minutes east of UTC) of the API's effective timezone for this
+                // specific instant, so the reader can render local wall-clock time without
+                // a tz database. Computed per-timestamp, so it stays DST-correct.
+                startTimeUtcOffsetMinutes: -activeUsageSession.startTime.getTimezoneOffset(),
+              }
             : null,
           flowButtons: flowNodes.map((node) => ({
             id: node.id,
@@ -143,9 +157,14 @@ export class ResourceListService {
           })),
         };
       }),
-    });
-    this.logger.debug(`Sending resource list to socket ${socket.id}`, resourceListResponse);
-    await socket.sendMessage(resourceListResponse);
+    };
+    await Promise.all(
+      sockets.map(async (socket) => {
+        const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, resourceListPayload);
+        this.logger.debug(`Sending resource list to socket ${socket.id}`, resourceListResponse);
+        await socket.sendMessage(resourceListResponse);
+      }),
+    );
   }
 
   private buildHealthReason(unhealthyEntries: { identifier: string; reason: string | null }[]): string {

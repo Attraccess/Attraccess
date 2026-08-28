@@ -7,6 +7,8 @@ import {
   isWellFormedXml,
   splitHead,
   unwrapFragment,
+  withLogoPlaceholder,
+  withPreviewEmailLogo,
   wrapFragment,
   wrapInLayoutChrome,
 } from './mjmlLayout';
@@ -82,6 +84,25 @@ describe('isWellFormedXml', () => {
     expect(isWellFormedXml('<mjml><mj-body><br/></mj-body></mjml>')).toBe(true);
     expect(isWellFormedXml('<mjml><mj-body><br></mj-body></mjml>')).toBe(false);
     expect(isWellFormedXml('<mjml><mj-body>Terms & Conditions</mj-body></mjml>')).toBe(false);
+  });
+});
+
+describe('email logo preview mapping', () => {
+  const previewUrl = 'https://attraccess.example/api/logo.png';
+  const placeholderImage = '<mj-image src="{{host.logoUrl}}" />';
+
+  it('uses the API image in the browser preview and restores the placeholder for saving', () => {
+    const preview = withPreviewEmailLogo(placeholderImage, previewUrl);
+
+    expect(preview).toBe(`<mj-image src="${previewUrl}" />`);
+    expect(withLogoPlaceholder(preview, previewUrl)).toBe(placeholderImage);
+  });
+
+  it('does not alter unrelated image sources', () => {
+    const image = '<mj-image src="https://example.com/logo.png" />';
+
+    expect(withPreviewEmailLogo(image, previewUrl)).toBe(image);
+    expect(withLogoPlaceholder(image, previewUrl)).toBe(image);
   });
 });
 

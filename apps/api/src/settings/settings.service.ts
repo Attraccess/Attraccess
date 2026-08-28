@@ -5,7 +5,7 @@ import { Repository } from 'typeorm';
 import { randomBytes } from 'crypto';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { AppSettingsDto } from './dto/app-settings.dto';
-import { SmtpSettingsDto } from './dto/smtp-settings.dto';
+import { SmtpServiceType, SmtpSettingsDto } from './dto/smtp-settings.dto';
 import { UpdateAppSettingsDto } from './dto/update-app-settings.dto';
 import { UpdateSmtpSettingsDto } from './dto/update-smtp-settings.dto';
 import { SystemSettingsDto } from './dto/system-settings.dto';
@@ -74,9 +74,10 @@ export class SettingsService {
         !!app.url?.trim() &&
         app.licenseKeyConfigured === true,
       smtp:
-        !!smtp.service &&
-        !!smtp.user?.trim() &&
-        !!smtp.from?.trim(),
+        !!smtp.from?.trim() &&
+        (!smtp.passConfigured || !!smtp.user?.trim()) &&
+        (smtp.service === SmtpServiceType.Outlook365 ||
+          (smtp.service === SmtpServiceType.SMTP && !!smtp.host?.trim() && !!smtp.port)),
       admin: userCount > 0,
       adminEmailVerified,
     };

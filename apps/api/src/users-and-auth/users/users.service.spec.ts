@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuthenticationDetail, ResourceUsage, Session, User } from '@attraccess/database-entities';
-import { DataSource, Repository, UpdateResult } from 'typeorm';
+import { DataSource, EntityManager, Repository, UpdateResult } from 'typeorm';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 import { LicenseService } from '../../license/license.service';
@@ -22,19 +22,20 @@ const mockMetricsService = {
 const mockRbacService = {
   assignRoleByKey: jest.fn().mockResolvedValue(undefined),
   assignDefaultRoles: jest.fn().mockResolvedValue(undefined),
-  isLastOwner: jest.fn().mockResolvedValue(false),
+  isLastAdministrator: jest.fn().mockResolvedValue(false),
 };
 
 describe('UsersService', () => {
   let service: UsersService;
   let userRepository: jest.Mocked<Repository<User>>;
+  let dataSource: jest.Mocked<DataSource>;
   let emailService: { sendUsernameChangedEmail: jest.Mock };
 
   beforeEach(async () => {
     mockRbacService.assignRoleByKey.mockClear();
     mockRbacService.assignDefaultRoles.mockClear();
-    mockRbacService.isLastOwner.mockClear();
-    mockRbacService.isLastOwner.mockResolvedValue(false);
+    mockRbacService.isLastAdministrator.mockClear();
+    mockRbacService.isLastAdministrator.mockResolvedValue(false);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -78,6 +79,7 @@ describe('UsersService', () => {
             save: jest.fn(),
             update: jest.fn(),
             findAndCount: jest.fn(),
+            createQueryBuilder: jest.fn(),
             count: jest.fn(),
           },
         },
@@ -112,6 +114,7 @@ describe('UsersService', () => {
 
     service = module.get<UsersService>(UsersService);
     userRepository = module.get(getRepositoryToken(User)) as jest.Mocked<Repository<User>>;
+    dataSource = module.get(DataSource) as jest.Mocked<DataSource>;
     emailService = module.get(EmailService) as unknown as { sendUsernameChangedEmail: jest.Mock };
   });
 
@@ -153,20 +156,37 @@ describe('UsersService', () => {
     });
   });
 
+  describe('rollbackFailedRegistration', () => {
+    it('hard-deletes the unregistered user without updating user metrics', async () => {
+      const manager = { delete: jest.fn().mockResolvedValue(undefined) };
+      dataSource.transaction.mockImplementation(async (callback) => callback(manager as EntityManager));
+
+      await service.rollbackFailedRegistration(14);
+
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+      expect(manager.delete).toHaveBeenCalledWith(User, 14);
+      expect(mockMetricsService.usersTotal.dec).not.toHaveBeenCalled();
+      expect(mockMetricsService.usersPerLocale.dec).not.toHaveBeenCalled();
+    });
+  });
+
   describe('createOne', () => {
-    it('the first created user should be assigned the owner role via RBAC', async () => {
+    it('the first created user should be assigned the administrator role via RBAC', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(userRepository, 'save').mockImplementation(async (data) => ({
-        id: 1,
-        username: 'test',
-        email: 'test@example.com',
-        externalIdentifier: null,
-        ...data,
-      } as User));
+      jest.spyOn(userRepository, 'save').mockImplementation(
+        async (data) =>
+          ({
+            id: 1,
+            username: 'test',
+            email: 'test@example.com',
+            externalIdentifier: null,
+            ...data,
+          }) as User,
+      );
       jest.spyOn(userRepository, 'count').mockResolvedValue(0);
 
       await service.createOne({ username: 'test', email: 'test@example.com', externalIdentifier: null });
-      expect(mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'owner', expect.anything());
+      expect(mockRbacService.assignRoleByKey).toHaveBeenCalledWith(1, 'administrator', expect.anything());
     });
 
     it('a subsequent user should be assigned default roles via RBAC', async () => {
@@ -274,7 +294,6 @@ describe('UsersService', () => {
 
       await expect(service.updateOne(1, { externalIdentifier: 'value' })).rejects.toThrow(UserNotFoundException);
     });
-
   });
 
   describe('findMany', () => {
@@ -378,9 +397,236 @@ describe('UsersService', () => {
 
       await service.findMany({ page: 1, limit: 10 });
 
+      expect(userRepository.findAndCount).toHaveBeenCalledWith(expect.objectContaining({ order: { username: 'ASC' } }));
+     });
+
+     it('should filter users by role assignment', async () => {
+       userRepository.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.findMany({ page: 1, limit: 10, roleId: 42 });
+
       expect(userRepository.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({ order: { username: 'ASC' } }),
+         expect.objectContaining({ where: { userRoles: { roleId: 42 } } }),
+       );
+     });
+
+    it('should retain the role assignment filter when searching', async () => {
+      userRepository.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.findMany({ page: 1, limit: 10, roleId: 42, search: 'alice' });
+
+      expect(userRepository.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.arrayContaining([expect.objectContaining({ userRoles: { roleId: 42 } })]),
+        }),
       );
+    });
+
+    it('should require every selected role when roleMatch is all', async () => {
+      const query = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        subQuery: jest.fn(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      const roleFilter = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        having: jest.fn().mockReturnThis(),
+        getQuery: jest.fn().mockReturnValue('(SELECT role user IDs)'),
+      };
+      query.subQuery.mockReturnValue(roleFilter);
+      userRepository.createQueryBuilder.mockReturnValue(query as never);
+
+      await service.findMany({ page: 1, limit: 10, roleIds: [2, 2, 4], roleMatch: 'all' });
+
+      expect(roleFilter.having).toHaveBeenCalledWith('COUNT(DISTINCT userRole.roleId) = :roleCount');
+      expect(query.andWhere).toHaveBeenCalledWith('user.id IN (SELECT role user IDs)', {
+        roleIds: [2, 4],
+        roleCount: 2,
+      });
+    });
+
+    it('should exclude users assigned any selected role', async () => {
+      const query = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        subQuery: jest.fn(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      const excludedRoles = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getQuery: jest.fn().mockReturnValue('(SELECT excluded role user IDs)'),
+      };
+      query.subQuery.mockReturnValue(excludedRoles);
+      userRepository.createQueryBuilder.mockReturnValue(query as never);
+
+      await service.findMany({ page: 1, limit: 10, excludeRoleIds: [2, 2, 4] });
+
+      expect(query.andWhere).toHaveBeenCalledWith('NOT EXISTS (SELECT excluded role user IDs)', {
+        excludeRoleIds: [2, 4],
+      });
+    });
+
+    it('should combine selected SSO providers with no SSO users for an any match', async () => {
+      const query = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        subQuery: jest.fn(),
+        setParameters: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      const noSsoProvider = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getQuery: jest.fn().mockReturnValue('(SELECT no SSO provider)'),
+      };
+      const ssoProviders = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getQuery: jest.fn().mockReturnValue('(SELECT selected SSO providers)'),
+      };
+      query.subQuery.mockReturnValueOnce(noSsoProvider).mockReturnValueOnce(ssoProviders);
+      userRepository.createQueryBuilder.mockReturnValue(query as never);
+
+      await service.findMany({ page: 1, limit: 10, ssoProviderIds: [7], ssoProviderNone: true });
+
+      expect(query.andWhere).toHaveBeenCalledWith(expect.anything());
+      expect(query.setParameters).toHaveBeenCalledWith({
+        ssoType: 'sso',
+        ssoProviderIds: [7],
+        ssoProviderCount: 1,
+      });
+    });
+
+    it('should deduplicate SSO providers before applying an all match', async () => {
+      const query = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        subQuery: jest.fn(),
+        setParameters: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      const ssoProviders = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        having: jest.fn().mockReturnThis(),
+        getQuery: jest.fn().mockReturnValue('(SELECT selected SSO providers)'),
+      };
+      query.subQuery
+        .mockReturnValueOnce({
+          select: jest.fn().mockReturnThis(),
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getQuery: jest.fn().mockReturnValue('(SELECT no SSO provider)'),
+        })
+        .mockReturnValueOnce(ssoProviders);
+      userRepository.createQueryBuilder.mockReturnValue(query as never);
+
+      await service.findMany({ page: 1, limit: 10, ssoProviderIds: [7, 7], ssoProviderMatch: 'all' });
+
+      expect(ssoProviders.having).toHaveBeenCalledWith('COUNT(DISTINCT ssoDetail.providerId) = :ssoProviderCount');
+      expect(query.setParameters).toHaveBeenCalledWith({
+        ssoType: 'sso',
+        ssoProviderIds: [7],
+        ssoProviderCount: 1,
+      });
+    });
+
+    it('should exclude users linked to any selected SSO provider', async () => {
+      const query = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        subQuery: jest.fn(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      const excludedSsoProviders = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getQuery: jest.fn().mockReturnValue('(SELECT excluded SSO providers)'),
+      };
+      query.subQuery.mockReturnValue(excludedSsoProviders);
+      userRepository.createQueryBuilder.mockReturnValue(query as never);
+
+      await service.findMany({ page: 1, limit: 10, excludeSsoProviderIds: [7, 7] });
+
+      expect(query.andWhere).toHaveBeenCalledWith('NOT EXISTS (SELECT excluded SSO providers)', {
+        excludedSsoType: 'sso',
+        excludeSsoProviderIds: [7],
+      });
+    });
+
+    it('should require users with an SSO provider', async () => {
+      const query = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        subQuery: jest.fn(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      const ssoProviderExists = {
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getQuery: jest.fn().mockReturnValue('(SELECT any SSO provider)'),
+      };
+      query.subQuery.mockReturnValue(ssoProviderExists);
+      userRepository.createQueryBuilder.mockReturnValue(query as never);
+
+      await service.findMany({ page: 1, limit: 10, hasSsoProvider: true });
+
+      expect(query.andWhere).toHaveBeenCalledWith('EXISTS (SELECT any SSO provider)', {
+        anySsoType: 'sso',
+      });
+    });
+
+    it('should filter by email verification status', async () => {
+      const query = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      userRepository.createQueryBuilder.mockReturnValue(query as never);
+
+      await service.findMany({ page: 1, limit: 10, emailVerified: true });
+
+      expect(query.andWhere).toHaveBeenCalledWith('user.isEmailVerified = :emailVerified', { emailVerified: true });
     });
 
     it('should throw error for invalid pagination options', async () => {
@@ -548,17 +794,98 @@ describe('UsersService', () => {
   describe('confirmSelfDeletion', () => {
     const futureDate = new Date(Date.now() + 86_400_000);
 
-    it('throws ForbiddenException when user is the last owner', async () => {
+    it('throws ForbiddenException when user is the last administrator', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue({
         id: 1,
-        email: 'owner@example.com',
+        email: 'admin@example.com',
         deletedAt: null,
         deleteAccountToken: 'hashed:tok',
         deleteAccountTokenExpiresAt: futureDate,
       } as unknown as User);
-      mockRbacService.isLastOwner.mockResolvedValue(true);
+      mockRbacService.isLastAdministrator.mockResolvedValue(true);
 
-      await expect(service.confirmSelfDeletion('owner@example.com', 'tok')).rejects.toThrow(ForbiddenException);
+      await expect(service.confirmSelfDeletion('admin@example.com', 'tok')).rejects.toThrow(ForbiddenException);
+    });
+
+    it('treats a repeated confirmation as success after the email has been reused', async () => {
+      const reusedEmailUser = {
+        id: 2,
+        deletedAt: null,
+        deleteAccountToken: 'hashed:different-token',
+        deleteAccountTokenExpiresAt: futureDate,
+      } as User;
+      const deletedUser = {
+        id: 1,
+        deletedAt: new Date(),
+        deleteAccountToken: 'hashed:tok',
+        deleteAccountTokenExpiresAt: futureDate,
+      } as User;
+      userRepository.findOne.mockResolvedValueOnce(reusedEmailUser).mockResolvedValueOnce(deletedUser);
+
+      await expect(service.confirmSelfDeletion('deleted@example.com', 'tok')).resolves.toBeUndefined();
+
+      expect(userRepository.findOne).toHaveBeenNthCalledWith(2, {
+        where: expect.objectContaining({
+          deleteAccountToken: expect.anything(),
+          deletedAt: expect.anything(),
+        }),
+        withDeleted: true,
+      });
+    });
+
+    it('rejects an expired confirmation token for a deleted account', async () => {
+      const deletedUser = {
+        id: 1,
+        deletedAt: new Date(),
+        deleteAccountToken: 'hashed:tok',
+        deleteAccountTokenExpiresAt: new Date(Date.now() - 1_000),
+      } as User;
+      userRepository.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(deletedUser);
+
+      await expect(service.confirmSelfDeletion('deleted@example.com', 'tok')).rejects.toThrow(
+        'DeleteAccountTokenExpiredException',
+      );
+    });
+
+    it('retains confirmation token evidence while confirming an account deletion', async () => {
+      const user = {
+        id: 1,
+        locale: 'en',
+        deletedAt: null,
+        deleteAccountToken: 'hashed:tok',
+        deleteAccountTokenExpiresAt: futureDate,
+        deleteAccountRequestedAt: new Date(),
+      } as User;
+      const userRepo = {
+        findOne: jest.fn().mockResolvedValue(user),
+        update: jest.fn().mockResolvedValue({ affected: 1 }),
+        softDelete: jest.fn().mockResolvedValue({ affected: 1 }),
+      };
+      const usageRepo = { findOne: jest.fn().mockResolvedValue(null) };
+      const authRepo = { delete: jest.fn().mockResolvedValue({ affected: 1 }) };
+      const sessionRepo = { delete: jest.fn().mockResolvedValue({ affected: 1 }) };
+      const manager = {
+        getRepository: jest.fn((entity) => {
+          if (entity === User) return userRepo;
+          if (entity === ResourceUsage) return usageRepo;
+          if (entity === AuthenticationDetail) return authRepo;
+          return sessionRepo;
+        }),
+      } as unknown as EntityManager;
+      dataSource.transaction.mockImplementation(async (callback) => callback(manager));
+
+      userRepository.findOne.mockResolvedValue(user);
+
+      await service.confirmSelfDeletion('deleted@example.com', 'tok');
+
+      expect(userRepo.update).toHaveBeenCalledWith(
+        1,
+        expect.not.objectContaining({
+          deleteAccountToken: expect.anything(),
+          deleteAccountTokenExpiresAt: expect.anything(),
+          deleteAccountRequestedAt: expect.anything(),
+        }),
+      );
     });
   });
 });

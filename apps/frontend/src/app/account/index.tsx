@@ -11,6 +11,8 @@ import { EmailForm } from './email';
 import { SetPasswordForm } from '../user-management/details/components/setPasswordForm';
 import { useAuth } from '../../hooks/useAuth';
 import { TwoFactorCard } from './two-factor';
+import { PasskeysCard } from './passkeys';
+import { ApiTokensCard } from './api-tokens';
 import { NotificationPreferencesForm } from './notifications';
 import { useUsersServiceRequestDeleteAccount, ApiError } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
@@ -24,7 +26,7 @@ export default function AccountPage() {
     de: { ...de, apiErrors: API_ERROR_TRANSLATIONS_DE },
   });
 
-  const { user: me } = useAuth();
+  const { user: me, hasPermission } = useAuth();
   const toast = useToastMessage();
   const { isOpen, open, close, setOpen } = useOverlayState();
 
@@ -62,10 +64,18 @@ export default function AccountPage() {
           <div className="flex flex-col gap-6">
             {me && <SetPasswordForm userId={me.id} username={me.username} />}
             {me && <TwoFactorCard />}
+            {me && <PasskeysCard />}
+            {me && hasPermission('users.api-tokens.manage') && (
+              <ApiTokensCard availablePermissions={me.effectivePermissions ?? []} />
+            )}
           </div>
         </FlatSection>
 
-        <FlatSection icon={<BellIcon size={16} />} title={t('sections.notifications')} className="sm:col-span-2 xl:col-span-3">
+        <FlatSection
+          icon={<BellIcon size={16} />}
+          title={t('sections.notifications')}
+          className="sm:col-span-2 xl:col-span-3"
+        >
           <div className="flex flex-col gap-6">
             <NotificationPreferencesForm />
           </div>

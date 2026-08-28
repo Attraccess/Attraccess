@@ -258,19 +258,22 @@ export function TranslationsSection({ templateType, liveContent }: TranslationsS
         <>
           <div className="flex flex-row flex-wrap items-center gap-2">
             <Tabs selectedKey={selectedLocale} onSelectionChange={(key: Key) => setSelectedLocale(String(key))}>
-              <TabList>
-                {allLocales.map((locale) => (
-                  <Tab id={locale} key={locale} data-cy={`translations-language-tab-${locale}`}>
-                    <span className="flex items-center gap-1.5">
-                      {displayName(locale)}
-                      <span className="text-xs text-default-400">
-                        {filledCount(locale)}/{extractedKeys.length}
+              <Tabs.ListContainer>
+                <TabList>
+                  {allLocales.map((locale) => (
+                    <Tab id={locale} key={locale} data-cy={`translations-language-tab-${locale}`}>
+                      <Tabs.Indicator />
+                      <span className="flex items-center gap-1.5">
+                        {displayName(locale)}
+                        <span className="text-xs text-default-400">
+                          {filledCount(locale)}/{extractedKeys.length}
+                        </span>
+                        {isDirty(locale) && <span className="w-1.5 h-1.5 rounded-full bg-warning" aria-hidden="true" />}
                       </span>
-                      {isDirty(locale) && <span className="w-1.5 h-1.5 rounded-full bg-warning" aria-hidden="true" />}
-                    </span>
-                  </Tab>
-                ))}
-              </TabList>
+                    </Tab>
+                  ))}
+                </TabList>
+              </Tabs.ListContainer>
             </Tabs>
             {selectedLocale && (
               <Button
