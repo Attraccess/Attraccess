@@ -172,6 +172,41 @@ describe('NpmPluginService', () => {
     expect(service.packageMetadata).toHaveBeenCalledWith('@example/plugin', 'npm');
   });
 
+  it('includes official allowlisted packages even when npm search omits them', async () => {
+    const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
+    const internals = service as unknown as ServiceInternals;
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+    jest.spyOn(axios, 'get').mockResolvedValue({ data: { objects: [] } });
+    jest.spyOn(service, 'packageMetadata').mockImplementation(async (name) => ({
+      name,
+      publisher: { username: 'attraccess' },
+      'dist-tags': { latest: '1.2.3' },
+      versions: {
+        '1.2.3': {
+          name,
+          version: '1.2.3',
+          keywords: ['attraccess-plugin'],
+          peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
+          attraccess: {
+            displayName: name,
+            host: '*',
+            backend: 'dist/index.js',
+            sdk: { backend: '*' },
+            permissions: [],
+          },
+        },
+      },
+    }));
+
+    await expect(service.searchMarketplace('')).resolves.toMatchObject({
+      results: expect.arrayContaining([
+        expect.objectContaining({ name: '@attraccess-plugins/shelly', classification: 'official' }),
+        expect.objectContaining({ name: '@attraccess-plugins/rabbitmq', classification: 'official' }),
+      ]),
+    });
+  });
+
   it('retains hydrated marketplace packages when another result no longer has metadata', async () => {
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
     const internals = service as unknown as ServiceInternals;

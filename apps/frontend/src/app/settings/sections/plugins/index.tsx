@@ -84,6 +84,7 @@ type MarketplacePlugin = {
   description: string | null;
   permissions: string[];
   hostRange: string | null;
+  sdkCompatibility: { backend: string | null; frontend: string | null };
   repository: string | null;
   homepage: string | null;
   license: string | null;
@@ -95,6 +96,7 @@ type MarketplacePlugin = {
   installable: boolean;
   incompatibilityReason: string | null;
   integrity: string | null;
+  provenance: string | null;
 };
 
 type Registry = { id: string; name: string; url: string; tokenConfigured: boolean };
@@ -465,6 +467,11 @@ export function PluginsSection() {
                           classification={installedNpmPlugins.get(plugin.name)?.classification ?? 'community'}
                         />
                       </div>
+                      {installedNpmPlugins.get(plugin.name)?.registryUrl ? (
+                        <p className="mt-1 text-xs text-muted md:hidden">
+                          {installedNpmPlugins.get(plugin.name)?.registryUrl}
+                        </p>
+                      ) : null}
                     </TableCell>
                     <TableCell>
                       <Chip variant="soft" color="accent">
@@ -531,6 +538,7 @@ export function PluginsSection() {
                                 description: null,
                                 permissions: installedNpmPlugins.get(plugin.name)?.permissions ?? [],
                                 hostRange: null,
+                                sdkCompatibility: { backend: null, frontend: null },
                                 repository: null,
                                 homepage: null,
                                 license: null,
@@ -546,6 +554,7 @@ export function PluginsSection() {
                                 installable: true,
                                 incompatibilityReason: null,
                                 integrity: installedNpmPlugins.get(plugin.name)?.integrity ?? null,
+                                provenance: installedNpmPlugins.get(plugin.name)?.publisher ?? null,
                               })
                             }
                           >
@@ -646,6 +655,12 @@ export function PluginsSection() {
                         <PluginClassificationBadge classification={plugin.classification} />
                       </div>
                       {plugin.description ? <p className="text-sm text-muted">{plugin.description}</p> : null}
+                      <p className="text-xs text-muted">
+                        {t('marketplace.version', { version: plugin.version ?? '-' })}
+                      </p>
+                      {plugin.incompatibilityReason ? (
+                        <p className="text-sm text-danger">{plugin.incompatibilityReason}</p>
+                      ) : null}
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs text-muted">
                           {plugin.registry.name} · {plugin.publisher ?? '-'}
@@ -740,6 +755,12 @@ export function PluginsSection() {
                   <p>{t('marketplace.version', { version: marketplacePlugin.version ?? '-' })}</p>
                   <p>{t('marketplace.publisher', { publisher: marketplacePlugin.publisher ?? '-' })}</p>
                   <p>{t('marketplace.hostCompatibility', { range: marketplacePlugin.hostRange ?? '-' })}</p>
+                  <p>
+                    {t('marketplace.sdkCompatibility', {
+                      backend: marketplacePlugin.sdkCompatibility?.backend ?? '-',
+                      frontend: marketplacePlugin.sdkCompatibility?.frontend ?? '-',
+                    })}
+                  </p>
                   <p>{t('marketplace.license', { license: marketplacePlugin.license ?? '-' })}</p>
                   {marketplacePlugin.repository ? (
                     <a
@@ -762,6 +783,9 @@ export function PluginsSection() {
                     </a>
                   ) : null}
                   <p>{t('marketplace.integrity', { integrity: marketplacePlugin.integrity ?? '-' })}</p>
+                  {marketplacePlugin.provenance ? (
+                    <p>{t('marketplace.provenance', { provenance: marketplacePlugin.provenance })}</p>
+                  ) : null}
                   {marketplacePlugin.deprecated ? <p className="text-warning">{t('marketplace.deprecated')}</p> : null}
                   <p>
                     {t('marketplace.permissions', {
@@ -771,6 +795,7 @@ export function PluginsSection() {
                   {marketplacePlugin.incompatibilityReason ? (
                     <p className="text-danger">{marketplacePlugin.incompatibilityReason}</p>
                   ) : null}
+                  <p className="text-warning text-sm">{t('marketplace.restartWarning')}</p>
                 </div>
               ) : null}
             </ModalBody>
