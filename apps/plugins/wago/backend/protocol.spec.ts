@@ -1,4 +1,14 @@
-import { compatibilityError, DISCOVERY_ROOT, discoveryTopic, heartbeatTopic, parseAnnouncement } from './protocol';
+import {
+  compatibilityError,
+  configurationDesiredTopic,
+  configurationReportedHardwareId,
+  configurationReportedTopic,
+  configurationReportedWildcardTopic,
+  DISCOVERY_ROOT,
+  discoveryTopic,
+  heartbeatTopic,
+  parseAnnouncement,
+} from './protocol';
 
 describe('WAGO protocol', () => {
   const valid = {
@@ -6,7 +16,7 @@ describe('WAGO protocol', () => {
     pairingCode: '482931',
     protocolVersion: '1.2.0',
     runtimeVersion: '0.4.0',
-    capabilities: ['claim', 'heartbeat'],
+    capabilities: ['claim', 'heartbeat', 'configuration-v1'],
     sequence: 3,
   };
 
@@ -15,6 +25,34 @@ describe('WAGO protocol', () => {
     expect(discoveryTopic(valid.hardwareId)).toBe(`${DISCOVERY_ROOT}/cc100-01`);
     expect(heartbeatTopic(valid.hardwareId)).toBe('attraccess/wago/controllers/cc100-01/heartbeat');
   });
+
+  it('uses a versioned configuration protocol below the configurable operational prefix', () => {
+    expect(configurationDesiredTopic('customer/wago/', 'cc100-01')).toBe(
+      'customer/wago/v1/controllers/cc100-01/configuration/desired',
+    );
+    expect(configurationReportedTopic('customer/wago', 'cc100-01')).toBe(
+      'customer/wago/v1/controllers/cc100-01/configuration/reported',
+    );
+    expect(configurationReportedWildcardTopic('customer/wago')).toBe(
+      'customer/wago/v1/controllers/+/configuration/reported',
+    );
+    expect(
+      configurationReportedHardwareId(
+        'customer/wago',
+        'customer/wago/v1/controllers/cc100-01/configuration/reported',
+      ),
+    ).toBe('cc100-01');
+    expect(configurationReportedHardwareId('customer/wago', 'customer/wago/v1/controllers/+/configuration/reported')).toBeNull();
+  });
+
+  it.each(['', '/', 'customer//wago', 'customer/+/wago', 'customer/#/wago'])(
+    'rejects invalid operational prefix %j',
+    (prefix) => {
+      expect(() => configurationDesiredTopic(prefix, valid.hardwareId)).toThrow(
+        'MQTT prefix must contain non-empty segments without wildcards',
+      );
+    },
+  );
 
   it.each([
     ['invalid JSON', Buffer.from('{')],
@@ -28,6 +66,9 @@ describe('WAGO protocol', () => {
       'supports protocol 1.x',
     );
     expect(compatibilityError({ protocolVersion: '1.0.0', capabilities: ['claim'] })).toContain('heartbeat');
+    expect(compatibilityError({ protocolVersion: '1.0.0', capabilities: ['claim', 'heartbeat'] })).toContain(
+      'configuration-v1',
+    );
     expect(compatibilityError({ protocolVersion: '1.0.0', capabilities: valid.capabilities })).toBeNull();
   });
 });

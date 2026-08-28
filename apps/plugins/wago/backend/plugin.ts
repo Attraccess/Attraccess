@@ -5,12 +5,14 @@ import { WagoController } from './wago-controller.entity';
 import { WagoService } from './wago.service';
 import { WagoSettings } from './wago-settings.entity';
 import { WagoEnrollment } from './wago-enrollment.entity';
+import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
+import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 class WagoPluginModule {}
 
 const plugin: PluginBackendModule = {
-  entities: [WagoController, WagoSettings, WagoEnrollment],
+  entities: [WagoController, WagoSettings, WagoEnrollment, WagoConfigurationDraft, WagoConfigurationRevision],
   register(context: PluginContext): DynamicModule {
     return {
       module: WagoPluginModule,

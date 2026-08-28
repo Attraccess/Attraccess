@@ -1,5 +1,7 @@
 export const DISCOVERY_ROOT = 'attraccess/wago/discovery';
-export const REQUIRED_CAPABILITIES = ['claim', 'heartbeat'] as const;
+export const CONFIGURATION_PROTOCOL_VERSION = 1;
+export const CONFIGURATION_CAPABILITY = `configuration-v${CONFIGURATION_PROTOCOL_VERSION}`;
+export const REQUIRED_CAPABILITIES = ['claim', 'heartbeat', CONFIGURATION_CAPABILITY] as const;
 export const SUPPORTED_PROTOCOL_MAJOR = 1;
 
 export interface WagoAnnouncement {
@@ -60,4 +62,36 @@ export function discoveryTopic(hardwareId: string): string {
 }
 export function heartbeatTopic(hardwareId: string): string {
   return `attraccess/wago/controllers/${hardwareId}/heartbeat`;
+}
+
+export function configurationDesiredTopic(prefix: string, hardwareId: string): string {
+  return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${hardwareId}/configuration/desired`;
+}
+
+export function configurationReportedTopic(prefix: string, hardwareId: string): string {
+  return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${hardwareId}/configuration/reported`;
+}
+
+export function configurationReportedWildcardTopic(prefix: string): string {
+  return configurationReportedTopic(prefix, '+');
+}
+
+export function configurationReportedHardwareId(prefix: string, topic: string): string | null {
+  const topicPrefix = `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/`;
+  const topicSuffix = '/configuration/reported';
+  if (!topic.startsWith(topicPrefix) || !topic.endsWith(topicSuffix)) return null;
+  const hardwareId = topic.slice(topicPrefix.length, -topicSuffix.length);
+  return hardwareId && !/[+/]/.test(hardwareId) ? hardwareId : null;
+}
+
+export function normalizeOperationalPrefix(prefix: string): string {
+  const trimmed = prefix.trim();
+  let start = 0;
+  let end = trimmed.length;
+  while (trimmed[start] === '/') start += 1;
+  while (trimmed[end - 1] === '/') end -= 1;
+  const normalized = trimmed.slice(start, end);
+  if (!normalized || normalized.split('/').some((segment) => !segment || /[+#]/.test(segment)))
+    throw new Error('MQTT prefix must contain non-empty segments without wildcards');
+  return normalized;
 }

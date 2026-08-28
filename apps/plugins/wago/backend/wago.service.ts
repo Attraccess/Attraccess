@@ -9,19 +9,36 @@ import {
 } from '@nestjs/common';
 import type { PluginContext, PluginMqttSubscription, Repository } from '@attraccess/plugins-backend-sdk';
 import {
+  CONFIGURATION_PROTOCOL_VERSION,
   DISCOVERY_ROOT,
   compatibilityError,
+  configurationDesiredTopic,
+  configurationReportedHardwareId,
+  configurationReportedTopic,
+  configurationReportedWildcardTopic,
   discoveryTopic,
   heartbeatTopic,
+  normalizeOperationalPrefix,
   parseAnnouncement,
   type WagoAnnouncement,
 } from './protocol';
 import { WagoController } from './wago-controller.entity';
 import { WagoSettings } from './wago-settings.entity';
 import { WagoEnrollment } from './wago-enrollment.entity';
+import {
+  canonicalSnapshot,
+  configurationDiff,
+  configurationHash,
+  parseConfigurationReport,
+  type ConfigurationValidationError,
+  validateSnapshot,
+} from './configuration';
+import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
+import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 const STALE_AFTER_MS = 90_000;
+const MAX_PENDING_CONFIGURATION_REPORTS = 100;
 const ENROLLMENT_RETRY_MS = 60_000;
 
 type WagoControllerSummary = Omit<WagoController, 'fingerprint' | 'pairingCodeHash'> & {
@@ -33,9 +50,14 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   private readonly controllers: Repository<WagoController>;
   private readonly settings: Repository<WagoSettings>;
   private readonly enrollments: Repository<WagoEnrollment>;
+  private readonly drafts: Repository<WagoConfigurationDraft>;
+  private readonly revisions: Repository<WagoConfigurationRevision>;
   private readonly subscriptions: PluginMqttSubscription[] = [];
   private readonly enrollmentExpiryTimers = new Map<number, ReturnType<typeof setTimeout>>();
   private readonly claimLocks = new Map<number, Promise<void>>();
+  private readonly configurationLocks = new Map<number, Promise<void>>();
+  private readonly configurationReportQueues = new Map<number, { pending: Map<number, Buffer>; processing: boolean }>();
+  private claimConfigurationLock = Promise.resolve();
   private subscriptionRebuild = Promise.resolve();
   private subscriptionRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private activeSubscriptionGeneration = 0;
@@ -45,6 +67,8 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     this.controllers = context.getRepository(WagoController);
     this.settings = context.getRepository(WagoSettings);
     this.enrollments = context.getRepository(WagoEnrollment);
+    this.drafts = context.getRepository(WagoConfigurationDraft);
+    this.revisions = context.getRepository(WagoConfigurationRevision);
   }
 
   async onModuleInit(): Promise<void> {
@@ -91,20 +115,181 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     await this.settings
       .createQueryBuilder()
       .insert()
-      .values({ id: 1, defaultMqttServerId: null })
+      .values({ id: 1, defaultMqttServerId: null, operationalPrefix: 'attraccess/wago' })
       .orIgnore()
       .execute();
     return this.settings.findOneByOrFail({ id: 1 });
   }
 
-  async setDefaultMqttServer(serverId: number | null): Promise<WagoSettings> {
-    if (serverId !== null && !(await this.context.getMqttServerConfig(serverId)))
+  async setSettings(serverId?: number | null, operationalPrefix?: string): Promise<WagoSettings> {
+    if (serverId !== undefined && serverId !== null && !(await this.context.getMqttServerConfig(serverId)))
       throw new NotFoundException(`MQTT server ${serverId} not found`);
-    const settings = await this.getSettings();
-    settings.defaultMqttServerId = serverId;
-    await this.settings.save(settings);
+    const save = async (): Promise<WagoSettings> => {
+      const settings = await this.getSettings();
+      if (serverId !== undefined) settings.defaultMqttServerId = serverId;
+      if (operationalPrefix !== undefined) {
+        const normalizedPrefix = normalizeOperationalPrefix(operationalPrefix);
+        if (normalizedPrefix !== settings.operationalPrefix) {
+          const controllers = await this.controllers.find({ where: { trustState: 'claimed' } });
+          if (controllers.length)
+            throw new ConflictException('operational MQTT prefix cannot change after a controller has been claimed');
+          settings.operationalPrefix = normalizedPrefix;
+        }
+      }
+      await this.settings.save(settings);
+      return settings;
+    };
+    const settings = operationalPrefix === undefined ? await save() : await this.withClaimConfigurationLock(save);
     await this.subscribeConfiguredServers();
     return settings;
+  }
+
+  async setDefaultMqttServer(serverId: number | null): Promise<WagoSettings> {
+    return this.setSettings(serverId);
+  }
+
+  async getDraft(controllerId: number): Promise<WagoConfigurationDraft | null> {
+    await this.claimedController(controllerId);
+    return this.drafts.findOneBy({ controllerId });
+  }
+
+  async saveDraft(controllerId: number, snapshot: unknown): Promise<WagoConfigurationDraft> {
+    return this.withConfigurationLock(controllerId, () => this.saveDraftWhileLocked(controllerId, snapshot));
+  }
+
+  async validateDraft(controllerId: number): Promise<{ valid: boolean; errors: ConfigurationValidationError[] }> {
+    const draft = await this.getDraft(controllerId);
+    if (!draft) throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
+    const errors = validateSnapshot(JSON.parse(draft.snapshot));
+    return { valid: errors.length === 0, errors };
+  }
+
+  async revisionsFor(
+    controllerId: number,
+    offset = 0,
+    limit = 20,
+  ): Promise<{ revisions: Array<Omit<WagoConfigurationRevision, 'snapshot'>>; offset: number; limit: number }> {
+    await this.claimedController(controllerId);
+    const pageOffset = Number.isSafeInteger(offset) && offset > 0 ? offset : 0;
+    const pageLimit = Number.isSafeInteger(limit) && limit > 0 ? Math.min(limit, 100) : 20;
+    const revisions = await this.revisions.find({
+      where: { controllerId },
+      order: { revision: 'DESC' },
+      select: [
+        'id',
+        'controllerId',
+        'revision',
+        'contentHash',
+        'state',
+        'rejectionErrors',
+        'publishedAt',
+        'reportedAt',
+      ],
+      skip: pageOffset,
+      take: pageLimit,
+    });
+    return { revisions, offset: pageOffset, limit: pageLimit };
+  }
+
+  async reviewDraft(controllerId: number): Promise<{
+    draft: WagoConfigurationDraft;
+    previous: WagoConfigurationRevision | null;
+    changed: boolean;
+    diff: ReturnType<typeof configurationDiff>;
+  }> {
+    return this.withConfigurationLock(controllerId, () => this.reviewDraftWhileLocked(controllerId));
+  }
+
+  async publishDraft(controllerId: number): Promise<WagoConfigurationRevision> {
+    return this.withConfigurationLock(controllerId, () => this.publishDraftWhileLocked(controllerId));
+  }
+
+  async rollback(controllerId: number, revision: number): Promise<WagoConfigurationRevision> {
+    return this.withConfigurationLock(controllerId, async () => {
+      const source = await this.revisions.findOneBy({ controllerId, revision });
+      if (!source) throw new NotFoundException(`WAGO configuration revision ${revision} not found`);
+      await this.saveDraftWhileLocked(controllerId, JSON.parse(source.snapshot));
+      await this.reviewDraftWhileLocked(controllerId);
+      return this.publishDraftWhileLocked(controllerId);
+    });
+  }
+
+  async previewRevision(
+    controllerId: number,
+    revision: number,
+  ): Promise<{
+    revision: WagoConfigurationRevision;
+    current: WagoConfigurationRevision | null;
+    diff: ReturnType<typeof configurationDiff>;
+  }> {
+    await this.claimedController(controllerId);
+    const selected = await this.revisions.findOneBy({ controllerId, revision });
+    if (!selected) throw new NotFoundException(`WAGO configuration revision ${revision} not found`);
+    const [current] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
+    return {
+      revision: selected,
+      current: current ?? null,
+      diff: configurationDiff(current ? JSON.parse(current.snapshot) : null, JSON.parse(selected.snapshot)),
+    };
+  }
+
+  private async saveDraftWhileLocked(controllerId: number, snapshot: unknown): Promise<WagoConfigurationDraft> {
+    await this.claimedController(controllerId);
+    const serialized = canonicalSnapshot(snapshot);
+    const existing = await this.drafts.findOneBy({ controllerId });
+    const draft =
+      existing ?? this.drafts.create({ controllerId, snapshot: serialized, reviewedHash: null, updatedAt: '' });
+    draft.snapshot = serialized;
+    draft.reviewedHash = null;
+    draft.updatedAt = new Date().toISOString();
+    return this.drafts.save(draft);
+  }
+
+  private async reviewDraftWhileLocked(controllerId: number): Promise<{
+    draft: WagoConfigurationDraft;
+    previous: WagoConfigurationRevision | null;
+    changed: boolean;
+    diff: ReturnType<typeof configurationDiff>;
+  }> {
+    await this.claimedController(controllerId);
+    const draft = await this.drafts.findOneBy({ controllerId });
+    if (!draft) throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
+    const previous = await this.latestRevision(controllerId);
+    draft.reviewedHash = configurationHash(JSON.parse(draft.snapshot));
+    await this.drafts.save(draft);
+    const diff = configurationDiff(previous ? JSON.parse(previous.snapshot) : null, JSON.parse(draft.snapshot));
+    return { draft, previous, changed: diff.length > 0, diff };
+  }
+
+  private async publishDraftWhileLocked(controllerId: number): Promise<WagoConfigurationRevision> {
+    const controller = await this.claimedController(controllerId);
+    const draft = await this.drafts.findOneBy({ controllerId });
+    if (!draft) throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
+    const validation = validateSnapshot(JSON.parse(draft.snapshot));
+    if (validation.length)
+      throw new ConflictException({ message: 'configuration draft is invalid', errors: validation });
+    const contentHash = configurationHash(JSON.parse(draft.snapshot));
+    if (draft.reviewedHash !== contentHash)
+      throw new ConflictException('review the current configuration draft before publishing it');
+    const previous = await this.latestRevision(controllerId);
+    if (previous?.state === 'pending' && previous.contentHash === contentHash)
+      return this.publishRevision(controller, previous);
+    const revision = this.revisions.create({
+      controllerId,
+      revision: (previous?.revision ?? 0) + 1,
+      snapshot: draft.snapshot,
+      contentHash,
+      state: 'pending',
+      rejectionErrors: null,
+      publishedAt: new Date().toISOString(),
+      reportedAt: null,
+    });
+    return this.publishRevision(controller, await this.revisions.save(revision));
+  }
+
+  private async latestRevision(controllerId: number): Promise<WagoConfigurationRevision | null> {
+    const [revision] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
+    return revision ?? null;
   }
 
   async createEnrollment(
@@ -177,15 +362,51 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   }
 
   async claim(id: number, name: string, verifier: string, mqttServerId?: number): Promise<WagoController> {
-    return this.withClaimLock(id, () => this.claimController(id, name, verifier, mqttServerId));
+    return this.withClaimLock(id, async () => {
+      const prepared = await this.withClaimConfigurationLock(() => this.prepareClaim(id, name, verifier, mqttServerId));
+      try {
+        await this.context.mqtt.publish(
+          prepared.mqttServerId,
+          `${discoveryTopic(prepared.controller.hardwareId)}/claim`,
+          JSON.stringify({
+            username: prepared.credential.username,
+            password: prepared.credential.password,
+            configuration: prepared.configuration,
+          }),
+          { qos: 1 },
+        );
+        prepared.credentialDelivered = true;
+        await this.context.mqtt.publish(prepared.mqttServerId, discoveryTopic(prepared.controller.hardwareId), '', {
+          qos: 1,
+          retain: true,
+        });
+        return prepared.controller;
+      } catch (error) {
+        if (!prepared.credentialDelivered) await this.restoreUnclaimedController(prepared);
+        throw error;
+      } finally {
+        await this.subscribeConfiguredServers().catch((error) => {
+          this.context.logger.warn(`Could not refresh WAGO MQTT subscriptions after claim: ${String(error)}`);
+          this.scheduleSubscriptionRetry();
+        });
+      }
+    });
   }
 
-  private async claimController(
+  private async prepareClaim(
     id: number,
     name: string,
     verifier: string,
     mqttServerId?: number,
-  ): Promise<WagoController> {
+  ): Promise<{
+    controller: WagoController;
+    mqttServerId: number;
+    credential: { username: string; password: string };
+    configuration: { protocolVersion: number; namespace: string; desiredTopic: string; reportedTopic: string };
+    identity: string;
+    previousController: Pick<WagoController, 'trustState' | 'name' | 'mqttServerId' | 'updatedAt'>;
+    credentialDelivered: boolean;
+  }> {
     const controller = await this.controllers.findOneBy({ id });
     if (!controller) throw new NotFoundException(`WAGO controller ${id} not found`);
     if (controller.trustState === 'claimed') throw new ConflictException('controller has already been claimed');
@@ -206,20 +427,24 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       );
 
     const identity = `wago-controller-${controller.hardwareId}`;
+    const settings = await this.getSettings();
+    const namespace = normalizeOperationalPrefix(settings.operationalPrefix);
     const credential = await this.context.getMqttCredentialProvisioning().provision({
       mqttServerId: selectedServerId,
       identity,
       username: identity,
       vhost: '/',
       topicPolicy: {
-        publish: [`attraccess/wago/controllers/${controller.hardwareId}/#`],
-        subscribe: [`attraccess/wago/controllers/${controller.hardwareId}/desired/#`],
+        publish: [
+          `attraccess/wago/controllers/${controller.hardwareId}/#`,
+          configurationReportedTopic(namespace, controller.hardwareId),
+        ],
+        subscribe: [configurationDesiredTopic(namespace, controller.hardwareId)],
       },
     });
     if (!('password' in credential)) {
       throw new ConflictException(`Manual credential provisioning is required: ${credential.instructions.join(' ')}`);
     }
-    let credentialDelivered = false;
     const previousController = {
       trustState: controller.trustState,
       name: controller.name,
@@ -235,38 +460,73 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       controller.mqttServerId = selectedServerId;
       controller.updatedAt = new Date().toISOString();
       await this.controllers.save(controller);
-      await this.context.mqtt.publish(
-        selectedServerId,
-        `${discoveryTopic(controller.hardwareId)}/claim`,
-        JSON.stringify({ username: credential.username, password: credential.password }),
-        { qos: 1 },
-      );
-      credentialDelivered = true;
-      await this.context.mqtt.publish(selectedServerId, discoveryTopic(controller.hardwareId), '', {
-        qos: 1,
-        retain: true,
-      });
-      return controller;
+      return {
+        controller,
+        mqttServerId: selectedServerId,
+        credential,
+        configuration: {
+          protocolVersion: CONFIGURATION_PROTOCOL_VERSION,
+          namespace,
+          desiredTopic: configurationDesiredTopic(namespace, controller.hardwareId),
+          reportedTopic: configurationReportedTopic(namespace, controller.hardwareId),
+        },
+        identity,
+        previousController,
+        credentialDelivered: false,
+      };
     } catch (error) {
-      if (!credentialDelivered) {
-        await this.context
-          .getMqttCredentialProvisioning()
-          .revoke({ mqttServerId: selectedServerId, identity, username: identity, vhost: '/' })
-          .catch(() => undefined);
-        Object.assign(controller, previousController);
-        await this.controllers.save(controller).catch((rollbackError) => {
-          this.context.logger.warn(
-            `Could not restore WAGO controller ${controller.id} after claim failure: ${String(rollbackError)}`,
-          );
-        });
-      }
-      throw error;
-    } finally {
-      await this.subscribeConfiguredServers().catch((error) => {
-        this.context.logger.warn(`Could not refresh WAGO MQTT subscriptions after claim: ${String(error)}`);
-        this.scheduleSubscriptionRetry();
+      await this.restoreUnclaimedControllerWhileLocked({
+        controller,
+        mqttServerId: selectedServerId,
+        identity,
+        previousController,
       });
+      throw error;
     }
+  }
+
+  private async restoreUnclaimedController({
+    controller,
+    mqttServerId,
+    identity,
+    previousController,
+  }: {
+    controller: WagoController;
+    mqttServerId: number;
+    identity: string;
+    previousController: Pick<WagoController, 'trustState' | 'name' | 'mqttServerId' | 'updatedAt'>;
+  }): Promise<void> {
+    await this.withClaimConfigurationLock(() =>
+      this.restoreUnclaimedControllerWhileLocked({
+        controller,
+        mqttServerId,
+        identity,
+        previousController,
+      }),
+    );
+  }
+
+  private async restoreUnclaimedControllerWhileLocked({
+    controller,
+    mqttServerId,
+    identity,
+    previousController,
+  }: {
+    controller: WagoController;
+    mqttServerId: number;
+    identity: string;
+    previousController: Pick<WagoController, 'trustState' | 'name' | 'mqttServerId' | 'updatedAt'>;
+  }): Promise<void> {
+    await this.context
+      .getMqttCredentialProvisioning()
+      .revoke({ mqttServerId, identity, username: identity, vhost: '/' })
+      .catch(() => undefined);
+    Object.assign(controller, previousController);
+    await this.controllers.save(controller).catch((rollbackError) => {
+      this.context.logger.warn(
+        `Could not restore WAGO controller ${controller.id} after claim failure: ${String(rollbackError)}`,
+      );
+    });
   }
 
   private async subscribeConfiguredServers(): Promise<void> {
@@ -301,15 +561,43 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
             await this.onDiscovery(serverId, message.topic, message.payload);
           }),
         );
-        for (const controller of controllers.filter(
+        if (this.destroyed) {
+          replacements.forEach((subscription) => subscription.unsubscribe());
+          return;
+        }
+        const claimedControllers = controllers.filter(
           (item) => item.trustState === 'claimed' && (item.mqttServerId ?? settings.defaultMqttServerId) === serverId,
-        )) {
+        );
+        const controllersByHardwareId = new Map(
+          claimedControllers.map((controller) => [controller.hardwareId, controller]),
+        );
+        replacements.push(
+          await this.context.mqtt.subscribe(
+            serverId,
+            configurationReportedWildcardTopic(settings.operationalPrefix),
+            (message) => {
+              if (!this.isActiveSubscriptionGeneration(generation)) return;
+              const hardwareId = configurationReportedHardwareId(settings.operationalPrefix, message.topic);
+              const controller = hardwareId ? controllersByHardwareId.get(hardwareId) : undefined;
+              if (controller) this.enqueueConfigurationReport(controller.id, message.payload);
+            },
+          ),
+        );
+        if (this.destroyed) {
+          replacements.forEach((subscription) => subscription.unsubscribe());
+          return;
+        }
+        for (const controller of claimedControllers) {
           replacements.push(
             await this.context.mqtt.subscribe(serverId, heartbeatTopic(controller.hardwareId), async (message) => {
               if (!this.isActiveSubscriptionGeneration(generation)) return;
               await this.onHeartbeat(controller.hardwareId, message.payload);
             }),
           );
+          if (this.destroyed) {
+            replacements.forEach((subscription) => subscription.unsubscribe());
+            return;
+          }
         }
       }
     } catch (error) {
@@ -424,6 +712,106 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     await this.controllers.save(controller);
   }
 
+  private async onConfigurationReported(controllerId: number, payload: Buffer): Promise<void> {
+    let report: ReturnType<typeof parseConfigurationReport>;
+    try {
+      report = parseConfigurationReport(JSON.parse(payload.toString('utf8')));
+    } catch {
+      this.context.logger.warn(`Ignoring invalid WAGO configuration report for controller ${controllerId}`);
+      return;
+    }
+    if (!report) {
+      this.context.logger.warn(`Ignoring malformed WAGO configuration report for controller ${controllerId}`);
+      return;
+    }
+    await this.withConfigurationLock(controllerId, async () => {
+      const revision = await this.revisions.findOneBy({ controllerId, revision: report.revision });
+      if (!revision || revision.contentHash !== report.contentHash) return;
+      if (revision.state !== 'published') return;
+      revision.state = report.errors.length ? 'rejected' : 'applied';
+      revision.rejectionErrors = report.errors.length ? JSON.stringify(report.errors) : null;
+      revision.reportedAt = new Date().toISOString();
+      await this.revisions.save(revision);
+    });
+  }
+
+  private enqueueConfigurationReport(controllerId: number, payload: Buffer): void {
+    const queue = this.configurationReportQueues.get(controllerId) ?? { pending: new Map(), processing: false };
+    this.configurationReportQueues.set(controllerId, queue);
+    if (queue.processing) {
+      // Preserve acknowledgements for distinct immutable revisions in arrival order.
+      const revision = this.configurationReportRevision(payload);
+      const key = revision ?? Number.NaN;
+      if (queue.pending.has(key) || queue.pending.size < MAX_PENDING_CONFIGURATION_REPORTS)
+        queue.pending.set(key, payload);
+      else this.context.logger.warn(`Dropping excess WAGO configuration report for controller ${controllerId}`);
+      return;
+    }
+    queue.processing = true;
+    void this.processConfigurationReports(controllerId, payload, queue);
+  }
+
+  private async processConfigurationReports(
+    controllerId: number,
+    payload: Buffer,
+    queue: { pending: Map<number, Buffer>; processing: boolean },
+  ): Promise<void> {
+    let next: Buffer | null = payload;
+    while (next) {
+      try {
+        await this.onConfigurationReported(controllerId, next);
+      } catch (error) {
+        this.context.logger.warn(`Could not process WAGO configuration report: ${String(error)}`);
+      }
+      const pending = queue.pending.entries().next();
+      if (pending.done) next = null;
+      else {
+        const [revision, report] = pending.value;
+        queue.pending.delete(revision);
+        next = report;
+      }
+    }
+    queue.processing = false;
+    if (this.configurationReportQueues.get(controllerId) === queue) this.configurationReportQueues.delete(controllerId);
+  }
+
+  private configurationReportRevision(payload: Buffer): number | null {
+    try {
+      const report = JSON.parse(payload.toString('utf8')) as { revision?: unknown };
+      return Number.isSafeInteger(report.revision) && (report.revision as number) >= 1
+        ? (report.revision as number)
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async publishRevision(
+    controller: WagoController,
+    revision: WagoConfigurationRevision,
+  ): Promise<WagoConfigurationRevision> {
+    if (!controller.mqttServerId) throw new ConflictException(`WAGO controller ${controller.id} has no MQTT server`);
+    const incompatibility = compatibilityError({
+      protocolVersion: controller.protocolVersion,
+      capabilities: JSON.parse(controller.capabilities) as string[],
+    });
+    if (incompatibility) throw new ConflictException(`Cannot publish configuration: ${incompatibility}`);
+    const settings = await this.getSettings();
+    await this.context.mqtt.publish(
+      controller.mqttServerId,
+      configurationDesiredTopic(settings.operationalPrefix ?? 'attraccess/wago', controller.hardwareId),
+      JSON.stringify({
+        protocolVersion: CONFIGURATION_PROTOCOL_VERSION,
+        revision: revision.revision,
+        contentHash: revision.contentHash,
+        snapshot: JSON.parse(revision.snapshot),
+      }),
+      { qos: 1, retain: true },
+    );
+    revision.state = 'published';
+    return this.revisions.save(revision);
+  }
+
   private connectivity(controller: WagoController): 'online' | 'stale' | 'untrusted' {
     if (controller.trustState === 'untrusted') return 'untrusted';
     return controller.lastHeartbeatAt && Date.now() - Date.parse(controller.lastHeartbeatAt) <= STALE_AFTER_MS
@@ -518,6 +906,43 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     } finally {
       release();
       if (this.claimLocks.get(id) === lock) this.claimLocks.delete(id);
+    }
+  }
+  private async withClaimConfigurationLock<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = this.claimConfigurationLock;
+    let release!: () => void;
+    const lock = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.claimConfigurationLock = lock;
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (this.claimConfigurationLock === lock) this.claimConfigurationLock = Promise.resolve();
+    }
+  }
+  private async claimedController(id: number): Promise<WagoController> {
+    const controller = await this.controllers.findOneBy({ id });
+    if (!controller || controller.trustState !== 'claimed')
+      throw new NotFoundException(`claimed WAGO controller ${id} not found`);
+    if (!controller.mqttServerId) throw new ConflictException(`WAGO controller ${id} has no MQTT server`);
+    return controller;
+  }
+  private async withConfigurationLock<T>(id: number, operation: () => Promise<T>): Promise<T> {
+    const previous = this.configurationLocks.get(id) ?? Promise.resolve();
+    let release!: () => void;
+    const lock = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.configurationLocks.set(id, lock);
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (this.configurationLocks.get(id) === lock) this.configurationLocks.delete(id);
     }
   }
   private scheduleSubscriptionRetry(): void {
