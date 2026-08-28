@@ -14,7 +14,8 @@ if (tag === 'next') {
   const runNumber = process.env.GITHUB_RUN_NUMBER;
   if (!runNumber) throw new Error('GITHUB_RUN_NUMBER is required to publish a nightly plugin package.');
 
-  pkg.version = `${pkg.version.replace(/-.+$/, '')}-nightly.${runNumber}`;
+  const runAttempt = process.env.GITHUB_RUN_ATTEMPT ?? '1';
+  pkg.version = `${pkg.version.replace(/-.+$/, '')}-nightly.${runNumber}.${runAttempt}`;
   writeFileSync(packageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
   rmSync(distDir, { recursive: true, force: true });
   execFileSync('npm', ['pack', '--pack-destination', '../dist'], { cwd: packageDir, stdio: 'inherit' });
