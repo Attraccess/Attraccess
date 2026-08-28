@@ -19,11 +19,16 @@ const usage = (id: number, startTime: string, endTime: string | null): ResourceU
 describe('ResourceOperatingAttributionService', () => {
   const asOf = at('12:00:00');
   let service: ResourceOperatingAttributionService;
+  let intervalRepository: jest.Mocked<Pick<Repository<ResourceOperatingInterval>, 'find'>>;
+  let usageRepository: jest.Mocked<Pick<Repository<ResourceUsage>, 'find'>>;
 
   beforeEach(() => {
-    const intervalRepository = { find: jest.fn() } as unknown as Repository<ResourceOperatingInterval>;
-    const usageRepository = { find: jest.fn() } as unknown as Repository<ResourceUsage>;
-    service = new ResourceOperatingAttributionService(intervalRepository, usageRepository);
+    intervalRepository = { find: jest.fn() };
+    usageRepository = { find: jest.fn() };
+    service = new ResourceOperatingAttributionService(
+      intervalRepository as unknown as Repository<ResourceOperatingInterval>,
+      usageRepository as unknown as Repository<ResourceUsage>,
+    );
   });
 
   it('derives exact closed intersections and the remaining operating duration', () => {
@@ -145,5 +150,41 @@ describe('ResourceOperatingAttributionService', () => {
       isProvisional: false,
       attributions: [],
     });
+  });
+
+  it('clips closed intervals to the attribution snapshot time', () => {
+    const result = service.derive([operating(1, '10:00:00', '13:00:00')], [usage(2, '11:00:00', '13:00:00')], asOf);
+
+    expect(result).toMatchObject({
+      operatingDurationMs: 2 * 60 * 60_000,
+      attributedOperatingDurationMs: 60 * 60_000,
+      unattributedOperatingDurationMs: 60 * 60_000,
+      isProvisional: true,
+      attributions: [expect.objectContaining({ endTime: asOf, isProvisional: true })],
+    });
+  });
+
+  it('loads only intervals that overlap the recent attribution window', async () => {
+    intervalRepository.find.mockResolvedValue([] as ResourceOperatingInterval[]);
+    usageRepository.find.mockResolvedValue([] as ResourceUsage[]);
+
+    await service.getForResource(1, asOf);
+
+    expect(intervalRepository.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.arrayContaining([
+          expect.objectContaining({ resourceId: 1 }),
+          expect.objectContaining({ resourceId: 1 }),
+        ]),
+      }),
+    );
+    expect(usageRepository.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.arrayContaining([
+          expect.objectContaining({ resourceId: 1, usageAction: ResourceUsageAction.Usage }),
+          expect.objectContaining({ resourceId: 1, usageAction: ResourceUsageAction.Usage }),
+        ]),
+      }),
+    );
   });
 });

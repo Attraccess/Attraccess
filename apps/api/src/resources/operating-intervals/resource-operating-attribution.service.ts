@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResourceOperatingInterval, ResourceUsage, ResourceUsageAction } from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
+import { IsNull, LessThan, MoreThan, Repository } from 'typeorm';
+
+const ATTRIBUTION_LOOKBACK_MS = 31 * 24 * 60 * 60_000;
 
 export interface ResourceOperatingAttribution {
   operatingIntervalId: number;
@@ -36,51 +38,71 @@ export class ResourceOperatingAttributionService {
   ) {}
 
   async getForResource(resourceId: number, asOf = new Date()): Promise<ResourceOperatingAttributionSummary> {
+    const windowStart = new Date(asOf.getTime() - ATTRIBUTION_LOOKBACK_MS);
     const [operatingIntervals, usages] = await Promise.all([
-      this.intervalRepository.find({ where: { resourceId }, order: { startTime: 'ASC' } }),
+      this.intervalRepository.find({
+        where: [
+          { resourceId, startTime: LessThan(asOf), endTime: IsNull() },
+          { resourceId, startTime: LessThan(asOf), endTime: MoreThan(windowStart) },
+        ],
+        order: { startTime: 'ASC' },
+      }),
       this.usageRepository.find({
-        where: { resourceId, usageAction: ResourceUsageAction.Usage },
+        where: [
+          { resourceId, usageAction: ResourceUsageAction.Usage, startTime: LessThan(asOf), endTime: IsNull() },
+          {
+            resourceId,
+            usageAction: ResourceUsageAction.Usage,
+            startTime: LessThan(asOf),
+            endTime: MoreThan(windowStart),
+          },
+        ],
         order: { startTime: 'ASC' },
       }),
     ]);
 
-    return this.derive(operatingIntervals, usages, asOf);
+    return this.derive(operatingIntervals, usages, asOf, windowStart);
   }
 
   derive(
     operatingIntervals: ResourceOperatingInterval[],
     usages: ResourceUsage[],
     asOf = new Date(),
+    windowStart?: Date,
   ): ResourceOperatingAttributionSummary {
     const attributions: ResourceOperatingAttribution[] = [];
     const attributedRanges: TimeRange[] = [];
-    const operatingRanges: TimeRange[] = [];
+    const operatingRanges = operatingIntervals
+      .map((interval) => ({ interval, range: this.toRange(interval, asOf, windowStart) }))
+      .filter((entry): entry is { interval: ResourceOperatingInterval; range: TimeRange } => entry.range !== null)
+      .sort((left, right) => left.range.startTime.getTime() - right.range.startTime.getTime());
+    const usageRanges = usages
+      .filter((usage) => usage.usageAction === ResourceUsageAction.Usage)
+      .map((usage) => ({ usage, range: this.toRange(usage, asOf, windowStart) }))
+      .filter((entry): entry is { usage: ResourceUsage; range: TimeRange } => entry.range !== null)
+      .sort((left, right) => left.range.startTime.getTime() - right.range.startTime.getTime());
     let isProvisional = false;
+    let usageIndex = 0;
 
-    for (const operatingInterval of operatingIntervals) {
-      const operatingRange = this.toRange(operatingInterval, asOf);
-      if (!operatingRange) {
-        continue;
+    for (const { interval: operatingInterval, range: operatingRange } of operatingRanges) {
+      isProvisional ||= this.isOpenAt(operatingInterval, asOf);
+
+      while (usageRanges[usageIndex]?.range.endTime <= operatingRange.startTime) {
+        usageIndex++;
       }
 
-      operatingRanges.push(operatingRange);
-      isProvisional ||= operatingInterval.endTime === null;
-
-      for (const usage of usages) {
-        if (usage.usageAction !== ResourceUsageAction.Usage) {
-          continue;
+      // Every range visited below produces an attribution, so work grows with the response size.
+      for (let index = usageIndex; index < usageRanges.length; index++) {
+        const { usage, range: usageRange } = usageRanges[index];
+        if (usageRange.startTime >= operatingRange.endTime) {
+          break;
         }
-        const usageRange = this.toRange(usage, asOf);
-        if (!usageRange) {
-          continue;
-        }
-
         const intersection = this.intersection(operatingRange, usageRange);
         if (!intersection) {
           continue;
         }
 
-        const provisional = operatingInterval.endTime === null || usage.endTime === null;
+        const provisional = this.isOpenAt(operatingInterval, asOf) || this.isOpenAt(usage, asOf);
         attributions.push({
           operatingIntervalId: operatingInterval.id,
           usageId: usage.id,
@@ -93,7 +115,7 @@ export class ResourceOperatingAttributionService {
       }
     }
 
-    const operatingDurationMs = this.unionDuration(operatingRanges);
+    const operatingDurationMs = this.unionDuration(operatingRanges.map(({ range }) => range));
     const attributedOperatingDurationMs = this.unionDuration(attributedRanges);
     return {
       asOf,
@@ -108,9 +130,15 @@ export class ResourceOperatingAttributionService {
   private toRange(
     interval: Pick<ResourceOperatingInterval | ResourceUsage, 'startTime' | 'endTime'>,
     asOf: Date,
+    windowStart?: Date,
   ): TimeRange | null {
-    const endTime = interval.endTime ?? asOf;
-    return interval.startTime < endTime ? { startTime: interval.startTime, endTime } : null;
+    const startTime = windowStart && interval.startTime < windowStart ? windowStart : interval.startTime;
+    const endTime = !interval.endTime || interval.endTime > asOf ? asOf : interval.endTime;
+    return startTime < endTime ? { startTime, endTime } : null;
+  }
+
+  private isOpenAt(interval: Pick<ResourceOperatingInterval | ResourceUsage, 'endTime'>, asOf: Date): boolean {
+    return interval.endTime === null || interval.endTime > asOf;
   }
 
   private intersection(left: TimeRange, right: TimeRange): TimeRange | null {

@@ -12,7 +12,7 @@ export class ResourceOperatingAttributionController {
   constructor(private readonly attributionService: ResourceOperatingAttributionService) {}
 
   @Get()
-  @Auth()
+  @Auth('resources.update')
   @ApiOperation({
     summary: 'Get operating time attributed to usage sessions',
     operationId: 'resourceOperatingAttributionGet',
