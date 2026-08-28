@@ -460,22 +460,29 @@ export class NpmPluginService implements OnModuleInit {
   async checkInstalled(name: string): Promise<InstalledNpmPlugin> {
     const installed = this.installed(name);
     try {
-      const candidates = await this.installedVersionCandidates(name);
       const policy = await this.getUpdatePolicy();
-      const candidate = candidates.find(
-        (item) => item.direction === 'newer' && item.compatible && eligibleForPolicy(item, installed, policy),
-      );
-      const blocked = candidates.some((item) => item.direction === 'newer' && item.compatible) && !candidate;
-      const updateCheck = {
-        checkedAt: new Date().toISOString(),
-        candidate: candidate?.version ?? null,
-        state: candidate ? ('available' as const) : blocked ? ('blocked' as const) : ('up-to-date' as const),
-        error: null,
-      };
+      if (!policy.checksEnabled) return installed;
+      const candidates = await this.installedVersionCandidates(name);
+      const requested = isDistTag(installed.requestedSpec)
+        ? await this.resolveVersion(name, installed.requestedSpec, await this.registry(installed.registryId))
+        : undefined;
       return await this.mutateInstalls(async () => {
+        const current = this.installed(name);
+        const candidate = candidates.find(
+          (item) =>
+            item.direction === 'newer' &&
+            item.compatible &&
+            eligibleForPolicy(item, current, policy, requested?.version),
+        );
+        const blocked = candidates.some((item) => item.direction === 'newer' && item.compatible) && !candidate;
         const updated = {
-          ...this.installed(name),
-          updateCheck,
+          ...current,
+          updateCheck: {
+            checkedAt: new Date().toISOString(),
+            candidate: candidate?.version ?? null,
+            state: candidate ? ('available' as const) : blocked ? ('blocked' as const) : ('up-to-date' as const),
+            error: null,
+          },
         };
         await this.writeState(updated);
         return updated;
@@ -1027,8 +1034,8 @@ function semverImpact(current: string, target: string): InstalledNpmPluginVersio
   return 'patch';
 }
 
-function matchesSpec(version: string, spec: string, includePrerelease = false): boolean {
-  return version === spec || semver.satisfies(version, spec, { includePrerelease });
+function matchesSpec(version: string, spec: string, includePrerelease = false, resolvedVersion?: string): boolean {
+  return version === resolvedVersion || version === spec || semver.satisfies(version, spec, { includePrerelease });
 }
 
 function normalizeUpdatePolicy(value: unknown): PluginUpdatePolicy {
@@ -1058,16 +1065,33 @@ function eligibleForPolicy(
   candidate: InstalledNpmPluginVersion,
   installed: InstalledNpmPlugin,
   policy: PluginUpdatePolicy,
+  resolvedRequestedVersion?: string,
 ): boolean {
-  const mode =
-    installed.updateOverride === 'inherit' || !installed.updateOverride ? policy.mode : installed.updateOverride;
-  if (!policy.checksEnabled || mode === 'off' || candidate.deprecated || candidate.permissionAdditions.length > 0)
+  const override = installed.updateOverride ?? 'inherit';
+  const checksEnabled = override !== 'off' && policy.checksEnabled;
+  const mode = effectiveUpdateMode(policy.mode, override);
+  if (!checksEnabled || mode === 'off' || candidate.deprecated || candidate.permissionAdditions.length > 0)
     return false;
   if (!policy.prerelease && semver.prerelease(candidate.version)) return false;
   if (candidate.semverImpact === 'major') return false;
   if (mode === 'patch') return candidate.semverImpact === 'patch';
   if (mode === 'minor') return candidate.semverImpact === 'patch' || candidate.semverImpact === 'minor';
-  return matchesSpec(candidate.version, installed.requestedSpec, policy.prerelease);
+  return matchesSpec(candidate.version, installed.requestedSpec, policy.prerelease, resolvedRequestedVersion);
+}
+
+function effectiveUpdateMode(
+  globalMode: PluginUpdatePolicy['mode'],
+  override: NonNullable<InstalledNpmPlugin['updateOverride']>,
+): PluginUpdatePolicy['mode'] {
+  if (override === 'inherit') return globalMode;
+  if (override === 'off' || globalMode === 'off') return 'off';
+  if (globalMode === 'patch' || override === 'patch') return 'patch';
+  if (globalMode === 'minor' || override === 'minor') return 'minor';
+  return 'follow';
+}
+
+function isDistTag(spec: string): boolean {
+  return !semver.valid(spec) && !semver.validRange(spec);
 }
 
 function repositoryUrl(value: string | { url: string } | undefined): string | null {
