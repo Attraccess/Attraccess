@@ -163,7 +163,13 @@ export class WagoRuntime {
     }
     for (const channel of this.state.accepted?.snapshot.logicalChannels ?? []) {
       if (!channel.capabilities.includes('output')) continue;
-      if (channel.disconnectPolicy.mode === 'immediate') await this.writeChannel(channel, false);
+      if (channel.disconnectPolicy.mode === 'immediate') {
+        try {
+          await this.writeChannel(channel, false);
+        } catch {
+          // Continue the safety shutdown even when durable state cannot be updated for one output.
+        }
+      }
       if (channel.disconnectPolicy.mode === 'watchdog')
         this.watchdogs.set(
           channel.id,
