@@ -161,6 +161,7 @@ export class WagoRuntime {
       await this.publishState();
       return;
     }
+    let stateSaveFailed = false;
     for (const channel of this.state.accepted?.snapshot.logicalChannels ?? []) {
       if (!channel.capabilities.includes('output')) continue;
       if (channel.disconnectPolicy.mode === 'immediate') {
@@ -168,6 +169,7 @@ export class WagoRuntime {
           await this.writeChannel(channel, false);
         } catch {
           // Continue the safety shutdown even when durable state cannot be updated for one output.
+          stateSaveFailed = true;
         }
       }
       if (channel.disconnectPolicy.mode === 'watchdog')
@@ -176,6 +178,7 @@ export class WagoRuntime {
           setTimeout(() => void this.ignoreTimerRejection(() => this.writeChannel(channel, false)), channel.disconnectPolicy.timeoutMs),
         );
     }
+    if (stateSaveFailed) await this.options.store.save(this.state);
     await this.publishState();
   }
 

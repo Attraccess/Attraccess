@@ -193,7 +193,7 @@ describe('WagoRuntime', () => {
     expect(transport.published).toContainEqual(expect.objectContaining({ topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements', payload: { id: 'command-1', status: 'duplicate', error: undefined } }));
   });
 
-  it('continues immediate disconnect shutdowns after a state-store failure', async () => {
+  it('retries the aggregate immediate shutdown state after a state-store failure', async () => {
     const twoOutputs: Snapshot = {
       ...snapshot,
       physicalPoints: [
@@ -215,12 +215,14 @@ describe('WagoRuntime', () => {
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(twoOutputs), snapshot: twoOutputs });
     await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
     await transport.send(commands, { id: 'command-2', channelId: 'load-2', action: 'set', value: true });
-    jest.spyOn(store, 'save').mockRejectedValueOnce(new Error('disk full'));
+    const persist = store.save.bind(store);
+    jest.spyOn(store, 'save').mockImplementationOnce(persist).mockRejectedValueOnce(new Error('disk full'));
 
     await expect(runtime.setConnected(false)).resolves.toBeUndefined();
 
     expect(device.values.get('751-9301:0')).toBe(false);
     expect(device.values.get('751-9301:1')).toBe(false);
+    await expect(store.load()).resolves.toEqual(expect.objectContaining({ outputs: { load: false, 'load-2': false } }));
   });
 
   it('persists output and connection state changes', async () => {
