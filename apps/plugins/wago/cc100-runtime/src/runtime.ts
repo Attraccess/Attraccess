@@ -24,8 +24,10 @@ export type Snapshot = {
     profile: string;
     capabilities: string[];
     disconnectPolicy: DisconnectPolicy;
+    range?: { minimum: number; maximum: number };
     pulse?: { durationMs: number };
     guard?: { channelId: string; when: 'on' | 'off' };
+    feedback?: { channelId: string; expected: 'match' | 'inverse'; timeoutMs: number };
     measurement?: { unit: string; scale: number; offset: number };
   }>;
 };
@@ -81,6 +83,7 @@ export class WagoRuntime {
   private connected = true;
   private readonly pulses = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly watchdogs = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly feedbackChecks = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly inFlightCommandIds = new Set<string>();
 
   constructor(
@@ -116,6 +119,8 @@ export class WagoRuntime {
       return;
     }
     // Persist only after validation; a rejected snapshot cannot alter active I/O.
+    this.feedbackChecks.forEach(clearTimeout);
+    this.feedbackChecks.clear();
     this.state.accepted = { revision: desired.revision, contentHash: desired.contentHash, snapshot: desired.snapshot };
     await this.options.store.save(this.state);
     await this.publishReport(desired.revision, desired.contentHash, []);
@@ -240,6 +245,7 @@ export class WagoRuntime {
     }
     onWritten?.();
     this.state.outputs[channel.id] = value;
+    this.scheduleFeedbackCheck(channel, value);
     try {
       await this.options.store.save(this.state);
     } catch {
@@ -258,6 +264,38 @@ export class WagoRuntime {
     const existingPulse = this.pulses.get(channel.id);
     if (existingPulse) clearTimeout(existingPulse);
     this.pulses.set(channel.id, setTimeout(() => void this.ignoreTimerRejection(() => this.writeChannel(channel, false)), duration));
+  }
+  private scheduleFeedbackCheck(channel: Snapshot['logicalChannels'][number], value: boolean): void {
+    if (!channel.feedback) return;
+    const existing = this.feedbackChecks.get(channel.id);
+    if (existing) clearTimeout(existing);
+    this.feedbackChecks.set(
+      channel.id,
+      setTimeout(() => void this.ignoreTimerRejection(() => this.verifyFeedback(channel, value)), channel.feedback.timeoutMs),
+    );
+  }
+  private async verifyFeedback(channel: Snapshot['logicalChannels'][number], value: boolean): Promise<void> {
+    const feedback = channel.feedback;
+    const snapshot = this.state.accepted?.snapshot;
+    const feedbackChannel = snapshot?.logicalChannels.find((item) => item.id === feedback?.channelId);
+    const point = snapshot?.physicalPoints.find((item) => item.id === feedbackChannel?.physicalPointId);
+    if (!feedback || !point) return;
+    try {
+      const actual = Boolean(await this.options.device.read(point));
+      const expected = feedback.expected === 'match' ? value : !value;
+      if (actual !== expected)
+        await this.options.transport.publish(this.topic('faults'), {
+          channelId: channel.id,
+          code: 'feedback_mismatch',
+          message: 'configured feedback does not match the requested output state',
+        });
+    } catch (error) {
+      await this.options.transport.publish(this.topic('faults'), {
+        channelId: channel.id,
+        code: 'feedback_read_failed',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   private async publishState(): Promise<void> {
@@ -323,16 +361,22 @@ export function validateSnapshot(value: unknown): ValidationError[] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return [{ path: 'snapshot', code: 'invalid_snapshot', message: 'snapshot must be an object' }];
   const snapshot = value as Partial<Snapshot>;
   const errors: ValidationError[] = [];
+  validateKeys(snapshot as Record<string, unknown>, 'snapshot', ['version', 'physicalPoints', 'logicalChannels'], errors);
   if (snapshot.version !== 1) errors.push({ path: 'snapshot.version', code: 'unsupported_version', message: 'snapshot version must be 1' });
   if (!Array.isArray(snapshot.physicalPoints) || !Array.isArray(snapshot.logicalChannels)) return [...errors, { path: 'snapshot', code: 'invalid_collection', message: 'physicalPoints and logicalChannels must be arrays' }];
   const pointIds = new Set<string>();
   snapshot.physicalPoints.forEach((point, index) => {
+    if (!point || typeof point !== 'object' || Array.isArray(point)) {
+      errors.push({ path: `snapshot.physicalPoints[${index}]`, code: 'invalid_object', message: 'physical point must be an object' });
+      return;
+    }
+    validateKeys(point as Record<string, unknown>, `snapshot.physicalPoints[${index}]`, ['id', 'hardwareProfile', 'channel'], errors);
     if (!point?.id || pointIds.has(point.id)) errors.push({ path: `snapshot.physicalPoints[${index}].id`, code: 'invalid_id', message: 'physical point IDs must be unique' });
     pointIds.add(point?.id);
     if (!['751-9301', '879-3000', '879-1300'].includes(point?.hardwareProfile ?? '')) errors.push({ path: `snapshot.physicalPoints[${index}].hardwareProfile`, code: 'unsupported_profile', message: 'unsupported hardware profile' });
     if (!Number.isSafeInteger(point?.channel) || (point?.channel ?? -1) < 0) errors.push({ path: `snapshot.physicalPoints[${index}].channel`, code: 'invalid_channel', message: 'channel must be non-negative' });
   });
-  const channelIds = new Set<string>();
+    const channelIds = new Set<string>();
   const channelIdCounts = new Map<string, number>();
   snapshot.logicalChannels.forEach((channel) => {
     if (typeof channel?.id !== 'string') return;
@@ -341,16 +385,50 @@ export function validateSnapshot(value: unknown): ValidationError[] {
   });
   snapshot.logicalChannels.forEach((channel, index) => {
     const path = `snapshot.logicalChannels[${index}]`;
+    if (!channel || typeof channel !== 'object' || Array.isArray(channel)) {
+      errors.push({ path, code: 'invalid_object', message: 'logical channel must be an object' });
+      return;
+    }
+    validateKeys(channel as Record<string, unknown>, path, ['id', 'physicalPointId', 'profile', 'capabilities', 'disconnectPolicy', 'range', 'pulse', 'guard', 'feedback', 'measurement'], errors);
     if (!channel?.id || channelIdCounts.get(channel.id) !== 1) errors.push({ path: `${path}.id`, code: 'invalid_id', message: 'logical channel IDs must be unique' });
     if (!pointIds.has(channel?.physicalPointId ?? '')) errors.push({ path: `${path}.physicalPointId`, code: 'missing_reference', message: 'physical point does not exist' });
     const capabilities = Array.isArray(channel?.capabilities) ? channel.capabilities : [];
     if (!capabilities.length) errors.push({ path: `${path}.capabilities`, code: 'invalid_capabilities', message: 'capabilities are required' });
+    if (capabilities.some((capability, capabilityIndex) => !['output', 'input', 'measurement', 'pulse', 'guard', 'feedback'].includes(capability) || capabilities.indexOf(capability) !== capabilityIndex))
+      errors.push({ path: `${path}.capabilities`, code: 'invalid_capabilities', message: 'capabilities must be unique supported values' });
+    if (!['metered-switched-load', 'pulsed-lock-bank', 'guarded-enable-request', 'generic-digital-output', 'generic-monitored-input'].includes(channel.profile))
+      errors.push({ path: `${path}.profile`, code: 'unsupported_profile', message: 'unsupported logical channel profile' });
     const policy = channel?.disconnectPolicy;
     if (!policy || !['hold', 'immediate', 'watchdog'].includes(policy.mode) || (policy.mode === 'watchdog' && (!Number.isSafeInteger(policy.timeoutMs) || (policy.timeoutMs ?? 0) <= 0))) errors.push({ path: `${path}.disconnectPolicy`, code: 'invalid_disconnect_policy', message: 'every channel needs hold, immediate, or watchdog disconnect behavior' });
     if (channel?.pulse && (!capabilities.includes('pulse') || !Number.isSafeInteger(channel.pulse.durationMs) || channel.pulse.durationMs <= 0)) errors.push({ path: `${path}.pulse`, code: 'invalid_pulse', message: 'pulse requires pulse capability and positive duration' });
+    if (channel?.pulse) validateKeys(channel.pulse as Record<string, unknown>, `${path}.pulse`, ['durationMs'], errors);
     if (channel?.guard && (!capabilities.includes('guard') || !channelIds.has(channel.guard.channelId))) errors.push({ path: `${path}.guard`, code: 'invalid_guard', message: 'guard requires guard capability and an existing channel' });
+    if (channel?.guard) validateKeys(channel.guard as Record<string, unknown>, `${path}.guard`, ['channelId', 'when'], errors);
+    if (
+      channel?.feedback &&
+      (!capabilities.includes('feedback') ||
+        !channelIds.has(channel.feedback.channelId) ||
+        !['match', 'inverse'].includes(channel.feedback.expected) ||
+        !Number.isSafeInteger(channel.feedback.timeoutMs) ||
+        channel.feedback.timeoutMs <= 0)
+    )
+      errors.push({ path: `${path}.feedback`, code: 'invalid_feedback', message: 'feedback requires feedback capability, a channel, expectation, and positive timeout' });
+    if (channel?.feedback) validateKeys(channel.feedback as Record<string, unknown>, `${path}.feedback`, ['channelId', 'expected', 'timeoutMs'], errors);
+    if (channel?.range && (!['input', 'measurement'].some((capability) => capabilities.includes(capability)) || !Number.isFinite(channel.range.minimum) || !Number.isFinite(channel.range.maximum) || channel.range.minimum >= channel.range.maximum))
+      errors.push({ path: `${path}.range`, code: 'invalid_range', message: 'range requires input or measurement capability and finite ordered values' });
+    if (channel?.range) validateKeys(channel.range as Record<string, unknown>, `${path}.range`, ['minimum', 'maximum'], errors);
+    if (channel?.measurement && (!capabilities.includes('measurement') || !['ampere', 'volt', 'watt', 'percent'].includes(channel.measurement.unit) || !Number.isFinite(channel.measurement.scale) || !Number.isFinite(channel.measurement.offset)))
+      errors.push({ path: `${path}.measurement`, code: 'invalid_measurement', message: 'measurement requires capability, supported unit, and finite transform' });
+    if (channel?.measurement) validateKeys(channel.measurement as Record<string, unknown>, `${path}.measurement`, ['unit', 'scale', 'offset'], errors);
+    const required: Record<string, string[]> = { 'metered-switched-load': ['output', 'measurement'], 'pulsed-lock-bank': ['output', 'pulse'], 'guarded-enable-request': ['output', 'guard'], 'generic-digital-output': ['output'], 'generic-monitored-input': ['input'] };
+    if (channel.profile in required && required[channel.profile].some((capability) => !capabilities.includes(capability)))
+      errors.push({ path: `${path}.capabilities`, code: 'missing_capability', message: `${channel.profile} is missing a required capability` });
   });
   return errors;
+}
+
+function validateKeys(value: Record<string, unknown>, path: string, allowed: string[], errors: ValidationError[]): void {
+  Object.keys(value).filter((key) => !allowed.includes(key)).forEach((key) => errors.push({ path: `${path}.${key}`, code: 'unknown_field', message: 'field is not supported by configuration version 1' }));
 }
 
 function sort(value: unknown): unknown {

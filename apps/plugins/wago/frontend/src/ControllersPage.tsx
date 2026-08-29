@@ -2,6 +2,7 @@ import { Alert, Button, Spinner } from '@heroui/react';
 import { RefreshCwIcon } from 'lucide-react';
 import { useState } from 'react';
 import { ClaimControllerModal } from './ClaimControllerModal';
+import { ConfigurationEditor } from './ConfigurationEditor';
 import { CreateEnrollmentCard } from './CreateEnrollmentCard';
 import { ControllersTable } from './ControllersTable';
 import { MqttSettingsCard } from './MqttSettingsCard';
@@ -10,6 +11,7 @@ import { useControllersQuery } from './queries';
 export function ControllersPage() {
   const controllersQuery = useControllersQuery();
   const [claimControllerId, setClaimControllerId] = useState<number | null>(null);
+  const [configurationControllerId, setConfigurationControllerId] = useState<number | null>(null);
 
   return (
     <main className="wg:mx-auto wg:flex wg:w-full wg:max-w-6xl wg:flex-col wg:gap-6 wg:p-4 wg:md:p-6">
@@ -47,7 +49,7 @@ export function ControllersPage() {
           <Spinner color="accent" />
         </div>
       ) : (
-        <ControllersTable controllers={controllersQuery.data ?? []} onClaim={setClaimControllerId} />
+          <ControllersTable controllers={controllersQuery.data ?? []} onClaim={setClaimControllerId} onConfigure={setConfigurationControllerId} />
       )}
 
       <ClaimControllerModal
@@ -56,6 +58,7 @@ export function ControllersPage() {
           if (!isOpen) setClaimControllerId(null);
         }}
       />
+      <ConfigurationEditor controllerId={configurationControllerId} onOpenChange={(isOpen) => { if (!isOpen) setConfigurationControllerId(null); }} />
     </main>
   );
 }

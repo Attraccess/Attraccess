@@ -2,16 +2,24 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   claimController,
   createEnrollment,
+  applyPreset,
   getSettings,
+  getDraft,
+  listPresets,
   listControllers,
+  previewPreset,
+  saveDraft,
   setSettings,
   type ClaimControllerInput,
   type CreateEnrollmentInput,
+  type WagoPresetApplication,
 } from './api';
 
 const queryKeys = {
   controllers: ['wago', 'controllers'] as const,
   settings: ['wago', 'settings'] as const,
+  draft: (controllerId: number) => ['wago', 'configuration-draft', controllerId] as const,
+  presets: ['wago', 'configuration-presets'] as const,
 };
 
 export function useControllersQuery() {
@@ -53,4 +61,29 @@ export function useClaimControllerMutation() {
 
 export function useCreateEnrollmentMutation() {
   return useMutation({ mutationFn: (input: CreateEnrollmentInput) => createEnrollment(input) });
+}
+
+export function useDraftQuery(controllerId: number | null) {
+  return useQuery({ queryKey: queryKeys.draft(controllerId ?? 0), queryFn: () => getDraft(controllerId ?? 0), enabled: controllerId !== null });
+}
+
+export function usePresetsQuery() {
+  return useQuery({ queryKey: queryKeys.presets, queryFn: listPresets });
+}
+
+export function useSaveDraftMutation(controllerId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({ mutationFn: (snapshot: unknown) => saveDraft(controllerId, snapshot), onSuccess: (draft) => queryClient.setQueryData(queryKeys.draft(controllerId), draft) });
+}
+
+export function usePreviewPresetMutation(controllerId: number) {
+  return useMutation({ mutationFn: (application: WagoPresetApplication) => previewPreset(controllerId, application) });
+}
+
+export function useApplyPresetMutation(controllerId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ application, selectedPaths }: { application: WagoPresetApplication; selectedPaths: string[] }) => applyPreset(controllerId, application, selectedPaths),
+    onSuccess: (draft) => queryClient.setQueryData(queryKeys.draft(controllerId), draft),
+  });
 }
