@@ -167,6 +167,64 @@ describe('WagoRuntime', () => {
     }));
   });
 
+  it('shuts off an accepted pulse after a newer command fails', async () => {
+    let resolvePulseWrite: (() => void) | undefined;
+    let falseWrites = 0;
+    const writes: boolean[] = [];
+    const delayedPulseDevice = {
+      write: async (_point: Snapshot['physicalPoints'][number], value: boolean) => {
+        writes.push(value);
+        if (value) await new Promise<void>((resolve) => { resolvePulseWrite = resolve; });
+        else if (++falseWrites === 1) throw new Error('temporary failure');
+      },
+      read: async () => false,
+    };
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`), transport, device: delayedPulseDevice });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+
+    const pulse = transport.send(commands, { id: 'command-1', channelId: 'load', action: 'pulse' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await transport.send(commands, { id: 'command-2', channelId: 'load', action: 'set', value: false });
+    resolvePulseWrite?.();
+    await pulse;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
+      payload: { id: 'command-1', status: 'accepted', error: undefined },
+    }));
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
+      payload: { id: 'command-2', status: 'rejected', error: 'device write failed' },
+    }));
+    expect(writes).toEqual([true, false, false]);
+  });
+
+  it('shuts off a delayed pulse after a newer command succeeds', async () => {
+    let resolvePulseWrite: (() => void) | undefined;
+    const writes: boolean[] = [];
+    const delayedPulseDevice = {
+      write: async (_point: Snapshot['physicalPoints'][number], value: boolean) => {
+        writes.push(value);
+        if (writes.length === 1) await new Promise<void>((resolve) => { resolvePulseWrite = resolve; });
+      },
+      read: async () => false,
+    };
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`), transport, device: delayedPulseDevice });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+
+    const pulse = transport.send(commands, { id: 'command-1', channelId: 'load', action: 'pulse' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await transport.send(commands, { id: 'command-2', channelId: 'load', action: 'set', value: false });
+    resolvePulseWrite?.();
+    await pulse;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(writes).toEqual([true, false, false]);
+  });
+
   it('persists a command reservation before actuating the device', async () => {
     const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
     const reservingDevice = {
