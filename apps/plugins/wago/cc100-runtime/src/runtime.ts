@@ -49,6 +49,8 @@ export interface DeviceAdapter {
 }
 
 export class JsonStateStore {
+  private saveQueue: Promise<void> = Promise.resolve();
+
   constructor(private readonly path: string) {}
 
   async load(): Promise<RuntimeState> {
@@ -62,10 +64,15 @@ export class JsonStateStore {
   }
 
   async save(state: RuntimeState): Promise<void> {
-    await mkdir(dirname(this.path), { recursive: true });
-    const temporary = `${this.path}.next`;
-    await writeFile(temporary, JSON.stringify(state), { mode: 0o600 });
-    await rename(temporary, this.path);
+    const contents = JSON.stringify(state);
+    const save = this.saveQueue.then(async () => {
+      await mkdir(dirname(this.path), { recursive: true });
+      const temporary = `${this.path}.next`;
+      await writeFile(temporary, contents, { mode: 0o600 });
+      await rename(temporary, this.path);
+    });
+    this.saveQueue = save.catch(() => undefined);
+    await save;
   }
 }
 
@@ -74,6 +81,7 @@ export class WagoRuntime {
   private connected = true;
   private readonly pulses = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly watchdogs = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly inFlightCommandIds = new Set<string>();
 
   constructor(
     private readonly options: { hardwareId: string; prefix: string; store: JsonStateStore; transport: Transport; device: DeviceAdapter },
@@ -124,21 +132,26 @@ export class WagoRuntime {
     if (!command?.id || !command.channelId || !['set', 'pulse'].includes(command.action)) return;
     if (command.action === 'set' && typeof command.value !== 'boolean') return this.acknowledge(command.id, 'rejected', 'set commands require a boolean value');
     if (this.state.commandIds.includes(command.id)) return this.acknowledge(command.id, 'duplicate');
-    const channel = this.state.accepted?.snapshot.logicalChannels.find((item) => item.id === command.channelId);
-    if (!channel || !channel.capabilities.includes('output')) return this.acknowledge(command.id, 'rejected', 'unknown output channel');
-    // Reserve the ID before any I/O so simultaneous deliveries cannot actuate twice.
-    this.state.commandIds = [...this.state.commandIds, command.id].slice(-100);
-    await this.options.store.save(this.state);
-    if (!(await this.isGuardSatisfied(channel))) return this.acknowledge(command.id, 'rejected', 'operational guard is not satisfied');
-    if (command.action === 'pulse') {
-      const duration = channel.pulse?.durationMs;
-      if (!duration) return this.acknowledge(command.id, 'rejected', 'channel does not define a pulse duration');
-      if (!(await this.writeChannel(channel, true))) return this.acknowledge(command.id, 'rejected', 'device write failed');
-      const existingPulse = this.pulses.get(channel.id);
-      if (existingPulse) clearTimeout(existingPulse);
-      this.pulses.set(channel.id, setTimeout(() => void this.ignoreTimerRejection(() => this.writeChannel(channel, false)), duration));
-    } else if (!(await this.writeChannel(channel, command.value))) return this.acknowledge(command.id, 'rejected', 'device write failed');
-    await this.acknowledge(command.id, 'accepted');
+    if (this.inFlightCommandIds.has(command.id)) return this.acknowledge(command.id, 'duplicate');
+    this.inFlightCommandIds.add(command.id);
+    try {
+      const channel = this.state.accepted?.snapshot.logicalChannels.find((item) => item.id === command.channelId);
+      if (!channel || !channel.capabilities.includes('output')) return this.acknowledge(command.id, 'rejected', 'unknown output channel');
+      if (!(await this.isGuardSatisfied(channel))) return this.acknowledge(command.id, 'rejected', 'operational guard is not satisfied');
+      if (command.action === 'pulse') {
+        const duration = channel.pulse?.durationMs;
+        if (!duration) return this.acknowledge(command.id, 'rejected', 'channel does not define a pulse duration');
+        if (!(await this.writeChannel(channel, true))) return this.acknowledge(command.id, 'rejected', 'device write failed');
+        const existingPulse = this.pulses.get(channel.id);
+        if (existingPulse) clearTimeout(existingPulse);
+        this.pulses.set(channel.id, setTimeout(() => void this.ignoreTimerRejection(() => this.writeChannel(channel, false)), duration));
+      } else if (!(await this.writeChannel(channel, command.value))) return this.acknowledge(command.id, 'rejected', 'device write failed');
+      this.state.commandIds = [...this.state.commandIds, command.id].slice(-100);
+      await this.options.store.save(this.state);
+      await this.acknowledge(command.id, 'accepted');
+    } finally {
+      this.inFlightCommandIds.delete(command.id);
+    }
   }
 
   async setConnected(connected: boolean): Promise<void> {

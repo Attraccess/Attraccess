@@ -44,6 +44,6 @@ function subscribe(client: MqttClient, topic: string, listener: (payload: Buffer
 }
 function handleAsync(callback: () => void | Promise<void>): Promise<void> {
   return Promise.resolve().then(callback).catch((error: unknown) => {
-    console.error('WAGO CC100 runtime callback failed', error);
+    process.stderr.write(`WAGO CC100 runtime callback failed: ${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
   });
 }

@@ -97,6 +97,28 @@ describe('WagoRuntime', () => {
     expect(writes).toEqual([true]);
   });
 
+  it('allows a command to be retried after a failed device write', async () => {
+    let attempts = 0;
+    const flakyDevice = {
+      write: async () => {
+        attempts += 1;
+        if (attempts === 1) throw new Error('temporary failure');
+      },
+      read: async () => false,
+    };
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`), transport, device: flakyDevice });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+    await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
+    await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
+
+    expect(attempts).toBe(2);
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
+      payload: { id: 'command-1', status: 'accepted', error: undefined },
+    }));
+  });
+
   it('acknowledges duplicate commands and enforces immediate disconnect policy', async () => {
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
     await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
@@ -118,5 +140,15 @@ describe('WagoRuntime', () => {
       payload: expect.objectContaining({ connected: false, outputs: { load: false } }),
       retain: true,
     }));
+  });
+
+  it('serializes concurrent state saves', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    await Promise.all([
+      store.save({ outputs: { load: false }, commandIds: [] }),
+      store.save({ outputs: { load: true }, commandIds: ['command-1'] }),
+    ]);
+
+    await expect(store.load()).resolves.toEqual({ outputs: { load: true }, commandIds: ['command-1'] });
   });
 });

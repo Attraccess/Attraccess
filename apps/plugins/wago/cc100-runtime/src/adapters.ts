@@ -62,6 +62,7 @@ export class ModbusTcpAdapter implements DeviceAdapter {
         const response = Buffer.concat(chunks);
         if (response.length >= 6 && response.length >= 6 + response.readUInt16BE(4)) finish();
       });
+      socket.once('end', () => finish(new Error('Modbus TCP connection ended before a complete response')));
       socket.once('timeout', () => finish(new Error('Modbus TCP request timed out')));
       socket.once('error', finish);
     });
