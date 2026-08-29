@@ -141,6 +141,7 @@ export function validateSnapshot(snapshot: unknown): ConfigurationValidationErro
   const channels = collection(value.logicalChannels, 'logicalChannels', errors);
   const pointIds = new Set<string>();
   const channelIds = new Set<string>();
+  const channelsById = new Map<string, Record<string, unknown>>();
 
   points.forEach((point, index) => {
     const path = `physicalPoints[${index}]`;
@@ -157,8 +158,11 @@ export function validateSnapshot(snapshot: unknown): ConfigurationValidationErro
   });
 
   channels.forEach((channel, index) => {
-    if (channel && typeof channel === 'object' && !Array.isArray(channel))
-      addId((channel as Record<string, unknown>).id, `logicalChannels[${index}].id`, channelIds, errors);
+    if (channel && typeof channel === 'object' && !Array.isArray(channel)) {
+      const item = channel as Record<string, unknown>;
+      addId(item.id, `logicalChannels[${index}].id`, channelIds, errors);
+      if (typeof item.id === 'string') channelsById.set(item.id, item);
+    }
   });
 
   channels.forEach((channel, index) => {
@@ -189,7 +193,7 @@ export function validateSnapshot(snapshot: unknown): ConfigurationValidationErro
     validateRange(channel.range, `${path}.range`, capabilities, errors);
     validatePulse(channel.pulse, `${path}.pulse`, capabilities, errors);
     validateGuard(channel.guard, `${path}.guard`, capabilities, channelIds, errors);
-    validateFeedback(channel.feedback, `${path}.feedback`, capabilities, channelIds, errors);
+    validateFeedback(channel.feedback, `${path}.feedback`, capabilities, channel.id, channelsById, errors);
     validateMeasurement(channel.measurement, `${path}.measurement`, capabilities, errors);
     validateProfile(channel.profile, capabilities, path, errors);
   });
@@ -415,14 +419,18 @@ function validateFeedback(
   value: unknown,
   path: string,
   capabilities: Set<string>,
-  channelIds: Set<string>,
+  currentChannelId: unknown,
+  channelsById: Map<string, Record<string, unknown>>,
   errors: ConfigurationValidationError[],
 ): void {
   if (value === undefined) return;
   if (!record(value, path, errors)) return;
   exactKeys(value, path, ['channelId', 'expected', 'timeoutMs'], errors);
-  if (typeof value.channelId !== 'string' || !channelIds.has(value.channelId))
+  const feedbackChannel = typeof value.channelId === 'string' ? channelsById.get(value.channelId) : undefined;
+  if (!feedbackChannel)
     errors.push(referenceError(`${path}.channelId`, 'logical channel', value.channelId));
+  else if (value.channelId === currentChannelId || !Array.isArray(feedbackChannel.capabilities) || !feedbackChannel.capabilities.includes('input'))
+    errors.push({ path: `${path}.channelId`, code: 'invalid_feedback_channel', message: 'feedback must reference a distinct input channel' });
   if (!['match', 'inverse'].includes(value.expected as string))
     errors.push({ path: `${path}.expected`, code: 'unsupported_value', message: 'expected must be match or inverse' });
   if (!Number.isSafeInteger(value.timeoutMs) || (value.timeoutMs as number) <= 0)

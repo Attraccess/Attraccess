@@ -45,9 +45,9 @@ export class WagoControllerApi {
   }
   @Post('controllers/:id/configuration/presets/apply') applyPreset(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { application?: WagoPresetApplication; selectedPaths?: string[] },
+    @Body() body: { application?: WagoPresetApplication; selectedPaths?: string[]; previewedDraftHash?: string },
   ) {
-    return this.wago.applyPreset(id, body?.application as WagoPresetApplication, body?.selectedPaths ?? []);
+    return this.wago.applyPreset(id, body?.application as WagoPresetApplication, body?.selectedPaths ?? [], body?.previewedDraftHash ?? '');
   }
   @Post('controllers/:id/configuration/draft') saveDraft(
     @Param('id', ParseIntPipe) id: number,

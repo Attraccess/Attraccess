@@ -215,6 +215,38 @@ describe('WagoRuntime', () => {
     }));
   });
 
+  it('preserves feedback verification for the active phase of a short pulse', async () => {
+    const monitored: Snapshot = {
+      ...snapshot,
+      physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
+      logicalChannels: [
+        { id: 'feedback', physicalPointId: 'input-1', profile: 'generic-monitored-input', capabilities: ['input'], disconnectPolicy: { mode: 'hold' } },
+        { id: 'load', physicalPointId: 'output-1', profile: 'pulsed-lock-bank', capabilities: ['output', 'pulse', 'feedback'], disconnectPolicy: { mode: 'immediate' }, pulse: { durationMs: 5 }, feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 15 } },
+      ],
+    };
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(monitored), snapshot: monitored });
+    await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'pulse' });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+      payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),
+    }));
+  });
+
+  it('rejects feedback that references the output rather than an input channel', async () => {
+    const invalid: Snapshot = {
+      ...snapshot,
+      logicalChannels: [{ ...snapshot.logicalChannels[0], capabilities: ['output', 'pulse', 'feedback'], feedback: { channelId: 'load', expected: 'match', timeoutMs: 5 } }],
+    };
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(invalid), snapshot: invalid });
+
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/configuration/reported',
+      payload: expect.objectContaining({ errors: expect.arrayContaining([expect.objectContaining({ path: 'snapshot.logicalChannels[0].feedback', code: 'invalid_feedback' })]) }),
+    }));
+  });
+
   it('retries the aggregate immediate shutdown state after a state-store failure', async () => {
     const twoOutputs: Snapshot = {
       ...snapshot,

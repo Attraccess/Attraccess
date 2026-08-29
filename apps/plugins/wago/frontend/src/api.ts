@@ -58,6 +58,7 @@ export interface WagoPresetApplication {
   feedbackChannelId?: string;
 }
 export interface ConfigurationDiff { path: string; previous: unknown; current: unknown }
+export interface PresetPreview { draftHash: string; diff: ConfigurationDiff[] }
 
 const api = createPluginApiClient('/api/wago');
 
@@ -79,6 +80,6 @@ export const saveDraft = (id: number, snapshot: unknown) =>
   api.request<WagoConfigurationDraft>(`/controllers/${id}/configuration/draft`, { method: 'POST', body: { snapshot } });
 export const listPresets = () => api.request<WagoPreset[]>('/configuration/presets');
 export const previewPreset = (id: number, application: WagoPresetApplication) =>
-  api.request<{ diff: ConfigurationDiff[] }>(`/controllers/${id}/configuration/presets/preview`, { method: 'POST', body: { application } });
-export const applyPreset = (id: number, application: WagoPresetApplication, selectedPaths: string[]) =>
-  api.request<WagoConfigurationDraft>(`/controllers/${id}/configuration/presets/apply`, { method: 'POST', body: { application, selectedPaths } });
+  api.request<PresetPreview>(`/controllers/${id}/configuration/presets/preview`, { method: 'POST', body: { application } });
+export const applyPreset = (id: number, application: WagoPresetApplication, selectedPaths: string[], previewedDraftHash: string) =>
+  api.request<WagoConfigurationDraft>(`/controllers/${id}/configuration/presets/apply`, { method: 'POST', body: { application, selectedPaths, previewedDraftHash } });

@@ -98,4 +98,25 @@ describe('WAGO configuration snapshots', () => {
       ],
     })).toEqual([]);
   });
+
+  it('requires feedback to reference a distinct input channel', () => {
+    const snapshot = {
+      version: 1,
+      physicalPoints: [{ id: 'output', hardwareProfile: '751-9301', channel: 0 }],
+      logicalChannels: [
+        {
+          id: 'output',
+          physicalPointId: 'output',
+          profile: 'generic-digital-output',
+          capabilities: ['output', 'feedback'],
+          disconnectPolicy: { mode: 'immediate' },
+          feedback: { channelId: 'output', expected: 'match', timeoutMs: 100 },
+        },
+      ],
+    };
+
+    expect(validateSnapshot(snapshot)).toContainEqual(
+      expect.objectContaining({ path: 'logicalChannels[0].feedback.channelId', code: 'invalid_feedback_channel' }),
+    );
+  });
 });

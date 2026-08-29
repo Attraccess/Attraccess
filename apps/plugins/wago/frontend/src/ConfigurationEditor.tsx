@@ -43,6 +43,11 @@ export function ConfigurationEditor({ controllerId, onOpenChange }: { controller
     else if (!draftQuery.isPending) setSnapshot(JSON.stringify(emptySnapshot, null, 2));
   }, [draftQuery.data, draftQuery.isPending]);
 
+  useEffect(() => {
+    previewPreset.reset();
+    setSelectedPaths([]);
+  }, [preset, channelId, physicalPointId, guardChannelId, feedbackChannelId]);
+
   function application(): WagoPresetApplication | null {
     if (!preset) return null;
     return {
@@ -74,7 +79,7 @@ export function ConfigurationEditor({ controllerId, onOpenChange }: { controller
       setFormError(null);
       const selected = application();
       if (!selected) return;
-      const draft = await applyPreset.mutateAsync({ application: selected, selectedPaths });
+      const draft = await applyPreset.mutateAsync({ application: selected, selectedPaths, previewedDraftHash: previewPreset.data?.draftHash ?? '' });
       setSnapshot(JSON.stringify(JSON.parse(draft.snapshot), null, 2));
       previewPreset.reset();
     } catch (error) { setFormError(error instanceof Error ? error.message : 'Could not apply preset changes.'); }
@@ -98,7 +103,7 @@ export function ConfigurationEditor({ controllerId, onOpenChange }: { controller
                 </Alert>
                 <TextField className="wg:w-full">
                   <Label>Editable configuration draft</Label>
-                  <TextArea value={snapshot} onChange={(event) => setSnapshot(event.target.value)} rows={14} className="wg:font-mono" />
+                  <TextArea value={snapshot} onChange={(event) => { previewPreset.reset(); setSelectedPaths([]); setSnapshot(event.target.value); }} rows={14} className="wg:font-mono" />
                 </TextField>
                 <Card>
                   <Card.Header><h2 className="wg:font-medium">Apply editable preset foundation</h2></Card.Header>

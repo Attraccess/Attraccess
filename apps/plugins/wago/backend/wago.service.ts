@@ -188,20 +188,23 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   async previewPreset(
     controllerId: number,
     application: WagoPresetApplication,
-  ): Promise<{ diff: ReturnType<typeof configurationDiff> }> {
+  ): Promise<{ draftHash: string; diff: ReturnType<typeof configurationDiff> }> {
     const draft = await this.draftForPreset(controllerId);
     const snapshot = JSON.parse(draft.snapshot) as WagoConfigurationSnapshot;
-    return { diff: configurationDiff(snapshot, applyPreset(snapshot, application)) };
+    return { draftHash: configurationHash(snapshot), diff: configurationDiff(snapshot, applyPreset(snapshot, application)) };
   }
 
   async applyPreset(
     controllerId: number,
     application: WagoPresetApplication,
     selectedPaths: string[],
+    previewedDraftHash: string,
   ): Promise<WagoConfigurationDraft> {
     return this.withConfigurationLock(controllerId, async () => {
       const draft = await this.draftForPreset(controllerId);
       const snapshot = JSON.parse(draft.snapshot) as WagoConfigurationSnapshot;
+      if (previewedDraftHash !== configurationHash(snapshot))
+        throw new ConflictException('selected preset changes no longer match the configuration draft');
       const candidate = applyPreset(snapshot, application);
       const diff = configurationDiff(snapshot, candidate);
       const validPaths = new Set(diff.map((change) => change.path));
@@ -210,7 +213,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       draft.snapshot = canonicalSnapshot(applySelectedChanges(snapshot, diff, selectedPaths));
       draft.reviewedHash = null;
       draft.presetProvenance = JSON.stringify([
-        ...parsePresetProvenance(draft.presetProvenance),
+        ...parsePresetProvenance(draft.presetProvenance).slice(-99),
         { presetId: application.presetId, appliedAt: new Date().toISOString(), selectedPaths },
       ]);
       draft.updatedAt = new Date().toISOString();
