@@ -15,9 +15,10 @@ import type { WagoController } from './api';
 interface ControllersTableProps {
   controllers: WagoController[];
   onClaim: (controllerId: number) => void;
+  onConfigure: (controllerId: number) => void;
 }
 
-export function ControllersTable({ controllers, onClaim }: ControllersTableProps) {
+export function ControllersTable({ controllers, onClaim, onConfigure }: ControllersTableProps) {
   return (
     <Table>
       <TableScrollContainer>
@@ -62,6 +63,7 @@ export function ControllersTable({ controllers, onClaim }: ControllersTableProps
                       Claim
                     </Button>
                   )}
+                  {controller.trustState === 'claimed' && <Button size="sm" variant="secondary" onPress={() => onConfigure(controller.id)}>Configure</Button>}
                 </TableCell>
               </TableRow>
             )}

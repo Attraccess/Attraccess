@@ -68,7 +68,7 @@ describe('WagoRuntime', () => {
       ...snapshot,
       physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
       logicalChannels: [
-        { id: 'interlock', physicalPointId: 'input-1', profile: 'generic-digital-input', capabilities: ['input'], disconnectPolicy: { mode: 'hold' } },
+        { id: 'interlock', physicalPointId: 'input-1', profile: 'generic-monitored-input', capabilities: ['input'], disconnectPolicy: { mode: 'hold' } },
         { ...snapshot.logicalChannels[0], capabilities: ['output', 'guard', 'pulse'], guard: { channelId: 'interlock', when: 'on' } },
       ],
     };
@@ -190,7 +190,29 @@ describe('WagoRuntime', () => {
     await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: false });
     await runtime.setConnected(false);
     expect(device.values.get('751-9301:0')).toBe(false);
+    await runtime.setConnected(true);
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
     expect(transport.published).toContainEqual(expect.objectContaining({ topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements', payload: { id: 'command-1', status: 'duplicate', error: undefined } }));
+    expect(transport.published).toContainEqual(expect.objectContaining({ topic: 'attraccess/wago/v1/controllers/cc100-1/configuration/reported', payload: { revision: 1, contentHash: hash(snapshot), errors: [] }, retain: true }));
+  });
+
+  it('reports a feedback mismatch after the configured feedback timeout', async () => {
+    const monitored: Snapshot = {
+      ...snapshot,
+      physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
+      logicalChannels: [
+        { id: 'feedback', physicalPointId: 'input-1', profile: 'generic-monitored-input', capabilities: ['input'], disconnectPolicy: { mode: 'hold' } },
+        { id: 'load', physicalPointId: 'output-1', profile: 'generic-digital-output', capabilities: ['output', 'feedback'], disconnectPolicy: { mode: 'immediate' }, feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 5 } },
+      ],
+    };
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(monitored), snapshot: monitored });
+    await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+      payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),
+    }));
   });
 
   it('retries the aggregate immediate shutdown state after a state-store failure', async () => {

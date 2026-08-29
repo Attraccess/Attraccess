@@ -28,10 +28,14 @@ import { WagoSettings } from './wago-settings.entity';
 import { WagoEnrollment } from './wago-enrollment.entity';
 import {
   canonicalSnapshot,
+  applyPreset,
   configurationDiff,
   configurationHash,
   parseConfigurationReport,
+  WAGO_PRESETS,
   type ConfigurationValidationError,
+  type WagoConfigurationSnapshot,
+  type WagoPresetApplication,
   validateSnapshot,
 } from './configuration';
 import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
@@ -177,6 +181,43 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     return { valid: errors.length === 0, errors };
   }
 
+  presets() {
+    return WAGO_PRESETS;
+  }
+
+  async previewPreset(
+    controllerId: number,
+    application: WagoPresetApplication,
+  ): Promise<{ diff: ReturnType<typeof configurationDiff> }> {
+    const draft = await this.draftForPreset(controllerId);
+    const snapshot = JSON.parse(draft.snapshot) as WagoConfigurationSnapshot;
+    return { diff: configurationDiff(snapshot, applyPreset(snapshot, application)) };
+  }
+
+  async applyPreset(
+    controllerId: number,
+    application: WagoPresetApplication,
+    selectedPaths: string[],
+  ): Promise<WagoConfigurationDraft> {
+    return this.withConfigurationLock(controllerId, async () => {
+      const draft = await this.draftForPreset(controllerId);
+      const snapshot = JSON.parse(draft.snapshot) as WagoConfigurationSnapshot;
+      const candidate = applyPreset(snapshot, application);
+      const diff = configurationDiff(snapshot, candidate);
+      const validPaths = new Set(diff.map((change) => change.path));
+      if (!Array.isArray(selectedPaths) || selectedPaths.some((path) => !validPaths.has(path)))
+        throw new ConflictException('selected preset changes no longer match the configuration draft');
+      draft.snapshot = canonicalSnapshot(applySelectedChanges(snapshot, diff, selectedPaths));
+      draft.reviewedHash = null;
+      draft.presetProvenance = JSON.stringify([
+        ...parsePresetProvenance(draft.presetProvenance),
+        { presetId: application.presetId, appliedAt: new Date().toISOString(), selectedPaths },
+      ]);
+      draft.updatedAt = new Date().toISOString();
+      return this.drafts.save(draft);
+    });
+  }
+
   async revisionsFor(
     controllerId: number,
     offset = 0,
@@ -251,7 +292,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     const serialized = canonicalSnapshot(snapshot);
     const existing = await this.drafts.findOneBy({ controllerId });
     const draft =
-      existing ?? this.drafts.create({ controllerId, snapshot: serialized, reviewedHash: null, updatedAt: '' });
+      existing ?? this.drafts.create({ controllerId, snapshot: serialized, reviewedHash: null, presetProvenance: null, updatedAt: '' });
     draft.snapshot = serialized;
     draft.reviewedHash = null;
     draft.updatedAt = new Date().toISOString();
@@ -272,6 +313,13 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     await this.drafts.save(draft);
     const diff = configurationDiff(previous ? JSON.parse(previous.snapshot) : null, JSON.parse(draft.snapshot));
     return { draft, previous, changed: diff.length > 0, diff };
+  }
+
+  private async draftForPreset(controllerId: number): Promise<WagoConfigurationDraft> {
+    await this.claimedController(controllerId);
+    const draft = await this.drafts.findOneBy({ controllerId });
+    if (!draft) throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
+    return draft;
   }
 
   private async publishDraftWhileLocked(controllerId: number): Promise<WagoConfigurationRevision> {
@@ -993,4 +1041,40 @@ function safeEqual(left: string, right: string): boolean {
 }
 function isValidHardwareId(hardwareId: string): boolean {
   return Boolean(hardwareId) && !/[/+#]/.test(hardwareId);
+}
+
+function parsePresetProvenance(value: string | null): unknown[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function applySelectedChanges(
+  snapshot: WagoConfigurationSnapshot,
+  diff: ReturnType<typeof configurationDiff>,
+  selectedPaths: string[],
+): WagoConfigurationSnapshot {
+  const merged = JSON.parse(JSON.stringify(snapshot)) as WagoConfigurationSnapshot;
+  const changes = new Map(diff.map((change) => [change.path, change]));
+  for (const path of selectedPaths) {
+    const change = changes.get(path);
+    if (!change) continue;
+    const segments = [...path.matchAll(/\.([^.[\]]+)|\[(\d+)\]/g)].map((match) => match[1] ?? Number(match[2]));
+    if (!segments.length) continue;
+    let target: Record<string, unknown> | unknown[] = merged as unknown as Record<string, unknown>;
+    for (const segment of segments.slice(0, -1)) {
+      const next = target[segment];
+      if (next === undefined) target[segment] = typeof segment === 'number' ? [] : {};
+      target = target[segment] as Record<string, unknown> | unknown[];
+    }
+    const last = segments[segments.length - 1];
+    if (last === undefined) continue;
+    if (change.current === undefined) delete target[last];
+    else target[last] = change.current;
+  }
+  return merged;
 }

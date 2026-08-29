@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Inject, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { WagoService } from './wago.service';
+import type { WagoPresetApplication } from './configuration';
 
 @Auth('resources.update')
 @Controller('wago')
@@ -32,6 +33,21 @@ export class WagoControllerApi {
   }
   @Get('controllers/:id/configuration/draft') draft(@Param('id', ParseIntPipe) id: number) {
     return this.wago.getDraft(id);
+  }
+  @Get('configuration/presets') presets() {
+    return this.wago.presets();
+  }
+  @Post('controllers/:id/configuration/presets/preview') previewPreset(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { application?: WagoPresetApplication },
+  ) {
+    return this.wago.previewPreset(id, body?.application as WagoPresetApplication);
+  }
+  @Post('controllers/:id/configuration/presets/apply') applyPreset(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { application?: WagoPresetApplication; selectedPaths?: string[] },
+  ) {
+    return this.wago.applyPreset(id, body?.application as WagoPresetApplication, body?.selectedPaths ?? []);
   }
   @Post('controllers/:id/configuration/draft') saveDraft(
     @Param('id', ParseIntPipe) id: number,
