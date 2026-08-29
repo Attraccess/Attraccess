@@ -42,6 +42,61 @@ describe('WagoRuntime', () => {
     expect(transport.published).toContainEqual(expect.objectContaining({ topic: 'attraccess/wago/v1/controllers/cc100-1/configuration/reported', payload: expect.objectContaining({ revision: 2, errors: expect.any(Array) }) }));
   });
 
+  it('reports malformed snapshot capabilities instead of throwing', async () => {
+    const malformed = {
+      ...snapshot,
+      logicalChannels: [{ ...snapshot.logicalChannels[0], capabilities: undefined }],
+    };
+    await expect(transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(malformed), snapshot: malformed })).resolves.toBeUndefined();
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/configuration/reported',
+      payload: expect.objectContaining({ errors: expect.arrayContaining([expect.objectContaining({ code: 'invalid_capabilities' })]) }),
+    }));
+  });
+
+  it('rejects duplicate logical channel IDs', async () => {
+    const duplicated = { ...snapshot, logicalChannels: [...snapshot.logicalChannels, { ...snapshot.logicalChannels[0] }] };
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(duplicated), snapshot: duplicated });
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/configuration/reported',
+      payload: expect.objectContaining({ errors: expect.arrayContaining([expect.objectContaining({ path: 'snapshot.logicalChannels[0].id' })]) }),
+    }));
+  });
+
+  it('evaluates guards against their physical input', async () => {
+    const guarded: Snapshot = {
+      ...snapshot,
+      physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
+      logicalChannels: [
+        { id: 'interlock', physicalPointId: 'input-1', profile: 'generic-digital-input', capabilities: ['input'], disconnectPolicy: { mode: 'hold' } },
+        { ...snapshot.logicalChannels[0], capabilities: ['output', 'guard', 'pulse'], guard: { channelId: 'interlock', when: 'on' } },
+      ],
+    };
+    device.values.set('751-9301:1', true);
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(guarded), snapshot: guarded });
+    await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
+    expect(device.values.get('751-9301:0')).toBe(true);
+  });
+
+  it('reserves concurrent command IDs before device writes', async () => {
+    const writes: boolean[] = [];
+    const delayedDevice = {
+      write: async (_point: Snapshot['physicalPoints'][number], value: boolean) => {
+        writes.push(value);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      },
+      read: async () => false,
+    };
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`), transport, device: delayedDevice });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+    await Promise.all([
+      transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true }),
+      transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true }),
+    ]);
+    expect(writes).toEqual([true]);
+  });
+
   it('acknowledges duplicate commands and enforces immediate disconnect policy', async () => {
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
     await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
@@ -49,5 +104,19 @@ describe('WagoRuntime', () => {
     await runtime.setConnected(false);
     expect(device.values.get('751-9301:0')).toBe(false);
     expect(transport.published).toContainEqual(expect.objectContaining({ topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements', payload: { id: 'command-1', status: 'duplicate', error: undefined } }));
+  });
+
+  it('persists output and connection state changes', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport, device });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+    await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
+    await runtime.setConnected(false);
+    expect((await store.load()).outputs).toEqual({ load: false });
+    expect(transport.published.filter((message) => message.topic.endsWith('/state')).at(-1)).toEqual(expect.objectContaining({
+      payload: expect.objectContaining({ connected: false, outputs: { load: false } }),
+      retain: true,
+    }));
   });
 });

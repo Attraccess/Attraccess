@@ -126,18 +126,18 @@ export class WagoRuntime {
     if (this.state.commandIds.includes(command.id)) return this.acknowledge(command.id, 'duplicate');
     const channel = this.state.accepted?.snapshot.logicalChannels.find((item) => item.id === command.channelId);
     if (!channel || !channel.capabilities.includes('output')) return this.acknowledge(command.id, 'rejected', 'unknown output channel');
-    const guarded = channel.guard && this.state.outputs[channel.guard.channelId] !== (channel.guard.when === 'on');
-    if (guarded) return this.acknowledge(command.id, 'rejected', 'operational guard is not satisfied');
+    // Reserve the ID before any I/O so simultaneous deliveries cannot actuate twice.
+    this.state.commandIds = [...this.state.commandIds, command.id].slice(-100);
+    await this.options.store.save(this.state);
+    if (!(await this.isGuardSatisfied(channel))) return this.acknowledge(command.id, 'rejected', 'operational guard is not satisfied');
     if (command.action === 'pulse') {
       const duration = channel.pulse?.durationMs;
       if (!duration) return this.acknowledge(command.id, 'rejected', 'channel does not define a pulse duration');
       if (!(await this.writeChannel(channel, true))) return this.acknowledge(command.id, 'rejected', 'device write failed');
       const existingPulse = this.pulses.get(channel.id);
       if (existingPulse) clearTimeout(existingPulse);
-      this.pulses.set(channel.id, setTimeout(() => void this.writeChannel(channel, false), duration));
+      this.pulses.set(channel.id, setTimeout(() => void this.ignoreTimerRejection(() => this.writeChannel(channel, false)), duration));
     } else if (!(await this.writeChannel(channel, command.value))) return this.acknowledge(command.id, 'rejected', 'device write failed');
-    this.state.commandIds = [...this.state.commandIds, command.id].slice(-100);
-    await this.options.store.save(this.state);
     await this.acknowledge(command.id, 'accepted');
   }
 
@@ -146,6 +146,7 @@ export class WagoRuntime {
     if (connected) {
       this.watchdogs.forEach(clearTimeout);
       this.watchdogs.clear();
+      await this.publishState();
       return;
     }
     for (const channel of this.state.accepted?.snapshot.logicalChannels ?? []) {
@@ -154,9 +155,10 @@ export class WagoRuntime {
       if (channel.disconnectPolicy.mode === 'watchdog')
         this.watchdogs.set(
           channel.id,
-          setTimeout(() => void this.writeChannel(channel, false), channel.disconnectPolicy.timeoutMs),
+          setTimeout(() => void this.ignoreTimerRejection(() => this.writeChannel(channel, false)), channel.disconnectPolicy.timeoutMs),
         );
     }
+    await this.publishState();
   }
 
   async publishHeartbeat(): Promise<void> {
@@ -200,6 +202,7 @@ export class WagoRuntime {
     try {
       await this.options.device.write(point, value);
       this.state.outputs[channel.id] = value;
+      await this.options.store.save(this.state);
       await this.publishState();
       return true;
     } catch (error) {
@@ -234,6 +237,21 @@ export class WagoRuntime {
   }
   private desiredTopic(): string { return this.topic('configuration/desired'); }
   private commandTopic(): string { return this.topic('commands'); }
+  private async isGuardSatisfied(channel: Snapshot['logicalChannels'][number]): Promise<boolean> {
+    if (!channel.guard) return true;
+    const snapshot = this.state.accepted?.snapshot;
+    const guardChannel = snapshot?.logicalChannels.find((item) => item.id === channel.guard?.channelId);
+    const guardPoint = snapshot?.physicalPoints.find((item) => item.id === guardChannel?.physicalPointId);
+    if (!guardPoint) return false;
+    try {
+      return Boolean(await this.options.device.read(guardPoint)) === (channel.guard.when === 'on');
+    } catch {
+      return false;
+    }
+  }
+  private ignoreTimerRejection(callback: () => Promise<unknown>): void {
+    void callback().catch(() => undefined);
+  }
 }
 
 export function hash(value: unknown): string {
@@ -264,16 +282,23 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     if (!['751-9301', '879-3000', '879-1300'].includes(point?.hardwareProfile ?? '')) errors.push({ path: `snapshot.physicalPoints[${index}].hardwareProfile`, code: 'unsupported_profile', message: 'unsupported hardware profile' });
     if (!Number.isSafeInteger(point?.channel) || (point?.channel ?? -1) < 0) errors.push({ path: `snapshot.physicalPoints[${index}].channel`, code: 'invalid_channel', message: 'channel must be non-negative' });
   });
-  const channelIds = new Set(snapshot.logicalChannels.map((channel) => channel?.id));
+  const channelIds = new Set<string>();
+  const channelIdCounts = new Map<string, number>();
+  snapshot.logicalChannels.forEach((channel) => {
+    if (typeof channel?.id !== 'string') return;
+    channelIds.add(channel.id);
+    channelIdCounts.set(channel.id, (channelIdCounts.get(channel.id) ?? 0) + 1);
+  });
   snapshot.logicalChannels.forEach((channel, index) => {
     const path = `snapshot.logicalChannels[${index}]`;
-    if (!channel?.id || [...channelIds].filter((id) => id === channel.id).length !== 1) errors.push({ path: `${path}.id`, code: 'invalid_id', message: 'logical channel IDs must be unique' });
+    if (!channel?.id || channelIdCounts.get(channel.id) !== 1) errors.push({ path: `${path}.id`, code: 'invalid_id', message: 'logical channel IDs must be unique' });
     if (!pointIds.has(channel?.physicalPointId ?? '')) errors.push({ path: `${path}.physicalPointId`, code: 'missing_reference', message: 'physical point does not exist' });
-    if (!Array.isArray(channel?.capabilities) || !channel.capabilities.length) errors.push({ path: `${path}.capabilities`, code: 'invalid_capabilities', message: 'capabilities are required' });
+    const capabilities = Array.isArray(channel?.capabilities) ? channel.capabilities : [];
+    if (!capabilities.length) errors.push({ path: `${path}.capabilities`, code: 'invalid_capabilities', message: 'capabilities are required' });
     const policy = channel?.disconnectPolicy;
     if (!policy || !['hold', 'immediate', 'watchdog'].includes(policy.mode) || (policy.mode === 'watchdog' && (!Number.isSafeInteger(policy.timeoutMs) || (policy.timeoutMs ?? 0) <= 0))) errors.push({ path: `${path}.disconnectPolicy`, code: 'invalid_disconnect_policy', message: 'every channel needs hold, immediate, or watchdog disconnect behavior' });
-    if (channel?.pulse && (!channel.capabilities.includes('pulse') || !Number.isSafeInteger(channel.pulse.durationMs) || channel.pulse.durationMs <= 0)) errors.push({ path: `${path}.pulse`, code: 'invalid_pulse', message: 'pulse requires pulse capability and positive duration' });
-    if (channel?.guard && (!channel.capabilities.includes('guard') || !channelIds.has(channel.guard.channelId))) errors.push({ path: `${path}.guard`, code: 'invalid_guard', message: 'guard requires guard capability and an existing channel' });
+    if (channel?.pulse && (!capabilities.includes('pulse') || !Number.isSafeInteger(channel.pulse.durationMs) || channel.pulse.durationMs <= 0)) errors.push({ path: `${path}.pulse`, code: 'invalid_pulse', message: 'pulse requires pulse capability and positive duration' });
+    if (channel?.guard && (!capabilities.includes('guard') || !channelIds.has(channel.guard.channelId))) errors.push({ path: `${path}.guard`, code: 'invalid_guard', message: 'guard requires guard capability and an existing channel' });
   });
   return errors;
 }

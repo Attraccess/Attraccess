@@ -47,12 +47,23 @@ export class ModbusTcpAdapter implements DeviceAdapter {
       request.writeUInt16BE(value, 10);
       const socket = connectSocket(this.port, this.host);
       const chunks: Buffer[] = [];
+      let settled = false;
+      const finish = (error?: Error) => {
+        if (settled) return;
+        settled = true;
+        socket.destroy();
+        if (error) reject(error);
+        else resolve(Buffer.concat(chunks));
+      };
       socket.setTimeout(5_000);
       socket.once('connect', () => socket.write(request));
-      socket.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
-      socket.once('end', () => resolve(Buffer.concat(chunks)));
-      socket.once('timeout', () => socket.destroy(new Error('Modbus TCP request timed out')));
-      socket.once('error', reject);
+      socket.on('data', (chunk) => {
+        chunks.push(Buffer.from(chunk));
+        const response = Buffer.concat(chunks);
+        if (response.length >= 6 && response.length >= 6 + response.readUInt16BE(4)) finish();
+      });
+      socket.once('timeout', () => finish(new Error('Modbus TCP request timed out')));
+      socket.once('error', finish);
     });
   }
 }

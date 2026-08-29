@@ -14,13 +14,13 @@ const transport: Transport = {
 const adapter = new Cc100OnboardIoAdapter(JSON.parse(process.env.WAGO_IO_PATHS ?? '{}'));
 const runtime = new WagoRuntime({ hardwareId, prefix, store: new JsonStateStore(statePath), transport, device: adapter });
 
-client.once('connect', async () => {
+client.once('connect', () => void handleAsync(async () => {
   await runtime.start();
-  setInterval(() => void runtime.publishHeartbeat(), 30_000).unref();
-  setInterval(() => void runtime.publishMeasurements(), 5_000).unref();
-});
-client.on('close', () => void runtime.setConnected(false));
-client.on('connect', () => void runtime.setConnected(true));
+  setInterval(() => void handleAsync(() => runtime.publishHeartbeat()), 30_000).unref();
+  setInterval(() => void handleAsync(() => runtime.publishMeasurements()), 5_000).unref();
+}));
+client.on('close', () => void handleAsync(() => runtime.setConnected(false)));
+client.on('connect', () => void handleAsync(() => runtime.setConnected(true)));
 process.on('SIGTERM', () => client.end(true, () => process.exit(0)));
 
 function required(name: string): string {
@@ -35,8 +35,15 @@ function subscribe(client: MqttClient, topic: string, listener: (payload: Buffer
   return new Promise((resolve, reject) =>
     client.subscribe(topic, { qos: 1 }, (error) => {
       if (error) return reject(error);
-      client.on('message', (receivedTopic, payload) => { if (receivedTopic === topic) void listener(payload); });
+      client.on('message', (receivedTopic, payload) => {
+        if (receivedTopic === topic) void handleAsync(() => listener(payload));
+      });
       resolve();
     }),
   );
+}
+function handleAsync(callback: () => void | Promise<void>): Promise<void> {
+  return Promise.resolve().then(callback).catch((error: unknown) => {
+    console.error('WAGO CC100 runtime callback failed', error);
+  });
 }
