@@ -50,7 +50,7 @@ export function ConfigurationEditor({ controllerId, onOpenChange }: { controller
     previewPreset.reset();
     setSelectedPaths([]);
     setPresetPreview(null);
-  }, [preset, channelId, physicalPointId, guardChannelId, feedbackChannelId]);
+  }, [controllerId, preset, channelId, physicalPointId, guardChannelId, feedbackChannelId]);
 
   function application(): WagoPresetApplication | null {
     if (!preset) return null;
