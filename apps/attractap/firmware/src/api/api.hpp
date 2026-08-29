@@ -294,6 +294,7 @@ public:
     void stopResourceUsageSession(uint32_t resourceId);
     void requestFormFields(uint32_t resourceId, ResourceUsageFormActionType action, uint32_t formId, uint32_t offset, uint32_t limit);
     void submitFormPage(uint32_t resourceId, ResourceUsageFormActionType action, const FormPageSubmission &page);
+    void cancelForm(uint32_t resourceId, ResourceUsageFormActionType action);
     void lockDoor(uint32_t resourceId);
     void unlockDoor(uint32_t resourceId);
     void unlatchDoor(uint32_t resourceId);

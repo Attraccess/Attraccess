@@ -13,6 +13,7 @@ import {
   ResourceUsageFormGetFieldsPayload,
   ResourceUsageFormFieldsPayload,
   ResourceUsageFormSubmitPagePayload,
+  ResourceUsageFormCancelPayload,
   ResourceUsageFormPageResultPayload,
 } from '../websocket.types';
 
@@ -45,6 +46,11 @@ export class AttractapFormsHandler {
     if (socket.state.formDrafts) {
       delete socket.state.formDrafts[this.formDraftKey(resourceId, action)];
     }
+  }
+
+  public handleResourceUsageFormCancel(socket: AuthenticatedWebSocket, data: AttractapEvent['data']): void {
+    const { resourceId, action } = data.payload as ResourceUsageFormCancelPayload;
+    this.clearFormDraft(socket, resourceId, action);
   }
 
   public async ensureFormsSatisfied({

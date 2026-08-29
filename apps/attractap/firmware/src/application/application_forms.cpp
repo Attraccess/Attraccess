@@ -8,11 +8,12 @@
 void Application::handleFormsRequest(
     const API::ResourceUsageFormRequest &request) {
   // 'request' aliases this->pendingFormRequest (filled by the callback).
-  (void)request;
   // The server retries un-acked messages (RETRY_COUNT in the gateway). A duplicate
   // RESOURCE_USAGE_FORM_REQUEST must not reset an in-progress form, nor reopen one
   // that was already submitted while the START/STOP result is in flight (ATT-545).
-  if (this->hasPendingFormRequest || this->formFlowSubmitted) {
+  if (this->hasPendingFormRequest || this->formFlowSubmitted ||
+      this->pendingActionType == PENDING_ACTION_NONE ||
+      request.resourceId != this->pendingActionResourceId) {
     return;
   }
   this->hasPendingFormRequest = true;
@@ -198,12 +199,18 @@ void Application::finishFormFlow() {
 }
 
 void Application::handleFormsCancel() {
-  if (!this->hasPendingFormRequest) {
-    return;
+  if (this->hasPendingFormRequest) {
+    this->api.cancelForm(this->pendingFormRequest.resourceId,
+                         this->pendingFormRequest.action);
   }
   this->hasPendingFormRequest = false;
   this->formFlowSubmitted = false;
   this->pendingActionType = PENDING_ACTION_NONE;
+  this->pendingActionResourceId = 0;
+  this->pendingActionProjectId = 0;
+  this->pendingFormRequestReady = false;
+  this->pendingFormFieldsReady = false;
+  this->pendingFormPageResultReady = false;
   this->formCursorFormIdx = 0;
   this->formCursorOffset = 0;
   this->clearFormPageCache();

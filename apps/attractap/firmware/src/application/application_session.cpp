@@ -196,10 +196,7 @@ void Application::handleResourceDetailsButtonClick(
     this->unlocked = false;
     this->currentProjectsUser = "";
     this->clearProjectSelection();
-    this->pendingActionType = PENDING_ACTION_NONE;
-    this->hasPendingFormRequest = false;
-    this->formFlowSubmitted = false;
-    Display::resourceDetailsScreen.hideFormsModal();
+    this->handleFormsCancel();
     break;
   }
 }
