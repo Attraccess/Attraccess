@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const packageDir = process.argv[2];
@@ -18,6 +18,7 @@ if (process.env.NPM_NIGHTLY === 'true') {
   pkg.version = `${pkg.version.replace(/-.+$/, '')}-nightly.${runNumber}.${runAttempt}`;
   writeFileSync(packageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
   rmSync(distDir, { recursive: true, force: true });
+  mkdirSync(distDir, { recursive: true });
   execFileSync('npm', ['pack', '--pack-destination', '../dist'], { cwd: packageDir, stdio: 'inherit' });
 }
 
