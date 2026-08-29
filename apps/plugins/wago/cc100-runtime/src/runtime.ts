@@ -84,6 +84,7 @@ export class WagoRuntime {
   private readonly pulses = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly watchdogs = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly feedbackChecks = new Map<string, ReturnType<typeof setTimeout>>();
+  private feedbackCheckSequence = 0;
   private readonly inFlightCommandIds = new Set<string>();
 
   constructor(
@@ -267,11 +268,13 @@ export class WagoRuntime {
   }
   private scheduleFeedbackCheck(channel: Snapshot['logicalChannels'][number], value: boolean): void {
     if (!channel.feedback) return;
-    const existing = this.feedbackChecks.get(channel.id);
-    if (existing) clearTimeout(existing);
+    const checkId = `${channel.id}:${++this.feedbackCheckSequence}`;
     this.feedbackChecks.set(
-      channel.id,
-      setTimeout(() => void this.ignoreTimerRejection(() => this.verifyFeedback(channel, value)), channel.feedback.timeoutMs),
+      checkId,
+      setTimeout(() => {
+        this.feedbackChecks.delete(checkId);
+        void this.ignoreTimerRejection(() => this.verifyFeedback(channel, value));
+      }, channel.feedback.timeoutMs),
     );
   }
   private async verifyFeedback(channel: Snapshot['logicalChannels'][number], value: boolean): Promise<void> {
@@ -376,11 +379,13 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     if (!['751-9301', '879-3000', '879-1300'].includes(point?.hardwareProfile ?? '')) errors.push({ path: `snapshot.physicalPoints[${index}].hardwareProfile`, code: 'unsupported_profile', message: 'unsupported hardware profile' });
     if (!Number.isSafeInteger(point?.channel) || (point?.channel ?? -1) < 0) errors.push({ path: `snapshot.physicalPoints[${index}].channel`, code: 'invalid_channel', message: 'channel must be non-negative' });
   });
-    const channelIds = new Set<string>();
+  const channelIds = new Set<string>();
+  const channelsById = new Map<string, Snapshot['logicalChannels'][number]>();
   const channelIdCounts = new Map<string, number>();
   snapshot.logicalChannels.forEach((channel) => {
     if (typeof channel?.id !== 'string') return;
     channelIds.add(channel.id);
+    channelsById.set(channel.id, channel);
     channelIdCounts.set(channel.id, (channelIdCounts.get(channel.id) ?? 0) + 1);
   });
   snapshot.logicalChannels.forEach((channel, index) => {
@@ -404,10 +409,14 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     if (channel?.pulse) validateKeys(channel.pulse as Record<string, unknown>, `${path}.pulse`, ['durationMs'], errors);
     if (channel?.guard && (!capabilities.includes('guard') || !channelIds.has(channel.guard.channelId))) errors.push({ path: `${path}.guard`, code: 'invalid_guard', message: 'guard requires guard capability and an existing channel' });
     if (channel?.guard) validateKeys(channel.guard as Record<string, unknown>, `${path}.guard`, ['channelId', 'when'], errors);
+    const feedbackChannel = channel?.feedback ? channelsById.get(channel.feedback.channelId) : undefined;
     if (
       channel?.feedback &&
       (!capabilities.includes('feedback') ||
-        !channelIds.has(channel.feedback.channelId) ||
+        !feedbackChannel ||
+        feedbackChannel.id === channel.id ||
+        !Array.isArray(feedbackChannel.capabilities) ||
+        !feedbackChannel.capabilities.includes('input') ||
         !['match', 'inverse'].includes(channel.feedback.expected) ||
         !Number.isSafeInteger(channel.feedback.timeoutMs) ||
         channel.feedback.timeoutMs <= 0)
