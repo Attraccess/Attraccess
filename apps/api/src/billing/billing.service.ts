@@ -412,8 +412,7 @@ export class BillingService {
     if (await this.isBillingEnabled(resourceId, transactionalEntityManager)) {
       const balance = await this.getBalance(user.id, transactionalEntityManager);
       const sessionDurationRate = usage.sessionDurationCreditsPerMinute ?? resourceBillingConfiguration.creditsPerMinute;
-      const operatingDurationRate = usage.operatingDurationCreditsPerMinute ?? 0;
-      if (balance < resourceBillingConfiguration.creditsPerUsage + sessionDurationRate + operatingDurationRate) {
+      if (balance < resourceBillingConfiguration.creditsPerUsage + sessionDurationRate) {
         throw new InsufficientBalanceError();
       }
     }

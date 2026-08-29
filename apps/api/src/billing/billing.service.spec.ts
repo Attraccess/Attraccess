@@ -686,6 +686,33 @@ describe('BillingService', () => {
     });
   });
 
+  describe('handleResourceUsageStart', () => {
+    it('does not reserve an operating-minute charge that may not be incurred', async () => {
+      const usage = {
+        id: 22,
+        sessionDurationCreditsPerMinute: 3,
+        operatingDurationCreditsPerMinute: 7,
+      } as ResourceUsage;
+      const user = { id: 25 } as User;
+
+      jest.spyOn(service, 'getResourceBillingConfiguration').mockResolvedValue({
+        creditsPerUsage: 5,
+        creditsPerMinute: 3,
+        creditsPerOperatingMinute: 7,
+      } as ResourceBillingConfiguration);
+      jest.spyOn(service, 'isBillingEnabled').mockResolvedValue(true);
+      jest.spyOn(service, 'getBalance').mockResolvedValue(8);
+
+      await expect(service.handleResourceUsageStart(205, usage, user)).resolves.toBeUndefined();
+      expect(billingTransactionRepository.save).toHaveBeenCalledWith({
+        userId: user.id,
+        resourceUsageId: usage.id,
+        amount: 0,
+        status: BillingTransactionStatus.Pending,
+      });
+    });
+  });
+
   describe('updateResourceBillingConfiguration', () => {
     it('throws when configuration not found', async () => {
       resourceBillingConfigurationRepository.findOneBy.mockResolvedValue(null);
