@@ -461,9 +461,25 @@ void Application::setup() {
         // DO NOT copy the large struct here - websocket task has limited
         // stack/heap. Just set a flag; the LVGL async handler will do the copy
         // on the main thread.
-        this->pendingFormRequestResourceId = request.resourceId;
-        this->pendingFormRequestAction = request.action;
-        this->hasPendingServerFormFlow = true;
+        API::ResourceUsageFormActionType expectedAction =
+            API::ResourceUsageFormActionType::UNKNOWN;
+        if (this->pendingActionType == PENDING_ACTION_START_SESSION) {
+          expectedAction = this->pendingActionIsTakeover
+                               ? API::ResourceUsageFormActionType::TAKEOVER
+                               : API::ResourceUsageFormActionType::START;
+        } else if (this->pendingActionType == PENDING_ACTION_STOP_SESSION) {
+          expectedAction = API::ResourceUsageFormActionType::END;
+        }
+
+        // Preserve the cancellation target for the active action only. Rejected
+        // requests must not replace it before LVGL validates them.
+        if (!this->hasPendingServerFormFlow &&
+            request.resourceId == this->pendingActionResourceId &&
+            request.action == expectedAction) {
+          this->pendingFormRequestResourceId = request.resourceId;
+          this->pendingFormRequestAction = request.action;
+          this->hasPendingServerFormFlow = true;
+        }
         this->pendingFormRequestReady = true;
         // Schedule the copy + UI update on LVGL thread
         Display::asyncCall(
