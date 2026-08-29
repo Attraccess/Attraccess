@@ -23,7 +23,9 @@ describe('WAGO protocol', () => {
   it('accepts a complete announcement and preserves its protocol state', () => {
     expect(parseAnnouncement(Buffer.from(JSON.stringify(valid)))).toEqual(valid);
     expect(discoveryTopic(valid.hardwareId)).toBe(`${DISCOVERY_ROOT}/cc100-01`);
-    expect(heartbeatTopic(valid.hardwareId)).toBe('attraccess/wago/controllers/cc100-01/heartbeat');
+    expect(heartbeatTopic('attraccess/wago', valid.hardwareId)).toBe(
+      'attraccess/wago/v1/controllers/cc100-01/heartbeat',
+    );
   });
 
   it('uses a versioned configuration protocol below the configurable operational prefix', () => {

@@ -1,0 +1,51 @@
+name: WAGO CC100 Runtime
+
+on:
+  pull_request:
+    paths:
+      - 'apps/plugins/wago/cc100-runtime/**'
+      - 'apps/plugins/wago/backend/protocol.ts'
+      - 'apps/plugins/wago/backend/wago.service.ts'
+      - '.github/workflows/wago-cc100-runtime.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/plugins/wago/cc100-runtime/**'
+      - 'apps/plugins/wago/backend/protocol.ts'
+      - 'apps/plugins/wago/backend/wago.service.ts'
+      - '.github/workflows/wago-cc100-runtime.yml'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
+      - run: pnpm nx run wago-cc100-runtime:typecheck
+      - run: pnpm nx run wago-cc100-runtime:test
+      - run: pnpm nx run wago-cc100-runtime:build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wago-cc100-runtime-manifest
+          path: apps/plugins/wago/cc100-runtime/manifest.json
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.event_name == 'push'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/plugins/wago/cc100-runtime/Dockerfile
+          platforms: linux/arm64
+          push: ${{ github.event_name == 'push' }}
+          tags: ghcr.io/${{ github.repository_owner }}/wago-cc100-runtime:${{ github.sha }}
