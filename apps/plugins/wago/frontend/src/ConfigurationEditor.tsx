@@ -17,8 +17,8 @@ import {
   TextArea,
   TextField,
 } from '@heroui/react';
-import { useEffect, useState } from 'react';
-import type { WagoPreset, WagoPresetApplication } from './api';
+import { useEffect, useRef, useState } from 'react';
+import type { PresetPreview, WagoPreset, WagoPresetApplication } from './api';
 import { useApplyPresetMutation, useDraftQuery, usePresetsQuery, usePreviewPresetMutation, useSaveDraftMutation } from './queries';
 
 const emptySnapshot = { version: 1, physicalPoints: [], logicalChannels: [] };
@@ -33,7 +33,9 @@ export function ConfigurationEditor({ controllerId, onOpenChange }: { controller
   const [guardChannelId, setGuardChannelId] = useState('');
   const [feedbackChannelId, setFeedbackChannelId] = useState('');
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+  const [presetPreview, setPresetPreview] = useState<PresetPreview | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const previewGeneration = useRef(0);
   const saveDraft = useSaveDraftMutation(controllerId ?? 0);
   const previewPreset = usePreviewPresetMutation(controllerId ?? 0);
   const applyPreset = useApplyPresetMutation(controllerId ?? 0);
@@ -44,8 +46,10 @@ export function ConfigurationEditor({ controllerId, onOpenChange }: { controller
   }, [draftQuery.data, draftQuery.isPending]);
 
   useEffect(() => {
+    previewGeneration.current += 1;
     previewPreset.reset();
     setSelectedPaths([]);
+    setPresetPreview(null);
   }, [preset, channelId, physicalPointId, guardChannelId, feedbackChannelId]);
 
   function application(): WagoPresetApplication | null {
@@ -64,14 +68,20 @@ export function ConfigurationEditor({ controllerId, onOpenChange }: { controller
   }
 
   async function preview() {
+    const generation = previewGeneration.current;
     try {
       setFormError(null);
       const selected = application();
       if (!selected) return;
       await saveDraft.mutateAsync(parsedSnapshot());
       const result = await previewPreset.mutateAsync(selected);
+      if (generation !== previewGeneration.current) return;
+      setPresetPreview(result);
       setSelectedPaths(result.diff.map((change) => change.path));
-    } catch (error) { setFormError(error instanceof Error ? error.message : 'Could not preview preset changes.'); }
+    } catch (error) {
+      if (generation === previewGeneration.current)
+        setFormError(error instanceof Error ? error.message : 'Could not preview preset changes.');
+    }
   }
 
   async function apply() {
@@ -79,13 +89,14 @@ export function ConfigurationEditor({ controllerId, onOpenChange }: { controller
       setFormError(null);
       const selected = application();
       if (!selected) return;
-      const draft = await applyPreset.mutateAsync({ application: selected, selectedPaths, previewedDraftHash: previewPreset.data?.draftHash ?? '' });
+      const draft = await applyPreset.mutateAsync({ application: selected, selectedPaths, previewedDraftHash: presetPreview?.draftHash ?? '' });
       setSnapshot(JSON.stringify(JSON.parse(draft.snapshot), null, 2));
       previewPreset.reset();
+      setPresetPreview(null);
     } catch (error) { setFormError(error instanceof Error ? error.message : 'Could not apply preset changes.'); }
   }
 
-  const error = saveDraft.error ?? previewPreset.error ?? applyPreset.error;
+  const error = saveDraft.error ?? applyPreset.error;
   return (
     <Modal isOpen={controllerId !== null} onOpenChange={onOpenChange}>
       <ModalBackdrop>
@@ -103,7 +114,7 @@ export function ConfigurationEditor({ controllerId, onOpenChange }: { controller
                 </Alert>
                 <TextField className="wg:w-full">
                   <Label>Editable configuration draft</Label>
-                  <TextArea value={snapshot} onChange={(event) => { previewPreset.reset(); setSelectedPaths([]); setSnapshot(event.target.value); }} rows={14} className="wg:font-mono" />
+                  <TextArea value={snapshot} onChange={(event) => { previewGeneration.current += 1; previewPreset.reset(); setSelectedPaths([]); setPresetPreview(null); setSnapshot(event.target.value); }} rows={14} className="wg:font-mono" />
                 </TextField>
                 <Card>
                   <Card.Header><h2 className="wg:font-medium">Apply editable preset foundation</h2></Card.Header>
@@ -121,10 +132,10 @@ export function ConfigurationEditor({ controllerId, onOpenChange }: { controller
                     {preset?.id === 'guarded-enable-request' && <TextField isRequired><Label>Guard input channel ID</Label><Input value={guardChannelId} onChange={(event) => setGuardChannelId(event.target.value)} /></TextField>}
                     {preset?.id === 'generic-digital-output' && <TextField><Label>Optional feedback channel ID</Label><Input value={feedbackChannelId} onChange={(event) => setFeedbackChannelId(event.target.value)} /></TextField>}
                     <Button isDisabled={!preset} isPending={saveDraft.isPending || previewPreset.isPending} onPress={() => void preview()}>Preview changes</Button>
-                    {previewPreset.data && (
+                    {presetPreview && (
                       <div className="wg:flex wg:flex-col wg:gap-2">
                         <p className="wg:text-sm wg:font-medium">Select preset changes to copy into this draft</p>
-                        {previewPreset.data.diff.map((change) => (
+                        {presetPreview.diff.map((change) => (
                           <Checkbox key={change.path} isSelected={selectedPaths.includes(change.path)} onChange={(selected) => setSelectedPaths((paths) => selected ? [...paths, change.path] : paths.filter((path) => path !== change.path))}>
                             <code>{change.path}</code>
                           </Checkbox>

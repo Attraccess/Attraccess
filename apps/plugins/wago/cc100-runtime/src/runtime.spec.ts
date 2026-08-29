@@ -234,6 +234,26 @@ describe('WagoRuntime', () => {
     }));
   });
 
+  it('cancels feedback checks superseded by a later output command', async () => {
+    const monitored: Snapshot = {
+      ...snapshot,
+      physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
+      logicalChannels: [
+        { id: 'feedback', physicalPointId: 'input-1', profile: 'generic-monitored-input', capabilities: ['input'], disconnectPolicy: { mode: 'hold' } },
+        { id: 'load', physicalPointId: 'output-1', profile: 'generic-digital-output', capabilities: ['output', 'feedback'], disconnectPolicy: { mode: 'immediate' }, feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 15 } },
+      ],
+    };
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(monitored), snapshot: monitored });
+    await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
+    await transport.send(commands, { id: 'command-2', channelId: 'load', action: 'set', value: false });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    expect(transport.published).not.toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+      payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),
+    }));
+  });
+
   it('rejects feedback that references the output rather than an input channel', async () => {
     const invalid: Snapshot = {
       ...snapshot,
