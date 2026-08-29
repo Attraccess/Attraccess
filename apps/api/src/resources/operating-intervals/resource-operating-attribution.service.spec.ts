@@ -197,6 +197,20 @@ describe('ResourceOperatingAttributionService', () => {
     });
   });
 
+  it('calculates a completed usage session from its exact operating overlap', async () => {
+    const manager = {
+      getRepository: jest.fn(() => ({
+        find: jest.fn().mockResolvedValue([operating(1, '10:00:00', '11:00:00')]),
+      })),
+    };
+    const minutes = await service.getForUsage(
+      usage(2, '10:15:00', '10:45:00'),
+      manager as never,
+    );
+
+    expect(minutes).toBe(30);
+  });
+
   it('loads only intervals that overlap the recent attribution window', async () => {
     intervalRepository.find.mockResolvedValue([] as ResourceOperatingInterval[]);
     usageRepository.find.mockResolvedValue([] as ResourceUsage[]);

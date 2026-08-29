@@ -8,6 +8,10 @@
     "creditsPerMinute": {
       "label": "{{currency}} pro Minute",
       "description": "Dieser Betrag wird pro Minute der Sitzungsdauer abgezogen."
+    },
+    "creditsPerOperatingMinute": {
+      "label": "{{currency}} pro Betriebsminute",
+      "description": "Dieser Betrag wird pro Betriebsminute abgezogen, die der Nutzung zugeordnet ist."
     }
   },
   "actions": {

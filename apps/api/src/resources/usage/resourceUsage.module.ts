@@ -18,6 +18,7 @@ import { ProjectsModule } from '../../projects/projects.module';
 import { ResourceFormsModule } from '../forms/forms.module';
 import { ResourceHealthModule } from '../health/resource-health.module';
 import { ResourceRetrainingModule } from '../retraining/resourceRetraining.module';
+import { ResourceOperatingIntervalModule } from '../operating-intervals/resource-operating-interval.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { ResourceRetrainingModule } from '../retraining/resourceRetraining.modul
     forwardRef(() => ProjectsModule),
     ResourceFormsModule,
     ResourceHealthModule,
+    ResourceOperatingIntervalModule,
   ],
   controllers: [ResourceUsageController],
   providers: [

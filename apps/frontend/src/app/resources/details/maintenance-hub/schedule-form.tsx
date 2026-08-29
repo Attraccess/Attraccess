@@ -32,6 +32,11 @@ const TRIGGER_OPTIONS = [
   { value: ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL, labelKey: 'TIME_INTERVAL' },
 ] as const;
 
+const DURATION_BASIS_OPTIONS = [
+  { value: 'SESSION_DURATION', labelKey: 'SESSION_DURATION' },
+  { value: 'ATTRIBUTABLE_OPERATING_DURATION', labelKey: 'ATTRIBUTABLE_OPERATING_DURATION' },
+] as const;
+
 interface Props {
   resourceId: number;
   scheduleId?: number;
@@ -51,6 +56,7 @@ export function ScheduleForm(props: Props) {
   );
   const [usageHoursDuration, setUsageHoursDuration] = useState('100');
   const [usageHoursUnit, setUsageHoursUnit] = useState<UsageDurationUnit>(UsageDurationUnit.HOURS);
+  const [durationBasis, setDurationBasis] = useState<(typeof DURATION_BASIS_OPTIONS)[number]['value']>('SESSION_DURATION');
   const [thresholdSessions, setThresholdSessions] = useState('50');
   const [timeIntervalDuration, setTimeIntervalDuration] = useState('500');
   const [timeIntervalUnit, setTimeIntervalUnit] = useState<UsageDurationUnit>(UsageDurationUnit.HOURS);
@@ -69,6 +75,9 @@ export function ScheduleForm(props: Props) {
     setEnabled(existing.enabled);
     setUsageHoursDuration(existing.usageHoursConfig?.duration?.toString() ?? '100');
     setUsageHoursUnit(existing.usageHoursConfig?.unit ?? UsageDurationUnit.HOURS);
+    setDurationBasis(
+      (existing as { durationBasis?: (typeof DURATION_BASIS_OPTIONS)[number]['value'] }).durationBasis ?? 'SESSION_DURATION',
+    );
     setThresholdSessions(existing.usageCountConfig?.thresholdSessions?.toString() ?? '50');
     setTimeIntervalDuration(existing.timeIntervalConfig?.duration?.toString() ?? '500');
     setTimeIntervalUnit((existing.timeIntervalConfig?.unit as UsageDurationUnit) ?? UsageDurationUnit.HOURS);
@@ -96,7 +105,7 @@ export function ScheduleForm(props: Props) {
       if (triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS) {
         const duration = parseInt(usageHoursDuration, 10);
         if (Number.isNaN(duration) || duration < 1) return null;
-        return { ...base, usageHoursConfig: { duration, unit: usageHoursUnit } };
+        return { ...base, durationBasis, usageHoursConfig: { duration, unit: usageHoursUnit } };
       }
       if (triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT) {
         const sessions = parseInt(thresholdSessions, 10);
@@ -112,12 +121,12 @@ export function ScheduleForm(props: Props) {
     if (!requestBody) return;
 
     if (scheduleId != null) {
-      update({ resourceId, scheduleId, requestBody });
+      update({ resourceId, scheduleId, requestBody: requestBody as never });
     } else {
-      create({ resourceId, requestBody });
+      create({ resourceId, requestBody: requestBody as never });
     }
   }, [
-    name, triggerType, usageHoursDuration, usageHoursUnit, thresholdSessions,
+    name, triggerType, usageHoursDuration, usageHoursUnit, durationBasis, thresholdSessions,
     timeIntervalDuration, timeIntervalUnit, enabled, resourceId, scheduleId, create, update,
   ]);
 
@@ -155,6 +164,15 @@ export function ScheduleForm(props: Props) {
             items={Object.values(UsageDurationUnit).map((unit) => ({
               key: unit,
               label: t(`form.unit.${unit}`),
+            }))}
+          />
+          <Select
+            label={t('form.durationBasis.label')}
+            value={durationBasis}
+            onChange={(key) => { if (key) setDurationBasis(key as typeof durationBasis); }}
+            items={DURATION_BASIS_OPTIONS.map((option) => ({
+              key: option.value,
+              label: t(`form.durationBasis.${option.labelKey}`),
             }))}
           />
         </>

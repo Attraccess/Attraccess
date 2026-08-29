@@ -119,6 +119,30 @@ export class ResourceUsage {
   })
   usageInMinutes!: number;
 
+  @Column({ type: 'float', nullable: true })
+  @ApiProperty({
+    description: 'Operating duration attributed to this usage session in minutes',
+    required: false,
+    nullable: true,
+  })
+  attributedOperatingDurationInMinutes!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'Snapshot of the session-duration rate when this usage session started',
+    required: false,
+    nullable: true,
+  })
+  sessionDurationCreditsPerMinute!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'Snapshot of the attributable-operating-duration rate when this usage session started',
+    required: false,
+    nullable: true,
+  })
+  operatingDurationCreditsPerMinute!: number | null;
+
   @OneToOne(() => BillingTransaction, (billingTransaction) => billingTransaction.resourceUsage, {
     onDelete: 'CASCADE',
     nullable: true,

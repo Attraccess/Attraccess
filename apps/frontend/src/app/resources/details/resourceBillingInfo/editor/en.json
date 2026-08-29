@@ -8,6 +8,10 @@
     "creditsPerMinute": {
       "label": "{{currency}} per minute",
       "description": "This amount will be deducted per minute of the session duration."
+    },
+    "creditsPerOperatingMinute": {
+      "label": "{{currency}} per operating minute",
+      "description": "This amount will be deducted per minute attributed to machine operation."
     }
   },
   "actions": {

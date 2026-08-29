@@ -632,6 +632,7 @@ describe('BillingService', () => {
         resourceId: 42,
         creditsPerUsage: 0,
         creditsPerMinute: 0,
+        creditsPerOperatingMinute: 0,
       });
       expect(resourceBillingConfigurationRepository.save).toHaveBeenCalledWith(created);
       expect(result).toBe(created);
@@ -644,6 +645,44 @@ describe('BillingService', () => {
       const result = await service.getResourceBillingConfiguration(7);
       expect(resourceBillingConfigurationRepository.findOneBy).toHaveBeenCalledWith({ resourceId: 7 });
       expect(result).toBe(existing);
+    });
+
+    it('charges both snapped duration rates without changing legacy session-duration charging', async () => {
+      const usage = {
+        id: 22,
+        endTime: new Date(),
+        usageInMinutes: 2.1,
+        attributedOperatingDurationInMinutes: 1.1,
+        sessionDurationCreditsPerMinute: 3,
+        operatingDurationCreditsPerMinute: 7,
+        resource: { id: 205 },
+        userId: 25,
+        user: { id: 25, billingFactor: 100 } as User,
+      } as ResourceUsage;
+      jest
+        .spyOn(service, 'getResourceBillingConfiguration')
+        .mockResolvedValue({ creditsPerMinute: 99, creditsPerUsage: 0 } as ResourceBillingConfiguration);
+      const manager = {
+        findOneBy: jest.fn().mockResolvedValue(null),
+        findOne: jest.fn().mockResolvedValue(null),
+        save: jest.fn(async (_entity: unknown, data: Record<string, unknown>) =>
+          'amount' in data ? { id: 1005, ...data } : data,
+        ),
+      } as unknown as never;
+
+      await service.chargeForResourceUsage(usage, manager);
+
+      expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: -23 }),
+      );
+      expect((manager as { save: jest.Mock }).save).toHaveBeenCalledWith(
+        BillingTransactionItem,
+        expect.objectContaining({ name: 'PER_MINUTE', unitPrice: 3, quantity: 3 }),
+      );
+      expect((manager as { save: jest.Mock }).save).toHaveBeenCalledWith(
+        BillingTransactionItem,
+        expect.objectContaining({ name: 'PER_ATTRIBUTABLE_OPERATING_MINUTE', unitPrice: 7, quantity: 2 }),
+      );
     });
   });
 
