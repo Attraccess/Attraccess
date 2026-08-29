@@ -216,6 +216,22 @@ void Application::handleFormsCancel() {
   if (this->hasPendingServerFormFlow) {
     this->api.cancelForm(this->pendingFormRequestResourceId,
                          this->pendingFormRequestAction);
+  } else if (this->pendingActionType != PENDING_ACTION_NONE) {
+    // A form request may still be waiting for the LVGL callback. Cancel against
+    // the action identity now so its server-side draft cannot survive locally
+    // clearing the pending action.
+    API::ResourceUsageFormActionType action =
+        API::ResourceUsageFormActionType::UNKNOWN;
+    if (this->pendingActionType == PENDING_ACTION_START_SESSION) {
+      action = this->pendingActionIsTakeover
+                   ? API::ResourceUsageFormActionType::TAKEOVER
+                   : API::ResourceUsageFormActionType::START;
+    } else if (this->pendingActionType == PENDING_ACTION_STOP_SESSION) {
+      action = API::ResourceUsageFormActionType::END;
+    }
+    if (action != API::ResourceUsageFormActionType::UNKNOWN) {
+      this->api.cancelForm(this->pendingActionResourceId, action);
+    }
   }
   this->hasPendingFormRequest = false;
   this->formFlowSubmitted = false;
