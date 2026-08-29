@@ -31,6 +31,7 @@ import {
   useOverlayState,
 } from '@heroui/react';
 import {
+  BluetoothIcon,
   CpuIcon,
   InfoIcon,
   KeyRoundIcon,
@@ -46,6 +47,7 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { AddDeviceDrawer } from './AddDeviceDrawer';
 import { AdminPasswordDrawer } from './AdminPasswordDrawer';
+import { BleProvisionDrawer } from './BleProvisionDrawer';
 import { DeviceInfoDrawer } from './DeviceInfoDrawer';
 import { DiscoverDrawer } from './DiscoverDrawer';
 import { StatusAlert } from './StatusAlert';
@@ -193,6 +195,7 @@ export function DevicesPage() {
   const [deleting, setDeleting] = useState(false);
   const addDrawer = useOverlayState();
   const discoverDrawer = useOverlayState();
+  const bleDrawer = useOverlayState();
 
   // Firmware checks talk to every device (and, on Gen2+, to the Shelly update
   // server), so they run after the list rather than holding the table hostage.
@@ -265,6 +268,9 @@ export function DevicesPage() {
           </div>
         </div>
         <div className="sh:flex sh:flex-wrap sh:gap-2">
+          <Button variant="secondary" onPress={bleDrawer.open} data-cy="shelly-ble-open">
+            <BluetoothIcon className="sh:h-4 sh:w-4" /> Bluetooth
+          </Button>
           <Button variant="secondary" onPress={discoverDrawer.open} data-cy="shelly-discover-open">
             <SearchIcon className="sh:h-4 sh:w-4" /> Discover
           </Button>
@@ -360,6 +366,7 @@ export function DevicesPage() {
         onOpenChange={discoverDrawer.setOpen}
         onDiscovered={refresh}
       />
+      <BleProvisionDrawer isOpen={bleDrawer.isOpen} onOpenChange={bleDrawer.setOpen} onProvisioned={refresh} />
       <DeviceInfoDrawer device={infoDevice} onOpenChange={(open) => !open && setInfoDevice(null)} />
       <AdminPasswordDrawer device={authDevice} onOpenChange={(open) => !open && setAuthDevice(null)} onSaved={refresh} />
       <FirmwareDrawer

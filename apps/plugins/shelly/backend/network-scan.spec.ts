@@ -49,6 +49,10 @@ describe('isPrivateIpv4', () => {
     ['192.168.0.1', true],
     ['169.254.1.1', true],
     ['1.1.1.1', false],
+    ['192.168.1.1:80', false],
+    ['http://192.168.1.1', false],
+    ['192.168..1', false],
+    ['127.0.0.1', false],
   ])('%s -> %s', (ip, expected) => {
     expect(isPrivateIpv4(ip)).toBe(expected);
   });

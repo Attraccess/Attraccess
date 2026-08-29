@@ -1,6 +1,7 @@
 import { registerAs } from '@nestjs/config';
 import { z } from 'zod';
 import { LogLevel } from '@nestjs/common';
+import * as path from 'path';
 
 const PLACEHOLDER_VERSIONS = new Set(['', '0.0.0', 'undefined', 'null']);
 
@@ -21,7 +22,7 @@ export function resolveAppVersion(
   return '0.0.0-dev';
 }
 
-const AppEnvSchema = z
+export const AppEnvSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     PORT: z.coerce.number().default(3000),
@@ -45,7 +46,12 @@ const AppEnvSchema = z
     COMMIT_SHA: z.string().optional(),
     STATIC_FRONTEND_FILE_PATH: z.string().optional(),
     STATIC_DOCS_FILE_PATH: z.string().optional(),
-    PLUGIN_DIR: z.string().optional(),
+    // The documented default (docs/*/plugins/overview.md) — leaving it unset used
+    // to make plugin upload fail deep inside path.join() with "path must be of
+    // type string", since only the Dockerfile ever supplied a value.
+    PLUGIN_DIR: z
+      .string()
+      .default(() => path.join(process.env.STORAGE_ROOT ?? path.join(process.cwd(), 'storage'), 'plugins')),
     RESTART_BY_EXIT: z.coerce.boolean().default(false),
     DISABLE_PLUGINS: z.coerce.boolean().default(false),
     SSL_GENERATE_SELF_SIGNED_CERTIFICATES: z.coerce.boolean().default(false),

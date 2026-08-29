@@ -73,9 +73,6 @@ export async function bootstrap() {
     bootstrapLogger.error("Application configuration ('app') not loaded. Exiting.");
     process.exit(1);
   }
-  if (!earlyConfig.PLUGIN_DIR) {
-    bootstrapLogger.warn('PLUGIN_DIR is not set — plugin backends will not be loaded.');
-  }
   bootstrapLogger.log('Configuring PluginSystem...');
   PluginService.configure({
     PLUGIN_DIR: earlyConfig.PLUGIN_DIR,

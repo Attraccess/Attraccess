@@ -12,6 +12,7 @@
 //  * At most a /22 (1022 hosts). The scan runs inside the request, and a /16
 //    would be 65k probes.
 import { networkInterfaces } from 'node:os';
+import { isIPv4 } from 'node:net';
 
 /** Smallest prefix length (i.e. largest subnet) we are willing to enumerate. */
 export const MIN_PREFIX_LENGTH = 22;
@@ -35,8 +36,8 @@ function toIp(value: number): string {
 
 /** True for RFC1918 (10/8, 172.16/12, 192.168/16) and link-local (169.254/16). */
 export function isPrivateIpv4(ip: string): boolean {
+  if (!isIPv4(ip)) return false;
   const parts = ip.split('.').map(Number);
-  if (parts.length !== 4 || parts.some((p) => !Number.isInteger(p) || p < 0 || p > 255)) return false;
   const [a, b] = parts;
   if (a === 10) return true;
   if (a === 172 && b >= 16 && b <= 31) return true;
@@ -66,7 +67,7 @@ export function expandCidr(cidr: string): string[] {
   }
   if (prefix < MIN_PREFIX_LENGTH) {
     throw new InvalidCidrError(
-      `subnet ${cidr} is too large to scan — use a prefix of /${MIN_PREFIX_LENGTH} or longer (e.g. /24)`
+      `subnet ${cidr} is too large to scan — use a prefix of /${MIN_PREFIX_LENGTH} or longer (e.g. /24)`,
     );
   }
 
@@ -77,7 +78,7 @@ export function expandCidr(cidr: string): string[] {
 
   if (!isPrivateIpv4(toIp(network))) {
     throw new InvalidCidrError(
-      `refusing to scan ${cidr}: only private networks (10/8, 172.16/12, 192.168/16, 169.254/16) may be scanned`
+      `refusing to scan ${cidr}: only private networks (10/8, 172.16/12, 192.168/16, 169.254/16) may be scanned`,
     );
   }
 
