@@ -85,6 +85,7 @@ export class WagoRuntime {
   private readonly watchdogs = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly feedbackChecks = new Map<string, { timer: ReturnType<typeof setTimeout>; channelId: string; generation: number }>();
   private feedbackCheckSequence = 0;
+  private readonly feedbackCommandGenerations = new Map<string, number>();
   private readonly feedbackGenerations = new Map<string, number>();
   private readonly inFlightCommandIds = new Set<string>();
 
@@ -152,9 +153,9 @@ export class WagoRuntime {
       this.state.commandIds = [...this.state.commandIds, command.id].slice(-100);
       await this.options.store.save(this.state);
       if (command.action === 'pulse') {
-        const generation = this.beginFeedbackGeneration(channel.id);
+        const generation = this.reserveFeedbackGeneration(channel.id);
         if (!(await this.writeChannel(channel, true, () => this.schedulePulse(channel, duration, generation), generation))) return this.rejectFailedWrite(command.id);
-      } else if (!(await this.writeChannel(channel, command.value, undefined, this.beginFeedbackGeneration(channel.id)))) return this.rejectFailedWrite(command.id);
+      } else if (!(await this.writeChannel(channel, command.value, undefined, this.reserveFeedbackGeneration(channel.id)))) return this.rejectFailedWrite(command.id);
       await this.acknowledge(command.id, 'accepted');
     } finally {
       this.inFlightCommandIds.delete(command.id);
@@ -229,7 +230,7 @@ export class WagoRuntime {
     channel: Snapshot['logicalChannels'][number],
     value: boolean,
     onWritten?: () => void,
-    feedbackGeneration = this.beginFeedbackGeneration(channel.id),
+    feedbackGeneration = this.reserveFeedbackGeneration(channel.id),
   ): Promise<boolean> {
     const point = this.state.accepted?.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
     if (!point) return false;
@@ -247,9 +248,10 @@ export class WagoRuntime {
       }
       return false;
     }
-    onWritten?.();
+    const feedbackIsCurrent = this.commitFeedbackGeneration(channel.id, feedbackGeneration);
+    if (feedbackIsCurrent) onWritten?.();
     this.state.outputs[channel.id] = value;
-    this.scheduleFeedbackCheck(channel, value, feedbackGeneration);
+    if (feedbackIsCurrent) this.scheduleFeedbackCheck(channel, value, feedbackGeneration);
     try {
       await this.options.store.save(this.state);
     } catch {
@@ -269,8 +271,13 @@ export class WagoRuntime {
     if (existingPulse) clearTimeout(existingPulse);
     this.pulses.set(channel.id, setTimeout(() => void this.ignoreTimerRejection(() => this.writeChannel(channel, false, undefined, feedbackGeneration)), duration));
   }
-  private beginFeedbackGeneration(channelId: string): number {
-    const generation = (this.feedbackGenerations.get(channelId) ?? 0) + 1;
+  private reserveFeedbackGeneration(channelId: string): number {
+    const generation = (this.feedbackCommandGenerations.get(channelId) ?? 0) + 1;
+    this.feedbackCommandGenerations.set(channelId, generation);
+    return generation;
+  }
+  private commitFeedbackGeneration(channelId: string, generation: number): boolean {
+    if (this.feedbackCommandGenerations.get(channelId) !== generation) return false;
     this.feedbackGenerations.set(channelId, generation);
     for (const [checkId, check] of this.feedbackChecks) {
       if (check.channelId === channelId && check.generation !== generation) {
@@ -278,18 +285,19 @@ export class WagoRuntime {
         this.feedbackChecks.delete(checkId);
       }
     }
-    return generation;
+    return true;
   }
   private scheduleFeedbackCheck(channel: Snapshot['logicalChannels'][number], value: boolean, generation: number): void {
     if (!channel.feedback) return;
     const checkId = `${channel.id}:${++this.feedbackCheckSequence}`;
     const timer = setTimeout(() => {
       this.feedbackChecks.delete(checkId);
-      void this.ignoreTimerRejection(() => this.verifyFeedback(channel, value));
+      void this.ignoreTimerRejection(() => this.verifyFeedback(channel, value, generation));
     }, channel.feedback.timeoutMs);
     this.feedbackChecks.set(checkId, { timer, channelId: channel.id, generation });
   }
-  private async verifyFeedback(channel: Snapshot['logicalChannels'][number], value: boolean): Promise<void> {
+  private async verifyFeedback(channel: Snapshot['logicalChannels'][number], value: boolean, generation: number): Promise<void> {
+    if (this.feedbackGenerations.get(channel.id) !== generation) return;
     const feedback = channel.feedback;
     const snapshot = this.state.accepted?.snapshot;
     const feedbackChannel = snapshot?.logicalChannels.find((item) => item.id === feedback?.channelId);
@@ -298,13 +306,14 @@ export class WagoRuntime {
     try {
       const actual = Boolean(await this.options.device.read(point));
       const expected = feedback.expected === 'match' ? value : !value;
-      if (actual !== expected)
+      if (actual !== expected && this.feedbackGenerations.get(channel.id) === generation)
         await this.options.transport.publish(this.topic('faults'), {
           channelId: channel.id,
           code: 'feedback_mismatch',
           message: 'configured feedback does not match the requested output state',
         });
     } catch (error) {
+      if (this.feedbackGenerations.get(channel.id) !== generation) return;
       await this.options.transport.publish(this.topic('faults'), {
         channelId: channel.id,
         code: 'feedback_read_failed',
