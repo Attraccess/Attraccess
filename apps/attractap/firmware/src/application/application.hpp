@@ -285,8 +285,6 @@ private:
     // START/STOP message sent. Guards against a re-delivered (retried by the server)
     // RESOURCE_USAGE_FORM_REQUEST reopening the form from the beginning (ATT-545).
     bool formFlowSubmitted = false;
-    // Flags set by websocket callbacks when form events arrive; processed by LVGL thread
-    volatile bool pendingFormRequestReady = false;
     // Preserved before deferred LVGL activation so cancellation can clear the server draft.
     bool hasPendingServerFormFlow = false;
     uint32_t pendingFormRequestResourceId = 0;

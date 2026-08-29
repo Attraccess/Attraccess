@@ -459,41 +459,32 @@ void Application::setup() {
   this->api.setResourceFormsRequestCallback(
       [this](const API::ResourceUsageFormRequest &request) {
         // DO NOT copy the large struct here - websocket task has limited
-        // stack/heap. Just set a flag; the LVGL async handler will do the copy
-        // on the main thread.
-        API::ResourceUsageFormActionType expectedAction =
-            API::ResourceUsageFormActionType::UNKNOWN;
-        if (this->pendingActionType == PENDING_ACTION_START_SESSION) {
-          expectedAction = this->pendingActionIsTakeover
-                               ? API::ResourceUsageFormActionType::TAKEOVER
-                               : API::ResourceUsageFormActionType::START;
-        } else if (this->pendingActionType == PENDING_ACTION_STOP_SESSION) {
-          expectedAction = API::ResourceUsageFormActionType::END;
+        // stack/heap. Queue only its identity; LVGL validates it against the
+        // pending action before copying the complete request metadata.
+        struct Payload {
+          Application *self;
+          uint32_t resourceId;
+          API::ResourceUsageFormActionType action;
+        };
+        Payload *payload = new Payload{this, request.resourceId, request.action};
+        if (!payload) {
+          return;
         }
-
-        // Preserve the cancellation target for the active action only. Rejected
-        // requests must not replace it before LVGL validates them.
-        if (!this->hasPendingServerFormFlow &&
-            request.resourceId == this->pendingActionResourceId &&
-            request.action == expectedAction) {
-          this->pendingFormRequestResourceId = request.resourceId;
-          this->pendingFormRequestAction = request.action;
-          this->hasPendingServerFormFlow = true;
-        }
-        this->pendingFormRequestReady = true;
-        // Schedule the copy + UI update on LVGL thread
         Display::asyncCall(
             [](void *u) {
-              auto *self = static_cast<Application *>(u);
-              if (self && self->pendingFormRequestReady) {
-                self->pendingFormRequestReady = false;
-                // Copy from API's scratch buffer on the main thread (safe
-                // stack/heap)
-                self->pendingFormRequest = self->api.getFormRequestScratch();
-                self->handleFormsRequest(self->pendingFormRequest);
+              auto *payload = static_cast<Payload *>(u);
+              if (payload && payload->self) {
+                // The scratch buffer can hold a newer request by the time this
+                // runs, so only process the request represented by this payload.
+                const auto &request = payload->self->api.getFormRequestScratch();
+                if (request.resourceId == payload->resourceId &&
+                    request.action == payload->action) {
+                  payload->self->handleFormsRequest(request);
+                }
               }
+              delete payload;
             },
-            this);
+            payload);
       });
 
   this->api.setResourceFormFieldsCallback(

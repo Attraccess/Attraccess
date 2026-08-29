@@ -245,7 +245,7 @@ void Application::resetSessionOnDisconnect() {
   bool sessionActive = this->unlocked || this->resourceIsSelected ||
                        this->pendingActionType != PENDING_ACTION_NONE ||
                        this->hasPendingFormRequest ||
-                       this->pendingFormRequestReady ||
+                       this->hasPendingServerFormFlow ||
                        this->currentProjectsUser.length() > 0;
 
   if (!sessionActive) {
@@ -264,7 +264,6 @@ void Application::resetSessionOnDisconnect() {
   this->pendingActionProjectId = 0;
   this->pendingActionIsTakeover = false;
   this->hasPendingFormRequest = false;
-  this->pendingFormRequestReady = false;
   this->hasPendingServerFormFlow = false;
   this->pendingFormRequestResourceId = 0;
   this->pendingFormRequestAction = API::ResourceUsageFormActionType::UNKNOWN;

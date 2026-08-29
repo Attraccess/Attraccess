@@ -25,6 +25,11 @@ void Application::handleFormsRequest(
       request.action != expectedAction) {
     return;
   }
+  // This runs on the LVGL thread, which owns all pending-action state.
+  this->pendingFormRequest = request;
+  this->pendingFormRequestResourceId = request.resourceId;
+  this->pendingFormRequestAction = request.action;
+  this->hasPendingServerFormFlow = true;
   this->hasPendingFormRequest = true;
   this->formCursorFormIdx = 0;
   this->formCursorOffset = 0;
@@ -218,7 +223,6 @@ void Application::handleFormsCancel() {
   this->pendingActionResourceId = 0;
   this->pendingActionProjectId = 0;
   this->pendingActionIsTakeover = false;
-  this->pendingFormRequestReady = false;
   this->hasPendingServerFormFlow = false;
   this->pendingFormRequestResourceId = 0;
   this->pendingFormRequestAction = API::ResourceUsageFormActionType::UNKNOWN;
