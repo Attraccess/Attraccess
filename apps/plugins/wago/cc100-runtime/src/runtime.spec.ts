@@ -145,6 +145,28 @@ describe('WagoRuntime', () => {
     expect(device.values.get('751-9301:0')).toBe(false);
   });
 
+  it('does not acknowledge a pulse when persisting its output state fails', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport, device });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+    const persist = store.save.bind(store);
+    const save = jest.spyOn(store, 'save');
+    save.mockImplementationOnce(persist).mockRejectedValueOnce(new Error('disk full'));
+
+    await expect(transport.send(commands, { id: 'command-1', channelId: 'load', action: 'pulse' })).rejects.toThrow(
+      'failed to persist channel state',
+    );
+
+    expect(device.values.get('751-9301:0')).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(device.values.get('751-9301:0')).toBe(false);
+    expect(transport.published).not.toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
+      payload: expect.objectContaining({ id: 'command-1', status: 'accepted' }),
+    }));
+  });
+
   it('persists a command reservation before actuating the device', async () => {
     const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
     const reservingDevice = {

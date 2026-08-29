@@ -145,10 +145,7 @@ export class WagoRuntime {
       this.state.commandIds = [...this.state.commandIds, command.id].slice(-100);
       await this.options.store.save(this.state);
       if (command.action === 'pulse') {
-        if (!(await this.writeChannel(channel, true))) return this.rejectFailedWrite(command.id);
-        const existingPulse = this.pulses.get(channel.id);
-        if (existingPulse) clearTimeout(existingPulse);
-        this.pulses.set(channel.id, setTimeout(() => void this.ignoreTimerRejection(() => this.writeChannel(channel, false)), duration));
+        if (!(await this.writeChannel(channel, true, () => this.schedulePulse(channel, duration)))) return this.rejectFailedWrite(command.id);
       } else if (!(await this.writeChannel(channel, command.value))) return this.rejectFailedWrite(command.id);
       await this.acknowledge(command.id, 'accepted');
     } finally {
@@ -211,7 +208,11 @@ export class WagoRuntime {
     }
   }
 
-  private async writeChannel(channel: Snapshot['logicalChannels'][number], value: boolean): Promise<boolean> {
+  private async writeChannel(
+    channel: Snapshot['logicalChannels'][number],
+    value: boolean,
+    onWritten?: () => void,
+  ): Promise<boolean> {
     const point = this.state.accepted?.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
     if (!point) return false;
     try {
@@ -228,14 +229,26 @@ export class WagoRuntime {
       }
       return false;
     }
+    onWritten?.();
     this.state.outputs[channel.id] = value;
     try {
       await this.options.store.save(this.state);
+    } catch {
+      // Do not acknowledge an operation whose durable output state is stale.
+      throw new Error('failed to persist channel state');
+    }
+    try {
       await this.publishState();
     } catch {
-      // A successful physical write must still allow a pulse's safety timer to turn it off.
+      // Retained-state publication does not change the durable state of a successful write.
     }
     return true;
+  }
+
+  private schedulePulse(channel: Snapshot['logicalChannels'][number], duration: number): void {
+    const existingPulse = this.pulses.get(channel.id);
+    if (existingPulse) clearTimeout(existingPulse);
+    this.pulses.set(channel.id, setTimeout(() => void this.ignoreTimerRejection(() => this.writeChannel(channel, false)), duration));
   }
 
   private async publishState(): Promise<void> {
