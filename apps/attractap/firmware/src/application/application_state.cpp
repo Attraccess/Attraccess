@@ -185,6 +185,7 @@ void Application::processState() {
         this->pendingActionType = PENDING_ACTION_START_SESSION;
         this->pendingActionResourceId = this->selectedResourceId;
         this->pendingActionProjectId = this->selectedProjectId;
+        this->pendingActionIsTakeover = false;
         this->hasPendingFormRequest = false;
         this->api.startResourceUsageSession(this->selectedResourceId, this->selectedProjectId);
       }

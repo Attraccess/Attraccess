@@ -7,13 +7,22 @@
 #ifdef HAS_LVGL_DISPLAY
 void Application::handleFormsRequest(
     const API::ResourceUsageFormRequest &request) {
-  // 'request' aliases this->pendingFormRequest (filled by the callback).
   // The server retries un-acked messages (RETRY_COUNT in the gateway). A duplicate
   // RESOURCE_USAGE_FORM_REQUEST must not reset an in-progress form, nor reopen one
   // that was already submitted while the START/STOP result is in flight (ATT-545).
+  API::ResourceUsageFormActionType expectedAction =
+      API::ResourceUsageFormActionType::UNKNOWN;
+  if (this->pendingActionType == PENDING_ACTION_START_SESSION) {
+    expectedAction = this->pendingActionIsTakeover
+                         ? API::ResourceUsageFormActionType::TAKEOVER
+                         : API::ResourceUsageFormActionType::START;
+  } else if (this->pendingActionType == PENDING_ACTION_STOP_SESSION) {
+    expectedAction = API::ResourceUsageFormActionType::END;
+  }
   if (this->hasPendingFormRequest || this->formFlowSubmitted ||
       this->pendingActionType == PENDING_ACTION_NONE ||
-      request.resourceId != this->pendingActionResourceId) {
+      request.resourceId != this->pendingActionResourceId ||
+      request.action != expectedAction) {
     return;
   }
   this->hasPendingFormRequest = true;
@@ -199,16 +208,20 @@ void Application::finishFormFlow() {
 }
 
 void Application::handleFormsCancel() {
-  if (this->hasPendingFormRequest) {
-    this->api.cancelForm(this->pendingFormRequest.resourceId,
-                         this->pendingFormRequest.action);
+  if (this->hasPendingServerFormFlow) {
+    this->api.cancelForm(this->pendingFormRequestResourceId,
+                         this->pendingFormRequestAction);
   }
   this->hasPendingFormRequest = false;
   this->formFlowSubmitted = false;
   this->pendingActionType = PENDING_ACTION_NONE;
   this->pendingActionResourceId = 0;
   this->pendingActionProjectId = 0;
+  this->pendingActionIsTakeover = false;
   this->pendingFormRequestReady = false;
+  this->hasPendingServerFormFlow = false;
+  this->pendingFormRequestResourceId = 0;
+  this->pendingFormRequestAction = API::ResourceUsageFormActionType::UNKNOWN;
   this->pendingFormFieldsReady = false;
   this->pendingFormPageResultReady = false;
   this->formCursorFormIdx = 0;
@@ -225,6 +238,7 @@ void Application::onActionResult(const std::string &eventType) {
       eventType == "STOP_RESOURCE_USAGE_SESSION") {
     this->pendingActionType = PENDING_ACTION_NONE;
     this->hasPendingFormRequest = false;
+    this->hasPendingServerFormFlow = false;
     this->formFlowSubmitted = false;
     Display::resourceDetailsScreen.hideFormsModal();
   }

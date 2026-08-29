@@ -461,7 +461,9 @@ void Application::setup() {
         // DO NOT copy the large struct here - websocket task has limited
         // stack/heap. Just set a flag; the LVGL async handler will do the copy
         // on the main thread.
-        (void)request; // The data is in api.getFormRequestScratch()
+        this->pendingFormRequestResourceId = request.resourceId;
+        this->pendingFormRequestAction = request.action;
+        this->hasPendingServerFormFlow = true;
         this->pendingFormRequestReady = true;
         // Schedule the copy + UI update on LVGL thread
         Display::asyncCall(

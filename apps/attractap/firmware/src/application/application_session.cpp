@@ -152,6 +152,7 @@ void Application::handleResourceDetailsButtonClick(
     this->pendingActionType = PENDING_ACTION_START_SESSION;
     this->pendingActionResourceId = this->selectedResourceId;
     this->pendingActionProjectId = isTakeover ? 0 : this->selectedProjectId;
+    this->pendingActionIsTakeover = isTakeover;
     this->hasPendingFormRequest = false;
     this->formFlowSubmitted = false;
     this->api.startResourceUsageSession(this->selectedResourceId,
@@ -165,6 +166,7 @@ void Application::handleResourceDetailsButtonClick(
     this->pendingActionType = PENDING_ACTION_STOP_SESSION;
     this->pendingActionResourceId = this->selectedResourceId;
     this->pendingActionProjectId = 0;
+    this->pendingActionIsTakeover = false;
     this->hasPendingFormRequest = false;
     this->formFlowSubmitted = false;
     this->api.stopResourceUsageSession(this->selectedResourceId);
@@ -260,8 +262,12 @@ void Application::resetSessionOnDisconnect() {
   this->pendingActionType = PENDING_ACTION_NONE;
   this->pendingActionResourceId = 0;
   this->pendingActionProjectId = 0;
+  this->pendingActionIsTakeover = false;
   this->hasPendingFormRequest = false;
   this->pendingFormRequestReady = false;
+  this->hasPendingServerFormFlow = false;
+  this->pendingFormRequestResourceId = 0;
+  this->pendingFormRequestAction = API::ResourceUsageFormActionType::UNKNOWN;
   this->pendingFormFieldsReady = false;
   this->pendingFormPageResultReady = false;
   this->formCursorFormIdx = 0;
