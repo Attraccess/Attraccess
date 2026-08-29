@@ -119,6 +119,32 @@ describe('WagoRuntime', () => {
     }));
   });
 
+  it('deactivates a pulse when retained state publication fails after it turns on', async () => {
+    let failStatePublication = false;
+    const failingTransport: Transport = {
+      publish: async (topic, payload, options) => {
+        if (failStatePublication && topic.endsWith('/state')) throw new Error('broker unavailable');
+        await transport.publish(topic, payload, options);
+      },
+      subscribe: async (topic, listener) => transport.subscribe(topic, listener),
+    };
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+      transport: failingTransport,
+      device,
+    });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+    failStatePublication = true;
+
+    await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'pulse' });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(device.values.get('751-9301:0')).toBe(false);
+  });
+
   it('persists a command reservation before actuating the device', async () => {
     const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
     const reservingDevice = {

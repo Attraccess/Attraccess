@@ -229,8 +229,12 @@ export class WagoRuntime {
       return false;
     }
     this.state.outputs[channel.id] = value;
-    await this.options.store.save(this.state);
-    await this.publishState();
+    try {
+      await this.options.store.save(this.state);
+      await this.publishState();
+    } catch {
+      // A successful physical write must still allow a pulse's safety timer to turn it off.
+    }
     return true;
   }
 
