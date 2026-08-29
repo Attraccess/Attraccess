@@ -249,7 +249,9 @@ export class WagoRuntime {
       return false;
     }
     const feedbackIsCurrent = this.commitFeedbackGeneration(channel.id, feedbackGeneration);
-    if (feedbackIsCurrent) onWritten?.();
+    // A pulse must always arrange its physical shutoff after it is written, even
+    // when a newer command has superseded its feedback generation.
+    onWritten?.();
     this.state.outputs[channel.id] = value;
     if (feedbackIsCurrent) this.scheduleFeedbackCheck(channel, value, feedbackGeneration);
     try {
