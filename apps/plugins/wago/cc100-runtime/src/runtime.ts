@@ -138,16 +138,18 @@ export class WagoRuntime {
       const channel = this.state.accepted?.snapshot.logicalChannels.find((item) => item.id === command.channelId);
       if (!channel || !channel.capabilities.includes('output')) return this.acknowledge(command.id, 'rejected', 'unknown output channel');
       if (!(await this.isGuardSatisfied(channel))) return this.acknowledge(command.id, 'rejected', 'operational guard is not satisfied');
+      const duration = command.action === 'pulse' ? channel.pulse?.durationMs : undefined;
+      if (command.action === 'pulse' && !duration) return this.acknowledge(command.id, 'rejected', 'channel does not define a pulse duration');
+
+      // Keep the reservation through an unexpected exit after the physical write.
+      this.state.commandIds = [...this.state.commandIds, command.id].slice(-100);
+      await this.options.store.save(this.state);
       if (command.action === 'pulse') {
-        const duration = channel.pulse?.durationMs;
-        if (!duration) return this.acknowledge(command.id, 'rejected', 'channel does not define a pulse duration');
-        if (!(await this.writeChannel(channel, true))) return this.acknowledge(command.id, 'rejected', 'device write failed');
+        if (!(await this.writeChannel(channel, true))) return this.rejectFailedWrite(command.id);
         const existingPulse = this.pulses.get(channel.id);
         if (existingPulse) clearTimeout(existingPulse);
         this.pulses.set(channel.id, setTimeout(() => void this.ignoreTimerRejection(() => this.writeChannel(channel, false)), duration));
-      } else if (!(await this.writeChannel(channel, command.value))) return this.acknowledge(command.id, 'rejected', 'device write failed');
-      this.state.commandIds = [...this.state.commandIds, command.id].slice(-100);
-      await this.options.store.save(this.state);
+      } else if (!(await this.writeChannel(channel, command.value))) return this.rejectFailedWrite(command.id);
       await this.acknowledge(command.id, 'accepted');
     } finally {
       this.inFlightCommandIds.delete(command.id);
@@ -214,18 +216,22 @@ export class WagoRuntime {
     if (!point) return false;
     try {
       await this.options.device.write(point, value);
-      this.state.outputs[channel.id] = value;
-      await this.options.store.save(this.state);
-      await this.publishState();
-      return true;
     } catch (error) {
-      await this.options.transport.publish(this.topic('faults'), {
-        channelId: channel.id,
-        code: 'device_write_failed',
-        message: error instanceof Error ? error.message : String(error),
-      });
+      try {
+        await this.options.transport.publish(this.topic('faults'), {
+          channelId: channel.id,
+          code: 'device_write_failed',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      } catch {
+        // A fault-publication failure must not turn a known failed write into an accepted command.
+      }
       return false;
     }
+    this.state.outputs[channel.id] = value;
+    await this.options.store.save(this.state);
+    await this.publishState();
+    return true;
   }
 
   private async publishState(): Promise<void> {
@@ -261,6 +267,11 @@ export class WagoRuntime {
     } catch {
       return false;
     }
+  }
+  private async rejectFailedWrite(id: string): Promise<void> {
+    this.state.commandIds = this.state.commandIds.filter((commandId) => commandId !== id);
+    await this.options.store.save(this.state);
+    await this.acknowledge(id, 'rejected', 'device write failed');
   }
   private ignoreTimerRejection(callback: () => Promise<unknown>): void {
     void callback().catch(() => undefined);

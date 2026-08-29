@@ -119,6 +119,23 @@ describe('WagoRuntime', () => {
     }));
   });
 
+  it('persists a command reservation before actuating the device', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    const reservingDevice = {
+      write: async () => {
+        expect((await store.load()).commandIds).toContain('command-1');
+      },
+      read: async () => false,
+    };
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport, device: reservingDevice });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+
+    await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
+
+    await expect(store.load()).resolves.toEqual(expect.objectContaining({ commandIds: ['command-1'] }));
+  });
+
   it('acknowledges duplicate commands and enforces immediate disconnect policy', async () => {
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
     await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
