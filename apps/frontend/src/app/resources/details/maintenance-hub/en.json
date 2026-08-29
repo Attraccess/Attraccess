@@ -76,6 +76,11 @@
     "name": { "label": "Name", "placeholder": "e.g. Monthly check" },
     "triggerType": { "label": "Trigger type" },
     "duration": { "label": "Duration" },
+    "durationBasis": {
+      "label": "Duration basis",
+      "SESSION_DURATION": "Session duration",
+      "ATTRIBUTABLE_OPERATING_DURATION": "Attributed operating duration"
+    },
     "unit": { "label": "Unit", "MINUTES": "minutes", "HOURS": "hours", "DAYS": "days" },
     "thresholdSessions": { "label": "Sessions threshold" },
     "enabled": { "label": "Enabled" },
