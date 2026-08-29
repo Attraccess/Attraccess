@@ -142,8 +142,9 @@ On credential compromise, decommissioning, or failed rotation:
 2. Stop the container to prevent repeated failed authentication attempts.
 3. Issue a new controller-scoped credential through the Attraccess provisioning process.
 4. Replace `WAGO_MQTT_USERNAME` and `WAGO_MQTT_PASSWORD` in the `0600` environment file.
-5. Start the container, inspect logs, and verify a heartbeat under the expected hardware ID.
-6. Preserve the persistent volume unless recovery requires discarding the accepted configuration and command history.
+5. Remove the stopped container and recreate it with the same reviewed image digest, state volume, and I/O mapping, using the updated `--env-file`. Docker reads `--env-file` only when creating a container; `docker start` would retain the revoked credentials.
+6. Inspect logs and verify a heartbeat under the expected hardware ID.
+7. Preserve the persistent volume unless recovery requires discarding the accepted configuration and command history.
 
 ## Configuration and operational inspection
 
