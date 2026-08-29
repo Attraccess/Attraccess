@@ -12,6 +12,7 @@ import {
   CONFIGURATION_PROTOCOL_VERSION,
   DISCOVERY_ROOT,
   compatibilityError,
+  commandTopic,
   configurationDesiredTopic,
   configurationReportedHardwareId,
   configurationReportedTopic,
@@ -436,10 +437,12 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       vhost: '/',
       topicPolicy: {
         publish: [
-          `attraccess/wago/controllers/${controller.hardwareId}/#`,
-          configurationReportedTopic(namespace, controller.hardwareId),
+          `${namespace}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${controller.hardwareId}/#`,
         ],
-        subscribe: [configurationDesiredTopic(namespace, controller.hardwareId)],
+        subscribe: [
+          configurationDesiredTopic(namespace, controller.hardwareId),
+          commandTopic(namespace, controller.hardwareId),
+        ],
       },
     });
     if (!('password' in credential)) {
@@ -589,10 +592,14 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
         }
         for (const controller of claimedControllers) {
           replacements.push(
-            await this.context.mqtt.subscribe(serverId, heartbeatTopic(controller.hardwareId), async (message) => {
-              if (!this.isActiveSubscriptionGeneration(generation)) return;
-              await this.onHeartbeat(controller.hardwareId, message.payload);
-            }),
+            await this.context.mqtt.subscribe(
+              serverId,
+              heartbeatTopic(settings.operationalPrefix, controller.hardwareId),
+              async (message) => {
+                if (!this.isActiveSubscriptionGeneration(generation)) return;
+                await this.onHeartbeat(controller.hardwareId, message.payload);
+              },
+            ),
           );
           if (this.destroyed) {
             replacements.forEach((subscription) => subscription.unsubscribe());

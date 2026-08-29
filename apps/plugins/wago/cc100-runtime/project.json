@@ -1,0 +1,36 @@
+{
+  "name": "wago-cc100-runtime",
+  "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/plugins/wago/cc100-runtime/src",
+  "projectType": "application",
+  "tags": ["scope:hardware"],
+  "targets": {
+    "build": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-runtime"],
+      "options": {
+        "main": "apps/plugins/wago/cc100-runtime/src/main.ts",
+        "tsConfig": "apps/plugins/wago/cc100-runtime/tsconfig.json",
+        "outputPath": "dist/apps/wago-cc100-runtime",
+        "platform": "node",
+        "format": ["cjs"],
+        "bundle": true,
+        "thirdParty": true,
+        "generatePackageJson": true,
+        "esbuildOptions": { "target": "node24" }
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "options": { "jestConfig": "apps/plugins/wago/cc100-runtime/jest.config.ts" }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": { "cwd": "apps/plugins/wago/cc100-runtime", "command": "eslint src" }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": { "cwd": "apps/plugins/wago/cc100-runtime", "command": "tsc --noEmit -p tsconfig.json" }
+    }
+  }
+}

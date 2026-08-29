@@ -60,8 +60,8 @@ export function compatibilityError(
 export function discoveryTopic(hardwareId: string): string {
   return `${DISCOVERY_ROOT}/${hardwareId}`;
 }
-export function heartbeatTopic(hardwareId: string): string {
-  return `attraccess/wago/controllers/${hardwareId}/heartbeat`;
+export function heartbeatTopic(prefix: string, hardwareId: string): string {
+  return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${hardwareId}/heartbeat`;
 }
 
 export function configurationDesiredTopic(prefix: string, hardwareId: string): string {
@@ -70,6 +70,10 @@ export function configurationDesiredTopic(prefix: string, hardwareId: string): s
 
 export function configurationReportedTopic(prefix: string, hardwareId: string): string {
   return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${hardwareId}/configuration/reported`;
+}
+
+export function commandTopic(prefix: string, hardwareId: string): string {
+  return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${hardwareId}/commands`;
 }
 
 export function configurationReportedWildcardTopic(prefix: string): string {

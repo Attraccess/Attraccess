@@ -1,5 +1,7 @@
 import { discoveryTopic, heartbeatTopic } from './protocol';
 
+const prefix = 'attraccess/wago';
+
 type Credentials = { password: string; publish: string[]; subscribe: string[] };
 
 class InMemoryMqttBroker {
@@ -58,7 +60,7 @@ class WagoProtocolEmulator {
   heartbeat(hardwareId: string, sequence: number): void {
     this.broker.publish(
       this.credentials,
-      heartbeatTopic(hardwareId),
+      heartbeatTopic(prefix, hardwareId),
       JSON.stringify({
         hardwareId,
         pairingCode: '482931',
@@ -92,7 +94,7 @@ describe('WAGO protocol emulator', () => {
     const server = {
       password: 'server',
       publish: [`${discoveryTopic('cc100-01')}/claim`],
-      subscribe: [discoveryTopic('cc100-01'), discoveryTopic('cc100-02'), heartbeatTopic('cc100-01')],
+      subscribe: [discoveryTopic('cc100-01'), discoveryTopic('cc100-02'), heartbeatTopic(prefix, 'cc100-01')],
     };
     broker.allow('server', server);
     broker.connect('server', 'server');
@@ -109,7 +111,7 @@ describe('WAGO protocol emulator', () => {
     first.receiveClaim('cc100-01', (credentials) => {
       permanentCredentials = credentials;
     });
-    broker.allow('controller-1', { password: 'permanent-1', publish: [heartbeatTopic('cc100-01')], subscribe: [] });
+    broker.allow('controller-1', { password: 'permanent-1', publish: [heartbeatTopic(prefix, 'cc100-01')], subscribe: [] });
     broker.publish(
       server,
       `${discoveryTopic('cc100-01')}/claim`,
@@ -120,7 +122,7 @@ describe('WAGO protocol emulator', () => {
 
     const reconnected = broker.connect(permanentCredentials.username, permanentCredentials.password);
     const sequences: number[] = [];
-    broker.subscribe(server, heartbeatTopic('cc100-01'), (payload) => sequences.push(JSON.parse(payload).sequence));
+    broker.subscribe(server, heartbeatTopic(prefix, 'cc100-01'), (payload) => sequences.push(JSON.parse(payload).sequence));
     reconnected.heartbeat('cc100-01', 1);
     expect(sequences).toEqual([1]);
     expect(() => reconnected.heartbeat('cc100-02', 1)).toThrow('publish denied');
