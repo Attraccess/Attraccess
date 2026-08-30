@@ -199,11 +199,20 @@ def resolve_toolchain_identity():
 
 
 def file_digest(path):
+    digest = hashlib.sha256()
     with open(path, "rb") as f:
-        return hashlib.file_digest(f, "sha256").hexdigest()
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
-def prepare_build_dir(build_dir, clean, toolchain_identity, sdkconfig_defaults_digest):
+def prepare_build_dir(
+    build_dir,
+    clean,
+    toolchain_identity,
+    sdkconfig_defaults_digest,
+    firmware_version_digest,
+):
     """Discard build state only when requested or configured elsewhere."""
     if not os.path.exists(build_dir):
         return
@@ -222,19 +231,26 @@ def prepare_build_dir(build_dir, clean, toolchain_identity, sdkconfig_defaults_d
         "firmwareDir": FIRMWARE_DIR,
         "toolchain": toolchain_identity,
         "sdkconfigDefaults": sdkconfig_defaults_digest,
+        "firmwareVersion": firmware_version_digest,
     }
     if state != expected_state:
         print(f"Cleaning stale CMake build directory: {os.path.abspath(build_dir)}")
         shutil.rmtree(build_dir)
 
 
-def write_build_state(build_dir, toolchain_identity, sdkconfig_defaults_digest):
+def write_build_state(
+    build_dir,
+    toolchain_identity,
+    sdkconfig_defaults_digest,
+    firmware_version_digest,
+):
     with open(os.path.join(build_dir, ".attractap-build-state.json"), "w") as f:
         json.dump(
             {
                 "firmwareDir": FIRMWARE_DIR,
                 "toolchain": toolchain_identity,
                 "sdkconfigDefaults": sdkconfig_defaults_digest,
+                "firmwareVersion": firmware_version_digest,
             },
             f,
             sort_keys=True,
@@ -262,6 +278,7 @@ def main():
     esptool_cmd = resolve_esptool_command()
     toolchain_identity = resolve_toolchain_identity()
     sdkconfig_defaults_digest = file_digest("sdkconfig.defaults")
+    firmware_version_digest = file_digest("version.txt")
 
     with open("version.txt") as f:
         firmware_version = f.read().strip().splitlines()[0]
@@ -319,6 +336,7 @@ def main():
             args.clean,
             toolchain_identity,
             sdkconfig_defaults_digest,
+            firmware_version_digest,
         )
         sdkconfig_path = os.path.abspath(os.path.join(build_dir, "sdkconfig"))
         build_args = [
@@ -332,7 +350,12 @@ def main():
         if run_idf(build_args) != 0:
             print(f"Error: Build failed for variant '{variant}'")
             sys.exit(1)
-        write_build_state(build_dir, toolchain_identity, sdkconfig_defaults_digest)
+        write_build_state(
+            build_dir,
+            toolchain_identity,
+            sdkconfig_defaults_digest,
+            firmware_version_digest,
+        )
 
         # Flash layout from flasher_args.json (bootloader, partition table,
         # otadata initial image, app). The otadata image MUST be part of the
