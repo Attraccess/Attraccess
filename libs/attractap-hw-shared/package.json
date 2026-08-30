@@ -13,10 +13,10 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "tscircuit": "0.0.1774"
+    "tscircuit": "0.0.2460"
   },
   "devDependencies": {
-    "tsx": "^4.20.3",
-    "vitest": "^4.1.10"
+    "tsx": "^4.23.12",
+    "vitest": "^4.1.11"
   }
 }
