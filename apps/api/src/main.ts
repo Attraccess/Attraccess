@@ -7,8 +7,10 @@ async function main() {
   const logger = new Logger('Bootstrap');
   try {
     const { app, port, globalPrefix, nodeEnv, shouldGuardPluginLifecycle } = await bootstrap();
-    await startListening(app, port, globalPrefix, nodeEnv);
+    // Plugin lifecycle hooks run during initialization, before socket binding.
+    await app.init();
     if (shouldGuardPluginLifecycle) PluginService.clearBootGuard();
+    await startListening(app, port, globalPrefix, nodeEnv);
   } catch (error) {
     logger.error('Failed to bootstrap application', error.stack);
     PluginService.recordBootFailure(error);
