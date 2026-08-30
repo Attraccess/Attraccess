@@ -89,9 +89,9 @@
     "alert": { "errorTitle": "Couldn't save schedule" }
   },
   "configSummary": {
-    "usageHoursMinutes": "{{duration}} min of use",
-    "usageHoursHours": "{{duration}} h of use",
-    "usageHoursDays": "{{duration}} d of use",
+    "usageHoursMinutes": "{{duration}} min of use ({{durationBasis}})",
+    "usageHoursHours": "{{duration}} h of use ({{durationBasis}})",
+    "usageHoursDays": "{{duration}} d of use ({{durationBasis}})",
     "usageCount": "Every {{count}} sessions",
     "timeIntervalMinutes": "Every {{duration}} min",
     "timeIntervalHours": "Every {{duration}} h",

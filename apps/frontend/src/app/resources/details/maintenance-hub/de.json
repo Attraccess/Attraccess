@@ -89,9 +89,9 @@
     "alert": { "errorTitle": "Zeitplan konnte nicht gespeichert werden" }
   },
   "configSummary": {
-    "usageHoursMinutes": "{{duration}} Min. Nutzung",
-    "usageHoursHours": "{{duration}} Std. Nutzung",
-    "usageHoursDays": "{{duration}} Tage Nutzung",
+    "usageHoursMinutes": "{{duration}} Min. Nutzung ({{durationBasis}})",
+    "usageHoursHours": "{{duration}} Std. Nutzung ({{durationBasis}})",
+    "usageHoursDays": "{{duration}} Tage Nutzung ({{durationBasis}})",
     "usageCount": "Alle {{count}} Sitzungen",
     "timeIntervalMinutes": "Alle {{duration}} Min.",
     "timeIntervalHours": "Alle {{duration}} Std.",

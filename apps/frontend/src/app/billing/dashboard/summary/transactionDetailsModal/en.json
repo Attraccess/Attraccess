@@ -36,6 +36,7 @@
     "system": {
       "PER_SESSION": "Per session",
       "PER_MINUTE": "Per minute",
+      "PER_ATTRIBUTABLE_OPERATING_MINUTE": "Per attributable operating minute",
       "BILLING_FACTOR": "Billing factor"
     },
     "empty": "No items",
