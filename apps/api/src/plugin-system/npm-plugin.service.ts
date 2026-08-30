@@ -697,7 +697,10 @@ export class NpmPluginService implements OnModuleInit {
         try {
           PluginService.clearPluginQuarantine(installed.installPath);
         } catch (error) {
-          this.logger.error(`Failed to clear quarantine for installed package ${name}`, error);
+          await this.rollbackActivation(activation);
+          if (replacing) await this.writeState(replacing);
+          else await this.writeStateWithout(name);
+          throw error;
         }
         try {
           await this.removeBackup(activation.backup);
