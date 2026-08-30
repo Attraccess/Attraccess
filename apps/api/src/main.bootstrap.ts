@@ -109,7 +109,6 @@ export async function bootstrap() {
   const { AppModule } = await import('./app/app.module');
 
   const appForConfig = await NestFactory.create<NestExpressApplication>(AppModule, { logger: initialLogLevels });
-  if (shouldGuardPluginLifecycle) PluginService.clearBootGuard();
 
   const appConfig = appForConfig.get(ConfigService).get<AppConfigType>('app');
   const storageConfig = appForConfig.get(ConfigService).get<StorageConfigType>('storage');
@@ -150,12 +149,10 @@ export async function bootstrap() {
     };
   }
 
-  if (shouldGuardPluginLifecycle) PluginService.beginBootGuard();
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: initialLogLevels,
     httpsOptions,
   });
-  if (shouldGuardPluginLifecycle) PluginService.clearBootGuard();
   bootstrapLogger.log('Main application instance created.');
 
   // Behind a reverse proxy, X-Forwarded-For only reflects the real client IP when Express is told
@@ -284,7 +281,14 @@ export async function bootstrap() {
   const port = appConfig.PORT;
   // Listening and related logging will be handled by startListening function
   bootstrapLogger.log('Bootstrap process completed.');
-  return { app, globalPrefix, swaggerDocumentFactory: documentFactory, port, nodeEnv: appConfig.NODE_ENV };
+  return {
+    app,
+    globalPrefix,
+    swaggerDocumentFactory: documentFactory,
+    port,
+    nodeEnv: appConfig.NODE_ENV,
+    shouldGuardPluginLifecycle,
+  };
 }
 
 export async function startListening(app: NestExpressApplication, port: number, globalPrefix: string, nodeEnv: string) {
