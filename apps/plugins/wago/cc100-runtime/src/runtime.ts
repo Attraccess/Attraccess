@@ -81,7 +81,9 @@ export class JsonStateStore {
 export class WagoRuntime {
   private state: RuntimeState = { outputs: {}, commandIds: [] };
   private connected = true;
-  private readonly pulses = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly pulses = new Map<string, { generation: number; timer: ReturnType<typeof setTimeout> }>();
+  private pulseSequence = 0;
+  private readonly channelWrites = new Map<string, Promise<void>>();
   private readonly watchdogs = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly feedbackChecks = new Map<string, { timer: ReturnType<typeof setTimeout>; channelId: string; generation: number }>();
   private feedbackCheckSequence = 0;
@@ -154,7 +156,7 @@ export class WagoRuntime {
       await this.options.store.save(this.state);
       if (command.action === 'pulse') {
         const generation = this.reserveFeedbackGeneration(channel.id);
-        if (!(await this.writeChannel(channel, true, () => this.schedulePulse(channel, duration, generation), generation))) return this.rejectFailedWrite(command.id);
+        if (!(await this.writeChannel(channel, true, () => this.schedulePulse(channel, duration, generation), generation, true))) return this.rejectFailedWrite(command.id);
       } else if (!(await this.writeChannel(channel, command.value, undefined, this.reserveFeedbackGeneration(channel.id)))) return this.rejectFailedWrite(command.id);
       await this.acknowledge(command.id, 'accepted');
     } finally {
@@ -231,6 +233,21 @@ export class WagoRuntime {
     value: boolean,
     onWritten?: () => void,
     feedbackGeneration = this.reserveFeedbackGeneration(channel.id),
+    preservePulse = false,
+    shouldWrite?: () => boolean,
+  ): Promise<boolean> {
+    return this.enqueueChannelWrite(channel.id, async () => {
+      if (shouldWrite && !shouldWrite()) return false;
+      return this.writeChannelWhileQueued(channel, value, onWritten, feedbackGeneration, preservePulse);
+    });
+  }
+
+  private async writeChannelWhileQueued(
+    channel: Snapshot['logicalChannels'][number],
+    value: boolean,
+    onWritten: (() => void) | undefined,
+    feedbackGeneration: number,
+    preservePulse: boolean,
   ): Promise<boolean> {
     const point = this.state.accepted?.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
     if (!point) return false;
@@ -260,6 +277,8 @@ export class WagoRuntime {
       // Do not acknowledge an operation whose durable output state is stale.
       throw new Error('failed to persist channel state');
     }
+    // Only an accepted newer output write cancels a pending pulse shutoff.
+    if (!preservePulse) this.clearPulse(channel.id);
     try {
       await this.publishState();
     } catch {
@@ -269,9 +288,42 @@ export class WagoRuntime {
   }
 
   private schedulePulse(channel: Snapshot['logicalChannels'][number], duration: number, feedbackGeneration: number): void {
-    const existingPulse = this.pulses.get(channel.id);
-    if (existingPulse) clearTimeout(existingPulse);
-    this.pulses.set(channel.id, setTimeout(() => void this.ignoreTimerRejection(() => this.writeChannel(channel, false, undefined, feedbackGeneration)), duration));
+    this.clearPulse(channel.id);
+    const generation = ++this.pulseSequence;
+    const timer = setTimeout(
+      () => void this.ignoreTimerRejection(() => this.writeChannel(
+        channel,
+        false,
+        undefined,
+        feedbackGeneration,
+        true,
+        () => {
+          if (this.pulses.get(channel.id)?.generation !== generation) return false;
+          this.pulses.delete(channel.id);
+          return true;
+        },
+      )),
+      duration,
+    );
+    this.pulses.set(channel.id, { generation, timer });
+  }
+
+  private clearPulse(channelId: string): void {
+    const pulse = this.pulses.get(channelId);
+    if (!pulse) return;
+    clearTimeout(pulse.timer);
+    this.pulses.delete(channelId);
+  }
+
+  private async enqueueChannelWrite<T>(channelId: string, write: () => Promise<T>): Promise<T> {
+    const previous = this.channelWrites.get(channelId) ?? Promise.resolve();
+    const next = previous.catch(() => undefined).then(write);
+    const settled = next.then(() => undefined, () => undefined);
+    this.channelWrites.set(channelId, settled);
+    void settled.finally(() => {
+      if (this.channelWrites.get(channelId) === settled) this.channelWrites.delete(channelId);
+    });
+    return next;
   }
   private reserveFeedbackGeneration(channelId: string): number {
     const generation = (this.feedbackCommandGenerations.get(channelId) ?? 0) + 1;
