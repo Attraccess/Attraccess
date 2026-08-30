@@ -58,11 +58,11 @@ type WagoControllerSummary = Omit<WagoController, 'fingerprint' | 'pairingCodeHa
 
 @Injectable()
 export class WagoService implements OnModuleInit, OnModuleDestroy {
-  private readonly controllers: Repository<WagoController>;
-  private readonly settings: Repository<WagoSettings>;
-  private readonly enrollments: Repository<WagoEnrollment>;
-  private readonly drafts: Repository<WagoConfigurationDraft>;
-  private readonly revisions: Repository<WagoConfigurationRevision>;
+  private controllers!: Repository<WagoController>;
+  private settings!: Repository<WagoSettings>;
+  private enrollments!: Repository<WagoEnrollment>;
+  private drafts!: Repository<WagoConfigurationDraft>;
+  private revisions!: Repository<WagoConfigurationRevision>;
   private readonly subscriptions: PluginMqttSubscription[] = [];
   private readonly enrollmentExpiryTimers = new Map<number, ReturnType<typeof setTimeout>>();
   private readonly claimLocks = new Map<number, Promise<void>>();
@@ -74,15 +74,15 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   private activeSubscriptionGeneration = 0;
   private destroyed = false;
 
-  constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {
-    this.controllers = context.getRepository(WagoController);
-    this.settings = context.getRepository(WagoSettings);
-    this.enrollments = context.getRepository(WagoEnrollment);
-    this.drafts = context.getRepository(WagoConfigurationDraft);
-    this.revisions = context.getRepository(WagoConfigurationRevision);
-  }
+  constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
 
   async onModuleInit(): Promise<void> {
+    // The host datasource is available only after plugin module construction completes.
+    this.controllers = this.context.getRepository(WagoController);
+    this.settings = this.context.getRepository(WagoSettings);
+    this.enrollments = this.context.getRepository(WagoEnrollment);
+    this.drafts = this.context.getRepository(WagoConfigurationDraft);
+    this.revisions = this.context.getRepository(WagoConfigurationRevision);
     const enrollments = await this.enrollments
       .createQueryBuilder('enrollment')
       .where('enrollment.consumedAt IS NULL')
