@@ -143,6 +143,7 @@ private:
     uint8_t missedHeartbeatEventNextIndex = 0;
     uint8_t pongRttSampleNextIndex = 0;
     uint32_t lastPongRttMs = 0;
+    bool hasPongRttSample = false;
     uint32_t lastPongProbeTime = 0;
     uint32_t pendingPongProbeTime = 0;
     uint32_t pendingPongProbeToken = 0;

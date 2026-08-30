@@ -255,7 +255,8 @@ void Websocket::clearPendingPongProbe()
 void Websocket::publishNetworkQuality()
 {
     uint32_t nowMs = millis();
-    uint32_t inboundAgeMs = (this->lastInboundFrameTime == 0) ? 0 : nowMs - this->lastInboundFrameTime;
+    bool hasInboundMessage = this->lastInboundFrameTime != 0;
+    uint32_t inboundAgeMs = hasInboundMessage ? nowMs - this->lastInboundFrameTime : 0;
     uint8_t txDepth = this->tx_queue ? (uint8_t)uxQueueMessagesWaiting(this->tx_queue) : 0;
     uint8_t reconnects = 0;
     uint8_t queueFull = 0;
@@ -269,6 +270,7 @@ void Websocket::publishNetworkQuality()
     uint32_t lastPongRttMs = 0;
     uint32_t averagePongRttMs = 0;
     int32_t pongRttTrendMs = 0;
+    bool hasPongRttSample = false;
     if (this->network_quality_mutex)
     {
         xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
@@ -284,6 +286,7 @@ void Websocket::publishNetworkQuality()
         lastPongRttMs = this->lastPongRttMs;
         averagePongRttMs = averageRecentPongRtt(nowMs);
         pongRttTrendMs = recentPongRttTrend(nowMs);
+        hasPongRttSample = this->hasPongRttSample;
         xSemaphoreGive(this->network_quality_mutex);
     }
 
@@ -310,8 +313,9 @@ void Websocket::publishNetworkQuality()
         quality = State::NETWORK_QUALITY_DEGRADED;
     }
 
-    State::setNetworkQualityState(quality, inboundAgeMs, reconnects, txDepth, queueFull, sendFailures, livenessTimeouts,
-                                  lastPongRttMs, averagePongRttMs, pongRttTrendMs, pongTimeouts, pongProbeLossPercent,
+    State::setNetworkQualityState(quality, inboundAgeMs, hasInboundMessage, reconnects, txDepth, queueFull, sendFailures,
+                                  livenessTimeouts, lastPongRttMs, averagePongRttMs, pongRttTrendMs,
+                                  hasPongRttSample, pongTimeouts, pongProbeLossPercent, completedPongProbes > 0,
                                   missedHeartbeats);
 }
 
@@ -337,6 +341,7 @@ void Websocket::recordPongRtt(uint32_t rttMs, uint32_t nowMs)
 
     xSemaphoreTake(this->network_quality_mutex, portMAX_DELAY);
     this->lastPongRttMs = rttMs;
+    this->hasPongRttSample = true;
     this->pongRttSamples[this->pongRttSampleNextIndex] = rttMs;
     this->pongRttSampleTimes[this->pongRttSampleNextIndex] = nowMs;
     this->pongRttSampleNextIndex = (uint8_t)((this->pongRttSampleNextIndex + 1) % QUALITY_EVENT_SLOTS);

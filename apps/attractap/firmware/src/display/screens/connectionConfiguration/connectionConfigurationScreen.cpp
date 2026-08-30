@@ -1,4 +1,6 @@
 #include "connectionConfigurationScreen.hpp"
+#include "../../../state/state.hpp"
+#include <cstdio>
 #include <string>
 
 // Screen construction (tabs/widgets) and lifecycle. Behaviour-specific logic
@@ -218,6 +220,17 @@ void ConnectionConfigurationScreen::init()
    lv_obj_t *containerForSaveButtonDevice = this->createSaveContainer(deviceTab);
    this->createSaveButton(containerForSaveButtonDevice);
 
+   lv_obj_t *statusTab = lv_tabview_add_tab(this->tabs, "Status");
+   lv_obj_set_flex_flow(statusTab, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(statusTab, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+
+   this->networkQualityStatus = lv_label_create(statusTab);
+   lv_obj_set_width(this->networkQualityStatus, lv_pct(100));
+   lv_label_set_long_mode(this->networkQualityStatus, LV_LABEL_LONG_WRAP);
+   lv_obj_set_style_text_color(this->networkQualityStatus, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->networkQualityStatus, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->updateNetworkQualityStatus();
+
    this->keyboard = lv_keyboard_create(this->screen);
    lv_obj_set_width(this->keyboard, lv_pct(100));
    lv_obj_set_height(this->keyboard, lv_pct(48));
@@ -293,8 +306,79 @@ void ConnectionConfigurationScreen::destroy()
    this->devicePin = nullptr;
    this->labelForDevicePin = nullptr;
    this->beeperEnabled = nullptr;
+   this->networkQualityStatus = nullptr;
+   this->lastNetworkQualityStatusUpdateMs = 0;
    this->wifiScanRequested = false;
    this->wifiScanCompleted = false;
    this->wifiDropdownHasNetworks = false;
    this->wifiScanStartMs = 0;
+}
+
+void ConnectionConfigurationScreen::updateNetworkQualityStatus()
+{
+   if (!this->networkQualityStatus)
+   {
+      return;
+   }
+
+   State::NetworkQualityState quality = State::getNetworkQualityState();
+   const char *qualityLabel = "Offline";
+   switch (quality.quality)
+   {
+   case State::NETWORK_QUALITY_GOOD:
+      qualityLabel = "Gut";
+      break;
+   case State::NETWORK_QUALITY_DEGRADED:
+      qualityLabel = "Eingeschraenkt";
+      break;
+   case State::NETWORK_QUALITY_OFFLINE:
+   default:
+      break;
+   }
+
+   char lastInboundText[32];
+   char lastPongText[32];
+   char averagePongText[32];
+   char pongTrendText[32];
+   char pongLossText[32];
+   snprintf(lastInboundText, sizeof(lastInboundText), quality.hasInboundMessage ? "%lu ms" : "Nicht verfuegbar",
+            (unsigned long)quality.lastInboundAgeMs);
+   snprintf(lastPongText, sizeof(lastPongText), quality.hasPongRttSample ? "%lu ms" : "Nicht verfuegbar",
+            (unsigned long)quality.lastPongRttMs);
+   snprintf(averagePongText, sizeof(averagePongText), quality.hasPongRttSample ? "%lu ms" : "Nicht verfuegbar",
+            (unsigned long)quality.averagePongRttMs);
+   snprintf(pongTrendText, sizeof(pongTrendText), quality.hasPongRttSample ? "%+ld ms" : "Nicht verfuegbar",
+            (long)quality.pongRttTrendMs);
+   snprintf(pongLossText, sizeof(pongLossText), quality.hasCompletedPongProbe ? "%u%%" : "Nicht verfuegbar",
+            (unsigned)quality.pongProbeLossPercentLastMinute);
+
+   char text[600];
+   snprintf(text, sizeof(text),
+            "Verbindungsqualitaet: %s\n\n"
+            "Letzte Nachricht: %s\n"
+            "Letzter Ping: %s\n"
+            "Durchschnittlicher Ping: %s\n"
+            "Ping-Trend: %s\n\n"
+            "Wiederverbindungen (1 Min.): %u\n"
+            "Sende-Warteschlange: %u\n"
+            "Warteschlange voll (1 Min.): %u\n"
+            "Sendefehler (1 Min.): %u\n"
+            "Verbindungs-Timeouts (1 Min.): %u\n"
+            "Ping-Timeouts (1 Min.): %u\n"
+            "Ping-Verlust (1 Min.): %s\n"
+            "Verpasste Heartbeats (1 Min.): %u",
+            qualityLabel,
+            lastInboundText,
+            lastPongText,
+            averagePongText,
+            pongTrendText,
+            (unsigned)quality.reconnectsLastMinute,
+            (unsigned)quality.txQueueDepth,
+            (unsigned)quality.txQueueFullEventsLastMinute,
+            (unsigned)quality.sendFailuresLastMinute,
+            (unsigned)quality.livenessTimeoutsLastMinute,
+            (unsigned)quality.pongTimeoutsLastMinute,
+            pongLossText,
+            (unsigned)quality.missedHeartbeatsLastMinute);
+   lv_label_set_text(this->networkQualityStatus, text);
 }
