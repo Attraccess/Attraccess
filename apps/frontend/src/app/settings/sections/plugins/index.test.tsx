@@ -573,6 +573,23 @@ describe('PluginsSection', () => {
     render(<PluginsSection />);
 
     expect(screen.getByText('Failed to load')).toBeInTheDocument();
+    expect(screen.getByText("Cannot find module '@nestjs/common'")).toBeInTheDocument();
+  });
+
+  it('warns when plugins are globally disabled', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: { url?: string } | string) => {
+        const url = typeof input === 'string' ? input : (input.url ?? '');
+        if (url.endsWith('/api/plugins/status')) return Promise.resolve({ ok: true, json: async () => ({ disabled: true }) });
+        if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+        if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+        return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
+      }),
+    );
+    render(<PluginsSection />);
+
+    expect(await screen.findByText('Plugins are disabled')).toBeInTheDocument();
   });
 
   it('marks a successfully loaded plugin', () => {

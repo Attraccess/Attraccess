@@ -1,5 +1,9 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
   Chip,
   DrawerBody,
   DrawerFooter,
@@ -123,6 +127,7 @@ export function PluginsSection() {
   const toast = useToastMessage();
 
   const { data: plugins } = usePluginsServiceGetPlugins();
+  const [pluginsDisabled, setPluginsDisabled] = useState(false);
   const [pluginToDelete, setPluginToDelete] = useState<string | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [versionPlugin, setVersionPlugin] = useState<VersionPlugin | null>(null);
@@ -169,6 +174,14 @@ export function PluginsSection() {
           new Map<string, InstalledNpmPlugin>(installed.map((plugin) => [plugin.name, plugin] as const)),
         );
       })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!globalThis.fetch) return;
+    void fetch(`${getBaseUrl()}/api/plugins/status`, { credentials: 'include' })
+      .then(async (response) => (response.ok ? (response.json() as Promise<{ disabled?: boolean }>) : undefined))
+      .then((status) => setPluginsDisabled(status?.disabled === true))
       .catch(() => undefined);
   }, []);
 
@@ -454,6 +467,14 @@ export function PluginsSection() {
   return (
     <SettingsSection title={t('title')} description={t('description')} aside={aside}>
       <div data-cy="plugins-list-card" className="flex flex-col gap-4">
+        {pluginsDisabled ? (
+          <Alert status="warning" data-cy="plugins-disabled-warning">
+            <AlertContent>
+              <AlertTitle>{t('disabledWarning.title')}</AlertTitle>
+              <AlertDescription>{t('disabledWarning.description')}</AlertDescription>
+            </AlertContent>
+          </Alert>
+        ) : null}
         <div className="flex justify-end">
           <Dropdown>
             <DropdownTrigger
@@ -538,15 +559,20 @@ export function PluginsSection() {
                     </TableCell>
                     <TableCell>
                       {plugin.status === 'error' ? (
-                        <Tooltip>
-                          <Chip variant="soft" color="danger" data-cy={`plugins-list-status-${plugin.id}`}>
-                            <span className="inline-flex items-center gap-1">
-                              <AlertTriangle size={14} />
-                              {t('status.error')}
-                            </span>
-                          </Chip>
-                          <TooltipContent>{t('status.errorTooltip', { message: plugin.error ?? '' })}</TooltipContent>
-                        </Tooltip>
+                        <div>
+                          <Tooltip>
+                            <Chip variant="soft" color="danger" data-cy={`plugins-list-status-${plugin.id}`}>
+                              <span className="inline-flex items-center gap-1">
+                                <AlertTriangle size={14} />
+                                {t('status.error')}
+                              </span>
+                            </Chip>
+                            <TooltipContent>{t('status.errorTooltip', { message: plugin.error ?? '' })}</TooltipContent>
+                          </Tooltip>
+                          <p className="mt-1 max-w-xs break-words text-xs text-danger" data-cy={`plugins-list-error-${plugin.id}`}>
+                            {plugin.error}
+                          </p>
+                        </div>
                       ) : plugin.status === 'loaded' ? (
                         <Chip variant="soft" color="success" data-cy={`plugins-list-status-${plugin.id}`}>
                           <span className="inline-flex items-center gap-1">

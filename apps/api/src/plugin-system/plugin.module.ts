@@ -63,6 +63,10 @@ export class PluginModule {
     PluginModule.logger.log(`PluginModule configured. DisablePlugins: ${PluginModule.DISABLE_PLUGINS_FLAG}`);
   }
 
+  public static arePluginsDisabled(): boolean {
+    return PluginModule.DISABLE_PLUGINS_FLAG;
+  }
+
   public static forRoot(): DynamicModule {
     if (PluginModule.DISABLE_PLUGINS_FLAG) {
       PluginModule.logger.log('Plugins are disabled');

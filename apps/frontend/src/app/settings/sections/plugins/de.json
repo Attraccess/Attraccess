@@ -1,6 +1,10 @@
 {
   "title": "Plugins",
   "description": "Auf dieser Instanz installierte Plugins und was davon geladen wurde.",
+  "disabledWarning": {
+    "title": "Plugins sind deaktiviert",
+    "description": "Plugins sind durch die Einstellung DISABLE_PLUGINS deaktiviert und werden erst geladen, wenn die Anwendung mit deaktivierter Einstellung neu gestartet wird."
+  },
   "installPlugin": "Plugin installieren",
   "uploadButton": "ZIP-Datei hochladen",
   "docsButton": "Dokumentation",

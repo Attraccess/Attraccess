@@ -1,6 +1,10 @@
 {
   "title": "Plugins",
   "description": "Plugins installed on this instance, and what each of them loaded.",
+  "disabledWarning": {
+    "title": "Plugins are disabled",
+    "description": "Plugins are disabled by the DISABLE_PLUGINS setting and will not load until the application is restarted with it disabled."
+  },
   "installPlugin": "Install plugin",
   "uploadButton": "Upload ZIP file",
   "docsButton": "Documentation",
