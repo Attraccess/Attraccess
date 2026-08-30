@@ -164,6 +164,18 @@ describe('WagoService', () => {
     expect(settingsQuery.orIgnore).toHaveBeenCalled();
   });
 
+  it('keeps the host running when initial WAGO MQTT subscriptions fail', async () => {
+    const { service, context } = createService([], [], 2);
+    (context.mqtt.subscribe as jest.Mock).mockRejectedValue(new Error('broker unavailable'));
+
+    await expect(service.onModuleInit()).resolves.toBeUndefined();
+
+    expect(context.logger.warn).toHaveBeenCalledWith(
+      'Could not establish WAGO MQTT subscriptions during startup: Error: broker unavailable',
+    );
+    service.onModuleDestroy();
+  });
+
   it('preserves the MQTT server during a prefix-only settings update', async () => {
     const { service, settingsRepository } = createService([], [], 2);
 
