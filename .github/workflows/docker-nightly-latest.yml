@@ -88,6 +88,7 @@ jobs:
           NPM_DIST_TAG: next
           NPM_NIGHTLY: 'true'
         run: |
+          set -o pipefail
           git diff --name-only "${{ github.event.before }}" "$GITHUB_SHA" -- . ':(exclude).github/workflows/**' |
             pnpm nx affected --target=publish --parallel=3 --stdin --exclude='*,!tag:type:plugin'
 
