@@ -12,7 +12,7 @@ class TestTransport implements Transport {
 const snapshot: Snapshot = {
   version: 1,
   physicalPoints: [{ id: 'output-1', hardwareProfile: '751-9301', channel: 0 }],
-  logicalChannels: [{ id: 'load', physicalPointId: 'output-1', profile: 'generic-digital-output', capabilities: ['output', 'pulse'], disconnectPolicy: { mode: 'immediate' }, pulse: { durationMs: 10 } }],
+  logicalChannels: [{ id: 'load', physicalPointId: 'output-1', profile: 'site-load', capabilities: ['output', 'pulse'], disconnectPolicy: { mode: 'immediate' }, pulse: { durationMs: 10 } }],
 };
 
 describe('WagoRuntime', () => {
@@ -32,6 +32,20 @@ describe('WagoRuntime', () => {
   it('applies a complete valid retained snapshot and reports its revision', async () => {
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
     expect(transport.published).toContainEqual(expect.objectContaining({ topic: 'attraccess/wago/v1/controllers/cc100-1/configuration/reported', payload: { revision: 1, contentHash: hash(snapshot), errors: [] }, retain: true }));
+  });
+
+  it('accepts opaque server-defined profile names', async () => {
+    const serverDefined = {
+      ...snapshot,
+      logicalChannels: [{ ...snapshot.logicalChannels[0], profile: 'server-defined-profile' }],
+    };
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(serverDefined), snapshot: serverDefined });
+
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/configuration/reported',
+      payload: { revision: 1, contentHash: hash(serverDefined), errors: [] },
+      retain: true,
+    }));
   });
 
   it('rejects an invalid snapshot without replacing the last valid configuration', async () => {
