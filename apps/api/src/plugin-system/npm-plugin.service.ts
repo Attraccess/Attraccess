@@ -738,6 +738,23 @@ export class NpmPluginService implements OnModuleInit {
               await this.rollbackActivation(activation);
             } catch (rollbackError) {
               this.logger.error(`Failed to roll back installed package ${name}`, rollbackError);
+              try {
+                await this.isolateActivation(activation.target);
+              } catch (isolationError) {
+                throw new AggregateError(
+                  [error, quarantineError, rollbackError, isolationError],
+                  `Failed to safely activate ${name}`,
+                );
+              }
+            }
+            try {
+              if (replacing) await this.writeState(replacing);
+              else await this.writeStateWithout(name);
+            } catch (stateError) {
+              throw new AggregateError(
+                [error, quarantineError, stateError],
+                `Failed to restore installation state for ${name}`,
+              );
             }
           }
           throw error;
@@ -852,6 +869,13 @@ export class NpmPluginService implements OnModuleInit {
   private async rollbackActivation({ target, backup }: { target: string; backup: string }): Promise<void> {
     await rm(target, { recursive: true, force: true });
     if (existsSync(backup)) await rename(backup, target);
+  }
+
+  private async isolateActivation(target: string): Promise<void> {
+    if (!existsSync(target)) return;
+    const directory = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY);
+    await mkdir(directory, { recursive: true });
+    await rename(target, join(directory, `failed-${randomUUID()}`));
   }
 
   private removeBackup(backup: string): Promise<void> {
