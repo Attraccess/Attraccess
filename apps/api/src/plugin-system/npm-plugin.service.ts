@@ -727,10 +727,19 @@ export class NpmPluginService implements OnModuleInit {
           // the real quarantine before returning this failed activation.
           this.logger.error(`Failed to activate installed package ${name}`, error);
           const message = error instanceof Error ? error.message : 'Unknown error';
-          PluginService.quarantinePluginDirectory(
-            installed.installPath,
-            new Error(`Plugin activation could not be persisted: ${message}`),
-          );
+          try {
+            PluginService.quarantinePluginDirectory(
+              installed.installPath,
+              new Error(`Plugin activation could not be persisted: ${message}`),
+            );
+          } catch (quarantineError) {
+            this.logger.error(`Failed to quarantine installed package ${name}`, quarantineError);
+            try {
+              await this.rollbackActivation(activation);
+            } catch (rollbackError) {
+              this.logger.error(`Failed to roll back installed package ${name}`, rollbackError);
+            }
+          }
           throw error;
         }
         try {

@@ -920,6 +920,36 @@ describe('NpmPluginService', () => {
     expect(PluginService.isPluginQuarantined({ pluginDirectory: installPath })).toBe(true);
   });
 
+  it('rolls back an activation when its quarantine fallback cannot be persisted', async () => {
+    const name = '@attraccess/plugin';
+    const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
+    const tarball = await packageTarball(name);
+    const service = new NpmPluginService({} as never);
+    const internals = service as unknown as ServiceInternals;
+
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      versions: {
+        '1.2.3': {
+          version: '1.2.3',
+          dist: { tarball: 'plugin', shasum: createHash('sha1').update(tarball).digest('hex') },
+        },
+      },
+    });
+    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+    jest
+      .spyOn(internals, 'writeState')
+      .mockResolvedValueOnce()
+      .mockRejectedValueOnce(new Error('final state write failed'));
+    jest.spyOn(PluginService, 'quarantinePluginDirectory').mockImplementation(() => {
+      throw new Error('quarantine write failed');
+    });
+
+    await expect(service.install(name, '1.2.3')).rejects.toThrow('final state write failed');
+
+    expect(existsSync(join(root, installPath))).toBe(false);
+  });
+
   it('restores the state-matching package after an interrupted replacement', async () => {
     const name = '@attraccess/plugin';
     const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
