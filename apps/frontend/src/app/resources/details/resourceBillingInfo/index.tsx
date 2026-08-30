@@ -117,8 +117,8 @@ export function ResourceBillingInfo(props: Props) {
 
     return (
       creditsPerUsage +
-      creditsPerMinute * exampleSessionMinutes +
-      creditsPerOperatingMinute * exampleOperatingMinutes +
+      creditsPerMinute * Math.ceil(exampleSessionMinutes) +
+      creditsPerOperatingMinute * Math.ceil(exampleOperatingMinutes) +
       customFlowBillingItemsCost
     );
   }, [
