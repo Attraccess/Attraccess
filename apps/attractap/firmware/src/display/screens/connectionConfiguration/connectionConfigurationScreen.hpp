@@ -94,6 +94,10 @@ private:
     uint32_t wifiScanStartMs = 0;
     bool wifiDropdownHasNetworks = false;
 
+    lv_obj_t *networkQualityStatus = nullptr;
+    uint32_t lastNetworkQualityStatusUpdateMs = 0;
+    void updateNetworkQualityStatus();
+
     lv_obj_t *createSaveButton(lv_obj_t *parent);
     lv_obj_t *createSaveContainer(lv_obj_t *parent);
 };

@@ -12,6 +12,13 @@ static const uint32_t WIFI_SCAN_TIMEOUT_MS = 10000;
 
 void ConnectionConfigurationScreen::loop()
 {
+   uint32_t nowMs = millis();
+   if (nowMs - this->lastNetworkQualityStatusUpdateMs >= 1000)
+   {
+      this->lastNetworkQualityStatusUpdateMs = nowMs;
+      this->updateNetworkQualityStatus();
+   }
+
    if (!this->wifiSelectNetwork || !this->wifiScanRequested || this->wifiScanCompleted)
    {
       return;

@@ -1,4 +1,6 @@
 #include "connectionConfigurationScreen.hpp"
+#include "../../../state/state.hpp"
+#include <cstdio>
 #include <string>
 
 // Screen construction (tabs/widgets) and lifecycle. Behaviour-specific logic
@@ -218,6 +220,17 @@ void ConnectionConfigurationScreen::init()
    lv_obj_t *containerForSaveButtonDevice = this->createSaveContainer(deviceTab);
    this->createSaveButton(containerForSaveButtonDevice);
 
+   lv_obj_t *statusTab = lv_tabview_add_tab(this->tabs, "Status");
+   lv_obj_set_flex_flow(statusTab, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(statusTab, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+
+   this->networkQualityStatus = lv_label_create(statusTab);
+   lv_obj_set_width(this->networkQualityStatus, lv_pct(100));
+   lv_label_set_long_mode(this->networkQualityStatus, LV_LABEL_LONG_WRAP);
+   lv_obj_set_style_text_color(this->networkQualityStatus, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->networkQualityStatus, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->updateNetworkQualityStatus();
+
    this->keyboard = lv_keyboard_create(this->screen);
    lv_obj_set_width(this->keyboard, lv_pct(100));
    lv_obj_set_height(this->keyboard, lv_pct(48));
@@ -293,8 +306,63 @@ void ConnectionConfigurationScreen::destroy()
    this->devicePin = nullptr;
    this->labelForDevicePin = nullptr;
    this->beeperEnabled = nullptr;
+   this->networkQualityStatus = nullptr;
+   this->lastNetworkQualityStatusUpdateMs = 0;
    this->wifiScanRequested = false;
    this->wifiScanCompleted = false;
    this->wifiDropdownHasNetworks = false;
    this->wifiScanStartMs = 0;
+}
+
+void ConnectionConfigurationScreen::updateNetworkQualityStatus()
+{
+   if (!this->networkQualityStatus)
+   {
+      return;
+   }
+
+   State::NetworkQualityState quality = State::getNetworkQualityState();
+   const char *qualityLabel = "Offline";
+   switch (quality.quality)
+   {
+   case State::NETWORK_QUALITY_GOOD:
+      qualityLabel = "Gut";
+      break;
+   case State::NETWORK_QUALITY_DEGRADED:
+      qualityLabel = "Eingeschraenkt";
+      break;
+   case State::NETWORK_QUALITY_OFFLINE:
+   default:
+      break;
+   }
+
+   char text[600];
+   snprintf(text, sizeof(text),
+            "Verbindungsqualitaet: %s\n\n"
+            "Letzte Nachricht: %lu ms\n"
+            "Letzter Ping: %lu ms\n"
+            "Durchschnittlicher Ping: %lu ms\n"
+            "Ping-Trend: %+ld ms\n\n"
+            "Wiederverbindungen (1 Min.): %u\n"
+            "Sende-Warteschlange: %u\n"
+            "Warteschlange voll (1 Min.): %u\n"
+            "Sendefehler (1 Min.): %u\n"
+            "Verbindungs-Timeouts (1 Min.): %u\n"
+            "Ping-Timeouts (1 Min.): %u\n"
+            "Ping-Verlust (1 Min.): %u%%\n"
+            "Verpasste Heartbeats (1 Min.): %u",
+            qualityLabel,
+            (unsigned long)quality.lastInboundAgeMs,
+            (unsigned long)quality.lastPongRttMs,
+            (unsigned long)quality.averagePongRttMs,
+            (long)quality.pongRttTrendMs,
+            (unsigned)quality.reconnectsLastMinute,
+            (unsigned)quality.txQueueDepth,
+            (unsigned)quality.txQueueFullEventsLastMinute,
+            (unsigned)quality.sendFailuresLastMinute,
+            (unsigned)quality.livenessTimeoutsLastMinute,
+            (unsigned)quality.pongTimeoutsLastMinute,
+            (unsigned)quality.pongProbeLossPercentLastMinute,
+            (unsigned)quality.missedHeartbeatsLastMinute);
+   lv_label_set_text(this->networkQualityStatus, text);
 }
