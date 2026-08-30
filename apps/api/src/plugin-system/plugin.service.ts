@@ -101,15 +101,16 @@ export class PluginService {
   public static quarantinePlugin(manifest: LoadedPluginManifest, error: Error): void {
     const key = `${manifest.name}@${manifest.version}`;
     PluginService.setPluginLoadError(key, error);
-    PluginService.pluginFailures.set(manifest.pluginDirectory, {
-      pluginDirectory: manifest.pluginDirectory,
-      message: error.message,
-    });
     try {
-      PluginService.writeFailures([...PluginService.pluginFailures.values()]);
+      PluginService.quarantinePluginDirectory(manifest.pluginDirectory, error);
     } catch (persistenceError) {
       PluginService.logger.error(`Failed to persist quarantine for ${key}`, persistenceError as Error);
     }
+  }
+
+  public static quarantinePluginDirectory(pluginDirectory: string, error: Error): void {
+    PluginService.pluginFailures.set(pluginDirectory, { pluginDirectory, message: error.message });
+    PluginService.writeFailures([...PluginService.pluginFailures.values()]);
   }
 
   public static isPluginQuarantined(manifest: Pick<LoadedPluginManifest, 'pluginDirectory'>): boolean {

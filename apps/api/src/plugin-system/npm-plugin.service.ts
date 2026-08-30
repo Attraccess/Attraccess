@@ -723,9 +723,14 @@ export class NpmPluginService implements OnModuleInit {
         try {
           await this.writeState(installed);
         } catch (error) {
-          // Keep the already-persisted pending state rather than exposing code as
-          // active when its final state transition cannot be recorded.
+          // The npm record alone is not used during module discovery, so restore
+          // the real quarantine before returning this failed activation.
           this.logger.error(`Failed to activate installed package ${name}`, error);
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          PluginService.quarantinePluginDirectory(
+            installed.installPath,
+            new Error(`Plugin activation could not be persisted: ${message}`),
+          );
           throw error;
         }
         try {
