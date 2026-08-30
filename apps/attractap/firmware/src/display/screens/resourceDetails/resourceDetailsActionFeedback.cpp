@@ -22,6 +22,10 @@ void ResourceDetailsScreen::onToastDelete(lv_event_t *e)
 }
 void ResourceDetailsScreen::showActionProgress(const char *)
 {
+   // The originating button can disappear during a screen transition, but the
+   // request must still block additional actions until its result arrives.
+   this->actionInProgress = true;
+
    if (!this->activeActionButton || !lv_obj_is_valid(this->activeActionButton))
    {
       return;
@@ -43,7 +47,6 @@ void ResourceDetailsScreen::showActionProgress(const char *)
    }
    lv_obj_clear_flag(this->activeActionSpinner, LV_OBJ_FLAG_HIDDEN);
    lv_obj_add_state(this->activeActionButton, LV_STATE_DISABLED);
-   this->actionInProgress = true;
 }
 void ResourceDetailsScreen::hideActionProgress()
 {
