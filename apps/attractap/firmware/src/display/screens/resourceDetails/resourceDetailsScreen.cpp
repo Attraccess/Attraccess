@@ -878,7 +878,7 @@ void ResourceDetailsScreen::setUserDetails(UserDetails userDetails)
 }
 void ResourceDetailsScreen::onScreenLeave()
 {
-   this->hideActionProgress();
+   this->hideActionProgressVisual();
    if (this->successToast)
    {
       lv_obj_add_flag(this->successToast, LV_OBJ_FLAG_HIDDEN);

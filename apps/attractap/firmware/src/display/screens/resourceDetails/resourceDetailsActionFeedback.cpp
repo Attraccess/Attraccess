@@ -50,14 +50,7 @@ void ResourceDetailsScreen::showActionProgress(const char *)
 }
 void ResourceDetailsScreen::hideActionProgress()
 {
-   if (this->activeActionSpinner && lv_obj_is_valid(this->activeActionSpinner))
-   {
-      lv_obj_add_flag(this->activeActionSpinner, LV_OBJ_FLAG_HIDDEN);
-   }
-   if (this->activeActionLabel && lv_obj_is_valid(this->activeActionLabel))
-   {
-      lv_obj_clear_flag(this->activeActionLabel, LV_OBJ_FLAG_HIDDEN);
-   }
+   this->hideActionProgressVisual();
    if (this->activeActionButton && lv_obj_is_valid(this->activeActionButton))
    {
       lv_obj_clear_state(this->activeActionButton, LV_STATE_DISABLED);
@@ -66,6 +59,17 @@ void ResourceDetailsScreen::hideActionProgress()
    this->activeActionLabel = nullptr;
    this->activeActionSpinner = nullptr;
    this->actionInProgress = false;
+}
+void ResourceDetailsScreen::hideActionProgressVisual()
+{
+   if (this->activeActionSpinner && lv_obj_is_valid(this->activeActionSpinner))
+   {
+      lv_obj_add_flag(this->activeActionSpinner, LV_OBJ_FLAG_HIDDEN);
+   }
+   if (this->activeActionLabel && lv_obj_is_valid(this->activeActionLabel))
+   {
+      lv_obj_clear_flag(this->activeActionLabel, LV_OBJ_FLAG_HIDDEN);
+   }
 }
 void ResourceDetailsScreen::showSuccessToast(const char *text, uint16_t ms)
 {

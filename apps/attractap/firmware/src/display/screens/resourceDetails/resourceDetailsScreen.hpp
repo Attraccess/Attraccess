@@ -266,5 +266,6 @@ private:
     void disposeProjectsModal();
     void disposeFormsModal();
     void disposeSuccessToast();
+    void hideActionProgressVisual();
     void resetFormsModalState();
 };
