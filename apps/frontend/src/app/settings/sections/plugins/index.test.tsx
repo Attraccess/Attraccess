@@ -568,11 +568,16 @@ describe('PluginsSection', () => {
     detail.resolve({ ok: true, json: async () => plugin });
   });
 
-  it('flags a plugin whose backend failed to load', () => {
+  it('shows a plugin load error in a modal', async () => {
     hoisted.plugins = [makePlugin({ status: 'error', error: "Cannot find module '@nestjs/common'" })];
+    const user = userEvent.setup();
     render(<PluginsSection />);
 
     expect(screen.getByText('Failed to load')).toBeInTheDocument();
+    expect(screen.queryByText("Cannot find module '@nestjs/common'")).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'View load error for Cool Plugin' }));
+
+    expect(await screen.findByRole('heading', { name: 'Cool Plugin failed to load' })).toBeInTheDocument();
     expect(screen.getByText("Cannot find module '@nestjs/common'")).toBeInTheDocument();
   });
 

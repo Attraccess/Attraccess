@@ -139,6 +139,25 @@ export class PluginService {
     PluginService.writeBootGuard(active);
   }
 
+  /**
+   * Records the error that prevented the guarded startup from completing so the
+   * next process can show the actionable cause rather than a generic warning.
+   */
+  public static recordBootFailure(error: unknown): void {
+    const active = PluginService.readBootGuard();
+    if (active.length === 0) return;
+
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack ?? '' : '';
+    const affected = active.filter((pluginDirectory) => stack.includes(join(PluginService.PLUGIN_PATH, pluginDirectory)));
+    const pluginDirectories = affected.length > 0 ? affected : active;
+
+    for (const pluginDirectory of pluginDirectories) {
+      PluginService.pluginFailures.set(pluginDirectory, { pluginDirectory, message });
+    }
+    PluginService.writeFailures([...PluginService.pluginFailures.values()]);
+  }
+
   public static clearBootGuard(): void {
     const path = join(PluginService.PLUGIN_PATH, PLUGIN_BOOT_GUARD_FILE);
     if (existsSync(path)) rmSync(path, { force: true });

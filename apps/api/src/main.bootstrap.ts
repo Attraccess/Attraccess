@@ -224,6 +224,7 @@ export async function bootstrap() {
     } catch (error) {
       bootstrapLogger.error('Failed to run database migrations');
       bootstrapLogger.error(error);
+      PluginService.recordBootFailure(error);
       process.exit(1);
     }
   }

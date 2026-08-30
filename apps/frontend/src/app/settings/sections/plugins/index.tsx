@@ -128,6 +128,7 @@ export function PluginsSection() {
 
   const { data: plugins } = usePluginsServiceGetPlugins();
   const [pluginsDisabled, setPluginsDisabled] = useState(false);
+  const [failedPlugin, setFailedPlugin] = useState<{ name: string; error: string } | null>(null);
   const [pluginToDelete, setPluginToDelete] = useState<string | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [versionPlugin, setVersionPlugin] = useState<VersionPlugin | null>(null);
@@ -559,20 +560,23 @@ export function PluginsSection() {
                     </TableCell>
                     <TableCell>
                       {plugin.status === 'error' ? (
-                        <div>
+                        <button
+                          type="button"
+                          className="rounded-medium outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                          onClick={() => setFailedPlugin({ name: plugin.name, error: plugin.error ?? '' })}
+                          aria-label={t('status.viewError', { pluginName: plugin.name })}
+                          data-cy={`plugins-list-status-${plugin.id}`}
+                        >
                           <Tooltip>
-                            <Chip variant="soft" color="danger" data-cy={`plugins-list-status-${plugin.id}`}>
+                            <Chip variant="soft" color="danger">
                               <span className="inline-flex items-center gap-1">
                                 <AlertTriangle size={14} />
                                 {t('status.error')}
                               </span>
                             </Chip>
-                            <TooltipContent>{t('status.errorTooltip', { message: plugin.error ?? '' })}</TooltipContent>
+                            <TooltipContent>{t('status.errorTooltip')}</TooltipContent>
                           </Tooltip>
-                          <p className="mt-1 max-w-xs break-words text-xs text-danger" data-cy={`plugins-list-error-${plugin.id}`}>
-                            {plugin.error}
-                          </p>
-                        </div>
+                        </button>
                       ) : plugin.status === 'loaded' ? (
                         <Chip variant="soft" color="success" data-cy={`plugins-list-status-${plugin.id}`}>
                           <span className="inline-flex items-center gap-1">
@@ -654,6 +658,32 @@ export function PluginsSection() {
             </TableContent>
           </TableScrollContainer>
         </Table>
+
+        <StandardModal
+          isOpen={failedPlugin !== null}
+          onOpenChange={(open) => !open && setFailedPlugin(null)}
+          data-cy="plugins-list-load-error-modal"
+          size="md"
+        >
+          {({ close }) => (
+            <>
+              <ModalHeader>
+                <ModalHeading>{t('status.errorTitle', { pluginName: failedPlugin?.name ?? '' })}</ModalHeading>
+              </ModalHeader>
+              <ModalBody>
+                <p className="text-sm text-muted">{t('status.errorDescription')}</p>
+                <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-medium border border-divider p-3 text-sm text-danger">
+                  {failedPlugin?.error}
+                </pre>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="secondary" onPress={close}>
+                  {t('status.close')}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </StandardModal>
 
         <StandardModal isOpen={isMarketplaceOpen} onOpenChange={setIsMarketplaceOpen} size="lg">
           {() => (

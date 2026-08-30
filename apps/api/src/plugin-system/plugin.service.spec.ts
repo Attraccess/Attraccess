@@ -204,7 +204,7 @@ describe('PluginService', () => {
       expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
     });
 
-    it('quarantines plugins from an incomplete previous startup before retrying', () => {
+    it('persists the startup error before quarantining plugins from an incomplete startup', () => {
       writePlugin(root, 'previously-active', {
         name: 'previously-active',
         version: '1.0.0',
@@ -213,12 +213,13 @@ describe('PluginService', () => {
       });
 
       PluginService.beginBootGuard();
+      PluginService.recordBootFailure(new Error('Plugin onModuleInit failed'));
       PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
       PluginService.beginBootGuard();
 
       const [plugin] = PluginService.getPlugins();
       expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
-      expect(PluginService.getPluginsWithLoadStatus()[0].error).toMatch(/previous application startup did not complete/);
+      expect(PluginService.getPluginsWithLoadStatus()[0].error).toBe('Plugin onModuleInit failed');
     });
 
     it('creates a configured plugin directory before writing boot guard state', () => {

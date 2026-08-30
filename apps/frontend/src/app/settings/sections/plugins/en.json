@@ -86,7 +86,11 @@
     "loaded": "Loaded",
     "error": "Failed to load",
     "unknown": "Frontend only",
-    "errorTooltip": "This plugin failed to load on the server: {{message}}"
+    "errorTooltip": "View the server load error",
+    "viewError": "View load error for {{pluginName}}",
+    "errorTitle": "{{pluginName}} failed to load",
+    "errorDescription": "The server reported this error during startup:",
+    "close": "Close"
   },
   "noPermissions": "None requested",
   "updatePolicy": {

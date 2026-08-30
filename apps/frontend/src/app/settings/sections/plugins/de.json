@@ -86,7 +86,11 @@
     "loaded": "Geladen",
     "error": "Laden fehlgeschlagen",
     "unknown": "Nur Frontend",
-    "errorTooltip": "Dieses Plugin konnte auf dem Server nicht geladen werden: {{message}}"
+    "errorTooltip": "Serverfehler beim Laden anzeigen",
+    "viewError": "Ladefehler für {{pluginName}} anzeigen",
+    "errorTitle": "{{pluginName}} konnte nicht geladen werden",
+    "errorDescription": "Der Server hat beim Start diesen Fehler gemeldet:",
+    "close": "Schließen"
   },
   "noPermissions": "Keine angefordert",
   "updatePolicy": {
