@@ -185,6 +185,25 @@ describe('PluginService', () => {
       expect(PluginService.isPluginQuarantined(PluginService.getPlugins()[0])).toBe(false);
     });
 
+    it('preserves quarantine state when clearing it cannot be persisted', () => {
+      writePlugin(root, 'repaired-plugin', {
+        name: 'repaired-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+      const [plugin] = PluginService.getPlugins();
+      PluginService.quarantinePlugin(plugin, new Error('prior crash'));
+      jest
+        .spyOn(PluginService as unknown as { writeFailures(failures: unknown[]): void }, 'writeFailures')
+        .mockImplementation(() => {
+          throw new Error('read-only plugin directory');
+        });
+
+      expect(() => PluginService.clearPluginQuarantine(plugin.pluginDirectory)).toThrow('read-only plugin directory');
+      expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
+    });
+
     it('quarantines plugins from an incomplete previous startup before retrying', () => {
       writePlugin(root, 'previously-active', {
         name: 'previously-active',

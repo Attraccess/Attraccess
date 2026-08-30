@@ -144,8 +144,16 @@ export class PluginService {
   }
 
   public static clearPluginQuarantine(pluginDirectory: string): void {
-    if (!PluginService.pluginFailures.delete(pluginDirectory)) return;
-    PluginService.writeFailures([...PluginService.pluginFailures.values()]);
+    const failure = PluginService.pluginFailures.get(pluginDirectory);
+    if (!failure) return;
+
+    PluginService.pluginFailures.delete(pluginDirectory);
+    try {
+      PluginService.writeFailures([...PluginService.pluginFailures.values()]);
+    } catch (error) {
+      PluginService.pluginFailures.set(pluginDirectory, failure);
+      throw error;
+    }
   }
 
   private static findPluginsInFolder(rootFolder: string): LoadedPluginManifest[] {
@@ -295,10 +303,10 @@ export class PluginService {
         throw new BadRequestException('Plugin already exists');
       }
 
+      PluginService.clearPluginQuarantine(manifest.name);
       // move plugin to plugins folder
       PluginService.logger.debug(`Moving plugin to plugins folder ${pluginFolder}`);
       await rename(sourceFolder, pluginFolder);
-      PluginService.clearPluginQuarantine(manifest.name);
 
       // restart app in 1 second
       setTimeout(() => {
@@ -369,6 +377,8 @@ export class PluginService {
       throw new NotFoundException('Plugin not found');
     }
 
+    PluginService.clearPluginQuarantine(plugin.pluginDirectory);
+
     // Revert the plugin's database migrations (drops its tables/data) BEFORE the
     // files are removed — the migration classes live in the plugin bundle and
     // must still be on disk to run. A failure here is logged but never blocks the
@@ -386,7 +396,6 @@ export class PluginService {
 
     // delete folder
     await rm(pluginFolder, { recursive: true });
-    PluginService.clearPluginQuarantine(plugin.pluginDirectory);
 
     // restart app
     setTimeout(() => {

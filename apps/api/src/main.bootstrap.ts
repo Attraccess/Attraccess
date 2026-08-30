@@ -89,6 +89,10 @@ export async function bootstrap() {
   if (earlyConfig.PLUGIN_DIR) await NpmPluginService.recoverBackups();
   bootstrapLogger.log('PluginSystem configured.');
 
+  // Record active plugins before migrations or module loading execute plugin code.
+  const shouldGuardPluginLifecycle = !earlyConfig.DISABLE_PLUGINS && Boolean(earlyConfig.PLUGIN_DIR);
+  if (shouldGuardPluginLifecycle) PluginService.beginBootGuard();
+
   // Run plugin-shipped up-migrations BEFORE AppModule is imported, so every
   // plugin's tables exist before any plugin code (its onModuleInit) runs. This
   // uses a standalone DataSource per plugin against the same DB, so it does not
@@ -104,8 +108,6 @@ export async function bootstrap() {
   // Import AppModule only now, so PluginModule.forRoot() sees the configured PLUGIN_DIR.
   const { AppModule } = await import('./app/app.module');
 
-  const shouldGuardPluginLifecycle = !earlyConfig.DISABLE_PLUGINS && Boolean(earlyConfig.PLUGIN_DIR);
-  if (shouldGuardPluginLifecycle) PluginService.beginBootGuard();
   const appForConfig = await NestFactory.create<NestExpressApplication>(AppModule, { logger: initialLogLevels });
   if (shouldGuardPluginLifecycle) PluginService.clearBootGuard();
 

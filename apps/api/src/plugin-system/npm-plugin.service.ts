@@ -335,6 +335,7 @@ export class NpmPluginService implements OnModuleInit {
       const target = join(PluginService.PLUGIN_PATH, installed.installPath);
       const backup = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY, backupDirectoryName(installed.installPath));
 
+      PluginService.clearPluginQuarantine(installed.installPath);
       if (existsSync(target)) {
         await mkdir(join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY), { recursive: true });
         await rename(target, backup);
@@ -351,7 +352,6 @@ export class NpmPluginService implements OnModuleInit {
       } catch (error) {
         this.logger.error(`Failed to remove uninstalled package files for ${name}`, error);
       }
-      PluginService.clearPluginQuarantine(installed.installPath);
       // Data and secrets are deliberately retained. Removing them is a separate,
       // destructive recovery operation rather than part of package deactivation.
       new PluginService().requestRestart();
@@ -683,6 +683,7 @@ export class NpmPluginService implements OnModuleInit {
         if (!replacing && this.listInstalled().some((plugin) => plugin.name === name)) {
           throw new BadRequestException('Package is already installed; use the replacement endpoint');
         }
+        PluginService.clearPluginQuarantine(installed.installPath);
         const activation = await this.activate(source, name);
         try {
           await this.writeState(installed);
@@ -695,7 +696,6 @@ export class NpmPluginService implements OnModuleInit {
         } catch (error) {
           this.logger.error(`Failed to remove backup for ${name}`, error);
         }
-        PluginService.clearPluginQuarantine(installed.installPath);
         new PluginService().requestRestart();
         return installed;
       });
