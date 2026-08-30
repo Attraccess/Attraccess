@@ -336,33 +336,49 @@ void ConnectionConfigurationScreen::updateNetworkQualityStatus()
       break;
    }
 
+   char lastInboundText[32];
+   char lastPongText[32];
+   char averagePongText[32];
+   char pongTrendText[32];
+   char pongLossText[32];
+   snprintf(lastInboundText, sizeof(lastInboundText), quality.hasInboundMessage ? "%lu ms" : "Nicht verfuegbar",
+            (unsigned long)quality.lastInboundAgeMs);
+   snprintf(lastPongText, sizeof(lastPongText), quality.hasPongRttSample ? "%lu ms" : "Nicht verfuegbar",
+            (unsigned long)quality.lastPongRttMs);
+   snprintf(averagePongText, sizeof(averagePongText), quality.hasPongRttSample ? "%lu ms" : "Nicht verfuegbar",
+            (unsigned long)quality.averagePongRttMs);
+   snprintf(pongTrendText, sizeof(pongTrendText), quality.hasPongRttSample ? "%+ld ms" : "Nicht verfuegbar",
+            (long)quality.pongRttTrendMs);
+   snprintf(pongLossText, sizeof(pongLossText), quality.hasCompletedPongProbe ? "%u%%" : "Nicht verfuegbar",
+            (unsigned)quality.pongProbeLossPercentLastMinute);
+
    char text[600];
    snprintf(text, sizeof(text),
             "Verbindungsqualitaet: %s\n\n"
-            "Letzte Nachricht: %lu ms\n"
-            "Letzter Ping: %lu ms\n"
-            "Durchschnittlicher Ping: %lu ms\n"
-            "Ping-Trend: %+ld ms\n\n"
+            "Letzte Nachricht: %s\n"
+            "Letzter Ping: %s\n"
+            "Durchschnittlicher Ping: %s\n"
+            "Ping-Trend: %s\n\n"
             "Wiederverbindungen (1 Min.): %u\n"
             "Sende-Warteschlange: %u\n"
             "Warteschlange voll (1 Min.): %u\n"
             "Sendefehler (1 Min.): %u\n"
             "Verbindungs-Timeouts (1 Min.): %u\n"
             "Ping-Timeouts (1 Min.): %u\n"
-            "Ping-Verlust (1 Min.): %u%%\n"
+            "Ping-Verlust (1 Min.): %s\n"
             "Verpasste Heartbeats (1 Min.): %u",
             qualityLabel,
-            (unsigned long)quality.lastInboundAgeMs,
-            (unsigned long)quality.lastPongRttMs,
-            (unsigned long)quality.averagePongRttMs,
-            (long)quality.pongRttTrendMs,
+            lastInboundText,
+            lastPongText,
+            averagePongText,
+            pongTrendText,
             (unsigned)quality.reconnectsLastMinute,
             (unsigned)quality.txQueueDepth,
             (unsigned)quality.txQueueFullEventsLastMinute,
             (unsigned)quality.sendFailuresLastMinute,
             (unsigned)quality.livenessTimeoutsLastMinute,
             (unsigned)quality.pongTimeoutsLastMinute,
-            (unsigned)quality.pongProbeLossPercentLastMinute,
+            pongLossText,
             (unsigned)quality.missedHeartbeatsLastMinute);
    lv_label_set_text(this->networkQualityStatus, text);
 }

@@ -32,6 +32,7 @@ public:
     {
         NetworkQuality quality;
         uint32_t lastInboundAgeMs;
+        bool hasInboundMessage;
         uint8_t reconnectsLastMinute;
         uint8_t txQueueDepth;
         uint8_t txQueueFullEventsLastMinute;
@@ -40,13 +41,16 @@ public:
         uint32_t lastPongRttMs;
         uint32_t averagePongRttMs;
         int32_t pongRttTrendMs;
+        bool hasPongRttSample;
         uint8_t pongTimeoutsLastMinute;
         uint8_t pongProbeLossPercentLastMinute;
+        bool hasCompletedPongProbe;
         uint8_t missedHeartbeatsLastMinute;
     };
 
     static void setNetworkQualityState(NetworkQuality quality,
                                        uint32_t lastInboundAgeMs,
+                                       bool hasInboundMessage,
                                        uint8_t reconnectsLastMinute,
                                        uint8_t txQueueDepth,
                                        uint8_t txQueueFullEventsLastMinute,
@@ -55,8 +59,10 @@ public:
                                        uint32_t lastPongRttMs,
                                        uint32_t averagePongRttMs,
                                        int32_t pongRttTrendMs,
+                                       bool hasPongRttSample,
                                        uint8_t pongTimeoutsLastMinute,
                                        uint8_t pongProbeLossPercentLastMinute,
+                                       bool hasCompletedPongProbe,
                                        uint8_t missedHeartbeatsLastMinute);
     static NetworkQualityState getNetworkQualityState();
 
@@ -115,6 +121,7 @@ private:
     static std::string websocket_hostname;
     static NetworkQuality network_quality;
     static uint32_t network_quality_last_inbound_age_ms;
+    static bool network_quality_has_inbound_message;
     static uint8_t network_quality_reconnects_last_minute;
     static uint8_t network_quality_tx_queue_depth;
     static uint8_t network_quality_tx_queue_full_events_last_minute;
@@ -123,8 +130,10 @@ private:
     static uint32_t network_quality_last_pong_rtt_ms;
     static uint32_t network_quality_average_pong_rtt_ms;
     static int32_t network_quality_pong_rtt_trend_ms;
+    static bool network_quality_has_pong_rtt_sample;
     static uint8_t network_quality_pong_timeouts_last_minute;
     static uint8_t network_quality_pong_probe_loss_percent_last_minute;
+    static bool network_quality_has_completed_pong_probe;
     static uint8_t network_quality_missed_heartbeats_last_minute;
 
     static uint16_t websocket_port;
