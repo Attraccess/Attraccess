@@ -303,10 +303,14 @@ export class PluginService {
         throw new BadRequestException('Plugin already exists');
       }
 
-      PluginService.clearPluginQuarantine(manifest.name);
       // move plugin to plugins folder
       PluginService.logger.debug(`Moving plugin to plugins folder ${pluginFolder}`);
       await rename(sourceFolder, pluginFolder);
+      try {
+        PluginService.clearPluginQuarantine(manifest.name);
+      } catch (error) {
+        PluginService.logger.error(`Failed to clear quarantine for uploaded plugin ${manifest.name}`, error as Error);
+      }
 
       // restart app in 1 second
       setTimeout(() => {
@@ -394,7 +398,11 @@ export class PluginService {
 
     // delete folder
     await rm(pluginFolder, { recursive: true });
-    PluginService.clearPluginQuarantine(plugin.pluginDirectory);
+    try {
+      PluginService.clearPluginQuarantine(plugin.pluginDirectory);
+    } catch (error) {
+      PluginService.logger.error(`Failed to clear quarantine for deleted plugin ${plugin.name}`, error as Error);
+    }
 
     // restart app
     setTimeout(() => {

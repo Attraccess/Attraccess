@@ -345,7 +345,11 @@ export class NpmPluginService implements OnModuleInit {
         if (existsSync(backup) && !existsSync(target)) await rename(backup, target);
         throw error;
       }
-      PluginService.clearPluginQuarantine(installed.installPath);
+      try {
+        PluginService.clearPluginQuarantine(installed.installPath);
+      } catch (error) {
+        this.logger.error(`Failed to clear quarantine for removed package ${name}`, error);
+      }
 
       try {
         await rm(backup, { recursive: true, force: true });
@@ -690,7 +694,11 @@ export class NpmPluginService implements OnModuleInit {
           await this.rollbackActivation(activation);
           throw error;
         }
-        PluginService.clearPluginQuarantine(installed.installPath);
+        try {
+          PluginService.clearPluginQuarantine(installed.installPath);
+        } catch (error) {
+          this.logger.error(`Failed to clear quarantine for installed package ${name}`, error);
+        }
         try {
           await this.removeBackup(activation.backup);
         } catch (error) {

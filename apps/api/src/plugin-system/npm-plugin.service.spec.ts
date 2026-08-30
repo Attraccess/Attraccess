@@ -744,6 +744,37 @@ describe('NpmPluginService', () => {
     expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
   });
 
+  it('restarts after removing a package when quarantine cleanup fails', async () => {
+    const name = '@attraccess/plugin';
+    const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
+    mkdirSync(join(root, installPath), { recursive: true });
+    writeFileSync(
+      join(root, '.npm-plugin-state.json'),
+      JSON.stringify([
+        {
+          name,
+          version: '1.2.3',
+          registryId: 'npm',
+          registryUrl: 'https://registry.npmjs.org',
+          integrity: 'sha512-test',
+          installPath,
+          permissions: [],
+          lastError: null,
+        },
+      ]),
+    );
+    jest.spyOn(PluginService, 'clearPluginQuarantine').mockImplementation(() => {
+      throw new Error('quarantine write failed');
+    });
+    const service = new NpmPluginService({} as never);
+
+    await expect(service.removeInstalled(name)).resolves.toBeUndefined();
+
+    expect(existsSync(join(root, installPath))).toBe(false);
+    expect(service.listInstalled()).toEqual([]);
+    expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
+  });
+
   it('keeps a removed npm plugin quarantined when state persistence fails', async () => {
     const name = '@attraccess/plugin';
     const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
@@ -823,6 +854,32 @@ describe('NpmPluginService', () => {
     await service.onModuleInit();
 
     expect(existsSync(join(root, '.npm-backups'))).toBe(false);
+  });
+
+  it('restarts after installing a package when quarantine cleanup fails', async () => {
+    const name = '@attraccess/plugin';
+    const tarball = await packageTarball(name);
+    const service = new NpmPluginService({} as never);
+    const internals = service as unknown as ServiceInternals;
+
+    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      versions: {
+        '1.2.3': {
+          version: '1.2.3',
+          dist: { tarball: 'plugin', shasum: createHash('sha1').update(tarball).digest('hex') },
+        },
+      },
+    });
+    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+    jest.spyOn(PluginService, 'clearPluginQuarantine').mockImplementation(() => {
+      throw new Error('quarantine write failed');
+    });
+
+    await expect(service.install(name, '1.2.3')).resolves.toMatchObject({ name, version: '1.2.3' });
+
+    expect(service.listInstalled()).toHaveLength(1);
+    expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
   });
 
   it('restores the state-matching package after an interrupted replacement', async () => {
