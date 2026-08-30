@@ -229,9 +229,11 @@ private:
     std::string buildIntroducersText(const API::ResourceBrief &resource);
     void refreshAccessState();
 
-    // overlay/toast state
-    lv_obj_t *actionOverlay = nullptr;
-    lv_obj_t *actionOverlayLabel = nullptr;
+    // The action that initiated the current request shows its progress inline.
+    lv_obj_t *activeActionButton = nullptr;
+    lv_obj_t *activeActionLabel = nullptr;
+    lv_obj_t *activeActionSpinner = nullptr;
+    bool actionInProgress = false;
     lv_obj_t *successToast = nullptr;
     lv_timer_t *successToastTimer = nullptr;
 
@@ -263,7 +265,6 @@ private:
     void applyCachedState();
     void disposeProjectsModal();
     void disposeFormsModal();
-    void disposeActionOverlay();
     void disposeSuccessToast();
     void resetFormsModalState();
 };
