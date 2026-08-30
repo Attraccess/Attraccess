@@ -87,9 +87,6 @@ export async function bootstrap() {
   // Restore a known-good package before migrations or module discovery can load
   // code left behind by an interrupted npm plugin replacement.
   if (earlyConfig.PLUGIN_DIR) await NpmPluginService.recoverBackups();
-  // An unclean startup means one of these in-process plugins may have crashed
-  // Nest during lifecycle initialisation. Quarantine them before loading code.
-  if (!earlyConfig.DISABLE_PLUGINS && earlyConfig.PLUGIN_DIR) PluginService.beginBootGuard();
   bootstrapLogger.log('PluginSystem configured.');
 
   // Run plugin-shipped up-migrations BEFORE AppModule is imported, so every
@@ -107,9 +104,10 @@ export async function bootstrap() {
   // Import AppModule only now, so PluginModule.forRoot() sees the configured PLUGIN_DIR.
   const { AppModule } = await import('./app/app.module');
 
-  const appForConfig = await NestFactory.create<NestExpressApplication>(AppModule, {
-    logger: initialLogLevels,
-  });
+  const shouldGuardPluginLifecycle = !earlyConfig.DISABLE_PLUGINS && Boolean(earlyConfig.PLUGIN_DIR);
+  if (shouldGuardPluginLifecycle) PluginService.beginBootGuard();
+  const appForConfig = await NestFactory.create<NestExpressApplication>(AppModule, { logger: initialLogLevels });
+  if (shouldGuardPluginLifecycle) PluginService.clearBootGuard();
 
   const appConfig = appForConfig.get(ConfigService).get<AppConfigType>('app');
   const storageConfig = appForConfig.get(ConfigService).get<StorageConfigType>('storage');
@@ -150,10 +148,12 @@ export async function bootstrap() {
     };
   }
 
+  if (shouldGuardPluginLifecycle) PluginService.beginBootGuard();
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: initialLogLevels,
     httpsOptions,
   });
+  if (shouldGuardPluginLifecycle) PluginService.clearBootGuard();
   bootstrapLogger.log('Main application instance created.');
 
   // Behind a reverse proxy, X-Forwarded-For only reflects the real client IP when Express is told

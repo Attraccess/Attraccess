@@ -351,6 +351,7 @@ export class NpmPluginService implements OnModuleInit {
       } catch (error) {
         this.logger.error(`Failed to remove uninstalled package files for ${name}`, error);
       }
+      PluginService.clearPluginQuarantine(installed.installPath);
       // Data and secrets are deliberately retained. Removing them is a separate,
       // destructive recovery operation rather than part of package deactivation.
       new PluginService().requestRestart();
@@ -694,6 +695,7 @@ export class NpmPluginService implements OnModuleInit {
         } catch (error) {
           this.logger.error(`Failed to remove backup for ${name}`, error);
         }
+        PluginService.clearPluginQuarantine(installed.installPath);
         new PluginService().requestRestart();
         return installed;
       });
