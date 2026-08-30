@@ -856,7 +856,7 @@ describe('NpmPluginService', () => {
     expect(existsSync(join(root, '.npm-backups'))).toBe(false);
   });
 
-  it('keeps an install committed when quarantine cleanup fails', async () => {
+  it('returns a quarantined install when quarantine cleanup fails', async () => {
     const name = '@attraccess/plugin';
     const tarball = await packageTarball(name);
     const service = new NpmPluginService({} as never);
@@ -876,9 +876,16 @@ describe('NpmPluginService', () => {
       throw new Error('quarantine write failed');
     });
 
-    await expect(service.install(name, '1.2.3')).resolves.toMatchObject({ name, version: '1.2.3' });
+    await expect(service.install(name, '1.2.3')).resolves.toMatchObject({
+      name,
+      version: '1.2.3',
+      state: 'quarantined',
+      lastError: expect.stringContaining('quarantine cleanup failed'),
+    });
 
-    expect(service.listInstalled()).toHaveLength(1);
+    expect(service.listInstalled()).toEqual([
+      expect.objectContaining({ state: 'quarantined', lastError: expect.stringContaining('quarantine cleanup failed') }),
+    ]);
     expect(existsSync(join(root, `npm-${Buffer.from(name).toString('base64url')}`))).toBe(true);
     expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
   });

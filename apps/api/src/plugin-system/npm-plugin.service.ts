@@ -79,7 +79,7 @@ export type InstalledNpmPlugin = {
     host: string;
     sdk: { backend?: string; frontend?: string };
   };
-  state: 'active';
+  state: 'active' | 'quarantined';
   installedAt: string;
   activatedAt: string;
   lastError: string | null;
@@ -688,8 +688,15 @@ export class NpmPluginService implements OnModuleInit {
           throw new BadRequestException('Package is already installed; use the replacement endpoint');
         }
         const activation = await this.activate(source, name);
+        // Do not expose replacement code as active until its prior quarantine has
+        // been removed. If that cleanup fails, this state remains safely disabled.
+        const pendingActivation: InstalledNpmPlugin = {
+          ...installed,
+          state: 'quarantined',
+          lastError: 'Plugin activation is pending quarantine cleanup.',
+        };
         try {
-          await this.writeState(installed);
+          await this.writeState(pendingActivation);
         } catch (error) {
           await this.rollbackActivation(activation);
           throw error;
@@ -697,9 +704,29 @@ export class NpmPluginService implements OnModuleInit {
         try {
           PluginService.clearPluginQuarantine(installed.installPath);
         } catch (error) {
-          // The package files and installation state are already committed. Do not
-          // compensate one without the other; leave the prior quarantine in place.
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          const quarantined = {
+            ...pendingActivation,
+            lastError: `Plugin remains quarantined because quarantine cleanup failed: ${message}`,
+          };
           this.logger.error(`Failed to clear quarantine for installed package ${name}`, error);
+          try {
+            await this.writeState(quarantined);
+          } catch (stateError) {
+            // The pending state was persisted before cleanup, so a later write
+            // failure cannot make a quarantined package appear active.
+            this.logger.error(`Failed to record quarantine cleanup failure for ${name}`, stateError);
+          }
+          new PluginService().requestRestart();
+          return quarantined;
+        }
+        try {
+          await this.writeState(installed);
+        } catch (error) {
+          // Keep the already-persisted pending state rather than exposing code as
+          // active when its final state transition cannot be recorded.
+          this.logger.error(`Failed to activate installed package ${name}`, error);
+          throw error;
         }
         try {
           await this.removeBackup(activation.backup);
