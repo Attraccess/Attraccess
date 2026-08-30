@@ -143,4 +143,24 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
     expect(startSession).toHaveBeenCalledTimes(1);
     expect(sentTypes(socket)).toContain(AttractapEventType.START_RESOURCE_USAGE_SESSION);
   });
+
+  it('starts with an empty form after cancellation', async () => {
+    const socket = makeSocket();
+
+    await sessionHandler.handleStartResourceUsageSession(socket, {
+      payload: { resourceId: RESOURCE_ID },
+    } as AttractapEvent['data']);
+    expect((await submitPage(socket, 0, [{ fieldId: 11, value: 'Alice' }])).valid).toBe(true);
+
+    formsHandler.handleResourceUsageFormCancel(socket, {
+      payload: { resourceId: RESOURCE_ID, action: ACTION },
+    } as AttractapEvent['data']);
+
+    socket.sendMessage.mockClear();
+    await sessionHandler.handleStartResourceUsageSession(socket, {
+      payload: { resourceId: RESOURCE_ID },
+    } as AttractapEvent['data']);
+
+    expect(sentTypes(socket)).toContain(AttractapEventType.RESOURCE_USAGE_FORM_REQUEST);
+  });
 });
