@@ -128,6 +128,7 @@ private:
     lv_obj_t *stopSessionButtonLabel = nullptr;
     lv_obj_t *stopOtherUserNote = nullptr;
     lv_obj_t *doorControls = nullptr;
+    lv_obj_t *unlatchDoorButton = nullptr;
 
     lv_obj_t *flowButtonsContainer = nullptr;
     lv_obj_t *formsModalOverlay = nullptr;

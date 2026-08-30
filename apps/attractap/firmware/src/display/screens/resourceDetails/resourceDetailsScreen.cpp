@@ -361,17 +361,17 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(labelForUnlockDoorButton, LV_ALIGN_CENTER);
    lv_label_set_text(labelForUnlockDoorButton, "Aufschliessen");
 
-   lv_obj_t *unlatchDoorButton = lv_button_create(this->doorControls);
-   lv_obj_set_height(unlatchDoorButton, 50);
-   lv_obj_set_width(unlatchDoorButton, lv_pct(30));
-   lv_obj_set_align(unlatchDoorButton, LV_ALIGN_CENTER);
-   lv_obj_add_flag(unlatchDoorButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-   lv_obj_remove_flag(unlatchDoorButton, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_bg_color(unlatchDoorButton, lv_color_hex(0x9353D3), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(unlatchDoorButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_add_event_cb(unlatchDoorButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_UNLATCH_DOOR, {}});
+   this->unlatchDoorButton = lv_button_create(this->doorControls);
+   lv_obj_set_height(this->unlatchDoorButton, 50);
+   lv_obj_set_width(this->unlatchDoorButton, lv_pct(30));
+   lv_obj_set_align(this->unlatchDoorButton, LV_ALIGN_CENTER);
+   lv_obj_add_flag(this->unlatchDoorButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+   lv_obj_remove_flag(this->unlatchDoorButton, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_style_bg_color(this->unlatchDoorButton, lv_color_hex(0x9353D3), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_opa(this->unlatchDoorButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_add_event_cb(this->unlatchDoorButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_UNLATCH_DOOR, {}});
 
-   lv_obj_t *labelForUnlatchDoorButton = lv_label_create(unlatchDoorButton);
+   lv_obj_t *labelForUnlatchDoorButton = lv_label_create(this->unlatchDoorButton);
    lv_obj_set_width(labelForUnlatchDoorButton, LV_SIZE_CONTENT);
    lv_obj_set_height(labelForUnlatchDoorButton, LV_SIZE_CONTENT);
    lv_obj_set_align(labelForUnlatchDoorButton, LV_ALIGN_CENTER);
@@ -527,6 +527,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
       lv_obj_add_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN);
       lv_obj_add_flag(this->stopSessionButton, LV_OBJ_FLAG_HIDDEN);
       lv_obj_remove_flag(this->doorControls, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_set_flag(this->unlatchDoorButton, LV_OBJ_FLAG_HIDDEN, !resource.separateUnlockAndUnlatch);
       break;
    }
 
@@ -752,6 +753,7 @@ void ResourceDetailsScreen::destroy()
    this->stopSessionButtonLabel = nullptr;
    this->stopOtherUserNote = nullptr;
    this->doorControls = nullptr;
+   this->unlatchDoorButton = nullptr;
    this->flowButtonsContainer = nullptr;
    this->formsModalPanel = nullptr;
    this->formsModalContent = nullptr;
