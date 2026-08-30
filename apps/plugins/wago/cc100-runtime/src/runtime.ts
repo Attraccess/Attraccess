@@ -476,8 +476,8 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     if (!capabilities.length) errors.push({ path: `${path}.capabilities`, code: 'invalid_capabilities', message: 'capabilities are required' });
     if (capabilities.some((capability, capabilityIndex) => !['output', 'input', 'measurement', 'pulse', 'guard', 'feedback'].includes(capability) || capabilities.indexOf(capability) !== capabilityIndex))
       errors.push({ path: `${path}.capabilities`, code: 'invalid_capabilities', message: 'capabilities must be unique supported values' });
-    if (!['metered-switched-load', 'pulsed-lock-bank', 'guarded-enable-request', 'generic-digital-output', 'generic-monitored-input'].includes(channel.profile))
-      errors.push({ path: `${path}.profile`, code: 'unsupported_profile', message: 'unsupported logical channel profile' });
+    if (typeof channel.profile !== 'string' || !channel.profile.trim())
+      errors.push({ path: `${path}.profile`, code: 'invalid_profile', message: 'logical channel profile must be a non-empty string' });
     const policy = channel?.disconnectPolicy;
     if (!policy || !['hold', 'immediate', 'watchdog'].includes(policy.mode) || (policy.mode === 'watchdog' && (!Number.isSafeInteger(policy.timeoutMs) || (policy.timeoutMs ?? 0) <= 0))) errors.push({ path: `${path}.disconnectPolicy`, code: 'invalid_disconnect_policy', message: 'every channel needs hold, immediate, or watchdog disconnect behavior' });
     if (channel?.pulse && (!capabilities.includes('pulse') || !Number.isSafeInteger(channel.pulse.durationMs) || channel.pulse.durationMs <= 0)) errors.push({ path: `${path}.pulse`, code: 'invalid_pulse', message: 'pulse requires pulse capability and positive duration' });
@@ -504,9 +504,6 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     if (channel?.measurement && (!capabilities.includes('measurement') || !['ampere', 'volt', 'watt', 'percent'].includes(channel.measurement.unit) || !Number.isFinite(channel.measurement.scale) || !Number.isFinite(channel.measurement.offset)))
       errors.push({ path: `${path}.measurement`, code: 'invalid_measurement', message: 'measurement requires capability, supported unit, and finite transform' });
     if (channel?.measurement) validateKeys(channel.measurement as Record<string, unknown>, `${path}.measurement`, ['unit', 'scale', 'offset'], errors);
-    const required: Record<string, string[]> = { 'metered-switched-load': ['output', 'measurement'], 'pulsed-lock-bank': ['output', 'pulse'], 'guarded-enable-request': ['output', 'guard'], 'generic-digital-output': ['output'], 'generic-monitored-input': ['input'] };
-    if (channel.profile in required && required[channel.profile].some((capability) => !capabilities.includes(capability)))
-      errors.push({ path: `${path}.capabilities`, code: 'missing_capability', message: `${channel.profile} is missing a required capability` });
   });
   return errors;
 }
