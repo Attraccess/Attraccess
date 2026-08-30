@@ -159,7 +159,7 @@ export class WagoRuntime {
       await this.options.store.save(this.state);
       if (command.action === 'pulse') {
         const generation = this.reserveFeedbackGeneration(channel.id);
-        const result = await this.writeChannel(channel, true, () => this.schedulePulse(channel, duration, generation), generation, true, undefined, true);
+        const result = await this.writeChannel(channel, true, (configurationGeneration) => this.schedulePulse(channel, duration, generation, configurationGeneration), generation, true, undefined, true);
         if (result !== 'written') return this.rejectFailedWrite(command.id, result === 'queue_full' ? 'channel write queue is full' : undefined);
       } else {
         const result = await this.writeChannel(channel, command.value, undefined, this.reserveFeedbackGeneration(channel.id), false, undefined, true);
@@ -239,24 +239,26 @@ export class WagoRuntime {
   private async writeChannel(
     channel: Snapshot['logicalChannels'][number],
     value: boolean,
-    onWritten?: () => void,
+    onWritten?: (configurationGeneration: number) => void,
     feedbackGeneration = this.reserveFeedbackGeneration(channel.id),
     preservePulse = false,
     shouldWrite?: () => boolean,
     rejectWhenQueued = false,
+    configurationGeneration = this.configurationGeneration,
   ): Promise<'written' | 'failed' | 'queue_full'> {
     return this.enqueueChannelWrite(channel.id, async () => {
       if (shouldWrite && !shouldWrite()) return 'failed';
-      return this.writeChannelWhileQueued(channel, value, onWritten, feedbackGeneration, preservePulse);
+      return this.writeChannelWhileQueued(channel, value, onWritten, feedbackGeneration, preservePulse, configurationGeneration);
     }, rejectWhenQueued);
   }
 
   private async writeChannelWhileQueued(
     channel: Snapshot['logicalChannels'][number],
     value: boolean,
-    onWritten: (() => void) | undefined,
+    onWritten: ((configurationGeneration: number) => void) | undefined,
     feedbackGeneration: number,
     preservePulse: boolean,
+    configurationGeneration: number,
   ): Promise<'written' | 'failed'> {
     const point = this.state.accepted?.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
     if (!point) return 'failed';
@@ -277,9 +279,10 @@ export class WagoRuntime {
     const feedbackIsCurrent = this.commitFeedbackGeneration(channel.id, feedbackGeneration);
     // A pulse must always arrange its physical shutoff after it is written, even
     // when a newer command has superseded its feedback generation.
-    onWritten?.();
+    onWritten?.(configurationGeneration);
     this.state.outputs[channel.id] = value;
-    if (feedbackIsCurrent) this.scheduleFeedbackCheck(channel, value, feedbackGeneration);
+    if (feedbackIsCurrent && configurationGeneration === this.configurationGeneration)
+      this.scheduleFeedbackCheck(channel, value, feedbackGeneration, configurationGeneration);
     try {
       await this.options.store.save(this.state);
     } catch {
@@ -296,7 +299,7 @@ export class WagoRuntime {
     return 'written';
   }
 
-  private schedulePulse(channel: Snapshot['logicalChannels'][number], duration: number, feedbackGeneration: number): void {
+  private schedulePulse(channel: Snapshot['logicalChannels'][number], duration: number, feedbackGeneration: number, configurationGeneration: number): void {
     this.clearPulse(channel.id);
     const generation = ++this.pulseSequence;
     const timer = setTimeout(
@@ -311,6 +314,8 @@ export class WagoRuntime {
           this.pulses.delete(channel.id);
           return true;
         },
+        false,
+        configurationGeneration,
       )),
       duration,
     );
@@ -352,10 +357,9 @@ export class WagoRuntime {
     }
     return true;
   }
-  private scheduleFeedbackCheck(channel: Snapshot['logicalChannels'][number], value: boolean, generation: number): void {
+  private scheduleFeedbackCheck(channel: Snapshot['logicalChannels'][number], value: boolean, generation: number, configurationGeneration: number): void {
     if (!channel.feedback) return;
     const checkId = `${channel.id}:${++this.feedbackCheckSequence}`;
-    const configurationGeneration = this.configurationGeneration;
     const timer = setTimeout(() => {
       this.feedbackChecks.delete(checkId);
       void this.ignoreTimerRejection(() => this.verifyFeedback(channel, value, generation, configurationGeneration));
