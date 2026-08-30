@@ -492,6 +492,43 @@ describe('WagoRuntime', () => {
     }));
   });
 
+  it('does not schedule feedback from a write that began before configuration replacement', async () => {
+    const monitored: Snapshot = {
+      ...snapshot,
+      physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
+      logicalChannels: [
+        { id: 'feedback', physicalPointId: 'input-1', profile: 'generic-monitored-input', capabilities: ['input'], disconnectPolicy: { mode: 'hold' } },
+        { id: 'load', physicalPointId: 'output-1', profile: 'generic-digital-output', capabilities: ['output', 'feedback'], disconnectPolicy: { mode: 'immediate' }, feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 5 } },
+      ],
+    };
+    let releaseWrite!: () => void;
+    let writeStarted!: () => void;
+    const delayedWrite = new Promise<void>((resolve) => { releaseWrite = resolve; });
+    const started = new Promise<void>((resolve) => { writeStarted = resolve; });
+    const delayedWriteDevice = {
+      write: async () => {
+        writeStarted();
+        await delayedWrite;
+      },
+      read: async () => false,
+    };
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`), transport, device: delayedWriteDevice });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(monitored), snapshot: monitored });
+
+    const command = transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
+    await started;
+    await transport.send(desired, { protocolVersion: 1, revision: 2, contentHash: hash(monitored), snapshot: monitored });
+    releaseWrite();
+    await command;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(transport.published).not.toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+      payload: expect.objectContaining({ channelId: 'load' }),
+    }));
+  });
+
   it('rejects commands beyond the per-channel write queue limit', async () => {
     let releaseFirstWrite!: () => void;
     let firstWriteStarted!: () => void;
@@ -512,7 +549,7 @@ describe('WagoRuntime', () => {
       transport.send(commands, { id: `command-${index}`, channelId: 'load', action: 'set', value: true }),
     );
     await started;
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await commandsInFlight[MAX_PENDING_CHANNEL_WRITES];
     expect(transport.published).toContainEqual(expect.objectContaining({
       topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
       payload: { id: `command-${MAX_PENDING_CHANNEL_WRITES}`, status: 'rejected', error: 'channel write queue is full' },
