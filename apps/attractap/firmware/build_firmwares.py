@@ -10,6 +10,7 @@ field set must stay stable; the flasher and OTA pipeline depend on it.
 """
 import argparse
 import glob
+import hashlib
 import json
 import os
 import re
@@ -170,31 +171,43 @@ def resolve_toolchain_identity():
     export_script = find_idf_export()
     if export_script:
         idf_path = os.path.dirname(export_script)
-        try:
-            revision = subprocess.run(
-                ["git", "-C", idf_path, "rev-parse", "HEAD"],
-                capture_output=True,
-                text=True,
-            )
-        except OSError:
-            revision = None
-        if revision and revision.returncode == 0:
-            return f"{idf_path}@{revision.stdout.strip()}"
-        version_path = os.path.join(idf_path, "version.txt")
-        try:
-            with open(version_path) as f:
-                return f"{idf_path}@{f.read().strip()}"
-        except FileNotFoundError:
-            pass
-        return idf_path
-    return os.path.realpath(shutil.which("idf.py") or "idf.py")
+    else:
+        idf_py = shutil.which("idf.py")
+        if not idf_py:
+            return None
+        # idf.py lives at <IDF_PATH>/tools/idf.py.
+        idf_path = os.path.dirname(os.path.dirname(os.path.realpath(idf_py)))
+
+    try:
+        revision = subprocess.run(
+            ["git", "-C", idf_path, "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        revision = None
+    if revision and revision.returncode == 0:
+        return f"{idf_path}@{revision.stdout.strip()}"
+
+    version_path = os.path.join(idf_path, "version.txt")
+    try:
+        with open(version_path) as f:
+            return f"{idf_path}@{f.read().strip()}"
+    except FileNotFoundError:
+        # Without a revision-bearing identity, restored CMake state is unsafe.
+        return None
 
 
-def prepare_build_dir(build_dir, clean, toolchain_identity):
+def file_digest(path):
+    with open(path, "rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
+
+
+def prepare_build_dir(build_dir, clean, toolchain_identity, sdkconfig_defaults_digest):
     """Discard build state only when requested or configured elsewhere."""
     if not os.path.exists(build_dir):
         return
-    if clean:
+    if clean or toolchain_identity is None:
         print(f"Cleaning CMake build directory: {os.path.abspath(build_dir)}")
         shutil.rmtree(build_dir)
         return
@@ -208,18 +221,20 @@ def prepare_build_dir(build_dir, clean, toolchain_identity):
     expected_state = {
         "firmwareDir": FIRMWARE_DIR,
         "toolchain": toolchain_identity,
+        "sdkconfigDefaults": sdkconfig_defaults_digest,
     }
     if state != expected_state:
         print(f"Cleaning stale CMake build directory: {os.path.abspath(build_dir)}")
         shutil.rmtree(build_dir)
 
 
-def write_build_state(build_dir, toolchain_identity):
+def write_build_state(build_dir, toolchain_identity, sdkconfig_defaults_digest):
     with open(os.path.join(build_dir, ".attractap-build-state.json"), "w") as f:
         json.dump(
             {
                 "firmwareDir": FIRMWARE_DIR,
                 "toolchain": toolchain_identity,
+                "sdkconfigDefaults": sdkconfig_defaults_digest,
             },
             f,
             sort_keys=True,
@@ -246,6 +261,7 @@ def main():
     python_cmd = resolve_python_command()
     esptool_cmd = resolve_esptool_command()
     toolchain_identity = resolve_toolchain_identity()
+    sdkconfig_defaults_digest = file_digest("sdkconfig.defaults")
 
     with open("version.txt") as f:
         firmware_version = f.read().strip().splitlines()[0]
@@ -298,7 +314,12 @@ def main():
             sys.exit(1)
 
         build_dir = os.path.join("build", variant)
-        prepare_build_dir(build_dir, args.clean, toolchain_identity)
+        prepare_build_dir(
+            build_dir,
+            args.clean,
+            toolchain_identity,
+            sdkconfig_defaults_digest,
+        )
         sdkconfig_path = os.path.abspath(os.path.join(build_dir, "sdkconfig"))
         build_args = [
             "-B", build_dir,
@@ -311,7 +332,7 @@ def main():
         if run_idf(build_args) != 0:
             print(f"Error: Build failed for variant '{variant}'")
             sys.exit(1)
-        write_build_state(build_dir, toolchain_identity)
+        write_build_state(build_dir, toolchain_identity, sdkconfig_defaults_digest)
 
         # Flash layout from flasher_args.json (bootloader, partition table,
         # otadata initial image, app). The otadata image MUST be part of the
