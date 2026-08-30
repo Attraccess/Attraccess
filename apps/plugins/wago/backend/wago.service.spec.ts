@@ -32,6 +32,7 @@ describe('WagoService', () => {
     controllers = [controller()],
     enrollments: WagoEnrollment[] = [],
     defaultMqttServerId: number | null = null,
+    initialize = true,
   ) {
     const controllerRepository = {
       find: jest.fn().mockResolvedValue(controllers),
@@ -101,8 +102,16 @@ describe('WagoService', () => {
       },
       getMqttCredentialProvisioning: jest.fn(),
     } as unknown as PluginContext;
+    const service = new WagoService(context);
+    if (initialize) {
+      Reflect.set(service, 'controllers', controllerRepository);
+      Reflect.set(service, 'enrollments', enrollmentRepository);
+      Reflect.set(service, 'settings', settingsRepository);
+      Reflect.set(service, 'drafts', draftRepository);
+      Reflect.set(service, 'revisions', revisionRepository);
+    }
     return {
-      service: new WagoService(context),
+      service,
       controllerRepository,
       enrollmentRepository,
       settingsRepository,
@@ -121,6 +130,16 @@ describe('WagoService', () => {
 
     expect(listed).not.toHaveProperty('fingerprint');
     expect(listed).not.toHaveProperty('pairingCodeHash');
+  });
+
+  it('defers repository access until plugin module initialization', async () => {
+    const { service, context } = createService([], [], null, false);
+
+    expect(context.getRepository).not.toHaveBeenCalled();
+
+    await service.onModuleInit();
+
+    expect(context.getRepository).toHaveBeenCalledTimes(5);
   });
 
   it('creates default settings when none have been persisted', async () => {
