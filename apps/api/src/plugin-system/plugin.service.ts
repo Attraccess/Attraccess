@@ -377,8 +377,6 @@ export class PluginService {
       throw new NotFoundException('Plugin not found');
     }
 
-    PluginService.clearPluginQuarantine(plugin.pluginDirectory);
-
     // Revert the plugin's database migrations (drops its tables/data) BEFORE the
     // files are removed — the migration classes live in the plugin bundle and
     // must still be on disk to run. A failure here is logged but never blocks the
@@ -396,6 +394,7 @@ export class PluginService {
 
     // delete folder
     await rm(pluginFolder, { recursive: true });
+    PluginService.clearPluginQuarantine(plugin.pluginDirectory);
 
     // restart app
     setTimeout(() => {

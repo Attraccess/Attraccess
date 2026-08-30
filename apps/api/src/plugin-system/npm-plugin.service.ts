@@ -335,7 +335,6 @@ export class NpmPluginService implements OnModuleInit {
       const target = join(PluginService.PLUGIN_PATH, installed.installPath);
       const backup = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY, backupDirectoryName(installed.installPath));
 
-      PluginService.clearPluginQuarantine(installed.installPath);
       if (existsSync(target)) {
         await mkdir(join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY), { recursive: true });
         await rename(target, backup);
@@ -346,6 +345,7 @@ export class NpmPluginService implements OnModuleInit {
         if (existsSync(backup) && !existsSync(target)) await rename(backup, target);
         throw error;
       }
+      PluginService.clearPluginQuarantine(installed.installPath);
 
       try {
         await rm(backup, { recursive: true, force: true });
@@ -683,7 +683,6 @@ export class NpmPluginService implements OnModuleInit {
         if (!replacing && this.listInstalled().some((plugin) => plugin.name === name)) {
           throw new BadRequestException('Package is already installed; use the replacement endpoint');
         }
-        PluginService.clearPluginQuarantine(installed.installPath);
         const activation = await this.activate(source, name);
         try {
           await this.writeState(installed);
@@ -691,6 +690,7 @@ export class NpmPluginService implements OnModuleInit {
           await this.rollbackActivation(activation);
           throw error;
         }
+        PluginService.clearPluginQuarantine(installed.installPath);
         try {
           await this.removeBackup(activation.backup);
         } catch (error) {
