@@ -740,6 +740,10 @@ export class NpmPluginService implements OnModuleInit {
               this.logger.error(`Failed to roll back installed package ${name}`, rollbackError);
               try {
                 await this.isolateActivation(activation.target);
+                // Removing the failed package makes the original backup eligible
+                // for restoration. Do not restore its active record until this
+                // retry has put the backup back at the discovery target.
+                await this.rollbackActivation(activation);
               } catch (isolationError) {
                 throw new AggregateError(
                   [error, quarantineError, rollbackError, isolationError],

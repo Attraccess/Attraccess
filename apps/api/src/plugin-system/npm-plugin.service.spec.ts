@@ -953,7 +953,7 @@ describe('NpmPluginService', () => {
     expect(service.listInstalled()).toEqual([]);
   });
 
-  it('isolates a failed activation when quarantine persistence and rollback both fail', async () => {
+  it('retries rollback after isolating a failed activation', async () => {
     const name = '@attraccess/plugin';
     const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
     const tarball = await packageTarball(name);
@@ -979,10 +979,15 @@ describe('NpmPluginService', () => {
     jest.spyOn(PluginService, 'quarantinePluginDirectory').mockImplementation(() => {
       throw new Error('quarantine write failed');
     });
-    jest.spyOn(internals, 'rollbackActivation').mockRejectedValue(new Error('rollback failed'));
+    const rollbackActivation = internals.rollbackActivation.bind(service);
+    const rollback = jest
+      .spyOn(internals, 'rollbackActivation')
+      .mockRejectedValueOnce(new Error('rollback failed'))
+      .mockImplementation(rollbackActivation);
 
     await expect(service.install(name, '1.2.3')).rejects.toThrow('final state write failed');
 
+    expect(rollback).toHaveBeenCalledTimes(2);
     expect(existsSync(join(root, installPath))).toBe(false);
     expect(readdirSync(join(root, '.npm-backups')).some((entry) => entry.startsWith('failed-'))).toBe(true);
   });
