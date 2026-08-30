@@ -1,5 +1,5 @@
 import { MemoryDeviceAdapter } from './adapters';
-import { JsonStateStore, WagoRuntime, hash, type Snapshot, type Transport } from './runtime';
+import { JsonStateStore, MAX_PENDING_CHANNEL_WRITES, WagoRuntime, hash, type Snapshot, type Transport } from './runtime';
 
 class TestTransport implements Transport {
   readonly published: Array<{ topic: string; payload: unknown; retain?: boolean }> = [];
@@ -395,6 +395,45 @@ describe('WagoRuntime', () => {
     }));
   });
 
+  it('keeps feedback verification for a successful write queued before a failed replacement', async () => {
+    const monitored: Snapshot = {
+      ...snapshot,
+      physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
+      logicalChannels: [
+        { id: 'feedback', physicalPointId: 'input-1', profile: 'generic-monitored-input', capabilities: ['input'], disconnectPolicy: { mode: 'hold' } },
+        { id: 'load', physicalPointId: 'output-1', profile: 'generic-digital-output', capabilities: ['output', 'feedback'], disconnectPolicy: { mode: 'immediate' }, feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 5 } },
+      ],
+    };
+    let releaseFirstWrite!: () => void;
+    let firstWriteStarted!: () => void;
+    const firstWrite = new Promise<void>((resolve) => { releaseFirstWrite = resolve; });
+    const started = new Promise<void>((resolve) => { firstWriteStarted = resolve; });
+    const queuedFailureDevice = {
+      write: async (_point: Snapshot['physicalPoints'][number], value: boolean) => {
+        if (value) {
+          firstWriteStarted();
+          await firstWrite;
+        } else throw new Error('temporary failure');
+      },
+      read: async () => false,
+    };
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`), transport, device: queuedFailureDevice });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(monitored), snapshot: monitored });
+
+    const first = transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
+    await started;
+    const replacement = transport.send(commands, { id: 'command-2', channelId: 'load', action: 'set', value: false });
+    releaseFirstWrite();
+    await Promise.all([first, replacement]);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+      payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),
+    }));
+  });
+
   it('does not publish a mismatch from a superseded in-flight feedback check', async () => {
     const monitored: Snapshot = {
       ...snapshot,
@@ -422,6 +461,65 @@ describe('WagoRuntime', () => {
       topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
       payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),
     }));
+  });
+
+  it('does not publish a fault from an in-flight feedback check after replacing configuration', async () => {
+    const monitored: Snapshot = {
+      ...snapshot,
+      physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
+      logicalChannels: [
+        { id: 'feedback', physicalPointId: 'input-1', profile: 'generic-monitored-input', capabilities: ['input'], disconnectPolicy: { mode: 'hold' } },
+        { id: 'load', physicalPointId: 'output-1', profile: 'generic-digital-output', capabilities: ['output', 'feedback'], disconnectPolicy: { mode: 'immediate' }, feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 5 } },
+      ],
+    };
+    let resolveRead: ((value: boolean) => void) | undefined;
+    const delayedReadDevice = {
+      write: async () => undefined,
+      read: async () => new Promise<boolean>((resolve) => { resolveRead = resolve; }),
+    };
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`), transport, device: delayedReadDevice });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(monitored), snapshot: monitored });
+    await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await transport.send(desired, { protocolVersion: 1, revision: 2, contentHash: hash(monitored), snapshot: monitored });
+    resolveRead?.(false);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(transport.published).not.toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+      payload: expect.objectContaining({ channelId: 'load' }),
+    }));
+  });
+
+  it('rejects commands beyond the per-channel write queue limit', async () => {
+    let releaseFirstWrite!: () => void;
+    let firstWriteStarted!: () => void;
+    const firstWrite = new Promise<void>((resolve) => { releaseFirstWrite = resolve; });
+    const started = new Promise<void>((resolve) => { firstWriteStarted = resolve; });
+    const slowDevice = {
+      write: async () => {
+        firstWriteStarted();
+        await firstWrite;
+      },
+      read: async () => false,
+    };
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`), transport, device: slowDevice });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+
+    const commandsInFlight = Array.from({ length: MAX_PENDING_CHANNEL_WRITES + 1 }, (_, index) =>
+      transport.send(commands, { id: `command-${index}`, channelId: 'load', action: 'set', value: true }),
+    );
+    await started;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
+      payload: { id: `command-${MAX_PENDING_CHANNEL_WRITES}`, status: 'rejected', error: 'channel write queue is full' },
+    }));
+
+    releaseFirstWrite();
+    await Promise.all(commandsInFlight);
   });
 
   it('rejects feedback that references the output rather than an input channel', async () => {

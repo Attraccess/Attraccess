@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Inject, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { WagoService } from './wago.service';
 import type { WagoPresetApplication } from './configuration';
@@ -41,13 +41,15 @@ export class WagoControllerApi {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { application?: WagoPresetApplication },
   ) {
-    return this.wago.previewPreset(id, body?.application as WagoPresetApplication);
+    if (!body?.application) throw new BadRequestException('application is required');
+    return this.wago.previewPreset(id, body.application);
   }
   @Post('controllers/:id/configuration/presets/apply') applyPreset(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { application?: WagoPresetApplication; selectedPaths?: string[]; previewedDraftHash?: string },
   ) {
-    return this.wago.applyPreset(id, body?.application as WagoPresetApplication, body?.selectedPaths ?? [], body?.previewedDraftHash ?? '');
+    if (!body?.application) throw new BadRequestException('application is required');
+    return this.wago.applyPreset(id, body.application, body.selectedPaths ?? [], body.previewedDraftHash ?? '');
   }
   @Post('controllers/:id/configuration/draft') saveDraft(
     @Param('id', ParseIntPipe) id: number,

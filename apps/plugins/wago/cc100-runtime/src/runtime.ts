@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 export const PROTOCOL_VERSION = 1;
+export const MAX_PENDING_CHANNEL_WRITES = 100;
 export const CAPABILITIES = [
   'claim',
   'heartbeat',
@@ -83,12 +84,13 @@ export class WagoRuntime {
   private connected = true;
   private readonly pulses = new Map<string, { generation: number; timer: ReturnType<typeof setTimeout> }>();
   private pulseSequence = 0;
-  private readonly channelWrites = new Map<string, Promise<void>>();
+  private readonly channelWrites = new Map<string, { tail: Promise<void>; pending: number }>();
   private readonly watchdogs = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly feedbackChecks = new Map<string, { timer: ReturnType<typeof setTimeout>; channelId: string; generation: number }>();
   private feedbackCheckSequence = 0;
-  private readonly feedbackCommandGenerations = new Map<string, number>();
+  private readonly feedbackGenerationSequences = new Map<string, number>();
   private readonly feedbackGenerations = new Map<string, number>();
+  private configurationGeneration = 0;
   private readonly inFlightCommandIds = new Set<string>();
 
   constructor(
@@ -126,6 +128,7 @@ export class WagoRuntime {
     // Persist only after validation; a rejected snapshot cannot alter active I/O.
     this.feedbackChecks.forEach(({ timer }) => clearTimeout(timer));
     this.feedbackChecks.clear();
+    this.configurationGeneration += 1;
     this.state.accepted = { revision: desired.revision, contentHash: desired.contentHash, snapshot: desired.snapshot };
     await this.options.store.save(this.state);
     await this.publishReport(desired.revision, desired.contentHash, []);
@@ -156,8 +159,12 @@ export class WagoRuntime {
       await this.options.store.save(this.state);
       if (command.action === 'pulse') {
         const generation = this.reserveFeedbackGeneration(channel.id);
-        if (!(await this.writeChannel(channel, true, () => this.schedulePulse(channel, duration, generation), generation, true))) return this.rejectFailedWrite(command.id);
-      } else if (!(await this.writeChannel(channel, command.value, undefined, this.reserveFeedbackGeneration(channel.id)))) return this.rejectFailedWrite(command.id);
+        const result = await this.writeChannel(channel, true, () => this.schedulePulse(channel, duration, generation), generation, true, undefined, true);
+        if (result !== 'written') return this.rejectFailedWrite(command.id, result === 'queue_full' ? 'channel write queue is full' : undefined);
+      } else {
+        const result = await this.writeChannel(channel, command.value, undefined, this.reserveFeedbackGeneration(channel.id), false, undefined, true);
+        if (result !== 'written') return this.rejectFailedWrite(command.id, result === 'queue_full' ? 'channel write queue is full' : undefined);
+      }
       await this.acknowledge(command.id, 'accepted');
     } finally {
       this.inFlightCommandIds.delete(command.id);
@@ -177,7 +184,8 @@ export class WagoRuntime {
       if (!channel.capabilities.includes('output')) continue;
       if (channel.disconnectPolicy.mode === 'immediate') {
         try {
-          await this.writeChannel(channel, false);
+          const result = await this.writeChannel(channel, false);
+          if (result !== 'written') stateSaveFailed = true;
         } catch {
           // Continue the safety shutdown even when durable state cannot be updated for one output.
           stateSaveFailed = true;
@@ -235,11 +243,12 @@ export class WagoRuntime {
     feedbackGeneration = this.reserveFeedbackGeneration(channel.id),
     preservePulse = false,
     shouldWrite?: () => boolean,
-  ): Promise<boolean> {
+    rejectWhenQueued = false,
+  ): Promise<'written' | 'failed' | 'queue_full'> {
     return this.enqueueChannelWrite(channel.id, async () => {
-      if (shouldWrite && !shouldWrite()) return false;
+      if (shouldWrite && !shouldWrite()) return 'failed';
       return this.writeChannelWhileQueued(channel, value, onWritten, feedbackGeneration, preservePulse);
-    });
+    }, rejectWhenQueued);
   }
 
   private async writeChannelWhileQueued(
@@ -248,9 +257,9 @@ export class WagoRuntime {
     onWritten: (() => void) | undefined,
     feedbackGeneration: number,
     preservePulse: boolean,
-  ): Promise<boolean> {
+  ): Promise<'written' | 'failed'> {
     const point = this.state.accepted?.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
-    if (!point) return false;
+    if (!point) return 'failed';
     try {
       await this.options.device.write(point, value);
     } catch (error) {
@@ -263,7 +272,7 @@ export class WagoRuntime {
       } catch {
         // A fault-publication failure must not turn a known failed write into an accepted command.
       }
-      return false;
+      return 'failed';
     }
     const feedbackIsCurrent = this.commitFeedbackGeneration(channel.id, feedbackGeneration);
     // A pulse must always arrange its physical shutoff after it is written, even
@@ -284,7 +293,7 @@ export class WagoRuntime {
     } catch {
       // Retained-state publication does not change the durable state of a successful write.
     }
-    return true;
+    return 'written';
   }
 
   private schedulePulse(channel: Snapshot['logicalChannels'][number], duration: number, feedbackGeneration: number): void {
@@ -315,23 +324,25 @@ export class WagoRuntime {
     this.pulses.delete(channelId);
   }
 
-  private async enqueueChannelWrite<T>(channelId: string, write: () => Promise<T>): Promise<T> {
-    const previous = this.channelWrites.get(channelId) ?? Promise.resolve();
-    const next = previous.catch(() => undefined).then(write);
-    const settled = next.then(() => undefined, () => undefined);
-    this.channelWrites.set(channelId, settled);
-    void settled.finally(() => {
-      if (this.channelWrites.get(channelId) === settled) this.channelWrites.delete(channelId);
+  private async enqueueChannelWrite<T>(channelId: string, write: () => Promise<T>, rejectWhenQueued = false): Promise<T | 'queue_full'> {
+    const queue = this.channelWrites.get(channelId) ?? { tail: Promise.resolve(), pending: 0 };
+    if (rejectWhenQueued && queue.pending >= MAX_PENDING_CHANNEL_WRITES) return 'queue_full';
+    queue.pending += 1;
+    const next = queue.tail.then(write);
+    queue.tail = next.then(() => undefined, () => undefined);
+    this.channelWrites.set(channelId, queue);
+    void queue.tail.finally(() => {
+      queue.pending -= 1;
+      if (queue.pending === 0) this.channelWrites.delete(channelId);
     });
     return next;
   }
   private reserveFeedbackGeneration(channelId: string): number {
-    const generation = (this.feedbackCommandGenerations.get(channelId) ?? 0) + 1;
-    this.feedbackCommandGenerations.set(channelId, generation);
+    const generation = (this.feedbackGenerationSequences.get(channelId) ?? 0) + 1;
+    this.feedbackGenerationSequences.set(channelId, generation);
     return generation;
   }
   private commitFeedbackGeneration(channelId: string, generation: number): boolean {
-    if (this.feedbackCommandGenerations.get(channelId) !== generation) return false;
     this.feedbackGenerations.set(channelId, generation);
     for (const [checkId, check] of this.feedbackChecks) {
       if (check.channelId === channelId && check.generation !== generation) {
@@ -344,14 +355,15 @@ export class WagoRuntime {
   private scheduleFeedbackCheck(channel: Snapshot['logicalChannels'][number], value: boolean, generation: number): void {
     if (!channel.feedback) return;
     const checkId = `${channel.id}:${++this.feedbackCheckSequence}`;
+    const configurationGeneration = this.configurationGeneration;
     const timer = setTimeout(() => {
       this.feedbackChecks.delete(checkId);
-      void this.ignoreTimerRejection(() => this.verifyFeedback(channel, value, generation));
+      void this.ignoreTimerRejection(() => this.verifyFeedback(channel, value, generation, configurationGeneration));
     }, channel.feedback.timeoutMs);
     this.feedbackChecks.set(checkId, { timer, channelId: channel.id, generation });
   }
-  private async verifyFeedback(channel: Snapshot['logicalChannels'][number], value: boolean, generation: number): Promise<void> {
-    if (this.feedbackGenerations.get(channel.id) !== generation) return;
+  private async verifyFeedback(channel: Snapshot['logicalChannels'][number], value: boolean, generation: number, configurationGeneration: number): Promise<void> {
+    if (this.feedbackGenerations.get(channel.id) !== generation || this.configurationGeneration !== configurationGeneration) return;
     const feedback = channel.feedback;
     const snapshot = this.state.accepted?.snapshot;
     const feedbackChannel = snapshot?.logicalChannels.find((item) => item.id === feedback?.channelId);
@@ -360,14 +372,14 @@ export class WagoRuntime {
     try {
       const actual = Boolean(await this.options.device.read(point));
       const expected = feedback.expected === 'match' ? value : !value;
-      if (actual !== expected && this.feedbackGenerations.get(channel.id) === generation)
+      if (actual !== expected && this.feedbackGenerations.get(channel.id) === generation && this.configurationGeneration === configurationGeneration)
         await this.options.transport.publish(this.topic('faults'), {
           channelId: channel.id,
           code: 'feedback_mismatch',
           message: 'configured feedback does not match the requested output state',
         });
     } catch (error) {
-      if (this.feedbackGenerations.get(channel.id) !== generation) return;
+      if (this.feedbackGenerations.get(channel.id) !== generation || this.configurationGeneration !== configurationGeneration) return;
       await this.options.transport.publish(this.topic('faults'), {
         channelId: channel.id,
         code: 'feedback_read_failed',
@@ -410,10 +422,10 @@ export class WagoRuntime {
       return false;
     }
   }
-  private async rejectFailedWrite(id: string): Promise<void> {
+  private async rejectFailedWrite(id: string, error = 'device write failed'): Promise<void> {
     this.state.commandIds = this.state.commandIds.filter((commandId) => commandId !== id);
     await this.options.store.save(this.state);
-    await this.acknowledge(id, 'rejected', 'device write failed');
+    await this.acknowledge(id, 'rejected', error);
   }
   private ignoreTimerRejection(callback: () => Promise<unknown>): void {
     void callback().catch(() => undefined);
