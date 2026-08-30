@@ -4,7 +4,7 @@ import type { PluginManifestInfo } from '@attraccess/plugins-backend-sdk';
 import { PluginManifest, PluginManifestSchema, LoadedPluginManifest } from './plugin.manifest';
 import { PluginSandboxService } from './plugin-sandbox.service';
 import { PluginMigrationService } from './plugin-migration.service';
-import { existsSync, readdirSync, readFileSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs';
 import { FileUpload } from '../common/types/file-upload.types';
 import { rename, rm } from 'fs/promises';
 import decompress from 'decompress';
@@ -12,6 +12,10 @@ import { createHash, randomBytes } from 'crypto';
 import { spawn } from 'child_process';
 
 const INTERNAL_PLUGIN_DIRECTORIES = new Set(['.npm-backups']);
+const PLUGIN_FAILURES_FILE = '.plugin-failures.json';
+const PLUGIN_BOOT_GUARD_FILE = '.plugin-boot-guard.json';
+
+type PluginFailure = { pluginDirectory: string; message: string };
 
 
 export class PluginService {
@@ -26,6 +30,8 @@ export class PluginService {
     PluginService.PLUGIN_PATH = config.PLUGIN_DIR; // Assume PLUGIN_DIR from appConfig is already resolved or correct
     PluginService.RESTART_BY_EXIT_FLAG = config.RESTART_BY_EXIT;
     PluginService.plugins = null; // Discovery may have been cached with an unset path before configure() ran; force a re-scan.
+    PluginService.loadedPlugins.clear();
+    PluginService.pluginLoadErrors.clear();
     PluginService.logger.log(`PluginService configured. Path: ${PluginService.PLUGIN_PATH}, RestartByExit: ${PluginService.RESTART_BY_EXIT_FLAG}`);
     if (!PluginService.PLUGIN_PATH) {
         PluginService.logger.error('PLUGIN_DIR is not configured in AppConfig! Plugin system may not work.');
@@ -84,6 +90,50 @@ export class PluginService {
     PluginService.pluginLoadErrors.set(pluginName, error);
   }
 
+  /**
+   * Persist a failed plugin outside its package. A subsequent process must never
+   * retry code which already prevented the host from starting.
+   */
+  public static quarantinePlugin(manifest: LoadedPluginManifest, error: Error): void {
+    const key = `${manifest.name}@${manifest.version}`;
+    PluginService.setPluginLoadError(key, error);
+    const failures = PluginService.readFailures().filter((failure) => failure.pluginDirectory !== manifest.pluginDirectory);
+    failures.push({ pluginDirectory: manifest.pluginDirectory, message: error.message });
+    PluginService.writeFailures(failures);
+  }
+
+  public static isPluginQuarantined(manifest: Pick<LoadedPluginManifest, 'pluginDirectory'>): boolean {
+    return PluginService.readFailures().some((failure) => failure.pluginDirectory === manifest.pluginDirectory);
+  }
+
+  /** Marks active plugins before executing their code. Cleared only after listen(). */
+  public static beginBootGuard(): void {
+    const previous = PluginService.readBootGuard();
+    if (previous.length > 0) {
+      const failures = PluginService.readFailures();
+      for (const pluginDirectory of previous) {
+        if (!failures.some((failure) => failure.pluginDirectory === pluginDirectory)) {
+          failures.push({
+            pluginDirectory,
+            message: 'Plugin was automatically disabled because the previous application startup did not complete. Review the plugin and reinstall or remove it before enabling it again.',
+          });
+        }
+      }
+      PluginService.writeFailures(failures);
+      PluginService.logger.error(`Disabled ${previous.length} plugin(s) after an incomplete previous startup.`);
+    }
+
+    const active = PluginService.getPlugins()
+      .filter((manifest) => !PluginService.isPluginQuarantined(manifest))
+      .map((manifest) => manifest.pluginDirectory);
+    PluginService.writeBootGuard(active);
+  }
+
+  public static clearBootGuard(): void {
+    const path = join(PluginService.PLUGIN_PATH, PLUGIN_BOOT_GUARD_FILE);
+    if (existsSync(path)) rmSync(path, { force: true });
+  }
+
   private static findPluginsInFolder(rootFolder: string): LoadedPluginManifest[] {
     // if folder does not exist, return empty array
     if (!existsSync(rootFolder)) {
@@ -109,6 +159,11 @@ export class PluginService {
         // The directory is the installation identity. Keeping its derived ID stable
         // prevents registrations from changing every time the host restarts.
         manifest.id = createHash('sha256').update(pluginFolder).digest('base64url').slice(0, 21);
+
+        const failure = PluginService.readFailures().find((item) => item.pluginDirectory === pluginFolder);
+        if (failure) {
+          PluginService.setPluginLoadError(`${manifest.name}@${manifest.version}`, new Error(failure.message));
+        }
 
         try {
           manifest.permissions = PluginSandboxService.validateDeclaredPermissions(manifest.name, manifest.permissions);
@@ -145,6 +200,38 @@ export class PluginService {
     }
 
     return manifest;
+  }
+
+  private static readFailures(): PluginFailure[] {
+    return PluginService.readJsonFile<PluginFailure[]>(PLUGIN_FAILURES_FILE, []);
+  }
+
+  private static writeFailures(failures: PluginFailure[]): void {
+    PluginService.writeJsonFile(PLUGIN_FAILURES_FILE, failures);
+  }
+
+  private static readBootGuard(): string[] {
+    return PluginService.readJsonFile<string[]>(PLUGIN_BOOT_GUARD_FILE, []);
+  }
+
+  private static writeBootGuard(pluginDirectories: string[]): void {
+    PluginService.writeJsonFile(PLUGIN_BOOT_GUARD_FILE, pluginDirectories);
+  }
+
+  private static readJsonFile<T>(name: string, fallback: T): T {
+    try {
+      const value: unknown = JSON.parse(readFileSync(join(PluginService.PLUGIN_PATH, name), 'utf8'));
+      return Array.isArray(fallback) && !Array.isArray(value) ? fallback : (value as T);
+    } catch {
+      return fallback;
+    }
+  }
+
+  private static writeJsonFile(name: string, value: unknown): void {
+    const path = join(PluginService.PLUGIN_PATH, name);
+    const temporary = `${path}.${randomBytes(8).toString('hex')}.tmp`;
+    writeFileSync(temporary, JSON.stringify(value));
+    renameSync(temporary, path);
   }
 
   public async uploadPlugin(zipFile: FileUpload) {

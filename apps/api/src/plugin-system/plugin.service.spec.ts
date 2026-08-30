@@ -132,6 +132,42 @@ describe('PluginService', () => {
       expect(byName['plugin-bad'].error).toBe("Cannot find module '@nestjs/common'");
     });
 
+    it('persists a quarantined plugin error across a new process discovery', () => {
+      writePlugin(root, 'crashing-plugin', {
+        name: 'crashing-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+      const [plugin] = PluginService.getPlugins();
+
+      PluginService.quarantinePlugin(plugin, new Error('onModuleInit failed'));
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+
+      expect(PluginService.isPluginQuarantined(PluginService.getPlugins()[0])).toBe(true);
+      expect(PluginService.getPluginsWithLoadStatus()[0]).toMatchObject({
+        status: 'error',
+        error: 'onModuleInit failed',
+      });
+    });
+
+    it('quarantines plugins from an incomplete previous startup before retrying', () => {
+      writePlugin(root, 'previously-active', {
+        name: 'previously-active',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+
+      PluginService.beginBootGuard();
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      PluginService.beginBootGuard();
+
+      const [plugin] = PluginService.getPlugins();
+      expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
+      expect(PluginService.getPluginsWithLoadStatus()[0].error).toMatch(/previous application startup did not complete/);
+    });
+
     it('caches discovery between calls and re-scans after configure', () => {
       writePlugin(root, 'plugin-a', {
         name: 'plugin-a',

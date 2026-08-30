@@ -87,6 +87,9 @@ export async function bootstrap() {
   // Restore a known-good package before migrations or module discovery can load
   // code left behind by an interrupted npm plugin replacement.
   if (earlyConfig.PLUGIN_DIR) await NpmPluginService.recoverBackups();
+  // An unclean startup means one of these in-process plugins may have crashed
+  // Nest during lifecycle initialisation. Quarantine them before loading code.
+  if (!earlyConfig.DISABLE_PLUGINS && earlyConfig.PLUGIN_DIR) PluginService.beginBootGuard();
   bootstrapLogger.log('PluginSystem configured.');
 
   // Run plugin-shipped up-migrations BEFORE AppModule is imported, so every

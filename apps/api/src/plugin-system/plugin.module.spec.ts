@@ -95,6 +95,25 @@ describe('PluginModule', () => {
       expect(PluginService.getManifestById(discovered[0].id)).toBeDefined();
     });
 
+    it('does not import a plugin persisted as quarantined after a previous failure', () => {
+      mkdirSync(join(root, 'quarantined', 'dist'), { recursive: true });
+      writeFileSync(
+        join(root, 'quarantined', 'plugin.json'),
+        JSON.stringify({
+          name: 'quarantined',
+          version: '1.0.0',
+          main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+          attraccessVersion: { min: '1.0.0' },
+        }),
+      );
+      writeFileSync(join(root, 'quarantined', 'dist', 'index.js'), 'throw new Error("must not be imported");');
+      const [plugin] = PluginService.getPlugins();
+      PluginService.quarantinePlugin(plugin, new Error('prior crash'));
+
+      expect(PluginModule.forRoot().imports).toEqual([SettingsModule, MqttModule]);
+      expect(PluginService.getPluginsWithLoadStatus()[0]).toMatchObject({ status: 'error', error: 'prior crash' });
+    });
+
     it('does not register a credential provider from a plugin whose factory fails', () => {
       mkdirSync(join(root, 'broken-provider', 'dist'), { recursive: true });
       writeFileSync(
