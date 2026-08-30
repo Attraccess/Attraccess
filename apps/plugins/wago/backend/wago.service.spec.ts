@@ -176,6 +176,16 @@ describe('WagoService', () => {
     service.onModuleDestroy();
   });
 
+  it('fails startup when WAGO subscription configuration cannot be read', async () => {
+    const { service, context, settingsRepository } = createService([], [], 2);
+    settingsRepository.findOneBy.mockRejectedValue(new Error('settings unavailable'));
+
+    await expect(service.onModuleInit()).rejects.toThrow('settings unavailable');
+
+    expect(context.logger.warn).not.toHaveBeenCalled();
+    service.onModuleDestroy();
+  });
+
   it('preserves the MQTT server during a prefix-only settings update', async () => {
     const { service, settingsRepository } = createService([], [], 2);
 

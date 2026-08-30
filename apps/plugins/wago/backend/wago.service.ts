@@ -42,6 +42,12 @@ const STALE_AFTER_MS = 90_000;
 const MAX_PENDING_CONFIGURATION_REPORTS = 100;
 const ENROLLMENT_RETRY_MS = 60_000;
 
+class MqttSubscriptionError extends Error {
+  constructor(readonly mqttError: unknown) {
+    super(String(mqttError));
+  }
+}
+
 type WagoControllerSummary = Omit<WagoController, 'fingerprint' | 'pairingCodeHash'> & {
   connectivity: 'online' | 'stale' | 'untrusted';
 };
@@ -78,10 +84,13 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       .where('enrollment.consumedAt IS NULL')
       .getMany();
     for (const enrollment of enrollments) this.scheduleEnrollmentExpiry(enrollment);
-    await this.subscribeConfiguredServers().catch((error) => {
-      this.context.logger.warn(`Could not establish WAGO MQTT subscriptions during startup: ${String(error)}`);
+    try {
+      await this.subscribeConfiguredServers();
+    } catch (error) {
+      if (!(error instanceof MqttSubscriptionError)) throw error;
+      this.context.logger.warn(`Could not establish WAGO MQTT subscriptions during startup: ${String(error.mqttError)}`);
       this.scheduleSubscriptionRetry();
-    });
+    }
   }
   onModuleDestroy(): void {
     this.destroyed = true;
@@ -562,7 +571,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     try {
       for (const serverId of serverIds) {
         replacements.push(
-          await this.context.mqtt.subscribe(serverId, `${DISCOVERY_ROOT}/+`, async (message) => {
+          await this.subscribeMqtt(serverId, `${DISCOVERY_ROOT}/+`, async (message) => {
             if (!this.isActiveSubscriptionGeneration(generation)) return;
             await this.onDiscovery(serverId, message.topic, message.payload);
           }),
@@ -578,7 +587,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
           claimedControllers.map((controller) => [controller.hardwareId, controller]),
         );
         replacements.push(
-          await this.context.mqtt.subscribe(
+          await this.subscribeMqtt(
             serverId,
             configurationReportedWildcardTopic(settings.operationalPrefix),
             (message) => {
@@ -595,7 +604,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
         }
         for (const controller of claimedControllers) {
           replacements.push(
-            await this.context.mqtt.subscribe(
+            await this.subscribeMqtt(
               serverId,
               heartbeatTopic(settings.operationalPrefix, controller.hardwareId),
               async (message) => {
@@ -626,6 +635,14 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
 
   private unsubscribe(): void {
     this.subscriptions.splice(0).forEach((subscription) => subscription.unsubscribe());
+  }
+
+  private async subscribeMqtt(...args: Parameters<PluginContext['mqtt']['subscribe']>): Promise<PluginMqttSubscription> {
+    try {
+      return await this.context.mqtt.subscribe(...args);
+    } catch (error) {
+      throw new MqttSubscriptionError(error);
+    }
   }
 
   private isActiveSubscriptionGeneration(generation: number): boolean {
