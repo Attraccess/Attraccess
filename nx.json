@@ -90,6 +90,9 @@
     "e2e-ci--**/*": {
       "dependsOn": ["^build"]
     },
+    "publish": {
+      "inputs": ["{workspaceRoot}/apps/plugins/scripts/publish-plugin.mjs"]
+    },
     "lint": {
       "cache": true,
       "inputs": [
