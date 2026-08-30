@@ -22,12 +22,12 @@ void ResourceDetailsScreen::onToastDelete(lv_event_t *e)
 }
 void ResourceDetailsScreen::showActionProgress(const char *)
 {
-   if (!this->activeActionButton)
+   if (!this->activeActionButton || !lv_obj_is_valid(this->activeActionButton))
    {
       return;
    }
 
-   if (!this->activeActionSpinner)
+   if (!this->activeActionSpinner || !lv_obj_is_valid(this->activeActionSpinner))
    {
       this->activeActionSpinner = lv_spinner_create(this->activeActionButton);
       lv_obj_update_layout(this->activeActionButton);
@@ -37,7 +37,7 @@ void ResourceDetailsScreen::showActionProgress(const char *)
       lv_obj_add_flag(this->activeActionSpinner, LV_OBJ_FLAG_HIDDEN);
    }
 
-   if (this->activeActionLabel)
+   if (this->activeActionLabel && lv_obj_is_valid(this->activeActionLabel))
    {
       lv_obj_add_flag(this->activeActionLabel, LV_OBJ_FLAG_HIDDEN);
    }
@@ -47,15 +47,15 @@ void ResourceDetailsScreen::showActionProgress(const char *)
 }
 void ResourceDetailsScreen::hideActionProgress()
 {
-   if (this->activeActionSpinner)
+   if (this->activeActionSpinner && lv_obj_is_valid(this->activeActionSpinner))
    {
       lv_obj_add_flag(this->activeActionSpinner, LV_OBJ_FLAG_HIDDEN);
    }
-   if (this->activeActionLabel)
+   if (this->activeActionLabel && lv_obj_is_valid(this->activeActionLabel))
    {
       lv_obj_clear_flag(this->activeActionLabel, LV_OBJ_FLAG_HIDDEN);
    }
-   if (this->activeActionButton)
+   if (this->activeActionButton && lv_obj_is_valid(this->activeActionButton))
    {
       lv_obj_clear_state(this->activeActionButton, LV_STATE_DISABLED);
    }

@@ -20,7 +20,6 @@ void Application::handleFormsRequest(
   this->formCursorOffset = 0;
   this->clearFormPageCache();
   this->awaitingFieldRender = false;
-  Display::resourceDetailsScreen.hideActionProgress();
   Display::resourceDetailsScreen.showFormsModal(this->pendingFormRequest);
   this->requestCurrentFormField();
 }

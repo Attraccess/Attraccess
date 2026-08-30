@@ -836,6 +836,13 @@ void ResourceDetailsScreen::onButtonClick(lv_event_t *e)
 void ResourceDetailsScreen::onContainerDelete(lv_event_t *e)
 {
    ButtonClickEventData *evt = static_cast<ButtonClickEventData *>(lv_event_get_user_data(e));
+   if (evt && evt->self && lv_event_get_target(e) == evt->self->activeActionButton)
+   {
+      // Flow buttons are rebuilt during resource refreshes while their request may still be pending.
+      evt->self->activeActionButton = nullptr;
+      evt->self->activeActionLabel = nullptr;
+      evt->self->activeActionSpinner = nullptr;
+   }
    if (evt)
    {
       delete evt;
