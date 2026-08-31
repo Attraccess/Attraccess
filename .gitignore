@@ -60,3 +60,5 @@ coverage/
 
 # companion-ws-client — generated at build time
 libs/companion-ws-client/src/lib/
+apps/plugins/*/package.zip
+apps/attractap/firmware/__pycache__/
