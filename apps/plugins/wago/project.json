@@ -34,11 +34,22 @@
       "executor": "nx:run-commands",
       "cache": true,
       "dependsOn": ["build-backend", "build-frontend"],
-      "inputs": ["{projectRoot}/package.json"],
+      "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json"],
       "outputs": ["{projectRoot}/package"],
       "options": {
         "cwd": "apps/plugins/wago",
-        "command": "node -e \"require('fs').copyFileSync('package.json','package/package.json')\""
+        "command": "node -e \"for (const file of ['package.json', 'plugin.json']) require('fs').copyFileSync(file, 'package/' + file)\""
+      }
+    },
+    "zip": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build"],
+      "inputs": ["{projectRoot}/package/**/*", "{workspaceRoot}/apps/plugins/scripts/zip-plugin.mjs"],
+      "outputs": ["{projectRoot}/dist/plugin-wago.zip"],
+      "options": {
+        "cwd": "apps/plugins/wago",
+        "command": "node ../scripts/zip-plugin.mjs --src package --out dist/plugin-wago.zip"
       }
     },
     "pack": {

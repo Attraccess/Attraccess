@@ -8,6 +8,7 @@
   "targets": {
     "copy-attractap-firmware-into-assets": {
       "executor": "nx:run-commands",
+      "dependsOn": [],
       "cache": false,
       "options": {
         "command": "node {projectRoot}/copy-attractap-firmware-into-assets.js"
