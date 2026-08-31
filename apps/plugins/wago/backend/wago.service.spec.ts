@@ -132,6 +132,16 @@ describe('WagoService', () => {
     expect(listed).not.toHaveProperty('pairingCodeHash');
   });
 
+  it('requires exactly one credential provider for automatic enrollment', async () => {
+    const { service, context } = createService();
+    (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = jest.fn().mockResolvedValue({});
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({
+      availableProviders: jest.fn().mockResolvedValue(['provider-a', 'provider-b']),
+    });
+
+    await expect(service.enrollmentCredentialSupport(2)).resolves.toEqual({ automatic: false });
+  });
+
   it('defers repository access until plugin module initialization', async () => {
     const { service, context } = createService([], [], null, false);
 

@@ -261,6 +261,17 @@ describe('PluginService', () => {
       expect(PluginService.getPlugins()).toEqual([]);
     });
 
+    it('excludes hidden replacement backups from discovery', () => {
+      writePlugin(root, '.uploaded-plugin-backup', {
+        name: 'uploaded-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+
+      expect(PluginService.getPlugins()).toEqual([]);
+    });
+
     it('excludes a plugin whose declared permissions are invalid', () => {
       writePlugin(root, 'bad-perms', {
         name: 'bad-perms',
@@ -401,6 +412,42 @@ describe('PluginService', () => {
       expect(manifest.version).toBe('1.2.4');
       expect(readFileSync(join(root, 'uploaded-plugin', 'dist', 'index.js'), 'utf8')).toBe('module.exports = "new";');
       expect(readdirSync(root).filter((entry) => entry.startsWith('.uploaded-plugin-'))).toEqual([]);
+    });
+
+    it.each(['../outside-plugin', 'nested/plugin', '..\\outside-plugin'])('rejects a plugin name that escapes its directory: %s', async (name) => {
+      const service = new PluginService();
+      const manifest = { ...VALID_MANIFEST, name };
+
+      await expect(service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(manifest) }))).rejects.toThrow(
+        'Plugin name must be a single path segment',
+      );
+      expect(existsSync(join(root, 'outside-plugin'))).toBe(false);
+    });
+
+    it('serializes plugin updates with the same name', async () => {
+      const withPluginUploadLock = Reflect.get(PluginService, 'withPluginUploadLock') as <T>(
+        name: string,
+        action: () => Promise<T>,
+      ) => Promise<T>;
+      let releaseFirst!: () => void;
+      const order: string[] = [];
+      const first = withPluginUploadLock('uploaded-plugin', async () => {
+        order.push('first-start');
+        await new Promise<void>((resolve) => {
+          releaseFirst = resolve;
+        });
+        order.push('first-end');
+      });
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      const second = withPluginUploadLock('uploaded-plugin', async () => {
+        order.push('second');
+      });
+
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(order).toEqual(['first-start']);
+      releaseFirst();
+      await Promise.all([first, second]);
+      expect(order).toEqual(['first-start', 'first-end', 'second']);
     });
   });
 

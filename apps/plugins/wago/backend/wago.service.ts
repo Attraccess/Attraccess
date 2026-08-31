@@ -169,7 +169,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     if (!(await this.context.getMqttServerConfig(mqttServerId)))
       throw new NotFoundException(`MQTT server ${mqttServerId} not found`);
     const providers = await this.context.getMqttCredentialProvisioning().availableProviders(mqttServerId);
-    return { automatic: providers.length > 0 };
+    return { automatic: providers.length === 1 };
   }
 
   async getDraft(controllerId: number): Promise<WagoConfigurationDraft | null> {
