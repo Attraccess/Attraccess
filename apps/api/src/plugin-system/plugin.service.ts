@@ -315,17 +315,26 @@ export class PluginService {
       PluginService.logger.debug(`Validating manifest`, manifestContent);
       const manifest = PluginManifestSchema.parse(manifestContent);
 
-      // if folder exists throw error
       const pluginFolder = join(PluginService.PLUGIN_PATH, manifest.name);
-      PluginService.logger.debug(`Checking if plugin folder ${pluginFolder} exists`, pluginFolder);
-      if (existsSync(pluginFolder)) {
-        PluginService.logger.error(`Plugin ${manifest.name} already exists`);
-        throw new BadRequestException('Plugin already exists');
+      const backupFolder = join(PluginService.PLUGIN_PATH, `.${manifest.name}-${randomBytes(8).toString('hex')}`);
+      const replacing = existsSync(pluginFolder);
+
+      // A zip upload is the update mechanism for uploaded plugins. Keep the
+      // old archive on disk until the new one has been placed successfully.
+      if (replacing) {
+        PluginService.logger.log(`Replacing uploaded plugin ${manifest.name}`);
+        await rename(pluginFolder, backupFolder);
       }
 
-      // move plugin to plugins folder
-      PluginService.logger.debug(`Moving plugin to plugins folder ${pluginFolder}`);
-      await rename(sourceFolder, pluginFolder);
+      try {
+        PluginService.logger.debug(`Moving plugin to plugins folder ${pluginFolder}`);
+        await rename(sourceFolder, pluginFolder);
+      } catch (error) {
+        if (replacing) await rename(backupFolder, pluginFolder);
+        throw error;
+      }
+
+      if (replacing) await rm(backupFolder, { recursive: true, force: true });
       try {
         PluginService.clearPluginQuarantine(manifest.name);
       } catch (error) {

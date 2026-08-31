@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
@@ -381,12 +381,26 @@ describe('PluginService', () => {
       await expect(service.uploadPlugin(file)).rejects.toBeDefined();
     });
 
-    it('rejects when a plugin with the same name already exists', async () => {
+    it('replaces an uploaded plugin with the same name', async () => {
       const service = new PluginService();
-      await service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(VALID_MANIFEST) }));
+      await service.uploadPlugin(
+        zipFileUpload({
+          'plugin.json': JSON.stringify(VALID_MANIFEST),
+          'dist/index.js': 'module.exports = "old";',
+        }),
+      );
 
-      const again = zipFileUpload({ 'plugin.json': JSON.stringify(VALID_MANIFEST) });
-      await expect(service.uploadPlugin(again)).rejects.toThrow(/already exists/);
+      const updatedManifest = { ...VALID_MANIFEST, version: '1.2.4' };
+      const manifest = await service.uploadPlugin(
+        zipFileUpload({
+          'plugin.json': JSON.stringify(updatedManifest),
+          'dist/index.js': 'module.exports = "new";',
+        }),
+      );
+
+      expect(manifest.version).toBe('1.2.4');
+      expect(readFileSync(join(root, 'uploaded-plugin', 'dist', 'index.js'), 'utf8')).toBe('module.exports = "new";');
+      expect(readdirSync(root).filter((entry) => entry.startsWith('.uploaded-plugin-'))).toEqual([]);
     });
   });
 

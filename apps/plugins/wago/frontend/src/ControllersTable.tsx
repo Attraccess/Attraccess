@@ -63,7 +63,11 @@ export function ControllersTable({ controllers, onClaim, onConfigure }: Controll
                       Claim
                     </Button>
                   )}
-                  {controller.trustState === 'claimed' && <Button size="sm" variant="secondary" onPress={() => onConfigure(controller.id)}>Configure</Button>}
+                  {controller.trustState === 'claimed' && (
+                    <Button size="sm" variant="secondary" onPress={() => onConfigure(controller.id)}>
+                      Configure
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             )}
@@ -77,7 +81,7 @@ export function ControllersTable({ controllers, onClaim, onConfigure }: Controll
 function EmptyControllers() {
   return (
     <div className="wg:px-4 wg:py-12 wg:text-center wg:text-sm wg:text-muted">
-      No candidates yet. Configure a default MQTT server, then start the enrolled controller.
+      No controllers have connected yet. Enroll a device, apply its one-time package, then start the controller.
     </div>
   );
 }

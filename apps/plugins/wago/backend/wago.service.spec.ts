@@ -215,6 +215,17 @@ describe('WagoService', () => {
     );
   });
 
+  it('reports whether an MQTT server can provision discovery credentials', async () => {
+    const { service, context } = createService();
+    const getMqttServerConfig = jest.fn().mockResolvedValue({ id: 2 });
+    const availableProviders = jest.fn().mockResolvedValue([{ providerId: 'rabbitmq', displayName: 'RabbitMQ' }]);
+    (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = getMqttServerConfig;
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({ availableProviders });
+
+    await expect(service.enrollmentCredentialSupport(2)).resolves.toEqual({ automatic: true });
+    expect(availableProviders).toHaveBeenCalledWith(2);
+  });
+
   it('requires a non-empty matching fingerprint', () => {
     const { service } = createService();
     const matchesVerifier = Reflect.get(service, 'matchesVerifier') as (item: WagoController, value: string) => boolean;

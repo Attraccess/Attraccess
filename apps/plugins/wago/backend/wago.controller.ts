@@ -25,6 +25,11 @@ export class WagoControllerApi {
         : undefined;
     return this.wago.createEnrollment(body?.hardwareId ?? '', body?.mqttServerId, manualCredentials);
   }
+  @Get('enrollments/credential-support/:mqttServerId') credentialSupport(
+    @Param('mqttServerId', ParseIntPipe) mqttServerId: number,
+  ) {
+    return this.wago.enrollmentCredentialSupport(mqttServerId);
+  }
   @Post('controllers/:id/claim') claim(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { name?: string; verifier?: string; mqttServerId?: number },
