@@ -13,6 +13,7 @@ const hoisted = vi.hoisted(() => ({
   getRemoteMock: vi.fn(),
   refetchMock: vi.fn(),
   getBaseUrlMock: vi.fn(() => 'http://test.local'),
+  toastWarningMock: vi.fn(),
   user: { id: 1, username: 'admin' } as Record<string, unknown> | null,
 }));
 
@@ -34,7 +35,7 @@ vi.mock('../../api', () => ({
 }));
 
 vi.mock('../../components/toastProvider', () => ({
-  useToastMessage: () => ({ showToast: vi.fn(), success: vi.fn(), error: vi.fn() }),
+  useToastMessage: () => ({ showToast: vi.fn(), success: vi.fn(), error: vi.fn(), warning: hoisted.toastWarningMock }),
 }));
 
 let pluginCounter = 0;
@@ -78,6 +79,7 @@ beforeEach(() => {
   hoisted.getRemoteMock.mockReset();
   hoisted.refetchMock.mockReset();
   hoisted.getBaseUrlMock.mockReturnValue('http://test.local');
+  hoisted.toastWarningMock.mockReset();
   hoisted.user = { id: 1, username: 'admin' };
 });
 
@@ -188,6 +190,28 @@ describe('PluginProvider', () => {
     await waitFor(() => expect(consoleError).toHaveBeenCalled());
     expect(usePluginState.getState().plugins).toHaveLength(0);
     expect(screen.getByText('app-shell')).toBeInTheDocument();
+  });
+
+  it('does not load a quarantined plugin and warns the user with its failure detail', async () => {
+    hoisted.refetchMock.mockResolvedValue({
+      data: [
+        {
+          name: 'BrokenPlugin',
+          version: '1.0.0',
+          status: 'error',
+          error: 'Plugin was automatically disabled after startup failed',
+          main: { frontend: { entryPoint: 'index.js' } },
+        },
+      ],
+    });
+
+    render(<PluginProvider />);
+
+    await waitFor(() => expect(hoisted.toastWarningMock).toHaveBeenCalled());
+    expect(hoisted.toastWarningMock).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Plugin "BrokenPlugin" is disabled', description: expect.stringContaining('startup failed') }),
+    );
+    expect(hoisted.getRemoteMock).not.toHaveBeenCalled();
   });
 
   it('injects plugin routes that render and are navigable', async () => {

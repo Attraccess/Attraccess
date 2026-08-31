@@ -132,6 +132,104 @@ describe('PluginService', () => {
       expect(byName['plugin-bad'].error).toBe("Cannot find module '@nestjs/common'");
     });
 
+    it('persists a quarantined plugin error across a new process discovery', () => {
+      writePlugin(root, 'crashing-plugin', {
+        name: 'crashing-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+      const [plugin] = PluginService.getPlugins();
+
+      PluginService.quarantinePlugin(plugin, new Error('onModuleInit failed'));
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+
+      expect(PluginService.isPluginQuarantined(PluginService.getPlugins()[0])).toBe(true);
+      expect(PluginService.getPluginsWithLoadStatus()[0]).toMatchObject({
+        status: 'error',
+        error: 'onModuleInit failed',
+      });
+    });
+
+    it('keeps a failed plugin quarantined in memory when persistence fails', () => {
+      writePlugin(root, 'crashing-plugin', {
+        name: 'crashing-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+      const [plugin] = PluginService.getPlugins();
+      jest
+        .spyOn(PluginService as unknown as { writeFailures(failures: unknown[]): void }, 'writeFailures')
+        .mockImplementation(() => {
+          throw new Error('read-only plugin directory');
+        });
+
+      expect(() => PluginService.quarantinePlugin(plugin, new Error('onModuleInit failed'))).not.toThrow();
+      expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
+    });
+
+    it('removes quarantine state when a plugin is replaced', () => {
+      writePlugin(root, 'repaired-plugin', {
+        name: 'repaired-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+      const [plugin] = PluginService.getPlugins();
+      PluginService.quarantinePlugin(plugin, new Error('prior crash'));
+
+      PluginService.clearPluginQuarantine(plugin.pluginDirectory);
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+
+      expect(PluginService.isPluginQuarantined(PluginService.getPlugins()[0])).toBe(false);
+    });
+
+    it('preserves quarantine state when clearing it cannot be persisted', () => {
+      writePlugin(root, 'repaired-plugin', {
+        name: 'repaired-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+      const [plugin] = PluginService.getPlugins();
+      PluginService.quarantinePlugin(plugin, new Error('prior crash'));
+      jest
+        .spyOn(PluginService as unknown as { writeFailures(failures: unknown[]): void }, 'writeFailures')
+        .mockImplementation(() => {
+          throw new Error('read-only plugin directory');
+        });
+
+      expect(() => PluginService.clearPluginQuarantine(plugin.pluginDirectory)).toThrow('read-only plugin directory');
+      expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
+    });
+
+    it('persists the startup error before quarantining plugins from an incomplete startup', () => {
+      writePlugin(root, 'previously-active', {
+        name: 'previously-active',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+
+      PluginService.beginBootGuard();
+      PluginService.recordBootFailure(new Error('Plugin onModuleInit failed'));
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      PluginService.beginBootGuard();
+
+      const [plugin] = PluginService.getPlugins();
+      expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
+      expect(PluginService.getPluginsWithLoadStatus()[0].error).toBe('Plugin onModuleInit failed');
+    });
+
+    it('creates a configured plugin directory before writing boot guard state', () => {
+      const missingRoot = join(root, 'does-not-exist');
+      PluginService.configure({ PLUGIN_DIR: missingRoot, RESTART_BY_EXIT: true });
+
+      expect(() => PluginService.beginBootGuard()).not.toThrow();
+      expect(existsSync(join(missingRoot, '.plugin-boot-guard.json'))).toBe(true);
+    });
+
     it('caches discovery between calls and re-scans after configure', () => {
       writePlugin(root, 'plugin-a', {
         name: 'plugin-a',
@@ -222,6 +320,19 @@ describe('PluginService', () => {
       expect(restartSpy).toHaveBeenCalledTimes(1);
     });
 
+    it('clears stale quarantine state for an uploaded replacement', async () => {
+      writePlugin(root, 'uploaded-plugin', VALID_MANIFEST);
+      const [previous] = PluginService.getPlugins();
+      PluginService.quarantinePlugin(previous, new Error('prior crash'));
+      rmSync(join(root, 'uploaded-plugin'), { recursive: true, force: true });
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+
+      await new PluginService().uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(VALID_MANIFEST) }));
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+
+      expect(PluginService.isPluginQuarantined(PluginService.getPlugins()[0])).toBe(false);
+    });
+
     // Finder ("Compress" on an unpacked folder) and most GUI zip tools wrap the
     // contents in a single top-level folder. Before, that surfaced as a raw
     // ENOENT on <temp>/plugin.json.
@@ -293,11 +404,13 @@ describe('PluginService', () => {
         attraccessVersion: { min: '1.0.0' },
       });
       const [plugin] = PluginService.getPlugins();
+      PluginService.quarantinePlugin(plugin, new Error('prior crash'));
       const service = new PluginService();
 
       await service.deletePlugin(plugin.id);
 
       expect(existsSync(join(root, 'delete-me'))).toBe(false);
+      expect(PluginService.isPluginQuarantined(plugin)).toBe(false);
       flushScheduledRestart();
       expect(restartSpy).toHaveBeenCalledTimes(1);
     });

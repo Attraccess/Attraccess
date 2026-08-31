@@ -63,6 +63,10 @@ export class PluginModule {
     PluginModule.logger.log(`PluginModule configured. DisablePlugins: ${PluginModule.DISABLE_PLUGINS_FLAG}`);
   }
 
+  public static arePluginsDisabled(): boolean {
+    return PluginModule.DISABLE_PLUGINS_FLAG;
+  }
+
   public static forRoot(): DynamicModule {
     if (PluginModule.DISABLE_PLUGINS_FLAG) {
       PluginModule.logger.log('Plugins are disabled');
@@ -86,6 +90,7 @@ export class PluginModule {
     this.pluginManifests = PluginService.getPlugins();
 
     const pluginModules = this.pluginManifests
+      .filter((manifest) => !PluginService.isPluginQuarantined(manifest))
       .map((manifest) => {
         try {
           const module = PluginModule.loadPluginModule(manifest);
@@ -93,7 +98,7 @@ export class PluginModule {
           return module;
         } catch (error) {
           this.logger.error(`Error loading plugin ${manifest.name}`, error);
-          PluginService.setPluginLoadError(`${manifest.name}@${manifest.version}`, error as Error);
+          PluginService.quarantinePlugin(manifest, error as Error);
           return null;
         }
       })

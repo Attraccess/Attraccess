@@ -152,7 +152,14 @@ export function PluginProvider(props: PropsWithChildren) {
 
     const plugins = await refetchPlugins();
     const pluginsArray = plugins.data ?? [];
-    await Promise.all(pluginsArray.map((manifest) => loadPlugin(manifest)));
+    const failedPlugins = pluginsArray.filter((manifest) => manifest.status === 'error');
+    for (const plugin of failedPlugins) {
+      toastRef.current.warning({
+        title: `Plugin "${plugin.name}" is disabled`,
+        description: plugin.error ?? 'The plugin failed to load. Open Settings > Plugins for details.',
+      });
+    }
+    await Promise.all(pluginsArray.filter((manifest) => manifest.status !== 'error').map((manifest) => loadPlugin(manifest)));
 
     arePluginsLoaded.current = true;
     console.debug('Attraccess Plugin System: All plugins loaded');

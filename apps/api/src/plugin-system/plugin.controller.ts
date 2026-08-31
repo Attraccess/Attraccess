@@ -14,6 +14,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { PluginService } from './plugin.service';
+import { PluginModule } from './plugin.module';
 import { createReadStream, existsSync } from 'fs';
 import { ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { LoadedPluginManifest } from './plugin.manifest';
@@ -197,6 +198,13 @@ export class PluginController {
   })
   getAllPlugins() {
     return PluginService.getPluginsWithLoadStatus();
+  }
+
+  @Get('status')
+  @Auth('system.plugins.manage')
+  @ApiOperation({ summary: 'Get plugin system status', operationId: 'getPluginSystemStatus' })
+  getPluginSystemStatus() {
+    return { disabled: PluginModule.arePluginsDisabled() };
   }
 
   // Also add support for loading the index.js file

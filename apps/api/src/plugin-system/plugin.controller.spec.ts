@@ -4,6 +4,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { PluginController } from './plugin.controller';
 import { PluginService } from './plugin.service';
+import { PluginModule } from './plugin.module';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { FileUpload } from '../common/types/file-upload.types';
 
@@ -34,6 +35,7 @@ describe('PluginController', () => {
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'plugin-controller-'));
     PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+    PluginModule.configure({ DISABLE_PLUGINS: false });
     service = { uploadPlugin: jest.fn(), deletePlugin: jest.fn() };
     npmService = {
       findInstalledByPluginId: jest.fn(),
@@ -56,6 +58,12 @@ describe('PluginController', () => {
     expect(controller.getAllPlugins()).toEqual(
       plugins.map((plugin) => ({ ...plugin, status: 'unknown', error: null })),
     );
+  });
+
+  it('reports when plugins are globally disabled', () => {
+    PluginModule.configure({ DISABLE_PLUGINS: true });
+
+    expect(controller.getPluginSystemStatus()).toEqual({ disabled: true });
   });
 
   describe('getFrontendPluginFile', () => {
