@@ -2,7 +2,7 @@ module.exports = {
   displayName: 'api',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
-  setupFiles: ['<rootDir>/../../scripts/jest-docker-context.ts', '<rootDir>/src/test/jest.setup.ts'],
+  setupFiles: ['<rootDir>/src/test/jest.setup.ts'],
   transform: {
     '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json', isolatedModules: true }],
   },

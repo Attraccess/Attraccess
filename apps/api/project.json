@@ -136,7 +136,7 @@
       "inputs": ["testing", "^production"],
       "outputs": ["{workspaceRoot}/coverage/apps/api-e2e"],
       "options": {
-        "jestConfig": "apps/api/jest.config.ts",
+        "jestConfig": "apps/api/jest.e2e.config.ts",
         "testMatch": ["**/*.e2e.spec.ts"],
         "passWithNoTests": true
       }
