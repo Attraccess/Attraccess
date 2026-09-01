@@ -1102,6 +1102,28 @@ describe('WagoRuntime', () => {
     }));
   });
 
+  it('does not publish from a sequence range whose reservation failed to save', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport, device });
+    await runtime.start();
+    runtime['sequence'] = 100;
+    runtime['reservedSequence'] = 100;
+    runtime['state'].sequence = 100;
+    const persist = store.save.bind(store);
+    const save = jest.spyOn(store, 'save').mockRejectedValueOnce(new Error('disk full')).mockImplementation(persist);
+
+    await expect(runtime['publishOperational']('measurements', { timestamp: '2026-09-01T00:00:00.000Z', channelId: 'meter', unit: 'percent', value: 42 })).rejects.toThrow('disk full');
+    expect(runtime['reservedSequence']).toBe(100);
+    expect(runtime['state'].sequence).toBe(100);
+
+    await runtime['publishOperational']('measurements', { timestamp: '2026-09-01T00:00:05.000Z', channelId: 'meter', unit: 'percent', value: 43 });
+
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(transport.published.filter((message) => message.topic.endsWith('/measurements'))).toContainEqual(expect.objectContaining({
+      payload: expect.objectContaining({ sequence: 101, value: 43 }),
+    }));
+  });
+
   it('serializes concurrent state saves', async () => {
     const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
     await Promise.all([
