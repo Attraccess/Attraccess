@@ -89,15 +89,20 @@ export function ConfigurationEditor({ controllerId, onOpenChange }: { controller
   }
 
   async function apply() {
+    const generation = previewGeneration.current;
     try {
       setFormError(null);
       const selected = application();
       if (!selected || draftQuery.isPending) return;
       const draft = await applyPreset.mutateAsync({ application: selected, selectedPaths, previewedDraftHash: presetPreview?.draftHash ?? '' });
+      if (generation !== previewGeneration.current) return;
       setSnapshot(JSON.stringify(JSON.parse(draft.snapshot), null, 2));
       previewPreset.reset();
       setPresetPreview(null);
-    } catch (error) { setFormError(error instanceof Error ? error.message : 'Could not apply preset changes.'); }
+    } catch (error) {
+      if (generation === previewGeneration.current)
+        setFormError(error instanceof Error ? error.message : 'Could not apply preset changes.');
+    }
   }
 
   const error = saveDraft.error ?? applyPreset.error;
