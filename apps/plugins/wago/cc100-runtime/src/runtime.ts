@@ -573,14 +573,19 @@ export class WagoRuntime {
     return `${this.options.prefix.replace(/^\/+|\/+$/g, '')}/discovery/${this.options.hardwareId}`;
   }
   private async nextSequence(): Promise<number> {
-    if (this.sequence === this.reservedSequence) {
+    while (this.sequence === this.reservedSequence) {
       if (!this.sequenceReservation) {
-        this.reservedSequence += 100;
-        this.state.sequence = this.reservedSequence;
-        this.sequenceReservation = this.options.store.save(this.state).finally(() => { this.sequenceReservation = null; });
+        const reservedSequence = this.reservedSequence + 100;
+        this.sequenceReservation = this.options.store
+          .save({ ...this.state, sequence: reservedSequence })
+          .then(() => {
+            this.reservedSequence = reservedSequence;
+            this.state.sequence = reservedSequence;
+          })
+          .finally(() => { this.sequenceReservation = null; });
       }
+      await this.sequenceReservation;
     }
-    if (this.sequenceReservation) await this.sequenceReservation;
     return ++this.sequence;
   }
   private async publishOperational(
