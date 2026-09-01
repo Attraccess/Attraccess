@@ -1083,6 +1083,7 @@ function applySelectedChanges(
     }
     const last = segments[segments.length - 1];
     if (last === undefined) continue;
+    if (last === '__proto__' || last === 'constructor' || last === 'prototype') continue;
     if (change.current === undefined) delete target[last];
     else Object.defineProperty(target, last, { configurable: true, enumerable: true, value: change.current, writable: true });
   }
