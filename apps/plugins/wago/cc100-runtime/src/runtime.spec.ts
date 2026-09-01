@@ -1124,6 +1124,24 @@ describe('WagoRuntime', () => {
     }));
   });
 
+  it('does not let a concurrent state save overwrite a sequence reservation', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport, device });
+    await runtime.start();
+    runtime['sequence'] = 100;
+    runtime['reservedSequence'] = 100;
+    runtime['state'].sequence = 100;
+
+    const publish = runtime['publishOperational']('measurements', { timestamp: '2026-09-01T00:00:00.000Z', channelId: 'meter', unit: 'percent', value: 42 });
+    const saveClaim = runtime.receiveClaim({ username: 'controller', password: 'secret' });
+    await Promise.all([publish, saveClaim]);
+
+    await expect(store.load()).resolves.toEqual(expect.objectContaining({
+      credentials: { username: 'controller', password: 'secret' },
+      sequence: 200,
+    }));
+  });
+
   it('serializes concurrent state saves', async () => {
     const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
     await Promise.all([
