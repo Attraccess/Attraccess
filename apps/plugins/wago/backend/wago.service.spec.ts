@@ -197,6 +197,50 @@ describe('WagoService', () => {
     ]);
   });
 
+  it('rejects acknowledgement timeouts that exceed the supported maximum', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.validateCommandConfig({
+        controllerId: 1,
+        channelId: 'pump',
+        action: 'pulse',
+        expectedConfigurationRevision: 1,
+        acknowledgementTimeoutSeconds: Number.MAX_SAFE_INTEGER,
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        field: 'acknowledgementTimeoutSeconds',
+        message: 'Acknowledgement timeout must not exceed 300 seconds.',
+      }),
+    ]);
+  });
+
+  it('consumes a pending acknowledgement rejection when command publication fails', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, context, revisionRepository } = createService([claimed], [], 2);
+    revisionRepository.find.mockResolvedValue([
+      {
+        controllerId: claimed.id,
+        revision: 3,
+        state: 'applied',
+        snapshot: JSON.stringify({
+          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'] }],
+        }),
+      },
+    ]);
+    (context.mqtt.publish as jest.Mock).mockRejectedValue(new Error('broker offline'));
+
+    await expect(
+      service.executeCommand({
+        controllerId: claimed.id,
+        channelId: 'pump',
+        action: 'pulse',
+        expectedConfigurationRevision: 3,
+      }),
+    ).rejects.toThrow('Failed to publish WAGO command: Error: broker offline');
+  });
+
   it('propagates a controller acknowledgement rejection message', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
     const { service, context, revisionRepository } = createService([claimed], [], 2);

@@ -91,7 +91,10 @@ export class ResourceFlowsService {
       }),
     ]);
 
-    const validationErrors = (await Promise.all(nodes.map((node) => this.validateNodeData(node)))).flat();
+    const validationContext = new Map<string, unknown>();
+    const validationErrors = (
+      await Promise.all(nodes.map((node) => this.validateNodeData(node, validationContext)))
+    ).flat();
     return { nodes, edges, ...(validationErrors.length ? { validationErrors } : {}) };
   }
 
@@ -120,7 +123,10 @@ export class ResourceFlowsService {
     return this.pluginNodeSchema(definition, configSchema);
   }
 
-  private async validateNodeData(nodeData: { id: string; type: string; data: unknown }): Promise<ValidationError[]> {
+  private async validateNodeData(
+    nodeData: { id: string; type: string; data: unknown },
+    validationContext = new Map<string, unknown>(),
+  ): Promise<ValidationError[]> {
     const errors: ValidationError[] = [];
 
     // Non-core types must belong to a registered plugin; reject unknown types at save time.
@@ -135,7 +141,10 @@ export class ResourceFlowsService {
       }
       const plugin = getPluginFlowNode(nodeData.type);
       if (plugin && !plugin.isInput && plugin.validateConfig) {
-        const validationErrors = await plugin.validateConfig(nodeData.data as Record<string, unknown>);
+        const validationErrors = await plugin.validateConfig(
+          nodeData.data as Record<string, unknown>,
+          validationContext,
+        );
         errors.push(
           ...validationErrors.map((error) => ({
             nodeId: nodeData.id,
@@ -190,8 +199,9 @@ export class ResourceFlowsService {
 
     // Collect validation errors from all nodes
     const allValidationErrors: ValidationError[] = [];
+    const validationContext = new Map<string, unknown>();
     for (const nodeData of flowData.nodes) {
-      const nodeErrors = await this.validateNodeData(nodeData);
+      const nodeErrors = await this.validateNodeData(nodeData, validationContext);
       allValidationErrors.push(...nodeErrors);
     }
 

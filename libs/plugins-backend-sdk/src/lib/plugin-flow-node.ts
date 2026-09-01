@@ -36,6 +36,9 @@ export interface PluginFlowNodeValidationError {
   value?: unknown;
 }
 
+/** Request-scoped storage shared while validating all nodes in a flow. */
+export type PluginFlowNodeValidationContext = Map<string, unknown>;
+
 /**
  * Describes a single custom flow node contributed by a plugin.
  *
@@ -98,7 +101,10 @@ interface PluginFlowNodeDefinitionBase {
   readonly isOutput?: boolean;
 
   /** Validates persisted configuration independently of the editor schema. */
-  validateConfig?(config: Record<string, unknown>): Promise<PluginFlowNodeValidationError[]>;
+  validateConfig?(
+    config: Record<string, unknown>,
+    context: PluginFlowNodeValidationContext,
+  ): Promise<PluginFlowNodeValidationError[]>;
 
   /** Enables the host's shared external-effect failure policy for this node. */
   getFailureBehavior?(config: Record<string, unknown>): PluginFlowFailureBehavior | undefined;
