@@ -113,8 +113,8 @@ export function ConfigurationEditor({
         selectedPaths,
         previewedDraftHash: presetPreview?.draftHash ?? '',
       });
-      setDraftQueryData(draft);
       if (generation !== previewGeneration.current) return;
+      setDraftQueryData(draft);
       setSnapshot(JSON.stringify(JSON.parse(draft.snapshot), null, 2));
       previewPreset.reset();
       setPresetPreview(null);
