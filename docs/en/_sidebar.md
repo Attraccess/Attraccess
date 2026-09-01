@@ -61,10 +61,11 @@
   - [Firmware Updates](attractap/firmware-updates.md)
   - [LED Guide (Lite)](attractap/led-guide.md)
 
-- **MQTT & IoT**
-  - [Overview](mqtt/overview.md)
-  - [Server Setup](mqtt/server-setup.md)
-  - [Examples](mqtt/examples.md)
+- **Devices**
+  - [MQTT](devices/mqtt/overview.md)
+  - [MQTT Server Setup](devices/mqtt/server-setup.md)
+  - [MQTT Examples](devices/mqtt/examples.md)
+  - [WAGO CC100 Docker Runtime](devices/wago-cc100-runtime.md)
 
 - **Billing**
   - [Overview](billing/overview.md)

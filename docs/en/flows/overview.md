@@ -47,5 +47,5 @@ Here are some common examples:
 
 - [Flow Editor](flows/flow-editor.md) -- How to use the visual editor
 - [Node Types](flows/node-types.md) -- All available node types
-- [MQTT & IoT](mqtt/overview.md) -- Connect your hardware
+- [MQTT & IoT](devices/mqtt/overview.md) -- Connect your hardware
 - [Billing](billing/overview.md) -- Automate cost tracking

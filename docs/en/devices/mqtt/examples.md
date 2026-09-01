@@ -3,7 +3,7 @@
 This page shows practical examples of how to use MQTT with Attraccess to control machines, receive sensor data, and automate your makerspace.
 
 > [!NOTE]
-> All examples assume you have already [connected an MQTT broker](mqtt/server-setup.md) and are familiar with the basics of [Flows](flows/overview.md).
+> All examples assume you have already [connected an MQTT broker](devices/mqtt/server-setup.md) and are familiar with the basics of [Flows](flows/overview.md).
 
 ## Example 1: Machine Power Control via MQTT Relay
 
@@ -126,8 +126,8 @@ See [Node Types](flows/node-types.md) for a complete list of available nodes.
 
 ## See Also
 
-- [Overview](mqtt/overview.md) -- What is MQTT?
-- [Server Setup](mqtt/server-setup.md) -- Connect Attraccess to an MQTT broker
+- [Overview](devices/mqtt/overview.md) -- What is MQTT?
+- [Server Setup](devices/mqtt/server-setup.md) -- Connect Attraccess to an MQTT broker
 - [Flows & Automation](flows/overview.md) -- Create automation workflows
 - [Flow Editor](flows/flow-editor.md) -- How to use the visual editor
 - [Node Types](flows/node-types.md) -- All available node types
