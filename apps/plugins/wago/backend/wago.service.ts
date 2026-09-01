@@ -1084,7 +1084,7 @@ function applySelectedChanges(
     const last = segments[segments.length - 1];
     if (last === undefined) continue;
     if (change.current === undefined) delete target[last];
-    else target[last] = change.current;
+    else Object.defineProperty(target, last, { configurable: true, enumerable: true, value: change.current, writable: true });
   }
   return merged;
 }
