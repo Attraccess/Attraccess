@@ -419,9 +419,19 @@ describe('PluginService', () => {
       const manifest = { ...VALID_MANIFEST, name };
 
       await expect(service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(manifest) }))).rejects.toThrow(
-        'Plugin name must be a single path segment',
+        'Plugin name must be a visible single path segment',
       );
       expect(existsSync(join(root, 'outside-plugin'))).toBe(false);
+    });
+
+    it('rejects a dot-prefixed plugin name that discovery would skip', async () => {
+      const service = new PluginService();
+      const manifest = { ...VALID_MANIFEST, name: '.hidden-plugin' };
+
+      await expect(service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(manifest) }))).rejects.toThrow(
+        'Plugin name must be a visible single path segment',
+      );
+      expect(existsSync(join(root, '.hidden-plugin'))).toBe(false);
     });
 
     it('serializes plugin updates with the same name', async () => {

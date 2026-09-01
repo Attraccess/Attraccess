@@ -41,6 +41,10 @@ export function ConfigurationEditor({ controllerId, onOpenChange }: { controller
   const applyPreset = useApplyPresetMutation(controllerId ?? 0);
 
   useEffect(() => {
+    setSnapshot(JSON.stringify(emptySnapshot, null, 2));
+  }, [controllerId]);
+
+  useEffect(() => {
     if (draftQuery.data) setSnapshot(JSON.stringify(JSON.parse(draftQuery.data.snapshot), null, 2));
     else if (!draftQuery.isPending) setSnapshot(JSON.stringify(emptySnapshot, null, 2));
   }, [draftQuery.data, draftQuery.isPending]);
@@ -72,7 +76,7 @@ export function ConfigurationEditor({ controllerId, onOpenChange }: { controller
     try {
       setFormError(null);
       const selected = application();
-      if (!selected) return;
+      if (!selected || draftQuery.isPending) return;
       await saveDraft.mutateAsync(parsedSnapshot());
       const result = await previewPreset.mutateAsync(selected);
       if (generation !== previewGeneration.current) return;
@@ -88,7 +92,7 @@ export function ConfigurationEditor({ controllerId, onOpenChange }: { controller
     try {
       setFormError(null);
       const selected = application();
-      if (!selected) return;
+      if (!selected || draftQuery.isPending) return;
       const draft = await applyPreset.mutateAsync({ application: selected, selectedPaths, previewedDraftHash: presetPreview?.draftHash ?? '' });
       setSnapshot(JSON.stringify(JSON.parse(draft.snapshot), null, 2));
       previewPreset.reset();
@@ -103,7 +107,7 @@ export function ConfigurationEditor({ controllerId, onOpenChange }: { controller
         <ModalContainer size="lg">
           <ModalDialog>
             <ModalHeader><ModalHeading>Controller configuration</ModalHeading></ModalHeader>
-            <Form onSubmit={(event) => { event.preventDefault(); try { setFormError(null); void saveDraft.mutateAsync(parsedSnapshot()).catch((error) => setFormError(error instanceof Error ? error.message : 'Could not save draft.')); } catch (error) { setFormError(error instanceof Error ? error.message : 'Configuration must be valid JSON.'); } }}>
+            <Form onSubmit={(event) => { event.preventDefault(); if (draftQuery.isPending) return; try { setFormError(null); void saveDraft.mutateAsync(parsedSnapshot()).catch((error) => setFormError(error instanceof Error ? error.message : 'Could not save draft.')); } catch (error) { setFormError(error instanceof Error ? error.message : 'Configuration must be valid JSON.'); } }}>
               <ModalBody className="wg:flex wg:max-h-[75vh] wg:flex-col wg:gap-4 wg:overflow-y-auto">
                 <Alert status="warning">
                   <Alert.Indicator />
@@ -114,7 +118,7 @@ export function ConfigurationEditor({ controllerId, onOpenChange }: { controller
                 </Alert>
                 <TextField className="wg:w-full">
                   <Label>Editable configuration draft</Label>
-                  <TextArea value={snapshot} onChange={(event) => { previewGeneration.current += 1; previewPreset.reset(); setSelectedPaths([]); setPresetPreview(null); setSnapshot(event.target.value); }} rows={14} className="wg:font-mono" />
+                  <TextArea isDisabled={draftQuery.isPending} value={snapshot} onChange={(event) => { previewGeneration.current += 1; previewPreset.reset(); setSelectedPaths([]); setPresetPreview(null); setSnapshot(event.target.value); }} rows={14} className="wg:font-mono" />
                 </TextField>
                 <Card>
                   <Card.Header><h2 className="wg:font-medium">Apply editable preset foundation</h2></Card.Header>
@@ -131,7 +135,7 @@ export function ConfigurationEditor({ controllerId, onOpenChange }: { controller
                     <TextField isRequired><Label>Physical point ID</Label><Input value={physicalPointId} onChange={(event) => setPhysicalPointId(event.target.value)} /></TextField>
                     {preset?.id === 'guarded-enable-request' && <TextField isRequired><Label>Guard input channel ID</Label><Input value={guardChannelId} onChange={(event) => setGuardChannelId(event.target.value)} /></TextField>}
                     {preset?.id === 'generic-digital-output' && <TextField><Label>Optional feedback channel ID</Label><Input value={feedbackChannelId} onChange={(event) => setFeedbackChannelId(event.target.value)} /></TextField>}
-                    <Button isDisabled={!preset} isPending={saveDraft.isPending || previewPreset.isPending} onPress={() => void preview()}>Preview changes</Button>
+                    <Button isDisabled={!preset || draftQuery.isPending} isPending={saveDraft.isPending || previewPreset.isPending} onPress={() => void preview()}>Preview changes</Button>
                     {presetPreview && (
                       <div className="wg:flex wg:flex-col wg:gap-2">
                         <p className="wg:text-sm wg:font-medium">Select preset changes to copy into this draft</p>
@@ -140,7 +144,7 @@ export function ConfigurationEditor({ controllerId, onOpenChange }: { controller
                             <code>{change.path}</code>
                           </Checkbox>
                         ))}
-                        <Button isPending={applyPreset.isPending} onPress={() => void apply()}>Apply selected changes</Button>
+                        <Button isDisabled={draftQuery.isPending} isPending={applyPreset.isPending} onPress={() => void apply()}>Apply selected changes</Button>
                       </div>
                     )}
                   </Card.Content>
@@ -150,7 +154,7 @@ export function ConfigurationEditor({ controllerId, onOpenChange }: { controller
               </ModalBody>
               <ModalFooter>
                 <Button variant="secondary" onPress={() => onOpenChange(false)}>Close</Button>
-                <Button type="submit" isPending={saveDraft.isPending}>Save draft</Button>
+                <Button type="submit" isDisabled={draftQuery.isPending} isPending={saveDraft.isPending}>Save draft</Button>
               </ModalFooter>
             </Form>
           </ModalDialog>

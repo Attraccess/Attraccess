@@ -372,14 +372,14 @@ export class PluginService {
     const target = resolve(root, safeName);
     const targetRelativeToRoot = relative(root, target);
     if (
+      !safeName ||
+      safeName.startsWith('.') ||
       safeName !== name ||
-      safeName === '.' ||
-      safeName === '..' ||
       name.includes('\\') ||
       targetRelativeToRoot.startsWith('..') ||
       isAbsolute(targetRelativeToRoot)
     )
-      throw new BadRequestException('Plugin name must be a single path segment');
+      throw new BadRequestException('Plugin name must be a visible single path segment');
     return safeName;
   }
 
