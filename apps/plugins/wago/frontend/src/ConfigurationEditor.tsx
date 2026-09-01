@@ -25,7 +25,6 @@ import {
   usePresetsQuery,
   usePreviewPresetMutation,
   useSaveDraftMutation,
-  useSetDraftQueryData,
 } from './queries';
 
 const emptySnapshot = { version: 1, physicalPoints: [], logicalChannels: [] };
@@ -52,7 +51,6 @@ export function ConfigurationEditor({
   const saveDraft = useSaveDraftMutation(controllerId ?? 0);
   const previewPreset = usePreviewPresetMutation(controllerId ?? 0);
   const applyPreset = useApplyPresetMutation(controllerId ?? 0);
-  const setDraftQueryData = useSetDraftQueryData(controllerId ?? 0);
 
   useEffect(() => {
     setSnapshot(JSON.stringify(emptySnapshot, null, 2));
@@ -114,7 +112,6 @@ export function ConfigurationEditor({
         previewedDraftHash: presetPreview?.draftHash ?? '',
       });
       if (generation !== previewGeneration.current) return;
-      setDraftQueryData(draft);
       setSnapshot(JSON.stringify(JSON.parse(draft.snapshot), null, 2));
       previewPreset.reset();
       setPresetPreview(null);
@@ -125,6 +122,7 @@ export function ConfigurationEditor({
   }
 
   const error = saveDraft.error ?? applyPreset.error;
+  const isApplyingPreset = applyPreset.isPending;
   return (
     <Modal isOpen={controllerId !== null} onOpenChange={onOpenChange}>
       <ModalBackdrop>
@@ -161,7 +159,7 @@ export function ConfigurationEditor({
                 <TextField className="wg:w-full">
                   <Label>Editable configuration draft</Label>
                   <TextArea
-                    isDisabled={draftQuery.isPending}
+                    isDisabled={draftQuery.isPending || isApplyingPreset}
                     value={snapshot}
                     onChange={(event) => {
                       previewGeneration.current += 1;
@@ -185,6 +183,7 @@ export function ConfigurationEditor({
                           key={item.id}
                           size="sm"
                           variant={preset?.id === item.id ? 'primary' : 'secondary'}
+                          isDisabled={isApplyingPreset}
                           onPress={() => setPreset(item)}
                         >
                           {item.name}
@@ -194,16 +193,28 @@ export function ConfigurationEditor({
                     {preset && <p className="wg:text-sm wg:text-muted">{preset.description}</p>}
                     <TextField isRequired>
                       <Label>Logical channel ID</Label>
-                      <Input value={channelId} onChange={(event) => setChannelId(event.target.value)} />
+                      <Input
+                        isDisabled={isApplyingPreset}
+                        value={channelId}
+                        onChange={(event) => setChannelId(event.target.value)}
+                      />
                     </TextField>
                     <TextField isRequired>
                       <Label>Physical point ID</Label>
-                      <Input value={physicalPointId} onChange={(event) => setPhysicalPointId(event.target.value)} />
+                      <Input
+                        isDisabled={isApplyingPreset}
+                        value={physicalPointId}
+                        onChange={(event) => setPhysicalPointId(event.target.value)}
+                      />
                     </TextField>
                     {preset?.id === 'guarded-enable-request' && (
                       <TextField isRequired>
                         <Label>Guard input channel ID</Label>
-                        <Input value={guardChannelId} onChange={(event) => setGuardChannelId(event.target.value)} />
+                        <Input
+                          isDisabled={isApplyingPreset}
+                          value={guardChannelId}
+                          onChange={(event) => setGuardChannelId(event.target.value)}
+                        />
                       </TextField>
                     )}
                     {preset?.id === 'generic-digital-output' && (
@@ -211,12 +222,13 @@ export function ConfigurationEditor({
                         <Label>Optional feedback channel ID</Label>
                         <Input
                           value={feedbackChannelId}
+                          isDisabled={isApplyingPreset}
                           onChange={(event) => setFeedbackChannelId(event.target.value)}
                         />
                       </TextField>
                     )}
                     <Button
-                      isDisabled={!preset || draftQuery.isPending}
+                      isDisabled={!preset || draftQuery.isPending || isApplyingPreset}
                       isPending={saveDraft.isPending || previewPreset.isPending}
                       onPress={() => void preview()}
                     >
@@ -228,6 +240,7 @@ export function ConfigurationEditor({
                         {presetPreview.diff.map((change) => (
                           <Checkbox
                             key={change.path}
+                            isDisabled={isApplyingPreset}
                             isSelected={selectedPaths.includes(change.path)}
                             onChange={(selected) =>
                               setSelectedPaths((paths) =>
@@ -239,7 +252,7 @@ export function ConfigurationEditor({
                           </Checkbox>
                         ))}
                         <Button
-                          isDisabled={draftQuery.isPending}
+                          isDisabled={draftQuery.isPending || isApplyingPreset}
                           isPending={applyPreset.isPending}
                           onPress={() => void apply()}
                         >
@@ -267,7 +280,11 @@ export function ConfigurationEditor({
                 <Button variant="secondary" onPress={() => onOpenChange(false)}>
                   Close
                 </Button>
-                <Button type="submit" isDisabled={draftQuery.isPending} isPending={saveDraft.isPending}>
+                <Button
+                  type="submit"
+                  isDisabled={draftQuery.isPending || isApplyingPreset}
+                  isPending={saveDraft.isPending}
+                >
                   Save draft
                 </Button>
               </ModalFooter>

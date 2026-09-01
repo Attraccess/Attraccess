@@ -108,6 +108,7 @@ export function usePreviewPresetMutation(controllerId: number) {
 }
 
 export function useApplyPresetMutation(controllerId: number) {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
       application,
@@ -118,11 +119,6 @@ export function useApplyPresetMutation(controllerId: number) {
       selectedPaths: string[];
       previewedDraftHash: string;
     }) => applyPreset(controllerId, application, selectedPaths, previewedDraftHash),
+    onSuccess: (draft) => queryClient.setQueryData(queryKeys.draft(controllerId), draft),
   });
-}
-
-export function useSetDraftQueryData(controllerId: number) {
-  const queryClient = useQueryClient();
-  return (draft: Awaited<ReturnType<typeof getDraft>>) =>
-    queryClient.setQueryData(queryKeys.draft(controllerId), draft);
 }
