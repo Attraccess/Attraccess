@@ -1,5 +1,5 @@
 import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
-import { join } from 'path';
+import { basename, isAbsolute, join, relative, resolve } from 'path';
 import type { PluginManifestInfo } from '@attraccess/plugins-backend-sdk';
 import { PluginManifest, PluginManifestSchema, LoadedPluginManifest } from './plugin.manifest';
 import { PluginSandboxService } from './plugin-sandbox.service';
@@ -24,6 +24,7 @@ export class PluginService {
   private static pluginLoadErrors: Map<string, Error> = new Map();
   private static pluginFailures: Map<string, PluginFailure> = new Map();
   private static logger = new Logger(PluginService.name);
+  private static readonly pluginUploadLocks = new Map<string, Promise<void>>();
   public static PLUGIN_PATH: string;
   private static RESTART_BY_EXIT_FLAG: boolean;
 
@@ -187,7 +188,7 @@ export class PluginService {
     PluginService.logger.log(`Found ${potentialPluginFolders.length} folders in ${rootFolder}`);
 
     return potentialPluginFolders
-      .filter((pluginFolder) => !INTERNAL_PLUGIN_DIRECTORIES.has(pluginFolder))
+      .filter((pluginFolder) => !pluginFolder.startsWith('.') && !INTERNAL_PLUGIN_DIRECTORIES.has(pluginFolder))
       .map((pluginFolder) => {
         const manifest = PluginService.findPluginManifestInPluginFolder(
           rootFolder,
@@ -315,33 +316,87 @@ export class PluginService {
       PluginService.logger.debug(`Validating manifest`, manifestContent);
       const manifest = PluginManifestSchema.parse(manifestContent);
 
-      // if folder exists throw error
-      const pluginFolder = join(PluginService.PLUGIN_PATH, manifest.name);
-      PluginService.logger.debug(`Checking if plugin folder ${pluginFolder} exists`, pluginFolder);
-      if (existsSync(pluginFolder)) {
-        PluginService.logger.error(`Plugin ${manifest.name} already exists`);
-        throw new BadRequestException('Plugin already exists');
-      }
+      const pluginName = PluginService.safePluginName(manifest.name);
+      await PluginService.withPluginUploadLock(pluginName, async () => {
+        const pluginFolder = join(PluginService.PLUGIN_PATH, pluginName);
+        const backupFolder = join(PluginService.PLUGIN_PATH, `.${pluginName}-${randomBytes(8).toString('hex')}`);
+        const replacing = existsSync(pluginFolder);
 
-      // move plugin to plugins folder
-      PluginService.logger.debug(`Moving plugin to plugins folder ${pluginFolder}`);
-      await rename(sourceFolder, pluginFolder);
-      try {
-        PluginService.clearPluginQuarantine(manifest.name);
-      } catch (error) {
-        PluginService.logger.error(`Failed to clear quarantine for uploaded plugin ${manifest.name}`, error as Error);
-      }
+        // A zip upload is the update mechanism for uploaded plugins. Keep the
+        // old archive on disk until the new one has been placed successfully.
+        if (replacing) {
+          PluginService.logger.log(`Replacing uploaded plugin ${pluginName}`);
+          await rename(pluginFolder, backupFolder);
+        }
 
-      // restart app in 1 second
-      setTimeout(() => {
-        this.restartApp();
-      }, 1000);
+        try {
+          PluginService.logger.debug(`Moving plugin to plugins folder ${pluginFolder}`);
+          await rename(sourceFolder, pluginFolder);
+        } catch (error) {
+          if (replacing) await rename(backupFolder, pluginFolder);
+          throw error;
+        }
+
+        // The replacement is complete once the new directory is in place.
+        // A stale backup must not prevent activating the uploaded plugin.
+        setTimeout(() => {
+          this.restartApp();
+        }, 1000);
+
+        if (replacing) {
+          try {
+            await rm(backupFolder, { recursive: true, force: true });
+          } catch (error) {
+            PluginService.logger.error(`Failed to remove plugin backup ${backupFolder}`, error as Error);
+          }
+        }
+
+        try {
+          PluginService.clearPluginQuarantine(pluginName);
+        } catch (error) {
+          PluginService.logger.error(`Failed to clear quarantine for uploaded plugin ${pluginName}`, error as Error);
+        }
+      });
 
       // return manifest
       PluginService.logger.debug(`Returning manifest ${manifest}`);
       return manifest;
     } finally {
       await rm(tempFolder, { recursive: true, force: true });
+    }
+  }
+
+  private static safePluginName(name: string): string {
+    const safeName = basename(name);
+    const root = resolve(PluginService.PLUGIN_PATH);
+    const target = resolve(root, safeName);
+    const targetRelativeToRoot = relative(root, target);
+    if (
+      !safeName ||
+      safeName.startsWith('.') ||
+      safeName !== name ||
+      name.includes('\\') ||
+      targetRelativeToRoot.startsWith('..') ||
+      isAbsolute(targetRelativeToRoot)
+    )
+      throw new BadRequestException('Plugin name must be a visible single path segment');
+    return safeName;
+  }
+
+  private static async withPluginUploadLock<T>(pluginName: string, action: () => Promise<T>): Promise<T> {
+    const previous = PluginService.pluginUploadLocks.get(pluginName) ?? Promise.resolve();
+    let release!: () => void;
+    const current = previous.then(() => new Promise<void>((resolve) => {
+      release = resolve;
+    }));
+    PluginService.pluginUploadLocks.set(pluginName, current);
+    await previous;
+    try {
+      return await action();
+    } finally {
+      release();
+      if (PluginService.pluginUploadLocks.get(pluginName) === current)
+        PluginService.pluginUploadLocks.delete(pluginName);
     }
   }
 

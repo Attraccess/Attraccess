@@ -641,7 +641,8 @@ so they share the workspace toolchain, caching and CI.
   | ---------------- | ----------------------------------------------------------------------- |
   | `build-backend`  | `package/dist/index.js` (esbuild, CommonJS, host packages externalized) |
   | `build-frontend` | `package/frontend/remoteEntry.js` (Vite federation remote)              |
-  | `build`          | copies `package.json` into `package/` (depends on the two builds)       |
+  | `build`          | stages `package.json` and `plugin.json` in `package/` (depends on both builds) |
+  | `zip`            | `dist/plugin-<name>.zip` — uploadable in the Plugins UI                 |
   | `pack`           | `dist/*.tgz` — the npm package artifact (depends on `build`)            |
   | `pack-test`      | validates the packed tarball and loads its backend                      |
   | `publish`        | publishes a new package version to npm                                  |
@@ -649,8 +650,12 @@ so they share the workspace toolchain, caching and CI.
   ```bash
    # Build and pack a single plugin app:
    pnpm nx pack plugin-rabbitmq
+   # Build a ZIP for direct upload through the Plugins UI:
+   pnpm nx zip plugin-rabbitmq
   # …or every plugin app at once:
    pnpm nx run-many --target=pack --projects=tag:type:plugin
+   # …or build uploadable ZIPs for every plugin app:
+   pnpm nx run-many --target=zip --projects=tag:type:plugin
   ```
 
 - **CI:** pull requests test and pack affected plugin apps. Every main-branch

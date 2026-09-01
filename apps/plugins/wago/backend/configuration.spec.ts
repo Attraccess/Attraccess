@@ -2,6 +2,7 @@ import {
   canonicalSnapshot,
   configurationDiff,
   configurationHash,
+  applyPreset,
   parseConfigurationReport,
   validateSnapshot,
 } from './configuration';
@@ -72,6 +73,50 @@ describe('WAGO configuration snapshots', () => {
         expect.objectContaining({ path: 'physicalPoints', code: 'required_field' }),
         expect.objectContaining({ path: 'logicalChannels', code: 'required_field' }),
       ]),
+    );
+  });
+
+  it('builds editable presets with explicit disconnect defaults', () => {
+    const base = { version: 1 as const, physicalPoints: [{ id: 'point-a', hardwareProfile: '751-9301' as const, channel: 0 }], logicalChannels: [] };
+    const output = applyPreset(base, { presetId: 'pulsed-lock-bank', channelId: 'lock-a', physicalPointId: 'point-a' });
+    const input = applyPreset(base, { presetId: 'generic-monitored-input', channelId: 'input-a', physicalPointId: 'point-a' });
+
+    expect(output.logicalChannels[0]).toMatchObject({ capabilities: ['output', 'pulse'], disconnectPolicy: { mode: 'immediate' }, pulse: { durationMs: 500 } });
+    expect(input.logicalChannels[0]).toMatchObject({ capabilities: ['input'], disconnectPolicy: { mode: 'hold' } });
+  });
+
+  it('validates feedback mismatch declarations as declarative configuration', () => {
+    expect(validateSnapshot({
+      version: 1,
+      physicalPoints: [
+        { id: 'output', hardwareProfile: '751-9301', channel: 0 },
+        { id: 'input', hardwareProfile: '751-9301', channel: 1 },
+      ],
+      logicalChannels: [
+        { id: 'feedback', physicalPointId: 'input', profile: 'generic-monitored-input', capabilities: ['input'], disconnectPolicy: { mode: 'hold' } },
+        { id: 'output', physicalPointId: 'output', profile: 'generic-digital-output', capabilities: ['output', 'feedback'], disconnectPolicy: { mode: 'immediate' }, feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 100 } },
+      ],
+    })).toEqual([]);
+  });
+
+  it('requires feedback to reference a distinct input channel', () => {
+    const snapshot = {
+      version: 1,
+      physicalPoints: [{ id: 'output', hardwareProfile: '751-9301', channel: 0 }],
+      logicalChannels: [
+        {
+          id: 'output',
+          physicalPointId: 'output',
+          profile: 'generic-digital-output',
+          capabilities: ['output', 'feedback'],
+          disconnectPolicy: { mode: 'immediate' },
+          feedback: { channelId: 'output', expected: 'match', timeoutMs: 100 },
+        },
+      ],
+    };
+
+    expect(validateSnapshot(snapshot)).toContainEqual(
+      expect.objectContaining({ path: 'logicalChannels[0].feedback.channelId', code: 'invalid_feedback_channel' }),
     );
   });
 });

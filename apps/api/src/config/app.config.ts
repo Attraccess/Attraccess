@@ -1,8 +1,11 @@
 import { registerAs } from '@nestjs/config';
 import { z } from 'zod';
 import { LogLevel } from '@nestjs/common';
+import { join } from 'path';
+import { DEFAULT_STORAGE_ROOT } from './storage.config';
 
 const PLACEHOLDER_VERSIONS = new Set(['', '0.0.0', 'undefined', 'null']);
+export const DEFAULT_PLUGIN_DIR = join(DEFAULT_STORAGE_ROOT, 'plugins');
 
 export const BUILD_TIME_VERSION: string | undefined = process.env.ATTRACCESS_VERSION;
 
@@ -21,7 +24,11 @@ export function resolveAppVersion(
   return '0.0.0-dev';
 }
 
-const AppEnvSchema = z
+export function resolvePluginDir(env: NodeJS.ProcessEnv = process.env): string {
+  return env.PLUGIN_DIR ?? join(env.STORAGE_ROOT ?? DEFAULT_STORAGE_ROOT, 'plugins');
+}
+
+export const AppEnvSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     PORT: z.coerce.number().default(3000),
@@ -45,7 +52,7 @@ const AppEnvSchema = z
     COMMIT_SHA: z.string().optional(),
     STATIC_FRONTEND_FILE_PATH: z.string().optional(),
     STATIC_DOCS_FILE_PATH: z.string().optional(),
-    PLUGIN_DIR: z.string().optional(),
+    PLUGIN_DIR: z.string().min(1).default(resolvePluginDir),
     RESTART_BY_EXIT: z.coerce.boolean().default(false),
     DISABLE_PLUGINS: z.coerce.boolean().default(false),
     SSL_GENERATE_SELF_SIGNED_CERTIFICATES: z.coerce.boolean().default(false),
@@ -87,6 +94,7 @@ const appConfigFactory = (): AppConfigType => {
       ...process.env,
       ATTRACCESS_URL: ATTRACCESS_URL_ENV,
       ATTRACCESS_PUBLIC_INTERNET_URL: ATTRACCESS_PUBLIC_INTERNET_URL_ENV,
+      PLUGIN_DIR: resolvePluginDir(),
     });
 
     return {

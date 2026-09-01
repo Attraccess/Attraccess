@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Inject, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Inject, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { WagoService } from './wago.service';
+import type { WagoPresetApplication } from './configuration';
 
 @Auth('resources.update')
 @Controller('wago')
@@ -24,6 +25,11 @@ export class WagoControllerApi {
         : undefined;
     return this.wago.createEnrollment(body?.hardwareId ?? '', body?.mqttServerId, manualCredentials);
   }
+  @Get('enrollments/credential-support/:mqttServerId') credentialSupport(
+    @Param('mqttServerId', ParseIntPipe) mqttServerId: number,
+  ) {
+    return this.wago.enrollmentCredentialSupport(mqttServerId);
+  }
   @Post('controllers/:id/claim') claim(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { name?: string; verifier?: string; mqttServerId?: number },
@@ -32,6 +38,23 @@ export class WagoControllerApi {
   }
   @Get('controllers/:id/configuration/draft') draft(@Param('id', ParseIntPipe) id: number) {
     return this.wago.getDraft(id);
+  }
+  @Get('configuration/presets') presets() {
+    return this.wago.presets();
+  }
+  @Post('controllers/:id/configuration/presets/preview') previewPreset(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { application?: WagoPresetApplication },
+  ) {
+    if (!body?.application) throw new BadRequestException('application is required');
+    return this.wago.previewPreset(id, body.application);
+  }
+  @Post('controllers/:id/configuration/presets/apply') applyPreset(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { application?: WagoPresetApplication; selectedPaths?: string[]; previewedDraftHash?: string },
+  ) {
+    if (!body?.application) throw new BadRequestException('application is required');
+    return this.wago.applyPreset(id, body.application, body.selectedPaths ?? [], body.previewedDraftHash ?? '');
   }
   @Post('controllers/:id/configuration/draft') saveDraft(
     @Param('id', ParseIntPipe) id: number,
