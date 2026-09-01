@@ -171,7 +171,7 @@
     "@nx/vite": "22.7.8",
     "@nx/web": "22.7.8",
     "@nx/webpack": "22.7.8",
-    "@nx/workspace": "22.7.8",
+    "@nx/workspace": "23.1.1",
     "@originjs/vite-plugin-federation": "^1.4.1",
     "@rollup/plugin-url": "^8.0.2",
     "@surma/rollup-plugin-off-main-thread": "^2.2.3",
