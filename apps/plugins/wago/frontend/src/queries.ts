@@ -21,7 +21,8 @@ const queryKeys = {
   controllers: ['wago', 'controllers'] as const,
   settings: ['wago', 'settings'] as const,
   mqttServers: ['mqtt', 'servers'] as const,
-  enrollmentCredentialSupport: (mqttServerId: number) => ['wago', 'enrollment-credential-support', mqttServerId] as const,
+  enrollmentCredentialSupport: (mqttServerId: number) =>
+    ['wago', 'enrollment-credential-support', mqttServerId] as const,
   draft: (controllerId: number) => ['wago', 'configuration-draft', controllerId] as const,
   presets: ['wago', 'configuration-presets'] as const,
 };
@@ -107,7 +108,6 @@ export function usePreviewPresetMutation(controllerId: number) {
 }
 
 export function useApplyPresetMutation(controllerId: number) {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
       application,
@@ -118,6 +118,11 @@ export function useApplyPresetMutation(controllerId: number) {
       selectedPaths: string[];
       previewedDraftHash: string;
     }) => applyPreset(controllerId, application, selectedPaths, previewedDraftHash),
-    onSuccess: (draft) => queryClient.setQueryData(queryKeys.draft(controllerId), draft),
   });
+}
+
+export function useSetDraftQueryData(controllerId: number) {
+  const queryClient = useQueryClient();
+  return (draft: Awaited<ReturnType<typeof getDraft>>) =>
+    queryClient.setQueryData(queryKeys.draft(controllerId), draft);
 }
