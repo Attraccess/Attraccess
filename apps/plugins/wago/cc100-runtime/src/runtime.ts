@@ -102,6 +102,7 @@ export class WagoRuntime {
   private sequence = 0;
   private reservedSequence = 0;
   private sequenceReservation: Promise<void> | null = null;
+  private statePersistence: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly options: {
@@ -127,7 +128,7 @@ export class WagoRuntime {
 
   async receiveClaim(credentials: DiscoveryClaim): Promise<void> {
     this.state.credentials = credentials;
-    await this.options.store.save(this.state);
+    await this.saveState();
   }
 
   async receiveDiscoveryClaim(payload: Buffer): Promise<DiscoveryClaim | undefined> {
@@ -197,7 +198,7 @@ export class WagoRuntime {
     this.feedbackChecks.clear();
     this.configurationGeneration += 1;
     this.state.accepted = { revision: desired.revision, contentHash: desired.contentHash, snapshot: desired.snapshot };
-    await this.options.store.save(this.state);
+    await this.saveState();
     await this.publishReport(desired.revision, desired.contentHash, []);
     await this.publishState();
   }
@@ -227,7 +228,7 @@ export class WagoRuntime {
 
       // Keep the reservation through an unexpected exit after the physical write.
       this.state.commandIds = [...this.state.commandIds, command.id].slice(-100);
-      await this.options.store.save(this.state);
+      await this.saveState();
       if (command.action === 'pulse') {
         const generation = this.reserveFeedbackGeneration(channel.id);
         const result = await this.writeChannel(
@@ -295,7 +296,7 @@ export class WagoRuntime {
           ),
         );
     }
-    if (stateSaveFailed) await this.options.store.save(this.state);
+    if (stateSaveFailed) await this.saveState();
     await this.publishState();
   }
 
@@ -399,7 +400,7 @@ export class WagoRuntime {
     if (feedbackIsCurrent && configurationGeneration === this.configurationGeneration)
       this.scheduleFeedbackCheck(channel, value, feedbackGeneration, configurationGeneration);
     try {
-      await this.options.store.save(this.state);
+      await this.saveState();
     } catch {
       // Do not acknowledge an operation whose durable output state is stale.
       throw new Error('failed to persist channel state');
@@ -575,18 +576,25 @@ export class WagoRuntime {
   private async nextSequence(): Promise<number> {
     while (this.sequence === this.reservedSequence) {
       if (!this.sequenceReservation) {
-        const reservedSequence = this.reservedSequence + 100;
-        this.sequenceReservation = this.options.store
-          .save({ ...this.state, sequence: reservedSequence })
-          .then(() => {
-            this.reservedSequence = reservedSequence;
-            this.state.sequence = reservedSequence;
-          })
+        this.sequenceReservation = this.queueStateSave(async () => {
+          const reservedSequence = this.reservedSequence + 100;
+          await this.options.store.save({ ...this.state, sequence: reservedSequence });
+          this.reservedSequence = reservedSequence;
+          this.state.sequence = reservedSequence;
+        })
           .finally(() => { this.sequenceReservation = null; });
       }
       await this.sequenceReservation;
     }
     return ++this.sequence;
+  }
+  private saveState(): Promise<void> {
+    return this.queueStateSave(() => this.options.store.save(this.state));
+  }
+  private queueStateSave(save: () => Promise<void>): Promise<void> {
+    const queued = this.statePersistence.then(save);
+    this.statePersistence = queued.catch(() => undefined);
+    return queued;
   }
   private async publishOperational(
     suffix: 'state' | 'measurements' | 'faults' | 'acknowledgements',
@@ -612,7 +620,7 @@ export class WagoRuntime {
   }
   private async rejectFailedWrite(id: string, error = 'device write failed'): Promise<void> {
     this.state.commandIds = this.state.commandIds.filter((commandId) => commandId !== id);
-    await this.options.store.save(this.state);
+    await this.saveState();
     await this.acknowledge(id, 'rejected', error);
   }
   private ignoreTimerRejection(callback: () => Promise<unknown>): void {
