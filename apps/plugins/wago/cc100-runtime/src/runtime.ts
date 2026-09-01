@@ -41,6 +41,7 @@ export type RuntimeState = {
   accepted?: { revision: number; contentHash: string; snapshot: Snapshot };
   outputs: Record<string, boolean>;
   commandIds: string[];
+  sequence?: number;
 };
 
 export interface Transport {
@@ -97,6 +98,7 @@ export class WagoRuntime {
   private readonly feedbackGenerations = new Map<string, number>();
   private configurationGeneration = 0;
   private readonly inFlightCommandIds = new Set<string>();
+  private sequence = 0;
 
   constructor(
     private readonly options: {
@@ -112,6 +114,7 @@ export class WagoRuntime {
 
   async start(): Promise<void> {
     this.state = await this.options.store.load();
+    this.sequence = this.state.sequence ?? 0;
     await this.options.transport.subscribe(this.desiredTopic(), (payload) => this.receiveDesired(payload));
     await this.options.transport.subscribe(this.commandTopic(), (payload) => this.receiveCommand(payload));
     await this.publishHeartbeat();
@@ -315,13 +318,15 @@ export class WagoRuntime {
         const raw = await this.options.device.read(point);
         if (typeof raw !== 'number') continue;
         const transform = channel.measurement ?? { unit: 'percent', scale: 1, offset: 0 };
-        await this.options.transport.publish(this.topic('measurements'), {
+        await this.publishOperational('measurements', {
+          timestamp: new Date().toISOString(),
           channelId: channel.id,
           unit: transform.unit,
           value: raw * transform.scale + transform.offset,
         });
       } catch (error) {
-        await this.options.transport.publish(this.topic('faults'), {
+        await this.publishOperational('faults', {
+          timestamp: new Date().toISOString(),
           channelId: channel.id,
           code: 'measurement_read_failed',
           message: error instanceof Error ? error.message : String(error),
@@ -371,7 +376,8 @@ export class WagoRuntime {
       await this.options.device.write(point, value);
     } catch (error) {
       try {
-        await this.options.transport.publish(this.topic('faults'), {
+        await this.publishOperational('faults', {
+          timestamp: new Date().toISOString(),
           channelId: channel.id,
           code: 'device_write_failed',
           message: error instanceof Error ? error.message : String(error),
@@ -535,16 +541,13 @@ export class WagoRuntime {
   }
 
   private async publishState(): Promise<void> {
-    await this.options.transport.publish(
-      this.topic('state'),
-      {
-        connected: this.connected,
-        revision: this.state.accepted?.revision ?? null,
-        contentHash: this.state.accepted?.contentHash ?? null,
-        outputs: this.state.outputs,
-      },
-      { retain: true },
-    );
+    await this.publishOperational('state', {
+      timestamp: new Date().toISOString(),
+      connected: this.connected,
+      revision: this.state.accepted?.revision ?? null,
+      contentHash: this.state.accepted?.contentHash ?? null,
+      outputs: this.state.outputs,
+    }, { retain: true });
   }
   private publishReport(revision: number, contentHash: string, errors: ValidationError[]): Promise<void> {
     return this.options.transport.publish(
@@ -557,7 +560,7 @@ export class WagoRuntime {
     return this.publishReport(revision, contentHash, errors);
   }
   private acknowledge(id: string, status: 'accepted' | 'duplicate' | 'rejected', error?: string): Promise<void> {
-    return this.options.transport.publish(this.topic('acknowledgements'), { id, status, error });
+    return this.publishOperational('acknowledgements', { timestamp: new Date().toISOString(), id, status, error });
   }
   private topic(suffix: string): string {
     return `${this.options.prefix.replace(/^\/+|\/+$/g, '')}/v1/controllers/${this.options.hardwareId}/${suffix}`;
@@ -565,12 +568,22 @@ export class WagoRuntime {
   private discoveryTopic(): string {
     return `${this.options.prefix.replace(/^\/+|\/+$/g, '')}/discovery/${this.options.hardwareId}`;
   }
-  private desiredTopic(): string {
-    return this.topic('configuration/desired');
+  private nextSequence(): number {
+    this.state.sequence = ++this.sequence;
+    return this.sequence;
   }
-  private commandTopic(): string {
-    return this.topic('commands');
+  private async publishOperational(
+    suffix: 'state' | 'measurements' | 'faults' | 'acknowledgements',
+    payload: Record<string, unknown>,
+    options?: { retain?: boolean },
+  ): Promise<void> {
+    const sequence = this.nextSequence();
+    // Persist before publishing so a process restart cannot replay a sequence number.
+    await this.options.store.save(this.state);
+    await this.options.transport.publish(this.topic(suffix), { sequence, ...payload }, options);
   }
+  private desiredTopic(): string { return this.topic('configuration/desired'); }
+  private commandTopic(): string { return this.topic('commands'); }
   private async isGuardSatisfied(channel: Snapshot['logicalChannels'][number]): Promise<boolean> {
     if (!channel.guard) return true;
     const snapshot = this.state.accepted?.snapshot;
