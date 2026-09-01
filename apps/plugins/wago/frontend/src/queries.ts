@@ -107,18 +107,20 @@ export function usePreviewPresetMutation(controllerId: number) {
   return useMutation({ mutationFn: (application: WagoPresetApplication) => previewPreset(controllerId, application) });
 }
 
-export function useApplyPresetMutation(controllerId: number) {
+export function useApplyPresetMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
+      controllerId,
       application,
       selectedPaths,
       previewedDraftHash,
     }: {
+      controllerId: number;
       application: WagoPresetApplication;
       selectedPaths: string[];
       previewedDraftHash: string;
     }) => applyPreset(controllerId, application, selectedPaths, previewedDraftHash),
-    onSuccess: (draft) => queryClient.setQueryData(queryKeys.draft(controllerId), draft),
+    onSuccess: (draft, { controllerId }) => queryClient.setQueryData(queryKeys.draft(controllerId), draft),
   });
 }

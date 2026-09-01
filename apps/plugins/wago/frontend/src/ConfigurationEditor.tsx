@@ -50,7 +50,7 @@ export function ConfigurationEditor({
   const previewGeneration = useRef(0);
   const saveDraft = useSaveDraftMutation(controllerId ?? 0);
   const previewPreset = usePreviewPresetMutation(controllerId ?? 0);
-  const applyPreset = useApplyPresetMutation(controllerId ?? 0);
+  const applyPreset = useApplyPresetMutation();
 
   useEffect(() => {
     setSnapshot(JSON.stringify(emptySnapshot, null, 2));
@@ -105,8 +105,9 @@ export function ConfigurationEditor({
     try {
       setFormError(null);
       const selected = application();
-      if (!selected || draftQuery.isPending) return;
+      if (!selected || controllerId === null || draftQuery.isPending) return;
       const draft = await applyPreset.mutateAsync({
+        controllerId,
         application: selected,
         selectedPaths,
         previewedDraftHash: presetPreview?.draftHash ?? '',
