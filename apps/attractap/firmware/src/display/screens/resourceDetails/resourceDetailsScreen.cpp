@@ -466,10 +466,6 @@ void ResourceDetailsScreen::init()
    lv_obj_set_style_text_color(this->healthReasonLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(this->healthReasonLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   // action overlay is created lazily on lv_layer_top() when needed
-   this->actionOverlay = nullptr;
-   this->actionOverlayLabel = nullptr;
-
    this->applyCachedState();
 }
 void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief &resource)
@@ -721,7 +717,6 @@ void ResourceDetailsScreen::destroy()
 {
    this->disposeProjectsModal();
    this->disposeFormsModal();
-   this->disposeActionOverlay();
    this->disposeSuccessToast();
 
    if (this->screen)
@@ -766,6 +761,7 @@ void ResourceDetailsScreen::destroy()
    this->formsBackButton = nullptr;
    this->formsNextButton = nullptr;
    this->formsNextLabel = nullptr;
+   this->formsNextSpinner = nullptr;
    this->elapsedTime = nullptr;
    this->sessionTimeoutIndicator = nullptr;
    this->noIntroductionPanel = nullptr;
@@ -774,7 +770,10 @@ void ResourceDetailsScreen::destroy()
    this->maintenanceIntroducersLabel = nullptr;
    this->healthPanel = nullptr;
    this->healthReasonLabel = nullptr;
-   this->actionOverlayLabel = nullptr;
+   this->activeActionButton = nullptr;
+   this->activeActionLabel = nullptr;
+   this->activeActionSpinner = nullptr;
+   this->actionInProgress = false;
    this->successToast = nullptr;
    this->formsModalMeta = nullptr;
    this->formsModalPage = nullptr;
@@ -818,17 +817,32 @@ void ResourceDetailsScreen::setButtonClickCallback(std::function<void(ButtonClic
 void ResourceDetailsScreen::onButtonClick(lv_event_t *e)
 {
    ButtonClickEventData *evt = static_cast<ButtonClickEventData *>(lv_event_get_user_data(e));
-   if (!evt->self)
+   if (!evt->self || evt->self->actionInProgress)
       return;
 
    if (!evt->self->buttonClickCallback)
       return;
 
+   if (evt->buttonClickType != BUTTON_CLICK_TYPE_LOGOUT)
+   {
+      evt->self->activeActionButton = static_cast<lv_obj_t *>(lv_event_get_current_target(e));
+      evt->self->activeActionLabel = lv_obj_get_child(evt->self->activeActionButton, 0);
+      evt->self->activeActionSpinner = lv_obj_get_child_count(evt->self->activeActionButton) > 1
+                                          ? lv_obj_get_child(evt->self->activeActionButton, 1)
+                                          : nullptr;
+   }
    evt->self->buttonClickCallback(*evt);
 }
 void ResourceDetailsScreen::onContainerDelete(lv_event_t *e)
 {
    ButtonClickEventData *evt = static_cast<ButtonClickEventData *>(lv_event_get_user_data(e));
+   if (evt && evt->self && lv_event_get_target(e) == evt->self->activeActionButton)
+   {
+      // Flow buttons are rebuilt during resource refreshes while their request may still be pending.
+      evt->self->activeActionButton = nullptr;
+      evt->self->activeActionLabel = nullptr;
+      evt->self->activeActionSpinner = nullptr;
+   }
    if (evt)
    {
       delete evt;
@@ -864,10 +878,7 @@ void ResourceDetailsScreen::setUserDetails(UserDetails userDetails)
 }
 void ResourceDetailsScreen::onScreenLeave()
 {
-   if (this->actionOverlay)
-   {
-      lv_obj_add_flag(this->actionOverlay, LV_OBJ_FLAG_HIDDEN);
-   }
+   this->hideActionProgressVisual();
    if (this->successToast)
    {
       lv_obj_add_flag(this->successToast, LV_OBJ_FLAG_HIDDEN);

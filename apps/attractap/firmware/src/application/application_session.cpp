@@ -152,6 +152,7 @@ void Application::handleResourceDetailsButtonClick(
     this->pendingActionType = PENDING_ACTION_START_SESSION;
     this->pendingActionResourceId = this->selectedResourceId;
     this->pendingActionProjectId = isTakeover ? 0 : this->selectedProjectId;
+    this->pendingActionIsTakeover = isTakeover;
     this->hasPendingFormRequest = false;
     this->formFlowSubmitted = false;
     this->api.startResourceUsageSession(this->selectedResourceId,
@@ -165,6 +166,7 @@ void Application::handleResourceDetailsButtonClick(
     this->pendingActionType = PENDING_ACTION_STOP_SESSION;
     this->pendingActionResourceId = this->selectedResourceId;
     this->pendingActionProjectId = 0;
+    this->pendingActionIsTakeover = false;
     this->hasPendingFormRequest = false;
     this->formFlowSubmitted = false;
     this->api.stopResourceUsageSession(this->selectedResourceId);
@@ -196,10 +198,7 @@ void Application::handleResourceDetailsButtonClick(
     this->unlocked = false;
     this->currentProjectsUser = "";
     this->clearProjectSelection();
-    this->pendingActionType = PENDING_ACTION_NONE;
-    this->hasPendingFormRequest = false;
-    this->formFlowSubmitted = false;
-    Display::resourceDetailsScreen.hideFormsModal();
+    this->handleFormsCancel();
     break;
   }
 }
@@ -246,7 +245,7 @@ void Application::resetSessionOnDisconnect() {
   bool sessionActive = this->unlocked || this->resourceIsSelected ||
                        this->pendingActionType != PENDING_ACTION_NONE ||
                        this->hasPendingFormRequest ||
-                       this->pendingFormRequestReady ||
+                       this->hasPendingServerFormFlow ||
                        this->currentProjectsUser.length() > 0;
 
   if (!sessionActive) {
@@ -263,8 +262,11 @@ void Application::resetSessionOnDisconnect() {
   this->pendingActionType = PENDING_ACTION_NONE;
   this->pendingActionResourceId = 0;
   this->pendingActionProjectId = 0;
+  this->pendingActionIsTakeover = false;
   this->hasPendingFormRequest = false;
-  this->pendingFormRequestReady = false;
+  this->hasPendingServerFormFlow = false;
+  this->pendingFormRequestResourceId = 0;
+  this->pendingFormRequestAction = API::ResourceUsageFormActionType::UNKNOWN;
   this->pendingFormFieldsReady = false;
   this->pendingFormPageResultReady = false;
   this->formCursorFormIdx = 0;

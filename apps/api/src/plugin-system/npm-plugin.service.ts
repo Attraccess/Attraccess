@@ -79,7 +79,7 @@ export type InstalledNpmPlugin = {
     host: string;
     sdk: { backend?: string; frontend?: string };
   };
-  state: 'active';
+  state: 'active' | 'quarantined';
   installedAt: string;
   activatedAt: string;
   lastError: string | null;
@@ -344,6 +344,11 @@ export class NpmPluginService implements OnModuleInit {
       } catch (error) {
         if (existsSync(backup) && !existsSync(target)) await rename(backup, target);
         throw error;
+      }
+      try {
+        PluginService.clearPluginQuarantine(installed.installPath);
+      } catch (error) {
+        this.logger.error(`Failed to clear quarantine for removed package ${name}`, error);
       }
 
       try {
@@ -683,10 +688,79 @@ export class NpmPluginService implements OnModuleInit {
           throw new BadRequestException('Package is already installed; use the replacement endpoint');
         }
         const activation = await this.activate(source, name);
+        // Do not expose replacement code as active until its prior quarantine has
+        // been removed. If that cleanup fails, this state remains safely disabled.
+        const pendingActivation: InstalledNpmPlugin = {
+          ...installed,
+          state: 'quarantined',
+          lastError: 'Plugin activation is pending quarantine cleanup.',
+        };
+        try {
+          await this.writeState(pendingActivation);
+        } catch (error) {
+          await this.rollbackActivation(activation);
+          throw error;
+        }
+        try {
+          PluginService.clearPluginQuarantine(installed.installPath);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          const quarantined = {
+            ...pendingActivation,
+            lastError: `Plugin remains quarantined because quarantine cleanup failed: ${message}`,
+          };
+          this.logger.error(`Failed to clear quarantine for installed package ${name}`, error);
+          try {
+            await this.writeState(quarantined);
+          } catch (stateError) {
+            // The pending state was persisted before cleanup, so a later write
+            // failure cannot make a quarantined package appear active.
+            this.logger.error(`Failed to record quarantine cleanup failure for ${name}`, stateError);
+          }
+          new PluginService().requestRestart();
+          return quarantined;
+        }
         try {
           await this.writeState(installed);
         } catch (error) {
-          await this.rollbackActivation(activation);
+          // The npm record alone is not used during module discovery, so restore
+          // the real quarantine before returning this failed activation.
+          this.logger.error(`Failed to activate installed package ${name}`, error);
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          try {
+            PluginService.quarantinePluginDirectory(
+              installed.installPath,
+              new Error(`Plugin activation could not be persisted: ${message}`),
+            );
+          } catch (quarantineError) {
+            this.logger.error(`Failed to quarantine installed package ${name}`, quarantineError);
+            try {
+              await this.rollbackActivation(activation);
+            } catch (rollbackError) {
+              this.logger.error(`Failed to roll back installed package ${name}`, rollbackError);
+              try {
+                await this.isolateActivation(activation.target);
+                // Removing the failed package makes the original backup eligible
+                // for restoration. Do not restore its active record until this
+                // retry has put the backup back at the discovery target.
+                await this.rollbackActivation(activation);
+              } catch (isolationError) {
+                throw new AggregateError(
+                  [error, quarantineError, rollbackError, isolationError],
+                  `Failed to safely activate ${name}`,
+                );
+              }
+            }
+            try {
+              if (replacing) await this.writeState(replacing);
+              else await this.writeStateWithout(name);
+            } catch (stateError) {
+              throw new AggregateError(
+                [error, quarantineError, stateError],
+                `Failed to restore installation state for ${name}`,
+              );
+            }
+          }
           throw error;
         }
         try {
@@ -799,6 +873,13 @@ export class NpmPluginService implements OnModuleInit {
   private async rollbackActivation({ target, backup }: { target: string; backup: string }): Promise<void> {
     await rm(target, { recursive: true, force: true });
     if (existsSync(backup)) await rename(backup, target);
+  }
+
+  private async isolateActivation(target: string): Promise<void> {
+    if (!existsSync(target)) return;
+    const directory = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY);
+    await mkdir(directory, { recursive: true });
+    await rename(target, join(directory, `failed-${randomUUID()}`));
   }
 
   private removeBackup(backup: string): Promise<void> {

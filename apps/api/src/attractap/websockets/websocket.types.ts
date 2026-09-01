@@ -55,6 +55,7 @@ export enum AttractapEventType {
   RESOURCE_USAGE_FORM_FIELDS = 'RESOURCE_USAGE_FORM_FIELDS',
   RESOURCE_USAGE_FORM_SUBMIT_PAGE = 'RESOURCE_USAGE_FORM_SUBMIT_PAGE',
   RESOURCE_USAGE_FORM_PAGE_RESULT = 'RESOURCE_USAGE_FORM_PAGE_RESULT',
+  RESOURCE_USAGE_FORM_CANCEL = 'RESOURCE_USAGE_FORM_CANCEL',
 }
 
 export interface ReaderCrashReportPayload {
@@ -222,6 +223,11 @@ export interface ResourceUsageFormSubmitPagePayload {
   formId: number;
   offset: number;
   answers: { fieldId: number; value: FormFieldAnswerValue }[];
+}
+
+export interface ResourceUsageFormCancelPayload {
+  resourceId: number;
+  action: ResourceFormAction;
 }
 
 export interface ResourceUsageFormPageErrorPayload {
