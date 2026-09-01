@@ -62,10 +62,10 @@
   - [LED Guide (Lite)](attractap/led-guide.md)
 
 - **Devices**
-  - [MQTT](mqtt/overview.md)
-  - [MQTT Server Setup](mqtt/server-setup.md)
-  - [MQTT Examples](mqtt/examples.md)
-  - [WAGO CC100 Docker Runtime](mqtt/wago-cc100-runtime.md)
+  - [MQTT](devices/mqtt/overview.md)
+  - [MQTT Server Setup](devices/mqtt/server-setup.md)
+  - [MQTT Examples](devices/mqtt/examples.md)
+  - [WAGO CC100 Docker Runtime](devices/wago-cc100-runtime.md)
 
 - **Billing**
   - [Overview](billing/overview.md)
