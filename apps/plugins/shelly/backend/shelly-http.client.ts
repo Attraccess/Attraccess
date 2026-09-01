@@ -44,7 +44,9 @@ export class ShellyHttpClient {
     }
 
     if (!response.ok) {
-      throw new Error(`Shelly request ${url} failed: HTTP ${response.status}`);
+      // Gen2+ reports RPC errors as HTTP 500 with the reason in the body, so the
+      // status alone is useless for diagnosing a failed call.
+      throw new Error(`Shelly request ${url} failed: HTTP ${response.status}${await describeErrorBody(response)}`);
     }
     return response.json();
   }
@@ -75,6 +77,15 @@ export class ShellyHttpClient {
       return { Authorization: `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}` };
     }
     return { Authorization: buildDigestAuthorization(challenge, url, method, username, password) };
+  }
+}
+
+async function describeErrorBody(response: Response): Promise<string> {
+  try {
+    const body = (await response.text()).trim();
+    return body ? ` - ${body.slice(0, 300)}` : '';
+  } catch {
+    return '';
   }
 }
 
@@ -131,10 +142,10 @@ function parseDigestChallenge(challenge: string): Record<string, string> {
   return params;
 }
 
-export function md5(value: string): string {
+function md5(value: string): string {
   return createHash('md5').update(value).digest('hex');
 }
 
-function sha256(value: string): string {
+export function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
