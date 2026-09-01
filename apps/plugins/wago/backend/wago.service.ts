@@ -1074,7 +1074,7 @@ function applySelectedChanges(
     const change = changes.get(path);
     if (!change) continue;
     const segments = [...path.matchAll(/\.([^.[\]]+)|\[(\d+)\]/g)].map((match) => match[1] ?? Number(match[2]));
-    if (!segments.length) continue;
+    if (!segments.length || segments.some((segment) => typeof segment === 'string' && unsafePathSegment(segment))) continue;
     let target: Record<string, unknown> | unknown[] = merged as unknown as Record<string, unknown>;
     for (const segment of segments.slice(0, -1)) {
       const next = target[segment];
@@ -1087,4 +1087,8 @@ function applySelectedChanges(
     else target[last] = change.current;
   }
   return merged;
+}
+
+function unsafePathSegment(segment: string): boolean {
+  return segment === '__proto__' || segment === 'constructor' || segment === 'prototype';
 }
