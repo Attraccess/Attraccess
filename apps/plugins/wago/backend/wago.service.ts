@@ -1068,26 +1068,32 @@ function applySelectedChanges(
   diff: ReturnType<typeof configurationDiff>,
   selectedPaths: string[],
 ): WagoConfigurationSnapshot {
-  const merged = JSON.parse(JSON.stringify(snapshot)) as WagoConfigurationSnapshot;
+  let merged = JSON.parse(JSON.stringify(snapshot)) as WagoConfigurationSnapshot;
   const changes = new Map(diff.map((change) => [change.path, change]));
   for (const path of selectedPaths) {
     const change = changes.get(path);
     if (!change) continue;
     const segments = [...path.matchAll(/\.([^.[\]]+)|\[(\d+)\]/g)].map((match) => match[1] ?? Number(match[2]));
     if (!segments.length || segments.some((segment) => typeof segment === 'string' && unsafePathSegment(segment))) continue;
-    let target: Record<string, unknown> | unknown[] = merged as unknown as Record<string, unknown>;
-    for (const segment of segments.slice(0, -1)) {
-      const next = target[segment];
-      if (next === undefined) target[segment] = typeof segment === 'number' ? [] : {};
-      target = target[segment] as Record<string, unknown> | unknown[];
-    }
-    const last = segments[segments.length - 1];
-    if (last === undefined) continue;
-    if (last === '__proto__' || last === 'constructor' || last === 'prototype') continue;
-    if (change.current === undefined) delete target[last];
-    else Object.defineProperty(target, last, { configurable: true, enumerable: true, value: change.current, writable: true });
+    merged = replacePath(merged, segments, change.current) as WagoConfigurationSnapshot;
   }
   return merged;
+}
+
+function replacePath(value: unknown, [segment, ...remaining]: (string | number)[], replacement: unknown): unknown {
+  if (segment === undefined) return replacement;
+  if (typeof segment === 'number') {
+    const next = Array.isArray(value) ? [...value] : [];
+    if (remaining.length) next[segment] = replacePath(next[segment], remaining, replacement);
+    else if (replacement === undefined) delete next[segment];
+    else next[segment] = replacement;
+    return next;
+  }
+
+  const entries = Object.entries(value ?? {}).filter(([key]) => key !== segment);
+  if (remaining.length) entries.push([segment, replacePath((value as Record<string, unknown> | undefined)?.[segment], remaining, replacement)]);
+  else if (replacement !== undefined) entries.push([segment, replacement]);
+  return Object.fromEntries(entries);
 }
 
 function unsafePathSegment(segment: string): boolean {
