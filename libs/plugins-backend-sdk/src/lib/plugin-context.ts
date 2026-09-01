@@ -6,7 +6,6 @@ import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscri
 import type { PluginEntityClass } from './entity';
 import type { MqttCredentialProvisioningProviderFactory } from './mqtt-credential-provisioning';
 import type { MqttCredentialProvisioningHostProvider } from './mqtt-credential-provisioning';
-import type { PluginAuditContext } from './plugin-audit';
 
 /**
  * DI token under which a plugin's own services can inject the PluginContext.
@@ -43,11 +42,6 @@ export interface MqttServerConnectionConfig {
   readonly host: string;
   readonly port: number;
   readonly useTls: boolean;
-  /** PEM trust anchors for private PKI. Omitted by older hosts. */
-  readonly caCert?: string | null;
-  /** Integrations requiring authenticated TLS must reject this setting. */
-  readonly tlsInsecure?: boolean;
-  readonly tlsServername?: string | null;
   readonly username: string | null;
   /** Resolved (decrypted) password. Only ever provided to permitted plugins. */
   readonly password: string | null;
@@ -108,20 +102,12 @@ export interface PluginFlowsContext {
   trigger(nodeType: string, matches: (config: Record<string, unknown>, nodeId: string) => boolean, payload: object): Promise<void>;
 }
 
-/** Host-managed encryption for plugin-owned secrets. Plaintext is never persisted by the host. */
-export interface PluginSecretsContext {
-  encrypt(plaintext: string): string;
-  decrypt(ciphertext: string): string;
-}
-
 /**
  * Curated facade handed to a backend plugin at load time. It is the single,
  * versioned seam between plugin code and the host application. Adding a field is
  * a minor SDK bump; removing/changing one is a major bump.
  */
 export interface PluginContext {
-  /** Optional for compatibility with hosts predating generic plugin audit support. */
-  readonly audit?: PluginAuditContext;
   /** This plugin's own manifest (name, version, directory, id). */
   readonly manifest: PluginManifestInfo;
 
@@ -173,9 +159,6 @@ export interface PluginContext {
 
   /** Start matching flows from a plugin-declared trigger node. Requires TRIGGER_FLOWS. */
   readonly flows: PluginFlowsContext;
-
-  /** Encrypt and decrypt plugin-owned secret material. Requires MANAGE_SECRETS. */
-  readonly secrets: PluginSecretsContext;
 }
 
 /**
@@ -202,7 +185,7 @@ export interface PluginBackendModule {
    *
    * Type naming convention: "plugin.<pluginName>.<nodeName>".
    */
-  flowNodes?: PluginFlowNodeDefinition[] | ((context: PluginContext) => PluginFlowNodeDefinition[]);
+  flowNodes?: PluginFlowNodeDefinition[];
 
   /** Optional broker credential provider offered to other integrations by this plugin. */
   credentialProvisioningProvider?: MqttCredentialProvisioningProviderFactory;
