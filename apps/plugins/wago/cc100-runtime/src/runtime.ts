@@ -41,6 +41,7 @@ export type RuntimeState = {
   accepted?: { revision: number; contentHash: string; snapshot: Snapshot };
   outputs: Record<string, boolean>;
   commandIds: string[];
+  /** Highest sequence number durably reserved for future operational messages. */
   sequence?: number;
 };
 
@@ -99,6 +100,8 @@ export class WagoRuntime {
   private configurationGeneration = 0;
   private readonly inFlightCommandIds = new Set<string>();
   private sequence = 0;
+  private reservedSequence = 0;
+  private sequenceReservation: Promise<void> | null = null;
 
   constructor(
     private readonly options: {
@@ -115,6 +118,7 @@ export class WagoRuntime {
   async start(): Promise<void> {
     this.state = await this.options.store.load();
     this.sequence = this.state.sequence ?? 0;
+    this.reservedSequence = this.sequence;
     await this.options.transport.subscribe(this.desiredTopic(), (payload) => this.receiveDesired(payload));
     await this.options.transport.subscribe(this.commandTopic(), (payload) => this.receiveCommand(payload));
     await this.publishHeartbeat();
@@ -568,18 +572,23 @@ export class WagoRuntime {
   private discoveryTopic(): string {
     return `${this.options.prefix.replace(/^\/+|\/+$/g, '')}/discovery/${this.options.hardwareId}`;
   }
-  private nextSequence(): number {
-    this.state.sequence = ++this.sequence;
-    return this.sequence;
+  private async nextSequence(): Promise<number> {
+    if (this.sequence === this.reservedSequence) {
+      if (!this.sequenceReservation) {
+        this.reservedSequence += 100;
+        this.state.sequence = this.reservedSequence;
+        this.sequenceReservation = this.options.store.save(this.state).finally(() => { this.sequenceReservation = null; });
+      }
+    }
+    if (this.sequenceReservation) await this.sequenceReservation;
+    return ++this.sequence;
   }
   private async publishOperational(
     suffix: 'state' | 'measurements' | 'faults' | 'acknowledgements',
     payload: Record<string, unknown>,
     options?: { retain?: boolean },
   ): Promise<void> {
-    const sequence = this.nextSequence();
-    // Persist before publishing so a process restart cannot replay a sequence number.
-    await this.options.store.save(this.state);
+    const sequence = await this.nextSequence();
     await this.options.transport.publish(this.topic(suffix), { sequence, ...payload }, options);
   }
   private desiredTopic(): string { return this.topic('configuration/desired'); }

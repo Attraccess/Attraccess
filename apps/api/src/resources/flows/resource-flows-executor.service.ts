@@ -485,7 +485,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
   public async triggerPluginFlows(
     pluginName: string,
     nodeType: string,
-    matches: (config: Record<string, unknown>) => boolean,
+    matches: (config: Record<string, unknown>, nodeId: string) => boolean,
     payload: object,
   ): Promise<void> {
     const definition = getPluginFlowNode(nodeType);
@@ -517,7 +517,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
         await Promise.allSettled(nodes.slice(offset, offset + concurrency).map(async (node) => {
           let isMatch: boolean;
           try {
-            isMatch = matches(node.data as Record<string, unknown>);
+            isMatch = matches(node.data as Record<string, unknown>, node.id);
           } catch (error) {
             this.logger.error(
               `Failed to match plugin flow trigger node ID: ${node.id} (Type: ${nodeType})`,

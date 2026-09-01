@@ -10,6 +10,7 @@ const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 const STALE_AFTER_MS = 90_000;
 const MAX_CACHE_ENTRIES = 2_000;
 const MAX_PENDING_DISPATCHES = 100;
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 type CachedState = { controllerId: number; hardwareId: string; channelId: string; category: WagoOperationalMessage['category']; value: unknown; timestamp: string; sequence: number; receivedAt: number };
 type NodeKind = 'event' | 'read' | 'wait';
@@ -20,12 +21,14 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   private readonly revisions: Repository<WagoConfigurationRevision>;
   private readonly settings: Repository<WagoSettings>;
   private readonly cache = new Map<string, CachedState>();
+  private controllerByHardwareId = new Map<string, { controller: WagoController; serverId: number }>();
   private readonly sequences = new Map<number, number>();
   private readonly sequenceTimestamps = new Map<number, number>();
   private readonly channelCache = new Map<number, WagoConfigurationSnapshot['logicalChannels']>();
   private readonly waiters = new Set<() => void>();
   private readonly subscriptions: PluginMqttSubscription[] = [];
   private readonly dispatches: Array<{ state: CachedState; previous?: CachedState }> = [];
+  private readonly lastDispatchAtByNode = new Map<string, number>();
   private dispatching = false;
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -53,6 +56,11 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     this.channelCache.clear();
     await Promise.all(controllers.map((controller) => this.channels(controller.id)));
     const serverIds = new Set(controllers.map((controller) => controller.mqttServerId ?? settings.defaultMqttServerId).filter(Boolean) as number[]);
+    const controllerByHardwareId = new Map(
+      controllers
+        .map((controller) => [controller.hardwareId, { controller, serverId: controller.mqttServerId ?? settings.defaultMqttServerId }] as const)
+        .filter(([, entry]) => Boolean(entry.serverId)),
+    );
     const replacements: PluginMqttSubscription[] = [];
     try {
       for (const serverId of serverIds)
@@ -60,6 +68,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     } catch (error) { replacements.forEach((subscription) => subscription.unsubscribe()); throw error; }
     this.subscriptions.splice(0).forEach((subscription) => subscription.unsubscribe());
     this.subscriptions.push(...replacements);
+    this.controllerByHardwareId = controllerByHardwareId;
   }
 
   async resolveConfigSchema(config: Record<string, unknown>, kind: NodeKind): Promise<Record<string, unknown>> {
@@ -80,7 +89,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       properties.category = { type: 'string', title: 'State category', refreshesSchema: true, oneOf: this.readCategories(channel).map((category) => ({ const: category, title: category })) };
     if (kind === 'wait') {
       properties.equals = { type: config.category === 'measurement' ? 'number' : 'boolean', title: 'Equals' };
-      properties.timeoutMs = { type: 'number', title: 'Timeout (ms)', minimum: 1 };
+      properties.timeoutMs = { type: 'number', title: 'Timeout (ms)', minimum: 1, maximum: MAX_TIMEOUT_MS };
     }
     return { dynamic: true, type: 'object', properties, required: ['controllerId', 'channelId', 'category'] };
   }
@@ -93,7 +102,9 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   async wait(config: Record<string, unknown>): Promise<CachedState | null> {
     const current = this.read(config);
     if (current && this.matchesCondition(current, config)) return current;
-    const timeoutMs = typeof config.timeoutMs === 'number' && config.timeoutMs > 0 ? config.timeoutMs : 30_000;
+    const timeoutMs = typeof config.timeoutMs === 'number' && Number.isFinite(config.timeoutMs) && config.timeoutMs > 0
+      ? Math.min(config.timeoutMs, MAX_TIMEOUT_MS)
+      : 30_000;
     return new Promise((resolve) => {
       const timer = setTimeout(() => { this.waiters.delete(wake); resolve(null); }, timeoutMs);
       const wake = () => { const state = this.read(config); if (!state || !this.matchesCondition(state, config)) return; clearTimeout(timer); this.waiters.delete(wake); resolve(state); };
@@ -106,8 +117,9 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     try { parsed = parseOperationalMessage(prefix, topic, payload); } catch (error) { this.context.logger.warn(`Ignoring invalid WAGO event: ${String(error)}`); return; }
     if (!parsed) return;
     const { hardwareId, message: event } = parsed;
-    const controller = await this.controllers.findOneBy({ hardwareId });
-    if (!controller || controller.trustState !== 'claimed' || controller.mqttServerId !== serverId) return;
+    const entry = this.controllerByHardwareId.get(hardwareId);
+    if (!entry || entry.serverId !== serverId) return;
+    const { controller } = entry;
     const previous = this.sequences.get(controller.id);
     const eventTime = Date.parse(event.timestamp);
     const previousTime = this.sequenceTimestamps.get(controller.id);
@@ -151,10 +163,14 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   }
   private categories(channel?: WagoConfigurationSnapshot['logicalChannels'][number]): string[] { return ['state', ...(channel?.capabilities.includes('measurement') ? ['measurement'] : []), 'fault']; }
   private readCategories(channel?: WagoConfigurationSnapshot['logicalChannels'][number]): string[] { return ['state', ...(channel?.capabilities.includes('measurement') ? ['measurement'] : [])]; }
-  private matchesEvent(config: Record<string, unknown>, state: CachedState, previous?: CachedState): boolean {
+  private matchesEvent(config: Record<string, unknown>, nodeId: string, state: CachedState, previous?: CachedState): boolean {
     if (config.controllerId !== state.controllerId || config.channelId !== state.channelId || config.category !== state.category) return false;
-    if (typeof config.minimumIntervalMs === 'number' && previous && state.receivedAt - previous.receivedAt < config.minimumIntervalMs) return false;
     if (typeof config.minimumChange === 'number' && typeof state.value === 'number' && typeof previous?.value === 'number' && Math.abs(state.value - previous.value) < config.minimumChange) return false;
+    if (typeof config.minimumIntervalMs === 'number') {
+      const lastDispatchAt = this.lastDispatchAtByNode.get(nodeId);
+      if (lastDispatchAt !== undefined && state.receivedAt - lastDispatchAt < config.minimumIntervalMs) return false;
+      this.lastDispatchAtByNode.set(nodeId, state.receivedAt);
+    }
     return true;
   }
   private matchesCondition(state: CachedState, config: Record<string, unknown>): boolean { return config.equals === undefined || state.value === config.equals; }
@@ -165,7 +181,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       const dispatch = this.dispatches.shift();
       if (!dispatch) continue;
       const { state, previous } = dispatch;
-      try { await this.context.flows.trigger('plugin.wago.event-received', (config) => this.matchesEvent(config, state, previous), { wago: this.payload(state) }); }
+      try { await this.context.flows.trigger('plugin.wago.event-received', (config, nodeId) => this.matchesEvent(config, nodeId, state, previous), { wago: this.payload(state) }); }
       catch (error) { this.context.logger.warn(`Could not trigger WAGO flows: ${String(error)}`); }
     }
     this.dispatching = false;

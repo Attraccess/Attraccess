@@ -5,7 +5,7 @@ import { WagoFlowService } from './wago-flow.service';
 import { WagoSettings } from './wago-settings.entity';
 
 describe('WagoFlowService', () => {
-  const controller = { id: 1, hardwareId: 'cc100-01', trustState: 'claimed', mqttServerId: 2 } as WagoController;
+  const controller = { id: 1, hardwareId: 'cc100-01', trustState: 'claimed', mqttServerId: null } as WagoController;
   const revision = {
     controllerId: 1,
     state: 'applied',
@@ -14,7 +14,7 @@ describe('WagoFlowService', () => {
 
   function createService() {
     const trigger = jest.fn().mockResolvedValue(undefined);
-    const controllerRepository = { find: jest.fn().mockResolvedValue([controller]), findOneBy: jest.fn().mockResolvedValue(controller) };
+    const controllerRepository = { find: jest.fn().mockResolvedValue([controller]), findOneBy: jest.fn() };
     const revisionRepository = { find: jest.fn().mockResolvedValue([revision]) };
     const settingsRepository = { findOneBy: jest.fn().mockResolvedValue({ id: 1, defaultMqttServerId: 2, operationalPrefix: 'attraccess/wago' } as WagoSettings) };
     const context = {
@@ -27,14 +27,17 @@ describe('WagoFlowService', () => {
   }
 
   it('caches a validated retained state and dispatches matching trigger nodes', async () => {
-    const { service, trigger } = createService();
+    const { service, trigger, context } = createService();
+    await service.refresh();
     await service['onMessage'](2, 'attraccess/wago', 'attraccess/wago/v1/controllers/cc100-01/state', Buffer.from(JSON.stringify({ sequence: 1, timestamp: '2026-08-30T00:00:00.000Z', connected: true, revision: 1, contentHash: 'hash', outputs: { door: true } })));
     expect(service.read({ controllerId: 1, channelId: 'door' })).toMatchObject({ value: true, sequence: 1 });
     expect(trigger).toHaveBeenCalledWith('plugin.wago.event-received', expect.any(Function), expect.objectContaining({ wago: expect.objectContaining({ channelId: 'door', value: true }) }));
+    expect(context.getRepository(WagoController).findOneBy).not.toHaveBeenCalled();
   });
 
   it('ignores duplicate sequences and resolves waiters from later state', async () => {
     const { service, trigger } = createService();
+    await service.refresh();
     const topic = 'attraccess/wago/v1/controllers/cc100-01/state';
     const event = (sequence: number, value: boolean) => Buffer.from(JSON.stringify({ sequence, timestamp: '2026-08-30T00:00:00.000Z', connected: true, revision: 1, contentHash: 'hash', outputs: { door: value } }));
     await service['onMessage'](2, 'attraccess/wago', topic, event(1, false));
@@ -47,6 +50,7 @@ describe('WagoFlowService', () => {
 
   it('isolates messages from another MQTT server and accepts a newer controller restart', async () => {
     const { service } = createService();
+    await service.refresh();
     const topic = 'attraccess/wago/v1/controllers/cc100-01/state';
     const event = (sequence: number, timestamp: string, value: boolean) => Buffer.from(JSON.stringify({ sequence, timestamp, connected: true, revision: 1, contentHash: 'hash', outputs: { door: value } }));
     await service['onMessage'](3, 'attraccess/wago', topic, event(1, '2026-08-30T00:00:00.000Z', true));
@@ -58,6 +62,7 @@ describe('WagoFlowService', () => {
 
   it('uses source timestamps for stale state and returns node-specific schemas', async () => {
     const { service } = createService();
+    await service.refresh();
     const topic = 'attraccess/wago/v1/controllers/cc100-01/state';
     await service['onMessage'](2, 'attraccess/wago', topic, Buffer.from(JSON.stringify({ sequence: 1, timestamp: new Date(Date.now() - 90_001).toISOString(), connected: true, revision: 1, contentHash: 'hash', outputs: { door: true } })));
     const state = service.read({ controllerId: 1, channelId: 'door', category: 'state' });
@@ -66,5 +71,17 @@ describe('WagoFlowService', () => {
     const waitSchema = await service.resolveConfigSchema({ controllerId: 1, channelId: 'door', category: 'state' }, 'wait');
     expect(eventSchema).toMatchObject({ required: ['controllerId', 'channelId', 'category'], properties: { minimumIntervalMs: expect.any(Object) } });
     expect(waitSchema).toMatchObject({ properties: { equals: { type: 'boolean' }, timeoutMs: expect.any(Object) } });
+    expect((waitSchema.properties as Record<string, { maximum: number }>).timeoutMs.maximum).toBe(2_147_483_647);
+  });
+
+  it('applies minimum intervals from the last dispatch for each trigger node', () => {
+    const { service } = createService();
+    const config = { controllerId: 1, channelId: 'door', category: 'state', minimumIntervalMs: 75 };
+    const state = (receivedAt: number) => ({ controllerId: 1, hardwareId: 'cc100-01', channelId: 'door', category: 'state', value: true, timestamp: '2026-08-30T00:00:00.000Z', sequence: receivedAt, receivedAt }) as const;
+
+    expect(service['matchesEvent'](config, 'node-1', state(0))).toBe(true);
+    expect(service['matchesEvent'](config, 'node-1', state(50))).toBe(false);
+    expect(service['matchesEvent'](config, 'node-1', state(100))).toBe(true);
+    expect(service['matchesEvent'](config, 'node-2', state(50))).toBe(true);
   });
 });
