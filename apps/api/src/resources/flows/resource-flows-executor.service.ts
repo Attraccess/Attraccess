@@ -679,8 +679,15 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     } catch (error) {
       const processingTime = Date.now() - startTime;
       const failureBehavior = dispatchStarted ? getExternalEffectFailureBehavior(node.type, node.data) : undefined;
+      const pluginNode = getPluginFlowNode(node.type);
+      const pluginFailureBehavior =
+        dispatchStarted && pluginNode && !pluginNode.isInput
+          ? pluginNode.getFailureBehavior?.(node.data as Record<string, unknown>)
+          : undefined;
       const failureKind = dispatchStarted
-        ? (this.nodeExecutors[node.type]?.getFailureKind?.(error) ?? 'node-failure')
+        ? (this.nodeExecutors[node.type]?.getFailureKind?.(error) ??
+          (pluginNode && !pluginNode.isInput ? pluginNode.getFailureKind?.(error) : undefined) ??
+          'node-failure')
         : 'node-failure';
       const errorMessage = this.errorReason(error);
       this.logger.error(
@@ -693,20 +700,21 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
         nodeId: node.id,
         resourceId: node.resourceId,
         type: ResourceFlowLogType.NODE_PROCESSING_FAILED,
-        payload: () => ({ error: errorMessage, failureKind, failureBehavior: failureBehavior ?? 'fail-flow' }),
+        payload: () => ({ error: errorMessage, failureKind, failureBehavior: pluginFailureBehavior ?? failureBehavior ?? 'fail-flow' }),
       });
 
-      if (!failureBehavior || failureBehavior === 'fail-flow') {
-        throw failureBehavior === 'fail-flow' ? new ExternalEffectFailureError(errorMessage, error, failureKind) : error;
+      const effectiveFailureBehavior = pluginFailureBehavior ?? failureBehavior;
+      if (!effectiveFailureBehavior || effectiveFailureBehavior === 'fail-flow') {
+        throw effectiveFailureBehavior === 'fail-flow' ? new ExternalEffectFailureError(errorMessage, error, failureKind) : error;
       }
 
       const payload =
-        failureBehavior === 'failure-output'
+        effectiveFailureBehavior === 'failure-output'
           ? { ...resultOfPreviousNode.payload, flowError: { kind: failureKind, message: errorMessage } }
           : resultOfPreviousNode.payload;
       responseOfNode = {
         payload,
-        outputHandle: failureBehavior === 'failure-output' ? 'failure' : 'output',
+        outputHandle: effectiveFailureBehavior === 'failure-output' ? 'failure' : 'output',
       };
     }
 

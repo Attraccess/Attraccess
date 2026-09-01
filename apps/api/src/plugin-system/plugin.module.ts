@@ -144,8 +144,12 @@ export class PluginModule {
     // resolvable so the plugin can use context.getRepository(Entity).
     PluginModule.registerPluginEntities(manifest, (exported as PluginBackendModule)?.entities);
 
+    const context = PluginModule.createPluginContext(manifest);
+
     // Register any custom flow nodes contributed by this plugin.
-    const pluginFlowNodes = (exported as PluginBackendModule)?.flowNodes;
+    const configuredFlowNodes = (exported as PluginBackendModule)?.flowNodes;
+    const pluginFlowNodes =
+      typeof configuredFlowNodes === 'function' ? configuredFlowNodes(context) : configuredFlowNodes;
     if (pluginFlowNodes?.length) {
       registerPluginFlowNodes(manifest.name, pluginFlowNodes);
       this.logger.log(`Registered ${pluginFlowNodes.length} flow node(s) from plugin ${manifest.name}`);
@@ -158,7 +162,6 @@ export class PluginModule {
       return exported as DynamicModule;
     }
 
-    const context = PluginModule.createPluginContext(manifest);
     const pluginModule = (exported as PluginBackendModule).register(context);
     const credentialProvider = (exported as PluginBackendModule).credentialProvisioningProvider;
     if (credentialProvider) {

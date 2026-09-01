@@ -22,6 +22,7 @@ interface Props {
     forceToolbarVisible?: boolean;
     toolbarPosition?: Position;
   };
+  validationError?: string;
 }
 
 enum ProcessingState {
@@ -32,7 +33,7 @@ enum ProcessingState {
 }
 
 export function AttraccessNode(props: Props) {
-  const { schema, previewMode, tNodeTranslations: t, tNodeExists, data } = props;
+  const { schema, previewMode, tNodeTranslations: t, tNodeExists, data, validationError } = props;
 
   const nodeId = useNodeId();
 
@@ -102,9 +103,10 @@ export function AttraccessNode(props: Props) {
       'animate-pulse border-2 border-blue-500': processingState === ProcessingState.PROCESSING,
       'border-2 border-red-500': processingState === ProcessingState.FAILED,
       'border-2 border-green-500': processingState === ProcessingState.COMPLETED,
+      'border-2 border-warning': Boolean(validationError),
       'opacity-60 grayscale border-dashed': !schema.supportedByResource,
     });
-  }, [processingState, schema, isSelected]);
+  }, [processingState, schema, isSelected, validationError]);
 
   const targetHandlesWithStyles = useMemo((): { id: string; label?: string; style: React.CSSProperties }[] => {
     return schema.inputs.map((inputName, index) => {
@@ -311,11 +313,16 @@ export function AttraccessNode(props: Props) {
             ))}
           </div>
 
-          {!previewMode && !schema.supportedByResource && (
+           {!previewMode && !schema.supportedByResource && (
             <div className="text-xs text-warning-600 dark:text-warning-400 mt-1 px-1 flex flex-row items-center gap-1">
               <TriangleAlertIcon size={12} /> {t('nodes.unsupportedForResourceType')}
             </div>
-          )}
+           )}
+           {!previewMode && validationError && (
+             <div className="text-xs text-danger mt-1 px-1 flex flex-row items-center gap-1">
+               <TriangleAlertIcon size={12} /> {validationError}
+             </div>
+           )}
         </div>
       )}
     </NodeEditor>

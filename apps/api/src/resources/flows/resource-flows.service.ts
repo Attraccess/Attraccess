@@ -91,7 +91,8 @@ export class ResourceFlowsService {
       }),
     ]);
 
-    return { nodes, edges };
+    const validationErrors = (await Promise.all(nodes.map((node) => this.validateNodeData(node)))).flat();
+    return { nodes, edges, ...(validationErrors.length ? { validationErrors } : {}) };
   }
 
   async resolveNodeSchema(
@@ -110,7 +111,7 @@ export class ResourceFlowsService {
     }
 
     const configSchema = definition.resolveConfigSchema
-      ? await definition.resolveConfigSchema(config)
+      ? await definition.resolveConfigSchema(config, { resourceId })
       : definition.configSchema;
     if (!configSchema) {
       throw new Error(`Plugin flow node type "${nodeType}" does not provide a configuration schema.`);
@@ -119,7 +120,7 @@ export class ResourceFlowsService {
     return this.pluginNodeSchema(definition, configSchema);
   }
 
-  private validateNodeData(nodeData: { id: string; type: string; data: unknown }): ValidationError[] {
+  private async validateNodeData(nodeData: { id: string; type: string; data: unknown }): Promise<ValidationError[]> {
     const errors: ValidationError[] = [];
 
     // Non-core types must belong to a registered plugin; reject unknown types at save time.
@@ -132,7 +133,17 @@ export class ResourceFlowsService {
           message: `Unknown node type: ${nodeData.type}`,
         });
       }
-      // Plugin owns its own data validation — skip core schema check regardless.
+      const plugin = getPluginFlowNode(nodeData.type);
+      if (plugin && !plugin.isInput && plugin.validateConfig) {
+        const validationErrors = await plugin.validateConfig(nodeData.data as Record<string, unknown>);
+        errors.push(
+          ...validationErrors.map((error) => ({
+            nodeId: nodeData.id,
+            nodeType: nodeData.type,
+            ...error,
+          })),
+        );
+      }
       return errors;
     }
 
@@ -180,7 +191,7 @@ export class ResourceFlowsService {
     // Collect validation errors from all nodes
     const allValidationErrors: ValidationError[] = [];
     for (const nodeData of flowData.nodes) {
-      const nodeErrors = this.validateNodeData(nodeData);
+      const nodeErrors = await this.validateNodeData(nodeData);
       allValidationErrors.push(...nodeErrors);
     }
 

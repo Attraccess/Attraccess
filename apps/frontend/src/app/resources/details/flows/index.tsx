@@ -164,6 +164,7 @@ function FlowsPageInner() {
     addLiveLogReceiver,
     removeLiveLogReceiver,
     flowNodeTypes,
+    setValidationErrors,
     copySelectedNodes,
     cutSelectedNodes,
     pasteNodes,
@@ -182,8 +183,11 @@ function FlowsPageInner() {
     if (originalFlowData) {
       setNodes(originalFlowData.nodes);
       setEdges(originalFlowData.edges);
+      setValidationErrors(
+        ((originalFlowData as unknown as { validationErrors?: Array<{ nodeId: string; message: string }> }).validationErrors ?? []),
+      );
     }
-  }, [originalFlowData, setNodes, setEdges]);
+  }, [originalFlowData, setNodes, setEdges, setValidationErrors]);
 
   const nodesHaveChanged = useMemo(() => {
     const originalNodes = originalFlowData?.nodes ?? [];
