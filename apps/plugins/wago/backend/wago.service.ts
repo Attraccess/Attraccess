@@ -1194,7 +1194,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       .select(['node.id', 'node.resourceId'])
       .where('node.type = :type', { type: 'plugin.wago.command' })
       .andWhere('node.resourceId <> :resourceId', { resourceId })
-      .andWhere("node.data ->> 'controllerId' = :controllerId", { controllerId: String(controllerId) })
+      .andWhere("node.data ->> 'controllerId' = :controllerId", { controllerId })
       .andWhere("node.data ->> 'channelId' = :channelId", { channelId })
       .getMany();
     return nodes.map((node) => `resource ${node.resourceId} / node ${node.id}`);

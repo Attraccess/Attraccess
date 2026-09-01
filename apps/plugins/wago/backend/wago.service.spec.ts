@@ -216,6 +216,38 @@ describe('WagoService', () => {
     ]);
   });
 
+  it('binds numeric controller IDs when looking up channel references', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, context, revisionRepository } = createService([claimed]);
+    revisionRepository.find.mockResolvedValue([
+      {
+        controllerId: claimed.id,
+        revision: 3,
+        state: 'applied',
+        snapshot: JSON.stringify({
+          logicalChannels: [{ id: 'pump', profile: 'generic-digital-output', capabilities: ['output'] }],
+        }),
+      },
+    ]);
+    const query = {
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    };
+    Object.assign(context, {
+      dataSource: {
+        getRepository: jest.fn().mockReturnValue({ createQueryBuilder: jest.fn().mockReturnValue(query) }),
+      },
+    });
+
+    await service.commandSchema({ controllerId: claimed.id, channelId: 'pump' }, 2);
+
+    expect(query.andWhere).toHaveBeenCalledWith("node.data ->> 'controllerId' = :controllerId", {
+      controllerId: claimed.id,
+    });
+  });
+
   it('consumes a pending acknowledgement rejection when command publication fails', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
     const { service, context, revisionRepository } = createService([claimed], [], 2);

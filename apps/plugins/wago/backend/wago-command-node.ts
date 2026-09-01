@@ -14,7 +14,7 @@ export function createWagoCommandNode(context: PluginContext): PluginFlowExecuti
     outputs: ['output', 'failure'],
     isOutput: true,
     resolveConfigSchema: (config, schemaContext) => service().commandSchema(config, schemaContext.resourceId),
-    validateConfig: (config) => service().validateCommandConfig(config),
+    validateConfig: (config, validationContext) => service().validateCommandConfig(config, validationContext),
     getFailureBehavior: (config) => service().commandFailureBehavior(config),
     getFailureKind: (error) => service().commandFailureKind(error),
     execute: async (node, input) => {
