@@ -120,7 +120,7 @@ Check startup and retain the output:
 ```sh
 docker ps --filter name=attraccess-wago-cc100
 docker logs --tail 200 attraccess-wago-cc100
-docker inspect --format '{{.State.Status}} {{.State.RestartCount}}' attraccess-wago-cc100
+docker inspect --format '{{.State.Status}} {{.RestartCount}}' attraccess-wago-cc100
 ```
 
 Runtime callback failures are written to container stderr, so `docker logs` is the primary log collection command. Add the output of `docker inspect`, `docker logs`, firmware version, and non-secret configuration metadata to a support bundle. Never include `/etc/attraccess-wago/runtime.env` or `state.json` without removing credentials.
