@@ -48,7 +48,7 @@ The current CI workflow publishes commit-SHA tags, not this version tag, and the
 ```sh
 export IMAGE='ghcr.io/attraccess/wago-cc100-runtime@sha256:<published-release-digest>'
 docker pull "$IMAGE"
-docker image inspect "$IMAGE" --format '{{index .RepoDigests 0}}'
+docker image inspect "$IMAGE" --format '{{index (split (index .RepoDigests 0) "@") 1}}'
 ```
 
 The inspected digest must exactly match the release digest. Retain the pulled image locally for rollback; do not delete the previous known-good image until the new image has passed the physical verification checklist.
