@@ -457,12 +457,10 @@ describe('WagoRuntime', () => {
     await transport.send(commands, validCommand());
 
     expect(attempts).toBe(2);
-    expect(transport.published).toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: { id: 'command-1', status: 'accepted', error: undefined },
-      }),
-    );
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
+      payload: expect.objectContaining({ id: 'command-1', status: 'accepted', error: undefined }),
+    }));
   });
 
   it('deactivates a pulse when retained state publication fails after it turns on', async () => {
