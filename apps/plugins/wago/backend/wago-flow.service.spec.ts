@@ -23,7 +23,7 @@ describe('WagoFlowService', () => {
       flows: { trigger },
       mqtt: { subscribe: jest.fn().mockResolvedValue({ unsubscribe: jest.fn() }) },
     } as unknown as PluginContext;
-    return { service: new WagoFlowService(context), trigger, context };
+    return { service: new WagoFlowService(context), trigger, context, revisionRepository };
   }
 
   it('caches a validated retained state and dispatches matching trigger nodes', async () => {
@@ -46,6 +46,26 @@ describe('WagoFlowService', () => {
     await service['onMessage'](2, 'attraccess/wago', topic, event(2, true));
     await expect(waiting).resolves.toMatchObject({ value: true, sequence: 2 });
     expect(trigger).toHaveBeenCalledTimes(2);
+  });
+
+  it('cancels pending state waits during shutdown', async () => {
+    const { service } = createService();
+    const waiting = service.wait({ controllerId: 1, channelId: 'door', equals: true, timeoutMs: 2_147_483_647 });
+    service.onModuleDestroy();
+    await expect(waiting).resolves.toBeNull();
+    expect(service['waiters'].size).toBe(0);
+  });
+
+  it('loads applied revisions in one query and prunes removed channel state', async () => {
+    const { service, revisionRepository } = createService();
+    await service.refresh();
+    await service['onMessage'](2, 'attraccess/wago', 'attraccess/wago/v1/controllers/cc100-01/state', Buffer.from(JSON.stringify({ sequence: 1, timestamp: '2026-08-30T00:00:00.000Z', connected: true, revision: 1, contentHash: 'hash', outputs: { door: true } })));
+    revisionRepository.find.mockResolvedValueOnce([]);
+
+    await service.refresh();
+
+    expect(revisionRepository.find).toHaveBeenCalledTimes(2);
+    expect(service.read({ controllerId: 1, channelId: 'door' })).toBeNull();
   });
 
   it('isolates messages from another MQTT server and accepts a newer controller restart', async () => {
