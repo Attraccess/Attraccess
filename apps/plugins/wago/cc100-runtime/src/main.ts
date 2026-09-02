@@ -17,7 +17,15 @@ let measurementTimer: NodeJS.Timeout | undefined;
 void handleAsync(start);
 
 async function start(): Promise<void> {
-  const credentials = (await store.load()).credentials;
+  const persistedCredentials = (await store.load()).credentials;
+  const credentials =
+    process.env.WAGO_MQTT_USE_ENV_CREDENTIALS === 'true'
+      ? {
+          username: required('WAGO_MQTT_USERNAME'),
+          password: required('WAGO_MQTT_PASSWORD'),
+          prefix: persistedCredentials?.prefix,
+        }
+      : persistedCredentials;
   connectRuntime(credentials);
 }
 
@@ -42,6 +50,8 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
     transport,
     device: adapter,
   });
+  let initialized = false;
+  let connected = false;
 
   activeClient.once(
     'connect',
@@ -57,15 +67,19 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
           return;
         }
         await runtime.start();
+        initialized = true;
+        if (!connected) await runtime.setConnected(false);
         heartbeatTimer = setInterval(() => void handleAsync(() => runtime.publishHeartbeat()), 30_000).unref();
         measurementTimer = setInterval(() => void handleAsync(() => runtime.publishMeasurements()), 5_000).unref();
       }),
   );
   activeClient.on('close', () => {
-    if (activeClient === client && credentials) void handleAsync(() => runtime.setConnected(false));
+    connected = false;
+    if (initialized && activeClient === client && credentials) void handleAsync(() => runtime.setConnected(false));
   });
   activeClient.on('connect', () => {
-    if (activeClient === client && credentials) void handleAsync(() => runtime.setConnected(true));
+    connected = true;
+    if (initialized && activeClient === client && credentials) void handleAsync(() => runtime.setConnected(true));
   });
 }
 

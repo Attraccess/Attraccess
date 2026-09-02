@@ -34,14 +34,14 @@ export type Snapshot = {
 };
 
 export type ValidationError = { path: string; code: string; message: string };
+export type DiscoveryClaim = { username: string; password: string; prefix?: string };
+
 export type RuntimeState = {
-  credentials?: { username: string; password: string };
+  credentials?: DiscoveryClaim;
   accepted?: { revision: number; contentHash: string; snapshot: Snapshot };
   outputs: Record<string, boolean>;
   commandIds: string[];
 };
-
-export type DiscoveryClaim = { username: string; password: string; prefix?: string };
 
 export interface Transport {
   publish(topic: string, payload: unknown, options?: { retain?: boolean }): Promise<void>;
@@ -143,6 +143,7 @@ export class WagoRuntime {
       password,
       ...(typeof namespace === 'string' ? { prefix: namespace } : {}),
     };
+    this.state = await this.options.store.load();
     await this.receiveClaim(credentials);
     return credentials;
   }

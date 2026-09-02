@@ -93,6 +93,33 @@ describe('WagoRuntime', () => {
     await expect(runtime.receiveDiscoveryClaim(Buffer.from('{"username":"controller"}'))).resolves.toBeUndefined();
   });
 
+  it('preserves persisted runtime state when receiving a discovery claim before startup', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    await store.save({
+      accepted: { revision: 3, contentHash: hash(snapshot), snapshot },
+      outputs: { load: true },
+      commandIds: ['command-1'],
+    });
+    const discoveryRuntime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      enrollmentSecret: 'enrollment-secret',
+      store,
+      transport,
+      device,
+    });
+
+    await discoveryRuntime.receiveDiscoveryClaim(Buffer.from('{"username":"controller","password":"secret"}'));
+
+    await expect(store.load()).resolves.toEqual({
+      accepted: { revision: 3, contentHash: hash(snapshot), snapshot },
+      outputs: { load: true },
+      commandIds: ['command-1'],
+      credentials: { username: 'controller', password: 'secret' },
+    });
+  });
+
   it('includes the pairing code in the backend-compatible heartbeat', async () => {
     await runtime.publishHeartbeat();
     expect(transport.published).toContainEqual(
