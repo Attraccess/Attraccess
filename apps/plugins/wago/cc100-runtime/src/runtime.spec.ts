@@ -475,6 +475,8 @@ describe('WagoRuntime', () => {
       expect(shutdownAttempts).toBe(1);
       await jest.advanceTimersByTimeAsync(3_100);
       expect(shutdownAttempts).toBe(6);
+      await jest.advanceTimersByTimeAsync(5_000);
+      expect(shutdownAttempts).toBe(7);
 
       await transport.send(commands, validCommand({ id: 'still-revision-one' }));
       expect(device.values.get('751-9301:0')).toBe(true);
@@ -797,6 +799,27 @@ describe('WagoRuntime', () => {
       expect.objectContaining({
         topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
         payload: expect.objectContaining({ id: 'command-1', status: 'accepted' }),
+      }),
+    );
+  });
+
+  it('keeps the previous configuration active when persisting a replacement fails', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport, device });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+    const persist = store.save.bind(store);
+    jest.spyOn(store, 'save').mockRejectedValueOnce(new Error('disk full')).mockImplementation(persist);
+
+    await transport.send(desired, { protocolVersion: 1, revision: 2, contentHash: hash(snapshot), snapshot });
+    await transport.send(commands, validCommand({ id: 'revision-one', expectedConfigurationRevision: 1 }));
+    await transport.send(commands, validCommand({ id: 'revision-two', expectedConfigurationRevision: 2 }));
+
+    expect(device.values.get('751-9301:0')).toBe(true);
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
+        payload: expect.objectContaining({ id: 'revision-two', status: 'rejected', code: 'stale_revision' }),
       }),
     );
   });

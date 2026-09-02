@@ -140,12 +140,13 @@ export class WagoRuntime {
       // Keep the command barrier through this commit so old-revision commands cannot cross the boundary.
       try {
         await this.outputs.replaceConfiguration(async () => {
-          this.state.accepted = {
+          const accepted = {
             revision: desired.revision,
             contentHash: desired.contentHash,
             snapshot: desired.snapshot,
           };
-          await this.options.store.save(this.state);
+          await this.options.store.save({ ...this.state, accepted });
+          this.state.accepted = accepted;
         });
       } catch {
         return this.reportRejected(desired.revision, desired.contentHash, [
