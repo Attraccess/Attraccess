@@ -4,6 +4,10 @@ type LogicalChannel = Snapshot['logicalChannels'][number];
 type PhysicalPoint = Snapshot['physicalPoints'][number];
 type Pulse = { timer: ReturnType<typeof setTimeout>; channel: LogicalChannel; point: PhysicalPoint };
 
+const INITIAL_PULSE_SHUTDOWN_RETRY_DELAY_MS = 100;
+const MAX_PULSE_SHUTDOWN_RETRY_DELAY_MS = 5_000;
+const MAX_PULSE_SHUTDOWN_ATTEMPTS = 5;
+
 export class OutputController {
   private readonly pulses = new Map<string, Pulse>();
   private readonly watchdogs = new Map<string, ReturnType<typeof setTimeout>>();
@@ -26,7 +30,7 @@ export class OutputController {
     },
   ) {}
 
-  async replaceConfiguration(): Promise<void> {
+  async replaceConfiguration<T>(commit: () => Promise<T>): Promise<T> {
     let releaseReplacement!: () => void;
     this.replacement = new Promise<void>((resolve) => {
       releaseReplacement = resolve;
@@ -35,9 +39,6 @@ export class OutputController {
     try {
       await Promise.all(this.commandOperations);
       await Promise.all([...this.channelWrites.values()]);
-      this.configurationGeneration += 1;
-      this.feedbackChecks.forEach(({ timer }) => clearTimeout(timer));
-      this.feedbackChecks.clear();
       const pulses = [...this.pulses.entries()];
       let shutdownFailed = false;
       await Promise.all(
@@ -56,10 +57,14 @@ export class OutputController {
       );
       if (shutdownFailed) {
         pulses.forEach(([channelId, pulse]) => {
-          if (this.pulses.get(channelId) === pulse) this.retryPulseShutdown(channelId, pulse);
+          if (this.pulses.get(channelId) === pulse) this.retryPulseShutdown(channelId, pulse, 1);
         });
         throw new Error('failed to de-energize active pulse');
       }
+      this.configurationGeneration += 1;
+      this.feedbackChecks.forEach(({ timer }) => clearTimeout(timer));
+      this.feedbackChecks.clear();
+      return await commit();
     } finally {
       this.replacement = undefined;
       releaseReplacement();
@@ -232,17 +237,22 @@ export class OutputController {
     return this.writePointWhileQueued(channel, point, false, undefined, undefined, -1);
   }
 
-  private retryPulseShutdown(channelId: string, pulse: Pulse): void {
+  private retryPulseShutdown(channelId: string, pulse: Pulse, attempt: number): void {
+    if (attempt > MAX_PULSE_SHUTDOWN_ATTEMPTS) return;
+    const delayMs = Math.min(
+      INITIAL_PULSE_SHUTDOWN_RETRY_DELAY_MS * 2 ** (attempt - 1),
+      MAX_PULSE_SHUTDOWN_RETRY_DELAY_MS,
+    );
     pulse.timer = setTimeout(
       () =>
         void this.ignoreRejection(() =>
           this.runForChannel(channelId, async () => {
             if (this.pulses.get(channelId) !== pulse) return;
             if (await this.writePulseShutdown(pulse.channel, pulse.point)) this.pulses.delete(channelId);
-            else this.retryPulseShutdown(channelId, pulse);
+            else this.retryPulseShutdown(channelId, pulse, attempt + 1);
           }),
         ),
-      0,
+      delayMs,
     );
   }
 

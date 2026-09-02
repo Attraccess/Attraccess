@@ -137,20 +137,21 @@ export class WagoRuntime {
         return this.reportRejected(desired.revision, desired.contentHash, [
           { path: 'revision', code: 'stale_revision', message: 'configuration revision is stale' },
         ]);
-      // Persist only after validation and pulse shutdown; a rejected snapshot cannot alter active I/O.
+      // Keep the command barrier through this commit so old-revision commands cannot cross the boundary.
       try {
-        await this.outputs.replaceConfiguration();
+        await this.outputs.replaceConfiguration(async () => {
+          this.state.accepted = {
+            revision: desired.revision,
+            contentHash: desired.contentHash,
+            snapshot: desired.snapshot,
+          };
+          await this.options.store.save(this.state);
+        });
       } catch {
         return this.reportRejected(desired.revision, desired.contentHash, [
           { path: 'snapshot', code: 'pulse_shutdown_failed', message: 'failed to de-energize active pulse' },
         ]);
       }
-      this.state.accepted = {
-        revision: desired.revision,
-        contentHash: desired.contentHash,
-        snapshot: desired.snapshot,
-      };
-      await this.options.store.save(this.state);
       await this.publishReport(desired.revision, desired.contentHash, []);
       await this.publishState();
     });

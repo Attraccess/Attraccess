@@ -438,10 +438,15 @@ describe('WagoRuntime', () => {
   });
 
   it('does not apply a replacement when pulse shutdown fails', async () => {
+    jest.useFakeTimers();
     let failShutdown = false;
+    let shutdownAttempts = 0;
     const flakyDevice = {
       write: async (point: Snapshot['physicalPoints'][number], value: boolean) => {
-        if (failShutdown && !value) throw new Error('relay write failed');
+        if (failShutdown && !value) {
+          shutdownAttempts += 1;
+          throw new Error('relay write failed');
+        }
         device.values.set(`${point.hardwareProfile}:${point.channel}`, value);
       },
       read: async () => false,
@@ -453,21 +458,29 @@ describe('WagoRuntime', () => {
       transport,
       device: flakyDevice,
     });
-    await runtime.start();
-    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
-    await transport.send(commands, validCommand({ action: 'pulse' }));
-    failShutdown = true;
+    try {
+      await runtime.start();
+      await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+      await transport.send(commands, validCommand({ action: 'pulse' }));
+      failShutdown = true;
 
-    await transport.send(desired, { protocolVersion: 1, revision: 2, contentHash: hash(snapshot), snapshot });
+      await transport.send(desired, { protocolVersion: 1, revision: 2, contentHash: hash(snapshot), snapshot });
 
-    expect(transport.published).toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/configuration/reported',
-        payload: expect.objectContaining({ revision: 2, errors: expect.arrayContaining([expect.any(Object)]) }),
-      }),
-    );
-    await transport.send(commands, validCommand({ id: 'still-revision-one' }));
-    expect(device.values.get('751-9301:0')).toBe(true);
+      expect(transport.published).toContainEqual(
+        expect.objectContaining({
+          topic: 'attraccess/wago/v1/controllers/cc100-1/configuration/reported',
+          payload: expect.objectContaining({ revision: 2, errors: expect.arrayContaining([expect.any(Object)]) }),
+        }),
+      );
+      expect(shutdownAttempts).toBe(1);
+      await jest.advanceTimersByTimeAsync(3_100);
+      expect(shutdownAttempts).toBe(6);
+
+      await transport.send(commands, validCommand({ id: 'still-revision-one' }));
+      expect(device.values.get('751-9301:0')).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('shuts down a pulse that completes while configuration replacement is waiting', async () => {
