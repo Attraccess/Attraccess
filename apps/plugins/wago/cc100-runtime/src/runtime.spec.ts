@@ -391,18 +391,14 @@ describe('WagoRuntime', () => {
     await set;
     await new Promise((resolve) => setTimeout(resolve, 150));
 
-    expect(transport.published).toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: { id: 'command-1', status: 'accepted', error: undefined },
-      }),
-    );
-    expect(transport.published).toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: { id: 'command-2', status: 'rejected', error: 'device write failed' },
-      }),
-    );
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
+      payload: expect.objectContaining({ id: 'command-1', status: 'accepted', error: undefined }),
+    }));
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
+      payload: expect.objectContaining({ id: 'command-2', status: 'rejected', error: 'device write failed' }),
+    }));
     expect(writes).toEqual([true, false, false]);
   });
 
@@ -516,19 +512,8 @@ describe('WagoRuntime', () => {
     expect(device.values.get('751-9301:0')).toBe(false);
     await runtime.setConnected(true);
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
-    expect(transport.published).toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: { id: 'command-1', status: 'duplicate', error: undefined },
-      }),
-    );
-    expect(transport.published).toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/configuration/reported',
-        payload: { revision: 1, contentHash: hash(snapshot), errors: [] },
-        retain: true,
-      }),
-    );
+    expect(transport.published).toContainEqual(expect.objectContaining({ topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements', payload: expect.objectContaining({ id: 'command-1', status: 'duplicate', error: undefined }) }));
+    expect(transport.published).toContainEqual(expect.objectContaining({ topic: 'attraccess/wago/v1/controllers/cc100-1/configuration/reported', payload: { revision: 1, contentHash: hash(snapshot), errors: [] }, retain: true }));
   });
 
   it('reports a feedback mismatch after the configured feedback timeout', async () => {
@@ -997,16 +982,10 @@ describe('WagoRuntime', () => {
     );
     await started;
     await commandsInFlight[MAX_PENDING_CHANNEL_WRITES];
-    expect(transport.published).toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: {
-          id: `command-${MAX_PENDING_CHANNEL_WRITES}`,
-          status: 'rejected',
-          error: 'channel write queue is full',
-        },
-      }),
-    );
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
+      payload: expect.objectContaining({ id: `command-${MAX_PENDING_CHANNEL_WRITES}`, status: 'rejected', error: 'channel write queue is full' }),
+    }));
 
     releaseFirstWrite();
     await Promise.all(commandsInFlight);
