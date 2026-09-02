@@ -1,11 +1,27 @@
 {
   "runtime": "attraccess-wago-cc100",
   "runtimeVersion": "0.1.0",
-  "image": "ghcr.io/attraccess/wago-cc100-runtime:0.1.0",
-  "imageDigest": "published-by-ci",
+  "image": "ghcr.io/attraccess/wago-cc100-runtime:<commit-sha>",
+  "imageDigest": "Recorded by the publishing workflow as ghcr.io/attraccess/wago-cc100-runtime:<commit-sha>@sha256:<digest>",
   "protocolVersion": "1.0.0",
-  "hardware": { "model": "751-9301", "firmwareBaseline": "WAGO CC100 Linux firmware with Docker" },
-  "capabilities": ["claim", "heartbeat", "configuration-v1", "commands", "state", "measurement", "fault", "acknowledgement"],
+  "hardware": {
+    "model": "751-9301",
+    "platform": "linux/arm/v7",
+    "firmwareBaseline": "WAGO CC100 Linux firmware with Docker"
+  },
+  "capabilities": [
+    "claim",
+    "heartbeat",
+    "configuration-v1",
+    "commands",
+    "state",
+    "measurement",
+    "fault",
+    "acknowledgement"
+  ],
   "security": { "arbitraryCodeUpload": false, "safetyRated": false },
-  "deployment": { "privileged": true, "releaseRequirement": "Replace privileged mode with documented minimum device and bind mounts after hardware validation." }
+  "deployment": {
+    "privileged": true,
+    "releaseRequirement": "Replace privileged mode with documented minimum device and bind mounts after hardware validation."
+  }
 }

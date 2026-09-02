@@ -12,12 +12,12 @@ This runtime is **not safety rated**. It must not be used as an emergency stop, 
 
 Before deployment, confirm all of the following:
 
-- The controller is a `751-9301`. The current image is built for `linux/arm64`.
+- The controller is a `751-9301`. The published image is built for `linux/arm/v7`.
 - The CC100 has a WAGO Linux firmware release with Docker support. WAGO's onboard-I/O reference requires firmware 21 (`03.09.04`) or later; record the installed firmware in the deployment record.
 - An administrator has SSH access or WBM access to the CC100. Use an isolated administrative network and restrict SSH/WBM access to authorised operators.
 - The controller can reach the configured MQTT broker and the registry hosting `ghcr.io`. There are no inbound runtime ports; outbound MQTT and image-registry access are required.
 - Persistent storage is available for Docker and for `/var/lib/attraccess-wago`. WAGO's Docker lifecycle uses `/home/docker` for Docker data.
-- A per-controller hardware ID, MQTT URL, and initial broker credential have been issued by the Attraccess operator.
+- A per-controller hardware ID, pairing code, MQTT URL, discovery credential, and enrollment secret have been issued by the Attraccess operator.
 - The physical assembly, wiring, guards, contactors, and non-safety stop/fault/permissive signals have been reviewed. The `751-9301`, `879-3000`, and `879-1300` reference assemblies require the physical verification checklist below.
 
 ## Enable Docker
@@ -43,7 +43,7 @@ The runtime manifest names this intended version tag:
 ghcr.io/attraccess/wago-cc100-runtime:0.1.0
 ```
 
-The current CI workflow publishes commit-SHA tags, not this version tag, and the manifest records `imageDigest` as `published-by-ci`, not a deployable immutable digest. Therefore there is no current operator image reference and this WIP release must not be promoted as a reproducible deployment. When CI publishes a release digest, record it in the deployment record and use the digest form below rather than a mutable tag.
+CI publishes a commit-SHA tag for `linux/arm/v7`, verifies the published manifest, and uploads the immutable `<tag>@<digest>` reference as the `wago-cc100-runtime-image` artifact. Use that recorded digest rather than a mutable tag.
 
 ```sh
 export IMAGE='ghcr.io/attraccess/wago-cc100-runtime@sha256:<published-release-digest>'
@@ -65,12 +65,14 @@ WAGO_HARDWARE_ID=<controller-hardware-id>
 WAGO_MQTT_URL=mqtts://<broker-host>:8883
 WAGO_MQTT_USERNAME=<initial-controller-username>
 WAGO_MQTT_PASSWORD=<initial-controller-password>
+WAGO_PAIRING_CODE=<controller-pairing-code>
+WAGO_ENROLLMENT_SECRET=<enrollment-secret>
 WAGO_MQTT_PREFIX=attraccess/wago
 EOF
 chmod 0600 /etc/attraccess-wago/runtime.env
 ```
 
-The runtime requires `WAGO_HARDWARE_ID` and `WAGO_MQTT_URL`. `WAGO_MQTT_PREFIX` defaults to `attraccess/wago`; use the issued namespace if it differs. The persistent state path defaults to `/var/lib/attraccess-wago/state.json` and stores the last accepted configuration, output state, bounded command history, and any permanent credentials. The file is created with mode `0600`.
+The runtime requires `WAGO_HARDWARE_ID`, `WAGO_MQTT_URL`, and `WAGO_PAIRING_CODE`. `WAGO_MQTT_USERNAME` and `WAGO_MQTT_PASSWORD` are discovery credentials until the controller is claimed. `WAGO_ENROLLMENT_SECRET` is required for discovery enrollment. `WAGO_MQTT_PREFIX` defaults to `attraccess/wago`; use the issued namespace if it differs. The persistent state path defaults to `/var/lib/attraccess-wago/state.json` and stores the last accepted configuration, output state, bounded command history, and permanent credentials. The file is created with mode `0600`.
 
 ### I/O paths and host access
 
@@ -134,14 +136,14 @@ The intended enrollment flow is discovery-scoped and one-time:
 3. Attraccess returns controller-scoped MQTT credentials and operational topic details, then revokes the discovery credential.
 4. The controller persists permanent credentials and reconnects with only the controller-scoped identity.
 
-**Current WIP limitation:** the runtime image does not yet publish the discovery announcement or subscribe to the discovery claim topic. It starts with the MQTT credentials provided in `runtime.env`. Do not represent a deployed image as self-enrolled. Use a separately controlled provisioning process until this gap is implemented and validated.
+The runtime publishes a retained discovery announcement, subscribes to the claim topic, validates and persists the returned credentials before disconnecting, then reconnects with the permanent controller identity. Subsequent starts use the persisted identity and do not require the discovery identity to remain valid.
 
 On credential compromise, decommissioning, or failed rotation:
 
 1. Revoke the affected broker identity first.
 2. Stop the container to prevent repeated failed authentication attempts.
 3. Issue a new controller-scoped credential through the Attraccess provisioning process.
-4. Replace `WAGO_MQTT_USERNAME` and `WAGO_MQTT_PASSWORD` in the `0600` environment file.
+4. Replace `WAGO_MQTT_USERNAME` and `WAGO_MQTT_PASSWORD` in the `0600` environment file, and set `WAGO_MQTT_USE_ENV_CREDENTIALS=true` to use the complete replacement pair instead of persisted credentials.
 5. Remove the stopped container and recreate it with the same reviewed image digest, state volume, and I/O mapping, using the updated `--env-file`. Docker reads `--env-file` only when creating a container; `docker start` would retain the revoked credentials.
 6. Inspect logs and verify a heartbeat under the expected hardware ID.
 7. Preserve the persistent volume unless recovery requires discarding the accepted configuration and command history.
@@ -163,7 +165,7 @@ It publishes with QoS 1:
 
 - `configuration/reported` retained, including revision, content hash, and structured validation errors
 - `state` retained, including connection state, accepted revision/hash, and output states
-- `heartbeat` every 30 seconds with hardware ID, protocol/runtime versions, capabilities, and a sequence value
+- `heartbeat` every 30 seconds with hardware ID, pairing code, protocol/runtime versions, capabilities, and a sequence value
 - `measurements` every 5 seconds for configured measurement channels
 - `faults` when a measurement read or device write fails
 - `acknowledgements` for accepted, duplicate, or rejected commands
@@ -226,7 +228,7 @@ Validate the returned image digest, heartbeat, retained configuration, and physi
 
 Record evidence against [ATT-984](https://linear.app/attraccess/issue/ATT-984/validate-the-four-wago-package-assemblies); passing this checklist is required before supported-beta release.
 
-- Confirm controller order number `751-9301`, installed firmware, Docker activation, ARM64 image digest, and persistent restart behaviour.
+- Confirm controller order number `751-9301`, installed firmware, Docker activation, ARMv7 image digest, and persistent restart behaviour.
 - Confirm the `879-3000` and `879-1300` assemblies have the intended power, wiring, Modbus settings, address map, readings, rollover handling, and fault reporting once a runtime release selects the Modbus adapters.
 - Confirm each configured onboard digital path against the target firmware's sysfs layout. Validate analog/Pt1000 paths and `/etc/calib` only when the runtime implements calibration.
 - Confirm `/dev/serial` is the RS-485 interface and that no unrelated serial or device access is granted when RS-485 support is implemented.
