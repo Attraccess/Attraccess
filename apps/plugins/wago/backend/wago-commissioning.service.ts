@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFile, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
@@ -22,14 +22,17 @@ const SIGNING_IDENTITY = 'attraccess-wago-runtime';
 type TemporarySshCredential = { username: string; password: string };
 
 @Injectable()
-export class WagoCommissioningService {
-  private readonly sessions: Repository<WagoCommissioningSession>;
+export class WagoCommissioningService implements OnModuleInit {
+  private sessions!: Repository<WagoCommissioningSession>;
 
   constructor(
     @Inject(PLUGIN_CONTEXT) private readonly context: PluginContext,
     private readonly wago: WagoService,
-  ) {
-    this.sessions = context.getRepository(WagoCommissioningSession);
+  ) {}
+
+  onModuleInit(): void {
+    // The host datasource is available only after plugin module construction completes.
+    this.sessions = this.context.getRepository(WagoCommissioningSession);
   }
 
   support(): { firmwareBaseline: string | null; ready: boolean } {
