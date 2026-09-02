@@ -1,5 +1,6 @@
 import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import type { PluginContext, PluginMqttSubscription, Repository } from '@attraccess/plugins-backend-sdk';
+import { In } from 'typeorm';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { WagoController } from './wago-controller.entity';
 import type { WagoConfigurationSnapshot } from './configuration';
@@ -25,7 +26,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   private readonly sequences = new Map<number, number>();
   private readonly sequenceTimestamps = new Map<number, number>();
   private readonly channelCache = new Map<number, WagoConfigurationSnapshot['logicalChannels']>();
-  private readonly waiters = new Set<() => void>();
+  private readonly waiters = new Set<(cancel?: boolean) => void>();
   private readonly subscriptions: PluginMqttSubscription[] = [];
   private readonly dispatches: Array<{ state: CachedState; previous?: CachedState }> = [];
   private readonly lastDispatchAtByNode = new Map<string, number>();
@@ -46,7 +47,8 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   onModuleDestroy(): void {
     if (this.refreshTimer) clearInterval(this.refreshTimer);
     this.subscriptions.splice(0).forEach((subscription) => subscription.unsubscribe());
-    this.waiters.forEach((wake) => wake());
+    this.waiters.forEach((wake) => wake(true));
+    this.waiters.clear();
   }
 
   async refresh(): Promise<void> {
@@ -54,7 +56,15 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     if (!settings) return;
     const controllers = await this.controllers.find({ where: { trustState: 'claimed' } });
     this.channelCache.clear();
-    await Promise.all(controllers.map((controller) => this.channels(controller.id)));
+    const revisions = await this.loadLatestAppliedRevisions(controllers.map((controller) => controller.id));
+    for (const revision of revisions) this.cacheChannels(revision);
+    for (const controller of controllers)
+      if (!this.channelCache.has(controller.id)) this.channelCache.set(controller.id, []);
+    const validChannels = new Map(
+      controllers.map((controller) => [controller.id, new Set((this.channelCache.get(controller.id) ?? []).map((channel) => channel.id))]),
+    );
+    for (const [key, state] of this.cache)
+      if (!validChannels.get(state.controllerId)?.has(state.channelId)) this.cache.delete(key);
     const serverIds = new Set(controllers.map((controller) => controller.mqttServerId ?? settings.defaultMqttServerId).filter(Boolean) as number[]);
     const controllerByHardwareId = new Map(
       controllers
@@ -107,7 +117,13 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       : 30_000;
     return new Promise((resolve) => {
       const timer = setTimeout(() => { this.waiters.delete(wake); resolve(null); }, timeoutMs);
-      const wake = () => { const state = this.read(config); if (!state || !this.matchesCondition(state, config)) return; clearTimeout(timer); this.waiters.delete(wake); resolve(state); };
+      const wake = (cancel = false) => {
+        const state = this.read(config);
+        if (!cancel && (!state || !this.matchesCondition(state, config))) return;
+        clearTimeout(timer);
+        this.waiters.delete(wake);
+        resolve(cancel ? null : state);
+      };
       this.waiters.add(wake);
     });
   }
@@ -154,12 +170,31 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     const cached = this.channelCache.get(controllerId);
     if (cached) return cached;
     const [revision] = await this.revisions.find({ where: { controllerId, state: 'applied' }, order: { revision: 'DESC' }, take: 1 });
-    if (!revision) return [];
+    if (!revision) {
+      this.channelCache.set(controllerId, []);
+      return [];
+    }
+    return this.cacheChannels(revision);
+  }
+  private async loadLatestAppliedRevisions(controllerIds: number[]): Promise<WagoConfigurationRevision[]> {
+    if (!controllerIds.length) return [];
+    const revisions = await this.revisions.find({ where: { controllerId: In(controllerIds), state: 'applied' } });
+    const latestByController = new Map<number, WagoConfigurationRevision>();
+    for (const revision of revisions) {
+      const latest = latestByController.get(revision.controllerId);
+      if (!latest || revision.revision > latest.revision) latestByController.set(revision.controllerId, revision);
+    }
+    return [...latestByController.values()];
+  }
+  private cacheChannels(revision: WagoConfigurationRevision): WagoConfigurationSnapshot['logicalChannels'] {
     try {
       const channels = (JSON.parse(revision.snapshot) as WagoConfigurationSnapshot).logicalChannels;
-      this.channelCache.set(controllerId, channels);
+      this.channelCache.set(revision.controllerId, channels);
       return channels;
-    } catch { return []; }
+    } catch {
+      this.channelCache.set(revision.controllerId, []);
+      return [];
+    }
   }
   private categories(channel?: WagoConfigurationSnapshot['logicalChannels'][number]): string[] { return ['state', ...(channel?.capabilities.includes('measurement') ? ['measurement'] : []), 'fault']; }
   private readCategories(channel?: WagoConfigurationSnapshot['logicalChannels'][number]): string[] { return ['state', ...(channel?.capabilities.includes('measurement') ? ['measurement'] : [])]; }

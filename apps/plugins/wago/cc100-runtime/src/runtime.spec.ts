@@ -547,12 +547,10 @@ describe('WagoRuntime', () => {
     await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    expect(transport.published).toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
-        payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),
-      }),
-    );
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+      payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch', timestamp: expect.any(String), sequence: expect.any(Number) }),
+    }));
   });
 
   it('preserves feedback verification for the active phase of a short pulse', async () => {

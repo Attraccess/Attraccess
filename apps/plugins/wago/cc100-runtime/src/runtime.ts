@@ -526,7 +526,8 @@ export class WagoRuntime {
         this.feedbackGenerations.get(channel.id) === generation &&
         this.configurationGeneration === configurationGeneration
       )
-        await this.options.transport.publish(this.topic('faults'), {
+        await this.publishOperational('faults', {
+          timestamp: new Date().toISOString(),
           channelId: channel.id,
           code: 'feedback_mismatch',
           message: 'configured feedback does not match the requested output state',
@@ -537,7 +538,8 @@ export class WagoRuntime {
         this.configurationGeneration !== configurationGeneration
       )
         return;
-      await this.options.transport.publish(this.topic('faults'), {
+      await this.publishOperational('faults', {
+        timestamp: new Date().toISOString(),
         channelId: channel.id,
         code: 'feedback_read_failed',
         message: error instanceof Error ? error.message : String(error),
