@@ -288,7 +288,7 @@ async function scanHostKey(host: string): Promise<string> {
   const knownHosts = join(dir, 'known_hosts');
   try {
     await writeFile(knownHosts, await scanHostKeys(host), { mode: 0o600 });
-    return fingerprintFor(knownHosts);
+    return await fingerprintFor(knownHosts);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
