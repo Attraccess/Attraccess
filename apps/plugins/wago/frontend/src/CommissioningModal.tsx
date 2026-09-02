@@ -52,7 +52,7 @@ export function CommissioningModal({ isOpen, onOpenChange }: CommissioningModalP
     if (isOpen) setMqttServerId(settingsQuery.data?.defaultMqttServerId?.toString() ?? null);
   }, [isOpen, settingsQuery.data?.defaultMqttServerId]);
 
-  const session = deliverSessionMutation.data ?? createSessionMutation.data;
+  const session = revokeSessionMutation.data ?? deliverSessionMutation.data ?? createSessionMutation.data;
   const selectedMqttServerId = mqttServerId === null ? null : Number(mqttServerId);
 
   function close() {
@@ -265,6 +265,7 @@ function SessionStatus({
         SSH host key: {session.hostKeyFingerprint}
       </code>
       {session.enrollmentExpiresAt && <p className="wg:text-sm wg:text-muted">Bootstrap expiry: {new Date(session.enrollmentExpiresAt).toLocaleString()}</p>}
+      {session.pairingCode && <p className="wg:text-sm wg:text-muted">Pairing code: <span className="wg:font-medium">{session.pairingCode}</span></p>}
       {session.failureReason && <Alert status="warning"><Alert.Indicator /><Alert.Content><Alert.Description>{session.failureReason}</Alert.Description></Alert.Content></Alert>}
       <TextField name="sshUsername" isRequired>
         <Label>Temporary SSH username</Label>
@@ -283,9 +284,9 @@ function SessionStatus({
       <p className="wg:text-sm wg:text-muted">No broker credentials are available from this session.</p>
       {deliveryError && <ErrorAlert error={deliveryError} />}
       {revokeError && <ErrorAlert error={revokeError} />}
-      <Button isPending={isDelivering} isDisabled={!sshUsername || !sshPassword || !physicalIdentityConfirmed} onPress={onDeliver}>
+      {session.state !== 'revoked' && <Button isPending={isDelivering} isDisabled={!sshUsername || !sshPassword || !physicalIdentityConfirmed} onPress={onDeliver}>
         {deliveryError || session.state === 'delivery_failed' ? 'Retry delivery' : 'Deliver commissioning'}
-      </Button>
+      </Button>}
       {session.state !== 'revoked' && <Button variant="secondary" isPending={isRevoking} onPress={onRevoke}>Revoke bootstrap session</Button>}
     </ModalBody>
   );

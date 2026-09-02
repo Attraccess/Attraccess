@@ -368,6 +368,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     mqttServerId?: number,
     manualCredentials?: { username: string; password: string },
   ): Promise<{
+    id: number;
     broker: { host: string; port: number; useTls: boolean };
     username: string;
     password?: string;
@@ -418,6 +419,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       this.scheduleSubscriptionRetry();
     });
     return {
+      id: enrollment.id,
       broker: { host: server.host, port: server.port, useTls: server.useTls },
       username: credential.username,
       password: 'password' in credential ? credential.password : undefined,
@@ -432,10 +434,10 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  /** Server-side commissioning calls this to revoke a bootstrap identity without exposing it to a browser. */
-  async revokeEnrollmentForHardwareId(hardwareId: string): Promise<void> {
-    const enrollment = (await this.enrollments.find({ where: { hardwareId } })).find((item) => this.isActiveEnrollment(item));
-    if (enrollment) await this.revokeEnrollment(enrollment);
+  /** Server-side commissioning revokes the enrollment it created without exposing credentials to a browser. */
+  async revokeEnrollmentById(id: number): Promise<void> {
+    const enrollment = await this.enrollments.findOneBy({ id });
+    if (enrollment && this.isActiveEnrollment(enrollment)) await this.revokeEnrollment(enrollment);
   }
 
   async claim(id: number, name: string, verifier: string, mqttServerId?: number): Promise<WagoController> {

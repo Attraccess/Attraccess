@@ -41,6 +41,7 @@ export interface CommissioningSession {
   firmwareBaseline: string;
   state: string;
   enrollmentExpiresAt: string | null;
+  pairingCode: string | null;
   codesysState: string | null;
   failureReason: string | null;
   createdAt: string;

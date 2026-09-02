@@ -1,6 +1,6 @@
 import { ConflictException, Inject, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomInt } from 'node:crypto';
 import { copyFile, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -24,10 +24,11 @@ type TemporarySshCredential = { username: string; password: string };
 @Injectable()
 export class WagoCommissioningService implements OnModuleInit {
   private sessions!: Repository<WagoCommissioningSession>;
+  private readonly deliveryLocks = new Map<number, Promise<void>>();
 
   constructor(
     @Inject(PLUGIN_CONTEXT) private readonly context: PluginContext,
-    private readonly wago: WagoService,
+    @Inject(WagoService) private readonly wago: WagoService,
   ) {}
 
   onModuleInit(): void {
@@ -67,6 +68,8 @@ export class WagoCommissioningService implements OnModuleInit {
         firmwareBaseline: configuredFirmwareBaseline,
         state: 'awaiting_identity_confirmation',
         enrollmentExpiresAt: null,
+        enrollmentId: null,
+        pairingCode: null,
         codesysState: null,
         auditLog: JSON.stringify([{ at: now, event: 'host_key_scanned' }]),
         failureReason: null,
@@ -76,8 +79,10 @@ export class WagoCommissioningService implements OnModuleInit {
     );
   }
 
-  async list(): Promise<WagoCommissioningSession[]> {
-    return this.sessions.find({ order: { updatedAt: 'DESC' } });
+  async list(limit = 50, offset = 0): Promise<WagoCommissioningSession[]> {
+    const take = Number.isSafeInteger(limit) ? Math.min(Math.max(limit, 1), 100) : 50;
+    const skip = Number.isSafeInteger(offset) ? Math.max(offset, 0) : 0;
+    return this.sessions.find({ order: { updatedAt: 'DESC' }, take, skip });
   }
 
   async deliver(
@@ -89,9 +94,22 @@ export class WagoCommissioningService implements OnModuleInit {
       temporarySsh: TemporarySshCredential;
     },
   ): Promise<WagoCommissioningSession> {
+    return this.withDeliveryLock(id, () => this.deliverWhileLocked(id, input));
+  }
+
+  private async deliverWhileLocked(
+    id: number,
+    input: {
+      hostKeyFingerprint: string;
+      physicalIdentityConfirmed: boolean;
+      codesysStopConfirmed: boolean;
+      temporarySsh: TemporarySshCredential;
+    },
+  ): Promise<WagoCommissioningSession> {
     const session = await this.sessions.findOneBy({ id });
     if (!session) throw new NotFoundException('commissioning session not found');
-    if (session.state === 'completed' || session.state === 'revoked') throw new ConflictException('commissioning session is no longer active');
+    if (!['awaiting_identity_confirmation', 'awaiting_codesys_confirmation', 'delivery_failed'].includes(session.state))
+      throw new ConflictException('commissioning session cannot be delivered in its current state');
     if (!input.physicalIdentityConfirmed) throw new ConflictException('physical controller identity confirmation is required');
     if (input.hostKeyFingerprint !== session.hostKeyFingerprint) throw new ConflictException('controller SSH host key does not match the scanned key');
     if (!input.temporarySsh.username.trim() || !input.temporarySsh.password)
@@ -102,7 +120,7 @@ export class WagoCommissioningService implements OnModuleInit {
     try {
       const inspection = await this.inspect(session.targetHost, session.hostKeyFingerprint, input.temporarySsh);
       session.codesysState = inspection.codesys;
-      if (!isSupportedController(inspection.firmware, session.firmwareBaseline)) {
+      if (!isSupportedController(inspection.firmware, session.firmwareBaseline))
         throw new ConflictException(`unsupported CC100 model or firmware; expected baseline ${session.firmwareBaseline}`);
       }
       if (inspection.codesys === 'active' && !input.codesysStopConfirmed) {
@@ -115,12 +133,16 @@ export class WagoCommissioningService implements OnModuleInit {
 
       const enrollment = await this.wago.createEnrollment(session.hardwareId, session.mqttServerId);
       if (!enrollment.password) throw new ConflictException('automatic restricted MQTT credential provisioning is required for secure commissioning');
+      const pairingCode = randomInt(100_000, 1_000_000).toString();
+      session.enrollmentId = enrollment.id;
+      session.pairingCode = pairingCode;
       const runtimeEnv = [
         `WAGO_HARDWARE_ID=${session.hardwareId}`,
         `WAGO_MQTT_URL=${enrollment.broker.useTls ? 'mqtts' : 'mqtt'}://${enrollment.broker.host}:${enrollment.broker.port}`,
         `WAGO_MQTT_USERNAME=${enrollment.username}`,
         `WAGO_MQTT_PASSWORD=${enrollment.password}`,
         `WAGO_ENROLLMENT_SECRET=${enrollment.claimSecret}`,
+        `WAGO_PAIRING_CODE=${pairingCode}`,
       ].join('\n');
 
       if (inspection.codesys === 'active')
@@ -138,7 +160,7 @@ export class WagoCommissioningService implements OnModuleInit {
           session.targetHost,
           session.hostKeyFingerprint,
           input.temporarySsh,
-          `rm -rf /tmp/attraccess-wago-runtime && mkdir -m 0700 /tmp/attraccess-wago-runtime && tar -xf /tmp/attraccess-wago-runtime.tar -C /tmp/attraccess-wago-runtime && rm -f /tmp/attraccess-wago-runtime.tar && grep -Fqx -- ${shellQuote(configuredRuntimeImage)} /tmp/attraccess-wago-runtime/image-reference && docker load -i /tmp/attraccess-wago-runtime/image.tar && rm -rf /tmp/attraccess-wago-runtime && docker image inspect ${runtimeImageTag()} >/dev/null && (docker rm -f attraccess-wago >/dev/null 2>&1 || true) && docker run -d --name attraccess-wago --restart unless-stopped --env-file /etc/attraccess-wago/runtime.env -v /var/lib/attraccess-wago:/var/lib/attraccess-wago ${runtimeImageTag()}`,
+          `rm -rf /tmp/attraccess-wago-runtime && mkdir -m 0700 /tmp/attraccess-wago-runtime && tar -xf /tmp/attraccess-wago-runtime.tar -C /tmp/attraccess-wago-runtime && rm -f /tmp/attraccess-wago-runtime.tar && grep -Fqx -- ${shellQuote(configuredRuntimeImage)} /tmp/attraccess-wago-runtime/image-reference && runtime_image=$(docker load -i /tmp/attraccess-wago-runtime/image.tar | sed -n 's/^Loaded image: //p') && test -n "$runtime_image" && rm -rf /tmp/attraccess-wago-runtime && docker image inspect "$runtime_image" >/dev/null && (docker rm -f attraccess-wago >/dev/null 2>&1 || true) && docker run -d --name attraccess-wago --restart unless-stopped --env-file /etc/attraccess-wago/runtime.env -v /var/lib/attraccess-wago:/var/lib/attraccess-wago "$runtime_image"`,
         );
       } finally {
         await rm(bundle.directory, { recursive: true, force: true });
@@ -149,7 +171,10 @@ export class WagoCommissioningService implements OnModuleInit {
       session.failureReason = null;
       return this.save(session, 'bootstrap_delivered');
     } catch (error) {
+      if (session.enrollmentId !== null) await this.wago.revokeEnrollmentById(session.enrollmentId).catch(() => undefined);
       session.state = 'delivery_failed';
+      session.enrollmentExpiresAt = null;
+      session.pairingCode = null;
       session.failureReason = error instanceof Error ? redact(error.message) : 'Secure delivery failed';
       return this.save(session, 'delivery_failed');
     }
@@ -158,7 +183,7 @@ export class WagoCommissioningService implements OnModuleInit {
   async revoke(id: number): Promise<WagoCommissioningSession> {
     const session = await this.sessions.findOneBy({ id });
     if (!session) throw new NotFoundException('commissioning session not found');
-    await this.wago.revokeEnrollmentForHardwareId(session.hardwareId);
+    if (session.enrollmentId !== null) await this.wago.revokeEnrollmentById(session.enrollmentId);
     session.state = 'revoked';
     session.failureReason = null;
     return this.save(session, 'revoked');
@@ -166,8 +191,11 @@ export class WagoCommissioningService implements OnModuleInit {
 
   private async inspect(host: string, fingerprint: string, credential: TemporarySshCredential): Promise<{ firmware: string; codesys: string }> {
     const output = await this.run(host, fingerprint, credential, "cat /etc/os-release; printf '\\nCODESYS='; ps");
-    const [, codesys = 'unknown'] = output.match(/CODESYS=([^\r\n]*)/) ?? [];
-    return { firmware: output, codesys: /codesys/i.test(codesys) ? 'active' : 'inactive' };
+    const marker = '\nCODESYS=';
+    const markerIndex = output.indexOf(marker);
+    const firmware = markerIndex >= 0 ? output.slice(0, markerIndex) : output;
+    const processes = markerIndex >= 0 ? output.slice(markerIndex + marker.length) : '';
+    return { firmware, codesys: /codesys/i.test(processes) ? 'active' : 'inactive' };
   }
 
   private async writeRuntimeEnvironment(host: string, fingerprint: string, credential: TemporarySshCredential, content: string): Promise<void> {
@@ -201,7 +229,7 @@ export class WagoCommissioningService implements OnModuleInit {
         'ssh',
         [
           '-o', 'BatchMode=no', '-o', 'NumberOfPasswordPrompts=1', '-o', 'HostKeyAlgorithms=ssh-ed25519', '-o', 'StrictHostKeyChecking=yes', '-o', `UserKnownHostsFile=${knownHosts}`,
-          '-o', 'ConnectTimeout=15', `${credential.username}@${host}`, 'sh', '-c', command,
+          '-o', 'ConnectTimeout=15', `${credential.username}@${host}`, `sh -c ${shellQuote(command)}`,
         ],
         input,
         { SSH_ASKPASS: askPass, SSH_ASKPASS_REQUIRE: 'force', DISPLAY: 'attraccess', ATTRACCESS_SSH_PASSWORD: credential.password },
@@ -238,6 +266,21 @@ export class WagoCommissioningService implements OnModuleInit {
     session.auditLog = JSON.stringify(audit.slice(-50));
     session.updatedAt = new Date().toISOString();
     return this.sessions.save(session);
+  }
+
+  private async withDeliveryLock<T>(id: number, operation: () => Promise<T>): Promise<T> {
+    const previous = this.deliveryLocks.get(id) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => (release = resolve));
+    const queued = previous.then(() => current);
+    this.deliveryLocks.set(id, queued);
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (this.deliveryLocks.get(id) === queued) this.deliveryLocks.delete(id);
+    }
   }
 }
 
@@ -334,49 +377,42 @@ async function verifyRuntimeBundle(): Promise<{ directory: string; path: string 
       copyFile(configuredRuntimeBundleChecksum, checksumPath),
       copyFile(configuredRuntimeBundleSignature, signaturePath),
     ]);
+    const [bundle, checksum, signature] = await Promise.all([readFile(bundlePath), readFile(checksumPath, 'utf8'), stat(signaturePath)]);
+    if (!signature.isFile()) throw new ConflictException('CC100 runtime signature is not a file');
+
+    const digest = createHash('sha256').update(bundle).digest('hex');
+    if (!new RegExp(`^${digest}\\s+\\*?${escapeRegExp(configuredRuntimeBundle.split('/').pop() ?? '')}\\s*$`, 'm').test(checksum))
+      throw new ConflictException('CC100 runtime bundle checksum does not match');
+
+    const allowedSigners = join(directory, 'allowed_signers');
+    const publicKey = await readFile(join(__dirname, 'signing-public-key.pub'), 'utf8');
+    await writeFile(allowedSigners, `${SIGNING_IDENTITY} ${publicKey.trim()}\n`, { mode: 0o600 });
+    try {
+      await runProcess(
+        'ssh-keygen',
+        ['-Y', 'verify', '-f', allowedSigners, '-I', SIGNING_IDENTITY, '-n', SIGNING_NAMESPACE, '-s', signaturePath],
+        bundle,
+      );
+    } finally {
+      await rm(allowedSigners, { force: true });
+    }
+    return { directory, path: bundlePath };
   } catch (error) {
     await rm(directory, { recursive: true, force: true });
     throw error;
   }
-  const [bundle, checksum, signature] = await Promise.all([readFile(bundlePath), readFile(checksumPath, 'utf8'), stat(signaturePath)]);
-  if (!signature.isFile()) throw new ConflictException('CC100 runtime signature is not a file');
-
-  const digest = createHash('sha256').update(bundle).digest('hex');
-  if (!new RegExp(`^${digest}\\s+\\*?${escapeRegExp(configuredRuntimeBundle.split('/').pop() ?? '')}\\s*$`, 'm').test(checksum)) {
-    throw new ConflictException('CC100 runtime bundle checksum does not match');
-  }
-
-  try {
-    const allowedSigners = join(directory, 'allowed_signers');
-    const publicKey = await readFile(join(__dirname, 'signing-public-key.pub'), 'utf8');
-    await writeFile(allowedSigners, `${SIGNING_IDENTITY} ${publicKey.trim()}\n`, { mode: 0o600 });
-    await runProcess(
-      'ssh-keygen',
-      ['-Y', 'verify', '-f', allowedSigners, '-I', SIGNING_IDENTITY, '-n', SIGNING_NAMESPACE, '-s', signaturePath],
-      bundle,
-    );
-  } finally {
-    await rm(join(directory, 'allowed_signers'), { force: true });
-  }
-  return { directory, path: bundlePath };
 }
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function runtimeImageTag(): string {
-  return configuredRuntimeImage.split('@', 1)[0];
-}
-
 function isSupportedController(inspection: string, firmwareBaseline: string): boolean {
   if (!inspection.includes('PTXDIST_PLATFORM_NAME="cc100"')) return false;
-  // Current CTL images do not expose their WBM firmware release over SSH. The
-  // administrator confirms that physical release in the pinned-host-key flow.
-  const reportedFirmware = inspection.match(/firmware[^\r\n]*?(\d+(?:\.\d+)+|\d+)/i)?.[1];
-  return !reportedFirmware || reportedFirmware.includes(firmwareBaseline);
+  const reportedFirmware = inspection.match(/^VERSION_ID=["']?([^"'\r\n]+)["']?$/m)?.[1]?.trim();
+  return reportedFirmware === firmwareBaseline.trim();
 }
 
 function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, "'\\\"'\\\"'")}'`;
+  return `'${value.replaceAll("'", "'\\\"'\\\"'")}'`;
 }

@@ -20,12 +20,15 @@ export class WagoControllerApi {
   @Post('settings') setSettings(@Body() body: { defaultMqttServerId?: number | null; operationalPrefix?: string }) {
     return this.wago.setSettings(body?.defaultMqttServerId, body?.operationalPrefix);
   }
+  @Auth('system.settings.manage')
   @Get('commissioning/support') commissioningSupport() {
     return this.commissioning.support();
   }
-  @Get('commissioning/sessions') commissioningSessions() {
-    return this.commissioning.list();
+  @Auth('system.settings.manage')
+  @Get('commissioning/sessions') commissioningSessions(@Query('limit') limit?: string, @Query('offset') offset?: string) {
+    return this.commissioning.list(Number(limit), Number(offset));
   }
+  @Auth('system.settings.manage')
   @Post('commissioning/sessions') createCommissioningSession(
     @Body() body: { hardwareId?: string; mqttServerId?: number; targetHost?: string },
   ) {
@@ -36,6 +39,7 @@ export class WagoControllerApi {
       targetHost: body.targetHost ?? '',
     });
   }
+  @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/deliver') deliverCommissioningSession(
     @Param('id', ParseIntPipe) id: number,
     @Body()
@@ -53,6 +57,7 @@ export class WagoControllerApi {
       temporarySsh: { username: body?.temporarySsh?.username ?? '', password: body?.temporarySsh?.password ?? '' },
     });
   }
+  @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/revoke') revokeCommissioningSession(@Param('id', ParseIntPipe) id: number) {
     return this.commissioning.revoke(id);
   }
