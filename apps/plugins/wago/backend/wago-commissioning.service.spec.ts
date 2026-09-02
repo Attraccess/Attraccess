@@ -70,4 +70,40 @@ describe('WagoCommissioningService', () => {
       state: 'awaiting_identity_confirmation',
     });
   });
+
+  it('serializes revocation with in-progress delivery work for the same session', async () => {
+    const session = {
+      id: 1,
+      enrollmentId: 2,
+      state: 'awaiting_identity_confirmation',
+      failureReason: null,
+      auditLog: '[]',
+      updatedAt: '',
+    } as WagoCommissioningSession;
+    const repository = {
+      findOneBy: jest.fn().mockResolvedValue(session),
+      save: jest.fn().mockImplementation(async (value) => value),
+    };
+    const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
+    let releaseDelivery!: () => void;
+    const delivery = new Promise<void>((resolve) => (releaseDelivery = resolve));
+    const wago = { revokeEnrollmentById: jest.fn().mockResolvedValue(undefined) } as unknown as WagoService;
+    const service = new WagoCommissioningService(context, wago);
+    service.onModuleInit();
+
+    const inProgressDelivery = service['withDeliveryLock'](session.id, () => delivery);
+    await Promise.resolve();
+    const revoke = service.revoke(session.id);
+    await Promise.resolve();
+
+    expect(repository.findOneBy).not.toHaveBeenCalled();
+
+    releaseDelivery();
+    await inProgressDelivery;
+    await revoke;
+
+    expect(repository.findOneBy).toHaveBeenCalledWith({ id: session.id });
+    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(session.enrollmentId);
+    expect(session.state).toBe('revoked');
+  });
 });

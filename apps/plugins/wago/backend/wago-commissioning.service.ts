@@ -170,7 +170,19 @@ export class WagoCommissioningService implements OnModuleInit {
       session.failureReason = null;
       return this.save(session, 'bootstrap_delivered');
     } catch (error) {
-      if (session.enrollmentId !== null) await this.wago.revokeEnrollmentById(session.enrollmentId).catch(() => undefined);
+      if (session.enrollmentId !== null) {
+        try {
+          await this.wago.revokeEnrollmentById(session.enrollmentId);
+        } catch (revocationError) {
+          session.state = 'delivery_failed';
+          session.enrollmentExpiresAt = null;
+          session.pairingCode = null;
+          session.failureReason = `Secure delivery failed and bootstrap credential revocation requires attention: ${redact(
+            revocationError instanceof Error ? revocationError.message : String(revocationError),
+          )}`;
+          return this.save(session, 'enrollment_revocation_failed');
+        }
+      }
       session.state = 'delivery_failed';
       session.enrollmentExpiresAt = null;
       session.pairingCode = null;
@@ -180,12 +192,14 @@ export class WagoCommissioningService implements OnModuleInit {
   }
 
   async revoke(id: number): Promise<WagoCommissioningSession> {
-    const session = await this.sessions.findOneBy({ id });
-    if (!session) throw new NotFoundException('commissioning session not found');
-    if (session.enrollmentId !== null) await this.wago.revokeEnrollmentById(session.enrollmentId);
-    session.state = 'revoked';
-    session.failureReason = null;
-    return this.save(session, 'revoked');
+    return this.withDeliveryLock(id, async () => {
+      const session = await this.sessions.findOneBy({ id });
+      if (!session) throw new NotFoundException('commissioning session not found');
+      if (session.enrollmentId !== null) await this.wago.revokeEnrollmentById(session.enrollmentId);
+      session.state = 'revoked';
+      session.failureReason = null;
+      return this.save(session, 'revoked');
+    });
   }
 
   private async inspect(host: string, fingerprint: string, credential: TemporarySshCredential): Promise<{ firmware: string; codesys: string }> {
