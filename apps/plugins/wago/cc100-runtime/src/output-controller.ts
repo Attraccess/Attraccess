@@ -10,8 +10,10 @@ export class OutputController {
   private readonly channelWrites = new Map<string, Promise<void>>();
   private readonly feedbackChecks = new Map<string, { timer: ReturnType<typeof setTimeout>; generation: number }>();
   private readonly feedbackGenerations = new Map<string, number>();
+  private readonly commandOperations = new Set<Promise<void>>();
   private feedbackGenerationSequence = 0;
   private configurationGeneration = 0;
+  private replacement?: Promise<void>;
 
   constructor(
     private readonly options: {
@@ -25,17 +27,58 @@ export class OutputController {
   ) {}
 
   async replaceConfiguration(): Promise<void> {
-    this.configurationGeneration += 1;
-    this.feedbackChecks.forEach(({ timer }) => clearTimeout(timer));
-    this.feedbackChecks.clear();
-    const pulses = [...this.pulses.entries()];
-    this.pulses.clear();
-    await Promise.all(
-      pulses.map(async ([channelId, pulse]) => {
-        clearTimeout(pulse.timer);
-        await this.runForChannel(channelId, () => this.writePulseShutdown(pulse.channel, pulse.point));
-      }),
-    );
+    let releaseReplacement!: () => void;
+    this.replacement = new Promise<void>((resolve) => {
+      releaseReplacement = resolve;
+    });
+
+    try {
+      await Promise.all(this.commandOperations);
+      await Promise.all([...this.channelWrites.values()]);
+      this.configurationGeneration += 1;
+      this.feedbackChecks.forEach(({ timer }) => clearTimeout(timer));
+      this.feedbackChecks.clear();
+      const pulses = [...this.pulses.entries()];
+      let shutdownFailed = false;
+      await Promise.all(
+        pulses.map(async ([channelId, pulse]) => {
+          clearTimeout(pulse.timer);
+          try {
+            const stopped = await this.runForChannel(channelId, () =>
+              this.writePulseShutdown(pulse.channel, pulse.point),
+            );
+            if (stopped && this.pulses.get(channelId) === pulse) this.pulses.delete(channelId);
+            else shutdownFailed = true;
+          } catch {
+            shutdownFailed = true;
+          }
+        }),
+      );
+      if (shutdownFailed) {
+        pulses.forEach(([channelId, pulse]) => {
+          if (this.pulses.get(channelId) === pulse) this.retryPulseShutdown(channelId, pulse);
+        });
+        throw new Error('failed to de-energize active pulse');
+      }
+    } finally {
+      this.replacement = undefined;
+      releaseReplacement();
+    }
+  }
+
+  async runForCommand<T>(channelId: string, operation: () => Promise<T>): Promise<T> {
+    while (this.replacement) await this.replacement;
+    let release!: () => void;
+    const completion = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.commandOperations.add(completion);
+    try {
+      return await this.runForChannel(channelId, operation);
+    } finally {
+      this.commandOperations.delete(completion);
+      release();
+    }
   }
 
   async runForChannel<T>(channelId: string, operation: () => Promise<T>): Promise<T> {
@@ -187,6 +230,20 @@ export class OutputController {
 
   private async writePulseShutdown(channel: LogicalChannel, point: PhysicalPoint): Promise<boolean> {
     return this.writePointWhileQueued(channel, point, false, undefined, undefined, -1);
+  }
+
+  private retryPulseShutdown(channelId: string, pulse: Pulse): void {
+    pulse.timer = setTimeout(
+      () =>
+        void this.ignoreRejection(() =>
+          this.runForChannel(channelId, async () => {
+            if (this.pulses.get(channelId) !== pulse) return;
+            if (await this.writePulseShutdown(pulse.channel, pulse.point)) this.pulses.delete(channelId);
+            else this.retryPulseShutdown(channelId, pulse);
+          }),
+        ),
+      0,
+    );
   }
 
   private scheduleFeedbackCheck(channel: LogicalChannel, value: boolean): void {

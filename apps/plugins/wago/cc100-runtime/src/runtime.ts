@@ -30,6 +30,7 @@ export class WagoRuntime {
   private connected = true;
   private readonly inFlightCommandIds = new Set<string>();
   private readonly outputs: OutputController;
+  private configurationUpdates = Promise.resolve();
 
   constructor(
     private readonly options: {
@@ -120,20 +121,39 @@ export class WagoRuntime {
         { path: '$', code: 'invalid_json', message: 'desired configuration is not valid JSON' },
       ]);
     }
-    const errors = validateDesired(desired);
-    if (!errors.length && desired.contentHash !== hash(desired.snapshot))
-      errors.push({ path: 'contentHash', code: 'hash_mismatch', message: 'content hash does not match snapshot' });
-    if (errors.length) return this.reportRejected(desired.revision, desired.contentHash, errors);
-    if (this.state.accepted?.revision === desired.revision && this.state.accepted.contentHash === desired.contentHash) {
+    await this.runConfigurationUpdate(async () => {
+      const errors = validateDesired(desired);
+      if (!errors.length && desired.contentHash !== hash(desired.snapshot))
+        errors.push({ path: 'contentHash', code: 'hash_mismatch', message: 'content hash does not match snapshot' });
+      if (errors.length) return this.reportRejected(desired.revision, desired.contentHash, errors);
+      if (
+        this.state.accepted?.revision === desired.revision &&
+        this.state.accepted.contentHash === desired.contentHash
+      ) {
+        await this.publishReport(desired.revision, desired.contentHash, []);
+        return;
+      }
+      if ((this.state.accepted?.revision ?? 0) > desired.revision)
+        return this.reportRejected(desired.revision, desired.contentHash, [
+          { path: 'revision', code: 'stale_revision', message: 'configuration revision is stale' },
+        ]);
+      // Persist only after validation and pulse shutdown; a rejected snapshot cannot alter active I/O.
+      try {
+        await this.outputs.replaceConfiguration();
+      } catch {
+        return this.reportRejected(desired.revision, desired.contentHash, [
+          { path: 'snapshot', code: 'pulse_shutdown_failed', message: 'failed to de-energize active pulse' },
+        ]);
+      }
+      this.state.accepted = {
+        revision: desired.revision,
+        contentHash: desired.contentHash,
+        snapshot: desired.snapshot,
+      };
+      await this.options.store.save(this.state);
       await this.publishReport(desired.revision, desired.contentHash, []);
-      return;
-    }
-    // Persist only after validation; a rejected snapshot cannot alter active I/O.
-    await this.outputs.replaceConfiguration();
-    this.state.accepted = { revision: desired.revision, contentHash: desired.contentHash, snapshot: desired.snapshot };
-    await this.options.store.save(this.state);
-    await this.publishReport(desired.revision, desired.contentHash, []);
-    await this.publishState();
+      await this.publishState();
+    });
   }
 
   async receiveCommand(payload: Buffer): Promise<void> {
@@ -187,7 +207,7 @@ export class WagoRuntime {
       this.state.commandIds = [...this.state.commandIds, command.id].slice(-100);
       this.state.commandExpiries = { ...this.state.commandExpiries, [command.id]: expiresAt };
       await this.options.store.save(this.state);
-      await this.outputs.runForChannel(channel.id, async () => {
+      await this.outputs.runForCommand(channel.id, async () => {
         const currentChannel = this.state.accepted?.snapshot.logicalChannels.find(
           (item) => item.id === command.channelId,
         );
@@ -341,5 +361,19 @@ export class WagoRuntime {
     this.state.commandExpiries = Object.fromEntries(
       Object.entries(this.state.commandExpiries ?? {}).filter(([, expiresAt]) => Date.parse(expiresAt) > now),
     );
+  }
+
+  private async runConfigurationUpdate<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = this.configurationUpdates;
+    let release!: () => void;
+    this.configurationUpdates = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+    }
   }
 }
