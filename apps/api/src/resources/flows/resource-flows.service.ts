@@ -93,8 +93,14 @@ export class ResourceFlowsService {
 
     const validationContext = new Map<string, unknown>();
     const validationErrors: ValidationError[] = [];
-    // Plugin validators may query external state, so do not fan out an entire flow at once.
-    for (const node of nodes) validationErrors.push(...(await this.validateNodeData(node, validationContext)));
+    // Plugin validators may query external state, so bound the fanout without serializing the whole flow.
+    const validationConcurrency = 4;
+    for (let index = 0; index < nodes.length; index += validationConcurrency) {
+      const batch = nodes.slice(index, index + validationConcurrency);
+      validationErrors.push(
+        ...(await Promise.all(batch.map((node) => this.validateNodeData(node, validationContext)))).flat(),
+      );
+    }
     return { nodes, edges, ...(validationErrors.length ? { validationErrors } : {}) };
   }
 
@@ -569,8 +575,8 @@ export class ResourceFlowsService {
 
     // Append plugin-contributed node schemas.
     const pluginSchemas = getRegisteredPluginFlowNodes().map((definition) => {
-      const configSchema = definition.configSchema ??
-        (definition.resolveConfigSchema ? { dynamic: true, properties: {} } : undefined);
+      const configSchema =
+        definition.configSchema ?? (definition.resolveConfigSchema ? { dynamic: true, properties: {} } : undefined);
       if (!configSchema) {
         throw new Error(`Plugin flow node type "${definition.type}" does not provide a configuration schema.`);
       }

@@ -129,7 +129,7 @@ export class WagoRuntime {
       return;
     }
     // Persist only after validation; a rejected snapshot cannot alter active I/O.
-    this.outputs.replaceConfiguration();
+    await this.outputs.replaceConfiguration();
     this.state.accepted = { revision: desired.revision, contentHash: desired.contentHash, snapshot: desired.snapshot };
     await this.options.store.save(this.state);
     await this.publishReport(desired.revision, desired.contentHash, []);
@@ -188,14 +188,39 @@ export class WagoRuntime {
       this.state.commandExpiries = { ...this.state.commandExpiries, [command.id]: expiresAt };
       await this.options.store.save(this.state);
       await this.outputs.runForChannel(channel.id, async () => {
-        if (!(await this.outputs.isGuardSatisfied(channel))) {
+        const currentChannel = this.state.accepted?.snapshot.logicalChannels.find(
+          (item) => item.id === command.channelId,
+        );
+        if (
+          this.state.accepted?.revision !== expectedConfigurationRevision ||
+          !currentChannel?.capabilities.includes('output')
+        ) {
+          await this.releaseCommand(command.id);
+          return this.acknowledge(
+            command.id,
+            'rejected',
+            'controller configuration revision is stale',
+            'stale_revision',
+          );
+        }
+        if (!(await this.outputs.isGuardSatisfied(currentChannel))) {
           await this.releaseCommand(command.id);
           return this.acknowledge(command.id, 'rejected', 'operational guard is not satisfied', 'guard_rejected');
         }
         if (command.action === 'pulse') {
-          if (!(await this.outputs.writeWhileQueued(channel, true, () => this.outputs.schedulePulse(channel, duration))))
+          const currentDuration = currentChannel.pulse?.durationMs;
+          if (!currentDuration) return this.rejectFailedWrite(command.id);
+          if (
+            !(await this.outputs.writeWhileQueued(currentChannel, true, () =>
+              this.outputs.schedulePulse(currentChannel, currentDuration),
+            ))
+          )
             return this.rejectFailedWrite(command.id);
-        } else if (!(await this.outputs.writeWhileQueued(channel, command.value, undefined, () => this.outputs.clearPulse(channel.id))))
+        } else if (
+          !(await this.outputs.writeWhileQueued(currentChannel, command.value, undefined, () =>
+            this.outputs.clearPulse(currentChannel.id),
+          ))
+        )
           return this.rejectFailedWrite(command.id);
         await this.acknowledge(command.id, 'accepted');
       });

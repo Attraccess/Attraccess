@@ -1,9 +1,11 @@
 import { type DeviceAdapter, type RuntimeState, type Snapshot } from './runtime-types';
 
 type LogicalChannel = Snapshot['logicalChannels'][number];
+type PhysicalPoint = Snapshot['physicalPoints'][number];
+type Pulse = { timer: ReturnType<typeof setTimeout>; channel: LogicalChannel; point: PhysicalPoint };
 
 export class OutputController {
-  private readonly pulses = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly pulses = new Map<string, Pulse>();
   private readonly watchdogs = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly channelWrites = new Map<string, Promise<void>>();
   private readonly feedbackChecks = new Map<string, { timer: ReturnType<typeof setTimeout>; generation: number }>();
@@ -22,10 +24,18 @@ export class OutputController {
     },
   ) {}
 
-  replaceConfiguration(): void {
+  async replaceConfiguration(): Promise<void> {
     this.configurationGeneration += 1;
     this.feedbackChecks.forEach(({ timer }) => clearTimeout(timer));
     this.feedbackChecks.clear();
+    const pulses = [...this.pulses.entries()];
+    this.pulses.clear();
+    await Promise.all(
+      pulses.map(async ([channelId, pulse]) => {
+        clearTimeout(pulse.timer);
+        await this.runForChannel(channelId, () => this.writePulseShutdown(pulse.channel, pulse.point));
+      }),
+    );
   }
 
   async runForChannel<T>(channelId: string, operation: () => Promise<T>): Promise<T> {
@@ -62,6 +72,17 @@ export class OutputController {
     const configurationGeneration = this.configurationGeneration;
     const point = this.options.getSnapshot()?.physicalPoints.find((item) => item.id === channel.physicalPointId);
     if (!point) return false;
+    return this.writePointWhileQueued(channel, point, value, onWritten, onCommitted, configurationGeneration);
+  }
+
+  private async writePointWhileQueued(
+    channel: LogicalChannel,
+    point: PhysicalPoint,
+    value: boolean,
+    onWritten?: () => void,
+    onCommitted?: () => void,
+    configurationGeneration = this.configurationGeneration,
+  ): Promise<boolean> {
     try {
       await this.options.device.write(point, value);
     } catch (error) {
@@ -81,12 +102,12 @@ export class OutputController {
       throw new Error('failed to persist channel state');
     }
     onCommitted?.();
+    if (configurationGeneration === this.configurationGeneration) this.scheduleFeedbackCheck(channel, value);
     try {
       await this.options.publishState();
     } catch {
       // Retained-state publication does not change the durable state of a successful write.
     }
-    if (configurationGeneration === this.configurationGeneration) this.scheduleFeedbackCheck(channel, value);
     return true;
   }
 
@@ -104,29 +125,30 @@ export class OutputController {
   }
 
   schedulePulse(channel: LogicalChannel, duration: number): void {
+    const point = this.options.getSnapshot()?.physicalPoints.find((item) => item.id === channel.physicalPointId);
+    if (!point) return;
     const existingPulse = this.pulses.get(channel.id);
-    if (existingPulse) clearTimeout(existingPulse);
-    const configurationGeneration = this.configurationGeneration;
-    this.pulses.set(
-      channel.id,
-      setTimeout(
+    if (existingPulse) clearTimeout(existingPulse.timer);
+    this.pulses.set(channel.id, {
+      channel,
+      point,
+      timer: setTimeout(
         () =>
           void this.ignoreRejection(() =>
             this.runForChannel(channel.id, async () => {
-              if (this.configurationGeneration !== configurationGeneration) return;
               this.pulses.delete(channel.id);
-              await this.writeWhileQueued(channel, false);
+              await this.writePulseShutdown(channel, point);
             }),
           ),
         duration,
       ),
-    );
+    });
   }
 
   clearPulse(channelId: string): void {
     const pulse = this.pulses.get(channelId);
     if (!pulse) return;
-    clearTimeout(pulse);
+    clearTimeout(pulse.timer);
     this.pulses.delete(channelId);
   }
 
@@ -163,6 +185,10 @@ export class OutputController {
     void callback().catch(() => undefined);
   }
 
+  private async writePulseShutdown(channel: LogicalChannel, point: PhysicalPoint): Promise<boolean> {
+    return this.writePointWhileQueued(channel, point, false, undefined, undefined, -1);
+  }
+
   private scheduleFeedbackCheck(channel: LogicalChannel, value: boolean): void {
     if (!channel.feedback) return;
     const generation = ++this.feedbackGenerationSequence;
@@ -184,8 +210,12 @@ export class OutputController {
     configurationGeneration: number,
   ): Promise<void> {
     if (!this.isCurrentFeedback(channel.id, generation, configurationGeneration)) return;
-    const feedbackChannel = this.options.getSnapshot()?.logicalChannels.find((item) => item.id === channel.feedback?.channelId);
-    const point = this.options.getSnapshot()?.physicalPoints.find((item) => item.id === feedbackChannel?.physicalPointId);
+    const feedbackChannel = this.options
+      .getSnapshot()
+      ?.logicalChannels.find((item) => item.id === channel.feedback?.channelId);
+    const point = this.options
+      .getSnapshot()
+      ?.physicalPoints.find((item) => item.id === feedbackChannel?.physicalPointId);
     if (!channel.feedback || !point) return;
     try {
       const actual = Boolean(await this.options.device.read(point));
