@@ -56,6 +56,7 @@ function createFakePlugin(name: string, routes: unknown[] = []): AttraccessFront
 interface ManifestOptions {
   name?: string;
   entryPoint?: string | undefined;
+  styles?: string;
   routes?: unknown[];
 }
 
@@ -64,7 +65,12 @@ function primeManifest(options: ManifestOptions = {}) {
   const manifest = {
     name,
     version: '1.0.0',
-    main: { frontend: 'entryPoint' in options ? { entryPoint: options.entryPoint } : { entryPoint: 'index.js' } },
+    main: {
+      frontend: {
+        entryPoint: 'entryPoint' in options ? options.entryPoint : 'index.js',
+        ...(options.styles ? { styles: options.styles } : {}),
+      },
+    },
   };
   hoisted.refetchMock.mockResolvedValue({ data: [manifest] });
   hoisted.getRemoteMock.mockResolvedValue({ default: function () {
@@ -126,6 +132,26 @@ describe('PluginProvider', () => {
     render(<PluginProvider />);
     await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(1));
     expect(usePluginState.getState().plugins[0].plugin.getPluginName()).toMatch(/^Plugin/);
+  });
+
+  it('encodes scoped package names in frontend asset URLs', async () => {
+    const { name } = primeManifest({ name: '@attraccess/plugin-wago', styles: 'style.css' });
+    const appendChild = vi.spyOn(document.head, 'appendChild').mockImplementation((node) => node);
+
+    render(<PluginProvider />);
+
+    await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(1));
+
+    const remoteConfig = hoisted.setRemoteMock.mock.calls.at(-1)?.[1] as { url: () => Promise<string> };
+    await expect(remoteConfig.url()).resolves.toBe(
+      'http://test.local/api/plugins/%40attraccess%2Fplugin-wago/frontend/module-federation/index.js'
+    );
+    const styleLink = appendChild.mock.calls.find(([node]) => node instanceof HTMLLinkElement)?.[0];
+    expect(styleLink).toHaveAttribute('id', `plugin-styles-${name}`);
+    expect(styleLink).toHaveAttribute(
+      'href',
+      'http://test.local/api/plugins/%40attraccess%2Fplugin-wago/frontend/module-federation/style.css'
+    );
   });
 
   it('skips plugins without a frontend entry point', async () => {

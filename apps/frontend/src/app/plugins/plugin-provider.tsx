@@ -79,7 +79,8 @@ export function PluginProvider(props: PropsWithChildren) {
           }
 
           const baseUrl = getBaseUrl();
-          const remoteUrl = `${baseUrl}/api/plugins/${pluginManifest.name}/frontend/module-federation/${entryPointFile}`;
+          const pluginUrlPath = `${baseUrl}/api/plugins/${encodeURIComponent(pluginManifest.name)}/frontend/module-federation`;
+          const remoteUrl = `${pluginUrlPath}/${entryPointFile}`;
 
           // Plugins bundle their own CSS (e.g. their Tailwind utilities); the
           // federation remote only carries JS, so inject the stylesheet here.
@@ -90,7 +91,7 @@ export function PluginProvider(props: PropsWithChildren) {
               const link = document.createElement('link');
               link.id = linkId;
               link.rel = 'stylesheet';
-              link.href = `${baseUrl}/api/plugins/${pluginManifest.name}/frontend/module-federation/${stylesFile}`;
+              link.href = `${pluginUrlPath}/${stylesFile}`;
               document.head.appendChild(link);
             }
           }
