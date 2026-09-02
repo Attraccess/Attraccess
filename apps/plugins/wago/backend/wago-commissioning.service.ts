@@ -122,7 +122,6 @@ export class WagoCommissioningService implements OnModuleInit {
       session.codesysState = inspection.codesys;
       if (!isSupportedController(inspection.firmware, session.firmwareBaseline))
         throw new ConflictException(`unsupported CC100 model or firmware; expected baseline ${session.firmwareBaseline}`);
-      }
       if (inspection.codesys === 'active' && !input.codesysStopConfirmed) {
         session.state = 'awaiting_codesys_confirmation';
         session.failureReason = 'CODESYS is active; explicit administrator confirmation is required before it is stopped.';
