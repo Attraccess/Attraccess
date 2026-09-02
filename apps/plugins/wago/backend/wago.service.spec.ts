@@ -105,8 +105,17 @@ describe('WagoService', () => {
       },
       getMqttCredentialProvisioning: jest.fn(),
     } as unknown as PluginContext;
+    const service = new WagoService(context);
+    // Unit tests invoke service methods directly, outside Nest's module lifecycle.
+    Object.assign(service, {
+      controllers: controllerRepository,
+      settings: settingsRepository,
+      enrollments: enrollmentRepository,
+      drafts: draftRepository,
+      revisions: revisionRepository,
+    });
     return {
-      service: new WagoService(context),
+      service,
       controllerRepository,
       enrollmentRepository,
       settingsRepository,
@@ -144,6 +153,25 @@ describe('WagoService', () => {
 
     expect(listed).not.toHaveProperty('fingerprint');
     expect(listed).not.toHaveProperty('pairingCodeHash');
+  });
+
+  it('resolves repositories only after the host module initializes', async () => {
+    const context = { getRepository: jest.fn() } as unknown as PluginContext;
+    new WagoService(context);
+
+    expect(context.getRepository).not.toHaveBeenCalled();
+  });
+
+  it('retries MQTT subscriptions instead of failing module startup', async () => {
+    const { service, context } = createService([], [], 2);
+    (context.mqtt.subscribe as jest.Mock).mockRejectedValueOnce(new Error('broker unavailable'));
+
+    await expect(service.onModuleInit()).resolves.toBeUndefined();
+
+    expect(context.logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Could not establish WAGO MQTT subscriptions during startup'),
+    );
+    service.onModuleDestroy();
   });
 
   it('publishes a configured command without waiting when dispatch completion is selected', async () => {

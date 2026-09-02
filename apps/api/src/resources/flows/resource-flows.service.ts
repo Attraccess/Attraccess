@@ -92,9 +92,9 @@ export class ResourceFlowsService {
     ]);
 
     const validationContext = new Map<string, unknown>();
-    const validationErrors = (
-      await Promise.all(nodes.map((node) => this.validateNodeData(node, validationContext)))
-    ).flat();
+    const validationErrors: ValidationError[] = [];
+    // Plugin validators may query external state, so do not fan out an entire flow at once.
+    for (const node of nodes) validationErrors.push(...(await this.validateNodeData(node, validationContext)));
     return { nodes, edges, ...(validationErrors.length ? { validationErrors } : {}) };
   }
 

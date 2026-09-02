@@ -110,7 +110,12 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       .where('enrollment.consumedAt IS NULL')
       .getMany();
     for (const enrollment of enrollments) this.scheduleEnrollmentExpiry(enrollment);
-    await this.subscribeConfiguredServers();
+    try {
+      await this.subscribeConfiguredServers();
+    } catch (error) {
+      this.context.logger.warn(`Could not establish WAGO MQTT subscriptions during startup: ${String(error)}`);
+      this.scheduleSubscriptionRetry();
+    }
   }
   onModuleDestroy(): void {
     this.destroyed = true;

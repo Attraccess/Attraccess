@@ -129,6 +129,7 @@ export class WagoRuntime {
       return;
     }
     // Persist only after validation; a rejected snapshot cannot alter active I/O.
+    this.outputs.replaceConfiguration();
     this.state.accepted = { revision: desired.revision, contentHash: desired.contentHash, snapshot: desired.snapshot };
     await this.options.store.save(this.state);
     await this.publishReport(desired.revision, desired.contentHash, []);
@@ -173,8 +174,6 @@ export class WagoRuntime {
       const channel = this.state.accepted?.snapshot.logicalChannels.find((item) => item.id === command.channelId);
       if (!channel || !channel.capabilities.includes('output'))
         return this.acknowledge(command.id, 'rejected', 'unknown output channel', 'unknown_channel');
-      if (!(await this.outputs.isGuardSatisfied(channel)))
-        return this.acknowledge(command.id, 'rejected', 'operational guard is not satisfied', 'guard_rejected');
       const duration = command.action === 'pulse' ? channel.pulse?.durationMs : undefined;
       if (command.action === 'pulse' && !duration)
         return this.acknowledge(
@@ -188,11 +187,18 @@ export class WagoRuntime {
       this.state.commandIds = [...this.state.commandIds, command.id].slice(-100);
       this.state.commandExpiries = { ...this.state.commandExpiries, [command.id]: expiresAt };
       await this.options.store.save(this.state);
-      if (command.action === 'pulse') {
-        if (!(await this.outputs.write(channel, true, () => this.outputs.schedulePulse(channel, duration))))
+      await this.outputs.runForChannel(channel.id, async () => {
+        if (!(await this.outputs.isGuardSatisfied(channel))) {
+          await this.releaseCommand(command.id);
+          return this.acknowledge(command.id, 'rejected', 'operational guard is not satisfied', 'guard_rejected');
+        }
+        if (command.action === 'pulse') {
+          if (!(await this.outputs.writeWhileQueued(channel, true, () => this.outputs.schedulePulse(channel, duration))))
+            return this.rejectFailedWrite(command.id);
+        } else if (!(await this.outputs.writeWhileQueued(channel, command.value, undefined, () => this.outputs.clearPulse(channel.id))))
           return this.rejectFailedWrite(command.id);
-      } else if (!(await this.outputs.write(channel, command.value))) return this.rejectFailedWrite(command.id);
-      await this.acknowledge(command.id, 'accepted');
+        await this.acknowledge(command.id, 'accepted');
+      });
     } finally {
       this.inFlightCommandIds.delete(command.id);
     }
@@ -264,10 +270,16 @@ export class WagoRuntime {
     return this.publishReport(revision, contentHash, errors);
   }
   private publishFault(channelId: string, error: unknown): Promise<void> {
+    const fault =
+      error && typeof error === 'object' && 'code' in error && 'message' in error
+        ? (error as { code: string; message: string })
+        : {
+            code: 'device_write_failed',
+            message: error instanceof Error ? error.message : String(error),
+          };
     return this.options.transport.publish(this.topic('faults'), {
       channelId,
-      code: 'device_write_failed',
-      message: error instanceof Error ? error.message : String(error),
+      ...fault,
     });
   }
   private acknowledge(
@@ -291,10 +303,13 @@ export class WagoRuntime {
     return this.topic('commands');
   }
   private async rejectFailedWrite(id: string): Promise<void> {
+    await this.releaseCommand(id);
+    await this.acknowledge(id, 'rejected', 'device write failed', 'device_write_failed');
+  }
+  private async releaseCommand(id: string): Promise<void> {
     this.state.commandIds = this.state.commandIds.filter((commandId) => commandId !== id);
     if (this.state.commandExpiries) delete this.state.commandExpiries[id];
     await this.options.store.save(this.state);
-    await this.acknowledge(id, 'rejected', 'device write failed', 'device_write_failed');
   }
   private pruneCommandExpiries(): void {
     const now = Date.now();
