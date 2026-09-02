@@ -275,7 +275,7 @@ function SessionStatus({
         <Input value={sshPassword} onChange={(event) => onSshPasswordChange(event.target.value)} />
       </TextField>
       <Checkbox isSelected={physicalIdentityConfirmed} onChange={onPhysicalIdentityConfirmedChange}>
-        <Checkbox.Content><Checkbox.Control><Checkbox.Indicator /></Checkbox.Control>I verified this SSH host key and controller hardware ID in person.</Checkbox.Content>
+        <Checkbox.Content><Checkbox.Control><Checkbox.Indicator /></Checkbox.Control>I verified this SSH host key, controller hardware ID, and supported firmware baseline in person.</Checkbox.Content>
       </Checkbox>
       <Checkbox isSelected={codesysStopAcknowledged} onChange={onCodesysStopAcknowledgedChange}>
         <Checkbox.Content><Checkbox.Control><Checkbox.Indicator /></Checkbox.Control>I approve stopping CODESYS if it is active. This does not alter safety circuits or unrelated workloads.</Checkbox.Content>

@@ -11,9 +11,9 @@ export const TOKEN_VERSION = 'v1';
 const SALT = Buffer.from('attraccess.encryption.salt', 'utf8');
 const INFO = Buffer.from('attraccess|aes-256-gcm|content-encryption', 'utf8');
 
-function deriveKey(secret: string): Buffer {
+function deriveKey(secret: string, info = INFO): Buffer {
   const raw = typeof secret === 'string' ? secret.trim() : String(secret).trim();
-  const derived = hkdfSync('sha256', Buffer.from(raw, 'utf8'), SALT, INFO, KEY_LENGTH_BYTES);
+  const derived = hkdfSync('sha256', Buffer.from(raw, 'utf8'), SALT, info, KEY_LENGTH_BYTES);
   return Buffer.from(derived as unknown as ArrayBuffer);
 }
 
@@ -24,6 +24,20 @@ function encryptWithKey(key: Buffer, plaintext: string): string {
   const authTag = cipher.getAuthTag();
   const payload = Buffer.concat([iv, ciphertext, authTag]);
   return `${TOKEN_VERSION}.${payload.toString('base64url')}`;
+}
+
+function decryptWithKey(key: Buffer, token: string): string {
+  const [version, encoded] = token.split('.', 2);
+  if (version !== TOKEN_VERSION || !encoded) throw new Error('decrypt: unsupported or malformed token');
+  const payload = Buffer.from(encoded, 'base64url');
+  if (payload.toString('base64url') !== encoded) throw new Error('decrypt: token payload not canonical');
+  if (payload.length < IV_LENGTH_BYTES + AUTH_TAG_LENGTH_BYTES + 1) throw new Error('decrypt: token payload too short');
+  const iv = payload.subarray(0, IV_LENGTH_BYTES);
+  const authTag = payload.subarray(payload.length - AUTH_TAG_LENGTH_BYTES);
+  const ciphertext = payload.subarray(IV_LENGTH_BYTES, payload.length - AUTH_TAG_LENGTH_BYTES);
+  const decipher = createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(authTag);
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
 }
 
 export interface StandaloneEncryptor {
@@ -69,12 +83,11 @@ export class EncryptionService {
     return this.cachedKey;
   }
 
-  private encodeBase64Url(buffer: Buffer): string {
-    return buffer.toString('base64url');
-  }
-
-  private decodeBase64Url(input: string): Buffer {
-    return Buffer.from(input, 'base64url');
+  private getPluginEncryptionKey(pluginId: string): Buffer {
+    const appConfig = this.configService.get<AppConfigType>('app');
+    const secret = appConfig?.AUTH_SESSION_SECRET;
+    if (!secret || secret.length === 0) throw new Error('AUTH_SESSION_SECRET is required for encryption');
+    return deriveKey(secret, Buffer.from(`attraccess|aes-256-gcm|plugin-secret|${pluginId}`, 'utf8'));
   }
 
   isEncrypted(value: string | null | undefined): value is string {
@@ -113,31 +126,18 @@ export class EncryptionService {
       throw new TypeError('decrypt: token must be a non-empty string');
     }
 
-    const [version, encoded] = token.split('.', 2);
-    if (version !== TOKEN_VERSION || !encoded) {
-      throw new Error('decrypt: unsupported or malformed token');
-    }
+    return decryptWithKey(this.getEncryptionKey(), token);
+  }
 
-    const payload = this.decodeBase64Url(encoded);
-    // Enforce canonical base64url encoding to prevent alternate encodings of the same bytes
-    // from being accepted as valid tokens (guards against non-canonical tampering).
-    const canonical = this.encodeBase64Url(payload);
-    if (canonical !== encoded) {
-      throw new Error('decrypt: token payload not canonical');
-    }
-    if (payload.length < IV_LENGTH_BYTES + AUTH_TAG_LENGTH_BYTES + 1) {
-      throw new Error('decrypt: token payload too short');
-    }
+  encryptForPlugin(pluginId: string, plaintext: string): string {
+    if (!pluginId || !/^[a-z0-9-]+$/.test(pluginId)) throw new Error('plugin ID is required for encryption');
+    if (typeof plaintext !== 'string') throw new TypeError('encrypt: plaintext must be a string');
+    return encryptWithKey(this.getPluginEncryptionKey(pluginId), plaintext);
+  }
 
-    const iv = payload.subarray(0, IV_LENGTH_BYTES);
-    const authTag = payload.subarray(payload.length - AUTH_TAG_LENGTH_BYTES);
-    const ciphertext = payload.subarray(IV_LENGTH_BYTES, payload.length - AUTH_TAG_LENGTH_BYTES);
-
-    const key = this.getEncryptionKey();
-    const decipher = createDecipheriv('aes-256-gcm', key, iv);
-    decipher.setAuthTag(authTag);
-
-    const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
-    return plaintext;
+  decryptForPlugin(pluginId: string, token: string): string {
+    if (!pluginId || !/^[a-z0-9-]+$/.test(pluginId)) throw new Error('plugin ID is required for decryption');
+    if (typeof token !== 'string' || token.length === 0) throw new TypeError('decrypt: token must be a non-empty string');
+    return decryptWithKey(this.getPluginEncryptionKey(pluginId), token);
   }
 }

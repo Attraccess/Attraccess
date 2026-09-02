@@ -4,7 +4,7 @@ import { WagoService } from './wago.service';
 import { WagoCommissioningService } from './wago-commissioning.service';
 import type { WagoPresetApplication } from './configuration';
 
-@Auth('resources.update')
+@Auth('system.settings.manage')
 @Controller('wago')
 export class WagoControllerApi {
   constructor(
