@@ -437,7 +437,7 @@ describe('WagoRuntime', () => {
     expect(device.values.get('751-9301:0')).toBe(false);
   });
 
-  it('does not apply a replacement or retry pulse shutdown indefinitely', async () => {
+  it('retains a failed pulse for a later replacement without retrying indefinitely', async () => {
     jest.useFakeTimers();
     let failShutdown = false;
     let shutdownAttempts = 0;
@@ -478,8 +478,16 @@ describe('WagoRuntime', () => {
       await jest.advanceTimersByTimeAsync(5_000);
       expect(shutdownAttempts).toBe(6);
 
-      await transport.send(commands, validCommand({ id: 'still-revision-one' }));
-      expect(device.values.get('751-9301:0')).toBe(true);
+      failShutdown = false;
+      await transport.send(desired, { protocolVersion: 1, revision: 3, contentHash: hash(snapshot), snapshot });
+
+      expect(device.values.get('751-9301:0')).toBe(false);
+      expect(transport.published).toContainEqual(
+        expect.objectContaining({
+          topic: 'attraccess/wago/v1/controllers/cc100-1/configuration/reported',
+          payload: expect.objectContaining({ revision: 3, errors: [] }),
+        }),
+      );
     } finally {
       jest.useRealTimers();
     }
