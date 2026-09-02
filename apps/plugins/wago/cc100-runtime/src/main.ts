@@ -52,6 +52,17 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
   });
   let initialized = false;
   let connected = false;
+  const pendingConnectionStates: boolean[] = [];
+
+  const applyConnectionState = (state: boolean): void => {
+    connected = state;
+    if (activeClient !== client || !credentials) return;
+    if (!initialized) {
+      pendingConnectionStates.push(state);
+      return;
+    }
+    void handleAsync(() => runtime.setConnected(state));
+  };
 
   activeClient.once(
     'connect',
@@ -67,20 +78,19 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
           return;
         }
         await runtime.start();
+        const hadPendingConnectionState = pendingConnectionStates.length > 0;
+        while (pendingConnectionStates.length > 0) {
+          const state = pendingConnectionStates.shift();
+          if (state !== undefined) await runtime.setConnected(state);
+        }
         initialized = true;
-        if (!connected) await runtime.setConnected(false);
+        if (!hadPendingConnectionState && !connected) await runtime.setConnected(false);
         heartbeatTimer = setInterval(() => void handleAsync(() => runtime.publishHeartbeat()), 30_000).unref();
         measurementTimer = setInterval(() => void handleAsync(() => runtime.publishMeasurements()), 5_000).unref();
       }),
   );
-  activeClient.on('close', () => {
-    connected = false;
-    if (initialized && activeClient === client && credentials) void handleAsync(() => runtime.setConnected(false));
-  });
-  activeClient.on('connect', () => {
-    connected = true;
-    if (initialized && activeClient === client && credentials) void handleAsync(() => runtime.setConnected(true));
-  });
+  activeClient.on('close', () => applyConnectionState(false));
+  activeClient.on('connect', () => applyConnectionState(true));
 }
 
 process.on('SIGTERM', () => {
