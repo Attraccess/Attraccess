@@ -15,7 +15,12 @@ describe('WagoFlowService', () => {
   function createService() {
     const trigger = jest.fn().mockResolvedValue(undefined);
     const controllerRepository = { find: jest.fn().mockResolvedValue([controller]), findOneBy: jest.fn() };
-    const revisionRepository = { find: jest.fn().mockResolvedValue([revision]) };
+    const revisionQuery = {
+      innerJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([revision]),
+    };
+    const revisionRepository = { find: jest.fn().mockResolvedValue([revision]), createQueryBuilder: jest.fn().mockReturnValue(revisionQuery) };
     const settingsRepository = { findOneBy: jest.fn().mockResolvedValue({ id: 1, defaultMqttServerId: 2, operationalPrefix: 'attraccess/wago' } as WagoSettings) };
     const context = {
       getRepository: jest.fn((entity) => entity === WagoController ? controllerRepository : entity === WagoConfigurationRevision ? revisionRepository : settingsRepository),
@@ -23,7 +28,7 @@ describe('WagoFlowService', () => {
       flows: { trigger },
       mqtt: { subscribe: jest.fn().mockResolvedValue({ unsubscribe: jest.fn() }) },
     } as unknown as PluginContext;
-    return { service: new WagoFlowService(context), trigger, context, revisionRepository };
+    return { service: new WagoFlowService(context), trigger, context, revisionQuery, revisionRepository };
   }
 
   it('caches a validated retained state and dispatches matching trigger nodes', async () => {
@@ -56,15 +61,17 @@ describe('WagoFlowService', () => {
     expect(service['waiters'].size).toBe(0);
   });
 
-  it('loads applied revisions in one query and prunes removed channel state', async () => {
-    const { service, revisionRepository } = createService();
+  it('loads only the latest applied revision per controller and prunes removed channel state', async () => {
+    const { service, revisionQuery, revisionRepository } = createService();
     await service.refresh();
     await service['onMessage'](2, 'attraccess/wago', 'attraccess/wago/v1/controllers/cc100-01/state', Buffer.from(JSON.stringify({ sequence: 1, timestamp: '2026-08-30T00:00:00.000Z', connected: true, revision: 1, contentHash: 'hash', outputs: { door: true } })));
-    revisionRepository.find.mockResolvedValueOnce([]);
+    revisionQuery.getMany.mockResolvedValueOnce([]);
 
     await service.refresh();
 
-    expect(revisionRepository.find).toHaveBeenCalledTimes(2);
+    expect(revisionRepository.find).not.toHaveBeenCalled();
+    expect(revisionRepository.createQueryBuilder).toHaveBeenCalledTimes(2);
+    expect(revisionQuery.innerJoin).toHaveBeenCalledWith(expect.any(Function), 'latest', 'latest.controllerId = revision.controllerId AND latest.revision = revision.revision');
     expect(service.read({ controllerId: 1, channelId: 'door' })).toBeNull();
   });
 
