@@ -1,6 +1,5 @@
 import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import type { PluginContext, PluginMqttSubscription, Repository } from '@attraccess/plugins-backend-sdk';
-import { In } from 'typeorm';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { WagoController } from './wago-controller.entity';
 import type { WagoConfigurationSnapshot } from './configuration';
@@ -178,13 +177,22 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   }
   private async loadLatestAppliedRevisions(controllerIds: number[]): Promise<WagoConfigurationRevision[]> {
     if (!controllerIds.length) return [];
-    const revisions = await this.revisions.find({ where: { controllerId: In(controllerIds), state: 'applied' } });
-    const latestByController = new Map<number, WagoConfigurationRevision>();
-    for (const revision of revisions) {
-      const latest = latestByController.get(revision.controllerId);
-      if (!latest || revision.revision > latest.revision) latestByController.set(revision.controllerId, revision);
-    }
-    return [...latestByController.values()];
+    return this.revisions
+      .createQueryBuilder('revision')
+      .innerJoin(
+        (query) => query
+          .subQuery()
+          .select('latest.controllerId', 'controllerId')
+          .addSelect('MAX(latest.revision)', 'revision')
+          .from(WagoConfigurationRevision, 'latest')
+          .where('latest.controllerId IN (:...controllerIds)', { controllerIds })
+          .andWhere('latest.state = :state', { state: 'applied' })
+          .groupBy('latest.controllerId'),
+        'latest',
+        'latest.controllerId = revision.controllerId AND latest.revision = revision.revision',
+      )
+      .where('revision.state = :state', { state: 'applied' })
+      .getMany();
   }
   private cacheChannels(revision: WagoConfigurationRevision): WagoConfigurationSnapshot['logicalChannels'] {
     try {
