@@ -7,17 +7,26 @@ import { WagoSettings } from './wago-settings.entity';
 import { WagoEnrollment } from './wago-enrollment.entity';
 import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
+import { WagoCommissioningSession } from './wago-commissioning-session.entity';
+import { WagoCommissioningService } from './wago-commissioning.service';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 class WagoPluginModule {}
 
 const plugin: PluginBackendModule = {
-  entities: [WagoController, WagoSettings, WagoEnrollment, WagoConfigurationDraft, WagoConfigurationRevision],
+  entities: [
+    WagoController,
+    WagoSettings,
+    WagoEnrollment,
+    WagoConfigurationDraft,
+    WagoConfigurationRevision,
+    WagoCommissioningSession,
+  ],
   register(context: PluginContext): DynamicModule {
     return {
       module: WagoPluginModule,
       controllers: [WagoControllerApi],
-      providers: [{ provide: PLUGIN_CONTEXT, useValue: context }, WagoService],
+      providers: [{ provide: PLUGIN_CONTEXT, useValue: context }, WagoService, WagoCommissioningService],
     };
   },
 };

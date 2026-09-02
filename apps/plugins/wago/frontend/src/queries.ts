@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   claimController,
-  createEnrollment,
-  getEnrollmentCredentialSupport,
+  createCommissioningSession,
+  deliverCommissioningSession,
   applyPreset,
   getSettings,
   getDraft,
@@ -10,10 +10,11 @@ import {
   listControllers,
   listMqttServers,
   previewPreset,
+  revokeCommissioningSession,
   saveDraft,
   setSettings,
   type ClaimControllerInput,
-  type CreateEnrollmentInput,
+  type CreateCommissioningSessionInput,
   type WagoPresetApplication,
 } from './api';
 
@@ -21,8 +22,6 @@ const queryKeys = {
   controllers: ['wago', 'controllers'] as const,
   settings: ['wago', 'settings'] as const,
   mqttServers: ['mqtt', 'servers'] as const,
-  enrollmentCredentialSupport: (mqttServerId: number) =>
-    ['wago', 'enrollment-credential-support', mqttServerId] as const,
   draft: (controllerId: number) => ['wago', 'configuration-draft', controllerId] as const,
   presets: ['wago', 'configuration-presets'] as const,
 };
@@ -71,16 +70,24 @@ export function useClaimControllerMutation() {
   });
 }
 
-export function useCreateEnrollmentMutation() {
-  return useMutation({ mutationFn: (input: CreateEnrollmentInput) => createEnrollment(input) });
+export function useCreateCommissioningSessionMutation() {
+  return useMutation({ mutationFn: (input: CreateCommissioningSessionInput) => createCommissioningSession(input) });
 }
 
-export function useEnrollmentCredentialSupportQuery(mqttServerId: number | null) {
-  return useQuery({
-    queryKey: queryKeys.enrollmentCredentialSupport(mqttServerId ?? 0),
-    queryFn: () => getEnrollmentCredentialSupport(mqttServerId ?? 0),
-    enabled: mqttServerId !== null,
+export function useDeliverCommissioningSessionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, ...input }: Parameters<typeof deliverCommissioningSession>[1] & { id: number }) =>
+      deliverCommissioningSession(id, input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.controllers });
+    },
   });
+}
+
+export function useRevokeCommissioningSessionMutation() {
+  return useMutation({ mutationFn: revokeCommissioningSession });
 }
 
 export function useDraftQuery(controllerId: number | null) {

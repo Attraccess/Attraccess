@@ -432,6 +432,12 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  /** Server-side commissioning calls this to revoke a bootstrap identity without exposing it to a browser. */
+  async revokeEnrollmentForHardwareId(hardwareId: string): Promise<void> {
+    const enrollment = (await this.enrollments.find({ where: { hardwareId } })).find((item) => this.isActiveEnrollment(item));
+    if (enrollment) await this.revokeEnrollment(enrollment);
+  }
+
   async claim(id: number, name: string, verifier: string, mqttServerId?: number): Promise<WagoController> {
     return this.withClaimLock(id, async () => {
       const prepared = await this.withClaimConfigurationLock(() => this.prepareClaim(id, name, verifier, mqttServerId));

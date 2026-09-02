@@ -32,22 +32,25 @@ export interface ClaimControllerInput {
   verifier: string;
   mqttServerId?: number;
 }
-export interface EnrollmentPackage {
-  broker: { host: string; port: number; useTls: boolean };
-  username: string;
-  password?: string;
-  claimSecret: string;
-  expiresAt: string;
-  manualInstructions?: readonly string[];
-}
-export interface CreateEnrollmentInput {
+export interface CommissioningSession {
+  id: number;
   hardwareId: string;
-  mqttServerId?: number;
-  manualUsername?: string;
-  manualPassword?: string;
+  mqttServerId: number;
+  targetHost: string;
+  hostKeyFingerprint: string;
+  firmwareBaseline: string;
+  state: string;
+  enrollmentExpiresAt: string | null;
+  codesysState: string | null;
+  failureReason: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
-export interface EnrollmentCredentialSupport {
-  automatic: boolean;
+
+export interface CreateCommissioningSessionInput {
+  targetHost: string;
+  hardwareId: string;
+  mqttServerId: number;
 }
 export interface WagoConfigurationDraft {
   controllerId: number;
@@ -98,11 +101,20 @@ export const listMqttServers = () => hostApi.request<MqttServer[]>('/mqtt/server
 export const claimController = (id: number, input: ClaimControllerInput) =>
   api.request<WagoController>(`/controllers/${id}/claim`, { method: 'POST', body: input });
 
-export const createEnrollment = (input: CreateEnrollmentInput) =>
-  api.request<EnrollmentPackage>('/enrollments', { method: 'POST', body: input });
+export const createCommissioningSession = (input: CreateCommissioningSessionInput) =>
+  api.request<CommissioningSession>('/commissioning/sessions', { method: 'POST', body: input });
 
-export const getEnrollmentCredentialSupport = (mqttServerId: number) =>
-  api.request<EnrollmentCredentialSupport>(`/enrollments/credential-support/${mqttServerId}`);
+export const deliverCommissioningSession = (
+  id: number,
+  input: {
+    hostKeyFingerprint: string;
+    physicalIdentityConfirmed: boolean;
+    codesysStopConfirmed: boolean;
+    temporarySsh: { username: string; password: string };
+  },
+) => api.request<CommissioningSession>(`/commissioning/sessions/${id}/deliver`, { method: 'POST', body: input });
+export const revokeCommissioningSession = (id: number) =>
+  api.request<CommissioningSession>(`/commissioning/sessions/${id}/revoke`, { method: 'POST' });
 
 export const getDraft = (id: number) =>
   api.request<WagoConfigurationDraft | null>(`/controllers/${id}/configuration/draft`);

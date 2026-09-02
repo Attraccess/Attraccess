@@ -81,7 +81,7 @@ export function ControllersTable({ controllers, onClaim, onConfigure }: Controll
 function EmptyControllers() {
   return (
     <div className="wg:px-4 wg:py-12 wg:text-center wg:text-sm wg:text-muted">
-      No controllers have connected yet. Enroll a device, apply its one-time package, then start the controller.
+      No controllers have connected yet. Commission a controller, then wait for it to connect.
     </div>
   );
 }
