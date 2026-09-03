@@ -22,6 +22,7 @@ export function PluginProvider(props: PropsWithChildren) {
   const { refetch: refetchPlugins } = usePluginsServiceGetPlugins();
   const addPlugin = usePluginState((s) => s.addPlugin);
   const isInstalled = usePluginState((s) => s.isInstalled);
+  const setLoading = usePluginState((s) => s.setLoading);
   const plugins = usePluginState((s) => s.plugins);
   const toast = useToastMessage();
   const { user } = useAuth();
@@ -120,7 +121,6 @@ export function PluginProvider(props: PropsWithChildren) {
 
         pluginStore.install(plugin);
 
-        await new Promise((resolve) => setTimeout(resolve, 200));
         const fullPlugin = {
           ...pluginManifest,
           plugin,
@@ -150,13 +150,18 @@ export function PluginProvider(props: PropsWithChildren) {
     if (arePluginsLoaded.current) return;
     console.debug('Attraccess Plugin System: Loading all plugins');
 
-    const plugins = await refetchPlugins();
-    const pluginsArray = plugins.data ?? [];
-    await Promise.all(pluginsArray.map((manifest) => loadPlugin(manifest)));
-
-    arePluginsLoaded.current = true;
-    console.debug('Attraccess Plugin System: All plugins loaded');
-  }, [loadPlugin, refetchPlugins]);
+    try {
+      const plugins = await refetchPlugins();
+      const pluginsArray = plugins.data ?? [];
+      await Promise.all(pluginsArray.map((manifest) => loadPlugin(manifest)));
+    } catch (error) {
+      console.error('Attraccess Plugin System: Failed to fetch plugins', error);
+    } finally {
+      arePluginsLoaded.current = true;
+      setLoading(false);
+      console.debug('Attraccess Plugin System: All plugins loaded');
+    }
+  }, [loadPlugin, refetchPlugins, setLoading]);
 
   useEffect(() => {
     if (arePluginsLoaded.current) return;

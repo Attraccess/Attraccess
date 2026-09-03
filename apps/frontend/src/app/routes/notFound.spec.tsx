@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SystemPermission } from '@attraccess/shared';
+import usePluginState from '../plugins/plugin.state';
 
 // The changelog page reads CHANGELOG.md from the repo root with `?raw`, which lives outside the
 // frontend's vite root and is therefore unreadable here. Nothing in this spec touches it.
@@ -66,7 +67,16 @@ function byCy(value: string) {
 describe('not-found route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    usePluginState.setState({ isLoading: false, plugins: [] });
     mockOperator(['system.settings.manage', 'users.read']);
+  });
+
+  it('shows plugin loading instead of the catch-all while plugin routes are registering', () => {
+    usePluginState.setState({ isLoading: true });
+    renderAt('/wago');
+
+    expect(screen.getByRole('status')).toHaveTextContent('Loading plugins');
+    expect(byCy('not-found')).toBeNull();
   });
 
   // ATT-866 deleted twelve admin routes on a "move, don't redirect" decision. Without a catch-all
