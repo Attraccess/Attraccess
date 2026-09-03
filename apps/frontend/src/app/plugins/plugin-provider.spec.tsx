@@ -104,6 +104,18 @@ describe('PluginProvider', () => {
     expect(screen.getByText('app-shell')).toBeInTheDocument();
   });
 
+  it('keeps the application shell available while plugin discovery is pending', () => {
+    hoisted.refetchMock.mockReturnValue(new Promise(() => undefined));
+
+    render(
+      <PluginProvider>
+        <div>core route</div>
+      </PluginProvider>
+    );
+
+    expect(screen.getByText('core route')).toBeInTheDocument();
+  });
+
   it('sets up the module-federation remote and loads the plugin into the store', async () => {
     const { name } = primeManifest();
 
