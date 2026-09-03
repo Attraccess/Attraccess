@@ -267,12 +267,13 @@ function SessionStatus({
       {session.enrollmentExpiresAt && <p className="wg:text-sm wg:text-muted">Bootstrap expiry: {new Date(session.enrollmentExpiresAt).toLocaleString()}</p>}
       {session.pairingCode && <p className="wg:text-sm wg:text-muted">Pairing code: <span className="wg:font-medium">{session.pairingCode}</span></p>}
       {session.failureReason && <Alert status="warning"><Alert.Indicator /><Alert.Content><Alert.Description>{session.failureReason}</Alert.Description></Alert.Content></Alert>}
-      <TextField name="sshUsername" isRequired>
-        <Label>Temporary SSH username</Label>
+      <p className="wg:text-sm wg:text-muted">Delivery tries the CC100 default SSH credentials first. Enter overrides only if they were changed.</p>
+      <TextField name="sshUsername">
+        <Label>Alternate SSH username</Label>
         <Input value={sshUsername} onChange={(event) => onSshUsernameChange(event.target.value)} />
       </TextField>
-      <TextField name="sshPassword" type="password" isRequired>
-        <Label>Temporary SSH password</Label>
+      <TextField name="sshPassword" type="password">
+        <Label>Alternate SSH password</Label>
         <Input value={sshPassword} onChange={(event) => onSshPasswordChange(event.target.value)} />
       </TextField>
       <Checkbox isSelected={physicalIdentityConfirmed} onChange={onPhysicalIdentityConfirmedChange}>
@@ -284,7 +285,7 @@ function SessionStatus({
       <p className="wg:text-sm wg:text-muted">No broker credentials are available from this session.</p>
       {deliveryError && <ErrorAlert error={deliveryError} />}
       {revokeError && <ErrorAlert error={revokeError} />}
-      {session.state !== 'revoked' && <Button isPending={isDelivering} isDisabled={!sshUsername || !sshPassword || !physicalIdentityConfirmed} onPress={onDeliver}>
+      {session.state !== 'revoked' && <Button isPending={isDelivering} isDisabled={!physicalIdentityConfirmed} onPress={onDeliver}>
         {deliveryError || session.state === 'delivery_failed' ? 'Retry delivery' : 'Deliver commissioning'}
       </Button>}
       {session.state !== 'revoked' && <Button variant="secondary" isPending={isRevoking} onPress={onRevoke}>Revoke bootstrap session</Button>}

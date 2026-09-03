@@ -28,6 +28,7 @@ import { AttraccessUserActionsBridge } from '../components/attraccessUserActions
 import { SupervisorApprovalListener } from '../components/supervisorApproval/SupervisorApprovalListener';
 import { KioskGuard } from './kiosk/KioskGuard';
 import { useLocaleSync } from '../hooks/useLocaleSync';
+import usePluginState from './plugins/plugin.state';
 import { NotFound } from './not-found';
 
 // Exported for settingsAccess.spec.tsx, which drives the real route table through this gate.
@@ -146,6 +147,7 @@ function AppLayout(props: PropsWithChildren) {
 // Exported for notFound.spec.tsx, which drives the real route table (catch-all included).
 export function AppRoutes() {
   const { isAuthenticated } = useAuth();
+  const pluginsLoaded = usePluginState((state) => state.pluginsLoaded);
   const allRoutes = useAllRoutes();
 
   const bareRoutes = useMemo(() => allRoutes.filter((r) => r.noLayout), [allRoutes]);
@@ -186,7 +188,10 @@ export function AppRoutes() {
         {layoutRouteElements}
         {/* Without this a logged-in operator on an unknown path matched nothing at all, so the
             layout route never rendered and the document came up blank (ATT-869). */}
-        <Route path="*" element={<NotFound isAuthenticated={isAuthenticated} />} />
+        <Route
+          path="*"
+          element={pluginsLoaded ? <NotFound isAuthenticated={isAuthenticated} /> : <div className="flex justify-center p-8"><Spinner size="sm" /></div>}
+        />
       </Route>
     </Routes>
   );

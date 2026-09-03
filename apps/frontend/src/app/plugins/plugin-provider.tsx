@@ -21,6 +21,7 @@ const pluginStore = createPluginStore();
 export function PluginProvider(props: PropsWithChildren) {
   const { refetch: refetchPlugins } = usePluginsServiceGetPlugins();
   const addPlugin = usePluginState((s) => s.addPlugin);
+  const setPluginsLoaded = usePluginState((s) => s.setPluginsLoaded);
   const isInstalled = usePluginState((s) => s.isInstalled);
   const plugins = usePluginState((s) => s.plugins);
   const toast = useToastMessage();
@@ -151,20 +152,23 @@ export function PluginProvider(props: PropsWithChildren) {
     if (arePluginsLoaded.current) return;
     console.debug('Attraccess Plugin System: Loading all plugins');
 
-    const plugins = await refetchPlugins();
-    const pluginsArray = plugins.data ?? [];
-    const failedPlugins = pluginsArray.filter((manifest) => manifest.status === 'error');
-    for (const plugin of failedPlugins) {
-      toastRef.current.warning({
-        title: `Plugin "${plugin.name}" is disabled`,
-        description: plugin.error ?? 'The plugin failed to load. Open Settings > Plugins for details.',
-      });
+    try {
+      const plugins = await refetchPlugins();
+      const pluginsArray = plugins.data ?? [];
+      const failedPlugins = pluginsArray.filter((manifest) => manifest.status === 'error');
+      for (const plugin of failedPlugins) {
+        toastRef.current.warning({
+          title: `Plugin "${plugin.name}" is disabled`,
+          description: plugin.error ?? 'The plugin failed to load. Open Settings > Plugins for details.',
+        });
+      }
+      await Promise.all(pluginsArray.filter((manifest) => manifest.status !== 'error').map((manifest) => loadPlugin(manifest)));
+    } finally {
+      arePluginsLoaded.current = true;
+      setPluginsLoaded();
+      console.debug('Attraccess Plugin System: All plugins loaded');
     }
-    await Promise.all(pluginsArray.filter((manifest) => manifest.status !== 'error').map((manifest) => loadPlugin(manifest)));
-
-    arePluginsLoaded.current = true;
-    console.debug('Attraccess Plugin System: All plugins loaded');
-  }, [loadPlugin, refetchPlugins]);
+  }, [loadPlugin, refetchPlugins, setPluginsLoaded]);
 
   useEffect(() => {
     if (arePluginsLoaded.current) return;

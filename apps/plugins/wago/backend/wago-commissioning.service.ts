@@ -20,6 +20,7 @@ const SIGNING_NAMESPACE = 'attraccess-wago-runtime';
 const SIGNING_IDENTITY = 'attraccess-wago-runtime';
 
 type TemporarySshCredential = { username: string; password: string };
+const defaultSshCredential: TemporarySshCredential = { username: 'admin', password: 'wago' };
 
 @Injectable()
 export class WagoCommissioningService implements OnModuleInit {
@@ -112,13 +113,13 @@ export class WagoCommissioningService implements OnModuleInit {
       throw new ConflictException('commissioning session cannot be delivered in its current state');
     if (!input.physicalIdentityConfirmed) throw new ConflictException('physical controller identity confirmation is required');
     if (input.hostKeyFingerprint !== session.hostKeyFingerprint) throw new ConflictException('controller SSH host key does not match the scanned key');
-    if (!input.temporarySsh.username.trim() || !input.temporarySsh.password)
-      throw new ConflictException('temporary SSH credentials are required for this session only');
     if (!isRuntimeArtifactConfigured())
       throw new ConflictException('no immutable, signed CC100 runtime bundle is configured for commissioning');
 
+    const credential = input.temporarySsh.username.trim() && input.temporarySsh.password ? input.temporarySsh : defaultSshCredential;
+
     try {
-      const inspection = await this.inspect(session.targetHost, session.hostKeyFingerprint, input.temporarySsh);
+      const inspection = await this.inspect(session.targetHost, session.hostKeyFingerprint, credential);
       session.codesysState = inspection.codesys;
       if (!isSupportedController(inspection.firmware, session.firmwareBaseline))
         throw new ConflictException(`unsupported CC100 model or firmware; expected baseline ${session.firmwareBaseline}`);
@@ -145,20 +146,20 @@ export class WagoCommissioningService implements OnModuleInit {
       ].join('\n');
 
       if (inspection.codesys === 'active')
-        await this.sudoRun(session.targetHost, session.hostKeyFingerprint, input.temporarySsh, '/etc/init.d/pp_codesys3 stop');
+        await this.sudoRun(session.targetHost, session.hostKeyFingerprint, credential, '/etc/init.d/pp_codesys3 stop');
       await this.sudoRun(
         session.targetHost,
         session.hostKeyFingerprint,
-        input.temporarySsh,
+        credential,
         'docker info >/dev/null 2>&1 || /etc/init.d/dockerd start; docker info >/dev/null',
       );
-      await this.writeRuntimeEnvironment(session.targetHost, session.hostKeyFingerprint, input.temporarySsh, runtimeEnv);
+      await this.writeRuntimeEnvironment(session.targetHost, session.hostKeyFingerprint, credential, runtimeEnv);
       try {
-        await this.copyTo(session.targetHost, session.hostKeyFingerprint, input.temporarySsh, bundle.path, '/tmp/attraccess-wago-runtime.tar');
+        await this.copyTo(session.targetHost, session.hostKeyFingerprint, credential, bundle.path, '/tmp/attraccess-wago-runtime.tar');
         await this.sudoRun(
           session.targetHost,
           session.hostKeyFingerprint,
-          input.temporarySsh,
+          credential,
           `rm -rf /tmp/attraccess-wago-runtime && mkdir -m 0700 /tmp/attraccess-wago-runtime && tar -xf /tmp/attraccess-wago-runtime.tar -C /tmp/attraccess-wago-runtime && rm -f /tmp/attraccess-wago-runtime.tar && grep -Fqx -- ${shellQuote(configuredRuntimeImage)} /tmp/attraccess-wago-runtime/image-reference && runtime_image=$(docker load -i /tmp/attraccess-wago-runtime/image.tar | sed -n 's/^Loaded image: //p') && test -n "$runtime_image" && rm -rf /tmp/attraccess-wago-runtime && docker image inspect "$runtime_image" >/dev/null && (docker rm -f attraccess-wago >/dev/null 2>&1 || true) && docker run -d --name attraccess-wago --restart unless-stopped --env-file /etc/attraccess-wago/runtime.env -v /var/lib/attraccess-wago:/var/lib/attraccess-wago "$runtime_image"`,
         );
       } finally {
