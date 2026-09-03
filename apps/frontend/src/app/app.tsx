@@ -4,7 +4,6 @@ import { PropsWithChildren, useEffect, useMemo, useState } from 'react';
 import { Layout } from './layout/layout';
 import { useAuth } from '../hooks/useAuth';
 import { useAllRoutes } from './routes';
-import usePluginState from './plugins/plugin.state';
 import { VerifyEmail } from './verify-email';
 import { ToastProvider } from '../components/toastProvider';
 import { I18nProvider, RouterProvider, Spinner, useTheme } from '@heroui/react';
@@ -147,7 +146,6 @@ function AppLayout(props: PropsWithChildren) {
 // Exported for notFound.spec.tsx, which drives the real route table (catch-all included).
 export function AppRoutes() {
   const { isAuthenticated } = useAuth();
-  const pluginsAreLoading = usePluginState((state) => state.isLoading);
   const allRoutes = useAllRoutes();
 
   const bareRoutes = useMemo(() => allRoutes.filter((r) => r.noLayout), [allRoutes]);
@@ -155,15 +153,6 @@ export function AppRoutes() {
 
   const bareRouteElements = useRoutesWithAuthElements(bareRoutes);
   const layoutRouteElements = useRoutesWithAuthElements(layoutRoutes);
-
-  if (pluginsAreLoading) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center p-8" role="status" aria-live="polite">
-        <Spinner size="sm" />
-        <span className="sr-only">Loading plugins</span>
-      </div>
-    );
-  }
 
   return (
     <Routes>
