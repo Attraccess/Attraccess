@@ -80,7 +80,7 @@ function primeManifest(options: ManifestOptions = {}) {
 }
 
 beforeEach(() => {
-  usePluginState.setState({ plugins: [] });
+  usePluginState.setState({ isLoading: true, plugins: [] });
   hoisted.setRemoteMock.mockReset();
   hoisted.getRemoteMock.mockReset();
   hoisted.refetchMock.mockReset();
@@ -120,6 +120,7 @@ describe('PluginProvider', () => {
       expect.objectContaining({ format: 'esm', from: 'vite' })
     );
     expect(hoisted.getRemoteMock).toHaveBeenCalledWith(name, './plugin');
+    expect(usePluginState.getState().isLoading).toBe(false);
 
     const remoteConfig = hoisted.setRemoteMock.mock.calls.at(-1)?.[1] as { url: () => Promise<string> };
     await expect(remoteConfig.url()).resolves.toBe(
