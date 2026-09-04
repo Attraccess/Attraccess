@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { scadWithLabel, triggerDownload } from './download';
+import { plugScadSource, scadWithLabel, triggerDownload } from './download';
 import scadSource from './nfc-keychain-card.scad?raw';
+import plugSource from './smart-plug-cover.scad?raw';
 
 describe('scadWithLabel', () => {
   it('rewrites the LABEL default so the downloaded source matches what the preview showed', () => {
@@ -10,9 +11,7 @@ describe('scadWithLabel', () => {
   });
 
   it('escapes quotes and backslashes so the result stays a valid OpenSCAD string', () => {
-    expect(scadWithLabel('LABEL = "Makerspace";', 'He said "hi" \\ bye')).toBe(
-      'LABEL = "He said \\"hi\\" \\\\ bye";',
-    );
+    expect(scadWithLabel('LABEL = "Makerspace";', 'He said "hi" \\ bye')).toBe('LABEL = "He said \\"hi\\" \\\\ bye";');
   });
 
   it('leaves other assignments alone', () => {
@@ -29,6 +28,18 @@ describe('scadWithLabel', () => {
     // Without this, renaming or reformatting the LABEL line in nfc-keychain-card.scad would make
     // every .scad download throw, and only in the browser.
     expect(scadWithLabel(scadSource, 'Robot Lab')).toContain('LABEL = "Robot Lab";');
+  });
+});
+
+describe('plugScadSource', () => {
+  it('makes the downloaded source reproduce the selected profile and clearances', () => {
+    const source = plugScadSource(plugSource, 'shelly_plus_gen3', 'angled_euro', 1.5, 30.9, 25, 30);
+    expect(source).toContain('DEVICE = "shelly_plus_gen3";');
+    expect(source).toContain('CABLE = "angled_euro";');
+    expect(source).toContain('DEVICE_EXTRA_D = 1.5;');
+    expect(source).toContain('CORD_OPEN_D = 30.9;');
+    expect(source).toContain('HEIGHT_ABOVE_PLUG = 25;');
+    expect(source).toContain('CABLE_CUT_H = 30;');
   });
 });
 
