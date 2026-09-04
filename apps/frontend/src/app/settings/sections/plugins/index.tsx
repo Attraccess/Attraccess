@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
+  Card,
   Chip,
   DrawerBody,
   DrawerFooter,
@@ -26,8 +27,18 @@ import {
   Tooltip,
   TooltipContent,
 } from '@heroui/react';
-import { buttonVariants } from '@heroui/styles';
-import { AlertTriangle, BookOpen, CheckCircle2, ChevronDown, Store, Trash2, Upload } from 'lucide-react';
+import { buttonVariants, cardVariants } from '@heroui/styles';
+import {
+  AlertTriangle,
+  BookOpen,
+  CheckCircle2,
+  ChevronDown,
+  ExternalLink,
+  ShieldCheck,
+  Store,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import { usePluginsServiceDeletePlugin, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { SettingsSection } from '../../components/SettingsSection';
@@ -302,7 +313,7 @@ export function PluginsSection() {
     return () => window.clearTimeout(timeout);
   }, [isMarketplaceOpen, marketplaceQuery, selectedRegistryId]);
 
-  const openMarketplacePlugin = async (plugin: MarketplacePlugin, closeMarketplace = false) => {
+  const openMarketplacePlugin = async (plugin: MarketplacePlugin) => {
     const request = ++marketplaceDetailRequest.current;
     setIsLoadingMarketplaceDetail(true);
     try {
@@ -314,7 +325,6 @@ export function PluginsSection() {
       const details = (await response.json()) as MarketplacePlugin;
       if (marketplaceDetailRequest.current === request) {
         setMarketplacePlugin(details);
-        if (closeMarketplace) setIsMarketplaceOpen(false);
       }
     } catch {
       if (marketplaceDetailRequest.current === request) toast.error({ title: t('marketplace.loadError') });
@@ -629,247 +639,197 @@ export function PluginsSection() {
           </TableScrollContainer>
         </Table>
 
-        <StandardModal isOpen={isMarketplaceOpen} onOpenChange={setIsMarketplaceOpen} size="lg">
+        <StandardModal
+          isOpen={isMarketplaceOpen}
+          onOpenChange={(open) => {
+            setIsMarketplaceOpen(open);
+            if (!open) setMarketplacePlugin(null);
+          }}
+          size="cover"
+        >
           {() => (
             <>
               <ModalHeader>
-                <ModalHeading>{t('marketplace.title')}</ModalHeading>
+                {marketplacePlugin ? (
+                  <div className="flex items-center gap-3">
+                    <Button variant="secondary" size="sm" onPress={() => setMarketplacePlugin(null)}>
+                      {t('marketplace.back')}
+                    </Button>
+                    <div className="min-w-0">
+                      <ModalHeading>{marketplacePlugin.displayName ?? marketplacePlugin.name}</ModalHeading>
+                      <p className="truncate text-sm text-muted">{marketplacePlugin.name}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <ModalHeading>{t('marketplace.title')}</ModalHeading>
+                    <p className="text-sm text-muted">{t('marketplace.description')}</p>
+                  </div>
+                )}
               </ModalHeader>
               <ModalBody>
-                <div className="flex flex-col gap-4">
-                  <p className="text-sm text-muted">{t('marketplace.description')}</p>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <TextField
-                      value={marketplaceQuery}
-                      onChange={(value) => {
-                        marketplaceSearchRequest.current++;
-                        setMarketplaceQuery(value);
-                      }}
-                      className="w-full"
-                    >
-                      <Input placeholder={t('marketplace.searchPlaceholder')} aria-label={t('marketplace.search')} />
-                    </TextField>
-                    <select
-                      aria-label={t('marketplace.registry')}
-                      value={selectedRegistryId}
-                      onChange={(event) => {
-                        marketplaceSearchRequest.current++;
-                        setSelectedRegistryId(event.target.value);
-                      }}
-                      className="h-10 rounded-medium border border-divider bg-content1 px-3 text-sm"
-                    >
-                      <option value="">{t('marketplace.allRegistries')}</option>
-                      <option value="npm">npm</option>
-                      {registries.map((registry) => (
-                        <option key={registry.id} value={registry.id}>
-                          {registry.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  {isLoadingMarketplace ? (
-                    <p role="status" className="text-sm text-muted">
-                      {t('marketplace.loading')}
-                    </p>
-                  ) : null}
-                  {(['official', 'community'] as const).map((classification) => {
-                    const pluginsForClassification = marketplacePlugins.filter(
-                      (plugin) => plugin.classification === classification,
-                    );
-                    if (pluginsForClassification.length === 0) return null;
-                    return (
-                      <div key={classification} className="flex flex-col gap-3">
-                        <h4 className="font-medium text-foreground">{t(`marketplace.${classification}`)}</h4>
-                        <div className="grid gap-3 md:grid-cols-2">
-                          {pluginsForClassification.map((plugin) => (
-                            <article
-                              key={`${plugin.registry.id}:${plugin.name}`}
-                              className="flex flex-col gap-3 rounded-medium border border-divider p-4"
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <h4 className="font-medium text-foreground">{plugin.displayName ?? plugin.name}</h4>
-                                  <p className="text-xs text-muted">{plugin.name}</p>
-                                </div>
-                                <PluginClassificationBadge classification={plugin.classification} />
-                              </div>
-                              {plugin.description ? <p className="text-sm text-muted">{plugin.description}</p> : null}
-                              <p className="text-xs text-muted">
-                                {t('marketplace.version', { version: plugin.version ?? '-' })}
-                              </p>
-                              {plugin.incompatibilityReason ? (
-                                <p className="text-sm text-danger">{plugin.incompatibilityReason}</p>
-                              ) : null}
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-xs text-muted">
-                                  {plugin.registry.name} · {plugin.publisher ?? '-'}
-                                </span>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onPress={() => void openMarketplacePlugin(plugin, true)}
-                                >
-                                  {npmPluginNames.has(plugin.name)
-                                    ? t('marketplace.installed')
-                                    : t('marketplace.details')}
-                                </Button>
-                              </div>
-                            </article>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {!isLoadingMarketplace && marketplacePlugins.length === 0 ? (
-                    <p role="status" className="text-sm text-muted">
-                      {t('marketplace.noResults')}
-                    </p>
-                  ) : null}
-                  <details className="border-t border-divider pt-4">
-                    <summary className="cursor-pointer font-medium text-foreground">
-                      {t('marketplace.registryManagement')}
-                    </summary>
-                    <div className="mt-3 flex flex-col gap-3">
-                      <div className="grid gap-2 sm:grid-cols-3">
-                        <TextField value={registryName} onChange={setRegistryName}>
-                          <Input
-                            placeholder={t('marketplace.registryName')}
-                            aria-label={t('marketplace.registryName')}
-                          />
-                        </TextField>
-                        <TextField value={registryUrl} onChange={setRegistryUrl}>
-                          <Input placeholder={t('marketplace.registryUrl')} aria-label={t('marketplace.registryUrl')} />
-                        </TextField>
-                        <TextField value={registryToken} onChange={setRegistryToken}>
-                          <Input
-                            type="password"
-                            placeholder={t('marketplace.registryToken')}
-                            aria-label={t('marketplace.registryToken')}
-                          />
-                        </TextField>
-                      </div>
-                      <div>
-                        <Button variant="secondary" onPress={() => void addRegistry()} isPending={isSavingRegistry}>
-                          {t('marketplace.addRegistry')}
-                        </Button>
-                      </div>
-                      {registries.map((registry) => (
-                        <div
-                          key={registry.id}
-                          className="flex flex-wrap items-center justify-between gap-2 rounded-medium border border-divider p-3 text-sm"
-                        >
-                          <span>
-                            {registry.name} · {registry.url} ·{' '}
-                            {registry.tokenConfigured ? t('marketplace.tokenConfigured') : t('marketplace.noToken')}
-                          </span>
-                          <span className="flex gap-2">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onPress={() => void testRegistry(registry.id)}
-                              isPending={testingRegistryId === registry.id}
-                            >
-                              {t('marketplace.testRegistry')}
-                            </Button>
-                            <Button variant="danger-soft" size="sm" onPress={() => void removeRegistry(registry.id)}>
-                              {t('marketplace.removeRegistry')}
-                            </Button>
-                          </span>
-                        </div>
-                      ))}
+                {marketplacePlugin ? (
+                  <MarketplacePluginDetails
+                    plugin={marketplacePlugin}
+                    isInstalled={npmPluginNames.has(marketplacePlugin.name)}
+                    onInstall={() => {
+                      setInstallApproved(false);
+                      setPluginToInstall(marketplacePlugin);
+                    }}
+                    t={t}
+                  />
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <TextField
+                        value={marketplaceQuery}
+                        onChange={(value) => {
+                          marketplaceSearchRequest.current++;
+                          setMarketplaceQuery(value);
+                        }}
+                        className="w-full"
+                      >
+                        <Input placeholder={t('marketplace.searchPlaceholder')} aria-label={t('marketplace.search')} />
+                      </TextField>
+                      <select
+                        aria-label={t('marketplace.registry')}
+                        value={selectedRegistryId}
+                        onChange={(event) => {
+                          marketplaceSearchRequest.current++;
+                          setSelectedRegistryId(event.target.value);
+                        }}
+                        className="h-10 rounded-medium border border-divider bg-content1 px-3 text-sm"
+                      >
+                        <option value="">{t('marketplace.allRegistries')}</option>
+                        <option value="npm">npm</option>
+                        {registries.map((registry) => (
+                          <option key={registry.id} value={registry.id}>
+                            {registry.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                  </details>
-                </div>
+                    {isLoadingMarketplace ? (
+                      <p role="status" className="text-sm text-muted">
+                        {t('marketplace.loading')}
+                      </p>
+                    ) : null}
+                    {(['official', 'community'] as const).map((classification) => {
+                      const pluginsForClassification = marketplacePlugins.filter(
+                        (plugin) => plugin.classification === classification,
+                      );
+                      if (pluginsForClassification.length === 0) return null;
+                      return (
+                        <div key={classification} className="flex flex-col gap-3">
+                          <h4 className="font-medium text-foreground">{t(`marketplace.${classification}`)}</h4>
+                          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                            {pluginsForClassification.map((plugin) => (
+                              <button
+                                type="button"
+                                key={`${plugin.registry.id}:${plugin.name}`}
+                                className={`${cardVariants().base()} h-full cursor-pointer text-left transition-all hover:border-accent hover:shadow-md ${plugin.incompatibilityReason ? 'opacity-75' : ''}`}
+                                onClick={() => void openMarketplacePlugin(plugin)}
+                              >
+                                <Card.Header>
+                                  <div className="flex w-full items-start justify-between gap-3">
+                                    <div>
+                                      <Card.Title className="text-base">{plugin.displayName ?? plugin.name}</Card.Title>
+                                      <Card.Description className="text-xs">{plugin.name}</Card.Description>
+                                    </div>
+                                    <PluginClassificationBadge classification={plugin.classification} />
+                                  </div>
+                                </Card.Header>
+                                <Card.Content className="flex flex-col gap-3">
+                                  {plugin.description ? (
+                                    <p className="text-sm text-muted">{plugin.description}</p>
+                                  ) : null}
+                                  <p className="text-xs text-muted">
+                                    {t('marketplace.version', { version: plugin.version ?? '-' })}
+                                  </p>
+                                  {plugin.incompatibilityReason ? (
+                                    <p className="text-sm text-danger">{plugin.incompatibilityReason}</p>
+                                  ) : null}
+                                </Card.Content>
+                                <Card.Footer className="mt-auto justify-between gap-2">
+                                  <span className="text-xs text-muted">
+                                    {plugin.registry.name} · {plugin.publisher ?? '-'}
+                                  </span>
+                                </Card.Footer>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {!isLoadingMarketplace && marketplacePlugins.length === 0 ? (
+                      <p role="status" className="text-sm text-muted">
+                        {t('marketplace.noResults')}
+                      </p>
+                    ) : null}
+                    <details className="border-t border-divider pt-4">
+                      <summary className="cursor-pointer font-medium text-foreground">
+                        {t('marketplace.registryManagement')}
+                      </summary>
+                      <div className="mt-3 flex flex-col gap-3">
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          <TextField value={registryName} onChange={setRegistryName}>
+                            <Input
+                              placeholder={t('marketplace.registryName')}
+                              aria-label={t('marketplace.registryName')}
+                            />
+                          </TextField>
+                          <TextField value={registryUrl} onChange={setRegistryUrl}>
+                            <Input
+                              placeholder={t('marketplace.registryUrl')}
+                              aria-label={t('marketplace.registryUrl')}
+                            />
+                          </TextField>
+                          <TextField value={registryToken} onChange={setRegistryToken}>
+                            <Input
+                              type="password"
+                              placeholder={t('marketplace.registryToken')}
+                              aria-label={t('marketplace.registryToken')}
+                            />
+                          </TextField>
+                        </div>
+                        <div>
+                          <Button variant="secondary" onPress={() => void addRegistry()} isPending={isSavingRegistry}>
+                            {t('marketplace.addRegistry')}
+                          </Button>
+                        </div>
+                        {registries.map((registry) => (
+                          <div
+                            key={registry.id}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-medium border border-divider p-3 text-sm"
+                          >
+                            <span>
+                              {registry.name} · {registry.url} ·{' '}
+                              {registry.tokenConfigured ? t('marketplace.tokenConfigured') : t('marketplace.noToken')}
+                            </span>
+                            <span className="flex gap-2">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onPress={() => void testRegistry(registry.id)}
+                                isPending={testingRegistryId === registry.id}
+                              >
+                                {t('marketplace.testRegistry')}
+                              </Button>
+                              <Button variant="danger-soft" size="sm" onPress={() => void removeRegistry(registry.id)}>
+                                {t('marketplace.removeRegistry')}
+                              </Button>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  </div>
+                )}
               </ModalBody>
             </>
           )}
         </StandardModal>
       </div>
-
-      <StandardDrawer
-        isOpen={marketplacePlugin !== null}
-        onOpenChange={(open) => !open && setMarketplacePlugin(null)}
-        contentProps={{ placement: 'right' }}
-      >
-        <DrawerHeader>
-          <h2 className="text-lg font-semibold">
-            {t('marketplace.detailTitle', {
-              pluginName: marketplacePlugin?.displayName ?? marketplacePlugin?.name ?? '',
-            })}
-          </h2>
-        </DrawerHeader>
-        <DrawerBody>
-          {marketplacePlugin ? (
-            <div className="flex flex-col gap-3">
-              <PluginClassificationBadge classification={marketplacePlugin.classification} />
-              {marketplacePlugin.description ? <p>{marketplacePlugin.description}</p> : null}
-              <p>{t('marketplace.source', { registry: marketplacePlugin.registry.url })}</p>
-              <p>{t('marketplace.version', { version: marketplacePlugin.version ?? '-' })}</p>
-              <p>{t('marketplace.publisher', { publisher: marketplacePlugin.publisher ?? '-' })}</p>
-              <p>{t('marketplace.hostCompatibility', { range: marketplacePlugin.hostRange ?? '-' })}</p>
-              <p>
-                {t('marketplace.sdkCompatibility', {
-                  backend: marketplacePlugin.sdkCompatibility?.backend ?? '-',
-                  frontend: marketplacePlugin.sdkCompatibility?.frontend ?? '-',
-                })}
-              </p>
-              <p>{t('marketplace.license', { license: marketplacePlugin.license ?? '-' })}</p>
-              {marketplacePlugin.repository ? (
-                <a
-                  className="text-primary underline"
-                  href={marketplacePlugin.repository}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {t('marketplace.repository')}
-                </a>
-              ) : null}
-              {marketplacePlugin.homepage ? (
-                <a
-                  className="text-primary underline"
-                  href={marketplacePlugin.homepage}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {t('marketplace.homepage')}
-                </a>
-              ) : null}
-              <p>{t('marketplace.integrity', { integrity: marketplacePlugin.integrity ?? '-' })}</p>
-              {marketplacePlugin.provenance ? (
-                <p>{t('marketplace.provenance', { provenance: marketplacePlugin.provenance })}</p>
-              ) : null}
-              {marketplacePlugin.deprecated ? <p className="text-warning">{t('marketplace.deprecated')}</p> : null}
-              <p>
-                {t('marketplace.permissions', {
-                  permissions: marketplacePlugin.permissions.join(', ') || t('noPermissions'),
-                })}
-              </p>
-              {marketplacePlugin.incompatibilityReason ? (
-                <p className="text-danger">{marketplacePlugin.incompatibilityReason}</p>
-              ) : null}
-              <p className="text-warning text-sm">{t('marketplace.restartWarning')}</p>
-            </div>
-          ) : null}
-        </DrawerBody>
-        <DrawerFooter>
-          <Button variant="ghost" onPress={() => setMarketplacePlugin(null)}>
-            {t('marketplace.cancel')}
-          </Button>
-          <Button
-            variant="primary"
-            isDisabled={!marketplacePlugin?.installable || npmPluginNames.has(marketplacePlugin?.name ?? '')}
-            onPress={() => {
-              if (marketplacePlugin) {
-                setInstallApproved(false);
-                setPluginToInstall(marketplacePlugin);
-                setMarketplacePlugin(null);
-              }
-            }}
-          >
-            {npmPluginNames.has(marketplacePlugin?.name ?? '') ? t('marketplace.installed') : t('marketplace.install')}
-          </Button>
-        </DrawerFooter>
-      </StandardDrawer>
 
       <StandardDrawer
         isOpen={pluginToInstall !== null}
@@ -1106,6 +1066,118 @@ export function PluginsSection() {
 
       <UploadPluginModal isOpen={isUploadOpen} onClose={() => setIsUploadOpen(false)} />
     </SettingsSection>
+  );
+}
+
+function MarketplaceDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-medium bg-surface-secondary p-3">
+      <p className="text-xs text-muted">{label}</p>
+      <p className="mt-1 break-words font-medium">{value}</p>
+    </div>
+  );
+}
+
+function MarketplacePluginDetails({
+  plugin,
+  isInstalled,
+  onInstall,
+  t,
+}: {
+  plugin: MarketplacePlugin;
+  isInstalled: boolean;
+  onInstall: () => void;
+  t: (key: string, values?: Record<string, string>) => string;
+}) {
+  return (
+    <div className="mx-auto grid w-full max-w-6xl items-start gap-6 py-2 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <Card>
+        <Card.Header>
+          <div className="flex flex-col gap-2">
+            <Card.Title>{t('marketplace.about')}</Card.Title>
+            {plugin.description ? <Card.Description>{plugin.description}</Card.Description> : null}
+          </div>
+        </Card.Header>
+        <Card.Content className="flex flex-col gap-6">
+          <div className="grid gap-3 text-sm sm:grid-cols-2">
+            <MarketplaceDetail label={t('marketplace.versionLabel')} value={plugin.version ?? '-'} />
+            <MarketplaceDetail label={t('marketplace.publisherLabel')} value={plugin.publisher ?? '-'} />
+            <MarketplaceDetail label={t('marketplace.hostCompatibilityLabel')} value={plugin.hostRange ?? '-'} />
+            <MarketplaceDetail
+              label={t('marketplace.sdkCompatibilityLabel')}
+              value={t('marketplace.sdkCompatibilityValue', {
+                backend: plugin.sdkCompatibility?.backend ?? '-',
+                frontend: plugin.sdkCompatibility?.frontend ?? '-',
+              })}
+            />
+            <MarketplaceDetail label={t('marketplace.licenseLabel')} value={plugin.license ?? '-'} />
+            <MarketplaceDetail label={t('marketplace.sourceLabel')} value={plugin.registry.url} />
+          </div>
+          {(plugin.repository || plugin.homepage) && (
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium">{t('marketplace.links')}</span>
+              <div className="flex flex-wrap gap-3 text-sm">
+                {plugin.repository ? (
+                  <a
+                    className="inline-flex items-center gap-1 text-primary underline"
+                    href={plugin.repository}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {t('marketplace.repository')} <ExternalLink className="size-3" />
+                  </a>
+                ) : null}
+                {plugin.homepage ? (
+                  <a
+                    className="inline-flex items-center gap-1 text-primary underline"
+                    href={plugin.homepage}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {t('marketplace.homepage')} <ExternalLink className="size-3" />
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          )}
+        </Card.Content>
+      </Card>
+      <Card>
+        <Card.Header>
+          <div className="flex flex-col gap-2">
+            <PluginClassificationBadge classification={plugin.classification} />
+            <Card.Title>{t('marketplace.install')}</Card.Title>
+            <Card.Description>{t('marketplace.installDescription')}</Card.Description>
+          </div>
+        </Card.Header>
+        <Card.Content className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-medium">{t('marketplace.permissionsLabel')}</span>
+            {plugin.permissions.length ? (
+              <div className="flex flex-wrap gap-2">
+                {plugin.permissions.map((permission) => (
+                  <Chip key={permission} variant="soft" color="warning">
+                    {permission}
+                  </Chip>
+                ))}
+              </div>
+            ) : (
+              <span className="text-sm text-muted">{t('noPermissions')}</span>
+            )}
+          </div>
+          {plugin.incompatibilityReason ? <p className="text-sm text-danger">{plugin.incompatibilityReason}</p> : null}
+          {plugin.deprecated ? <p className="text-sm text-warning">{t('marketplace.deprecated')}</p> : null}
+          <p className="inline-flex items-start gap-2 text-sm text-warning">
+            <ShieldCheck className="mt-0.5 size-4 shrink-0" /> {t('marketplace.safetyWarning')}
+          </p>
+        </Card.Content>
+        <Card.Footer>
+          <Button variant="primary" fullWidth isDisabled={!plugin.installable || isInstalled} onPress={onInstall}>
+            {isInstalled ? t('marketplace.installed') : t('marketplace.install')}
+          </Button>
+        </Card.Footer>
+      </Card>
+    </div>
   );
 }
 

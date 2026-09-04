@@ -202,7 +202,7 @@ describe('PluginsSection', () => {
     render(<PluginsSection />);
     await openMarketplace(user);
 
-    await user.click(await screen.findByRole('button', { name: 'Details' }));
+    await user.click(await screen.findByText('Shelly'));
     await user.click(screen.getByRole('button', { name: 'Install' }));
 
     const installDialog = screen.getByRole('heading', { name: 'Install Shelly?' }).closest('[role="dialog"]');
@@ -248,7 +248,7 @@ describe('PluginsSection', () => {
 
     await user.selectOptions(screen.getByLabelText('Registry'), 'private');
     await user.type(screen.getByLabelText('Search plugins'), '@private/plugin');
-    await user.click(await screen.findByRole('button', { name: 'Details' }));
+    await user.click(await screen.findByText('Private plugin'));
     await user.click(await screen.findByRole('button', { name: 'Install' }));
     await user.click(screen.getByRole('checkbox'));
     const installDialog = screen.getByRole('heading', { name: 'Install Private plugin?' }).closest('[role="dialog"]');
@@ -453,7 +453,7 @@ describe('PluginsSection', () => {
     );
   });
 
-  it('replaces the marketplace with package details', async () => {
+  it('opens package details in the marketplace and returns to the catalog', async () => {
     const plugin = (name: string) => ({
       name,
       version: '1.0.0',
@@ -482,9 +482,10 @@ describe('PluginsSection', () => {
     render(<PluginsSection />);
     await openMarketplace(user);
 
-    await user.click((await screen.findAllByRole('button', { name: 'Details' }))[1]);
-    expect(await screen.findByRole('heading', { name: 'Second details' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Plugin marketplace' })).not.toBeInTheDocument();
+    await user.click((await screen.findAllByText('Second'))[1]);
+    expect(await screen.findByRole('heading', { name: 'Second' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByRole('heading', { name: 'Plugin marketplace' })).toBeInTheDocument();
   });
 
   it('opens details when a debounced search starts after the details click', async () => {
@@ -517,11 +518,11 @@ describe('PluginsSection', () => {
     await openMarketplace(user);
 
     await user.type(screen.getByLabelText('Search plugins'), 's');
-    await user.click(await screen.findByRole('button', { name: 'Details' }));
+    await user.click(await screen.findByText('Shelly'));
     await new Promise((resolve) => setTimeout(resolve, 350));
     detail.resolve({ ok: true, json: async () => plugin });
 
-    expect(await screen.findByRole('heading', { name: 'Shelly details' })).toBeInTheDocument();
+    expect(await screen.findByText('About this plugin')).toBeInTheDocument();
   });
 
   it('keeps the marketplace loading indicator visible while details are pending after a search completes', async () => {
@@ -559,7 +560,7 @@ describe('PluginsSection', () => {
     render(<PluginsSection />);
     await openMarketplace(user);
 
-    await user.click(await screen.findByRole('button', { name: 'Details' }));
+    await user.click(await screen.findByText('Shelly'));
     await user.type(screen.getByLabelText('Search plugins'), 's');
     await new Promise((resolve) => setTimeout(resolve, 350));
     refreshedSearch.resolve({ ok: true, json: async () => ({ results: [plugin], errors: [] }) });
