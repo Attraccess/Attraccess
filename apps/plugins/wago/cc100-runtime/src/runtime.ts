@@ -35,6 +35,7 @@ export type RuntimeState = {
   credentials?: { username: string; password: string };
   accepted?: { revision: number; contentHash: string; snapshot: Snapshot };
   outputs: Record<string, boolean>;
+  feedback?: Record<string, boolean>;
   commandIds: string[];
 };
 
@@ -84,7 +85,14 @@ export class WagoRuntime {
   private readonly inFlightCommandIds = new Set<string>();
 
   constructor(
-    private readonly options: { hardwareId: string; prefix: string; store: JsonStateStore; transport: Transport; device: DeviceAdapter },
+    private readonly options: {
+      hardwareId: string;
+      prefix: string;
+      store: JsonStateStore;
+      transport: Transport;
+      device: DeviceAdapter;
+      configurationError?: () => ValidationError | undefined;
+    },
   ) {}
 
   async start(): Promise<void> {
@@ -108,6 +116,8 @@ export class WagoRuntime {
       return this.reportRejected(0, '', [{ path: '$', code: 'invalid_json', message: 'desired configuration is not valid JSON' }]);
     }
     const errors = validateDesired(desired);
+    const configurationError = this.options.configurationError?.();
+    if (configurationError) errors.push(configurationError);
     if (!errors.length && desired.contentHash !== hash(desired.snapshot))
       errors.push({ path: 'contentHash', code: 'hash_mismatch', message: 'content hash does not match snapshot' });
     if (errors.length) return this.reportRejected(desired.revision, desired.contentHash, errors);
@@ -241,6 +251,20 @@ export class WagoRuntime {
     onWritten?.();
     this.state.outputs[channel.id] = value;
     try {
+      const feedback = await this.options.device.read(point);
+      if (typeof feedback === 'boolean') {
+        (this.state.feedback ??= {})[channel.id] = feedback;
+        if (feedback !== value)
+          await this.options.transport.publish(this.topic('faults'), {
+            channelId: channel.id,
+            code: 'feedback_mismatch',
+            message: `expected feedback ${value}, received ${feedback}`,
+          });
+      }
+    } catch {
+      // Some real output modules have no readable feedback path.
+    }
+    try {
       await this.options.store.save(this.state);
     } catch {
       // Do not acknowledge an operation whose durable output state is stale.
@@ -266,6 +290,7 @@ export class WagoRuntime {
       revision: this.state.accepted?.revision ?? null,
       contentHash: this.state.accepted?.contentHash ?? null,
       outputs: this.state.outputs,
+      feedback: this.state.feedback ?? {},
     }, { retain: true });
   }
   private publishReport(revision: number, contentHash: string, errors: ValidationError[]): Promise<void> {
