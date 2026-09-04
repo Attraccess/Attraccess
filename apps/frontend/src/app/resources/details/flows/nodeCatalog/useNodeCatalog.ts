@@ -32,6 +32,44 @@ interface UseNodeCatalogResult {
 
 const STORAGE_KEY_COLLAPSED = 'nodeCatalog.collapsed';
 const STORAGE_KEY_EXPANDED_PREFIX = 'nodeCatalog.expanded.';
+const STORAGE_KEY_VERSION = 'nodeCatalog.storageVersion';
+const STORAGE_VERSION = '2';
+const LEGACY_EXPANDED_DOMAINS: Record<string, string[]> = {
+  'usage-sessions': ['resource', 'triggers'],
+  'operation-activity': ['resource', 'triggers'],
+  billing: ['resource'],
+  'access-doors': ['door', 'triggers'],
+  'health-monitoring': ['health'],
+  'companion-device': ['companion', 'triggers'],
+  messaging: ['mqtt', 'triggers'],
+  'web-requests': ['http'],
+  'flow-control': ['manual', 'logic', 'triggers'],
+};
+
+function migrateExpandedDomains(domains: string[]): void {
+  if (typeof window === 'undefined' || window.localStorage.getItem(STORAGE_KEY_VERSION) === STORAGE_VERSION) return;
+
+  const domainMappings = {
+    ...LEGACY_EXPANDED_DOMAINS,
+    ...Object.fromEntries(domains.filter((domain) => domain.startsWith('plugin.')).map((domain) => [domain, ['triggers']])),
+  };
+  for (const [domain, legacyDomains] of Object.entries(domainMappings)) {
+    const key = STORAGE_KEY_EXPANDED_PREFIX + domain;
+    if (window.localStorage.getItem(key) !== null) continue;
+
+    const legacyKeys = legacyDomains.map((legacy) => STORAGE_KEY_EXPANDED_PREFIX + legacy);
+    if (legacyKeys.some((legacyKey) => window.localStorage.getItem(legacyKey) === 'false')) {
+      window.localStorage.setItem(key, 'false');
+    }
+  }
+
+  for (const legacyDomains of Object.values(LEGACY_EXPANDED_DOMAINS)) {
+    for (const domain of legacyDomains) {
+      window.localStorage.removeItem(STORAGE_KEY_EXPANDED_PREFIX + domain);
+    }
+  }
+  window.localStorage.setItem(STORAGE_KEY_VERSION, STORAGE_VERSION);
+}
 
 function getDirection(schema: ResourceFlowNodeSchemaDto): Direction {
   if (schema.isOutput) return 'up';
@@ -51,6 +89,10 @@ function writeBool(key: string, value: boolean): void {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(key, String(value));
   window.dispatchEvent(new StorageEvent('storage', { key, newValue: String(value) }));
+}
+
+function readDomainExpanded(domain: string): boolean {
+  return readBool(STORAGE_KEY_EXPANDED_PREFIX + domain, true);
 }
 
 function subscribeToStorage(callback: () => void): () => void {
@@ -74,9 +116,7 @@ function useExpandedSnapshot(domains: string[]): string {
     subscribeToStorage,
     () => {
       if (typeof window === 'undefined') return '';
-      return domains
-        .map((key) => key + '=' + (readBool(STORAGE_KEY_EXPANDED_PREFIX + key, true) ? '1' : '0'))
-        .join('|');
+      return domains.map((key) => key + '=' + (readDomainExpanded(key) ? '1' : '0')).join('|');
     },
     () => '',
   );
@@ -89,7 +129,7 @@ export function useNodeCatalog({ resourceId }: UseNodeCatalogArgs): UseNodeCatal
     const byDomain = new Map<string, CatalogNode[]>();
     for (const schema of schemas ?? []) {
       if (!schema.supportedByResource) continue;
-      const domain = schema.isInput ? 'triggers' : nodeTypeDomain(schema.type);
+      const domain = nodeTypeDomain(schema.type);
       const list = byDomain.get(domain) ?? [];
       list.push({ schema, direction: getDirection(schema) });
       byDomain.set(domain, list);
@@ -107,6 +147,7 @@ export function useNodeCatalog({ resourceId }: UseNodeCatalogArgs): UseNodeCatal
   }, [schemas]);
 
   const allDomains = useMemo(() => groups.map((g) => g.domain), [groups]);
+  if (schemas !== undefined) migrateExpandedDomains(allDomains);
 
   const [collapsed, setCollapsed] = useStoredBool(STORAGE_KEY_COLLAPSED, false);
 
