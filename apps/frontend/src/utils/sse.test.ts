@@ -48,4 +48,21 @@ describe('useSSE', () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('shares one connection between subscribers to the same stream', async () => {
+    const { unmount } = renderHook(() => {
+      useSSE({ path: '/resources/1/events', onUpdate: vi.fn(), enabled: true });
+      useSSE({ path: '/resources/1/events', onUpdate: vi.fn(), enabled: true });
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    unmount();
+
+    expect(abortSpy).toHaveBeenCalledTimes(1);
+  });
 });
