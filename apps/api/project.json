@@ -105,7 +105,7 @@
     },
     "export-asyncapi": {
       "executor": "nx:run-commands",
-      "dependsOn": ["asyncapi-build"],
+      "dependsOn": ["build", "asyncapi-build"],
       "cache": true,
       "outputs": ["{workspaceRoot}/dist/apps/api/asyncapi.json"],
       "options": {
