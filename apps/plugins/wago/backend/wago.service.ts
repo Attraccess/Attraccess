@@ -65,6 +65,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   private revisions!: Repository<WagoConfigurationRevision>;
   private readonly subscriptions: PluginMqttSubscription[] = [];
   private readonly enrollmentExpiryTimers = new Map<number, ReturnType<typeof setTimeout>>();
+  private readonly claimAcknowledgementSubscriptions = new Map<number, PluginMqttSubscription>();
   private readonly claimLocks = new Map<number, Promise<void>>();
   private readonly configurationLocks = new Map<number, Promise<void>>();
   private readonly configurationReportQueues = new Map<number, { pending: Map<number, Buffer>; processing: boolean }>();
@@ -99,6 +100,8 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   onModuleDestroy(): void {
     this.destroyed = true;
     this.unsubscribe();
+    this.claimAcknowledgementSubscriptions.forEach((subscription) => subscription.unsubscribe());
+    this.claimAcknowledgementSubscriptions.clear();
     this.enrollmentExpiryTimers.forEach((timer) => clearTimeout(timer));
     this.enrollmentExpiryTimers.clear();
     if (this.subscriptionRetryTimer) clearTimeout(this.subscriptionRetryTimer);
@@ -392,7 +395,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       username: identity,
       vhost: '/',
       topicPolicy: {
-        publish: [discoveryTopic(normalizedHardwareId)],
+        publish: [discoveryTopic(normalizedHardwareId), `${discoveryTopic(normalizedHardwareId)}/claim/ack`],
         subscribe: [`${discoveryTopic(normalizedHardwareId)}/claim`],
       },
     });
@@ -444,6 +447,8 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     return this.withClaimLock(id, async () => {
       const prepared = await this.withClaimConfigurationLock(() => this.prepareClaim(id, name, verifier, mqttServerId));
       try {
+        const acknowledgementToken = randomBytes(24).toString('base64url');
+        await this.watchClaimAcknowledgement(prepared, acknowledgementToken);
         await this.context.mqtt.publish(
           prepared.mqttServerId,
           `${discoveryTopic(prepared.controller.hardwareId)}/claim`,
@@ -451,18 +456,18 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
             username: prepared.credential.username,
             password: prepared.credential.password,
             configuration: prepared.configuration,
+            acknowledgementToken,
           }),
           { qos: 1 },
         );
         prepared.credentialDelivered = true;
-        // The enrolled client must remain connected until it receives the permanent credential.
-        await this.revokeEnrollment(prepared.enrollment);
         await this.context.mqtt.publish(prepared.mqttServerId, discoveryTopic(prepared.controller.hardwareId), '', {
           qos: 1,
           retain: true,
         });
         return prepared.controller;
       } catch (error) {
+        this.clearClaimAcknowledgement(prepared.enrollment.id);
         if (!prepared.credentialDelivered) await this.restoreUnclaimedController(prepared);
         throw error;
       } finally {
@@ -807,6 +812,27 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     await this.controllers.save(controller);
   }
 
+  private async watchClaimAcknowledgement(
+    prepared: {
+      controller: WagoController;
+      enrollment: WagoEnrollment;
+      mqttServerId: number;
+    },
+    acknowledgementToken: string,
+  ): Promise<void> {
+    const topic = `${discoveryTopic(prepared.controller.hardwareId)}/claim/ack`;
+    const subscription = await this.subscribeMqtt(prepared.mqttServerId, topic, async (message) => {
+      if (!isClaimAcknowledgement(message.payload, acknowledgementToken)) return;
+      this.clearClaimAcknowledgement(prepared.enrollment.id);
+      try {
+        await this.revokeEnrollment(prepared.enrollment);
+      } catch (error) {
+        this.context.logger.warn(`Could not revoke acknowledged WAGO enrollment ${prepared.enrollment.id}: ${String(error)}`);
+      }
+    });
+    this.claimAcknowledgementSubscriptions.set(prepared.enrollment.id, subscription);
+  }
+
   private async onConfigurationReported(controllerId: number, payload: Buffer): Promise<void> {
     let report: ReturnType<typeof parseConfigurationReport>;
     try {
@@ -987,6 +1013,11 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     const timer = this.enrollmentExpiryTimers.get(enrollment.id);
     if (timer) clearTimeout(timer);
     this.enrollmentExpiryTimers.delete(enrollment.id);
+    this.clearClaimAcknowledgement(enrollment.id);
+  }
+  private clearClaimAcknowledgement(enrollmentId: number): void {
+    this.claimAcknowledgementSubscriptions.get(enrollmentId)?.unsubscribe();
+    this.claimAcknowledgementSubscriptions.delete(enrollmentId);
   }
   private async withClaimLock<T>(id: number, operation: () => Promise<T>): Promise<T> {
     const previous = this.claimLocks.get(id) ?? Promise.resolve();
@@ -1061,6 +1092,14 @@ function safeEqual(left: string, right: string): boolean {
 }
 function isValidHardwareId(hardwareId: string): boolean {
   return Boolean(hardwareId) && !/[/+#]/.test(hardwareId);
+}
+function isClaimAcknowledgement(payload: Buffer, token: string): boolean {
+  try {
+    const value = JSON.parse(payload.toString('utf8')) as { acknowledgementToken?: unknown };
+    return typeof value.acknowledgementToken === 'string' && safeEqual(value.acknowledgementToken, token);
+  } catch {
+    return false;
+  }
 }
 
 function parsePresetProvenance(value: string | null): unknown[] {

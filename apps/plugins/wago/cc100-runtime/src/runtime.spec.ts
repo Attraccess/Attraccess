@@ -87,9 +87,14 @@ describe('WagoRuntime', () => {
     });
     await expect(
       runtime.receiveDiscoveryClaim(
-        Buffer.from('{"username":"controller","password":"secret","configuration":{"namespace":"customer/wago"}}'),
+        Buffer.from('{"username":"controller","password":"secret","configuration":{"namespace":"customer/wago"},"acknowledgementToken":"claim-token"}'),
       ),
     ).resolves.toEqual({ username: 'controller', password: 'secret', prefix: 'customer/wago' });
+    expect(transport.published).toContainEqual({
+      topic: 'attraccess/wago/discovery/cc100-1/claim/ack',
+      payload: { acknowledgementToken: 'claim-token' },
+      retain: undefined,
+    });
     await expect(runtime.receiveDiscoveryClaim(Buffer.from('{"username":"controller"}'))).resolves.toBeUndefined();
   });
 

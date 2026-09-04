@@ -41,6 +41,7 @@ export function CommissioningModal({ isOpen, onOpenChange }: CommissioningModalP
   const settingsQuery = useSettingsQuery();
   const mqttServersQuery = useMqttServersQuery();
   const [controllerIp, setControllerIp] = useState('');
+  const [hardwareId, setHardwareId] = useState('');
   const [mqttServerId, setMqttServerId] = useState<Key | null>(null);
   const [sshUsername, setSshUsername] = useState('');
   const [sshPassword, setSshPassword] = useState('');
@@ -64,6 +65,7 @@ export function CommissioningModal({ isOpen, onOpenChange }: CommissioningModalP
 
   function close() {
     setControllerIp('');
+    setHardwareId('');
     setMqttServerId(null);
     setSshUsername('');
     setSshPassword('');
@@ -82,6 +84,7 @@ export function CommissioningModal({ isOpen, onOpenChange }: CommissioningModalP
 
     createSessionMutation.mutate(
       {
+        hardwareId,
         targetHost: controllerIp,
         mqttServerId: selectedMqttServerId,
       },
@@ -151,6 +154,10 @@ export function CommissioningModal({ isOpen, onOpenChange }: CommissioningModalP
                     <Label>Controller IP address</Label>
                     <Input value={controllerIp} onChange={(event) => setControllerIp(event.target.value)} />
                   </TextField>
+                  <TextField name="hardwareId" isRequired>
+                    <Label>Controller hardware ID</Label>
+                    <Input value={hardwareId} onChange={(event) => setHardwareId(event.target.value)} />
+                  </TextField>
                   {mqttServersQuery.isPending ? (
                     <div className="wg:flex wg:justify-center wg:p-2">
                       <Spinner color="accent" size="sm" />
@@ -204,6 +211,7 @@ export function CommissioningModal({ isOpen, onOpenChange }: CommissioningModalP
                     type="submit"
                     isPending={createSessionMutation.isPending}
                     isDisabled={
+                      !hardwareId.trim() ||
                       selectedMqttServerId === null ||
                       mqttServersQuery.isPending ||
                       mqttServersQuery.isError
@@ -276,7 +284,7 @@ function SessionStatus({
       {session.pairingCode && <p className="wg:text-sm wg:text-muted">Pairing code: <span className="wg:font-medium">{session.pairingCode}</span></p>}
       {session.failureReason && <Alert status="warning"><Alert.Indicator /><Alert.Content><Alert.Description>{session.failureReason}</Alert.Description></Alert.Content></Alert>}
       {isDelivering && <DeliveryProgress elapsedSeconds={deliveryElapsedSeconds} />}
-      <p className="wg:text-sm wg:text-muted">Delivery tries the CC100 default SSH credentials first. Enter overrides only if they were changed.</p>
+      <p className="wg:text-sm wg:text-muted">Delivery tries the CC100 default SSH credentials first. Alternate accounts must be sudo-capable; their password is used for the privileged installation steps.</p>
       <TextField name="sshUsername">
         <Label>Alternate SSH username</Label>
         <Input value={sshUsername} onChange={(event) => onSshUsernameChange(event.target.value)} />
@@ -286,7 +294,7 @@ function SessionStatus({
         <Input value={sshPassword} onChange={(event) => onSshPasswordChange(event.target.value)} />
       </TextField>
       <Checkbox isSelected={physicalIdentityConfirmed} onChange={onPhysicalIdentityConfirmedChange}>
-        <Checkbox.Content><Checkbox.Control><Checkbox.Indicator /></Checkbox.Control>I verified this SSH host key, controller hardware ID, and supported firmware baseline in person.</Checkbox.Content>
+        <Checkbox.Content><Checkbox.Control><Checkbox.Indicator /></Checkbox.Control>I verified this SSH host key, the hardware ID printed on this controller, and supported firmware baseline in person.</Checkbox.Content>
       </Checkbox>
       <Checkbox isSelected={codesysStopAcknowledged} onChange={onCodesysStopAcknowledgedChange}>
         <Checkbox.Content><Checkbox.Control><Checkbox.Indicator /></Checkbox.Control>I approve stopping CODESYS if it is active. This does not alter safety circuits or unrelated workloads.</Checkbox.Content>

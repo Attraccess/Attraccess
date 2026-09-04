@@ -410,6 +410,38 @@ describe('WagoService', () => {
     );
   });
 
+  it('revokes bootstrap credentials only after the controller acknowledges durable claim storage', async () => {
+    const enrollment = {
+      id: 3,
+      mqttServerId: 2,
+      hardwareId: 'cc100-01',
+      secretHash: 'secret-hash',
+      identity: 'wago-enrollment-test',
+      createdAt: '',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      revokedAt: null,
+      consumedAt: null,
+    };
+    const candidate = { ...controller(), fingerprint: 'fingerprint' };
+    const { service, context, enrollmentRepository } = createService([candidate], [enrollment]);
+    const revoke = jest.fn().mockResolvedValue(undefined);
+    (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = jest.fn().mockResolvedValue({});
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({
+      provision: jest.fn().mockResolvedValue({ username: 'wago-controller-cc100-01', password: 'secret' }),
+      revoke,
+    });
+    enrollmentRepository.findOneBy.mockResolvedValue(enrollment);
+
+    await service.claim(candidate.id, 'Controller', 'fingerprint');
+
+    expect(revoke).not.toHaveBeenCalled();
+    const claimPayload = JSON.parse((context.mqtt.publish as jest.Mock).mock.calls[0][2]) as { acknowledgementToken: string };
+    const acknowledgementHandler = (context.mqtt.subscribe as jest.Mock).mock.calls[0][2] as (message: { payload: Buffer }) => Promise<void>;
+    await acknowledgementHandler({ payload: Buffer.from(JSON.stringify({ acknowledgementToken: claimPayload.acknowledgementToken })) });
+
+    expect(revoke).toHaveBeenCalledWith(expect.objectContaining({ identity: enrollment.identity }));
+  });
+
   it('records structured controller rejection without changing the published snapshot', async () => {
     const { service, revisionRepository } = createService([{ ...controller(), trustState: 'claimed' as const }]);
     const revision = {
@@ -793,7 +825,7 @@ describe('WagoService', () => {
     await expect(service.createEnrollment(hardwareId)).rejects.toThrow('without MQTT separators or wildcards');
   });
 
-  it('keeps permanent credentials after a post-delivery claim failure', async () => {
+  it('leaves bootstrap credentials available until expiry after a post-delivery claim failure', async () => {
     const enrollment = {
       id: 3,
       mqttServerId: 2,
@@ -821,8 +853,7 @@ describe('WagoService', () => {
     await expect(service.claim(candidate.id, 'Controller', 'fingerprint')).rejects.toThrow('cleanup failed');
 
     expect(controllerRepository.save).toHaveBeenCalledWith(expect.objectContaining({ trustState: 'claimed' }));
-    expect(revoke).toHaveBeenCalledTimes(1);
-    expect(revoke).toHaveBeenCalledWith(expect.objectContaining({ identity: enrollment.identity }));
+    expect(revoke).not.toHaveBeenCalled();
   });
 
   it('preserves the claim failure when restoring the controller state fails', async () => {

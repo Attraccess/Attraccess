@@ -49,6 +49,7 @@ export interface CommissioningSession {
 }
 
 export interface CreateCommissioningSessionInput {
+  hardwareId: string;
   targetHost: string;
   mqttServerId: number;
 }

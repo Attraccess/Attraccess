@@ -88,8 +88,8 @@ describe('WagoCommissioningService', () => {
     const service = new WagoCommissioningService(context, {} as WagoService);
     service.onModuleInit();
 
-    await expect(service.create({ mqttServerId: 1, targetHost: '192.168.1.10' })).resolves.toMatchObject({
-      hardwareId: 'cc100-923d750abecd3ba7',
+    await expect(service.create({ hardwareId: 'CC100-TEST', mqttServerId: 1, targetHost: '192.168.1.10' })).resolves.toMatchObject({
+      hardwareId: 'CC100-TEST',
       hostKeyFingerprint: 'SHA256:test',
       state: 'awaiting_identity_confirmation',
     });

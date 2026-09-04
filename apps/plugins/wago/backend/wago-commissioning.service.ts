@@ -51,14 +51,15 @@ export class WagoCommissioningService implements OnModuleInit {
     };
   }
 
-  async create(input: { mqttServerId: number; targetHost: string }): Promise<WagoCommissioningSession> {
+  async create(input: { hardwareId: string; mqttServerId: number; targetHost: string }): Promise<WagoCommissioningSession> {
+    const hardwareId = input.hardwareId.trim();
+    if (!/^[A-Za-z0-9._-]+$/.test(hardwareId)) throw new ConflictException('a valid controller hardware ID is required');
     if (!isPrivateAddress(input.targetHost)) throw new ConflictException('commissioning is limited to a private controller address');
     if (!configuredFirmwareBaseline)
       throw new ConflictException('no CC100 firmware baseline is configured; commissioning is disabled until an exact supported baseline is set');
     if (!(await this.context.getMqttServerConfig(input.mqttServerId))) throw new NotFoundException('MQTT server not found');
 
     const hostKeyFingerprint = await scanHostKey(input.targetHost);
-    const hardwareId = `cc100-${createHash('sha256').update(hostKeyFingerprint).digest('hex').slice(0, 16)}`;
     const now = new Date().toISOString();
     return this.sessions.save(
       this.sessions.create({
@@ -131,13 +132,12 @@ export class WagoCommissioningService implements OnModuleInit {
       }
 
       const bundle = await verifyRuntimeBundle();
-
-      if (inspection.codesys === 'active') {
-        await this.run(session.targetHost, session.hostKeyFingerprint, credential, 'kill $(pidof codesys3) 2>/dev/null || true');
-        await this.run(session.targetHost, session.hostKeyFingerprint, credential, '/etc/config-tools/config_runtime runtime-version=0');
-      }
-      await this.run(session.targetHost, session.hostKeyFingerprint, credential, '/etc/config-tools/config_docker activate');
       try {
+        if (inspection.codesys === 'active') {
+          await this.sudoRun(session.targetHost, session.hostKeyFingerprint, credential, 'kill $(pidof codesys3) 2>/dev/null || true');
+          await this.sudoRun(session.targetHost, session.hostKeyFingerprint, credential, '/etc/config-tools/config_runtime runtime-version=0');
+        }
+        await this.sudoRun(session.targetHost, session.hostKeyFingerprint, credential, '/etc/config-tools/config_docker activate');
         await this.copyTo(session.targetHost, session.hostKeyFingerprint, credential, bundle.path, '/tmp/attraccess-wago-runtime.tar');
         const enrollment = await this.wago.createEnrollment(session.hardwareId, session.mqttServerId);
         if (!enrollment.password) throw new ConflictException('automatic restricted MQTT credential provisioning is required for secure commissioning');
@@ -158,7 +158,7 @@ export class WagoCommissioningService implements OnModuleInit {
             `WAGO_PAIRING_CODE=${pairingCode}`,
           ].join('\n'),
         );
-        await this.runScript(
+        await this.sudoRunScript(
           session.targetHost,
           session.hostKeyFingerprint,
           credential,
@@ -215,7 +215,7 @@ export class WagoCommissioningService implements OnModuleInit {
   }
 
   private async writeRuntimeEnvironment(host: string, fingerprint: string, credential: TemporarySshCredential, content: string): Promise<void> {
-    await this.run(
+    await this.sudoRun(
       host,
       fingerprint,
       credential,
@@ -224,8 +224,18 @@ export class WagoCommissioningService implements OnModuleInit {
     );
   }
 
-  private runScript(host: string, fingerprint: string, credential: TemporarySshCredential, script: string): Promise<string> {
-    return this.run(host, fingerprint, credential, 'base64 -d | sh', Buffer.from(script).toString('base64'));
+  private sudoRun(
+    host: string,
+    fingerprint: string,
+    credential: TemporarySshCredential,
+    command: string,
+    input?: string,
+  ): Promise<string> {
+    return this.run(host, fingerprint, credential, `sudo -S sh -c ${shellQuote(command)}`, `${credential.password}\n${input ?? ''}`);
+  }
+
+  private sudoRunScript(host: string, fingerprint: string, credential: TemporarySshCredential, script: string): Promise<string> {
+    return this.sudoRun(host, fingerprint, credential, 'base64 -d | sh', Buffer.from(script).toString('base64'));
   }
 
   private async run(host: string, fingerprint: string, credential: TemporarySshCredential, command: string, input?: string): Promise<string> {
