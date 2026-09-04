@@ -48,7 +48,19 @@ If CODESYS is active, the current implementation stops it before commissioning. 
 
 After runtime delivery, the session shows **Waiting for the controller to connect**. The controller uses a restricted, one-time enrollment credential to announce through the selected local MQTT broker. Attraccess then shows **Claiming automatically**, applies permanent controller-scoped credentials, and revokes the enrollment credential.
 
-The session is **Claimed** when its progress says **Commissioning complete** and **The controller is claimed and ready to configure**. Before operating equipment, send the first Desired Configuration and verify the matching Reported Configuration revision and content hash, a current heartbeat, the expected runtime version, and controller state in the controller detail view.
+The session is **Claimed** when its progress says **Commissioning complete** and **The controller is claimed and ready to configure**. Claiming is not sufficient to operate equipment.
+
+### Verify configuration readiness
+
+The current **WAGO controllers** UI can save a configuration draft, but does not expose validation, review, publishing, revision history, or Reported Configuration verification. An authorized operator must complete the first configuration through the supported API before operating equipment. These endpoints require the `resources.update` permission:
+
+1. Save the complete Desired Configuration to `POST /api/wago/controllers/:id/configuration/draft` with `{ "snapshot": { ... } }`. A draft saved through the UI is also valid input to the following steps.
+2. Validate it with `POST /api/wago/controllers/:id/configuration/validate`. Stop and correct every returned validation error.
+3. Review the resulting changes with `POST /api/wago/controllers/:id/configuration/review`. Confirm the returned `diff` is intended and retain the returned draft `reviewedHash`.
+4. Publish the reviewed draft with `POST /api/wago/controllers/:id/configuration/publish`. Record the returned `revision` and `contentHash`; Attraccess publishes that Desired Configuration to the controller.
+5. Poll `GET /api/wago/controllers/:id/configuration/revisions` until the recorded revision has `state: "applied"`, a non-empty `reportedAt`, and the same `contentHash` returned at publish. If its state is `rejected`, stop, correct the complete Desired Configuration, and repeat the workflow with a new revision.
+
+Also confirm a current heartbeat and the expected runtime version in the controllers table. Do not operate equipment until all of this readiness verification has completed through the API; there is currently no controller detail view that can perform it.
 
 ## Recovery
 
@@ -62,7 +74,7 @@ The session is **Claimed** when its progress says **Commissioning complete** and
 | Bundle checksum or signature fails          | Stop. Replace the local artifact with the approved signed release. Do not bypass verification or copy an image from a registry.                                                                                                        |
 | Delivery fails                              | Open **View progress**, record the displayed failure reason, restore reachability or prerequisites, then select **Retry delivery**. If credential revocation needs attention, resolve that condition before retrying.                  |
 | Controller does not connect or claim        | Verify local MQTT reachability and broker selection, then inspect the controller runtime logs through the secured SSH path. The enrollment credential expires after 15 minutes; cancel the session and create a new one if it expires. |
-| Initial configuration is rejected           | Correct the complete Desired Configuration and publish a new revision. Do not edit the controller state file by hand.                                                                                                                  |
+| Initial configuration is rejected           | Correct the complete Desired Configuration, then validate, review, and publish a new revision through the configuration API. Do not edit the controller state file by hand.                                                            |
 
 Select **Cancel enrollment** only to abandon the session. It revokes the enrollment credential and deletes the Attraccess commissioning session. Removing a controller from Attraccess also revokes its MQTT access, but does not uninstall the runtime from the CC100.
 
