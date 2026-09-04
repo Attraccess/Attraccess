@@ -87,6 +87,13 @@ export function ResourceBillingInfoEditor(props: Props) {
       configuration?.minorUnit ?? 1,
     ),
   );
+  const [creditsPerOperatingMinute, setCreditsPerOperatingMinute] = useState(
+    dbCurrencyToUserCurrency(
+      (resourceBillingConfiguration?.configuration as { creditsPerOperatingMinute?: number } | undefined)
+        ?.creditsPerOperatingMinute ?? 0,
+      configuration?.minorUnit ?? 1,
+    ),
+  );
 
   useEffect(() => {
     if (!configuration) {
@@ -105,6 +112,13 @@ export function ResourceBillingInfoEditor(props: Props) {
         configuration.minorUnit,
       ),
     );
+    setCreditsPerOperatingMinute(
+      dbCurrencyToUserCurrency(
+        (resourceBillingConfiguration?.configuration as { creditsPerOperatingMinute?: number } | undefined)
+          ?.creditsPerOperatingMinute ?? 0,
+        configuration.minorUnit,
+      ),
+    );
   }, [resourceBillingConfiguration, configuration]);
 
   const onSubmit = useCallback(async () => {
@@ -117,9 +131,10 @@ export function ResourceBillingInfoEditor(props: Props) {
       requestBody: {
         creditsPerUsage: userCurrencyToDbCurrency(creditsPerUsage, configuration.minorUnit),
         creditsPerMinute: userCurrencyToDbCurrency(creditsPerMinute, configuration.minorUnit),
-      },
+        creditsPerOperatingMinute: userCurrencyToDbCurrency(creditsPerOperatingMinute, configuration.minorUnit),
+      } as never,
     });
-  }, [updateConfiguration, resourceId, creditsPerUsage, creditsPerMinute, configuration]);
+  }, [updateConfiguration, resourceId, creditsPerUsage, creditsPerMinute, creditsPerOperatingMinute, configuration]);
 
   const { hasPermission } = useAuth();
   if (!hasPermission('billing.manage')) {
@@ -146,6 +161,19 @@ export function ResourceBillingInfoEditor(props: Props) {
               defaultValue={0}
             >
               <Label>{t('inputs.creditsPerUsage.label', { currency: configuration.currency })}</Label>
+              <NumberFieldGroup>
+                <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+                <NumberFieldInput />
+                <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+              </NumberFieldGroup>
+            </NumberField>
+            <NumberField
+              value={creditsPerOperatingMinute}
+              minValue={0}
+              onChange={(value) => setCreditsPerOperatingMinute(value)}
+              defaultValue={0}
+            >
+              <Label>{t('inputs.creditsPerOperatingMinute.label', { currency: configuration.currency })}</Label>
               <NumberFieldGroup>
                 <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
                 <NumberFieldInput />

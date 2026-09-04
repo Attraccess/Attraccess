@@ -9,6 +9,7 @@ import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { MetricsService } from '../../metrics/metrics.service';
 import {
   ResourceMaintenanceSchedule,
+  ResourceMaintenanceScheduleDurationBasis,
   ResourceMaintenance,
   Resource,
   ResourceUsage,
@@ -135,6 +136,29 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       const result = await service.getBaselineDate(resourceId, scheduleId);
       expect(result).toEqual(lastEnd);
     });
+  });
+
+  it('uses only persisted attributable operating duration for an operating-duration schedule', async () => {
+    const queryBuilder = createQueryBuilderMock();
+    queryBuilder.getRawOne.mockResolvedValue({ total: '60' });
+    jest.spyOn(usageRepository, 'createQueryBuilder').mockReturnValue(queryBuilder as never);
+
+    const triggered = await service.shouldTrigger(
+      {
+        id: scheduleId,
+        resourceId,
+        triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_HOURS,
+        durationBasis: ResourceMaintenanceScheduleDurationBasis.ATTRIBUTABLE_OPERATING_DURATION,
+        usageHoursConfig: { duration: 1, unit: 'HOURS' as const },
+      } as ResourceMaintenanceSchedule,
+      resourceId,
+    );
+
+    expect(triggered).toBe(true);
+    expect(queryBuilder.select).toHaveBeenCalledWith(
+      'COALESCE(SUM(usage.attributedOperatingDurationInMinutes), 0)',
+      'total',
+    );
   });
 
   describe('evaluateResource', () => {

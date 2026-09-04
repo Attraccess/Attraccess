@@ -76,6 +76,11 @@
     "name": { "label": "Name", "placeholder": "e.g. Monthly check" },
     "triggerType": { "label": "Trigger type" },
     "duration": { "label": "Duration" },
+    "durationBasis": {
+      "label": "Duration basis",
+      "SESSION_DURATION": "Session duration",
+      "ATTRIBUTABLE_OPERATING_DURATION": "Attributed operating duration"
+    },
     "unit": { "label": "Unit", "MINUTES": "minutes", "HOURS": "hours", "DAYS": "days" },
     "thresholdSessions": { "label": "Sessions threshold" },
     "enabled": { "label": "Enabled" },
@@ -84,9 +89,9 @@
     "alert": { "errorTitle": "Couldn't save schedule" }
   },
   "configSummary": {
-    "usageHoursMinutes": "{{duration}} min of use",
-    "usageHoursHours": "{{duration}} h of use",
-    "usageHoursDays": "{{duration}} d of use",
+    "usageHoursMinutes": "{{duration}} min of use ({{durationBasis}})",
+    "usageHoursHours": "{{duration}} h of use ({{durationBasis}})",
+    "usageHoursDays": "{{duration}} d of use ({{durationBasis}})",
     "usageCount": "Every {{count}} sessions",
     "timeIntervalMinutes": "Every {{duration}} min",
     "timeIntervalHours": "Every {{duration}} h",

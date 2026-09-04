@@ -14,8 +14,17 @@
   "perMinute": {
     "label": "Per minute"
   },
+  "perOperatingMinute": {
+    "label": "Per attributable operating minute"
+  },
   "example": {
-    "label": "Example cost ({{minutes}} min)"
+    "label": "Example cost",
+    "sessionDuration": {
+      "label": "Session duration (min)"
+    },
+    "operatingDuration": {
+      "label": "Attributed operating duration (min)"
+    }
   },
   "simulator": {
     "minutesLabel": "Simulate minutes"

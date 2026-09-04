@@ -76,6 +76,11 @@
     "name": { "label": "Name", "placeholder": "z. B. monatlicher Check" },
     "triggerType": { "label": "Auslöser-Typ" },
     "duration": { "label": "Dauer" },
+    "durationBasis": {
+      "label": "Dauergrundlage",
+      "SESSION_DURATION": "Sitzungsdauer",
+      "ATTRIBUTABLE_OPERATING_DURATION": "Zugeordnete Betriebsdauer"
+    },
     "unit": { "label": "Einheit", "MINUTES": "Minuten", "HOURS": "Stunden", "DAYS": "Tage" },
     "thresholdSessions": { "label": "Sitzungsschwelle" },
     "enabled": { "label": "Aktiv" },
@@ -84,9 +89,9 @@
     "alert": { "errorTitle": "Zeitplan konnte nicht gespeichert werden" }
   },
   "configSummary": {
-    "usageHoursMinutes": "{{duration}} Min. Nutzung",
-    "usageHoursHours": "{{duration}} Std. Nutzung",
-    "usageHoursDays": "{{duration}} Tage Nutzung",
+    "usageHoursMinutes": "{{duration}} Min. Nutzung ({{durationBasis}})",
+    "usageHoursHours": "{{duration}} Std. Nutzung ({{durationBasis}})",
+    "usageHoursDays": "{{duration}} Tage Nutzung ({{durationBasis}})",
     "usageCount": "Alle {{count}} Sitzungen",
     "timeIntervalMinutes": "Alle {{duration}} Min.",
     "timeIntervalHours": "Alle {{duration}} Std.",

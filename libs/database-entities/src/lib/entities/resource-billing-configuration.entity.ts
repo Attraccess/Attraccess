@@ -34,4 +34,8 @@ export class ResourceBillingConfiguration {
   @Column({ type: 'integer' })
   @ApiProperty({ description: 'The credit cost per minute' })
   creditsPerMinute!: number;
+
+  @Column({ type: 'integer', default: 0 })
+  @ApiProperty({ description: 'The credit cost per attributable operating minute' })
+  creditsPerOperatingMinute!: number;
 }

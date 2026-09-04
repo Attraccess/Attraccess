@@ -1,4 +1,14 @@
-import { Button, cn, NumberField, NumberFieldDecrementButton, NumberFieldGroup, NumberFieldIncrementButton, NumberFieldInput, Skeleton } from "@heroui/react";
+import {
+  Button,
+  cn,
+  Label,
+  NumberField,
+  NumberFieldDecrementButton,
+  NumberFieldGroup,
+  NumberFieldIncrementButton,
+  NumberFieldInput,
+  Skeleton,
+} from '@heroui/react';
 import { CreditCard, Edit2Icon } from 'lucide-react';
 import {
   useBillingServiceGetBillingBalance,
@@ -69,13 +79,29 @@ export function ResourceBillingInfo(props: Props) {
     );
   }, [resourceBillingConfiguration, configuration]);
 
+  const creditsPerOperatingMinute = useMemo(() => {
+    if (!configuration) {
+      return 0;
+    }
+
+    return dbCurrencyToUserCurrency(
+      (resourceBillingConfiguration?.configuration as { creditsPerOperatingMinute?: number } | undefined)
+        ?.creditsPerOperatingMinute ?? 0,
+      configuration.minorUnit,
+    );
+  }, [resourceBillingConfiguration, configuration]);
+
   const isFree = useMemo(() => {
     return (
-      creditsPerUsage === 0 && creditsPerMinute === 0 && resourceBillingConfiguration?.additionalItems.length === 0
+      creditsPerUsage === 0 &&
+      creditsPerMinute === 0 &&
+      creditsPerOperatingMinute === 0 &&
+      resourceBillingConfiguration?.additionalItems.length === 0
     );
-  }, [creditsPerUsage, creditsPerMinute, resourceBillingConfiguration]);
+  }, [creditsPerUsage, creditsPerMinute, creditsPerOperatingMinute, resourceBillingConfiguration]);
 
-  const [exampleMinutes, setExampleMinutes] = useState(10);
+  const [exampleSessionMinutes, setExampleSessionMinutes] = useState(10);
+  const [exampleOperatingMinutes, setExampleOperatingMinutes] = useState(10);
 
   const exampleCost = useMemo(() => {
     if (!resourceBillingConfiguration || !configuration) {
@@ -89,8 +115,21 @@ export function ResourceBillingInfo(props: Props) {
       configuration.minorUnit,
     );
 
-    return creditsPerUsage + creditsPerMinute * exampleMinutes + customFlowBillingItemsCost;
-  }, [creditsPerUsage, creditsPerMinute, exampleMinutes, resourceBillingConfiguration, configuration]);
+    return (
+      creditsPerUsage +
+      creditsPerMinute * Math.ceil(exampleSessionMinutes) +
+      creditsPerOperatingMinute * Math.ceil(exampleOperatingMinutes) +
+      customFlowBillingItemsCost
+    );
+  }, [
+    creditsPerUsage,
+    creditsPerMinute,
+    creditsPerOperatingMinute,
+    exampleSessionMinutes,
+    exampleOperatingMinutes,
+    resourceBillingConfiguration,
+    configuration,
+  ]);
 
   const exampleResultingBalance = useMemo(() => {
     return adjustedBalance - exampleCost;
@@ -159,6 +198,13 @@ export function ResourceBillingInfo(props: Props) {
             currency: configuration.currency,
           })}
         </dd>
+        <dt>{t('perOperatingMinute.label')}</dt>
+        <dd className={cn(valueClass, 'text-warning')}>
+          {t('billingValue', {
+            credits: formatNumber(creditsPerOperatingMinute),
+            currency: configuration.currency,
+          })}
+        </dd>
         {resourceBillingConfiguration.additionalItems.map((item) => (
           <Fragment key={JSON.stringify(item)}>
             <dt>{item.name}</dt>
@@ -177,14 +223,32 @@ export function ResourceBillingInfo(props: Props) {
       </dl>
 
       <dl className={cn(dlClass, 'border-t border-divider pt-3')}>
-        <dt>
+        <dt className="flex flex-col gap-2">
+          <span className="font-medium">{t('example.label')}</span>
           <NumberField
-            aria-label={t('example.label', { minutes: exampleMinutes })}
-            value={exampleMinutes}
-            onChange={(value) => setExampleMinutes(value)}
+            value={exampleSessionMinutes}
+            onChange={(value) => {
+              setExampleSessionMinutes(value);
+              setExampleOperatingMinutes((operatingMinutes) => Math.min(operatingMinutes, value));
+            }}
             minValue={0}
             defaultValue={10}
           >
+            <Label>{t('example.sessionDuration.label')}</Label>
+            <NumberFieldGroup>
+              <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
+              <NumberFieldInput />
+              <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
+            </NumberFieldGroup>
+          </NumberField>
+          <NumberField
+            value={exampleOperatingMinutes}
+            onChange={(value) => setExampleOperatingMinutes(value)}
+            minValue={0}
+            maxValue={exampleSessionMinutes}
+            defaultValue={10}
+          >
+            <Label>{t('example.operatingDuration.label')}</Label>
             <NumberFieldGroup>
               <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
               <NumberFieldInput />
@@ -196,7 +260,6 @@ export function ResourceBillingInfo(props: Props) {
           {t('billingValue', {
             credits: formatNumber(exampleCost),
             currency: configuration.currency,
-            minutes: exampleMinutes,
           })}
         </dd>
         <dt className="font-medium">{t('exampleResultingBalance.label')}</dt>
@@ -220,7 +283,6 @@ export function ResourceBillingInfo(props: Props) {
     <ResourceBillingInfoEditor resourceId={resourceId}>
       {(onOpen) => (
         <Button variant="primary" isIconOnly onPress={onOpen} aria-label={t('actions.edit')}>
-
           <Edit2Icon size={12} />
         </Button>
       )}

@@ -197,6 +197,7 @@ export class BillingService {
         resourceId,
         creditsPerUsage: 0,
         creditsPerMinute: 0,
+        creditsPerOperatingMinute: 0,
       });
       configuration = await repository.save(configuration);
     }
@@ -222,6 +223,16 @@ export class BillingService {
       configuration.creditsPerMinute = data.creditsPerMinute;
     }
 
+    if (data.creditsPerOperatingMinute === null) {
+      data.creditsPerOperatingMinute = 0;
+    }
+    if (data.creditsPerOperatingMinute !== undefined) {
+      if (data.creditsPerOperatingMinute < 0) {
+        throw new BadRequestException('Credits per operating minute cannot be negative');
+      }
+      configuration.creditsPerOperatingMinute = data.creditsPerOperatingMinute;
+    }
+
     if (data.creditsPerUsage === null) {
       data.creditsPerUsage = 0;
     }
@@ -238,6 +249,9 @@ export class BillingService {
 
     if (data.creditsPerMinute !== undefined && data.creditsPerMinute % 1 !== 0) {
       throw new BadRequestException('Credits per minute must be an integer (multiply by currency minor unit)');
+    }
+    if (data.creditsPerOperatingMinute !== undefined && data.creditsPerOperatingMinute % 1 !== 0) {
+      throw new BadRequestException('Credits per operating minute must be an integer (multiply by currency minor unit)');
     }
 
     const savedConfiguration = await this.resourceBillingConfigurationRepository.save(configuration);
@@ -268,10 +282,14 @@ export class BillingService {
     const doCalculation = async (manager: EntityManager) => {
       const configuration = await this.getResourceBillingConfiguration(usage.resource.id, manager);
 
+      const sessionDurationRate = usage.sessionDurationCreditsPerMinute ?? configuration.creditsPerMinute;
+      const operatingDurationRate = usage.operatingDurationCreditsPerMinute ?? 0;
       const roundedMinutes = Math.ceil(usage.usageInMinutes);
-      const creditsForUsageDuration = configuration.creditsPerMinute * roundedMinutes;
+      const roundedOperatingMinutes = Math.ceil(usage.attributedOperatingDurationInMinutes ?? 0);
+      const creditsForUsageDuration = sessionDurationRate * roundedMinutes;
+      const creditsForOperatingDuration = operatingDurationRate * roundedOperatingMinutes;
       const creditsForSession = configuration.creditsPerUsage;
-      let totalCredits = creditsForUsageDuration;
+      let totalCredits = creditsForUsageDuration + creditsForOperatingDuration;
       totalCredits += creditsForSession;
 
       let transaction = await manager.findOne(BillingTransaction, {
@@ -319,9 +337,18 @@ export class BillingService {
       await manager.save(BillingTransactionItem, {
         billingTransactionId: transaction.id,
         name: 'PER_MINUTE',
-        unitPrice: configuration.creditsPerMinute,
+        unitPrice: sessionDurationRate,
         quantity: roundedMinutes,
       });
+
+      if (operatingDurationRate > 0) {
+        await manager.save(BillingTransactionItem, {
+          billingTransactionId: transaction.id,
+          name: 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+          unitPrice: operatingDurationRate,
+          quantity: roundedOperatingMinutes,
+        });
+      }
 
       if (billingFactorDiscountAmount !== 0) {
         await manager.save(BillingTransactionItem, {
@@ -384,7 +411,8 @@ export class BillingService {
 
     if (await this.isBillingEnabled(resourceId, transactionalEntityManager)) {
       const balance = await this.getBalance(user.id, transactionalEntityManager);
-      if (balance < resourceBillingConfiguration.creditsPerUsage + resourceBillingConfiguration.creditsPerMinute) {
+      const sessionDurationRate = usage.sessionDurationCreditsPerMinute ?? resourceBillingConfiguration.creditsPerMinute;
+      if (balance < resourceBillingConfiguration.creditsPerUsage + sessionDurationRate) {
         throw new InsufficientBalanceError();
       }
     }
@@ -403,7 +431,11 @@ export class BillingService {
 
   public async isBillingEnabled(resourceId: number, transactionalEntityManager?: EntityManager) {
     const configuration = await this.getResourceBillingConfiguration(resourceId, transactionalEntityManager);
-    if (configuration.creditsPerUsage > 0 || configuration.creditsPerMinute > 0) {
+    if (
+      configuration.creditsPerUsage > 0 ||
+      configuration.creditsPerMinute > 0 ||
+      configuration.creditsPerOperatingMinute > 0
+    ) {
       return true;
     }
 
