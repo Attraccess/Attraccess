@@ -8,7 +8,7 @@ import { PLUGIN_CONTEXT, PluginContext, Repository } from '@attraccess/plugins-b
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
 import { WagoService } from './wago.service';
 
-const SSH_TIMEOUT_MS = 20_000;
+const SSH_TIMEOUT_MS = 30 * 60_000;
 // The initial supported CC100 commissioning baseline. Operators may pin a more
 // specific vendor firmware identifier through configuration as it becomes available.
 const configuredFirmwareBaseline = process.env.WAGO_CC100_FIRMWARE_BASELINE?.trim() || '31';
@@ -16,10 +16,12 @@ const configuredRuntimeImage = process.env.WAGO_CC100_RUNTIME_IMAGE?.trim() ?? '
 const configuredRuntimeBundle = process.env.WAGO_CC100_RUNTIME_BUNDLE_PATH?.trim() ?? '';
 const configuredRuntimeBundleChecksum = process.env.WAGO_CC100_RUNTIME_BUNDLE_SHA256_PATH?.trim() ?? '';
 const configuredRuntimeBundleSignature = process.env.WAGO_CC100_RUNTIME_BUNDLE_SIGNATURE_PATH?.trim() ?? '';
+const configuredRuntimeSigningPublicKey = process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH?.trim() ?? '';
 const SIGNING_NAMESPACE = 'attraccess-wago-runtime';
 const SIGNING_IDENTITY = 'attraccess-wago-runtime';
 
 type TemporarySshCredential = { username: string; password: string };
+const defaultSshCredential: TemporarySshCredential = { username: 'root', password: 'wago' };
 
 @Injectable()
 export class WagoCommissioningService implements OnModuleInit {
@@ -49,15 +51,14 @@ export class WagoCommissioningService implements OnModuleInit {
     };
   }
 
-  async create(input: { hardwareId: string; mqttServerId: number; targetHost: string }): Promise<WagoCommissioningSession> {
-    const hardwareId = input.hardwareId.trim();
-    if (!/^[A-Za-z0-9._-]+$/.test(hardwareId)) throw new ConflictException('a valid controller hardware ID is required');
+  async create(input: { mqttServerId: number; targetHost: string }): Promise<WagoCommissioningSession> {
     if (!isPrivateAddress(input.targetHost)) throw new ConflictException('commissioning is limited to a private controller address');
     if (!configuredFirmwareBaseline)
       throw new ConflictException('no CC100 firmware baseline is configured; commissioning is disabled until an exact supported baseline is set');
     if (!(await this.context.getMqttServerConfig(input.mqttServerId))) throw new NotFoundException('MQTT server not found');
 
     const hostKeyFingerprint = await scanHostKey(input.targetHost);
+    const hardwareId = `cc100-${createHash('sha256').update(hostKeyFingerprint).digest('hex').slice(0, 16)}`;
     const now = new Date().toISOString();
     return this.sessions.save(
       this.sessions.create({
@@ -112,13 +113,14 @@ export class WagoCommissioningService implements OnModuleInit {
       throw new ConflictException('commissioning session cannot be delivered in its current state');
     if (!input.physicalIdentityConfirmed) throw new ConflictException('physical controller identity confirmation is required');
     if (input.hostKeyFingerprint !== session.hostKeyFingerprint) throw new ConflictException('controller SSH host key does not match the scanned key');
-    if (!input.temporarySsh.username.trim() || !input.temporarySsh.password)
-      throw new ConflictException('temporary SSH credentials are required for this session only');
     if (!isRuntimeArtifactConfigured())
       throw new ConflictException('no immutable, signed CC100 runtime bundle is configured for commissioning');
 
+    const credential = input.temporarySsh.username.trim() && input.temporarySsh.password ? input.temporarySsh : defaultSshCredential;
+    let enrollmentExpiresAt: string | null = null;
+
     try {
-      const inspection = await this.inspect(session.targetHost, session.hostKeyFingerprint, input.temporarySsh);
+      const inspection = await this.inspect(session.targetHost, session.hostKeyFingerprint, credential);
       session.codesysState = inspection.codesys;
       if (!isSupportedController(inspection.firmware, session.firmwareBaseline))
         throw new ConflictException(`unsupported CC100 model or firmware; expected baseline ${session.firmwareBaseline}`);
@@ -130,43 +132,44 @@ export class WagoCommissioningService implements OnModuleInit {
 
       const bundle = await verifyRuntimeBundle();
 
-      const enrollment = await this.wago.createEnrollment(session.hardwareId, session.mqttServerId);
-      if (!enrollment.password) throw new ConflictException('automatic restricted MQTT credential provisioning is required for secure commissioning');
-      const pairingCode = randomInt(100_000, 1_000_000).toString();
-      session.enrollmentId = enrollment.id;
-      session.pairingCode = pairingCode;
-      const runtimeEnv = [
-        `WAGO_HARDWARE_ID=${session.hardwareId}`,
-        `WAGO_MQTT_URL=${enrollment.broker.useTls ? 'mqtts' : 'mqtt'}://${enrollment.broker.host}:${enrollment.broker.port}`,
-        `WAGO_MQTT_USERNAME=${enrollment.username}`,
-        `WAGO_MQTT_PASSWORD=${enrollment.password}`,
-        `WAGO_ENROLLMENT_SECRET=${enrollment.claimSecret}`,
-        `WAGO_PAIRING_CODE=${pairingCode}`,
-      ].join('\n');
-
-      if (inspection.codesys === 'active')
-        await this.sudoRun(session.targetHost, session.hostKeyFingerprint, input.temporarySsh, '/etc/init.d/pp_codesys3 stop');
-      await this.sudoRun(
-        session.targetHost,
-        session.hostKeyFingerprint,
-        input.temporarySsh,
-        'docker info >/dev/null 2>&1 || /etc/init.d/dockerd start; docker info >/dev/null',
-      );
-      await this.writeRuntimeEnvironment(session.targetHost, session.hostKeyFingerprint, input.temporarySsh, runtimeEnv);
+      if (inspection.codesys === 'active') {
+        await this.run(session.targetHost, session.hostKeyFingerprint, credential, 'kill $(pidof codesys3) 2>/dev/null || true');
+        await this.run(session.targetHost, session.hostKeyFingerprint, credential, '/etc/config-tools/config_runtime runtime-version=0');
+      }
+      await this.run(session.targetHost, session.hostKeyFingerprint, credential, '/etc/config-tools/config_docker activate');
       try {
-        await this.copyTo(session.targetHost, session.hostKeyFingerprint, input.temporarySsh, bundle.path, '/tmp/attraccess-wago-runtime.tar');
-        await this.sudoRun(
+        await this.copyTo(session.targetHost, session.hostKeyFingerprint, credential, bundle.path, '/tmp/attraccess-wago-runtime.tar');
+        const enrollment = await this.wago.createEnrollment(session.hardwareId, session.mqttServerId);
+        if (!enrollment.password) throw new ConflictException('automatic restricted MQTT credential provisioning is required for secure commissioning');
+        const pairingCode = randomInt(100_000, 1_000_000).toString();
+        session.enrollmentId = enrollment.id;
+        session.pairingCode = pairingCode;
+        enrollmentExpiresAt = enrollment.expiresAt;
+        await this.writeRuntimeEnvironment(
           session.targetHost,
           session.hostKeyFingerprint,
-          input.temporarySsh,
-          `rm -rf /tmp/attraccess-wago-runtime && mkdir -m 0700 /tmp/attraccess-wago-runtime && tar -xf /tmp/attraccess-wago-runtime.tar -C /tmp/attraccess-wago-runtime && rm -f /tmp/attraccess-wago-runtime.tar && grep -Fqx -- ${shellQuote(configuredRuntimeImage)} /tmp/attraccess-wago-runtime/image-reference && runtime_image=$(docker load -i /tmp/attraccess-wago-runtime/image.tar | sed -n 's/^Loaded image: //p') && test -n "$runtime_image" && rm -rf /tmp/attraccess-wago-runtime && docker image inspect "$runtime_image" >/dev/null && (docker rm -f attraccess-wago >/dev/null 2>&1 || true) && docker run -d --name attraccess-wago --restart unless-stopped --env-file /etc/attraccess-wago/runtime.env -v /var/lib/attraccess-wago:/var/lib/attraccess-wago "$runtime_image"`,
+          credential,
+          [
+            `WAGO_HARDWARE_ID=${session.hardwareId}`,
+            `WAGO_MQTT_URL=${enrollment.broker.useTls ? 'mqtts' : 'mqtt'}://${enrollment.broker.host}:${enrollment.broker.port}`,
+            `WAGO_MQTT_USERNAME=${enrollment.username}`,
+            `WAGO_MQTT_PASSWORD=${enrollment.password}`,
+            `WAGO_ENROLLMENT_SECRET=${enrollment.claimSecret}`,
+            `WAGO_PAIRING_CODE=${pairingCode}`,
+          ].join('\n'),
+        );
+        await this.runScript(
+          session.targetHost,
+          session.hostKeyFingerprint,
+          credential,
+          runtimeBundleInstallScript(configuredRuntimeImage),
         );
       } finally {
         await rm(bundle.directory, { recursive: true, force: true });
       }
 
       session.state = 'awaiting_discovery';
-      session.enrollmentExpiresAt = enrollment.expiresAt;
+      session.enrollmentExpiresAt = enrollmentExpiresAt;
       session.failureReason = null;
       return this.save(session, 'bootstrap_delivered');
     } catch (error) {
@@ -212,23 +215,17 @@ export class WagoCommissioningService implements OnModuleInit {
   }
 
   private async writeRuntimeEnvironment(host: string, fingerprint: string, credential: TemporarySshCredential, content: string): Promise<void> {
-    await this.sudoRun(
+    await this.run(
       host,
       fingerprint,
       credential,
-      'install -d -m 0700 /etc/attraccess-wago && umask 077 && base64 -d > /etc/attraccess-wago/runtime.env && chmod 0600 /etc/attraccess-wago/runtime.env',
+      'mkdir -p /etc/attraccess-wago && chmod 0700 /etc/attraccess-wago && umask 077 && base64 -d > /etc/attraccess-wago/runtime.env && chmod 0600 /etc/attraccess-wago/runtime.env',
       Buffer.from(content).toString('base64'),
     );
   }
 
-  private async sudoRun(
-    host: string,
-    fingerprint: string,
-    credential: TemporarySshCredential,
-    command: string,
-    input?: string,
-  ): Promise<string> {
-    return this.run(host, fingerprint, credential, `sudo -S sh -c ${shellQuote(command)}`, `${credential.password}\n${input ?? ''}`);
+  private runScript(host: string, fingerprint: string, credential: TemporarySshCredential, script: string): Promise<string> {
+    return this.run(host, fingerprint, credential, 'base64 -d | sh', Buffer.from(script).toString('base64'));
   }
 
   private async run(host: string, fingerprint: string, credential: TemporarySshCredential, command: string, input?: string): Promise<string> {
@@ -262,7 +259,7 @@ export class WagoCommissioningService implements OnModuleInit {
       await runProcess(
         'scp',
         [
-          '-o', 'BatchMode=no', '-o', 'NumberOfPasswordPrompts=1', '-o', 'HostKeyAlgorithms=ssh-ed25519', '-o', 'StrictHostKeyChecking=yes', '-o', `UserKnownHostsFile=${knownHosts}`,
+          '-O', '-o', 'BatchMode=no', '-o', 'NumberOfPasswordPrompts=1', '-o', 'HostKeyAlgorithms=ssh-ed25519', '-o', 'StrictHostKeyChecking=yes', '-o', `UserKnownHostsFile=${knownHosts}`,
           '-o', 'ConnectTimeout=15', source, `${credential.username}@${host}:${destination}`,
         ],
         undefined,
@@ -338,6 +335,8 @@ function runProcess(command: string, args: string[], input?: string | Buffer, en
     let stdout = '';
     let stderr = '';
     const timer = setTimeout(() => child.kill(), SSH_TIMEOUT_MS);
+    // A constrained controller may reject stdin before SSH exits; preserve its error instead of crashing the API.
+    child.stdin.on('error', () => undefined);
     child.stdout.on('data', (chunk) => (stdout += chunk));
     child.stderr.on('data', (chunk) => (stderr += chunk));
     child.on('error', reject);
@@ -398,7 +397,10 @@ async function verifyRuntimeBundle(): Promise<{ directory: string; path: string 
       throw new ConflictException('CC100 runtime bundle checksum does not match');
 
     const allowedSigners = join(directory, 'allowed_signers');
-    const publicKey = await readFile(join(__dirname, 'signing-public-key.pub'), 'utf8');
+    const publicKey = await readFile(
+      resolveRuntimeSigningPublicKeyPath(process.env.NODE_ENV, configuredRuntimeSigningPublicKey, join(__dirname, 'signing-public-key.pub')),
+      'utf8',
+    );
     await writeFile(allowedSigners, `${SIGNING_IDENTITY} ${publicKey.trim()}\n`, { mode: 0o600 });
     try {
       await runProcess(
@@ -420,10 +422,23 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function isSupportedController(inspection: string, firmwareBaseline: string): boolean {
+export function isSupportedController(inspection: string, firmwareBaseline: string): boolean {
   if (!inspection.includes('PTXDIST_PLATFORM_NAME="cc100"')) return false;
   const reportedFirmware = inspection.match(/^VERSION_ID=["']?([^"'\r\n]+)["']?$/m)?.[1]?.trim();
-  return reportedFirmware === firmwareBaseline.trim();
+  if (reportedFirmware === firmwareBaseline.trim()) return true;
+
+  // WAGO CC100 firmware revision 31 is built on the 2024.12.0 PTXdist BSP.
+  return firmwareBaseline.trim() === '31' && reportedFirmware === '2024.12.0';
+}
+
+export function runtimeBundleInstallScript(runtimeImage: string): string {
+  return `rm -rf /tmp/attraccess-wago-runtime && mkdir -m 0700 /tmp/attraccess-wago-runtime && tar --warning=no-timestamp --warning=no-unknown-keyword -xf /tmp/attraccess-wago-runtime.tar -C /tmp/attraccess-wago-runtime && rm -f /tmp/attraccess-wago-runtime.tar && grep -Fqx -- ${shellQuote(runtimeImage)} /tmp/attraccess-wago-runtime/image-reference && runtime_image=$(docker load -i /tmp/attraccess-wago-runtime/image.tar | sed -n -e 's/^Loaded image: //p' -e 's/^Loaded image ID: //p') && test -n "$runtime_image" && rm -rf /tmp/attraccess-wago-runtime && docker image inspect "$runtime_image" >/dev/null && (docker rm -f attraccess-wago >/dev/null 2>&1 || true) && mkdir -p /var/lib/attraccess-wago && chown 10001:10001 /var/lib/attraccess-wago && docker run -d --name attraccess-wago --restart unless-stopped --env-file /etc/attraccess-wago/runtime.env -v /var/lib/attraccess-wago:/var/lib/attraccess-wago "$runtime_image"`;
+}
+
+export function resolveRuntimeSigningPublicKeyPath(environment: string | undefined, localPath: string, releasePath: string): string {
+  if (!localPath) return releasePath;
+  if (environment !== 'development') throw new ConflictException('local CC100 runtime signing keys are only allowed in development');
+  return localPath;
 }
 
 function shellQuote(value: string): string {

@@ -70,7 +70,7 @@ jobs:
           docker tag "$IMAGE@$DIGEST" "$IMAGE"
           docker save "$IMAGE" -o image.tar
           printf '%s@%s\n' "$IMAGE" "$DIGEST" > image-reference
-          tar -cf wago-cc100-runtime.tar image.tar image-reference
+          tar --mtime='@0' -cf wago-cc100-runtime.tar image.tar image-reference
           rm -f image.tar image-reference
           sha256sum wago-cc100-runtime.tar > wago-cc100-runtime.tar.sha256
           umask 077

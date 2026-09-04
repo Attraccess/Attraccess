@@ -3,12 +3,35 @@ import { EventEmitter } from 'node:events';
 import { readFile } from 'node:fs/promises';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
-import { WagoCommissioningService } from './wago-commissioning.service';
+import {
+  isSupportedController,
+  resolveRuntimeSigningPublicKeyPath,
+  runtimeBundleInstallScript,
+  WagoCommissioningService,
+} from './wago-commissioning.service';
 import { WagoService } from './wago.service';
 
 jest.mock('node:child_process', () => ({ spawn: jest.fn() }));
 
 describe('WagoCommissioningService', () => {
+  it('extracts runtime bundles without emitting controller-clock timestamp warnings', () => {
+    const script = runtimeBundleInstallScript('ghcr.io/attraccess/wago@sha256:abc');
+    expect(script).toContain('tar --warning=no-timestamp --warning=no-unknown-keyword -xf');
+    expect(script).toContain("-e 's/^Loaded image ID: //p'");
+  });
+
+  it('allows a local runtime signing key only during development', () => {
+    expect(resolveRuntimeSigningPublicKeyPath('development', '/local/key.pub', '/release/key.pub')).toBe('/local/key.pub');
+    expect(() => resolveRuntimeSigningPublicKeyPath('production', '/local/key.pub', '/release/key.pub')).toThrow(
+      'local CC100 runtime signing keys are only allowed in development',
+    );
+  });
+
+  it('recognizes WAGO firmware revision 31 by its PTXdist BSP version', () => {
+    expect(isSupportedController('PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"', '31')).toBe(true);
+    expect(isSupportedController('PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"', '32')).toBe(false);
+  });
+
   it('defers repository access until plugin module initialization', () => {
     const repository = {};
     const context = {
@@ -30,7 +53,7 @@ describe('WagoCommissioningService', () => {
       const child = Object.assign(new EventEmitter(), {
         stdout: new EventEmitter(),
         stderr: new EventEmitter(),
-        stdin: { end: jest.fn() },
+        stdin: Object.assign(new EventEmitter(), { end: jest.fn() }),
         kill: jest.fn(),
       });
       if (command === 'ssh-keyscan') {
@@ -65,7 +88,8 @@ describe('WagoCommissioningService', () => {
     const service = new WagoCommissioningService(context, {} as WagoService);
     service.onModuleInit();
 
-    await expect(service.create({ hardwareId: 'CC100-TEST', mqttServerId: 1, targetHost: '192.168.1.10' })).resolves.toMatchObject({
+    await expect(service.create({ mqttServerId: 1, targetHost: '192.168.1.10' })).resolves.toMatchObject({
+      hardwareId: 'cc100-923d750abecd3ba7',
       hostKeyFingerprint: 'SHA256:test',
       state: 'awaiting_identity_confirmation',
     });

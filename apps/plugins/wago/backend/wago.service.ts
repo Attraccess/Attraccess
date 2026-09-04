@@ -455,6 +455,8 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
           { qos: 1 },
         );
         prepared.credentialDelivered = true;
+        // The enrolled client must remain connected until it receives the permanent credential.
+        await this.revokeEnrollment(prepared.enrollment);
         await this.context.mqtt.publish(prepared.mqttServerId, discoveryTopic(prepared.controller.hardwareId), '', {
           qos: 1,
           retain: true,
@@ -479,6 +481,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     mqttServerId?: number,
   ): Promise<{
     controller: WagoController;
+    enrollment: WagoEnrollment;
     mqttServerId: number;
     credential: { username: string; password: string };
     configuration: { protocolVersion: number; namespace: string; desiredTopic: string; reportedTopic: string };
@@ -533,8 +536,6 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       updatedAt: controller.updatedAt,
     };
     try {
-      // Revoke discovery access before sending the permanent password to its one-time topic.
-      await this.revokeEnrollment(enrollment);
       // Persist the claimed state before delivery so post-delivery failures cannot revoke its credentials.
       controller.trustState = 'claimed';
       controller.name = name.trim();
@@ -543,6 +544,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       await this.controllers.save(controller);
       return {
         controller,
+        enrollment,
         mqttServerId: selectedServerId,
         credential,
         configuration: {

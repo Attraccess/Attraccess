@@ -30,11 +30,10 @@ export class WagoControllerApi {
   }
   @Auth('system.settings.manage')
   @Post('commissioning/sessions') createCommissioningSession(
-    @Body() body: { hardwareId?: string; mqttServerId?: number; targetHost?: string },
+    @Body() body: { mqttServerId?: number; targetHost?: string },
   ) {
     if (!body?.mqttServerId) throw new BadRequestException('MQTT server is required');
     return this.commissioning.create({
-      hardwareId: body.hardwareId ?? '',
       mqttServerId: body.mqttServerId,
       targetHost: body.targetHost ?? '',
     });

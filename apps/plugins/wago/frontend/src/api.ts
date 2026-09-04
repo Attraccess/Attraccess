@@ -50,7 +50,6 @@ export interface CommissioningSession {
 
 export interface CreateCommissioningSessionInput {
   targetHost: string;
-  hardwareId: string;
   mqttServerId: number;
 }
 export interface WagoConfigurationDraft {

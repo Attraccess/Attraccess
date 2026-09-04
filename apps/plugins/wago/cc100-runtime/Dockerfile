@@ -15,4 +15,4 @@ COPY --from=build /workspace/apps/plugins/wago/cc100-runtime/manifest.json ./man
 RUN chown -R runtime:runtime /app /var/lib/attraccess-wago
 USER runtime
 VOLUME ["/var/lib/attraccess-wago"]
-CMD ["node", "main.js"]
+CMD ["node", "main.cjs"]

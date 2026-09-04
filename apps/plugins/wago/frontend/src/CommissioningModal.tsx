@@ -41,28 +41,36 @@ export function CommissioningModal({ isOpen, onOpenChange }: CommissioningModalP
   const settingsQuery = useSettingsQuery();
   const mqttServersQuery = useMqttServersQuery();
   const [controllerIp, setControllerIp] = useState('');
-  const [hardwareId, setHardwareId] = useState('');
   const [mqttServerId, setMqttServerId] = useState<Key | null>(null);
   const [sshUsername, setSshUsername] = useState('');
   const [sshPassword, setSshPassword] = useState('');
   const [physicalIdentityConfirmed, setPhysicalIdentityConfirmed] = useState(false);
   const [codesysStopAcknowledged, setCodesysStopAcknowledged] = useState(false);
+  const [deliveryStartedAt, setDeliveryStartedAt] = useState<number | null>(null);
+  const [deliveryElapsedSeconds, setDeliveryElapsedSeconds] = useState(0);
 
   useEffect(() => {
     if (isOpen) setMqttServerId(settingsQuery.data?.defaultMqttServerId?.toString() ?? null);
   }, [isOpen, settingsQuery.data?.defaultMqttServerId]);
+
+  useEffect(() => {
+    if (deliveryStartedAt === null || !deliverSessionMutation.isPending) return;
+    const interval = window.setInterval(() => setDeliveryElapsedSeconds(Math.floor((Date.now() - deliveryStartedAt) / 1_000)), 1_000);
+    return () => window.clearInterval(interval);
+  }, [deliveryStartedAt, deliverSessionMutation.isPending]);
 
   const session = revokeSessionMutation.data ?? deliverSessionMutation.data ?? createSessionMutation.data;
   const selectedMqttServerId = mqttServerId === null ? null : Number(mqttServerId);
 
   function close() {
     setControllerIp('');
-    setHardwareId('');
     setMqttServerId(null);
     setSshUsername('');
     setSshPassword('');
     setPhysicalIdentityConfirmed(false);
     setCodesysStopAcknowledged(false);
+    setDeliveryStartedAt(null);
+    setDeliveryElapsedSeconds(0);
     createSessionMutation.reset();
     deliverSessionMutation.reset();
     revokeSessionMutation.reset();
@@ -75,7 +83,6 @@ export function CommissioningModal({ isOpen, onOpenChange }: CommissioningModalP
     createSessionMutation.mutate(
       {
         targetHost: controllerIp,
-        hardwareId,
         mqttServerId: selectedMqttServerId,
       },
     );
@@ -84,6 +91,8 @@ export function CommissioningModal({ isOpen, onOpenChange }: CommissioningModalP
   function deliverSession(session: CommissioningSession) {
     const temporarySsh = { username: sshUsername, password: sshPassword };
     setSshPassword('');
+    setDeliveryStartedAt(Date.now());
+    setDeliveryElapsedSeconds(0);
     deliverSessionMutation.mutate({
       id: session.id,
       hostKeyFingerprint: session.hostKeyFingerprint,
@@ -105,6 +114,7 @@ export function CommissioningModal({ isOpen, onOpenChange }: CommissioningModalP
               <SessionStatus
                 session={session}
                 isDelivering={deliverSessionMutation.isPending}
+                deliveryElapsedSeconds={deliveryElapsedSeconds}
                 deliveryError={deliverSessionMutation.error}
                 isRevoking={revokeSessionMutation.isPending}
                 revokeError={revokeSessionMutation.error}
@@ -140,10 +150,6 @@ export function CommissioningModal({ isOpen, onOpenChange }: CommissioningModalP
                   <TextField name="controllerIp" isRequired>
                     <Label>Controller IP address</Label>
                     <Input value={controllerIp} onChange={(event) => setControllerIp(event.target.value)} />
-                  </TextField>
-                  <TextField name="hardwareId" isRequired>
-                    <Label>Controller hardware ID</Label>
-                    <Input value={hardwareId} onChange={(event) => setHardwareId(event.target.value)} />
                   </TextField>
                   {mqttServersQuery.isPending ? (
                     <div className="wg:flex wg:justify-center wg:p-2">
@@ -225,6 +231,7 @@ export function CommissioningModal({ isOpen, onOpenChange }: CommissioningModalP
 function SessionStatus({
   session,
   isDelivering,
+  deliveryElapsedSeconds,
   deliveryError,
   isRevoking,
   revokeError,
@@ -241,6 +248,7 @@ function SessionStatus({
 }: {
   session: CommissioningSession;
   isDelivering: boolean;
+  deliveryElapsedSeconds: number;
   deliveryError: unknown;
   isRevoking: boolean;
   revokeError: unknown;
@@ -267,12 +275,14 @@ function SessionStatus({
       {session.enrollmentExpiresAt && <p className="wg:text-sm wg:text-muted">Bootstrap expiry: {new Date(session.enrollmentExpiresAt).toLocaleString()}</p>}
       {session.pairingCode && <p className="wg:text-sm wg:text-muted">Pairing code: <span className="wg:font-medium">{session.pairingCode}</span></p>}
       {session.failureReason && <Alert status="warning"><Alert.Indicator /><Alert.Content><Alert.Description>{session.failureReason}</Alert.Description></Alert.Content></Alert>}
-      <TextField name="sshUsername" isRequired>
-        <Label>Temporary SSH username</Label>
+      {isDelivering && <DeliveryProgress elapsedSeconds={deliveryElapsedSeconds} />}
+      <p className="wg:text-sm wg:text-muted">Delivery tries the CC100 default SSH credentials first. Enter overrides only if they were changed.</p>
+      <TextField name="sshUsername">
+        <Label>Alternate SSH username</Label>
         <Input value={sshUsername} onChange={(event) => onSshUsernameChange(event.target.value)} />
       </TextField>
-      <TextField name="sshPassword" type="password" isRequired>
-        <Label>Temporary SSH password</Label>
+      <TextField name="sshPassword" type="password">
+        <Label>Alternate SSH password</Label>
         <Input value={sshPassword} onChange={(event) => onSshPasswordChange(event.target.value)} />
       </TextField>
       <Checkbox isSelected={physicalIdentityConfirmed} onChange={onPhysicalIdentityConfirmedChange}>
@@ -284,12 +294,34 @@ function SessionStatus({
       <p className="wg:text-sm wg:text-muted">No broker credentials are available from this session.</p>
       {deliveryError && <ErrorAlert error={deliveryError} />}
       {revokeError && <ErrorAlert error={revokeError} />}
-      {session.state !== 'revoked' && <Button isPending={isDelivering} isDisabled={!sshUsername || !sshPassword || !physicalIdentityConfirmed} onPress={onDeliver}>
+      {session.state !== 'revoked' && <Button isPending={isDelivering} isDisabled={!physicalIdentityConfirmed} onPress={onDeliver}>
         {deliveryError || session.state === 'delivery_failed' ? 'Retry delivery' : 'Deliver commissioning'}
       </Button>}
       {session.state !== 'revoked' && <Button variant="secondary" isPending={isRevoking} onPress={onRevoke}>Revoke bootstrap session</Button>}
     </ModalBody>
   );
+}
+
+function DeliveryProgress({ elapsedSeconds }: { elapsedSeconds: number }) {
+  const phase = elapsedSeconds < 10
+    ? 'Validating the controller and preparing its restricted broker enrollment.'
+    : elapsedSeconds < 40
+      ? 'Activating the official Docker runtime and preparing the signed bundle.'
+      : 'Transferring the 70 MB signed runtime bundle. This can take several minutes on a CC100.';
+
+  return (
+    <Alert status="info">
+      <Alert.Indicator><Spinner color="accent" size="sm" /></Alert.Indicator>
+      <Alert.Content>
+        <Alert.Title>Commissioning in progress ({formatDuration(elapsedSeconds)})</Alert.Title>
+        <Alert.Description>{phase} Do not power off the controller.</Alert.Description>
+      </Alert.Content>
+    </Alert>
+  );
+}
+
+function formatDuration(seconds: number): string {
+  return `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`;
 }
 
 function ErrorAlert({ error }: { error: unknown }) {
