@@ -426,8 +426,8 @@ export class ResourceFlowsService {
           schema.isOutput = true;
           break;
 
-        case ResourceFlowNodeType.OUTPUT_RESOURCE_OPERATING:
-        case ResourceFlowNodeType.OUTPUT_RESOURCE_IDLE:
+        case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_OPERATING:
+        case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE:
           schema.configSchema = z.toJSONSchema(ResourceOperatingTransitionNodeDataSchema, { io: 'input' });
           schema.inputs = ['input'];
           schema.outputs = ['output'];

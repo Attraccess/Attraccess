@@ -20,8 +20,8 @@ export enum ResourceFlowNodeType {
   OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS = 'output.resource.billing.calculation.set-additional-items',
   OUTPUT_RESOURCE_USAGE_END_SESSION = 'output.resource.usage.end-session',
   OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY = 'output.resource.activity.track-activity',
-  OUTPUT_RESOURCE_OPERATING = 'output.resource.operating',
-  OUTPUT_RESOURCE_IDLE = 'output.resource.idle',
+  OUTPUT_RESOURCE_ACTIVITY_OPERATING = 'output.resource.activity.operating',
+  OUTPUT_RESOURCE_ACTIVITY_IDLE = 'output.resource.activity.idle',
   PROCESSING_WAIT = 'processing.wait',
   PROCESSING_IF = 'processing.if',
   PROCESSING_SET_PAYLOAD = 'processing.set-payload',
@@ -367,8 +367,8 @@ export function getNodeDataSchema(nodeType: ResourceFlowNodeType) {
     case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY:
       return ResourceActivityTrackActivityNodeDataSchema;
 
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_OPERATING:
-    case ResourceFlowNodeType.OUTPUT_RESOURCE_IDLE:
+    case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_OPERATING:
+    case ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE:
       return ResourceOperatingTransitionNodeDataSchema;
 
     case ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT:
