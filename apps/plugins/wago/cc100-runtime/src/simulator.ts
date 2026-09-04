@@ -30,9 +30,18 @@ function connectEnrollment(): void {
   enrollmentClient.once('connect', () => void handleAsync(async () => {
     const discovery = `${prefix.replace(/^\/+|\/+$/g, '')}/discovery/${hardwareId}`;
     await subscribe(enrollmentClient, `${discovery}/claim`, async (payload) => {
-      const claim = JSON.parse(payload.toString('utf8')) as { username: string; password: string; configuration?: unknown };
-      if (!claim.username || !claim.password) throw new Error('claim does not include permanent MQTT credentials');
-      await store.save({ ...(await store.load()), credentials: { username: claim.username, password: claim.password } });
+      const claim = JSON.parse(payload.toString('utf8')) as {
+        username: string;
+        password: string;
+        configuration?: { namespace?: string };
+      };
+      if (!claim.username || !claim.password || !claim.configuration?.namespace)
+        throw new Error('claim does not include permanent MQTT credentials and configuration namespace');
+      await store.save({
+        ...(await store.load()),
+        credentials: { username: claim.username, password: claim.password },
+        operationalPrefix: claim.configuration.namespace,
+      });
       enrollmentClient.end(true, () => void handleAsync(async () => connectOperational(await store.load())));
     });
     await publish(enrollmentClient, discovery, {
@@ -56,7 +65,7 @@ function connectOperational(state: RuntimeState): void {
   device.restore(state.accepted?.snapshot, state.outputs);
   const operationalRuntime = new WagoRuntime({
     hardwareId,
-    prefix,
+    prefix: state.operationalPrefix ?? prefix,
     store,
     transport: transport(operationalClient),
     device,

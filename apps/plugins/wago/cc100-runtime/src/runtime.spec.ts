@@ -239,6 +239,38 @@ describe('WagoRuntime', () => {
     }));
   });
 
+  it('normalizes numeric digital output feedback', async () => {
+    const numericFeedbackDevice = {
+      write: async () => undefined,
+      read: async () => 1,
+    };
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+      transport,
+      device: numericFeedbackDevice,
+    });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+    await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
+
+    expect(transport.published.filter((message) => message.topic.endsWith('/state')).at(-1)).toEqual(expect.objectContaining({
+      payload: expect.objectContaining({ feedback: { load: true } }),
+    }));
+  });
+
+  it('excludes feedback for outputs removed from the active configuration', async () => {
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+    await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
+    const noOutputs: Snapshot = { ...snapshot, logicalChannels: [] };
+    await transport.send(desired, { protocolVersion: 1, revision: 2, contentHash: hash(noOutputs), snapshot: noOutputs });
+
+    expect(transport.published.filter((message) => message.topic.endsWith('/state')).at(-1)).toEqual(expect.objectContaining({
+      payload: expect.objectContaining({ feedback: {} }),
+    }));
+  });
+
   it('serializes concurrent state saves', async () => {
     const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
     await Promise.all([
