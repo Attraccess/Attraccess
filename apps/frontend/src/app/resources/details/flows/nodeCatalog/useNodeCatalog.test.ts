@@ -133,6 +133,21 @@ describe('useNodeCatalog', () => {
     expect(window.localStorage.getItem('nodeCatalog.expanded.triggers')).toBeNull();
   });
 
+  it('waits for schemas before migrating plugin category state', () => {
+    mockIsLoading = true;
+    window.localStorage.setItem('nodeCatalog.expanded.triggers', 'false');
+    const { result, rerender } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
+
+    expect(window.localStorage.getItem('nodeCatalog.expanded.triggers')).toBe('false');
+    expect(window.localStorage.getItem('nodeCatalog.storageVersion')).toBeNull();
+
+    mockIsLoading = false;
+    rerender();
+
+    expect(result.current.isDomainExpanded('plugin.example')).toBe(false);
+    expect(window.localStorage.getItem('nodeCatalog.expanded.triggers')).toBeNull();
+  });
+
   it('toggles sidebar collapsed state and persists it', () => {
     const { result } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
     expect(result.current.collapsed).toBe(false);

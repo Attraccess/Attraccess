@@ -147,7 +147,7 @@ export function useNodeCatalog({ resourceId }: UseNodeCatalogArgs): UseNodeCatal
   }, [schemas]);
 
   const allDomains = useMemo(() => groups.map((g) => g.domain), [groups]);
-  migrateExpandedDomains(allDomains);
+  if (schemas !== undefined) migrateExpandedDomains(allDomains);
 
   const [collapsed, setCollapsed] = useStoredBool(STORAGE_KEY_COLLAPSED, false);
 
