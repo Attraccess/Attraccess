@@ -18,6 +18,8 @@ interface OperatingDurationSummary {
   isProvisional: boolean;
 }
 
+const RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST = 100;
+
 function durationMsForSession(item: ResourceUsage, asOf: Date): number {
   const now = new Date();
   const end = Math.min(new Date(item.endTime ?? now).getTime(), asOf.getTime(), now.getTime());
@@ -57,14 +59,22 @@ export function ResourceUsageExport(props: ExportProps) {
   const { data: operatingDurations, status: operatingDurationsStatus } = useQuery({
     queryKey: ['resource-operating-durations', resourceIds, props.start, props.end],
     queryFn: async () => {
-      const response = await fetch(`${getBaseUrl()}/api/analytics/resource-operating-durations`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ resourceIds, start: props.start.toISOString(), end: props.end.toISOString() }),
-      });
-      if (!response.ok) throw new Error('Failed to load operating durations');
-      return response.json() as Promise<Record<number, OperatingDurationSummary>>;
+      const operatingDurations: Record<number, OperatingDurationSummary> = {};
+      for (let index = 0; index < resourceIds.length; index += RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST) {
+        const response = await fetch(`${getBaseUrl()}/api/analytics/resource-operating-durations`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            resourceIds: resourceIds.slice(index, index + RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST),
+            start: props.start.toISOString(),
+            end: props.end.toISOString(),
+          }),
+        });
+        if (!response.ok) throw new Error('Failed to load operating durations');
+        Object.assign(operatingDurations, await response.json());
+      }
+      return operatingDurations;
     },
     enabled: resourceIds.length > 0,
   });
@@ -211,7 +221,9 @@ export function ResourceUsageExport(props: ExportProps) {
       options={options}
       setOption={setOption}
       filename="resource-usage.csv"
-      queryStatus={resourceIds.length > 0 && operatingDurationsStatus === 'pending' ? 'pending' : fetchStatus}
+      queryStatus={
+        fetchStatus === 'pending' ? 'pending' : resourceIds.length > 0 ? operatingDurationsStatus : fetchStatus
+      }
       onFetchAllPages={() => setFetchAll(true)}
       isFetchingAllPages={isFetchingAllPages}
     />

@@ -19,11 +19,27 @@ const usage = (id: number, startTime: string, endTime: string | null): ResourceU
 describe('ResourceOperatingAttributionService', () => {
   const asOf = at('12:00:00');
   let service: ResourceOperatingAttributionService;
-  let intervalRepository: jest.Mocked<Pick<Repository<ResourceOperatingInterval>, 'find' | 'existsBy'>>;
+  let intervalRepository: jest.Mocked<
+    Pick<Repository<ResourceOperatingInterval>, 'createQueryBuilder' | 'find' | 'existsBy'>
+  >;
   let usageRepository: jest.Mocked<Pick<Repository<ResourceUsage>, 'find'>>;
+  let availabilityQuery: {
+    select: jest.Mock;
+    where: jest.Mock;
+    getRawMany: jest.Mock;
+  };
 
   beforeEach(() => {
-    intervalRepository = { find: jest.fn(), existsBy: jest.fn().mockResolvedValue(true) };
+    availabilityQuery = {
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      getRawMany: jest.fn().mockResolvedValue([]),
+    };
+    intervalRepository = {
+      find: jest.fn(),
+      existsBy: jest.fn().mockResolvedValue(true),
+      createQueryBuilder: jest.fn().mockReturnValue(availabilityQuery),
+    };
     usageRepository = { find: jest.fn() };
     service = new ResourceOperatingAttributionService(
       intervalRepository as unknown as Repository<ResourceOperatingInterval>,
@@ -234,12 +250,18 @@ describe('ResourceOperatingAttributionService', () => {
       usage(1, '10:00:00', '10:30:00'),
       { ...usage(2, '10:00:00', '10:15:00'), resourceId: 2 },
     ] as ResourceUsage[]);
+    availabilityQuery.getRawMany.mockResolvedValue([{ resourceId: 1 }, { resourceId: 2 }]);
 
     const result = await service.getForResources([1, 2], at('09:00:00'), asOf);
 
     expect(result.get(1)).toMatchObject({ sessionDurationMs: 30 * 60_000, operatingDurationMs: 60 * 60_000 });
     expect(result.get(2)).toMatchObject({ sessionDurationMs: 15 * 60_000, operatingDurationMs: 30 * 60_000 });
-    expect(intervalRepository.find).toHaveBeenCalledTimes(2);
+    expect(intervalRepository.find).toHaveBeenCalledTimes(1);
     expect(usageRepository.find).toHaveBeenCalledTimes(1);
+    expect(intervalRepository.createQueryBuilder).toHaveBeenCalledWith('interval');
+    expect(availabilityQuery.select).toHaveBeenCalledWith('DISTINCT interval.resourceId', 'resourceId');
+    expect(availabilityQuery.where).toHaveBeenCalledWith('interval.resourceId IN (:...resourceIds)', {
+      resourceIds: [1, 2],
+    });
   });
 });

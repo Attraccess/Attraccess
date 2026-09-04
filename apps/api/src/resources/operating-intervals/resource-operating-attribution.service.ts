@@ -121,12 +121,13 @@ export class ResourceOperatingAttributionService {
         ],
         order: { startTime: 'ASC' },
       }),
-      this.intervalRepository.find({
-        select: { resourceId: true },
-        where: { resourceId: In(uniqueResourceIds) },
-      }),
+      this.intervalRepository
+        .createQueryBuilder('interval')
+        .select('DISTINCT interval.resourceId', 'resourceId')
+        .where('interval.resourceId IN (:...resourceIds)', { resourceIds: uniqueResourceIds })
+        .getRawMany<{ resourceId: number }>(),
     ]);
-    const availableResourceIds = new Set(resourcesWithOperatingData.map((interval) => interval.resourceId));
+    const availableResourceIds = new Set(resourcesWithOperatingData.map(({ resourceId }) => resourceId));
     const groupByResourceId = <T extends { resourceId: number }>(items: T[]) =>
       items.reduce((grouped, item) => {
         const group = grouped.get(item.resourceId) ?? [];
