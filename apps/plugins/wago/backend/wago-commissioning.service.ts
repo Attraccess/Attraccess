@@ -6,6 +6,7 @@ import { copyFile, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { PLUGIN_CONTEXT, PluginContext, Repository } from '@attraccess/plugins-backend-sdk';
+import { Like, MoreThan, Not } from 'typeorm';
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
 import { WagoService } from './wago.service';
 
@@ -20,6 +21,7 @@ const configuredRuntimeBundleSignature = process.env.WAGO_CC100_RUNTIME_BUNDLE_S
 const configuredRuntimeSigningPublicKey = process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH?.trim() ?? '';
 const SIGNING_NAMESPACE = 'attraccess-wago-runtime';
 const SIGNING_IDENTITY = 'attraccess-wago-runtime';
+const LEGACY_VERIFIER_REVOCATION_BATCH_SIZE = 100;
 
 type TemporarySshCredential = { username: string; password: string };
 type CommissioningSessionResponse = Omit<WagoCommissioningSession, 'pairingCode'>;
@@ -34,16 +36,12 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     @Inject(WagoService) private readonly wago: WagoService,
   ) {}
 
-  onApplicationBootstrap(): void {
+  async onApplicationBootstrap(): Promise<void> {
     // The host datasource is available only after plugin module construction completes.
     this.sessions = this.context.getRepository(WagoCommissioningSession);
+    await this.revokeLegacyPlaintextPairingCodes();
+    await this.resumePendingDeliveries();
     this.wago.registerCommissioningDiscoveryHandler((controller) => this.claimDiscovered(controller));
-    void this.revokeLegacyPlaintextPairingCodes().catch((error) =>
-      this.context.logger?.warn(`Could not revoke legacy WAGO commissioning sessions: ${String(error)}`),
-    );
-    void this.resumePendingDeliveries().catch((error) =>
-      this.context.logger?.warn(`Could not resume pending WAGO commissioning deliveries: ${String(error)}`),
-    );
     void this.reconcileCompletedSessions().catch((error) =>
       this.context.logger?.warn(`Could not retire superseded WAGO commissioning sessions: ${String(error)}`),
     );
@@ -625,16 +623,38 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
   }
 
   private async revokeLegacyPlaintextPairingCodes(): Promise<void> {
-    const sessions = await this.sessions.find();
-    for (const session of sessions) {
-      if (!session.pairingCode || session.pairingCode.startsWith('v1.')) continue;
-      if (session.enrollmentId !== null) await this.wago.revokeEnrollmentById(session.enrollmentId);
-      session.pairingCode = null;
-      session.state = 'revoked';
-      session.failureReason = 'This commissioning session was revoked because it stored a legacy unencrypted verifier.';
-      session.progressStep = 'Session revoked';
-      session.progressDetail = 'Start a new commissioning session to use encrypted verifier storage.';
-      await this.save(session, 'legacy_plaintext_verifier_revoked');
+    let lastId = 0;
+    while (true) {
+      const sessions = await this.sessions.find({
+        where: { id: MoreThan(lastId), pairingCode: Not(Like('v1.%')) },
+        order: { id: 'ASC' },
+        take: LEGACY_VERIFIER_REVOCATION_BATCH_SIZE,
+      });
+      if (!sessions.length) return;
+
+      for (const session of sessions) {
+        lastId = session.id;
+        if (!session.pairingCode) continue;
+        await this.withDeliveryLock(session.id, async () => {
+          const current = await this.sessions.findOneBy({ id: session.id });
+          if (!current?.pairingCode || current.pairingCode.startsWith('v1.')) return;
+          try {
+            if (current.enrollmentId !== null) await this.wago.revokeEnrollmentById(current.enrollmentId);
+            current.pairingCode = null;
+            current.state = 'revoked';
+            current.failureReason =
+              'This commissioning session was revoked because it stored a legacy unencrypted verifier.';
+            current.progressStep = 'Session revoked';
+            current.progressDetail = 'Start a new commissioning session to use encrypted verifier storage.';
+            await this.save(current, 'legacy_plaintext_verifier_revoked');
+          } catch (error) {
+            this.context.logger?.warn(
+              `Could not revoke legacy WAGO commissioning session ${current.id}: ${String(error)}`,
+            );
+          }
+        });
+      }
+      if (sessions.length < LEGACY_VERIFIER_REVOCATION_BATCH_SIZE) return;
     }
   }
 

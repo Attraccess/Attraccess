@@ -34,8 +34,8 @@ describe('WagoCommissioningService', () => {
     expect(isSupportedController('PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"', '32')).toBe(false);
   });
 
-  it('defers repository access until plugin module initialization', () => {
-    const repository = {};
+  it('defers repository access until plugin module initialization', async () => {
+    const repository = { find: jest.fn().mockResolvedValue([]) };
     const context = {
       getRepository: jest.fn().mockReturnValue(repository),
     } as unknown as PluginContext;
@@ -46,7 +46,7 @@ describe('WagoCommissioningService', () => {
 
     expect(context.getRepository).not.toHaveBeenCalled();
 
-    service.onApplicationBootstrap();
+    await service.onApplicationBootstrap();
 
     expect(context.getRepository).toHaveBeenCalledWith(WagoCommissioningSession);
   });
@@ -128,6 +128,7 @@ describe('WagoCommissioningService', () => {
     const repository = {
       create: jest.fn((session) => session),
       save: jest.fn(async (session) => session),
+      find: jest.fn().mockResolvedValue([]),
     };
     const context = {
       getRepository: jest.fn().mockReturnValue(repository),
@@ -137,7 +138,7 @@ describe('WagoCommissioningService', () => {
     const service = new WagoCommissioningService(context, {
       registerCommissioningDiscoveryHandler: jest.fn(),
     } as unknown as WagoService);
-    service.onApplicationBootstrap();
+    await service.onApplicationBootstrap();
 
     const session = await service.create({ mqttServerId: 1, targetHost: '192.168.1.10', name: 'Boiler room' });
     expect(session).toMatchObject({
@@ -164,6 +165,7 @@ describe('WagoCommissioningService', () => {
     const repository = {
       findOneBy: jest.fn().mockResolvedValue(session),
       save: jest.fn().mockImplementation(async (value) => value),
+      find: jest.fn().mockResolvedValue([]),
     };
     const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
     let releaseDelivery!: () => void;
@@ -173,7 +175,7 @@ describe('WagoCommissioningService', () => {
       ...wago,
       registerCommissioningDiscoveryHandler: jest.fn(),
     } as unknown as WagoService);
-    service.onApplicationBootstrap();
+    await service.onApplicationBootstrap();
 
     const inProgressDelivery = service['withDeliveryLock'](session.id, () => delivery);
     await Promise.resolve();
@@ -191,10 +193,84 @@ describe('WagoCommissioningService', () => {
     expect(session.state).toBe('revoked');
   });
 
+  it('finishes legacy verifier cleanup before discovery work is registered', async () => {
+    const session = {
+      id: 1,
+      pairingCode: 'plaintext',
+      enrollmentId: 2,
+      state: 'awaiting_delivery',
+      auditLog: '[]',
+      updatedAt: '',
+    } as WagoCommissioningSession;
+    const repository = {
+      find: jest.fn().mockResolvedValue([session]),
+      findOneBy: jest.fn().mockResolvedValue(session),
+      save: jest.fn().mockImplementation(async (value) => value),
+    };
+    let finishRevocation!: () => void;
+    const revocation = new Promise<void>((resolve) => (finishRevocation = resolve));
+    const registerCommissioningDiscoveryHandler = jest.fn();
+    const service = new WagoCommissioningService(
+      { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext,
+      {
+        registerCommissioningDiscoveryHandler,
+        revokeEnrollmentById: jest.fn().mockReturnValue(revocation),
+      } as unknown as WagoService,
+    );
+
+    const bootstrap = service.onApplicationBootstrap();
+    await Promise.resolve();
+
+    expect(registerCommissioningDiscoveryHandler).not.toHaveBeenCalled();
+
+    finishRevocation();
+    await bootstrap;
+
+    expect(registerCommissioningDiscoveryHandler).toHaveBeenCalled();
+    expect(session).toMatchObject({ pairingCode: null, state: 'revoked' });
+  });
+
+  it('continues bounded legacy verifier cleanup after a revocation failure', async () => {
+    const first = {
+      id: 1,
+      pairingCode: 'plaintext-first',
+      enrollmentId: 2,
+      state: 'awaiting_delivery',
+      auditLog: '[]',
+      updatedAt: '',
+    } as WagoCommissioningSession;
+    const second = { ...first, id: 2, pairingCode: 'plaintext-second', enrollmentId: 3 };
+    const sessions = [first, second];
+    const repository = {
+      find: jest.fn().mockResolvedValue(sessions),
+      findOneBy: jest.fn().mockImplementation(async ({ id }) => sessions.find((session) => session.id === id) ?? null),
+      save: jest.fn().mockImplementation(async (value) => value),
+    };
+    const revokeEnrollmentById = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('unavailable'))
+      .mockResolvedValueOnce(undefined);
+    const service = new WagoCommissioningService(
+      { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext,
+      { registerCommissioningDiscoveryHandler: jest.fn(), revokeEnrollmentById } as unknown as WagoService,
+    );
+
+    await service.onApplicationBootstrap();
+
+    expect(repository.find).toHaveBeenCalledWith(expect.objectContaining({ order: { id: 'ASC' }, take: 100 }));
+    expect(revokeEnrollmentById).toHaveBeenCalledWith(first.enrollmentId);
+    expect(revokeEnrollmentById).toHaveBeenCalledWith(second.enrollmentId);
+    expect(first).toMatchObject({ pairingCode: 'plaintext-first', state: 'awaiting_delivery' });
+    expect(second).toMatchObject({ pairingCode: null, state: 'revoked' });
+  });
+
   it('does not expose stored commissioning verifiers in session lists', async () => {
     const repository = {
       find: jest
         .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
         .mockResolvedValue([
           { id: 1, controllerName: 'Boiler room', pairingCode: 'v1.ciphertext' } as WagoCommissioningSession,
         ]),
@@ -203,7 +279,7 @@ describe('WagoCommissioningService', () => {
     const service = new WagoCommissioningService(context, {
       registerCommissioningDiscoveryHandler: jest.fn(),
     } as unknown as WagoService);
-    service.onApplicationBootstrap();
+    await service.onApplicationBootstrap();
 
     const [listed] = await service.list();
 
@@ -225,12 +301,13 @@ describe('WagoCommissioningService', () => {
     const repository = {
       findOneBy: jest.fn().mockResolvedValue(session),
       save: jest.fn().mockImplementation(async (value) => value),
+      find: jest.fn().mockResolvedValue([]),
     };
     const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
     const service = new WagoCommissioningService(context, {
       registerCommissioningDiscoveryHandler: jest.fn(),
     } as unknown as WagoService);
-    service.onApplicationBootstrap();
+    await service.onApplicationBootstrap();
 
     await expect(service.confirmHostKey(session.id, 'SHA256:other')).rejects.toThrow('does not match');
     await expect(service.confirmHostKey(session.id, session.hostKeyFingerprint)).resolves.toMatchObject({
@@ -241,24 +318,24 @@ describe('WagoCommissioningService', () => {
 
   it('rejects direct delivery before the scanned host key is confirmed', async () => {
     const session = { id: 1, state: 'awaiting_identity_confirmation' } as WagoCommissioningSession;
-    const repository = { findOneBy: jest.fn().mockResolvedValue(session) };
+    const repository = { findOneBy: jest.fn().mockResolvedValue(session), find: jest.fn().mockResolvedValue([]) };
     const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
     const service = new WagoCommissioningService(context, {
       registerCommissioningDiscoveryHandler: jest.fn(),
     } as unknown as WagoService);
-    service.onApplicationBootstrap();
+    await service.onApplicationBootstrap();
 
     await expect(service.deliver(session.id)).rejects.toThrow('cannot be delivered in its current state');
   });
 
   it('requires an explicit temporary SSH credential for every delivery attempt', async () => {
     const session = { id: 1, state: 'awaiting_delivery' } as WagoCommissioningSession;
-    const repository = { findOneBy: jest.fn().mockResolvedValue(session) };
+    const repository = { findOneBy: jest.fn().mockResolvedValue(session), find: jest.fn().mockResolvedValue([]) };
     const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
     const service = new WagoCommissioningService(context, {
       registerCommissioningDiscoveryHandler: jest.fn(),
     } as unknown as WagoService);
-    service.onApplicationBootstrap();
+    await service.onApplicationBootstrap();
 
     await expect(service.deliver(session.id)).rejects.toThrow('temporary SSH username and password are required');
   });
@@ -276,12 +353,13 @@ describe('WagoCommissioningService', () => {
     const repository = {
       findOneBy: jest.fn().mockResolvedValue(session),
       save: jest.fn().mockImplementation(async (value) => value),
+      find: jest.fn().mockResolvedValue([]),
     };
     const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
     const service = new WagoCommissioningService(context, {
       registerCommissioningDiscoveryHandler: jest.fn(),
     } as unknown as WagoService);
-    service.onApplicationBootstrap();
+    await service.onApplicationBootstrap();
 
     await expect(service.confirmWbmBootstrap(session.id)).resolves.toMatchObject({ state: 'awaiting_delivery' });
     session.state = 'awaiting_codesys_confirmation';
@@ -296,6 +374,7 @@ describe('WagoCommissioningService', () => {
     const repository = {
       findOneBy: jest.fn().mockResolvedValue(session),
       delete: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
     };
     const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
     const wago = {
@@ -304,7 +383,7 @@ describe('WagoCommissioningService', () => {
       deleteEnrollmentById: jest.fn().mockResolvedValue(undefined),
     } as unknown as WagoService;
     const service = new WagoCommissioningService(context, wago);
-    service.onApplicationBootstrap();
+    await service.onApplicationBootstrap();
 
     await service.remove(session.id);
 
@@ -348,6 +427,7 @@ describe('WagoCommissioningService', () => {
         );
       }),
       save: jest.fn().mockImplementation(async (value) => value),
+      find: jest.fn().mockResolvedValue([]),
     };
     const registerCommissioningDiscoveryHandler = jest.fn();
     const wago = {
@@ -359,7 +439,7 @@ describe('WagoCommissioningService', () => {
       secrets: { decrypt: (value: string) => value.slice(3) },
     } as unknown as PluginContext;
     const service = new WagoCommissioningService(context, wago);
-    service.onApplicationBootstrap();
+    await service.onApplicationBootstrap();
 
     const handler = registerCommissioningDiscoveryHandler.mock.calls[0][0] as (controller: {
       id: number;
