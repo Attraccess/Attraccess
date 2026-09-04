@@ -230,7 +230,7 @@ export class WagoRuntime {
         const transform = channel.measurement ?? { unit: 'percent', scale: 1, offset: 0 };
         const scaledValue = raw * transform.scale + transform.offset;
         const value = Math.round(scaledValue);
-        if (!Number.isSafeInteger(value) || Math.abs(scaledValue - value) > Number.EPSILON * Math.max(1, Math.abs(scaledValue)) * 16) {
+        if (!Number.isSafeInteger(value) || Math.abs(scaledValue - value) > 1e-9) {
           await this.options.transport.publish(this.topic('faults'), {
             channelId: channel.id,
             code: 'invalid_measurement_transform',
