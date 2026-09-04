@@ -92,7 +92,9 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       await this.subscribeConfiguredServers();
     } catch (error) {
       if (!(error instanceof MqttSubscriptionError)) throw error;
-      this.context.logger.warn(`Could not establish WAGO MQTT subscriptions during startup: ${String(error.mqttError)}`);
+      this.context.logger.warn(
+        `Could not establish WAGO MQTT subscriptions during startup: ${String(error.mqttError)}`,
+      );
       this.scheduleSubscriptionRetry();
     }
   }
@@ -198,7 +200,10 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   ): Promise<{ draftHash: string; diff: ReturnType<typeof configurationDiff> }> {
     const draft = await this.draftForPreset(controllerId);
     const snapshot = JSON.parse(draft.snapshot) as WagoConfigurationSnapshot;
-    return { draftHash: configurationHash(snapshot), diff: configurationDiff(snapshot, applyPreset(snapshot, application)) };
+    return {
+      draftHash: configurationHash(snapshot),
+      diff: configurationDiff(snapshot, applyPreset(snapshot, application)),
+    };
   }
 
   async applyPreset(
@@ -302,7 +307,14 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     const serialized = canonicalSnapshot(snapshot);
     const existing = await this.drafts.findOneBy({ controllerId });
     const draft =
-      existing ?? this.drafts.create({ controllerId, snapshot: serialized, reviewedHash: null, presetProvenance: null, updatedAt: '' });
+      existing ??
+      this.drafts.create({
+        controllerId,
+        snapshot: serialized,
+        reviewedHash: null,
+        presetProvenance: null,
+        updatedAt: '',
+      });
     draft.snapshot = serialized;
     draft.reviewedHash = null;
     draft.updatedAt = new Date().toISOString();
@@ -506,9 +518,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       username: identity,
       vhost: '/',
       topicPolicy: {
-        publish: [
-          `${namespace}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${controller.hardwareId}/#`,
-        ],
+        publish: [`${namespace}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${controller.hardwareId}/#`],
         subscribe: [
           configurationDesiredTopic(namespace, controller.hardwareId),
           commandTopic(namespace, controller.hardwareId),
@@ -695,7 +705,9 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     this.subscriptions.splice(0).forEach((subscription) => subscription.unsubscribe());
   }
 
-  private async subscribeMqtt(...args: Parameters<PluginContext['mqtt']['subscribe']>): Promise<PluginMqttSubscription> {
+  private async subscribeMqtt(
+    ...args: Parameters<PluginContext['mqtt']['subscribe']>
+  ): Promise<PluginMqttSubscription> {
     try {
       return await this.context.mqtt.subscribe(...args);
     } catch (error) {
@@ -1074,7 +1086,8 @@ function applySelectedChanges(
     const change = changes.get(path);
     if (!change) continue;
     const segments = [...path.matchAll(/\.([^.[\]]+)|\[(\d+)\]/g)].map((match) => match[1] ?? Number(match[2]));
-    if (!segments.length || segments.some((segment) => typeof segment === 'string' && unsafePathSegment(segment))) continue;
+    if (!segments.length || segments.some((segment) => typeof segment === 'string' && unsafePathSegment(segment)))
+      continue;
     merged = replacePath(merged, segments, change.current) as WagoConfigurationSnapshot;
   }
   return merged;
@@ -1091,7 +1104,11 @@ function replacePath(value: unknown, [segment, ...remaining]: (string | number)[
   }
 
   const entries = Object.entries(value ?? {}).filter(([key]) => key !== segment);
-  if (remaining.length) entries.push([segment, replacePath((value as Record<string, unknown> | undefined)?.[segment], remaining, replacement)]);
+  if (remaining.length)
+    entries.push([
+      segment,
+      replacePath((value as Record<string, unknown> | undefined)?.[segment], remaining, replacement),
+    ]);
   else if (replacement !== undefined) entries.push([segment, replacement]);
   return Object.fromEntries(entries);
 }

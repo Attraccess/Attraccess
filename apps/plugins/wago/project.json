@@ -7,7 +7,10 @@
   "targets": {
     "lint": {
       "executor": "nx:run-commands",
-      "options": { "cwd": "apps/plugins/wago", "command": "eslint backend frontend/src measurement-contract.ts" }
+      "options": {
+        "cwd": "apps/plugins/wago",
+        "command": "eslint backend frontend/src --max-warnings=0 && prettier --check backend frontend/src"
+      }
     },
     "test": {
       "executor": "@nx/jest:jest",
@@ -16,11 +19,11 @@
     "build-backend": {
       "executor": "nx:run-commands",
       "cache": true,
-        "inputs": ["{projectRoot}/backend/**/*", "{projectRoot}/measurement-contract.ts", "{projectRoot}/cc100-runtime/signing-public-key.pub", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
+      "inputs": ["{projectRoot}/backend/**/*", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/wago",
-        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js && cp cc100-runtime/signing-public-key.pub package/dist/signing-public-key.pub"
+        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js"
       }
     },
     "build-frontend": {

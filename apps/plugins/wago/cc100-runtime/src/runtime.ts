@@ -548,13 +548,17 @@ export class WagoRuntime {
   }
 
   private async publishState(): Promise<void> {
-    await this.publishOperational('state', {
-      timestamp: new Date().toISOString(),
-      connected: this.connected,
-      revision: this.state.accepted?.revision ?? null,
-      contentHash: this.state.accepted?.contentHash ?? null,
-      outputs: this.state.outputs,
-    }, { retain: true });
+    await this.publishOperational(
+      'state',
+      {
+        timestamp: new Date().toISOString(),
+        connected: this.connected,
+        revision: this.state.accepted?.revision ?? null,
+        contentHash: this.state.accepted?.contentHash ?? null,
+        outputs: this.state.outputs,
+      },
+      { retain: true },
+    );
   }
   private publishReport(revision: number, contentHash: string, errors: ValidationError[]): Promise<void> {
     return this.options.transport.publish(
@@ -583,8 +587,9 @@ export class WagoRuntime {
           await this.options.store.save({ ...this.state, sequence: reservedSequence });
           this.reservedSequence = reservedSequence;
           this.state.sequence = reservedSequence;
-        })
-          .finally(() => { this.sequenceReservation = null; });
+        }).finally(() => {
+          this.sequenceReservation = null;
+        });
       }
       await this.sequenceReservation;
     }
@@ -606,8 +611,12 @@ export class WagoRuntime {
     const sequence = await this.nextSequence();
     await this.options.transport.publish(this.topic(suffix), { sequence, ...payload }, options);
   }
-  private desiredTopic(): string { return this.topic('configuration/desired'); }
-  private commandTopic(): string { return this.topic('commands'); }
+  private desiredTopic(): string {
+    return this.topic('configuration/desired');
+  }
+  private commandTopic(): string {
+    return this.topic('commands');
+  }
   private async isGuardSatisfied(channel: Snapshot['logicalChannels'][number]): Promise<boolean> {
     if (!channel.guard) return true;
     const snapshot = this.state.accepted?.snapshot;
