@@ -5,7 +5,6 @@ type Point = Snapshot['physicalPoints'][number];
 export class SimulatorDeviceAdapter implements DeviceAdapter {
   private readonly values = new Map<string, boolean | number>();
   private readonly initialValues: Record<string, boolean | number>;
-  private snapshot?: Snapshot;
 
   constructor(
     initialValues: Record<string, boolean | number>,
@@ -32,24 +31,8 @@ export class SimulatorDeviceAdapter implements DeviceAdapter {
     return value;
   }
 
-  validate(_snapshot: Snapshot): [] {
-    return [];
-  }
-
-  activate(snapshot: Snapshot): void {
-    this.snapshot = snapshot;
-  }
-
-  async readChannel(channelId: string): Promise<boolean | number> {
-    const channel = this.snapshot?.logicalChannels.find((item) => item.id === channelId);
-    const point = channel && this.snapshot?.physicalPoints.find((item) => item.id === channel.physicalPointId);
-    if (!point) throw new Error(`unknown simulator channel: ${channelId}`);
-    return this.read(point);
-  }
-
   restore(snapshot: Snapshot | undefined, outputs: Record<string, boolean>): void {
     if (!snapshot) return;
-    this.snapshot = snapshot;
     for (const channel of snapshot.logicalChannels) {
       if (!channel.capabilities.includes('output') || outputs[channel.id] === undefined) continue;
       const point = snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
@@ -58,6 +41,4 @@ export class SimulatorDeviceAdapter implements DeviceAdapter {
   }
 }
 
-function key(point: Point): string {
-  return `${point.hardwareProfile}:${point.channel}`;
-}
+function key(point: Point): string { return `${point.hardwareProfile}:${point.channel}`; }
