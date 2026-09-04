@@ -33,7 +33,6 @@ import {
   configurationHash,
   parseConfigurationReport,
   WAGO_PRESETS,
-  WAGO_METER_PROFILES,
   type ConfigurationValidationError,
   type WagoConfigurationSnapshot,
   type WagoPresetApplication,
@@ -191,10 +190,6 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
 
   presets() {
     return WAGO_PRESETS;
-  }
-
-  meterProfiles() {
-    return WAGO_METER_PROFILES;
   }
 
   async previewPreset(

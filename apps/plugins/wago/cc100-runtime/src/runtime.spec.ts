@@ -34,10 +34,10 @@ describe('WagoRuntime', () => {
     expect(transport.published).toContainEqual(expect.objectContaining({ topic: 'attraccess/wago/v1/controllers/cc100-1/configuration/reported', payload: { revision: 1, contentHash: hash(snapshot), errors: [] }, retain: true }));
   });
 
-  it('publishes typed integer-base-unit measurements with source identity', async () => {
+  it('publishes typed integer-base-unit measurements with stream identity', async () => {
     const metered: Snapshot = {
       version: 1,
-      physicalPoints: [{ id: 'meter', hardwareProfile: '879-1300', channel: 0 }],
+      physicalPoints: [{ id: 'meter', hardwareProfile: '751-9301', channel: 0 }],
       logicalChannels: [{
         id: 'import-energy',
         physicalPointId: 'meter',
@@ -47,30 +47,59 @@ describe('WagoRuntime', () => {
         measurement: { unit: 'watt-hour', scale: 1, offset: 0, kind: 'cumulative' },
       }],
     };
-    device.values.set('879-1300:0', 1234);
+    device.values.set('751-9301:0', 1234);
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(metered), snapshot: metered });
     await runtime.publishMeasurements();
 
     expect(transport.published).toContainEqual(expect.objectContaining({
       topic: 'attraccess/wago/v1/controllers/cc100-1/measurements',
-      payload: expect.objectContaining({ channelId: 'import-energy', value: 1234, unit: 'watt-hour', kind: 'cumulative', sequence: 1, sourceTimestamp: expect.any(String) }),
+      payload: expect.objectContaining({ channelId: 'import-energy', value: 1234, unit: 'watt-hour', kind: 'cumulative', sequence: 1, sourceTimestamp: expect.any(String), streamId: expect.any(String) }),
     }));
   });
 
-  it('faults rather than publishing a fractional base-unit measurement', async () => {
+  it('rounds scaled float measurements within floating-point precision', async () => {
     const metered: Snapshot = {
       version: 1,
-      physicalPoints: [{ id: 'meter', hardwareProfile: '879-3000', channel: 0 }],
-      logicalChannels: [{ id: 'power', physicalPointId: 'meter', profile: 'meter', capabilities: ['measurement'], disconnectPolicy: { mode: 'hold' }, measurement: { unit: 'watt', scale: 0.5, offset: 0 } }],
+      physicalPoints: [{ id: 'meter', hardwareProfile: '751-9301', channel: 0 }],
+      logicalChannels: [{ id: 'power', physicalPointId: 'meter', profile: 'meter', capabilities: ['measurement'], disconnectPolicy: { mode: 'hold' }, measurement: { unit: 'watt', scale: 1000, offset: 0 } }],
     };
-    device.values.set('879-3000:0', 1);
+    device.values.set('751-9301:0', 1.001);
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(metered), snapshot: metered });
     await runtime.publishMeasurements();
 
     expect(transport.published).toContainEqual(expect.objectContaining({
-      topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
-      payload: expect.objectContaining({ channelId: 'power', code: 'invalid_measurement_transform' }),
+      topic: 'attraccess/wago/v1/controllers/cc100-1/measurements',
+      payload: expect.objectContaining({ channelId: 'power', value: 1001 }),
     }));
+  });
+
+  it('uses a new measurement stream identity after a runtime restart', async () => {
+    const metered: Snapshot = {
+      version: 1,
+      physicalPoints: [{ id: 'meter', hardwareProfile: '751-9301', channel: 0 }],
+      logicalChannels: [{ id: 'power', physicalPointId: 'meter', profile: 'meter', capabilities: ['measurement'], disconnectPolicy: { mode: 'hold' }, measurement: { unit: 'watt', scale: 1, offset: 0 } }],
+    };
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    const firstTransport = new TestTransport();
+    const firstRuntime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport: firstTransport, device });
+    device.values.set('751-9301:0', 1);
+    await firstRuntime.start();
+    await firstTransport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(metered), snapshot: metered });
+    await firstRuntime.publishMeasurements();
+    const firstEvent = firstTransport.published.find((event) => event.topic.endsWith('/measurements'));
+    if (!firstEvent) throw new Error('first runtime did not publish a measurement');
+    const firstMeasurement = firstEvent.payload as { sequence: number; streamId: string };
+
+    const restartedTransport = new TestTransport();
+    const restartedRuntime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport: restartedTransport, device });
+    await restartedRuntime.start();
+    await restartedRuntime.publishMeasurements();
+    const restartedEvent = restartedTransport.published.find((event) => event.topic.endsWith('/measurements'));
+    if (!restartedEvent) throw new Error('restarted runtime did not publish a measurement');
+    const restartedMeasurement = restartedEvent.payload as { sequence: number; streamId: string };
+
+    expect(restartedMeasurement).toEqual(expect.objectContaining({ sequence: 1, streamId: expect.any(String) }));
+    expect(restartedMeasurement.streamId).not.toBe(firstMeasurement.streamId);
   });
 
   it('accepts opaque server-defined profile names', async () => {
