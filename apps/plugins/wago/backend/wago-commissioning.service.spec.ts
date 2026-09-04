@@ -21,7 +21,9 @@ describe('WagoCommissioningService', () => {
   });
 
   it('allows a local runtime signing key only during development', () => {
-    expect(resolveRuntimeSigningPublicKeyPath('development', '/local/key.pub', '/release/key.pub')).toBe('/local/key.pub');
+    expect(resolveRuntimeSigningPublicKeyPath('development', '/local/key.pub', '/release/key.pub')).toBe(
+      '/local/key.pub',
+    );
     expect(() => resolveRuntimeSigningPublicKeyPath('production', '/local/key.pub', '/release/key.pub')).toThrow(
       'local CC100 runtime signing keys are only allowed in development',
     );
@@ -54,7 +56,13 @@ describe('WagoCommissioningService', () => {
     const run = jest.fn().mockResolvedValue('');
     service['run'] = run;
 
-    await service['sudoRun']('192.168.1.10', 'SHA256:test', { username: 'root', password: 'wago' }, 'base64 -d | sh', 'script');
+    await service['sudoRun'](
+      '192.168.1.10',
+      'SHA256:test',
+      { username: 'root', password: 'wago' },
+      'base64 -d | sh',
+      'script',
+    );
 
     expect(run).toHaveBeenCalledWith(
       '192.168.1.10',
@@ -70,7 +78,13 @@ describe('WagoCommissioningService', () => {
     const run = jest.fn().mockResolvedValue('');
     service['run'] = run;
 
-    await service['sudoRun']('192.168.1.10', 'SHA256:test', { username: 'operator', password: 'secret' }, 'base64 -d | sh', 'script');
+    await service['sudoRun'](
+      '192.168.1.10',
+      'SHA256:test',
+      { username: 'operator', password: 'secret' },
+      'base64 -d | sh',
+      'script',
+    );
 
     expect(run).toHaveBeenCalledWith(
       '192.168.1.10',
@@ -175,9 +189,11 @@ describe('WagoCommissioningService', () => {
 
   it('does not expose stored commissioning verifiers in session lists', async () => {
     const repository = {
-      find: jest.fn().mockResolvedValue([
-        { id: 1, controllerName: 'Boiler room', pairingCode: '482931' } as WagoCommissioningSession,
-      ]),
+      find: jest
+        .fn()
+        .mockResolvedValue([
+          { id: 1, controllerName: 'Boiler room', pairingCode: '482931' } as WagoCommissioningSession,
+        ]),
     };
     const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
     const service = new WagoCommissioningService(context, {
@@ -192,14 +208,43 @@ describe('WagoCommissioningService', () => {
   });
 
   it('requires the administrator to confirm the scanned host key before delivery', async () => {
-    const session = { id: 1, hostKeyFingerprint: 'SHA256:test', state: 'awaiting_identity_confirmation', progressPercent: 0, progressStep: 'Confirm controller identity', progressDetail: '', auditLog: '[]', updatedAt: '' } as WagoCommissioningSession;
-    const repository = { findOneBy: jest.fn().mockResolvedValue(session), save: jest.fn().mockImplementation(async (value) => value) };
+    const session = {
+      id: 1,
+      hostKeyFingerprint: 'SHA256:test',
+      state: 'awaiting_identity_confirmation',
+      progressPercent: 0,
+      progressStep: 'Confirm controller identity',
+      progressDetail: '',
+      auditLog: '[]',
+      updatedAt: '',
+    } as WagoCommissioningSession;
+    const repository = {
+      findOneBy: jest.fn().mockResolvedValue(session),
+      save: jest.fn().mockImplementation(async (value) => value),
+    };
     const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
-    const service = new WagoCommissioningService(context, { registerCommissioningDiscoveryHandler: jest.fn() } as unknown as WagoService);
+    const service = new WagoCommissioningService(context, {
+      registerCommissioningDiscoveryHandler: jest.fn(),
+    } as unknown as WagoService);
     service.onApplicationBootstrap();
 
     await expect(service.confirmHostKey(session.id, 'SHA256:other')).rejects.toThrow('does not match');
-    await expect(service.confirmHostKey(session.id, session.hostKeyFingerprint)).resolves.toMatchObject({ state: 'awaiting_delivery', progressStep: 'Identity confirmed' });
+    await expect(service.confirmHostKey(session.id, session.hostKeyFingerprint)).resolves.toMatchObject({
+      state: 'awaiting_delivery',
+      progressStep: 'Identity confirmed',
+    });
+  });
+
+  it('rejects direct delivery before the scanned host key is confirmed', async () => {
+    const session = { id: 1, state: 'awaiting_identity_confirmation' } as WagoCommissioningSession;
+    const repository = { findOneBy: jest.fn().mockResolvedValue(session) };
+    const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
+    const service = new WagoCommissioningService(context, {
+      registerCommissioningDiscoveryHandler: jest.fn(),
+    } as unknown as WagoService);
+    service.onApplicationBootstrap();
+
+    await expect(service.deliver(session.id)).rejects.toThrow('cannot be delivered in its current state');
   });
 
   it('revokes and removes an enrollment session without retaining its records', async () => {
@@ -276,8 +321,18 @@ describe('WagoCommissioningService', () => {
       enrollmentId: number;
     }) => Promise<void>;
     await Promise.all([
-      handler({ id: 9, hardwareId: first.hardwareId, mqttServerId: first.mqttServerId, enrollmentId: first.enrollmentId }),
-      handler({ id: 10, hardwareId: second.hardwareId, mqttServerId: second.mqttServerId, enrollmentId: second.enrollmentId }),
+      handler({
+        id: 9,
+        hardwareId: first.hardwareId,
+        mqttServerId: first.mqttServerId,
+        enrollmentId: first.enrollmentId,
+      }),
+      handler({
+        id: 10,
+        hardwareId: second.hardwareId,
+        mqttServerId: second.mqttServerId,
+        enrollmentId: second.enrollmentId,
+      }),
     ]);
 
     expect(wago.claim).toHaveBeenCalledWith(9, 'Boiler room', '482931', 2);
@@ -286,7 +341,9 @@ describe('WagoCommissioningService', () => {
     expect(second.state).toBe('completed');
     expect(first.pairingCode).toBeNull();
     expect(second.pairingCode).toBeNull();
-    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ auditLog: expect.stringContaining('automatic_claim_completed') }));
+    expect(repository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ auditLog: expect.stringContaining('automatic_claim_completed') }),
+    );
 
     await handler({ id: 11, hardwareId: first.hardwareId, mqttServerId: 4, enrollmentId: 5 });
     expect(wago.claim).toHaveBeenCalledTimes(2);

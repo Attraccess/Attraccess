@@ -52,20 +52,28 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       firmwareBaseline: configuredFirmwareBaseline || null,
       ready: Boolean(
         configuredFirmwareBaseline &&
-          isImmutableImage(configuredRuntimeImage) &&
-          configuredRuntimeBundle &&
-          configuredRuntimeBundleChecksum &&
-          configuredRuntimeBundleSignature,
+        isImmutableImage(configuredRuntimeImage) &&
+        configuredRuntimeBundle &&
+        configuredRuntimeBundleChecksum &&
+        configuredRuntimeBundleSignature,
       ),
     };
   }
 
-  async create(input: { mqttServerId: number; targetHost: string; name: string }): Promise<CommissioningSessionResponse> {
-    if (!isPrivateAddress(input.targetHost)) throw new ConflictException('commissioning is limited to a private controller address');
+  async create(input: {
+    mqttServerId: number;
+    targetHost: string;
+    name: string;
+  }): Promise<CommissioningSessionResponse> {
+    if (!isPrivateAddress(input.targetHost))
+      throw new ConflictException('commissioning is limited to a private controller address');
     if (!input.name.trim()) throw new ConflictException('a controller name is required');
     if (!configuredFirmwareBaseline)
-      throw new ConflictException('no CC100 firmware baseline is configured; commissioning is disabled until an exact supported baseline is set');
-    if (!(await this.context.getMqttServerConfig(input.mqttServerId))) throw new NotFoundException('MQTT server not found');
+      throw new ConflictException(
+        'no CC100 firmware baseline is configured; commissioning is disabled until an exact supported baseline is set',
+      );
+    if (!(await this.context.getMqttServerConfig(input.mqttServerId)))
+      throw new NotFoundException('MQTT server not found');
 
     const hostKeyFingerprint = await scanHostKey(input.targetHost);
     const hardwareId = `cc100-${createHash('sha256').update(hostKeyFingerprint).digest('hex').slice(0, 16)}`;
@@ -100,8 +108,12 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     return this.withDeliveryLock(id, async () => {
       const session = await this.sessions.findOneBy({ id });
       if (!session) throw new NotFoundException('commissioning session not found');
-      if (session.state !== 'awaiting_identity_confirmation') throw new ConflictException('commissioning session identity cannot be confirmed in its current state');
-      if (hostKeyFingerprint !== session.hostKeyFingerprint) throw new ConflictException('the supplied SSH host-key fingerprint does not match the scanned controller identity');
+      if (session.state !== 'awaiting_identity_confirmation')
+        throw new ConflictException('commissioning session identity cannot be confirmed in its current state');
+      if (hostKeyFingerprint !== session.hostKeyFingerprint)
+        throw new ConflictException(
+          'the supplied SSH host-key fingerprint does not match the scanned controller identity',
+        );
 
       session.state = 'awaiting_delivery';
       session.progressPercent = 0;
@@ -115,11 +127,12 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     const take = Number.isSafeInteger(limit) ? Math.min(Math.max(limit, 1), 100) : 50;
     const skip = Number.isSafeInteger(offset) ? Math.max(offset, 0) : 0;
     const sessions = await this.sessions.find({ order: { updatedAt: 'DESC' }, take, skip });
-    return sessions.map((session) =>
-      Object.fromEntries(Object.entries(session).filter(([field]) => field !== 'pairingCode')) as Omit<
-        WagoCommissioningSession,
-        'pairingCode'
-      >,
+    return sessions.map(
+      (session) =>
+        Object.fromEntries(Object.entries(session).filter(([field]) => field !== 'pairingCode')) as Omit<
+          WagoCommissioningSession,
+          'pairingCode'
+        >,
     );
   }
 
@@ -136,44 +149,102 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
   ): Promise<CommissioningSessionResponse> {
     const session = await this.sessions.findOneBy({ id });
     if (!session) throw new NotFoundException('commissioning session not found');
-    if (!['awaiting_delivery', 'delivering', 'awaiting_identity_confirmation', 'awaiting_codesys_confirmation', 'delivery_failed'].includes(session.state))
+    if (
+      !['awaiting_delivery', 'delivering', 'awaiting_codesys_confirmation', 'delivery_failed'].includes(session.state)
+    )
       throw new ConflictException('commissioning session cannot be delivered in its current state');
     if (!isRuntimeArtifactConfigured())
       throw new ConflictException('no immutable, signed CC100 runtime bundle is configured for commissioning');
 
-    const credential = input.temporarySsh?.username.trim() && input.temporarySsh.password ? input.temporarySsh : defaultSshCredential;
+    const credential =
+      input.temporarySsh?.username.trim() && input.temporarySsh.password ? input.temporarySsh : defaultSshCredential;
     let enrollmentExpiresAt: string | null = null;
 
     try {
       session.state = 'delivering';
       session.failureReason = null;
-      await this.updateProgress(session, 10, 'Verifying controller identity', 'Rechecking the pinned SSH host key and inspecting the CC100.');
+      await this.updateProgress(
+        session,
+        10,
+        'Verifying controller identity',
+        'Rechecking the pinned SSH host key and inspecting the CC100.',
+      );
       const inspection = await this.inspect(session.targetHost, session.hostKeyFingerprint, credential);
       session.codesysState = inspection.codesys;
       if (!isSupportedController(inspection.firmware, session.firmwareBaseline))
-        throw new ConflictException(`unsupported CC100 model or firmware; expected baseline ${session.firmwareBaseline}`);
-      await this.updateProgress(session, 20, 'Checking runtime package', 'Verifying the signed commissioning runtime bundle.');
+        throw new ConflictException(
+          `unsupported CC100 model or firmware; expected baseline ${session.firmwareBaseline}`,
+        );
+      await this.updateProgress(
+        session,
+        20,
+        'Checking runtime package',
+        'Verifying the signed commissioning runtime bundle.',
+      );
       const bundle = await verifyRuntimeBundle();
 
       if (inspection.codesys === 'active') {
-        await this.updateProgress(session, 30, 'Stopping CODESYS', 'Stopping the active CODESYS runtime before commissioning.');
-        await this.sudoRun(session.targetHost, session.hostKeyFingerprint, credential, 'kill $(pidof codesys3) 2>/dev/null || true');
-        await this.sudoRun(session.targetHost, session.hostKeyFingerprint, credential, '/etc/config-tools/config_runtime runtime-version=0');
+        await this.updateProgress(
+          session,
+          30,
+          'Stopping CODESYS',
+          'Stopping the active CODESYS runtime before commissioning.',
+        );
+        await this.sudoRun(
+          session.targetHost,
+          session.hostKeyFingerprint,
+          credential,
+          'kill $(pidof codesys3) 2>/dev/null || true',
+        );
+        await this.sudoRun(
+          session.targetHost,
+          session.hostKeyFingerprint,
+          credential,
+          '/etc/config-tools/config_runtime runtime-version=0',
+        );
       }
       await this.updateProgress(session, 40, 'Activating Docker', 'Preparing the controller runtime environment.');
-      await this.sudoRun(session.targetHost, session.hostKeyFingerprint, credential, '/etc/config-tools/config_docker activate');
+      await this.sudoRun(
+        session.targetHost,
+        session.hostKeyFingerprint,
+        credential,
+        '/etc/config-tools/config_docker activate',
+      );
       try {
-        await this.updateProgress(session, 55, 'Transferring runtime', 'Uploading the signed runtime bundle to the controller.');
-        await this.copyTo(session.targetHost, session.hostKeyFingerprint, credential, bundle.path, '/tmp/attraccess-wago-runtime.tar', (percent) =>
-          this.reportTransferProgress(session, percent),
+        await this.updateProgress(
+          session,
+          55,
+          'Transferring runtime',
+          'Uploading the signed runtime bundle to the controller.',
         );
-        await this.updateProgress(session, 75, 'Creating enrollment', 'Provisioning a restricted MQTT credential for the initial connection.');
+        await this.copyTo(
+          session.targetHost,
+          session.hostKeyFingerprint,
+          credential,
+          bundle.path,
+          '/tmp/attraccess-wago-runtime.tar',
+          (percent) => this.reportTransferProgress(session, percent),
+        );
+        await this.updateProgress(
+          session,
+          75,
+          'Creating enrollment',
+          'Provisioning a restricted MQTT credential for the initial connection.',
+        );
         const enrollment = await this.wago.createEnrollment(session.hardwareId, session.mqttServerId);
-        if (!enrollment.password) throw new ConflictException('automatic restricted MQTT credential provisioning is required for secure commissioning');
+        if (!enrollment.password)
+          throw new ConflictException(
+            'automatic restricted MQTT credential provisioning is required for secure commissioning',
+          );
         if (!session.pairingCode) throw new ConflictException('commissioning session has no automatic claim verifier');
         session.enrollmentId = enrollment.id;
         enrollmentExpiresAt = enrollment.expiresAt;
-        await this.updateProgress(session, 82, 'Writing runtime configuration', 'Installing the controller identity and restricted connection settings.');
+        await this.updateProgress(
+          session,
+          82,
+          'Writing runtime configuration',
+          'Installing the controller identity and restricted connection settings.',
+        );
         await this.writeRuntimeEnvironment(
           session.targetHost,
           session.hostKeyFingerprint,
@@ -187,7 +258,12 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             `WAGO_PAIRING_CODE=${session.pairingCode}`,
           ].join('\n'),
         );
-        await this.updateProgress(session, 92, 'Starting runtime', 'Loading and starting the commissioning runtime on the controller.');
+        await this.updateProgress(
+          session,
+          92,
+          'Starting runtime',
+          'Loading and starting the commissioning runtime on the controller.',
+        );
         await this.sudoRunScript(
           session.targetHost,
           session.hostKeyFingerprint,
@@ -203,7 +279,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       session.failureReason = null;
       session.progressPercent = 100;
       session.progressStep = 'Waiting for controller connection';
-      session.progressDetail = 'Runtime delivered. Waiting for the controller to connect and complete its automatic claim.';
+      session.progressDetail =
+        'Runtime delivered. Waiting for the controller to connect and complete its automatic claim.';
       return this.toResponse(await this.save(session, 'bootstrap_delivered'));
     } catch (error) {
       if (session.enrollmentId !== null) {
@@ -257,7 +334,12 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     await Promise.all(sessions.map((session) => this.remove(session.id)));
   }
 
-  async claimDiscovered(controller: { id: number; hardwareId: string; mqttServerId: number | null; enrollmentId: number | null }): Promise<void> {
+  async claimDiscovered(controller: {
+    id: number;
+    hardwareId: string;
+    mqttServerId: number | null;
+    enrollmentId: number | null;
+  }): Promise<void> {
     if (!controller.mqttServerId || !controller.enrollmentId) return;
     const session = await this.sessions.findOneBy({
       hardwareId: controller.hardwareId,
@@ -306,7 +388,11 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     });
   }
 
-  private async inspect(host: string, fingerprint: string, credential: TemporarySshCredential): Promise<{ firmware: string; codesys: string }> {
+  private async inspect(
+    host: string,
+    fingerprint: string,
+    credential: TemporarySshCredential,
+  ): Promise<{ firmware: string; codesys: string }> {
     const output = await this.run(host, fingerprint, credential, "cat /etc/os-release; printf '\\nCODESYS='; ps");
     const marker = '\nCODESYS=';
     const markerIndex = output.indexOf(marker);
@@ -315,7 +401,12 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     return { firmware, codesys: /codesys/i.test(processes) ? 'active' : 'inactive' };
   }
 
-  private async writeRuntimeEnvironment(host: string, fingerprint: string, credential: TemporarySshCredential, content: string): Promise<void> {
+  private async writeRuntimeEnvironment(
+    host: string,
+    fingerprint: string,
+    credential: TemporarySshCredential,
+    content: string,
+  ): Promise<void> {
     await this.sudoRun(
       host,
       fingerprint,
@@ -333,14 +424,31 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     input?: string,
   ): Promise<string> {
     if (credential.username === 'root') return this.run(host, fingerprint, credential, command, input);
-    return this.run(host, fingerprint, credential, `sudo -S sh -c ${shellQuote(command)}`, `${credential.password}\n${input ?? ''}`);
+    return this.run(
+      host,
+      fingerprint,
+      credential,
+      `sudo -S sh -c ${shellQuote(command)}`,
+      `${credential.password}\n${input ?? ''}`,
+    );
   }
 
-  private sudoRunScript(host: string, fingerprint: string, credential: TemporarySshCredential, script: string): Promise<string> {
+  private sudoRunScript(
+    host: string,
+    fingerprint: string,
+    credential: TemporarySshCredential,
+    script: string,
+  ): Promise<string> {
     return this.sudoRun(host, fingerprint, credential, 'base64 -d | sh', Buffer.from(script).toString('base64'));
   }
 
-  private async run(host: string, fingerprint: string, credential: TemporarySshCredential, command: string, input?: string): Promise<string> {
+  private async run(
+    host: string,
+    fingerprint: string,
+    credential: TemporarySshCredential,
+    command: string,
+    input?: string,
+  ): Promise<string> {
     const dir = await mkdtemp(join(tmpdir(), 'attraccess-cc100-'));
     const knownHosts = join(dir, 'known_hosts');
     const askPass = join(dir, 'askpass');
@@ -350,11 +458,28 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       return await runProcess(
         'ssh',
         [
-          '-o', 'BatchMode=no', '-o', 'NumberOfPasswordPrompts=1', '-o', 'HostKeyAlgorithms=ssh-ed25519', '-o', 'StrictHostKeyChecking=yes', '-o', `UserKnownHostsFile=${knownHosts}`,
-          '-o', 'ConnectTimeout=15', `${credential.username}@${host}`, `sh -c ${shellQuote(command)}`,
+          '-o',
+          'BatchMode=no',
+          '-o',
+          'NumberOfPasswordPrompts=1',
+          '-o',
+          'HostKeyAlgorithms=ssh-ed25519',
+          '-o',
+          'StrictHostKeyChecking=yes',
+          '-o',
+          `UserKnownHostsFile=${knownHosts}`,
+          '-o',
+          'ConnectTimeout=15',
+          `${credential.username}@${host}`,
+          `sh -c ${shellQuote(command)}`,
         ],
         input,
-        { SSH_ASKPASS: askPass, SSH_ASKPASS_REQUIRE: 'force', DISPLAY: 'attraccess', ATTRACCESS_SSH_PASSWORD: credential.password },
+        {
+          SSH_ASKPASS: askPass,
+          SSH_ASKPASS_REQUIRE: 'force',
+          DISPLAY: 'attraccess',
+          ATTRACCESS_SSH_PASSWORD: credential.password,
+        },
       );
     } finally {
       await rm(dir, { recursive: true, force: true });
@@ -378,10 +503,27 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       await uploadFile(
         source,
         [
-          '-o', 'BatchMode=no', '-o', 'NumberOfPasswordPrompts=1', '-o', 'HostKeyAlgorithms=ssh-ed25519', '-o', 'StrictHostKeyChecking=yes', '-o', `UserKnownHostsFile=${knownHosts}`,
-          '-o', 'ConnectTimeout=15', `${credential.username}@${host}`, `mkdir -p ${shellQuote(dirname(destination))} && cat > ${shellQuote(destination)}`,
+          '-o',
+          'BatchMode=no',
+          '-o',
+          'NumberOfPasswordPrompts=1',
+          '-o',
+          'HostKeyAlgorithms=ssh-ed25519',
+          '-o',
+          'StrictHostKeyChecking=yes',
+          '-o',
+          `UserKnownHostsFile=${knownHosts}`,
+          '-o',
+          'ConnectTimeout=15',
+          `${credential.username}@${host}`,
+          `mkdir -p ${shellQuote(dirname(destination))} && cat > ${shellQuote(destination)}`,
         ],
-        { SSH_ASKPASS: askPass, SSH_ASKPASS_REQUIRE: 'force', DISPLAY: 'attraccess', ATTRACCESS_SSH_PASSWORD: credential.password },
+        {
+          SSH_ASKPASS: askPass,
+          SSH_ASKPASS_REQUIRE: 'force',
+          DISPLAY: 'attraccess',
+          ATTRACCESS_SSH_PASSWORD: credential.password,
+        },
         onProgress,
       );
     } finally {
@@ -438,7 +580,10 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     const sessions = await this.sessions.find({ where: { hardwareId } });
     await Promise.all(
       sessions
-        .filter((session) => session.id !== completedSessionId && session.state !== 'completed' && session.state !== 'revoked')
+        .filter(
+          (session) =>
+            session.id !== completedSessionId && session.state !== 'completed' && session.state !== 'revoked',
+        )
         .map((session) =>
           this.withDeliveryLock(session.id, async () => {
             const current = await this.sessions.findOneBy({ id: session.id });
@@ -516,7 +661,8 @@ async function pinnedHostKey(host: string, expectedFingerprint: string): Promise
   const knownHosts = join(dir, 'known_hosts');
   try {
     await writeFile(knownHosts, `${key}\n`, { mode: 0o600 });
-    if ((await fingerprintFor(knownHosts)) !== expectedFingerprint) throw new ConflictException('controller SSH host key changed after automatic identity verification');
+    if ((await fingerprintFor(knownHosts)) !== expectedFingerprint)
+      throw new ConflictException('controller SSH host key changed after automatic identity verification');
     return `${key}\n`;
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -524,12 +670,19 @@ async function pinnedHostKey(host: string, expectedFingerprint: string): Promise
 }
 
 async function fingerprintFor(knownHosts: string): Promise<string> {
-  const result = (await runProcess('ssh-keygen', ['-lf', knownHosts, '-E', 'sha256'])).match(/(SHA256:[A-Za-z0-9+/=]+)/)?.[1];
+  const result = (await runProcess('ssh-keygen', ['-lf', knownHosts, '-E', 'sha256'])).match(
+    /(SHA256:[A-Za-z0-9+/=]+)/,
+  )?.[1];
   if (!result) throw new ConflictException('the controller did not provide a supported SSH host key');
   return result;
 }
 
-function runProcess(command: string, args: string[], input?: string | Buffer, environment?: Record<string, string>): Promise<string> {
+function runProcess(
+  command: string,
+  args: string[],
+  input?: string | Buffer,
+  environment?: Record<string, string>,
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { env: { ...process.env, ...environment }, stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '';
@@ -616,9 +769,9 @@ function isImmutableImage(image: string): boolean {
 function isRuntimeArtifactConfigured(): boolean {
   return Boolean(
     isImmutableImage(configuredRuntimeImage) &&
-      configuredRuntimeBundle &&
-      configuredRuntimeBundleChecksum &&
-      configuredRuntimeBundleSignature,
+    configuredRuntimeBundle &&
+    configuredRuntimeBundleChecksum &&
+    configuredRuntimeBundleSignature,
   );
 }
 
@@ -633,16 +786,28 @@ async function verifyRuntimeBundle(): Promise<{ directory: string; path: string 
       copyFile(configuredRuntimeBundleChecksum, checksumPath),
       copyFile(configuredRuntimeBundleSignature, signaturePath),
     ]);
-    const [bundle, checksum, signature] = await Promise.all([readFile(bundlePath), readFile(checksumPath, 'utf8'), stat(signaturePath)]);
+    const [bundle, checksum, signature] = await Promise.all([
+      readFile(bundlePath),
+      readFile(checksumPath, 'utf8'),
+      stat(signaturePath),
+    ]);
     if (!signature.isFile()) throw new ConflictException('CC100 runtime signature is not a file');
 
     const digest = createHash('sha256').update(bundle).digest('hex');
-    if (!new RegExp(`^${digest}\\s+\\*?${escapeRegExp(configuredRuntimeBundle.split('/').pop() ?? '')}\\s*$`, 'm').test(checksum))
+    if (
+      !new RegExp(`^${digest}\\s+\\*?${escapeRegExp(configuredRuntimeBundle.split('/').pop() ?? '')}\\s*$`, 'm').test(
+        checksum,
+      )
+    )
       throw new ConflictException('CC100 runtime bundle checksum does not match');
 
     const allowedSigners = join(directory, 'allowed_signers');
     const publicKey = await readFile(
-      resolveRuntimeSigningPublicKeyPath(process.env.NODE_ENV, configuredRuntimeSigningPublicKey, join(__dirname, 'signing-public-key.pub')),
+      resolveRuntimeSigningPublicKeyPath(
+        process.env.NODE_ENV,
+        configuredRuntimeSigningPublicKey,
+        join(__dirname, 'signing-public-key.pub'),
+      ),
       'utf8',
     );
     await writeFile(allowedSigners, `${SIGNING_IDENTITY} ${publicKey.trim()}\n`, { mode: 0o600 });
@@ -679,9 +844,14 @@ export function runtimeBundleInstallScript(runtimeImage: string): string {
   return `rm -rf /tmp/attraccess-wago-runtime && mkdir -m 0700 /tmp/attraccess-wago-runtime && tar --warning=no-timestamp --warning=no-unknown-keyword -xf /tmp/attraccess-wago-runtime.tar -C /tmp/attraccess-wago-runtime && rm -f /tmp/attraccess-wago-runtime.tar && grep -Fqx -- ${shellQuote(runtimeImage)} /tmp/attraccess-wago-runtime/image-reference && runtime_image=$(docker load -i /tmp/attraccess-wago-runtime/image.tar | sed -n -e 's/^Loaded image: //p' -e 's/^Loaded image ID: //p') && test -n "$runtime_image" && rm -rf /tmp/attraccess-wago-runtime && docker image inspect "$runtime_image" >/dev/null && (docker rm -f attraccess-wago >/dev/null 2>&1 || true) && mkdir -p /var/lib/attraccess-wago && chown 10001:10001 /var/lib/attraccess-wago && docker run -d --name attraccess-wago --restart unless-stopped --env-file /etc/attraccess-wago/runtime.env -v /var/lib/attraccess-wago:/var/lib/attraccess-wago "$runtime_image"`;
 }
 
-export function resolveRuntimeSigningPublicKeyPath(environment: string | undefined, localPath: string, releasePath: string): string {
+export function resolveRuntimeSigningPublicKeyPath(
+  environment: string | undefined,
+  localPath: string,
+  releasePath: string,
+): string {
   if (!localPath) return releasePath;
-  if (environment !== 'development') throw new ConflictException('local CC100 runtime signing keys are only allowed in development');
+  if (environment !== 'development')
+    throw new ConflictException('local CC100 runtime signing keys are only allowed in development');
   return localPath;
 }
 
