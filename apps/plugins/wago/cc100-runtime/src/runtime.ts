@@ -29,7 +29,12 @@ export type Snapshot = {
     pulse?: { durationMs: number };
     guard?: { channelId: string; when: 'on' | 'off' };
     feedback?: { channelId: string; expected: 'match' | 'inverse'; timeoutMs: number };
-    measurement?: { unit: string; scale: number; offset: number };
+    measurement?: {
+      unit: string;
+      scale: number;
+      offset: number;
+      kind?: 'live' | 'cumulative';
+    };
   }>;
 };
 
@@ -92,6 +97,7 @@ export class WagoRuntime {
   private readonly feedbackGenerations = new Map<string, number>();
   private configurationGeneration = 0;
   private readonly inFlightCommandIds = new Set<string>();
+  private measurementSequence = 0;
 
   constructor(
     private readonly options: { hardwareId: string; prefix: string; store: JsonStateStore; transport: Transport; device: DeviceAdapter },
@@ -221,10 +227,22 @@ export class WagoRuntime {
         const raw = await this.options.device.read(point);
         if (typeof raw !== 'number') continue;
         const transform = channel.measurement ?? { unit: 'percent', scale: 1, offset: 0 };
+        const value = raw * transform.scale + transform.offset;
+        if (!Number.isSafeInteger(value)) {
+          await this.options.transport.publish(this.topic('faults'), {
+            channelId: channel.id,
+            code: 'invalid_measurement_transform',
+            message: 'measurement transforms must produce an integer base-unit value',
+          });
+          continue;
+        }
         await this.options.transport.publish(this.topic('measurements'), {
           channelId: channel.id,
           unit: transform.unit,
-          value: raw * transform.scale + transform.offset,
+          value,
+          kind: transform.kind ?? 'live',
+          sourceTimestamp: new Date().toISOString(),
+          sequence: ++this.measurementSequence,
         });
       } catch (error) {
         await this.options.transport.publish(this.topic('faults'), {
@@ -517,9 +535,9 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     if (channel?.range && (!['input', 'measurement'].some((capability) => capabilities.includes(capability)) || !Number.isFinite(channel.range.minimum) || !Number.isFinite(channel.range.maximum) || channel.range.minimum >= channel.range.maximum))
       errors.push({ path: `${path}.range`, code: 'invalid_range', message: 'range requires input or measurement capability and finite ordered values' });
     if (channel?.range) validateKeys(channel.range as Record<string, unknown>, `${path}.range`, ['minimum', 'maximum'], errors);
-    if (channel?.measurement && (!capabilities.includes('measurement') || !['ampere', 'volt', 'watt', 'percent'].includes(channel.measurement.unit) || !Number.isFinite(channel.measurement.scale) || !Number.isFinite(channel.measurement.offset)))
-      errors.push({ path: `${path}.measurement`, code: 'invalid_measurement', message: 'measurement requires capability, supported unit, and finite transform' });
-    if (channel?.measurement) validateKeys(channel.measurement as Record<string, unknown>, `${path}.measurement`, ['unit', 'scale', 'offset'], errors);
+    if (channel?.measurement && (!capabilities.includes('measurement') || !['ampere', 'volt', 'watt', 'watt-hour', 'percent'].includes(channel.measurement.unit) || !Number.isFinite(channel.measurement.scale) || !Number.isFinite(channel.measurement.offset) || (channel.measurement.kind !== undefined && !['live', 'cumulative'].includes(channel.measurement.kind))))
+      errors.push({ path: `${path}.measurement`, code: 'invalid_measurement', message: 'measurement requires capability, supported unit, finite transform, and a valid kind' });
+    if (channel?.measurement) validateKeys(channel.measurement as Record<string, unknown>, `${path}.measurement`, ['unit', 'scale', 'offset', 'kind'], errors);
   });
   return errors;
 }

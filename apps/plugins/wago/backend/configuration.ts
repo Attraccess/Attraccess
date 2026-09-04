@@ -33,6 +33,33 @@ export const WAGO_PRESETS = [
   { id: 'generic-monitored-input', name: 'Generic monitored input', description: 'A monitored digital input foundation.' },
 ] as const;
 
+export const WAGO_METER_PROFILES = [
+  {
+    id: '879-3000',
+    name: 'WAGO Energy Meter MID24',
+    readOnly: true,
+    transport: 'modbus-rtu',
+    defaultUnitId: 1,
+    measurements: [
+      { id: 'active-power', address: 0x5012, dataType: 'float32', byteOrder: 'ABCD', scale: 1000, unit: 'watt', kind: 'live' },
+      { id: 'import-energy', address: 0x600c, dataType: 'float32', byteOrder: 'ABCD', scale: 1000, unit: 'watt-hour', kind: 'cumulative' },
+      { id: 'export-energy', address: 0x6018, dataType: 'float32', byteOrder: 'ABCD', scale: 1000, unit: 'watt-hour', kind: 'cumulative' },
+    ],
+  },
+  {
+    id: '879-1300',
+    name: 'WAGO Energy Meter MID26',
+    readOnly: true,
+    transport: 'modbus-rtu',
+    defaultUnitId: 1,
+    measurements: [
+      { id: 'active-power', address: 0x5012, dataType: 'float32', byteOrder: 'ABCD', scale: 1000, unit: 'watt', kind: 'live' },
+      { id: 'import-energy', address: 0x600c, dataType: 'uint32', byteOrder: 'ABCD', scale: 1, unit: 'watt-hour', kind: 'cumulative' },
+      { id: 'export-energy', address: 0x6018, dataType: 'uint32', byteOrder: 'ABCD', scale: 1, unit: 'watt-hour', kind: 'cumulative' },
+    ],
+  },
+] as const;
+
 export interface WagoConfigurationSnapshot {
   version: typeof CONFIGURATION_PROTOCOL_VERSION;
   physicalPoints: Array<{ id: string; hardwareProfile: (typeof HARDWARE_PROFILES)[number]; channel: number }>;
@@ -46,7 +73,7 @@ export interface WagoConfigurationSnapshot {
     pulse?: { durationMs: number };
     guard?: { channelId: string; when: 'on' | 'off' };
     feedback?: { channelId: string; expected: 'match' | 'inverse'; timeoutMs: number };
-    measurement?: { unit: 'ampere' | 'volt' | 'watt' | 'percent'; scale: number; offset: number };
+    measurement?: { unit: 'ampere' | 'volt' | 'watt' | 'watt-hour' | 'percent'; scale: number; offset: number; kind?: 'live' | 'cumulative' };
   }>;
 }
 
@@ -407,10 +434,12 @@ function validateMeasurement(
 ): void {
   if (value === undefined) return;
   if (!record(value, path, errors)) return;
-  exactKeys(value, path, ['unit', 'scale', 'offset'], errors);
-  enumValue(value.unit, `${path}.unit`, ['ampere', 'volt', 'watt', 'percent'], errors);
+  exactKeys(value, path, ['unit', 'scale', 'offset', 'kind'], errors, ['kind']);
+  enumValue(value.unit, `${path}.unit`, ['ampere', 'volt', 'watt', 'watt-hour', 'percent'], errors);
   if (!Number.isFinite(value.scale) || !Number.isFinite(value.offset))
     errors.push({ path, code: 'invalid_measurement', message: 'scale and offset must be finite numbers' });
+  if (value.kind !== undefined && !['live', 'cumulative'].includes(value.kind as string))
+    errors.push({ path: `${path}.kind`, code: 'unsupported_value', message: 'kind must be live or cumulative' });
   if (!capabilities.has('measurement'))
     errors.push({ path, code: 'unsupported_field', message: 'measurement requires measurement capability' });
 }

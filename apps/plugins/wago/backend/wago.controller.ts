@@ -42,6 +42,9 @@ export class WagoControllerApi {
   @Get('configuration/presets') presets() {
     return this.wago.presets();
   }
+  @Get('meter-profiles') meterProfiles() {
+    return this.wago.meterProfiles();
+  }
   @Post('controllers/:id/configuration/presets/preview') previewPreset(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { application?: WagoPresetApplication },

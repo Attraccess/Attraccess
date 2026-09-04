@@ -34,6 +34,45 @@ describe('WagoRuntime', () => {
     expect(transport.published).toContainEqual(expect.objectContaining({ topic: 'attraccess/wago/v1/controllers/cc100-1/configuration/reported', payload: { revision: 1, contentHash: hash(snapshot), errors: [] }, retain: true }));
   });
 
+  it('publishes typed integer-base-unit measurements with source identity', async () => {
+    const metered: Snapshot = {
+      version: 1,
+      physicalPoints: [{ id: 'meter', hardwareProfile: '879-1300', channel: 0 }],
+      logicalChannels: [{
+        id: 'import-energy',
+        physicalPointId: 'meter',
+        profile: 'meter',
+        capabilities: ['measurement'],
+        disconnectPolicy: { mode: 'hold' },
+        measurement: { unit: 'watt-hour', scale: 1, offset: 0, kind: 'cumulative' },
+      }],
+    };
+    device.values.set('879-1300:0', 1234);
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(metered), snapshot: metered });
+    await runtime.publishMeasurements();
+
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/measurements',
+      payload: expect.objectContaining({ channelId: 'import-energy', value: 1234, unit: 'watt-hour', kind: 'cumulative', sequence: 1, sourceTimestamp: expect.any(String) }),
+    }));
+  });
+
+  it('faults rather than publishing a fractional base-unit measurement', async () => {
+    const metered: Snapshot = {
+      version: 1,
+      physicalPoints: [{ id: 'meter', hardwareProfile: '879-3000', channel: 0 }],
+      logicalChannels: [{ id: 'power', physicalPointId: 'meter', profile: 'meter', capabilities: ['measurement'], disconnectPolicy: { mode: 'hold' }, measurement: { unit: 'watt', scale: 0.5, offset: 0 } }],
+    };
+    device.values.set('879-3000:0', 1);
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(metered), snapshot: metered });
+    await runtime.publishMeasurements();
+
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+      payload: expect.objectContaining({ channelId: 'power', code: 'invalid_measurement_transform' }),
+    }));
+  });
+
   it('accepts opaque server-defined profile names', async () => {
     const serverDefined = {
       ...snapshot,

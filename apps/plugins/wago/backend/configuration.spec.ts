@@ -5,6 +5,7 @@ import {
   applyPreset,
   parseConfigurationReport,
   validateSnapshot,
+  WAGO_METER_PROFILES,
 } from './configuration';
 
 describe('WAGO configuration snapshots', () => {
@@ -83,6 +84,21 @@ describe('WAGO configuration snapshots', () => {
 
     expect(output.logicalChannels[0]).toMatchObject({ capabilities: ['output', 'pulse'], disconnectPolicy: { mode: 'immediate' }, pulse: { durationMs: 500 } });
     expect(input.logicalChannels[0]).toMatchObject({ capabilities: ['input'], disconnectPolicy: { mode: 'hold' } });
+  });
+
+  it('ships read-only validated WAGO meter profiles in integer base units', () => {
+    expect(WAGO_METER_PROFILES).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: '879-3000', readOnly: true, transport: 'modbus-rtu' }),
+        expect.objectContaining({ id: '879-1300', readOnly: true, transport: 'modbus-rtu' }),
+      ]),
+    );
+    expect(WAGO_METER_PROFILES[0].measurements).toContainEqual(
+      expect.objectContaining({ id: 'import-energy', address: 0x600c, dataType: 'float32', scale: 1000, unit: 'watt-hour', kind: 'cumulative' }),
+    );
+    expect(WAGO_METER_PROFILES[1].measurements).toContainEqual(
+      expect.objectContaining({ id: 'import-energy', address: 0x600c, dataType: 'uint32', scale: 1, unit: 'watt-hour', kind: 'cumulative' }),
+    );
   });
 
   it('validates feedback mismatch declarations as declarative configuration', () => {
