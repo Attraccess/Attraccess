@@ -16,7 +16,7 @@
     "sessionDurationMs": "Exact Session Duration (ms)",
     "operatingDurationMs": "Operating Duration (ms, selected range)",
     "unattributedOperatingDurationMs": "Unattributed Operating Duration (ms, selected range)",
-    "durationStatus": "Duration Status",
+    "durationStatus": "Operating Data Status",
     "startNotes": "Start Notes",
     "endNotes": "End Notes",
     "supervisorId": "Supervisor ID",

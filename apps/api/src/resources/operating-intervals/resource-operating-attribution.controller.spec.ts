@@ -1,4 +1,5 @@
 import { ResourceOperatingAttributionController } from './resource-operating-attribution.controller';
+import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import {
   ResourceOperatingAttributionService,
   ResourceOperatingAttributionSummary,
@@ -10,9 +11,12 @@ describe('ResourceOperatingAttributionController', () => {
     const attributionService = {
       getForResource: jest.fn().mockResolvedValue(summary),
     } as unknown as ResourceOperatingAttributionService;
-    const controller = new ResourceOperatingAttributionController(attributionService);
+    const maintenanceService = {
+      canManageMaintenance: jest.fn().mockResolvedValue(true),
+    } as unknown as ResourceMaintenanceService;
+    const controller = new ResourceOperatingAttributionController(attributionService, maintenanceService);
 
-    await expect(controller.getForResource(12)).resolves.toBe(summary);
+    await expect(controller.getForResource(12, { user: {} } as AuthenticatedRequest)).resolves.toBe(summary);
     expect(attributionService.getForResource).toHaveBeenCalledWith(12);
   });
 });

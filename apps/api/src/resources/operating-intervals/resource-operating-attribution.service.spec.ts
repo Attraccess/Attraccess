@@ -186,6 +186,7 @@ describe('ResourceOperatingAttributionService', () => {
       operatingDurationMs: null,
       attributedOperatingDurationMs: null,
       unattributedOperatingDurationMs: null,
+      isOperating: false,
       isProvisional: false,
       attributions: [],
     });

@@ -17,6 +17,7 @@ import de from './translations/resourceUsageHistory.de';
 import historyTableEn from './components/HistoryTable/utils/translations/en.json';
 import historyTableDe from './components/HistoryTable/utils/translations/de.json';
 import { FlatSection } from '../../../components/flatSection';
+import { useCanViewOperatingDuration, useOperatingDuration } from '../operatingDuration';
 
 type ResourceUsageHistoryProps = Omit<HTMLAttributes<HTMLElement>, 'children'> & {
   resourceId: number;
@@ -28,6 +29,8 @@ export function ResourceUsageHistory({ resourceId, hideHeader, ...rest }: Resour
   const { t: tHistoryTable } = useTranslations({ en: historyTableEn, de: historyTableDe });
   const { hasPermission } = useAuth();
   const canUpdateResources = hasPermission('resources.update');
+  const canViewOperatingDuration = useCanViewOperatingDuration(resourceId);
+  const { data: operatingDuration } = useOperatingDuration(resourceId, canViewOperatingDuration);
   const queryClient = useQueryClient();
   const toast = useToastMessage();
 
@@ -146,6 +149,8 @@ export function ResourceUsageHistory({ resourceId, hideHeader, ...rest }: Resour
       resolveProjectId={resolveProjectId}
       updatingSessionIds={updatingSessionIds}
       onProjectChange={handleProjectChange}
+      canViewOperatingDuration={canViewOperatingDuration}
+      operatingDuration={operatingDuration}
     />
   );
 
@@ -159,6 +164,13 @@ export function ResourceUsageHistory({ resourceId, hideHeader, ...rest }: Resour
       resolveProjectId={resolveProjectId}
       updatingSessionIds={updatingSessionIds}
       onProjectChange={handleProjectChange}
+      operatingDurationMs={
+        selectedSession && canViewOperatingDuration
+          ? operatingDuration?.attributions
+              .filter((attribution) => attribution.usageId === selectedSession.id)
+              .reduce((total, attribution) => total + attribution.durationMs, 0)
+          : undefined
+      }
     />
   );
 

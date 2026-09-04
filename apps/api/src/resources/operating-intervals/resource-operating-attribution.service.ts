@@ -22,6 +22,7 @@ export interface ResourceOperatingAttributionSummary {
   operatingDurationMs: number | null;
   attributedOperatingDurationMs: number | null;
   unattributedOperatingDurationMs: number | null;
+  isOperating: boolean;
   isProvisional: boolean;
   attributions: ResourceOperatingAttribution[];
 }
@@ -248,6 +249,7 @@ export class ResourceOperatingAttributionService {
       unattributedOperatingDurationMs: operatingDataAvailable
         ? operatingDurationMs - attributedOperatingDurationMs
         : null,
+      isOperating: operatingRanges.some(({ interval }) => this.isOpenAt(interval, asOf)),
       isProvisional: liveValuesMayChange && isProvisional,
       attributions,
     };

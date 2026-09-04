@@ -1,8 +1,10 @@
 {
   "title": "Betriebsdauer",
-  "session": "Sitzung",
-  "operating": "Betrieb",
-  "unattributedOperating": "Nicht zugeordneter Betrieb",
+  "session": "Gesamte Sitzungszeit",
+  "operating": "Maschinenlaufzeit",
+  "unattributedOperating": "Laufzeit außerhalb einer Sitzung",
+  "running": "Maschine läuft gerade",
+  "idle": "Maschine ist gerade im Leerlauf",
   "provisional": "Live-Werte sind vorläufig.",
   "unavailable": "Für diese Ressource ist keine Betriebsintervallquelle verfügbar."
 }

@@ -1,15 +1,11 @@
 import { memo } from 'react';
-import {
-  DrawerBody,
-  DrawerHeader,
-  Button,
-  Spinner,
-} from '@heroui/react';
+import { DrawerBody, DrawerHeader, Button, Spinner } from '@heroui/react';
 import { FormFieldType, ResourceUsage, ResourceUsageAction } from '@attraccess/react-query-client';
 import { AttraccessUser, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './translations/en';
 import de from './translations/de';
 import { DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
+import { DurationDisplay } from '@attraccess/plugins-frontend-ui';
 import { X } from 'lucide-react';
 import { ProjectsSelect } from '../../../../../components/projectsSelect';
 import { StandardDrawer } from '../../../../../components/standardDrawer';
@@ -24,6 +20,7 @@ interface UsageNotesModalProps {
   resolveProjectId?: (session: ResourceUsage) => number | null;
   updatingSessionIds?: Record<number, boolean>;
   onProjectChange?: (session: ResourceUsage, projectId: number | undefined) => void;
+  operatingDurationMs?: number;
 }
 
 export const UsageNotesModal = memo(
@@ -36,6 +33,7 @@ export const UsageNotesModal = memo(
     resolveProjectId,
     updatingSessionIds,
     onProjectChange,
+    operatingDurationMs,
   }: UsageNotesModalProps) => {
     const { t } = useTranslations({ en, de });
     const { user } = useAuth();
@@ -108,6 +106,13 @@ export const UsageNotesModal = memo(
                 <section className="space-y-2 border-t border-divider pt-4">
                   <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{t('supervisor')}</p>
                   <AttraccessUser user={session.supervisorUser} />
+                </section>
+              )}
+
+              {operatingDurationMs !== undefined && (
+                <section className="space-y-2 border-t border-divider pt-4">
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">{t('machineRunningTime')}</p>
+                  <DurationDisplay minutes={operatingDurationMs / 60_000} />
                 </section>
               )}
 

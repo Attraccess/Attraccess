@@ -16,7 +16,7 @@
     "sessionDurationMs": "Exakte Sitzungsdauer (ms)",
     "operatingDurationMs": "Betriebsdauer (ms, ausgewählter Zeitraum)",
     "unattributedOperatingDurationMs": "Nicht zugeordnete Betriebsdauer (ms, ausgewählter Zeitraum)",
-    "durationStatus": "Dauerstatus",
+    "durationStatus": "Status der Betriebsdaten",
     "startNotes": "Start-Notizen",
     "endNotes": "End-Notizen",
     "supervisorId": "Aufsicht-ID",
