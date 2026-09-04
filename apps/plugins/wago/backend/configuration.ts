@@ -46,7 +46,7 @@ export interface WagoConfigurationSnapshot {
     pulse?: { durationMs: number };
     guard?: { channelId: string; when: 'on' | 'off' };
     feedback?: { channelId: string; expected: 'match' | 'inverse'; timeoutMs: number };
-    measurement?: { unit: 'ampere' | 'volt' | 'watt' | 'percent'; scale: number; offset: number };
+    measurement?: { unit: 'ampere' | 'volt' | 'watt' | 'watt-hour' | 'percent'; scale: number; offset: number; kind?: 'live' | 'cumulative' };
   }>;
 }
 
@@ -407,10 +407,12 @@ function validateMeasurement(
 ): void {
   if (value === undefined) return;
   if (!record(value, path, errors)) return;
-  exactKeys(value, path, ['unit', 'scale', 'offset'], errors);
-  enumValue(value.unit, `${path}.unit`, ['ampere', 'volt', 'watt', 'percent'], errors);
+  exactKeys(value, path, ['unit', 'scale', 'offset', 'kind'], errors, ['kind']);
+  enumValue(value.unit, `${path}.unit`, ['ampere', 'volt', 'watt', 'watt-hour', 'percent'], errors);
   if (!Number.isFinite(value.scale) || !Number.isFinite(value.offset))
     errors.push({ path, code: 'invalid_measurement', message: 'scale and offset must be finite numbers' });
+  if (value.kind !== undefined && !['live', 'cumulative'].includes(value.kind as string))
+    errors.push({ path: `${path}.kind`, code: 'unsupported_value', message: 'kind must be live or cumulative' });
   if (!capabilities.has('measurement'))
     errors.push({ path, code: 'unsupported_field', message: 'measurement requires measurement capability' });
 }
