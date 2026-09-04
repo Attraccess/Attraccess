@@ -8,8 +8,11 @@ import {
   getDraft,
   listPresets,
   listControllers,
+  listCommissioningSessions,
   listMqttServers,
   previewPreset,
+  removeCommissioningSession,
+  removeController,
   revokeCommissioningSession,
   saveDraft,
   setSettings,
@@ -24,6 +27,7 @@ const queryKeys = {
   mqttServers: ['mqtt', 'servers'] as const,
   draft: (controllerId: number) => ['wago', 'configuration-draft', controllerId] as const,
   presets: ['wago', 'configuration-presets'] as const,
+  commissioningSessions: ['wago', 'commissioning-sessions'] as const,
 };
 
 export function useControllersQuery() {
@@ -31,6 +35,14 @@ export function useControllersQuery() {
     queryKey: queryKeys.controllers,
     queryFn: listControllers,
     refetchInterval: 10_000,
+  });
+}
+
+export function useCommissioningSessionsQuery() {
+  return useQuery({
+    queryKey: queryKeys.commissioningSessions,
+    queryFn: () => listCommissioningSessions(),
+    refetchInterval: 2_000,
   });
 }
 
@@ -71,7 +83,11 @@ export function useClaimControllerMutation() {
 }
 
 export function useCreateCommissioningSessionMutation() {
-  return useMutation({ mutationFn: (input: CreateCommissioningSessionInput) => createCommissioningSession(input) });
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateCommissioningSessionInput) => createCommissioningSession(input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.commissioningSessions }),
+  });
 }
 
 export function useDeliverCommissioningSessionMutation() {
@@ -82,12 +98,39 @@ export function useDeliverCommissioningSessionMutation() {
       deliverCommissioningSession(id, input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.controllers });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.commissioningSessions });
     },
   });
 }
 
 export function useRevokeCommissioningSessionMutation() {
-  return useMutation({ mutationFn: revokeCommissioningSession });
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: revokeCommissioningSession,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.commissioningSessions }),
+  });
+}
+
+export function useRemoveCommissioningSessionMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: removeCommissioningSession,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.controllers });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.commissioningSessions });
+    },
+  });
+}
+
+export function useRemoveControllerMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: removeController,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.controllers });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.commissioningSessions });
+    },
+  });
 }
 
 export function useDraftQuery(controllerId: number | null) {

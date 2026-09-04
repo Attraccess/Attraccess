@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Inject, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Inject, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { WagoService } from './wago.service';
 import { WagoCommissioningService } from './wago-commissioning.service';
@@ -30,42 +30,43 @@ export class WagoControllerApi {
   }
   @Auth('system.settings.manage')
   @Post('commissioning/sessions') createCommissioningSession(
-    @Body() body: { hardwareId?: string; mqttServerId?: number; targetHost?: string },
+    @Body() body: { mqttServerId?: number; targetHost?: string; name?: string },
   ) {
     if (!body?.mqttServerId) throw new BadRequestException('MQTT server is required');
+    if (!body.name?.trim()) throw new BadRequestException('controller name is required');
     return this.commissioning.create({
-      hardwareId: body.hardwareId ?? '',
       mqttServerId: body.mqttServerId,
       targetHost: body.targetHost ?? '',
+      name: body.name,
     });
   }
   @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/deliver') deliverCommissioningSession(
     @Param('id', ParseIntPipe) id: number,
-    @Body()
-    body: {
-      hostKeyFingerprint?: string;
-      physicalIdentityConfirmed?: boolean;
-      codesysStopConfirmed?: boolean;
-      temporarySsh?: { username?: string; password?: string };
-    },
+    @Body() body: { temporarySsh?: { username?: string; password?: string } },
   ) {
     return this.commissioning.deliver(id, {
-      hostKeyFingerprint: body?.hostKeyFingerprint ?? '',
-      physicalIdentityConfirmed: body?.physicalIdentityConfirmed === true,
-      codesysStopConfirmed: body?.codesysStopConfirmed === true,
-      temporarySsh: { username: body?.temporarySsh?.username ?? '', password: body?.temporarySsh?.password ?? '' },
+      temporarySsh: body?.temporarySsh
+        ? { username: body.temporarySsh.username ?? '', password: body.temporarySsh.password ?? '' }
+        : undefined,
     });
   }
   @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/revoke') revokeCommissioningSession(@Param('id', ParseIntPipe) id: number) {
     return this.commissioning.revoke(id);
   }
+  @Delete('commissioning/sessions/:id') async removeCommissioningSession(@Param('id', ParseIntPipe) id: number) {
+    await this.commissioning.remove(id);
+  }
   @Post('controllers/:id/claim') claim(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { name?: string; verifier?: string; mqttServerId?: number },
   ) {
     return this.wago.claim(id, body?.name ?? '', body?.verifier ?? '', body?.mqttServerId);
+  }
+  @Delete('controllers/:id') async removeController(@Param('id', ParseIntPipe) id: number) {
+    const hardwareId = await this.wago.remove(id);
+    await this.commissioning.removeByHardwareId(hardwareId);
   }
   @Get('controllers/:id/configuration/draft') draft(@Param('id', ParseIntPipe) id: number) {
     return this.wago.getDraft(id);

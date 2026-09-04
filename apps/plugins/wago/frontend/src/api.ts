@@ -32,26 +32,40 @@ export interface ClaimControllerInput {
   verifier: string;
   mqttServerId?: number;
 }
+export type WagoCommissioningState =
+  | 'awaiting_delivery'
+  | 'delivering'
+  | 'awaiting_identity_confirmation'
+  | 'awaiting_codesys_confirmation'
+  | 'delivery_failed'
+  | 'awaiting_discovery'
+  | 'awaiting_claim'
+  | 'completed'
+  | 'revoked';
 export interface CommissioningSession {
   id: number;
   hardwareId: string;
   mqttServerId: number;
   targetHost: string;
+  controllerName: string | null;
   hostKeyFingerprint: string;
   firmwareBaseline: string;
-  state: string;
+  state: WagoCommissioningState;
   enrollmentExpiresAt: string | null;
-  pairingCode: string | null;
   codesysState: string | null;
+  progressPercent: number | null;
+  progressStep: string | null;
+  progressDetail: string | null;
+  auditLog: string;
   failureReason: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface CreateCommissioningSessionInput {
-  hardwareId: string;
   targetHost: string;
   mqttServerId: number;
+  name: string;
 }
 export interface WagoConfigurationDraft {
   controllerId: number;
@@ -105,17 +119,18 @@ export const claimController = (id: number, input: ClaimControllerInput) =>
 export const createCommissioningSession = (input: CreateCommissioningSessionInput) =>
   api.request<CommissioningSession>('/commissioning/sessions', { method: 'POST', body: input });
 
+export const listCommissioningSessions = (limit = 100, offset = 0) =>
+  api.request<CommissioningSession[]>(`/commissioning/sessions?limit=${limit}&offset=${offset}`);
+
 export const deliverCommissioningSession = (
   id: number,
-  input: {
-    hostKeyFingerprint: string;
-    physicalIdentityConfirmed: boolean;
-    codesysStopConfirmed: boolean;
-    temporarySsh: { username: string; password: string };
-  },
+  input: { temporarySsh?: { username: string; password: string } } = {},
 ) => api.request<CommissioningSession>(`/commissioning/sessions/${id}/deliver`, { method: 'POST', body: input });
 export const revokeCommissioningSession = (id: number) =>
   api.request<CommissioningSession>(`/commissioning/sessions/${id}/revoke`, { method: 'POST' });
+export const removeCommissioningSession = (id: number) =>
+  api.request<void>(`/commissioning/sessions/${id}`, { method: 'DELETE' });
+export const removeController = (id: number) => api.request<void>(`/controllers/${id}`, { method: 'DELETE' });
 
 export const getDraft = (id: number) =>
   api.request<WagoConfigurationDraft | null>(`/controllers/${id}/configuration/draft`);

@@ -213,13 +213,32 @@ describe('PluginService', () => {
       });
 
       PluginService.beginBootGuard();
-      PluginService.recordBootFailure(new Error('Plugin onModuleInit failed'));
+      const error = new Error('Plugin onModuleInit failed');
+      error.stack = `${error.stack}\n    at ${join(root, 'previously-active', 'dist', 'index.js')}:1:1`;
+      PluginService.recordBootFailure(error);
       PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
       PluginService.beginBootGuard();
 
       const [plugin] = PluginService.getPlugins();
       expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
       expect(PluginService.getPluginsWithLoadStatus()[0].error).toBe('Plugin onModuleInit failed');
+    });
+
+    it('does not quarantine unrelated plugins when a startup failure has no plugin stack frame', () => {
+      writePlugin(root, 'unrelated-plugin', {
+        name: 'unrelated-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+
+      PluginService.beginBootGuard();
+      PluginService.recordBootFailure(new Error('database unavailable'));
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      PluginService.beginBootGuard();
+
+      const [plugin] = PluginService.getPlugins();
+      expect(PluginService.isPluginQuarantined(plugin)).toBe(false);
     });
 
     it('creates a configured plugin directory before writing boot guard state', () => {

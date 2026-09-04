@@ -1,344 +1,199 @@
 import {
   Alert,
   Button,
-  Checkbox,
-  Form,
+  DrawerBody,
+  DrawerFooter,
+  DrawerHeader,
   Input,
   Label,
   ListBox,
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContainer,
-  ModalDialog,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
   Select,
   Spinner,
   TextField,
 } from '@heroui/react';
 import type { Key } from '@heroui/react';
+import { AlertCircleIcon, CheckCircle2Icon, CpuIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { CommissioningSession } from './api';
+import { commissioningLabel } from './ControllersTable';
+import { StandardDrawer } from './drawer';
 import {
   useCreateCommissioningSessionMutation,
   useDeliverCommissioningSessionMutation,
   useMqttServersQuery,
-  useRevokeCommissioningSessionMutation,
+  useRemoveCommissioningSessionMutation,
   useSettingsQuery,
 } from './queries';
 
 interface CommissioningModalProps {
   isOpen: boolean;
+  session: CommissioningSession | null;
   onOpenChange: (isOpen: boolean) => void;
 }
 
-export function CommissioningModal({ isOpen, onOpenChange }: CommissioningModalProps) {
+export function CommissioningModal({ isOpen, session: resumedSession, onOpenChange }: CommissioningModalProps) {
   const createSessionMutation = useCreateCommissioningSessionMutation();
   const deliverSessionMutation = useDeliverCommissioningSessionMutation();
-  const revokeSessionMutation = useRevokeCommissioningSessionMutation();
+  const removeSessionMutation = useRemoveCommissioningSessionMutation();
   const settingsQuery = useSettingsQuery();
   const mqttServersQuery = useMqttServersQuery();
+  const [createdSession, setCreatedSession] = useState<CommissioningSession | null>(null);
+  const [step, setStep] = useState(0);
+  const [name, setName] = useState('');
   const [controllerIp, setControllerIp] = useState('');
-  const [hardwareId, setHardwareId] = useState('');
   const [mqttServerId, setMqttServerId] = useState<Key | null>(null);
-  const [sshUsername, setSshUsername] = useState('');
-  const [sshPassword, setSshPassword] = useState('');
-  const [physicalIdentityConfirmed, setPhysicalIdentityConfirmed] = useState(false);
-  const [codesysStopAcknowledged, setCodesysStopAcknowledged] = useState(false);
-  const [deliveryStartedAt, setDeliveryStartedAt] = useState<number | null>(null);
-  const [deliveryElapsedSeconds, setDeliveryElapsedSeconds] = useState(0);
+  const [isCancelConfirmationOpen, setCancelConfirmationOpen] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) setMqttServerId(settingsQuery.data?.defaultMqttServerId?.toString() ?? null);
-  }, [isOpen, settingsQuery.data?.defaultMqttServerId]);
-
-  useEffect(() => {
-    if (deliveryStartedAt === null || !deliverSessionMutation.isPending) return;
-    const interval = window.setInterval(() => setDeliveryElapsedSeconds(Math.floor((Date.now() - deliveryStartedAt) / 1_000)), 1_000);
-    return () => window.clearInterval(interval);
-  }, [deliveryStartedAt, deliverSessionMutation.isPending]);
-
-  const session = revokeSessionMutation.data ?? deliverSessionMutation.data ?? createSessionMutation.data;
+  const session = deliverSessionMutation.data ?? resumedSession ?? createdSession;
   const selectedMqttServerId = mqttServerId === null ? null : Number(mqttServerId);
+  const isLoading = createSessionMutation.isPending || deliverSessionMutation.isPending || removeSessionMutation.isPending;
+  const loadingStatus = createSessionMutation.isPending
+    ? ['Preparing commissioning', 'Scanning and pinning the controller SSH identity.']
+    : removeSessionMutation.isPending
+        ? ['Canceling enrollment', 'Revoking access and removing the enrollment records.']
+        : null;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setMqttServerId(resumedSession?.mqttServerId.toString() ?? settingsQuery.data?.defaultMqttServerId?.toString() ?? null);
+    setName(resumedSession?.controllerName ?? '');
+    setControllerIp(resumedSession?.targetHost ?? '');
+    setStep(sessionStep(resumedSession));
+  }, [isOpen, resumedSession, settingsQuery.data?.defaultMqttServerId]);
 
   function close() {
+    setCreatedSession(null);
+    setStep(0);
+    setName('');
     setControllerIp('');
-    setHardwareId('');
     setMqttServerId(null);
-    setSshUsername('');
-    setSshPassword('');
-    setPhysicalIdentityConfirmed(false);
-    setCodesysStopAcknowledged(false);
-    setDeliveryStartedAt(null);
-    setDeliveryElapsedSeconds(0);
+    setCancelConfirmationOpen(false);
     createSessionMutation.reset();
     deliverSessionMutation.reset();
-    revokeSessionMutation.reset();
+    removeSessionMutation.reset();
     onOpenChange(false);
   }
 
   function createSession() {
     if (selectedMqttServerId === null) return;
-
     createSessionMutation.mutate(
-      {
-        hardwareId,
-        targetHost: controllerIp,
-        mqttServerId: selectedMqttServerId,
-      },
+      { name, targetHost: controllerIp, mqttServerId: selectedMqttServerId },
+      { onSuccess: (created) => { setCreatedSession(created); setStep(2); } },
     );
   }
 
-  function deliverSession(session: CommissioningSession) {
-    const temporarySsh = { username: sshUsername, password: sshPassword };
-    setSshPassword('');
-    setDeliveryStartedAt(Date.now());
-    setDeliveryElapsedSeconds(0);
-    deliverSessionMutation.mutate({
-      id: session.id,
-      hostKeyFingerprint: session.hostKeyFingerprint,
-      physicalIdentityConfirmed,
-      codesysStopConfirmed: codesysStopAcknowledged,
-      temporarySsh,
-    });
+  function deliverSession() {
+    if (!session) return;
+    deliverSessionMutation.mutate({ id: session.id });
   }
 
+  const activeStep = session ? sessionStep(session) : step;
+  const title = session?.controllerName || name || 'New CC100 controller';
+
   return (
-    <Modal isOpen={isOpen} onOpenChange={(open) => !open && close()}>
-      <ModalBackdrop>
-        <ModalContainer size="lg">
-          <ModalDialog>
-            <ModalHeader>
-              <ModalHeading>{session ? 'Secure commissioning session' : 'Commission WAGO controller'}</ModalHeading>
-            </ModalHeader>
-            {session ? (
-              <SessionStatus
-                session={session}
-                isDelivering={deliverSessionMutation.isPending}
-                deliveryElapsedSeconds={deliveryElapsedSeconds}
-                deliveryError={deliverSessionMutation.error}
-                isRevoking={revokeSessionMutation.isPending}
-                revokeError={revokeSessionMutation.error}
-                sshUsername={sshUsername}
-                sshPassword={sshPassword}
-                physicalIdentityConfirmed={physicalIdentityConfirmed}
-                codesysStopAcknowledged={codesysStopAcknowledged}
-                onSshUsernameChange={setSshUsername}
-                onSshPasswordChange={setSshPassword}
-                onPhysicalIdentityConfirmedChange={setPhysicalIdentityConfirmed}
-                onCodesysStopAcknowledgedChange={setCodesysStopAcknowledged}
-                onDeliver={() => deliverSession(session)}
-                onRevoke={() => revokeSessionMutation.mutate(session.id)}
-              />
-            ) : (
-              <Form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  createSession();
-                }}
-              >
-                <ModalBody>
-                  <Alert status="warning">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      <Alert.Title>Physical access is required</Alert.Title>
-                      <Alert.Description>
-                        Commissioning connects to the specified controller over SSH. Broker credentials are never shown
-                        in this UI.
-                      </Alert.Description>
-                    </Alert.Content>
-                  </Alert>
-                  <TextField name="controllerIp" isRequired>
-                    <Label>Controller IP address</Label>
-                    <Input value={controllerIp} onChange={(event) => setControllerIp(event.target.value)} />
-                  </TextField>
-                  <TextField name="hardwareId" isRequired>
-                    <Label>Controller hardware ID</Label>
-                    <Input value={hardwareId} onChange={(event) => setHardwareId(event.target.value)} />
-                  </TextField>
-                  {mqttServersQuery.isPending ? (
-                    <div className="wg:flex wg:justify-center wg:p-2">
-                      <Spinner color="accent" size="sm" />
-                    </div>
-                  ) : mqttServersQuery.isError ? (
-                    <ErrorAlert error={mqttServersQuery.error} />
-                  ) : (
-                    <Select
-                      className="wg:w-full"
-                      name="mqttServerId"
-                      placeholder="Select an MQTT server"
-                      value={mqttServerId}
-                      onChange={setMqttServerId}
-                    >
-                      <Label>MQTT server</Label>
-                      <Select.Trigger>
-                        <Select.Value />
-                        <Select.Indicator />
-                      </Select.Trigger>
-                      <Select.Popover>
-                        <ListBox
-                          renderEmptyState={() => (
-                            <span className="wg:block wg:p-3 wg:text-sm wg:text-muted">
-                              No MQTT servers configured.
-                            </span>
-                          )}
-                        >
-                          {(mqttServersQuery.data ?? []).map((server) => (
-                            <ListBox.Item key={server.id} id={server.id.toString()} textValue={server.name}>
-                              <div className="wg:flex wg:flex-col">
-                                <span>{server.name}</span>
-                                <span className="wg:text-xs wg:text-muted">
-                                  {server.host}:{server.port}
-                                  {server.useTls ? ' (TLS)' : ''}
-                                </span>
-                              </div>
-                              <ListBox.ItemIndicator />
-                            </ListBox.Item>
-                          ))}
-                        </ListBox>
-                      </Select.Popover>
-                    </Select>
-                  )}
-                  {createSessionMutation.isError && <ErrorAlert error={createSessionMutation.error} />}
-                </ModalBody>
-                <ModalFooter>
-                  <Button variant="secondary" onPress={close}>
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    isPending={createSessionMutation.isPending}
-                    isDisabled={
-                      !hardwareId.trim() ||
-                      selectedMqttServerId === null ||
-                      mqttServersQuery.isPending ||
-                      mqttServersQuery.isError
-                    }
-                  >
-                    Create secure session
-                  </Button>
-                </ModalFooter>
-              </Form>
-            )}
-            {session && (
-              <ModalFooter>
-                <Button variant="secondary" onPress={close}>
-                  Close
-                </Button>
-              </ModalFooter>
-            )}
-          </ModalDialog>
-        </ModalContainer>
-      </ModalBackdrop>
-    </Modal>
+    <StandardDrawer isOpen={isOpen} onOpenChange={(open) => !open && close()}>
+      <DrawerHeader><h2 className="wg:text-xl wg:font-semibold">Commission a controller</h2></DrawerHeader>
+      <DrawerBody>
+              <div className="wg:grid wg:min-w-0 wg:gap-5 wg:md:grid-cols-[13rem_minmax(0,1fr)]">
+                 <DevicePassport className="wg:hidden wg:md:block" name={title} step={activeStep} />
+                <div className="wg:min-w-0 wg:space-y-5">
+                   <StepHeading step={activeStep} />
+                   {loadingStatus && <OperationStatus title={loadingStatus[0]} description={loadingStatus[1]} />}
+                  {!session && activeStep === 0 && <NameStep name={name} onNameChange={setName} />}
+                   {!session && activeStep === 1 && <ConnectionStep controllerIp={controllerIp} mqttServerId={mqttServerId} mqttServersQuery={mqttServersQuery} onControllerIpChange={setControllerIp} onMqttServerIdChange={setMqttServerId} />}
+                    {session && activeStep === 2 && <DeliveryStep isDelivering={deliverSessionMutation.isPending} session={session} />}
+                   {session && activeStep === 3 && <ProgressStep name={title} session={session} />}
+                   {createSessionMutation.isError && <ErrorAlert error={createSessionMutation.error} />}
+                   {deliverSessionMutation.isError && <ErrorAlert error={deliverSessionMutation.error} />}
+                   {isCancelConfirmationOpen && <Alert status="warning"><Alert.Indicator /><Alert.Content><Alert.Description>Canceling revokes the enrollment credential and deletes this commissioning session.</Alert.Description></Alert.Content></Alert>}
+                </div>
+              </div>
+      </DrawerBody>
+      <DrawerFooter>
+               <Button variant="secondary" onPress={isCancelConfirmationOpen ? () => setCancelConfirmationOpen(false) : close}>{isCancelConfirmationOpen ? 'Keep enrollment' : 'Close'}</Button>
+              {!session && activeStep === 0 && <Button isDisabled={!name.trim()} onPress={() => setStep(1)}>Continue</Button>}
+               {!session && activeStep === 1 && <Button isPending={isLoading} isDisabled={!controllerIp.trim() || selectedMqttServerId === null || mqttServersQuery.isPending || mqttServersQuery.isError} onPress={createSession}>{isLoading ? 'Preparing commissioning' : 'Start automatic commissioning'}</Button>}
+                {session?.state === 'delivery_failed' && <Button isPending={isLoading} onPress={deliverSession}>{isLoading ? 'Retrying delivery' : 'Retry automatic delivery'}</Button>}
+                {session && session.state !== 'completed' && session.state !== 'revoked' && (isCancelConfirmationOpen ? <Button color="danger" isPending={isLoading} onPress={() => removeSessionMutation.mutate(session.id, { onSuccess: close })}>{isLoading ? 'Canceling enrollment' : 'Confirm cancellation'}</Button> : <Button variant="secondary" isDisabled={isLoading} onPress={() => setCancelConfirmationOpen(true)}>Cancel enrollment</Button>)}
+      </DrawerFooter>
+    </StandardDrawer>
   );
 }
 
-function SessionStatus({
-  session,
-  isDelivering,
-  deliveryElapsedSeconds,
-  deliveryError,
-  isRevoking,
-  revokeError,
-  sshUsername,
-  sshPassword,
-  physicalIdentityConfirmed,
-  codesysStopAcknowledged,
-  onSshUsernameChange,
-  onSshPasswordChange,
-  onPhysicalIdentityConfirmedChange,
-  onCodesysStopAcknowledgedChange,
-  onDeliver,
-  onRevoke,
-}: {
-  session: CommissioningSession;
-  isDelivering: boolean;
-  deliveryElapsedSeconds: number;
-  deliveryError: unknown;
-  isRevoking: boolean;
-  revokeError: unknown;
-  sshUsername: string;
-  sshPassword: string;
-  physicalIdentityConfirmed: boolean;
-  codesysStopAcknowledged: boolean;
-  onSshUsernameChange: (value: string) => void;
-  onSshPasswordChange: (value: string) => void;
-  onPhysicalIdentityConfirmedChange: (value: boolean) => void;
-  onCodesysStopAcknowledgedChange: (value: boolean) => void;
-  onDeliver: () => void;
-  onRevoke: () => void;
-}) {
-  return (
-    <ModalBody>
-      <p className="wg:text-sm wg:text-muted">
-        Session status: <span className="wg:font-medium">{session.state}</span>
-      </p>
-      <p className="wg:text-sm wg:text-muted">Supported baseline: {session.firmwareBaseline}</p>
-      <code className="wg:block wg:overflow-x-auto wg:rounded-medium wg:bg-default-100 wg:p-2 wg:text-xs">
-        SSH host key: {session.hostKeyFingerprint}
-      </code>
-      {session.enrollmentExpiresAt && <p className="wg:text-sm wg:text-muted">Bootstrap expiry: {new Date(session.enrollmentExpiresAt).toLocaleString()}</p>}
-      {session.pairingCode && <p className="wg:text-sm wg:text-muted">Pairing code: <span className="wg:font-medium">{session.pairingCode}</span></p>}
-      {session.failureReason && <Alert status="warning"><Alert.Indicator /><Alert.Content><Alert.Description>{session.failureReason}</Alert.Description></Alert.Content></Alert>}
-      {isDelivering && <DeliveryProgress elapsedSeconds={deliveryElapsedSeconds} />}
-      <p className="wg:text-sm wg:text-muted">Delivery tries the CC100 default SSH credentials first. Alternate accounts must be sudo-capable; their password is used for the privileged installation steps.</p>
-      <TextField name="sshUsername">
-        <Label>Alternate SSH username</Label>
-        <Input value={sshUsername} onChange={(event) => onSshUsernameChange(event.target.value)} />
-      </TextField>
-      <TextField name="sshPassword" type="password">
-        <Label>Alternate SSH password</Label>
-        <Input value={sshPassword} onChange={(event) => onSshPasswordChange(event.target.value)} />
-      </TextField>
-      <Checkbox isSelected={physicalIdentityConfirmed} onChange={onPhysicalIdentityConfirmedChange}>
-        <Checkbox.Content><Checkbox.Control><Checkbox.Indicator /></Checkbox.Control>I verified this SSH host key, the hardware ID printed on this controller, and supported firmware baseline in person.</Checkbox.Content>
-      </Checkbox>
-      <Checkbox isSelected={codesysStopAcknowledged} onChange={onCodesysStopAcknowledgedChange}>
-        <Checkbox.Content><Checkbox.Control><Checkbox.Indicator /></Checkbox.Control>I approve stopping CODESYS if it is active. This does not alter safety circuits or unrelated workloads.</Checkbox.Content>
-      </Checkbox>
-      <p className="wg:text-sm wg:text-muted">No broker credentials are available from this session.</p>
-      {deliveryError && <ErrorAlert error={deliveryError} />}
-      {revokeError && <ErrorAlert error={revokeError} />}
-      {session.state !== 'revoked' && <Button isPending={isDelivering} isDisabled={!physicalIdentityConfirmed} onPress={onDeliver}>
-        {deliveryError || session.state === 'delivery_failed' ? 'Retry delivery' : 'Deliver commissioning'}
-      </Button>}
-      {session.state !== 'revoked' && <Button variant="secondary" isPending={isRevoking} onPress={onRevoke}>Revoke bootstrap session</Button>}
-    </ModalBody>
-  );
+function DevicePassport({ className, name, step }: { className?: string; name: string; step: number }) {
+  return <aside className={`wg:min-w-0 wg:rounded-large wg:bg-default-100 wg:p-5 ${className ?? ''}`}><CpuIcon className="wg:h-10 wg:w-10 wg:text-primary" /><p className="wg:mt-4 wg:text-xs wg:font-semibold wg:uppercase wg:tracking-wider wg:text-muted">CC100 device passport</p><p className="wg:mt-1 wg:truncate wg:text-lg wg:font-semibold">{name}</p><div className="wg:mt-5 wg:space-y-3"><PassportRow label="Identity" value={step >= 2 ? 'Verified automatically' : 'Not scanned'} /><PassportRow label="Runtime" value={step >= 3 ? 'Provisioning' : 'Not delivered'} /><PassportRow label="Claim" value={step >= 3 ? 'Automatic' : 'Queued'} /></div><div className="wg:mt-6 wg:flex wg:gap-1">{[0, 1, 2, 3].map((index) => <span key={index} className={`wg:h-1.5 wg:flex-1 wg:rounded-full ${index <= step ? 'wg:bg-primary' : 'wg:bg-default-300'}`} />)}</div></aside>;
 }
 
-function DeliveryProgress({ elapsedSeconds }: { elapsedSeconds: number }) {
-  const phase = elapsedSeconds < 10
-    ? 'Validating the controller and preparing its restricted broker enrollment.'
-    : elapsedSeconds < 40
-      ? 'Activating the official Docker runtime and preparing the signed bundle.'
-      : 'Transferring the 70 MB signed runtime bundle. This can take several minutes on a CC100.';
-
-  return (
-    <Alert status="info">
-      <Alert.Indicator><Spinner color="accent" size="sm" /></Alert.Indicator>
-      <Alert.Content>
-        <Alert.Title>Commissioning in progress ({formatDuration(elapsedSeconds)})</Alert.Title>
-        <Alert.Description>{phase} Do not power off the controller.</Alert.Description>
-      </Alert.Content>
-    </Alert>
-  );
+function PassportRow({ label, value }: { label: string; value: string }) {
+  return <div><p className="wg:text-xs wg:text-muted">{label}</p><p className="wg:truncate wg:text-sm wg:font-medium">{value}</p></div>;
 }
 
-function formatDuration(seconds: number): string {
-  return `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`;
+function StepHeading({ step }: { step: number }) {
+  const content = [
+    ['Give this controller a useful name', 'This name is reserved now and applied automatically when the controller comes online.'],
+    ['Connect it securely', 'Enter the private address and MQTT server. The controller identity is verified automatically.'],
+    ['Verifying and provisioning', 'The server pins the SSH fingerprint automatically and installs the runtime without an operator confirmation.'],
+    ['Commissioning continues automatically', 'You can close this window and start another controller at any time.'],
+  ][step];
+  return <div><p className="wg:text-sm wg:font-medium">Step {step + 1} of 4</p><h2 className="wg:mt-1 wg:text-xl wg:font-semibold">{content[0]}</h2><p className="wg:mt-1 wg:text-sm wg:text-muted">{content[1]}</p></div>;
+}
+
+function OperationStatus({ title, description }: { title: string; description: string }) {
+  return <div aria-live="polite" className="wg:rounded-large wg:border wg:border-primary/30 wg:bg-primary/5 wg:p-3"><div className="wg:flex wg:items-center wg:gap-2"><Spinner color="accent" size="sm" /><p className="wg:text-sm wg:font-medium">{title}</p></div><p className="wg:mt-1 wg:text-xs wg:text-muted">{description}</p><div className="wg:mt-3 wg:h-1 wg:overflow-hidden wg:rounded-full wg:bg-default-200"><div className="wg:h-full wg:w-2/5 wg:animate-pulse wg:rounded-full wg:bg-primary" /></div></div>;
+}
+
+function NameStep({ name, onNameChange }: { name: string; onNameChange: (name: string) => void }) {
+  return <TextField isRequired name="controller-name"><Label>Controller name</Label><Input autoFocus value={name} placeholder="e.g. Pool house controller" onChange={(event) => onNameChange(event.target.value)} /></TextField>;
+}
+
+function ConnectionStep({ controllerIp, mqttServerId, mqttServersQuery, onControllerIpChange, onMqttServerIdChange }: { controllerIp: string; mqttServerId: Key | null; mqttServersQuery: ReturnType<typeof useMqttServersQuery>; onControllerIpChange: (value: string) => void; onMqttServerIdChange: (value: Key | null) => void }) {
+  return <div className="wg:space-y-4"><TextField isRequired name="controller-ip"><Label>Controller IP address</Label><Input value={controllerIp} placeholder="192.168.1.42" onChange={(event) => onControllerIpChange(event.target.value)} /></TextField>{mqttServersQuery.isPending ? <div className="wg:flex wg:justify-center wg:p-2"><Spinner color="accent" size="sm" /></div> : mqttServersQuery.isError ? <ErrorAlert error={mqttServersQuery.error} /> : <Select className="wg:w-full" name="mqttServerId" placeholder="Select an MQTT server" value={mqttServerId} onChange={onMqttServerIdChange}><Label>MQTT server</Label><Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger><Select.Popover><ListBox renderEmptyState={() => <span className="wg:block wg:p-3 wg:text-sm wg:text-muted">No MQTT servers configured.</span>}>{(mqttServersQuery.data ?? []).map((server) => <ListBox.Item key={server.id} id={server.id.toString()} textValue={server.name}><div className="wg:min-w-0 wg:truncate">{server.name}</div><ListBox.ItemIndicator /></ListBox.Item>)}</ListBox></Select.Popover></Select>}</div>;
+}
+
+function DeliveryStep({ isDelivering, session }: { isDelivering: boolean; session: CommissioningSession }) {
+  return <CommissioningStatusPanel isActive={isDelivering || session.state === 'delivering'} session={session} />;
+}
+
+function ProgressStep({ name, session }: { name: string; session: CommissioningSession }) {
+  const complete = session.state === 'completed';
+  return <div className="wg:space-y-4"><DevicePassport className="wg:md:hidden" name={name} step={3} /><CommissioningStatusPanel isActive={!complete} session={session} /><div className="wg:rounded-large wg:border wg:border-default-200 wg:p-4 wg:text-sm"><p className="wg:font-medium">Safe to close</p><p className="wg:mt-1 wg:text-muted">This session is saved in the CC100 devices table. Start another commissioning session while this one continues in the background.</p></div>{session.failureReason && <Alert status="warning"><Alert.Indicator /><Alert.Content><Alert.Description>{session.failureReason}</Alert.Description></Alert.Content></Alert>}</div>;
+}
+
+function CommissioningStatusPanel({ isActive, session }: { isActive: boolean; session: CommissioningSession }) {
+  const percent = session.progressPercent ?? 0;
+  const isQueued = session.state === 'awaiting_delivery';
+  const hasFailure = !isActive && Boolean(session.failureReason);
+  const title = isQueued ? 'Delivery queued' : session.progressStep ?? (isActive ? 'Preparing commissioning' : commissioningLabel(session.state));
+  const detail = isQueued ? 'The server will begin or resume this saved delivery automatically.' : session.progressDetail ?? 'Waiting for the next commissioning operation.';
+  return <div aria-live="polite" className="wg:rounded-large wg:border wg:border-primary/30 wg:bg-primary/5 wg:p-4"><div className="wg:flex wg:items-start wg:gap-3">{isActive ? <Spinner color="accent" size="sm" /> : hasFailure ? <AlertCircleIcon className="wg:h-6 wg:w-6 wg:shrink-0 wg:text-danger" /> : isQueued ? <CpuIcon className="wg:h-6 wg:w-6 wg:shrink-0 wg:text-muted" /> : <CheckCircle2Icon className="wg:h-6 wg:w-6 wg:shrink-0 wg:text-success" />}<div className="wg:min-w-0 wg:flex-1"><div className="wg:flex wg:items-center wg:justify-between wg:gap-3"><p className="wg:font-medium">{title}</p><span className="wg:text-sm wg:text-muted">{percent}%</span></div><p className="wg:mt-1 wg:text-sm wg:text-muted">{detail}</p><div className="wg:mt-3 wg:h-1.5 wg:overflow-hidden wg:rounded-full wg:bg-default-200"><div className={`wg:h-full wg:rounded-full wg:transition-[width] wg:duration-500 ${hasFailure ? 'wg:bg-danger' : 'wg:bg-primary'}`} style={{ width: `${percent}%` }} /></div></div></div>{hasFailure && <Alert className="wg:mt-4" status="danger"><Alert.Indicator /><Alert.Content><Alert.Title>Delivery error</Alert.Title><Alert.Description>{session.failureReason}</Alert.Description></Alert.Content></Alert>}<ActivityLog auditLog={session.auditLog} /></div>;
+}
+
+function ActivityLog({ auditLog }: { auditLog: string }) {
+  const events = parseActivityLog(auditLog);
+  if (!events.length) return null;
+  return <div className="wg:mt-4 wg:border-t wg:border-default-200 wg:pt-3"><p className="wg:text-xs wg:font-semibold wg:uppercase wg:tracking-wider wg:text-muted">Activity</p><ol className="wg:mt-2 wg:space-y-1">{events.map((event) => <li key={`${event.at}-${event.event}`} className="wg:text-xs wg:text-muted"><span className="wg:text-foreground">{formatActivity(event.event)}</span> <span>{new Date(event.at).toLocaleTimeString()}</span></li>)}</ol></div>;
+}
+
+function formatActivity(event: string): string {
+  return event.replace(/^progress: /, '').replaceAll('_', ' ');
+}
+
+function parseActivityLog(auditLog: string): Array<{ at: string; event: string }> {
+  try {
+    const entries = JSON.parse(auditLog) as Array<{ at?: unknown; event?: unknown }>;
+    return entries
+      .filter((entry): entry is { at: string; event: string } => typeof entry.at === 'string' && typeof entry.event === 'string')
+      .slice(-5);
+  } catch {
+    return [];
+  }
+}
+
+function sessionStep(session: CommissioningSession | null): number {
+  if (!session) return 0;
+  return ['awaiting_delivery', 'delivering', 'awaiting_identity_confirmation', 'awaiting_codesys_confirmation', 'delivery_failed'].includes(session.state) ? 2 : 3;
 }
 
 function ErrorAlert({ error }: { error: unknown }) {
-  return (
-    <Alert status="danger">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Description>{error instanceof Error ? error.message : 'Please try again.'}</Alert.Description>
-      </Alert.Content>
-    </Alert>
-  );
+  return <Alert status="danger"><Alert.Indicator /><Alert.Content><Alert.Description>{error instanceof Error ? error.message : 'Please try again.'}</Alert.Description></Alert.Content></Alert>;
 }

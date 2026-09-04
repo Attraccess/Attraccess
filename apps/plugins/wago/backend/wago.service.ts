@@ -4,8 +4,8 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  OnApplicationBootstrap,
   OnModuleDestroy,
-  OnModuleInit,
 } from '@nestjs/common';
 import type { PluginContext, PluginMqttSubscription, Repository } from '@attraccess/plugins-backend-sdk';
 import {
@@ -57,7 +57,7 @@ type WagoControllerSummary = Omit<WagoController, 'fingerprint' | 'pairingCodeHa
 };
 
 @Injectable()
-export class WagoService implements OnModuleInit, OnModuleDestroy {
+export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
   private controllers!: Repository<WagoController>;
   private settings!: Repository<WagoSettings>;
   private enrollments!: Repository<WagoEnrollment>;
@@ -69,6 +69,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   private readonly claimLocks = new Map<number, Promise<void>>();
   private readonly configurationLocks = new Map<number, Promise<void>>();
   private readonly configurationReportQueues = new Map<number, { pending: Map<number, Buffer>; processing: boolean }>();
+  private commissioningDiscoveryHandler: ((controller: WagoController) => Promise<void>) | null = null;
   private claimConfigurationLock = Promise.resolve();
   private subscriptionRebuild = Promise.resolve();
   private subscriptionRetryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -77,7 +78,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
 
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
 
-  async onModuleInit(): Promise<void> {
+  async onApplicationBootstrap(): Promise<void> {
     // The host datasource is available only after plugin module construction completes.
     this.controllers = this.context.getRepository(WagoController);
     this.settings = this.context.getRepository(WagoSettings);
@@ -127,6 +128,10 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       updatedAt: controller.updatedAt,
       connectivity: this.connectivity(controller),
     }));
+  }
+
+  registerCommissioningDiscoveryHandler(handler: (controller: WagoController) => Promise<void>): void {
+    this.commissioningDiscoveryHandler = handler;
   }
 
   async getSettings(): Promise<WagoSettings> {
@@ -441,6 +446,45 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   async revokeEnrollmentById(id: number): Promise<void> {
     const enrollment = await this.enrollments.findOneBy({ id });
     if (enrollment && this.isActiveEnrollment(enrollment)) await this.revokeEnrollment(enrollment);
+  }
+
+  async deleteEnrollmentById(id: number): Promise<void> {
+    await this.enrollments.delete(id);
+  }
+
+  /** Revokes the controller's access before removing all of its local state. */
+  async remove(id: number): Promise<string> {
+    return this.withClaimLock(id, () =>
+      this.withClaimConfigurationLock(async () => {
+        const controller = await this.controllers.findOneBy({ id });
+        if (!controller) throw new NotFoundException(`WAGO controller ${id} not found`);
+
+        if (controller.trustState === 'claimed' && controller.mqttServerId) {
+          const identity = `wago-controller-${controller.hardwareId}`;
+          const manual = await this.context.getMqttCredentialProvisioning().revoke({
+            mqttServerId: controller.mqttServerId,
+            identity,
+            username: identity,
+            vhost: '/',
+          });
+          if (manual)
+            throw new ConflictException(`Manual credential revocation is required: ${manual.instructions.join(' ')}`);
+        }
+
+        if (controller.enrollmentId) await this.revokeEnrollmentById(controller.enrollmentId);
+        await Promise.all([
+          this.drafts.delete({ controllerId: id }),
+          this.revisions.delete({ controllerId: id }),
+        ]);
+        await this.controllers.delete(id);
+        this.configurationReportQueues.delete(id);
+        await this.subscribeConfiguredServers().catch((error) => {
+          this.context.logger.warn(`Could not refresh WAGO MQTT subscriptions after controller removal: ${String(error)}`);
+          this.scheduleSubscriptionRetry();
+        });
+        return controller.hardwareId;
+      }),
+    );
   }
 
   async claim(id: number, name: string, verifier: string, mqttServerId?: number): Promise<WagoController> {
@@ -780,6 +824,13 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
     candidate.compatibilityError = compatibilityError(announcement);
     candidate.updatedAt = now;
     await this.controllers.save(candidate);
+    if (this.commissioningDiscoveryHandler) {
+      try {
+        await this.commissioningDiscoveryHandler(candidate);
+      } catch (error) {
+        this.context.logger.warn(`Could not automatically claim commissioned WAGO controller ${candidate.hardwareId}: ${String(error)}`);
+      }
+    }
   }
 
   private async onHeartbeat(hardwareId: string, payload: Buffer): Promise<void> {
@@ -942,7 +993,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   private matchesVerifier(controller: WagoController, verifier: string): boolean {
     const value = verifier.trim();
     return (
-      (Boolean(value) && Boolean(controller.fingerprint) && value === controller.fingerprint) ||
+      (Boolean(value) && Boolean(controller.fingerprint) && safeEqual(hash(value), hash(controller.fingerprint))) ||
       safeEqual(hash(value), controller.pairingCodeHash)
     );
   }

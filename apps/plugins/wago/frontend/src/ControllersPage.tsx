@@ -1,19 +1,30 @@
 import { Alert, Button, Spinner } from '@heroui/react';
 import { PlusIcon, RefreshCwIcon, SettingsIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ClaimControllerModal } from './ClaimControllerModal';
 import { ConfigurationEditor } from './ConfigurationEditor';
 import { ControllersTable } from './ControllersTable';
 import { CommissioningModal } from './CommissioningModal';
 import { MqttSettingsModal } from './MqttSettingsModal';
-import { useControllersQuery } from './queries';
+import type { CommissioningSession, WagoController } from './api';
+import { RemoveControllerDrawer } from './RemoveControllerDrawer';
+import { useCommissioningSessionsQuery, useControllersQuery } from './queries';
 
 export function ControllersPage() {
   const controllersQuery = useControllersQuery();
+  const sessionsQuery = useCommissioningSessionsQuery();
   const [claimControllerId, setClaimControllerId] = useState<number | null>(null);
   const [configurationControllerId, setConfigurationControllerId] = useState<number | null>(null);
   const [isCommissioningOpen, setCommissioningOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
+  const [commissioningSession, setCommissioningSession] = useState<CommissioningSession | null>(null);
+  const [removingController, setRemovingController] = useState<WagoController | null>(null);
+
+  useEffect(() => {
+    setCommissioningSession((session) =>
+      session ? sessionsQuery.data?.find((candidate) => candidate.id === session.id) ?? session : null,
+    );
+  }, [sessionsQuery.data]);
 
   return (
     <main className="wg:mx-auto wg:flex wg:w-full wg:max-w-6xl wg:flex-col wg:gap-6 wg:p-4 wg:md:p-6">
@@ -56,10 +67,16 @@ export function ControllersPage() {
           <Spinner color="accent" />
         </div>
       ) : (
-        <ControllersTable
-          controllers={controllersQuery.data ?? []}
-          onClaim={setClaimControllerId}
-          onConfigure={setConfigurationControllerId}
+          <ControllersTable
+            controllers={controllersQuery.data ?? []}
+            sessions={sessionsQuery.data ?? []}
+            onClaim={setClaimControllerId}
+            onConfigure={setConfigurationControllerId}
+            onRemove={setRemovingController}
+            onResume={(session) => {
+              setCommissioningSession(session);
+              setCommissioningOpen(true);
+            }}
         />
       )}
 
@@ -75,8 +92,16 @@ export function ControllersPage() {
           if (!isOpen) setConfigurationControllerId(null);
         }}
       />
-      <CommissioningModal isOpen={isCommissioningOpen} onOpenChange={setCommissioningOpen} />
+      <CommissioningModal
+        isOpen={isCommissioningOpen}
+        session={commissioningSession}
+        onOpenChange={(open) => {
+          setCommissioningOpen(open);
+          if (!open) setCommissioningSession(null);
+        }}
+      />
       <MqttSettingsModal isOpen={isSettingsOpen} onOpenChange={setSettingsOpen} />
+      <RemoveControllerDrawer controller={removingController} onOpenChange={(open) => !open && setRemovingController(null)} />
     </main>
   );
 }

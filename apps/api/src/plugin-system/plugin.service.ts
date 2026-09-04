@@ -122,16 +122,9 @@ export class PluginService {
   public static beginBootGuard(): void {
     const previous = PluginService.readBootGuard();
     if (previous.length > 0) {
-      for (const pluginDirectory of previous) {
-        if (!PluginService.pluginFailures.has(pluginDirectory)) {
-          PluginService.pluginFailures.set(pluginDirectory, {
-            pluginDirectory,
-            message: 'Plugin was automatically disabled because the previous application startup did not complete. Review the plugin and reinstall or remove it before enabling it again.',
-          });
-        }
-      }
-      PluginService.writeFailures([...PluginService.pluginFailures.values()]);
-      PluginService.logger.error(`Disabled ${previous.length} plugin(s) after an incomplete previous startup.`);
+      PluginService.logger.warn(
+        `Previous startup ended before plugin lifecycle completed for ${previous.length} plugin(s); retaining them because no specific plugin failure was recorded.`,
+      );
     }
 
     const active = PluginService.getPlugins()
@@ -151,9 +144,12 @@ export class PluginService {
     const message = error instanceof Error ? error.message : String(error);
     const stack = error instanceof Error ? error.stack ?? '' : '';
     const affected = active.filter((pluginDirectory) => stack.includes(join(PluginService.PLUGIN_PATH, pluginDirectory)));
-    const pluginDirectories = affected.length > 0 ? affected : active;
+    if (affected.length === 0) {
+      PluginService.logger.error('Could not attribute the startup failure to a plugin; no plugins were quarantined.');
+      return;
+    }
 
-    for (const pluginDirectory of pluginDirectories) {
+    for (const pluginDirectory of affected) {
       PluginService.pluginFailures.set(pluginDirectory, { pluginDirectory, message });
     }
     PluginService.writeFailures([...PluginService.pluginFailures.values()]);

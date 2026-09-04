@@ -1,9 +1,10 @@
-import { ConflictException, Inject, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
 import { spawn } from 'node:child_process';
-import { createHash, randomInt } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import { copyFile, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { PLUGIN_CONTEXT, PluginContext, Repository } from '@attraccess/plugins-backend-sdk';
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
 import { WagoService } from './wago.service';
@@ -24,7 +25,7 @@ type TemporarySshCredential = { username: string; password: string };
 const defaultSshCredential: TemporarySshCredential = { username: 'root', password: 'wago' };
 
 @Injectable()
-export class WagoCommissioningService implements OnModuleInit {
+export class WagoCommissioningService implements OnApplicationBootstrap {
   private sessions!: Repository<WagoCommissioningSession>;
   private readonly deliveryLocks = new Map<number, Promise<void>>();
 
@@ -33,9 +34,16 @@ export class WagoCommissioningService implements OnModuleInit {
     @Inject(WagoService) private readonly wago: WagoService,
   ) {}
 
-  onModuleInit(): void {
+  onApplicationBootstrap(): void {
     // The host datasource is available only after plugin module construction completes.
     this.sessions = this.context.getRepository(WagoCommissioningSession);
+    this.wago.registerCommissioningDiscoveryHandler((controller) => this.claimDiscovered(controller));
+    void this.resumePendingDeliveries().catch((error) =>
+      this.context.logger?.warn(`Could not resume pending WAGO commissioning deliveries: ${String(error)}`),
+    );
+    void this.reconcileCompletedSessions().catch((error) =>
+      this.context.logger?.warn(`Could not retire superseded WAGO commissioning sessions: ${String(error)}`),
+    );
   }
 
   support(): { firmwareBaseline: string | null; ready: boolean } {
@@ -51,100 +59,107 @@ export class WagoCommissioningService implements OnModuleInit {
     };
   }
 
-  async create(input: { hardwareId: string; mqttServerId: number; targetHost: string }): Promise<WagoCommissioningSession> {
-    const hardwareId = input.hardwareId.trim();
-    if (!/^[A-Za-z0-9._-]+$/.test(hardwareId)) throw new ConflictException('a valid controller hardware ID is required');
+  async create(input: { mqttServerId: number; targetHost: string; name: string }): Promise<WagoCommissioningSession> {
     if (!isPrivateAddress(input.targetHost)) throw new ConflictException('commissioning is limited to a private controller address');
+    if (!input.name.trim()) throw new ConflictException('a controller name is required');
     if (!configuredFirmwareBaseline)
       throw new ConflictException('no CC100 firmware baseline is configured; commissioning is disabled until an exact supported baseline is set');
     if (!(await this.context.getMqttServerConfig(input.mqttServerId))) throw new NotFoundException('MQTT server not found');
 
     const hostKeyFingerprint = await scanHostKey(input.targetHost);
+    const hardwareId = `cc100-${createHash('sha256').update(hostKeyFingerprint).digest('hex').slice(0, 16)}`;
     const now = new Date().toISOString();
-    return this.sessions.save(
+    const session = await this.sessions.save(
       this.sessions.create({
         hardwareId,
         mqttServerId: input.mqttServerId,
         targetHost: input.targetHost,
         hostKeyFingerprint,
         firmwareBaseline: configuredFirmwareBaseline,
-        state: 'awaiting_identity_confirmation',
+        controllerName: input.name.trim(),
+        state: 'awaiting_delivery',
         enrollmentExpiresAt: null,
         enrollmentId: null,
-        pairingCode: null,
+        // This verifier authenticates the first runtime announcement and is never exposed to an operator.
+        pairingCode: randomBytes(32).toString('base64url'),
         codesysState: null,
+        progressPercent: 0,
+        progressStep: 'Identity scanned',
+        progressDetail: 'SSH host key captured and pinned for automatic verification.',
         auditLog: JSON.stringify([{ at: now, event: 'host_key_scanned' }]),
         failureReason: null,
         createdAt: now,
         updatedAt: now,
       }),
     );
+    // Delivery belongs to the server so it continues after the browser closes or reloads.
+    void this.deliverInBackground(session.id);
+    return session;
   }
 
-  async list(limit = 50, offset = 0): Promise<WagoCommissioningSession[]> {
+  async list(limit = 50, offset = 0): Promise<Array<Omit<WagoCommissioningSession, 'pairingCode'>>> {
     const take = Number.isSafeInteger(limit) ? Math.min(Math.max(limit, 1), 100) : 50;
     const skip = Number.isSafeInteger(offset) ? Math.max(offset, 0) : 0;
-    return this.sessions.find({ order: { updatedAt: 'DESC' }, take, skip });
+    const sessions = await this.sessions.find({ order: { updatedAt: 'DESC' }, take, skip });
+    return sessions.map((session) =>
+      Object.fromEntries(Object.entries(session).filter(([field]) => field !== 'pairingCode')) as Omit<
+        WagoCommissioningSession,
+        'pairingCode'
+      >,
+    );
   }
 
   async deliver(
     id: number,
-    input: {
-      hostKeyFingerprint: string;
-      physicalIdentityConfirmed: boolean;
-      codesysStopConfirmed: boolean;
-      temporarySsh: TemporarySshCredential;
-    },
+    input: { temporarySsh?: TemporarySshCredential } = {},
   ): Promise<WagoCommissioningSession> {
     return this.withDeliveryLock(id, () => this.deliverWhileLocked(id, input));
   }
 
   private async deliverWhileLocked(
     id: number,
-    input: {
-      hostKeyFingerprint: string;
-      physicalIdentityConfirmed: boolean;
-      codesysStopConfirmed: boolean;
-      temporarySsh: TemporarySshCredential;
-    },
+    input: { temporarySsh?: TemporarySshCredential },
   ): Promise<WagoCommissioningSession> {
     const session = await this.sessions.findOneBy({ id });
     if (!session) throw new NotFoundException('commissioning session not found');
-    if (!['awaiting_identity_confirmation', 'awaiting_codesys_confirmation', 'delivery_failed'].includes(session.state))
+    if (!['awaiting_delivery', 'delivering', 'awaiting_identity_confirmation', 'awaiting_codesys_confirmation', 'delivery_failed'].includes(session.state))
       throw new ConflictException('commissioning session cannot be delivered in its current state');
-    if (!input.physicalIdentityConfirmed) throw new ConflictException('physical controller identity confirmation is required');
-    if (input.hostKeyFingerprint !== session.hostKeyFingerprint) throw new ConflictException('controller SSH host key does not match the scanned key');
     if (!isRuntimeArtifactConfigured())
       throw new ConflictException('no immutable, signed CC100 runtime bundle is configured for commissioning');
 
-    const credential = input.temporarySsh.username.trim() && input.temporarySsh.password ? input.temporarySsh : defaultSshCredential;
+    const credential = input.temporarySsh?.username.trim() && input.temporarySsh.password ? input.temporarySsh : defaultSshCredential;
     let enrollmentExpiresAt: string | null = null;
 
     try {
+      session.state = 'delivering';
+      session.failureReason = null;
+      await this.updateProgress(session, 10, 'Verifying controller identity', 'Rechecking the pinned SSH host key and inspecting the CC100.');
       const inspection = await this.inspect(session.targetHost, session.hostKeyFingerprint, credential);
       session.codesysState = inspection.codesys;
       if (!isSupportedController(inspection.firmware, session.firmwareBaseline))
         throw new ConflictException(`unsupported CC100 model or firmware; expected baseline ${session.firmwareBaseline}`);
-      if (inspection.codesys === 'active' && !input.codesysStopConfirmed) {
-        session.state = 'awaiting_codesys_confirmation';
-        session.failureReason = 'CODESYS is active; explicit administrator confirmation is required before it is stopped.';
-        return this.save(session, 'codesys_confirmation_required');
-      }
-
+      await this.updateProgress(session, 20, 'Checking runtime package', 'Verifying the signed commissioning runtime bundle.');
       const bundle = await verifyRuntimeBundle();
+
+      if (inspection.codesys === 'active') {
+        await this.updateProgress(session, 30, 'Stopping CODESYS', 'Stopping the active CODESYS runtime before commissioning.');
+        await this.sudoRun(session.targetHost, session.hostKeyFingerprint, credential, 'kill $(pidof codesys3) 2>/dev/null || true');
+        await this.sudoRun(session.targetHost, session.hostKeyFingerprint, credential, '/etc/config-tools/config_runtime runtime-version=0');
+      }
+      await this.updateProgress(session, 40, 'Activating Docker', 'Preparing the controller runtime environment.');
+      await this.sudoRun(session.targetHost, session.hostKeyFingerprint, credential, '/etc/config-tools/config_docker activate');
       try {
-        if (inspection.codesys === 'active') {
-          await this.sudoRun(session.targetHost, session.hostKeyFingerprint, credential, 'kill $(pidof codesys3) 2>/dev/null || true');
-          await this.sudoRun(session.targetHost, session.hostKeyFingerprint, credential, '/etc/config-tools/config_runtime runtime-version=0');
-        }
-        await this.sudoRun(session.targetHost, session.hostKeyFingerprint, credential, '/etc/config-tools/config_docker activate');
-        await this.copyTo(session.targetHost, session.hostKeyFingerprint, credential, bundle.path, '/tmp/attraccess-wago-runtime.tar');
+        await this.updateProgress(session, 55, 'Transferring runtime', 'Uploading the signed runtime bundle to the controller.');
+        await this.copyTo(session.targetHost, session.hostKeyFingerprint, credential, bundle.path, '/tmp/attraccess-wago-runtime.tar', (percent) =>
+          this.reportTransferProgress(session, percent),
+        );
+        await this.updateProgress(session, 75, 'Creating enrollment', 'Provisioning a restricted MQTT credential for the initial connection.');
         const enrollment = await this.wago.createEnrollment(session.hardwareId, session.mqttServerId);
         if (!enrollment.password) throw new ConflictException('automatic restricted MQTT credential provisioning is required for secure commissioning');
-        const pairingCode = randomInt(100_000, 1_000_000).toString();
+        if (!session.pairingCode) throw new ConflictException('commissioning session has no automatic claim verifier');
         session.enrollmentId = enrollment.id;
-        session.pairingCode = pairingCode;
         enrollmentExpiresAt = enrollment.expiresAt;
+        await this.updateProgress(session, 82, 'Writing runtime configuration', 'Installing the controller identity and restricted connection settings.');
         await this.writeRuntimeEnvironment(
           session.targetHost,
           session.hostKeyFingerprint,
@@ -155,9 +170,10 @@ export class WagoCommissioningService implements OnModuleInit {
             `WAGO_MQTT_USERNAME=${enrollment.username}`,
             `WAGO_MQTT_PASSWORD=${enrollment.password}`,
             `WAGO_ENROLLMENT_SECRET=${enrollment.claimSecret}`,
-            `WAGO_PAIRING_CODE=${pairingCode}`,
+            `WAGO_PAIRING_CODE=${session.pairingCode}`,
           ].join('\n'),
         );
+        await this.updateProgress(session, 92, 'Starting runtime', 'Loading and starting the commissioning runtime on the controller.');
         await this.sudoRunScript(
           session.targetHost,
           session.hostKeyFingerprint,
@@ -171,6 +187,9 @@ export class WagoCommissioningService implements OnModuleInit {
       session.state = 'awaiting_discovery';
       session.enrollmentExpiresAt = enrollmentExpiresAt;
       session.failureReason = null;
+      session.progressPercent = 100;
+      session.progressStep = 'Waiting for controller connection';
+      session.progressDetail = 'Runtime delivered. Waiting for the controller to connect and complete its automatic claim.';
       return this.save(session, 'bootstrap_delivered');
     } catch (error) {
       if (session.enrollmentId !== null) {
@@ -179,7 +198,8 @@ export class WagoCommissioningService implements OnModuleInit {
         } catch (revocationError) {
           session.state = 'delivery_failed';
           session.enrollmentExpiresAt = null;
-          session.pairingCode = null;
+          session.progressStep = 'Delivery failed';
+          session.progressDetail = 'Credential revocation requires attention before delivery can be retried.';
           session.failureReason = `Secure delivery failed and bootstrap credential revocation requires attention: ${redact(
             revocationError instanceof Error ? revocationError.message : String(revocationError),
           )}`;
@@ -188,7 +208,8 @@ export class WagoCommissioningService implements OnModuleInit {
       }
       session.state = 'delivery_failed';
       session.enrollmentExpiresAt = null;
-      session.pairingCode = null;
+      session.progressStep = 'Delivery failed';
+      session.progressDetail = 'Review the error and retry automatic delivery when the controller is reachable.';
       session.failureReason = error instanceof Error ? redact(error.message) : 'Secure delivery failed';
       return this.save(session, 'delivery_failed');
     }
@@ -202,6 +223,72 @@ export class WagoCommissioningService implements OnModuleInit {
       session.state = 'revoked';
       session.failureReason = null;
       return this.save(session, 'revoked');
+    });
+  }
+
+  async remove(id: number): Promise<void> {
+    await this.withDeliveryLock(id, async () => {
+      const session = await this.sessions.findOneBy({ id });
+      if (!session) throw new NotFoundException('commissioning session not found');
+      if (session.enrollmentId !== null) {
+        await this.wago.revokeEnrollmentById(session.enrollmentId);
+        await this.wago.deleteEnrollmentById(session.enrollmentId);
+      }
+      await this.sessions.delete(id);
+    });
+  }
+
+  async removeByHardwareId(hardwareId: string): Promise<void> {
+    const sessions = await this.sessions.find({ where: { hardwareId } });
+    await Promise.all(sessions.map((session) => this.remove(session.id)));
+  }
+
+  async claimDiscovered(controller: { id: number; hardwareId: string; mqttServerId: number | null; enrollmentId: number | null }): Promise<void> {
+    if (!controller.mqttServerId || !controller.enrollmentId) return;
+    const session = await this.sessions.findOneBy({
+      hardwareId: controller.hardwareId,
+      mqttServerId: controller.mqttServerId,
+      enrollmentId: controller.enrollmentId,
+      state: 'awaiting_discovery',
+    });
+    if (!session) return;
+
+    await this.withDeliveryLock(session.id, async () => {
+      const current = await this.sessions.findOneBy({ id: session.id });
+      if (
+        !current ||
+        current.state !== 'awaiting_discovery' ||
+        current.hardwareId !== controller.hardwareId ||
+        current.mqttServerId !== controller.mqttServerId ||
+        current.enrollmentId !== controller.enrollmentId ||
+        !current.controllerName ||
+        !current.pairingCode
+      )
+        return;
+
+      current.state = 'awaiting_claim';
+      current.failureReason = null;
+      current.progressPercent = 100;
+      current.progressStep = 'Claiming controller';
+      current.progressDetail = 'Applying permanent credentials and the reserved controller name.';
+      await this.save(current, 'automatic_claim_started');
+      try {
+        await this.wago.claim(controller.id, current.controllerName, current.pairingCode, current.mqttServerId);
+        current.state = 'completed';
+        current.pairingCode = null;
+        current.failureReason = null;
+        current.progressStep = 'Commissioning complete';
+        current.progressDetail = 'The controller is claimed and ready to configure.';
+        await this.save(current, 'automatic_claim_completed');
+      } catch (error) {
+        current.state = 'awaiting_discovery';
+        current.failureReason = error instanceof Error ? redact(error.message) : 'Automatic claim failed';
+        await this.save(current, 'automatic_claim_failed');
+        return;
+      }
+      await this.retireSupersededSessions(current.hardwareId, current.id).catch((error) =>
+        this.context.logger?.warn(`Could not retire superseded WAGO commissioning sessions: ${String(error)}`),
+      );
     });
   }
 
@@ -260,21 +347,28 @@ export class WagoCommissioningService implements OnModuleInit {
     }
   }
 
-  private async copyTo(host: string, fingerprint: string, credential: TemporarySshCredential, source: string, destination: string): Promise<void> {
+  private async copyTo(
+    host: string,
+    fingerprint: string,
+    credential: TemporarySshCredential,
+    source: string,
+    destination: string,
+    onProgress: (percent: number) => void,
+  ): Promise<void> {
     const dir = await mkdtemp(join(tmpdir(), 'attraccess-cc100-'));
     const knownHosts = join(dir, 'known_hosts');
     const askPass = join(dir, 'askpass');
     try {
       await writeFile(knownHosts, await pinnedHostKey(host, fingerprint), { mode: 0o600 });
       await writeFile(askPass, '#!/bin/sh\nprintf \'%s\\n\' "$ATTRACCESS_SSH_PASSWORD"\n', { mode: 0o700 });
-      await runProcess(
-        'scp',
+      await uploadFile(
+        source,
         [
-          '-O', '-o', 'BatchMode=no', '-o', 'NumberOfPasswordPrompts=1', '-o', 'HostKeyAlgorithms=ssh-ed25519', '-o', 'StrictHostKeyChecking=yes', '-o', `UserKnownHostsFile=${knownHosts}`,
-          '-o', 'ConnectTimeout=15', source, `${credential.username}@${host}:${destination}`,
+          '-o', 'BatchMode=no', '-o', 'NumberOfPasswordPrompts=1', '-o', 'HostKeyAlgorithms=ssh-ed25519', '-o', 'StrictHostKeyChecking=yes', '-o', `UserKnownHostsFile=${knownHosts}`,
+          '-o', 'ConnectTimeout=15', `${credential.username}@${host}`, `mkdir -p ${shellQuote(dirname(destination))} && cat > ${shellQuote(destination)}`,
         ],
-        undefined,
         { SSH_ASKPASS: askPass, SSH_ASKPASS_REQUIRE: 'force', DISPLAY: 'attraccess', ATTRACCESS_SSH_PASSWORD: credential.password },
+        onProgress,
       );
     } finally {
       await rm(dir, { recursive: true, force: true });
@@ -287,6 +381,80 @@ export class WagoCommissioningService implements OnModuleInit {
     session.auditLog = JSON.stringify(audit.slice(-50));
     session.updatedAt = new Date().toISOString();
     return this.sessions.save(session);
+  }
+
+  private async updateProgress(
+    session: WagoCommissioningSession,
+    percent: number,
+    step: string,
+    detail: string,
+  ): Promise<void> {
+    session.progressPercent = percent;
+    session.progressStep = step;
+    session.progressDetail = detail;
+    await this.save(session, `progress: ${step}`);
+  }
+
+  private reportTransferProgress(session: WagoCommissioningSession, percent: number): void {
+    const progressPercent = 55 + Math.round((percent * 15) / 100);
+    session.progressPercent = progressPercent;
+    session.progressStep = 'Transferring runtime';
+    session.progressDetail = `Uploading signed runtime bundle: ${percent}%.`;
+    void this.sessions
+      .update(session.id, {
+        progressPercent,
+        progressStep: session.progressStep,
+        progressDetail: session.progressDetail,
+        updatedAt: new Date().toISOString(),
+      })
+      .catch((error) => this.context.logger?.warn(`Could not update WAGO runtime transfer progress: ${String(error)}`));
+  }
+
+  private async resumePendingDeliveries(): Promise<void> {
+    const sessions = await this.sessions.find({ where: [{ state: 'awaiting_delivery' }, { state: 'delivering' }] });
+    for (const session of sessions) void this.deliverInBackground(session.id);
+  }
+
+  private async reconcileCompletedSessions(): Promise<void> {
+    const sessions = await this.sessions.find({ where: { state: 'completed' } });
+    await Promise.all(sessions.map((session) => this.retireSupersededSessions(session.hardwareId, session.id)));
+  }
+
+  private async retireSupersededSessions(hardwareId: string, completedSessionId: number): Promise<void> {
+    const sessions = await this.sessions.find({ where: { hardwareId } });
+    await Promise.all(
+      sessions
+        .filter((session) => session.id !== completedSessionId && session.state !== 'completed' && session.state !== 'revoked')
+        .map((session) =>
+          this.withDeliveryLock(session.id, async () => {
+            const current = await this.sessions.findOneBy({ id: session.id });
+            if (!current || current.state === 'completed' || current.state === 'revoked') return;
+            current.state = 'revoked';
+            current.failureReason = null;
+            current.progressStep = 'Superseded by completed commissioning';
+            current.progressDetail = 'A newer commissioning session claimed this controller.';
+            await this.save(current, 'superseded_by_completed_session');
+          }),
+        ),
+    );
+  }
+
+  private async deliverInBackground(id: number): Promise<void> {
+    try {
+      await this.deliver(id);
+    } catch (error) {
+      try {
+        const session = await this.sessions.findOneBy({ id });
+        if (!session || !['awaiting_delivery', 'delivering'].includes(session.state)) return;
+        session.state = 'delivery_failed';
+        session.progressStep = 'Delivery failed';
+        session.progressDetail = 'Review the error and retry automatic delivery when the controller is reachable.';
+        session.failureReason = error instanceof Error ? redact(error.message) : 'Secure delivery failed';
+        await this.save(session, 'delivery_failed');
+      } catch (reportingError) {
+        this.context.logger?.warn(`Could not record WAGO commissioning delivery failure: ${String(reportingError)}`);
+      }
+    }
   }
 
   private async withDeliveryLock<T>(id: number, operation: () => Promise<T>): Promise<T> {
@@ -327,7 +495,7 @@ async function pinnedHostKey(host: string, expectedFingerprint: string): Promise
   const knownHosts = join(dir, 'known_hosts');
   try {
     await writeFile(knownHosts, `${key}\n`, { mode: 0o600 });
-    if ((await fingerprintFor(knownHosts)) !== expectedFingerprint) throw new ConflictException('controller SSH host key changed after identity confirmation');
+    if ((await fingerprintFor(knownHosts)) !== expectedFingerprint) throw new ConflictException('controller SSH host key changed after automatic identity verification');
     return `${key}\n`;
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -357,6 +525,50 @@ function runProcess(command: string, args: string[], input?: string | Buffer, en
       else reject(new Error(stderr || `${command} exited with status ${code}`));
     });
     child.stdin.end(input);
+  });
+}
+
+async function uploadFile(
+  source: string,
+  args: string[],
+  environment: Record<string, string>,
+  onProgress: (percent: number) => void,
+): Promise<void> {
+  const size = (await stat(source)).size;
+  return new Promise((resolve, reject) => {
+    const child = spawn('ssh', args, { env: { ...process.env, ...environment }, stdio: ['pipe', 'ignore', 'pipe'] });
+    const stream = createReadStream(source);
+    let stderr = '';
+    let transferred = 0;
+    let lastPercent = -1;
+    let settled = false;
+    const timer = setTimeout(() => child.kill(), SSH_TIMEOUT_MS);
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      stream.destroy();
+      if (error) reject(error);
+      else resolve();
+    };
+    child.stdin.on('error', () => undefined);
+    child.stderr.on('data', (chunk) => (stderr += chunk));
+    child.on('error', finish);
+    child.on('close', (code) => finish(code === 0 ? undefined : new Error(stderr || `ssh exited with status ${code}`)));
+    stream.on('error', (error) => {
+      child.kill();
+      finish(error);
+    });
+    stream.on('data', (chunk: Buffer) => {
+      transferred += chunk.length;
+      const percent = size ? Math.floor((transferred * 100) / size) : 100;
+      if (percent === 100 || percent - lastPercent >= 5) {
+        lastPercent = percent;
+        onProgress(percent);
+      }
+    });
+    onProgress(0);
+    stream.pipe(child.stdin);
   });
 }
 

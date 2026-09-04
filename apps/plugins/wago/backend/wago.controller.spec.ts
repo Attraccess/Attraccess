@@ -5,7 +5,7 @@ import type { WagoService } from './wago.service';
 
 describe('WagoControllerApi', () => {
   const service = { previewPreset: jest.fn(), applyPreset: jest.fn() } as unknown as WagoService;
-  const commissioning = { list: jest.fn() } as unknown as WagoCommissioningService;
+  const commissioning = { list: jest.fn(), create: jest.fn() } as unknown as WagoCommissioningService;
   const controller = new WagoControllerApi(service, commissioning);
 
   it.each([
@@ -19,5 +19,11 @@ describe('WagoControllerApi', () => {
     controller.commissioningSessions('20', '40');
 
     expect(commissioning.list).toHaveBeenCalledWith(20, 40);
+  });
+
+  it('requires automatic-claim details when creating a commissioning session', () => {
+    expect(() => controller.createCommissioningSession({ mqttServerId: 1, targetHost: '192.168.1.10' })).toThrow(
+      new BadRequestException('controller name is required'),
+    );
   });
 });
