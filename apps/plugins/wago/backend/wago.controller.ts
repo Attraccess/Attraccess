@@ -4,7 +4,7 @@ import { WagoService } from './wago.service';
 import { WagoCommissioningService } from './wago-commissioning.service';
 import type { WagoPresetApplication } from './configuration';
 
-@Auth('system.settings.manage')
+@Auth('resources.update')
 @Controller('wago')
 export class WagoControllerApi {
   constructor(
@@ -14,9 +14,11 @@ export class WagoControllerApi {
   @Get('controllers') list() {
     return this.wago.list();
   }
+  @Auth('system.settings.manage')
   @Get('settings') settings() {
     return this.wago.getSettings();
   }
+  @Auth('system.settings.manage')
   @Post('settings') setSettings(@Body() body: { defaultMqttServerId?: number | null; operationalPrefix?: string }) {
     return this.wago.setSettings(body?.defaultMqttServerId, body?.operationalPrefix);
   }
@@ -60,6 +62,7 @@ export class WagoControllerApi {
   @Post('commissioning/sessions/:id/revoke') revokeCommissioningSession(@Param('id', ParseIntPipe) id: number) {
     return this.commissioning.revoke(id);
   }
+  @Auth('system.settings.manage')
   @Delete('commissioning/sessions/:id') async removeCommissioningSession(@Param('id', ParseIntPipe) id: number) {
     await this.commissioning.remove(id);
   }

@@ -130,13 +130,13 @@ export class EncryptionService {
   }
 
   encryptForPlugin(pluginId: string, plaintext: string): string {
-    if (!pluginId || !/^[a-z0-9-]+$/.test(pluginId)) throw new Error('plugin ID is required for encryption');
+    if (!pluginId || !/^[A-Za-z0-9_-]+$/.test(pluginId)) throw new Error('plugin ID is required for encryption');
     if (typeof plaintext !== 'string') throw new TypeError('encrypt: plaintext must be a string');
     return encryptWithKey(this.getPluginEncryptionKey(pluginId), plaintext);
   }
 
   decryptForPlugin(pluginId: string, token: string): string {
-    if (!pluginId || !/^[a-z0-9-]+$/.test(pluginId)) throw new Error('plugin ID is required for decryption');
+    if (!pluginId || !/^[A-Za-z0-9_-]+$/.test(pluginId)) throw new Error('plugin ID is required for decryption');
     if (typeof token !== 'string' || token.length === 0) throw new TypeError('decrypt: token must be a non-empty string');
     return decryptWithKey(this.getPluginEncryptionKey(pluginId), token);
   }
