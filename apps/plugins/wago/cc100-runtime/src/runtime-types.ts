@@ -19,7 +19,7 @@ export type Snapshot = {
 export type ValidationError = { path: string; code: string; message: string };
 
 export type RuntimeState = {
-  credentials?: { username: string; password: string };
+  credentials?: { username: string; password: string; prefix?: string };
   accepted?: { revision: number; contentHash: string; snapshot: Snapshot };
   outputs: Record<string, boolean>;
   commandIds: string[];

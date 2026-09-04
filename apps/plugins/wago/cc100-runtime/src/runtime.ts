@@ -2,7 +2,6 @@ import { hash, validateDesired } from './configuration';
 import { OutputController } from './output-controller';
 import {
   type DeviceAdapter,
-  type DiscoveryClaim,
   type RuntimeState,
   type Snapshot,
   type StateStore,
@@ -13,6 +12,8 @@ import {
 export { PROTOCOL_VERSION, hash, validateDesired, validateSnapshot } from './configuration';
 export { JsonStateStore } from './state-store';
 export type { DeviceAdapter, RuntimeState, Snapshot, Transport, ValidationError } from './runtime-types';
+
+export type DiscoveryClaim = { username: string; password: string; prefix?: string };
 
 export const CAPABILITIES = [
   'claim',
@@ -61,7 +62,7 @@ export class WagoRuntime {
     await this.publishState();
   }
 
-  async receiveClaim(credentials: { username: string; password: string }): Promise<void> {
+  async receiveClaim(credentials: DiscoveryClaim): Promise<void> {
     this.state.credentials = credentials;
     await this.options.store.save(this.state);
   }
@@ -260,6 +261,7 @@ export class WagoRuntime {
   async publishHeartbeat(): Promise<void> {
     await this.options.transport.publish(this.topic('heartbeat'), {
       hardwareId: this.options.hardwareId,
+      pairingCode: this.options.pairingCode,
       protocolVersion: '1.0.0',
       runtimeVersion: '0.1.0',
       capabilities: CAPABILITIES,
