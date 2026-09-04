@@ -32,7 +32,9 @@ interface UseNodeCatalogResult {
 
 const STORAGE_KEY_COLLAPSED = 'nodeCatalog.collapsed';
 const STORAGE_KEY_EXPANDED_PREFIX = 'nodeCatalog.expanded.';
-const LEGACY_EXPANDED_DOMAINS: Partial<Record<string, string[]>> = {
+const STORAGE_KEY_VERSION = 'nodeCatalog.storageVersion';
+const STORAGE_VERSION = '2';
+const LEGACY_EXPANDED_DOMAINS: Record<string, string[]> = {
   'usage-sessions': ['resource', 'triggers'],
   'operation-activity': ['resource', 'triggers'],
   billing: ['resource'],
@@ -43,6 +45,31 @@ const LEGACY_EXPANDED_DOMAINS: Partial<Record<string, string[]>> = {
   'web-requests': ['http'],
   'flow-control': ['manual', 'logic', 'triggers'],
 };
+
+function migrateExpandedDomains(domains: string[]): void {
+  if (typeof window === 'undefined' || window.localStorage.getItem(STORAGE_KEY_VERSION) === STORAGE_VERSION) return;
+
+  const domainMappings = {
+    ...LEGACY_EXPANDED_DOMAINS,
+    ...Object.fromEntries(domains.filter((domain) => domain.startsWith('plugin.')).map((domain) => [domain, ['triggers']])),
+  };
+  for (const [domain, legacyDomains] of Object.entries(domainMappings)) {
+    const key = STORAGE_KEY_EXPANDED_PREFIX + domain;
+    if (window.localStorage.getItem(key) !== null) continue;
+
+    const legacyKeys = legacyDomains.map((legacy) => STORAGE_KEY_EXPANDED_PREFIX + legacy);
+    if (legacyKeys.some((legacyKey) => window.localStorage.getItem(legacyKey) === 'false')) {
+      window.localStorage.setItem(key, 'false');
+    }
+  }
+
+  for (const legacyDomains of Object.values(LEGACY_EXPANDED_DOMAINS)) {
+    for (const domain of legacyDomains) {
+      window.localStorage.removeItem(STORAGE_KEY_EXPANDED_PREFIX + domain);
+    }
+  }
+  window.localStorage.setItem(STORAGE_KEY_VERSION, STORAGE_VERSION);
+}
 
 function getDirection(schema: ResourceFlowNodeSchemaDto): Direction {
   if (schema.isOutput) return 'up';
@@ -65,11 +92,7 @@ function writeBool(key: string, value: boolean): void {
 }
 
 function readDomainExpanded(domain: string): boolean {
-  const key = STORAGE_KEY_EXPANDED_PREFIX + domain;
-  if (typeof window === 'undefined' || window.localStorage.getItem(key) !== null) return readBool(key, true);
-  // A collapsed legacy category stays collapsed when it is renamed or split.
-  const legacyDomains = LEGACY_EXPANDED_DOMAINS[domain] ?? (domain.startsWith('plugin.') ? ['triggers'] : []);
-  return !legacyDomains.some((legacy) => !readBool(STORAGE_KEY_EXPANDED_PREFIX + legacy, true));
+  return readBool(STORAGE_KEY_EXPANDED_PREFIX + domain, true);
 }
 
 function subscribeToStorage(callback: () => void): () => void {
@@ -124,6 +147,7 @@ export function useNodeCatalog({ resourceId }: UseNodeCatalogArgs): UseNodeCatal
   }, [schemas]);
 
   const allDomains = useMemo(() => groups.map((g) => g.domain), [groups]);
+  migrateExpandedDomains(allDomains);
 
   const [collapsed, setCollapsed] = useStoredBool(STORAGE_KEY_COLLAPSED, false);
 
