@@ -44,6 +44,7 @@ describe('WagoService', () => {
             null,
         ),
       save: jest.fn().mockImplementation(async (value) => value),
+      delete: jest.fn(),
     };
     const enrollmentQuery = {
       where: jest.fn().mockReturnThis(),
@@ -55,6 +56,7 @@ describe('WagoService', () => {
       findOneBy: jest.fn(),
       create: jest.fn((value) => value),
       save: jest.fn().mockImplementation(async (value) => value),
+      delete: jest.fn(),
       createQueryBuilder: jest.fn().mockReturnValue(enrollmentQuery),
     };
     const settingsRepository = {
@@ -67,12 +69,14 @@ describe('WagoService', () => {
       findOneBy: jest.fn().mockResolvedValue(null),
       create: jest.fn((value) => value),
       save: jest.fn().mockImplementation(async (value) => value),
+      delete: jest.fn(),
     };
     const revisionRepository = {
       find: jest.fn().mockResolvedValue([]),
       findOneBy: jest.fn().mockResolvedValue(null),
       create: jest.fn((value) => value),
       save: jest.fn().mockImplementation(async (value) => value),
+      delete: jest.fn(),
     };
     const settingsQuery = {
       insert: jest.fn().mockReturnThis(),
@@ -123,6 +127,25 @@ describe('WagoService', () => {
     };
   }
 
+  it('revokes a claimed controller before deleting its local records', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const, enrollmentId: null };
+    const { service, context, controllerRepository, draftRepository, revisionRepository } = createService([claimed]);
+    const revoke = jest.fn().mockResolvedValue(undefined);
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({ revoke });
+
+    await expect(service.remove(claimed.id)).resolves.toBe(claimed.hardwareId);
+
+    expect(revoke).toHaveBeenCalledWith({
+      mqttServerId: claimed.mqttServerId,
+      identity: `wago-controller-${claimed.hardwareId}`,
+      username: `wago-controller-${claimed.hardwareId}`,
+      vhost: '/',
+    });
+    expect(draftRepository.delete).toHaveBeenCalledWith({ controllerId: claimed.id });
+    expect(revisionRepository.delete).toHaveBeenCalledWith({ controllerId: claimed.id });
+    expect(controllerRepository.delete).toHaveBeenCalledWith(claimed.id);
+  });
+
   it('does not expose physical-verification secrets in controller listings', async () => {
     const { service } = createService();
 
@@ -147,7 +170,7 @@ describe('WagoService', () => {
 
     expect(context.getRepository).not.toHaveBeenCalled();
 
-    await service.onModuleInit();
+    await service.onApplicationBootstrap();
 
     expect(context.getRepository).toHaveBeenCalledTimes(5);
   });
@@ -197,7 +220,7 @@ describe('WagoService', () => {
     const { service, context } = createService([], [], 2);
     (context.mqtt.subscribe as jest.Mock).mockRejectedValue(new Error('broker unavailable'));
 
-    await expect(service.onModuleInit()).resolves.toBeUndefined();
+    await expect(service.onApplicationBootstrap()).resolves.toBeUndefined();
 
     expect(context.logger.warn).toHaveBeenCalledWith(
       'Could not establish WAGO MQTT subscriptions during startup: Error: broker unavailable',
@@ -209,7 +232,7 @@ describe('WagoService', () => {
     const { service, context, settingsRepository } = createService([], [], 2);
     settingsRepository.findOneBy.mockRejectedValue(new Error('settings unavailable'));
 
-    await expect(service.onModuleInit()).rejects.toThrow('settings unavailable');
+    await expect(service.onApplicationBootstrap()).rejects.toThrow('settings unavailable');
 
     expect(context.logger.warn).not.toHaveBeenCalled();
     service.onModuleDestroy();
@@ -410,6 +433,38 @@ describe('WagoService', () => {
     );
   });
 
+  it('revokes bootstrap credentials only after the controller acknowledges durable claim storage', async () => {
+    const enrollment = {
+      id: 3,
+      mqttServerId: 2,
+      hardwareId: 'cc100-01',
+      secretHash: 'secret-hash',
+      identity: 'wago-enrollment-test',
+      createdAt: '',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      revokedAt: null,
+      consumedAt: null,
+    };
+    const candidate = { ...controller(), fingerprint: 'fingerprint' };
+    const { service, context, enrollmentRepository } = createService([candidate], [enrollment]);
+    const revoke = jest.fn().mockResolvedValue(undefined);
+    (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = jest.fn().mockResolvedValue({});
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({
+      provision: jest.fn().mockResolvedValue({ username: 'wago-controller-cc100-01', password: 'secret' }),
+      revoke,
+    });
+    enrollmentRepository.findOneBy.mockResolvedValue(enrollment);
+
+    await service.claim(candidate.id, 'Controller', 'fingerprint');
+
+    expect(revoke).not.toHaveBeenCalled();
+    const claimPayload = JSON.parse((context.mqtt.publish as jest.Mock).mock.calls[0][2]) as { acknowledgementToken: string };
+    const acknowledgementHandler = (context.mqtt.subscribe as jest.Mock).mock.calls[0][2] as (message: { payload: Buffer }) => Promise<void>;
+    await acknowledgementHandler({ payload: Buffer.from(JSON.stringify({ acknowledgementToken: claimPayload.acknowledgementToken })) });
+
+    expect(revoke).toHaveBeenCalledWith(expect.objectContaining({ identity: enrollment.identity }));
+  });
+
   it('records structured controller rejection without changing the published snapshot', async () => {
     const { service, revisionRepository } = createService([{ ...controller(), trustState: 'claimed' as const }]);
     const revision = {
@@ -541,7 +596,7 @@ describe('WagoService', () => {
         controllerId === first.id ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve(),
       );
 
-    await service.onModuleInit();
+    await service.onApplicationBootstrap();
 
     const reportSubscriptions = (context.mqtt.subscribe as jest.Mock).mock.calls.filter(([, topic]) =>
       topic.endsWith('/configuration/reported'),
@@ -575,7 +630,7 @@ describe('WagoService', () => {
       return processed.length === 1 ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve();
     });
 
-    await service.onModuleInit();
+    await service.onApplicationBootstrap();
 
     const reportSubscription = (context.mqtt.subscribe as jest.Mock).mock.calls.find(([, topic]) =>
       topic.endsWith('/configuration/reported'),
@@ -605,7 +660,7 @@ describe('WagoService', () => {
       return processed.length === 1 ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve();
     });
 
-    await service.onModuleInit();
+    await service.onApplicationBootstrap();
 
     const reportSubscription = (context.mqtt.subscribe as jest.Mock).mock.calls.find(([, topic]) =>
       topic.endsWith('/configuration/reported'),
@@ -793,7 +848,7 @@ describe('WagoService', () => {
     await expect(service.createEnrollment(hardwareId)).rejects.toThrow('without MQTT separators or wildcards');
   });
 
-  it('keeps permanent credentials after a post-delivery claim failure', async () => {
+  it('leaves bootstrap credentials available until expiry after a post-delivery claim failure', async () => {
     const enrollment = {
       id: 3,
       mqttServerId: 2,
@@ -821,8 +876,7 @@ describe('WagoService', () => {
     await expect(service.claim(candidate.id, 'Controller', 'fingerprint')).rejects.toThrow('cleanup failed');
 
     expect(controllerRepository.save).toHaveBeenCalledWith(expect.objectContaining({ trustState: 'claimed' }));
-    expect(revoke).toHaveBeenCalledTimes(1);
-    expect(revoke).toHaveBeenCalledWith(expect.objectContaining({ identity: enrollment.identity }));
+    expect(revoke).not.toHaveBeenCalled();
   });
 
   it('preserves the claim failure when restoring the controller state fails', async () => {

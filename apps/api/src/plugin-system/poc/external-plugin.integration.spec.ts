@@ -99,6 +99,16 @@ async function bootAndPing(artifactPath: string): Promise<PocPongPayload> {
       pluginEvents.emit(event, payload);
     },
     getMqttServerConfig: () => Promise.resolve(null),
+    getMqttCredentialProvisioning: () => ({
+      availableProviders: async () => [],
+      provision: async () => ({}),
+      revoke: async () => undefined,
+    }),
+    flows: { trigger: async () => undefined },
+    secrets: {
+      encrypt: (value) => `encrypted:${value}`,
+      decrypt: (value) => value.replace('encrypted:', ''),
+    },
   };
 
   const plugin = loadDefaultExport(artifactPath);

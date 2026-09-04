@@ -7,7 +7,7 @@
   "hardware": {
     "model": "751-9301",
     "platform": "linux/arm/v7",
-    "firmwareBaseline": "WAGO CC100 Linux firmware with Docker"
+    "firmwareBaseline": "31"
   },
   "capabilities": [
     "claim",

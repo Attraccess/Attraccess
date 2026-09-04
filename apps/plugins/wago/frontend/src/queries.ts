@@ -1,19 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   claimController,
-  createEnrollment,
-  getEnrollmentCredentialSupport,
+  confirmCommissioningHostKey,
+  createCommissioningSession,
+  deliverCommissioningSession,
   applyPreset,
   getSettings,
   getDraft,
   listPresets,
   listControllers,
+  listCommissioningSessions,
   listMqttServers,
   previewPreset,
+  removeCommissioningSession,
+  removeController,
+  revokeCommissioningSession,
   saveDraft,
   setSettings,
   type ClaimControllerInput,
-  type CreateEnrollmentInput,
+  type CreateCommissioningSessionInput,
   type WagoPresetApplication,
 } from './api';
 
@@ -21,10 +26,9 @@ const queryKeys = {
   controllers: ['wago', 'controllers'] as const,
   settings: ['wago', 'settings'] as const,
   mqttServers: ['mqtt', 'servers'] as const,
-  enrollmentCredentialSupport: (mqttServerId: number) =>
-    ['wago', 'enrollment-credential-support', mqttServerId] as const,
   draft: (controllerId: number) => ['wago', 'configuration-draft', controllerId] as const,
   presets: ['wago', 'configuration-presets'] as const,
+  commissioningSessions: ['wago', 'commissioning-sessions'] as const,
 };
 
 export function useControllersQuery() {
@@ -32,6 +36,14 @@ export function useControllersQuery() {
     queryKey: queryKeys.controllers,
     queryFn: listControllers,
     refetchInterval: 10_000,
+  });
+}
+
+export function useCommissioningSessionsQuery() {
+  return useQuery({
+    queryKey: queryKeys.commissioningSessions,
+    queryFn: () => listCommissioningSessions(),
+    refetchInterval: 2_000,
   });
 }
 
@@ -71,15 +83,62 @@ export function useClaimControllerMutation() {
   });
 }
 
-export function useCreateEnrollmentMutation() {
-  return useMutation({ mutationFn: (input: CreateEnrollmentInput) => createEnrollment(input) });
+export function useCreateCommissioningSessionMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateCommissioningSessionInput) => createCommissioningSession(input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.commissioningSessions }),
+  });
 }
 
-export function useEnrollmentCredentialSupportQuery(mqttServerId: number | null) {
-  return useQuery({
-    queryKey: queryKeys.enrollmentCredentialSupport(mqttServerId ?? 0),
-    queryFn: () => getEnrollmentCredentialSupport(mqttServerId ?? 0),
-    enabled: mqttServerId !== null,
+export function useConfirmCommissioningHostKeyMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, hostKeyFingerprint }: { id: number; hostKeyFingerprint: string }) => confirmCommissioningHostKey(id, hostKeyFingerprint),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.commissioningSessions }),
+  });
+}
+
+export function useDeliverCommissioningSessionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, ...input }: Parameters<typeof deliverCommissioningSession>[1] & { id: number }) =>
+      deliverCommissioningSession(id, input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.controllers });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.commissioningSessions });
+    },
+  });
+}
+
+export function useRevokeCommissioningSessionMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: revokeCommissioningSession,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.commissioningSessions }),
+  });
+}
+
+export function useRemoveCommissioningSessionMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: removeCommissioningSession,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.controllers });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.commissioningSessions });
+    },
+  });
+}
+
+export function useRemoveControllerMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: removeController,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.controllers });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.commissioningSessions });
+    },
   });
 }
 

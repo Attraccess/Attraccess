@@ -16,11 +16,11 @@
     "build-backend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/backend/**/*", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
+        "inputs": ["{projectRoot}/backend/**/*", "{projectRoot}/cc100-runtime/signing-public-key.pub", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/wago",
-        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js"
+        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js && cp cc100-runtime/signing-public-key.pub package/dist/signing-public-key.pub"
       }
     },
     "build-frontend": {

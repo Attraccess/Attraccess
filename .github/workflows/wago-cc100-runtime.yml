@@ -58,8 +58,35 @@ jobs:
         run: |
           docker buildx imagetools inspect "$IMAGE" --raw | jq -e '[.manifests[] | select(.platform.os == "linux" and .platform.architecture == "arm" and .platform.variant == "v7")] | length == 1'
           printf '%s@%s\n' "$IMAGE" "$DIGEST" | tee wago-cc100-runtime-image.txt
+      - name: Create signed offline runtime bundle
+        if: github.event_name == 'push'
+        env:
+          IMAGE: ghcr.io/attraccess/wago-cc100-runtime:${{ github.sha }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+          WAGO_RUNTIME_SIGNING_PRIVATE_KEY: ${{ secrets.WAGO_RUNTIME_SIGNING_PRIVATE_KEY }}
+        run: |
+          test -n "$WAGO_RUNTIME_SIGNING_PRIVATE_KEY"
+          docker pull --platform linux/arm/v7 "$IMAGE@$DIGEST"
+          docker tag "$IMAGE@$DIGEST" "$IMAGE"
+          docker save "$IMAGE" -o image.tar
+          printf '%s@%s\n' "$IMAGE" "$DIGEST" > image-reference
+          tar --mtime='@0' -cf wago-cc100-runtime.tar image.tar image-reference
+          rm -f image.tar image-reference
+          sha256sum wago-cc100-runtime.tar > wago-cc100-runtime.tar.sha256
+          umask 077
+          printf '%s\n' "$WAGO_RUNTIME_SIGNING_PRIVATE_KEY" > signing-private-key
+          ssh-keygen -Y sign -f signing-private-key -n attraccess-wago-runtime wago-cc100-runtime.tar
+          rm -f signing-private-key
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'push'
         with:
           name: wago-cc100-runtime-image
           path: wago-cc100-runtime-image.txt
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push'
+        with:
+          name: wago-cc100-runtime-bundle
+          path: |
+            wago-cc100-runtime.tar
+            wago-cc100-runtime.tar.sha256
+            wago-cc100-runtime.tar.sig

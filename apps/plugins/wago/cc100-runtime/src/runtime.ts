@@ -131,7 +131,7 @@ export class WagoRuntime {
       return undefined;
     }
     if (!claim || typeof claim !== 'object') return undefined;
-    const { username, password, configuration } = claim as Record<string, unknown>;
+    const { username, password, configuration, acknowledgementToken } = claim as Record<string, unknown>;
     if (typeof username !== 'string' || !username || typeof password !== 'string' || !password) return undefined;
     const namespace =
       configuration && typeof configuration === 'object'
@@ -145,6 +145,8 @@ export class WagoRuntime {
     };
     this.state = await this.options.store.load();
     await this.receiveClaim(credentials);
+    if (typeof acknowledgementToken === 'string' && acknowledgementToken)
+      await this.options.transport.publish(`${this.discoveryClaimTopic()}/ack`, { acknowledgementToken });
     return credentials;
   }
 

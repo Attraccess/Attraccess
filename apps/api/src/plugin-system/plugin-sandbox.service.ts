@@ -6,6 +6,7 @@ import {
   MqttCredentialProvisioningHostProvider,
   PluginContext,
   PluginFlowsContext,
+  PluginSecretsContext,
   PluginPermission,
   PluginPermissionError,
   SystemEvent,
@@ -166,6 +167,10 @@ export class PluginSandboxService {
       get flows(): PluginFlowsContext {
         require(PluginPermission.TRIGGER_FLOWS, 'flows.trigger()');
         return base.flows;
+      },
+      get secrets(): PluginSecretsContext {
+        require(PluginPermission.MANAGE_SECRETS, 'secrets');
+        return base.secrets;
       },
     };
   }

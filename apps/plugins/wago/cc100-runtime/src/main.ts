@@ -31,8 +31,10 @@ async function start(): Promise<void> {
 
 function connectRuntime(credentials?: DiscoveryClaim): void {
   const prefix = credentials?.prefix ?? defaultPrefix;
+  const username = credentials?.username ?? required('WAGO_MQTT_USERNAME');
   client = connect(mqttUrl, {
-    username: credentials?.username ?? required('WAGO_MQTT_USERNAME'),
+    clientId: username,
+    username,
     password: credentials?.password ?? required('WAGO_MQTT_PASSWORD'),
   });
   const activeClient = client;
