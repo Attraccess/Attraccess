@@ -10,12 +10,12 @@ import en from './en.json';
 import { CsvExportDrawerContent, ColumnDefinition } from '../export-drawer';
 import { useQuery } from '@tanstack/react-query';
 import { getBaseUrl } from '../../../api';
-
-interface OperatingDurationSummary {
-  operatingDataAvailable: boolean;
-  isProvisional: boolean;
-  attributions: Array<{ usageId: number; durationMs: number }>;
-}
+import {
+  attributedDurationByResourceAndUsage,
+  mergeOperatingDurationSummaries,
+  operatingDurationWindows,
+  type OperatingDurationSummary,
+} from './operating-duration';
 
 const RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST = 100;
 
@@ -23,17 +23,6 @@ function durationMsForSession(item: ResourceUsage, asOf: Date): number {
   const now = new Date();
   const end = Math.min(new Date(item.endTime ?? now).getTime(), asOf.getTime(), now.getTime());
   return end - new Date(item.startTime).getTime();
-}
-
-function attributedOperatingDurationMs(summary: OperatingDurationSummary | undefined, usageId: number): number | '' {
-  if (!summary?.operatingDataAvailable) {
-    return '';
-  }
-
-  return summary.attributions.reduce(
-    (durationMs, attribution) => durationMs + (attribution.usageId === usageId ? attribution.durationMs : 0),
-    0,
-  );
 }
 
 export function ResourceUsageExport(props: ExportProps) {
@@ -66,29 +55,39 @@ export function ResourceUsageExport(props: ExportProps) {
     () => [...new Set(resourceUsageExport.map((usage) => usage.resourceId))],
     [resourceUsageExport],
   );
+  const operatingDurationRanges = useMemo(
+    () => operatingDurationWindows(props.start, props.end),
+    [props.start, props.end],
+  );
   const { data: operatingDurations, status: operatingDurationsStatus } = useQuery({
     queryKey: ['resource-operating-durations', resourceIds, props.start, props.end],
     queryFn: async ({ signal }) => {
       const operatingDurations: Record<number, OperatingDurationSummary> = {};
       for (let index = 0; index < resourceIds.length; index += RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST) {
-        const response = await fetch(`${getBaseUrl()}/api/analytics/resource-operating-durations`, {
-          method: 'POST',
-          credentials: 'include',
-          signal,
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            resourceIds: resourceIds.slice(index, index + RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST),
-            start: props.start.toISOString(),
-            end: props.end.toISOString(),
-          }),
-        });
-        if (!response.ok) throw new Error('Failed to load operating durations');
-        Object.assign(operatingDurations, await response.json());
+        for (const range of operatingDurationRanges) {
+          const response = await fetch(`${getBaseUrl()}/api/analytics/resource-operating-durations`, {
+            method: 'POST',
+            credentials: 'include',
+            signal,
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              resourceIds: resourceIds.slice(index, index + RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST),
+              start: range.start.toISOString(),
+              end: range.end.toISOString(),
+            }),
+          });
+          if (!response.ok) throw new Error('Failed to load operating durations');
+          mergeOperatingDurationSummaries(operatingDurations, await response.json());
+        }
       }
       return operatingDurations;
     },
     enabled: resourceIds.length > 0 && !isFetchingAllPages,
   });
+  const attributedDurations = useMemo(
+    () => attributedDurationByResourceAndUsage(operatingDurations),
+    [operatingDurations],
+  );
 
   const formatDateTimeFull = useDateTimeFormatter({ showDate: true, showTime: true, showSeconds: true });
   const formatUsageDuration = useNumberFormatter();
@@ -180,7 +179,10 @@ export function ResourceUsageExport(props: ExportProps) {
       {
         label: t('columns.operatingDurationMs'),
         key: 'operatingDurationMs',
-        getter: (item) => attributedOperatingDurationMs(operatingDurations?.[item.resourceId], item.id),
+        getter: (item) =>
+          operatingDurations?.[item.resourceId]?.operatingDataAvailable
+            ? attributedDurations.get(item.resourceId)?.get(item.id) ?? 0
+            : '',
         selectedByDefault: true,
       },
       {
@@ -214,7 +216,7 @@ export function ResourceUsageExport(props: ExportProps) {
         getter: (item) => item.supervisorUser?.username ?? '',
       },
     ] as ColumnDefinition<ResourceUsage>[];
-  }, [formatUsageDuration, formatDateTimeFull, operatingDurations, props.end, t]);
+  }, [attributedDurations, formatUsageDuration, formatDateTimeFull, operatingDurations, props.end, t]);
 
   // TODO: handle grouping by user and resource
 
