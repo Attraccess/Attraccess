@@ -73,6 +73,25 @@ describe('WagoRuntime', () => {
     }));
   });
 
+  it('rejects large fractional measurements', async () => {
+    const metered: Snapshot = {
+      version: 1,
+      physicalPoints: [{ id: 'meter', hardwareProfile: '751-9301', channel: 0 }],
+      logicalChannels: [{ id: 'power', physicalPointId: 'meter', profile: 'meter', capabilities: ['measurement'], disconnectPolicy: { mode: 'hold' }, measurement: { unit: 'watt', scale: 1, offset: 0 } }],
+    };
+    device.values.set('751-9301:0', 1_000_000_000_000_000.25);
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(metered), snapshot: metered });
+    await runtime.publishMeasurements();
+
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+      payload: expect.objectContaining({ channelId: 'power', code: 'invalid_measurement_transform' }),
+    }));
+    expect(transport.published).not.toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/measurements',
+    }));
+  });
+
   it('uses a new measurement stream identity after a runtime restart', async () => {
     const metered: Snapshot = {
       version: 1,
