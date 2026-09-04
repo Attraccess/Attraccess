@@ -9,13 +9,17 @@ const mqttUrl = required('WAGO_MQTT_URL');
 const prefix = process.env.WAGO_MQTT_PREFIX ?? 'attraccess/wago';
 const statePath = process.env.WAGO_STATE_PATH ?? '/var/lib/attraccess-wago/state.json';
 const scenario = process.env.WAGO_SCENARIO ?? 'normal';
-const capabilities = parseCapabilities(process.env.WAGO_CAPABILITIES);
 const store = new JsonStateStore(statePath);
-const device = new SimulatorDeviceAdapter(parseValues(process.env.WAGO_INITIAL_VALUES), scenario, Number(process.env.WAGO_MEASUREMENT_STEP ?? '0'));
+const measurementStep = Number(process.env.WAGO_MEASUREMENT_STEP ?? '0');
+if (!Number.isFinite(measurementStep)) throw new Error('WAGO_MEASUREMENT_STEP must be a finite number');
+const device = new SimulatorDeviceAdapter(parseValues(process.env.WAGO_INITIAL_VALUES), scenario, measurementStep);
 let client: MqttClient | undefined;
 let timers: NodeJS.Timeout[] = [];
 
-void start();
+void start().catch((error: unknown) => {
+  process.stderr.write(`WAGO simulator startup failed: ${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
+  process.exit(1);
+});
 
 async function start(): Promise<void> {
   const state = await store.load();
@@ -28,22 +32,13 @@ function connectEnrollment(): void {
   client = enrollmentClient;
   enrollmentClient.on('error', logConnectionError);
   enrollmentClient.once('connect', () => void handleAsync(async () => {
-    const discovery = `${prefix.replace(/^\/+|\/+$/g, '')}/discovery/${hardwareId}`;
-    await subscribe(enrollmentClient, `${discovery}/claim`, async (payload) => {
-      const claim = JSON.parse(payload.toString('utf8')) as { username: string; password: string; configuration?: unknown };
-      if (!claim.username || !claim.password) throw new Error('claim does not include permanent MQTT credentials');
-      await store.save({ ...(await store.load()), credentials: { username: claim.username, password: claim.password } });
+    const enrollmentRuntime = runtime(enrollmentClient);
+    await subscribe(enrollmentClient, enrollmentRuntime.discoveryClaimTopic(), async (payload) => {
+      const claim = await enrollmentRuntime.receiveDiscoveryClaim(payload);
+      if (!claim) return;
       enrollmentClient.end(true, () => void handleAsync(async () => connectOperational(await store.load())));
     });
-    await publish(enrollmentClient, discovery, {
-      hardwareId,
-      pairingCode,
-      enrollmentSecret,
-      protocolVersion: '1.0.0',
-      runtimeVersion: '0.1.0-simulator',
-      capabilities,
-      sequence: Date.now(),
-    }, true);
+    await enrollmentRuntime.publishDiscoveryAnnouncement();
     process.stdout.write(`WAGO CC100 simulator enrollment connected as ${hardwareId}\n`);
   }));
 }
@@ -54,16 +49,7 @@ function connectOperational(state: RuntimeState): void {
   client = operationalClient;
   operationalClient.on('error', logConnectionError);
   device.restore(state.accepted?.snapshot, state.outputs);
-  const operationalRuntime = new WagoRuntime({
-    hardwareId,
-    prefix,
-    store,
-    transport: transport(operationalClient),
-    device,
-    configurationError: () => scenario === 'reject-configuration'
-      ? { path: '$', code: 'simulated_rejection', message: 'configuration rejected by simulator scenario' }
-      : undefined,
-  });
+  const operationalRuntime = runtime(operationalClient, state.credentials.prefix);
   operationalClient.once('connect', () => void handleAsync(async () => {
     await operationalRuntime.start();
     process.stdout.write(`WAGO CC100 simulator connected as ${hardwareId}\n`);
@@ -76,6 +62,18 @@ function connectOperational(state: RuntimeState): void {
   }));
   operationalClient.on('close', () => void handleAsync(() => operationalRuntime.setConnected(false)));
   operationalClient.on('connect', () => void handleAsync(() => operationalRuntime.setConnected(true)));
+}
+
+function runtime(mqtt: MqttClient, operationalPrefix?: string): WagoRuntime {
+  return new WagoRuntime({
+    hardwareId,
+    prefix: operationalPrefix ?? prefix,
+    pairingCode,
+    enrollmentSecret,
+    store,
+    transport: transport(mqtt),
+    device,
+  });
 }
 
 function transport(mqtt: MqttClient): Transport {
@@ -94,13 +92,6 @@ function parseValues(value: string | undefined): Record<string, boolean | number
   if (!parsed || Array.isArray(parsed) || Object.values(parsed).some((item) => typeof item !== 'boolean' && typeof item !== 'number'))
     throw new Error('WAGO_INITIAL_VALUES must be a JSON object with boolean or numeric values');
   return parsed as Record<string, boolean | number>;
-}
-function parseCapabilities(value: string | undefined): string[] {
-  if (!value) return ['claim', 'heartbeat', 'configuration-v1', 'commands', 'state', 'measurement', 'fault', 'acknowledgement'];
-  const parsed = JSON.parse(value);
-  if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== 'string' || !item.trim()))
-    throw new Error('WAGO_CAPABILITIES must be a JSON array of non-empty strings');
-  return parsed;
 }
 function required(name: string): string {
   const value = process.env[name];
