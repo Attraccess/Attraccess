@@ -154,5 +154,4 @@ export * from './1783300000000-add-delete-account-token-index';
 export * from './1783300000000-api-tokens';
 export * from './1783400000000-api-token-management-permission';
 export * from './1783500000000-resource-operating-interval';
-export * from './1783600000000-activity-flow-node-types';
 export * from './1765442000000-form-field-position';

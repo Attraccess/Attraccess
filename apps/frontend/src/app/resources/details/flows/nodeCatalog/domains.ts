@@ -135,6 +135,7 @@ export function nodeTypeDomain(nodeType: string): string {
     const parts = nodeType.split('.');
     return parts.length >= 2 ? `plugin.${parts[1]}` : 'plugin';
   }
+  if (nodeType === 'output.resource.operating' || nodeType === 'output.resource.idle') return 'operation-activity';
   if (nodeType.includes('.usage.')) return 'usage-sessions';
   if (nodeType.includes('.activity.')) return 'operation-activity';
   if (nodeType.includes('.billing.')) return 'billing';
@@ -143,5 +144,6 @@ export function nodeTypeDomain(nodeType: string): string {
   if (nodeType.includes('.companion.')) return 'companion-device';
   if (nodeType.includes('.mqtt.')) return 'messaging';
   if (nodeType.includes('.http.')) return 'web-requests';
+  if (nodeType === 'input.button' || nodeType === 'input.variable.changed' || nodeType.startsWith('processing.')) return 'flow-control';
   return 'flow-control';
 }

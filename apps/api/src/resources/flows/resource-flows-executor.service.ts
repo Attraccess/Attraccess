@@ -190,11 +190,11 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       [ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE]: new MqttSendMessageExecutor(this.mqttClientService),
       [ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION]: new EndUsageSessionExecutor(this.resourceUsageService),
       [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY]: new ActivityTrackExecutor(this.resourceActivity),
-      [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_OPERATING]: new OperatingTransitionExecutor(
+      [ResourceFlowNodeType.OUTPUT_RESOURCE_OPERATING]: new OperatingTransitionExecutor(
         this.operatingIntervals,
         'operating',
       ),
-      [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE]: new OperatingTransitionExecutor(this.operatingIntervals, 'idle'),
+      [ResourceFlowNodeType.OUTPUT_RESOURCE_IDLE]: new OperatingTransitionExecutor(this.operatingIntervals, 'idle'),
 
       [ResourceFlowNodeType.PROCESSING_WAIT]: new WaitExecutor(),
       [ResourceFlowNodeType.PROCESSING_IF]: new IfExecutor(),

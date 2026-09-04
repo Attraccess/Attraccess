@@ -17,8 +17,17 @@ describe('node catalog category translations', () => {
     });
   });
 
-  it('provides German labels for every approved category', () => {
-    expect(Object.keys(de.domains)).toEqual(Object.keys(en.domains));
-    expect(Object.values(de.domains)).not.toContain('Ressource');
+  it('uses the approved German category labels and order', () => {
+    expect(de.domains).toEqual({
+      'usage-sessions': 'Nutzungssitzungen',
+      'operation-activity': 'Betrieb & Aktivität',
+      billing: 'Abrechnung',
+      'access-doors': 'Zugang & Türen',
+      'health-monitoring': 'Zustandsüberwachung',
+      'companion-device': 'Companion-Gerät',
+      messaging: 'Nachrichten',
+      'web-requests': 'Webanfragen',
+      'flow-control': 'Ablaufsteuerung',
+    });
   });
 });

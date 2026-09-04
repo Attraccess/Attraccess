@@ -1,47 +1,52 @@
 // Tests for domain mapping: nodeTypeDomain, getDomainDef, getPluginDomainLabel, DOMAINS, and DOMAIN_ORDER
 // FEATURE: Node catalog redesign — domain grouping
 import { describe, expect, it } from 'vitest';
+import { ResourceFlowNodeType } from '@attraccess/react-query-client';
 import { DOMAINS, DOMAIN_ORDER, getDomainDef, getPluginDomainLabel, nodeTypeDomain, type Domain } from './domains';
 
-const cases: Array<[string, Domain]> = [
-  ['input.button', 'flow-control'],
-  ['input.resource.usage.started', 'usage-sessions'],
-  ['input.resource.usage.stopped', 'usage-sessions'],
-  ['input.resource.usage.takeover', 'usage-sessions'],
-  ['output.resource.usage.end-session', 'usage-sessions'],
-  ['output.resource.activity.operating', 'operation-activity'],
-  ['output.resource.activity.idle', 'operation-activity'],
-  ['input.resource.activity.no-activity', 'operation-activity'],
-  ['output.resource.activity.track-activity', 'operation-activity'],
-  ['output.resource.billing.calculation.set-additional-items', 'billing'],
-  ['input.resource.door.unlocked', 'access-doors'],
-  ['input.resource.door.locked', 'access-doors'],
-  ['input.resource.door.unlatched', 'access-doors'],
-  ['input.mqtt.message.received', 'messaging'],
-  ['output.mqtt.sendMessage', 'messaging'],
-  ['processing.mqtt.waitForMessage', 'messaging'],
-  ['output.http.sendRequest', 'web-requests'],
-  ['processing.wait', 'flow-control'],
-  ['processing.if', 'flow-control'],
-  ['processing.set-payload', 'flow-control'],
-  ['processing.error', 'flow-control'],
-  ['processing.variables.set', 'flow-control'],
-  ['processing.variables.get', 'flow-control'],
-  ['input.variable.changed', 'flow-control'],
-  ['output.resource.health.heartbeat', 'health-monitoring'],
-  ['output.resource.health.set', 'health-monitoring'],
-  ['output.companion.lock-pc', 'companion-device'],
-  ['output.companion.unlock-pc', 'companion-device'],
-  ['input.companion.idle', 'companion-device'],
-  ['input.companion.active', 'companion-device'],
-  ['input.companion.foreground_app_changed', 'companion-device'],
-  ['input.companion.usb_device_connected', 'companion-device'],
-  ['input.companion.usb_device_disconnected', 'companion-device'],
+const cases: Array<[ResourceFlowNodeType, Domain]> = [
+  [ResourceFlowNodeType.INPUT_BUTTON, 'flow-control'],
+  [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, 'usage-sessions'],
+  [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED, 'usage-sessions'],
+  [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER, 'usage-sessions'],
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION, 'usage-sessions'],
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_OPERATING, 'operation-activity'],
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_IDLE, 'operation-activity'],
+  [ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY, 'operation-activity'],
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY, 'operation-activity'],
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_CALCULATION_SET_ADDITIONAL_ITEMS, 'billing'],
+  [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED, 'access-doors'],
+  [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED, 'access-doors'],
+  [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED, 'access-doors'],
+  [ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED, 'messaging'],
+  [ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE, 'messaging'],
+  [ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE, 'messaging'],
+  [ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST, 'web-requests'],
+  [ResourceFlowNodeType.PROCESSING_WAIT, 'flow-control'],
+  [ResourceFlowNodeType.PROCESSING_IF, 'flow-control'],
+  [ResourceFlowNodeType.PROCESSING_SET_PAYLOAD, 'flow-control'],
+  [ResourceFlowNodeType.PROCESSING_ERROR, 'flow-control'],
+  [ResourceFlowNodeType.PROCESSING_VARIABLES_SET, 'flow-control'],
+  [ResourceFlowNodeType.PROCESSING_VARIABLES_GET, 'flow-control'],
+  [ResourceFlowNodeType.INPUT_VARIABLE_CHANGED, 'flow-control'],
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT, 'health-monitoring'],
+  [ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET, 'health-monitoring'],
+  [ResourceFlowNodeType.OUTPUT_COMPANION_LOCK_PC, 'companion-device'],
+  [ResourceFlowNodeType.OUTPUT_COMPANION_UNLOCK_PC, 'companion-device'],
+  [ResourceFlowNodeType.INPUT_COMPANION_IDLE, 'companion-device'],
+  [ResourceFlowNodeType.INPUT_COMPANION_ACTIVE, 'companion-device'],
+  [ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED, 'companion-device'],
+  [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_CONNECTED, 'companion-device'],
+  [ResourceFlowNodeType.INPUT_COMPANION_USB_DEVICE_DISCONNECTED, 'companion-device'],
 ];
 
 describe('nodeTypeDomain', () => {
   it.each(cases)('maps %s to its declared domain', (nodeType, expectedDomain) => {
     expect(nodeTypeDomain(nodeType)).toBe(expectedDomain);
+  });
+
+  it('maps every core node type to an approved domain', () => {
+    expect(cases.map(([nodeType]) => nodeType).sort()).toEqual(Object.values(ResourceFlowNodeType).sort());
   });
 
   it('maps plugin nodes to a per-plugin domain', () => {
