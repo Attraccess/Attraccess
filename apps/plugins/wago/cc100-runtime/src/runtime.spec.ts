@@ -256,6 +256,7 @@ describe('WagoRuntime', () => {
     runtime = new WagoRuntime({
       hardwareId: 'cc100-1',
       prefix: 'attraccess/wago',
+      pairingCode: '482931',
       store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
       transport,
       device: delayedDevice,
@@ -329,7 +330,14 @@ describe('WagoRuntime', () => {
 
   it('does not repeat an unexpired pulse after a runtime reboot', async () => {
     const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
-    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport, device });
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      store,
+      transport,
+      device,
+    });
     await runtime.start();
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
     await transport.send(commands, {
@@ -339,7 +347,14 @@ describe('WagoRuntime', () => {
       action: 'pulse',
       expectedConfigurationRevision: 1,
     });
-    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport, device });
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      store,
+      transport,
+      device,
+    });
     await runtime.start();
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
     await transport.send(commands, {
@@ -374,6 +389,7 @@ describe('WagoRuntime', () => {
     runtime = new WagoRuntime({
       hardwareId: 'cc100-1',
       prefix: 'attraccess/wago',
+      pairingCode: '482931',
       store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
       transport,
       device: flakyDevice,
@@ -404,6 +420,7 @@ describe('WagoRuntime', () => {
     runtime = new WagoRuntime({
       hardwareId: 'cc100-1',
       prefix: 'attraccess/wago',
+      pairingCode: '482931',
       store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
       transport: failingTransport,
       device,
@@ -454,6 +471,7 @@ describe('WagoRuntime', () => {
     runtime = new WagoRuntime({
       hardwareId: 'cc100-1',
       prefix: 'attraccess/wago',
+      pairingCode: '482931',
       store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
       transport,
       device: flakyDevice,
@@ -515,6 +533,7 @@ describe('WagoRuntime', () => {
     runtime = new WagoRuntime({
       hardwareId: 'cc100-1',
       prefix: 'attraccess/wago',
+      pairingCode: '482931',
       store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
       transport,
       device: delayedDevice,
@@ -560,6 +579,7 @@ describe('WagoRuntime', () => {
     runtime = new WagoRuntime({
       hardwareId: 'cc100-1',
       prefix: 'attraccess/wago',
+      pairingCode: '482931',
       store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
       transport,
       device: delayedDevice,
@@ -621,6 +641,7 @@ describe('WagoRuntime', () => {
     runtime = new WagoRuntime({
       hardwareId: 'cc100-1',
       prefix: 'attraccess/wago',
+      pairingCode: '482931',
       store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
       transport,
       device: delayedDevice,
@@ -676,6 +697,7 @@ describe('WagoRuntime', () => {
   });
 
   it('starts feedback verification before retained-state publication completes', async () => {
+    jest.useFakeTimers();
     const monitored: Snapshot = {
       ...snapshot,
       physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
@@ -697,12 +719,19 @@ describe('WagoRuntime', () => {
     };
     let delayStatePublication = false;
     let releaseStatePublication!: () => void;
+    let statePublicationStarted!: () => void;
     const statePublication = new Promise<void>((resolve) => {
       releaseStatePublication = resolve;
     });
+    const startedStatePublication = new Promise<void>((resolve) => {
+      statePublicationStarted = resolve;
+    });
     const delayedTransport: Transport = {
       publish: async (topic, payload, options) => {
-        if (delayStatePublication && topic.endsWith('/state')) await statePublication;
+        if (delayStatePublication && topic.endsWith('/state')) {
+          statePublicationStarted();
+          await statePublication;
+        }
         await transport.publish(topic, payload, options);
       },
       subscribe: async (topic, listener) => transport.subscribe(topic, listener),
@@ -710,6 +739,7 @@ describe('WagoRuntime', () => {
     runtime = new WagoRuntime({
       hardwareId: 'cc100-1',
       prefix: 'attraccess/wago',
+      pairingCode: '482931',
       store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
       transport: delayedTransport,
       device,
@@ -723,17 +753,23 @@ describe('WagoRuntime', () => {
     });
     delayStatePublication = true;
 
-    const command = transport.send(commands, validCommand());
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    try {
+      const command = transport.send(commands, validCommand());
+      await startedStatePublication;
+      await jest.advanceTimersByTimeAsync(10);
 
-    expect(transport.published).toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
-        payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),
-      }),
-    );
-    releaseStatePublication();
-    await command;
+      expect(transport.published).toContainEqual(
+        expect.objectContaining({
+          topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+          payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),
+        }),
+      );
+      releaseStatePublication();
+      await command;
+    } finally {
+      releaseStatePublication();
+      jest.useRealTimers();
+    }
   });
 
   it('rejects a command that waits behind a write when its configuration changes', async () => {
@@ -759,6 +795,7 @@ describe('WagoRuntime', () => {
     runtime = new WagoRuntime({
       hardwareId: 'cc100-1',
       prefix: 'attraccess/wago',
+      pairingCode: '482931',
       store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
       transport,
       device: delayedDevice,
@@ -789,7 +826,14 @@ describe('WagoRuntime', () => {
 
   it('does not acknowledge a pulse when persisting its output state fails', async () => {
     const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
-    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport, device });
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      store,
+      transport,
+      device,
+    });
     await runtime.start();
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
     const persist = store.save.bind(store);
@@ -813,7 +857,14 @@ describe('WagoRuntime', () => {
 
   it('keeps the previous configuration active when persisting a replacement fails', async () => {
     const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
-    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport, device });
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      store,
+      transport,
+      device,
+    });
     await runtime.start();
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
     const persist = store.save.bind(store);
@@ -843,6 +894,7 @@ describe('WagoRuntime', () => {
     runtime = new WagoRuntime({
       hardwareId: 'cc100-1',
       prefix: 'attraccess/wago',
+      pairingCode: '482931',
       store,
       transport,
       device: reservingDevice,
@@ -883,7 +935,14 @@ describe('WagoRuntime', () => {
       ],
     };
     const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
-    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport, device });
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      store,
+      transport,
+      device,
+    });
     await runtime.start();
     await transport.send(desired, {
       protocolVersion: 1,
@@ -905,7 +964,14 @@ describe('WagoRuntime', () => {
 
   it('persists output and connection state changes', async () => {
     const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
-    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport, device });
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      store,
+      transport,
+      device,
+    });
     await runtime.start();
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
     await transport.send(commands, validCommand());
