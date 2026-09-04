@@ -13,9 +13,8 @@ import { getBaseUrl } from '../../../api';
 
 interface OperatingDurationSummary {
   operatingDataAvailable: boolean;
-  operatingDurationMs: number | null;
-  unattributedOperatingDurationMs: number | null;
   isProvisional: boolean;
+  attributions: Array<{ usageId: number; durationMs: number }>;
 }
 
 const RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST = 100;
@@ -24,6 +23,17 @@ function durationMsForSession(item: ResourceUsage, asOf: Date): number {
   const now = new Date();
   const end = Math.min(new Date(item.endTime ?? now).getTime(), asOf.getTime(), now.getTime());
   return end - new Date(item.startTime).getTime();
+}
+
+function attributedOperatingDurationMs(summary: OperatingDurationSummary | undefined, usageId: number): number | '' {
+  if (!summary?.operatingDataAvailable) {
+    return '';
+  }
+
+  return summary.attributions.reduce(
+    (durationMs, attribution) => durationMs + (attribution.usageId === usageId ? attribution.durationMs : 0),
+    0,
+  );
 }
 
 export function ResourceUsageExport(props: ExportProps) {
@@ -170,13 +180,7 @@ export function ResourceUsageExport(props: ExportProps) {
       {
         label: t('columns.operatingDurationMs'),
         key: 'operatingDurationMs',
-        getter: (item) => operatingDurations?.[item.resourceId]?.operatingDurationMs ?? '',
-        selectedByDefault: true,
-      },
-      {
-        label: t('columns.unattributedOperatingDurationMs'),
-        key: 'unattributedOperatingDurationMs',
-        getter: (item) => operatingDurations?.[item.resourceId]?.unattributedOperatingDurationMs ?? '',
+        getter: (item) => attributedOperatingDurationMs(operatingDurations?.[item.resourceId], item.id),
         selectedByDefault: true,
       },
       {

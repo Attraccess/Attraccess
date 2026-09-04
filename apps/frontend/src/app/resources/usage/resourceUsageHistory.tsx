@@ -17,7 +17,11 @@ import de from './translations/resourceUsageHistory.de';
 import historyTableEn from './components/HistoryTable/utils/translations/en.json';
 import historyTableDe from './components/HistoryTable/utils/translations/de.json';
 import { FlatSection } from '../../../components/flatSection';
-import { useCanViewOperatingDuration, useOperatingDuration } from '../operatingDuration';
+import {
+  attributedOperatingDurationForUsage,
+  useCanViewOperatingDuration,
+  useOperatingDuration,
+} from '../operatingDuration';
 
 type ResourceUsageHistoryProps = Omit<HTMLAttributes<HTMLElement>, 'children'> & {
   resourceId: number;
@@ -176,9 +180,7 @@ export function ResourceUsageHistory({ resourceId, hideHeader, ...rest }: Resour
       onProjectChange={handleProjectChange}
       operatingDurationMs={
         selectedSession && canViewOperatingDuration
-          ? selectedOperatingDuration?.attributions
-              .filter((attribution) => attribution.usageId === selectedSession.id)
-              .reduce((total, attribution) => total + attribution.durationMs, 0)
+          ? attributedOperatingDurationForUsage(selectedOperatingDuration, selectedSession.id)
           : undefined
       }
     />

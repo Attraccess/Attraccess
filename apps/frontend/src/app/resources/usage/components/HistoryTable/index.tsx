@@ -16,7 +16,7 @@ import { ProjectsSelect } from '../../../../../components/projectsSelect';
 import en from './utils/translations/en.json';
 import de from './utils/translations/de.json';
 import { SimplePagination } from '../../../../../components/simplePagination';
-import { useOperatingDuration } from '../../../operatingDuration';
+import { attributedOperatingDurationForUsage, useOperatingDuration } from '../../../operatingDuration';
 
 interface HistoryTableProps {
   resourceId: number;
@@ -148,9 +148,7 @@ export const HistoryTable = ({
 
     return {
       start: new Date(Math.min(...filteredHistory.map((session) => new Date(session.startTime).getTime()))),
-      end: new Date(
-        Math.max(...filteredHistory.map((session) => new Date(session.endTime ?? new Date()).getTime())),
-      ),
+      end: new Date(Math.max(...filteredHistory.map((session) => new Date(session.endTime ?? new Date()).getTime()))),
     };
   }, [filteredHistory, resource?.type]);
   const { data: operatingDurationForPage } = useOperatingDuration(
@@ -197,9 +195,7 @@ export const HistoryTable = ({
                         ),
                         {
                           canView: canViewOperatingDuration,
-                          durationMs: operatingDurationForPage?.attributions
-                            .filter((attribution) => attribution.usageId === session.id)
-                            .reduce((total, attribution) => total + attribution.durationMs, 0),
+                          durationMs: attributedOperatingDurationForUsage(operatingDurationForPage, session.id),
                         },
                       )
                     : []}
