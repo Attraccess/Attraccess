@@ -17,6 +17,11 @@ export interface OperatingDurationSummary {
   attributions: Array<{ usageId: number; durationMs: number }>;
 }
 
+interface OperatingDurationRange {
+  start: Date;
+  end: Date;
+}
+
 export function useCanViewOperatingDuration(resourceId: number) {
   const { hasPermission, user } = useAuth();
   const canManageResources = hasPermission('resources.update');
@@ -31,23 +36,25 @@ export function useCanViewOperatingDuration(resourceId: number) {
   return canManageResources || Boolean(introducer?.isIntroducer) || Boolean(maintenance?.canManage);
 }
 
-export function useOperatingDuration(resourceId: number, enabled: boolean) {
+export function useOperatingDuration(resourceId: number, enabled: boolean, range?: OperatingDurationRange) {
   const query = useQuery({
-    queryKey: ['resource-operating-attribution', resourceId],
+    queryKey: ['resource-operating-attribution', resourceId, range?.start, range?.end],
     enabled,
     queryFn: async () => {
-      const response = await fetch(`${getBaseUrl()}/api/resources/${resourceId}/operating-attribution`, {
+      const params = range && new URLSearchParams({ start: range.start.toISOString(), end: range.end.toISOString() });
+      const response = await fetch(`${getBaseUrl()}/api/resources/${resourceId}/operating-attribution${params ? `?${params}` : ''}`, {
         credentials: 'include',
       });
       if (!response.ok) throw new Error('Failed to load operating duration');
       return response.json() as Promise<OperatingDurationSummary>;
     },
-    refetchInterval: (query) => (query.state.data?.isProvisional ? 5_000 : false),
+    refetchInterval: (query) => (!range && query.state.data?.isProvisional ? 5_000 : false),
   });
 
   useSSE({
     path: `/api/resources/${resourceId}/events`,
     onUpdate: () => query.refetch(),
+    enabled: enabled && !range,
   });
 
   return query;

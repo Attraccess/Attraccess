@@ -16,7 +16,7 @@ import { ProjectsSelect } from '../../../../../components/projectsSelect';
 import en from './utils/translations/en.json';
 import de from './utils/translations/de.json';
 import { SimplePagination } from '../../../../../components/simplePagination';
-import { type OperatingDurationSummary } from '../../../operatingDuration';
+import { useOperatingDuration } from '../../../operatingDuration';
 
 interface HistoryTableProps {
   resourceId: number;
@@ -28,7 +28,6 @@ interface HistoryTableProps {
   updatingSessionIds: Record<number, boolean>;
   onProjectChange: (session: ResourceUsage, projectId: number | undefined) => void;
   canViewOperatingDuration: boolean;
-  operatingDuration?: OperatingDurationSummary;
 }
 
 interface ProjectAssignmentCellProps {
@@ -78,7 +77,6 @@ export const HistoryTable = ({
   updatingSessionIds,
   onProjectChange,
   canViewOperatingDuration,
-  operatingDuration,
 }: HistoryTableProps) => {
   const { t } = useTranslations({ en, de });
   const { user } = useAuth();
@@ -143,6 +141,24 @@ export const HistoryTable = ({
     });
   }, [usageHistory?.data, resource]);
 
+  const operatingDurationRange = useMemo(() => {
+    if (resource?.type !== ResourceType.MACHINE || filteredHistory.length === 0) {
+      return undefined;
+    }
+
+    return {
+      start: new Date(Math.min(...filteredHistory.map((session) => new Date(session.startTime).getTime()))),
+      end: new Date(
+        Math.max(...filteredHistory.map((session) => new Date(session.endTime ?? new Date()).getTime())),
+      ),
+    };
+  }, [filteredHistory, resource?.type]);
+  const { data: operatingDurationForPage } = useOperatingDuration(
+    resourceId,
+    canViewOperatingDuration && operatingDurationRange !== undefined,
+    operatingDurationRange,
+  );
+
   if (error) {
     return <div className="text-center py-4 text-red-500">{t('errorLoadingHistory')}</div>;
   }
@@ -181,7 +197,7 @@ export const HistoryTable = ({
                         ),
                         {
                           canView: canViewOperatingDuration,
-                          durationMs: operatingDuration?.attributions
+                          durationMs: operatingDurationForPage?.attributions
                             .filter((attribution) => attribution.usageId === session.id)
                             .reduce((total, attribution) => total + attribution.durationMs, 0),
                         },
