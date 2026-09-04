@@ -33,33 +33,6 @@ export const WAGO_PRESETS = [
   { id: 'generic-monitored-input', name: 'Generic monitored input', description: 'A monitored digital input foundation.' },
 ] as const;
 
-export const WAGO_METER_PROFILES = [
-  {
-    id: '879-3000',
-    name: 'WAGO Energy Meter MID24',
-    readOnly: true,
-    transport: 'modbus-rtu',
-    defaultUnitId: 1,
-    measurements: [
-      { id: 'active-power', address: 0x5012, dataType: 'float32', byteOrder: 'ABCD', scale: 1000, unit: 'watt', kind: 'live' },
-      { id: 'import-energy', address: 0x600c, dataType: 'float32', byteOrder: 'ABCD', scale: 1000, unit: 'watt-hour', kind: 'cumulative' },
-      { id: 'export-energy', address: 0x6018, dataType: 'float32', byteOrder: 'ABCD', scale: 1000, unit: 'watt-hour', kind: 'cumulative' },
-    ],
-  },
-  {
-    id: '879-1300',
-    name: 'WAGO Energy Meter MID26',
-    readOnly: true,
-    transport: 'modbus-rtu',
-    defaultUnitId: 1,
-    measurements: [
-      { id: 'active-power', address: 0x5012, dataType: 'float32', byteOrder: 'ABCD', scale: 1000, unit: 'watt', kind: 'live' },
-      { id: 'import-energy', address: 0x600c, dataType: 'uint32', byteOrder: 'ABCD', scale: 1, unit: 'watt-hour', kind: 'cumulative' },
-      { id: 'export-energy', address: 0x6018, dataType: 'uint32', byteOrder: 'ABCD', scale: 1, unit: 'watt-hour', kind: 'cumulative' },
-    ],
-  },
-] as const;
-
 export interface WagoConfigurationSnapshot {
   version: typeof CONFIGURATION_PROTOCOL_VERSION;
   physicalPoints: Array<{ id: string; hardwareProfile: (typeof HARDWARE_PROFILES)[number]; channel: number }>;

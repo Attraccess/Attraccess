@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
@@ -98,6 +98,7 @@ export class WagoRuntime {
   private configurationGeneration = 0;
   private readonly inFlightCommandIds = new Set<string>();
   private measurementSequence = 0;
+  private readonly measurementStreamId = randomUUID();
 
   constructor(
     private readonly options: { hardwareId: string; prefix: string; store: JsonStateStore; transport: Transport; device: DeviceAdapter },
@@ -227,8 +228,9 @@ export class WagoRuntime {
         const raw = await this.options.device.read(point);
         if (typeof raw !== 'number') continue;
         const transform = channel.measurement ?? { unit: 'percent', scale: 1, offset: 0 };
-        const value = raw * transform.scale + transform.offset;
-        if (!Number.isSafeInteger(value)) {
+        const scaledValue = raw * transform.scale + transform.offset;
+        const value = Math.round(scaledValue);
+        if (!Number.isSafeInteger(value) || Math.abs(scaledValue - value) > Number.EPSILON * Math.max(1, Math.abs(scaledValue)) * 16) {
           await this.options.transport.publish(this.topic('faults'), {
             channelId: channel.id,
             code: 'invalid_measurement_transform',
@@ -242,6 +244,7 @@ export class WagoRuntime {
           value,
           kind: transform.kind ?? 'live',
           sourceTimestamp: new Date().toISOString(),
+          streamId: this.measurementStreamId,
           sequence: ++this.measurementSequence,
         });
       } catch (error) {
