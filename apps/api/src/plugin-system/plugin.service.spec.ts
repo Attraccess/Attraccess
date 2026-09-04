@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
@@ -132,6 +132,104 @@ describe('PluginService', () => {
       expect(byName['plugin-bad'].error).toBe("Cannot find module '@nestjs/common'");
     });
 
+    it('persists a quarantined plugin error across a new process discovery', () => {
+      writePlugin(root, 'crashing-plugin', {
+        name: 'crashing-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+      const [plugin] = PluginService.getPlugins();
+
+      PluginService.quarantinePlugin(plugin, new Error('onModuleInit failed'));
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+
+      expect(PluginService.isPluginQuarantined(PluginService.getPlugins()[0])).toBe(true);
+      expect(PluginService.getPluginsWithLoadStatus()[0]).toMatchObject({
+        status: 'error',
+        error: 'onModuleInit failed',
+      });
+    });
+
+    it('keeps a failed plugin quarantined in memory when persistence fails', () => {
+      writePlugin(root, 'crashing-plugin', {
+        name: 'crashing-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+      const [plugin] = PluginService.getPlugins();
+      jest
+        .spyOn(PluginService as unknown as { writeFailures(failures: unknown[]): void }, 'writeFailures')
+        .mockImplementation(() => {
+          throw new Error('read-only plugin directory');
+        });
+
+      expect(() => PluginService.quarantinePlugin(plugin, new Error('onModuleInit failed'))).not.toThrow();
+      expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
+    });
+
+    it('removes quarantine state when a plugin is replaced', () => {
+      writePlugin(root, 'repaired-plugin', {
+        name: 'repaired-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+      const [plugin] = PluginService.getPlugins();
+      PluginService.quarantinePlugin(plugin, new Error('prior crash'));
+
+      PluginService.clearPluginQuarantine(plugin.pluginDirectory);
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+
+      expect(PluginService.isPluginQuarantined(PluginService.getPlugins()[0])).toBe(false);
+    });
+
+    it('preserves quarantine state when clearing it cannot be persisted', () => {
+      writePlugin(root, 'repaired-plugin', {
+        name: 'repaired-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+      const [plugin] = PluginService.getPlugins();
+      PluginService.quarantinePlugin(plugin, new Error('prior crash'));
+      jest
+        .spyOn(PluginService as unknown as { writeFailures(failures: unknown[]): void }, 'writeFailures')
+        .mockImplementation(() => {
+          throw new Error('read-only plugin directory');
+        });
+
+      expect(() => PluginService.clearPluginQuarantine(plugin.pluginDirectory)).toThrow('read-only plugin directory');
+      expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
+    });
+
+    it('persists the startup error before quarantining plugins from an incomplete startup', () => {
+      writePlugin(root, 'previously-active', {
+        name: 'previously-active',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+
+      PluginService.beginBootGuard();
+      PluginService.recordBootFailure(new Error('Plugin onModuleInit failed'));
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      PluginService.beginBootGuard();
+
+      const [plugin] = PluginService.getPlugins();
+      expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
+      expect(PluginService.getPluginsWithLoadStatus()[0].error).toBe('Plugin onModuleInit failed');
+    });
+
+    it('creates a configured plugin directory before writing boot guard state', () => {
+      const missingRoot = join(root, 'does-not-exist');
+      PluginService.configure({ PLUGIN_DIR: missingRoot, RESTART_BY_EXIT: true });
+
+      expect(() => PluginService.beginBootGuard()).not.toThrow();
+      expect(existsSync(join(missingRoot, '.plugin-boot-guard.json'))).toBe(true);
+    });
+
     it('caches discovery between calls and re-scans after configure', () => {
       writePlugin(root, 'plugin-a', {
         name: 'plugin-a',
@@ -155,6 +253,17 @@ describe('PluginService', () => {
     it('excludes internal npm backup storage from discovery', () => {
       writePlugin(root, '.npm-backups', {
         name: 'stale-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+
+      expect(PluginService.getPlugins()).toEqual([]);
+    });
+
+    it('excludes hidden replacement backups from discovery', () => {
+      writePlugin(root, '.uploaded-plugin-backup', {
+        name: 'uploaded-plugin',
         version: '1.0.0',
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
         attraccessVersion: { min: '1.0.0' },
@@ -222,6 +331,19 @@ describe('PluginService', () => {
       expect(restartSpy).toHaveBeenCalledTimes(1);
     });
 
+    it('clears stale quarantine state for an uploaded replacement', async () => {
+      writePlugin(root, 'uploaded-plugin', VALID_MANIFEST);
+      const [previous] = PluginService.getPlugins();
+      PluginService.quarantinePlugin(previous, new Error('prior crash'));
+      rmSync(join(root, 'uploaded-plugin'), { recursive: true, force: true });
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+
+      await new PluginService().uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(VALID_MANIFEST) }));
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+
+      expect(PluginService.isPluginQuarantined(PluginService.getPlugins()[0])).toBe(false);
+    });
+
     // Finder ("Compress" on an unpacked folder) and most GUI zip tools wrap the
     // contents in a single top-level folder. Before, that surfaced as a raw
     // ENOENT on <temp>/plugin.json.
@@ -270,12 +392,72 @@ describe('PluginService', () => {
       await expect(service.uploadPlugin(file)).rejects.toBeDefined();
     });
 
-    it('rejects when a plugin with the same name already exists', async () => {
+    it('replaces an uploaded plugin with the same name', async () => {
       const service = new PluginService();
-      await service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(VALID_MANIFEST) }));
+      await service.uploadPlugin(
+        zipFileUpload({
+          'plugin.json': JSON.stringify(VALID_MANIFEST),
+          'dist/index.js': 'module.exports = "old";',
+        }),
+      );
 
-      const again = zipFileUpload({ 'plugin.json': JSON.stringify(VALID_MANIFEST) });
-      await expect(service.uploadPlugin(again)).rejects.toThrow(/already exists/);
+      const updatedManifest = { ...VALID_MANIFEST, version: '1.2.4' };
+      const manifest = await service.uploadPlugin(
+        zipFileUpload({
+          'plugin.json': JSON.stringify(updatedManifest),
+          'dist/index.js': 'module.exports = "new";',
+        }),
+      );
+
+      expect(manifest.version).toBe('1.2.4');
+      expect(readFileSync(join(root, 'uploaded-plugin', 'dist', 'index.js'), 'utf8')).toBe('module.exports = "new";');
+      expect(readdirSync(root).filter((entry) => entry.startsWith('.uploaded-plugin-'))).toEqual([]);
+    });
+
+    it.each(['../outside-plugin', 'nested/plugin', '..\\outside-plugin'])('rejects a plugin name that escapes its directory: %s', async (name) => {
+      const service = new PluginService();
+      const manifest = { ...VALID_MANIFEST, name };
+
+      await expect(service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(manifest) }))).rejects.toThrow(
+        'Plugin name must be a visible single path segment',
+      );
+      expect(existsSync(join(root, 'outside-plugin'))).toBe(false);
+    });
+
+    it('rejects a dot-prefixed plugin name that discovery would skip', async () => {
+      const service = new PluginService();
+      const manifest = { ...VALID_MANIFEST, name: '.hidden-plugin' };
+
+      await expect(service.uploadPlugin(zipFileUpload({ 'plugin.json': JSON.stringify(manifest) }))).rejects.toThrow(
+        'Plugin name must be a visible single path segment',
+      );
+      expect(existsSync(join(root, '.hidden-plugin'))).toBe(false);
+    });
+
+    it('serializes plugin updates with the same name', async () => {
+      const withPluginUploadLock = Reflect.get(PluginService, 'withPluginUploadLock') as <T>(
+        name: string,
+        action: () => Promise<T>,
+      ) => Promise<T>;
+      let releaseFirst!: () => void;
+      const order: string[] = [];
+      const first = withPluginUploadLock('uploaded-plugin', async () => {
+        order.push('first-start');
+        await new Promise<void>((resolve) => {
+          releaseFirst = resolve;
+        });
+        order.push('first-end');
+      });
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      const second = withPluginUploadLock('uploaded-plugin', async () => {
+        order.push('second');
+      });
+
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(order).toEqual(['first-start']);
+      releaseFirst();
+      await Promise.all([first, second]);
+      expect(order).toEqual(['first-start', 'first-end', 'second']);
     });
   });
 
@@ -293,11 +475,13 @@ describe('PluginService', () => {
         attraccessVersion: { min: '1.0.0' },
       });
       const [plugin] = PluginService.getPlugins();
+      PluginService.quarantinePlugin(plugin, new Error('prior crash'));
       const service = new PluginService();
 
       await service.deletePlugin(plugin.id);
 
       expect(existsSync(join(root, 'delete-me'))).toBe(false);
+      expect(PluginService.isPluginQuarantined(plugin)).toBe(false);
       flushScheduledRestart();
       expect(restartSpy).toHaveBeenCalledTimes(1);
     });

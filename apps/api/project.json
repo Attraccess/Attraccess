@@ -8,6 +8,7 @@
   "targets": {
     "copy-attractap-firmware-into-assets": {
       "executor": "nx:run-commands",
+      "dependsOn": [],
       "cache": false,
       "options": {
         "command": "node {projectRoot}/copy-attractap-firmware-into-assets.js"
@@ -104,7 +105,7 @@
     },
     "export-asyncapi": {
       "executor": "nx:run-commands",
-      "dependsOn": ["asyncapi-build"],
+      "dependsOn": ["build", "asyncapi-build"],
       "cache": true,
       "outputs": ["{workspaceRoot}/dist/apps/api/asyncapi.json"],
       "options": {
@@ -135,7 +136,7 @@
       "inputs": ["testing", "^production"],
       "outputs": ["{workspaceRoot}/coverage/apps/api-e2e"],
       "options": {
-        "jestConfig": "apps/api/jest.config.ts",
+        "jestConfig": "apps/api/jest.e2e.config.ts",
         "testMatch": ["**/*.e2e.spec.ts"],
         "passWithNoTests": true
       }

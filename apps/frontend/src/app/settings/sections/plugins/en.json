@@ -1,6 +1,10 @@
 {
   "title": "Plugins",
   "description": "Plugins installed on this instance, and what each of them loaded.",
+  "disabledWarning": {
+    "title": "Plugins are disabled",
+    "description": "Plugins are disabled by the DISABLE_PLUGINS setting and will not load until the application is restarted with it disabled."
+  },
   "installPlugin": "Install plugin",
   "uploadButton": "Upload ZIP file",
   "docsButton": "Documentation",
@@ -94,7 +98,11 @@
     "loaded": "Loaded",
     "error": "Failed to load",
     "unknown": "Frontend only",
-    "errorTooltip": "This plugin failed to load on the server: {{message}}"
+    "errorTooltip": "View the server load error",
+    "viewError": "View load error for {{pluginName}}",
+    "errorTitle": "{{pluginName}} failed to load",
+    "errorDescription": "The server reported this error during startup:",
+    "close": "Close"
   },
   "noPermissions": "None requested",
   "updatePolicy": {

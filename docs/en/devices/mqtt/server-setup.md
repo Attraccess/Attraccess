@@ -113,7 +113,7 @@ The Servers page shows the current connection status for each broker:
 
 ## See Also
 
-- [Overview](mqtt/overview.md) -- What is MQTT?
-- [Examples](mqtt/examples.md) -- Practical MQTT integration examples
+- [Overview](devices/mqtt/overview.md) -- What is MQTT?
+- [Examples](devices/mqtt/examples.md) -- Practical MQTT integration examples
 - [Flows & Automation](flows/overview.md) -- Create automation workflows
 - [Environment Variables](installation/environment-variables.md) -- Server configuration

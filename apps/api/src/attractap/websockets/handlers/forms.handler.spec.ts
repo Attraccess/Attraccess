@@ -107,6 +107,26 @@ describe('AttractapFormsHandler', () => {
     });
   });
 
+  describe('handleResourceUsageFormCancel', () => {
+    it('clears only the cancelled form draft', () => {
+      const socket = createMockSocket({
+        state: {
+          lastAuthenticatedUserId: 1,
+          formDrafts: {
+            [`10:${ResourceFormAction.START}`]: { 1: 'a' },
+            [`11:${ResourceFormAction.END}`]: { 2: 'b' },
+          },
+        },
+      });
+
+      handler.handleResourceUsageFormCancel(socket, {
+        payload: { resourceId: 10, action: ResourceFormAction.START },
+      } as AttractapEvent['data']);
+
+      expect(socket.state.formDrafts).toEqual({ [`11:${ResourceFormAction.END}`]: { 2: 'b' } });
+    });
+  });
+
   describe('ensureFormsSatisfied', () => {
     it('returns [] when there are no forms', async () => {
       mockResourceFormsService.getFormsForAction.mockResolvedValue([]);

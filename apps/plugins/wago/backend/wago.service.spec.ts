@@ -32,6 +32,7 @@ describe('WagoService', () => {
     controllers = [controller()],
     enrollments: WagoEnrollment[] = [],
     defaultMqttServerId: number | null = null,
+    initialize = true,
   ) {
     const controllerRepository = {
       find: jest.fn().mockResolvedValue(controllers),
@@ -101,8 +102,16 @@ describe('WagoService', () => {
       },
       getMqttCredentialProvisioning: jest.fn(),
     } as unknown as PluginContext;
+    const service = new WagoService(context);
+    if (initialize) {
+      Reflect.set(service, 'controllers', controllerRepository);
+      Reflect.set(service, 'enrollments', enrollmentRepository);
+      Reflect.set(service, 'settings', settingsRepository);
+      Reflect.set(service, 'drafts', draftRepository);
+      Reflect.set(service, 'revisions', revisionRepository);
+    }
     return {
-      service: new WagoService(context),
+      service,
       controllerRepository,
       enrollmentRepository,
       settingsRepository,
@@ -121,6 +130,26 @@ describe('WagoService', () => {
 
     expect(listed).not.toHaveProperty('fingerprint');
     expect(listed).not.toHaveProperty('pairingCodeHash');
+  });
+
+  it('requires exactly one credential provider for automatic enrollment', async () => {
+    const { service, context } = createService();
+    (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = jest.fn().mockResolvedValue({});
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({
+      availableProviders: jest.fn().mockResolvedValue(['provider-a', 'provider-b']),
+    });
+
+    await expect(service.enrollmentCredentialSupport(2)).resolves.toEqual({ automatic: false });
+  });
+
+  it('defers repository access until plugin module initialization', async () => {
+    const { service, context } = createService([], [], null, false);
+
+    expect(context.getRepository).not.toHaveBeenCalled();
+
+    await service.onModuleInit();
+
+    expect(context.getRepository).toHaveBeenCalledTimes(5);
   });
 
   it('creates default settings when none have been persisted', async () => {
@@ -164,6 +193,28 @@ describe('WagoService', () => {
     expect(settingsQuery.orIgnore).toHaveBeenCalled();
   });
 
+  it('keeps the host running when initial WAGO MQTT subscriptions fail', async () => {
+    const { service, context } = createService([], [], 2);
+    (context.mqtt.subscribe as jest.Mock).mockRejectedValue(new Error('broker unavailable'));
+
+    await expect(service.onModuleInit()).resolves.toBeUndefined();
+
+    expect(context.logger.warn).toHaveBeenCalledWith(
+      'Could not establish WAGO MQTT subscriptions during startup: Error: broker unavailable',
+    );
+    service.onModuleDestroy();
+  });
+
+  it('fails startup when WAGO subscription configuration cannot be read', async () => {
+    const { service, context, settingsRepository } = createService([], [], 2);
+    settingsRepository.findOneBy.mockRejectedValue(new Error('settings unavailable'));
+
+    await expect(service.onModuleInit()).rejects.toThrow('settings unavailable');
+
+    expect(context.logger.warn).not.toHaveBeenCalled();
+    service.onModuleDestroy();
+  });
+
   it('preserves the MQTT server during a prefix-only settings update', async () => {
     const { service, settingsRepository } = createService([], [], 2);
 
@@ -172,6 +223,17 @@ describe('WagoService', () => {
     expect(settingsRepository.save).toHaveBeenCalledWith(
       expect.objectContaining({ defaultMqttServerId: 2, operationalPrefix: 'customer/wago' }),
     );
+  });
+
+  it('reports whether an MQTT server can provision discovery credentials', async () => {
+    const { service, context } = createService();
+    const getMqttServerConfig = jest.fn().mockResolvedValue({ id: 2 });
+    const availableProviders = jest.fn().mockResolvedValue([{ providerId: 'rabbitmq', displayName: 'RabbitMQ' }]);
+    (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = getMqttServerConfig;
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({ availableProviders });
+
+    await expect(service.enrollmentCredentialSupport(2)).resolves.toEqual({ automatic: true });
+    expect(availableProviders).toHaveBeenCalledWith(2);
   });
 
   it('requires a non-empty matching fingerprint', () => {
@@ -242,6 +304,66 @@ describe('WagoService', () => {
       { qos: 1, retain: true },
     );
     expect(revisionRepository.save).toHaveBeenCalledWith(expect.objectContaining({ revision: 1 }));
+  });
+
+  it('copies only selected preset changes into the editable draft and records provenance', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, draftRepository } = createService([claimed]);
+    const snapshot = { version: 1, physicalPoints: [{ id: 'point-a', hardwareProfile: '751-9301', channel: 0 }], logicalChannels: [] };
+    let draft: Record<string, unknown> | null = { controllerId: claimed.id, snapshot: JSON.stringify(snapshot), reviewedHash: null, presetProvenance: null, updatedAt: '' };
+    draftRepository.findOneBy.mockImplementation(async () => draft);
+    draftRepository.save.mockImplementation(async (value) => {
+      draft = value;
+      return value;
+    });
+    const application = { presetId: 'generic-digital-output' as const, channelId: 'output-a', physicalPointId: 'point-a' };
+    const preview = await service.previewPreset(claimed.id, application);
+
+    await service.applyPreset(claimed.id, application, [], preview.draftHash);
+    const unchanged = draft as Record<string, unknown>;
+    expect(JSON.parse(unchanged.snapshot as string).logicalChannels).toEqual([]);
+
+    await service.applyPreset(claimed.id, application, preview.diff.map((change) => change.path), preview.draftHash);
+    const applied = draft as Record<string, unknown>;
+    expect(JSON.parse(applied.snapshot as string).logicalChannels).toEqual([expect.objectContaining({ id: 'output-a' })]);
+    expect(applied.presetProvenance).toContain('generic-digital-output');
+  });
+
+  it('rejects applying a preset against a draft changed since its preview', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, draftRepository } = createService([claimed]);
+    const snapshot = { version: 1, physicalPoints: [{ id: 'point-a', hardwareProfile: '751-9301', channel: 0 }], logicalChannels: [] };
+    const draft = { controllerId: claimed.id, snapshot: JSON.stringify(snapshot), reviewedHash: null, presetProvenance: null, updatedAt: '' };
+    draftRepository.findOneBy.mockResolvedValue(draft);
+    const application = { presetId: 'generic-digital-output' as const, channelId: 'output-a', physicalPointId: 'point-a' };
+    const preview = await service.previewPreset(claimed.id, application);
+
+    draft.snapshot = JSON.stringify({ ...snapshot, physicalPoints: [{ ...snapshot.physicalPoints[0], channel: 1 }] });
+
+    await expect(service.applyPreset(claimed.id, application, preview.diff.map((change) => change.path), preview.draftHash)).rejects.toThrow(
+      'selected preset changes no longer match the configuration draft',
+    );
+  });
+
+  it('retains only the latest 100 preset provenance entries', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, draftRepository } = createService([claimed]);
+    const snapshot = { version: 1, physicalPoints: [{ id: 'point-a', hardwareProfile: '751-9301', channel: 0 }], logicalChannels: [] };
+    const draft = {
+      controllerId: claimed.id,
+      snapshot: JSON.stringify(snapshot),
+      reviewedHash: null,
+      presetProvenance: JSON.stringify(Array.from({ length: 100 }, (_, index) => ({ presetId: `preset-${index}` }))),
+      updatedAt: '',
+    };
+    draftRepository.findOneBy.mockResolvedValue(draft);
+    const application = { presetId: 'generic-digital-output' as const, channelId: 'output-a', physicalPointId: 'point-a' };
+    const preview = await service.previewPreset(claimed.id, application);
+
+    await service.applyPreset(claimed.id, application, preview.diff.map((change) => change.path), preview.draftHash);
+
+    expect(JSON.parse(draft.presetProvenance)).toHaveLength(100);
+    expect(JSON.parse(draft.presetProvenance)[0]).toEqual({ presetId: 'preset-1' });
   });
 
   it('rejects publication for a claimed runtime without the configuration contract', async () => {

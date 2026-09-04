@@ -1,4 +1,24 @@
-import { resolveAppVersion } from './app.config';
+import { AppEnvSchema, DEFAULT_PLUGIN_DIR, resolveAppVersion, resolvePluginDir } from './app.config';
+
+describe('plugin directory configuration', () => {
+  it('defaults PLUGIN_DIR when it is not configured', () => {
+    expect(AppEnvSchema.parse({ AUTH_SESSION_SECRET: 'test-secret' }).PLUGIN_DIR).toBe(resolvePluginDir());
+  });
+
+  it('uses the configured storage root for the default plugin directory', () => {
+    expect(resolvePluginDir({ STORAGE_ROOT: '/custom/storage' })).toBe('/custom/storage/plugins');
+  });
+
+  it('uses the default storage root when neither directory is configured', () => {
+    expect(resolvePluginDir({})).toBe(DEFAULT_PLUGIN_DIR);
+  });
+
+  it('preserves an explicitly configured plugin directory', () => {
+    expect(AppEnvSchema.parse({ AUTH_SESSION_SECRET: 'test-secret', PLUGIN_DIR: '/custom/plugins' }).PLUGIN_DIR).toBe(
+      '/custom/plugins',
+    );
+  });
+});
 
 describe('resolveAppVersion', () => {
   it('prefers the webpack-injected build-time version over any env var', () => {

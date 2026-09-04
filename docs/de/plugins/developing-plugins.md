@@ -184,11 +184,11 @@ Plugins, die **innerhalb dieses Monorepos** gepflegt werden, sind vollwertige
   `--exclude=...,tag:type:plugin` aus — analog zu `scope:hardware`.
 - **Build-Rezept:** die esbuild/Vite/zip-Schritte sind über
   `apps/plugins/scripts/` geteilt und in nx-Targets verdrahtet
-  (`build-backend`, `build-frontend`, `build`, `package`).
+  (`build-backend`, `build-frontend`, `build`, `zip`, `pack`).
 
 ```bash
-# Eine Plugin-App bauen und zippen:
-pnpm nx package plugin-rabbitmq
+# Eine ZIP für den Upload in der Plugins-Oberfläche bauen:
+pnpm nx zip plugin-rabbitmq
 # Alle Plugin-Apps auflisten:
 pnpm nx show projects --projects=tag:type:plugin
 ```

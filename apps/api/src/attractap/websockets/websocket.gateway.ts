@@ -11,12 +11,7 @@ import { Server } from 'ws';
 import { closeSync } from 'fs';
 import { Inject, Logger, UseInterceptors } from '@nestjs/common';
 import { WebsocketService } from './websocket.service';
-import {
-  AuthenticatedWebSocket,
-  AttractapEvent,
-  AttractapMessage,
-  AttractapEventType,
-} from './websocket.types';
+import { AuthenticatedWebSocket, AttractapEvent, AttractapMessage, AttractapEventType } from './websocket.types';
 import { AttractapService } from '../attractap.service';
 import { randomBytes } from 'crypto';
 import { Mutex } from 'async-mutex';
@@ -497,6 +492,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
       case AttractapEventType.RESOURCE_USAGE_FORM_SUBMIT_PAGE:
         await this.formsHandler.handleResourceUsageFormSubmitPage(socket, eventData);
+        break;
+
+      case AttractapEventType.RESOURCE_USAGE_FORM_CANCEL:
+        this.formsHandler.handleResourceUsageFormCancel(socket, eventData);
         break;
 
       case AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED:

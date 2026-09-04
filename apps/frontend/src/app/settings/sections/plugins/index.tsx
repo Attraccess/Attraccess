@@ -1,6 +1,10 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
   Card,
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
   Chip,
   DrawerBody,
   DrawerFooter,
@@ -134,6 +138,8 @@ export function PluginsSection() {
   const toast = useToastMessage();
 
   const { data: plugins } = usePluginsServiceGetPlugins();
+  const [pluginsDisabled, setPluginsDisabled] = useState(false);
+  const [failedPlugin, setFailedPlugin] = useState<{ name: string; error: string } | null>(null);
   const [pluginToDelete, setPluginToDelete] = useState<string | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [versionPlugin, setVersionPlugin] = useState<VersionPlugin | null>(null);
@@ -180,6 +186,14 @@ export function PluginsSection() {
           new Map<string, InstalledNpmPlugin>(installed.map((plugin) => [plugin.name, plugin] as const)),
         );
       })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!globalThis.fetch) return;
+    void fetch(`${getBaseUrl()}/api/plugins/status`, { credentials: 'include' })
+      .then(async (response) => (response.ok ? (response.json() as Promise<{ disabled?: boolean }>) : undefined))
+      .then((status) => setPluginsDisabled(status?.disabled === true))
       .catch(() => undefined);
   }, []);
 
@@ -465,6 +479,14 @@ export function PluginsSection() {
   return (
     <SettingsSection title={t('title')} description={t('description')} aside={aside}>
       <div data-cy="plugins-list-card" className="flex flex-col gap-4">
+        {pluginsDisabled ? (
+          <Alert status="warning" data-cy="plugins-disabled-warning">
+            <AlertContent>
+              <AlertTitle>{t('disabledWarning.title')}</AlertTitle>
+              <AlertDescription>{t('disabledWarning.description')}</AlertDescription>
+            </AlertContent>
+          </Alert>
+        ) : null}
         <div className="flex justify-end">
           <Dropdown>
             <DropdownTrigger
@@ -549,15 +571,23 @@ export function PluginsSection() {
                     </TableCell>
                     <TableCell>
                       {plugin.status === 'error' ? (
-                        <Tooltip>
-                          <Chip variant="soft" color="danger" data-cy={`plugins-list-status-${plugin.id}`}>
-                            <span className="inline-flex items-center gap-1">
-                              <AlertTriangle size={14} />
-                              {t('status.error')}
-                            </span>
-                          </Chip>
-                          <TooltipContent>{t('status.errorTooltip', { message: plugin.error ?? '' })}</TooltipContent>
-                        </Tooltip>
+                        <button
+                          type="button"
+                          className="rounded-medium outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                          onClick={() => setFailedPlugin({ name: plugin.name, error: plugin.error ?? '' })}
+                          aria-label={t('status.viewError', { pluginName: plugin.name })}
+                          data-cy={`plugins-list-status-${plugin.id}`}
+                        >
+                          <Tooltip>
+                            <Chip variant="soft" color="danger">
+                              <span className="inline-flex items-center gap-1">
+                                <AlertTriangle size={14} />
+                                {t('status.error')}
+                              </span>
+                            </Chip>
+                            <TooltipContent>{t('status.errorTooltip')}</TooltipContent>
+                          </Tooltip>
+                        </button>
                       ) : plugin.status === 'loaded' ? (
                         <Chip variant="soft" color="success" data-cy={`plugins-list-status-${plugin.id}`}>
                           <span className="inline-flex items-center gap-1">
@@ -639,6 +669,32 @@ export function PluginsSection() {
             </TableContent>
           </TableScrollContainer>
         </Table>
+
+        <StandardModal
+          isOpen={failedPlugin !== null}
+          onOpenChange={(open) => !open && setFailedPlugin(null)}
+          data-cy="plugins-list-load-error-modal"
+          size="md"
+        >
+          {({ close }) => (
+            <>
+              <ModalHeader>
+                <ModalHeading>{t('status.errorTitle', { pluginName: failedPlugin?.name ?? '' })}</ModalHeading>
+              </ModalHeader>
+              <ModalBody>
+                <p className="text-sm text-muted">{t('status.errorDescription')}</p>
+                <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-medium border border-divider p-3 text-sm text-danger">
+                  {failedPlugin?.error}
+                </pre>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="secondary" onPress={close}>
+                  {t('status.close')}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </StandardModal>
 
         <StandardModal
           isOpen={isMarketplaceOpen}

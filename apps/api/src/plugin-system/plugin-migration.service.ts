@@ -228,7 +228,9 @@ export class PluginMigrationService {
    * plugin can never block host boot.
    */
   public static async runPendingUpMigrationsForAllPlugins(): Promise<void> {
-    const plugins = PluginService.getPlugins().filter((manifest) => PluginMigrationService.hasMigrations(manifest));
+    const plugins = PluginService.getPlugins().filter(
+      (manifest) => PluginMigrationService.hasMigrations(manifest) && !PluginService.isPluginQuarantined(manifest),
+    );
 
     if (plugins.length === 0) {
       return;
@@ -244,7 +246,7 @@ export class PluginMigrationService {
           `Failed to run migrations for plugin "${manifest.name}"; the plugin will be flagged as failed.`,
           error as Error
         );
-        PluginService.setPluginLoadError(`${manifest.name}@${manifest.version}`, error as Error);
+        PluginService.quarantinePlugin(manifest, error as Error);
       }
     }
   }

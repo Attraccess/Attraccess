@@ -25,7 +25,7 @@ MQTT allows Attraccess to interact with physical hardware in your makerspace:
 
 ## How It Works in Attraccess
 
-1. You connect Attraccess to an MQTT broker (see [Server Setup](mqtt/server-setup.md))
+1. You connect Attraccess to an MQTT broker (see [Server Setup](devices/mqtt/server-setup.md))
 2. You create [Flows](flows/overview.md) that use MQTT nodes to send or receive messages
 3. When a flow triggers, Attraccess publishes or subscribes to MQTT topics
 4. Your machines and devices respond to (or send) these messages
@@ -47,13 +47,13 @@ MQTT is deeply integrated with the [Flow system](flows/overview.md). You can use
 ## Getting Started
 
 1. Set up an MQTT broker (or use an existing one)
-2. [Connect Attraccess to the broker](mqtt/server-setup.md)
+2. [Connect Attraccess to the broker](devices/mqtt/server-setup.md)
 3. Create flows that use MQTT nodes
 4. Connect your machines and sensors to the same broker
 
 ## See Also
 
-- [Server Setup](mqtt/server-setup.md) -- Connect Attraccess to an MQTT broker
-- [Examples](mqtt/examples.md) -- Practical MQTT integration examples
+- [Server Setup](devices/mqtt/server-setup.md) -- Connect Attraccess to an MQTT broker
+- [Examples](devices/mqtt/examples.md) -- Practical MQTT integration examples
 - [Flows & Automation](flows/overview.md) -- Create automation workflows
 - [Node Types](flows/node-types.md) -- All available flow nodes including MQTT
