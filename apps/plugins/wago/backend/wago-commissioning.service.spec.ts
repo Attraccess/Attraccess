@@ -47,6 +47,38 @@ describe('WagoCommissioningService', () => {
     expect(context.getRepository).toHaveBeenCalledWith(WagoCommissioningSession);
   });
 
+  it('does not add a sudo password to root command input', async () => {
+    const service = new WagoCommissioningService({} as PluginContext, {} as WagoService);
+    const run = jest.fn().mockResolvedValue('');
+    service['run'] = run;
+
+    await service['sudoRun']('192.168.1.10', 'SHA256:test', { username: 'root', password: 'wago' }, 'base64 -d | sh', 'script');
+
+    expect(run).toHaveBeenCalledWith(
+      '192.168.1.10',
+      'SHA256:test',
+      { username: 'root', password: 'wago' },
+      'base64 -d | sh',
+      'script',
+    );
+  });
+
+  it('sends a sudo password before command input for alternate SSH users', async () => {
+    const service = new WagoCommissioningService({} as PluginContext, {} as WagoService);
+    const run = jest.fn().mockResolvedValue('');
+    service['run'] = run;
+
+    await service['sudoRun']('192.168.1.10', 'SHA256:test', { username: 'operator', password: 'secret' }, 'base64 -d | sh', 'script');
+
+    expect(run).toHaveBeenCalledWith(
+      '192.168.1.10',
+      'SHA256:test',
+      { username: 'operator', password: 'secret' },
+      "sudo -S sh -c 'base64 -d | sh'",
+      'secret\nscript',
+    );
+  });
+
   it('waits for ssh-keygen before removing the scanned host key', async () => {
     const mockedSpawn = jest.mocked(spawn);
     mockedSpawn.mockImplementation(((command: string, args: string[]) => {

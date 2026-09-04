@@ -231,6 +231,7 @@ export class WagoCommissioningService implements OnModuleInit {
     command: string,
     input?: string,
   ): Promise<string> {
+    if (credential.username === 'root') return this.run(host, fingerprint, credential, command, input);
     return this.run(host, fingerprint, credential, `sudo -S sh -c ${shellQuote(command)}`, `${credential.password}\n${input ?? ''}`);
   }
 
