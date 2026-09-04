@@ -203,7 +203,7 @@ describe('WagoCommissioningService', () => {
       updatedAt: '',
     } as WagoCommissioningSession;
     const repository = {
-      find: jest.fn().mockResolvedValue([session]),
+      find: jest.fn().mockResolvedValueOnce([session]).mockResolvedValue([]),
       findOneBy: jest.fn().mockResolvedValue(session),
       save: jest.fn().mockImplementation(async (value) => value),
     };
@@ -230,7 +230,7 @@ describe('WagoCommissioningService', () => {
     expect(session).toMatchObject({ pairingCode: null, state: 'revoked' });
   });
 
-  it('continues bounded legacy verifier cleanup after a revocation failure', async () => {
+  it('does not register commissioning discovery when initial legacy verifier cleanup fails', async () => {
     const first = {
       id: 1,
       pairingCode: 'plaintext-first',
@@ -241,6 +241,7 @@ describe('WagoCommissioningService', () => {
     } as WagoCommissioningSession;
     const second = { ...first, id: 2, pairingCode: 'plaintext-second', enrollmentId: 3 };
     const sessions = [first, second];
+    const registerCommissioningDiscoveryHandler = jest.fn();
     const repository = {
       find: jest.fn().mockResolvedValue(sessions),
       findOneBy: jest.fn().mockImplementation(async ({ id }) => sessions.find((session) => session.id === id) ?? null),
@@ -252,16 +253,17 @@ describe('WagoCommissioningService', () => {
       .mockResolvedValueOnce(undefined);
     const service = new WagoCommissioningService(
       { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext,
-      { registerCommissioningDiscoveryHandler: jest.fn(), revokeEnrollmentById } as unknown as WagoService,
+      { registerCommissioningDiscoveryHandler, revokeEnrollmentById } as unknown as WagoService,
     );
 
-    await service.onApplicationBootstrap();
+    await expect(service.onApplicationBootstrap()).rejects.toThrow('unavailable');
 
     expect(repository.find).toHaveBeenCalledWith(expect.objectContaining({ order: { id: 'ASC' }, take: 100 }));
     expect(revokeEnrollmentById).toHaveBeenCalledWith(first.enrollmentId);
     expect(revokeEnrollmentById).toHaveBeenCalledWith(second.enrollmentId);
     expect(first).toMatchObject({ pairingCode: 'plaintext-first', state: 'awaiting_delivery' });
     expect(second).toMatchObject({ pairingCode: null, state: 'revoked' });
+    expect(registerCommissioningDiscoveryHandler).not.toHaveBeenCalled();
   });
 
   it('does not expose stored commissioning verifiers in session lists', async () => {
