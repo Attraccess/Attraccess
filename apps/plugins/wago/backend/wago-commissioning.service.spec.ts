@@ -194,7 +194,7 @@ describe('WagoCommissioningService', () => {
   });
 
   it('finishes legacy verifier cleanup before discovery work is registered', async () => {
-    const session = {
+    const firstSession = {
       id: 1,
       pairingCode: 'plaintext',
       enrollmentId: 2,
@@ -202,9 +202,16 @@ describe('WagoCommissioningService', () => {
       auditLog: '[]',
       updatedAt: '',
     } as WagoCommissioningSession;
+    const secondSession = { ...firstSession, id: 2, enrollmentId: 3 };
     const repository = {
-      find: jest.fn().mockResolvedValueOnce([session]).mockResolvedValue([]),
-      findOneBy: jest.fn().mockResolvedValue(session),
+      find: jest
+        .fn()
+        .mockResolvedValueOnce([firstSession])
+        .mockResolvedValueOnce([secondSession])
+        .mockResolvedValue([]),
+      findOneBy: jest
+        .fn()
+        .mockImplementation(async ({ id }) => (id === firstSession.id ? firstSession : secondSession)),
       save: jest.fn().mockImplementation(async (value) => value),
     };
     let finishRevocation!: () => void;
@@ -214,12 +221,14 @@ describe('WagoCommissioningService', () => {
       { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext,
       {
         registerCommissioningDiscoveryHandler,
-        revokeEnrollmentById: jest.fn().mockReturnValue(revocation),
+        revokeEnrollmentById: jest
+          .fn()
+          .mockImplementation((id) => (id === secondSession.enrollmentId ? revocation : undefined)),
       } as unknown as WagoService,
     );
 
     const bootstrap = service.onApplicationBootstrap();
-    await Promise.resolve();
+    await new Promise(setImmediate);
 
     expect(registerCommissioningDiscoveryHandler).not.toHaveBeenCalled();
 
@@ -227,7 +236,8 @@ describe('WagoCommissioningService', () => {
     await bootstrap;
 
     expect(registerCommissioningDiscoveryHandler).toHaveBeenCalled();
-    expect(session).toMatchObject({ pairingCode: null, state: 'revoked' });
+    expect(firstSession).toMatchObject({ pairingCode: null, state: 'revoked' });
+    expect(secondSession).toMatchObject({ pairingCode: null, state: 'revoked' });
   });
 
   it('does not register commissioning discovery when initial legacy verifier cleanup fails', async () => {

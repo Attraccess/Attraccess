@@ -40,12 +40,12 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
   async onApplicationBootstrap(): Promise<void> {
     // The host datasource is available only after plugin module construction completes.
     this.sessions = this.context.getRepository(WagoCommissioningSession);
-    const lastLegacySessionId = await this.revokeLegacyPlaintextPairingCodes();
+    let lastLegacySessionId: number | null = 0;
+    while (lastLegacySessionId !== null) {
+      lastLegacySessionId = await this.revokeLegacyPlaintextPairingCodes(lastLegacySessionId);
+    }
     await this.resumePendingDeliveries();
     this.wago.registerCommissioningDiscoveryHandler((controller) => this.claimDiscovered(controller));
-    void this.continueLegacyPlaintextPairingCodeRevocation(lastLegacySessionId).catch((error) =>
-      this.context.logger?.warn(`Could not continue legacy WAGO verifier cleanup: ${String(error)}`),
-    );
     void this.reconcileCompletedSessions().catch((error) =>
       this.context.logger?.warn(`Could not retire superseded WAGO commissioning sessions: ${String(error)}`),
     );
@@ -626,10 +626,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     return this.context.secrets.decrypt(session.pairingCode);
   }
 
-  private async revokeLegacyPlaintextPairingCodes(
-    afterId = 0,
-    continueOnError = false,
-  ): Promise<number | null> {
+  private async revokeLegacyPlaintextPairingCodes(afterId = 0): Promise<number | null> {
     const sessions = await this.sessions.find({
       where: { id: MoreThan(afterId), pairingCode: Not(Like('v1.%')) },
       order: { id: 'ASC' },
@@ -656,7 +653,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
               this.context.logger?.warn(
                 `Could not revoke legacy WAGO commissioning session ${current.id}: ${String(error)}`,
               );
-              if (!continueOnError) throw error;
+              throw error;
             }
           }),
         ),
@@ -665,16 +662,6 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
 
     return sessions.at(-1)?.id ?? null;
   }
-
-  private async continueLegacyPlaintextPairingCodeRevocation(lastId: number | null): Promise<void> {
-    let afterId = lastId ?? 0;
-    while (true) {
-      const nextLastId = await this.revokeLegacyPlaintextPairingCodes(afterId, true);
-      if (nextLastId === null) return;
-      afterId = nextLastId;
-    }
-  }
-
   private async reconcileCompletedSessions(): Promise<void> {
     const sessions = await this.sessions.find({ where: { state: 'completed' } });
     await Promise.all(sessions.map((session) => this.retireSupersededSessions(session.hardwareId, session.id)));
