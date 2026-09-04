@@ -1,14 +1,6 @@
 // Device info drawer (ATT-498): reads Shelly Gen 1/2+ status + config from the
 // device via the plugin backend and renders a summary card grid.
-import {
-  Button,
-  Card,
-  DrawerBody,
-  DrawerFooter,
-  DrawerHeader,
-  Form,
-  Skeleton,
-} from '@heroui/react';
+import { Button, Card, DrawerBody, DrawerFooter, DrawerHeader, Form, Skeleton } from '@heroui/react';
 import { EyeIcon, EyeOffIcon, InfoIcon, RefreshCwIcon, XIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { getDeviceInfo, type AuthState, type ShellyDevice, type ShellyDeviceInfo } from './api';
@@ -75,48 +67,42 @@ function AuthProtectedForm({
 
   return (
     <div className="sh:rounded-md sh:border-l-4 sh:border-l-warning sh:bg-warning/5 sh:p-4">
-        <Form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onLoad();
-          }}
-          className="sh:flex sh:flex-col sh:gap-3"
-        >
-          <p className="sh:text-sm">
-            This device requires authentication. Enter its admin password to read protected info.
-          </p>
-          <div className="sh:relative">
-            <TextFieldRow
-              label="Admin password"
-              value={currentPassword}
-              onChange={onChange}
-              placeholder="device admin password"
-              dataCy="shelly-info-current-password"
-            />
-            <Button
-              isIconOnly
-              variant="ghost"
-              size="sm"
-              aria-label={visible ? 'Hide password' : 'Show password'}
-              className="sh:absolute sh:right-1 sh:top-6"
-              onPress={() => setVisible((v) => !v)}
-            >
-              {visible ? <EyeOffIcon className="sh:h-4 sh:w-4" /> : <EyeIcon className="sh:h-4 sh:w-4" />}
-            </Button>
-          </div>
-          <div className="sh:flex sh:justify-end">
-            <Button
-              variant="primary"
-              size="sm"
-              isPending={loading}
-              onPress={onLoad}
-              data-cy="shelly-info-unlock"
-            >
-              Load info
-            </Button>
-          </div>
-          <input type="submit" hidden />
-        </Form>
+      <Form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onLoad();
+        }}
+        className="sh:flex sh:flex-col sh:gap-3"
+      >
+        <p className="sh:text-sm">
+          This device requires authentication. Enter its admin password to read protected info.
+        </p>
+        <div className="sh:relative">
+          <TextFieldRow
+            label="Admin password"
+            value={currentPassword}
+            onChange={onChange}
+            placeholder="device admin password"
+            dataCy="shelly-info-current-password"
+          />
+          <Button
+            isIconOnly
+            variant="ghost"
+            size="sm"
+            aria-label={visible ? 'Hide password' : 'Show password'}
+            className="sh:absolute sh:right-1 sh:top-6"
+            onPress={() => setVisible((v) => !v)}
+          >
+            {visible ? <EyeOffIcon className="sh:h-4 sh:w-4" /> : <EyeIcon className="sh:h-4 sh:w-4" />}
+          </Button>
+        </div>
+        <div className="sh:flex sh:justify-end">
+          <Button variant="primary" size="sm" isPending={loading} onPress={onLoad} data-cy="shelly-info-unlock">
+            Load info
+          </Button>
+        </div>
+        <input type="submit" hidden />
+      </Form>
     </div>
   );
 }
@@ -169,7 +155,9 @@ export function DeviceInfoCards({ info }: { info: ShellyDeviceInfo }) {
             <dl className="sh:grid sh:grid-cols-1 sh:gap-3 sh:sm:grid-cols-2">
               {card.rows.map((row) => (
                 <div key={row.label} className="sh:min-w-0">
-                  <dt className="sh:text-xs sh:font-medium sh:uppercase sh:tracking-wide sh:text-default-500">{row.label}</dt>
+                  <dt className="sh:text-xs sh:font-medium sh:uppercase sh:tracking-wide sh:text-default-500">
+                    {row.label}
+                  </dt>
                   <dd className="sh:mt-1 sh:truncate sh:text-sm sh:text-default-800" title={row.value}>
                     {row.value}
                   </dd>
@@ -233,9 +221,7 @@ export function DeviceInfoDrawer({
               <InfoIcon className="sh:h-5 sh:w-5 sh:shrink-0 sh:text-accent-soft-foreground" />
               <h2 className="sh:text-lg sh:font-semibold">{device?.name ?? 'Device info'}</h2>
             </div>
-            {device && (
-              <p className="sh:text-sm sh:text-muted">{device.ipAddress}</p>
-            )}
+            {device && <p className="sh:text-sm sh:text-muted">{device.ipAddress}</p>}
           </div>
           <Button isIconOnly variant="ghost" aria-label="Close" onPress={close}>
             <XIcon size={16} />

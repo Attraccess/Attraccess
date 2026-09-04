@@ -41,6 +41,7 @@ module.exports = [
       ],
       'no-warning-comments': 'off',
       'no-console': 'error',
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     },
   },
   // ATT-294 / ATT-834: the "no form fields inside a Card" guard is not an ESLint rule.
@@ -52,10 +53,10 @@ module.exports = [
   // Add special configuration for CI environment that converts warnings to errors
   ...(process.env.CI === 'true'
     ? [
-      {
-        files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx', '**/*.cjs', '**/*.mjs'],
-        rules: {},
-      },
-    ]
+        {
+          files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx', '**/*.cjs', '**/*.mjs'],
+          rules: {},
+        },
+      ]
     : []),
 ];

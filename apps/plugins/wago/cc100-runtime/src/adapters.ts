@@ -23,7 +23,10 @@ export class Cc100OnboardIoAdapter implements DeviceAdapter {
 }
 
 export class ModbusTcpAdapter implements DeviceAdapter {
-  constructor(private readonly host: string, private readonly port = 502) {}
+  constructor(
+    private readonly host: string,
+    private readonly port = 502,
+  ) {}
 
   async write(point: Point, value: boolean): Promise<void> {
     await this.request(5, point.channel, value ? 0xff00 : 0);
@@ -84,8 +87,14 @@ export class Rs485ModbusAdapter implements DeviceAdapter {
 
 export class MemoryDeviceAdapter implements DeviceAdapter {
   readonly values = new Map<string, boolean | number>();
-  async write(point: Point, value: boolean): Promise<void> { this.values.set(key(point), value); }
-  async read(point: Point): Promise<boolean | number> { return this.values.get(key(point)) ?? false; }
+  async write(point: Point, value: boolean): Promise<void> {
+    this.values.set(key(point), value);
+  }
+  async read(point: Point): Promise<boolean | number> {
+    return this.values.get(key(point)) ?? false;
+  }
 }
 
-function key(point: Point): string { return `${point.hardwareProfile}:${point.channel}`; }
+function key(point: Point): string {
+  return `${point.hardwareProfile}:${point.channel}`;
+}

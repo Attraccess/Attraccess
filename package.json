@@ -7,7 +7,7 @@
     "seed:dev": "node scripts/seed-dev-user.mjs",
     "lint:strict": "nx affected -t lint -- --max-warnings=0",
     "prepare": "husky",
-    "precommit": "pnpm nx affected --uncommitted --nxBail --target=lint,typecheck,build,test,e2e --exclude=tag:scope:hardware,tag:scope:companion",
+    "precommit": "pnpm nx affected --uncommitted --nxBail --target=lint,typecheck,build,test,e2e --exclude=tag:scope:hardware,tag:scope:companion,tag:type:plugin && pnpm nx affected --uncommitted --nxBail --target=lint --exclude='*,!tag:type:plugin'",
     "precommit:all": "pnpm nx run-many -t lint,typecheck,build,test,e2e",
     "services": "node --experimental-strip-types scripts/services-compose.mts"
   },

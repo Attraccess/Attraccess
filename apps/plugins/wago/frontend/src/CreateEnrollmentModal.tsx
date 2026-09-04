@@ -70,8 +70,10 @@ export function CreateEnrollmentModal({ isOpen, onOpenChange, onOpenSettings }: 
     createEnrollmentMutation.mutate({
       hardwareId,
       mqttServerId: selectedMqttServerId ?? undefined,
-      manualUsername: useCustomCredentials || credentialSupportQuery.data?.automatic === false ? manualUsername : undefined,
-      manualPassword: useCustomCredentials || credentialSupportQuery.data?.automatic === false ? manualPassword : undefined,
+      manualUsername:
+        useCustomCredentials || credentialSupportQuery.data?.automatic === false ? manualUsername : undefined,
+      manualPassword:
+        useCustomCredentials || credentialSupportQuery.data?.automatic === false ? manualPassword : undefined,
     });
   }
 
@@ -144,7 +146,9 @@ export function CreateEnrollmentModal({ isOpen, onOpenChange, onOpenSettings }: 
                       <Select.Popover>
                         <ListBox
                           renderEmptyState={() => (
-                            <span className="wg:block wg:p-3 wg:text-sm wg:text-muted">No MQTT servers configured.</span>
+                            <span className="wg:block wg:p-3 wg:text-sm wg:text-muted">
+                              No MQTT servers configured.
+                            </span>
                           )}
                         >
                           {(mqttServersQuery.data ?? []).map((server) => (
@@ -176,7 +180,9 @@ export function CreateEnrollmentModal({ isOpen, onOpenChange, onOpenSettings }: 
                   {credentialSupportQuery.data?.automatic && (
                     <Checkbox isSelected={useCustomCredentials} onChange={setUseCustomCredentials}>
                       <Checkbox.Content>
-                        <Checkbox.Control><Checkbox.Indicator /></Checkbox.Control>
+                        <Checkbox.Control>
+                          <Checkbox.Indicator />
+                        </Checkbox.Control>
                         Use custom discovery credentials
                       </Checkbox.Content>
                     </Checkbox>
@@ -184,8 +190,8 @@ export function CreateEnrollmentModal({ isOpen, onOpenChange, onOpenSettings }: 
                   {needsCustomCredentials && (
                     <>
                       <p className="wg:text-xs wg:text-muted">
-                        This server cannot automatically provision restricted discovery credentials. Enter credentials with
-                        access limited to this controller&apos;s discovery and claim topics.
+                        This server cannot automatically provision restricted discovery credentials. Enter credentials
+                        with access limited to this controller&apos;s discovery and claim topics.
                       </p>
                       <TextField name="manualUsername" isRequired>
                         <Label>Manual discovery username</Label>

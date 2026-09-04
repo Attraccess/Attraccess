@@ -27,7 +27,7 @@ export class CreateShellyDevices1749470400000 implements MigrationInterface {
         "created_at" varchar NOT NULL,
         "updated_at" varchar NOT NULL,
         CONSTRAINT "UQ_plugin_shelly_devices_ip_address" UNIQUE ("ip_address")
-      )`
+      )`,
     );
   }
 

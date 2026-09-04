@@ -30,7 +30,11 @@ export const WAGO_PRESETS = [
     description: 'Makes a non-safety enable request only while an operational guard is satisfied.',
   },
   { id: 'generic-digital-output', name: 'Generic digital output', description: 'A conservative output foundation.' },
-  { id: 'generic-monitored-input', name: 'Generic monitored input', description: 'A monitored digital input foundation.' },
+  {
+    id: 'generic-monitored-input',
+    name: 'Generic monitored input',
+    description: 'A monitored digital input foundation.',
+  },
 ] as const;
 
 export interface WagoConfigurationSnapshot {
@@ -59,7 +63,10 @@ export interface WagoPresetApplication {
   feedbackChannelId?: string;
 }
 
-export function applyPreset(snapshot: WagoConfigurationSnapshot, application: WagoPresetApplication): WagoConfigurationSnapshot {
+export function applyPreset(
+  snapshot: WagoConfigurationSnapshot,
+  application: WagoPresetApplication,
+): WagoConfigurationSnapshot {
   const preset = application && WAGO_PRESETS.find((item) => item.id === application.presetId);
   if (!preset) throw new Error('unknown WAGO preset');
   const channel = presetChannel(application);
@@ -267,7 +274,9 @@ function exactKeys(
       }),
     );
   allowed
-    .filter((key) => !['range', 'pulse', 'guard', 'feedback', 'measurement', ...optional].includes(key) && !(key in value))
+    .filter(
+      (key) => !['range', 'pulse', 'guard', 'feedback', 'measurement', ...optional].includes(key) && !(key in value),
+    )
     .forEach((key) =>
       errors.push({
         path: path === '$' ? key : `${path}.${key}`,
@@ -427,14 +436,25 @@ function validateFeedback(
   if (!record(value, path, errors)) return;
   exactKeys(value, path, ['channelId', 'expected', 'timeoutMs'], errors);
   const feedbackChannel = typeof value.channelId === 'string' ? channelsById.get(value.channelId) : undefined;
-  if (!feedbackChannel)
-    errors.push(referenceError(`${path}.channelId`, 'logical channel', value.channelId));
-  else if (value.channelId === currentChannelId || !Array.isArray(feedbackChannel.capabilities) || !feedbackChannel.capabilities.includes('input'))
-    errors.push({ path: `${path}.channelId`, code: 'invalid_feedback_channel', message: 'feedback must reference a distinct input channel' });
+  if (!feedbackChannel) errors.push(referenceError(`${path}.channelId`, 'logical channel', value.channelId));
+  else if (
+    value.channelId === currentChannelId ||
+    !Array.isArray(feedbackChannel.capabilities) ||
+    !feedbackChannel.capabilities.includes('input')
+  )
+    errors.push({
+      path: `${path}.channelId`,
+      code: 'invalid_feedback_channel',
+      message: 'feedback must reference a distinct input channel',
+    });
   if (!['match', 'inverse'].includes(value.expected as string))
     errors.push({ path: `${path}.expected`, code: 'unsupported_value', message: 'expected must be match or inverse' });
   if (!Number.isSafeInteger(value.timeoutMs) || (value.timeoutMs as number) <= 0)
-    errors.push({ path: `${path}.timeoutMs`, code: 'invalid_timeout', message: 'timeoutMs must be a positive integer' });
+    errors.push({
+      path: `${path}.timeoutMs`,
+      code: 'invalid_timeout',
+      message: 'timeoutMs must be a positive integer',
+    });
   if (!capabilities.has('feedback'))
     errors.push({ path, code: 'unsupported_field', message: 'feedback requires feedback capability' });
 }

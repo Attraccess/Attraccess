@@ -38,14 +38,20 @@ export function FirmwareCell({ entry }: { entry: FirmwareOverviewEntry | undefin
   }
   if (entry.error || !entry.status) {
     return (
-      <span className="sh:block sh:max-w-40 sh:truncate sh:text-sm sh:text-default-400" title={entry.error ?? undefined}>
+      <span
+        className="sh:block sh:max-w-40 sh:truncate sh:text-sm sh:text-default-400"
+        title={entry.error ?? undefined}
+      >
         Unavailable
       </span>
     );
   }
   return (
     <div className="sh:flex sh:flex-col sh:gap-1">
-      <span className="sh:block sh:max-w-40 sh:truncate sh:text-sm sh:text-default-700" title={entry.status.currentVersion ?? undefined}>
+      <span
+        className="sh:block sh:max-w-40 sh:truncate sh:text-sm sh:text-default-700"
+        title={entry.status.currentVersion ?? undefined}
+      >
         {entry.status.currentVersion ? shortVersion(entry.status.currentVersion) : 'Unknown'}
       </span>
       {entry.status.hasUpdate && entry.status.available.stable && (
@@ -106,7 +112,10 @@ export function FirmwareDetails({ status }: { status: FirmwareStatus | null }) {
     );
   }
   return (
-    <section className="sh:rounded-xl sh:border sh:border-default-200 sh:bg-surface sh:p-4" data-cy="shelly-firmware-details">
+    <section
+      className="sh:rounded-xl sh:border sh:border-default-200 sh:bg-surface sh:p-4"
+      data-cy="shelly-firmware-details"
+    >
       <VersionRow label="Installed" value={status.currentVersion ?? 'Unknown'} />
       <VersionRow label="Stable channel" value={status.available.stable ?? 'Up to date'} />
       <VersionRow label="Beta channel" value={status.available.beta ?? 'Nothing newer'} />
@@ -178,7 +187,7 @@ export function FirmwareDrawer({
         setError(err instanceof Error ? err.message : String(err));
       }
     },
-    [currentPassword, device, status]
+    [currentPassword, device, status],
   );
 
   // While an update runs the device reboots and stops answering — failed polls
@@ -195,7 +204,7 @@ export function FirmwareDrawer({
       if (Date.now() > deadline.current) {
         setInstalling(null);
         setError(
-          'The device did not report the expected firmware version within 5 minutes. Check it and re-check the firmware manually.'
+          'The device did not report the expected firmware version within 5 minutes. Check it and re-check the firmware manually.',
         );
         return;
       }
@@ -268,8 +277,8 @@ export function FirmwareDrawer({
               <span className="sh:flex sh:items-center sh:gap-2">
                 <Spinner size="sm" color="accent" />
                 Installing the {STAGE_LABEL[installing]} firmware
-                {targetVersion.current ? ` (${targetVersion.current})` : ''}. The device reboots during the update and is
-                offline for a moment — this page keeps checking.
+                {targetVersion.current ? ` (${targetVersion.current})` : ''}. The device reboots during the update and
+                is offline for a moment — this page keeps checking.
               </span>
             </StatusAlert>
           )}
@@ -292,7 +301,13 @@ export function FirmwareDrawer({
       {/* Wraps because the install labels carry a version string — three buttons
           on one row overflow a phone-width drawer. */}
       <DrawerFooter className="sh:flex-wrap">
-        <Button variant="secondary" onPress={load} isPending={loading} isDisabled={!!installing} data-cy="shelly-firmware-refresh">
+        <Button
+          variant="secondary"
+          onPress={load}
+          isPending={loading}
+          isDisabled={!!installing}
+          data-cy="shelly-firmware-refresh"
+        >
           <RefreshCwIcon className="sh:h-4 sh:w-4" /> Check again
         </Button>
         {stages.map((stage) => {

@@ -63,7 +63,7 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, worker: (item
 export class DiscoveryService {
   constructor(
     @Inject(DeviceRegistryService) private readonly registry: DeviceRegistryService,
-    @Inject(ShellyProbeService) private readonly probe: ShellyProbeService
+    @Inject(ShellyProbeService) private readonly probe: ShellyProbeService,
   ) {}
 
   /**
@@ -119,7 +119,7 @@ export class DiscoveryService {
   private async persist(
     ipAddress: string,
     source: 'mdns' | 'scan',
-    result: { generation: number; model: string | null; authState: AuthState }
+    result: { generation: number; model: string | null; authState: AuthState },
   ): Promise<DiscoveredDevice> {
     const probeFields = {
       generation: result.generation,

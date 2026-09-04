@@ -44,7 +44,10 @@ export function deleteDevice(id: number): Promise<{ deleted: boolean }> {
 }
 
 // POST so the optional device admin password travels in the body, not the URL.
-export function getDeviceInfo(id: number, input?: { username?: string; currentPassword?: string }): Promise<ShellyDeviceInfo> {
+export function getDeviceInfo(
+  id: number,
+  input?: { username?: string; currentPassword?: string },
+): Promise<ShellyDeviceInfo> {
   return api.request<ShellyDeviceInfo>(`/devices/${id}/info`, { method: 'POST', body: input ?? {} });
 }
 
@@ -71,7 +74,10 @@ export function listFirmware(): Promise<FirmwareOverviewEntry[]> {
   return api.request<FirmwareOverviewEntry[]>('/devices/firmware');
 }
 
-export function getFirmware(id: number, input?: { username?: string; currentPassword?: string }): Promise<FirmwareStatus> {
+export function getFirmware(
+  id: number,
+  input?: { username?: string; currentPassword?: string },
+): Promise<FirmwareStatus> {
   const params = new URLSearchParams();
   if (input?.username) params.set('username', input.username);
   if (input?.currentPassword) params.set('currentPassword', input.currentPassword);
@@ -81,7 +87,7 @@ export function getFirmware(id: number, input?: { username?: string; currentPass
 
 export function startFirmwareUpdate(
   id: number,
-  input: { stage: FirmwareStage; username?: string; currentPassword?: string }
+  input: { stage: FirmwareStage; username?: string; currentPassword?: string },
 ): Promise<{ started: true; stage: FirmwareStage }> {
   return api.request<{ started: true; stage: FirmwareStage }>(`/devices/${id}/firmware/update`, {
     method: 'POST',
@@ -91,7 +97,7 @@ export function startFirmwareUpdate(
 
 export function setAdminPassword(
   id: number,
-  input: { username?: string; currentPassword?: string; password: string }
+  input: { username?: string; currentPassword?: string; password: string },
 ): Promise<ShellyDevice> {
   return api.request<ShellyDevice>(`/devices/${id}/auth`, { method: 'POST', body: input });
 }
