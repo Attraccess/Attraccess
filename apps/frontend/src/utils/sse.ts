@@ -41,7 +41,13 @@ async function consume(url: string, connection: SseConnection) {
           continue;
         }
 
-        connection.subscribers.forEach((subscriber) => subscriber(nextPacket));
+        connection.subscribers.forEach((subscriber) => {
+          try {
+            subscriber(nextPacket);
+          } catch (subscriberError) {
+            console.error('[SSE] Subscriber error:', subscriberError);
+          }
+        });
       } catch (parseError) {
         console.error('[FlowContext] Error parsing event data:', parseError, event);
       }
@@ -52,7 +58,7 @@ async function consume(url: string, connection: SseConnection) {
       console.error('[SSE] Connection error:', error);
     }
   } finally {
-    if (connection.subscribers.size === 0 && connections.get(url) === connection) {
+    if (connections.get(url) === connection) {
       connections.delete(url);
     }
   }

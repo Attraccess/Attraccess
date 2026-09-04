@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { renderHook, act } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { events } from 'fetch-event-stream';
 import { useSSE } from './sse';
 
 vi.mock('fetch-event-stream', () => ({
@@ -19,6 +20,9 @@ describe('useSSE', () => {
   beforeEach(() => {
     abortSpy = vi.spyOn(AbortController.prototype, 'abort');
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+    vi.mocked(events).mockReturnValue({
+      [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => undefined) }),
+    });
   });
 
   afterEach(() => {
@@ -64,5 +68,60 @@ describe('useSSE', () => {
     unmount();
 
     expect(abortSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates a new connection after a completed stream', async () => {
+    vi.mocked(events).mockReturnValue({
+      [Symbol.asyncIterator]: () => ({ next: () => Promise.resolve({ done: true, value: undefined }) }),
+    });
+
+    const first = renderHook(() => useSSE({ path: '/resources/1/events', onUpdate: vi.fn(), enabled: true }));
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const second = renderHook(() => useSSE({ path: '/resources/1/events', onUpdate: vi.fn(), enabled: true }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+
+    first.unmount();
+    second.unmount();
+  });
+
+  it('delivers events to remaining subscribers when one throws', async () => {
+    const onUpdate = vi.fn();
+    const subscriberError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.mocked(events).mockReturnValue({
+      async *[Symbol.asyncIterator]() {
+        yield { data: JSON.stringify({ resourceId: 1 }) };
+      },
+    });
+
+    const { unmount } = renderHook(() => {
+      useSSE({
+        path: '/resources/1/events',
+        onUpdate: () => {
+          throw new Error('subscriber failed');
+        },
+        enabled: true,
+      });
+      useSSE({ path: '/resources/1/events', onUpdate, enabled: true });
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(onUpdate).toHaveBeenCalledWith({ resourceId: 1 });
+    expect(subscriberError).toHaveBeenCalledWith('[SSE] Subscriber error:', expect.any(Error));
+
+    unmount();
   });
 });
