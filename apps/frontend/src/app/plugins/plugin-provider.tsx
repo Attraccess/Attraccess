@@ -79,7 +79,8 @@ export function PluginProvider(props: PropsWithChildren) {
           }
 
           const baseUrl = getBaseUrl();
-          const remoteUrl = `${baseUrl}/api/plugins/${pluginManifest.name}/frontend/module-federation/${entryPointFile}`;
+          const pluginUrlPath = `${baseUrl}/api/plugins/${encodeURIComponent(pluginManifest.name)}/frontend/module-federation`;
+          const remoteUrl = `${pluginUrlPath}/${entryPointFile}`;
 
           // Plugins bundle their own CSS (e.g. their Tailwind utilities); the
           // federation remote only carries JS, so inject the stylesheet here.
@@ -90,7 +91,7 @@ export function PluginProvider(props: PropsWithChildren) {
               const link = document.createElement('link');
               link.id = linkId;
               link.rel = 'stylesheet';
-              link.href = `${baseUrl}/api/plugins/${pluginManifest.name}/frontend/module-federation/${stylesFile}`;
+              link.href = `${pluginUrlPath}/${stylesFile}`;
               document.head.appendChild(link);
             }
           }
@@ -120,7 +121,6 @@ export function PluginProvider(props: PropsWithChildren) {
 
         pluginStore.install(plugin);
 
-        await new Promise((resolve) => setTimeout(resolve, 200));
         const fullPlugin = {
           ...pluginManifest,
           plugin,
@@ -150,19 +150,23 @@ export function PluginProvider(props: PropsWithChildren) {
     if (arePluginsLoaded.current) return;
     console.debug('Attraccess Plugin System: Loading all plugins');
 
-    const plugins = await refetchPlugins();
-    const pluginsArray = plugins.data ?? [];
-    const failedPlugins = pluginsArray.filter((manifest) => manifest.status === 'error');
-    for (const plugin of failedPlugins) {
-      toastRef.current.warning({
-        title: `Plugin "${plugin.name}" is disabled`,
-        description: plugin.error ?? 'The plugin failed to load. Open Settings > Plugins for details.',
-      });
+    try {
+      const plugins = await refetchPlugins();
+      const pluginsArray = plugins.data ?? [];
+      const failedPlugins = pluginsArray.filter((manifest) => manifest.status === 'error');
+      for (const plugin of failedPlugins) {
+        toastRef.current.warning({
+          title: `Plugin "${plugin.name}" is disabled`,
+          description: plugin.error ?? 'The plugin failed to load. Open Settings > Plugins for details.',
+        });
+      }
+      await Promise.all(pluginsArray.filter((manifest) => manifest.status !== 'error').map((manifest) => loadPlugin(manifest)));
+    } catch (error) {
+      console.error('Attraccess Plugin System: Failed to fetch plugins', error);
+    } finally {
+      arePluginsLoaded.current = true;
+      console.debug('Attraccess Plugin System: All plugins loaded');
     }
-    await Promise.all(pluginsArray.filter((manifest) => manifest.status !== 'error').map((manifest) => loadPlugin(manifest)));
-
-    arePluginsLoaded.current = true;
-    console.debug('Attraccess Plugin System: All plugins loaded');
   }, [loadPlugin, refetchPlugins]);
 
   useEffect(() => {

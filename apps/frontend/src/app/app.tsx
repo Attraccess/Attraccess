@@ -28,6 +28,7 @@ import { AttraccessUserActionsBridge } from '../components/attraccessUserActions
 import { SupervisorApprovalListener } from '../components/supervisorApproval/SupervisorApprovalListener';
 import { KioskGuard } from './kiosk/KioskGuard';
 import { useLocaleSync } from '../hooks/useLocaleSync';
+import usePluginState from './plugins/plugin.state';
 import { NotFound } from './not-found';
 
 // Exported for settingsAccess.spec.tsx, which drives the real route table through this gate.
@@ -186,7 +187,10 @@ export function AppRoutes() {
         {layoutRouteElements}
         {/* Without this a logged-in operator on an unknown path matched nothing at all, so the
             layout route never rendered and the document came up blank (ATT-869). */}
-        <Route path="*" element={<NotFound isAuthenticated={isAuthenticated} />} />
+        <Route
+          path="*"
+          element={<NotFound isAuthenticated={isAuthenticated} />}
+        />
       </Route>
     </Routes>
   );

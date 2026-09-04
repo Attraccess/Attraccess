@@ -1,40 +1,80 @@
-import { BadRequestException, Body, Controller, Get, Inject, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Inject, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { WagoService } from './wago.service';
+import { WagoCommissioningService } from './wago-commissioning.service';
 import type { WagoPresetApplication } from './configuration';
 
 @Auth('resources.update')
 @Controller('wago')
 export class WagoControllerApi {
-  constructor(@Inject(WagoService) private readonly wago: WagoService) {}
+  constructor(
+    @Inject(WagoService) private readonly wago: WagoService,
+    @Inject(WagoCommissioningService) private readonly commissioning: WagoCommissioningService,
+  ) {}
   @Get('controllers') list() {
     return this.wago.list();
   }
+  @Auth('system.settings.manage')
   @Get('settings') settings() {
     return this.wago.getSettings();
   }
+  @Auth('system.settings.manage')
   @Post('settings') setSettings(@Body() body: { defaultMqttServerId?: number | null; operationalPrefix?: string }) {
     return this.wago.setSettings(body?.defaultMqttServerId, body?.operationalPrefix);
   }
-  @Post('enrollments') enrollment(
-    @Body() body: { hardwareId?: string; mqttServerId?: number; manualUsername?: string; manualPassword?: string },
-  ) {
-    const manualCredentials =
-      body?.manualUsername || body?.manualPassword
-        ? { username: body.manualUsername ?? '', password: body.manualPassword ?? '' }
-        : undefined;
-    return this.wago.createEnrollment(body?.hardwareId ?? '', body?.mqttServerId, manualCredentials);
+  @Auth('system.settings.manage')
+  @Get('commissioning/support') commissioningSupport() {
+    return this.commissioning.support();
   }
-  @Get('enrollments/credential-support/:mqttServerId') credentialSupport(
-    @Param('mqttServerId', ParseIntPipe) mqttServerId: number,
+  @Auth('system.settings.manage')
+  @Get('commissioning/sessions') commissioningSessions(@Query('limit') limit?: string, @Query('offset') offset?: string) {
+    return this.commissioning.list(Number(limit), Number(offset));
+  }
+  @Auth('system.settings.manage')
+  @Post('commissioning/sessions') createCommissioningSession(
+    @Body() body: { mqttServerId?: number; targetHost?: string; name?: string },
   ) {
-    return this.wago.enrollmentCredentialSupport(mqttServerId);
+    if (!body?.mqttServerId) throw new BadRequestException('MQTT server is required');
+    if (!body.name?.trim()) throw new BadRequestException('controller name is required');
+    return this.commissioning.create({
+      mqttServerId: body.mqttServerId,
+      targetHost: body.targetHost ?? '',
+      name: body.name,
+    });
+  }
+  @Auth('system.settings.manage')
+  @Post('commissioning/sessions/:id/confirm-host-key') confirmCommissioningHostKey(@Param('id', ParseIntPipe) id: number, @Body() body: { hostKeyFingerprint?: string }) {
+    if (!body?.hostKeyFingerprint) throw new BadRequestException('SSH host-key fingerprint is required');
+    return this.commissioning.confirmHostKey(id, body.hostKeyFingerprint);
+  }
+  @Auth('system.settings.manage')
+  @Post('commissioning/sessions/:id/deliver') deliverCommissioningSession(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { temporarySsh?: { username?: string; password?: string } },
+  ) {
+    return this.commissioning.deliver(id, {
+      temporarySsh: body?.temporarySsh
+        ? { username: body.temporarySsh.username ?? '', password: body.temporarySsh.password ?? '' }
+        : undefined,
+    });
+  }
+  @Auth('system.settings.manage')
+  @Post('commissioning/sessions/:id/revoke') revokeCommissioningSession(@Param('id', ParseIntPipe) id: number) {
+    return this.commissioning.revoke(id);
+  }
+  @Auth('system.settings.manage')
+  @Delete('commissioning/sessions/:id') async removeCommissioningSession(@Param('id', ParseIntPipe) id: number) {
+    await this.commissioning.remove(id);
   }
   @Post('controllers/:id/claim') claim(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { name?: string; verifier?: string; mqttServerId?: number },
   ) {
     return this.wago.claim(id, body?.name ?? '', body?.verifier ?? '', body?.mqttServerId);
+  }
+  @Delete('controllers/:id') async removeController(@Param('id', ParseIntPipe) id: number) {
+    const hardwareId = await this.wago.remove(id);
+    await this.commissioning.removeByHardwareId(hardwareId);
   }
   @Get('controllers/:id/configuration/draft') draft(@Param('id', ParseIntPipe) id: number) {
     return this.wago.getDraft(id);

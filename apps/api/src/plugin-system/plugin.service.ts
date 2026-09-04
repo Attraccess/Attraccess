@@ -126,7 +126,7 @@ export class PluginService {
         if (!PluginService.pluginFailures.has(pluginDirectory)) {
           PluginService.pluginFailures.set(pluginDirectory, {
             pluginDirectory,
-            message: 'Plugin was automatically disabled because the previous application startup did not complete. Review the plugin and reinstall or remove it before enabling it again.',
+            message: 'Plugin was disabled after an incomplete startup with no attributable stack frame.',
           });
         }
       }
@@ -151,9 +151,12 @@ export class PluginService {
     const message = error instanceof Error ? error.message : String(error);
     const stack = error instanceof Error ? error.stack ?? '' : '';
     const affected = active.filter((pluginDirectory) => stack.includes(join(PluginService.PLUGIN_PATH, pluginDirectory)));
-    const pluginDirectories = affected.length > 0 ? affected : active;
+    if (affected.length === 0) {
+      PluginService.logger.error('Could not attribute the startup failure to a plugin; no plugins were quarantined.');
+      return;
+    }
 
-    for (const pluginDirectory of pluginDirectories) {
+    for (const pluginDirectory of affected) {
       PluginService.pluginFailures.set(pluginDirectory, { pluginDirectory, message });
     }
     PluginService.writeFailures([...PluginService.pluginFailures.values()]);

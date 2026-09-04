@@ -17,6 +17,7 @@ import {
   MqttServerConnectionConfig,
   MqttServerHostProvider,
   PluginFlowsContext,
+  PluginSecretsContext,
   EntityTarget,
   ObjectLiteral,
   Repository,
@@ -37,6 +38,7 @@ import { MqttModule } from '../mqtt/mqtt.module';
 import { MqttCredentialProvisioningService } from '../mqtt/mqtt-credential-provisioning.service';
 import { join } from 'path';
 import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
+import { EncryptionService } from '../encryption/encryption.service';
 
 @Global()
 @Module({})
@@ -274,6 +276,13 @@ export class PluginModule {
         });
         return {
           trigger: (nodeType, matches, payload) => executor.triggerPluginFlows(manifest.name, nodeType, matches, payload),
+        };
+      },
+      get secrets(): PluginSecretsContext {
+        const encryption = PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get(EncryptionService, { strict: false });
+        return {
+          encrypt: (plaintext) => encryption.encryptForPlugin(manifest.id, plaintext),
+          decrypt: (ciphertext) => encryption.decryptForPlugin(manifest.id, ciphertext),
         };
       },
     };

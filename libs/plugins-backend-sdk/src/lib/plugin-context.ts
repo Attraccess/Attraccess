@@ -102,6 +102,12 @@ export interface PluginFlowsContext {
   trigger(nodeType: string, matches: (config: Record<string, unknown>) => boolean, payload: object): Promise<void>;
 }
 
+/** Host-managed encryption for plugin-owned secrets. Plaintext is never persisted by the host. */
+export interface PluginSecretsContext {
+  encrypt(plaintext: string): string;
+  decrypt(ciphertext: string): string;
+}
+
 /**
  * Curated facade handed to a backend plugin at load time. It is the single,
  * versioned seam between plugin code and the host application. Adding a field is
@@ -159,6 +165,9 @@ export interface PluginContext {
 
   /** Start matching flows from a plugin-declared trigger node. Requires TRIGGER_FLOWS. */
   readonly flows: PluginFlowsContext;
+
+  /** Encrypt and decrypt plugin-owned secret material. Requires MANAGE_SECRETS. */
+  readonly secrets: PluginSecretsContext;
 }
 
 /**

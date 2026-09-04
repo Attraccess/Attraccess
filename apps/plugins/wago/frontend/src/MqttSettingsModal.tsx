@@ -62,7 +62,8 @@ export function MqttSettingsModal({ isOpen, onOpenChange }: MqttSettingsModalPro
             >
               <ModalBody>
                 <p className="wg:text-sm wg:text-muted">
-                  Choose the MQTT server used for new WAGO enrollment packages. Change it before enrolling a controller.
+                  Choose the MQTT server used for new WAGO commissioning sessions. Change it before commissioning a
+                  controller.
                 </p>
                 {isLoading ? (
                   <div className="wg:flex wg:justify-center wg:p-4">
