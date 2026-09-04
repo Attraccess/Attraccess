@@ -1,5 +1,6 @@
 .idea/
 node_modules/
+__pycache__/
 .vscode/
 build/
 tmp/
@@ -45,6 +46,7 @@ apps/attractap/hardware/**/index.circuit.json
 
 # Plugin build staging dir (zip output lives in dist/, covered above)
 apps/plugins/**/package/
+apps/plugins/**/package.zip
 
 bom.json
 .autopilot.json
