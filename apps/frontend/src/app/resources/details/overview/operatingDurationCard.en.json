@@ -1,0 +1,8 @@
+{
+  "title": "Operating duration",
+  "session": "Session",
+  "operating": "Operating",
+  "unattributedOperating": "Unattributed operating",
+  "provisional": "Live values are provisional.",
+  "unavailable": "No operating interval source is available for this resource."
+}

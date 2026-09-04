@@ -19,11 +19,11 @@ const usage = (id: number, startTime: string, endTime: string | null): ResourceU
 describe('ResourceOperatingAttributionService', () => {
   const asOf = at('12:00:00');
   let service: ResourceOperatingAttributionService;
-  let intervalRepository: jest.Mocked<Pick<Repository<ResourceOperatingInterval>, 'find'>>;
+  let intervalRepository: jest.Mocked<Pick<Repository<ResourceOperatingInterval>, 'find' | 'existsBy'>>;
   let usageRepository: jest.Mocked<Pick<Repository<ResourceUsage>, 'find'>>;
 
   beforeEach(() => {
-    intervalRepository = { find: jest.fn() };
+    intervalRepository = { find: jest.fn(), existsBy: jest.fn().mockResolvedValue(true) };
     usageRepository = { find: jest.fn() };
     service = new ResourceOperatingAttributionService(
       intervalRepository as unknown as Repository<ResourceOperatingInterval>,
@@ -165,9 +165,11 @@ describe('ResourceOperatingAttributionService', () => {
     expect(result).toEqual({
       asOf,
       windowStart: null,
-      operatingDurationMs: 0,
-      attributedOperatingDurationMs: 0,
-      unattributedOperatingDurationMs: 0,
+      sessionDurationMs: 60 * 60_000,
+      operatingDataAvailable: false,
+      operatingDurationMs: null,
+      attributedOperatingDurationMs: null,
+      unattributedOperatingDurationMs: null,
       isProvisional: false,
       attributions: [],
     });
@@ -177,9 +179,9 @@ describe('ResourceOperatingAttributionService', () => {
     const result = service.derive([], [usage(2, '10:00:00', null)], asOf);
 
     expect(result).toMatchObject({
-      operatingDurationMs: 0,
-      attributedOperatingDurationMs: 0,
-      unattributedOperatingDurationMs: 0,
+      operatingDurationMs: null,
+      attributedOperatingDurationMs: null,
+      unattributedOperatingDurationMs: null,
       isProvisional: true,
       attributions: [],
     });
@@ -221,5 +223,23 @@ describe('ResourceOperatingAttributionService', () => {
         ]),
       }),
     );
+  });
+
+  it('loads and derives reports for multiple resources in one query per source', async () => {
+    intervalRepository.find.mockResolvedValue([
+      operating(1, '10:00:00', '11:00:00'),
+      { ...operating(2, '10:00:00', '10:30:00'), resourceId: 2 },
+    ] as ResourceOperatingInterval[]);
+    usageRepository.find.mockResolvedValue([
+      usage(1, '10:00:00', '10:30:00'),
+      { ...usage(2, '10:00:00', '10:15:00'), resourceId: 2 },
+    ] as ResourceUsage[]);
+
+    const result = await service.getForResources([1, 2], at('09:00:00'), asOf);
+
+    expect(result.get(1)).toMatchObject({ sessionDurationMs: 30 * 60_000, operatingDurationMs: 60 * 60_000 });
+    expect(result.get(2)).toMatchObject({ sessionDurationMs: 15 * 60_000, operatingDurationMs: 30 * 60_000 });
+    expect(intervalRepository.find).toHaveBeenCalledTimes(2);
+    expect(usageRepository.find).toHaveBeenCalledTimes(1);
   });
 });

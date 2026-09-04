@@ -1,9 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AnalyticsService } from './analytics.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BillingTransaction, ResourceUsage } from '@attraccess/database-entities';
+import { BillingTransaction, ResourceUsage, ResourceUsageAction } from '@attraccess/database-entities';
 import { Between, Repository } from 'typeorm';
 import { DateRangeValue } from './dtos/dateRangeValue';
+import { ResourceOperatingAttributionService } from '../resources/operating-intervals/resource-operating-attribution.service';
 
 describe('AnalyticsService', () => {
   let service: AnalyticsService;
@@ -11,6 +12,9 @@ describe('AnalyticsService', () => {
 
   const mockRepository = {
     findAndCount: jest.fn(),
+  };
+  const operatingAttributionService = {
+    getForResources: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -24,6 +28,10 @@ describe('AnalyticsService', () => {
         {
           provide: getRepositoryToken(BillingTransaction),
           useValue: {},
+        },
+        {
+          provide: ResourceOperatingAttributionService,
+          useValue: operatingAttributionService,
         },
       ],
     }).compile();
@@ -71,6 +79,7 @@ describe('AnalyticsService', () => {
       expect(repository.findAndCount).toHaveBeenCalledWith({
         where: {
           startTime: Between(dateRange.start, dateRange.end),
+          usageAction: ResourceUsageAction.Usage,
         },
         order: {
           id: 'DESC',
@@ -95,9 +104,7 @@ describe('AnalyticsService', () => {
 
       await service.getResourceUsageHoursInDateRange(dateRange, 2, 100);
 
-      expect(repository.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({ skip: 100, take: 100 }),
-      );
+      expect(repository.findAndCount).toHaveBeenCalledWith(expect.objectContaining({ skip: 100, take: 100 }));
     });
 
     it('should return an empty array when no records are found', async () => {
@@ -111,6 +118,47 @@ describe('AnalyticsService', () => {
       const result = await service.getResourceUsageHoursInDateRange(dateRange);
 
       expect(result).toEqual([[], 0]);
+    });
+  });
+
+  describe('getResourceOperatingDurations', () => {
+    afterEach(() => jest.useRealTimers());
+
+    it('delegates the selected resource IDs and range to the batched attribution service', async () => {
+      const dateRange: DateRangeValue = {
+        start: new Date('2023-01-01T00:00:00Z'),
+        end: new Date('2023-01-31T23:59:59Z'),
+      };
+      const report = new Map([[1, { operatingDurationMs: 60_000 }]]);
+      operatingAttributionService.getForResources.mockResolvedValue(report);
+
+      await expect(service.getResourceOperatingDurations([1], dateRange)).resolves.toEqual({
+        1: { operatingDurationMs: 60_000 },
+      });
+      expect(operatingAttributionService.getForResources).toHaveBeenCalledWith(
+        [1],
+        dateRange.start,
+        dateRange.end,
+        false,
+      );
+    });
+
+    it('caps live reports at the current instant', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2023-01-15T10:00:00Z'));
+      operatingAttributionService.getForResources.mockResolvedValue(new Map());
+      const dateRange: DateRangeValue = {
+        start: new Date('2023-01-15T00:00:00Z'),
+        end: new Date('2023-01-15T23:59:59Z'),
+      };
+
+      await service.getResourceOperatingDurations([1], dateRange);
+
+      expect(operatingAttributionService.getForResources).toHaveBeenCalledWith(
+        [1],
+        dateRange.start,
+        new Date('2023-01-15T10:00:00Z'),
+        true,
+      );
     });
   });
 });
