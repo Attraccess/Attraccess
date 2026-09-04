@@ -58,12 +58,13 @@ export function ResourceUsageExport(props: ExportProps) {
   );
   const { data: operatingDurations, status: operatingDurationsStatus } = useQuery({
     queryKey: ['resource-operating-durations', resourceIds, props.start, props.end],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const operatingDurations: Record<number, OperatingDurationSummary> = {};
       for (let index = 0; index < resourceIds.length; index += RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST) {
         const response = await fetch(`${getBaseUrl()}/api/analytics/resource-operating-durations`, {
           method: 'POST',
           credentials: 'include',
+          signal,
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             resourceIds: resourceIds.slice(index, index + RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST),
@@ -76,7 +77,7 @@ export function ResourceUsageExport(props: ExportProps) {
       }
       return operatingDurations;
     },
-    enabled: resourceIds.length > 0,
+    enabled: resourceIds.length > 0 && !isFetchingAllPages,
   });
 
   const formatDateTimeFull = useDateTimeFormatter({ showDate: true, showTime: true, showSeconds: true });
@@ -222,7 +223,7 @@ export function ResourceUsageExport(props: ExportProps) {
       setOption={setOption}
       filename="resource-usage.csv"
       queryStatus={
-        fetchStatus === 'pending' ? 'pending' : resourceIds.length > 0 ? operatingDurationsStatus : fetchStatus
+        fetchStatus !== 'success' ? fetchStatus : resourceIds.length > 0 ? operatingDurationsStatus : fetchStatus
       }
       onFetchAllPages={() => setFetchAll(true)}
       isFetchingAllPages={isFetchingAllPages}
