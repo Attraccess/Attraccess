@@ -1,4 +1,15 @@
-import { BadRequestException, Body, Controller, Delete, Get, Inject, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Inject,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { WagoService } from './wago.service';
 import { WagoCommissioningService } from './wago-commissioning.service';
@@ -15,25 +26,28 @@ export class WagoControllerApi {
     return this.wago.list();
   }
   @Auth('system.settings.manage')
-  @Get('settings') settings() {
+  @Get('settings')
+  settings() {
     return this.wago.getSettings();
   }
   @Auth('system.settings.manage')
-  @Post('settings') setSettings(@Body() body: { defaultMqttServerId?: number | null; operationalPrefix?: string }) {
+  @Post('settings')
+  setSettings(@Body() body: { defaultMqttServerId?: number | null; operationalPrefix?: string }) {
     return this.wago.setSettings(body?.defaultMqttServerId, body?.operationalPrefix);
   }
   @Auth('system.settings.manage')
-  @Get('commissioning/support') commissioningSupport() {
+  @Get('commissioning/support')
+  commissioningSupport() {
     return this.commissioning.support();
   }
   @Auth('system.settings.manage')
-  @Get('commissioning/sessions') commissioningSessions(@Query('limit') limit?: string, @Query('offset') offset?: string) {
+  @Get('commissioning/sessions')
+  commissioningSessions(@Query('limit') limit?: string, @Query('offset') offset?: string) {
     return this.commissioning.list(Number(limit), Number(offset));
   }
   @Auth('system.settings.manage')
-  @Post('commissioning/sessions') createCommissioningSession(
-    @Body() body: { mqttServerId?: number; targetHost?: string; name?: string },
-  ) {
+  @Post('commissioning/sessions')
+  createCommissioningSession(@Body() body: { mqttServerId?: number; targetHost?: string; name?: string }) {
     if (!body?.mqttServerId) throw new BadRequestException('MQTT server is required');
     if (!body.name?.trim()) throw new BadRequestException('controller name is required');
     return this.commissioning.create({
@@ -43,12 +57,14 @@ export class WagoControllerApi {
     });
   }
   @Auth('system.settings.manage')
-  @Post('commissioning/sessions/:id/confirm-host-key') confirmCommissioningHostKey(@Param('id', ParseIntPipe) id: number, @Body() body: { hostKeyFingerprint?: string }) {
+  @Post('commissioning/sessions/:id/confirm-host-key')
+  confirmCommissioningHostKey(@Param('id', ParseIntPipe) id: number, @Body() body: { hostKeyFingerprint?: string }) {
     if (!body?.hostKeyFingerprint) throw new BadRequestException('SSH host-key fingerprint is required');
     return this.commissioning.confirmHostKey(id, body.hostKeyFingerprint);
   }
   @Auth('system.settings.manage')
-  @Post('commissioning/sessions/:id/deliver') deliverCommissioningSession(
+  @Post('commissioning/sessions/:id/deliver')
+  deliverCommissioningSession(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { temporarySsh?: { username?: string; password?: string } },
   ) {
@@ -59,11 +75,13 @@ export class WagoControllerApi {
     });
   }
   @Auth('system.settings.manage')
-  @Post('commissioning/sessions/:id/revoke') revokeCommissioningSession(@Param('id', ParseIntPipe) id: number) {
+  @Post('commissioning/sessions/:id/revoke')
+  revokeCommissioningSession(@Param('id', ParseIntPipe) id: number) {
     return this.commissioning.revoke(id);
   }
   @Auth('system.settings.manage')
-  @Delete('commissioning/sessions/:id') async removeCommissioningSession(@Param('id', ParseIntPipe) id: number) {
+  @Delete('commissioning/sessions/:id')
+  async removeCommissioningSession(@Param('id', ParseIntPipe) id: number) {
     await this.commissioning.remove(id);
   }
   @Post('controllers/:id/claim') claim(

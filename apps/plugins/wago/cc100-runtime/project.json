@@ -3,7 +3,7 @@
   "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/plugins/wago/cc100-runtime/src",
   "projectType": "application",
-  "tags": ["scope:hardware"],
+  "tags": ["scope:hardware", "type:plugin"],
   "targets": {
     "build": {
       "executor": "@nx/esbuild:esbuild",
@@ -26,7 +26,10 @@
     },
     "lint": {
       "executor": "nx:run-commands",
-      "options": { "cwd": "apps/plugins/wago/cc100-runtime", "command": "eslint src" }
+      "options": {
+        "cwd": "apps/plugins/wago/cc100-runtime",
+        "command": "eslint src --max-warnings=0 && prettier --check src"
+      }
     },
     "typecheck": {
       "executor": "nx:run-commands",

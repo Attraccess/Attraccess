@@ -128,12 +128,7 @@ export function RabbitmqUserFormModal({
             </ModalHeader>
             <Form onSubmit={handleSubmit}>
               <ModalBody className="rmq:flex rmq:flex-col rmq:gap-4 rmq:w-full">
-                <TextField
-                  value={username}
-                  onChange={setUsername}
-                  className="rmq:w-full"
-                  isDisabled={isEdit}
-                >
+                <TextField value={username} onChange={setUsername} className="rmq:w-full" isDisabled={isEdit}>
                   <Label>Username</Label>
                   <Input
                     name="rabbitmq-username"
@@ -203,12 +198,7 @@ export function RabbitmqUserFormModal({
                 <Button variant="secondary" onPress={onClose} data-cy="rabbitmq-user-form-cancel-button">
                   Cancel
                 </Button>
-                <Button
-                  variant="primary"
-                  type="submit"
-                  isPending={saving}
-                  data-cy="rabbitmq-user-form-save-button"
-                >
+                <Button variant="primary" type="submit" isPending={saving} data-cy="rabbitmq-user-form-save-button">
                   {isEdit ? 'Save changes' : 'Create user'}
                 </Button>
               </ModalFooter>
