@@ -12,10 +12,10 @@ type Subscriber = (data: unknown) => void;
 
 interface SseConnection {
   abortController: AbortController;
-  subscribers: Set<Subscriber>;
 }
 
 const connections = new Map<string, SseConnection>();
+const subscribers = new Map<string, Set<Subscriber>>();
 
 async function consume(url: string, connection: SseConnection) {
   try {
@@ -41,7 +41,7 @@ async function consume(url: string, connection: SseConnection) {
           continue;
         }
 
-        connection.subscribers.forEach((subscriber) => {
+        subscribers.get(url)?.forEach((subscriber) => {
           try {
             subscriber(nextPacket);
           } catch (subscriberError) {
@@ -65,25 +65,33 @@ async function consume(url: string, connection: SseConnection) {
 }
 
 function subscribe(url: string, subscriber: Subscriber): () => void {
+  let subscriberSet = subscribers.get(url);
+
+  if (!subscriberSet) {
+    subscriberSet = new Set();
+    subscribers.set(url, subscriberSet);
+  }
+
   let connection = connections.get(url);
 
   if (!connection) {
     connection = {
       abortController: new AbortController(),
-      subscribers: new Set(),
     };
     connections.set(url, connection);
     void consume(url, connection);
   }
 
-  connection.subscribers.add(subscriber);
+  subscriberSet.add(subscriber);
 
   return () => {
-    connection.subscribers.delete(subscriber);
+    subscriberSet.delete(subscriber);
 
-    if (connection.subscribers.size === 0 && connections.get(url) === connection) {
+    if (subscriberSet.size === 0) {
+      const activeConnection = connections.get(url);
+      subscribers.delete(url);
       connections.delete(url);
-      connection.abortController.abort();
+      activeConnection?.abortController.abort();
     }
   };
 }

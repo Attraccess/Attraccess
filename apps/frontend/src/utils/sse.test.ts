@@ -94,6 +94,42 @@ describe('useSSE', () => {
     second.unmount();
   });
 
+  it('delivers replacement stream events to existing subscribers', async () => {
+    const firstSubscriber = vi.fn();
+    const secondSubscriber = vi.fn();
+    vi.mocked(events)
+      .mockReturnValueOnce({
+        [Symbol.asyncIterator]: () => ({ next: () => Promise.resolve({ done: true, value: undefined }) }),
+      })
+      .mockReturnValueOnce({
+        async *[Symbol.asyncIterator]() {
+          yield { data: JSON.stringify({ resourceId: 1 }) };
+        },
+      });
+
+    const first = renderHook(() => useSSE({ path: '/resources/1/events', onUpdate: firstSubscriber, enabled: true }));
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const second = renderHook(() =>
+      useSSE({ path: '/resources/1/events', onUpdate: secondSubscriber, enabled: true }),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(firstSubscriber).toHaveBeenCalledWith({ resourceId: 1 });
+    expect(secondSubscriber).toHaveBeenCalledWith({ resourceId: 1 });
+
+    first.unmount();
+    second.unmount();
+  });
+
   it('delivers events to remaining subscribers when one throws', async () => {
     const onUpdate = vi.fn();
     const subscriberError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
