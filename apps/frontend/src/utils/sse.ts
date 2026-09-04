@@ -87,7 +87,7 @@ function subscribe(url: string, subscriber: Subscriber): () => void {
   return () => {
     subscriberSet.delete(subscriber);
 
-    if (subscriberSet.size === 0) {
+    if (subscriberSet.size === 0 && subscribers.get(url) === subscriberSet) {
       const activeConnection = connections.get(url);
       subscribers.delete(url);
       connections.delete(url);

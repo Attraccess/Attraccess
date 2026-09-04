@@ -94,6 +94,32 @@ describe('useSSE', () => {
     second.unmount();
   });
 
+  it('does not abort a replacement connection when a stale subscriber unmounts', async () => {
+    const first = renderHook(() => useSSE({ path: '/resources/1/events', onUpdate: vi.fn(), enabled: true }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      first.result.current.abort();
+    });
+
+    const second = renderHook(() => useSSE({ path: '/resources/1/events', onUpdate: vi.fn(), enabled: true }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    first.unmount();
+
+    expect(abortSpy).toHaveBeenCalledTimes(1);
+
+    second.unmount();
+
+    expect(abortSpy).toHaveBeenCalledTimes(2);
+  });
+
   it('delivers replacement stream events to existing subscribers', async () => {
     const firstSubscriber = vi.fn();
     const secondSubscriber = vi.fn();
