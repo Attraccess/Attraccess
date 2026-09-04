@@ -285,12 +285,10 @@ describe('WagoRuntime', () => {
     await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
 
     expect(attempts).toBe(2);
-    expect(transport.published).toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: { id: 'command-1', status: 'accepted', error: undefined },
-      }),
-    );
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
+      payload: expect.objectContaining({ id: 'command-1', status: 'accepted', error: undefined }),
+    }));
   });
 
   it('deactivates a pulse when retained state publication fails after it turns on', async () => {
@@ -393,18 +391,14 @@ describe('WagoRuntime', () => {
     await set;
     await new Promise((resolve) => setTimeout(resolve, 150));
 
-    expect(transport.published).toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: { id: 'command-1', status: 'accepted', error: undefined },
-      }),
-    );
-    expect(transport.published).toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: { id: 'command-2', status: 'rejected', error: 'device write failed' },
-      }),
-    );
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
+      payload: expect.objectContaining({ id: 'command-1', status: 'accepted', error: undefined }),
+    }));
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
+      payload: expect.objectContaining({ id: 'command-2', status: 'rejected', error: 'device write failed' }),
+    }));
     expect(writes).toEqual([true, false, false]);
   });
 
@@ -518,19 +512,8 @@ describe('WagoRuntime', () => {
     expect(device.values.get('751-9301:0')).toBe(false);
     await runtime.setConnected(true);
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
-    expect(transport.published).toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: { id: 'command-1', status: 'duplicate', error: undefined },
-      }),
-    );
-    expect(transport.published).toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/configuration/reported',
-        payload: { revision: 1, contentHash: hash(snapshot), errors: [] },
-        retain: true,
-      }),
-    );
+    expect(transport.published).toContainEqual(expect.objectContaining({ topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements', payload: expect.objectContaining({ id: 'command-1', status: 'duplicate', error: undefined }) }));
+    expect(transport.published).toContainEqual(expect.objectContaining({ topic: 'attraccess/wago/v1/controllers/cc100-1/configuration/reported', payload: { revision: 1, contentHash: hash(snapshot), errors: [] }, retain: true }));
   });
 
   it('reports a feedback mismatch after the configured feedback timeout', async () => {
@@ -564,12 +547,10 @@ describe('WagoRuntime', () => {
     await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    expect(transport.published).toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
-        payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),
-      }),
-    );
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+      payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch', timestamp: expect.any(String), sequence: expect.any(Number) }),
+    }));
   });
 
   it('preserves feedback verification for the active phase of a short pulse', async () => {
@@ -999,16 +980,10 @@ describe('WagoRuntime', () => {
     );
     await started;
     await commandsInFlight[MAX_PENDING_CHANNEL_WRITES];
-    expect(transport.published).toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: {
-          id: `command-${MAX_PENDING_CHANNEL_WRITES}`,
-          status: 'rejected',
-          error: 'channel write queue is full',
-        },
-      }),
-    );
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
+      payload: expect.objectContaining({ id: `command-${MAX_PENDING_CHANNEL_WRITES}`, status: 'rejected', error: 'channel write queue is full' }),
+    }));
 
     releaseFirstWrite();
     await Promise.all(commandsInFlight);
@@ -1087,6 +1062,61 @@ describe('WagoRuntime', () => {
         retain: true,
       }),
     );
+  });
+
+  it('reserves operational message sequences without saving for every measurement', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport, device });
+    await runtime.start();
+    const save = jest.spyOn(store, 'save');
+
+    await runtime['publishOperational']('measurements', { timestamp: '2026-09-01T00:00:00.000Z', channelId: 'meter', unit: 'percent', value: 42 });
+    await runtime['publishOperational']('measurements', { timestamp: '2026-09-01T00:00:05.000Z', channelId: 'meter', unit: 'percent', value: 43 });
+
+    expect(save).not.toHaveBeenCalled();
+    expect(transport.published.filter((message) => message.topic.endsWith('/measurements'))).toContainEqual(expect.objectContaining({
+      payload: expect.objectContaining({ sequence: 2, value: 42 }),
+    }));
+  });
+
+  it('does not publish from a sequence range whose reservation failed to save', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport, device });
+    await runtime.start();
+    runtime['sequence'] = 100;
+    runtime['reservedSequence'] = 100;
+    runtime['state'].sequence = 100;
+    const persist = store.save.bind(store);
+    const save = jest.spyOn(store, 'save').mockRejectedValueOnce(new Error('disk full')).mockImplementation(persist);
+
+    await expect(runtime['publishOperational']('measurements', { timestamp: '2026-09-01T00:00:00.000Z', channelId: 'meter', unit: 'percent', value: 42 })).rejects.toThrow('disk full');
+    expect(runtime['reservedSequence']).toBe(100);
+    expect(runtime['state'].sequence).toBe(100);
+
+    await runtime['publishOperational']('measurements', { timestamp: '2026-09-01T00:00:05.000Z', channelId: 'meter', unit: 'percent', value: 43 });
+
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(transport.published.filter((message) => message.topic.endsWith('/measurements'))).toContainEqual(expect.objectContaining({
+      payload: expect.objectContaining({ sequence: 101, value: 43 }),
+    }));
+  });
+
+  it('does not let a concurrent state save overwrite a sequence reservation', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport, device });
+    await runtime.start();
+    runtime['sequence'] = 100;
+    runtime['reservedSequence'] = 100;
+    runtime['state'].sequence = 100;
+
+    const publish = runtime['publishOperational']('measurements', { timestamp: '2026-09-01T00:00:00.000Z', channelId: 'meter', unit: 'percent', value: 42 });
+    const saveClaim = runtime.receiveClaim({ username: 'controller', password: 'secret' });
+    await Promise.all([publish, saveClaim]);
+
+    await expect(store.load()).resolves.toEqual(expect.objectContaining({
+      credentials: { username: 'controller', password: 'secret' },
+      sequence: 200,
+    }));
   });
 
   it('serializes concurrent state saves', async () => {

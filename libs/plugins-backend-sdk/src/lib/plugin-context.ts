@@ -99,7 +99,7 @@ export interface PluginFlowsContext {
    * Starts a flow from every persisted trigger node of nodeType whose saved
    * configuration matches the supplied external event.
    */
-  trigger(nodeType: string, matches: (config: Record<string, unknown>) => boolean, payload: object): Promise<void>;
+  trigger(nodeType: string, matches: (config: Record<string, unknown>, nodeId: string) => boolean, payload: object): Promise<void>;
 }
 
 /**
