@@ -30,6 +30,20 @@ jobs:
       - run: pnpm nx run wago-cc100-runtime:typecheck
       - run: pnpm nx run wago-cc100-runtime:test
       - run: pnpm nx run wago-cc100-runtime:build
+      - run: pnpm nx run wago-cc100-runtime:build-simulator
+      - name: Start simulator against RabbitMQ
+        env:
+          WAGO_ENROLLMENT_SECRET: ci-enrollment-secret
+          WAGO_ENROLLMENT_USERNAME: attraccess
+          WAGO_ENROLLMENT_PASSWORD: password
+        run: |
+          docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml up --build --detach
+          sleep 15
+          logs="$(docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml logs cc100-simulator)"
+          [[ "$logs" == *"WAGO CC100 simulator enrollment connected"* ]]
+      - name: Stop simulator integration stack
+        if: always()
+        run: docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml down --volumes
       - uses: actions/upload-artifact@v4
         with:
           name: wago-cc100-runtime-manifest

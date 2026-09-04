@@ -1,0 +1,37 @@
+services:
+  mqtt:
+    image: rabbitmq:4.3.4-management
+    command: /bin/bash -c "rabbitmq-plugins enable --offline rabbitmq_mqtt; rabbitmq-server"
+    environment:
+      RABBITMQ_DEFAULT_USER: attraccess
+      RABBITMQ_DEFAULT_PASS: password
+    ports:
+      - '1883:1883'
+      - '15672:15672'
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+  cc100-simulator:
+    build:
+      context: ../../../..
+      dockerfile: apps/plugins/wago/cc100-runtime/Dockerfile.simulator
+    environment:
+      WAGO_MQTT_URL: mqtt://mqtt:1883
+      WAGO_HARDWARE_ID: ${WAGO_HARDWARE_ID:-simulated-cc100-01}
+      WAGO_PAIRING_CODE: ${WAGO_PAIRING_CODE:-482931}
+      WAGO_ENROLLMENT_SECRET: ${WAGO_ENROLLMENT_SECRET:?Create an enrollment in Attraccess and set its secret}
+      WAGO_ENROLLMENT_USERNAME: ${WAGO_ENROLLMENT_USERNAME:?Set the enrollment username}
+      WAGO_ENROLLMENT_PASSWORD: ${WAGO_ENROLLMENT_PASSWORD:?Set the enrollment password}
+      WAGO_SCENARIO: ${WAGO_SCENARIO:-normal}
+      WAGO_INITIAL_VALUES: ${WAGO_INITIAL_VALUES:-{}}
+      WAGO_MEASUREMENT_STEP: ${WAGO_MEASUREMENT_STEP:-0}
+      WAGO_CAPABILITIES: ${WAGO_CAPABILITIES:-["claim","heartbeat","configuration-v1","commands","state","measurement","fault","acknowledgement"]}
+    volumes:
+      - cc100-simulator-state:/var/lib/attraccess-wago
+    depends_on:
+      mqtt:
+        condition: service_healthy
+volumes:
+  cc100-simulator-state:
