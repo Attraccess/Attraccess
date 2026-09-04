@@ -33,6 +33,7 @@ export type Snapshot = {
 export type ValidationError = { path: string; code: string; message: string };
 export type RuntimeState = {
   credentials?: { username: string; password: string };
+  operationalPrefix?: string;
   accepted?: { revision: number; contentHash: string; snapshot: Snapshot };
   outputs: Record<string, boolean>;
   feedback?: Record<string, boolean>;
@@ -251,8 +252,13 @@ export class WagoRuntime {
     onWritten?.();
     this.state.outputs[channel.id] = value;
     try {
-      const feedback = await this.options.device.read(point);
-      if (typeof feedback === 'boolean') {
+      const rawFeedback = await this.options.device.read(point);
+      const feedback = typeof rawFeedback === 'boolean'
+        ? rawFeedback
+        : point.hardwareProfile === '751-9301' && (rawFeedback === 0 || rawFeedback === 1)
+          ? Boolean(rawFeedback)
+          : undefined;
+      if (feedback !== undefined) {
         (this.state.feedback ??= {})[channel.id] = feedback;
         if (feedback !== value)
           await this.options.transport.publish(this.topic('faults'), {
@@ -285,12 +291,19 @@ export class WagoRuntime {
   }
 
   private async publishState(): Promise<void> {
+    const activeOutputIds = new Set(
+      this.state.accepted?.snapshot.logicalChannels
+        .filter((channel) => channel.capabilities.includes('output'))
+        .map((channel) => channel.id),
+    );
     await this.options.transport.publish(this.topic('state'), {
       connected: this.connected,
       revision: this.state.accepted?.revision ?? null,
       contentHash: this.state.accepted?.contentHash ?? null,
       outputs: this.state.outputs,
-      feedback: this.state.feedback ?? {},
+      feedback: Object.fromEntries(
+        Object.entries(this.state.feedback ?? {}).filter(([channelId]) => activeOutputIds.has(channelId)),
+      ),
     }, { retain: true });
   }
   private publishReport(revision: number, contentHash: string, errors: ValidationError[]): Promise<void> {
