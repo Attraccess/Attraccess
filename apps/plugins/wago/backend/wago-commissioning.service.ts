@@ -22,6 +22,7 @@ const SIGNING_NAMESPACE = 'attraccess-wago-runtime';
 const SIGNING_IDENTITY = 'attraccess-wago-runtime';
 
 type TemporarySshCredential = { username: string; password: string };
+type CommissioningSessionResponse = Omit<WagoCommissioningSession, 'pairingCode'>;
 const defaultSshCredential: TemporarySshCredential = { username: 'root', password: 'wago' };
 
 @Injectable()
@@ -59,7 +60,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     };
   }
 
-  async create(input: { mqttServerId: number; targetHost: string; name: string }): Promise<WagoCommissioningSession> {
+  async create(input: { mqttServerId: number; targetHost: string; name: string }): Promise<CommissioningSessionResponse> {
     if (!isPrivateAddress(input.targetHost)) throw new ConflictException('commissioning is limited to a private controller address');
     if (!input.name.trim()) throw new ConflictException('a controller name is required');
     if (!configuredFirmwareBaseline)
@@ -94,7 +95,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     );
     // Delivery belongs to the server so it continues after the browser closes or reloads.
     void this.deliverInBackground(session.id);
-    return session;
+    return this.toResponse(session);
   }
 
   async list(limit = 50, offset = 0): Promise<Array<Omit<WagoCommissioningSession, 'pairingCode'>>> {
@@ -112,14 +113,14 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
   async deliver(
     id: number,
     input: { temporarySsh?: TemporarySshCredential } = {},
-  ): Promise<WagoCommissioningSession> {
+  ): Promise<CommissioningSessionResponse> {
     return this.withDeliveryLock(id, () => this.deliverWhileLocked(id, input));
   }
 
   private async deliverWhileLocked(
     id: number,
     input: { temporarySsh?: TemporarySshCredential },
-  ): Promise<WagoCommissioningSession> {
+  ): Promise<CommissioningSessionResponse> {
     const session = await this.sessions.findOneBy({ id });
     if (!session) throw new NotFoundException('commissioning session not found');
     if (!['awaiting_delivery', 'delivering', 'awaiting_identity_confirmation', 'awaiting_codesys_confirmation', 'delivery_failed'].includes(session.state))
@@ -190,7 +191,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       session.progressPercent = 100;
       session.progressStep = 'Waiting for controller connection';
       session.progressDetail = 'Runtime delivered. Waiting for the controller to connect and complete its automatic claim.';
-      return this.save(session, 'bootstrap_delivered');
+      return this.toResponse(await this.save(session, 'bootstrap_delivered'));
     } catch (error) {
       if (session.enrollmentId !== null) {
         try {
@@ -203,7 +204,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
           session.failureReason = `Secure delivery failed and bootstrap credential revocation requires attention: ${redact(
             revocationError instanceof Error ? revocationError.message : String(revocationError),
           )}`;
-          return this.save(session, 'enrollment_revocation_failed');
+          return this.toResponse(await this.save(session, 'enrollment_revocation_failed'));
         }
       }
       session.state = 'delivery_failed';
@@ -211,18 +212,18 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       session.progressStep = 'Delivery failed';
       session.progressDetail = 'Review the error and retry automatic delivery when the controller is reachable.';
       session.failureReason = error instanceof Error ? redact(error.message) : 'Secure delivery failed';
-      return this.save(session, 'delivery_failed');
+      return this.toResponse(await this.save(session, 'delivery_failed'));
     }
   }
 
-  async revoke(id: number): Promise<WagoCommissioningSession> {
+  async revoke(id: number): Promise<CommissioningSessionResponse> {
     return this.withDeliveryLock(id, async () => {
       const session = await this.sessions.findOneBy({ id });
       if (!session) throw new NotFoundException('commissioning session not found');
       if (session.enrollmentId !== null) await this.wago.revokeEnrollmentById(session.enrollmentId);
       session.state = 'revoked';
       session.failureReason = null;
-      return this.save(session, 'revoked');
+      return this.toResponse(await this.save(session, 'revoked'));
     });
   }
 
@@ -429,6 +430,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
           this.withDeliveryLock(session.id, async () => {
             const current = await this.sessions.findOneBy({ id: session.id });
             if (!current || current.state === 'completed' || current.state === 'revoked') return;
+            if (current.enrollmentId !== null) await this.wago.revokeEnrollmentById(current.enrollmentId);
             current.state = 'revoked';
             current.failureReason = null;
             current.progressStep = 'Superseded by completed commissioning';
@@ -455,6 +457,12 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         this.context.logger?.warn(`Could not record WAGO commissioning delivery failure: ${String(reportingError)}`);
       }
     }
+  }
+
+  private toResponse(session: WagoCommissioningSession): CommissioningSessionResponse {
+    const { pairingCode: _pairingCode, ...response } = session;
+    void _pairingCode;
+    return response;
   }
 
   private async withDeliveryLock<T>(id: number, operation: () => Promise<T>): Promise<T> {

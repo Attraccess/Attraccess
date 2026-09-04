@@ -124,15 +124,14 @@ describe('WagoCommissioningService', () => {
     } as unknown as WagoService);
     service.onApplicationBootstrap();
 
-    await expect(
-      service.create({ mqttServerId: 1, targetHost: '192.168.1.10', name: 'Boiler room' }),
-    ).resolves.toMatchObject({
+    const session = await service.create({ mqttServerId: 1, targetHost: '192.168.1.10', name: 'Boiler room' });
+    expect(session).toMatchObject({
       hardwareId: 'cc100-923d750abecd3ba7',
       hostKeyFingerprint: 'SHA256:test',
       controllerName: 'Boiler room',
-      pairingCode: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
       state: 'awaiting_delivery',
     });
+    expect(session).not.toHaveProperty('pairingCode');
   });
 
   it('serializes revocation with in-progress delivery work for the same session', async () => {

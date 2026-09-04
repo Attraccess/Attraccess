@@ -122,9 +122,16 @@ export class PluginService {
   public static beginBootGuard(): void {
     const previous = PluginService.readBootGuard();
     if (previous.length > 0) {
-      PluginService.logger.warn(
-        `Previous startup ended before plugin lifecycle completed for ${previous.length} plugin(s); retaining them because no specific plugin failure was recorded.`,
-      );
+      for (const pluginDirectory of previous) {
+        if (!PluginService.pluginFailures.has(pluginDirectory)) {
+          PluginService.pluginFailures.set(pluginDirectory, {
+            pluginDirectory,
+            message: 'Plugin was disabled after an incomplete startup with no attributable stack frame.',
+          });
+        }
+      }
+      PluginService.writeFailures([...PluginService.pluginFailures.values()]);
+      PluginService.logger.error(`Disabled ${previous.length} plugin(s) after an incomplete previous startup.`);
     }
 
     const active = PluginService.getPlugins()

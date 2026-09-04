@@ -37,6 +37,7 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
   const removeSessionMutation = useRemoveCommissioningSessionMutation();
   const settingsQuery = useSettingsQuery();
   const mqttServersQuery = useMqttServersQuery();
+  const commissioningSessionsQuery = useCommissioningSessionsQuery();
   const [createdSession, setCreatedSession] = useState<CommissioningSession | null>(null);
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
@@ -44,7 +45,10 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
   const [mqttServerId, setMqttServerId] = useState<Key | null>(null);
   const [isCancelConfirmationOpen, setCancelConfirmationOpen] = useState(false);
 
-  const session = deliverSessionMutation.data ?? resumedSession ?? createdSession;
+  const mutationSession = deliverSessionMutation.data ?? resumedSession ?? createdSession;
+  const session = mutationSession
+    ? commissioningSessionsQuery.data?.find((candidate) => candidate.id === mutationSession.id) ?? mutationSession
+    : null;
   const selectedMqttServerId = mqttServerId === null ? null : Number(mqttServerId);
   const isLoading = createSessionMutation.isPending || deliverSessionMutation.isPending || removeSessionMutation.isPending;
   const loadingStatus = createSessionMutation.isPending
