@@ -48,6 +48,14 @@ export class WagoControllerApi {
     return this.commissioning.confirmHostKey(id, body.hostKeyFingerprint);
   }
   @Auth('system.settings.manage')
+  @Post('commissioning/sessions/:id/confirm-wbm-bootstrap') confirmWbmBootstrap(@Param('id', ParseIntPipe) id: number) {
+    return this.commissioning.confirmWbmBootstrap(id);
+  }
+  @Auth('system.settings.manage')
+  @Post('commissioning/sessions/:id/confirm-codesys-stop') confirmCodesysStop(@Param('id', ParseIntPipe) id: number) {
+    return this.commissioning.confirmCodesysStop(id);
+  }
+  @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/deliver') deliverCommissioningSession(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { temporarySsh?: { username?: string; password?: string } },

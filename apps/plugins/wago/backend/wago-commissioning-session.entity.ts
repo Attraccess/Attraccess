@@ -1,6 +1,7 @@
 import { Column, Entity, PrimaryGeneratedColumn } from '@attraccess/plugins-backend-sdk';
 
 export type WagoCommissioningState =
+  | 'awaiting_wbm_confirmation'
   | 'awaiting_delivery'
   | 'delivering'
   | 'awaiting_identity_confirmation'

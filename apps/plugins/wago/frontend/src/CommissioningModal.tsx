@@ -1,6 +1,7 @@
 import {
   Alert,
   Button,
+  Checkbox,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
@@ -19,7 +20,9 @@ import { commissioningLabel } from './ControllersTable';
 import { StandardDrawer } from './drawer';
 import {
   useCommissioningSessionsQuery,
+  useConfirmCodesysStopMutation,
   useConfirmCommissioningHostKeyMutation,
+  useConfirmWbmBootstrapMutation,
   useCreateCommissioningSessionMutation,
   useDeliverCommissioningSessionMutation,
   useMqttServersQuery,
@@ -36,6 +39,8 @@ interface CommissioningModalProps {
 export function CommissioningModal({ isOpen, session: resumedSession, onOpenChange }: CommissioningModalProps) {
   const createSessionMutation = useCreateCommissioningSessionMutation();
   const confirmHostKeyMutation = useConfirmCommissioningHostKeyMutation();
+  const confirmWbmBootstrapMutation = useConfirmWbmBootstrapMutation();
+  const confirmCodesysStopMutation = useConfirmCodesysStopMutation();
   const deliverSessionMutation = useDeliverCommissioningSessionMutation();
   const removeSessionMutation = useRemoveCommissioningSessionMutation();
   const settingsQuery = useSettingsQuery();
@@ -47,8 +52,10 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
   const [controllerIp, setControllerIp] = useState('');
   const [mqttServerId, setMqttServerId] = useState<Key | null>(null);
   const [hostKeyFingerprint, setHostKeyFingerprint] = useState('');
-  const [sshUsername, setSshUsername] = useState('root');
-  const [sshPassword, setSshPassword] = useState('wago');
+  const [sshUsername, setSshUsername] = useState('');
+  const [sshPassword, setSshPassword] = useState('');
+  const [wbmConfirmed, setWbmConfirmed] = useState(false);
+  const [codesysConfirmed, setCodesysConfirmed] = useState(false);
   const [isCancelConfirmationOpen, setCancelConfirmationOpen] = useState(false);
 
   const mutationSession = deliverSessionMutation.data ?? resumedSession ?? createdSession;
@@ -56,7 +63,7 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
     ? commissioningSessionsQuery.data?.find((candidate) => candidate.id === mutationSession.id) ?? mutationSession
     : null;
   const selectedMqttServerId = mqttServerId === null ? null : Number(mqttServerId);
-  const isLoading = createSessionMutation.isPending || confirmHostKeyMutation.isPending || deliverSessionMutation.isPending || removeSessionMutation.isPending;
+  const isLoading = createSessionMutation.isPending || confirmHostKeyMutation.isPending || confirmWbmBootstrapMutation.isPending || confirmCodesysStopMutation.isPending || deliverSessionMutation.isPending || removeSessionMutation.isPending;
   const loadingStatus = createSessionMutation.isPending
     ? ['Preparing commissioning', 'Scanning and pinning the controller SSH identity.']
      : removeSessionMutation.isPending
@@ -80,8 +87,10 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
     setControllerIp('');
     setMqttServerId(null);
     setHostKeyFingerprint('');
-    setSshUsername('root');
-    setSshPassword('wago');
+    setSshUsername('');
+    setSshPassword('');
+    setWbmConfirmed(false);
+    setCodesysConfirmed(false);
     setCancelConfirmationOpen(false);
     createSessionMutation.reset();
     deliverSessionMutation.reset();
@@ -107,6 +116,21 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
     confirmHostKeyMutation.mutate({ id: session.id, hostKeyFingerprint });
   }
 
+  function confirmWbm() {
+    if (session) confirmWbmBootstrapMutation.mutate(session.id);
+  }
+
+  function confirmCodesys() {
+    if (!session) return;
+    confirmCodesysStopMutation.mutate(session.id, {
+      onSuccess: () => {
+        setSshUsername('');
+        setSshPassword('');
+        setCodesysConfirmed(false);
+      },
+    });
+  }
+
   const activeStep = session ? sessionStep(session) : step;
   const title = session?.controllerName || name || 'New CC100 controller';
 
@@ -121,11 +145,14 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
                    {loadingStatus && <OperationStatus title={loadingStatus[0]} description={loadingStatus[1]} />}
                   {!session && activeStep === 0 && <NameStep name={name} onNameChange={setName} />}
                    {!session && activeStep === 1 && <ConnectionStep controllerIp={controllerIp} mqttServerId={mqttServerId} mqttServersQuery={mqttServersQuery} onControllerIpChange={setControllerIp} onMqttServerIdChange={setMqttServerId} />}
-                    {session?.state === 'awaiting_identity_confirmation' && <HostKeyConfirmationStep fingerprint={hostKeyFingerprint} expectedFingerprint={session.hostKeyFingerprint} onFingerprintChange={setHostKeyFingerprint} />}
-                    {session && activeStep === 2 && session.state !== 'awaiting_identity_confirmation' && <DeliveryStep isDelivering={deliverSessionMutation.isPending} session={session} sshUsername={sshUsername} sshPassword={sshPassword} onSshUsernameChange={setSshUsername} onSshPasswordChange={setSshPassword} />}
+                     {session?.state === 'awaiting_identity_confirmation' && <HostKeyConfirmationStep fingerprint={hostKeyFingerprint} expectedFingerprint={session.hostKeyFingerprint} onFingerprintChange={setHostKeyFingerprint} />}
+                     {session?.state === 'awaiting_wbm_confirmation' && <WbmBootstrapStep confirmed={wbmConfirmed} onConfirmedChange={setWbmConfirmed} />}
+                     {session && activeStep === 2 && session.state !== 'awaiting_identity_confirmation' && <DeliveryStep codesysConfirmed={codesysConfirmed} isDelivering={deliverSessionMutation.isPending} session={session} sshUsername={sshUsername} sshPassword={sshPassword} onCodesysConfirmedChange={setCodesysConfirmed} onSshUsernameChange={setSshUsername} onSshPasswordChange={setSshPassword} />}
                    {session && activeStep === 3 && <ProgressStep name={title} session={session} />}
                    {createSessionMutation.isError && <ErrorAlert error={createSessionMutation.error} />}
-                    {confirmHostKeyMutation.isError && <ErrorAlert error={confirmHostKeyMutation.error} />}
+                     {confirmHostKeyMutation.isError && <ErrorAlert error={confirmHostKeyMutation.error} />}
+                     {confirmWbmBootstrapMutation.isError && <ErrorAlert error={confirmWbmBootstrapMutation.error} />}
+                     {confirmCodesysStopMutation.isError && <ErrorAlert error={confirmCodesysStopMutation.error} />}
                    {deliverSessionMutation.isError && <ErrorAlert error={deliverSessionMutation.error} />}
                    {isCancelConfirmationOpen && <Alert status="warning"><Alert.Indicator /><Alert.Content><Alert.Description>Canceling revokes the enrollment credential and deletes this commissioning session.</Alert.Description></Alert.Content></Alert>}
                 </div>
@@ -135,8 +162,10 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
                <Button variant="secondary" onPress={isCancelConfirmationOpen ? () => setCancelConfirmationOpen(false) : close}>{isCancelConfirmationOpen ? 'Keep enrollment' : 'Close'}</Button>
               {!session && activeStep === 0 && <Button isDisabled={!name.trim()} onPress={() => setStep(1)}>Continue</Button>}
                {!session && activeStep === 1 && <Button isPending={isLoading} isDisabled={!controllerIp.trim() || selectedMqttServerId === null || mqttServersQuery.isPending || mqttServersQuery.isError} onPress={createSession}>{isLoading ? 'Preparing commissioning' : 'Start automatic commissioning'}</Button>}
-                {session?.state === 'awaiting_identity_confirmation' && <Button isPending={isLoading} isDisabled={hostKeyFingerprint !== session.hostKeyFingerprint} onPress={confirmHostKey}>{isLoading ? 'Confirming identity' : 'Confirm host key'}</Button>}
-                {session && ['awaiting_delivery', 'delivery_failed'].includes(session.state) && <Button isPending={isLoading} isDisabled={!sshUsername.trim() || !sshPassword} onPress={deliverSession}>{isLoading ? 'Starting delivery' : session.state === 'delivery_failed' ? 'Retry delivery' : 'Start secure delivery'}</Button>}
+                 {session?.state === 'awaiting_identity_confirmation' && <Button isPending={isLoading} isDisabled={hostKeyFingerprint !== session.hostKeyFingerprint} onPress={confirmHostKey}>{isLoading ? 'Confirming identity' : 'Confirm host key'}</Button>}
+                 {session?.state === 'awaiting_wbm_confirmation' && <Button isPending={isLoading} isDisabled={!wbmConfirmed} onPress={confirmWbm}>{isLoading ? 'Confirming bootstrap' : 'Confirm WAGO bootstrap'}</Button>}
+                 {session && ['awaiting_delivery', 'delivery_failed'].includes(session.state) && <Button isPending={isLoading} isDisabled={!sshUsername.trim() || !sshPassword} onPress={deliverSession}>{isLoading ? 'Starting delivery' : session.state === 'delivery_failed' ? 'Retry delivery' : 'Start secure delivery'}</Button>}
+                 {session?.state === 'awaiting_codesys_confirmation' && <Button isPending={isLoading} isDisabled={!codesysConfirmed} onPress={confirmCodesys}>{isLoading ? 'Confirming' : 'Confirm it is safe to stop CODESYS'}</Button>}
                 {session && session.state !== 'completed' && session.state !== 'revoked' && (isCancelConfirmationOpen ? <Button color="danger" isPending={isLoading} onPress={() => removeSessionMutation.mutate(session.id, { onSuccess: close })}>{isLoading ? 'Canceling enrollment' : 'Confirm cancellation'}</Button> : <Button variant="secondary" isDisabled={isLoading} onPress={() => setCancelConfirmationOpen(true)}>Cancel enrollment</Button>)}
       </DrawerFooter>
     </StandardDrawer>
@@ -177,8 +206,12 @@ function HostKeyConfirmationStep({ fingerprint, expectedFingerprint, onFingerpri
   return <div className="wg:space-y-4"><Alert status="warning"><Alert.Indicator /><Alert.Content><Alert.Title>Verify the controller SSH key</Alert.Title><Alert.Description>Compare this fingerprint with the value shown on the physical controller or from a trusted inventory record. Enter it exactly to authorize delivery.</Alert.Description></Alert.Content></Alert><TextField isRequired name="host-key-fingerprint"><Label>Scanned SSH host-key fingerprint</Label><Input value={fingerprint} placeholder={expectedFingerprint} onChange={(event) => onFingerprintChange(event.target.value)} /></TextField></div>;
 }
 
-function DeliveryStep({ isDelivering, session, sshUsername, sshPassword, onSshUsernameChange, onSshPasswordChange }: { isDelivering: boolean; session: CommissioningSession; sshUsername: string; sshPassword: string; onSshUsernameChange: (value: string) => void; onSshPasswordChange: (value: string) => void }) {
-  return <div className="wg:space-y-4"><CommissioningStatusPanel isActive={isDelivering || session.state === 'delivering'} session={session} />{['awaiting_delivery', 'delivery_failed'].includes(session.state) && <div className="wg:grid wg:gap-4 wg:sm:grid-cols-2"><TextField isRequired name="ssh-username"><Label>Temporary SSH username</Label><Input value={sshUsername} onChange={(event) => onSshUsernameChange(event.target.value)} /></TextField><TextField isRequired name="ssh-password"><Label>Temporary SSH password</Label><Input type="password" value={sshPassword} onChange={(event) => onSshPasswordChange(event.target.value)} /></TextField></div>}</div>;
+function WbmBootstrapStep({ confirmed, onConfirmedChange }: { confirmed: boolean; onConfirmedChange: (confirmed: boolean) => void }) {
+  return <div className="wg:space-y-4"><Alert status="warning"><Alert.Indicator /><Alert.Content><Alert.Title>Complete WAGO Web-Based Management manually</Alert.Title><Alert.Description>Use the USB-C service interface if the controller is not on the production LAN. In WBM, verify the CC100 firmware baseline, enable SSH, and install and enable the approved WAGO Docker package. Attraccess does not automate, proxy, or guess WBM credentials.</Alert.Description></Alert.Content></Alert><Checkbox isSelected={confirmed} onChange={onConfirmedChange}>I completed these WBM prerequisites on this physically verified controller.</Checkbox></div>;
+}
+
+function DeliveryStep({ codesysConfirmed, isDelivering, session, sshUsername, sshPassword, onCodesysConfirmedChange, onSshUsernameChange, onSshPasswordChange }: { codesysConfirmed: boolean; isDelivering: boolean; session: CommissioningSession; sshUsername: string; sshPassword: string; onCodesysConfirmedChange: (value: boolean) => void; onSshUsernameChange: (value: string) => void; onSshPasswordChange: (value: string) => void }) {
+  return <div className="wg:space-y-4"><CommissioningStatusPanel isActive={isDelivering || session.state === 'delivering'} session={session} />{session.state === 'awaiting_codesys_confirmation' && <><Alert status="warning"><Alert.Indicator /><Alert.Content><Alert.Title>CODESYS is active</Alert.Title><Alert.Description>Stopping it interrupts the controller application. Confirm this is safe before Attraccess changes the runtime.</Alert.Description></Alert.Content></Alert><Checkbox isSelected={codesysConfirmed} onChange={onCodesysConfirmedChange}>I confirmed that stopping CODESYS is safe for this controller.</Checkbox></>}{['awaiting_delivery', 'delivery_failed'].includes(session.state) && <div className="wg:grid wg:gap-4 wg:sm:grid-cols-2"><TextField isRequired name="ssh-username"><Label>Temporary SSH username</Label><Input value={sshUsername} onChange={(event) => onSshUsernameChange(event.target.value)} /></TextField><TextField isRequired name="ssh-password"><Label>Temporary SSH password</Label><Input type="password" value={sshPassword} onChange={(event) => onSshPasswordChange(event.target.value)} /></TextField></div>}</div>;
 }
 
 function ProgressStep({ name, session }: { name: string; session: CommissioningSession }) {
@@ -218,7 +251,7 @@ function parseActivityLog(auditLog: string): Array<{ at: string; event: string }
 
 function sessionStep(session: CommissioningSession | null): number {
   if (!session) return 0;
-  return ['awaiting_delivery', 'delivering', 'awaiting_identity_confirmation', 'awaiting_codesys_confirmation', 'delivery_failed'].includes(session.state) ? 2 : 3;
+  return ['awaiting_wbm_confirmation', 'awaiting_delivery', 'delivering', 'awaiting_identity_confirmation', 'awaiting_codesys_confirmation', 'delivery_failed'].includes(session.state) ? 2 : 3;
 }
 
 function ErrorAlert({ error }: { error: unknown }) {

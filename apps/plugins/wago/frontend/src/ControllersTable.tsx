@@ -137,7 +137,7 @@ function ConnectivityChip({ connectivity }: Pick<WagoController, 'connectivity'>
 }
 
 function isResumable(state: WagoCommissioningState): boolean {
-  return ['awaiting_delivery', 'delivering', 'awaiting_identity_confirmation', 'awaiting_codesys_confirmation', 'delivery_failed'].includes(state);
+  return ['awaiting_wbm_confirmation', 'awaiting_delivery', 'delivering', 'awaiting_identity_confirmation', 'awaiting_codesys_confirmation', 'delivery_failed'].includes(state);
 }
 
 export function commissioningLabel(state: WagoCommissioningState): string {
@@ -145,6 +145,7 @@ export function commissioningLabel(state: WagoCommissioningState): string {
     awaiting_delivery: 'Preparing automatic delivery',
     delivering: 'Delivering commissioning runtime',
     awaiting_identity_confirmation: 'Ready to verify the physical controller',
+    awaiting_wbm_confirmation: 'Waiting for WAGO bootstrap confirmation',
     awaiting_codesys_confirmation: 'Waiting for CODESYS approval',
     delivery_failed: 'Delivery needs attention',
     awaiting_discovery: 'Waiting for the controller to connect',
