@@ -488,6 +488,63 @@ describe('PluginsSection', () => {
     expect(screen.getByRole('heading', { name: 'Plugin marketplace' })).toBeInTheDocument();
   });
 
+  it('discards detail responses that arrive after closing the marketplace', async () => {
+    const detail = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: { url?: string } | string) => {
+        const url = typeof input === 'string' ? input : (input.url ?? '');
+        if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+        if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+        if (url.includes('/marketplace/search'))
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              results: [
+                {
+                  name: '@attraccess/plugin-shelly',
+                  version: '1.0.0',
+                  displayName: 'Shelly',
+                  permissions: [],
+                  registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
+                  classification: 'official',
+                  classificationReason: 'Published by Attraccess on npm',
+                  installable: true,
+                  incompatibilityReason: null,
+                },
+              ],
+              errors: [],
+            }),
+          });
+        return detail.promise;
+      }),
+    );
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+    await openMarketplace(user);
+
+    await user.click(await screen.findByText('Shelly'));
+    await user.keyboard('{Escape}');
+    detail.resolve({
+      ok: true,
+      json: async () => ({
+        name: '@attraccess/plugin-shelly',
+        version: '1.0.0',
+        displayName: 'Shelly',
+        permissions: [],
+        registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
+        classification: 'official',
+        classificationReason: 'Published by Attraccess on npm',
+        installable: true,
+        incompatibilityReason: null,
+      }),
+    });
+    await openMarketplace(user);
+
+    expect(await screen.findByRole('heading', { name: 'Plugin marketplace' })).toBeInTheDocument();
+    expect(screen.queryByText('About this plugin')).not.toBeInTheDocument();
+  });
+
   it('opens details when a debounced search starts after the details click', async () => {
     const detail = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
     const plugin = {

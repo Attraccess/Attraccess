@@ -325,6 +325,7 @@ export function PluginsSection() {
       const details = (await response.json()) as MarketplacePlugin;
       if (marketplaceDetailRequest.current === request) {
         setMarketplacePlugin(details);
+        setIsMarketplaceOpen(true);
       }
     } catch {
       if (marketplaceDetailRequest.current === request) toast.error({ title: t('marketplace.loadError') });
@@ -643,7 +644,11 @@ export function PluginsSection() {
           isOpen={isMarketplaceOpen}
           onOpenChange={(open) => {
             setIsMarketplaceOpen(open);
-            if (!open) setMarketplacePlugin(null);
+            if (!open) {
+              ++marketplaceDetailRequest.current;
+              setIsLoadingMarketplaceDetail(false);
+              setMarketplacePlugin(null);
+            }
           }}
           size="cover"
         >
