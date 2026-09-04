@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   claimController,
+  confirmCommissioningHostKey,
   createCommissioningSession,
   deliverCommissioningSession,
   applyPreset,
@@ -86,6 +87,14 @@ export function useCreateCommissioningSessionMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateCommissioningSessionInput) => createCommissioningSession(input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.commissioningSessions }),
+  });
+}
+
+export function useConfirmCommissioningHostKeyMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, hostKeyFingerprint }: { id: number; hostKeyFingerprint: string }) => confirmCommissioningHostKey(id, hostKeyFingerprint),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.commissioningSessions }),
   });
 }

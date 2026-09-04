@@ -78,24 +78,37 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         hostKeyFingerprint,
         firmwareBaseline: configuredFirmwareBaseline,
         controllerName: input.name.trim(),
-        state: 'awaiting_delivery',
+        state: 'awaiting_identity_confirmation',
         enrollmentExpiresAt: null,
         enrollmentId: null,
         // This verifier authenticates the first runtime announcement and is never exposed to an operator.
         pairingCode: randomBytes(32).toString('base64url'),
         codesysState: null,
         progressPercent: 0,
-        progressStep: 'Identity scanned',
-        progressDetail: 'SSH host key captured and pinned for automatic verification.',
+        progressStep: 'Confirm controller identity',
+        progressDetail: 'Verify the scanned SSH host-key fingerprint on the controller before delivery.',
         auditLog: JSON.stringify([{ at: now, event: 'host_key_scanned' }]),
         failureReason: null,
         createdAt: now,
         updatedAt: now,
       }),
     );
-    // Delivery belongs to the server so it continues after the browser closes or reloads.
-    void this.deliverInBackground(session.id);
     return this.toResponse(session);
+  }
+
+  async confirmHostKey(id: number, hostKeyFingerprint: string): Promise<CommissioningSessionResponse> {
+    return this.withDeliveryLock(id, async () => {
+      const session = await this.sessions.findOneBy({ id });
+      if (!session) throw new NotFoundException('commissioning session not found');
+      if (session.state !== 'awaiting_identity_confirmation') throw new ConflictException('commissioning session identity cannot be confirmed in its current state');
+      if (hostKeyFingerprint !== session.hostKeyFingerprint) throw new ConflictException('the supplied SSH host-key fingerprint does not match the scanned controller identity');
+
+      session.state = 'awaiting_delivery';
+      session.progressPercent = 0;
+      session.progressStep = 'Identity confirmed';
+      session.progressDetail = 'The administrator confirmed the controller SSH host key. Ready for secure delivery.';
+      return this.toResponse(await this.save(session, 'host_key_confirmed'));
+    });
   }
 
   async list(limit = 50, offset = 0): Promise<Array<Omit<WagoCommissioningSession, 'pairingCode'>>> {

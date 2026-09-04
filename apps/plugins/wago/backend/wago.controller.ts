@@ -41,6 +41,11 @@ export class WagoControllerApi {
     });
   }
   @Auth('system.settings.manage')
+  @Post('commissioning/sessions/:id/confirm-host-key') confirmCommissioningHostKey(@Param('id', ParseIntPipe) id: number, @Body() body: { hostKeyFingerprint?: string }) {
+    if (!body?.hostKeyFingerprint) throw new BadRequestException('SSH host-key fingerprint is required');
+    return this.commissioning.confirmHostKey(id, body.hostKeyFingerprint);
+  }
+  @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/deliver') deliverCommissioningSession(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { temporarySsh?: { username?: string; password?: string } },

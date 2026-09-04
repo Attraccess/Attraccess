@@ -18,6 +18,8 @@ import type { CommissioningSession } from './api';
 import { commissioningLabel } from './ControllersTable';
 import { StandardDrawer } from './drawer';
 import {
+  useCommissioningSessionsQuery,
+  useConfirmCommissioningHostKeyMutation,
   useCreateCommissioningSessionMutation,
   useDeliverCommissioningSessionMutation,
   useMqttServersQuery,
@@ -33,6 +35,7 @@ interface CommissioningModalProps {
 
 export function CommissioningModal({ isOpen, session: resumedSession, onOpenChange }: CommissioningModalProps) {
   const createSessionMutation = useCreateCommissioningSessionMutation();
+  const confirmHostKeyMutation = useConfirmCommissioningHostKeyMutation();
   const deliverSessionMutation = useDeliverCommissioningSessionMutation();
   const removeSessionMutation = useRemoveCommissioningSessionMutation();
   const settingsQuery = useSettingsQuery();
@@ -43,6 +46,9 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
   const [name, setName] = useState('');
   const [controllerIp, setControllerIp] = useState('');
   const [mqttServerId, setMqttServerId] = useState<Key | null>(null);
+  const [hostKeyFingerprint, setHostKeyFingerprint] = useState('');
+  const [sshUsername, setSshUsername] = useState('root');
+  const [sshPassword, setSshPassword] = useState('wago');
   const [isCancelConfirmationOpen, setCancelConfirmationOpen] = useState(false);
 
   const mutationSession = deliverSessionMutation.data ?? resumedSession ?? createdSession;
@@ -50,11 +56,13 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
     ? commissioningSessionsQuery.data?.find((candidate) => candidate.id === mutationSession.id) ?? mutationSession
     : null;
   const selectedMqttServerId = mqttServerId === null ? null : Number(mqttServerId);
-  const isLoading = createSessionMutation.isPending || deliverSessionMutation.isPending || removeSessionMutation.isPending;
+  const isLoading = createSessionMutation.isPending || confirmHostKeyMutation.isPending || deliverSessionMutation.isPending || removeSessionMutation.isPending;
   const loadingStatus = createSessionMutation.isPending
     ? ['Preparing commissioning', 'Scanning and pinning the controller SSH identity.']
-    : removeSessionMutation.isPending
+     : removeSessionMutation.isPending
         ? ['Canceling enrollment', 'Revoking access and removing the enrollment records.']
+        : confirmHostKeyMutation.isPending
+          ? ['Confirming controller identity', 'Saving the administrator-confirmed SSH host key.']
         : null;
 
   useEffect(() => {
@@ -71,6 +79,9 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
     setName('');
     setControllerIp('');
     setMqttServerId(null);
+    setHostKeyFingerprint('');
+    setSshUsername('root');
+    setSshPassword('wago');
     setCancelConfirmationOpen(false);
     createSessionMutation.reset();
     deliverSessionMutation.reset();
@@ -88,7 +99,12 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
 
   function deliverSession() {
     if (!session) return;
-    deliverSessionMutation.mutate({ id: session.id });
+    deliverSessionMutation.mutate({ id: session.id, temporarySsh: { username: sshUsername, password: sshPassword } });
+  }
+
+  function confirmHostKey() {
+    if (!session) return;
+    confirmHostKeyMutation.mutate({ id: session.id, hostKeyFingerprint });
   }
 
   const activeStep = session ? sessionStep(session) : step;
@@ -105,9 +121,11 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
                    {loadingStatus && <OperationStatus title={loadingStatus[0]} description={loadingStatus[1]} />}
                   {!session && activeStep === 0 && <NameStep name={name} onNameChange={setName} />}
                    {!session && activeStep === 1 && <ConnectionStep controllerIp={controllerIp} mqttServerId={mqttServerId} mqttServersQuery={mqttServersQuery} onControllerIpChange={setControllerIp} onMqttServerIdChange={setMqttServerId} />}
-                    {session && activeStep === 2 && <DeliveryStep isDelivering={deliverSessionMutation.isPending} session={session} />}
+                    {session?.state === 'awaiting_identity_confirmation' && <HostKeyConfirmationStep fingerprint={hostKeyFingerprint} expectedFingerprint={session.hostKeyFingerprint} onFingerprintChange={setHostKeyFingerprint} />}
+                    {session && activeStep === 2 && session.state !== 'awaiting_identity_confirmation' && <DeliveryStep isDelivering={deliverSessionMutation.isPending} session={session} sshUsername={sshUsername} sshPassword={sshPassword} onSshUsernameChange={setSshUsername} onSshPasswordChange={setSshPassword} />}
                    {session && activeStep === 3 && <ProgressStep name={title} session={session} />}
                    {createSessionMutation.isError && <ErrorAlert error={createSessionMutation.error} />}
+                    {confirmHostKeyMutation.isError && <ErrorAlert error={confirmHostKeyMutation.error} />}
                    {deliverSessionMutation.isError && <ErrorAlert error={deliverSessionMutation.error} />}
                    {isCancelConfirmationOpen && <Alert status="warning"><Alert.Indicator /><Alert.Content><Alert.Description>Canceling revokes the enrollment credential and deletes this commissioning session.</Alert.Description></Alert.Content></Alert>}
                 </div>
@@ -117,7 +135,8 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
                <Button variant="secondary" onPress={isCancelConfirmationOpen ? () => setCancelConfirmationOpen(false) : close}>{isCancelConfirmationOpen ? 'Keep enrollment' : 'Close'}</Button>
               {!session && activeStep === 0 && <Button isDisabled={!name.trim()} onPress={() => setStep(1)}>Continue</Button>}
                {!session && activeStep === 1 && <Button isPending={isLoading} isDisabled={!controllerIp.trim() || selectedMqttServerId === null || mqttServersQuery.isPending || mqttServersQuery.isError} onPress={createSession}>{isLoading ? 'Preparing commissioning' : 'Start automatic commissioning'}</Button>}
-                {session?.state === 'delivery_failed' && <Button isPending={isLoading} onPress={deliverSession}>{isLoading ? 'Retrying delivery' : 'Retry automatic delivery'}</Button>}
+                {session?.state === 'awaiting_identity_confirmation' && <Button isPending={isLoading} isDisabled={hostKeyFingerprint !== session.hostKeyFingerprint} onPress={confirmHostKey}>{isLoading ? 'Confirming identity' : 'Confirm host key'}</Button>}
+                {session && ['awaiting_delivery', 'delivery_failed'].includes(session.state) && <Button isPending={isLoading} isDisabled={!sshUsername.trim() || !sshPassword} onPress={deliverSession}>{isLoading ? 'Starting delivery' : session.state === 'delivery_failed' ? 'Retry delivery' : 'Start secure delivery'}</Button>}
                 {session && session.state !== 'completed' && session.state !== 'revoked' && (isCancelConfirmationOpen ? <Button color="danger" isPending={isLoading} onPress={() => removeSessionMutation.mutate(session.id, { onSuccess: close })}>{isLoading ? 'Canceling enrollment' : 'Confirm cancellation'}</Button> : <Button variant="secondary" isDisabled={isLoading} onPress={() => setCancelConfirmationOpen(true)}>Cancel enrollment</Button>)}
       </DrawerFooter>
     </StandardDrawer>
@@ -154,8 +173,12 @@ function ConnectionStep({ controllerIp, mqttServerId, mqttServersQuery, onContro
   return <div className="wg:space-y-4"><TextField isRequired name="controller-ip"><Label>Controller IP address</Label><Input value={controllerIp} placeholder="192.168.1.42" onChange={(event) => onControllerIpChange(event.target.value)} /></TextField>{mqttServersQuery.isPending ? <div className="wg:flex wg:justify-center wg:p-2"><Spinner color="accent" size="sm" /></div> : mqttServersQuery.isError ? <ErrorAlert error={mqttServersQuery.error} /> : <Select className="wg:w-full" name="mqttServerId" placeholder="Select an MQTT server" value={mqttServerId} onChange={onMqttServerIdChange}><Label>MQTT server</Label><Select.Trigger><Select.Value /><Select.Indicator /></Select.Trigger><Select.Popover><ListBox renderEmptyState={() => <span className="wg:block wg:p-3 wg:text-sm wg:text-muted">No MQTT servers configured.</span>}>{(mqttServersQuery.data ?? []).map((server) => <ListBox.Item key={server.id} id={server.id.toString()} textValue={server.name}><div className="wg:min-w-0 wg:truncate">{server.name}</div><ListBox.ItemIndicator /></ListBox.Item>)}</ListBox></Select.Popover></Select>}</div>;
 }
 
-function DeliveryStep({ isDelivering, session }: { isDelivering: boolean; session: CommissioningSession }) {
-  return <CommissioningStatusPanel isActive={isDelivering || session.state === 'delivering'} session={session} />;
+function HostKeyConfirmationStep({ fingerprint, expectedFingerprint, onFingerprintChange }: { fingerprint: string; expectedFingerprint: string; onFingerprintChange: (value: string) => void }) {
+  return <div className="wg:space-y-4"><Alert status="warning"><Alert.Indicator /><Alert.Content><Alert.Title>Verify the controller SSH key</Alert.Title><Alert.Description>Compare this fingerprint with the value shown on the physical controller or from a trusted inventory record. Enter it exactly to authorize delivery.</Alert.Description></Alert.Content></Alert><TextField isRequired name="host-key-fingerprint"><Label>Scanned SSH host-key fingerprint</Label><Input value={fingerprint} placeholder={expectedFingerprint} onChange={(event) => onFingerprintChange(event.target.value)} /></TextField></div>;
+}
+
+function DeliveryStep({ isDelivering, session, sshUsername, sshPassword, onSshUsernameChange, onSshPasswordChange }: { isDelivering: boolean; session: CommissioningSession; sshUsername: string; sshPassword: string; onSshUsernameChange: (value: string) => void; onSshPasswordChange: (value: string) => void }) {
+  return <div className="wg:space-y-4"><CommissioningStatusPanel isActive={isDelivering || session.state === 'delivering'} session={session} />{['awaiting_delivery', 'delivery_failed'].includes(session.state) && <div className="wg:grid wg:gap-4 wg:sm:grid-cols-2"><TextField isRequired name="ssh-username"><Label>Temporary SSH username</Label><Input value={sshUsername} onChange={(event) => onSshUsernameChange(event.target.value)} /></TextField><TextField isRequired name="ssh-password"><Label>Temporary SSH password</Label><Input type="password" value={sshPassword} onChange={(event) => onSshPasswordChange(event.target.value)} /></TextField></div>}</div>;
 }
 
 function ProgressStep({ name, session }: { name: string; session: CommissioningSession }) {

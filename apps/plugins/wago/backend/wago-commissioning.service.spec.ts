@@ -129,7 +129,7 @@ describe('WagoCommissioningService', () => {
       hardwareId: 'cc100-923d750abecd3ba7',
       hostKeyFingerprint: 'SHA256:test',
       controllerName: 'Boiler room',
-      state: 'awaiting_delivery',
+      state: 'awaiting_identity_confirmation',
     });
     expect(session).not.toHaveProperty('pairingCode');
   });
@@ -189,6 +189,17 @@ describe('WagoCommissioningService', () => {
 
     expect(listed).toEqual({ id: 1, controllerName: 'Boiler room' });
     expect(listed).not.toHaveProperty('pairingCode');
+  });
+
+  it('requires the administrator to confirm the scanned host key before delivery', async () => {
+    const session = { id: 1, hostKeyFingerprint: 'SHA256:test', state: 'awaiting_identity_confirmation', progressPercent: 0, progressStep: 'Confirm controller identity', progressDetail: '', auditLog: '[]', updatedAt: '' } as WagoCommissioningSession;
+    const repository = { findOneBy: jest.fn().mockResolvedValue(session), save: jest.fn().mockImplementation(async (value) => value) };
+    const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
+    const service = new WagoCommissioningService(context, { registerCommissioningDiscoveryHandler: jest.fn() } as unknown as WagoService);
+    service.onApplicationBootstrap();
+
+    await expect(service.confirmHostKey(session.id, 'SHA256:other')).rejects.toThrow('does not match');
+    await expect(service.confirmHostKey(session.id, session.hostKeyFingerprint)).resolves.toMatchObject({ state: 'awaiting_delivery', progressStep: 'Identity confirmed' });
   });
 
   it('revokes and removes an enrollment session without retaining its records', async () => {
