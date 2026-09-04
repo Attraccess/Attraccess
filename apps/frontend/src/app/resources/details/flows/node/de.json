@@ -608,17 +608,19 @@
         }
       },
       "resource": {
-        "operating": {
-          "title": "Betriebsbeginn aufzeichnen",
-          "description": "Zeichnet auf, dass die Ressource zum aktuellen Serverzeitpunkt den Betrieb aufgenommen hat.",
-          "inputs": { "input": "Eingang" },
-          "outputs": { "output": "Ausgang" }
-        },
-        "idle": {
-          "title": "Betriebsende aufzeichnen",
-          "description": "Zeichnet auf, dass die Ressource zum aktuellen Serverzeitpunkt den Betrieb beendet hat.",
-          "inputs": { "input": "Eingang" },
-          "outputs": { "output": "Ausgang" }
+        "activity": {
+          "operating": {
+            "title": "Betriebsbeginn aufzeichnen",
+            "description": "Zeichnet auf, dass die Ressource zum aktuellen Serverzeitpunkt den Betrieb aufgenommen hat.",
+            "inputs": { "input": "Eingang" },
+            "outputs": { "output": "Ausgang" }
+          },
+          "idle": {
+            "title": "Betriebsende aufzeichnen",
+            "description": "Zeichnet auf, dass die Ressource zum aktuellen Serverzeitpunkt den Betrieb beendet hat.",
+            "inputs": { "input": "Eingang" },
+            "outputs": { "output": "Ausgang" }
+          }
         },
         "usage": {
           "end-session": {

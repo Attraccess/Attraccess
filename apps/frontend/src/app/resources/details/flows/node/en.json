@@ -608,17 +608,19 @@
         }
       },
       "resource": {
-        "operating": {
-          "title": "Record operation started",
-          "description": "Records that the resource began operating at the current server time.",
-          "inputs": { "input": "Input" },
-          "outputs": { "output": "Output" }
-        },
-        "idle": {
-          "title": "Record operation stopped",
-          "description": "Records that the resource stopped operating at the current server time.",
-          "inputs": { "input": "Input" },
-          "outputs": { "output": "Output" }
+        "activity": {
+          "operating": {
+            "title": "Record operation started",
+            "description": "Records that the resource began operating at the current server time.",
+            "inputs": { "input": "Input" },
+            "outputs": { "output": "Output" }
+          },
+          "idle": {
+            "title": "Record operation stopped",
+            "description": "Records that the resource stopped operating at the current server time.",
+            "inputs": { "input": "Input" },
+            "outputs": { "output": "Output" }
+          }
         },
         "usage": {
           "end-session": {
