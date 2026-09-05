@@ -8,14 +8,14 @@
   "loading": "Knoten werden geladen…",
   "error": "Knoten konnten nicht geladen werden. Bitte versuche es erneut.",
   "domains": {
-    "triggers": "Auslöser",
-    "manual": "Manuell",
-    "resource": "Ressource",
-    "door": "Tür",
-    "mqtt": "MQTT",
-    "http": "HTTP",
-    "logic": "Logik",
-    "health": "Gesundheit",
-    "companion": "Companion"
+    "usage-sessions": "Nutzungssitzungen",
+    "operation-activity": "Betrieb & Aktivität",
+    "billing": "Abrechnung",
+    "access-doors": "Zugang & Türen",
+    "health-monitoring": "Zustandsüberwachung",
+    "companion-device": "Companion-Gerät",
+    "messaging": "Nachrichten",
+    "web-requests": "Webanfragen",
+    "flow-control": "Ablaufsteuerung"
   }
 }

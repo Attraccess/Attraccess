@@ -78,6 +78,22 @@ export function commandTopic(prefix: string, hardwareId: string): string {
   return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${hardwareId}/commands`;
 }
 
+export function acknowledgementTopic(prefix: string, hardwareId: string): string {
+  return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${hardwareId}/acknowledgements`;
+}
+
+export function acknowledgementWildcardTopic(prefix: string): string {
+  return acknowledgementTopic(prefix, '+');
+}
+
+export function acknowledgementHardwareId(prefix: string, topic: string): string | null {
+  const topicPrefix = `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/`;
+  const topicSuffix = '/acknowledgements';
+  if (!topic.startsWith(topicPrefix) || !topic.endsWith(topicSuffix)) return null;
+  const hardwareId = topic.slice(topicPrefix.length, -topicSuffix.length);
+  return hardwareId && !/[+/]/.test(hardwareId) ? hardwareId : null;
+}
+
 export function configurationReportedWildcardTopic(prefix: string): string {
   return configurationReportedTopic(prefix, '+');
 }

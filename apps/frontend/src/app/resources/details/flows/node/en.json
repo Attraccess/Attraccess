@@ -33,22 +33,22 @@
       "resource": {
         "usage": {
           "started": {
-            "title": "Resource usage started",
-            "description": "This node is triggered when a resource is started.",
+            "title": "Usage started",
+            "description": "Triggers when a usage session starts.",
             "outputs": {
               "output": "Output"
             }
           },
           "stopped": {
-            "title": "Resource usage stopped",
-            "description": "This node is triggered when a resource is stopped.",
+            "title": "Usage stopped",
+            "description": "Triggers when a usage session stops.",
             "outputs": {
               "output": "Output"
             }
           },
           "takeover": {
-            "title": "Resource usage takeover",
-            "description": "This node is triggered when a resource is taken over.",
+            "title": "Usage taken over",
+            "description": "Triggers when a usage session is taken over.",
             "outputs": {
               "output": "Output"
             }
@@ -56,8 +56,8 @@
         },
         "activity": {
           "no-activity": {
-            "title": "Resource is inactive",
-            "description": "This node is triggered when a resource is inactive for a certain time.",
+            "title": "Inactivity timeout reached",
+            "description": "Triggers after the resource has had no recorded activity for the configured duration.",
             "outputs": {
               "output": "Output"
             },
@@ -608,22 +608,24 @@
         }
       },
       "resource": {
-        "operating": {
-          "title": "Mark resource operating",
-          "description": "Records that the machine is operating at the server time.",
-          "inputs": { "input": "Input" },
-          "outputs": { "output": "Output" }
-        },
-        "idle": {
-          "title": "Mark resource idle",
-          "description": "Records that the machine stopped operating at the server time.",
-          "inputs": { "input": "Input" },
-          "outputs": { "output": "Output" }
+        "activity": {
+          "operating": {
+            "title": "Record operation started",
+            "description": "Records that the resource began operating at the current server time.",
+            "inputs": { "input": "Input" },
+            "outputs": { "output": "Output" }
+          },
+          "idle": {
+            "title": "Record operation stopped",
+            "description": "Records that the resource stopped operating at the current server time.",
+            "inputs": { "input": "Input" },
+            "outputs": { "output": "Output" }
+          }
         },
         "usage": {
           "end-session": {
-            "title": "End usage session",
-            "description": "Ends the active usage session. Optionally sends notes (template or static).",
+            "title": "End active session",
+            "description": "Ends the current usage session, optionally with a note.",
             "inputs": { "input": "Input" },
             "outputs": { "output": "Output", "failure": "Failure" },
             "config": {
@@ -677,8 +679,8 @@
 
         "activity": {
           "track-activity": {
-            "title": "Resource was active",
-            "description": "Use this node to indicate that the resource was active.",
+            "title": "Record activity",
+            "description": "Records activity for this resource at the current server time.",
             "inputs": {
               "input": "Input"
             },
@@ -689,7 +691,7 @@
         },
         "health": {
           "heartbeat": {
-            "title": "Health heartbeat",
+            "title": "Send health heartbeat",
             "description": "Marks the resource healthy when this node fires. If no heartbeat arrives within the configured timeout the resource is automatically marked unhealthy.",
             "inputs": { "input": "Input" },
             "outputs": { "output": "Output" },

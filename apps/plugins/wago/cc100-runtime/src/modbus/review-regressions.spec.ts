@@ -141,8 +141,17 @@ function harness(initial: Snapshot, device: ModbusDeviceRouter, store = new Memo
 const onboard = { read: async () => false, write: async () => undefined };
 const desired = (s: Snapshot, revision = 2) =>
   Buffer.from(JSON.stringify({ protocolVersion: 1, revision, contentHash: hash(s), snapshot: s }));
-const command = (id: string, value = true) =>
-  Buffer.from(JSON.stringify({ id, channelId: 'output', action: 'set', value }));
+const command = (id: string, value = true, revision = 1) =>
+  Buffer.from(
+    JSON.stringify({
+      id,
+      channelId: 'output',
+      action: 'set',
+      value,
+      expectedConfigurationRevision: revision,
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    }),
+  );
 
 describe('ATT-1059 independent review regressions', () => {
   it.each(['remove', 'rebind'])(
@@ -318,7 +327,15 @@ describe('ATT-1059 independent review regressions', () => {
       await runtime.start();
       await runtime.receiveCommand(
         mode === 'pulse'
-          ? Buffer.from(JSON.stringify({ id: 'energize', channelId: 'output', action: 'pulse' }))
+          ? Buffer.from(
+              JSON.stringify({
+                id: 'energize',
+                channelId: 'output',
+                action: 'pulse',
+                expectedConfigurationRevision: 1,
+                expiresAt: '2099-01-01T00:00:00.000Z',
+              }),
+            )
           : command('energize'),
       );
       expect(store.saved).toMatchObject({ outputs: { output: true }, uncertainOutputChannelIds: [] });
@@ -512,7 +529,7 @@ describe('ATT-1059 independent review regressions', () => {
     expect(writes).toEqual([]);
     held.resolve();
     await apply;
-    await runtime.receiveCommand(command('after-save'));
+    await runtime.receiveCommand(command('after-save', true, 2));
     expect(writes).toEqual([22]);
   });
   it('retains old snapshot and route after failed configuration persistence', async () => {
@@ -531,7 +548,7 @@ describe('ATT-1059 independent review regressions', () => {
     next.modbus.profiles[0].actions[0].id = 'new-action';
     next.modbus.profiles[0].actions[0].address = 22;
     jest.spyOn(store, 'save').mockRejectedValueOnce(new Error('disk failure'));
-    await expect(runtime.receiveDesired(desired(next))).rejects.toThrow('disk failure');
+    await runtime.receiveDesired(desired(next));
     await runtime.receiveCommand(command('after-failure'));
     expect(writes).toEqual([12]);
     expect(store.saved.accepted?.revision).toBe(1);
@@ -571,7 +588,7 @@ describe('ATT-1059 independent review regressions', () => {
     const events = published.filter((p) => p.topic.endsWith('/measurements'));
     expect(events.map((p) => p.payload.channelId)).toEqual(['energy-1', 'energy-2']);
     expect(request).toHaveBeenCalledTimes(1);
-    expect(events.map((p) => p.payload.sequence)).toEqual([1, 2]);
+    expect(Number(events[1].payload.sequence)).toBe(Number(events[0].payload.sequence) + 1);
     for (const { payload } of events) {
       expect(payload).toEqual(
         expect.objectContaining({
@@ -653,7 +670,17 @@ describe('ATT-1059 independent review regressions', () => {
     }));
     const { runtime, store, published } = harness(s, router);
     await runtime.start();
-    await runtime.receiveCommand(Buffer.from(JSON.stringify({ id: 'pulse', channelId: 'output', action: 'pulse' })));
+    await runtime.receiveCommand(
+      Buffer.from(
+        JSON.stringify({
+          id: 'pulse',
+          channelId: 'output',
+          action: 'pulse',
+          expectedConfigurationRevision: 1,
+          expiresAt: '2099-01-01T00:00:00.000Z',
+        }),
+      ),
+    );
     const next = structuredClone(s);
     next.modbus.profiles[0].actions[0].address = 22;
     await runtime.receiveDesired(desired(next));

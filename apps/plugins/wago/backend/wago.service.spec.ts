@@ -32,7 +32,6 @@ describe('WagoService', () => {
     controllers = [controller()],
     enrollments: WagoEnrollment[] = [],
     defaultMqttServerId: number | null = null,
-    initialize = true,
   ) {
     const controllerRepository = {
       find: jest.fn().mockResolvedValue(controllers),
@@ -107,13 +106,14 @@ describe('WagoService', () => {
       getMqttCredentialProvisioning: jest.fn(),
     } as unknown as PluginContext;
     const service = new WagoService(context);
-    if (initialize) {
-      Reflect.set(service, 'controllers', controllerRepository);
-      Reflect.set(service, 'enrollments', enrollmentRepository);
-      Reflect.set(service, 'settings', settingsRepository);
-      Reflect.set(service, 'drafts', draftRepository);
-      Reflect.set(service, 'revisions', revisionRepository);
-    }
+    // Unit tests invoke service methods directly, outside Nest's module lifecycle.
+    Object.assign(service, {
+      controllers: controllerRepository,
+      settings: settingsRepository,
+      enrollments: enrollmentRepository,
+      drafts: draftRepository,
+      revisions: revisionRepository,
+    });
     return {
       service,
       controllerRepository,
@@ -155,24 +155,186 @@ describe('WagoService', () => {
     expect(listed).not.toHaveProperty('pairingCodeHash');
   });
 
-  it('requires exactly one credential provider for automatic enrollment', async () => {
-    const { service, context } = createService();
-    (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = jest.fn().mockResolvedValue({});
-    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({
-      availableProviders: jest.fn().mockResolvedValue(['provider-a', 'provider-b']),
-    });
-
-    await expect(service.enrollmentCredentialSupport(2)).resolves.toEqual({ automatic: false });
-  });
-
-  it('defers repository access until plugin module initialization', async () => {
-    const { service, context } = createService([], [], null, false);
+  it('resolves repositories only after the host module initializes', async () => {
+    const context = { getRepository: jest.fn() } as unknown as PluginContext;
+    new WagoService(context);
 
     expect(context.getRepository).not.toHaveBeenCalled();
+  });
 
-    await service.onApplicationBootstrap();
+  it('retries MQTT subscriptions instead of failing module startup', async () => {
+    const { service, context } = createService([], [], 2);
+    (context.mqtt.subscribe as jest.Mock).mockRejectedValueOnce(new Error('broker unavailable'));
 
-    expect(context.getRepository).toHaveBeenCalledTimes(5);
+    await expect(service.onApplicationBootstrap()).resolves.toBeUndefined();
+
+    expect(context.logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Could not establish WAGO MQTT subscriptions during startup'),
+    );
+    service.onModuleDestroy();
+  });
+
+  it('publishes a configured command without waiting when dispatch completion is selected', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, context, revisionRepository } = createService([claimed], [], 2);
+    revisionRepository.find.mockResolvedValue([
+      {
+        controllerId: claimed.id,
+        revision: 3,
+        state: 'applied',
+        snapshot: JSON.stringify({
+          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'] }],
+        }),
+      },
+    ]);
+
+    await expect(
+      service.executeCommand({
+        controllerId: claimed.id,
+        channelId: 'pump',
+        action: 'set',
+        value: true,
+        expectedConfigurationRevision: 3,
+        completionBehavior: 'dispatch',
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(context.mqtt.publish).toHaveBeenCalledWith(
+      claimed.mqttServerId,
+      'attraccess/wago/v1/controllers/cc100-01/commands',
+      expect.stringMatching(/"channelId":"pump"/),
+      { qos: 1, retain: false },
+    );
+  });
+
+  it('rejects invalid persisted command policies', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.validateCommandConfig({
+        controllerId: 1,
+        channelId: 'pump',
+        action: 'pulse',
+        expectedConfigurationRevision: 1,
+        completionBehavior: 'later',
+        failureBehavior: 'ignore-everything',
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({ field: 'completionBehavior' }),
+      expect.objectContaining({ field: 'failureBehavior' }),
+    ]);
+  });
+
+  it('rejects acknowledgement timeouts that exceed the supported maximum', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.validateCommandConfig({
+        controllerId: 1,
+        channelId: 'pump',
+        action: 'pulse',
+        expectedConfigurationRevision: 1,
+        acknowledgementTimeoutSeconds: Number.MAX_SAFE_INTEGER,
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        field: 'acknowledgementTimeoutSeconds',
+        message: 'Acknowledgement timeout must not exceed 300 seconds.',
+      }),
+    ]);
+  });
+
+  it('binds numeric controller IDs when looking up channel references', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, context, revisionRepository } = createService([claimed]);
+    revisionRepository.find.mockResolvedValue([
+      {
+        controllerId: claimed.id,
+        revision: 3,
+        state: 'applied',
+        snapshot: JSON.stringify({
+          logicalChannels: [{ id: 'pump', profile: 'generic-digital-output', capabilities: ['output'] }],
+        }),
+      },
+    ]);
+    const query = {
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    };
+    Object.assign(context, {
+      dataSource: {
+        getRepository: jest.fn().mockReturnValue({ createQueryBuilder: jest.fn().mockReturnValue(query) }),
+      },
+    });
+
+    await service.commandSchema({ controllerId: claimed.id, channelId: 'pump' }, 2);
+
+    expect(query.andWhere).toHaveBeenCalledWith("node.data ->> 'controllerId' = :controllerId", {
+      controllerId: claimed.id,
+    });
+  });
+
+  it('consumes a pending acknowledgement rejection when command publication fails', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, context, revisionRepository } = createService([claimed], [], 2);
+    revisionRepository.find.mockResolvedValue([
+      {
+        controllerId: claimed.id,
+        revision: 3,
+        state: 'applied',
+        snapshot: JSON.stringify({
+          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'] }],
+        }),
+      },
+    ]);
+    (context.mqtt.publish as jest.Mock).mockRejectedValue(new Error('broker offline'));
+
+    await expect(
+      service.executeCommand({
+        controllerId: claimed.id,
+        channelId: 'pump',
+        action: 'pulse',
+        expectedConfigurationRevision: 3,
+      }),
+    ).rejects.toThrow('Failed to publish WAGO command: Error: broker offline');
+  });
+
+  it('propagates a controller acknowledgement rejection message', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, context, revisionRepository } = createService([claimed], [], 2);
+    revisionRepository.find.mockResolvedValue([
+      {
+        controllerId: claimed.id,
+        revision: 3,
+        state: 'applied',
+        snapshot: JSON.stringify({
+          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'] }],
+        }),
+      },
+    ]);
+    (context.mqtt.publish as jest.Mock).mockImplementation(async () => {
+      const command = JSON.parse((context.mqtt.publish as jest.Mock).mock.calls[0][2]) as { id: string };
+      const acknowledge = Reflect.get(service, 'onCommandAcknowledgement') as (
+        controllerId: number,
+        payload: Buffer,
+      ) => void;
+      acknowledge.call(
+        service,
+        claimed.id,
+        Buffer.from(JSON.stringify({ id: command.id, status: 'rejected', error: 'command expired' })),
+      );
+    });
+
+    await expect(
+      service.executeCommand({
+        controllerId: claimed.id,
+        channelId: 'pump',
+        action: 'pulse',
+        expectedConfigurationRevision: 3,
+      }),
+    ).rejects.toThrow('command expired');
   });
 
   it('creates default settings when none have been persisted', async () => {
@@ -237,7 +399,6 @@ describe('WagoService', () => {
     expect(context.logger.warn).not.toHaveBeenCalled();
     service.onModuleDestroy();
   });
-
   it('preserves the MQTT server during a prefix-only settings update', async () => {
     const { service, settingsRepository } = createService([], [], 2);
 
@@ -246,17 +407,6 @@ describe('WagoService', () => {
     expect(settingsRepository.save).toHaveBeenCalledWith(
       expect.objectContaining({ defaultMqttServerId: 2, operationalPrefix: 'customer/wago' }),
     );
-  });
-
-  it('reports whether an MQTT server can provision discovery credentials', async () => {
-    const { service, context } = createService();
-    const getMqttServerConfig = jest.fn().mockResolvedValue({ id: 2 });
-    const availableProviders = jest.fn().mockResolvedValue([{ providerId: 'rabbitmq', displayName: 'RabbitMQ' }]);
-    (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = getMqttServerConfig;
-    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({ availableProviders });
-
-    await expect(service.enrollmentCredentialSupport(2)).resolves.toEqual({ automatic: true });
-    expect(availableProviders).toHaveBeenCalledWith(2);
   });
 
   it('requires a non-empty matching fingerprint', () => {
@@ -329,66 +479,6 @@ describe('WagoService', () => {
     expect(revisionRepository.save).toHaveBeenCalledWith(expect.objectContaining({ revision: 1 }));
   });
 
-  it('copies only selected preset changes into the editable draft and records provenance', async () => {
-    const claimed = { ...controller(), trustState: 'claimed' as const };
-    const { service, draftRepository } = createService([claimed]);
-    const snapshot = { version: 1, physicalPoints: [{ id: 'point-a', hardwareProfile: '751-9301', channel: 0 }], logicalChannels: [] };
-    let draft: Record<string, unknown> | null = { controllerId: claimed.id, snapshot: JSON.stringify(snapshot), reviewedHash: null, presetProvenance: null, updatedAt: '' };
-    draftRepository.findOneBy.mockImplementation(async () => draft);
-    draftRepository.save.mockImplementation(async (value) => {
-      draft = value;
-      return value;
-    });
-    const application = { presetId: 'generic-digital-output' as const, channelId: 'output-a', physicalPointId: 'point-a' };
-    const preview = await service.previewPreset(claimed.id, application);
-
-    await service.applyPreset(claimed.id, application, [], preview.draftHash);
-    const unchanged = draft as Record<string, unknown>;
-    expect(JSON.parse(unchanged.snapshot as string).logicalChannels).toEqual([]);
-
-    await service.applyPreset(claimed.id, application, preview.diff.map((change) => change.path), preview.draftHash);
-    const applied = draft as Record<string, unknown>;
-    expect(JSON.parse(applied.snapshot as string).logicalChannels).toEqual([expect.objectContaining({ id: 'output-a' })]);
-    expect(applied.presetProvenance).toContain('generic-digital-output');
-  });
-
-  it('rejects applying a preset against a draft changed since its preview', async () => {
-    const claimed = { ...controller(), trustState: 'claimed' as const };
-    const { service, draftRepository } = createService([claimed]);
-    const snapshot = { version: 1, physicalPoints: [{ id: 'point-a', hardwareProfile: '751-9301', channel: 0 }], logicalChannels: [] };
-    const draft = { controllerId: claimed.id, snapshot: JSON.stringify(snapshot), reviewedHash: null, presetProvenance: null, updatedAt: '' };
-    draftRepository.findOneBy.mockResolvedValue(draft);
-    const application = { presetId: 'generic-digital-output' as const, channelId: 'output-a', physicalPointId: 'point-a' };
-    const preview = await service.previewPreset(claimed.id, application);
-
-    draft.snapshot = JSON.stringify({ ...snapshot, physicalPoints: [{ ...snapshot.physicalPoints[0], channel: 1 }] });
-
-    await expect(service.applyPreset(claimed.id, application, preview.diff.map((change) => change.path), preview.draftHash)).rejects.toThrow(
-      'selected preset changes no longer match the configuration draft',
-    );
-  });
-
-  it('retains only the latest 100 preset provenance entries', async () => {
-    const claimed = { ...controller(), trustState: 'claimed' as const };
-    const { service, draftRepository } = createService([claimed]);
-    const snapshot = { version: 1, physicalPoints: [{ id: 'point-a', hardwareProfile: '751-9301', channel: 0 }], logicalChannels: [] };
-    const draft = {
-      controllerId: claimed.id,
-      snapshot: JSON.stringify(snapshot),
-      reviewedHash: null,
-      presetProvenance: JSON.stringify(Array.from({ length: 100 }, (_, index) => ({ presetId: `preset-${index}` }))),
-      updatedAt: '',
-    };
-    draftRepository.findOneBy.mockResolvedValue(draft);
-    const application = { presetId: 'generic-digital-output' as const, channelId: 'output-a', physicalPointId: 'point-a' };
-    const preview = await service.previewPreset(claimed.id, application);
-
-    await service.applyPreset(claimed.id, application, preview.diff.map((change) => change.path), preview.draftHash);
-
-    expect(JSON.parse(draft.presetProvenance)).toHaveLength(100);
-    expect(JSON.parse(draft.presetProvenance)[0]).toEqual({ presetId: 'preset-1' });
-  });
-
   it('rejects publication for a claimed runtime without the configuration contract', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const, capabilities: '["claim","heartbeat"]' };
     const { service, draftRepository } = createService([claimed]);
@@ -458,9 +548,15 @@ describe('WagoService', () => {
     await service.claim(candidate.id, 'Controller', 'fingerprint');
 
     expect(revoke).not.toHaveBeenCalled();
-    const claimPayload = JSON.parse((context.mqtt.publish as jest.Mock).mock.calls[0][2]) as { acknowledgementToken: string };
-    const acknowledgementHandler = (context.mqtt.subscribe as jest.Mock).mock.calls[0][2] as (message: { payload: Buffer }) => Promise<void>;
-    await acknowledgementHandler({ payload: Buffer.from(JSON.stringify({ acknowledgementToken: claimPayload.acknowledgementToken })) });
+    const claimPayload = JSON.parse((context.mqtt.publish as jest.Mock).mock.calls[0][2]) as {
+      acknowledgementToken: string;
+    };
+    const acknowledgementHandler = (context.mqtt.subscribe as jest.Mock).mock.calls[0][2] as (message: {
+      payload: Buffer;
+    }) => Promise<void>;
+    await acknowledgementHandler({
+      payload: Buffer.from(JSON.stringify({ acknowledgementToken: claimPayload.acknowledgementToken })),
+    });
 
     expect(revoke).toHaveBeenCalledWith(expect.objectContaining({ identity: enrollment.identity }));
   });

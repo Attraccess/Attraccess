@@ -45,6 +45,21 @@ export class ModbusDeviceRouter implements DeviceAdapter {
     private readonly onboard: DeviceAdapter,
     private readonly factory: (c: ModbusConnection) => ModbusTransport = (c) => new QueuedModbusTransport(c),
   ) {}
+  validate(snapshot: Snapshot) {
+    const points = snapshot.physicalPoints.filter((point) => !point.modbus);
+    const ids = new Set(points.map((point) => point.id));
+    return (
+      this.onboard.validate?.({
+        ...snapshot,
+        modbus: undefined,
+        physicalPoints: points,
+        logicalChannels: snapshot.logicalChannels.filter((channel) => ids.has(channel.physicalPointId)),
+      }) ?? []
+    );
+  }
+  checkAvailability(): Promise<void> {
+    return this.onboard.checkAvailability?.() ?? Promise.resolve();
+  }
   configure(snapshot: Snapshot): void {
     this.prepareConfiguration(snapshot)();
   }

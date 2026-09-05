@@ -164,16 +164,17 @@ describe('WAGO producer-to-consumer measurement contract', () => {
     expect(messages).toContainEqual(expect.objectContaining({ category: 'fault', code: 'invalid_measurement_value' }));
   });
 
-  it('starts new category sequences under a new stream ID after restoring the same persisted state', async () => {
+  it('resumes reserved category sequences under a new stream ID after restoring the same persisted state', async () => {
     await runtime.publishMeasurements();
     const previousStream = messages[0].streamId;
+    const previousSequence = Math.max(...messages.map((message) => message.sequence));
     messages.length = 0;
     runtime = createRuntime();
     await runtime.start();
     await runtime.publishMeasurements();
     expect(messages.every((message) => message.streamId !== previousStream)).toBe(true);
-    expect(messages.find((message) => message.category === 'state').sequence).toBe(1);
-    expect(messages.find((message) => message.category === 'measurement').sequence).toBe(1);
+    expect(messages.find((message) => message.category === 'state').sequence).toBeGreaterThan(previousSequence);
+    expect(messages.find((message) => message.category === 'measurement').sequence).toBeGreaterThan(previousSequence);
   });
 
   it.each([

@@ -9,6 +9,7 @@ import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
 import { WagoCommissioningService } from './wago-commissioning.service';
+import { createWagoCommandNode } from './wago-command-node';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 class WagoPluginModule {}
@@ -22,6 +23,7 @@ const plugin: PluginBackendModule = {
     WagoConfigurationRevision,
     WagoCommissioningSession,
   ],
+  flowNodes: (context) => [createWagoCommandNode(context)],
   register(context: PluginContext): DynamicModule {
     return {
       module: WagoPluginModule,
