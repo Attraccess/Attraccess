@@ -17,6 +17,7 @@ interface ControllersTableProps {
   sessions: CommissioningSession[];
   onClaim: (controllerId: number) => void;
   onConfigure: (controllerId: number) => void;
+  onDiagnostics: (controllerId: number) => void;
   onRemove: (controller: WagoController) => void;
   onResume: (session: CommissioningSession) => void;
 }
@@ -25,11 +26,12 @@ type TableRowData =
   | { key: string; kind: 'controller'; controller: WagoController; session: CommissioningSession | null }
   | { key: string; kind: 'session'; session: CommissioningSession };
 
-export function ControllersTable({ controllers, sessions, onClaim, onConfigure, onRemove, onResume }: ControllersTableProps) {
+export function ControllersTable({ controllers, sessions, onClaim, onConfigure, onDiagnostics, onRemove, onResume }: ControllersTableProps) {
   const activeSessions = sessions.filter(
     (session) =>
       session.state !== 'completed' &&
-      session.state !== 'revoked',
+      session.state !== 'revoked' &&
+      !controllers.some((controller) => controller.hardwareId === session.hardwareId && controller.trustState === 'claimed'),
   );
   const rows: TableRowData[] = [
     ...controllers.map((controller) => ({
@@ -59,7 +61,7 @@ export function ControllersTable({ controllers, sessions, onClaim, onConfigure, 
             {(row) => row.kind === 'session' ? (
               <CommissioningRow row={row} onResume={onResume} />
             ) : (
-               <ControllerRow row={row} onClaim={onClaim} onConfigure={onConfigure} onRemove={onRemove} onResume={onResume} />
+               <ControllerRow row={row} onClaim={onClaim} onConfigure={onConfigure} onDiagnostics={onDiagnostics} onRemove={onRemove} onResume={onResume} />
             )}
           </TableBody>
         </TableContent>
@@ -68,7 +70,7 @@ export function ControllersTable({ controllers, sessions, onClaim, onConfigure, 
   );
 }
 
-function ControllerRow({ row, onClaim, onConfigure, onRemove, onResume }: { row: Extract<TableRowData, { kind: 'controller' }>; onClaim: (controllerId: number) => void; onConfigure: (controllerId: number) => void; onRemove: (controller: WagoController) => void; onResume: (session: CommissioningSession) => void }) {
+function ControllerRow({ row, onClaim, onConfigure, onDiagnostics, onRemove, onResume }: { row: Extract<TableRowData, { kind: 'controller' }>; onClaim: (controllerId: number) => void; onConfigure: (controllerId: number) => void; onDiagnostics: (controllerId: number) => void; onRemove: (controller: WagoController) => void; onResume: (session: CommissioningSession) => void }) {
   const { controller, session } = row;
   return (
     <TableRow key={row.key} id={row.key} className={session ? 'wg:bg-primary/5' : undefined}>
@@ -88,8 +90,8 @@ function ControllerRow({ row, onClaim, onConfigure, onRemove, onResume }: { row:
       <TableCell className="wg:hidden wg:lg:table-cell">{formatHeartbeat(controller.lastHeartbeatAt)}</TableCell>
       <TableCell>
         <div className="wg:flex wg:justify-end wg:gap-2">
-          {session && <Button size="sm" variant="secondary" onPress={() => onResume(session)}>View progress</Button>}
-          {controller.trustState === 'untrusted' ? (!session &&
+          <Button size="sm" variant="secondary" onPress={() => onDiagnostics(controller.id)}>Diagnostics</Button>
+          {session ? <Button size="sm" variant="secondary" onPress={() => onResume(session)}>View progress</Button> : controller.trustState === 'untrusted' ? (
             <Button size="sm" onPress={() => onClaim(controller.id)}>Claim</Button>
           ) : <Button size="sm" variant="secondary" onPress={() => onConfigure(controller.id)}>Configure</Button>}
           <Button color="danger" size="sm" variant="ghost" onPress={() => onRemove(controller)}>Remove</Button>
@@ -150,9 +152,6 @@ export function commissioningLabel(state: WagoCommissioningState): string {
     awaiting_discovery: 'Waiting for the controller to connect',
     awaiting_claim: 'Claiming automatically',
     completed: 'Claimed',
-    awaiting_verification: 'Verification required',
-    claim_interrupted: 'Claim recovery required',
-    recovery_revocation_pending: 'Restored; revocation pending',
     revoked: 'Revoked',
   }[state];
 }

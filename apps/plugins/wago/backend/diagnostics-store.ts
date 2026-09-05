@@ -47,12 +47,7 @@ interface RuntimeDiagnostics extends DiagnosticStream {
   outputs: Record<string, DiagnosticSample>;
   measurements: Record<string, DiagnosticSample>;
   cumulativeMeasurements: Record<string, DiagnosticSample>;
-  rejection?: {
-    revision: number;
-    contentHash: string;
-    receivedAt: string;
-    errors: Array<{ path: string; code: string }>;
-  };
+  rejection?: { revision: number; contentHash: string; receivedAt: string; errors: Array<{ path: string; code: string }> };
   faults: Record<string, { code: string; receivedAt: string }>;
   acknowledgements: Record<string, DiagnosticAcknowledgement>;
   events: Array<{ kind: string; receivedAt: string }>;
@@ -100,14 +95,7 @@ export class WagoDiagnosticsStore {
           ...emptyStream(),
         };
     const cutoff = this.now() - RETENTION_MS;
-    for (const field of [
-      'inputs',
-      'outputs',
-      'measurements',
-      'cumulativeMeasurements',
-      'faults',
-      'acknowledgements',
-    ] as const) {
+    for (const field of ['inputs', 'outputs', 'measurements', 'cumulativeMeasurements', 'faults', 'acknowledgements'] as const) {
       copy[field] = Object.assign(Object.create(null), copy[field]);
     }
     for (const collection of [
@@ -148,14 +136,6 @@ export class WagoDiagnosticsStore {
     while (Object.keys(state.acknowledgements).length > MAX_CHANNELS)
       delete state.acknowledgements[Object.keys(state.acknowledgements)[0]];
   }
-  canTrack(id: number): boolean {
-    this.prune();
-    return (
-      this.controllers.has(id) ||
-      this.controllers.size < MAX_CONTROLLERS ||
-      [...this.controllers.values()].some((state) => !state.activeStream)
-    );
-  }
   ingest(id: number, kind: string, payload: Buffer): boolean {
     this.prune();
     if (payload.length > 65_536) return false;
@@ -175,7 +155,8 @@ export class WagoDiagnosticsStore {
       canonical &&
       kind === 'state' &&
       data.readiness !== undefined &&
-      (!isObject(data.readiness) || typeof data.readiness.hardwareAvailable !== 'boolean')
+      (!isObject(data.readiness) ||
+        (data.readiness.hardwareAvailable !== undefined && typeof data.readiness.hardwareAvailable !== 'boolean'))
     )
       return false;
     if (
@@ -296,7 +277,7 @@ export class WagoDiagnosticsStore {
         state.contentHash !== contentHash ||
         state.hardwareAvailable !== hardwareAvailable
       ) {
-        if (canonical || state.stateSourceAt)
+        if (state.stateSourceAt)
           state.measurementAfter = canonical ? (sourceTime(data.timestamp) as number) : this.now();
         state.measurements = Object.create(null);
         state.cumulativeMeasurements = Object.create(null);
@@ -356,15 +337,9 @@ export class WagoDiagnosticsStore {
         this.commands.delete(data.id);
       }
     }
-    if (
-      kind === 'configuration/reported' &&
-      Number.isSafeInteger(data.revision) &&
-      typeof data.contentHash === 'string'
-    )
+    if (kind === 'configuration/reported' && Number.isSafeInteger(data.revision) && typeof data.contentHash === 'string')
       state.rejection = {
-        revision: data.revision as number,
-        contentHash: data.contentHash,
-        receivedAt,
+        revision: data.revision as number, contentHash: data.contentHash, receivedAt,
         errors: safeValidationSummaries(data.errors),
       };
     for (const collection of [
