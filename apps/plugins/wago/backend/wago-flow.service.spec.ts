@@ -5,6 +5,11 @@ import { WagoFlowService } from './wago-flow.service';
 import { WagoSettings } from './wago-settings.entity';
 
 describe('WagoFlowService', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-09-05T12:00:00.000Z'));
+  });
+  afterEach(() => jest.useRealTimers());
   const controller = { id: 1, hardwareId: 'cc100-01', trustState: 'claimed', mqttServerId: null } as WagoController;
   const revision = {
     controllerId: 1,
@@ -79,7 +84,7 @@ describe('WagoFlowService', () => {
       Buffer.from(
         JSON.stringify({
           sequence,
-          timestamp: '2026-08-30T00:00:00.000Z',
+          timestamp: new Date().toISOString(),
           connected: true,
           revision: 1,
           contentHash: 'hash',
@@ -127,6 +132,7 @@ describe('WagoFlowService', () => {
     await service['onMessage'](2, 'attraccess/wago', topic, event({ door: false }));
 
     expect(read).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(100);
     await expect(waiting).resolves.toBeNull();
   });
 
@@ -235,23 +241,184 @@ describe('WagoFlowService', () => {
     expect((waitSchema.properties as Record<string, { maximum: number }>).timeoutMs.maximum).toBe(2_147_483_647);
   });
 
-  it('does not offer state categories for input-only channels', async () => {
+  it.each(['event', 'read', 'wait'] as const)('offers state for input-only channels in the %s editor', async (kind) => {
     const { service } = createService();
     const originalSnapshot = revision.snapshot;
     revision.snapshot = JSON.stringify({ logicalChannels: [{ id: 'door', capabilities: ['input'] }] });
     try {
       await service.refresh();
 
-      const eventSchema = await service.resolveConfigSchema({ controllerId: 1, channelId: 'door' }, 'event');
-      const readSchema = await service.resolveConfigSchema({ controllerId: 1, channelId: 'door' }, 'read');
+      const schema = await service.resolveConfigSchema({ controllerId: 1, channelId: 'door', category: 'state' }, kind);
 
-      expect((eventSchema.properties as Record<string, { oneOf: Array<{ const: string }> }>).category.oneOf).toEqual([
-        { const: 'fault', title: 'fault' },
+      expect((schema.properties as Record<string, { oneOf: Array<{ const: string }> }>).category.oneOf).toEqual([
+        { const: 'state', title: 'state' },
+        ...(kind === 'event' ? [{ const: 'fault', title: 'fault' }] : []),
       ]);
-      expect((readSchema.properties as Record<string, { oneOf: Array<{ const: string }> }>).category.oneOf).toEqual([]);
+      if (kind === 'wait') expect(schema).toMatchObject({ properties: { equals: { type: 'boolean' } } });
     } finally {
       revision.snapshot = originalSnapshot;
     }
+  });
+
+  describe('wait freshness', () => {
+    const config = { controllerId: 1, channelId: 'door', category: 'state', equals: true, timeoutMs: 1_000 };
+    const stateMessage = (
+      service: WagoFlowService,
+      sequence: number,
+      options: { age?: number; connected?: boolean; outputs?: Record<string, boolean> } = {},
+    ) =>
+      service['onMessage'](
+        2,
+        'attraccess/wago',
+        'attraccess/wago/v1/controllers/cc100-01/state',
+        Buffer.from(
+          JSON.stringify({
+            sequence,
+            timestamp: new Date(Date.now() - (options.age ?? 0)).toISOString(),
+            connected: options.connected ?? true,
+            revision: 1,
+            contentHash: 'hash',
+            outputs: options.outputs ?? { door: true },
+          }),
+        ),
+      );
+
+    it.each([
+      ['stale', { age: 90_001 }],
+      ['offline', { connected: false }],
+    ] as const)('does not complete from a %s cached match', async (_name, options) => {
+      const { service } = createService();
+      await service.refresh();
+      await stateMessage(service, 1, options);
+      const cached = service.read(config);
+      expect(cached).toMatchObject({ value: true });
+      expect(cached && service.payload(cached)).toMatchObject({ available: false });
+      const waiting = service.wait(config);
+      expect(service['waiters'].size).toBe(1);
+      await jest.advanceTimersByTimeAsync(1_000);
+      await expect(waiting).resolves.toBeNull();
+      expect(service['waitersByKey'].size).toBe(0);
+    });
+
+    it('completes immediately from a fresh retained match', async () => {
+      const { service } = createService();
+      await service.refresh();
+      await stateMessage(service, 1);
+      await expect(service.wait(config)).resolves.toMatchObject({ value: true });
+      expect(service['waiters'].size).toBe(0);
+    });
+
+    it('does not let future-dated samples block fresh updates after clock correction', async () => {
+      const { service } = createService();
+      await service.refresh();
+      const waiting = service.wait(config);
+      await stateMessage(service, 10, { age: -60_000 });
+      expect(service.read(config)).toBeNull();
+      expect(service['waiters'].size).toBe(1);
+      await stateMessage(service, 11, { connected: false });
+      expect(service['waiters'].size).toBe(1);
+      await stateMessage(service, 12);
+      await expect(waiting).resolves.toMatchObject({ value: true, sequence: 12, offline: false });
+    });
+
+    it('keeps a pending wait through stale and replayed matches until fresh reconnect state', async () => {
+      const { service } = createService();
+      await service.refresh();
+      const waiting = service.wait(config);
+      await stateMessage(service, 10, { age: 90_001 });
+      expect(service['waiters'].size).toBe(1);
+      await stateMessage(service, 10, { age: 90_001 });
+      await stateMessage(service, 11, { age: 90_002 });
+      expect(service.read(config)).toMatchObject({ sequence: 10 });
+      expect(service['waiters'].size).toBe(1);
+      await stateMessage(service, 1);
+      await expect(waiting).resolves.toMatchObject({ sequence: 1, value: true });
+    });
+
+    it('does not revive cached values when disconnect and reconnect omit the channel', async () => {
+      const { service } = createService();
+      await service.refresh();
+      await stateMessage(service, 1);
+      await stateMessage(service, 2, { connected: false, outputs: {} });
+      const cached = service.read(config);
+      expect(cached && service.payload(cached)).toMatchObject({ stale: false, offline: true, available: false });
+      const waiting = service.wait(config);
+      await stateMessage(service, 3, { connected: false });
+      expect(service['waiters'].size).toBe(1);
+      await stateMessage(service, 4, { outputs: {} });
+      expect(service['waiters'].size).toBe(1);
+      await stateMessage(service, 5);
+      await expect(waiting).resolves.toMatchObject({ value: true, sequence: 5, offline: false });
+    });
+
+    it('ages a previously fresh value using source time, without erasing readable state', async () => {
+      const { service } = createService();
+      await service.refresh();
+      await stateMessage(service, 1);
+      await jest.advanceTimersByTimeAsync(90_001);
+      const cached = service.read(config);
+      expect(cached && service.payload(cached)).toMatchObject({ value: true, stale: true, available: false });
+      const waiting = service.wait(config);
+      service.onModuleDestroy();
+      await expect(waiting).resolves.toBeNull();
+    });
+
+    it('keeps measurement waits unavailable across interleaved offline telemetry until a new connected sample', async () => {
+      const { service } = createService();
+      await service.refresh();
+      const measurementConfig = { ...config, category: 'measurement', equals: 42 };
+      const measurement = (sequence: number) =>
+        service['onMessage'](
+          2,
+          'attraccess/wago',
+          'attraccess/wago/v1/controllers/cc100-01/measurements',
+          Buffer.from(
+            JSON.stringify({
+              sequence,
+              timestamp: new Date().toISOString(),
+              channelId: 'door',
+              unit: 'watt',
+              value: 42,
+            }),
+          ),
+        );
+      await measurement(1);
+      await stateMessage(service, 2, { connected: false, outputs: {} });
+      const waiting = service.wait(measurementConfig);
+      await measurement(3);
+      expect(service['waiters'].size).toBe(1);
+      await stateMessage(service, 4, { outputs: {} });
+      const cached = service.read(measurementConfig);
+      expect(cached && service.payload(cached)).toMatchObject({ value: 42, offline: true, available: false });
+      await measurement(5);
+      await expect(waiting).resolves.toMatchObject({ value: 42, sequence: 5, offline: false });
+    });
+
+    it('bounds cache and queued dispatches while still resolving waits under backpressure', async () => {
+      const { service, trigger, revisionQuery } = createService();
+      const logicalChannels = Array.from({ length: 2_001 }, (_, index) => ({
+        id: `channel-${index}`,
+        capabilities: ['output'],
+      }));
+      revisionQuery.getMany.mockResolvedValue([{ ...revision, snapshot: JSON.stringify({ logicalChannels }) }]);
+      let releaseDispatch: () => void;
+      trigger.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            releaseDispatch = resolve;
+          }),
+      );
+      await service.refresh();
+      const waiting = service.wait({ ...config, channelId: 'channel-2000' });
+      await stateMessage(service, 1, { outputs: Object.fromEntries(logicalChannels.map(({ id }) => [id, true])) });
+      await expect(waiting).resolves.toMatchObject({ channelId: 'channel-2000', value: true });
+      expect(service['cache'].size).toBe(2_000);
+      expect(service['dispatches'].length).toBe(100);
+      expect(trigger).toHaveBeenCalledTimes(1);
+      releaseDispatch();
+      await jest.advanceTimersByTimeAsync(0);
+      expect(service['dispatches'].length).toBe(0);
+    });
   });
 
   it('applies minimum intervals from the last dispatch for each trigger node', () => {
