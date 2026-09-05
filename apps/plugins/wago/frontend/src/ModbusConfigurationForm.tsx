@@ -1,5 +1,5 @@
 import { Button, Description, Input, Label, ListBox, Select, TextField } from '@heroui/react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   BUILTIN_MODBUS_PROFILES,
   duplicateProfile,
@@ -121,21 +121,21 @@ function Field({
   disabled?: boolean;
 }) {
   const display = Number.isNaN(value) ? '' : String(value);
-  const [draft, setDraft] = useState(display);
-  const [focused, setFocused] = useState(false);
-  useEffect(() => {
-    if (!focused) setDraft(display);
-  }, [display, focused]);
+  // Keep incomplete numeric text only while it still represents our own emitted value.
+  // An authoritative replacement must take precedence, including while focused.
+  const [edit, setEdit] = useState<{ text: string; value: string | number } | null>(null);
+  const currentEdit = edit && Object.is(edit.value, value) ? edit : null;
+  if (edit && !currentEdit) setEdit(null);
   return (
     <TextField
       isDisabled={disabled}
       isInvalid={numeric && Number.isNaN(value)}
-      value={focused ? draft : display}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
+      value={currentEdit?.text ?? display}
+      onBlur={() => setEdit(null)}
       onChange={(text) => {
-        setDraft(text);
-        onChange(numeric && !allowEmpty && text.trim() === '' ? 'NaN' : text);
+        const emitted = numeric && !allowEmpty && text.trim() === '' ? 'NaN' : text;
+        setEdit({ text, value: numeric && !(allowEmpty && text === '') ? Number(emitted) : emitted });
+        onChange(emitted);
       }}
     >
       <Label>{label}</Label>

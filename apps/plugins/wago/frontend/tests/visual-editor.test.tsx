@@ -683,3 +683,164 @@ describe('Modbus output and serial composition', () => {
     expect(saved.modbus.connections[0]).not.toHaveProperty('port');
   });
 });
+
+describe('Modbus review regressions', () => {
+  function fixture(orphan = false): WagoConfigurationSnapshot {
+    const profile = duplicateProfile(BUILTIN_MODBUS_PROFILES[0], 'custom-map');
+    profile.name = 'Fixture map';
+    profile.actions = [
+      {
+        id: 'relay',
+        name: 'Relay',
+        functionCode: 5,
+        address: 0,
+        addressBase: 0,
+        dataType: 'uint16',
+        byteOrder: 'big',
+        wordOrder: 'big',
+        scale: 1,
+        offset: 0,
+        onValue: 1,
+        offValue: 0,
+      },
+    ];
+    return {
+      version: 1,
+      modbus: {
+        connections: [
+          {
+            id: 'bus',
+            transport: 'tcp',
+            host: 'old.fixture.invalid',
+            port: 502,
+            timeoutMs: 1000,
+            reconnectMs: 250,
+            queueLimit: 16,
+          },
+        ],
+        devices: [
+          { id: 'meter', name: 'Meter', connectionId: 'bus', unitId: 1, profileId: profile.id, profileVersion: 1 },
+        ],
+        profiles: [profile],
+      },
+      physicalPoints: [
+        {
+          id: 'meter-point',
+          hardwareProfile: 'modbus',
+          channel: 0,
+          modbus: { deviceId: 'meter', measurementId: 'active-power' },
+        },
+      ],
+      logicalChannels: orphan
+        ? []
+        : [
+            {
+              id: 'reading',
+              physicalPointId: 'meter-point',
+              profile: 'generic-monitored-input',
+              capabilities: ['input', 'measurement'],
+              measurement: { unit: 'watt', kind: 'live', scale: 1, offset: 0 },
+              disconnectPolicy: { mode: 'watchdog', timeoutMs: 2345 },
+              range: { minimum: 0, maximum: 1000 },
+            },
+          ],
+    };
+  }
+  function draftRecord(snapshot: WagoConfigurationSnapshot, updatedAt = 'initial') {
+    return {
+      controllerId: 1,
+      snapshot: JSON.stringify(snapshot),
+      presetProvenance: JSON.stringify({
+        editor: { names: { 'meter-point': 'Spare meter point', reading: 'Meter reading' }, presets: [] },
+      }),
+      reviewedHash: null,
+      updatedAt,
+    };
+  }
+  function start(snapshot: WagoConfigurationSnapshot) {
+    state.getDraft.mockResolvedValue(draftRecord(snapshot));
+    // Exercise the full backend validator as a read-only oracle for the submitted candidate.
+    state.validate.mockImplementation(async (_id, candidate) => {
+      const errors = validateEditorSnapshot(candidate);
+      return { valid: errors.length === 0, errors };
+    });
+    mount();
+    return userEvent.setup();
+  }
+
+  it('replaces a clean focused host authoritatively before the next keystroke', async () => {
+    const snapshot = fixture();
+    const user = start(snapshot);
+    const host = await screen.findByRole('textbox', { name: 'Host', exact: true });
+    await user.click(host);
+    const refreshed = fixture();
+    const connection = refreshed.modbus!.connections[0];
+    if (connection.transport === 'tcp') connection.host = 'new.fixture.invalid';
+    await act(async () => {
+      client.setQueryData(['wago', 'configuration-draft', 1], draftRecord(refreshed, 'refreshed'));
+    });
+    expect(host).toHaveFocus();
+    await waitFor(() => expect(host).toHaveValue('new.fixture.invalid'));
+    await user.keyboard('{End}-edited');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
+    expect(state.save.mock.calls[0][1].modbus.connections[0].host).toBe('new.fixture.invalid-edited');
+  });
+
+  it('converts a ranged measurement into a plain output without a hidden invalid range', async () => {
+    const user = start(fixture());
+    await user.click(await screen.findByRole('button', { name: /Named action/ }));
+    await user.click(await screen.findByRole('option', { name: 'Relay', exact: true }));
+    expect(screen.getByRole('spinbutton', { name: 'Maximum', exact: true })).toHaveValue(1000);
+    await user.click(screen.getByRole('button', { name: /Named measurement/ }));
+    await user.click(await screen.findByRole('option', { name: 'None', exact: true }));
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
+    const saved = state.save.mock.calls[0][1];
+    expect(validateEditorSnapshot(saved)).toEqual([]);
+    expect(saved.logicalChannels[0]).toMatchObject({
+      id: 'reading',
+      physicalPointId: 'meter-point',
+      profile: 'generic-digital-output',
+      capabilities: ['output'],
+    });
+    expect(saved.logicalChannels[0]).not.toHaveProperty('range');
+    expect(saved.logicalChannels[0]).not.toHaveProperty('measurement');
+  });
+
+  it('retains the customized input disconnect policy when selecting another measurement', async () => {
+    const user = start(fixture());
+    await user.click(await screen.findByRole('button', { name: /Named measurement/ }));
+    await user.click(await screen.findByRole('option', { name: /Imported energy/ }));
+    expect(screen.getByRole('spinbutton', { name: 'Watchdog timeout (ms)' })).toHaveValue(2345);
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
+    expect(state.save.mock.calls[0][1].logicalChannels[0]).toMatchObject({
+      id: 'reading',
+      disconnectPolicy: { mode: 'watchdog', timeoutMs: 2345 },
+      range: { minimum: 0, maximum: 1000 },
+    });
+  });
+
+  it('exposes an orphan binding for repair after map deletion and release after device deletion', async () => {
+    const user = start(fixture(true));
+    await user.click(await screen.findByText('Fixture map v1', { selector: 'summary' }));
+    await user.click(screen.getAllByRole('button', { name: 'Remove measurement', exact: true })[0]);
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: /Named measurement/ }));
+    await user.click(await screen.findByRole('option', { name: /Imported energy/ }));
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
+    expect(state.save.mock.calls[0][1].physicalPoints[0]).toMatchObject({
+      id: 'meter-point',
+      modbus: { measurementId: 'import-energy' },
+    });
+    expect(state.save.mock.calls[0][1].logicalChannels).toEqual([]);
+    await user.click(screen.getByRole('button', { name: 'Remove device', exact: true }));
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: /Release Spare meter point/ }));
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(2));
+    expect(state.save.mock.calls[1][1].physicalPoints).toEqual([]);
+  });
+});

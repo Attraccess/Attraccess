@@ -36,7 +36,6 @@ export function bindModbusPoint(snapshot: WagoConfigurationSnapshot, pointId: st
       } else {
         next.profile = 'generic-monitored-input';
         next.capabilities = ['input'];
-        next.disconnectPolicy = { mode: 'hold' };
         delete next.pulse;
         delete next.guard;
         delete next.feedback;
@@ -45,6 +44,7 @@ export function bindModbusPoint(snapshot: WagoConfigurationSnapshot, pointId: st
         next.capabilities.push('measurement');
         next.measurement = { unit: measurement.unit, kind: measurement.kind, scale: 1, offset: 0 };
       }
+      if (!next.capabilities.includes('input') && !next.capabilities.includes('measurement')) delete next.range;
       next.capabilities = [
         ...channel.capabilities.filter((capability) => next.capabilities.includes(capability)),
         ...next.capabilities.filter((capability) => !channel.capabilities.includes(capability)),
