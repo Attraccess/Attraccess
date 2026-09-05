@@ -862,19 +862,26 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     )
       return;
     const now = new Date().toISOString();
-    if (!this.diagnostics.ingest(controller.id, 'heartbeat', payload)) return;
+    this.diagnostics.ingest(controller.id, 'heartbeat', payload);
     // Connectivity is process-local between bounded persistence checkpoints.
     // Avoid a database write for every permanent heartbeat.
-    const metadataChanged = controller.protocolVersion !== heartbeat.protocolVersion ||
+    const metadataChanged =
+      controller.protocolVersion !== heartbeat.protocolVersion ||
       controller.runtimeVersion !== heartbeat.runtimeVersion ||
       controller.capabilities !== JSON.stringify(heartbeat.capabilities) ||
       controller.compatibilityError !== compatibilityError(heartbeat);
-    if (controller.lastHeartbeatAt && freshness(controller.lastSeenAt, Date.now(), 30_000) === 'fresh' && !metadataChanged) return;
+    if (
+      controller.lastHeartbeatAt &&
+      freshness(controller.lastSeenAt, Date.now(), 30_000) === 'fresh' &&
+      !metadataChanged
+    )
+      return;
     controller.protocolVersion = heartbeat.protocolVersion;
     controller.runtimeVersion = heartbeat.runtimeVersion;
     controller.capabilities = JSON.stringify(heartbeat.capabilities);
-    if (!canonical) controller.lastSequence = this.diagnostics.read(controller.id).legacyHeartbeatSequence ?? controller.lastSequence;
-    controller.lastHeartbeatAt = canonical ? this.diagnostics.read(controller.id).heartbeatAt ?? now : now;
+    if (!canonical)
+      controller.lastSequence = this.diagnostics.read(controller.id).legacyHeartbeatSequence ?? controller.lastSequence;
+    controller.lastHeartbeatAt = canonical ? (this.diagnostics.read(controller.id).heartbeatAt ?? now) : now;
     controller.lastSeenAt = now;
     controller.compatibilityError = compatibilityError(heartbeat);
     controller.updatedAt = now;
@@ -1011,9 +1018,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
   private connectivity(controller: WagoController): 'online' | 'stale' | 'untrusted' {
     if (controller.trustState === 'untrusted') return 'untrusted';
     const heartbeatAt = this.diagnostics.read(controller.id).heartbeatAt ?? controller.lastHeartbeatAt;
-    return freshness(heartbeatAt, Date.now(), STALE_AFTER_MS) === 'fresh'
-      ? 'online'
-      : 'stale';
+    return freshness(heartbeatAt, Date.now(), STALE_AFTER_MS) === 'fresh' ? 'online' : 'stale';
   }
   private async appliedRevision(controllerId: number): Promise<WagoConfigurationRevision | null> {
     const [revision] = await this.revisions.find({

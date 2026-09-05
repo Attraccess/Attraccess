@@ -19,7 +19,12 @@ describe('WAGO bounded diagnostics', () => {
     send('state', { connected: true, revision: 2, outputs: { relay: true, invalid: 'true' } });
     send('measurements', { channelId: 'meter', value: 12, unit: 'watt' });
     expect(store.read(1).outputs.relay.value).toBe(true);
-    expect(store.read(1).measurements.meter).toMatchObject({ kind: 'measurement', value: 12, unit: 'watt', sourceAt: null });
+    expect(store.read(1).measurements.meter).toMatchObject({
+      kind: 'measurement',
+      value: 12,
+      unit: 'watt',
+      sourceAt: null,
+    });
     expect(store.read(1).outputs.invalid).toBeUndefined();
   });
   it('excludes secrets and safely stores own prototype-named channels', () => {
@@ -60,5 +65,31 @@ describe('WAGO bounded diagnostics', () => {
     send('state', { outputs: { relay: false } });
     store.read(1).outputs.relay.value = true;
     expect(store.read(1).outputs.relay.value).toBe(false);
+  });
+  it('rejects measurements from before a canonical reconnect after a legacy disconnect', () => {
+    const streamId = '00000000-0000-4000-8000-000000000001';
+    const timestamp = (offset: number) => new Date(now + offset).toISOString();
+    send('state', { connected: false, revision: 2, outputs: {} });
+    now += 1;
+    send('state', {
+      timestamp: timestamp(0),
+      streamId,
+      sequence: 1,
+      connected: true,
+      revision: 2,
+      contentHash: 'a'.repeat(64),
+      outputs: {},
+    });
+    expect(
+      send('measurements', {
+        timestamp: timestamp(-1),
+        streamId,
+        sequence: 1,
+        channelId: 'meter',
+        value: 1,
+        unit: 'milliwatt',
+        kind: 'live',
+      }),
+    ).toBe(false);
   });
 });
