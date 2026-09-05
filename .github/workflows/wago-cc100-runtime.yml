@@ -5,6 +5,7 @@ on:
     paths:
       - 'apps/plugins/wago/cc100-runtime/**'
       - 'apps/plugins/wago/backend/**'
+      - 'apps/plugins/wago/measurement-contract.ts'
       - 'libs/plugins-backend-sdk/**'
       - '.github/workflows/wago-cc100-runtime.yml'
   push:
@@ -12,6 +13,7 @@ on:
     paths:
       - 'apps/plugins/wago/cc100-runtime/**'
       - 'apps/plugins/wago/backend/**'
+      - 'apps/plugins/wago/measurement-contract.ts'
       - 'libs/plugins-backend-sdk/**'
       - '.github/workflows/wago-cc100-runtime.yml'
 
