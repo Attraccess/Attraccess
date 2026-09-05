@@ -9,34 +9,56 @@
       "executor": "nx:run-commands",
       "cache": false,
       "dependsOn": ["typecheck-acceptance", "test-production-fleet-cleanup"],
-      "options": { "command": "node scripts/test-wago-production-fleet.mjs" }
+      "options": {
+        "command": "node scripts/test-wago-production-fleet.mjs"
+      }
     },
     "typecheck-acceptance": {
       "executor": "nx:run-commands",
-      "options": { "command": "pnpm exec tsc --noEmit -p apps/plugins/wago/acceptance/tsconfig.json" }
+      "options": {
+        "command": "pnpm exec tsc --noEmit -p apps/plugins/wago/acceptance/tsconfig.json"
+      }
     },
     "test-production-fleet-cleanup": {
       "executor": "nx:run-commands",
-      "options": { "command": "node --test scripts/test-wago-production-fleet.test.mjs" }
+      "options": {
+        "command": "node --test scripts/test-wago-production-fleet.test.mjs"
+      }
     },
     "typecheck": {
       "executor": "nx:run-commands",
-      "options": { "command": "pnpm exec tsc --noEmit -p apps/plugins/wago/tsconfig.spec.json" }
+      "options": {
+        "commands": [
+          "pnpm exec tsc --noEmit -p apps/plugins/wago/tsconfig.spec.json",
+          "pnpm exec tsc --noEmit -p apps/plugins/wago/frontend/tsconfig.app.json",
+          "node scripts/typecheck-wago-frontend-tests.mjs",
+          "pnpm exec tsc --noEmit -p apps/plugins/wago/acceptance/tsconfig.json"
+        ],
+        "parallel": false
+      }
     },
     "lint": {
       "executor": "nx:run-commands",
-      "options": { "cwd": "apps/plugins/wago", "command": "eslint backend frontend/src modbus measurement-contract.ts" }
+      "options": {
+        "cwd": "apps/plugins/wago",
+        "command": "eslint backend frontend/src frontend/tests acceptance modbus measurement-contract.ts"
+      }
     },
     "test": {
       "executor": "@nx/jest:jest",
       "dependsOn": ["test-frontend"],
-      "options": { "jestConfig": "apps/plugins/wago/jest.config.ts", "passWithNoTests": true }
+      "options": {
+        "jestConfig": "apps/plugins/wago/jest.config.ts",
+        "passWithNoTests": true
+      }
     },
     "test-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
       "inputs": ["{projectRoot}/frontend/**/*", "{projectRoot}/modbus/**/*"],
-      "options": { "cwd": "apps/plugins/wago", "command": "pnpm exec vitest run --root frontend" }
+      "options": {
+        "command": "pnpm exec vitest run --config apps/plugins/wago/frontend/vitest.config.mts"
+      }
     },
     "build-backend": {
       "executor": "nx:run-commands",
@@ -65,7 +87,10 @@
         "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"
       ],
       "outputs": ["{projectRoot}/package/frontend"],
-      "options": { "cwd": "apps/plugins/wago", "command": "pnpm exec vite build --config frontend/vite.config.ts" }
+      "options": {
+        "cwd": "apps/plugins/wago",
+        "command": "pnpm exec vite build --config frontend/vite.config.ts"
+      }
     },
     "build": {
       "executor": "nx:run-commands",
@@ -121,6 +146,36 @@
       "options": {
         "cwd": "apps/plugins/wago",
         "command": "node ../scripts/publish-plugin.mjs package dist"
+      }
+    },
+    "fleet-acceptance": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "commands": [
+          "pnpm nx run-many -p plugin-wago,wago-cc100-runtime -t test,typecheck,lint,build --parallel=2",
+          "node apps/plugins/wago/cc100-runtime/integration/run.mjs",
+          "pnpm nx run plugin-wago:production-fleet",
+          "bash apps/plugins/wago/frontend/tests/run_browser_tests.sh",
+          "node --test scripts/check-wago-acceptance.test.mjs"
+        ],
+        "parallel": false
+      }
+    },
+    "typecheck-frontend-tests": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsc --noEmit -p apps/plugins/wago/frontend/tsconfig.tests.json"
+      }
+    },
+    "typecheck-frontend-tests-baseline": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "node --test scripts/typecheck-wago-frontend-tests.test.mjs",
+          "node scripts/typecheck-wago-frontend-tests.mjs"
+        ],
+        "parallel": false
       }
     }
   }

@@ -6,8 +6,19 @@ on:
       - 'apps/plugins/wago/cc100-runtime/**'
       - 'apps/plugins/wago/backend/**'
       - 'apps/plugins/wago/acceptance/**'
+      - 'apps/plugins/wago/frontend/**'
+      - 'apps/plugins/wago/modbus/**'
+      - 'apps/plugins/wago/tsconfig.acceptance.json'
+      - 'scripts/typecheck-wago-frontend-tests*.mjs'
+      - 'apps/frontend/src/app/resources/details/flows/**'
+      - 'apps/api/src/resources/flows/**'
+      - 'apps/api/src/plugin-system/plugin-flow-node-registry*'
+      - 'libs/plugins-frontend-sdk/**'
       - 'apps/plugins/wago/project.json'
       - 'apps/plugins/wago/tsconfig.spec.json'
+      - 'tsconfig.base.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
       - 'scripts/test-wago-production-fleet*'
       - 'apps/plugins/wago/measurement-contract.ts'
       - 'libs/plugins-backend-sdk/**'
@@ -18,8 +29,19 @@ on:
       - 'apps/plugins/wago/cc100-runtime/**'
       - 'apps/plugins/wago/backend/**'
       - 'apps/plugins/wago/acceptance/**'
+      - 'apps/plugins/wago/frontend/**'
+      - 'apps/plugins/wago/modbus/**'
+      - 'apps/plugins/wago/tsconfig.acceptance.json'
+      - 'scripts/typecheck-wago-frontend-tests*.mjs'
+      - 'apps/frontend/src/app/resources/details/flows/**'
+      - 'apps/api/src/resources/flows/**'
+      - 'apps/api/src/plugin-system/plugin-flow-node-registry*'
+      - 'libs/plugins-frontend-sdk/**'
       - 'apps/plugins/wago/project.json'
       - 'apps/plugins/wago/tsconfig.spec.json'
+      - 'tsconfig.base.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
       - 'scripts/test-wago-production-fleet*'
       - 'apps/plugins/wago/measurement-contract.ts'
       - 'libs/plugins-backend-sdk/**'
@@ -47,6 +69,11 @@ jobs:
         run: pnpm exec tsc --noEmit -p apps/plugins/wago/cc100-runtime/integration/tsconfig.json
       - name: Verify simulator lifecycle and measurement flow on an isolated broker
         run: pnpm nx run wago-cc100-runtime:test-simulator-integration
+      - name: Typecheck production acceptance tests
+        run: pnpm nx run plugin-wago:typecheck-acceptance
+      - name: Typecheck frontend tests with explicit commissioning baseline
+        # The checker prints the raw two commissioning diagnostics and fails on any others.
+        run: pnpm nx run plugin-wago:typecheck-frontend-tests-baseline
       - name: Verify production fleet flows on an isolated RabbitMQ fixture
         env:
           WAGO_FLEET_DOCKER_CONTEXT: default
@@ -64,9 +91,50 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
+        id: image
         with:
           context: .
           file: apps/plugins/wago/cc100-runtime/Dockerfile
-          platforms: linux/arm64
+          platforms: linux/arm/v7
           push: ${{ github.event_name == 'push' }}
-          tags: ghcr.io/${{ github.repository_owner }}/wago-cc100-runtime:${{ github.sha }}
+          tags: ghcr.io/attraccess/wago-cc100-runtime:${{ github.sha }}
+      - name: Verify ARMv7 manifest and record immutable image
+        if: github.event_name == 'push'
+        env:
+          IMAGE: ghcr.io/attraccess/wago-cc100-runtime:${{ github.sha }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          docker buildx imagetools inspect "$IMAGE" --raw | jq -e '[.manifests[] | select(.platform.os == "linux" and .platform.architecture == "arm" and .platform.variant == "v7")] | length == 1'
+          printf '%s@%s\n' "$IMAGE" "$DIGEST" | tee wago-cc100-runtime-image.txt
+      - name: Create signed offline runtime bundle
+        if: github.event_name == 'push'
+        env:
+          IMAGE: ghcr.io/attraccess/wago-cc100-runtime:${{ github.sha }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+          WAGO_RUNTIME_SIGNING_PRIVATE_KEY: ${{ secrets.WAGO_RUNTIME_SIGNING_PRIVATE_KEY }}
+        run: |
+          test -n "$WAGO_RUNTIME_SIGNING_PRIVATE_KEY"
+          docker pull --platform linux/arm/v7 "$IMAGE@$DIGEST"
+          docker tag "$IMAGE@$DIGEST" "$IMAGE"
+          docker save "$IMAGE" -o image.tar
+          printf '%s@%s\n' "$IMAGE" "$DIGEST" > image-reference
+          tar --mtime='@0' -cf wago-cc100-runtime.tar image.tar image-reference
+          rm -f image.tar image-reference
+          sha256sum wago-cc100-runtime.tar > wago-cc100-runtime.tar.sha256
+          umask 077
+          printf '%s\n' "$WAGO_RUNTIME_SIGNING_PRIVATE_KEY" > signing-private-key
+          ssh-keygen -Y sign -f signing-private-key -n attraccess-wago-runtime wago-cc100-runtime.tar
+          rm -f signing-private-key
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push'
+        with:
+          name: wago-cc100-runtime-image
+          path: wago-cc100-runtime-image.txt
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push'
+        with:
+          name: wago-cc100-runtime-bundle
+          path: |
+            wago-cc100-runtime.tar
+            wago-cc100-runtime.tar.sha256
+            wago-cc100-runtime.tar.sig
