@@ -145,6 +145,31 @@ describe('WagoRuntime', () => {
     );
   });
 
+  it('starts when reserving initial state telemetry fails', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    await store.save({
+      accepted: { revision: 1, contentHash: hash(snapshot), snapshot },
+      outputs: { load: true },
+      commandIds: [],
+    });
+    const save = jest.spyOn(store, 'save').mockRejectedValueOnce(new Error('disk full'));
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      store,
+      transport,
+      device,
+    });
+
+    await expect(runtime.start()).resolves.toBeUndefined();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await expect(runtime.setConnected(false)).resolves.toBeUndefined();
+
+    expect(save).toHaveBeenCalled();
+    expect(device.values.get('751-9301:0')).toBe(false);
+  });
+
   it('accepts opaque server-defined profile names', async () => {
     const serverDefined = {
       ...snapshot,
