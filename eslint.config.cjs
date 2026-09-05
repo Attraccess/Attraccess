@@ -43,6 +43,12 @@ module.exports = [
       'no-console': 'error',
     },
   },
+  {
+    files: ['apps/plugins/wago/cc100-runtime/src/configuration.ts'],
+    rules: {
+      curly: 'error',
+    },
+  },
   // ATT-294 / ATT-834: the "no form fields inside a Card" guard is not an ESLint rule.
   // Every regression so far put the Card and the field in different files, which a
   // per-file rule cannot see, and nx's flat/react config declares no-restricted-syntax

@@ -47,6 +47,8 @@ interface FlowContextType {
   copySelectedNodes: () => Promise<void>;
   cutSelectedNodes: () => Promise<void>;
   pasteNodes: (targetFlowPosition?: { x: number; y: number }) => Promise<void>;
+  validationErrors: Record<string, string>;
+  setValidationErrors: (errors: Array<{ nodeId: string; message: string }>) => void;
 }
 
 const FlowContext = createContext<FlowContextType | undefined>(undefined);
@@ -59,6 +61,7 @@ interface FlowProviderProps {
 export function FlowProvider({ children, resourceId }: FlowProviderProps) {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+  const [validationErrors, setValidationErrorsState] = useState<Record<string, string>>({});
   const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
 
   const { t: tNodeTranslations, tExists: tNodeExists } = useTranslations({
@@ -101,6 +104,15 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
     [setNodes],
   );
 
+  const setValidationErrors = useCallback((errors: Array<{ nodeId: string; message: string }>) => {
+    setValidationErrorsState(
+      errors.reduce<Record<string, string>>((messages, error) => ({
+        ...messages,
+        [error.nodeId]: messages[error.nodeId] ? `${messages[error.nodeId]} ${error.message}` : error.message,
+      }), {}),
+    );
+  }, []);
+
   const liveLogReceivers = useRef<LiveLogReceiver[]>([]);
 
   const publishLiveLog = useCallback((log: ResourceFlowLog) => {
@@ -140,12 +152,13 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
           tNodeExists={tNodeExists}
           schema={nodeSchema}
           node={props}
+          validationError={validationErrors[props.id]}
         />
       );
     });
 
     return types;
-  }, [nodeSchemas, tNodeTranslations, tNodeExists]);
+  }, [nodeSchemas, tNodeTranslations, tNodeExists, validationErrors]);
 
   const copySelectedNodes = useCallback(async () => {
     const clipboardData = buildClipboardData(nodes, edges);
@@ -202,6 +215,8 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
       copySelectedNodes,
       cutSelectedNodes,
       pasteNodes,
+      validationErrors,
+      setValidationErrors,
     }),
     [
       nodes,
@@ -225,6 +240,8 @@ export function FlowProvider({ children, resourceId }: FlowProviderProps) {
       copySelectedNodes,
       cutSelectedNodes,
       pasteNodes,
+      validationErrors,
+      setValidationErrors,
     ],
   );
 

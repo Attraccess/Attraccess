@@ -194,7 +194,7 @@ export interface PluginBackendModule {
    *
    * Type naming convention: "plugin.<pluginName>.<nodeName>".
    */
-  flowNodes?: PluginFlowNodeDefinition[];
+  flowNodes?: PluginFlowNodeDefinition[] | ((context: PluginContext) => PluginFlowNodeDefinition[]);
 
   /** Optional broker credential provider offered to other integrations by this plugin. */
   credentialProvisioningProvider?: MqttCredentialProvisioningProviderFactory;

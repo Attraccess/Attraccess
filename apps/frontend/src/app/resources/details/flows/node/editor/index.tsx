@@ -99,6 +99,16 @@ export function NodeEditor(props: Props) {
       const nextData = Object.fromEntries(
         Object.entries(dataRef.current).filter(([name]) => properties?.[name] !== undefined),
       );
+      for (const [name, property] of Object.entries(properties ?? {})) {
+        if (
+          property &&
+          typeof property === 'object' &&
+          'default' in property &&
+          (!(name in nextData) || ('readOnly' in property && property.readOnly === true))
+        ) {
+          nextData[name] = (property as { default: unknown }).default;
+        }
+      }
       dataRef.current = nextData;
       setData(nextData);
     } catch (error) {
