@@ -7,15 +7,15 @@
 // verdict so repeated UI reads (badge + status panel, per row) don't re-probe.
 import type { MqttServerConnectionConfig, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import type { RabbitmqDetectionResult } from './rabbitmq-detection.types';
+import { describeManagementError, managementApiBase, managementRequest } from './rabbitmq-management-transport';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 
 // Default RabbitMQ management API ports. The management API is independent of
 // the MQTT listener, so we cannot reuse the MQTT port — RabbitMQ serves
 // management over 15672 (HTTP) / 15671 (HTTPS) by convention.
-const MGMT_PORT_HTTP = 15672;
-const MGMT_PORT_HTTPS = 15671;
 
 // How long a verdict stays fresh. Short enough to reflect a server that just
 // came online, long enough that a list of rows probes each broker once.
@@ -26,6 +26,7 @@ const CACHE_TTL_MS = 60_000;
 const PROBE_TIMEOUT_MS = 5_000;
 
 interface CacheEntry {
+  configKey: string;
   result: RabbitmqDetectionResult;
   expiresAt: number;
 }
@@ -48,22 +49,29 @@ export class RabbitmqDetectionService {
   // Returns a cached verdict when fresh, otherwise probes. `forceRefresh`
   // bypasses the cache (used by the UI's manual refresh).
   async detect(mqttServerId: number, forceRefresh = false): Promise<RabbitmqDetectionResult> {
+    const config = await this.context.getMqttServerConfig(mqttServerId);
+    // Never reuse a verdict obtained with different credentials or TLS trust.
+    const configKey = createHash('sha256')
+      .update(JSON.stringify(config ?? null))
+      .digest('hex');
     if (!forceRefresh) {
       const cached = this.cache.get(mqttServerId);
-      if (cached && cached.expiresAt > this.now()) {
+      if (cached && cached.configKey === configKey && cached.expiresAt > this.now()) {
         return cached.result;
       }
     }
 
-    const result = await this.probe(mqttServerId);
-    this.cache.set(mqttServerId, { result, expiresAt: this.now() + CACHE_TTL_MS });
+    const result = await this.probe(mqttServerId, config);
+    this.cache.set(mqttServerId, { result, configKey, expiresAt: this.now() + CACHE_TTL_MS });
     return result;
   }
 
-  private async probe(mqttServerId: number): Promise<RabbitmqDetectionResult> {
+  private async probe(
+    mqttServerId: number,
+    config: MqttServerConnectionConfig | null,
+  ): Promise<RabbitmqDetectionResult> {
     // ACCESS_MQTT_SERVERS gates this call; the core resolves + decrypts the
     // credentials and hands us a broker-agnostic config.
-    const config = await this.context.getMqttServerConfig(mqttServerId);
     const checkedAt = this.nowIso();
 
     if (!config) {
@@ -153,36 +161,11 @@ export class RabbitmqDetectionService {
   // management API runs on its own port, so we substitute the conventional
   // management port for the MQTT one and pick the scheme from useTls.
   private managementApiBase(config: MqttServerConnectionConfig): string {
-    const scheme = config.useTls ? 'https' : 'http';
-    const port = config.useTls ? MGMT_PORT_HTTPS : MGMT_PORT_HTTP;
-    return `${scheme}://${config.host}:${port}`;
+    return managementApiBase(config);
   }
 
   private async fetchOverview(managementApi: string, config: MqttServerConnectionConfig): Promise<Response> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
-    try {
-      return await fetch(`${managementApi}/api/overview`, {
-        headers: {
-          accept: 'application/json',
-          ...this.authHeader(config),
-        },
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-
-  private authHeader(config: MqttServerConnectionConfig): Record<string, string> {
-    if (config.username === null) {
-      return {};
-    }
-    const credentials = `${config.username}:${config.password ?? ''}`;
-    // btoa is available in the host Node runtime (>=16); encode the basic-auth
-    // pair as base64.
-    const encoded = Buffer.from(credentials, 'utf8').toString('base64');
-    return { authorization: `Basic ${encoded}` };
+    return managementRequest(config, `${managementApi}/api/overview`, 'GET', undefined, PROBE_TIMEOUT_MS);
   }
 
   private async parseOverview(response: Response): Promise<RabbitmqOverview | null> {
@@ -194,13 +177,7 @@ export class RabbitmqDetectionService {
   }
 
   private describeError(error: unknown): string {
-    if (error instanceof Error) {
-      if (error.name === 'AbortError') {
-        return `Management API did not respond within ${PROBE_TIMEOUT_MS}ms.`;
-      }
-      return error.message;
-    }
-    return 'Failed to reach the RabbitMQ management API.';
+    return describeManagementError(error, PROBE_TIMEOUT_MS);
   }
 
   private now(): number {

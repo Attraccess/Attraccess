@@ -42,6 +42,11 @@ export interface MqttServerConnectionConfig {
   readonly host: string;
   readonly port: number;
   readonly useTls: boolean;
+  /** PEM trust anchors for private PKI. Omitted by older hosts. */
+  readonly caCert?: string | null;
+  /** Integrations requiring authenticated TLS must reject this setting. */
+  readonly tlsInsecure?: boolean;
+  readonly tlsServername?: string | null;
   readonly username: string | null;
   /** Resolved (decrypted) password. Only ever provided to permitted plugins. */
   readonly password: string | null;
