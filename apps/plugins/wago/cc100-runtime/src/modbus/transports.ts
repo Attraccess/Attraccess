@@ -28,8 +28,7 @@ type Bus = {
   pending: number;
   retryAt: number;
   quarantined?: ModbusTransportError;
-  quarantine: Promise<ModbusTransportError>;
-  markQuarantined: (error: ModbusTransportError) => void;
+  quarantineListeners: Set<(error: ModbusTransportError) => void>;
 };
 const buses = new Map<string, Bus>();
 
@@ -52,11 +51,7 @@ export class QueuedModbusTransport implements ModbusTransport {
         : `rtu:${posix.normalize(this.connection.path).replace(/\/$/, '')}`;
     let bus = buses.get(key);
     if (!bus) {
-      let markQuarantined!: Bus['markQuarantined'];
-      const quarantine = new Promise<ModbusTransportError>((resolve) => {
-        markQuarantined = resolve;
-      });
-      bus = { tail: Promise.resolve(), pending: 0, retryAt: 0, quarantine, markQuarantined };
+      bus = { tail: Promise.resolve(), pending: 0, retryAt: 0, quarantineListeners: new Set() };
       buses.set(key, bus);
     }
     const queue = bus;
@@ -116,18 +111,23 @@ export class QueuedModbusTransport implements ModbusTransport {
         }
       });
     // Wake queued callers on quarantine even if a broken exchange never finishes teardown.
-    return Promise.race([
-      work,
-      queue.quarantine.then((error) => {
-        throw error;
-      }),
-    ]);
+    // Remove this request's listener when it settles so a busy healthy bus does not retain it.
+    return raceQuarantine(queue, work);
   }
 }
 function quarantineBus(bus: Bus, message: string): void {
   if (bus.quarantined) return;
   bus.quarantined = new ModbusTransportError('modbus_rtu_quarantined', message);
-  bus.markQuarantined(bus.quarantined);
+  for (const reject of bus.quarantineListeners) reject(bus.quarantined);
+  bus.quarantineListeners.clear();
+}
+function raceQuarantine<T>(bus: Bus, work: Promise<T>): Promise<T> {
+  let reject!: (error: ModbusTransportError) => void;
+  const quarantine = new Promise<never>((_, fail) => {
+    reject = fail;
+  });
+  bus.quarantineListeners.add(reject);
+  return Promise.race([work, quarantine]).finally(() => bus.quarantineListeners.delete(reject));
 }
 function deadline<T>(operation: Promise<T>, ms: number, onTimeout: () => void): Promise<T> {
   return new Promise((resolve, reject) => {

@@ -437,6 +437,16 @@ describe('ATT-1059 independent review regressions', () => {
     expect(validateBackend(s).length).toBeGreaterThan(0);
     expect(validateRuntime(s).length).toBeGreaterThan(0);
   });
+  it('rejects input channels bound only to an action at both boundaries', () => {
+    const s = snapshot();
+    delete s.physicalPoints[0].modbus.measurementId;
+    s.logicalChannels[0].capabilities = ['input'];
+    delete s.logicalChannels[0].measurement;
+    for (const validate of [validateBackend, validateRuntime])
+      expect(validate(s)).toEqual(
+        expect.arrayContaining([expect.objectContaining({ code: 'invalid_modbus_binding', message: 'input requires named measurement' })]),
+      );
+  });
   it.each(['remove', 'rebind'])('cancels a queued router ON after device %s', async (mode) => {
     const s = snapshot();
     const reply = deferred<Buffer>();
