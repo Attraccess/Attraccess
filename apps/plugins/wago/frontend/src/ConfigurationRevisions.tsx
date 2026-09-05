@@ -196,9 +196,6 @@ export function ConfigurationRevisions({
           revision history.
         </p>
       )}
-      <p role="status">
-        Hardware readiness: unknown. An applied revision confirms configuration acceptance, not physical I/O readiness.
-      </p>
       <h3 className="wg:font-medium">Revision history and deployment progress</h3>
       {history.isPending && <p>Loading history…</p>}
       {history.isError && <p role="alert">Could not load history: {history.error.message}</p>}
