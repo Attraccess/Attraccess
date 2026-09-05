@@ -37,18 +37,25 @@ async function snapshot(ref, label, directories) {
 }
 try {
   const backend = 'apps/plugins/wago/backend';
+  const measurementContract = 'apps/plugins/wago/measurement-contract.ts';
   const runtime = 'apps/plugins/wago/cc100-runtime';
-  const flowRoot = argument('flow-ref') ? await snapshot(argument('flow-ref'), 'flow', [backend]) : root;
-  const mainRoot = await snapshot(argument('main-ref') ?? 'origin/main', 'main', [backend]);
-  const runtimeRoot = argument('runtime-ref')
-    ? await snapshot(argument('runtime-ref'), 'runtime', [runtime, backend])
+  const flowRoot = argument('flow-ref')
+    ? await snapshot(argument('flow-ref'), 'flow', [backend, measurementContract])
     : root;
-  if (runtimeRoot !== root) {
-    await symlink(join(root, 'node_modules'), join(runtimeRoot, 'node_modules'), 'dir');
+  const mainRoot = await snapshot(argument('main-ref') ?? 'origin/main', 'main', [
+    runtime,
+    backend,
+    measurementContract,
+  ]);
+  const runtimeRoot = argument('runtime-ref')
+    ? await snapshot(argument('runtime-ref'), 'runtime', [runtime, backend, measurementContract])
+    : root;
+  for (const stagedRoot of [mainRoot, ...(runtimeRoot !== root ? [runtimeRoot] : [])]) {
+    await symlink(join(root, 'node_modules'), join(stagedRoot, 'node_modules'), 'dir');
     // Only the owned entrypoint/device are overlaid. Runtime modules are exact git blobs.
     for (const file of ['simulator.ts', 'simulator-device.ts'])
-      await writeFile(join(runtimeRoot, runtime, 'src', file), await readFile(join(root, runtime, 'src', file)));
-    const config = join(runtimeRoot, 'tsconfig.simulator.json');
+      await writeFile(join(stagedRoot, runtime, 'src', file), await readFile(join(root, runtime, 'src', file)));
+    const config = join(stagedRoot, 'tsconfig.simulator.json');
     await writeFile(
       config,
       JSON.stringify({
@@ -69,14 +76,18 @@ try {
     '--package-lock=false',
     'aedes@0.51.3',
   ]);
-  await build({
-    entryPoints: [join(runtimeRoot, runtime, 'src/simulator.ts')],
-    outfile: join(temporary, 'simulator.cjs'),
-    bundle: true,
-    platform: 'node',
-    target: 'node24',
-    nodePaths: [join(root, 'node_modules')],
-  });
+  for (const [sourceRoot, file] of [
+    [runtimeRoot, 'simulator.cjs'],
+    [mainRoot, 'main-simulator.cjs'],
+  ])
+    await build({
+      entryPoints: [join(sourceRoot, runtime, 'src/simulator.ts')],
+      outfile: join(temporary, file),
+      bundle: true,
+      platform: 'node',
+      target: 'node24',
+      nodePaths: [join(root, 'node_modules')],
+    });
   run(
     'pnpm',
     ['exec', 'jest', '--config', 'apps/plugins/wago/cc100-runtime/integration/jest.config.cjs', '--runInBand'],
