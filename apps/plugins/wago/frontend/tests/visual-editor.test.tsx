@@ -428,8 +428,13 @@ describe('visual configuration workflow', () => {
     await user.click(screen.getByRole('button', { name: /Apply to channel/ }));
     await user.click(await screen.findByRole('option', { name: 'Door lock' }));
     await user.click(screen.getByRole('button', { name: 'Preview preset' }));
+    const selectedChange = await screen.findByRole('checkbox', { name: /Door lock/ });
+    await user.click(selectedChange);
+    expect(screen.getByRole('button', { name: 'Copy selected changes to local edits' })).toBeDisabled();
+    await user.click(selectedChange);
     await user.click(await screen.findByRole('button', { name: 'Copy selected changes to local edits' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled());
+    expect(screen.getByRole('button', { name: 'Copy selected changes to local edits' })).toBeDisabled();
     expect(state.save).not.toHaveBeenCalled();
     await act(async () => {
       pending.resolve({ snapshot: JSON.stringify(candidate) });
@@ -442,13 +447,37 @@ describe('visual configuration workflow', () => {
     const application = { presetId: 'pulsed-lock-bank', channelId: 'output', physicalPointId: 'point' };
     expect(state.save.mock.calls[0][2].presets).toEqual([application]);
     // Reapply through the mounted UI, even when the copied settings are unchanged.
+    state.preview.mockResolvedValue({
+      draftHash: 'unchanged-preview',
+      snapshot: candidate,
+      diff: [],
+      errors: [{ path: '$.logicalChannels[0]', code: 'invalid', message: 'Invalid preset preview' }],
+    });
+    await user.click(screen.getByRole('button', { name: 'Preview preset' }));
+    expect(await screen.findByRole('button', { name: 'Reapply preset to local edits' })).toBeDisabled();
+    expect(state.apply).toHaveBeenCalledTimes(1);
+    state.preview.mockResolvedValue({ draftHash: 'unchanged-preview', snapshot: candidate, diff: [], errors: [] });
     state.apply.mockResolvedValue({ snapshot: JSON.stringify(candidate) });
     await user.click(screen.getByRole('button', { name: 'Preview preset' }));
-    await user.click(await screen.findByRole('button', { name: 'Copy selected changes to local edits' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Reapply preset to local edits' })).toBeEnabled());
+    expect(screen.getByText('No configuration changes.')).toBeInTheDocument();
+    expect(state.apply).toHaveBeenCalledTimes(1);
+    expect(state.save).toHaveBeenCalledTimes(1);
+    // Saving a no-op preview alone must not append audit intent.
+    const saving = deferred<unknown>();
+    state.save.mockReturnValueOnce(saving.promise);
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(state.save).toHaveBeenCalledTimes(2));
-    expect(state.save.mock.calls[1][2].presets).toEqual([application, application]);
+    expect(state.save.mock.calls[1][2].presets).toEqual([application]);
+    expect(screen.getByRole('button', { name: 'Reapply preset to local edits' })).toBeDisabled();
+    await act(async () => saving.resolve(await state.save.mock.results[0].value));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Reapply preset to local edits' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Reapply preset to local edits' }));
+    expect(state.apply).toHaveBeenLastCalledWith(1, application, [], 'unchanged-preview', candidate);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(3));
+    expect(state.save.mock.calls[2][2].presets).toEqual([application, application]);
   });
 
   it('freezes editing and close during publication and keeps readiness unknown', async () => {

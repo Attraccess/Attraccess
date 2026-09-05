@@ -73,6 +73,7 @@ export function ConfigurationPresets({
     ...(guardChannelId ? { guardChannelId } : {}),
     ...(feedbackChannelId ? { feedbackChannelId } : {}),
   };
+  const canCopy = !!result && !result.errors.length && (!result.diff.length || !!paths.length) && !busy;
   async function showPreview() {
     const current = generation.current;
     setError(null);
@@ -87,7 +88,7 @@ export function ConfigurationPresets({
     }
   }
   async function copyChanges() {
-    if (!result) return;
+    if (!result || !canCopy) return;
     const current = generation.current;
     setError(null);
     try {
@@ -166,11 +167,11 @@ export function ConfigurationPresets({
           />
           <ConfigurationErrors errors={result.errors} snapshot={result.snapshot} names={metadata.names} />
           <Button
-            isDisabled={!paths.length || preview.isPending}
+            isDisabled={!canCopy}
             isPending={apply.isPending}
             onPress={() => void copyChanges()}
           >
-            Copy selected changes to local edits
+            {result.diff.length ? 'Copy selected changes to local edits' : 'Reapply preset to local edits'}
           </Button>
         </>
       )}

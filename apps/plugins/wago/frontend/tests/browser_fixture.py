@@ -113,7 +113,7 @@ class WagoFixture:
             assert body["application"]["presetId"] == "pulsed-lock-bank", "Fixture supports pulsed preset only"
             channel.update(profile="pulsed-lock-bank", capabilities=["output", "pulse"], pulse={"durationMs": 500})
             changes = [{"path": f"$.logicalChannels[{index}].{key}", "previous": before.get(key), "current": channel[key]}
-                       for key in ("profile", "capabilities", "pulse")]
+                       for key in ("profile", "capabilities", "pulse") if before.get(key) != channel[key]]
             self.preview = {"draftHash": "qa-preview-hash", "snapshot": candidate, "diff": changes, "errors": []}
             reply(self.preview)
         elif suffix == "presets/apply":

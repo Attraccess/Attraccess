@@ -316,6 +316,32 @@ class ConfigurationBrowser(unittest.TestCase):
         self.assertEqual(channel["profile"], "generic-digital-output")
         self.assertEqual(channel["pulse"]["durationMs"], 750)
         self.assertEqual(self.fixture.count("/publish"), 0)
+        # Apply the complete preset, then preview its genuinely unchanged settings.
+        self.button("Preview preset").click()
+        copy.click()
+        expect(self.dialog.get_by_role("spinbutton", name=re.compile(r"^Pulse duration \(ms\)"))).to_have_value("500")
+        self.save()
+        saved = deepcopy(self.fixture.draft)
+        history = json.loads(saved["presetProvenance"])["editor"]["presets"]
+        self.button("Preview preset").click()
+        reapply = self.button("Reapply preset to local edits")
+        expect(reapply).to_be_enabled()
+        self.assertEqual(self.fixture.preview["diff"], [])
+        self.assertEqual(self.fixture.count("/presets/apply"), 2)
+        self.assertEqual(self.fixture.draft, saved)
+        # A no-op save alone leaves the application history unchanged.
+        self.save()
+        self.assertEqual(json.loads(self.fixture.draft["presetProvenance"])["editor"]["presets"], history)
+        reapply.click()
+        expect(self.dialog.get_by_text(re.compile("Unsaved local edits"))).to_be_visible()
+        self.assertEqual(self.fixture.count("/presets/apply"), 3)
+        applied = next(call["body"] for call in reversed(self.fixture.calls) if call["path"].endswith("/presets/apply"))
+        self.assertEqual(applied["selectedPaths"], [])
+        self.assertEqual(self.fixture.draft, saved)
+        self.save()
+        self.assertEqual(self.fixture.draft["snapshot"], saved["snapshot"])
+        self.assertEqual(json.loads(self.fixture.draft["presetProvenance"])["editor"]["presets"], history + [history[-1]])
+        self.assertEqual(self.fixture.count("/publish"), 0)
 
     def test_save_review_publish_and_reported_status(self):
         self.add_output()
