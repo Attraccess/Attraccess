@@ -158,13 +158,13 @@ The strict suite passes **8 tests, none skipped**, with these exact committed
 sources staged read-only:
 
 - Producer: `eb58308c87771a49eb15b8c41430b5ac938b1919` (runtime contract from `73995720`).
-- Flow service and parser: `0ea15d9acaf8414a13754f83dc142fd9fe0dce48`.
+- Flow service and parser: `f028f89b13a43d0503dd5dcaa53a66ec767e7b54`.
 - Main commissioning service and split command runtime: `9e0a1c47066d5b103ca09606f26f5d2ace6c3091`.
 
 ```sh
 node apps/plugins/wago/cc100-runtime/integration/run.mjs \
   --runtime-ref=eb58308c87771a49eb15b8c41430b5ac938b1919 \
-  --flow-ref=0ea15d9acaf8414a13754f83dc142fd9fe0dce48 \
+  --flow-ref=f028f89b13a43d0503dd5dcaa53a66ec767e7b54 \
   --main-ref=9e0a1c47066d5b103ca09606f26f5d2ace6c3091
 ```
 
