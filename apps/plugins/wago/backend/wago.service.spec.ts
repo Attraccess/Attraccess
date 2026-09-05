@@ -8,6 +8,10 @@ import { WagoConfigurationRevision } from './wago-configuration-revision.entity'
 import { configurationHash } from './configuration';
 
 describe('WagoService', () => {
+  const services: WagoService[] = [];
+  afterEach(() => {
+    services.splice(0).forEach((service) => service.onModuleDestroy());
+  });
   const controller = (): WagoController => ({
     id: 1,
     hardwareId: 'cc100-01',
@@ -106,6 +110,7 @@ describe('WagoService', () => {
       getMqttCredentialProvisioning: jest.fn(),
     } as unknown as PluginContext;
     const service = new WagoService(context);
+    services.push(service);
     // Unit tests invoke service methods directly, outside Nest's module lifecycle.
     Object.assign(service, {
       controllers: controllerRepository,

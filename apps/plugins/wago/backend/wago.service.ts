@@ -39,6 +39,8 @@ import {
 import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { WagoCommandError, WagoCommandHandler } from './wago-command-handler';
+import { freshness, WagoDiagnosticsStore } from './diagnostics-store';
+import { canonicalEnvelope } from './diagnostics-envelope';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 const STALE_AFTER_MS = 90_000;
@@ -57,6 +59,7 @@ type WagoControllerSummary = Omit<WagoController, 'fingerprint' | 'pairingCodeHa
 
 @Injectable()
 export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
+  readonly diagnostics = new WagoDiagnosticsStore();
   private controllers!: Repository<WagoController>;
   private settings!: Repository<WagoSettings>;
   private enrollments!: Repository<WagoEnrollment>;
@@ -75,6 +78,8 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     claimedController: (id) => this.claimedController(id),
     getSettings: () => this.getSettings(),
     appliedRevision: (id) => this.appliedRevision(id),
+    onCommand: (controllerId, channelId, id) => this.diagnostics.command(controllerId, channelId, id),
+    onCommandFailure: (id, status) => this.diagnostics.commandFailed(id, status),
   });
   private claimConfigurationLock = Promise.resolve();
   private subscriptionRebuild = Promise.resolve();
@@ -152,7 +157,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       runtimeVersion: controller.runtimeVersion,
       capabilities: controller.capabilities,
       lastSequence: controller.lastSequence,
-      lastHeartbeatAt: controller.lastHeartbeatAt,
+      lastHeartbeatAt: this.diagnostics.read(controller.id).heartbeatAt ?? controller.lastHeartbeatAt,
       lastSeenAt: controller.lastSeenAt,
       compatibilityError: controller.compatibilityError,
       createdAt: controller.createdAt,
@@ -685,7 +690,10 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
               if (!this.isActiveSubscriptionGeneration(generation)) return;
               const hardwareId = configurationReportedHardwareId(settings.operationalPrefix, message.topic);
               const controller = hardwareId ? controllersByHardwareId.get(hardwareId) : undefined;
-              if (controller) this.enqueueConfigurationReport(controller.id, message.payload);
+              if (controller) {
+                this.diagnostics.ingest(controller.id, 'configuration/reported', message.payload);
+                this.enqueueConfigurationReport(controller.id, message.payload);
+              }
             },
           ),
         );
@@ -694,7 +702,10 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
             if (!this.isActiveSubscriptionGeneration(generation)) return;
             const hardwareId = acknowledgementHardwareId(settings.operationalPrefix, message.topic);
             const controller = hardwareId ? controllersByHardwareId.get(hardwareId) : undefined;
-            if (controller) this.onCommandAcknowledgement(controller.id, message.payload);
+            if (controller) {
+              this.diagnostics.ingest(controller.id, 'acknowledgements', message.payload);
+              this.onCommandAcknowledgement(controller.id, message.payload);
+            }
           }),
         );
         if (this.destroyed) {
@@ -702,6 +713,18 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
           return;
         }
         for (const controller of claimedControllers) {
+          for (const suffix of ['state', 'measurements', 'faults']) {
+            replacements.push(
+              await this.subscribeMqtt(
+                serverId,
+                `${settings.operationalPrefix}/v1/controllers/${controller.hardwareId}/${suffix}`,
+                (message) => {
+                  if (this.isActiveSubscriptionGeneration(generation))
+                    this.diagnostics.ingest(controller.id, suffix, message.payload);
+                },
+              ),
+            );
+          }
           replacements.push(
             await this.subscribeMqtt(
               serverId,
@@ -830,19 +853,28 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       return;
     }
     if (heartbeat.hardwareId !== hardwareId) return;
+    const canonical = canonicalEnvelope(JSON.parse(payload.toString('utf8')), 'heartbeat');
     const controller = await this.controllers.findOneBy({ hardwareId });
     if (
       !controller ||
       controller.trustState !== 'claimed' ||
-      (heartbeat.sequence !== undefined && heartbeat.sequence < controller.lastSequence)
+      (!canonical && heartbeat.sequence !== undefined && heartbeat.sequence < controller.lastSequence)
     )
       return;
     const now = new Date().toISOString();
+    if (!this.diagnostics.ingest(controller.id, 'heartbeat', payload)) return;
+    // Connectivity is process-local between bounded persistence checkpoints.
+    // Avoid a database write for every permanent heartbeat.
+    const metadataChanged = controller.protocolVersion !== heartbeat.protocolVersion ||
+      controller.runtimeVersion !== heartbeat.runtimeVersion ||
+      controller.capabilities !== JSON.stringify(heartbeat.capabilities) ||
+      controller.compatibilityError !== compatibilityError(heartbeat);
+    if (controller.lastHeartbeatAt && freshness(controller.lastSeenAt, Date.now(), 30_000) === 'fresh' && !metadataChanged) return;
     controller.protocolVersion = heartbeat.protocolVersion;
     controller.runtimeVersion = heartbeat.runtimeVersion;
     controller.capabilities = JSON.stringify(heartbeat.capabilities);
-    controller.lastSequence = heartbeat.sequence ?? controller.lastSequence;
-    controller.lastHeartbeatAt = now;
+    if (!canonical) controller.lastSequence = this.diagnostics.read(controller.id).legacyHeartbeatSequence ?? controller.lastSequence;
+    controller.lastHeartbeatAt = canonical ? this.diagnostics.read(controller.id).heartbeatAt ?? now : now;
     controller.lastSeenAt = now;
     controller.compatibilityError = compatibilityError(heartbeat);
     controller.updatedAt = now;
@@ -978,7 +1010,8 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
 
   private connectivity(controller: WagoController): 'online' | 'stale' | 'untrusted' {
     if (controller.trustState === 'untrusted') return 'untrusted';
-    return controller.lastHeartbeatAt && Date.now() - Date.parse(controller.lastHeartbeatAt) <= STALE_AFTER_MS
+    const heartbeatAt = this.diagnostics.read(controller.id).heartbeatAt ?? controller.lastHeartbeatAt;
+    return freshness(heartbeatAt, Date.now(), STALE_AFTER_MS) === 'fresh'
       ? 'online'
       : 'stale';
   }
