@@ -5,8 +5,38 @@ import type { WagoService } from './wago.service';
 
 describe('WagoControllerApi', () => {
   const service = { previewPreset: jest.fn(), applyPreset: jest.fn() } as unknown as WagoService;
-  const commissioning = { list: jest.fn(), create: jest.fn() } as unknown as WagoCommissioningService;
+  const commissioning = { list: jest.fn(), create: jest.fn(), deliver: jest.fn(), recover: jest.fn() } as unknown as WagoCommissioningService;
   const controller = new WagoControllerApi(service, commissioning);
+
+  beforeEach(() => jest.clearAllMocks());
+
+  describe.each(['deliverCommissioningSession', 'recoverCommissioningSession'] as const)('%s', (method) => {
+    it.each([
+      {},
+      { confirmInstall: false, temporarySsh: { username: 'operator', password: 'secret' } },
+      { confirmInstall: true },
+      { confirmInstall: true, temporarySsh: { username: ' ', password: 'secret' } },
+      { confirmInstall: true, temporarySsh: { username: 'operator', password: '' } },
+    ])('rejects missing consent or credentials: %j', (body) => {
+      expect(() => controller[method](7, body)).toThrow(BadRequestException);
+      expect(commissioning.deliver).not.toHaveBeenCalled();
+      expect(commissioning.recover).not.toHaveBeenCalled();
+    });
+  });
+
+  it('returns the recovery session response and forwards only validated attempt fields', async () => {
+    const response = { id: 7, state: 'delivery_failed' };
+    jest.mocked(commissioning.recover).mockResolvedValue(response as Awaited<ReturnType<WagoCommissioningService['recover']>>);
+    const input = { confirmInstall: true, temporarySsh: { username: 'operator', password: 'test-only-secret' } };
+    await expect(controller.recoverCommissioningSession(7, input)).resolves.toEqual(response);
+    expect(commissioning.recover).toHaveBeenCalledWith(7, input);
+    expect(commissioning.deliver).not.toHaveBeenCalled();
+  });
+
+  it('propagates safe recovery errors', async () => {
+    jest.mocked(commissioning.recover).mockRejectedValue(new BadRequestException('Runtime snapshot unavailable'));
+    await expect(controller.recoverCommissioningSession(7, { confirmInstall: true, temporarySsh: { username: 'operator', password: 'test-only-secret' } })).rejects.toThrow('Runtime snapshot unavailable');
+  });
 
   it.each([
     ['previewPreset', () => controller.previewPreset(1, {})],

@@ -29,8 +29,7 @@ export function ControllersTable({ controllers, sessions, onClaim, onConfigure, 
   const activeSessions = sessions.filter(
     (session) =>
       session.state !== 'completed' &&
-      session.state !== 'revoked' &&
-      !controllers.some((controller) => controller.hardwareId === session.hardwareId && controller.trustState === 'claimed'),
+      session.state !== 'revoked',
   );
   const rows: TableRowData[] = [
     ...controllers.map((controller) => ({
@@ -89,7 +88,8 @@ function ControllerRow({ row, onClaim, onConfigure, onRemove, onResume }: { row:
       <TableCell className="wg:hidden wg:lg:table-cell">{formatHeartbeat(controller.lastHeartbeatAt)}</TableCell>
       <TableCell>
         <div className="wg:flex wg:justify-end wg:gap-2">
-          {session ? <Button size="sm" variant="secondary" onPress={() => onResume(session)}>View progress</Button> : controller.trustState === 'untrusted' ? (
+          {session && <Button size="sm" variant="secondary" onPress={() => onResume(session)}>View progress</Button>}
+          {controller.trustState === 'untrusted' ? (!session &&
             <Button size="sm" onPress={() => onClaim(controller.id)}>Claim</Button>
           ) : <Button size="sm" variant="secondary" onPress={() => onConfigure(controller.id)}>Configure</Button>}
           <Button color="danger" size="sm" variant="ghost" onPress={() => onRemove(controller)}>Remove</Button>
@@ -150,6 +150,9 @@ export function commissioningLabel(state: WagoCommissioningState): string {
     awaiting_discovery: 'Waiting for the controller to connect',
     awaiting_claim: 'Claiming automatically',
     completed: 'Claimed',
+    awaiting_verification: 'Verification required',
+    claim_interrupted: 'Claim recovery required',
+    recovery_revocation_pending: 'Restored; revocation pending',
     revoked: 'Revoked',
   }[state];
 }
