@@ -320,7 +320,10 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           isRequired={isRequired}
           aria-label={label}
           value={Number(parsedValue)}
-          onChange={(newValue) => setValue(newValue as TValue)}
+          onChange={(newValue) => {
+            if (!isRequired && Number.isNaN(newValue)) onChange(undefined as TValue);
+            else setValue(newValue as TValue);
+          }}
           minValue={getNumberFieldMinimum(schema)}
           maxValue={schema.maximum}
           step={schema.multipleOf}
