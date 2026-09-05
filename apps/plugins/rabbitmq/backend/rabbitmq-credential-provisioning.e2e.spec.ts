@@ -126,7 +126,13 @@ describe('RabbitMQ credential provisioning isolation (e2e)', () => {
     const allowed = `devices/${controllerA.identity}/reported/telemetry/value`;
     const nested = `devices/${controllerA.identity}/reported/telemetry/current/value`;
     const observer = await connect(mqttUrl, clients, ADMIN_USERNAME, ADMIN_PASSWORD, 'wildcard-observer');
-    const a = await connect(mqttUrl, clients, controllerA.username, controllerA.password, `${controllerA.identity}-wildcard`);
+    const a = await connect(
+      mqttUrl,
+      clients,
+      controllerA.username,
+      controllerA.password,
+      `${controllerA.identity}-wildcard`,
+    );
     await subscribe(observer, [allowed, nested]);
 
     const allowedMessage = nextMessage(observer, allowed);
@@ -180,7 +186,9 @@ async function subscribeIgnoringAuthorizationFailure(client: MqttClient, topic: 
 }
 
 async function publish(client: MqttClient, topic: string, payload: string): Promise<void> {
-  await new Promise<void>((resolve, reject) => client.publish(topic, payload, (error) => (error ? reject(error) : resolve())));
+  await new Promise<void>((resolve, reject) =>
+    client.publish(topic, payload, (error) => (error ? reject(error) : resolve())),
+  );
 }
 
 async function publishIgnoringAuthorizationFailure(client: MqttClient, topic: string, payload: string): Promise<void> {

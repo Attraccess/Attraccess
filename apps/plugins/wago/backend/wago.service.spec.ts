@@ -479,6 +479,119 @@ describe('WagoService', () => {
     expect(revisionRepository.save).toHaveBeenCalledWith(expect.objectContaining({ revision: 1 }));
   });
 
+  it('copies only selected preset changes into the editable draft and records provenance', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, draftRepository } = createService([claimed]);
+    const snapshot = {
+      version: 1,
+      physicalPoints: [{ id: 'point-a', hardwareProfile: '751-9301', channel: 0 }],
+      logicalChannels: [],
+    };
+    let draft: Record<string, unknown> | null = {
+      controllerId: claimed.id,
+      snapshot: JSON.stringify(snapshot),
+      reviewedHash: null,
+      presetProvenance: null,
+      updatedAt: '',
+    };
+    draftRepository.findOneBy.mockImplementation(async () => draft);
+    draftRepository.save.mockImplementation(async (value) => {
+      draft = value;
+      return value;
+    });
+    const application = {
+      presetId: 'generic-digital-output' as const,
+      channelId: 'output-a',
+      physicalPointId: 'point-a',
+    };
+    const preview = await service.previewPreset(claimed.id, application);
+
+    await service.applyPreset(claimed.id, application, [], preview.draftHash);
+    const unchanged = draft as Record<string, unknown>;
+    expect(JSON.parse(unchanged.snapshot as string).logicalChannels).toEqual([]);
+
+    await service.applyPreset(
+      claimed.id,
+      application,
+      preview.diff.map((change) => change.path),
+      preview.draftHash,
+    );
+    const applied = draft as Record<string, unknown>;
+    expect(JSON.parse(applied.snapshot as string).logicalChannels).toEqual([
+      expect.objectContaining({ id: 'output-a' }),
+    ]);
+    expect(applied.presetProvenance).toContain('generic-digital-output');
+  });
+
+  it('rejects applying a preset against a draft changed since its preview', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, draftRepository } = createService([claimed]);
+    const snapshot = {
+      version: 1,
+      physicalPoints: [{ id: 'point-a', hardwareProfile: '751-9301', channel: 0 }],
+      logicalChannels: [],
+    };
+    const draft = {
+      controllerId: claimed.id,
+      snapshot: JSON.stringify(snapshot),
+      reviewedHash: null,
+      presetProvenance: null,
+      updatedAt: '',
+    };
+    draftRepository.findOneBy.mockResolvedValue(draft);
+    const application = {
+      presetId: 'generic-digital-output' as const,
+      channelId: 'output-a',
+      physicalPointId: 'point-a',
+    };
+    const preview = await service.previewPreset(claimed.id, application);
+
+    draft.snapshot = JSON.stringify({ ...snapshot, physicalPoints: [{ ...snapshot.physicalPoints[0], channel: 1 }] });
+
+    await expect(
+      service.applyPreset(
+        claimed.id,
+        application,
+        preview.diff.map((change) => change.path),
+        preview.draftHash,
+      ),
+    ).rejects.toThrow('selected preset changes no longer match the configuration draft');
+  });
+
+  it('retains only the latest 100 preset provenance entries', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, draftRepository } = createService([claimed]);
+    const snapshot = {
+      version: 1,
+      physicalPoints: [{ id: 'point-a', hardwareProfile: '751-9301', channel: 0 }],
+      logicalChannels: [],
+    };
+    const draft = {
+      controllerId: claimed.id,
+      snapshot: JSON.stringify(snapshot),
+      reviewedHash: null,
+      presetProvenance: JSON.stringify(Array.from({ length: 100 }, (_, index) => ({ presetId: `preset-${index}` }))),
+      updatedAt: '',
+    };
+    draftRepository.findOneBy.mockResolvedValue(draft);
+    const application = {
+      presetId: 'generic-digital-output' as const,
+      channelId: 'output-a',
+      physicalPointId: 'point-a',
+    };
+    const preview = await service.previewPreset(claimed.id, application);
+
+    await service.applyPreset(
+      claimed.id,
+      application,
+      preview.diff.map((change) => change.path),
+      preview.draftHash,
+    );
+
+    expect(JSON.parse(draft.presetProvenance)).toHaveLength(100);
+    expect(JSON.parse(draft.presetProvenance)[0]).toEqual({ presetId: 'preset-1' });
+  });
+
   it('rejects publication for a claimed runtime without the configuration contract', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const, capabilities: '["claim","heartbeat"]' };
     const { service, draftRepository } = createService([claimed]);

@@ -241,7 +241,7 @@ describe('CC100 packed digital I/O', () => {
   it('does not overwrite a configuration commit with a simultaneous sequence reservation', async () => {
     await runtime.start();
     await apply();
-    for (let index = 0; index < 98; index++) await command('missing', true, `unknown-${index}`);
+    for (let index = 0; index < 100; index++) await command('missing', true, `unknown-${index}`);
     expect(Number(messages.at(-1)?.payload.sequence)).toBe(100);
     const started = deferred();
     const release = deferred();
