@@ -1,3 +1,5 @@
+import { parseMeasurement, type Measurement } from '../measurement-contract';
+
 export const DISCOVERY_ROOT = 'attraccess/wago/discovery';
 export const CONFIGURATION_PROTOCOL_VERSION = 1;
 export const CONFIGURATION_CAPABILITY = `configuration-v${CONFIGURATION_PROTOCOL_VERSION}`;
@@ -98,7 +100,7 @@ export function configurationReportedWildcardTopic(prefix: string): string {
 
 type WagoOperationalMessageBase = {
   timestamp: string;
-  streamId?: string;
+  streamId: string;
   sequence: number;
 };
 
@@ -156,10 +158,7 @@ export function parseOperationalMessage(
   const value = parseObject(payload, 'operational message');
   const timestamp = requiredTimestamp(value.timestamp);
   const sequence = requiredSequence(value.sequence);
-  if (
-    value.streamId !== undefined &&
-    (typeof value.streamId !== 'string' || !value.streamId.trim() || value.streamId.length > 128)
-  )
+  if (typeof value.streamId !== 'string' || !value.streamId.trim() || value.streamId.length > 128)
     throw new Error('operational streamId is invalid');
   const streamId = value.streamId;
   if (suffix === 'state') {
@@ -181,7 +180,7 @@ export function parseOperationalMessage(
       message: {
         category: 'state',
         timestamp,
-        ...(streamId !== undefined ? { streamId } : {}),
+        streamId,
         sequence,
         connected: value.connected,
         revision: value.revision as number | null,
@@ -195,7 +194,6 @@ export function parseOperationalMessage(
     };
   }
   if (suffix === 'measurements') {
-    if (streamId === undefined) throw new Error('operational streamId is required for measurements');
     return {
       hardwareId,
       message: {
@@ -215,7 +213,7 @@ export function parseOperationalMessage(
       message: {
         category: 'fault',
         timestamp,
-        ...(streamId !== undefined ? { streamId } : {}),
+        streamId,
         sequence,
         channelId: value.channelId,
         code: value.code,
@@ -234,7 +232,7 @@ export function parseOperationalMessage(
     message: {
       category: 'acknowledgement',
       timestamp,
-      ...(streamId !== undefined ? { streamId } : {}),
+      streamId,
       sequence,
       id: value.id,
       status: value.status as 'accepted' | 'duplicate' | 'rejected',
