@@ -23,25 +23,13 @@ export const requiredChecks = [
 
 const text = (value) => typeof value === 'string' && value.trim().length > 0;
 const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
-const recordedAt = (value) => {
-  if (typeof value !== 'string') return false;
-  const match =
-    /^(\d{4})-(\d{2})-(\d{2})T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.exec(
-      value,
-    );
-  if (!match || !Number.isFinite(Date.parse(value))) return false;
-  const [year, month, day] = match.slice(1, 4).map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
-};
 
 /** Checks evidence completeness only. It never contacts a controller or certifies evidence authenticity. */
 export function checkWagoAcceptance(evidence) {
   if (!record(evidence)) return ['Evidence must be a JSON object.'];
   const errors = [];
   if (evidence.schemaVersion !== 1) errors.push('schemaVersion must be 1.');
-  if (evidence.environment !== 'physical')
-    errors.push('Physical hardware evidence is required; simulation is not acceptance.');
+  if (evidence.environment !== 'physical') errors.push('Physical hardware evidence is required; simulation is not acceptance.');
   if (evidence.controller?.model !== '751-9301' || evidence.controller?.firmware !== '31') {
     errors.push('Record the supported CC100 751-9301 / firmware 31 baseline.');
   }
@@ -49,12 +37,10 @@ export function checkWagoAcceptance(evidence) {
     if (!text(evidence.controller?.[key])) errors.push(`controller.${key} is required.`);
   }
   for (const key of ['pluginCommit', 'runtimeCommit']) {
-    if (typeof evidence.build?.[key] !== 'string' || !/^[a-f0-9]{40}$/.test(evidence.build[key]))
-      errors.push(`build.${key} must be a full commit SHA.`);
+    if (!/^[a-f0-9]{40}$/.test(evidence.build?.[key] ?? '')) errors.push(`build.${key} must be a full commit SHA.`);
   }
   for (const key of ['frontendDigest', 'backendDigest', 'runtimeDigest']) {
-    if (typeof evidence.build?.[key] !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(evidence.build[key]))
-      errors.push(`build.${key} must be a SHA-256 digest.`);
+    if (!/^sha256:[a-f0-9]{64}$/.test(evidence.build?.[key] ?? '')) errors.push(`build.${key} must be a SHA-256 digest.`);
   }
   for (const key of ['protocolVersion', 'signedBundleEvidence', 'visualArtifactProvisioningEvidence']) {
     if (!text(evidence.build?.[key])) errors.push(`build.${key} is required.`);
@@ -62,32 +48,22 @@ export function checkWagoAcceptance(evidence) {
   for (const key of ['model', 'transport', 'profileVersion', 'qualificationEvidence']) {
     if (!text(evidence.modbus?.[key])) errors.push(`modbus.${key} is required; no unqualified support claims.`);
   }
-  if (!text(evidence.participant?.id) || !text(evidence.implementerId))
-    errors.push('Participant and implementer identifiers are required.');
-  if (
-    text(evidence.participant?.id) &&
-    text(evidence.implementerId) &&
-    evidence.participant.id.trim().toLowerCase() === evidence.implementerId.trim().toLowerCase()
-  ) {
+  if (!text(evidence.participant?.id) || !text(evidence.implementerId)) errors.push('Participant and implementer identifiers are required.');
+  if (text(evidence.participant?.id) && text(evidence.implementerId) &&
+      evidence.participant.id.trim().toLowerCase() === evidence.implementerId.trim().toLowerCase()) {
     errors.push('The acceptance participant must not be the implementer.');
   }
   if (!['nontechnical', 'lightly-technical'].includes(evidence.participant?.experience)) {
     errors.push('Record a nontechnical or lightly technical participant.');
   }
   if (evidence.noCodeJourney !== true || evidence.developerIntervention !== false) {
-    errors.push(
-      'The journey must require no terminal, code, JSON, API client, manual secret copying or developer intervention.',
-    );
+    errors.push('The journey must require no terminal, code, JSON, API client, manual secret copying or developer intervention.');
   }
-  if (evidence.safeFixtureConfirmed !== true)
-    errors.push('Confirm qualified wiring, low-voltage fixtures and independent safety circuits.');
-  if (!Array.isArray(evidence.blockers) || evidence.blockers.length)
-    errors.push('blockers must be an explicitly empty array.');
-  if (!Array.isArray(evidence.obstacles))
-    errors.push('Record participant obstacles, including an empty array if none.');
+  if (evidence.safeFixtureConfirmed !== true) errors.push('Confirm qualified wiring, low-voltage fixtures and independent safety circuits.');
+  if (!Array.isArray(evidence.blockers) || evidence.blockers.length) errors.push('blockers must be an explicitly empty array.');
+  if (!Array.isArray(evidence.obstacles)) errors.push('Record participant obstacles, including an empty array if none.');
   const checks = Array.isArray(evidence.checks) ? evidence.checks : [];
-  if (checks.some((check) => !record(check) || !requiredChecks.includes(check.id)))
-    errors.push('checks contains an unknown or malformed entry.');
+  if (checks.some((check) => !record(check) || !requiredChecks.includes(check.id))) errors.push('checks contains an unknown or malformed entry.');
   for (const id of requiredChecks) {
     const matches = checks.filter((check) => check?.id === id);
     if (matches.length !== 1) {
@@ -96,7 +72,7 @@ export function checkWagoAcceptance(evidence) {
     }
     const check = matches[0];
     if (check.result !== 'pass') errors.push(`${id}: required check did not pass.`);
-    if (!text(check.observed) || !text(check.evidenceRef) || !recordedAt(check.recordedAt)) {
+    if (!text(check.observed) || !text(check.evidenceRef) || !text(check.recordedAt) || !Number.isFinite(Date.parse(check.recordedAt))) {
       errors.push(`${id}: observed result, evidence reference and recording timestamp are required.`);
     }
   }
@@ -111,14 +87,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       console.error(['WAGO evidence incomplete:', ...errors.map((error) => `- ${error}`)].join('\n'));
       process.exitCode = 1;
     } else {
-      console.log(
-        'Evidence fields complete. Human review of linked hardware/user/audit evidence is still required. No release was published.',
-      );
+      console.log('Evidence fields complete. Human review of linked hardware/user/audit evidence is still required. No release was published.');
     }
   } catch {
-    console.error(
-      'Could not validate evidence. Supply one readable JSON file: node scripts/check-wago-acceptance.mjs <evidence.json>',
-    );
+    console.error('Could not validate evidence. Supply one readable JSON file: node scripts/check-wago-acceptance.mjs <evidence.json>');
     process.exitCode = 1;
   }
 }
