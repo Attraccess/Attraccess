@@ -4,17 +4,27 @@ on:
   pull_request:
     paths:
       - 'apps/plugins/wago/cc100-runtime/**'
-      - 'apps/plugins/wago/backend/protocol.ts'
-      - 'apps/plugins/wago/backend/wago.service.ts'
+<<<<<<< HEAD
+      - 'apps/plugins/wago/backend/**'
+      - 'libs/plugins-backend-sdk/**'
       - 'apps/plugins/wago/scripts/package-runtime-artifact.mjs'
+=======
+      - 'apps/plugins/wago/backend/**'
+      - 'libs/plugins-backend-sdk/**'
+>>>>>>> 96040193 (fix(ATT-1048): verify simulator lifecycle on isolated broker)
       - '.github/workflows/wago-cc100-runtime.yml'
   push:
     branches: [main]
     paths:
       - 'apps/plugins/wago/cc100-runtime/**'
-      - 'apps/plugins/wago/backend/protocol.ts'
-      - 'apps/plugins/wago/backend/wago.service.ts'
+<<<<<<< HEAD
+      - 'apps/plugins/wago/backend/**'
+      - 'libs/plugins-backend-sdk/**'
       - 'apps/plugins/wago/scripts/package-runtime-artifact.mjs'
+=======
+      - 'apps/plugins/wago/backend/**'
+      - 'libs/plugins-backend-sdk/**'
+>>>>>>> 96040193 (fix(ATT-1048): verify simulator lifecycle on isolated broker)
       - '.github/workflows/wago-cc100-runtime.yml'
 
 permissions:
@@ -33,6 +43,7 @@ jobs:
       - run: pnpm nx run wago-cc100-runtime:test
       - run: pnpm nx run wago-cc100-runtime:build
       - run: pnpm nx run wago-cc100-runtime:build-simulator
+<<<<<<< HEAD
       - name: Start simulator against RabbitMQ
         env:
           WAGO_ENROLLMENT_SECRET: ci-enrollment-secret
@@ -60,6 +71,16 @@ jobs:
       - name: Stop simulator integration stack
         if: always()
         run: WAGO_ENROLLMENT_SECRET=cleanup WAGO_ENROLLMENT_USERNAME=cleanup WAGO_ENROLLMENT_PASSWORD=cleanup docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml down --volumes
+      - name: Typecheck simulator integration harness
+        run: pnpm exec tsc --noEmit -p apps/plugins/wago/cc100-runtime/integration/tsconfig.json
+      - name: Verify simulator lifecycle and measurement flow on an isolated broker
+        run: pnpm nx run wago-cc100-runtime:test-simulator-integration
+=======
+      - name: Typecheck simulator integration harness
+        run: pnpm exec tsc --noEmit -p apps/plugins/wago/cc100-runtime/integration/tsconfig.json
+      - name: Verify simulator lifecycle and measurement flow on an isolated broker
+        run: pnpm nx run wago-cc100-runtime:test-simulator-integration
+>>>>>>> 96040193 (fix(ATT-1048): verify simulator lifecycle on isolated broker)
       - uses: actions/upload-artifact@v4
         with:
           name: wago-cc100-runtime-manifest
