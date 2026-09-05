@@ -71,7 +71,7 @@ export class WagoRuntime {
     this.reservedSequence = this.sequence;
     await this.options.transport.subscribe(this.desiredTopic(), (payload) => this.receiveDesired(payload));
     await this.options.transport.subscribe(this.commandTopic(), (payload) => this.receiveCommand(payload));
-    await this.publishHeartbeat();
+    await this.publishHeartbeat(true);
   }
 
   async receiveClaim(credentials: DiscoveryClaim): Promise<void> {
@@ -283,7 +283,7 @@ export class WagoRuntime {
     await this.publishState();
   }
 
-  async publishHeartbeat(): Promise<void> {
+  async publishHeartbeat(ignoreStatePublicationFailure = false): Promise<void> {
     if (this.publishingHeartbeat) return;
     this.publishingHeartbeat = true;
     try {
@@ -295,7 +295,13 @@ export class WagoRuntime {
         capabilities: CAPABILITIES,
         sequence: Date.now(),
       });
-      await this.publishState();
+      try {
+        await this.publishState();
+      } catch (error) {
+        // State telemetry reserves a durable sequence. A read-only state volume
+        // must not prevent startup or disconnect safety policies from running.
+        if (!ignoreStatePublicationFailure) throw error;
+      }
     } finally {
       this.publishingHeartbeat = false;
     }
