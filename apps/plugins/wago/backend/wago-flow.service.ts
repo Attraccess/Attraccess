@@ -181,7 +181,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       };
       properties.minimumIntervalMs = { type: 'number', title: 'Minimum interval (ms)', minimum: 0 };
       if (channel?.capabilities.includes('measurement'))
-        properties.minimumChange = { type: 'number', title: 'Minimum change', minimum: 0 };
+        properties.minimumChange = { type: 'number', title: 'Minimum change (wire units)', minimum: 0 };
     }
     if (kind !== 'event')
       properties.category = {
@@ -191,7 +191,10 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
         oneOf: this.readCategories(channel).map((category) => ({ const: category, title: category })),
       };
     if (kind === 'wait') {
-      properties.equals = { type: config.category === 'measurement' ? 'number' : 'boolean', title: 'Equals' };
+      properties.equals = {
+        type: config.category === 'measurement' ? 'number' : 'boolean',
+        title: config.category === 'measurement' ? 'Equals (wire value)' : 'Equals',
+      };
       properties.timeoutMs = { type: 'number', title: 'Timeout (ms)', minimum: 1, maximum: MAX_TIMEOUT_MS };
     }
     return { dynamic: true, type: 'object', properties, required: ['controllerId', 'channelId', 'category'] };
@@ -482,6 +485,9 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       typeof config.minimumChange === 'number' &&
       typeof state.value === 'number' &&
       typeof previous?.value === 'number' &&
+      previous.streamId === state.streamId &&
+      previous.unit === state.unit &&
+      previous.kind === state.kind &&
       Math.abs(state.value - previous.value) < config.minimumChange
     )
       return false;
