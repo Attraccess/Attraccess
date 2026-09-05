@@ -311,9 +311,12 @@ export class WagoRuntime {
           await this.releaseCommand(command.id);
           return { error: 'operational guard is not satisfied', code: 'guard_rejected' };
         }
-        const admit = () => {
-          if (Date.parse(expiresAt) <= Date.now()) throw new WriteAdmissionError('expired');
-        };
+        const admit = Object.assign(
+          () => {
+            if (Date.parse(expiresAt) <= Date.now()) throw new WriteAdmissionError('expired');
+          },
+          { expiresAt: Date.parse(expiresAt) },
+        );
         if (command.action === 'pulse') {
           const currentDuration = currentChannel.pulse?.durationMs;
           if (!currentDuration) return this.releaseFailedWrite(command.id, currentChannel.id);
