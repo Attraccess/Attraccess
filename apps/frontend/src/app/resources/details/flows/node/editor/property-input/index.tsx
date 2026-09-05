@@ -23,6 +23,7 @@ export interface Property<TValue> {
   items?: {
     type: 'object' | 'string' | 'number' | 'integer' | 'boolean';
     properties?: Record<string, Property<unknown>>;
+    required?: string[];
   };
   properties?: Record<string, Property<unknown>>;
   required?: string[];
@@ -35,6 +36,7 @@ export interface Property<TValue> {
   title?: string;
   description?: string;
   refreshesSchema?: boolean;
+  readOnly?: boolean;
   selectFromEntity?: 'mqttServer' | 'companionDevice';
   selectFromEntityProperty?: string;
   overrideWithInput?: string;
@@ -58,8 +60,10 @@ interface Props<TValue> {
 export function PropertyInput<TValue>(props: Props<TValue>) {
   const { name, isRequired, schema, tNodeTranslations: t, tNodeExists, nodeType, value, onChange: onChangeProp, hideLabel } = props;
   const onChange = useCallback(
-    (newValue: TValue, refreshesSchema = schema.refreshesSchema) => onChangeProp(newValue, refreshesSchema),
-    [onChangeProp, schema.refreshesSchema],
+    (newValue: TValue, refreshesSchema = schema.refreshesSchema) => {
+      if (!schema.readOnly) onChangeProp(newValue, refreshesSchema || schema.refreshesSchema);
+    },
+    [onChangeProp, schema.refreshesSchema, schema.readOnly],
   );
   const label = schema.title ?? t('nodes.' + nodeType + '.config.' + name + '.label');
 
@@ -69,12 +73,22 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
   const helpText = tNodeExists?.(helpTextKey) ? t(helpTextKey) : undefined;
   const docsUrl = tNodeExists?.(docsUrlKey) ? t(docsUrlKey) : undefined;
   const docsLabel = tNodeExists?.(docsLabelKey) ? t(docsLabelKey) : docsUrl;
+  const enumLabel = (item: EnumValue) => {
+    const key = `nodes.${nodeType}.config.${name}.enum.${item.const}`;
+    return item.title ?? (tNodeExists?.(key) ? t(key) : String(item.const));
+  };
 
   let description: React.ReactNode = schema.description
     ? `${schema.description}${schema.unit ? ` (${schema.unit})` : ''}`
     : schema.unit;
   if (schema.overrideWithInput) {
-    description = t('nodes.genericConfig.overridableByInput', { fieldName: schema.overrideWithInput });
+    description = (
+      <>
+        {description}
+        <br />
+        {t('nodes.genericConfig.overridableByInput', { fieldName: schema.overrideWithInput })}
+      </>
+    );
   }
   if (helpText || docsUrl) {
     description = (
@@ -121,6 +135,19 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
   const propertyKey = name.split('.').pop();
   const isQosField = propertyKey === 'qos' || propertyKey === 'subscribeQos';
   const [isCreateServerOpen, setIsCreateServerOpen] = useState(false);
+
+  if (schema.readOnly) {
+    return (
+      <TextField
+        isReadOnly
+        value={value == null ? '' : typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}
+      >
+        {!hideLabel && <Label>{label}</Label>}
+        <TextArea aria-label={label} />
+        {description && <Description className="whitespace-pre-wrap">{description}</Description>}
+      </TextField>
+    );
+  }
 
   if (!configuration && schema.isCurrency) {
     const currencyLabel = label;
@@ -198,16 +225,24 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
     case 'string':
       if (schema.enum || schema.oneOf) {
         const enumValues: EnumValue[] = schema.oneOf ?? schema.enum?.map((enumValue) => ({ const: enumValue })) ?? [];
+        const isCompatible = enumValues.some((item) => String(item.const) === String(value));
         return (
           <Select
+            isRequired={isRequired}
+            isInvalid={value !== undefined && !isCompatible}
             label={!hideLabel ? label : undefined}
             aria-label={label}
-            value={String(value ?? schema.default ?? '')}
+            value={isCompatible ? String(value) : ''}
             onChange={(newValue) => onChange(newValue as TValue)}
-            description={description}
+            description={
+              <span className="whitespace-pre-wrap">
+                {description}
+                {value !== undefined && !isCompatible ? <span> Select an available option.</span> : null}
+              </span>
+            }
             items={enumValues.map((enumValue) => ({
               key: String(enumValue.const),
-              label: enumValue.title ?? t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue.const),
+              label: enumLabel(enumValue),
             }))}
           />
         );
@@ -224,11 +259,10 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
               aria-label={multilineLabel}
               required={isRequired}
               placeholder={hideLabel ? multilineLabel : undefined}
-              value={value ? String(value) : undefined}
-              defaultValue={schema.default ? String(schema.default) : undefined}
+              value={value == null ? '' : String(value)}
               onChange={(e) => onChange(e.target.value as TValue)}
             />
-            {description && <Description>{description}</Description>}
+            {description && <Description className="whitespace-pre-wrap">{description}</Description>}
           </div>
         );
       }
@@ -240,11 +274,10 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           onChange={(newValue) => onChange(newValue as TValue)}
         >
           {!hideLabel && <Label>{label}</Label>}
-          {description && <Description>{description}</Description>}
+          {description && <Description className="whitespace-pre-wrap">{description}</Description>}
           <Input
             type="text"
             placeholder={hideLabel ? label : undefined}
-            defaultValue={schema.default ? String(schema.default) : undefined}
           />
         </TextField>
       );
@@ -254,11 +287,13 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
         (isQosField ? [0, 1, 2].map((enumValue) => ({ const: enumValue })) : undefined);
 
       if (enumValues) {
-        const selectedValue =
-          value !== undefined ? String(value) : schema.default !== undefined ? String(schema.default) : undefined;
+        const isCompatible = enumValues.some((item) => String(item.const) === String(value));
+        const selectedValue = isCompatible ? String(value) : '';
 
         return (
           <Select
+            isRequired={isRequired}
+            isInvalid={value !== undefined && !isCompatible}
             label={!hideLabel ? label : undefined}
             aria-label={label}
             value={selectedValue}
@@ -266,10 +301,15 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
               if (newValue == null) return;
               setValue(Number(newValue) as TValue);
             }}
-            description={description}
+            description={
+              <span className="whitespace-pre-wrap">
+                {description}
+                {value !== undefined && !isCompatible ? <span> Select an available option.</span> : null}
+              </span>
+            }
             items={enumValues.map((enumValue) => ({
               key: String(enumValue.const),
-              label: enumValue.title ?? t('nodes.' + nodeType + '.config.' + name + '.enum.' + enumValue.const),
+              label: enumLabel(enumValue),
             }))}
           />
         );
@@ -280,14 +320,13 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           isRequired={isRequired}
           aria-label={label}
           value={Number(parsedValue)}
-          defaultValue={schema.default ? Number(schema.default) : undefined}
           onChange={(newValue) => setValue(newValue as TValue)}
           minValue={getNumberFieldMinimum(schema)}
           maxValue={schema.maximum}
           step={schema.multipleOf}
         >
           {!hideLabel && <Label>{label}</Label>}
-          {description && <Description>{description}</Description>}
+          {description && <Description className="whitespace-pre-wrap">{description}</Description>}
           <NumberFieldGroup>
             <NumberFieldDecrementButton>-</NumberFieldDecrementButton>
             <NumberFieldInput />
@@ -360,7 +399,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
         return (
           <div className="flex flex-col gap-4 w-full">
             {!hideLabel && <small>{label}</small>}
-            {description && <Description>{description}</Description>}
+            {description && <Description className="whitespace-pre-wrap">{description}</Description>}
             {Object.entries(schema.properties).map(([propertyName, property]) => (
               <PropertyInput
                 key={propertyName}
@@ -415,7 +454,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
                             };
                             onChange(newArrayValue as TValue, refreshesSchema);
                           }}
-                          isRequired={false}
+                          isRequired={items.required?.includes(propName) ?? false}
                           hideLabel
                         />
                       ))}
@@ -488,9 +527,12 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
 
     case 'boolean':
       return (
-        <LabeledSwitch isSelected={value as boolean} onChange={(newValue) => onChange(newValue as TValue)}>
-          {!hideLabel ? label : null}
-        </LabeledSwitch>
+        <div>
+          <LabeledSwitch isSelected={value as boolean} onChange={(newValue) => onChange(newValue as TValue)}>
+            {!hideLabel ? label : null}
+          </LabeledSwitch>
+          {description && <Description className="whitespace-pre-wrap">{description}</Description>}
+        </div>
       );
   }
 
