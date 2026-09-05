@@ -7,3 +7,4 @@ test_python="${PYTHON:-python3}"
 pnpm exec vite build --config apps/plugins/wago/frontend/tests/harness/vite.config.mts
 # Deliberately exclude legacy command tests that require a real host login/API.
 "$test_python" -m unittest discover -s apps/plugins/wago/frontend/tests -p 'test_configuration_browser.py' -v "$@"
+"$test_python" -m unittest discover -s apps/plugins/wago/frontend/tests -p 'test_isolated_command_browser.py' -v "$@"

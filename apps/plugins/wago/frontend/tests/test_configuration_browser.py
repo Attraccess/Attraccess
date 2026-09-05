@@ -14,12 +14,13 @@ from isolated_browser_fixture import IsolatedWagoFixture, ORIGIN
 
 class ConfigurationBrowser(unittest.TestCase):
     viewport = {"width": 1440, "height": 1000}
+    fixture_class = IsolatedWagoFixture
 
     def setUp(self):
         ARTIFACTS.mkdir(parents=True, exist_ok=True)
         self.artifacts = ARTIFACTS / self.id().rsplit(".", 2)[-2] / self._testMethodName
         self.artifacts.mkdir(parents=True, exist_ok=True)
-        self.fixture = IsolatedWagoFixture()
+        self.fixture = self.fixture_class()
         self.runtime = sync_playwright().start()
         self.addCleanup(self.runtime.stop)
         try:
@@ -42,6 +43,9 @@ class ConfigurationBrowser(unittest.TestCase):
         self.errors = []
         self.page.on("pageerror", lambda error: self.errors.append(str(error)))
         self.addCleanup(self.save_evidence)
+        self.open_editor()
+
+    def open_editor(self):
         self.page.goto(ORIGIN)
         self.page.get_by_role("button", name="Configure", exact=True).click()
         self.dialog = self.page.get_by_role("dialog", name="Controller configuration")
@@ -254,6 +258,31 @@ class ConfigurationBrowser(unittest.TestCase):
         self.assertEqual(rollback["body"]["draftHash"], old_identity)
         self.assertNotEqual(old_identity, self.fixture.draft_identity())
 
+    def test_metadata_only_rename_review_and_rollback(self):
+        self.add_output()
+        self.save()
+        self.publish()
+        expect(self.dialog.get_by_role("region", name="Revision 1", exact=True)).to_be_visible()
+        original = deepcopy(self.fixture.revisions[0])
+        self.dialog.get_by_role("textbox", name=re.compile(r"^Channel name")).fill("Renamed light")
+        self.save()
+        self.button("Review saved draft").click()
+        changes = self.dialog.get_by_role("region", name="Editor metadata changes", exact=True)
+        expect(changes).to_contain_text("Before: Workshop light")
+        expect(changes).to_contain_text("After: Renamed light")
+        expect(self.button("Publish reviewed draft")).to_be_enabled()
+        self.assertEqual(self.fixture.changes(), [])
+        self.button("Publish reviewed draft").click()
+        expect(self.dialog.get_by_role("region", name="Revision 2", exact=True)).to_be_visible()
+        self.button("Preview rollback to revision 1").click()
+        expect(changes).to_contain_text("Before: Renamed light")
+        expect(changes).to_contain_text("After: Workshop light")
+        self.button("Publish rollback as new revision").click()
+        expect(self.dialog.get_by_role("region", name="Revision 3", exact=True)).to_be_visible()
+        expect(self.dialog.get_by_role("textbox", name=re.compile(r"^Channel name"))).to_have_value("Workshop light")
+        self.assertEqual(self.fixture.revisions[0]["snapshot"], original["snapshot"])
+        self.assertEqual(self.fixture.revisions[0]["presetProvenance"], original["presetProvenance"])
+
     def test_review_uses_user_facing_labels_without_json_paths(self):
         self.add_output()
         self.save()
@@ -318,6 +347,10 @@ class IsolationContract(unittest.TestCase):
         self.assertEqual(request("publish", {"reviewedHash": old_review})["status"], 409)
         self.assertEqual(fixture.revisions, [])
         self.assertEqual(request("publish", {"reviewedHash": fixture.draft["reviewedHash"]})["status"], 200)
+        unchanged = request("review", {})["json"]
+        self.assertEqual(unchanged["diff"], [])
+        self.assertEqual(unchanged["metadataDiff"], [])
+        self.assertFalse(unchanged["changed"])
 
     def test_non_fixture_requests_and_websockets_never_forward(self):
         fixture = IsolatedWagoFixture()

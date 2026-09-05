@@ -31,6 +31,10 @@ def configuration_diff(previous, current, path="$"):
              **({"current": current} if current is not None else {})}]
 
 
+def editor_metadata(record):
+    return json.loads(record["presetProvenance"])["editor"] if record and record.get("presetProvenance") else {"names": {}, "presets": []}
+
+
 class WagoFixture:
     def __init__(self, ports):
         self.origins = {ports[key]["url"] for key in ("api", "frontend", "preview")}
@@ -123,8 +127,11 @@ class WagoFixture:
         elif suffix == "review":
             assert self.draft, "Save is required before review"
             self.draft["reviewedHash"] = self.draft_identity()
+            diff = self.changes()
+            metadata_diff = configuration_diff(editor_metadata(self.revisions[0] if self.revisions else None), editor_metadata(self.draft))
             reply({"draft": self.draft, "previous": self.revisions[0] if self.revisions else None,
-                   "changed": True, "diff": self.changes(), "impacts": self.impacts(json.loads(self.draft["snapshot"]))})
+                   "changed": bool(diff or metadata_diff), "diff": diff, "metadataDiff": metadata_diff,
+                   "impacts": self.impacts(json.loads(self.draft["snapshot"]))})
         elif suffix == "publish":
             if not self.draft or not self.draft["reviewedHash"] or body.get("reviewedHash") != self.draft_identity() or self.draft["reviewedHash"] != self.draft_identity():
                 reply({"message": "draft changed since your review; review it again"}, 409)
@@ -137,8 +144,9 @@ class WagoFixture:
         elif suffix.startswith("revisions/") and suffix.endswith("/preview"):
             revision = next(r for r in self.revisions if r["revision"] == int(suffix.split("/")[1]))
             reply({"revision": revision, "current": self.revisions[0], "draftHash": self.draft_identity(),
-                   "diff": configuration_diff(json.loads(self.revisions[0]["snapshot"]), json.loads(revision["snapshot"])),
-                   "impacts": self.impacts(json.loads(revision["snapshot"]))})
+                    "diff": configuration_diff(json.loads(self.revisions[0]["snapshot"]), json.loads(revision["snapshot"])),
+                   "metadataDiff": configuration_diff(editor_metadata(self.revisions[0]), editor_metadata(revision)),
+                    "impacts": self.impacts(json.loads(revision["snapshot"]))})
         elif suffix.startswith("rollback/"):
             revision = next(r for r in self.revisions if r["revision"] == int(suffix.split("/")[1]))
             if body.get("draftHash") != self.draft_identity() or body.get("sourceHash") != revision["contentHash"] or body.get("currentHash") != self.revisions[0]["contentHash"]:

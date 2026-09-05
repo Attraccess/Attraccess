@@ -9,7 +9,8 @@ PYTHON=/opt/homebrew/opt/python@3.14/bin/python3.14 \
 
 Use any Python interpreter with Playwright and its Chromium browser installed.
 The wrapper builds the current production configuration editor into
-`output/playwright/att-1058/harness` and runs only `test_configuration_browser.py`.
+`output/playwright/att-1058/harness` and runs `test_configuration_browser.py`
+and `test_isolated_command_browser.py` explicitly.
 Pass `-k first_digital` to run just that scenario at both viewport sizes.
 No application source, dependency manifests, generated API clients, or database
 files are modified. Build output and browser evidence are not source files to commit.
@@ -40,7 +41,7 @@ this runner. Do not use broad `test_*browser.py` discovery for an isolated run.
 
 ## Coverage
 
-Nine browser scenarios run at 1440x1000 desktop and 390x844 touch/mobile:
+Ten configuration browser scenarios run at 1440x1000 desktop and 390x844 touch/mobile:
 
 1. First input/output setup, names, physical assignments, save and reload.
 2. Selected preset preview/copy and custom pulse duration without implicit save/publish.
@@ -51,14 +52,40 @@ Nine browser scenarios run at 1440x1000 desktop and 390x844 touch/mobile:
 7. Removing the first of two channels shows only the removed stable identity in review.
 8. A metadata-only draft change after rollback preview rejects confirmation without overwriting the draft.
 9. Embedded diagnostics refresh failure hides cached online status, recovers, and preserves unsaved edits without saving or publishing; the panel fits both viewports.
+10. Metadata-only renames appear in review and rollback preview; rollback restores the prior label without changing the hardware snapshot.
 
 Together with isolation, rollback-identity, and metadata-aware review contract tests,
-the runner executes 21 tests. Rollback requests must carry the previewed draft
+the configuration suite executes 23 tests. Rollback requests must carry the previewed draft
 identity; review identities include metadata and remain separate from content hashes. All editor
 interactions use browser clicks, typed fields, and checkboxes, not React state
 manipulation. Screenshots are evidence, not pixel-diff baselines. Fixture validation,
 publication and persistence do not establish backend validation, server durability,
 real controller acceptance, physical readiness, or host integration correctness.
+
+## Isolated Command Forms
+
+Two command scenarios run at both viewport sizes (4 more tests; **27 total**):
+
+1. Labelled controller/channel/operation choices, absence of input-only choices,
+   Pulse invalidation when switching to a set-only output, read-only revision,
+   initialized `false` saved intact, and saved values retained on reopening.
+2. An explicitly held schema response blocks Save; a simulated 503 keeps Save
+   blocked; Retry recovers, preserves selection and removes obsolete timeout data.
+
+The command harness uses the actual host `NodeEditor`, `PropertyInput`,
+`schema-values`, `Select`, `StandardDrawer`, and React Flow node context.
+The harness replaces only the host flow provider with an in-memory save callback,
+billing configuration with static data, and unused MQTT/companion/currency
+dependencies with throwing stubs. Production API URL resolution is unchanged.
+Schema requests for the fixture resource are intercepted and fulfilled by
+`CommandFixture`; backend schema generation/compatibility filtering is not tested.
+No flow is persisted or dispatched. The legacy command suite is untouched.
+
+The Vite boundary plugin applies only in this test build. The harness imports no
+real host login or host provider, and does not initialize backend services.
+Command tests share the same fail-closed router, request audit, blocked DNS,
+WebSockets/service workers, screenshot and trace assertions as configuration tests.
+`schema-failure.png` additionally captures the failed-schema state.
 
 ## Evidence
 

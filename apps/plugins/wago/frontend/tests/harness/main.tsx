@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '@heroui/styles/css';
 import '../../src/styles.css';
 import { ConfigurationEditor } from '../../src/ConfigurationEditor';
+import { CommandHarness } from './command';
+import './command.css';
 
 const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
 
@@ -19,4 +21,6 @@ function Harness() {
   );
 }
 
-createRoot(document.getElementById('root')!).render(<Harness />);
+createRoot(document.getElementById('root')!).render(
+  window.location.search === '?command' ? <CommandHarness /> : <Harness />,
+);

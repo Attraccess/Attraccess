@@ -6,7 +6,23 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   root: fileURLToPath(new URL('.', import.meta.url)),
   envDir: false,
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    {
+      name: 'command-fixture-host-boundaries',
+      enforce: 'pre',
+      resolveId(source, importer) {
+        if (!importer?.includes('/apps/frontend/src/')) return;
+        if (source === '../../flowContext') return fileURLToPath(new URL('./command-context.tsx', import.meta.url));
+        if (
+          ['@attraccess/react-query-client', '@attraccess/shared'].includes(source) ||
+          /\/(mqttServerSelect|companionDeviceSelect|CreateMqttServerPage)$/.test(source)
+        )
+          return fileURLToPath(new URL('./command-peripherals.ts', import.meta.url));
+      },
+    },
+    react(),
+    tailwindcss(),
+  ],
   resolve: {
     alias: {
       '@attraccess/plugins-frontend-sdk': fileURLToPath(

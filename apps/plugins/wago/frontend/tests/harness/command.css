@@ -1,0 +1,3 @@
+@import 'tailwindcss';
+@source '../../../../../frontend/src/app/resources/details/flows/node/editor';
+@source '../../../../../frontend/src/components/standardDrawer.tsx';

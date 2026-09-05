@@ -451,6 +451,66 @@ describe('WagoService', () => {
     expect(controllerRepository.save).toHaveBeenCalledWith(expect.objectContaining({ lastSequence: 4 }));
   });
 
+  it.each([
+    { elapsed: 31_000, runtimeVersion: '1.0.0', reason: 'the persistence checkpoint expires' },
+    { elapsed: 11_000, runtimeVersion: '0.9.0', reason: 'the rejected packet changes metadata' },
+  ])('does not persist a rejected legacy heartbeat when $reason', async ({ elapsed, runtimeVersion }) => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-05T12:00:00Z'));
+    try {
+      let stored = { ...controller(), trustState: 'claimed' as const };
+      const { service, controllerRepository } = createService([stored]);
+      controllerRepository.findOneBy.mockImplementation(async () => ({ ...stored }));
+      controllerRepository.save.mockImplementation(async (value) => {
+        stored = { ...value };
+        return value;
+      });
+      const onHeartbeat = (
+        Reflect.get(service, 'onHeartbeat') as (hardwareId: string, payload: Buffer) => Promise<void>
+      ).bind(service);
+      const send = (sequence: number, version = '1.0.0') =>
+        onHeartbeat(
+          stored.hardwareId,
+          Buffer.from(
+            JSON.stringify({
+              hardwareId: stored.hardwareId,
+              pairingCode: '482931',
+              protocolVersion: '1.0.0',
+              runtimeVersion: version,
+              capabilities: ['claim', 'heartbeat', 'configuration-v1'],
+              sequence,
+            }),
+          ),
+        );
+
+      await send(100);
+      const checkpoint = { ...stored };
+      jest.advanceTimersByTime(10_000);
+      await send(200);
+      expect(controllerRepository.save).toHaveBeenCalledTimes(1);
+      jest.advanceTimersByTime(elapsed - 10_000);
+      await send(150, runtimeVersion);
+
+      expect(controllerRepository.save).toHaveBeenCalledTimes(1);
+      expect(stored).toEqual(checkpoint);
+      expect(service.diagnostics.read(stored.id)).toMatchObject({
+        heartbeatAt: '2026-09-05T12:00:10.000Z',
+        legacyHeartbeatSequence: 200,
+      });
+
+      jest.advanceTimersByTime(32_000 - elapsed);
+      await send(201);
+      expect(controllerRepository.save).toHaveBeenCalledTimes(2);
+      expect(stored).toMatchObject({
+        lastHeartbeatAt: '2026-09-05T12:00:32.000Z',
+        lastSeenAt: '2026-09-05T12:00:32.000Z',
+        lastSequence: 201,
+        runtimeVersion: '1.0.0',
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('persists a valid canonical heartbeat when the bounded diagnostics cache is full', async () => {
     const claimed = { ...controller(), id: 257, trustState: 'claimed' as const };
     const { service, controllerRepository } = createService([claimed]);
