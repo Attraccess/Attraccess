@@ -35,6 +35,8 @@ type Dependencies = {
   claimedController: (id: number) => Promise<WagoController>;
   getSettings: () => Promise<{ operationalPrefix: string }>;
   appliedRevision: (controllerId: number) => Promise<WagoConfigurationRevision | null>;
+  onCommand?: (controllerId: number, channelId: string, id: string) => void;
+  onCommandFailure?: (id: string, status: 'dispatch-failed' | 'timeout') => void;
 };
 
 export class WagoCommandHandler {
@@ -188,6 +190,7 @@ export class WagoCommandHandler {
       throw new WagoCommandError(`WAGO controller ${controllerId} has no MQTT server`, 'transport-dispatch');
     const settings = await this.dependencies.getSettings();
     const id = randomUUID();
+    this.dependencies.onCommand?.(controllerId, channelId, id);
     const command = JSON.stringify({
       id,
       expiresAt: new Date(Date.now() + acknowledgementTimeoutSeconds * 1000).toISOString(),
@@ -208,6 +211,7 @@ export class WagoCommandHandler {
         { qos: 1, retain: false },
       );
     } catch (error) {
+      this.dependencies.onCommandFailure?.(id, 'dispatch-failed');
       const dispatchError = new WagoCommandError(
         `Failed to publish WAGO command: ${String(error)}`,
         'transport-dispatch',
@@ -369,6 +373,8 @@ export class WagoCommandHandler {
     pending.resolve();
   }
   private reject(id: string, error: Error): void {
+    if (error instanceof WagoCommandError && error.kind === 'acknowledgement-timeout')
+      this.dependencies.onCommandFailure?.(id, 'timeout');
     const pending = this.pending.get(id);
     if (!pending) return;
     this.pending.delete(id);
