@@ -20,7 +20,7 @@ describe('diagnostic references', () => {
     );
     expect(refs.map((ref) => ref.conflict)).toEqual([true, true, false, false]);
     expect(refs.map((ref) => ref.invalid)).toEqual([true, true, false, true]);
-    expect(refs[3]).toMatchObject({ nodeId: 'd', href: '/resources/4/flows' });
+    expect(refs[3]).toMatchObject({ nodeId: 'd', href: '/resources/4/flows?node=d' });
   });
   it('does not conflict for read/event references or control on the same resource', () => {
     const refs = diagnosticReferences([node('a', 1), node('b', 1), node('c', 2, 'read')], ['relay'], 2);
@@ -28,6 +28,14 @@ describe('diagnostic references', () => {
   });
   it('marks control references invalid when output capability was removed', () => {
     expect(diagnosticReferences([node('a', 1)], ['relay'], 2, { relay: ['input'] })[0].invalid).toBe(true);
+  });
+  it('encodes node IDs as a single query parameter', () => {
+    const id = 'node /?#&+%';
+    const [reference] = diagnosticReferences([node(id, 1)], ['relay'], 2);
+    const url = new URL(reference.href, 'https://example.test');
+    expect(url.pathname).toBe('/resources/1/flows');
+    expect(url.searchParams.get('node')).toBe(id);
+    expect([...url.searchParams]).toHaveLength(1);
   });
 });
 
