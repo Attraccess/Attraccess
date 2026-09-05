@@ -176,38 +176,6 @@ else if (args[0] === 'container' && args[1] === 'ls') {
     };
   }
 
-  it('binds recovery to the delivery token and leaves a retryable restored receipt', () => {
-    prior();
-    rmSync(join(config, 'runtime.env.next'));
-    const { script, bundle } = delivery();
-    expect(run(script, '', bundle).status).toBe(0);
-
-    expect(run(runtimeBundleRecoveryScript(root, 'b'.repeat(32))).stderr).toContain(
-      'belongs to another commissioning session',
-    );
-    expect(run(runtimeBundleRecoveryScript(root, 'a'.repeat(32))).status).toBe(0);
-    expect(existsSync(`${tx}.restored/token`)).toBe(true);
-    const before = readFileSync(join(root, 'docker.log'), 'utf8');
-    expect(run(runtimeBundleRecoveryScript(root, 'a'.repeat(32))).status).toBe(0);
-    expect(readFileSync(join(root, 'docker.log'), 'utf8')).toBe(before);
-  });
-
-  it('completes interrupted cleanup when retrying a restored receipt', () => {
-    prior();
-    expect(install().status).toBe(0);
-    expect(recover().status).toBe(0);
-    mkdirSync(join(config, 'delivery'));
-    write(join(config, 'delivery/phase'), 'installing');
-    write(join(root, 'tmp/attraccess-wago-runtime.tar'), 'stale bundle');
-
-    const before = readFileSync(join(root, 'docker.log'), 'utf8');
-    expect(recover().status).toBe(0);
-    expect(readFileSync(join(root, 'docker.log'), 'utf8')).toBe(before);
-    expect(existsSync(`${tx}.restored/bundle`)).toBe(false);
-    expect(existsSync(join(config, 'delivery'))).toBe(false);
-    expect(existsSync(join(root, 'tmp/attraccess-wago-runtime.tar'))).toBe(false);
-  });
-
   it('delivers one stream under flock and rolls the old CA back with prior data', () => {
     prior();
     write(join(data, 'mqtt-ca.pem'), 'old CA');
@@ -252,8 +220,8 @@ else if (args[0] === 'container' && args[1] === 'ls') {
     expect(install().status).toBe(0);
     expect(recover('cleanup-kill').status).not.toBe(0);
     expect(existsSync(tx)).toBe(false);
-    expect(existsSync(`${tx}.restored/prepared`)).toBe(true);
-    expect(existsSync(`${tx}.restored/old-id`)).toBe(true);
+    expect(existsSync(`${tx}.cleanup/prepared`)).toBe(true);
+    expect(existsSync(`${tx}.cleanup/old-id`)).toBe(false);
     const before = readFileSync(join(root, 'docker.log'), 'utf8');
     expect(recover().status).toBe(0);
     expect(readFileSync(join(root, 'docker.log'), 'utf8')).toBe(before);

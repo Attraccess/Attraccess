@@ -52,7 +52,7 @@ The session remains **Verification required**. The UI separately checks a fresh 
 
 ### Verify configuration readiness
 
-The no-code configuration journey is owned by ATT-1058. Until that integrated UI is available, the following API checks are developer diagnostics only, not an acceptable substitute for the supported operator journey. These endpoints require the `resources.update` permission:
+The no-code configuration journey is owned by ATT-1058. Until that integrated UI is available, the following API checks are developer diagnostics only, not an acceptable substitute for the supported operator journey. These endpoints require the `system.settings.manage` permission:
 
 1. Save the complete Desired Configuration to `POST /api/wago/controllers/:id/configuration/draft` with `{ "snapshot": { ... } }`. A draft saved through the UI is also valid input to the following steps.
 2. Validate it with `POST /api/wago/controllers/:id/configuration/validate`. Stop and correct every returned validation error.
