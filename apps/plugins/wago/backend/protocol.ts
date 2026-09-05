@@ -1,3 +1,5 @@
+import { parseMeasurement, type Measurement } from '../measurement-contract';
+
 export const DISCOVERY_ROOT = 'attraccess/wago/discovery';
 export const CONFIGURATION_PROTOCOL_VERSION = 1;
 export const CONFIGURATION_CAPABILITY = `configuration-v${CONFIGURATION_PROTOCOL_VERSION}`;
@@ -80,6 +82,140 @@ export function configurationReportedWildcardTopic(prefix: string): string {
   return configurationReportedTopic(prefix, '+');
 }
 
+type WagoOperationalMessageBase = {
+  timestamp: string;
+  streamId: string;
+  sequence: number;
+};
+
+export type WagoStateMessage = WagoOperationalMessageBase & {
+  category: 'state';
+  connected: boolean;
+  revision: number | null;
+  contentHash: string | null;
+  outputs: Record<string, boolean>;
+  inputs?: Record<string, boolean>;
+};
+
+export type WagoMeasurementMessage = WagoOperationalMessageBase &
+  Measurement & {
+    category: 'measurement';
+  };
+
+export type WagoFaultMessage = WagoOperationalMessageBase & {
+  category: 'fault';
+  channelId: string;
+  code: string;
+  message: string;
+};
+
+export type WagoAcknowledgementMessage = WagoOperationalMessageBase & {
+  category: 'acknowledgement';
+  id: string;
+  status: 'accepted' | 'duplicate' | 'rejected';
+  error?: string;
+};
+
+export type WagoOperationalMessage =
+  WagoStateMessage | WagoMeasurementMessage | WagoFaultMessage | WagoAcknowledgementMessage;
+
+export function operationalWildcardTopic(prefix: string): string {
+  return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/+/#`;
+}
+
+export function parseOperationalMessage(
+  prefix: string,
+  topic: string,
+  payload: Buffer,
+): { hardwareId: string; message: WagoOperationalMessage } | null {
+  const root = `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/`;
+  if (!topic.startsWith(root)) return null;
+  const [hardwareId, suffix, extra] = topic.slice(root.length).split('/');
+  if (
+    !hardwareId ||
+    /[+#]/.test(hardwareId) ||
+    extra !== undefined ||
+    !['state', 'measurements', 'faults', 'acknowledgements'].includes(suffix)
+  )
+    return null;
+  const value = parseObject(payload, 'operational message');
+  const timestamp = requiredTimestamp(value.timestamp);
+  const sequence = requiredSequence(value.sequence);
+  if (typeof value.streamId !== 'string' || !value.streamId.trim() || value.streamId.length > 128)
+    throw new Error('operational streamId is invalid');
+  const streamId = value.streamId;
+  if (suffix === 'state') {
+    if (
+      typeof value.connected !== 'boolean' ||
+      !isNullableInteger(value.revision) ||
+      !isNullableString(value.contentHash) ||
+      !isBooleanRecord(value.outputs) ||
+      (value.inputs !== undefined && !isBooleanRecord(value.inputs))
+    )
+      throw new Error('invalid state message');
+    return {
+      hardwareId,
+      message: {
+        category: 'state',
+        timestamp,
+        streamId,
+        sequence,
+        connected: value.connected,
+        revision: value.revision as number | null,
+        contentHash: value.contentHash as string | null,
+        outputs: value.outputs as Record<string, boolean>,
+        ...(value.inputs !== undefined ? { inputs: value.inputs as Record<string, boolean> } : {}),
+      },
+    };
+  }
+  if (suffix === 'measurements') {
+    return {
+      hardwareId,
+      message: {
+        category: 'measurement',
+        timestamp,
+        streamId,
+        sequence,
+        ...parseMeasurement(value),
+      },
+    };
+  }
+  if (suffix === 'faults') {
+    if (typeof value.channelId !== 'string' || typeof value.code !== 'string' || typeof value.message !== 'string')
+      throw new Error('invalid fault message');
+    return {
+      hardwareId,
+      message: {
+        category: 'fault',
+        timestamp,
+        streamId,
+        sequence,
+        channelId: value.channelId,
+        code: value.code,
+        message: value.message,
+      },
+    };
+  }
+  if (
+    typeof value.id !== 'string' ||
+    !['accepted', 'duplicate', 'rejected'].includes(value.status as string) ||
+    (value.error !== undefined && typeof value.error !== 'string')
+  )
+    throw new Error('invalid acknowledgement message');
+  return {
+    hardwareId,
+    message: {
+      category: 'acknowledgement',
+      timestamp,
+      streamId,
+      sequence,
+      id: value.id,
+      status: value.status as 'accepted' | 'duplicate' | 'rejected',
+      error: value.error as string | undefined,
+    },
+  };
+}
+
 export function configurationReportedHardwareId(prefix: string, topic: string): string | null {
   const topicPrefix = `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/`;
   const topicSuffix = '/configuration/reported';
@@ -98,4 +234,43 @@ export function normalizeOperationalPrefix(prefix: string): string {
   if (!normalized || normalized.split('/').some((segment) => !segment || /[+#]/.test(segment)))
     throw new Error('MQTT prefix must contain non-empty segments without wildcards');
   return normalized;
+}
+
+function parseObject(payload: Buffer, label: string): Record<string, unknown> {
+  let value: unknown;
+  try {
+    value = JSON.parse(payload.toString('utf8'));
+  } catch {
+    throw new Error(`${label} is not valid JSON`);
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
+  return value as Record<string, unknown>;
+}
+function requiredTimestamp(value: unknown): string {
+  if (
+    typeof value !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) ||
+    Number.isNaN(Date.parse(value)) ||
+    new Date(value).toISOString() !== value
+  )
+    throw new Error('operational timestamp is invalid');
+  return value;
+}
+function requiredSequence(value: unknown): number {
+  if (!Number.isSafeInteger(value) || (value as number) < 1) throw new Error('operational sequence is invalid');
+  return value as number;
+}
+function isNullableInteger(value: unknown): boolean {
+  return value === null || (Number.isSafeInteger(value) && (value as number) >= 0);
+}
+function isNullableString(value: unknown): boolean {
+  return value === null || typeof value === 'string';
+}
+function isBooleanRecord(value: unknown): boolean {
+  return (
+    Boolean(value) &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.values(value).every((item) => typeof item === 'boolean')
+  );
 }

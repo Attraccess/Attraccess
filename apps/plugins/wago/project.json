@@ -7,7 +7,7 @@
   "targets": {
     "lint": {
       "executor": "nx:run-commands",
-      "options": { "cwd": "apps/plugins/wago", "command": "eslint backend frontend/src" }
+      "options": { "cwd": "apps/plugins/wago", "command": "eslint backend frontend/src measurement-contract.ts" }
     },
     "test": {
       "executor": "@nx/jest:jest",
@@ -16,7 +16,7 @@
     "build-backend": {
       "executor": "nx:run-commands",
       "cache": true,
-        "inputs": ["{projectRoot}/backend/**/*", "{projectRoot}/cc100-runtime/signing-public-key.pub", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
+        "inputs": ["{projectRoot}/backend/**/*", "{projectRoot}/measurement-contract.ts", "{projectRoot}/cc100-runtime/signing-public-key.pub", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/wago",
