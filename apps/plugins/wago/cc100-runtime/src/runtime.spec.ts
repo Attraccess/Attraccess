@@ -87,7 +87,9 @@ describe('WagoRuntime', () => {
     });
     await expect(
       runtime.receiveDiscoveryClaim(
-        Buffer.from('{"username":"controller","password":"secret","configuration":{"namespace":"customer/wago"},"acknowledgementToken":"claim-token"}'),
+        Buffer.from(
+          '{"username":"controller","password":"secret","configuration":{"namespace":"customer/wago"},"acknowledgementToken":"claim-token"}',
+        ),
       ),
     ).resolves.toEqual({ username: 'controller', password: 'secret', prefix: 'customer/wago' });
     expect(transport.published).toContainEqual({
@@ -144,79 +146,143 @@ describe('WagoRuntime', () => {
     const metered: Snapshot = {
       version: 1,
       physicalPoints: [{ id: 'meter', hardwareProfile: '751-9301', channel: 0 }],
-      logicalChannels: [{
-        id: 'import-energy',
-        physicalPointId: 'meter',
-        profile: 'meter',
-        capabilities: ['measurement'],
-        disconnectPolicy: { mode: 'hold' },
-        measurement: { unit: 'watt-hour', scale: 1, offset: 0, kind: 'cumulative' },
-      }],
+      logicalChannels: [
+        {
+          id: 'import-energy',
+          physicalPointId: 'meter',
+          profile: 'meter',
+          capabilities: ['measurement'],
+          disconnectPolicy: { mode: 'hold' },
+          measurement: { unit: 'watt-hour', scale: 1, offset: 0, kind: 'cumulative' },
+        },
+      ],
     };
     device.values.set('751-9301:0', 1234);
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(metered), snapshot: metered });
     await runtime.publishMeasurements();
 
-    expect(transport.published).toContainEqual(expect.objectContaining({
-      topic: 'attraccess/wago/v1/controllers/cc100-1/measurements',
-      payload: expect.objectContaining({ channelId: 'import-energy', value: 1234, unit: 'watt-hour', kind: 'cumulative', sequence: 1, sourceTimestamp: expect.any(String), streamId: expect.any(String) }),
-    }));
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/measurements',
+        payload: expect.objectContaining({
+          channelId: 'import-energy',
+          value: 1234000,
+          unit: 'milliwatt-hour',
+          kind: 'cumulative',
+          sequence: 1,
+          timestamp: expect.any(String),
+          streamId: expect.any(String),
+        }),
+      }),
+    );
   });
 
   it('rounds scaled float measurements within floating-point precision', async () => {
     const metered: Snapshot = {
       version: 1,
       physicalPoints: [{ id: 'meter', hardwareProfile: '751-9301', channel: 0 }],
-      logicalChannels: [{ id: 'power', physicalPointId: 'meter', profile: 'meter', capabilities: ['measurement'], disconnectPolicy: { mode: 'hold' }, measurement: { unit: 'watt', scale: 1000, offset: 0 } }],
+      logicalChannels: [
+        {
+          id: 'power',
+          physicalPointId: 'meter',
+          profile: 'meter',
+          capabilities: ['measurement'],
+          disconnectPolicy: { mode: 'hold' },
+          measurement: { unit: 'watt', scale: 1000, offset: 0 },
+        },
+      ],
     };
     device.values.set('751-9301:0', 1.001);
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(metered), snapshot: metered });
     await runtime.publishMeasurements();
 
-    expect(transport.published).toContainEqual(expect.objectContaining({
-      topic: 'attraccess/wago/v1/controllers/cc100-1/measurements',
-      payload: expect.objectContaining({ channelId: 'power', value: 1001 }),
-    }));
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/measurements',
+        payload: expect.objectContaining({ channelId: 'power', value: 1001000, unit: 'milliwatt' }),
+      }),
+    );
   });
 
   it('rejects large fractional measurements', async () => {
     const metered: Snapshot = {
       version: 1,
       physicalPoints: [{ id: 'meter', hardwareProfile: '751-9301', channel: 0 }],
-      logicalChannels: [{ id: 'power', physicalPointId: 'meter', profile: 'meter', capabilities: ['measurement'], disconnectPolicy: { mode: 'hold' }, measurement: { unit: 'watt', scale: 1, offset: 0 } }],
+      logicalChannels: [
+        {
+          id: 'power',
+          physicalPointId: 'meter',
+          profile: 'meter',
+          capabilities: ['measurement'],
+          disconnectPolicy: { mode: 'hold' },
+          measurement: { unit: 'watt', scale: 1, offset: 0 },
+        },
+      ],
     };
     device.values.set('751-9301:0', 1_000_000_000_000_000.25);
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(metered), snapshot: metered });
     await runtime.publishMeasurements();
 
-    expect(transport.published).toContainEqual(expect.objectContaining({
-      topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
-      payload: expect.objectContaining({ channelId: 'power', code: 'invalid_measurement_transform' }),
-    }));
-    expect(transport.published).not.toContainEqual(expect.objectContaining({
-      topic: 'attraccess/wago/v1/controllers/cc100-1/measurements',
-    }));
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+        payload: expect.objectContaining({ channelId: 'power', code: 'invalid_measurement_transform' }),
+      }),
+    );
+    expect(transport.published).not.toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/measurements',
+      }),
+    );
   });
 
   it('uses a new measurement stream identity after a runtime restart', async () => {
     const metered: Snapshot = {
       version: 1,
       physicalPoints: [{ id: 'meter', hardwareProfile: '751-9301', channel: 0 }],
-      logicalChannels: [{ id: 'power', physicalPointId: 'meter', profile: 'meter', capabilities: ['measurement'], disconnectPolicy: { mode: 'hold' }, measurement: { unit: 'watt', scale: 1, offset: 0 } }],
+      logicalChannels: [
+        {
+          id: 'power',
+          physicalPointId: 'meter',
+          profile: 'meter',
+          capabilities: ['measurement'],
+          disconnectPolicy: { mode: 'hold' },
+          measurement: { unit: 'watt', scale: 1, offset: 0 },
+        },
+      ],
     };
     const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
     const firstTransport = new TestTransport();
-    const firstRuntime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport: firstTransport, device });
+    const firstRuntime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      pairingCode: '482931',
+      prefix: 'attraccess/wago',
+      store,
+      transport: firstTransport,
+      device,
+    });
     device.values.set('751-9301:0', 1);
     await firstRuntime.start();
-    await firstTransport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(metered), snapshot: metered });
+    await firstTransport.send(desired, {
+      protocolVersion: 1,
+      revision: 1,
+      contentHash: hash(metered),
+      snapshot: metered,
+    });
     await firstRuntime.publishMeasurements();
     const firstEvent = firstTransport.published.find((event) => event.topic.endsWith('/measurements'));
     if (!firstEvent) throw new Error('first runtime did not publish a measurement');
     const firstMeasurement = firstEvent.payload as { sequence: number; streamId: string };
 
     const restartedTransport = new TestTransport();
-    const restartedRuntime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport: restartedTransport, device });
+    const restartedRuntime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      pairingCode: '482931',
+      prefix: 'attraccess/wago',
+      store,
+      transport: restartedTransport,
+      device,
+    });
     await restartedRuntime.start();
     await restartedRuntime.publishMeasurements();
     const restartedEvent = restartedTransport.published.find((event) => event.topic.endsWith('/measurements'));
@@ -380,7 +446,7 @@ describe('WagoRuntime', () => {
     expect(transport.published).toContainEqual(
       expect.objectContaining({
         topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: { id: 'command-1', status: 'accepted', error: undefined },
+        payload: expect.objectContaining({ id: 'command-1', status: 'accepted', error: undefined }),
       }),
     );
   });
@@ -488,13 +554,13 @@ describe('WagoRuntime', () => {
     expect(transport.published).toContainEqual(
       expect.objectContaining({
         topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: { id: 'command-1', status: 'accepted', error: undefined },
+        payload: expect.objectContaining({ id: 'command-1', status: 'accepted', error: undefined }),
       }),
     );
     expect(transport.published).toContainEqual(
       expect.objectContaining({
         topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: { id: 'command-2', status: 'rejected', error: 'device write failed' },
+        payload: expect.objectContaining({ id: 'command-2', status: 'rejected', error: 'device write failed' }),
       }),
     );
     expect(writes).toEqual([true, false, false]);
@@ -613,7 +679,7 @@ describe('WagoRuntime', () => {
     expect(transport.published).toContainEqual(
       expect.objectContaining({
         topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: { id: 'command-1', status: 'duplicate', error: undefined },
+        payload: expect.objectContaining({ id: 'command-1', status: 'duplicate', error: undefined }),
       }),
     );
     expect(transport.published).toContainEqual(
@@ -1094,11 +1160,11 @@ describe('WagoRuntime', () => {
     expect(transport.published).toContainEqual(
       expect.objectContaining({
         topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: {
+        payload: expect.objectContaining({
           id: `command-${MAX_PENDING_CHANNEL_WRITES}`,
           status: 'rejected',
           error: 'channel write queue is full',
-        },
+        }),
       }),
     );
 

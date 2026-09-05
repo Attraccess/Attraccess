@@ -67,23 +67,21 @@ be represented are rejected. Write echoes are checked for address, value/count,
 function, unit, and transaction/CRC. No failed write is automatically replayed.
 Other functions and arbitrary numeric runtime commands are not supported.
 
-The ATT-979 correction owns MQTT encoding (safe integer milliampere, millivolt,
-milliwatt, milliwatt-hour, millipercent; source timestamp; per-boot UUID stream;
-per-category sequences). This branch starts from PR1796's older integer-base-unit
-encoder. **Merge the corrected ATT-979 branch before release**: fractional
-engineering values will otherwise be rejected by that older encoder. This module
-returns engineering values and does not multiply by 1000 itself.
+The merged ATT-979 correction (`73995720`, PR1796) supplies MQTT encoding: safe
+integer milliampere, millivolt, milliwatt, milliwatt-hour and millipercent values,
+with exact safe whole-unit fallback only on milli-range overflow. Persisted
+configuration transforms stay in physical units. This module returns engineering
+values and does not multiply by 1000 itself.
 
-The reviewed ATT-979 correction is `73995720` on PR1796. Fleet lead performs the
-merge; do not copy or edit its encoder from this dirty worktree. The Modbus hook
-is `acquireMeasurements(snapshot, device)`: each yielded result contains all
-bound `channels`, either `raw` and an ISO `timestamp` captured immediately after
-the read completes, or the original `error`. Keep the sweep/fanout when resolving
-the runtime merge, call `encodeMeasurement(channel.id, raw, transform)`, then
+`acquireMeasurements(snapshot, device)` yields all bound `channels` with either
+`raw` and an ISO `timestamp` captured immediately after the read completes, or
+the original `error`. The runtime preserves this acquisition/fanout hook, calls
+`encodeMeasurement(channel.id, raw, transform)`, then publishes through
 `publishOperational('measurements', measurement, undefined, timestamp)`.
-Use `measurementErrorCode(error)` when publishing faults: it preserves both
-`MeasurementContractError.code` and transport codes such as `modbus_rtu_quarantined`.
-Do not replace the acquisition timestamp with publication time.
+The category envelope supplies a per-boot UUID stream and separate sequences for
+state, measurements, faults and acknowledgements. `measurementErrorCode(error)`
+preserves both `MeasurementContractError.code` and transport codes such as
+`modbus_rtu_quarantined`. Publication delays do not change the acquisition timestamp.
 
 Polling intervals are best-effort minimum intervals (100–3600000 ms), checked by
 the runtime's 100 ms scheduler. Onboard reads retain a 5 s minimum. Only one
@@ -165,10 +163,15 @@ for 879-1300. Big byte/word order is an **unverified assumption**, not a confirm
 manual fact. Built-ins are version 1, frozen, read-only, explicitly labelled
 UNQUALIFIED / map unverified, and have no outputs or rollover assumption.
 
-Before release: merge and test corrected ATT-979 encoding, mount/visually verify
-forms with ATT-1058, independently verify manuals and byte/word order, run TCP
-fixtures in a socket-enabled environment, and qualify RTU/TCP on actual hardware
+Before release: mount/visually verify forms with ATT-1058, independently verify
+manuals and byte/word order, and qualify RTU/TCP on actual hardware
 with a complete backup. No hardware operation or hardware proof was performed.
+
+Fleet reported socket-enabled validation of `df46d31f` passing 90 runtime/Modbus
+tests (including the real TCP fixtures), 89 backend tests, and 106 generator-hook
+tests. These are software/fixture results, not hardware qualification or proof
+of RTU reconnect. Focused post-merge tests also cover the corrected encoding,
+acquisition timestamps, category envelopes and typed faults.
 
 Tests: `backend/modbus-configuration.spec.ts` validates persisted models/bindings;
 `cc100-runtime/src/modbus/modbus.spec.ts` contains actual loopback TCP fixtures,

@@ -263,6 +263,7 @@ describe('ATT-1059 independent review regressions', () => {
   });
   it('acquires one shared source once and publishes all bound channels with the original read timestamp', async () => {
     const s = snapshot();
+    s.modbus.profiles[0].measurements[0].scale = 0.05;
     s.physicalPoints.push({ ...s.physicalPoints[0], id: 'alias' });
     s.logicalChannels.push({ ...s.logicalChannels[0], id: 'energy-2', physicalPointId: 'alias' });
     const request = jest.fn(async () => Buffer.from([0, 10]));
@@ -273,9 +274,21 @@ describe('ATT-1059 independent review regressions', () => {
     const events = published.filter((p) => p.topic.endsWith('/measurements'));
     expect(events.map((p) => p.payload.channelId)).toEqual(['energy-1', 'energy-2']);
     expect(request).toHaveBeenCalledTimes(1);
-    expect(events[0].payload.sourceTimestamp ?? events[0].payload.timestamp).toEqual(
-      events[1].payload.sourceTimestamp ?? events[1].payload.timestamp,
-    );
+    expect(events.map((p) => p.payload.sequence)).toEqual([1, 2]);
+    for (const { payload } of events) {
+      expect(payload).toEqual(
+        expect.objectContaining({
+          unit: 'milliwatt-hour',
+          value: 500,
+          kind: 'cumulative',
+          timestamp: expect.any(String),
+          streamId: expect.any(String),
+        }),
+      );
+      expect(payload).not.toHaveProperty('sourceTimestamp');
+    }
+    expect(events[0].payload.timestamp).toEqual(events[1].payload.timestamp);
+    expect(events[0].payload.streamId).toEqual(published.find((p) => p.topic.endsWith('/state'))?.payload.streamId);
     await runtime.publishMeasurements();
     expect(request).toHaveBeenCalledTimes(1);
   });

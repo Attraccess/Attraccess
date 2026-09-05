@@ -28,6 +28,29 @@ function configuration(): ModbusConfiguration {
   };
 }
 describe('Modbus persisted configuration', () => {
+  it.each([null, {}, ['/dev/serial'], ['/dev/../tmp/device'], 42, true])('rejects non-string RTU path %p', (path) => {
+    const config = configuration();
+    expect(
+      validateModbus({
+        ...config,
+        connections: [
+          {
+            id: 'bus',
+            transport: 'rtu',
+            path,
+            baudRate: 19200,
+            parity: 'even',
+            stopBits: 1,
+            timeoutMs: 1000,
+            reconnectMs: 250,
+            queueLimit: 16,
+          },
+        ],
+      }),
+    ).toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: 'modbus.connections[0]', code: 'invalid_modbus' })]),
+    );
+  });
   it.each([
     null,
     {},

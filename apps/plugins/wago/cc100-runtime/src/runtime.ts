@@ -5,6 +5,9 @@ import { acquireMeasurements, measurementErrorCode } from './modbus/acquisition'
 // Shared pure configuration model is bundled into the standalone runtime.
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import { type ModbusConfiguration, type ModbusPoint, validateModbus, validateModbusBindings } from '../../modbus/model';
+// The standalone runtime bundles the same plugin-owned wire schema as its consumer.
+// eslint-disable-next-line @nx/enforce-module-boundaries
+import { encodeMeasurement } from '../../measurement-contract';
 
 export const PROTOCOL_VERSION = 1;
 export const MAX_PENDING_CHANNEL_WRITES = 100;
@@ -119,9 +122,9 @@ export class WagoRuntime {
   private configurationGeneration = 0;
   private configurationPending = false;
   private readonly inFlightCommandIds = new Set<string>();
-  private measurementSequence = 0;
   private measurementsPending = false;
-  private readonly measurementStreamId = randomUUID();
+  private readonly streamId = randomUUID();
+  private readonly sequences = { state: 0, measurements: 0, faults: 0, acknowledgements: 0 };
 
   constructor(
     private readonly options: {
@@ -384,29 +387,11 @@ export class WagoRuntime {
           try {
             if (reading.ok === false) throw reading.error;
             const { raw, timestamp } = reading;
-            if (typeof raw !== 'number') continue;
             const transform = channel.measurement ?? { unit: 'percent', scale: 1, offset: 0 };
-            const scaledValue = raw * transform.scale + transform.offset;
-            const value = Math.round(scaledValue);
-            if (!Number.isSafeInteger(value) || Math.abs(scaledValue - value) > 1e-9) {
-              await this.options.transport.publish(this.topic('faults'), {
-                channelId: channel.id,
-                code: 'invalid_measurement_transform',
-                message: 'measurement transforms must produce an integer base-unit value',
-              });
-              continue;
-            }
-            await this.options.transport.publish(this.topic('measurements'), {
-              channelId: channel.id,
-              unit: transform.unit,
-              value,
-              kind: transform.kind ?? 'live',
-              sourceTimestamp: timestamp,
-              streamId: this.measurementStreamId,
-              sequence: ++this.measurementSequence,
-            });
+            const measurement = encodeMeasurement(channel.id, raw, transform);
+            await this.publishOperational('measurements', measurement, undefined, timestamp);
           } catch (error) {
-            await this.options.transport.publish(this.topic('faults'), {
+            await this.publishOperational('faults', {
               channelId: channel.id,
               code: measurementErrorCode(error),
               message: error instanceof Error ? error.message : String(error),
@@ -461,7 +446,7 @@ export class WagoRuntime {
       await this.options.device.write(point, value);
     } catch (error) {
       try {
-        await this.options.transport.publish(this.topic('faults'), {
+        await this.publishOperational('faults', {
           channelId: channel.id,
           code: 'device_write_failed',
           message: error instanceof Error ? error.message : String(error),
@@ -605,7 +590,7 @@ export class WagoRuntime {
         this.feedbackGenerations.get(channel.id) === generation &&
         this.configurationGeneration === configurationGeneration
       )
-        await this.options.transport.publish(this.topic('faults'), {
+        await this.publishOperational('faults', {
           channelId: channel.id,
           code: 'feedback_mismatch',
           message: 'configured feedback does not match the requested output state',
@@ -616,7 +601,7 @@ export class WagoRuntime {
         this.configurationGeneration !== configurationGeneration
       )
         return;
-      await this.options.transport.publish(this.topic('faults'), {
+      await this.publishOperational('faults', {
         channelId: channel.id,
         code: 'feedback_read_failed',
         message: error instanceof Error ? error.message : String(error),
@@ -625,8 +610,8 @@ export class WagoRuntime {
   }
 
   private async publishState(): Promise<void> {
-    await this.options.transport.publish(
-      this.topic('state'),
+    await this.publishOperational(
+      'state',
       {
         connected: this.connected,
         revision: this.state.accepted?.revision ?? null,
@@ -647,7 +632,24 @@ export class WagoRuntime {
     return this.publishReport(revision, contentHash, errors);
   }
   private acknowledge(id: string, status: 'accepted' | 'duplicate' | 'rejected', error?: string): Promise<void> {
-    return this.options.transport.publish(this.topic('acknowledgements'), { id, status, error });
+    return this.publishOperational('acknowledgements', { id, status, error });
+  }
+  private publishOperational(
+    category: keyof WagoRuntime['sequences'],
+    payload: object,
+    options?: { retain?: boolean },
+    timestamp = new Date().toISOString(),
+  ): Promise<void> {
+    return this.options.transport.publish(
+      this.topic(category),
+      {
+        ...payload,
+        timestamp,
+        streamId: this.streamId,
+        sequence: ++this.sequences[category],
+      },
+      options,
+    );
   }
   private topic(suffix: string): string {
     return `${this.options.prefix.replace(/^\/+|\/+$/g, '')}/v1/controllers/${this.options.hardwareId}/${suffix}`;

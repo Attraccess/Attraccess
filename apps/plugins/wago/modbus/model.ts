@@ -167,6 +167,7 @@ export function validateModbus(value: unknown): Array<{ path: string; code: stri
         fail(path, 'TCP host and port 1..65535 required');
     } else if (c.transport === 'rtu') {
       if (
+        typeof c.path !== 'string' ||
         !/^\/dev\/[a-zA-Z0-9_./-]+$/.test(c.path) ||
         c.path.includes('..') ||
         ![1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200].includes(c.baudRate) ||

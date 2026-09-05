@@ -627,8 +627,9 @@ export function ModbusConfigurationForm({ value, onChange, isDisabled = false }:
       >
         Add device
       </Button>
-      {profiles.map((p) => (
-        <div key={p.id}>
+      {profiles.map((p, profileIndex) => (
+        // Profiles are appended and edited in place; the editable ID must not control mount identity.
+        <div key={profileIndex}>
           <ModbusProfileForm
             value={p}
             isDisabled={isDisabled}

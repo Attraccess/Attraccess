@@ -7,16 +7,22 @@
   "targets": {
     "lint": {
       "executor": "nx:run-commands",
-      "options": { "cwd": "apps/plugins/wago", "command": "eslint backend frontend/src" }
+      "options": { "cwd": "apps/plugins/wago", "command": "eslint backend frontend/src modbus measurement-contract.ts" }
     },
     "test": {
       "executor": "@nx/jest:jest",
       "options": { "jestConfig": "apps/plugins/wago/jest.config.ts", "passWithNoTests": true }
     },
+    "test-frontend": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["{projectRoot}/frontend/**/*", "{projectRoot}/modbus/**/*"],
+      "options": { "cwd": "apps/plugins/wago", "command": "pnpm exec vitest run --root frontend" }
+    },
     "build-backend": {
       "executor": "nx:run-commands",
       "cache": true,
-        "inputs": ["{projectRoot}/backend/**/*", "{projectRoot}/modbus/**/*", "{projectRoot}/cc100-runtime/signing-public-key.pub", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
+      "inputs": ["{projectRoot}/backend/**/*", "{projectRoot}/modbus/**/*", "{projectRoot}/measurement-contract.ts", "{projectRoot}/cc100-runtime/signing-public-key.pub", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/wago",
