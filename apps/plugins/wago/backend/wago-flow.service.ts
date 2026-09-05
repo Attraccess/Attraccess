@@ -11,6 +11,7 @@ const STALE_AFTER_MS = 90_000;
 const MAX_CACHE_ENTRIES = 2_000;
 const MAX_PENDING_DISPATCHES = 100;
 const MAX_TIMEOUT_MS = 2_147_483_647;
+const MAX_RETIRED_STREAMS = 128;
 
 type CachedState = {
   controllerId: number;
@@ -20,8 +21,14 @@ type CachedState = {
   value: unknown;
   timestamp: string;
   sequence: number;
+  streamId: string;
+  unit?: string;
+  kind?: 'live' | 'cumulative';
+  revision?: number | null;
+  contentHash?: string | null;
   receivedAt: number;
   offline?: boolean;
+  invalidated?: boolean;
 };
 type NodeKind = 'event' | 'read' | 'wait';
 type Waiter = (state?: CachedState, cancel?: boolean) => void;
@@ -33,9 +40,22 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   private readonly settings: Repository<WagoSettings>;
   private readonly cache = new Map<string, CachedState>();
   private controllerByHardwareId = new Map<string, { controller: WagoController; serverId: number }>();
-  private readonly sequences = new Map<number, number>();
-  private readonly sequenceTimestamps = new Map<number, number>();
+  private readonly streams = new Map<
+    number,
+    {
+      active: string;
+      latestSourceTime: number;
+      sampleNotBefore: number;
+      stateTimestamp?: number;
+      exhausted?: boolean;
+      retired: Set<string>;
+      sequences: Map<WagoOperationalMessage['category'], number>;
+    }
+  >();
   private readonly offlineControllers = new Set<number>();
+  private readonly unavailableHardware = new Set<number>();
+  private readonly unavailableConfiguration = new Set<number>();
+  private readonly appliedConfigurations = new Map<number, { revision: number; contentHash: string }>();
   private readonly channelCache = new Map<number, WagoConfigurationSnapshot['logicalChannels']>();
   private readonly waiters = new Set<Waiter>();
   private readonly waitersByKey = new Map<string, Set<Waiter>>();
@@ -76,6 +96,12 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     const controllers = await this.controllers.find({ where: { trustState: 'claimed' } });
     const controllerIds = new Set(controllers.map((controller) => controller.id));
     for (const id of this.offlineControllers) if (!controllerIds.has(id)) this.offlineControllers.delete(id);
+    for (const id of this.unavailableHardware) if (!controllerIds.has(id)) this.unavailableHardware.delete(id);
+    for (const id of this.unavailableConfiguration)
+      if (!controllerIds.has(id)) this.unavailableConfiguration.delete(id);
+    for (const id of this.appliedConfigurations.keys())
+      if (!controllerIds.has(id)) this.appliedConfigurations.delete(id);
+    for (const id of this.streams.keys()) if (!controllerIds.has(id)) this.streams.delete(id);
     this.channelCache.clear();
     const revisions = await this.loadLatestAppliedRevisions(controllers.map((controller) => controller.id));
     for (const revision of revisions) this.cacheChannels(revision);
@@ -181,7 +207,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
         state.channelId === config.channelId &&
         (!config.category || state.category === config.category),
     );
-    return entries.sort((left, right) => right.sequence - left.sequence)[0] ?? null;
+    return entries.sort((left, right) => right.receivedAt - left.receivedAt)[0] ?? null;
   }
   async wait(config: Record<string, unknown>): Promise<CachedState | null> {
     if (
@@ -222,7 +248,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async onMessage(serverId: number, prefix: string, topic: string, payload: Buffer): Promise<void> {
-    let parsed;
+    let parsed: ReturnType<typeof parseOperationalMessage>;
     try {
       parsed = parseOperationalMessage(prefix, topic, payload);
     } catch (error) {
@@ -234,49 +260,105 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     const entry = this.controllerByHardwareId.get(hardwareId);
     if (!entry || entry.serverId !== serverId) return;
     const { controller } = entry;
-    const previous = this.sequences.get(controller.id);
     const eventTime = Date.parse(event.timestamp);
     if (eventTime > Date.now()) {
       this.context.logger.warn(`Ignoring future-dated WAGO event for ${controller.hardwareId}`);
       return;
     }
-    const previousTime = this.sequenceTimestamps.get(controller.id);
-    if (
-      previousTime !== undefined &&
-      (eventTime < previousTime || (event.sequence <= (previous ?? -1) && eventTime === previousTime))
-    ) {
+    // Resolve configuration before mutating stream/cache state, then process the entire snapshot atomically.
+    const channels = await this.channels(controller.id);
+    let stream = this.streams.get(controller.id);
+    if (stream?.exhausted) return;
+    if (!stream || stream.active !== event.streamId) {
+      if (
+        event.category !== 'state' ||
+        stream?.retired.has(event.streamId) ||
+        (stream &&
+          (!event.connected || Date.now() - eventTime > STALE_AFTER_MS || eventTime <= stream.latestSourceTime))
+      ) {
+        this.context.logger.warn(`Ignoring unestablished or retired WAGO stream for ${controller.hardwareId}`);
+        return;
+      }
+      if (stream && stream.retired.size >= MAX_RETIRED_STREAMS) {
+        stream.exhausted = true;
+        for (const state of this.cache.values()) if (state.controllerId === controller.id) state.invalidated = true;
+        this.context.logger.warn(
+          `WAGO stream history exhausted for ${controller.hardwareId}; refusing further samples`,
+        );
+        return;
+      }
+      const retired = stream?.retired ?? new Set<string>();
+      if (stream) retired.add(stream.active);
+      stream = {
+        active: event.streamId,
+        latestSourceTime: eventTime,
+        sampleNotBefore: eventTime,
+        retired,
+        sequences: new Map(),
+      };
+      this.streams.set(controller.id, stream);
+      for (const state of this.cache.values()) if (state.controllerId === controller.id) state.invalidated = true;
+    }
+    const previous = stream.sequences.get(event.category);
+    if (previous !== undefined && event.sequence <= previous) {
       this.context.logger.warn(`Ignoring duplicate or out-of-order WAGO event for ${controller.hardwareId}`);
       return;
     }
-    if (previous !== undefined && event.sequence <= previous)
-      this.context.logger.warn(`Resetting WAGO event sequence after controller reconnect for ${controller.hardwareId}`);
     if (previous !== undefined && event.sequence > previous + 1)
       this.context.logger.warn(
         `WAGO event sequence gap for ${controller.hardwareId}: ${previous} to ${event.sequence}`,
       );
-    this.sequences.set(controller.id, event.sequence);
-    this.sequenceTimestamps.set(controller.id, eventTime);
+    stream.sequences.set(event.category, event.sequence);
+    stream.latestSourceTime = Math.max(stream.latestSourceTime, eventTime);
     if (event.category === 'state') {
+      const wasUnavailable =
+        this.offlineControllers.has(controller.id) ||
+        this.unavailableHardware.has(controller.id) ||
+        this.unavailableConfiguration.has(controller.id) ||
+        (stream.stateTimestamp !== undefined && Date.now() - stream.stateTimestamp > STALE_AFTER_MS);
+      stream.stateTimestamp = eventTime;
       if (event.connected) this.offlineControllers.delete(controller.id);
-      else {
-        this.offlineControllers.add(controller.id);
-        // Keep values readable, but reconnecting must not revive pre-disconnect samples.
-        for (const state of this.cache.values()) if (state.controllerId === controller.id) state.offline = true;
+      else this.offlineControllers.add(controller.id);
+      if (event.readiness?.hardwareAvailable === false) this.unavailableHardware.add(controller.id);
+      else if (event.readiness?.hardwareAvailable === true) this.unavailableHardware.delete(controller.id);
+      const applied = this.appliedConfigurations.get(controller.id);
+      if (applied && event.revision === applied.revision && event.contentHash === applied.contentHash)
+        this.unavailableConfiguration.delete(controller.id);
+      else this.unavailableConfiguration.add(controller.id);
+      if (
+        wasUnavailable ||
+        !event.connected ||
+        this.unavailableHardware.has(controller.id) ||
+        this.unavailableConfiguration.has(controller.id)
+      )
+        stream.sampleNotBefore = Math.max(stream.sampleNotBefore, eventTime);
+      // A state message is a complete snapshot. Missing values are unavailable, never held as current.
+      for (const state of this.cache.values()) {
+        if (state.controllerId !== controller.id) continue;
+        if (
+          !event.connected ||
+          this.unavailableHardware.has(controller.id) ||
+          this.unavailableConfiguration.has(controller.id) ||
+          state.category === 'state'
+        )
+          state.invalidated = true;
       }
+      for (const channel of channels) {
+        const value =
+          channel.capabilities.includes('input') && Object.hasOwn(event.inputs ?? {}, channel.id)
+            ? event.inputs[channel.id]
+            : channel.capabilities.includes('output') && Object.hasOwn(event.outputs, channel.id)
+              ? event.outputs[channel.id]
+              : undefined;
+        if (typeof value === 'boolean') this.store(controller, channel.id, event, value);
+      }
+    } else if ('channelId' in event) {
+      const channel = channels.find((channel) => channel.id === event.channelId);
+      if (!channel || (event.category === 'measurement' && !channel.capabilities.includes('measurement'))) return;
+      this.store(controller, event.channelId, event, event.category === 'measurement' ? event.value : event);
     }
-    const channelId = event.category === 'state' ? null : 'channelId' in event ? event.channelId : null;
-    if (event.category === 'state')
-      for (const [id, value] of Object.entries(event.outputs)) await this.store(controller, id, event, value);
-    else if (channelId)
-      await this.store(controller, channelId, event, event.category === 'measurement' ? event.value : event);
   }
-  private async store(
-    controller: WagoController,
-    channelId: string,
-    event: WagoOperationalMessage,
-    value: unknown,
-  ): Promise<void> {
-    if (!(await this.channels(controller.id)).some((channel) => channel.id === channelId)) return;
+  private store(controller: WagoController, channelId: string, event: WagoOperationalMessage, value: unknown): void {
     const state: CachedState = {
       controllerId: controller.id,
       hardwareId: controller.hardwareId,
@@ -285,8 +367,15 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       value,
       timestamp: event.timestamp,
       sequence: event.sequence,
+      streamId: event.streamId,
+      ...(event.category === 'measurement' ? { unit: event.unit, kind: event.kind } : {}),
+      ...(event.category === 'state' ? { revision: event.revision, contentHash: event.contentHash } : {}),
       receivedAt: Date.now(),
       offline: this.offlineControllers.has(controller.id),
+      invalidated:
+        this.unavailableHardware.has(controller.id) ||
+        this.unavailableConfiguration.has(controller.id) ||
+        Date.parse(event.timestamp) < (this.streams.get(controller.id)?.sampleNotBefore ?? 0),
     };
     const cacheKey = this.cacheKey(controller.id, channelId, event.category);
     const previous = this.cache.get(cacheKey);
@@ -340,6 +429,16 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   private cacheChannels(revision: WagoConfigurationRevision): WagoConfigurationSnapshot['logicalChannels'] {
     try {
       const channels = (JSON.parse(revision.snapshot) as WagoConfigurationSnapshot).logicalChannels;
+      const previous = this.appliedConfigurations.get(revision.controllerId);
+      if (previous?.revision !== revision.revision || previous?.contentHash !== revision.contentHash) {
+        this.unavailableConfiguration.add(revision.controllerId);
+        for (const state of this.cache.values())
+          if (state.controllerId === revision.controllerId) state.invalidated = true;
+      }
+      this.appliedConfigurations.set(revision.controllerId, {
+        revision: revision.revision,
+        contentHash: revision.contentHash,
+      });
       this.channelCache.set(revision.controllerId, channels);
       return channels;
     } catch {
@@ -396,14 +495,38 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   private matchesCondition(state: CachedState, config: Record<string, unknown>): boolean {
     return this.freshness(state).available && (config.equals === undefined || state.value === config.equals);
   }
-  private freshness(state: CachedState): { stale: boolean; offline: boolean; available: boolean } {
+  private freshness(state: CachedState): {
+    stale: boolean;
+    offline: boolean;
+    connectionStale: boolean;
+    available: boolean;
+  } {
     const age = Date.now() - Date.parse(state.timestamp);
     const stale = !Number.isFinite(age) || age < 0 || age > STALE_AFTER_MS;
     const offline = state.offline === true || this.offlineControllers.has(state.controllerId);
-    return { stale, offline, available: !stale && !offline };
+    const stream = this.streams.get(state.controllerId);
+    const stateTimestamp = stream?.stateTimestamp;
+    const connectionStale = stateTimestamp === undefined || Date.now() - stateTimestamp > STALE_AFTER_MS;
+    return {
+      stale,
+      offline,
+      connectionStale,
+      available:
+        !stale &&
+        !offline &&
+        !connectionStale &&
+        stream?.active === state.streamId &&
+        !stream.exhausted &&
+        Date.parse(state.timestamp) >= stream.sampleNotBefore &&
+        !state.invalidated &&
+        !this.unavailableHardware.has(state.controllerId) &&
+        !this.unavailableConfiguration.has(state.controllerId),
+    };
   }
   payload(state: CachedState): object {
-    return { ...state, ...this.freshness(state) };
+    const payload = { ...state };
+    delete payload.invalidated;
+    return { ...payload, ...this.freshness(state) };
   }
   private async dispatch(): Promise<void> {
     this.dispatching = true;
@@ -411,6 +534,8 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       const dispatch = this.dispatches.shift();
       if (!dispatch) continue;
       const { state, previous } = dispatch;
+      const stream = this.streams.get(state.controllerId);
+      if (stream?.active !== state.streamId || stream.exhausted) continue;
       try {
         await this.context.flows.trigger(
           'plugin.wago.event-received',
