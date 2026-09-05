@@ -444,6 +444,40 @@ describe('WagoService', () => {
     expect(controllerRepository.save).toHaveBeenCalledWith(expect.objectContaining({ lastSequence: 4 }));
   });
 
+  it('persists a valid canonical heartbeat when the bounded diagnostics cache is full', async () => {
+    const claimed = { ...controller(), id: 257, trustState: 'claimed' as const };
+    const { service, controllerRepository } = createService([claimed]);
+    const timestamp = new Date().toISOString();
+    const streamId = '00000000-0000-4000-8000-000000000001';
+    for (let id = 1; id <= 256; id++) {
+      service.diagnostics.ingest(id, 'heartbeat', Buffer.from(JSON.stringify({ timestamp, streamId, sequence: 1 })));
+    }
+    const onHeartbeat = (
+      Reflect.get(service, 'onHeartbeat') as (hardwareId: string, payload: Buffer) => Promise<void>
+    ).bind(service);
+
+    await onHeartbeat(
+      claimed.hardwareId,
+      Buffer.from(
+        JSON.stringify({
+          hardwareId: claimed.hardwareId,
+          pairingCode: '482931',
+          protocolVersion: '1.0.0',
+          runtimeVersion: '1.0.0',
+          capabilities: ['claim', 'heartbeat', 'configuration-v1'],
+          timestamp,
+          streamId,
+          sequence: 1,
+        }),
+      ),
+    );
+
+    expect(service.diagnostics.read(claimed.id).heartbeatAt).toBeUndefined();
+    expect(controllerRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ lastHeartbeatAt: timestamp, lastSeenAt: expect.any(String) }),
+    );
+  });
+
   it('publishes a retained, content-addressed revision only after validation', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
     const { service, draftRepository, revisionRepository, context } = createService([claimed]);
