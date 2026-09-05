@@ -33,6 +33,7 @@ const state = vi.hoisted(() => ({
   revisionPreview: vi.fn(),
   getDraft: vi.fn(),
   rollback: vi.fn(),
+  acknowledge: vi.fn(),
   diagnostics: vi.fn(),
   validate: vi.fn(),
 }));
@@ -52,6 +53,7 @@ vi.mock('../src/api', async (importOriginal) => ({
   reviewConfiguration: state.review,
   previewConfigurationRevision: state.revisionPreview,
   rollbackConfiguration: state.rollback,
+  acknowledgeConfigurationRejection: state.acknowledge,
 }));
 
 function deferred<T>() {
@@ -113,9 +115,15 @@ beforeEach(() => {
   vi.stubGlobal(
     'ResizeObserver',
     class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
+      observe() {
+        /* No layout observer in this DOM fixture. */
+      }
+      unobserve() {
+        /* No layout observer in this DOM fixture. */
+      }
+      disconnect() {
+        /* No layout observer in this DOM fixture. */
+      }
     },
   );
   vi.stubGlobal(
@@ -420,8 +428,13 @@ describe('visual configuration workflow', () => {
     await user.click(screen.getByRole('button', { name: /Apply to channel/ }));
     await user.click(await screen.findByRole('option', { name: 'Door lock' }));
     await user.click(screen.getByRole('button', { name: 'Preview preset' }));
+    const selectedChange = await screen.findByRole('checkbox', { name: /Door lock/ });
+    await user.click(selectedChange);
+    expect(screen.getByRole('button', { name: 'Copy selected changes to local edits' })).toBeDisabled();
+    await user.click(selectedChange);
     await user.click(await screen.findByRole('button', { name: 'Copy selected changes to local edits' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled());
+    expect(screen.getByRole('button', { name: 'Copy selected changes to local edits' })).toBeDisabled();
     expect(state.save).not.toHaveBeenCalled();
     await act(async () => {
       pending.resolve({ snapshot: JSON.stringify(candidate) });
@@ -429,6 +442,42 @@ describe('visual configuration workflow', () => {
     await screen.findByRole('spinbutton', { name: 'Pulse duration (ms)' });
     expect(screen.getByText(/Unsaved local edits/)).toBeInTheDocument();
     expect(state.save).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
+    const application = { presetId: 'pulsed-lock-bank', channelId: 'output', physicalPointId: 'point' };
+    expect(state.save.mock.calls[0][2].presets).toEqual([application]);
+    // Reapply through the mounted UI, even when the copied settings are unchanged.
+    state.preview.mockResolvedValue({
+      draftHash: 'unchanged-preview',
+      snapshot: candidate,
+      diff: [],
+      errors: [{ path: '$.logicalChannels[0]', code: 'invalid', message: 'Invalid preset preview' }],
+    });
+    await user.click(screen.getByRole('button', { name: 'Preview preset' }));
+    expect(await screen.findByRole('button', { name: 'Reapply preset to local edits' })).toBeDisabled();
+    expect(state.apply).toHaveBeenCalledTimes(1);
+    state.preview.mockResolvedValue({ draftHash: 'unchanged-preview', snapshot: candidate, diff: [], errors: [] });
+    state.apply.mockResolvedValue({ snapshot: JSON.stringify(candidate) });
+    await user.click(screen.getByRole('button', { name: 'Preview preset' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Reapply preset to local edits' })).toBeEnabled());
+    expect(screen.getByText('No configuration changes.')).toBeInTheDocument();
+    expect(state.apply).toHaveBeenCalledTimes(1);
+    expect(state.save).toHaveBeenCalledTimes(1);
+    // Saving a no-op preview alone must not append audit intent.
+    const saving = deferred<unknown>();
+    state.save.mockReturnValueOnce(saving.promise);
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(2));
+    expect(state.save.mock.calls[1][2].presets).toEqual([application]);
+    expect(screen.getByRole('button', { name: 'Reapply preset to local edits' })).toBeDisabled();
+    await act(async () => saving.resolve(await state.save.mock.results[0].value));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Reapply preset to local edits' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Reapply preset to local edits' }));
+    expect(state.apply).toHaveBeenLastCalledWith(1, application, [], 'unchanged-preview', candidate);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(3));
+    expect(state.save.mock.calls[2][2].presets).toEqual([application, application]);
   });
 
   it('freezes editing and close during publication and keeps readiness unknown', async () => {
@@ -478,6 +527,15 @@ describe('visual configuration workflow', () => {
     expect(await screen.findByText('Door lock · Physical terminal: Select a compatible terminal')).toBeInTheDocument();
     expect(screen.getByText(/Rejected by controller/)).toBeInTheDocument();
     expect(screen.queryByText(/logicalChannels\[0\]/)).not.toBeInTheDocument();
+    state.acknowledge.mockImplementation(async () => {
+      const saved = { ...revision, rejectionAcknowledgedAt: '2026-09-06', rejectionAcknowledgedBy: 7 };
+      state.history.mockResolvedValue({ revisions: [saved], offset: 0, limit: 20 });
+      return saved;
+    });
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Acknowledge rejection of revision 2' }));
+    await waitFor(() => expect(state.acknowledge).toHaveBeenCalledWith(1, 2, 'rejected', '2026-09-05'));
+    expect(await screen.findByText(/Rejection acknowledged by user 7/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Acknowledge rejection of revision 2' })).not.toBeInTheDocument();
   });
 });
 
@@ -485,10 +543,10 @@ describe('mounted Modbus configuration', () => {
   async function addMeter() {
     mount();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Add connection', exact: true }));
+    await user.click(await screen.findByRole('button', { name: 'Add connection' }));
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
-    await user.type(screen.getByRole('textbox', { name: 'Host', exact: true }), 'meter.fixture.invalid');
-    await user.click(screen.getByRole('button', { name: 'Add device', exact: true }));
+    await user.type(screen.getByRole('textbox', { name: 'Host' }), 'meter.fixture.invalid');
+    await user.click(screen.getByRole('button', { name: 'Add device' }));
     await user.clear(screen.getByRole('textbox', { name: 'Device name' }));
     await user.type(screen.getByRole('textbox', { name: 'Device name' }), 'Workshop meter');
     await user.click(screen.getByRole('button', { name: 'Add Active power from Workshop meter' }));
@@ -539,7 +597,7 @@ describe('mounted Modbus configuration', () => {
 
   it('blocks invalid transport and binding edits and displays server validation', async () => {
     const user = await addMeter();
-    const port = screen.getByRole('textbox', { name: 'Port', exact: true });
+    const port = screen.getByRole('textbox', { name: 'Port' });
     await user.clear(port);
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
     await user.type(port, '502');
@@ -550,7 +608,7 @@ describe('mounted Modbus configuration', () => {
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     expect(await screen.findByText('Workshop meter · unit Id: Fixture unit is unavailable')).toBeInTheDocument();
     expect(state.save).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Remove device', exact: true }));
+    await user.click(screen.getByRole('button', { name: 'Remove device' }));
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
     expect(screen.getByText(/existing device and named measurement\/action required/)).toBeInTheDocument();
   });
@@ -568,7 +626,7 @@ describe('mounted Modbus configuration', () => {
       client.setQueryData(['wago', 'configuration-draft', 1], fresh);
     });
     expect(await screen.findByText('Saved draft changed')).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Host', exact: true })).toBeDisabled();
+    expect(screen.getByRole('textbox', { name: 'Host' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     expect(state.save).not.toHaveBeenCalled();
@@ -651,11 +709,11 @@ describe('Modbus output and serial composition', () => {
       disconnectPolicy: { mode: 'immediate' },
     });
     await user.click(screen.getByRole('button', { name: /Named action/ }));
-    await user.click(await screen.findByRole('option', { name: 'None', exact: true }));
+    await user.click(await screen.findByRole('option', { name: 'None' }));
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
     expect(screen.getByRole('spinbutton', { name: 'Pulse duration (ms)' })).toHaveValue(500);
     await user.click(screen.getByRole('button', { name: /Named action/ }));
-    await user.click(await screen.findByRole('option', { name: 'Relay', exact: true }));
+    await user.click(await screen.findByRole('option', { name: 'Relay' }));
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(state.save).toHaveBeenCalledTimes(2));
     expect(state.save.mock.calls[1][1]).toEqual(saved);
@@ -664,10 +722,10 @@ describe('Modbus output and serial composition', () => {
   it('uses the actual transport selector to replace TCP fields with valid serial configuration', async () => {
     mount();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Add connection', exact: true }));
+    await user.click(await screen.findByRole('button', { name: 'Add connection' }));
     await user.click(screen.getByRole('button', { name: /Transport/ }));
-    await user.click(await screen.findByRole('option', { name: 'rtu', exact: true }));
-    expect(screen.queryByRole('textbox', { name: 'Host', exact: true })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole('option', { name: 'rtu' }));
+    expect(screen.queryByRole('textbox', { name: 'Host' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
     const [, saved] = state.save.mock.calls[0];
@@ -771,7 +829,7 @@ describe('Modbus review regressions', () => {
   it('replaces a clean focused host authoritatively before the next keystroke', async () => {
     const snapshot = fixture();
     const user = start(snapshot);
-    const host = await screen.findByRole('textbox', { name: 'Host', exact: true });
+    const host = await screen.findByRole('textbox', { name: 'Host' });
     await user.click(host);
     const refreshed = fixture();
     const connection = refreshed.modbus!.connections[0];
@@ -790,10 +848,10 @@ describe('Modbus review regressions', () => {
   it('converts a ranged measurement into a plain output without a hidden invalid range', async () => {
     const user = start(fixture());
     await user.click(await screen.findByRole('button', { name: /Named action/ }));
-    await user.click(await screen.findByRole('option', { name: 'Relay', exact: true }));
-    expect(screen.getByRole('spinbutton', { name: 'Maximum', exact: true })).toHaveValue(1000);
+    await user.click(await screen.findByRole('option', { name: 'Relay' }));
+    expect(screen.getByRole('spinbutton', { name: 'Maximum' })).toHaveValue(1000);
     await user.click(screen.getByRole('button', { name: /Named measurement/ }));
-    await user.click(await screen.findByRole('option', { name: 'None', exact: true }));
+    await user.click(await screen.findByRole('option', { name: 'None' }));
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
     const saved = state.save.mock.calls[0][1];
@@ -825,7 +883,7 @@ describe('Modbus review regressions', () => {
   it('exposes an orphan binding for repair after map deletion and release after device deletion', async () => {
     const user = start(fixture(true));
     await user.click(await screen.findByText('Fixture map v1', { selector: 'summary' }));
-    await user.click(screen.getAllByRole('button', { name: 'Remove measurement', exact: true })[0]);
+    await user.click(screen.getAllByRole('button', { name: 'Remove measurement' })[0]);
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: /Named measurement/ }));
     await user.click(await screen.findByRole('option', { name: /Imported energy/ }));
@@ -836,7 +894,7 @@ describe('Modbus review regressions', () => {
       modbus: { measurementId: 'import-energy' },
     });
     expect(state.save.mock.calls[0][1].logicalChannels).toEqual([]);
-    await user.click(screen.getByRole('button', { name: 'Remove device', exact: true }));
+    await user.click(screen.getByRole('button', { name: 'Remove device' }));
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: /Release Spare meter point/ }));
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
