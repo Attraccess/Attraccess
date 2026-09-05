@@ -664,6 +664,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     });
     const generation = this.activeSubscriptionGeneration + 1;
     const replacements: PluginMqttSubscription[] = [];
+    const retainedStates = new Map<number, Buffer>();
     try {
       for (const serverId of serverIds) {
         replacements.push(
@@ -721,6 +722,9 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
                 (message) => {
                   if (this.isActiveSubscriptionGeneration(generation))
                     this.diagnostics.ingest(controller.id, suffix, message.payload);
+                  // MQTT may deliver a retained snapshot before the generation swap completes.
+                  else if (!this.destroyed && suffix === 'state' && message.payload.length <= 65_536)
+                    retainedStates.set(controller.id, Buffer.from(message.payload));
                 },
               ),
             );
@@ -751,6 +755,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     }
     // New handlers are inert until this synchronous generation swap disables the old set.
     this.activeSubscriptionGeneration = generation;
+    retainedStates.forEach((payload, controllerId) => this.diagnostics.ingest(controllerId, 'state', payload));
     this.unsubscribe();
     this.subscriptions.push(...replacements);
   }
@@ -862,7 +867,9 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     )
       return;
     const now = new Date().toISOString();
-    this.diagnostics.ingest(controller.id, 'heartbeat', payload);
+    const admitted = this.diagnostics.ingest(controller.id, 'heartbeat', payload);
+    const heartbeatAt = this.diagnostics.read(controller.id).heartbeatAt;
+    if (canonical && (!admitted || !heartbeatAt)) return;
     // Connectivity is process-local between bounded persistence checkpoints.
     // Avoid a database write for every permanent heartbeat.
     const metadataChanged =
@@ -879,9 +886,12 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     controller.protocolVersion = heartbeat.protocolVersion;
     controller.runtimeVersion = heartbeat.runtimeVersion;
     controller.capabilities = JSON.stringify(heartbeat.capabilities);
-    if (!canonical)
+    if (!canonical) {
       controller.lastSequence = this.diagnostics.read(controller.id).legacyHeartbeatSequence ?? controller.lastSequence;
-    controller.lastHeartbeatAt = canonical ? (this.diagnostics.read(controller.id).heartbeatAt ?? now) : now;
+      controller.lastHeartbeatAt = now;
+    } else {
+      controller.lastHeartbeatAt = heartbeatAt;
+    }
     controller.lastSeenAt = now;
     controller.compatibilityError = compatibilityError(heartbeat);
     controller.updatedAt = now;

@@ -172,14 +172,13 @@ describe('controller diagnostics', () => {
       jest.useRealTimers();
     }
   });
-  it('persists permanent heartbeats when bounded diagnostics reject their admission', async () => {
+  it('does not persist rejected canonical heartbeats as fresh liveness', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-09-05T12:00:00Z'));
     try {
       const controller = { id: 1, hardwareId: 'cc100', trustState: 'claimed', lastSequence: 0, lastHeartbeatAt: null };
       const save = jest.fn().mockResolvedValue(controller);
       const service = new WagoService({ logger: { warn: jest.fn() } } as unknown as PluginContext);
       Reflect.set(service, 'controllers', { findOneBy: async () => controller, save });
-      jest.spyOn(service.diagnostics, 'ingest').mockReturnValue(false);
       const heartbeat = Reflect.get(service, 'onHeartbeat').bind(service) as (
         id: string,
         payload: Buffer,
@@ -193,11 +192,14 @@ describe('controller diagnostics', () => {
             protocolVersion: '1.0.0',
             runtimeVersion: '0.1.0',
             capabilities: ['claim', 'heartbeat', 'configuration-v1'],
+            timestamp: '2026-09-05T12:00:01.000Z',
+            streamId: '00000000-0000-4000-8000-000000000001',
+            sequence: 1,
           }),
         ),
       );
-      expect(save).toHaveBeenCalledTimes(1);
-      expect(controller.lastHeartbeatAt).toBe('2026-09-05T12:00:00.000Z');
+      expect(save).not.toHaveBeenCalled();
+      expect(controller.lastHeartbeatAt).toBeNull();
     } finally {
       jest.useRealTimers();
     }
