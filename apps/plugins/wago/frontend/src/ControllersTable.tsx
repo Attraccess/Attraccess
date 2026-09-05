@@ -17,6 +17,7 @@ interface ControllersTableProps {
   sessions: CommissioningSession[];
   onClaim: (controllerId: number) => void;
   onConfigure: (controllerId: number) => void;
+  onDiagnostics: (controllerId: number) => void;
   onRemove: (controller: WagoController) => void;
   onResume: (session: CommissioningSession) => void;
 }
@@ -30,6 +31,7 @@ export function ControllersTable({
   sessions,
   onClaim,
   onConfigure,
+  onDiagnostics,
   onRemove,
   onResume,
 }: ControllersTableProps) {
@@ -74,11 +76,11 @@ export function ControllersTable({
                   row={row}
                   onClaim={onClaim}
                   onConfigure={onConfigure}
+                  onDiagnostics={onDiagnostics}
                   onRemove={onRemove}
                   onResume={onResume}
                 />
               )
-            }
           </TableBody>
         </TableContent>
       </TableScrollContainer>
@@ -90,12 +92,14 @@ function ControllerRow({
   row,
   onClaim,
   onConfigure,
+  onDiagnostics,
   onRemove,
   onResume,
 }: {
   row: Extract<TableRowData, { kind: 'controller' }>;
   onClaim: (controllerId: number) => void;
   onConfigure: (controllerId: number) => void;
+  onDiagnostics: (controllerId: number) => void;
   onRemove: (controller: WagoController) => void;
   onResume: (session: CommissioningSession) => void;
 }) {
@@ -126,6 +130,9 @@ function ControllerRow({
       <TableCell className="wg:hidden wg:lg:table-cell">{formatHeartbeat(controller.lastHeartbeatAt)}</TableCell>
       <TableCell>
         <div className="wg:flex wg:justify-end wg:gap-2">
+          <Button size="sm" variant="secondary" onPress={() => onDiagnostics(controller.id)}>
+            Diagnostics
+          </Button>
           {session && (
             <Button size="sm" variant="secondary" onPress={() => onResume(session)}>
               View progress

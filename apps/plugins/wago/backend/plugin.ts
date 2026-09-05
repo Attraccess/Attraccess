@@ -16,6 +16,8 @@ import { WagoManagementEntity } from './wago-management.entity';
 import { WagoCommissioningLeaseEntity } from './wago-commissioning-lease.entity';
 import { createWagoCommandNode } from './wago-command-node';
 import { WagoFlowService } from './wago-flow.service';
+import { WagoDiagnosticsController } from './diagnostics.controller';
+import { WagoDiagnosticsService } from './diagnostics.service';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 class WagoPluginModule {}
@@ -76,7 +78,7 @@ const plugin: PluginBackendModule = {
     flowService = new WagoFlowService(context);
     return {
       module: WagoPluginModule,
-      controllers: [WagoControllerApi, WagoArtifactsController],
+      controllers: [WagoControllerApi, WagoArtifactsController, WagoDiagnosticsController],
       providers: [
         { provide: PLUGIN_CONTEXT, useValue: context },
         WagoService,
@@ -84,6 +86,7 @@ const plugin: PluginBackendModule = {
         WagoArtifactUploadInterceptor,
         WagoCommissioningReadiness,
         WagoCommissioningService,
+        WagoDiagnosticsService,
         { provide: WagoFlowService, useValue: flowService },
       ],
     };
