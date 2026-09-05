@@ -10,26 +10,23 @@ function useDiagnosticsClock() {
   }, []);
   return now;
 }
-function pollFresh(d: WagoDiagnostics, now: number) {
-  const generated = Date.parse(d.generatedAt);
-  return Number.isFinite(generated) && now - generated <= 15_000 && generated <= now + 1_000;
-}
-function sourceFresh(timestamp: string | null, now: number) {
-  const source = Date.parse(timestamp ?? '');
-  return Number.isFinite(source) && source <= now && now - source <= 90_000;
+function pollFresh(receivedAt: number, now: number) {
+  return receivedAt > 0 && now - receivedAt <= 15_000;
 }
 
 /** Shared status view with a freshness clock, but no fetching, for embedding hosts. */
 export function WagoStatus({
   diagnostics: d,
   pollingFailed = false,
+  pollingUpdatedAt,
 }: {
   diagnostics: WagoDiagnostics;
   pollingFailed?: boolean;
+  pollingUpdatedAt?: number;
 }) {
   const now = useDiagnosticsClock();
   const c = d.configuration;
-  if (pollingFailed || !pollFresh(d, now))
+  if (pollingFailed || (pollingUpdatedAt !== undefined && !pollFresh(pollingUpdatedAt, now)))
     return <p role="alert">Current controller status is unknown until diagnostics polling recovers.</p>;
   return (
     <Card className="wg:min-w-0 wg:break-words">
@@ -57,7 +54,12 @@ export function WagoStatus({
         <p>
           Hardware readiness: {d.hardwareReadiness}. {d.hardwareReadinessReason}
         </p>
-        {d.stateHardwareAvailable === false && <p role="alert">Runtime reports hardware unavailable. Inspect the controller hardware connection and configuration before retrying.</p>}
+        {d.stateHardwareAvailable === false && (
+          <p role="alert">
+            Runtime reports hardware unavailable. Inspect the controller hardware connection and configuration before
+            retrying.
+          </p>
+        )}
         {c.validationCodes.length > 0 && <p>Draft errors: {c.validationCodes.join(', ')}</p>}
         {c.validationErrors.map((error, index) => (
           <p key={`validation-${index}`}>
@@ -124,7 +126,7 @@ export function ControllerDiagnostics(props: { controllerId: number; onConfigure
 function DiagnosticsContent({ controllerId, onConfigure }: { controllerId: number; onConfigure?: () => void }) {
   const query = useWagoDiagnostics(controllerId);
   const now = useDiagnosticsClock();
-  const pollingStale = !!query.data && !pollFresh(query.data, now);
+  const pollingStale = !!query.data && !pollFresh(query.dataUpdatedAt, now);
   // Never render a cached online/current diagnosis after a failed or stalled poll.
   const d = query.isError || pollingStale ? undefined : query.data;
   return (
@@ -158,7 +160,7 @@ function DiagnosticsContent({ controllerId, onConfigure }: { controllerId: numbe
       {query.isPending && <p>Loading diagnostics…</p>}
       {d && (
         <>
-          <WagoStatus diagnostics={d} />
+          <WagoStatus diagnostics={d} pollingUpdatedAt={query.dataUpdatedAt} />
           {d.channels.map((channel) => (
             <Card key={channel.id} className="wg:min-w-0 wg:break-words">
               <Card.Header>
@@ -173,9 +175,9 @@ function DiagnosticsContent({ controllerId, onConfigure }: { controllerId: numbe
                   <div key={`${sample.kind}:${sample.measurementKind ?? ''}`}>
                     <p>
                       Latest {sample.kind}: {String(sample.value)} {sample.unit ?? ''} {sample.measurementKind ?? ''} ·{' '}
-                      {sample.current && sourceFresh(sample.sourceAt, now) && sourceFresh(d.stateSourceAt, now)
+                      {sample.current
                         ? 'current source sample'
-                        : `not current: ${sample.current ? 'source-stale' : sample.availabilityReason}`}
+                        : `not current: ${sample.availabilityReason}`}
                     </p>
                     <p>
                       Source time: {sample.sourceAt ?? 'unavailable'} ({sample.sourceFreshness}). Received:{' '}

@@ -47,7 +47,12 @@ interface RuntimeDiagnostics extends DiagnosticStream {
   outputs: Record<string, DiagnosticSample>;
   measurements: Record<string, DiagnosticSample>;
   cumulativeMeasurements: Record<string, DiagnosticSample>;
-  rejection?: { revision: number; contentHash: string; receivedAt: string; errors: Array<{ path: string; code: string }> };
+  rejection?: {
+    revision: number;
+    contentHash: string;
+    receivedAt: string;
+    errors: Array<{ path: string; code: string }>;
+  };
   faults: Record<string, { code: string; receivedAt: string }>;
   acknowledgements: Record<string, DiagnosticAcknowledgement>;
   events: Array<{ kind: string; receivedAt: string }>;
@@ -95,7 +100,14 @@ export class WagoDiagnosticsStore {
           ...emptyStream(),
         };
     const cutoff = this.now() - RETENTION_MS;
-    for (const field of ['inputs', 'outputs', 'measurements', 'cumulativeMeasurements', 'faults', 'acknowledgements'] as const) {
+    for (const field of [
+      'inputs',
+      'outputs',
+      'measurements',
+      'cumulativeMeasurements',
+      'faults',
+      'acknowledgements',
+    ] as const) {
       copy[field] = Object.assign(Object.create(null), copy[field]);
     }
     for (const collection of [
@@ -277,7 +289,7 @@ export class WagoDiagnosticsStore {
         state.contentHash !== contentHash ||
         state.hardwareAvailable !== hardwareAvailable
       ) {
-        if (state.stateSourceAt)
+        if (state.stateSourceAt || (canonical && state.connected === false))
           state.measurementAfter = canonical ? (sourceTime(data.timestamp) as number) : this.now();
         state.measurements = Object.create(null);
         state.cumulativeMeasurements = Object.create(null);
@@ -337,9 +349,15 @@ export class WagoDiagnosticsStore {
         this.commands.delete(data.id);
       }
     }
-    if (kind === 'configuration/reported' && Number.isSafeInteger(data.revision) && typeof data.contentHash === 'string')
+    if (
+      kind === 'configuration/reported' &&
+      Number.isSafeInteger(data.revision) &&
+      typeof data.contentHash === 'string'
+    )
       state.rejection = {
-        revision: data.revision as number, contentHash: data.contentHash, receivedAt,
+        revision: data.revision as number,
+        contentHash: data.contentHash,
+        receivedAt,
         errors: safeValidationSummaries(data.errors),
       };
     for (const collection of [

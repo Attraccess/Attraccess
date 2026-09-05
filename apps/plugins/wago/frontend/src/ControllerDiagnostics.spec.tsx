@@ -79,6 +79,7 @@ describe('diagnostics isolation', () => {
     (useWagoDiagnostics as jest.Mock).mockReturnValue({
       isError: true,
       isPending: false,
+      dataUpdatedAt: Date.now(),
       data: fixture(),
       refetch: jest.fn(),
     });
@@ -114,7 +115,13 @@ describe('diagnostics isolation', () => {
         acknowledgement: null,
       },
     ];
-    (useWagoDiagnostics as jest.Mock).mockReturnValue({ isError: false, isPending: false, data, refetch: jest.fn() });
+    (useWagoDiagnostics as jest.Mock).mockReturnValue({
+      isError: false,
+      isPending: false,
+      data,
+      dataUpdatedAt: Date.now(),
+      refetch: jest.fn(),
+    });
     render(<ControllerDiagnostics controllerId={1} />);
     expect(screen.getByText(/Latest input: true/)).toBeTruthy();
     expect(screen.getByText(/Hardware readiness: unknown/)).toBeTruthy();
@@ -124,7 +131,13 @@ describe('diagnostics isolation', () => {
     jest.useFakeTimers();
     try {
       const data = fixture();
-      (useWagoDiagnostics as jest.Mock).mockReturnValue({ isError: false, isPending: false, data, refetch: jest.fn() });
+      (useWagoDiagnostics as jest.Mock).mockReturnValue({
+        isError: false,
+        isPending: false,
+        data,
+        dataUpdatedAt: Date.now(),
+        refetch: jest.fn(),
+      });
       render(<ControllerDiagnostics controllerId={1} />);
       expect(screen.getByText('Controller: online')).toBeTruthy();
       act(() => jest.advanceTimersByTime(16_000));
@@ -138,5 +151,23 @@ describe('diagnostics isolation', () => {
     render(<WagoStatus diagnostics={fixture()} pollingFailed />);
     expect(screen.queryByText('Controller: online')).toBeNull();
     expect(screen.getByRole('alert').textContent).toContain('status is unknown');
+  });
+  it('uses local receipt time rather than the server-generated timestamp for polling freshness', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-05T12:00:00Z'));
+    try {
+      const data = fixture();
+      data.generatedAt = '2026-09-05T12:01:00Z';
+      (useWagoDiagnostics as jest.Mock).mockReturnValue({
+        isError: false,
+        isPending: false,
+        data,
+        dataUpdatedAt: Date.now(),
+        refetch: jest.fn(),
+      });
+      render(<ControllerDiagnostics controllerId={1} />);
+      expect(screen.getByText('Controller: online')).toBeTruthy();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

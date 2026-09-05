@@ -20,7 +20,7 @@ export function diagnosticReferences(
   capabilities?: Record<string, string[]>,
 ) {
   return nodes.map((node) => {
-    const channelId = typeof node.data.channelId === 'string' ? node.data.channelId.slice(0, 128) : '';
+    const channelId = typeof node.data.channelId === 'string' ? node.data.channelId : '';
     const control = node.type === 'plugin.wago.command';
     return {
       nodeId: node.id,
@@ -129,8 +129,11 @@ export class WagoDiagnosticsService {
         validationErrors: safeValidationSummaries(validationErrors),
         rejectionErrors: latest?.rejectionErrors
           ? safeValidationSummaries(JSON.parse(latest.rejectionErrors))
-          : latest && runtime.rejection?.revision === latest.revision && runtime.rejection.contentHash === latest.contentHash
-            ? runtime.rejection.errors : [],
+          : latest &&
+              runtime.rejection?.revision === latest.revision &&
+              runtime.rejection.contentHash === latest.contentHash
+            ? runtime.rejection.errors
+            : [],
         publishedRevision: latest?.revision ?? null,
         publishedState: latest?.state ?? null,
         appliedRevision: applied?.revision ?? null,
