@@ -209,6 +209,14 @@ export class WagoControllerApi {
       wagoAuditPrincipal(request),
     );
   }
+  @Post('controllers/:id/configuration/revisions/:revision/acknowledge-rejection') acknowledgeRejection(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('revision', ParseIntPipe) revision: number,
+    @Req() request: AuthenticatedRequest,
+    @Body() body?: { contentHash?: string; reportedAt?: string },
+  ) {
+    return this.wago.acknowledgeRejection(id, revision, body ?? {}, wagoAuditPrincipal(request));
+  }
   @Get('controllers/:id/configuration/revisions/:revision/preview') previewRevision(
     @Param('id', ParseIntPipe) id: number,
     @Param('revision', ParseIntPipe) revision: number,

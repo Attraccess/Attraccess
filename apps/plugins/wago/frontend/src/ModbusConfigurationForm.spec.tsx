@@ -111,7 +111,7 @@ it('keeps partial numeric text while typing and replaces it when the authoritati
   }
   render(<Editor />);
   const user = userEvent.setup();
-  const port = screen.getByRole('textbox', { name: 'Port', exact: true });
+  const port = screen.getByRole('textbox', { name: 'Port' });
   await user.clear(port);
   await user.type(port, '0502.');
   expect(port).toHaveValue('0502.');

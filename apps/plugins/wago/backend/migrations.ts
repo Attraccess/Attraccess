@@ -8,3 +8,4 @@ export * from './migrations/1780000000006-add-wago-commissioning-claim-details';
 export * from './migrations/1780000000007-add-wago-commissioning-progress';
 export * from './migrations/1780000000008-add-wago-commissioning-delivery-token';
 export * from './migrations/1780010580000-add-wago-revision-editor-metadata';
+export * from './migrations/1780010590000-add-wago-rejection-acknowledgement';

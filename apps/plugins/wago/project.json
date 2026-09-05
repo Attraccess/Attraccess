@@ -5,30 +5,47 @@
   "sourceRoot": "apps/plugins/wago",
   "tags": ["type:plugin"],
   "targets": {
+    "production-fleet": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "node scripts/test-wago-production-fleet.mjs"
+      }
+    },
     "typecheck": {
       "executor": "nx:run-commands",
       "options": {
         "commands": [
           "pnpm exec tsc --noEmit -p apps/plugins/wago/tsconfig.spec.json",
-          "pnpm exec tsc --noEmit -p apps/plugins/wago/frontend/tsconfig.app.json"
+          "pnpm exec tsc --noEmit -p apps/plugins/wago/frontend/tsconfig.app.json",
+          "node scripts/typecheck-wago-frontend-tests.mjs",
+          "pnpm exec tsc --noEmit -p apps/plugins/wago/tsconfig.acceptance.json"
         ],
         "parallel": false
       }
     },
     "lint": {
       "executor": "nx:run-commands",
-      "options": { "cwd": "apps/plugins/wago", "command": "eslint backend frontend/src modbus measurement-contract.ts" }
+      "options": {
+        "cwd": "apps/plugins/wago",
+        "command": "eslint backend frontend/src frontend/tests acceptance modbus measurement-contract.ts"
+      }
     },
     "test": {
       "executor": "@nx/jest:jest",
       "dependsOn": ["test-frontend"],
-      "options": { "jestConfig": "apps/plugins/wago/jest.config.ts", "passWithNoTests": true }
+      "options": {
+        "jestConfig": "apps/plugins/wago/jest.config.ts",
+        "passWithNoTests": true
+      }
     },
     "test-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
       "inputs": ["{projectRoot}/frontend/**/*", "{projectRoot}/modbus/**/*"],
-      "options": { "command": "pnpm exec vitest run --config apps/plugins/wago/frontend/vitest.config.mts" }
+      "options": {
+        "command": "pnpm exec vitest run --config apps/plugins/wago/frontend/vitest.config.mts"
+      }
     },
     "build-backend": {
       "executor": "nx:run-commands",
@@ -57,7 +74,10 @@
         "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"
       ],
       "outputs": ["{projectRoot}/package/frontend"],
-      "options": { "cwd": "apps/plugins/wago", "command": "pnpm exec vite build --config frontend/vite.config.ts" }
+      "options": {
+        "cwd": "apps/plugins/wago",
+        "command": "pnpm exec vite build --config frontend/vite.config.ts"
+      }
     },
     "build": {
       "executor": "nx:run-commands",
@@ -113,6 +133,20 @@
       "options": {
         "cwd": "apps/plugins/wago",
         "command": "node ../scripts/publish-plugin.mjs package dist"
+      }
+    },
+    "fleet-acceptance": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "commands": [
+          "pnpm nx run-many -p plugin-wago,wago-cc100-runtime -t test,typecheck,lint,build --parallel=2",
+          "node apps/plugins/wago/cc100-runtime/integration/run.mjs",
+          "pnpm nx run plugin-wago:production-fleet",
+          "bash apps/plugins/wago/frontend/tests/run_browser_tests.sh",
+          "node --test scripts/check-wago-acceptance.test.mjs"
+        ],
+        "parallel": false
       }
     }
   }

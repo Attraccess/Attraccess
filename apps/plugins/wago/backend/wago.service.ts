@@ -262,7 +262,14 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
           if (
             old &&
             configurationHash(old) === configurationHash(application) &&
-            configurationHash({ snapshot: before }) === configurationHash({ snapshot: candidate })
+            configurationHash(
+              (before as WagoConfigurationSnapshot | null)?.logicalChannels.find(
+                (channel) => channel.id === application.channelId,
+              ) ?? null,
+            ) ===
+              configurationHash(
+                candidate.logicalChannels.find((channel) => channel.id === application.channelId) ?? null,
+              )
           )
             continue;
           const operation = persist;
@@ -443,6 +450,8 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
         'contentHash',
         'state',
         'rejectionErrors',
+        'rejectionAcknowledgedAt',
+        'rejectionAcknowledgedBy',
         'publishedAt',
         'reportedAt',
         'presetProvenance',
@@ -485,40 +494,55 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     principal?: PluginAuditPrincipal,
   ): Promise<WagoConfigurationRevision> {
     return this.withConfigurationLock(controllerId, async () => {
-      await this.claimedController(controllerId);
+      const controller = await this.claimedController(controllerId);
+      this.requireConfigurationCompatibility(controller);
       const source = await this.revisions.findOneBy({ controllerId, revision });
       if (!source) throw new NotFoundException(`WAGO configuration revision ${revision} not found`);
       const current = await this.latestRevision(controllerId);
       const draft = await this.drafts.findOneBy({ controllerId });
-      if (
-        draftHash !==
-          this.rollbackIdentity(
-            draft,
-            current,
-            source,
-            await configurationFlowImpacts(
-              this.context,
-              controllerId,
-              current ? JSON.parse(current.snapshot) : null,
-              JSON.parse(source.snapshot),
-            ),
-          ) ||
-        sourceHash !== source.contentHash ||
-        currentHash !== (current?.contentHash ?? null)
-      )
-        throw new ConflictException('configuration changed since rollback preview; preview and confirm again');
       const snapshot = JSON.parse(source.snapshot);
       const errors = validateEditorSnapshot(snapshot);
       if (errors.length) throw new ConflictException({ message: 'rollback configuration is invalid', errors });
-      await this.requireImpactAcknowledgement(controllerId, current, snapshot, force);
+      const approvedImpacts = await configurationFlowImpacts(
+        this.context,
+        controllerId,
+        current ? JSON.parse(current.snapshot) : null,
+        snapshot,
+      );
+      const assertPreview = (impacts: typeof approvedImpacts) => {
+        if (
+          draftHash !== this.rollbackIdentity(draft, current, source, impacts) ||
+          sourceHash !== source.contentHash ||
+          currentHash !== (current?.contentHash ?? null)
+        )
+          throw new ConflictException('configuration changed since rollback preview; preview and confirm again');
+      };
+      assertPreview(approvedImpacts);
+      if (approvedImpacts.length && !force)
+        throw new ConflictException({
+          message: 'acknowledge potential flow impacts before publishing',
+          impacts: approvedImpacts,
+        });
       const persist = async () => {
-        await this.saveDraftWhileLocked(
+        // Flow edits use a separate lock. Recheck before replacing the draft, then
+        // carry the original consent into publication instead of silently re-reviewing.
+        assertPreview(
+          await configurationFlowImpacts(
+            this.context,
+            controllerId,
+            current ? JSON.parse(current.snapshot) : null,
+            snapshot,
+          ),
+        );
+        const replacement = await this.saveDraftWhileLocked(
           controllerId,
           snapshot,
           (source.presetProvenance ? JSON.parse(source.presetProvenance).editor : null) ?? { names: {}, presets: [] },
         );
-        await this.reviewDraftWhileLocked(controllerId);
-        return this.publishDraftWhileLocked(controllerId, force);
+        const approvedHash = this.reviewIdentity(replacement, current, approvedImpacts);
+        replacement.reviewedHash = approvedHash;
+        await this.drafts.save(replacement);
+        return this.publishDraftWhileLocked(controllerId, force, approvedHash);
       };
       return principal
         ? new WagoAudit(this.context).run(
@@ -530,6 +554,40 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
             (published) => ({ revision: published.revision }),
           )
         : persist();
+    });
+  }
+
+  async acknowledgeRejection(
+    controllerId: number,
+    revision: number,
+    expected: { contentHash?: string; reportedAt?: string },
+    principal: PluginAuditPrincipal,
+  ): Promise<WagoConfigurationRevision> {
+    return this.withConfigurationLock(controllerId, async () => {
+      await this.claimedController(controllerId);
+      const rejected = await this.revisions.findOneBy({ controllerId, revision });
+      if (!rejected) throw new NotFoundException(`WAGO configuration revision ${revision} not found`);
+      if (
+        rejected.state !== 'rejected' ||
+        !rejected.reportedAt ||
+        expected.contentHash !== rejected.contentHash ||
+        expected.reportedAt !== rejected.reportedAt
+      )
+        throw new ConflictException('rejection changed; refresh and review it before acknowledging');
+      if (rejected.rejectionAcknowledgedAt) return rejected;
+      return new WagoAudit(this.context).run(
+        principal,
+        controllerId,
+        'rejection_acknowledgement',
+        { revision },
+        async () => {
+          return this.revisions.save({
+            ...rejected,
+            rejectionAcknowledgedAt: new Date().toISOString(),
+            rejectionAcknowledgedBy: principal.userId,
+          });
+        },
+      );
     });
   }
 
@@ -693,20 +751,12 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     };
   }
 
-  private async requireImpactAcknowledgement(
-    controllerId: number,
-    previous: WagoConfigurationRevision | null,
-    snapshot: WagoConfigurationSnapshot,
-    force: boolean,
-  ) {
-    const impacts = await configurationFlowImpacts(
-      this.context,
-      controllerId,
-      previous ? JSON.parse(previous.snapshot) : null,
-      snapshot,
-    );
-    if (impacts.length && !force)
-      throw new ConflictException({ message: 'acknowledge potential flow impacts before publishing', impacts });
+  private requireConfigurationCompatibility(controller: WagoController): void {
+    const incompatibility = compatibilityError({
+      protocolVersion: controller.protocolVersion,
+      capabilities: JSON.parse(controller.capabilities) as string[],
+    });
+    if (incompatibility) throw new ConflictException(`Cannot publish configuration: ${incompatibility}`);
   }
 
   private async publishDraftWhileLocked(
@@ -716,11 +766,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     principal?: PluginAuditPrincipal,
   ): Promise<WagoConfigurationRevision> {
     const controller = await this.claimedController(controllerId);
-    const incompatibility = compatibilityError({
-      protocolVersion: controller.protocolVersion,
-      capabilities: JSON.parse(controller.capabilities) as string[],
-    });
-    if (incompatibility) throw new ConflictException(`Cannot publish configuration: ${incompatibility}`);
+    this.requireConfigurationCompatibility(controller);
     const draft = await this.drafts.findOneBy({ controllerId });
     if (!draft) throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
     const validation = validateEditorSnapshot(JSON.parse(draft.snapshot));

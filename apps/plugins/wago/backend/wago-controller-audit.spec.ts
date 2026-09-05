@@ -7,7 +7,13 @@ import type { WagoCommissioningService } from './wago-commissioning.service';
 describe('WAGO HTTP administration audit hooks', () => {
   const record = jest.fn<Promise<PluginAuditReceipt>, []>();
   const warn = jest.fn();
-  const service = { claim: jest.fn(), remove: jest.fn(), publishDraft: jest.fn(), rollback: jest.fn() };
+  const service = {
+    claim: jest.fn(),
+    remove: jest.fn(),
+    publishDraft: jest.fn(),
+    rollback: jest.fn(),
+    acknowledgeRejection: jest.fn(),
+  };
   const commissioning = { removeByHardwareId: jest.fn() };
   const request = { user: { id: 7, authenticationMethod: 'session' }, body: { userId: 999 } } as AuthenticatedRequest;
   const controller = new WagoControllerApi(
@@ -111,6 +117,16 @@ describe('WAGO HTTP administration audit hooks', () => {
       }),
     ).resolves.toBe(result);
     expect(service.rollback).toHaveBeenCalledWith(12, 3, true, 'source', 'current', 'preview', {
+      userId: 7,
+      authenticationMethod: 'session',
+    });
+    expect(record).not.toHaveBeenCalled();
+  });
+  it('passes reviewed rejection identity and authenticated actor to the persistence boundary', async () => {
+    const expected = { contentHash: 'reviewed', reportedAt: '2026-09-06' };
+    service.acknowledgeRejection.mockResolvedValue({ revision: 3 });
+    await expect(controller.acknowledgeRejection(12, 3, request, expected)).resolves.toEqual({ revision: 3 });
+    expect(service.acknowledgeRejection).toHaveBeenCalledWith(12, 3, expected, {
       userId: 7,
       authenticationMethod: 'session',
     });

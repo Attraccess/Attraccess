@@ -157,17 +157,33 @@ export function readableStructuralChanges(
       Object.keys(a).every((key) => Object.prototype.hasOwnProperty.call(b, key) && equal(a[key], b[key]))
     );
   }
-  for (const collection of ['logicalChannels', 'physicalPoints'] as const) {
+  const collections: [string, { id: string }[], { id: string }[]][] = [
+    ...(['logicalChannels', 'physicalPoints'] as const).map((key): [string, { id: string }[], { id: string }[]] => [
+      key,
+      before[key],
+      after[key],
+    ]),
+    ...(['connections', 'devices', 'profiles'] as const).map((key): [string, { id: string }[], { id: string }[]] => [
+      `modbus.${key}`,
+      before.modbus?.[key] ?? [],
+      after.modbus?.[key] ?? [],
+    ]),
+  ];
+  for (const [collection, beforeItems, afterItems] of collections) {
     if (
       equal(
-        before[collection].map((item) => item.id),
-        after[collection].map((item) => item.id),
+        beforeItems.map((item) => item.id),
+        afterItems.map((item) => item.id),
       )
     )
       continue;
-    result = result.filter((change) => !change.path.replace(/^\$\./, '').startsWith(`${collection}[`));
-    const previous = new Map<string, unknown>(before[collection].map((item) => [item.id, item] as const));
-    const current = new Map<string, unknown>(after[collection].map((item) => [item.id, item] as const));
+    result = result.filter(
+      (change) =>
+        change.path.replace(/^\$\./, '') !== collection &&
+        !change.path.replace(/^\$\./, '').startsWith(`${collection}[`),
+    );
+    const previous = new Map<string, unknown>(beforeItems.map((item) => [item.id, item] as const));
+    const current = new Map<string, unknown>(afterItems.map((item) => [item.id, item] as const));
     for (const id of new Set([...previous.keys(), ...current.keys()])) {
       if (equal(previous.get(id), current.get(id))) continue;
       result.push({
@@ -186,10 +202,13 @@ export function changeLabel(
   after: WagoConfigurationSnapshot,
   names: Record<string, string>,
 ) {
-  const structural = change.path.match(/^\$\.(logicalChannels|physicalPoints)\[id:(.*)\]$/);
+  const structural = change.path.match(
+    /^\$\.(logicalChannels|physicalPoints|modbus\.(?:connections|devices|profiles))\[id:(.*)\]$/,
+  );
   if (structural) {
     const id = decodeURIComponent(structural[2]);
-    const label = names[id] ?? id;
+    const item = change.current ?? change.previous;
+    const label = names[id] ?? (item && typeof item === 'object' && 'name' in item ? String(item.name) : id);
     return `${label} · ${change.current === undefined ? 'Removed' : change.previous === undefined ? 'Added' : 'Changed'}`;
   }
   const modbus = change.path.match(/^(?:\$\.)?modbus\.(connections|devices|profiles)\[(\d+)\](.*)$/);

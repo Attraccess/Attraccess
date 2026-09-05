@@ -116,6 +116,8 @@ export interface ConfigurationRevision {
   contentHash: string;
   state: 'pending' | 'published' | 'applied' | 'rejected';
   rejectionErrors: string | null;
+  rejectionAcknowledgedAt?: string | null;
+  rejectionAcknowledgedBy?: number | null;
   publishedAt: string;
   reportedAt: string | null;
 }
@@ -248,4 +250,15 @@ export const rollbackConfiguration = (
   api.request<ConfigurationRevision>(`/controllers/${id}/configuration/rollback/${revision}`, {
     method: 'POST',
     body: { force, sourceHash, currentHash, draftHash },
+  });
+
+export const acknowledgeConfigurationRejection = (
+  id: number,
+  revision: number,
+  contentHash: string,
+  reportedAt: string,
+) =>
+  api.request<ConfigurationRevision>(`/controllers/${id}/configuration/revisions/${revision}/acknowledge-rejection`, {
+    method: 'POST',
+    body: { contentHash, reportedAt },
   });

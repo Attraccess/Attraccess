@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '@heroui/react';
 import { ReactFlow, type NodeProps } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+// eslint-disable-next-line @nx/enforce-module-boundaries -- Browser fixture deliberately mounts the production host editor.
 import { NodeEditor } from '../../../../../frontend/src/app/resources/details/flows/node/editor';
 import { CommandContext } from './command-context';
 
@@ -10,6 +11,9 @@ const schema = {
   label: 'WAGO command',
   description: 'Fixture-only command authoring; nothing is dispatched.',
   configSchema: { dynamic: true, type: 'object', properties: {}, required: ['controllerId'] },
+  supportedByResource: true,
+  isOutput: false,
+  isInput: false,
   inputs: [],
   outputs: [],
 };

@@ -29,6 +29,7 @@ import {
   listConfigurationRevisions,
   previewConfigurationRevision,
   rollbackConfiguration,
+  acknowledgeConfigurationRejection,
 } from './api';
 
 const queryKeys = {
@@ -281,5 +282,17 @@ export function useConfigurationActions(controllerId: number) {
     }) => rollbackConfiguration(controllerId, revision, force, sourceHash, currentHash, draftHash),
     onSettled: refresh,
   });
-  return { validate, review, publish, preview, rollback };
+  const acknowledgeRejection = useMutation({
+    mutationFn: ({
+      revision,
+      contentHash,
+      reportedAt,
+    }: {
+      revision: number;
+      contentHash: string;
+      reportedAt: string;
+    }) => acknowledgeConfigurationRejection(controllerId, revision, contentHash, reportedAt),
+    onSettled: refresh,
+  });
+  return { validate, review, publish, preview, rollback, acknowledgeRejection };
 }

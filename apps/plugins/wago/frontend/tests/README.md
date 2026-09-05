@@ -99,3 +99,14 @@ Each browser case writes to `output/playwright/att-1058/<class>/<test>/`:
 `final.png`, `page.txt`, `aria.txt`, `requests.json`, `network.json`,
 `page-errors.json`, `unexpected.json`, and `trace.zip`.
 Screenshots disable animations. Failed Chromium launches are errors, never skips.
+
+The composed fleet release gate is `pnpm nx run plugin-wago:fleet-acceptance`.
+It runs the default plugin/runtime tests, typechecks, lint and builds, followed by
+isolated simulator, production RabbitMQ graph, desktop/mobile browser, and evidence
+validator suites. Run it before merging a composed fleet release. It requires the
+OrbStack Docker context and a Python installation with Playwright Chromium; set
+`PYTHON` to that interpreter if needed. It creates only dedicated local fixtures.
+The frontend test typecheck reports the two explicitly pinned commissioning-owner
+diagnostics separately; any other diagnostic fails the gate. Remove that temporary
+allowlist when the commissioning owner supplies their corrected tip.
+These checks do not qualify physical hardware or supply durable audit storage.

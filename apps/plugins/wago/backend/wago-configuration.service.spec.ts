@@ -557,6 +557,105 @@ describe('configuration editor service boundaries', () => {
     },
   );
 
+  it.each([2, 3])(
+    'rejects dependencies added during rollback lookup %s instead of refreshing consent',
+    async (changedLookup) => {
+      const { service, flowQuery, mqtt, draft } = fixture();
+      await service.saveDraft(1, snapshot);
+      await service.reviewDraft(1);
+      await service.publishDraft(1);
+      const node = (id: string) => ({
+        id,
+        resourceId: 2,
+        type: 'plugin.wago.command',
+        data: { controllerId: 1, channelId: 'output' },
+      });
+      flowQuery.getMany.mockResolvedValue([node('a')]);
+      const preview = await service.previewRevision(1, 1);
+      const before = draft();
+      let lookups = 0;
+      flowQuery.getMany.mockImplementation(async () =>
+        ++lookups >= changedLookup ? [node('a'), node('b')] : [node('a')],
+      );
+      mqtt.publish.mockClear();
+      await expect(
+        service.rollback(
+          1,
+          1,
+          true,
+          preview.revision.contentHash,
+          preview.current?.contentHash ?? null,
+          preview.draftHash,
+        ),
+      ).rejects.toThrow(/preview|review/);
+      expect(mqtt.publish).not.toHaveBeenCalled();
+      if (changedLookup === 2) expect(draft()).toEqual(before);
+    },
+  );
+
+  it('preserves a saved draft when rollback controller compatibility fails', async () => {
+    const { service, mqtt, draft } = fixture();
+    await service.saveDraft(1, snapshot);
+    await service.reviewDraft(1);
+    await service.publishDraft(1);
+    await service.saveDraft(1, { ...snapshot, logicalChannels: [] });
+    const before = draft();
+    const preview = await service.previewRevision(1, 1);
+    const controller = {
+      id: 1,
+      mqttServerId: 1,
+      trustState: 'claimed',
+      capabilities: '["claim","heartbeat","configuration-v1"]',
+    };
+    Object.assign(service, {
+      controllers: { findOneBy: jest.fn().mockResolvedValue({ ...controller, protocolVersion: '2.0.0' }) },
+    });
+    mqtt.publish.mockClear();
+    await expect(
+      service.rollback(
+        1,
+        1,
+        true,
+        preview.revision.contentHash,
+        preview.current?.contentHash ?? null,
+        preview.draftHash,
+      ),
+    ).rejects.toThrow('Cannot publish configuration');
+    expect(draft()).toEqual(before);
+    expect(mqtt.publish).not.toHaveBeenCalled();
+  });
+
+  it('does not audit reapplication of an untouched preset when adding an unrelated input', async () => {
+    const { service, audit } = fixture();
+    const principal = { userId: 7, authenticationMethod: 'session' as const };
+    const metadata = {
+      names: {},
+      presets: [{ presetId: 'generic-digital-output' as const, channelId: 'output', physicalPointId: 'point' }],
+    };
+    await service.saveDraft(1, snapshot, metadata, principal);
+    audit.record.mockClear();
+    await service.saveDraft(
+      1,
+      {
+        ...snapshot,
+        physicalPoints: [...snapshot.physicalPoints, { id: 'input-point', hardwareProfile: '751-9301', channel: 4 }],
+        logicalChannels: [
+          ...snapshot.logicalChannels,
+          {
+            id: 'input',
+            physicalPointId: 'input-point',
+            profile: 'generic-monitored-input',
+            capabilities: ['input'],
+            disconnectPolicy: { mode: 'hold' },
+          },
+        ],
+      },
+      metadata,
+      principal,
+    );
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
   it('audits validated forced publication and rollback once with the original revision result', async () => {
     const { service, audit, mqtt } = fixture();
     const principal = { userId: 7, authenticationMethod: 'session' as const };
@@ -629,6 +728,54 @@ describe('configuration editor service boundaries', () => {
         },
       }),
     );
+  });
+
+  it('persists and audits acknowledgement of exactly the reviewed rejection once', async () => {
+    const { service, revisions, audit, mqtt } = fixture();
+    await service.saveDraft(1, snapshot);
+    await service.reviewDraft(1);
+    await service.publishDraft(1);
+    Object.assign(revisions[0], {
+      state: 'rejected',
+      reportedAt: '2026-01-01T00:00:00.000Z',
+      rejectionErrors: '[{"path":"$","message":"invalid"}]',
+    });
+    const principal = { userId: 7, authenticationMethod: 'session' as const };
+    const expected = { contentHash: revisions[0].contentHash, reportedAt: revisions[0].reportedAt! };
+    mqtt.publish.mockClear();
+    const acknowledged = await service.acknowledgeRejection(1, 1, expected, principal);
+    expect(acknowledged).toMatchObject({
+      state: 'rejected',
+      rejectionAcknowledgedBy: 7,
+      rejectionAcknowledgedAt: expect.any(String),
+    });
+    expect(acknowledged.rejectionErrors).toEqual(revisions[0].rejectionErrors);
+    expect(audit.record.mock.calls.map(([event]) => [event.action, event.outcome])).toEqual([
+      ['wago.rejection_acknowledgement', 'attempted'],
+      ['wago.rejection_acknowledgement', 'succeeded'],
+    ]);
+    expect(audit.record).toHaveBeenLastCalledWith(expect.objectContaining({ principal, details: { revision: 1 } }));
+    await service.acknowledgeRejection(1, 1, expected, { ...principal, userId: 8 });
+    expect(revisions[0].rejectionAcknowledgedBy).toBe(7);
+    expect(audit.record).toHaveBeenCalledTimes(2);
+    expect(mqtt.publish).not.toHaveBeenCalled();
+  });
+
+  it.each(['state', 'hash', 'report'])('rejects stale rejection acknowledgement after %s changes', async (change) => {
+    const { service, revisions, audit } = fixture();
+    await service.saveDraft(1, snapshot);
+    await service.reviewDraft(1);
+    await service.publishDraft(1);
+    Object.assign(revisions[0], { state: 'rejected', reportedAt: '2026-01-01T00:00:00.000Z' });
+    const expected = { contentHash: revisions[0].contentHash, reportedAt: revisions[0].reportedAt! };
+    if (change === 'state') revisions[0].state = 'applied';
+    if (change === 'hash') expected.contentHash = 'stale';
+    if (change === 'report') expected.reportedAt = 'stale';
+    await expect(
+      service.acknowledgeRejection(1, 1, expected, { userId: 7, authenticationMethod: 'session' }),
+    ).rejects.toThrow('rejection changed');
+    expect(revisions[0].rejectionAcknowledgedAt).toBeUndefined();
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
   it('audits successful rollback with source and newly allocated revision exactly once', async () => {

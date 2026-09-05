@@ -59,6 +59,29 @@ describe('readable structural configuration changes', () => {
     expect(readableStructuralChanges(configurationDiff(before, reordered), before, reordered)).toEqual([]);
   });
 
+  it('matches removed and shifted Modbus devices by stable identity', () => {
+    const previous = {
+      ...before,
+      modbus: {
+        connections: [],
+        profiles: [],
+        devices: ['A', 'B'].map((id) => ({
+          id,
+          name: `Meter ${id}`,
+          connectionId: 'connection',
+          profileId: 'profile',
+          profileVersion: 1,
+          unitId: 1,
+        })),
+      },
+    };
+    const after = { ...previous, modbus: { ...previous.modbus, devices: previous.modbus.devices.slice(1) } };
+    const changes = readableStructuralChanges(configurationDiff(previous, after), previous, after);
+    expect(changes.map((change) => changeLabel(change, previous, after, {}))).toEqual(['Meter A · Removed']);
+    const reordered = { ...previous, modbus: { ...previous.modbus, devices: [...previous.modbus.devices].reverse() } };
+    expect(readableStructuralChanges(configurationDiff(previous, reordered), previous, reordered)).toEqual([]);
+  });
+
   it('keeps nonstructural preset field paths and initial configuration diffs unchanged', () => {
     const after = {
       ...before,

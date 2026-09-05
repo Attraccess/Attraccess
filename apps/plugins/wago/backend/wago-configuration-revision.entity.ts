@@ -12,6 +12,10 @@ export class WagoConfigurationRevision {
   @Column({ type: 'varchar', name: 'content_hash' }) contentHash!: string;
   @Column({ type: 'varchar' }) state!: WagoConfigurationRevisionState;
   @Column({ type: 'text', name: 'rejection_errors', nullable: true }) rejectionErrors!: string | null;
+  @Column({ type: 'varchar', name: 'rejection_acknowledged_at', nullable: true }) rejectionAcknowledgedAt?:
+    string | null;
+  @Column({ type: 'integer', name: 'rejection_acknowledged_by', nullable: true }) rejectionAcknowledgedBy?:
+    number | null;
   @Column({ type: 'varchar', name: 'published_at' }) publishedAt!: string;
   @Column({ type: 'varchar', name: 'reported_at', nullable: true }) reportedAt!: string | null;
 }
