@@ -2,9 +2,13 @@ import { connect, type MqttClient } from 'mqtt';
 import { JsonStateStore, WagoRuntime, type RuntimeState, type Transport } from './runtime';
 import { SimulatorDeviceAdapter } from './simulator-device';
 
-const hardwareId = required('WAGO_HARDWARE_ID');
-const pairingCode = required('WAGO_PAIRING_CODE');
-const enrollmentSecret = required('WAGO_ENROLLMENT_SECRET');
+type SimulatorState = RuntimeState & {
+  simulatorHardwareId?: string;
+  simulatorPairingCode?: string;
+};
+
+let hardwareId: string;
+let pairingCode: string;
 const mqttUrl = required('WAGO_MQTT_URL');
 const prefix = process.env.WAGO_MQTT_PREFIX ?? 'attraccess/wago';
 const statePath = process.env.WAGO_STATE_PATH ?? '/var/lib/attraccess-wago/state.json';
@@ -25,12 +29,20 @@ void start().catch((error: unknown) => {
 });
 
 async function start(): Promise<void> {
-  const state = await store.load();
+  const state = (await store.load()) as SimulatorState;
+  hardwareId = state.simulatorHardwareId ?? required('WAGO_HARDWARE_ID');
+  pairingCode = state.credentials ? state.simulatorPairingCode || process.env.WAGO_PAIRING_CODE || '' : required('WAGO_PAIRING_CODE');
+  if (process.env.WAGO_HARDWARE_ID && process.env.WAGO_HARDWARE_ID !== hardwareId)
+    throw new Error('WAGO_HARDWARE_ID does not match the persisted simulator identity');
+  if (!hardwareId.trim() || /[/+#]/.test(hardwareId) || hardwareId.includes(String.fromCharCode(0)))
+    throw new Error('invalid WAGO_HARDWARE_ID');
+  await store.save({ ...state, simulatorHardwareId: hardwareId, simulatorPairingCode: pairingCode });
   if (state.credentials) return connectOperational(state);
   return connectEnrollment();
 }
 
 function connectEnrollment(): void {
+  const enrollmentSecret = required('WAGO_ENROLLMENT_SECRET');
   const enrollmentClient = connect(mqttUrl, credentials('WAGO_ENROLLMENT'));
   client = enrollmentClient;
   enrollmentClient.on('error', logConnectionError);
@@ -38,7 +50,7 @@ function connectEnrollment(): void {
     'connect',
     () =>
       void handleAsync(async () => {
-        const enrollmentRuntime = runtime(enrollmentClient);
+        const enrollmentRuntime = runtime(enrollmentClient, undefined, enrollmentSecret);
         await subscribe(enrollmentClient, enrollmentRuntime.discoveryClaimTopic(), async (payload) => {
           const claim = await enrollmentRuntime.receiveDiscoveryClaim(payload);
           if (!claim) return;
@@ -50,7 +62,7 @@ function connectEnrollment(): void {
   );
 }
 
-function connectOperational(state: RuntimeState): void {
+function connectOperational(state: SimulatorState): void {
   if (!state.credentials) throw new Error('permanent MQTT credentials are required');
   const operationalClient = connect(mqttUrl, {
     username: state.credentials.username,
@@ -85,7 +97,7 @@ function connectOperational(state: RuntimeState): void {
   });
 }
 
-function runtime(mqtt: MqttClient, operationalPrefix?: string): WagoRuntime {
+function runtime(mqtt: MqttClient, operationalPrefix?: string, enrollmentSecret?: string): WagoRuntime {
   return new WagoRuntime({
     hardwareId,
     prefix: operationalPrefix ?? prefix,

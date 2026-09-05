@@ -97,6 +97,36 @@ permanent-identity TCP reconnect, commands after reconnect, persisted identity
 and outputs across process restart, plus offline, stale-heartbeat and rejected
 configuration scenarios.
 
+Both enrollment and operational MQTT connections use `clientId=username`, as
+required by provisioned RabbitMQ subscription-queue permissions. The broker tests
+reject wrong client IDs with otherwise valid credentials. Claim acknowledgement
+is published on the enrollment connection only after saving permanent credentials;
+the simulator waits for MQTT PUBACK before ending that connection. An injected
+state-write failure must produce neither an acknowledgement nor an operational
+connection; replaying the actual claim after storage recovers completes handoff.
+
+The runner also snapshots `origin/main` (or `--main-ref=<commit>`) and runs its real
+WagoService to capture the current claim payload and verify token acknowledgement
+and enrollment revocation. This is separate from the local heartbeat/parser test;
+no commissioning source is patched. Full git history is checked out in CI so the
+main source is available.
+
+To test a producer-owner commit alongside the flow-owner commit:
+
+```sh
+node apps/plugins/wago/cc100-runtime/integration/run.mjs \
+  --runtime-ref=<producer-commit> --flow-ref=<flow-commit>
+```
+
+`--runtime-ref` stages the exact committed runtime modules in temporary storage,
+overlays only the owned simulator entrypoint and device adapter, typechecks that
+combination, then builds it. It does not merge any runtime into this worktree or
+modify another worktree. The strict test sends commands with
+`expectedConfigurationRevision` and `expiresAt`; it expects physical percent 42
+to arrive as `kind: live`, `unit: millipercent`, `value: 42000`, with canonical ISO
+`timestamp`, a UUID `streamId` per boot and independent category counters. It
+keeps the same consumer alive across simulator restart to verify the new stream.
+
 `WAGO_HEARTBEAT_INTERVAL_MS` (default 30000) and
 `WAGO_MEASUREMENT_INTERVAL_MS` (default 5000) accept positive integer milliseconds
 and allow deterministic accelerated integration tests. `WAGO_STATE_PATH` selects
