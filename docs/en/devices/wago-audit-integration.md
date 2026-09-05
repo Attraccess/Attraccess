@@ -131,9 +131,11 @@ not reception of a device rejection. A `Promise<void>` operation can omit the
 completion projector. None of these success events asserts hardware application
 or durable audit storage; the unavailable-sink behavior above still applies.
 
-Currently the preset routes call missing `presets`, `previewPreset` and
-`applyPreset` service methods. This integration does not claim those routes work
-or modify their owner's implementation. Rotation, forced publication, rejection
+The composed preset routes implement catalog, preview and persisted application.
+Application/reapplication audit selection, summaries and persistence run inside
+the configuration lock, with the authenticated HTTP principal. Preview and no-op
+applications emit no successful persisted application event. Rotation, forced
+publication, rejection
 acknowledgement, Hardware Profile CRUD and manual-command HTTP operations are
 also not present here. Flow-node commands are not automatically classified as
 manual commands. No automatic claim or asynchronous command-handler wiring was

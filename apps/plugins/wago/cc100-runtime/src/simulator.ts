@@ -153,7 +153,7 @@ function connectOperational(state: SimulatorState): void {
       handleAsync(async () => {
         if (generation !== connectionGeneration) return;
         if (!started) {
-          await operationalRuntime.start();
+          await operationalRuntime.start(() => operationalRuntime.setConnected(operationalClient.connected));
           started = true;
         } else {
           await operationalRuntime.setConnected(true);
