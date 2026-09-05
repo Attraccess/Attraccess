@@ -22,6 +22,7 @@ export class OutputController {
     return this.uncertainWrites.has(channelId);
   }
   private readonly pulses = new Map<string, Pulse>();
+  private outageGeneration = 0;
   private readonly watchdogs = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly channelWrites = new Map<string, Promise<void>>();
   private readonly feedbackChecks = new Map<string, { timer: ReturnType<typeof setTimeout>; generation: number }>();
@@ -236,12 +237,15 @@ export class OutputController {
   async applyDisconnectPolicies(connected: boolean): Promise<void> {
     if (connected) {
       this.disconnected = false;
+      this.outageGeneration++;
       this.watchdogs.forEach(clearTimeout);
       this.watchdogs.clear();
       return;
     }
     if (this.disconnected) return;
     this.disconnected = true;
+    const generation = ++this.outageGeneration;
+    const disconnectedAt = Date.now();
     let stateSaveFailed = false;
     for (const channel of this.options.getSnapshot()?.logicalChannels ?? []) {
       if (!channel.capabilities.includes('output')) continue;
@@ -256,10 +260,18 @@ export class OutputController {
       if (channel.disconnectPolicy.mode === 'watchdog')
         this.watchdogs.set(
           channel.id,
-          setTimeout(() => {
-            this.watchdogs.delete(channel.id);
-            void this.ignoreRejection(() => this.write(channel, false));
-          }, channel.disconnectPolicy.timeoutMs),
+          setTimeout(
+            () => {
+              this.watchdogs.delete(channel.id);
+              void this.ignoreRejection(() =>
+                this.runForChannel(channel.id, async () => {
+                  if (this.disconnected && generation === this.outageGeneration)
+                    await this.writeWhileQueued(channel, false);
+                }),
+              );
+            },
+            Math.max(0, channel.disconnectPolicy.timeoutMs - (Date.now() - disconnectedAt)),
+          ),
         );
     }
     if (stateSaveFailed) await this.options.saveState();

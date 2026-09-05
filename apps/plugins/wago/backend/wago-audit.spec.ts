@@ -1,5 +1,17 @@
-import type { AuthenticatedRequest, PluginAuditEvent, PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
-import { WAGO_AUDIT_ACTIONS, WagoAudit, wagoAuditDetails, wagoAuditPrincipal, wagoAuditSummary, type WagoProfileAuditResult } from './wago-audit';
+import type {
+  AuthenticatedRequest,
+  PluginAuditEvent,
+  PluginAuditPrincipal,
+  PluginContext,
+} from '@attraccess/plugins-backend-sdk';
+import {
+  WAGO_AUDIT_ACTIONS,
+  WagoAudit,
+  wagoAuditDetails,
+  wagoAuditPrincipal,
+  wagoAuditSummary,
+  type WagoProfileAuditResult,
+} from './wago-audit';
 
 const principal: PluginAuditPrincipal = { userId: 7, authenticationMethod: 'api-token', apiTokenId: 9 };
 
@@ -9,52 +21,101 @@ describe('WAGO audit lifecycles', () => {
   const audit = new WagoAudit({ audit: { record }, logger: { log: jest.fn(), error: jest.fn(), warn } });
   beforeEach(() => jest.clearAllMocks());
 
-  it.each(WAGO_AUDIT_ACTIONS)('records %s attempt and completion with the same principal and operation ID', async (action) => {
-    const result = { revision: 4, password: 'SECRET', payload: { unsafe: 'SECRET' } };
-    await expect(audit.run(principal, 12, action, {}, async () => result, (value) => ({ revision: value.revision }))).resolves.toBe(result);
-    const [attempt, success] = record.mock.calls.map(([event]) => event);
-    expect(attempt).toEqual({
-      action: `wago.${action}`, operationId: expect.any(String), principal,
-      subject: { type: 'wago.controller', id: 12 }, outcome: 'attempted', details: {},
-    });
-    expect(success).toEqual({ ...attempt, outcome: 'succeeded', details: { revision: 4 } });
-    expect(JSON.stringify(record.mock.calls)).not.toContain('SECRET');
-  });
+  it.each(WAGO_AUDIT_ACTIONS)(
+    'records %s attempt and completion with the same principal and operation ID',
+    async (action) => {
+      const result = { revision: 4, password: 'SECRET', payload: { unsafe: 'SECRET' } };
+      await expect(
+        audit.run(
+          principal,
+          12,
+          action,
+          {},
+          async () => result,
+          (value) => ({ revision: value.revision }),
+        ),
+      ).resolves.toBe(result);
+      const [attempt, success] = record.mock.calls.map(([event]) => event);
+      expect(attempt).toEqual({
+        action: `wago.${action}`,
+        operationId: expect.any(String),
+        principal,
+        subject: { type: 'wago.controller', id: 12 },
+        outcome: 'attempted',
+        details: {},
+      });
+      expect(success).toEqual({ ...attempt, outcome: 'succeeded', details: { revision: 4 } });
+      expect(JSON.stringify(record.mock.calls)).not.toContain('SECRET');
+    },
+  );
 
   it.each(WAGO_AUDIT_ACTIONS)('records %s failures without copying arbitrary errors', async (action) => {
     const error = new Error('SECRET mqtt://user:password@broker payload');
-    await expect(audit.run(principal, 12, action, {}, async () => { throw error; })).rejects.toBe(error);
+    await expect(
+      audit.run(principal, 12, action, {}, async () => {
+        throw error;
+      }),
+    ).rejects.toBe(error);
     expect(record.mock.calls.map(([event]) => event.outcome)).toEqual(['attempted', 'failed']);
     expect(JSON.stringify(record.mock.calls)).not.toContain('SECRET');
   });
 
   it('retains manual dispatch identity until the actual acknowledgement and finishes once', async () => {
     const commandId = '9c53280c-01cd-4f67-8a40-23d9f1ffecfe';
-    const lifecycle = audit.begin(principal, 12, 'manual_command', { channelId: 'lock-a', operation: 'pulse', commandId });
+    const lifecycle = audit.begin(principal, 12, 'manual_command', {
+      channelId: 'lock-a',
+      operation: 'pulse',
+      commandId,
+    });
     await Promise.all([lifecycle.attempt(), lifecycle.attempt()]);
     expect(record).toHaveBeenCalledTimes(1);
-    await Promise.all([lifecycle.finish('succeeded', { result: 'acknowledged' }), lifecycle.finish('failed', { result: 'timeout' })]);
+    await Promise.all([
+      lifecycle.finish('succeeded', { result: 'acknowledged' }),
+      lifecycle.finish('failed', { result: 'timeout' }),
+    ]);
     expect(record).toHaveBeenCalledTimes(2);
-    expect(record.mock.calls[1][0].details).toEqual({ channelId: 'lock-a', operation: 'pulse', commandId, result: 'acknowledged' });
+    expect(record.mock.calls[1][0].details).toEqual({
+      channelId: 'lock-a',
+      operation: 'pulse',
+      commandId,
+      result: 'acknowledged',
+    });
   });
 
-  it.each(['profile_creation', 'profile_change'] as const)('projects %s persisted identity without profile payloads', async (action) => {
-    const result = {
-      profileId: ' custom/meter: A ', profileVersion: 1_000_000,
-      before: { physicalPointCount: 1, logicalChannelCount: 2, password: 'SECRET' },
-      after: { physicalPointCount: 2, logicalChannelCount: 3, payload: 'SECRET' },
-      profile: { name: 'SECRET', measurements: ['SECRET'], actions: ['SECRET'] },
-      transport: { host: 'SECRET', password: 'SECRET' }, errors: ['SECRET'],
-    };
-    await expect(audit.run(principal, 12, action, {}, async () => result, (value: WagoProfileAuditResult) => value)).resolves.toBe(result);
-    expect(record.mock.calls[0][0].details).toEqual({});
-    expect(record.mock.calls[1][0].details).toEqual({
-      profileId: result.profileId, profileVersion: 1_000_000,
-      'before.physicalPointCount': 1, 'before.logicalChannelCount': 2,
-      'after.physicalPointCount': 2, 'after.logicalChannelCount': 3,
-    });
-    expect(JSON.stringify(record.mock.calls)).not.toContain('SECRET');
-  });
+  it.each(['profile_creation', 'profile_change'] as const)(
+    'projects %s persisted identity without profile payloads',
+    async (action) => {
+      const result = {
+        profileId: ' custom/meter: A ',
+        profileVersion: 1_000_000,
+        before: { physicalPointCount: 1, logicalChannelCount: 2, password: 'SECRET' },
+        after: { physicalPointCount: 2, logicalChannelCount: 3, payload: 'SECRET' },
+        profile: { name: 'SECRET', measurements: ['SECRET'], actions: ['SECRET'] },
+        transport: { host: 'SECRET', password: 'SECRET' },
+        errors: ['SECRET'],
+      };
+      await expect(
+        audit.run(
+          principal,
+          12,
+          action,
+          {},
+          async () => result,
+          (value: WagoProfileAuditResult) => value,
+        ),
+      ).resolves.toBe(result);
+      expect(record.mock.calls[0][0].details).toEqual({});
+      expect(record.mock.calls[1][0].details).toEqual({
+        profileId: result.profileId,
+        profileVersion: 1_000_000,
+        'before.physicalPointCount': 1,
+        'before.logicalChannelCount': 2,
+        'after.physicalPointCount': 2,
+        'after.logicalChannelCount': 3,
+      });
+      expect(JSON.stringify(record.mock.calls)).not.toContain('SECRET');
+    },
+  );
 
   it('captures primitive identity and initial summaries before mutable inputs change', async () => {
     const actor = { ...principal };
@@ -68,9 +129,12 @@ describe('WAGO audit lifecycles', () => {
   });
 
   it.each(['dispatched', 'acknowledged', 'rejected', 'timeout', 'transport_failure'] as const)(
-    'preserves the bounded manual command result %s', async (result) => {
+    'preserves the bounded manual command result %s',
+    async (result) => {
       const lifecycle = audit.begin(principal, 12, 'manual_command', {
-        channelId: 'output-a', commandId: '9c53280c-01cd-4f67-8a40-23d9f1ffecfe', operation: 'set',
+        channelId: 'output-a',
+        commandId: '9c53280c-01cd-4f67-8a40-23d9f1ffecfe',
+        operation: 'set',
       });
       await lifecycle.finish(['dispatched', 'acknowledged'].includes(result) ? 'succeeded' : 'failed', { result });
       expect(record.mock.calls[1][0].details.result).toBe(result);
@@ -79,7 +143,9 @@ describe('WAGO audit lifecycles', () => {
 
   it('returns unavailable when the host has no foundation without failing the domain operation', async () => {
     const unavailable = new WagoAudit({ logger: { log: jest.fn(), error: jest.fn(), warn } });
-    await expect(unavailable.begin(principal, 12, 'claim').finish('succeeded')).resolves.toEqual({ status: 'unavailable' });
+    await expect(unavailable.begin(principal, 12, 'claim').finish('succeeded')).resolves.toEqual({
+      status: 'unavailable',
+    });
     await expect(unavailable.run(principal, 12, 'claim', {}, async () => 'claimed')).resolves.toBe('claimed');
     expect(warn).toHaveBeenCalledWith('WAGO audit storage unavailable');
   });
@@ -94,36 +160,79 @@ describe('WAGO audit lifecycles', () => {
 describe('WAGO audit projection', () => {
   it('excludes unexpected fields at every level and allows only enum values and bounded identifiers', () => {
     const untrusted = {
-      revision: 2, sourceRevision: 1, profileId: 'custom-meter', profileVersion: 4,
-      presetId: 'generic-digital-output' as const, channelId: 'output-a',
-      operation: 'set' as const, result: 'dispatched' as const,
+      revision: 2,
+      sourceRevision: 1,
+      profileId: 'custom-meter',
+      profileVersion: 4,
+      presetId: 'generic-digital-output' as const,
+      channelId: 'output-a',
+      operation: 'set' as const,
+      result: 'dispatched' as const,
       before: { physicalPointCount: 1, logicalChannelCount: 2, password: 'SECRET' },
       after: { physicalPointCount: 1, logicalChannelCount: 3, payload: 'SECRET' },
-      password: 'SECRET', claimSecret: 'SECRET', telemetry: 'SECRET', errors: ['SECRET'],
+      password: 'SECRET',
+      claimSecret: 'SECRET',
+      telemetry: 'SECRET',
+      errors: ['SECRET'],
     };
     expect(wagoAuditDetails(untrusted)).toEqual({
-      revision: 2, sourceRevision: 1, profileId: 'custom-meter', profileVersion: 4,
-      presetId: 'generic-digital-output', channelId: 'output-a', operation: 'set', result: 'dispatched',
-      'before.physicalPointCount': 1, 'before.logicalChannelCount': 2,
-      'after.physicalPointCount': 1, 'after.logicalChannelCount': 3,
+      revision: 2,
+      sourceRevision: 1,
+      profileId: 'custom-meter',
+      profileVersion: 4,
+      presetId: 'generic-digital-output',
+      channelId: 'output-a',
+      operation: 'set',
+      result: 'dispatched',
+      'before.physicalPointCount': 1,
+      'before.logicalChannelCount': 2,
+      'after.physicalPointCount': 1,
+      'after.logicalChannelCount': 3,
     });
-    expect(wagoAuditDetails(JSON.parse(JSON.stringify({
-      revision: -1, profileId: 3, presetId: 'SECRET', operation: 'SECRET', result: 'SECRET',
-      channelId: 'mqtt://SECRET', commandId: 'SECRET', before: { physicalPointCount: -2 },
-    })))).toEqual({});
+    expect(
+      wagoAuditDetails(
+        JSON.parse(
+          JSON.stringify({
+            revision: -1,
+            profileId: 3,
+            presetId: 'SECRET',
+            operation: 'SECRET',
+            result: 'SECRET',
+            channelId: 'mqtt://SECRET',
+            commandId: 'SECRET',
+            before: { physicalPointCount: -2 },
+          }),
+        ),
+      ),
+    ).toEqual({});
   });
 
   it.each([
-    'a', 'a'.repeat(160), ` ${'a'.repeat(158)} `,
-    'wago-879-3000-unverified', 'wago-879-1300-unverified',
-    ' custom/meter: A ', '\u00e9'.repeat(160), '\ud83d\udd0c'.repeat(80),
+    'a',
+    'a'.repeat(160),
+    ` ${'a'.repeat(158)} `,
+    'wago-879-3000-unverified',
+    'wago-879-1300-unverified',
+    ' custom/meter: A ',
+    '\u00e9'.repeat(160),
+    '\ud83d\udd0c'.repeat(80),
   ])('preserves valid profile identity verbatim: %s', (profileId) => {
     expect(wagoAuditDetails({ profileId })).toEqual({ profileId });
   });
 
   it.each([
-    undefined, null, 1, true, {}, ['custom-meter'], '', ' \t\n', '\u00a0',
-    'a'.repeat(161), ` ${'a'.repeat(160)}`, '\ud83d\udd0c'.repeat(81),
+    undefined,
+    null,
+    1,
+    true,
+    {},
+    ['custom-meter'],
+    '',
+    ' \t\n',
+    '\u00a0',
+    'a'.repeat(161),
+    ` ${'a'.repeat(160)}`,
+    '\ud83d\udd0c'.repeat(81),
   ])('drops invalid profile identity without coercion: %p', (profileId) => {
     expect(wagoAuditDetails({ profileId } as never)).toEqual({});
   });
@@ -132,20 +241,37 @@ describe('WAGO audit projection', () => {
     expect(wagoAuditDetails({ profileVersion })).toEqual({ profileVersion });
   });
 
-  it.each([undefined, null, 0, -1, 1.5, 1_000_001, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER + 1, NaN, Infinity, -Infinity, '1', true, {}, [1]])(
-    'drops invalid profile version without coercion: %p', (profileVersion) => {
-      expect(wagoAuditDetails({ profileVersion } as never)).toEqual({});
-    },
-  );
+  it.each([
+    undefined,
+    null,
+    0,
+    -1,
+    1.5,
+    1_000_001,
+    Number.MAX_SAFE_INTEGER,
+    Number.MAX_SAFE_INTEGER + 1,
+    NaN,
+    Infinity,
+    -Infinity,
+    '1',
+    true,
+    {},
+    [1],
+  ])('drops invalid profile version without coercion: %p', (profileVersion) => {
+    expect(wagoAuditDetails({ profileVersion } as never)).toEqual({});
+  });
 
   it('does not impose the profile version ceiling on configuration revisions', () => {
-    expect(wagoAuditDetails({ revision: Number.MAX_SAFE_INTEGER, sourceRevision: 1_000_001 }))
-      .toEqual({ revision: Number.MAX_SAFE_INTEGER, sourceRevision: 1_000_001 });
+    expect(wagoAuditDetails({ revision: Number.MAX_SAFE_INTEGER, sourceRevision: 1_000_001 })).toEqual({
+      revision: Number.MAX_SAFE_INTEGER,
+      sourceRevision: 1_000_001,
+    });
   });
 
   it('summarizes configuration shape without serializing points, channel values or telemetry', () => {
-    expect(wagoAuditSummary({ physicalPoints: [{ password: 'SECRET' }], logicalChannels: [{ payload: 'SECRET' }] }))
-      .toEqual({ physicalPointCount: 1, logicalChannelCount: 1 });
+    expect(
+      wagoAuditSummary({ physicalPoints: [{ password: 'SECRET' }], logicalChannels: [{ payload: 'SECRET' }] }),
+    ).toEqual({ physicalPointCount: 1, logicalChannelCount: 1 });
   });
 
   it('selects the authenticated principal without request-body overrides or token values', () => {
@@ -155,6 +281,27 @@ describe('WAGO audit projection', () => {
     } as unknown as AuthenticatedRequest;
     expect(wagoAuditPrincipal(request)).toEqual(principal);
     expect(() => wagoAuditPrincipal({ body: request.body } as AuthenticatedRequest)).toThrow();
-    expect(() => wagoAuditPrincipal({ user: { id: 1, authenticationMethod: 'api-token' } } as AuthenticatedRequest)).toThrow();
+    expect(() =>
+      wagoAuditPrincipal({ user: { id: 1, authenticationMethod: 'api-token' } } as AuthenticatedRequest),
+    ).toThrow();
+  });
+  it('continues the original domain operation when audit recording never settles', async () => {
+    jest.useFakeTimers();
+    try {
+      const record = jest.fn(() => new Promise<never>(() => undefined));
+      const operation = jest.fn().mockResolvedValue({ revision: 2 });
+      const warn = jest.fn();
+      const audit = new WagoAudit({ audit: { record }, logger: { warn } } as unknown as PluginContext);
+      const pending = audit.run(principal, 1, 'publication', {}, operation);
+      await jest.advanceTimersByTimeAsync(1000);
+      expect(operation).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(1000);
+      await expect(pending).resolves.toEqual({ revision: 2 });
+      expect(record).toHaveBeenCalledTimes(2);
+      expect(warn).toHaveBeenCalledTimes(2);
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

@@ -1,12 +1,29 @@
 import { randomUUID } from 'node:crypto';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
-import type { AuthenticatedRequest, PluginAuditPrincipal, PluginAuditReceipt, PluginContext } from '@attraccess/plugins-backend-sdk';
+import type {
+  AuthenticatedRequest,
+  PluginAuditPrincipal,
+  PluginAuditReceipt,
+  PluginContext,
+} from '@attraccess/plugins-backend-sdk';
 import { WAGO_PRESETS } from './configuration';
 
+export const WAGO_AUDIT_TIMEOUT_MS = 1000;
+
 export const WAGO_AUDIT_ACTIONS = [
-  'claim', 'unclaim', 'credential_rotation', 'manual_credential_fallback',
-  'publication', 'forced_publication', 'rollback', 'rejection_acknowledgement',
-  'preset_application', 'preset_reapplication', 'profile_creation', 'profile_change', 'manual_command',
+  'claim',
+  'unclaim',
+  'credential_rotation',
+  'manual_credential_fallback',
+  'publication',
+  'forced_publication',
+  'rollback',
+  'rejection_acknowledgement',
+  'preset_application',
+  'preset_reapplication',
+  'profile_creation',
+  'profile_change',
+  'manual_command',
 ] as const;
 export type WagoAuditAction = (typeof WAGO_AUDIT_ACTIONS)[number];
 
@@ -92,13 +109,21 @@ export function wagoAuditDetails(input: WagoAuditDetails): Record<string, string
   for (const key of ['revision', 'sourceRevision'] as const) {
     if (positiveInteger(input[key])) details[key] = input[key];
   }
-  if (typeof input.profileId === 'string' && input.profileId.length <= 160 && input.profileId.trim()) details.profileId = input.profileId;
-  if (positiveInteger(input.profileVersion) && input.profileVersion <= 1_000_000) details.profileVersion = input.profileVersion;
+  if (typeof input.profileId === 'string' && input.profileId.length <= 160 && input.profileId.trim())
+    details.profileId = input.profileId;
+  if (positiveInteger(input.profileVersion) && input.profileVersion <= 1_000_000)
+    details.profileVersion = input.profileVersion;
   if (WAGO_PRESETS.some((preset) => preset.id === input.presetId)) details.presetId = input.presetId;
-  if (typeof input.channelId === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(input.channelId)) details.channelId = input.channelId;
-  if (typeof input.commandId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.commandId)) details.commandId = input.commandId;
+  if (typeof input.channelId === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(input.channelId))
+    details.channelId = input.channelId;
+  if (
+    typeof input.commandId === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.commandId)
+  )
+    details.commandId = input.commandId;
   if (['set', 'pulse'].includes(input.operation)) details.operation = input.operation;
-  if (['dispatched', 'acknowledged', 'rejected', 'timeout', 'transport_failure'].includes(input.result)) details.result = input.result;
+  if (['dispatched', 'acknowledged', 'rejected', 'timeout', 'transport_failure'].includes(input.result))
+    details.result = input.result;
   for (const side of ['before', 'after'] as const) {
     for (const key of ['physicalPointCount', 'logicalChannelCount'] as const) {
       const count = input[side]?.[key];
@@ -134,39 +159,64 @@ export class WagoAudit {
   }
 
   /** For owners with asynchronous dispatch/ack lifecycles. Finish exactly once after the true outcome. */
-  begin(principal: PluginAuditPrincipal, controllerId: number, action: WagoAuditAction, details: WagoAuditDetails = {}): WagoAuditLifecycle {
-    if (!positiveInteger(controllerId) || !WAGO_AUDIT_ACTIONS.includes(action)) throw new BadRequestException('Invalid WAGO audit subject or action');
-    const actor = wagoAuditPrincipal({ user: {
-      id: principal.userId,
-      authenticationMethod: principal.authenticationMethod,
-      apiTokenId: principal.apiTokenId,
-    } } as Pick<AuthenticatedRequest, 'user'>);
+  begin(
+    principal: PluginAuditPrincipal,
+    controllerId: number,
+    action: WagoAuditAction,
+    details: WagoAuditDetails = {},
+  ): WagoAuditLifecycle {
+    if (!positiveInteger(controllerId) || !WAGO_AUDIT_ACTIONS.includes(action))
+      throw new BadRequestException('Invalid WAGO audit subject or action');
+    const actor = wagoAuditPrincipal({
+      user: {
+        id: principal.userId,
+        authenticationMethod: principal.authenticationMethod,
+        apiTokenId: principal.apiTokenId,
+      },
+    } as Pick<AuthenticatedRequest, 'user'>);
     const operationId = randomUUID();
     const initial = wagoAuditDetails(details);
     let attempted: Promise<PluginAuditReceipt> | undefined;
     let finished: Promise<PluginAuditReceipt> | undefined;
-    const record = async (outcome: 'attempted' | 'succeeded' | 'failed', extra: WagoAuditDetails = {}): Promise<PluginAuditReceipt> => {
+    const record = async (
+      outcome: 'attempted' | 'succeeded' | 'failed',
+      extra: WagoAuditDetails = {},
+    ): Promise<PluginAuditReceipt> => {
       let receipt: PluginAuditReceipt;
+      let timeout: ReturnType<typeof setTimeout> | undefined;
       try {
-        receipt = await this.context.audit?.record({
-          action: `wago.${action}`, operationId, principal: { ...actor }, outcome,
-          subject: { type: 'wago.controller', id: controllerId },
-          details: { ...initial, ...wagoAuditDetails(extra) },
-        }) ?? { status: 'unavailable' };
+        receipt = await Promise.race([
+          Promise.resolve(
+            this.context.audit?.record({
+              action: `wago.${action}`,
+              operationId,
+              principal: { ...actor },
+              outcome,
+              subject: { type: 'wago.controller', id: controllerId },
+              details: { ...initial, ...wagoAuditDetails(extra) },
+            }) ?? ({ status: 'unavailable' } as const),
+          ),
+          new Promise<PluginAuditReceipt>((resolve) => {
+            timeout = setTimeout(() => resolve({ status: 'unavailable' }), WAGO_AUDIT_TIMEOUT_MS);
+          }),
+        ]);
       } catch {
         receipt = { status: 'unavailable' };
+      } finally {
+        clearTimeout(timeout);
       }
       if (receipt.status === 'unavailable') this.context.logger.warn('WAGO audit storage unavailable');
       return receipt;
     };
-    const attempt = () => attempted ??= record('attempted');
+    const attempt = () => (attempted ??= record('attempted'));
     return {
       operationId,
       attempt,
-      finish: (outcome: 'succeeded' | 'failed', extra: WagoAuditDetails = {}) => finished ??= (async () => {
-        await attempt();
-        return record(outcome, extra);
-      })(),
+      finish: (outcome: 'succeeded' | 'failed', extra: WagoAuditDetails = {}) =>
+        (finished ??= (async () => {
+          await attempt();
+          return record(outcome, extra);
+        })()),
     };
   }
 }

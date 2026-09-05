@@ -302,7 +302,7 @@ function isNullableString(value: unknown): boolean {
 }
 function isBooleanRecord(value: unknown): boolean {
   return (
-    Boolean(value) &&
+    value !== null &&
     typeof value === 'object' &&
     !Array.isArray(value) &&
     Object.values(value).every((item) => typeof item === 'boolean')

@@ -15,7 +15,8 @@ import { Auth } from '@attraccess/plugins-backend-sdk';
 import type { AuthenticatedRequest, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { WagoService } from './wago.service';
 import { WagoCommissioningService } from './wago-commissioning.service';
-import type { WagoPresetApplication } from './configuration';
+import type { WagoPresetApplication, WagoConfigurationSnapshot } from './configuration';
+import type { ConfigurationEditorMetadata } from './configuration-editor';
 import { WagoAudit, wagoAuditPrincipal } from './wago-audit';
 
 type CommissioningAttemptInput = { confirmInstall?: boolean; temporarySsh?: { username?: string; password?: string } };
@@ -136,14 +137,20 @@ export class WagoControllerApi {
   }
   @Post('controllers/:id/configuration/presets/preview') previewPreset(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { application?: WagoPresetApplication },
+    @Body() body: { application?: WagoPresetApplication; snapshot?: WagoConfigurationSnapshot },
   ) {
     if (!body?.application) throw new BadRequestException('application is required');
-    return this.wago.previewPreset(id, body.application);
+    return this.wago.previewPreset(id, body.application, body.snapshot);
   }
   @Post('controllers/:id/configuration/presets/apply') applyPreset(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { application?: WagoPresetApplication; selectedPaths?: string[]; previewedDraftHash?: string },
+    @Body()
+    body: {
+      application?: WagoPresetApplication;
+      selectedPaths?: string[];
+      previewedDraftHash?: string;
+      snapshot?: WagoConfigurationSnapshot;
+    },
     @Req() request: AuthenticatedRequest,
   ) {
     if (!body?.application) throw new BadRequestException('application is required');
@@ -152,17 +159,22 @@ export class WagoControllerApi {
       body.application,
       body.selectedPaths ?? [],
       body.previewedDraftHash ?? '',
+      body.snapshot,
       wagoAuditPrincipal(request),
     );
   }
   @Post('controllers/:id/configuration/draft') saveDraft(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { snapshot?: unknown },
+    @Body() body: { snapshot?: unknown; metadata?: ConfigurationEditorMetadata },
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.wago.saveDraft(id, body?.snapshot);
+    return this.wago.saveDraft(id, body?.snapshot, body?.metadata, wagoAuditPrincipal(request));
   }
-  @Post('controllers/:id/configuration/validate') validateDraft(@Param('id', ParseIntPipe) id: number) {
-    return this.wago.validateDraft(id);
+  @Post('controllers/:id/configuration/validate') validateDraft(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body?: { snapshot?: unknown },
+  ) {
+    return this.wago.validateDraft(id, body?.snapshot);
   }
   @Post('controllers/:id/configuration/review') reviewDraft(@Param('id', ParseIntPipe) id: number) {
     return this.wago.reviewDraft(id);
@@ -177,28 +189,24 @@ export class WagoControllerApi {
   @Post('controllers/:id/configuration/publish') publishDraft(
     @Param('id', ParseIntPipe) id: number,
     @Req() request: AuthenticatedRequest,
+    @Body() body?: { force?: boolean; reviewedHash?: string },
   ) {
-    return this.audit.run(
-      wagoAuditPrincipal(request),
-      id,
-      'publication',
-      {},
-      () => this.wago.publishDraft(id),
-      (published) => ({ revision: published.revision }),
-    );
+    return this.wago.publishDraft(id, body?.force === true, body?.reviewedHash, wagoAuditPrincipal(request));
   }
   @Post('controllers/:id/configuration/rollback/:revision') rollback(
     @Param('id', ParseIntPipe) id: number,
     @Param('revision', ParseIntPipe) revision: number,
     @Req() request: AuthenticatedRequest,
+    @Body() body?: { force?: boolean; sourceHash?: string; currentHash?: string | null; draftHash?: string },
   ) {
-    return this.audit.run(
-      wagoAuditPrincipal(request),
+    return this.wago.rollback(
       id,
-      'rollback',
-      { sourceRevision: revision },
-      () => this.wago.rollback(id, revision),
-      (published) => ({ revision: published.revision }),
+      revision,
+      body?.force === true,
+      body?.sourceHash,
+      body?.currentHash,
+      body?.draftHash,
+      wagoAuditPrincipal(request),
     );
   }
   @Get('controllers/:id/configuration/revisions/:revision/preview') previewRevision(

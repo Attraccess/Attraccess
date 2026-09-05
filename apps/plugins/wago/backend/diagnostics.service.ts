@@ -242,7 +242,12 @@ export class WagoDiagnosticsService {
         : 'Legacy payloads have no source envelope; sequence gaps and source freshness are unavailable.',
       configuration: {
         draftUpdatedAt: draft?.updatedAt ?? null,
-        draftChanged: !!draft && (!latest || configurationHash(JSON.parse(draft.snapshot)) !== latest.contentHash),
+        draftChanged:
+          !!draft &&
+          (!latest ||
+            configurationHash(JSON.parse(draft.snapshot)) !== latest.contentHash ||
+            configurationHash({ metadata: draft.presetProvenance ? JSON.parse(draft.presetProvenance) : null }) !==
+              configurationHash({ metadata: latest.presetProvenance ? JSON.parse(latest.presetProvenance) : null })),
         validationErrorCount: validationErrors.length,
         // Codes originate in our validator. Omit messages and dynamic paths, which can include arbitrary draft values.
         validationCodes: [...new Set(validationErrors.map((error) => error.code))].slice(0, 50),

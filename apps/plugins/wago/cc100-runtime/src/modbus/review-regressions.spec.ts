@@ -695,4 +695,50 @@ describe('ATT-1059 independent review regressions', () => {
     await jest.advanceTimersByTimeAsync(10);
     expect(values).toEqual([1, 0]);
   });
+  it('shuts down an uncertain pulse ON on its original route and preserves command deduplication', async () => {
+    jest.useFakeTimers();
+    try {
+      const s = snapshot();
+      s.logicalChannels[1].capabilities.push('pulse');
+      Object.assign(s.logicalChannels[1], { pulse: { durationMs: 10 } });
+      const writes: Array<{ unit: number; address: number; value: number }> = [];
+      const router = new ModbusDeviceRouter(onboard, () => ({
+        request: async (unit, pdu) => {
+          const value = pdu.readUInt16BE(3);
+          writes.push({ unit, address: pdu.readUInt16BE(1), value });
+          if (value === 1) throw new Error('response lost after ON');
+          return pdu;
+        },
+      }));
+      const { runtime, store, published } = harness(s, router);
+      await runtime.start();
+      const pulse = Buffer.from(
+        JSON.stringify({
+          id: 'uncertain-pulse',
+          channelId: 'output',
+          action: 'pulse',
+          expectedConfigurationRevision: 1,
+          expiresAt: '2099-01-01T00:00:00.000Z',
+        }),
+      );
+      await runtime.receiveCommand(pulse);
+      const next = structuredClone(s);
+      next.modbus.devices[0].unitId = 2;
+      next.modbus.profiles[0].actions[0].address = 22;
+      await runtime.receiveDesired(desired(next));
+      expect(store.saved.accepted?.revision).toBe(1);
+      await jest.advanceTimersByTimeAsync(10);
+      expect(writes).toEqual([
+        { unit: 1, address: 12, value: 1 },
+        { unit: 1, address: 12, value: 0 },
+      ]);
+      await runtime.receiveCommand(pulse);
+      expect(writes).toHaveLength(2);
+      expect(published).toContainEqual(
+        expect.objectContaining({ payload: expect.objectContaining({ id: 'uncertain-pulse', status: 'duplicate' }) }),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

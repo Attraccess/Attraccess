@@ -7,7 +7,13 @@
   "targets": {
     "typecheck": {
       "executor": "nx:run-commands",
-      "options": { "command": "pnpm exec tsc --noEmit -p apps/plugins/wago/tsconfig.spec.json" }
+      "options": {
+        "commands": [
+          "pnpm exec tsc --noEmit -p apps/plugins/wago/tsconfig.spec.json",
+          "pnpm exec tsc --noEmit -p apps/plugins/wago/frontend/tsconfig.app.json"
+        ],
+        "parallel": false
+      }
     },
     "lint": {
       "executor": "nx:run-commands",
@@ -22,7 +28,7 @@
       "executor": "nx:run-commands",
       "cache": true,
       "inputs": ["{projectRoot}/frontend/**/*", "{projectRoot}/modbus/**/*"],
-      "options": { "cwd": "apps/plugins/wago", "command": "pnpm exec vitest run --root frontend" }
+      "options": { "command": "pnpm exec vitest run --config apps/plugins/wago/frontend/vitest.config.mts" }
     },
     "build-backend": {
       "executor": "nx:run-commands",

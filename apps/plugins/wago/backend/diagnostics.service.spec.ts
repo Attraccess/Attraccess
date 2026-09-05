@@ -4,6 +4,7 @@ import { WagoController } from './wago-controller.entity';
 import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { WagoDiagnosticsStore } from './diagnostics-store';
+import { configurationHash } from './configuration';
 import { WagoService } from './wago.service';
 
 describe('diagnostic references', () => {
@@ -271,7 +272,7 @@ describe('controller diagnostics', () => {
       jest.useRealTimers();
     }
   });
-  function setup(missing = false, controllerOverrides = {}) {
+  function setup(missing = false, controllerOverrides = {}, draft: unknown = null) {
     const snapshot = {
       version: 1,
       physicalPoints: [],
@@ -309,7 +310,7 @@ describe('controller diagnostics', () => {
                     },
             }
           : entity === WagoConfigurationDraft
-            ? { findOneBy: async () => null }
+            ? { findOneBy: async () => draft }
             : { findOne: async ({ where }: { where: { state?: string } }) => (where.state ? revision : latest) },
       dataSource: { getRepository: () => ({ createQueryBuilder: () => query }) },
     } as unknown as PluginContext;
@@ -324,6 +325,19 @@ describe('controller diagnostics', () => {
       snapshot,
     };
   }
+  it('reports metadata-only saved draft changes without replacing applied channel projection', async () => {
+    const draft = {
+      snapshot: '{}',
+      presetProvenance: JSON.stringify({ editor: { names: { io: 'Renamed' }, presets: [] } }),
+    };
+    const { service, latest, snapshot } = setup(false, {}, draft);
+    draft.snapshot = latest.snapshot;
+    latest.contentHash = configurationHash(snapshot);
+    expect((await service.get(1)).configuration.draftChanged).toBe(true);
+    Object.assign(latest, { presetProvenance: draft.presetProvenance });
+    expect((await service.get(1)).configuration.draftChanged).toBe(false);
+  });
+
   it('validates flows against applied mapping while reporting publication divergence', async () => {
     const { service, latest, query } = setup();
     latest.revision = 3;

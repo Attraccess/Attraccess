@@ -4,6 +4,7 @@ import type { PluginContext, Repository } from '@attraccess/plugins-backend-sdk'
 import { commandTopic } from './protocol';
 import { WagoController } from './wago-controller.entity';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
+import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
 
 const DEFAULT_COMMAND_TIMEOUT_SECONDS = 30;
 const MAX_COMMAND_TIMEOUT_SECONDS = 300;
@@ -59,7 +60,18 @@ export class WagoCommandHandler {
         })
       : null;
     const channelId = typeof config.channelId === 'string' ? config.channelId : undefined;
-    const channel = snapshot?.logicalChannels.find((item) => item.id === channelId);
+    const outputChannels = snapshot?.logicalChannels.filter((item) => item.capabilities.includes('output')) ?? [];
+    let names: Record<string, unknown> = {};
+    if (controllerId) {
+      const draft = await this.dependencies.context.getRepository(WagoConfigurationDraft).findOneBy({ controllerId });
+      try {
+        const storedNames = JSON.parse(revision?.presetProvenance ?? draft?.presetProvenance ?? 'null')?.editor?.names;
+        if (storedNames && typeof storedNames === 'object' && !Array.isArray(storedNames)) names = storedNames;
+      } catch {
+        /* Drafts created before the visual editor have no channel labels. */
+      }
+    }
+    const channel = outputChannels.find((item) => item.id === channelId);
     const references = channelId && controllerId ? await this.references(controllerId, channelId, resourceId) : [];
     const properties: Record<string, unknown> = {
       controllerId: {
@@ -71,17 +83,26 @@ export class WagoCommandHandler {
           title: controller.name ?? controller.hardwareId,
         })),
         refreshesSchema: true,
+        description:
+          controllerId && !revision
+            ? 'Publish a configuration and wait for the controller to apply it before authoring commands.'
+            : undefined,
       },
     };
     if (controllerId && revision && snapshot) {
       properties.channelId = {
         type: 'string',
         title: 'Logical Channel',
-        oneOf: snapshot.logicalChannels.map((item) => ({ const: item.id, title: `${item.id} (${item.profile})` })),
+        oneOf: outputChannels.map((item) => ({
+          const: item.id,
+          title: typeof names[item.id] === 'string' ? names[item.id] : `${item.id} (${item.profile})`,
+        })),
         refreshesSchema: true,
-        helpText: references.length
+        description: references.length
           ? `Also controlled by resource flow node${references.length === 1 ? '' : 's'}: ${references.join(', ')}. Reuse is allowed.`
-          : undefined,
+          : outputChannels.length
+            ? undefined
+            : 'This applied configuration has no output channels. Add an output and publish it first.',
       };
     }
     if (channel) {
@@ -92,7 +113,7 @@ export class WagoCommandHandler {
           ]
         : [];
       properties.action = { type: 'string', title: 'Operation', oneOf: actions, refreshesSchema: true };
-      if (config.action === 'set') properties.value = { type: 'boolean', title: 'State' };
+      if (config.action === 'set') properties.value = { type: 'boolean', title: 'State', default: false };
       properties.expectedConfigurationRevision = {
         type: 'number',
         title: 'Configuration revision',
@@ -133,7 +154,15 @@ export class WagoCommandHandler {
       dynamic: true,
       type: 'object',
       properties,
-      required: Object.keys(properties).filter((key) => key !== 'value'),
+      required: [
+        ...new Set([
+          'controllerId',
+          'channelId',
+          'action',
+          'expectedConfigurationRevision',
+          ...Object.keys(properties),
+        ]),
+      ],
     };
   }
 

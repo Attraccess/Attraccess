@@ -498,6 +498,32 @@ describe('WagoRuntime', () => {
     );
   });
 
+  it('retains legacy dedup reservations without expiry through startup and later commands', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    await store.save({
+      accepted: { revision: 1, contentHash: hash(snapshot), snapshot },
+      outputs: {},
+      commandIds: ['legacy-command'],
+    });
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      store,
+      transport,
+      device,
+    });
+    await runtime.start();
+    const write = jest.spyOn(device, 'write');
+    await transport.send(commands, validCommand({ id: 'legacy-command' }));
+    expect(write).not.toHaveBeenCalled();
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({ payload: expect.objectContaining({ id: 'legacy-command', status: 'duplicate' }) }),
+    );
+    await transport.send(commands, validCommand({ id: 'new-command' }));
+    expect((await store.load()).commandIds).toContain('legacy-command');
+  });
+
   it('allows a command ID to be reused after its persisted expiry', async () => {
     const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
     await store.save({
@@ -1120,6 +1146,45 @@ describe('WagoRuntime', () => {
     }
   });
 
+  it('cancels an expired watchdog queued behind a command when the connection recovers', async () => {
+    jest.useFakeTimers();
+    try {
+      const watchdogSnapshot: Snapshot = {
+        ...snapshot,
+        logicalChannels: [{ ...snapshot.logicalChannels[0], disconnectPolicy: { mode: 'watchdog', timeoutMs: 10 } }],
+      };
+      await transport.send(desired, {
+        protocolVersion: 1,
+        revision: 1,
+        contentHash: hash(watchdogSnapshot),
+        snapshot: watchdogSnapshot,
+      });
+      let started!: () => void;
+      let release!: () => void;
+      const ready = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const write = jest.spyOn(device, 'write').mockImplementationOnce(async () => {
+        started();
+        await held;
+      });
+      const command = transport.send(commands, validCommand({ id: 'held-command' }));
+      await ready;
+      await runtime.setConnected(false);
+      await jest.advanceTimersByTimeAsync(10);
+      await runtime.setConnected(true);
+      release();
+      await command;
+      await jest.advanceTimersByTimeAsync(0);
+      expect(write).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('cancels a pending watchdog shutdown when reconnecting', async () => {
     jest.useFakeTimers();
     try {
@@ -1657,43 +1722,48 @@ describe('WagoRuntime', () => {
   });
 
   it('cancels feedback checks superseded by a later output command', async () => {
-    const monitored: Snapshot = {
-      ...snapshot,
-      physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
-      logicalChannels: [
-        {
-          id: 'feedback',
-          physicalPointId: 'input-1',
-          profile: 'generic-monitored-input',
-          capabilities: ['input'],
-          disconnectPolicy: { mode: 'hold' },
-        },
-        {
-          id: 'load',
-          physicalPointId: 'output-1',
-          profile: 'generic-digital-output',
-          capabilities: ['output', 'feedback'],
-          disconnectPolicy: { mode: 'immediate' },
-          feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 15 },
-        },
-      ],
-    };
-    await transport.send(desired, {
-      protocolVersion: 1,
-      revision: 1,
-      contentHash: hash(monitored),
-      snapshot: monitored,
-    });
-    await transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'set', value: true }));
-    await transport.send(commands, validCommand({ id: 'command-2', channelId: 'load', action: 'set', value: false }));
-    await new Promise((resolve) => setTimeout(resolve, 25));
+    jest.useFakeTimers();
+    try {
+      const monitored: Snapshot = {
+        ...snapshot,
+        physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
+        logicalChannels: [
+          {
+            id: 'feedback',
+            physicalPointId: 'input-1',
+            profile: 'generic-monitored-input',
+            capabilities: ['input'],
+            disconnectPolicy: { mode: 'hold' },
+          },
+          {
+            id: 'load',
+            physicalPointId: 'output-1',
+            profile: 'generic-digital-output',
+            capabilities: ['output', 'feedback'],
+            disconnectPolicy: { mode: 'immediate' },
+            feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 15 },
+          },
+        ],
+      };
+      await transport.send(desired, {
+        protocolVersion: 1,
+        revision: 1,
+        contentHash: hash(monitored),
+        snapshot: monitored,
+      });
+      await transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'set', value: true }));
+      await transport.send(commands, validCommand({ id: 'command-2', channelId: 'load', action: 'set', value: false }));
+      await jest.advanceTimersByTimeAsync(25);
 
-    expect(transport.published).not.toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
-        payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),
-      }),
-    );
+      expect(transport.published).not.toContainEqual(
+        expect.objectContaining({
+          topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+          payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),
+        }),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('keeps the prior feedback check when a replacement write fails', async () => {

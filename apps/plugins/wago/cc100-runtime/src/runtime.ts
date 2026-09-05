@@ -622,10 +622,13 @@ export class WagoRuntime {
   }
   private pruneCommandExpiries(): void {
     const now = Date.now();
+    const previousExpiries = this.state.commandExpiries ?? {};
     this.state.commandExpiries = Object.fromEntries(
       Object.entries(this.state.commandExpiries ?? {}).filter(([, expiresAt]) => Date.parse(expiresAt) > now),
     );
-    this.state.commandIds = this.state.commandIds.filter((id) => this.state.commandExpiries?.[id]);
+    this.state.commandIds = this.state.commandIds.filter(
+      (id) => !Object.prototype.hasOwnProperty.call(previousExpiries, id) || this.state.commandExpiries?.[id],
+    );
   }
 
   private async runConfigurationUpdate<T>(operation: () => Promise<T>): Promise<T> {

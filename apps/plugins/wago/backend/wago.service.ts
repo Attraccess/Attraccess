@@ -1,6 +1,7 @@
 import { WagoAudit, wagoAuditSummary } from './wago-audit';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -46,9 +47,16 @@ import {
   configurationHash,
   parseConfigurationReport,
   type ConfigurationValidationError,
-  validateSnapshot,
 } from './configuration';
+import {
+  editorMetadata,
+  previewConfigurationPreset,
+  selectPresetChanges,
+  validateEditorSnapshot,
+  type ConfigurationEditorMetadata,
+} from './configuration-editor';
 import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
+import { configurationFlowImpacts } from './configuration-flow-references';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { WagoCommandError, WagoCommandHandler } from './wago-command-handler';
 import { freshness, WagoDiagnosticsStore } from './diagnostics-store';
@@ -226,14 +234,98 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     return this.drafts.findOneBy({ controllerId });
   }
 
-  async saveDraft(controllerId: number, snapshot: unknown): Promise<WagoConfigurationDraft> {
-    return this.withConfigurationLock(controllerId, () => this.saveDraftWhileLocked(controllerId, snapshot));
+  async saveDraft(
+    controllerId: number,
+    snapshot: unknown,
+    metadata?: ConfigurationEditorMetadata,
+    principal?: PluginAuditPrincipal,
+  ): Promise<WagoConfigurationDraft> {
+    return this.withConfigurationLock(controllerId, async () => {
+      const previous = await this.getDraft(controllerId);
+      const validatedMetadata = metadata === undefined ? undefined : editorMetadata(metadata);
+      const previousMetadata = this.metadataFromProvenance(previous?.presetProvenance);
+      const before = previous ? JSON.parse(previous.snapshot) : null;
+      const candidate = snapshot as WagoConfigurationSnapshot;
+      let persist = () => this.saveDraftWhileLocked(controllerId, snapshot, validatedMetadata);
+      if (principal && validateEditorSnapshot(snapshot).length === 0) {
+        for (const application of validatedMetadata?.presets ?? []) {
+          if (
+            !candidate.logicalChannels.some(
+              (channel) =>
+                channel.id === application.channelId && channel.physicalPointId === application.physicalPointId,
+            )
+          )
+            continue;
+          const old = previousMetadata.presets.find(
+            (entry) => entry.presetId === application.presetId && entry.channelId === application.channelId,
+          );
+          if (
+            old &&
+            configurationHash(old) === configurationHash(application) &&
+            configurationHash({ snapshot: before }) === configurationHash({ snapshot: candidate })
+          )
+            continue;
+          const operation = persist;
+          const details = {
+            presetId: application.presetId,
+            channelId: application.channelId,
+            before: wagoAuditSummary(before),
+          };
+          persist = () =>
+            new WagoAudit(this.context).run(
+              principal,
+              controllerId,
+              old ? 'preset_reapplication' : 'preset_application',
+              details,
+              operation,
+              (saved) => ({ ...details, after: wagoAuditSummary(JSON.parse(saved.snapshot)) }),
+            );
+        }
+        for (const profile of candidate.modbus?.profiles ?? []) {
+          const old = (before as WagoConfigurationSnapshot | null)?.modbus?.profiles.find(
+            (entry) => entry.id === profile.id,
+          );
+          if (old && configurationHash(old) === configurationHash(profile)) continue;
+          const operation = persist;
+          const details = { profileId: profile.id, profileVersion: profile.version, before: wagoAuditSummary(before) };
+          persist = () =>
+            new WagoAudit(this.context).run(
+              principal,
+              controllerId,
+              old ? 'profile_change' : 'profile_creation',
+              details,
+              operation,
+              (saved) => ({ ...details, after: wagoAuditSummary(JSON.parse(saved.snapshot)) }),
+            );
+        }
+      }
+      return persist();
+    });
   }
 
-  async validateDraft(controllerId: number): Promise<{ valid: boolean; errors: ConfigurationValidationError[] }> {
+  presets() {
+    return WAGO_PRESETS;
+  }
+
+  async previewPreset(controllerId: number, application: WagoPresetApplication, snapshot?: WagoConfigurationSnapshot) {
     const draft = await this.getDraft(controllerId);
-    if (!draft) throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
-    const errors = validateSnapshot(JSON.parse(draft.snapshot));
+    const source =
+      snapshot ?? (draft ? JSON.parse(draft.snapshot) : { version: 1, physicalPoints: [], logicalChannels: [] });
+    try {
+      return previewConfigurationPreset(source, application);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : 'invalid preset');
+    }
+  }
+
+  async validateDraft(
+    controllerId: number,
+    snapshot?: unknown,
+  ): Promise<{ valid: boolean; errors: ConfigurationValidationError[] }> {
+    const draft = await this.getDraft(controllerId);
+    if (!draft && snapshot === undefined)
+      throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
+    const errors = validateEditorSnapshot(snapshot === undefined && draft ? JSON.parse(draft.snapshot) : snapshot);
     return { valid: errors.length === 0, errors };
   }
 
@@ -244,29 +336,23 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     return draft;
   }
 
-  presets() {
-    return WAGO_PRESETS;
-  }
-
-  async previewPreset(
-    controllerId: number,
-    application: WagoPresetApplication,
-  ): Promise<{ draftHash: string; diff: ReturnType<typeof configurationDiff> }> {
-    const draft = await this.draftForPreset(controllerId);
-    const snapshot = JSON.parse(draft.snapshot) as WagoConfigurationSnapshot;
-    return {
-      draftHash: configurationHash(snapshot),
-      diff: configurationDiff(snapshot, applyPreset(snapshot, application)),
-    };
-  }
-
   async applyPreset(
     controllerId: number,
     application: WagoPresetApplication,
     selectedPaths: string[],
     previewedDraftHash: string,
+    snapshotOrPrincipal?: WagoConfigurationSnapshot | PluginAuditPrincipal,
     principal?: PluginAuditPrincipal,
-  ): Promise<WagoConfigurationDraft> {
+  ): Promise<Pick<WagoConfigurationDraft, 'snapshot'>> {
+    if (snapshotOrPrincipal && 'version' in snapshotOrPrincipal) {
+      await this.claimedController(controllerId);
+      return {
+        snapshot: canonicalSnapshot(
+          selectPresetChanges(snapshotOrPrincipal, application, selectedPaths, previewedDraftHash),
+        ),
+      };
+    }
+    if (snapshotOrPrincipal && 'userId' in snapshotOrPrincipal) principal ??= snapshotOrPrincipal;
     return this.withConfigurationLock(controllerId, async () => {
       const draft = await this.draftForPreset(controllerId);
       const snapshot = JSON.parse(draft.snapshot) as WagoConfigurationSnapshot;
@@ -280,7 +366,8 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       const updatedSnapshot = applySelectedChanges(snapshot, diff, selectedPaths);
       if (configurationHash(updatedSnapshot) === configurationHash(snapshot)) return draft;
       const provenance = parsePresetProvenance(draft.presetProvenance);
-      const reapplied = provenance.some((entry) => {
+      const metadata = this.metadataFromProvenance(draft.presetProvenance);
+      const reapplied = [...provenance, ...metadata.presets].some((entry) => {
         if (!entry || typeof entry !== 'object') return false;
         const previous = entry as { presetId?: string; channelId?: string };
         return (
@@ -300,15 +387,27 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       const persist = async () => {
         draft.snapshot = canonicalSnapshot(updatedSnapshot);
         draft.reviewedHash = null;
-        draft.presetProvenance = JSON.stringify([
-          ...provenance.slice(-99),
-          {
-            presetId: application.presetId,
-            channelId: application.channelId,
-            appliedAt: new Date().toISOString(),
-            selectedPaths,
-          },
-        ]);
+        const storedProvenance = draft.presetProvenance ? JSON.parse(draft.presetProvenance) : null;
+        draft.presetProvenance = storedProvenance?.editor
+          ? JSON.stringify({
+              ...storedProvenance,
+              editor: {
+                ...metadata,
+                presets: [
+                  ...metadata.presets.filter((entry) => entry.channelId !== application.channelId),
+                  application,
+                ],
+              },
+            })
+          : JSON.stringify([
+              ...provenance.slice(-99),
+              {
+                presetId: application.presetId,
+                channelId: application.channelId,
+                appliedAt: new Date().toISOString(),
+                selectedPaths,
+              },
+            ]);
         draft.updatedAt = new Date().toISOString();
         return this.drafts.save(draft);
       };
@@ -346,6 +445,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
         'rejectionErrors',
         'publishedAt',
         'reportedAt',
+        'presetProvenance',
       ],
       skip: pageOffset,
       take: pageLimit,
@@ -354,25 +454,82 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   async reviewDraft(controllerId: number): Promise<{
+    impacts: Awaited<ReturnType<typeof configurationFlowImpacts>>;
     draft: WagoConfigurationDraft;
     previous: WagoConfigurationRevision | null;
     changed: boolean;
     diff: ReturnType<typeof configurationDiff>;
+    metadataDiff: ReturnType<typeof configurationDiff>;
   }> {
     return this.withConfigurationLock(controllerId, () => this.reviewDraftWhileLocked(controllerId));
   }
 
-  async publishDraft(controllerId: number): Promise<WagoConfigurationRevision> {
-    return this.withConfigurationLock(controllerId, () => this.publishDraftWhileLocked(controllerId));
+  async publishDraft(
+    controllerId: number,
+    force = false,
+    reviewedHash?: string,
+    principal?: PluginAuditPrincipal,
+  ): Promise<WagoConfigurationRevision> {
+    return this.withConfigurationLock(controllerId, () =>
+      this.publishDraftWhileLocked(controllerId, force, reviewedHash, principal),
+    );
   }
 
-  async rollback(controllerId: number, revision: number): Promise<WagoConfigurationRevision> {
+  async rollback(
+    controllerId: number,
+    revision: number,
+    force = false,
+    sourceHash?: string,
+    currentHash?: string | null,
+    draftHash?: string,
+    principal?: PluginAuditPrincipal,
+  ): Promise<WagoConfigurationRevision> {
     return this.withConfigurationLock(controllerId, async () => {
+      await this.claimedController(controllerId);
       const source = await this.revisions.findOneBy({ controllerId, revision });
       if (!source) throw new NotFoundException(`WAGO configuration revision ${revision} not found`);
-      await this.saveDraftWhileLocked(controllerId, JSON.parse(source.snapshot));
-      await this.reviewDraftWhileLocked(controllerId);
-      return this.publishDraftWhileLocked(controllerId);
+      const current = await this.latestRevision(controllerId);
+      const draft = await this.drafts.findOneBy({ controllerId });
+      if (
+        draftHash !==
+          this.rollbackIdentity(
+            draft,
+            current,
+            source,
+            await configurationFlowImpacts(
+              this.context,
+              controllerId,
+              current ? JSON.parse(current.snapshot) : null,
+              JSON.parse(source.snapshot),
+            ),
+          ) ||
+        sourceHash !== source.contentHash ||
+        currentHash !== (current?.contentHash ?? null)
+      )
+        throw new ConflictException('configuration changed since rollback preview; preview and confirm again');
+      const snapshot = JSON.parse(source.snapshot);
+      const errors = validateEditorSnapshot(snapshot);
+      if (errors.length) throw new ConflictException({ message: 'rollback configuration is invalid', errors });
+      await this.requireImpactAcknowledgement(controllerId, current, snapshot, force);
+      const persist = async () => {
+        await this.saveDraftWhileLocked(
+          controllerId,
+          snapshot,
+          (source.presetProvenance ? JSON.parse(source.presetProvenance).editor : null) ?? { names: {}, presets: [] },
+        );
+        await this.reviewDraftWhileLocked(controllerId);
+        return this.publishDraftWhileLocked(controllerId, force);
+      };
+      return principal
+        ? new WagoAudit(this.context).run(
+            principal,
+            controllerId,
+            'rollback',
+            { sourceRevision: revision },
+            persist,
+            (published) => ({ revision: published.revision }),
+          )
+        : persist();
     });
   }
 
@@ -380,23 +537,109 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     controllerId: number,
     revision: number,
   ): Promise<{
+    impacts: Awaited<ReturnType<typeof configurationFlowImpacts>>;
     revision: WagoConfigurationRevision;
+    draftHash: string;
     current: WagoConfigurationRevision | null;
     diff: ReturnType<typeof configurationDiff>;
+    metadataDiff: ReturnType<typeof configurationDiff>;
   }> {
-    await this.claimedController(controllerId);
-    const selected = await this.revisions.findOneBy({ controllerId, revision });
-    if (!selected) throw new NotFoundException(`WAGO configuration revision ${revision} not found`);
-    const [current] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
-    return {
-      revision: selected,
-      current: current ?? null,
-      diff: configurationDiff(current ? JSON.parse(current.snapshot) : null, JSON.parse(selected.snapshot)),
-    };
+    return this.withConfigurationLock(controllerId, async () => {
+      await this.claimedController(controllerId);
+      const selected = await this.revisions.findOneBy({ controllerId, revision });
+      if (!selected) throw new NotFoundException(`WAGO configuration revision ${revision} not found`);
+      const [current] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
+      const draft = await this.drafts.findOneBy({ controllerId });
+      const impacts = await configurationFlowImpacts(
+        this.context,
+        controllerId,
+        current ? JSON.parse(current.snapshot) : null,
+        JSON.parse(selected.snapshot),
+      );
+      return {
+        draftHash: this.rollbackIdentity(draft, current ?? null, selected, impacts),
+        impacts,
+        revision: selected,
+        current: current ?? null,
+        diff: configurationDiff(current ? JSON.parse(current.snapshot) : null, JSON.parse(selected.snapshot)),
+        metadataDiff: configurationDiff(
+          this.metadataFromProvenance(current?.presetProvenance),
+          this.metadataFromProvenance(selected.presetProvenance),
+        ),
+      };
+    });
   }
 
-  private async saveDraftWhileLocked(controllerId: number, snapshot: unknown): Promise<WagoConfigurationDraft> {
+  private revisionIdentity(revision: WagoConfigurationRevision | null): unknown {
+    return revision
+      ? { revision: revision.revision, contentHash: revision.contentHash, metadata: revision.presetProvenance ?? null }
+      : null;
+  }
+
+  private impactIdentity(impacts: Awaited<ReturnType<typeof configurationFlowImpacts>>): unknown {
+    return impacts
+      .map((impact) => ({
+        ...impact,
+        references: [...impact.references].sort((a, b) => configurationHash(a).localeCompare(configurationHash(b))),
+      }))
+      .sort((a, b) => a.channelId.localeCompare(b.channelId));
+  }
+
+  private reviewIdentity(
+    draft: WagoConfigurationDraft,
+    current: WagoConfigurationRevision | null,
+    impacts: Awaited<ReturnType<typeof configurationFlowImpacts>>,
+  ): string {
+    return configurationHash({
+      draft: this.draftIdentity(draft),
+      current: this.revisionIdentity(current),
+      impacts: this.impactIdentity(impacts),
+    });
+  }
+
+  private rollbackIdentity(
+    draft: WagoConfigurationDraft | null,
+    current: WagoConfigurationRevision | null,
+    source: WagoConfigurationRevision,
+    impacts: Awaited<ReturnType<typeof configurationFlowImpacts>>,
+  ): string {
+    return configurationHash({
+      draft: this.draftIdentity(draft),
+      current: this.revisionIdentity(current),
+      source: this.revisionIdentity(source),
+      impacts: this.impactIdentity(impacts),
+    });
+  }
+
+  private draftIdentity(draft: WagoConfigurationDraft | null): string {
+    return configurationHash({
+      draft: draft ? { snapshot: draft.snapshot, metadata: draft.presetProvenance ?? null } : null,
+    });
+  }
+
+  private metadataFromProvenance(provenance: string | null | undefined): ConfigurationEditorMetadata {
+    if (!provenance) return { names: {}, presets: [] };
+    try {
+      return editorMetadata(JSON.parse(provenance).editor);
+    } catch {
+      return { names: {}, presets: [] };
+    }
+  }
+
+  private async saveDraftWhileLocked(
+    controllerId: number,
+    snapshot: unknown,
+    metadata?: ConfigurationEditorMetadata,
+  ): Promise<WagoConfigurationDraft> {
     await this.claimedController(controllerId);
+    let provenance: string | undefined;
+    if (metadata !== undefined) {
+      try {
+        provenance = JSON.stringify({ editor: editorMetadata(metadata) });
+      } catch (error) {
+        throw new BadRequestException(error instanceof Error ? error.message : 'invalid editor metadata');
+      }
+    }
     const serialized = canonicalSnapshot(snapshot);
     const existing = await this.drafts.findOneBy({ controllerId });
     const draft =
@@ -409,51 +652,125 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
         updatedAt: '',
       });
     draft.snapshot = serialized;
+    if (provenance !== undefined) draft.presetProvenance = provenance;
     draft.reviewedHash = null;
     draft.updatedAt = new Date().toISOString();
     return this.drafts.save(draft);
   }
 
   private async reviewDraftWhileLocked(controllerId: number): Promise<{
+    impacts: Awaited<ReturnType<typeof configurationFlowImpacts>>;
     draft: WagoConfigurationDraft;
     previous: WagoConfigurationRevision | null;
     changed: boolean;
     diff: ReturnType<typeof configurationDiff>;
+    metadataDiff: ReturnType<typeof configurationDiff>;
   }> {
     await this.claimedController(controllerId);
     const draft = await this.drafts.findOneBy({ controllerId });
     if (!draft) throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
     const previous = await this.latestRevision(controllerId);
-    draft.reviewedHash = configurationHash(JSON.parse(draft.snapshot));
+    const impacts = await configurationFlowImpacts(
+      this.context,
+      controllerId,
+      previous ? JSON.parse(previous.snapshot) : null,
+      JSON.parse(draft.snapshot),
+    );
+    draft.reviewedHash = this.reviewIdentity(draft, previous, impacts);
     await this.drafts.save(draft);
     const diff = configurationDiff(previous ? JSON.parse(previous.snapshot) : null, JSON.parse(draft.snapshot));
-    return { draft, previous, changed: diff.length > 0, diff };
+    const metadataDiff = configurationDiff(
+      this.metadataFromProvenance(previous?.presetProvenance),
+      this.metadataFromProvenance(draft.presetProvenance),
+    );
+    return {
+      draft,
+      previous,
+      changed: diff.length > 0 || metadataDiff.length > 0,
+      diff,
+      metadataDiff,
+      impacts,
+    };
   }
 
-  private async publishDraftWhileLocked(controllerId: number): Promise<WagoConfigurationRevision> {
+  private async requireImpactAcknowledgement(
+    controllerId: number,
+    previous: WagoConfigurationRevision | null,
+    snapshot: WagoConfigurationSnapshot,
+    force: boolean,
+  ) {
+    const impacts = await configurationFlowImpacts(
+      this.context,
+      controllerId,
+      previous ? JSON.parse(previous.snapshot) : null,
+      snapshot,
+    );
+    if (impacts.length && !force)
+      throw new ConflictException({ message: 'acknowledge potential flow impacts before publishing', impacts });
+  }
+
+  private async publishDraftWhileLocked(
+    controllerId: number,
+    force = false,
+    reviewedHash?: string,
+    principal?: PluginAuditPrincipal,
+  ): Promise<WagoConfigurationRevision> {
     const controller = await this.claimedController(controllerId);
+    const incompatibility = compatibilityError({
+      protocolVersion: controller.protocolVersion,
+      capabilities: JSON.parse(controller.capabilities) as string[],
+    });
+    if (incompatibility) throw new ConflictException(`Cannot publish configuration: ${incompatibility}`);
     const draft = await this.drafts.findOneBy({ controllerId });
     if (!draft) throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
-    const validation = validateSnapshot(JSON.parse(draft.snapshot));
+    const validation = validateEditorSnapshot(JSON.parse(draft.snapshot));
     if (validation.length)
       throw new ConflictException({ message: 'configuration draft is invalid', errors: validation });
     const contentHash = configurationHash(JSON.parse(draft.snapshot));
-    if (draft.reviewedHash !== contentHash)
-      throw new ConflictException('review the current configuration draft before publishing it');
     const previous = await this.latestRevision(controllerId);
-    if (previous?.state === 'pending' && previous.contentHash === contentHash)
-      return this.publishRevision(controller, previous);
-    const revision = this.revisions.create({
+    const impacts = await configurationFlowImpacts(
+      this.context,
       controllerId,
-      revision: (previous?.revision ?? 0) + 1,
-      snapshot: draft.snapshot,
-      contentHash,
-      state: 'pending',
-      rejectionErrors: null,
-      publishedAt: new Date().toISOString(),
-      reportedAt: null,
-    });
-    return this.publishRevision(controller, await this.revisions.save(revision));
+      previous ? JSON.parse(previous.snapshot) : null,
+      JSON.parse(draft.snapshot),
+    );
+    const reviewIdentity = this.reviewIdentity(draft, previous, impacts);
+    if (reviewedHash !== undefined && reviewedHash !== reviewIdentity)
+      throw new ConflictException('draft changed since your review; review it again');
+    if (draft.reviewedHash !== reviewIdentity)
+      throw new ConflictException('review the current configuration draft before publishing it');
+    if (impacts.length && !force)
+      throw new ConflictException({ message: 'acknowledge potential flow impacts before publishing', impacts });
+    const persist = async () => {
+      if (
+        previous?.state === 'pending' &&
+        previous.contentHash === contentHash &&
+        (previous.presetProvenance ?? null) === (draft.presetProvenance ?? null)
+      )
+        return this.publishRevision(controller, previous);
+      const revision = this.revisions.create({
+        controllerId,
+        revision: (previous?.revision ?? 0) + 1,
+        snapshot: draft.snapshot,
+        presetProvenance: draft.presetProvenance ?? null,
+        contentHash,
+        state: 'pending',
+        rejectionErrors: null,
+        publishedAt: new Date().toISOString(),
+        reportedAt: null,
+      });
+      return this.publishRevision(controller, await this.revisions.save(revision));
+    };
+    return principal
+      ? new WagoAudit(this.context).run(
+          principal,
+          controllerId,
+          force ? 'forced_publication' : 'publication',
+          {},
+          persist,
+          (published) => ({ revision: published.revision }),
+        )
+      : persist();
   }
 
   private async latestRevision(controllerId: number): Promise<WagoConfigurationRevision | null> {
@@ -984,6 +1301,8 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     const now = new Date().toISOString();
     const canTrackDiagnostics = this.diagnostics.canTrack(controller.id);
     const admitted = this.diagnostics.ingest(controller.id, 'heartbeat', payload);
+    // Rejected legacy packets must not refresh checkpoints or overwrite runtime metadata either.
+    if (canTrackDiagnostics && !admitted) return;
     const heartbeatAt = admitted
       ? this.diagnostics.read(controller.id).heartbeatAt
       : typeof rawHeartbeat.timestamp === 'string'
@@ -995,7 +1314,6 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     if (
       canonical &&
       (!validEnvelope(rawHeartbeat, Date.now()) ||
-        (canTrackDiagnostics && !admitted) ||
         !heartbeatAt ||
         (persistedHeartbeatAt !== null && sourceTime(heartbeatAt) < persistedHeartbeatAt))
     )

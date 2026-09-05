@@ -1,6 +1,6 @@
 # WAGO administration audit integration
 
-The WAGO HTTP controller emits allowlisted audit lifecycles through
+The WAGO HTTP controller and locked configuration services emit allowlisted audit lifecycles through
 `PluginContext.audit`. The host binds plugin identity from its loaded manifest.
 The controller obtains user identity from the guard-authenticated `request.user`
 using `wagoAuditPrincipal`; request bodies, JWT values and credentials are never
@@ -25,8 +25,9 @@ Return `recorded` only after durable acceptance. The storage owner must assign a
 server timestamp, enforce retention/access controls, and preserve the principal,
 controller subject, operation ID and revision/profile references. The host bridge
 overrides any caller-supplied plugin ID. It returns `unavailable` on missing
-providers or storage exceptions; it never serializes errors as fallback records.
+providers, storage exceptions or a one-second provider deadline; it never serializes errors as fallback records.
 WAGO emits only the fixed warning `WAGO audit storage unavailable` in this case.
+Timed-out calls are not retried; a late provider response cannot change the domain result.
 Domain operations continue; this is explicitly best-effort capture, not a durable
 outbox or transactional audit guarantee. Upgrade the host SDK before deploying a
 plugin expecting this bridge. Older contexts without `audit` remain supported.
@@ -134,10 +135,11 @@ or durable audit storage; the unavailable-sink behavior above still applies.
 The composed preset routes implement catalog, preview and persisted application.
 Application/reapplication audit selection, summaries and persistence run inside
 the configuration lock, with the authenticated HTTP principal. Preview and no-op
-applications emit no successful persisted application event. Rotation, forced
-publication, rejection
-acknowledgement, Hardware Profile CRUD and manual-command HTTP operations are
-also not present here. Flow-node commands are not automatically classified as
+applications emit no successful persisted application event. Publication and forced publication select their audit action after review and impact
+validation under the configuration lock. Rollback emits one lifecycle with source
+and resulting revision. Validated custom Modbus profile creates/changes are audited
+at explicit draft persistence. Rotation, rejection acknowledgement and manual-command
+HTTP operations remain absent. Flow-node commands are not automatically classified as
 manual commands. No automatic claim or asynchronous command-handler wiring was
 added to the services owned by other tasks. Those gaps and the missing durable
 foundation remain acceptance dependencies for ATT-983.
