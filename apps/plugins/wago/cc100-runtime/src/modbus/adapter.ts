@@ -8,6 +8,7 @@ import {
   validateModbus,
 } from '../../../modbus/model';
 import type { DeviceAdapter, Snapshot } from '../runtime';
+import { WriteAdmissionError } from '../runtime-types';
 import { decodeRaw, readPdu, writePdu } from './protocol';
 import { type ModbusTransport, ModbusTransportError, QueuedModbusTransport } from './transports';
 
@@ -169,16 +170,18 @@ export class ModbusDeviceRouter implements DeviceAdapter {
     return true;
   }
   writeMayHaveBeenTransmitted(error: unknown): boolean {
+    if (error instanceof WriteAdmissionError) return false;
     return !(
       error instanceof ModbusTransportError &&
       ['modbus_queue_full', 'modbus_configuration_changed'].includes(error.code)
     );
   }
-  async write(point: Point, value: boolean): Promise<void> {
+  async write(point: Point, value: boolean, admit?: () => void): Promise<void> {
+    admit?.();
     if (this.suspended) throw new Error('Modbus configuration persistence in progress');
     if (!point.modbus) {
       if (point.hardwareProfile !== '751-9301') throw new Error('meter outputs require an explicit custom action');
-      return this.onboard.write(point, value);
+      return this.onboard.write(point, value, admit);
     }
     const { binding, device, profile, transport } = this.resolve(point);
     const action = profile.actions.find((a) => a.id === binding.actionId);
@@ -187,7 +190,10 @@ export class ModbusDeviceRouter implements DeviceAdapter {
     await transport.request(
       device.unitId,
       writePdu(action.functionCode, action, value ? action.onValue : action.offValue),
-      () => generation === this.generation,
+      () => {
+        admit?.();
+        return generation === this.generation;
+      },
     );
   }
 }

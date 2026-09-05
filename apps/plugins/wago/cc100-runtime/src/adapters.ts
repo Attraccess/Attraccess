@@ -75,7 +75,7 @@ export class Cc100OnboardIoAdapter implements DeviceAdapter {
     await access(this.registers.output, constants.R_OK | constants.W_OK);
   }
 
-  async write(point: Point, value: boolean): Promise<void> {
+  async write(point: Point, value: boolean, admit?: () => void): Promise<void> {
     const channel = this.channel(point);
     if (channel.direction !== 'output') throw new Error(`${channel.name} is not an output`);
     if (typeof value !== 'boolean') throw new Error('digital outputs require a boolean');
@@ -83,6 +83,7 @@ export class Cc100OnboardIoAdapter implements DeviceAdapter {
     // including after failures; per-logical-channel queues cannot protect this register.
     const write = this.writes.then(async () => {
       const register = await this.readRegister(this.registers.output);
+      admit?.();
       const mask = 1 << channel.bit;
       await writeFile(this.registers.output, String(value ? register | mask : register & ~mask));
     });
@@ -118,8 +119,8 @@ export class ModbusTcpAdapter implements DeviceAdapter {
     private readonly port = 502,
   ) {}
 
-  async write(point: Point, value: boolean): Promise<void> {
-    await this.request(5, point.channel, value ? 0xff00 : 0);
+  async write(point: Point, value: boolean, admit?: () => void): Promise<void> {
+    await this.request(5, point.channel, value ? 0xff00 : 0, admit);
   }
 
   async read(point: Point): Promise<boolean | number> {
@@ -127,7 +128,7 @@ export class ModbusTcpAdapter implements DeviceAdapter {
     return Boolean(response.at(-1) & 1);
   }
 
-  private request(functionCode: number, address: number, value: number): Promise<Buffer> {
+  private request(functionCode: number, address: number, value: number, admit?: () => void): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const transaction = Math.floor(Math.random() * 0xffff);
       const request = Buffer.alloc(12);
@@ -149,7 +150,14 @@ export class ModbusTcpAdapter implements DeviceAdapter {
         else resolve(Buffer.concat(chunks));
       };
       socket.setTimeout(5_000);
-      socket.once('connect', () => socket.write(request));
+      socket.once('connect', () => {
+        try {
+          admit?.();
+          socket.write(request);
+        } catch (error) {
+          finish(error as Error);
+        }
+      });
       socket.on('data', (chunk) => {
         chunks.push(Buffer.from(chunk));
         const response = Buffer.concat(chunks);
@@ -166,7 +174,8 @@ export class ModbusTcpAdapter implements DeviceAdapter {
 // injected so production deployments can configure baud/parity without granting unrelated devices.
 export class Rs485ModbusAdapter implements DeviceAdapter {
   constructor(private readonly exchange: (request: Buffer) => Promise<Buffer>) {}
-  async write(point: Point, value: boolean): Promise<void> {
+  async write(point: Point, value: boolean, admit?: () => void): Promise<void> {
+    admit?.();
     await this.exchange(Buffer.from([1, 5, point.channel >> 8, point.channel & 0xff, value ? 0xff : 0, 0]));
   }
   async read(point: Point): Promise<boolean | number> {
@@ -177,7 +186,8 @@ export class Rs485ModbusAdapter implements DeviceAdapter {
 
 export class MemoryDeviceAdapter implements DeviceAdapter {
   readonly values = new Map<string, boolean | number>();
-  async write(point: Point, value: boolean): Promise<void> {
+  async write(point: Point, value: boolean, admit?: () => void): Promise<void> {
+    admit?.();
     this.values.set(key(point), value);
   }
   async read(point: Point): Promise<boolean | number> {

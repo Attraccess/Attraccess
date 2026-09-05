@@ -72,7 +72,7 @@ export class QueuedModbusTransport implements ModbusTransport {
       try {
         let response: Buffer;
         if (this.connection.transport === 'tcp')
-          response = await tcpExchange(this.connection, ++this.transaction & 0xffff, unit, pdu);
+          response = await tcpExchange(this.connection, ++this.transaction & 0xffff, unit, pdu, isCurrent);
         else {
           const abort = new AbortController();
           const operation = this.serial(this.connection, rtuFrame(unit, pdu), abort.signal);
@@ -148,6 +148,7 @@ function tcpExchange(
   transaction: number,
   unit: number,
   pdu: Buffer,
+  isCurrent?: () => boolean,
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const socket = connect({ host: c.host, port: c.port });
@@ -163,6 +164,16 @@ function tcpExchange(
     };
     const timer = setTimeout(() => finish(new Error('Modbus TCP timeout')), c.timeoutMs);
     socket.once('connect', () => {
+      try {
+        if (isCurrent && !isCurrent())
+          throw new ModbusTransportError(
+            'modbus_configuration_changed',
+            'Modbus configuration changed before transmission',
+          );
+      } catch (error) {
+        finish(error as Error);
+        return;
+      }
       const header = Buffer.alloc(7);
       header.writeUInt16BE(transaction);
       header.writeUInt16BE(pdu.length + 1, 4);

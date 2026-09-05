@@ -45,7 +45,10 @@ The production router separately supports explicitly configured Modbus points;
 those points are not mapped onto the onboard digital registers. The built-in
 Modbus device profiles remain unqualified pending isolated hardware evidence.
 Output aliases and duplicate physical addresses are rejected to prevent
-conflicting pulse/policy owners. Unsupported snapshots never receive a success
+conflicting pulse/policy owners, including overlapping Modbus holding registers
+across named actions and device aliases. Modbus register inputs require the
+`measurement` capability and a matching named measurement transform; input-only
+register channels are rejected at both backend and runtime boundaries. Unsupported snapshots never receive a success
 configuration report. Old manually mapped installations must republish the
 corrected channel mapping; the runtime does not guess legacy input addresses.
 
@@ -74,6 +77,10 @@ missing/unavailable channels, and exposes their changes to flows. The canonical
 envelope also applies to heartbeats, measurements, faults and acknowledgements.
 The production runtime and simulator share this publication contract, command
 expiry, revision guards, configuration barriers and pulse-shutdown retries.
+Command expiry is rechecked at write admission after storage, guard reads and
+I/O queues. Pulse shutdown obligations are saved before ON is attempted. Restart
+schedules immediate OFF recovery using the locked accepted configuration, with
+retries until shutdown and its durable state update succeed.
 
 ## Evidence And Limitations
 

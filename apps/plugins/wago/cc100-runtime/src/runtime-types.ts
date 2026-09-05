@@ -32,6 +32,8 @@ export type RuntimeState = {
   accepted?: { revision: number; contentHash: string; snapshot: Snapshot };
   outputs: Record<string, boolean>;
   uncertainOutputChannelIds?: string[];
+  /** Shutdown obligations use the accepted snapshot, whose routing remains locked until OFF is durable. */
+  pendingPulseChannelIds?: string[];
   commandIds: string[];
   commandExpiries?: Record<string, string>;
   /** Highest reserved operational sequence; skipped unused values are intentional. */
@@ -55,11 +57,18 @@ export interface DeviceAdapter {
 
   validate?(snapshot: Snapshot): ValidationError[];
   checkAvailability?(): Promise<void>;
-  write(point: Snapshot['physicalPoints'][number], value: boolean): Promise<void>;
+  write(point: Snapshot['physicalPoints'][number], value: boolean, admit?: () => void): Promise<void>;
   read(point: Snapshot['physicalPoints'][number]): Promise<boolean | number>;
 }
 
 export interface StateStore {
   load(): Promise<RuntimeState>;
   save(state: RuntimeState): Promise<void>;
+}
+
+/** A write was refused before physical transmission. */
+export class WriteAdmissionError extends Error {
+  constructor(readonly code: 'expired' | 'outage_ended') {
+    super(code === 'expired' ? 'command has expired' : 'disconnect outage has ended');
+  }
 }
