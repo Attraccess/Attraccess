@@ -56,13 +56,18 @@ export class QueuedModbusTransport implements ModbusTransport {
     }
     const queue = bus;
     if (queue.quarantined) return Promise.reject(queue.quarantined);
-    if (queue.pending >= this.connection.queueLimit) return Promise.reject(new Error('Modbus queue full'));
+    if (queue.pending >= this.connection.queueLimit)
+      return Promise.reject(new ModbusTransportError('modbus_queue_full', 'Modbus queue full'));
     queue.pending++;
     const work = queue.tail.then(async () => {
       const delay = queue.retryAt - Date.now();
       if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
       if (queue.quarantined) throw queue.quarantined;
-      if (isCurrent && !isCurrent()) throw new Error('Modbus configuration changed before transaction');
+      if (isCurrent && !isCurrent())
+        throw new ModbusTransportError(
+          'modbus_configuration_changed',
+          'Modbus configuration changed before transaction',
+        );
       let teardown: Promise<unknown> | undefined;
       try {
         let response: Buffer;
