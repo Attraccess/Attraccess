@@ -110,6 +110,17 @@ describe('RabbitMQ management TLS trust', () => {
     expect(httpsMock.mock.calls[0][1]).not.toHaveProperty('servername');
   });
 
+  it('treats blank optional trust settings from MQTT server forms as absent', async () => {
+    config = { ...config, caCert: '', tlsServername: '' };
+    await client.request(config, 'GET', '/overview');
+    expect((await detection.detect(4)).isRabbitMQ).toBe(true);
+    for (const [, options] of httpsMock.mock.calls as [string, RequestOptions][]) {
+      expect(options).toMatchObject({ rejectUnauthorized: true });
+      expect(options).not.toHaveProperty('ca');
+      expect(options).not.toHaveProperty('servername');
+    }
+  });
+
   it('accepts a PEM trust bundle', async () => {
     config = { ...config, caCert: `${pem}\n${rootCertificates[1]}` };
     await client.request(config, 'GET', '/overview');
@@ -129,11 +140,9 @@ describe('RabbitMQ management TLS trust', () => {
 
   it.each([
     [{ tlsInsecure: true }, 'certificate verification'],
-    [{ caCert: '' }, 'Invalid CA certificate'],
     [{ caCert: 'upstream-secret' }, 'Invalid CA certificate'],
     [{ caCert: '-----BEGIN CERTIFICATE-----\ninvalid\n-----END CERTIFICATE-----' }, 'Invalid CA certificate'],
     [{ caCert: `${pem}\nupstream-secret` }, 'Invalid CA certificate'],
-    [{ tlsServername: '' }, 'DNS hostname'],
     [{ tlsServername: 'https://management.invalid:15671' }, 'DNS hostname'],
     [{ tlsServername: '127.0.0.1' }, 'DNS hostname'],
   ])('rejects invalid trust options before either transport opens a connection: %j', async (overrides, message) => {
