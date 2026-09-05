@@ -45,6 +45,9 @@ export interface Transport {
   subscribe(topic: string, listener: (payload: Buffer) => void | Promise<void>): Promise<void>;
 }
 
+/** Optional absolute expiry also travels to a subprocess's final pre-send check. */
+export type WriteAdmission = (() => void) & { expiresAt?: number };
+
 export interface DeviceAdapter {
   configure?(snapshot: Snapshot): void;
   /** Prepare may throw; the returned synchronous installation must not throw. */
@@ -57,7 +60,7 @@ export interface DeviceAdapter {
 
   validate?(snapshot: Snapshot): ValidationError[];
   checkAvailability?(): Promise<void>;
-  write(point: Snapshot['physicalPoints'][number], value: boolean, admit?: () => void): Promise<void>;
+  write(point: Snapshot['physicalPoints'][number], value: boolean, admit?: WriteAdmission): Promise<void>;
   read(point: Snapshot['physicalPoints'][number]): Promise<boolean | number>;
 }
 
