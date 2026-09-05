@@ -39,6 +39,8 @@ import { MqttCredentialProvisioningService } from '../mqtt/mqtt-credential-provi
 import { join } from 'path';
 import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
 import { EncryptionService } from '../encryption/encryption.service';
+import { PLUGIN_AUDIT_HOST_PROVIDER, PluginAuditHostProvider } from '@attraccess/plugins-backend-sdk';
+import { createPluginAuditContext } from './plugin-audit-context';
 
 @Global()
 @Module({})
@@ -227,6 +229,12 @@ export class PluginModule {
 
   private static createPluginContext(manifest: LoadedPluginManifest): PluginContext {
     const base: PluginContext = {
+      audit: createPluginAuditContext(manifest.id, () =>
+        PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get<PluginAuditHostProvider>(
+          PLUGIN_AUDIT_HOST_PROVIDER,
+          { strict: false },
+        ),
+      ),
       manifest: PluginService.toManifestInfo(manifest),
       logger: new Logger(`Plugin:${manifest.name}`),
       mqtt: {
