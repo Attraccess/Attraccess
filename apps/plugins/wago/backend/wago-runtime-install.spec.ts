@@ -192,6 +192,22 @@ else if (args[0] === 'container' && args[1] === 'ls') {
     expect(readFileSync(join(root, 'docker.log'), 'utf8')).toBe(before);
   });
 
+  it('completes interrupted cleanup when retrying a restored receipt', () => {
+    prior();
+    expect(install().status).toBe(0);
+    expect(recover().status).toBe(0);
+    mkdirSync(join(config, 'delivery'));
+    write(join(config, 'delivery/phase'), 'installing');
+    write(join(root, 'tmp/attraccess-wago-runtime.tar'), 'stale bundle');
+
+    const before = readFileSync(join(root, 'docker.log'), 'utf8');
+    expect(recover().status).toBe(0);
+    expect(readFileSync(join(root, 'docker.log'), 'utf8')).toBe(before);
+    expect(existsSync(`${tx}.restored/bundle`)).toBe(false);
+    expect(existsSync(join(config, 'delivery'))).toBe(false);
+    expect(existsSync(join(root, 'tmp/attraccess-wago-runtime.tar'))).toBe(false);
+  });
+
   it('delivers one stream under flock and rolls the old CA back with prior data', () => {
     prior();
     write(join(data, 'mqtt-ca.pem'), 'old CA');
