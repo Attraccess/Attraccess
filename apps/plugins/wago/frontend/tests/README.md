@@ -40,7 +40,7 @@ this runner. Do not use broad `test_*browser.py` discovery for an isolated run.
 
 ## Coverage
 
-Eight browser scenarios run at 1440x1000 desktop and 390x844 touch/mobile:
+Nine browser scenarios run at 1440x1000 desktop and 390x844 touch/mobile:
 
 1. First input/output setup, names, physical assignments, save and reload.
 2. Selected preset preview/copy and custom pulse duration without implicit save/publish.
@@ -50,9 +50,10 @@ Eight browser scenarios run at 1440x1000 desktop and 390x844 touch/mobile:
 6. Readable review labels, no JSON editor/internal paths, and dialog viewport bounds.
 7. Removing the first of two channels shows only the removed stable identity in review.
 8. A metadata-only draft change after rollback preview rejects confirmation without overwriting the draft.
+9. Embedded diagnostics refresh failure hides cached online status, recovers, and preserves unsaved edits without saving or publishing; the panel fits both viewports.
 
 Together with isolation, rollback-identity, and metadata-aware review contract tests,
-the runner executes 19 tests. Rollback requests must carry the previewed draft
+the runner executes 21 tests. Rollback requests must carry the previewed draft
 identity; review identities include metadata and remain separate from content hashes. All editor
 interactions use browser clicks, typed fields, and checkboxes, not React state
 manipulation. Screenshots are evidence, not pixel-diff baselines. Fixture validation,
