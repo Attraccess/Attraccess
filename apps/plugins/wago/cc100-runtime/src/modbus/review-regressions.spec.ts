@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 // Exercise the real persistence and runtime validators against the same snapshots.
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import { validateSnapshot as validateBackend } from '../../../backend/configuration';
@@ -118,9 +121,8 @@ class MemoryStore extends JsonStateStore {
     this.saved = structuredClone(state);
   }
 }
-function harness(initial: Snapshot, device: ModbusDeviceRouter) {
+function harness(initial: Snapshot, device: ModbusDeviceRouter, store = new MemoryStore(initial)) {
   const published: Array<{ topic: string; payload: Record<string, unknown> }> = [];
-  const store = new MemoryStore(initial);
   const runtime = new WagoRuntime({
     hardwareId: 'fixture',
     prefix: 'test',
@@ -139,9 +141,278 @@ function harness(initial: Snapshot, device: ModbusDeviceRouter) {
 const onboard = { read: async () => false, write: async () => undefined };
 const desired = (s: Snapshot, revision = 2) =>
   Buffer.from(JSON.stringify({ protocolVersion: 1, revision, contentHash: hash(s), snapshot: s }));
-const command = (id: string) => Buffer.from(JSON.stringify({ id, channelId: 'output', action: 'set', value: true }));
+const command = (id: string, value = true) =>
+  Buffer.from(JSON.stringify({ id, channelId: 'output', action: 'set', value }));
 
 describe('ATT-1059 independent review regressions', () => {
+  it.each(['remove', 'rebind'])(
+    'blocks route %s after an ambiguous ON, including after restart, until explicit OFF',
+    async (mode) => {
+      const s = snapshot();
+      let energized = false;
+      const request = jest.fn(async (_unit: number, pdu: Buffer) => {
+        energized = pdu.readUInt16BE(3) === 1;
+        if (energized) throw new Error('timeout after actuator applied ON');
+        return pdu;
+      });
+      const store = new MemoryStore(s);
+      // Exercise both old persisted states with no output and a last-confirmed OFF.
+      if (mode === 'rebind') store.saved.outputs.output = false;
+      const first = harness(s, new ModbusDeviceRouter(onboard, () => ({ request })), store);
+      await first.runtime.start();
+      await first.runtime.receiveCommand(command('ambiguous-on'));
+      expect(energized).toBe(true);
+      expect(store.saved.uncertainOutputChannelIds).toEqual(['output']);
+      expect(store.saved.outputs.output).not.toBe(true);
+      expect(first.published).toContainEqual(
+        expect.objectContaining({
+          payload: expect.objectContaining({ id: 'ambiguous-on', status: 'rejected' }),
+        }),
+      );
+      const next: Snapshot = structuredClone(s);
+      if (mode === 'remove') {
+        next.logicalChannels = [];
+        next.physicalPoints = [];
+        next.modbus.devices = [];
+      } else next.modbus.profiles[0].actions[0].address = 22;
+      expect(validateRuntime(next)).toEqual([]);
+      const expectBlocked = async (h: ReturnType<typeof harness>) => {
+        await h.runtime.receiveDesired(desired(next));
+        expect(h.published.at(-1)?.payload).toEqual({
+          revision: 2,
+          contentHash: hash(next),
+          errors: [expect.objectContaining({ path: 'snapshot', code: 'outputs_busy' })],
+        });
+        expect(store.saved.accepted?.revision).toBe(1);
+      };
+      await expectBlocked(first);
+      const restarted = harness(s, new ModbusDeviceRouter(onboard, () => ({ request })), store);
+      await restarted.runtime.start();
+      await expectBlocked(restarted);
+      expect(request).toHaveBeenCalledTimes(1);
+      request.mockRejectedValueOnce(new Error('OFF acknowledgement missing'));
+      await restarted.runtime.receiveCommand(command('failed-off', false));
+      expect(store.saved.uncertainOutputChannelIds).toEqual(['output']);
+      await expectBlocked(restarted);
+      await restarted.runtime.receiveCommand(command('explicit-off', false));
+      expect(energized).toBe(false);
+      expect(store.saved.uncertainOutputChannelIds).toEqual([]);
+      expect(request).toHaveBeenCalledTimes(3);
+      expect(request.mock.calls[2][1].readUInt16BE(1)).toBe(12);
+      await restarted.runtime.receiveDesired(desired(next));
+      expect(store.saved.accepted?.revision).toBe(2);
+      expect(restarted.published).toContainEqual(
+        expect.objectContaining({
+          payload: { revision: 2, contentHash: hash(next), errors: [] },
+        }),
+      );
+    },
+  );
+  it('persists uncertainty before transmission and blocks a fresh runtime before the write settles', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'wago-uncertain-output-'));
+    const pending = deferred<Buffer>();
+    const entered = deferred<void>();
+    try {
+      const s = snapshot();
+      const path = join(directory, 'state.json');
+      const store = new JsonStateStore(path);
+      await store.save({ outputs: {}, commandIds: [], accepted: { revision: 1, contentHash: hash(s), snapshot: s } });
+      const request = jest.fn(() => {
+        entered.resolve();
+        return pending.promise;
+      });
+      const publish = jest.fn(async () => undefined);
+      const createRuntime = () =>
+        new WagoRuntime({
+          hardwareId: 'fixture',
+          prefix: 'test',
+          pairingCode: 'fixture',
+          store: new JsonStateStore(path),
+          device: new ModbusDeviceRouter(onboard, () => ({ request })),
+          transport: { subscribe: async () => undefined, publish },
+        });
+      const runtime = createRuntime();
+      await runtime.start();
+      const writing = runtime.receiveCommand(command('incomplete-on'));
+      await entered.promise;
+      expect(await store.load()).toMatchObject({
+        outputs: {},
+        uncertainOutputChannelIds: ['output'],
+        commandIds: ['incomplete-on'],
+      });
+      const restarted = createRuntime();
+      await restarted.start();
+      const next = structuredClone(s);
+      next.modbus.devices[0].unitId = 2;
+      await restarted.receiveDesired(desired(next));
+      expect(publish).toHaveBeenLastCalledWith(
+        expect.stringContaining('/configuration/reported'),
+        {
+          revision: 2,
+          contentHash: hash(next),
+          errors: [expect.objectContaining({ code: 'outputs_busy' })],
+        },
+        { retain: true },
+      );
+      await restarted.receiveCommand(command('incomplete-on'));
+      expect(request).toHaveBeenCalledTimes(1);
+      pending.reject(new Error('lost acknowledgement'));
+      await writing;
+      expect((await store.load()).uncertainOutputChannelIds).toEqual(['output']);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+  it('does not transmit until uncertainty is saved, and does not transmit when that save fails', async () => {
+    const s = snapshot();
+    const request = jest.fn(async (_unit: number, pdu: Buffer) => pdu);
+    const { runtime, store } = harness(s, new ModbusDeviceRouter(onboard, () => ({ request })));
+    await runtime.start();
+    const held = deferred<void>();
+    const entered = deferred<void>();
+    const save = store.save.bind(store);
+    jest.spyOn(store, 'save').mockImplementation(async (state) => {
+      if (state.uncertainOutputChannelIds?.length) {
+        entered.resolve();
+        await held.promise;
+      }
+      await save(state);
+    });
+    const writing = runtime.receiveCommand(command('unsaved-on'));
+    await entered.promise;
+    expect(request).not.toHaveBeenCalled();
+    const failure = expect(writing).rejects.toThrow('disk failure');
+    held.reject(new Error('disk failure'));
+    await failure;
+    expect(request).not.toHaveBeenCalled();
+  });
+  it.each(['disconnect', 'pulse'])(
+    'attempts automatic %s OFF despite storage failure and keeps routing conservative',
+    async (mode) => {
+      jest.useFakeTimers();
+      const s = snapshot();
+      if (mode === 'pulse') {
+        s.logicalChannels[1].capabilities.push('pulse');
+        Object.assign(s.logicalChannels[1], { pulse: { durationMs: 10 } });
+      }
+      const values: number[] = [];
+      const request = jest.fn(async (_unit: number, pdu: Buffer) => {
+        values.push(pdu.readUInt16BE(3));
+        return pdu;
+      });
+      const { runtime, store, published } = harness(s, new ModbusDeviceRouter(onboard, () => ({ request })));
+      await runtime.start();
+      await runtime.receiveCommand(
+        mode === 'pulse'
+          ? Buffer.from(JSON.stringify({ id: 'energize', channelId: 'output', action: 'pulse' }))
+          : command('energize'),
+      );
+      expect(store.saved).toMatchObject({ outputs: { output: true }, uncertainOutputChannelIds: [] });
+      jest.spyOn(store, 'save').mockRejectedValue(new Error('disk failure'));
+      if (mode === 'disconnect') await expect(runtime.setConnected(false)).rejects.toThrow('disk failure');
+      else await jest.advanceTimersByTimeAsync(10);
+      expect(values).toEqual([1, 0]);
+      // The confirmation could not be saved: restart must still treat the old route as energized.
+      expect(store.saved).toMatchObject({ outputs: { output: true }, uncertainOutputChannelIds: [] });
+      const next = structuredClone(s);
+      next.modbus.profiles[0].actions[0].address = 22;
+      await runtime.receiveDesired(desired(next));
+      expect(published.at(-1)?.payload.errors).toEqual([expect.objectContaining({ code: 'outputs_busy' })]);
+      const restarted = harness(s, new ModbusDeviceRouter(onboard, () => ({ request })), store);
+      await restarted.runtime.start();
+      await restarted.runtime.receiveDesired(desired(next));
+      expect(restarted.published.at(-1)?.payload.errors).toEqual([expect.objectContaining({ code: 'outputs_busy' })]);
+      expect(store.saved.accepted?.revision).toBe(1);
+      await jest.advanceTimersByTimeAsync(100);
+      expect(values).toEqual([1, 0]);
+    },
+  );
+  it('clears uncertainty on confirmed ON but keeps the energized guard, and retains uncertainty on failed OFF persistence', async () => {
+    const s = snapshot();
+    const request = jest.fn(async (_unit: number, pdu: Buffer) => pdu);
+    const { runtime, store, published } = harness(s, new ModbusDeviceRouter(onboard, () => ({ request })));
+    await runtime.start();
+    await runtime.receiveCommand(command('confirmed-on'));
+    expect(store.saved).toMatchObject({ outputs: { output: true }, uncertainOutputChannelIds: [] });
+    const next = structuredClone(s);
+    next.modbus.devices[0].unitId = 2;
+    await runtime.receiveDesired(desired(next));
+    expect(published.at(-1)?.payload.errors).toEqual([expect.objectContaining({ code: 'outputs_busy' })]);
+    const save = store.save.bind(store);
+    const saving = jest.spyOn(store, 'save').mockImplementation(async (state) => {
+      if (state.outputs.output === false && !state.uncertainOutputChannelIds?.length) throw new Error('disk failure');
+      await save(state);
+    });
+    await expect(runtime.receiveCommand(command('off-save-fails', false))).rejects.toThrow(
+      'failed to persist channel state',
+    );
+    expect(store.saved).toMatchObject({ outputs: { output: true }, uncertainOutputChannelIds: [] });
+    await runtime.receiveDesired(desired(next));
+    expect(published.at(-1)?.payload.errors).toEqual([expect.objectContaining({ code: 'outputs_busy' })]);
+    expect(request).toHaveBeenCalledTimes(2);
+    saving.mockRestore();
+    await runtime.receiveCommand(command('confirmed-off', false));
+    await runtime.receiveDesired(desired(next));
+    expect(store.saved).toMatchObject({
+      outputs: { output: false },
+      uncertainOutputChannelIds: [],
+      accepted: { revision: 2 },
+    });
+  });
+  it.each(['/dev/ttyS0', '/dev/serial/by-id/fixture.0'])('accepts canonical RTU path %s at both boundaries', (path) => {
+    const s = snapshot();
+    s.modbus.connections[0].path = path;
+    expect(validateBackend(s)).toEqual([]);
+    expect(validateRuntime(s)).toEqual([]);
+  });
+  it.each(['/dev/./ttyS0', '/dev//ttyS0', '/dev/ttyS0/', '/dev/sub/../ttyS0'])(
+    'rejects noncanonical RTU path %s at both boundaries',
+    (path) => {
+      const s = snapshot();
+      s.modbus.connections[0].path = path;
+      for (const validate of [validateBackend, validateRuntime]) {
+        expect(validate(s)).toEqual(
+          expect.arrayContaining([expect.objectContaining({ path: 'modbus.connections[0]', code: 'invalid_modbus' })]),
+        );
+      }
+    },
+  );
+  it.each(['path', 'host', 'port'])('rejects non-coercible endpoint %s at both boundaries', (field) => {
+    const s = snapshot();
+    if (field !== 'path') {
+      Object.assign(s.modbus.connections[0], { transport: 'tcp', host: 'fixture.invalid', port: 502 });
+    }
+    Object.assign(s.modbus.connections[0], { [field]: { toString: null } });
+    for (const validate of [validateBackend, validateRuntime]) {
+      expect(validate(s)).toEqual(
+        expect.arrayContaining([expect.objectContaining({ path: 'modbus.connections[0]', code: 'invalid_modbus' })]),
+      );
+    }
+  });
+  it.each(['.', '', 'sub/..', 'trailing'])(
+    'shares RTU quarantine with directly constructed lexical alias %p',
+    async (segment) => {
+      for (const aliasFirst of [false, true]) {
+        const s = snapshot();
+        const c = s.modbus.connections[0];
+        const exchange = jest.fn(async () => {
+          throw new Error('ambiguous serial failure');
+        });
+        const pdu = readPdu(3, s.modbus.profiles[0].measurements[0]);
+        const alias = {
+          ...c,
+          path: segment === 'trailing' ? `${c.path}/` : c.path.replace('/dev/', `/dev/${segment}/`),
+        };
+        await expect(new QueuedModbusTransport(aliasFirst ? alias : c, exchange).request(1, pdu)).rejects.toThrow();
+        await expect(new QueuedModbusTransport(aliasFirst ? c : alias, exchange).request(1, pdu)).rejects.toMatchObject(
+          {
+            code: 'modbus_rtu_quarantined',
+          },
+        );
+        expect(exchange).toHaveBeenCalledTimes(1);
+      }
+    },
+  );
   afterEach(() => {
     jest.useRealTimers();
     jest.restoreAllMocks();

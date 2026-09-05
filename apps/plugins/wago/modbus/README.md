@@ -112,6 +112,27 @@ production routing change; finish commands and switch outputs off first so a
 timed OFF cannot lose its old route. No implicit actuator writes are performed
 to make a configuration apply succeed.
 
+For adapters with `prepareConfiguration` (the production router), every output
+write first marks its logical channel ID uncertain in memory using the optional
+runtime state field `uncertainOutputChannelIds`. Older state files without the
+field mean an empty set. ON requires this uncertainty to be persisted before
+transmission; a failed save prevents ON transmission. OFF skips this write-ahead
+save so storage failure cannot suppress automatic disconnect or pulse shutoff.
+Previously durable energized/uncertain state remains conservative across restart
+until an OFF confirmation is successfully persisted. Command reservation
+persistence for explicit commands is unchanged.
+A write failure leaves uncertainty intact without changing the last-confirmed
+`outputs` value or acknowledging success. New desired revisions are rejected with
+the structured `outputs_busy` error while any output is uncertain, including
+after restart, so removal or rebinding cannot discard a possibly energized route.
+A confirmed write clears that channel's uncertainty; if saving the confirmation
+fails, the runtime conservatively restores uncertainty in memory. Successful ON
+still blocks configuration through the energized-output guard. A successful,
+persisted explicit OFF on the old route allows reconfiguration once no other
+outputs or commands are busy. Restart performs no output replay, and this change
+adds no write retry or implicit OFF. Legacy adapters without the production
+configuration-preparation seam retain their existing write/persistence behavior.
+
 ## Transports and deployment
 
 TCP uses a new socket per transaction, a bounded deadline including connection,
@@ -138,6 +159,15 @@ quarantined runtime, externally isolate/reset and establish a quiescent bus;
 merely restarting the process or changing the configured path is not proof of
 safe resynchronization. A valid protocol exception completes its transaction
 and does not by itself quarantine the bus. No RTU reconnect has been proven.
+
+RTU configuration requires a lexically canonical `/dev/...` path: no repeated
+slashes, `.` or `..` segments, or trailing slash. Transport bus keys additionally
+use POSIX lexical normalization so direct construction cannot evade an existing
+queue or quarantine with these aliases. This does not resolve symlinks or identify
+device nodes: distinct symlink paths to the same device can still bypass shared
+queue/quarantine identity. Use one consistent path per physical bus across all
+configurations; changing aliases is not a recovery mechanism. No filesystem
+discovery, realpath lookup, or additional device access is performed.
 
 Failure to open/configure/lock/read the serial device faults. Grant the runtime UID only the required serial device and
 its group; device discovery and RS-485 direction control are not configured here.

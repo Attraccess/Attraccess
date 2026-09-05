@@ -1,5 +1,6 @@
 import { connect } from 'node:net';
 import { spawn } from 'node:child_process';
+import { posix } from 'node:path';
 // Shared pure configuration model is bundled into the standalone runtime.
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import type { ModbusConnection } from '../../../modbus/model';
@@ -48,7 +49,7 @@ export class QueuedModbusTransport implements ModbusTransport {
     const key =
       this.connection.transport === 'tcp'
         ? `tcp:${this.connection.host.toLowerCase()}:${this.connection.port}`
-        : `rtu:${this.connection.path}`;
+        : `rtu:${posix.normalize(this.connection.path).replace(/\/$/, '')}`;
     let bus = buses.get(key);
     if (!bus) {
       let markQuarantined!: Bus['markQuarantined'];

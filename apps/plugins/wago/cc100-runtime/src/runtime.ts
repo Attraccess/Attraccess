@@ -58,6 +58,7 @@ export type RuntimeState = {
   credentials?: DiscoveryClaim;
   accepted?: { revision: number; contentHash: string; snapshot: Snapshot };
   outputs: Record<string, boolean>;
+  uncertainOutputChannelIds?: string[];
   commandIds: string[];
 };
 
@@ -230,13 +231,15 @@ export class WagoRuntime {
       (this.inFlightCommandIds.size ||
         this.channelWrites.size ||
         this.pulses.size ||
+        this.state.uncertainOutputChannelIds?.length ||
         Object.values(this.state.outputs).some(Boolean))
     )
       return this.reportRejected(desired.revision, desired.contentHash, [
         {
           path: 'snapshot',
           code: 'outputs_busy',
-          message: 'finish pending commands and switch outputs off before reconfiguration',
+          message:
+            'finish pending commands and confirm outputs off, including uncertain outputs, before reconfiguration',
         },
       ]);
     // Prepare is side-effect free. Keep the old snapshot and routing active as a pair until save succeeds.
@@ -442,6 +445,13 @@ export class WagoRuntime {
     if (this.configurationPending || configurationGeneration !== this.configurationGeneration) return 'failed';
     const point = this.state.accepted?.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
     if (!point) return 'failed';
+    if (this.options.device.prepareConfiguration) {
+      // Persist before ON; disk failure must not suppress OFF. Prior durable ON/uncertainty remains conservative.
+      this.state.uncertainOutputChannelIds = [
+        ...new Set([...(this.state.uncertainOutputChannelIds ?? []), channel.id]),
+      ];
+      if (value) await this.options.store.save(this.state);
+    }
     try {
       await this.options.device.write(point, value);
     } catch (error) {
@@ -461,11 +471,19 @@ export class WagoRuntime {
     // when a newer command has superseded its feedback generation.
     onWritten?.(configurationGeneration);
     this.state.outputs[channel.id] = value;
+    if (this.options.device.prepareConfiguration)
+      this.state.uncertainOutputChannelIds = (this.state.uncertainOutputChannelIds ?? []).filter(
+        (id) => id !== channel.id,
+      );
     if (feedbackIsCurrent && configurationGeneration === this.configurationGeneration)
       this.scheduleFeedbackCheck(channel, value, feedbackGeneration, configurationGeneration);
     try {
       await this.options.store.save(this.state);
     } catch {
+      if (this.options.device.prepareConfiguration)
+        this.state.uncertainOutputChannelIds = [
+          ...new Set([...(this.state.uncertainOutputChannelIds ?? []), channel.id]),
+        ];
       // Do not acknowledge an operation whose durable output state is stale.
       throw new Error('failed to persist channel state');
     }
