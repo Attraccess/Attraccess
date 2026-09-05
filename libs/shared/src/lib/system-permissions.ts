@@ -9,6 +9,7 @@ export type SystemPermission =
   | 'resources.delete'
   | 'resources.access.manage'
   | 'resources.maintenance.manage'
+  | 'resources.reports.export'
   | 'users.read'
   | 'users.create'
   | 'users.update'

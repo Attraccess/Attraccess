@@ -1,6 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-// eslint-disable-next-line @nx/enforce-module-boundaries -- test covers host behavior against plugin controller integration.
-import { ShellyController } from '../../../plugins/shelly/backend/shelly.controller';
+import { ShellyController } from './shelly.controller';
 
 describe('ShellyController ATT-498 device info and auth', () => {
   const registry = {

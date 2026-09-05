@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AnalyticsController } from './analytics.controller';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsQueryDto } from './dtos/analyticsQuery.dto';
+import { ResourceOperatingDurationsDto } from './dtos/resourceOperatingDurations.dto';
 
 describe('AnalyticsController', () => {
   let controller: AnalyticsController;
@@ -10,6 +11,7 @@ describe('AnalyticsController', () => {
   const mockAnalyticsService = {
     getResourceUsageHoursInDateRange: jest.fn(),
     getBillingTransactionsInDateRange: jest.fn(),
+    getResourceOperatingDurations: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -88,6 +90,22 @@ describe('AnalyticsController', () => {
       mockAnalyticsService.getResourceUsageHoursInDateRange.mockRejectedValue(error);
 
       await expect(controller.getResourceUsageHoursInDateRange(query)).rejects.toThrow(error);
+    });
+  });
+
+  it('returns exact operating durations for the requested resources and date range', async () => {
+    const body = Object.assign(new ResourceOperatingDurationsDto(), {
+      resourceIds: [1, 2],
+      start: new Date('2023-01-01T00:00:00Z'),
+      end: new Date('2023-01-31T23:59:59Z'),
+    });
+    const report = { 1: { sessionDurationMs: 60_000 } };
+    mockAnalyticsService.getResourceOperatingDurations.mockResolvedValue(report);
+
+    await expect(controller.getResourceOperatingDurations(body)).resolves.toBe(report);
+    expect(service.getResourceOperatingDurations).toHaveBeenCalledWith(body.resourceIds, {
+      start: body.start,
+      end: body.end,
     });
   });
 });

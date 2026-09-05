@@ -1,7 +1,5 @@
-// eslint-disable-next-line @nx/enforce-module-boundaries -- test covers host behavior against plugin device API integration.
-import { ShellyDeviceApiService } from '../../../plugins/shelly/backend/shelly-device-api.service';
-// eslint-disable-next-line @nx/enforce-module-boundaries -- test covers host behavior against plugin device API integration.
-import { ShellyHttpClient } from '../../../plugins/shelly/backend/shelly-http.client';
+import { ShellyDeviceApiService } from './shelly-device-api.service';
+import { ShellyHttpClient } from './shelly-http.client';
 
 describe('ShellyDeviceApiService', () => {
   const fetchMock = jest.fn();

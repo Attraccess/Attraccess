@@ -16,6 +16,7 @@ import { ProjectsSelect } from '../../../../../components/projectsSelect';
 import en from './utils/translations/en.json';
 import de from './utils/translations/de.json';
 import { SimplePagination } from '../../../../../components/simplePagination';
+import { attributedOperatingDurationForUsage, useOperatingDuration } from '../../../operatingDuration';
 
 interface HistoryTableProps {
   resourceId: number;
@@ -26,6 +27,7 @@ interface HistoryTableProps {
   resolveProjectId: (session: ResourceUsage) => number | null;
   updatingSessionIds: Record<number, boolean>;
   onProjectChange: (session: ResourceUsage, projectId: number | undefined) => void;
+  canViewOperatingDuration: boolean;
 }
 
 interface ProjectAssignmentCellProps {
@@ -74,6 +76,7 @@ export const HistoryTable = ({
   resolveProjectId,
   updatingSessionIds,
   onProjectChange,
+  canViewOperatingDuration,
 }: HistoryTableProps) => {
   const { t } = useTranslations({ en, de });
   const { user } = useAuth();
@@ -105,8 +108,8 @@ export const HistoryTable = ({
       return [];
     }
 
-    return generateHeaderColumns(t, resource, showAllUsers, canUpdateResources);
-  }, [t, showAllUsers, canUpdateResources, resource]);
+    return generateHeaderColumns(t, resource, showAllUsers, canUpdateResources, canViewOperatingDuration);
+  }, [t, showAllUsers, canUpdateResources, canViewOperatingDuration, resource]);
 
   const totalPages = useMemo(() => {
     if (!usageHistory?.total) {
@@ -138,6 +141,22 @@ export const HistoryTable = ({
     });
   }, [usageHistory?.data, resource]);
 
+  const operatingDurationRange = useMemo(() => {
+    if (resource?.type !== ResourceType.MACHINE || filteredHistory.length === 0) {
+      return undefined;
+    }
+
+    return {
+      start: new Date(Math.min(...filteredHistory.map((session) => new Date(session.startTime).getTime()))),
+      end: new Date(Math.max(...filteredHistory.map((session) => new Date(session.endTime ?? new Date()).getTime()))),
+    };
+  }, [filteredHistory, resource?.type]);
+  const { data: operatingDurationForPage } = useOperatingDuration(
+    resourceId,
+    canViewOperatingDuration && operatingDurationRange !== undefined,
+    operatingDurationRange,
+  );
+
   if (error) {
     return <div className="text-center py-4 text-red-500">{t('errorLoadingHistory')}</div>;
   }
@@ -157,17 +176,28 @@ export const HistoryTable = ({
                   onAction={() => onSessionClick(session)}
                 >
                   {resource
-                    ? generateRowCells(session, t, resource, showAllUsers, canUpdateResources, (sessionToRender) => (
-                        <ProjectAssignmentCell
-                          session={sessionToRender}
-                          canEdit={Boolean(sessionToRender.endTime) && sessionToRender.userId === user?.id}
-                          projectId={resolveProjectId(sessionToRender)}
-                          isUpdating={Boolean(updatingSessionIds[sessionToRender.id])}
-                          placeholder={projectPlaceholder}
-                          unassignedLabel={projectPlaceholder}
-                          onChange={(projectId) => onProjectChange(sessionToRender, projectId)}
-                        />
-                      ))
+                    ? generateRowCells(
+                        session,
+                        t,
+                        resource,
+                        showAllUsers,
+                        canUpdateResources,
+                        (sessionToRender) => (
+                          <ProjectAssignmentCell
+                            session={sessionToRender}
+                            canEdit={Boolean(sessionToRender.endTime) && sessionToRender.userId === user?.id}
+                            projectId={resolveProjectId(sessionToRender)}
+                            isUpdating={Boolean(updatingSessionIds[sessionToRender.id])}
+                            placeholder={projectPlaceholder}
+                            unassignedLabel={projectPlaceholder}
+                            onChange={(projectId) => onProjectChange(sessionToRender, projectId)}
+                          />
+                        ),
+                        {
+                          canView: canViewOperatingDuration,
+                          durationMs: attributedOperatingDurationForUsage(operatingDurationForPage, session.id),
+                        },
+                      )
                     : []}
                 </TableRow>
               ))}

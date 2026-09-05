@@ -16,6 +16,7 @@ vi.mock('../../usage/resourceUsageSession', () => ({ ResourceUsageSession: () =>
 vi.mock('../resourceBillingInfo', () => ({ ResourceBillingInfo: () => null }));
 vi.mock('./RecentSessionsCard', () => ({ RecentSessionsCard: () => null }));
 vi.mock('./ResourceDocsPreviewCard', () => ({ ResourceDocsPreviewCard: () => null }));
+vi.mock('./OperatingDurationCard', () => ({ OperatingDurationCard: () => null }));
 
 function installContribution(contribution: PluginSlotContribution<ResourceSlotContext>) {
   const plugin = {

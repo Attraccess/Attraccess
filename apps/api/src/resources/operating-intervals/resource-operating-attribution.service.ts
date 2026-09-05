@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResourceOperatingInterval, ResourceUsage, ResourceUsageAction } from '@attraccess/database-entities';
-import { IsNull, LessThan, MoreThan, Repository } from 'typeorm';
+import { In, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
 
 const ATTRIBUTION_LOOKBACK_MS = 31 * 24 * 60 * 60_000;
 
@@ -17,9 +17,12 @@ export interface ResourceOperatingAttribution {
 export interface ResourceOperatingAttributionSummary {
   asOf: Date;
   windowStart: Date | null;
-  operatingDurationMs: number;
-  attributedOperatingDurationMs: number;
-  unattributedOperatingDurationMs: number;
+  sessionDurationMs: number;
+  operatingDataAvailable: boolean;
+  operatingDurationMs: number | null;
+  attributedOperatingDurationMs: number | null;
+  unattributedOperatingDurationMs: number | null;
+  isOperating: boolean;
   isProvisional: boolean;
   attributions: ResourceOperatingAttribution[];
 }
@@ -52,9 +55,12 @@ export class ResourceOperatingAttributionService {
     private readonly usageRepository: Repository<ResourceUsage>,
   ) {}
 
-  async getForResource(resourceId: number, asOf = new Date()): Promise<ResourceOperatingAttributionSummary> {
-    const windowStart = new Date(asOf.getTime() - ATTRIBUTION_LOOKBACK_MS);
-    const [operatingIntervals, usages] = await Promise.all([
+  async getForResource(
+    resourceId: number,
+    asOf = new Date(),
+    windowStart = new Date(asOf.getTime() - ATTRIBUTION_LOOKBACK_MS),
+  ): Promise<ResourceOperatingAttributionSummary> {
+    const [operatingIntervals, usages, operatingDataAvailable] = await Promise.all([
       this.intervalRepository.find({
         where: [
           { resourceId, startTime: LessThan(asOf), endTime: IsNull() },
@@ -74,9 +80,78 @@ export class ResourceOperatingAttributionService {
         ],
         order: { startTime: 'ASC' },
       }),
+      this.intervalRepository.existsBy({ resourceId }),
     ]);
 
-    return this.derive(operatingIntervals, usages, asOf, windowStart);
+    return this.derive(operatingIntervals, usages, asOf, windowStart, operatingDataAvailable);
+  }
+
+  async getForResources(
+    resourceIds: number[],
+    windowStart: Date,
+    asOf: Date,
+    liveValuesMayChange = true,
+  ): Promise<Map<number, ResourceOperatingAttributionSummary>> {
+    const uniqueResourceIds = [...new Set(resourceIds)];
+    if (uniqueResourceIds.length === 0) {
+      return new Map();
+    }
+
+    const [operatingIntervals, usages, resourcesWithOperatingData] = await Promise.all([
+      this.intervalRepository.find({
+        where: [
+          { resourceId: In(uniqueResourceIds), startTime: LessThan(asOf), endTime: IsNull() },
+          { resourceId: In(uniqueResourceIds), startTime: LessThan(asOf), endTime: MoreThan(windowStart) },
+        ],
+        order: { startTime: 'ASC' },
+      }),
+      this.usageRepository.find({
+        where: [
+          {
+            resourceId: In(uniqueResourceIds),
+            usageAction: ResourceUsageAction.Usage,
+            startTime: LessThan(asOf),
+            endTime: IsNull(),
+          },
+          {
+            resourceId: In(uniqueResourceIds),
+            usageAction: ResourceUsageAction.Usage,
+            startTime: LessThan(asOf),
+            endTime: MoreThan(windowStart),
+          },
+        ],
+        order: { startTime: 'ASC' },
+      }),
+      this.intervalRepository
+        .createQueryBuilder('interval')
+        .select('DISTINCT interval.resourceId', 'resourceId')
+        .where('interval.resourceId IN (:...resourceIds)', { resourceIds: uniqueResourceIds })
+        .getRawMany<{ resourceId: number }>(),
+    ]);
+    const availableResourceIds = new Set(resourcesWithOperatingData.map(({ resourceId }) => resourceId));
+    const groupByResourceId = <T extends { resourceId: number }>(items: T[]) =>
+      items.reduce((grouped, item) => {
+        const group = grouped.get(item.resourceId) ?? [];
+        group.push(item);
+        grouped.set(item.resourceId, group);
+        return grouped;
+      }, new Map<number, T[]>());
+    const intervalsByResourceId = groupByResourceId(operatingIntervals);
+    const usagesByResourceId = groupByResourceId(usages);
+
+    return new Map(
+      uniqueResourceIds.map((resourceId) => [
+        resourceId,
+        this.derive(
+          intervalsByResourceId.get(resourceId) ?? [],
+          usagesByResourceId.get(resourceId) ?? [],
+          asOf,
+          windowStart,
+          availableResourceIds.has(resourceId),
+          liveValuesMayChange,
+        ),
+      ]),
+    );
   }
 
   derive(
@@ -84,6 +159,8 @@ export class ResourceOperatingAttributionService {
     usages: ResourceUsage[],
     asOf = new Date(),
     windowStart?: Date,
+    operatingDataAvailable = operatingIntervals.length > 0,
+    liveValuesMayChange = true,
   ): ResourceOperatingAttributionSummary {
     const attributions: ResourceOperatingAttribution[] = [];
     const attributedRanges: TimeRange[] = [];
@@ -158,15 +235,22 @@ export class ResourceOperatingAttributionService {
       }
     }
 
-    const operatingDurationMs = this.unionDuration(operatingRanges.map(({ range }) => range));
+    const operatingDurationMs = operatingDataAvailable
+      ? this.unionDuration(operatingRanges.map(({ range }) => range))
+      : null;
     const attributedOperatingDurationMs = this.unionDuration(attributedRanges);
     return {
       asOf,
       windowStart: windowStart ?? null,
+      sessionDurationMs: this.unionDuration(usageRanges.map(({ range }) => range)),
+      operatingDataAvailable,
       operatingDurationMs,
-      attributedOperatingDurationMs,
-      unattributedOperatingDurationMs: operatingDurationMs - attributedOperatingDurationMs,
-      isProvisional,
+      attributedOperatingDurationMs: operatingDataAvailable ? attributedOperatingDurationMs : null,
+      unattributedOperatingDurationMs: operatingDataAvailable
+        ? operatingDurationMs - attributedOperatingDurationMs
+        : null,
+      isOperating: operatingRanges.some(({ interval }) => this.isOpenAt(interval, asOf)),
+      isProvisional: liveValuesMayChange && isProvisional,
       attributions,
     };
   }
