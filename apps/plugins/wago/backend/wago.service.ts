@@ -40,7 +40,7 @@ import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { WagoCommandError, WagoCommandHandler } from './wago-command-handler';
 import { freshness, WagoDiagnosticsStore } from './diagnostics-store';
-import { canonicalEnvelope } from './diagnostics-envelope';
+import { canonicalEnvelope, validEnvelope } from './diagnostics-envelope';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 const STALE_AFTER_MS = 90_000;
@@ -858,7 +858,13 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       return;
     }
     if (heartbeat.hardwareId !== hardwareId) return;
-    const canonical = canonicalEnvelope(JSON.parse(payload.toString('utf8')), 'heartbeat');
+    let rawHeartbeat: Record<string, unknown>;
+    try {
+      rawHeartbeat = JSON.parse(payload.toString('utf8'));
+    } catch {
+      return;
+    }
+    const canonical = canonicalEnvelope(rawHeartbeat, 'heartbeat');
     const controller = await this.controllers.findOneBy({ hardwareId });
     if (
       !controller ||
@@ -867,9 +873,17 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     )
       return;
     const now = new Date().toISOString();
+    const canTrackDiagnostics = this.diagnostics.canTrack(controller.id);
     const admitted = this.diagnostics.ingest(controller.id, 'heartbeat', payload);
-    const heartbeatAt = this.diagnostics.read(controller.id).heartbeatAt;
-    if (canonical && (!admitted || !heartbeatAt)) return;
+    const heartbeatAt = admitted
+      ? this.diagnostics.read(controller.id).heartbeatAt
+      : typeof rawHeartbeat.timestamp === 'string'
+        ? rawHeartbeat.timestamp
+        : undefined;
+    // A full bounded diagnostic cache must not disable permanent heartbeat checkpoints.
+    // Other canonical rejections remain invalid and never use receipt time as liveness.
+    if (canonical && (!validEnvelope(rawHeartbeat, Date.now()) || (canTrackDiagnostics && !admitted) || !heartbeatAt))
+      return;
     // Connectivity is process-local between bounded persistence checkpoints.
     // Avoid a database write for every permanent heartbeat.
     const metadataChanged =

@@ -148,6 +148,14 @@ export class WagoDiagnosticsStore {
     while (Object.keys(state.acknowledgements).length > MAX_CHANNELS)
       delete state.acknowledgements[Object.keys(state.acknowledgements)[0]];
   }
+  canTrack(id: number): boolean {
+    this.prune();
+    return (
+      this.controllers.has(id) ||
+      this.controllers.size < MAX_CONTROLLERS ||
+      [...this.controllers.values()].some((state) => !state.activeStream)
+    );
+  }
   ingest(id: number, kind: string, payload: Buffer): boolean {
     this.prune();
     if (payload.length > 65_536) return false;
