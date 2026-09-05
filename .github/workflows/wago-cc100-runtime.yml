@@ -6,6 +6,7 @@ on:
       - 'apps/plugins/wago/cc100-runtime/**'
 <<<<<<< HEAD
       - 'apps/plugins/wago/backend/**'
+      - 'apps/plugins/wago/measurement-contract.ts'
       - 'libs/plugins-backend-sdk/**'
       - 'apps/plugins/wago/scripts/package-runtime-artifact.mjs'
 =======
@@ -19,6 +20,7 @@ on:
       - 'apps/plugins/wago/cc100-runtime/**'
 <<<<<<< HEAD
       - 'apps/plugins/wago/backend/**'
+      - 'apps/plugins/wago/measurement-contract.ts'
       - 'libs/plugins-backend-sdk/**'
       - 'apps/plugins/wago/scripts/package-runtime-artifact.mjs'
 =======
