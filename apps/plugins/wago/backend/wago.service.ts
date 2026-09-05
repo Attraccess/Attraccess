@@ -23,7 +23,9 @@ import {
   heartbeatTopic,
   normalizeOperationalPrefix,
   parseAnnouncement,
+  parseHeartbeat,
   type WagoAnnouncement,
+  type WagoHeartbeat,
 } from './protocol';
 import { WagoController } from './wago-controller.entity';
 import { WagoSettings } from './wago-settings.entity';
@@ -848,9 +850,9 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   private async onHeartbeat(hardwareId: string, payload: Buffer): Promise<void> {
-    let heartbeat: WagoAnnouncement;
+    let heartbeat: WagoHeartbeat;
     try {
-      heartbeat = parseAnnouncement(payload);
+      heartbeat = parseHeartbeat(payload);
     } catch (error) {
       this.context.logger.warn(
         `Ignoring invalid WAGO heartbeat: ${error instanceof Error ? error.message : String(error)}`,

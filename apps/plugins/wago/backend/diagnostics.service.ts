@@ -7,7 +7,7 @@ import { WagoConfigurationRevision } from './wago-configuration-revision.entity'
 import { configurationHash, validateSnapshot, type WagoConfigurationSnapshot } from './configuration';
 import { freshness } from './diagnostics-store';
 import { safeValidationSummaries } from './diagnostics-validation';
-import type { WagoDiagnostics } from '../diagnostics-types';
+import type { WagoDiagnostics, WagoResourceDiagnostics } from '../diagnostics-types';
 
 function own<T>(values: Record<string, T>, key: string): T | undefined {
   return Object.prototype.hasOwnProperty.call(values, key) ? values[key] : undefined;
@@ -27,7 +27,7 @@ export function diagnosticReferences(
       resourceId: node.resourceId,
       channelId,
       control,
-      href: `/resources/${node.resourceId}/flows`,
+      href: `/resources/${node.resourceId}/flows?node=${encodeURIComponent(node.id)}`,
       invalid:
         !channelIds.includes(channelId) ||
         (control &&
@@ -53,6 +53,56 @@ export class WagoDiagnosticsService {
     @Inject(Symbol.for('attraccess.plugin.context')) private readonly context: PluginContext,
     @Inject(WagoService) private readonly wago: WagoService,
   ) {}
+  async getResource(resourceId: number): Promise<WagoResourceDiagnostics> {
+    const nodes = await this.context.dataSource
+      .getRepository(ResourceFlowNode)
+      .createQueryBuilder('node')
+      .where('node.resourceId = :resourceId', { resourceId })
+      .andWhere('node.type LIKE :type', { type: 'plugin.wago.%' })
+      .orderBy('node.id', 'ASC')
+      .take(1001)
+      .getMany();
+    const controllerIds = new Set<number>();
+    let invalidControllerReferences = 0;
+    for (const node of nodes.slice(0, 1000)) {
+      const id = node.data.controllerId;
+      if (typeof id !== 'number' || !Number.isSafeInteger(id) || id <= 0) {
+        invalidControllerReferences++;
+      } else {
+        controllerIds.add(id);
+      }
+    }
+    const controllers = await Promise.all(
+      [...controllerIds].slice(0, 20).map(async (controllerId) => {
+        try {
+          const diagnostics = await this.get(controllerId);
+          return {
+            controllerId,
+            name: diagnostics.name,
+            unavailable: false,
+            references: diagnostics.references.filter((reference) => reference.resourceId === resourceId),
+            referencesTruncated: diagnostics.referencesTruncated,
+          };
+        } catch {
+          // A removed controller or corrupt snapshot must not hide healthy neighbours.
+          return {
+            controllerId,
+            name: `Controller ${controllerId}`,
+            unavailable: true,
+            references: [],
+            referencesTruncated: false,
+          };
+        }
+      }),
+    );
+    return {
+      resourceId,
+      controllers,
+      invalidControllerReferences,
+      truncated: nodes.length > 1000 || controllerIds.size > 20,
+    };
+  }
+
   async get(controllerId: number): Promise<WagoDiagnostics> {
     const controller = await this.context.getRepository(WagoController).findOneBy({ id: controllerId });
     if (!controller) throw new NotFoundException('WAGO controller not found');
@@ -118,7 +168,7 @@ export class WagoDiagnosticsService {
       stateHardwareAvailable: runtime.hardwareAvailable ?? null,
       stateSourceAt: runtime.stateSourceAt ?? null,
       sequenceExplanation: runtime.activeStream
-        ? 'Gaps are scoped to boot UUID and message category; duplicates and retired streams are ignored.'
+        ? 'Gaps are scoped to boot stream ID and message category; duplicates and retired streams are ignored.'
         : 'Legacy payloads have no source envelope; sequence gaps and source freshness are unavailable.',
       configuration: {
         draftUpdatedAt: draft?.updatedAt ?? null,
@@ -196,9 +246,9 @@ export class WagoDiagnosticsService {
       limitations: [
         'Hardware readiness remains unknown. Legacy samples have no source time and are never current.',
         'Diagnostics retain at most 256 channels, 50 recent events and 15 minutes in this process.',
-        'Resource-page slots are not integrated. Flow links open the affected resource flow; node IDs identify the exact nodes.',
+        'Flow links select the affected node. Diagnostics warnings do not block resource usage; required flow nodes determine gating.',
         'The MQTT SDK exposes neither retained-message flags nor broker connection events. Source age is bounded to 90 seconds; immediate broker-disconnect detection is unavailable.',
-        'Stream tracking keeps at most 16 retired boot UUIDs per controller and six category counters, and fails closed when exhausted. Replayed source times never become receipt times.',
+        'Stream tracking keeps at most 16 retired boot stream IDs per controller and six category counters, and fails closed when exhausted. Replayed source times never become receipt times.',
       ],
     };
   }
