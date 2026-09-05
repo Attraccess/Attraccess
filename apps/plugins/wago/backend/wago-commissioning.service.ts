@@ -4,21 +4,10 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { copyFile, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { PLUGIN_CONTEXT, PluginContext, Repository } from '@attraccess/plugins-backend-sdk';
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
 import { WagoService } from './wago.service';
-import { commissioningVerification } from './wago-commissioning-verification';
-import { WagoController } from './wago-controller.entity';
-import { assertCommissioningBroker } from './wago-commissioning-preflight';
-import {
-  runtimeBundleDeliveryScript,
-  runtimeBundlePreflightScript,
-  runtimeBundleRecoveryAcknowledgementScript,
-  runtimeBundleRecoveryScript,
-  runtimeBundleStreamReceiver,
-} from './wago-runtime-install';
-export { runtimeBundleInstallScript } from './wago-runtime-install';
 
 const SSH_TIMEOUT_MS = 30 * 60_000;
 // The initial supported CC100 commissioning baseline. Operators may pin a more
@@ -33,14 +22,13 @@ const SIGNING_NAMESPACE = 'attraccess-wago-runtime';
 const SIGNING_IDENTITY = 'attraccess-wago-runtime';
 
 type TemporarySshCredential = { username: string; password: string };
-type CommissioningSessionResponse = Omit<WagoCommissioningSession, 'pairingCode' | 'deliveryToken'>;
+type CommissioningSessionResponse = Omit<WagoCommissioningSession, 'pairingCode'>;
 const VERIFIER_PREFIX = 'encrypted:v1:';
 type DeliveryInput = { temporarySsh?: TemporarySshCredential; confirmInstall?: boolean };
 
 @Injectable()
 export class WagoCommissioningService implements OnApplicationBootstrap {
   private sessions!: Repository<WagoCommissioningSession>;
-  private readonly controllerLocks = new Map<string, Promise<void>>();
   private readonly deliveryLocks = new Map<number, Promise<void>>();
 
   constructor(
@@ -55,9 +43,6 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       await this.recoverSessions();
       await this.reconcileCompletedSessions();
       this.wago.registerCommissioningDiscoveryHandler((controller) => this.claimDiscovered(controller));
-      void this.reconcileDiscovery().catch(() =>
-        this.context.logger?.warn('Saved commissioning discovery requires attention.'),
-      );
     } catch {
       this.context.logger?.warn('WAGO commissioning recovery failed; automatic discovery claim is disabled.');
     }
@@ -162,30 +147,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     );
   }
 
-  async verification(id: number) {
-    const session = await this.sessions.findOneBy({ id });
-    if (!session) throw new NotFoundException('commissioning session not found');
-    return commissioningVerification(this.context, session);
-  }
-
-  private async reconcileDiscovery(): Promise<void> {
-    for (let skip = 0; ; skip += 100) {
-      const page = await this.sessions.find({ order: { id: 'ASC' }, take: 100, skip });
-      for (const session of page) {
-        if (session.state !== 'awaiting_discovery' || session.enrollmentId === null) continue;
-        const controller = await this.context.getRepository(WagoController).findOneBy({
-          hardwareId: session.hardwareId,
-          mqttServerId: session.mqttServerId,
-          enrollmentId: session.enrollmentId,
-        });
-        if (controller?.trustState === 'untrusted') await this.claimDiscovered(controller);
-      }
-      if (page.length < 100) return;
-    }
-  }
-
   async deliver(id: number, input: DeliveryInput = {}): Promise<CommissioningSessionResponse> {
-    return this.withDeliveryLock(id, () => this.withControllerLock(id, () => this.deliverWhileLocked(id, input)));
+    return this.withDeliveryLock(id, () => this.deliverWhileLocked(id, input));
   }
 
   private async deliverWhileLocked(id: number, input: DeliveryInput): Promise<CommissioningSessionResponse> {
@@ -195,7 +158,18 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       !['awaiting_delivery', 'delivering', 'awaiting_codesys_confirmation', 'delivery_failed'].includes(session.state)
     )
       throw new ConflictException('commissioning session cannot be delivered in its current state');
-    const credential = requireDeliveryCredentials(input);
+    if (input?.confirmInstall !== true)
+      throw new ConflictException('explicit installation confirmation is required for every delivery attempt');
+    const credential = input.temporarySsh;
+    if (
+      !credential ||
+      typeof credential.username !== 'string' ||
+      !/^[a-zA-Z_][a-zA-Z0-9_.-]{0,63}$/.test(credential.username) ||
+      typeof credential.password !== 'string' ||
+      !credential.password.trim() ||
+      /[\r\n\0]/.test(credential.password)
+    )
+      throw new ConflictException('explicit valid SSH username and password are required for every delivery attempt');
     if (!isRuntimeArtifactConfigured())
       throw new ConflictException('no immutable, signed CC100 runtime bundle is configured for commissioning');
 
@@ -207,97 +181,122 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       return this.toResponse(session);
     }
     let enrollmentExpiresAt: string | null = null;
-    let credentialsTouched = false;
-    let bundle: Awaited<ReturnType<typeof verifyRuntimeBundle>> | undefined;
-    let safeFailure =
-      'Secure delivery failed. Controller recovery may be required; check access and runtime prerequisites.';
 
     try {
-      const broker = await this.context.getMqttServerConfig(session.mqttServerId);
-      if (!broker) throw new ConflictException('MQTT server not found');
-      try {
-        assertCommissioningBroker(broker);
-      } catch (error) {
-        if (error instanceof ConflictException) safeFailure = error.message;
-        throw error;
-      }
-      const providers = await this.context.getMqttCredentialProvisioning().availableProviders(session.mqttServerId);
-      if (!providers.length) {
-        safeFailure = 'Automatic MQTT credential provisioning is unavailable.';
-        throw new Error(safeFailure);
-      }
-      bundle = await verifyRuntimeBundle();
+      // Do not replace the persisted enrollment reference until revocation succeeds.
+      await this.revokeSessionEnrollment(session);
       session.state = 'delivering';
       session.failureReason = null;
       await this.updateProgress(
         session,
         10,
         'Verifying controller identity',
-        'Checking pinned identity and runtime prerequisites.',
+        'Rechecking the pinned SSH host key and inspecting the CC100.',
       );
       const inspection = await this.inspect(session.targetHost, session.hostKeyFingerprint, credential);
       session.codesysState = inspection.codesys;
-      if (!isSupportedController(inspection.firmware, session.firmwareBaseline)) {
-        safeFailure = 'Unsupported CC100 model or firmware baseline.';
-        throw new Error(safeFailure);
-      }
-      if (inspection.codesys !== 'inactive') {
-        safeFailure =
-          'CODESYS is active or unknown. Delivery blocked because workload configuration cannot be safely preserved and restored.';
-        throw new Error(safeFailure);
-      }
-      await this.sudoRunScript(
-        session.targetHost,
-        session.hostKeyFingerprint,
-        credential,
-        runtimeBundlePreflightScript(bundle.bytes),
-      );
-      credentialsTouched = true;
-      await this.revokeSessionEnrollment(session);
-      const enrollment = await this.wago.createEnrollment(session.hardwareId, session.mqttServerId);
-      session.enrollmentId = enrollment.id;
-      await this.save(session, 'enrollment_created');
-      if (!enrollment.password) throw new Error('Restricted credential unavailable');
-      // Re-resolve trust settings supplied by the host, never infer them from the enrollment DTO.
-      const currentBroker = await this.context.getMqttServerConfig(session.mqttServerId);
-      if (!currentBroker) throw new Error('Broker unavailable');
-      assertCommissioningBroker(currentBroker);
-      if (JSON.stringify(currentBroker) !== JSON.stringify(broker)) throw new Error('Broker changed during delivery');
-      enrollmentExpiresAt = enrollment.expiresAt;
-      const environment = [
-        `WAGO_HARDWARE_ID=${session.hardwareId}`,
-        `WAGO_MQTT_URL=mqtts://${broker.host}:${broker.port}`,
-        `WAGO_MQTT_USERNAME=${enrollment.username}`,
-        `WAGO_MQTT_PASSWORD=${enrollment.password}`,
-        `WAGO_ENROLLMENT_SECRET=${enrollment.claimSecret}`,
-        `WAGO_PAIRING_CODE=${pairingCode}`,
-        ...(broker.caCert ? ['NODE_EXTRA_CA_CERTS=/var/lib/attraccess-wago/mqtt-ca.pem'] : []),
-      ];
-      if (environment.some((line) => /[\r\n\0]/.test(line))) throw new Error('Invalid environment value');
+      if (!isSupportedController(inspection.firmware, session.firmwareBaseline))
+        throw new ConflictException(
+          `unsupported CC100 model or firmware; expected baseline ${session.firmwareBaseline}`,
+        );
       await this.updateProgress(
         session,
-        55,
-        'Transferring runtime',
-        'One locked delivery stages configuration and installs the signed runtime.',
+        20,
+        'Checking runtime package',
+        'Verifying the signed commissioning runtime bundle.',
       );
-      const deliveryToken = session.deliveryToken ?? randomBytes(16).toString('hex');
-      session.deliveryToken = deliveryToken;
-      await this.save(session, 'runtime_delivery_started');
-      await this.copyTo(
+      const bundle = await verifyRuntimeBundle();
+
+      if (inspection.codesys === 'active') {
+        await this.updateProgress(
+          session,
+          30,
+          'Stopping CODESYS',
+          'Stopping the active CODESYS runtime before commissioning.',
+        );
+        await this.sudoRun(
+          session.targetHost,
+          session.hostKeyFingerprint,
+          credential,
+          'kill $(pidof codesys3) 2>/dev/null || true',
+        );
+        await this.sudoRun(
+          session.targetHost,
+          session.hostKeyFingerprint,
+          credential,
+          '/etc/config-tools/config_runtime runtime-version=0',
+        );
+      }
+      await this.updateProgress(session, 40, 'Activating Docker', 'Preparing the controller runtime environment.');
+      await this.sudoRun(
         session.targetHost,
         session.hostKeyFingerprint,
         credential,
-        bundle.path,
-        runtimeBundleDeliveryScript(
-          configuredRuntimeImage,
-          environment.join('\n'),
-          broker.caCert,
-          bundle.bytes,
-          bundle.digest,
-          deliveryToken,
-        ),
-        (percent) => this.reportTransferProgress(session, percent),
+        '/etc/config-tools/config_docker activate',
       );
+      try {
+        await this.updateProgress(
+          session,
+          55,
+          'Transferring runtime',
+          'Uploading the signed runtime bundle to the controller.',
+        );
+        await this.copyTo(
+          session.targetHost,
+          session.hostKeyFingerprint,
+          credential,
+          bundle.path,
+          '/tmp/attraccess-wago-runtime.tar',
+          (percent) => this.reportTransferProgress(session, percent),
+        );
+        await this.updateProgress(
+          session,
+          75,
+          'Creating enrollment',
+          'Provisioning a restricted MQTT credential for the initial connection.',
+        );
+        const enrollment = await this.wago.createEnrollment(session.hardwareId, session.mqttServerId);
+        session.enrollmentId = enrollment.id;
+        await this.save(session, 'enrollment_created');
+        if (!enrollment.password)
+          throw new ConflictException(
+            'automatic restricted MQTT credential provisioning is required for secure commissioning',
+          );
+        enrollmentExpiresAt = enrollment.expiresAt;
+        await this.updateProgress(
+          session,
+          82,
+          'Writing runtime configuration',
+          'Installing the controller identity and restricted connection settings.',
+        );
+        await this.writeRuntimeEnvironment(
+          session.targetHost,
+          session.hostKeyFingerprint,
+          credential,
+          [
+            `WAGO_HARDWARE_ID=${session.hardwareId}`,
+            `WAGO_MQTT_URL=${enrollment.broker.useTls ? 'mqtts' : 'mqtt'}://${enrollment.broker.host}:${enrollment.broker.port}`,
+            `WAGO_MQTT_USERNAME=${enrollment.username}`,
+            `WAGO_MQTT_PASSWORD=${enrollment.password}`,
+            `WAGO_ENROLLMENT_SECRET=${enrollment.claimSecret}`,
+            `WAGO_PAIRING_CODE=${pairingCode}`,
+          ].join('\n'),
+        );
+        await this.updateProgress(
+          session,
+          92,
+          'Starting runtime',
+          'Loading and starting the commissioning runtime on the controller.',
+        );
+        await this.sudoRunScript(
+          session.targetHost,
+          session.hostKeyFingerprint,
+          credential,
+          runtimeBundleInstallScript(configuredRuntimeImage),
+        );
+      } finally {
+        await rm(bundle.directory, { recursive: true, force: true });
+      }
 
       session.state = 'awaiting_discovery';
       session.enrollmentExpiresAt = enrollmentExpiresAt;
@@ -308,7 +307,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         'Runtime delivered. Waiting for the controller to connect and complete its automatic claim.';
       return this.toResponse(await this.save(session, 'bootstrap_delivered'));
     } catch {
-      if (credentialsTouched && session.enrollmentId !== null) {
+      if (session.enrollmentId !== null) {
         try {
           await this.revokeSessionEnrollment(session);
         } catch {
@@ -323,102 +322,9 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       session.state = 'delivery_failed';
       session.enrollmentExpiresAt = null;
       session.progressStep = 'Delivery failed';
-      session.progressDetail =
-        'Review the blocker. If delivery was interrupted, explicitly recover the controller snapshot before retrying.';
-      session.failureReason = safeFailure;
+      session.progressDetail = 'Review the error and retry automatic delivery when the controller is reachable.';
+      session.failureReason = 'Secure delivery failed. Check controller access and the configured runtime bundle.';
       return this.toResponse(await this.save(session, 'delivery_failed'));
-    } finally {
-      if (bundle) await rm(bundle.directory, { recursive: true, force: true });
-    }
-  }
-
-  async recover(id: number, input: DeliveryInput = {}): Promise<CommissioningSessionResponse> {
-    const credential = requireDeliveryCredentials(input);
-    return this.withDeliveryLock(id, () =>
-      this.withControllerLock(id, async () => {
-        const session = await this.sessions.findOneBy({ id });
-        if (!session) throw new NotFoundException('commissioning session not found');
-        if (
-          ![
-            'delivery_failed',
-            'awaiting_discovery',
-            'awaiting_verification',
-            'claim_interrupted',
-            'recovery_revocation_pending',
-            'delivering',
-            'awaiting_codesys_confirmation',
-          ].includes(session.state)
-        )
-          throw new ConflictException('commissioning session cannot be recovered in its current state');
-        const requiresNewSession =
-          !session.pairingCode || ['claim_interrupted', 'awaiting_verification'].includes(session.state);
-        if (!session.deliveryToken)
-          throw new ConflictException('commissioning session has no runtime recovery ownership token');
-        let restored = session.state === 'recovery_revocation_pending';
-        try {
-          // Recovery restores the old environment verbatim. Broker availability must
-          // not prevent restoring a controller; no new credentials are provisioned.
-          if (!restored)
-            await this.sudoRunScript(
-              session.targetHost,
-              session.hostKeyFingerprint,
-              credential,
-              runtimeBundleRecoveryScript('', session.deliveryToken),
-            );
-          restored = true;
-          if (requiresNewSession) session.pairingCode = null;
-          session.state = 'recovery_revocation_pending';
-          session.progressStep = 'Runtime snapshot restored';
-          session.progressDetail =
-            'Previous container, environment and data restored. Readiness is unverified; restored broker credentials may have been revoked.';
-          if (!session.pairingCode)
-            session.progressDetail +=
-              ' Remove the existing controller registration before creating a new commissioning session.';
-          session.failureReason = null;
-          await this.save(session, 'runtime_restored_revocation_pending');
-          await this.sudoRunScript(
-            session.targetHost,
-            session.hostKeyFingerprint,
-            credential,
-            runtimeBundleRecoveryAcknowledgementScript('', session.deliveryToken),
-          );
-          await this.revokeSessionEnrollment(session);
-          session.state = session.pairingCode ? 'delivery_failed' : 'revoked';
-          session.deliveryToken = null;
-          return this.toResponse(await this.save(session, 'runtime_recovered'));
-        } catch {
-          session.state = restored
-            ? 'recovery_revocation_pending'
-            : requiresNewSession
-              ? 'claim_interrupted'
-              : 'delivery_failed';
-          session.progressStep = 'Recovery requires attention';
-          session.progressDetail = restored
-            ? 'Runtime restored. Retry recovery to finish broker credential revocation; the controller will not be restored again.'
-            : 'Recovery could not be confirmed. An active lock is never removed; retry explicit recovery after the active operation ends.';
-          session.failureReason =
-            'Runtime recovery or credential revocation failed; inspect the retained snapshot before retrying delivery.';
-          return this.toResponse(await this.save(session, 'runtime_recovery_failed'));
-        }
-      }),
-    );
-  }
-
-  private async withControllerLock<T>(id: number, operation: () => Promise<T>): Promise<T> {
-    const session = await this.sessions.findOneBy({ id });
-    if (!session) throw new NotFoundException('commissioning session not found');
-    const key = session.hostKeyFingerprint || session.targetHost || session.hardwareId;
-    const previous = this.controllerLocks.get(key) ?? Promise.resolve();
-    let release!: () => void;
-    const current = new Promise<void>((resolve) => (release = resolve));
-    const queued = previous.then(() => current);
-    this.controllerLocks.set(key, queued);
-    await previous;
-    try {
-      return await operation();
-    } finally {
-      release();
-      if (this.controllerLocks.get(key) === queued) this.controllerLocks.delete(key);
     }
   }
 
@@ -466,6 +372,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       hardwareId: controller.hardwareId,
       mqttServerId: controller.mqttServerId,
       enrollmentId: controller.enrollmentId,
+      state: 'awaiting_discovery',
     });
     if (!session) return;
 
@@ -497,12 +404,11 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       await this.save(current, 'automatic_claim_started');
       try {
         await this.wago.claim(controller.id, current.controllerName, pairingCode, current.mqttServerId);
-        current.state = 'awaiting_verification';
+        current.state = 'completed';
         current.pairingCode = null;
         current.failureReason = null;
-        current.progressStep = 'Verifying commissioned controller';
-        current.progressDetail =
-          'Claim sent. Permanent connection, credential revocation, configuration and management hardening still require verification.';
+        current.progressStep = 'Commissioning complete';
+        current.progressDetail = 'The controller is claimed and ready to configure.';
         await this.save(current, 'automatic_claim_completed');
       } catch {
         current.state = 'awaiting_discovery';
@@ -521,17 +427,27 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     fingerprint: string,
     credential: TemporarySshCredential,
   ): Promise<{ firmware: string; codesys: string }> {
-    const output = await this.run(
-      host,
-      fingerprint,
-      credential,
-      "cat /etc/os-release; printf '\\nCODESYS='; ps -eo comm=",
-    );
+    const output = await this.run(host, fingerprint, credential, "cat /etc/os-release; printf '\\nCODESYS='; ps");
     const marker = '\nCODESYS=';
     const markerIndex = output.indexOf(marker);
     const firmware = markerIndex >= 0 ? output.slice(0, markerIndex) : output;
     const processes = markerIndex >= 0 ? output.slice(markerIndex + marker.length) : '';
-    return { firmware, codesys: markerIndex < 0 ? 'unknown' : /codesys/i.test(processes) ? 'active' : 'inactive' };
+    return { firmware, codesys: /codesys/i.test(processes) ? 'active' : 'inactive' };
+  }
+
+  private async writeRuntimeEnvironment(
+    host: string,
+    fingerprint: string,
+    credential: TemporarySshCredential,
+    content: string,
+  ): Promise<void> {
+    await this.sudoRun(
+      host,
+      fingerprint,
+      credential,
+      'mkdir -p /etc/attraccess-wago && chmod 0700 /etc/attraccess-wago && umask 077 && base64 -d > /etc/attraccess-wago/runtime.env && chmod 0600 /etc/attraccess-wago/runtime.env',
+      Buffer.from(content).toString('base64'),
+    );
   }
 
   private sudoRun(
@@ -609,7 +525,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     fingerprint: string,
     credential: TemporarySshCredential,
     source: string,
-    script: string,
+    destination: string,
     onProgress: (percent: number) => void,
   ): Promise<void> {
     const dir = await mkdtemp(join(tmpdir(), 'attraccess-cc100-'));
@@ -618,9 +534,6 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     try {
       await writeFile(knownHosts, await pinnedHostKey(host, fingerprint), { mode: 0o600 });
       await writeFile(askPass, '#!/bin/sh\nprintf \'%s\\n\' "$ATTRACCESS_SSH_PASSWORD"\n', { mode: 0o700 });
-      // Keep the credential-bearing script off the API host's process arguments.
-      // read consumes one line; the installer receives the remaining binary stream.
-      const receiver = runtimeBundleStreamReceiver;
       await uploadFile(
         source,
         [
@@ -637,7 +550,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
           '-o',
           'ConnectTimeout=15',
           `${credential.username}@${host}`,
-          credential.username === 'root' ? `sh -c ${shellQuote(receiver)}` : `sudo -S sh -c ${shellQuote(receiver)}`,
+          `mkdir -p ${shellQuote(dirname(destination))} && cat > ${shellQuote(destination)}`,
         ],
         {
           SSH_ASKPASS: askPass,
@@ -646,7 +559,6 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
           ATTRACCESS_SSH_PASSWORD: credential.password,
         },
         onProgress,
-        `${credential.username === 'root' ? '' : `${credential.password}\n`}${Buffer.from(script).toString('base64')}\n`,
       );
     } finally {
       await rm(dir, { recursive: true, force: true });
@@ -739,12 +651,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       const page = await this.sessions.find({ order: { id: 'ASC' }, take: 100, skip });
       for (const session of page) {
         try {
-          if (session.state === 'recovery_revocation_pending') continue;
-          if (
-            ['completed', 'awaiting_verification', 'claim_interrupted'].includes(session.state) &&
-            !session.pairingCode
-          )
-            continue;
+          if (session.state === 'completed' && !session.pairingCode) continue;
           if (session.state === 'revoked' && !session.pairingCode) {
             await this.revokeSessionEnrollment(session);
             continue;
@@ -755,24 +662,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             await this.invalidateVerifier(session);
             continue;
           }
-          if (session.state === 'awaiting_claim') {
-            const controller =
-              session.enrollmentId === null
-                ? null
-                : await this.context.getRepository(WagoController).findOneBy({
-                    hardwareId: session.hardwareId,
-                    mqttServerId: session.mqttServerId,
-                    enrollmentId: session.enrollmentId,
-                  });
-            // A persisted claim may already have reached the device. Do not reinstall
-            // or rotate its permanent identity merely because the API restarted.
-            session.state = controller?.trustState === 'claimed' ? 'claim_interrupted' : 'awaiting_discovery';
-            session.progressStep = 'Claim interrupted; recovery required';
-            session.progressDetail =
-              'Permanent credentials may or may not have reached the runtime. Do not retry installation; recover the saved runtime and remove its controller registration before creating a new session.';
-            await this.save(session, 'claim_reconciled_after_restart');
-          }
-          if (session.state === 'delivering') {
+          if (session.state === 'delivering' || session.state === 'awaiting_claim') {
             session.state = 'delivery_failed';
             session.progressStep = 'Delivery interrupted';
             session.progressDetail = 'Retry with explicit SSH credentials and installation confirmation.';
@@ -828,9 +718,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
   }
 
   private toResponse(session: WagoCommissioningSession): CommissioningSessionResponse {
-    const { pairingCode: _pairingCode, deliveryToken: _deliveryToken, ...response } = session;
+    const { pairingCode: _pairingCode, ...response } = session;
     void _pairingCode;
-    void _deliveryToken;
     return response;
   }
 
@@ -920,7 +809,6 @@ async function uploadFile(
   args: string[],
   environment: Record<string, string>,
   onProgress: (percent: number) => void,
-  prefix?: string,
 ): Promise<void> {
   const size = (await stat(source)).size;
   return new Promise((resolve, reject) => {
@@ -955,7 +843,6 @@ async function uploadFile(
       }
     });
     onProgress(0);
-    if (prefix) child.stdin.write(prefix);
     stream.pipe(child.stdin);
   });
 }
@@ -985,19 +872,17 @@ function isRuntimeArtifactConfigured(): boolean {
   );
 }
 
-async function verifyRuntimeBundle(): Promise<{ directory: string; path: string; bytes: number; digest: string }> {
+async function verifyRuntimeBundle(): Promise<{ directory: string; path: string }> {
   const directory = await mkdtemp(join(tmpdir(), 'attraccess-cc100-runtime-'));
   const bundlePath = join(directory, 'runtime.tar');
   const checksumPath = join(directory, 'runtime.tar.sha256');
   const signaturePath = join(directory, 'runtime.tar.sig');
   try {
-    const copies = await Promise.allSettled([
+    await Promise.all([
       copyFile(configuredRuntimeBundle, bundlePath),
       copyFile(configuredRuntimeBundleChecksum, checksumPath),
       copyFile(configuredRuntimeBundleSignature, signaturePath),
     ]);
-    const failedCopy = copies.find((result) => result.status === 'rejected');
-    if (failedCopy?.status === 'rejected') throw failedCopy.reason;
     const [bundle, checksum, signature] = await Promise.all([
       readFile(bundlePath),
       readFile(checksumPath, 'utf8'),
@@ -1032,7 +917,7 @@ async function verifyRuntimeBundle(): Promise<{ directory: string; path: string;
     } finally {
       await rm(allowedSigners, { force: true });
     }
-    return { directory, path: bundlePath, bytes: bundle.length, digest };
+    return { directory, path: bundlePath };
   } catch (error) {
     await rm(directory, { recursive: true, force: true });
     throw error;
@@ -1052,6 +937,10 @@ export function isSupportedController(inspection: string, firmwareBaseline: stri
   return firmwareBaseline.trim() === '31' && reportedFirmware === '2024.12.0';
 }
 
+export function runtimeBundleInstallScript(runtimeImage: string): string {
+  return `rm -rf /tmp/attraccess-wago-runtime && mkdir -m 0700 /tmp/attraccess-wago-runtime && tar --warning=no-timestamp --warning=no-unknown-keyword -xf /tmp/attraccess-wago-runtime.tar -C /tmp/attraccess-wago-runtime && rm -f /tmp/attraccess-wago-runtime.tar && grep -Fqx -- ${shellQuote(runtimeImage)} /tmp/attraccess-wago-runtime/image-reference && runtime_image=$(docker load -i /tmp/attraccess-wago-runtime/image.tar | sed -n -e 's/^Loaded image: //p' -e 's/^Loaded image ID: //p') && test -n "$runtime_image" && rm -rf /tmp/attraccess-wago-runtime && docker image inspect "$runtime_image" >/dev/null && (docker rm -f attraccess-wago >/dev/null 2>&1 || true) && mkdir -p /var/lib/attraccess-wago && chown 10001:10001 /var/lib/attraccess-wago && docker run -d --name attraccess-wago --restart unless-stopped --env-file /etc/attraccess-wago/runtime.env -v /var/lib/attraccess-wago:/var/lib/attraccess-wago "$runtime_image"`;
+}
+
 export function resolveRuntimeSigningPublicKeyPath(
   environment: string | undefined,
   localPath: string,
@@ -1065,20 +954,4 @@ export function resolveRuntimeSigningPublicKeyPath(
 
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\\\"'\\\"'")}'`;
-}
-
-function requireDeliveryCredentials(input: DeliveryInput): TemporarySshCredential {
-  if (input?.confirmInstall !== true)
-    throw new ConflictException('explicit installation confirmation is required for every delivery attempt');
-  const credential = input.temporarySsh;
-  if (
-    !credential ||
-    typeof credential.username !== 'string' ||
-    !/^[a-zA-Z_][a-zA-Z0-9_.-]{0,63}$/.test(credential.username) ||
-    typeof credential.password !== 'string' ||
-    !credential.password.trim() ||
-    /[\r\n\0]/.test(credential.password)
-  )
-    throw new ConflictException('explicit valid SSH username and password are required for every delivery attempt');
-  return credential;
 }
