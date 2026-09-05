@@ -143,17 +143,13 @@ export function NodeEditor(props: Props) {
   }, [isOpen, resolveSchema, schema, currentData, invalidateRequest]);
 
   const onInputChange = useCallback((propertyName: string, value: unknown, refreshesSchema?: boolean) => {
-    const next = initializeValue(
-      configProperty(resolvedSchema),
-      { ...dataRef.current, [propertyName]: value },
-      true,
-    ) as Record<string, unknown>;
+    const next = { ...dataRef.current, [propertyName]: value };
     dataRef.current = next;
     setData(next);
     if (schema.configSchema.dynamic === true && refreshesSchema) {
       scheduleSchemaResolution(next);
     }
-  }, [resolvedSchema, schema.configSchema.dynamic, scheduleSchemaResolution]);
+  }, [schema.configSchema.dynamic, scheduleSchemaResolution]);
 
   const titleKey = 'nodes.' + resolvedSchema.type + '.title';
   const descriptionKey = 'nodes.' + resolvedSchema.type + '.description';
