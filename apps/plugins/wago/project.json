@@ -15,6 +15,7 @@
     },
     "test": {
       "executor": "@nx/jest:jest",
+      "dependsOn": ["test-frontend"],
       "options": { "jestConfig": "apps/plugins/wago/jest.config.ts", "passWithNoTests": true }
     },
     "test-frontend": {
