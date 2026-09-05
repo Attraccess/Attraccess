@@ -8,7 +8,7 @@ module.exports = {
     '^.+\\.[tj]s$': [
       'ts-jest',
       {
-        tsconfig: '<rootDir>/apps/plugins/wago/tsconfig.spec.json',
+        tsconfig: '<rootDir>/apps/plugins/wago/acceptance/tsconfig.json',
         isolatedModules: true,
       },
     ],

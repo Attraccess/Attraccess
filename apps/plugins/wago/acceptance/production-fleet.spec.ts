@@ -85,6 +85,7 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
   let heldAcknowledgement: { topic: string; payload: unknown; release: () => Promise<void> } | undefined;
   const sockets = new Set<Socket>();
   const messages: Wire[] = [];
+  const processedAcknowledgements = new Set<string>();
   const errors: unknown[] = [];
   const warnings: string[] = [];
   const logs: Log[] = [];
@@ -297,7 +298,13 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
                 .split('/')
                 .every((part: string, index: number) => part === '#' || part === '+' || part === parts[index])
             )
-              Promise.resolve(listener({ topic, payload, retain: packet.retain })).catch((error) => errors.push(error));
+              Promise.resolve(listener({ topic, payload, retain: packet.retain }))
+                .then(() => {
+                  // Record processing only after the real backend callback returns.
+                  if (topic === `${base}/acknowledgements`)
+                    processedAcknowledgements.add(JSON.parse(payload.toString()).id);
+                })
+                .catch((error) => errors.push(error));
           };
           backendClient.on('message', handler);
           await backendClient.subscribeAsync(filter, { qos: 1 });
@@ -459,12 +466,16 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
     expect(completed('input-2').at(-1)?.payload?.().output.wago).toMatchObject({ value: true, available: true });
     expect(completed('input-3')).toHaveLength(0);
     // A wrong ID traverses RabbitMQ/backend but must not finish the command node.
+    const wrongId = randomUUID();
     await observer.publishAsync(
       `${base}/acknowledgements`,
-      JSON.stringify({ ...(required(heldAcknowledgement).payload as object), id: randomUUID() }),
+      JSON.stringify({ ...(required(heldAcknowledgement).payload as object), id: wrongId }),
       { qos: 1 },
     );
-    await delay(100);
+    await eventually(() => expect(processedAcknowledgements.has(wrongId)).toBe(true));
+    // Drain promise continuations from the processed acknowledgement, including
+    // command-node completion, without a timing-based negative assertion window.
+    await new Promise<void>((resolve) => setImmediate(resolve));
     expect(completed('input-3')).toHaveLength(0);
     holdAcknowledgement = false;
     await required(heldAcknowledgement).release();
