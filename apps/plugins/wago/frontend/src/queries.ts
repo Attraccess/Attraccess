@@ -103,8 +103,19 @@ export function useDeliverCommissioningSessionMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, ...input }: Parameters<typeof deliverCommissioningSession>[1] & { id: number }) =>
-      deliverCommissioningSession(id, input),
+    gcTime: 0,
+    retry: false,
+    networkMode: 'always',
+    mutationFn: (variables: Omit<Parameters<typeof deliverCommissioningSession>[1], 'confirmInstall'> & { id: number; confirmInstall: boolean }) => {
+      const temporarySsh = { ...variables.temporarySsh };
+      const confirmInstall = variables.confirmInstall;
+      // React Query retains mutation variables, including after reset/unmount.
+      // Scrub credentials and approval before starting the request.
+      variables.temporarySsh.password = '';
+      variables.confirmInstall = false;
+      if (confirmInstall !== true) throw new Error('Explicit installation consent is required');
+      return deliverCommissioningSession(variables.id, { confirmInstall, temporarySsh });
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.controllers });
       await queryClient.invalidateQueries({ queryKey: queryKeys.commissioningSessions });

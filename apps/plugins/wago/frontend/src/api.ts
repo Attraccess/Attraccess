@@ -127,7 +127,7 @@ export const listCommissioningSessions = (limit = 100, offset = 0) =>
 
 export const deliverCommissioningSession = (
   id: number,
-  input: { temporarySsh?: { username: string; password: string } } = {},
+  input: { confirmInstall: true; temporarySsh: { username: string; password: string } },
 ) => api.request<CommissioningSession>(`/commissioning/sessions/${id}/deliver`, { method: 'POST', body: input });
 export const revokeCommissioningSession = (id: number) =>
   api.request<CommissioningSession>(`/commissioning/sessions/${id}/revoke`, { method: 'POST' });
