@@ -16,8 +16,7 @@ function trustOptions(config: MqttServerConnectionConfig): RequestOptions {
       'RabbitMQ management requires certificate verification. Disable tlsInsecure and configure a trusted CA certificate.',
     );
   }
-  // MQTT server forms persist blank optional fields as empty strings.
-  const servername = config.tlsServername === '' ? undefined : config.tlsServername;
+  const servername = config.tlsServername;
   if (
     servername != null &&
     (typeof servername !== 'string' ||
@@ -29,10 +28,9 @@ function trustOptions(config: MqttServerConnectionConfig): RequestOptions {
       'TLS server name must be a DNS hostname matching the management certificate, without a scheme or port.',
     );
   }
-  const caCert = config.caCert === '' ? undefined : config.caCert;
-  if (caCert != null) {
+  if (config.caCert != null) {
     try {
-      const pem = caCert;
+      const pem = config.caCert;
       const certificates =
         typeof pem === 'string' ? pem.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g) : null;
       if (
@@ -50,7 +48,7 @@ function trustOptions(config: MqttServerConnectionConfig): RequestOptions {
   }
   return {
     rejectUnauthorized: true,
-    ...(caCert != null ? { ca: caCert } : {}),
+    ...(config.caCert != null ? { ca: config.caCert } : {}),
     ...(servername != null ? { servername } : {}),
   };
 }
