@@ -7,16 +7,24 @@
   "targets": {
     "lint": {
       "executor": "nx:run-commands",
-      "options": { "cwd": "apps/plugins/wago", "command": "eslint backend frontend/src" }
+      "options": {
+        "cwd": "apps/plugins/wago",
+        "command": "eslint backend frontend/src modbus measurement-contract.ts"
+      }
     },
     "test": {
       "executor": "@nx/jest:jest",
       "dependsOn": ["test-frontend"],
-      "options": { "jestConfig": "apps/plugins/wago/jest.config.ts", "passWithNoTests": true }
+      "options": {
+        "jestConfig": "apps/plugins/wago/jest.config.ts",
+        "passWithNoTests": true
+      }
     },
     "test-frontend": {
       "executor": "nx:run-commands",
-      "options": { "command": "pnpm exec vitest run --config apps/plugins/wago/frontend/vitest.config.mts" }
+      "options": {
+        "command": "pnpm exec vitest run --config apps/plugins/wago/frontend/vitest.config.mts"
+      }
     },
     "build-backend": {
       "executor": "nx:run-commands",
@@ -25,7 +33,9 @@
         "{projectRoot}/backend/**/*",
         "{projectRoot}/diagnostics-types.ts",
         "{projectRoot}/cc100-runtime/signing-public-key.pub",
-        "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"
+        "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs",
+        "{projectRoot}/modbus/**/*",
+        "{projectRoot}/measurement-contract.ts"
       ],
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
@@ -36,9 +46,17 @@
     "build-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/frontend/**/*", "{projectRoot}/diagnostics-types.ts", "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"],
+      "inputs": [
+        "{projectRoot}/frontend/**/*",
+        "{projectRoot}/diagnostics-types.ts",
+        "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs",
+        "{projectRoot}/modbus/**/*"
+      ],
       "outputs": ["{projectRoot}/package/frontend"],
-      "options": { "cwd": "apps/plugins/wago", "command": "pnpm exec vite build --config frontend/vite.config.ts" }
+      "options": {
+        "cwd": "apps/plugins/wago",
+        "command": "pnpm exec vite build --config frontend/vite.config.ts"
+      }
     },
     "build": {
       "executor": "nx:run-commands",

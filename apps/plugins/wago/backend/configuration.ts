@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 import { CONFIGURATION_PROTOCOL_VERSION } from './protocol';
+import { type ModbusConfiguration, type ModbusPoint, validateModbus, validateModbusBindings } from '../modbus/model';
 
 export { CONFIGURATION_PROTOCOL_VERSION } from './protocol';
 
-const HARDWARE_PROFILES = ['751-9301', '879-3000', '879-1300'] as const;
+const HARDWARE_PROFILES = ['751-9301', '879-3000', '879-1300', 'modbus'] as const;
 const CHANNEL_PROFILES = [
   'metered-switched-load',
   'pulsed-lock-bank',
@@ -30,12 +31,22 @@ export const WAGO_PRESETS = [
     description: 'Makes a non-safety enable request only while an operational guard is satisfied.',
   },
   { id: 'generic-digital-output', name: 'Generic digital output', description: 'A conservative output foundation.' },
-  { id: 'generic-monitored-input', name: 'Generic monitored input', description: 'A monitored digital input foundation.' },
+  {
+    id: 'generic-monitored-input',
+    name: 'Generic monitored input',
+    description: 'A monitored digital input foundation.',
+  },
 ] as const;
 
 export interface WagoConfigurationSnapshot {
   version: typeof CONFIGURATION_PROTOCOL_VERSION;
-  physicalPoints: Array<{ id: string; hardwareProfile: (typeof HARDWARE_PROFILES)[number]; channel: number }>;
+  modbus?: ModbusConfiguration;
+  physicalPoints: Array<{
+    id: string;
+    hardwareProfile: (typeof HARDWARE_PROFILES)[number];
+    channel: number;
+    modbus?: ModbusPoint;
+  }>;
   logicalChannels: Array<{
     id: string;
     physicalPointId: string;
@@ -46,7 +57,12 @@ export interface WagoConfigurationSnapshot {
     pulse?: { durationMs: number };
     guard?: { channelId: string; when: 'on' | 'off' };
     feedback?: { channelId: string; expected: 'match' | 'inverse'; timeoutMs: number };
-    measurement?: { unit: 'ampere' | 'volt' | 'watt' | 'percent'; scale: number; offset: number };
+    measurement?: {
+      unit: 'ampere' | 'volt' | 'watt' | 'watt-hour' | 'percent';
+      scale: number;
+      offset: number;
+      kind?: 'live' | 'cumulative';
+    };
   }>;
 }
 
@@ -59,7 +75,10 @@ export interface WagoPresetApplication {
   feedbackChannelId?: string;
 }
 
-export function applyPreset(snapshot: WagoConfigurationSnapshot, application: WagoPresetApplication): WagoConfigurationSnapshot {
+export function applyPreset(
+  snapshot: WagoConfigurationSnapshot,
+  application: WagoPresetApplication,
+): WagoConfigurationSnapshot {
   const preset = application && WAGO_PRESETS.find((item) => item.id === application.presetId);
   if (!preset) throw new Error('unknown WAGO preset');
   const channel = presetChannel(application);
@@ -130,7 +149,9 @@ export function validateSnapshot(snapshot: unknown): ConfigurationValidationErro
     ];
   }
   const errors: ConfigurationValidationError[] = [];
-  exactKeys(value, '$', ['version', 'physicalPoints', 'logicalChannels'], errors);
+  exactKeys(value, '$', ['version', 'physicalPoints', 'logicalChannels', 'modbus'], errors, ['modbus']);
+  if (value.modbus !== undefined) errors.push(...validateModbus(value.modbus));
+  errors.push(...validateModbusBindings(value));
   if (value.version !== CONFIGURATION_PROTOCOL_VERSION)
     errors.push({
       path: 'version',
@@ -146,7 +167,7 @@ export function validateSnapshot(snapshot: unknown): ConfigurationValidationErro
   points.forEach((point, index) => {
     const path = `physicalPoints[${index}]`;
     if (!record(point, path, errors)) return;
-    exactKeys(point, path, ['id', 'hardwareProfile', 'channel'], errors);
+    exactKeys(point, path, ['id', 'hardwareProfile', 'channel', 'modbus'], errors, ['modbus']);
     addId(point.id, `${path}.id`, pointIds, errors);
     enumValue(point.hardwareProfile, `${path}.hardwareProfile`, HARDWARE_PROFILES, errors);
     if (typeof point.channel !== 'number' || !Number.isSafeInteger(point.channel) || point.channel < 0)
@@ -267,7 +288,9 @@ function exactKeys(
       }),
     );
   allowed
-    .filter((key) => !['range', 'pulse', 'guard', 'feedback', 'measurement', ...optional].includes(key) && !(key in value))
+    .filter(
+      (key) => !['range', 'pulse', 'guard', 'feedback', 'measurement', ...optional].includes(key) && !(key in value),
+    )
     .forEach((key) =>
       errors.push({
         path: path === '$' ? key : `${path}.${key}`,
@@ -407,10 +430,12 @@ function validateMeasurement(
 ): void {
   if (value === undefined) return;
   if (!record(value, path, errors)) return;
-  exactKeys(value, path, ['unit', 'scale', 'offset'], errors);
-  enumValue(value.unit, `${path}.unit`, ['ampere', 'volt', 'watt', 'percent'], errors);
+  exactKeys(value, path, ['unit', 'scale', 'offset', 'kind'], errors, ['kind']);
+  enumValue(value.unit, `${path}.unit`, ['ampere', 'volt', 'watt', 'watt-hour', 'percent'], errors);
   if (!Number.isFinite(value.scale) || !Number.isFinite(value.offset))
     errors.push({ path, code: 'invalid_measurement', message: 'scale and offset must be finite numbers' });
+  if (value.kind !== undefined && !['live', 'cumulative'].includes(value.kind as string))
+    errors.push({ path: `${path}.kind`, code: 'unsupported_value', message: 'kind must be live or cumulative' });
   if (!capabilities.has('measurement'))
     errors.push({ path, code: 'unsupported_field', message: 'measurement requires measurement capability' });
 }
@@ -427,14 +452,25 @@ function validateFeedback(
   if (!record(value, path, errors)) return;
   exactKeys(value, path, ['channelId', 'expected', 'timeoutMs'], errors);
   const feedbackChannel = typeof value.channelId === 'string' ? channelsById.get(value.channelId) : undefined;
-  if (!feedbackChannel)
-    errors.push(referenceError(`${path}.channelId`, 'logical channel', value.channelId));
-  else if (value.channelId === currentChannelId || !Array.isArray(feedbackChannel.capabilities) || !feedbackChannel.capabilities.includes('input'))
-    errors.push({ path: `${path}.channelId`, code: 'invalid_feedback_channel', message: 'feedback must reference a distinct input channel' });
+  if (!feedbackChannel) errors.push(referenceError(`${path}.channelId`, 'logical channel', value.channelId));
+  else if (
+    value.channelId === currentChannelId ||
+    !Array.isArray(feedbackChannel.capabilities) ||
+    !feedbackChannel.capabilities.includes('input')
+  )
+    errors.push({
+      path: `${path}.channelId`,
+      code: 'invalid_feedback_channel',
+      message: 'feedback must reference a distinct input channel',
+    });
   if (!['match', 'inverse'].includes(value.expected as string))
     errors.push({ path: `${path}.expected`, code: 'unsupported_value', message: 'expected must be match or inverse' });
   if (!Number.isSafeInteger(value.timeoutMs) || (value.timeoutMs as number) <= 0)
-    errors.push({ path: `${path}.timeoutMs`, code: 'invalid_timeout', message: 'timeoutMs must be a positive integer' });
+    errors.push({
+      path: `${path}.timeoutMs`,
+      code: 'invalid_timeout',
+      message: 'timeoutMs must be a positive integer',
+    });
   if (!capabilities.has('feedback'))
     errors.push({ path, code: 'unsupported_field', message: 'feedback requires feedback capability' });
 }

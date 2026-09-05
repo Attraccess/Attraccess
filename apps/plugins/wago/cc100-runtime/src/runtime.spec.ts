@@ -1,5 +1,13 @@
 import { MemoryDeviceAdapter } from './adapters';
-import { JsonStateStore, WagoRuntime, hash, validateSnapshot, type Snapshot, type Transport } from './runtime';
+import {
+  MAX_PENDING_CHANNEL_WRITES,
+  JsonStateStore,
+  WagoRuntime,
+  hash,
+  validateSnapshot,
+  type Snapshot,
+  type Transport,
+} from './runtime';
 
 class TestTransport implements Transport {
   readonly published: Array<{ topic: string; payload: unknown; retain?: boolean }> = [];
@@ -83,7 +91,7 @@ describe('WagoRuntime', () => {
         protocolVersion: '1.0.0',
         runtimeVersion: '0.1.0',
         capabilities: expect.arrayContaining(['claim', 'heartbeat', 'configuration-v1']),
-        sequence: 1,
+        sequence: expect.any(Number),
       }),
       retain: true,
     });
@@ -143,6 +151,31 @@ describe('WagoRuntime', () => {
         }),
       }),
     );
+  });
+
+  it('starts when reserving initial state telemetry fails', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    await store.save({
+      accepted: { revision: 1, contentHash: hash(snapshot), snapshot },
+      outputs: { load: true },
+      commandIds: [],
+    });
+    const save = jest.spyOn(store, 'save').mockRejectedValueOnce(new Error('disk full'));
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      store,
+      transport,
+      device,
+    });
+
+    await expect(runtime.start()).resolves.toBeUndefined();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await expect(runtime.setConnected(false)).resolves.toBeUndefined();
+
+    expect(save).toHaveBeenCalled();
+    expect(device.values.get('751-9301:0')).toBe(false);
   });
 
   it('accepts opaque server-defined profile names', async () => {
@@ -301,14 +334,17 @@ describe('WagoRuntime', () => {
   it('rejects expired commands before writing the device', async () => {
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
 
-    await transport.send(commands, {
-      id: 'expired-command',
-      expiresAt: '2000-01-01T00:00:00.000Z',
-      channelId: 'load',
-      action: 'set',
-      value: true,
-      expectedConfigurationRevision: 1,
-    });
+    await transport.send(
+      commands,
+      validCommand({
+        id: 'expired-command',
+        expiresAt: '2000-01-01T00:00:00.000Z',
+        channelId: 'load',
+        action: 'set',
+        value: true,
+        expectedConfigurationRevision: 1,
+      }),
+    );
 
     expect(device.values.get('751-9301:0')).toBeUndefined();
     expect(transport.published).toContainEqual(
@@ -341,14 +377,17 @@ describe('WagoRuntime', () => {
   it('rejects stale configuration revisions before writing the device', async () => {
     await transport.send(desired, { protocolVersion: 1, revision: 2, contentHash: hash(snapshot), snapshot });
 
-    await transport.send(commands, {
-      id: 'stale-command',
-      expiresAt: '2099-01-01T00:00:00.000Z',
-      channelId: 'load',
-      action: 'set',
-      value: true,
-      expectedConfigurationRevision: 1,
-    });
+    await transport.send(
+      commands,
+      validCommand({
+        id: 'stale-command',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        channelId: 'load',
+        action: 'set',
+        value: true,
+        expectedConfigurationRevision: 1,
+      }),
+    );
 
     expect(device.values.get('751-9301:0')).toBeUndefined();
     expect(transport.published).toContainEqual(
@@ -371,13 +410,16 @@ describe('WagoRuntime', () => {
     });
     await runtime.start();
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
-    await transport.send(commands, {
-      id: 'durable-pulse',
-      expiresAt: '2099-01-01T00:00:00.000Z',
-      channelId: 'load',
-      action: 'pulse',
-      expectedConfigurationRevision: 1,
-    });
+    await transport.send(
+      commands,
+      validCommand({
+        id: 'durable-pulse',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        channelId: 'load',
+        action: 'pulse',
+        expectedConfigurationRevision: 1,
+      }),
+    );
     runtime = new WagoRuntime({
       hardwareId: 'cc100-1',
       prefix: 'attraccess/wago',
@@ -388,13 +430,16 @@ describe('WagoRuntime', () => {
     });
     await runtime.start();
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
-    await transport.send(commands, {
-      id: 'durable-pulse',
-      expiresAt: '2099-01-01T00:00:00.000Z',
-      channelId: 'load',
-      action: 'pulse',
-      expectedConfigurationRevision: 1,
-    });
+    await transport.send(
+      commands,
+      validCommand({
+        id: 'durable-pulse',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        channelId: 'load',
+        action: 'pulse',
+        expectedConfigurationRevision: 1,
+      }),
+    );
 
     expect(
       transport.published.filter(
@@ -460,7 +505,7 @@ describe('WagoRuntime', () => {
     expect(transport.published).toContainEqual(
       expect.objectContaining({
         topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: { id: 'command-1', status: 'accepted', error: undefined },
+        payload: expect.objectContaining({ id: 'command-1', status: 'accepted', error: undefined }),
       }),
     );
   });
@@ -999,7 +1044,7 @@ describe('WagoRuntime', () => {
     expect(transport.published).toContainEqual(
       expect.objectContaining({
         topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: { id: 'command-1', status: 'duplicate', error: undefined },
+        payload: expect.objectContaining({ id: 'command-1', status: 'duplicate', error: undefined }),
       }),
     );
   });
@@ -1080,5 +1125,838 @@ describe('WagoRuntime', () => {
       commandIds: ['command-1'],
       commandExpiries: {},
     });
+  });
+  it('publishes typed integer-base-unit measurements with stream identity', async () => {
+    const metered: Snapshot = {
+      version: 1,
+      physicalPoints: [{ id: 'meter', hardwareProfile: '751-9301', channel: 0 }],
+      logicalChannels: [
+        {
+          id: 'import-energy',
+          physicalPointId: 'meter',
+          profile: 'meter',
+          capabilities: ['measurement'],
+          disconnectPolicy: { mode: 'hold' },
+          measurement: { unit: 'watt-hour', scale: 1, offset: 0, kind: 'cumulative' },
+        },
+      ],
+    };
+    device.values.set('751-9301:0', 1234);
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(metered), snapshot: metered });
+    await runtime.publishMeasurements();
+
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/measurements',
+        payload: expect.objectContaining({
+          channelId: 'import-energy',
+          value: 1234000,
+          unit: 'milliwatt-hour',
+          kind: 'cumulative',
+          sequence: expect.any(Number),
+          timestamp: expect.any(String),
+          streamId: expect.any(String),
+        }),
+      }),
+    );
+  });
+
+  it('rounds scaled float measurements within floating-point precision', async () => {
+    const metered: Snapshot = {
+      version: 1,
+      physicalPoints: [{ id: 'meter', hardwareProfile: '751-9301', channel: 0 }],
+      logicalChannels: [
+        {
+          id: 'power',
+          physicalPointId: 'meter',
+          profile: 'meter',
+          capabilities: ['measurement'],
+          disconnectPolicy: { mode: 'hold' },
+          measurement: { unit: 'watt', scale: 1000, offset: 0 },
+        },
+      ],
+    };
+    device.values.set('751-9301:0', 1.001);
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(metered), snapshot: metered });
+    await runtime.publishMeasurements();
+
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/measurements',
+        payload: expect.objectContaining({ channelId: 'power', value: 1001000, unit: 'milliwatt' }),
+      }),
+    );
+  });
+
+  it('rejects large fractional measurements', async () => {
+    const metered: Snapshot = {
+      version: 1,
+      physicalPoints: [{ id: 'meter', hardwareProfile: '751-9301', channel: 0 }],
+      logicalChannels: [
+        {
+          id: 'power',
+          physicalPointId: 'meter',
+          profile: 'meter',
+          capabilities: ['measurement'],
+          disconnectPolicy: { mode: 'hold' },
+          measurement: { unit: 'watt', scale: 1, offset: 0 },
+        },
+      ],
+    };
+    device.values.set('751-9301:0', 1_000_000_000_000_000.25);
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(metered), snapshot: metered });
+    await runtime.publishMeasurements();
+
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+        payload: expect.objectContaining({ channelId: 'power', code: 'invalid_measurement_transform' }),
+      }),
+    );
+    expect(transport.published).not.toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/measurements',
+      }),
+    );
+  });
+
+  it('uses a new measurement stream identity after a runtime restart', async () => {
+    const metered: Snapshot = {
+      version: 1,
+      physicalPoints: [{ id: 'meter', hardwareProfile: '751-9301', channel: 0 }],
+      logicalChannels: [
+        {
+          id: 'power',
+          physicalPointId: 'meter',
+          profile: 'meter',
+          capabilities: ['measurement'],
+          disconnectPolicy: { mode: 'hold' },
+          measurement: { unit: 'watt', scale: 1, offset: 0 },
+        },
+      ],
+    };
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    const firstTransport = new TestTransport();
+    const firstRuntime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      pairingCode: '482931',
+      prefix: 'attraccess/wago',
+      store,
+      transport: firstTransport,
+      device,
+    });
+    device.values.set('751-9301:0', 1);
+    await firstRuntime.start();
+    await firstTransport.send(desired, {
+      protocolVersion: 1,
+      revision: 1,
+      contentHash: hash(metered),
+      snapshot: metered,
+    });
+    await firstRuntime.publishMeasurements();
+    const firstEvent = firstTransport.published.find((event) => event.topic.endsWith('/measurements'));
+    if (!firstEvent) throw new Error('first runtime did not publish a measurement');
+    const firstMeasurement = firstEvent.payload as { sequence: number; streamId: string };
+
+    const restartedTransport = new TestTransport();
+    const restartedRuntime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      pairingCode: '482931',
+      prefix: 'attraccess/wago',
+      store,
+      transport: restartedTransport,
+      device,
+    });
+    await restartedRuntime.start();
+    await restartedRuntime.publishMeasurements();
+    const restartedEvent = restartedTransport.published.find((event) => event.topic.endsWith('/measurements'));
+    if (!restartedEvent) throw new Error('restarted runtime did not publish a measurement');
+    const restartedMeasurement = restartedEvent.payload as { sequence: number; streamId: string };
+
+    expect(restartedMeasurement).toEqual(
+      expect.objectContaining({ sequence: expect.any(Number), streamId: expect.any(String) }),
+    );
+    expect(restartedMeasurement.streamId).not.toBe(firstMeasurement.streamId);
+  });
+
+  it('shuts off an accepted pulse after a newer command fails', async () => {
+    const pulseSnapshot: Snapshot = {
+      ...snapshot,
+      logicalChannels: snapshot.logicalChannels.map((channel) => ({
+        ...channel,
+        pulse: { durationMs: 100 },
+      })),
+    };
+    let resolvePulseWrite: (() => void) | undefined;
+    let notifyPulseWriteStarted: (() => void) | undefined;
+    const pulseWriteStarted = new Promise<void>((resolve) => {
+      notifyPulseWriteStarted = resolve;
+    });
+    let falseWrites = 0;
+    const writes: boolean[] = [];
+    const delayedPulseDevice = {
+      write: async (_point: Snapshot['physicalPoints'][number], value: boolean) => {
+        writes.push(value);
+        if (value) {
+          notifyPulseWriteStarted?.();
+          await new Promise<void>((resolve) => {
+            resolvePulseWrite = resolve;
+          });
+        } else if (++falseWrites === 1) throw new Error('temporary failure');
+      },
+      read: async () => false,
+    };
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+      transport,
+      device: delayedPulseDevice,
+    });
+    await runtime.start();
+    await transport.send(desired, {
+      protocolVersion: 1,
+      revision: 1,
+      contentHash: hash(pulseSnapshot),
+      snapshot: pulseSnapshot,
+    });
+
+    const pulse = transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'pulse' }));
+    await pulseWriteStarted;
+    const set = transport.send(
+      commands,
+      validCommand({ id: 'command-2', channelId: 'load', action: 'set', value: false }),
+    );
+    resolvePulseWrite?.();
+    await pulse;
+    await set;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
+        payload: expect.objectContaining({ id: 'command-1', status: 'accepted', error: undefined }),
+      }),
+    );
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
+        payload: expect.objectContaining({ id: 'command-2', status: 'rejected', error: 'device write failed' }),
+      }),
+    );
+    expect(writes).toEqual([true, false, false]);
+  });
+
+  it('shuts off a delayed pulse after a newer command succeeds', async () => {
+    let resolvePulseWrite: (() => void) | undefined;
+    let notifyPulseWriteStarted: (() => void) | undefined;
+    const pulseWriteStarted = new Promise<void>((resolve) => {
+      notifyPulseWriteStarted = resolve;
+    });
+    const writes: boolean[] = [];
+    const delayedPulseDevice = {
+      write: async (_point: Snapshot['physicalPoints'][number], value: boolean) => {
+        writes.push(value);
+        if (writes.length === 1) {
+          notifyPulseWriteStarted?.();
+          await new Promise<void>((resolve) => {
+            resolvePulseWrite = resolve;
+          });
+        }
+      },
+      read: async () => false,
+    };
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+      transport,
+      device: delayedPulseDevice,
+    });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+
+    const pulse = transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'pulse' }));
+    await pulseWriteStarted;
+    const set = transport.send(
+      commands,
+      validCommand({ id: 'command-2', channelId: 'load', action: 'set', value: false }),
+    );
+    resolvePulseWrite?.();
+    await pulse;
+    await set;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(writes).toEqual([true, false]);
+  });
+
+  it('does not let a stale pulse shutoff override a newer successful set command', async () => {
+    let resolvePulseWrite: (() => void) | undefined;
+    let notifyPulseWriteStarted: (() => void) | undefined;
+    const pulseWriteStarted = new Promise<void>((resolve) => {
+      notifyPulseWriteStarted = resolve;
+    });
+    const writes: boolean[] = [];
+    const delayedPulseDevice = {
+      write: async (_point: Snapshot['physicalPoints'][number], value: boolean) => {
+        writes.push(value);
+        if (writes.length === 1) {
+          notifyPulseWriteStarted?.();
+          await new Promise<void>((resolve) => {
+            resolvePulseWrite = resolve;
+          });
+        }
+      },
+      read: async () => false,
+    };
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+      transport,
+      device: delayedPulseDevice,
+    });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+
+    const pulse = transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'pulse' }));
+    await pulseWriteStarted;
+    const set = transport.send(
+      commands,
+      validCommand({ id: 'command-2', channelId: 'load', action: 'set', value: true }),
+    );
+    resolvePulseWrite?.();
+    await Promise.all([pulse, set]);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(writes).toEqual([true, true]);
+  });
+
+  it('reports a feedback mismatch after the configured feedback timeout', async () => {
+    const monitored: Snapshot = {
+      ...snapshot,
+      physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
+      logicalChannels: [
+        {
+          id: 'feedback',
+          physicalPointId: 'input-1',
+          profile: 'generic-monitored-input',
+          capabilities: ['input'],
+          disconnectPolicy: { mode: 'hold' },
+        },
+        {
+          id: 'load',
+          physicalPointId: 'output-1',
+          profile: 'generic-digital-output',
+          capabilities: ['output', 'feedback'],
+          disconnectPolicy: { mode: 'immediate' },
+          feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 5 },
+        },
+      ],
+    };
+    await transport.send(desired, {
+      protocolVersion: 1,
+      revision: 1,
+      contentHash: hash(monitored),
+      snapshot: monitored,
+    });
+    await transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'set', value: true }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+        payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),
+      }),
+    );
+  });
+
+  it('preserves feedback verification for the active phase of a short pulse', async () => {
+    const monitored: Snapshot = {
+      ...snapshot,
+      physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
+      logicalChannels: [
+        {
+          id: 'feedback',
+          physicalPointId: 'input-1',
+          profile: 'generic-monitored-input',
+          capabilities: ['input'],
+          disconnectPolicy: { mode: 'hold' },
+        },
+        {
+          id: 'load',
+          physicalPointId: 'output-1',
+          profile: 'pulsed-lock-bank',
+          capabilities: ['output', 'pulse', 'feedback'],
+          disconnectPolicy: { mode: 'immediate' },
+          pulse: { durationMs: 5 },
+          feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 15 },
+        },
+      ],
+    };
+    await transport.send(desired, {
+      protocolVersion: 1,
+      revision: 1,
+      contentHash: hash(monitored),
+      snapshot: monitored,
+    });
+    await transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'pulse' }));
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+        payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),
+      }),
+    );
+  });
+
+  it('cancels feedback checks superseded by a later output command', async () => {
+    const monitored: Snapshot = {
+      ...snapshot,
+      physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
+      logicalChannels: [
+        {
+          id: 'feedback',
+          physicalPointId: 'input-1',
+          profile: 'generic-monitored-input',
+          capabilities: ['input'],
+          disconnectPolicy: { mode: 'hold' },
+        },
+        {
+          id: 'load',
+          physicalPointId: 'output-1',
+          profile: 'generic-digital-output',
+          capabilities: ['output', 'feedback'],
+          disconnectPolicy: { mode: 'immediate' },
+          feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 15 },
+        },
+      ],
+    };
+    await transport.send(desired, {
+      protocolVersion: 1,
+      revision: 1,
+      contentHash: hash(monitored),
+      snapshot: monitored,
+    });
+    await transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'set', value: true }));
+    await transport.send(commands, validCommand({ id: 'command-2', channelId: 'load', action: 'set', value: false }));
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    expect(transport.published).not.toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+        payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),
+      }),
+    );
+  });
+
+  it('keeps the prior feedback check when a replacement write fails', async () => {
+    const monitored: Snapshot = {
+      ...snapshot,
+      physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
+      logicalChannels: [
+        {
+          id: 'feedback',
+          physicalPointId: 'input-1',
+          profile: 'generic-monitored-input',
+          capabilities: ['input'],
+          disconnectPolicy: { mode: 'hold' },
+        },
+        {
+          id: 'load',
+          physicalPointId: 'output-1',
+          profile: 'generic-digital-output',
+          capabilities: ['output', 'feedback'],
+          disconnectPolicy: { mode: 'immediate' },
+          feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 10 },
+        },
+      ],
+    };
+    const failingDevice = {
+      write: async (_point: Snapshot['physicalPoints'][number], value: boolean) => {
+        if (!value) throw new Error('temporary failure');
+      },
+      read: async () => false,
+    };
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+      transport,
+      device: failingDevice,
+    });
+    await runtime.start();
+    await transport.send(desired, {
+      protocolVersion: 1,
+      revision: 1,
+      contentHash: hash(monitored),
+      snapshot: monitored,
+    });
+    await transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'set', value: true }));
+    await transport.send(commands, validCommand({ id: 'command-2', channelId: 'load', action: 'set', value: false }));
+    await new Promise((resolve) => setTimeout(resolve, 15));
+
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+        payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),
+      }),
+    );
+  });
+
+  it('keeps feedback verification for a successful write queued before a failed replacement', async () => {
+    const monitored: Snapshot = {
+      ...snapshot,
+      physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
+      logicalChannels: [
+        {
+          id: 'feedback',
+          physicalPointId: 'input-1',
+          profile: 'generic-monitored-input',
+          capabilities: ['input'],
+          disconnectPolicy: { mode: 'hold' },
+        },
+        {
+          id: 'load',
+          physicalPointId: 'output-1',
+          profile: 'generic-digital-output',
+          capabilities: ['output', 'feedback'],
+          disconnectPolicy: { mode: 'immediate' },
+          feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 5 },
+        },
+      ],
+    };
+    let releaseFirstWrite!: () => void;
+    let firstWriteStarted!: () => void;
+    const firstWrite = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      firstWriteStarted = resolve;
+    });
+    const queuedFailureDevice = {
+      write: async (_point: Snapshot['physicalPoints'][number], value: boolean) => {
+        if (value) {
+          firstWriteStarted();
+          await firstWrite;
+        } else throw new Error('temporary failure');
+      },
+      read: async () => false,
+    };
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+      transport,
+      device: queuedFailureDevice,
+    });
+    await runtime.start();
+    await transport.send(desired, {
+      protocolVersion: 1,
+      revision: 1,
+      contentHash: hash(monitored),
+      snapshot: monitored,
+    });
+
+    const first = transport.send(
+      commands,
+      validCommand({ id: 'command-1', channelId: 'load', action: 'set', value: true }),
+    );
+    await started;
+    const replacement = transport.send(
+      commands,
+      validCommand({ id: 'command-2', channelId: 'load', action: 'set', value: false }),
+    );
+    releaseFirstWrite();
+    await Promise.all([first, replacement]);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+        payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),
+      }),
+    );
+  });
+
+  it('does not publish a mismatch from a superseded in-flight feedback check', async () => {
+    const monitored: Snapshot = {
+      ...snapshot,
+      physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
+      logicalChannels: [
+        {
+          id: 'feedback',
+          physicalPointId: 'input-1',
+          profile: 'generic-monitored-input',
+          capabilities: ['input'],
+          disconnectPolicy: { mode: 'hold' },
+        },
+        {
+          id: 'load',
+          physicalPointId: 'output-1',
+          profile: 'generic-digital-output',
+          capabilities: ['output', 'feedback'],
+          disconnectPolicy: { mode: 'immediate' },
+          feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 5 },
+        },
+      ],
+    };
+    let delayNextRead = false;
+    let resolveRead: ((value: boolean) => void) | undefined;
+    const delayedReadDevice = {
+      write: async () => undefined,
+      read: async () => {
+        if (!delayNextRead) return false;
+        delayNextRead = false;
+        return new Promise<boolean>((resolve) => {
+          resolveRead = resolve;
+        });
+      },
+    };
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+      transport,
+      device: delayedReadDevice,
+    });
+    await runtime.start();
+    await transport.send(desired, {
+      protocolVersion: 1,
+      revision: 1,
+      contentHash: hash(monitored),
+      snapshot: monitored,
+    });
+    await transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'set', value: true }));
+    await runtime.pollInputs();
+    delayNextRead = true;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await transport.send(commands, validCommand({ id: 'command-2', channelId: 'load', action: 'set', value: false }));
+    resolveRead?.(false);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(transport.published).not.toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+        payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),
+      }),
+    );
+  });
+
+  it('does not publish a fault from an in-flight feedback check after replacing configuration', async () => {
+    const monitored: Snapshot = {
+      ...snapshot,
+      physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
+      logicalChannels: [
+        {
+          id: 'feedback',
+          physicalPointId: 'input-1',
+          profile: 'generic-monitored-input',
+          capabilities: ['input'],
+          disconnectPolicy: { mode: 'hold' },
+        },
+        {
+          id: 'load',
+          physicalPointId: 'output-1',
+          profile: 'generic-digital-output',
+          capabilities: ['output', 'feedback'],
+          disconnectPolicy: { mode: 'immediate' },
+          feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 5 },
+        },
+      ],
+    };
+    let delayNextRead = false;
+    let resolveRead: ((value: boolean) => void) | undefined;
+    const delayedReadDevice = {
+      write: async () => undefined,
+      read: async () => {
+        if (!delayNextRead) return false;
+        delayNextRead = false;
+        return new Promise<boolean>((resolve) => {
+          resolveRead = resolve;
+        });
+      },
+    };
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+      transport,
+      device: delayedReadDevice,
+    });
+    await runtime.start();
+    await transport.send(desired, {
+      protocolVersion: 1,
+      revision: 1,
+      contentHash: hash(monitored),
+      snapshot: monitored,
+    });
+    await transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'set', value: true }));
+    await runtime.pollInputs();
+    delayNextRead = true;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await transport.send(desired, {
+      protocolVersion: 1,
+      revision: 2,
+      contentHash: hash(monitored),
+      snapshot: monitored,
+    });
+    resolveRead?.(false);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(transport.published).not.toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+        payload: expect.objectContaining({ channelId: 'load' }),
+      }),
+    );
+  });
+
+  it('does not schedule feedback from a write that began before configuration replacement', async () => {
+    const monitored: Snapshot = {
+      ...snapshot,
+      physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
+      logicalChannels: [
+        {
+          id: 'feedback',
+          physicalPointId: 'input-1',
+          profile: 'generic-monitored-input',
+          capabilities: ['input'],
+          disconnectPolicy: { mode: 'hold' },
+        },
+        {
+          id: 'load',
+          physicalPointId: 'output-1',
+          profile: 'generic-digital-output',
+          capabilities: ['output', 'feedback'],
+          disconnectPolicy: { mode: 'immediate' },
+          feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 5 },
+        },
+      ],
+    };
+    let releaseWrite!: () => void;
+    let writeStarted!: () => void;
+    const delayedWrite = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      writeStarted = resolve;
+    });
+    const delayedWriteDevice = {
+      write: async () => {
+        writeStarted();
+        await delayedWrite;
+      },
+      read: async () => false,
+    };
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+      transport,
+      device: delayedWriteDevice,
+    });
+    await runtime.start();
+    await transport.send(desired, {
+      protocolVersion: 1,
+      revision: 1,
+      contentHash: hash(monitored),
+      snapshot: monitored,
+    });
+
+    const command = transport.send(
+      commands,
+      validCommand({ id: 'command-1', channelId: 'load', action: 'set', value: true }),
+    );
+    await started;
+    const replacement = transport.send(desired, {
+      protocolVersion: 1,
+      revision: 2,
+      contentHash: hash(monitored),
+      snapshot: monitored,
+    });
+    releaseWrite();
+    await command;
+    await replacement;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(transport.published).not.toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+        payload: expect.objectContaining({ channelId: 'load' }),
+      }),
+    );
+  });
+
+  it('rejects commands beyond the per-channel write queue limit', async () => {
+    let releaseFirstWrite!: () => void;
+    let firstWriteStarted!: () => void;
+    const firstWrite = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      firstWriteStarted = resolve;
+    });
+    const slowDevice = {
+      write: async () => {
+        firstWriteStarted();
+        await firstWrite;
+      },
+      read: async () => false,
+    };
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+      transport,
+      device: slowDevice,
+    });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+
+    const commandsInFlight = Array.from({ length: MAX_PENDING_CHANNEL_WRITES + 1 }, (_, index) =>
+      transport.send(commands, validCommand({ id: `command-${index}`, channelId: 'load', action: 'set', value: true })),
+    );
+    await started;
+    await commandsInFlight[MAX_PENDING_CHANNEL_WRITES];
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
+        payload: expect.objectContaining({
+          id: `command-${MAX_PENDING_CHANNEL_WRITES}`,
+          status: 'rejected',
+          error: 'channel write queue is full',
+        }),
+      }),
+    );
+
+    releaseFirstWrite();
+    await Promise.all(commandsInFlight);
+  });
+
+  it('rejects feedback that references the output rather than an input channel', async () => {
+    const invalid: Snapshot = {
+      ...snapshot,
+      logicalChannels: [
+        {
+          ...snapshot.logicalChannels[0],
+          capabilities: ['output', 'pulse', 'feedback'],
+          feedback: { channelId: 'load', expected: 'match', timeoutMs: 5 },
+        },
+      ],
+    };
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(invalid), snapshot: invalid });
+
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/configuration/reported',
+        payload: expect.objectContaining({
+          errors: expect.arrayContaining([
+            expect.objectContaining({ path: 'snapshot.logicalChannels[0].feedback', code: 'invalid_feedback' }),
+          ]),
+        }),
+      }),
+    );
   });
 });
