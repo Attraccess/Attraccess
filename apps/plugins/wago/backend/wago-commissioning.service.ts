@@ -14,6 +14,7 @@ import { assertCommissioningBroker } from './wago-commissioning-preflight';
 import {
   runtimeBundleDeliveryScript,
   runtimeBundlePreflightScript,
+  runtimeBundleRecoveryAcknowledgementScript,
   runtimeBundleRecoveryScript,
   runtimeBundleStreamReceiver,
 } from './wago-runtime-install';
@@ -32,7 +33,7 @@ const SIGNING_NAMESPACE = 'attraccess-wago-runtime';
 const SIGNING_IDENTITY = 'attraccess-wago-runtime';
 
 type TemporarySshCredential = { username: string; password: string };
-type CommissioningSessionResponse = Omit<WagoCommissioningSession, 'pairingCode'>;
+type CommissioningSessionResponse = Omit<WagoCommissioningSession, 'pairingCode' | 'deliveryToken'>;
 const VERIFIER_PREFIX = 'encrypted:v1:';
 type DeliveryInput = { temporarySsh?: TemporarySshCredential; confirmInstall?: boolean };
 
@@ -279,6 +280,9 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         'Transferring runtime',
         'One locked delivery stages configuration and installs the signed runtime.',
       );
+      const deliveryToken = session.deliveryToken ?? randomBytes(16).toString('hex');
+      session.deliveryToken = deliveryToken;
+      await this.save(session, 'runtime_delivery_started');
       await this.copyTo(
         session.targetHost,
         session.hostKeyFingerprint,
@@ -290,7 +294,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
           broker.caCert,
           bundle.bytes,
           bundle.digest,
-          randomBytes(16).toString('hex'),
+          deliveryToken,
         ),
         (percent) => this.reportTransferProgress(session, percent),
       );
@@ -348,6 +352,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
           throw new ConflictException('commissioning session cannot be recovered in its current state');
         const requiresNewSession =
           !session.pairingCode || ['claim_interrupted', 'awaiting_verification'].includes(session.state);
+        if (!session.deliveryToken)
+          throw new ConflictException('commissioning session has no runtime recovery ownership token');
         let restored = session.state === 'recovery_revocation_pending';
         try {
           // Recovery restores the old environment verbatim. Broker availability must
@@ -357,7 +363,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
               session.targetHost,
               session.hostKeyFingerprint,
               credential,
-              runtimeBundleRecoveryScript(),
+              runtimeBundleRecoveryScript('', session.deliveryToken),
             );
           restored = true;
           if (requiresNewSession) session.pairingCode = null;
@@ -370,8 +376,15 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
               ' Remove the existing controller registration before creating a new commissioning session.';
           session.failureReason = null;
           await this.save(session, 'runtime_restored_revocation_pending');
+          await this.sudoRunScript(
+            session.targetHost,
+            session.hostKeyFingerprint,
+            credential,
+            runtimeBundleRecoveryAcknowledgementScript('', session.deliveryToken),
+          );
           await this.revokeSessionEnrollment(session);
           session.state = session.pairingCode ? 'delivery_failed' : 'revoked';
+          session.deliveryToken = null;
           return this.toResponse(await this.save(session, 'runtime_recovered'));
         } catch {
           session.state = restored
@@ -815,8 +828,9 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
   }
 
   private toResponse(session: WagoCommissioningSession): CommissioningSessionResponse {
-    const { pairingCode: _pairingCode, ...response } = session;
+    const { pairingCode: _pairingCode, deliveryToken: _deliveryToken, ...response } = session;
     void _pairingCode;
+    void _deliveryToken;
     return response;
   }
 
