@@ -40,8 +40,7 @@ export function validEnvelope(data: Record<string, unknown>, now: number): boole
     time !== null &&
     time <= now &&
     typeof data.streamId === 'string' &&
-    data.streamId.trim().length > 0 &&
-    data.streamId.length <= 128 &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.streamId) &&
     Number.isSafeInteger(data.sequence) &&
     (data.sequence as number) >= 1
   );
@@ -53,7 +52,7 @@ export function admitEnvelope(
   category: string,
   now: number,
 ): 'accepted' | 'restart' | 'rejected' {
-  const stream = data.streamId as string;
+  const stream = (data.streamId as string).toLowerCase();
   const timestamp = sourceTime(data.timestamp) as number;
   const sequence = data.sequence as number;
   if (state.retiredStreams.includes(stream) || state.trackingExhausted) return 'rejected';
@@ -61,8 +60,7 @@ export function admitEnvelope(
   if (restart) {
     if (
       !(category === 'heartbeat' || (category === 'state' && data.connected === true)) ||
-      now - timestamp > 90_000 ||
-      timestamp < state.lastSourceTime
+      now - timestamp > 90_000 || timestamp < state.lastSourceTime
     )
       return 'rejected';
     if (state.retiredStreams.length >= 16) {

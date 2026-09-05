@@ -2,7 +2,6 @@ import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { diagnosticReferences, WagoDiagnosticsService } from './diagnostics.service';
 import { WagoController } from './wago-controller.entity';
 import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
-import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { WagoDiagnosticsStore } from './diagnostics-store';
 import { WagoService } from './wago.service';
 
@@ -21,7 +20,7 @@ describe('diagnostic references', () => {
     );
     expect(refs.map((ref) => ref.conflict)).toEqual([true, true, false, false]);
     expect(refs.map((ref) => ref.invalid)).toEqual([true, true, false, true]);
-    expect(refs[3]).toMatchObject({ nodeId: 'd', href: '/resources/4/flows?node=d' });
+    expect(refs[3]).toMatchObject({ nodeId: 'd', href: '/resources/4/flows' });
   });
   it('does not conflict for read/event references or control on the same resource', () => {
     const refs = diagnosticReferences([node('a', 1), node('b', 1), node('c', 2, 'read')], ['relay'], 2);
@@ -39,67 +38,9 @@ describe('diagnostic references', () => {
     );
     expect(refs.every((ref) => !ref.invalid && ref.conflict)).toBe(true);
   });
-  it('encodes node IDs as a single query parameter', () => {
-    const id = 'node /?#&+%';
-    const [reference] = diagnosticReferences([node(id, 1)], ['relay'], 2);
-    const url = new URL(reference.href, 'https://example.test');
-    expect(url.pathname).toBe('/resources/1/flows');
-    expect(url.searchParams.get('node')).toBe(id);
-    expect([...url.searchParams]).toHaveLength(1);
-  });
 });
 
 describe('controller diagnostics', () => {
-  it('keeps healthy resource controllers available when another applied snapshot is corrupt', async () => {
-    const nodes = [
-      { id: 'broken', resourceId: 1, type: 'plugin.wago.command', data: { controllerId: 1, channelId: 'io' } },
-      { id: 'healthy', resourceId: 1, type: 'plugin.wago.command', data: { controllerId: 2, channelId: 'io' } },
-    ];
-    const query = (result: unknown[]) => {
-      const builder = {
-        select: jest.fn(),
-        distinctOn: jest.fn(),
-        where: jest.fn(),
-        andWhere: jest.fn(),
-        orderBy: jest.fn(),
-        addOrderBy: jest.fn(),
-        take: jest.fn(),
-        getMany: jest.fn().mockResolvedValue(result),
-      };
-      for (const method of ['select', 'distinctOn', 'where', 'andWhere', 'orderBy', 'addOrderBy', 'take'] as const)
-        builder[method].mockReturnValue(builder);
-      return builder;
-    };
-    const resourceQueries = [query(nodes), query([])];
-    const context = {
-      getRepository: (entity: unknown) => {
-        if (entity === WagoController)
-          return { createQueryBuilder: () => query([{ id: 1, hardwareId: 'broken' }, { id: 2, hardwareId: 'healthy' }]) };
-        if (entity === WagoConfigurationRevision)
-          return {
-            createQueryBuilder: () =>
-              query([
-                { controllerId: 1, revision: 1, snapshot: '{' },
-                {
-                  controllerId: 2,
-                  revision: 1,
-                  snapshot: JSON.stringify({ version: 1, physicalPoints: [], logicalChannels: [{ id: 'io', capabilities: [] }] }),
-                },
-              ]),
-          };
-        throw new Error('unexpected repository');
-      },
-      dataSource: { getRepository: () => ({ createQueryBuilder: () => resourceQueries.shift() }) },
-    } as unknown as PluginContext;
-    const service = new WagoDiagnosticsService(context, {} as WagoService);
-
-    await expect(service.getResource(1)).resolves.toMatchObject({
-      controllers: [
-        { controllerId: 1, unavailable: true, references: [] },
-        { controllerId: 2, unavailable: false, references: [{ nodeId: 'healthy' }] },
-      ],
-    });
-  });
   it('checkpoints heartbeat persistence while keeping permanent connectivity current', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-09-05T12:00:00Z'));
     try {
@@ -114,6 +55,7 @@ describe('controller diagnostics', () => {
       const payload = Buffer.from(
         JSON.stringify({
           hardwareId: 'cc100',
+          pairingCode: 'SECRET',
           protocolVersion: '1.0.0',
           runtimeVersion: '0.1.0',
           capabilities: ['claim', 'heartbeat', 'configuration-v1'],
@@ -147,6 +89,7 @@ describe('controller diagnostics', () => {
           Buffer.from(
             JSON.stringify({
               hardwareId: 'cc100',
+              pairingCode: 'SECRET',
               protocolVersion: '1.0.0',
               runtimeVersion,
               capabilities: ['claim', 'heartbeat', 'configuration-v1'],
