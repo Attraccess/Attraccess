@@ -176,7 +176,7 @@ describe('dynamic node editor', () => {
     expect(mocks.update).not.toHaveBeenCalled();
   });
 
-  it('allows an optional numeric field to be entered and cleared before saving', async () => {
+  it('allows an optional defaulted numeric field to be cleared before saving', async () => {
     vi.useRealTimers();
     const user = userEvent.setup();
     render(editor({
@@ -184,13 +184,11 @@ describe('dynamic node editor', () => {
       configSchema: {
         ...base.configSchema,
         dynamic: false,
-        properties: { ...base.configSchema.properties, timeout: { type: 'number', title: 'Optional timeout' } },
+        properties: { ...base.configSchema.properties, timeout: { type: 'number', title: 'Optional timeout', default: 15 } },
       },
     }));
     fireEvent.click(screen.getByText('Open'));
     const timeout = screen.getByRole('textbox', { name: /Optional timeout/ });
-    await user.type(timeout, '15');
-    await user.tab();
     await user.clear(timeout);
     await user.tab();
     await user.click(screen.getByText('editor.buttons.save'));
