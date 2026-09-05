@@ -24,7 +24,7 @@ export class OutputController {
       getSnapshot: () => Snapshot | undefined;
       getState: () => RuntimeState;
       saveState: () => Promise<void>;
-      publishState: () => Promise<void>;
+      publishState: () => void;
       publishFault: (channelId: string, error: unknown) => Promise<void>;
     },
   ) {}
@@ -133,15 +133,12 @@ export class OutputController {
     try {
       await this.options.device.write(point, value);
     } catch (error) {
-      try {
-        await this.options.publishFault(channel.id, error);
-      } catch {
-        // A fault-publication failure must not turn a known failed write into an accepted command.
-      }
+      // Neither a fault ack nor an offline broker may delay retrying a failed shutoff.
+      void this.options.publishFault(channel.id, error).catch(() => undefined);
       return false;
     }
     onWritten?.();
-    this.options.getState().outputs[channel.id] = value;
+    this.options.getState().outputs = { ...this.options.getState().outputs, [channel.id]: value };
     try {
       await this.options.saveState();
     } catch {
@@ -150,11 +147,9 @@ export class OutputController {
     }
     onCommitted?.();
     if (configurationGeneration === this.configurationGeneration) this.scheduleFeedbackCheck(channel, value);
-    try {
-      await this.options.publishState();
-    } catch {
-      // Retained-state publication does not change the durable state of a successful write.
-    }
+    // Telemetry must not hold the physical channel queue: a pending MQTT ack
+    // could otherwise prevent the pulse timer or disconnect policy from writing off.
+    this.options.publishState();
     return true;
   }
 
