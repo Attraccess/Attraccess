@@ -50,7 +50,10 @@ describe('canonical diagnostic consumer', () => {
     expect(store.read(1).cumulativeMeasurements.meter.measurementKind).toBe('cumulative');
     expect(store.read(1).measurements.meter).toMatchObject({ value: 500, measurementKind: 'live' });
     expect(measurement(3, { unit: 'watt-hour', kind: 'cumulative', value: Number.MAX_SAFE_INTEGER })).toBe(true);
-    expect(store.read(1).cumulativeMeasurements.meter).toMatchObject({ unit: 'watt-hour', value: Number.MAX_SAFE_INTEGER });
+    expect(store.read(1).cumulativeMeasurements.meter).toMatchObject({
+      unit: 'watt-hour',
+      value: Number.MAX_SAFE_INTEGER,
+    });
   });
   it('rejects malformed/future timestamps and invalid category values before watermarks', () => {
     state();
@@ -63,7 +66,9 @@ describe('canonical diagnostic consumer', () => {
       { unit: 'unknown-unit' },
       { kind: 'unknown' },
       { sequence: 0 },
-      { streamId: 'not-a-uuid' },
+      { streamId: '' },
+      { streamId: ' '.repeat(128) },
+      { streamId: 'b'.repeat(129) },
     ]) {
       expect(measurement(100, extra)).toBe(false);
     }
@@ -93,6 +98,32 @@ describe('canonical diagnostic consumer', () => {
     expect(send('heartbeat', envelope(1, 18))).toBe(false);
     expect(store.read(1).trackingExhausted).toBe(true);
   });
+  it.each(['simulator-boot-1', ' Boot-A ', 'b'.repeat(128)])(
+    'preserves valid opaque stream identity %j',
+    (streamId) => {
+      expect(send('heartbeat', { ...envelope(1), streamId })).toBe(true);
+      expect(state(1, 1, { streamId })).toBe(true);
+      expect(measurement(1, { streamId })).toBe(true);
+      expect(store.read(1).activeStream).toBe(streamId);
+      expect(store.read(1).measurements.meter.streamId).toBe(streamId);
+      expect(store.read(1).sequenceGaps).toBe(0);
+    },
+  );
+  it('treats case changes as distinct boots and rejects retired identities', () => {
+    expect(send('heartbeat', { ...envelope(1), streamId: 'Boot-A' })).toBe(true);
+    now++;
+    expect(send('heartbeat', { ...envelope(1), streamId: 'boot-a' })).toBe(true);
+    expect(send('heartbeat', { ...envelope(2), streamId: 'Boot-A' })).toBe(false);
+    expect(store.read(1).retiredStreams).toEqual(['Boot-A']);
+  });
+  it.each([null, [], {}, { hardwareAvailable: undefined }, { hardwareAvailable: 'true' }])(
+    'rejects malformed supplied readiness without consuming sequence: %j',
+    (readiness) => {
+      expect(state(1, 1, { readiness })).toBe(false);
+      expect(state(1, 1, { readiness: { hardwareAvailable: false } })).toBe(true);
+      expect(store.read(1).hardwareAvailable).toBe(false);
+    },
+  );
   it('bounds both measurement kinds and expires rejection evidence despite ongoing traffic', () => {
     state();
     for (let index = 0; index < 300; index++) {
