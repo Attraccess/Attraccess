@@ -14,7 +14,8 @@ export class SimulatorDeviceAdapter implements DeviceAdapter {
     this.initialValues = initialValues;
   }
 
-  async write(point: Point, value: boolean): Promise<void> {
+  async write(point: Point, value: boolean, admit?: () => void): Promise<void> {
+    admit?.();
     if (this.scenario === 'write-failure') throw new Error('simulated output write failure');
     this.values.set(key(point), value);
   }

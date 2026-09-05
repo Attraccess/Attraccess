@@ -1011,7 +1011,7 @@ describe('WagoRuntime', () => {
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
     const persist = store.save.bind(store);
     const save = jest.spyOn(store, 'save');
-    save.mockImplementationOnce(persist).mockRejectedValueOnce(new Error('disk full'));
+    save.mockImplementationOnce(persist).mockImplementationOnce(persist).mockRejectedValueOnce(new Error('disk full'));
 
     await expect(transport.send(commands, validCommand({ action: 'pulse' }))).rejects.toThrow(
       'failed to persist channel state',

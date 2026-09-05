@@ -1,4 +1,4 @@
-import { type DeviceAdapter, type RuntimeState, type Snapshot } from './runtime-types';
+import { WriteAdmissionError, type DeviceAdapter, type RuntimeState, type Snapshot } from './runtime-types';
 
 type LogicalChannel = Snapshot['logicalChannels'][number];
 type PhysicalPoint = Snapshot['physicalPoints'][number];
@@ -7,7 +7,21 @@ type Pulse = { timer: ReturnType<typeof setTimeout>; channel: LogicalChannel; po
 const INITIAL_PULSE_SHUTDOWN_RETRY_DELAY_MS = 100;
 const MAX_PULSE_SHUTDOWN_RETRY_DELAY_MS = 5_000;
 
+export const MAX_PENDING_CHANNEL_WRITES = 100;
+
 export class OutputController {
+  private readonly uncertainWrites = new Set<string>();
+  private readonly pendingCommands = new Map<string, number>();
+  private disconnected = false;
+  private outageGeneration = 0;
+
+  get busy(): boolean {
+    return Boolean(this.commandOperations.size || this.channelWrites.size || this.pulses.size);
+  }
+
+  isWriteUncertain(channelId: string): boolean {
+    return this.uncertainWrites.has(channelId);
+  }
   private readonly pulses = new Map<string, Pulse>();
   private readonly watchdogs = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly channelWrites = new Map<string, Promise<void>>();
@@ -16,7 +30,6 @@ export class OutputController {
   private readonly commandOperations = new Set<Promise<void>>();
   private feedbackGenerationSequence = 0;
   private configurationGeneration = 0;
-  private disconnected = false;
   private replacement?: Promise<void>;
 
   constructor(
@@ -72,6 +85,9 @@ export class OutputController {
   }
 
   async runForCommand<T>(channelId: string, operation: () => Promise<T>): Promise<T> {
+    const pending = this.pendingCommands.get(channelId) ?? 0;
+    if (pending >= MAX_PENDING_CHANNEL_WRITES) throw new Error('channel write queue is full');
+    this.pendingCommands.set(channelId, pending + 1);
     while (this.replacement) await this.replacement;
     let release!: () => void;
     const completion = new Promise<void>((resolve) => {
@@ -81,6 +97,7 @@ export class OutputController {
     try {
       return await this.runForChannel(channelId, operation);
     } finally {
+      this.pendingCommands.set(channelId, (this.pendingCommands.get(channelId) ?? 1) - 1);
       this.commandOperations.delete(completion);
       release();
     }
@@ -116,11 +133,22 @@ export class OutputController {
     value: boolean,
     onWritten?: () => void,
     onCommitted?: () => void,
+    admit?: () => void,
+    pulseDuration?: number,
   ): Promise<boolean> {
     const configurationGeneration = this.configurationGeneration;
     const point = this.options.getSnapshot()?.physicalPoints.find((item) => item.id === channel.physicalPointId);
     if (!point) return false;
-    return this.writePointWhileQueued(channel, point, value, onWritten, onCommitted, configurationGeneration);
+    return this.writePointWhileQueued(
+      channel,
+      point,
+      value,
+      onWritten,
+      onCommitted,
+      configurationGeneration,
+      admit,
+      pulseDuration,
+    );
   }
 
   private async writePointWhileQueued(
@@ -130,19 +158,59 @@ export class OutputController {
     onWritten?: () => void,
     onCommitted?: () => void,
     configurationGeneration = this.configurationGeneration,
+    admit?: () => void,
+    pulseDuration?: number,
   ): Promise<boolean> {
+    this.uncertainWrites.delete(channel.id);
+    const state = this.options.getState();
+    const wasUncertain = state.uncertainOutputChannelIds?.includes(channel.id);
+    const hadPulse = state.pendingPulseChannelIds?.includes(channel.id);
+    if (pulseDuration)
+      state.pendingPulseChannelIds = [...new Set([...(state.pendingPulseChannelIds ?? []), channel.id])];
+    if (this.options.device.prepareConfiguration) {
+      this.options.getState().uncertainOutputChannelIds = [
+        ...new Set([...(this.options.getState().uncertainOutputChannelIds ?? []), channel.id]),
+      ];
+    }
+    if (value && (this.options.device.prepareConfiguration || pulseDuration)) await this.options.saveState();
     try {
-      await this.options.device.write(point, value);
+      admit?.();
+      await this.options.device.write(point, value, admit);
     } catch (error) {
+      if (error instanceof WriteAdmissionError) {
+        if (!wasUncertain)
+          state.uncertainOutputChannelIds = (state.uncertainOutputChannelIds ?? []).filter((id) => id !== channel.id);
+        if (!hadPulse)
+          state.pendingPulseChannelIds = (state.pendingPulseChannelIds ?? []).filter((id) => id !== channel.id);
+        await this.options.saveState();
+        throw error;
+      }
+      if (this.options.device.writeMayHaveBeenTransmitted?.(error)) {
+        this.uncertainWrites.add(channel.id);
+        // An ambiguous ON may still have energized the relay: arrange pulse shutdown.
+        onWritten?.();
+      }
       // Neither a fault ack nor an offline broker may delay retrying a failed shutoff.
       void this.options.publishFault(channel.id, error).catch(() => undefined);
       return false;
     }
     onWritten?.();
     this.options.getState().outputs = { ...this.options.getState().outputs, [channel.id]: value };
+    if (this.options.device.prepareConfiguration)
+      this.options.getState().uncertainOutputChannelIds = (
+        this.options.getState().uncertainOutputChannelIds ?? []
+      ).filter((id) => id !== channel.id);
+    const pendingPulses = state.pendingPulseChannelIds;
+    if (!pulseDuration && pendingPulses) state.pendingPulseChannelIds = pendingPulses.filter((id) => id !== channel.id);
     try {
       await this.options.saveState();
     } catch {
+      if (pendingPulses?.includes(channel.id))
+        state.pendingPulseChannelIds = [...new Set([...(state.pendingPulseChannelIds ?? []), channel.id])];
+      if (this.options.device.prepareConfiguration)
+        this.options.getState().uncertainOutputChannelIds = [
+          ...new Set([...(this.options.getState().uncertainOutputChannelIds ?? []), channel.id]),
+        ];
       // Do not acknowledge an operation whose durable output state is stale.
       throw new Error('failed to persist channel state');
     }
@@ -190,6 +258,14 @@ export class OutputController {
     });
   }
 
+  recoverPulses(): void {
+    for (const id of this.options.getState().pendingPulseChannelIds ?? []) {
+      const channel = this.options.getSnapshot()?.logicalChannels.find((item) => item.id === id);
+      if (!channel?.capabilities.includes('output')) throw new Error('persisted pulse has no output route');
+      this.schedulePulse(channel, 0);
+    }
+  }
+
   clearPulse(channelId: string): void {
     const pulse = this.pulses.get(channelId);
     if (!pulse) return;
@@ -200,15 +276,17 @@ export class OutputController {
   async applyDisconnectPolicies(connected: boolean): Promise<void> {
     if (connected) {
       this.disconnected = false;
+      this.outageGeneration++;
       this.watchdogs.forEach(clearTimeout);
       this.watchdogs.clear();
       return;
     }
-    // MQTT clients can report the same disconnect more than once. The first
-    // report establishes the watchdog deadline; later notifications must not
-    // defer it, including after a watchdog has already fired.
     if (this.disconnected) return;
     this.disconnected = true;
+    const outage = ++this.outageGeneration;
+    const admit = () => {
+      if (!this.disconnected || outage !== this.outageGeneration) throw new WriteAdmissionError('outage_ended');
+    };
     let stateSaveFailed = false;
     for (const channel of this.options.getSnapshot()?.logicalChannels ?? []) {
       if (!channel.capabilities.includes('output')) continue;
@@ -223,10 +301,15 @@ export class OutputController {
       if (channel.disconnectPolicy.mode === 'watchdog')
         this.watchdogs.set(
           channel.id,
-          setTimeout(
-            () => void this.ignoreRejection(() => this.write(channel, false)),
-            channel.disconnectPolicy.timeoutMs,
-          ),
+          setTimeout(() => {
+            this.watchdogs.delete(channel.id);
+            void this.ignoreRejection(() =>
+              this.runForChannel(channel.id, async () => {
+                admit();
+                return this.writeWhileQueued(channel, false, undefined, undefined, admit);
+              }),
+            );
+          }, channel.disconnectPolicy.timeoutMs),
         );
     }
     if (stateSaveFailed) await this.options.saveState();
@@ -237,7 +320,12 @@ export class OutputController {
   }
 
   private async writePulseShutdown(channel: LogicalChannel, point: PhysicalPoint): Promise<boolean> {
-    return this.writePointWhileQueued(channel, point, false, undefined, undefined, -1);
+    try {
+      return await this.writePointWhileQueued(channel, point, false, undefined, undefined, -1);
+    } catch {
+      // A confirmed OFF whose durable commit failed still needs a retry/recovery obligation.
+      return false;
+    }
   }
 
   private retryPulseShutdown(channelId: string, pulse: Pulse, attempt: number): void {
