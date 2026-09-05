@@ -183,11 +183,14 @@ export class WagoRuntime {
           stateSaveFailed = true;
         }
       }
-      if (channel.disconnectPolicy.mode === 'watchdog')
+      if (channel.disconnectPolicy.mode === 'watchdog') {
+        const existingWatchdog = this.watchdogs.get(channel.id);
+        if (existingWatchdog) clearTimeout(existingWatchdog);
         this.watchdogs.set(
           channel.id,
           setTimeout(() => void this.ignoreTimerRejection(() => this.writeChannel(channel, false)), channel.disconnectPolicy.timeoutMs),
         );
+      }
     }
     if (stateSaveFailed) await this.options.store.save(this.state);
     await this.publishState();

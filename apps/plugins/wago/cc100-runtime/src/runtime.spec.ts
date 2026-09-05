@@ -193,6 +193,27 @@ describe('WagoRuntime', () => {
     expect(transport.published).toContainEqual(expect.objectContaining({ topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements', payload: { id: 'command-1', status: 'duplicate', error: undefined } }));
   });
 
+  it('cancels superseded watchdog shutdowns when reconnecting', async () => {
+    jest.useFakeTimers();
+    try {
+      const watchdogSnapshot: Snapshot = {
+        ...snapshot,
+        logicalChannels: [{ ...snapshot.logicalChannels[0], disconnectPolicy: { mode: 'watchdog', timeoutMs: 100 } }],
+      };
+      await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(watchdogSnapshot), snapshot: watchdogSnapshot });
+      await transport.send(commands, { id: 'command-1', channelId: 'load', action: 'set', value: true });
+
+      await runtime.setConnected(false);
+      await runtime.setConnected(false);
+      await runtime.setConnected(true);
+      await jest.advanceTimersByTimeAsync(100);
+
+      expect(device.values.get('751-9301:0')).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('retries the aggregate immediate shutdown state after a state-store failure', async () => {
     const twoOutputs: Snapshot = {
       ...snapshot,
