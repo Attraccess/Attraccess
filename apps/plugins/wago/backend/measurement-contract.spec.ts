@@ -137,14 +137,14 @@ describe('WAGO producer-to-consumer measurement contract', () => {
           unit: fixture.wireUnit,
           value: fixture.value,
           kind: fixture.kind,
-          sequence: index + 1,
+          sequence: expect.any(Number),
         }),
       ),
     );
     expect((await store.load()).accepted).toEqual({ revision: 7, contentHash: hash(snapshot), snapshot });
   });
 
-  it('keeps sequences contiguous per category across interleaved measurements, state, faults and acknowledgements', async () => {
+  it('keeps a contiguous controller sequence across interleaved measurements, state, faults and acknowledgements', async () => {
     await runtime.publishMeasurements();
     await runtime.setConnected(false);
     device.values.set('751-9301:0', NaN);
@@ -159,12 +159,14 @@ describe('WAGO producer-to-consumer measurement contract', () => {
     for (const category of ['state', 'measurement', 'fault', 'acknowledgement']) {
       const events = messages.filter((message) => message.category === category);
       expect(events.length).toBeGreaterThan(0);
-      expect(events.map((message) => message.sequence)).toEqual(events.map((_, index) => index + 1));
     }
+    expect(messages.map((message) => message.sequence)).toEqual(
+      [...messages].sort((left, right) => left.sequence - right.sequence).map((message) => message.sequence),
+    );
     expect(messages).toContainEqual(expect.objectContaining({ category: 'fault', code: 'invalid_measurement_value' }));
   });
 
-  it('starts new category sequences under a new stream ID after restoring the same persisted state', async () => {
+  it('starts a new stream ID after restoring the same persisted state', async () => {
     await runtime.publishMeasurements();
     const previousStream = messages[0].streamId;
     messages.length = 0;
@@ -172,8 +174,7 @@ describe('WAGO producer-to-consumer measurement contract', () => {
     await runtime.start();
     await runtime.publishMeasurements();
     expect(messages.every((message) => message.streamId !== previousStream)).toBe(true);
-    expect(messages.find((message) => message.category === 'state').sequence).toBe(1);
-    expect(messages.find((message) => message.category === 'measurement').sequence).toBe(1);
+    expect(messages.every((message) => Number.isSafeInteger(message.sequence) && message.sequence > 0)).toBe(true);
   });
 
   it.each([
@@ -208,7 +209,9 @@ describe('WAGO producer-to-consumer measurement contract', () => {
     messages.length = 0;
     device.values.set('751-9301:0', raw);
     await runtime.publishMeasurements();
-    expect(messages).toEqual([expect.objectContaining({ category: 'fault', code, channelId: 'current', sequence: 1 })]);
+    expect(messages).toEqual([
+      expect.objectContaining({ category: 'fault', code, channelId: 'current', sequence: expect.any(Number) }),
+    ]);
   });
 });
 

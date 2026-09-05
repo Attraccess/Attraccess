@@ -50,7 +50,12 @@ export interface WagoConfigurationSnapshot {
     pulse?: { durationMs: number };
     guard?: { channelId: string; when: 'on' | 'off' };
     feedback?: { channelId: string; expected: 'match' | 'inverse'; timeoutMs: number };
-    measurement?: { unit: 'ampere' | 'volt' | 'watt' | 'watt-hour' | 'percent'; scale: number; offset: number; kind?: 'live' | 'cumulative' };
+    measurement?: {
+      unit: 'ampere' | 'volt' | 'watt' | 'watt-hour' | 'percent';
+      scale: number;
+      offset: number;
+      kind?: 'live' | 'cumulative';
+    };
   }>;
 }
 

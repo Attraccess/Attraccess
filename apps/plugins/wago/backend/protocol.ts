@@ -98,7 +98,7 @@ export function configurationReportedWildcardTopic(prefix: string): string {
 
 type WagoOperationalMessageBase = {
   timestamp: string;
-  streamId: string;
+  streamId?: string;
   sequence: number;
 };
 
@@ -109,12 +109,13 @@ export type WagoStateMessage = WagoOperationalMessageBase & {
   contentHash: string | null;
   outputs: Record<string, boolean>;
   inputs?: Record<string, boolean>;
+  readiness?: { hardwareAvailable: boolean };
 };
 
 export type WagoMeasurementMessage = WagoOperationalMessageBase &
   Measurement & {
-  category: 'measurement';
-};
+    category: 'measurement';
+  };
 
 export type WagoFaultMessage = WagoOperationalMessageBase & {
   category: 'fault';
@@ -155,7 +156,10 @@ export function parseOperationalMessage(
   const value = parseObject(payload, 'operational message');
   const timestamp = requiredTimestamp(value.timestamp);
   const sequence = requiredSequence(value.sequence);
-  if (typeof value.streamId !== 'string' || !value.streamId.trim() || value.streamId.length > 128)
+  if (
+    value.streamId !== undefined &&
+    (typeof value.streamId !== 'string' || !value.streamId.trim() || value.streamId.length > 128)
+  )
     throw new Error('operational streamId is invalid');
   const streamId = value.streamId;
   if (suffix === 'state') {
@@ -164,7 +168,12 @@ export function parseOperationalMessage(
       !isNullableInteger(value.revision) ||
       !isNullableString(value.contentHash) ||
       !isBooleanRecord(value.outputs) ||
-      (value.inputs !== undefined && !isBooleanRecord(value.inputs))
+      (value.inputs !== undefined && !isBooleanRecord(value.inputs)) ||
+      (value.readiness !== undefined &&
+        (!value.readiness ||
+          typeof value.readiness !== 'object' ||
+          Array.isArray(value.readiness) ||
+          typeof (value.readiness as Record<string, unknown>).hardwareAvailable !== 'boolean'))
     )
       throw new Error('invalid state message');
     return {
@@ -172,17 +181,21 @@ export function parseOperationalMessage(
       message: {
         category: 'state',
         timestamp,
-        streamId,
+        ...(streamId !== undefined ? { streamId } : {}),
         sequence,
         connected: value.connected,
         revision: value.revision as number | null,
         contentHash: value.contentHash as string | null,
         outputs: value.outputs as Record<string, boolean>,
         ...(value.inputs !== undefined ? { inputs: value.inputs as Record<string, boolean> } : {}),
+        ...(value.readiness !== undefined
+          ? { readiness: { hardwareAvailable: (value.readiness as { hardwareAvailable: boolean }).hardwareAvailable } }
+          : {}),
       },
     };
   }
   if (suffix === 'measurements') {
+    if (streamId === undefined) throw new Error('operational streamId is required for measurements');
     return {
       hardwareId,
       message: {
@@ -202,7 +215,7 @@ export function parseOperationalMessage(
       message: {
         category: 'fault',
         timestamp,
-        streamId,
+        ...(streamId !== undefined ? { streamId } : {}),
         sequence,
         channelId: value.channelId,
         code: value.code,
@@ -221,7 +234,7 @@ export function parseOperationalMessage(
     message: {
       category: 'acknowledgement',
       timestamp,
-      streamId,
+      ...(streamId !== undefined ? { streamId } : {}),
       sequence,
       id: value.id,
       status: value.status as 'accepted' | 'duplicate' | 'rejected',
