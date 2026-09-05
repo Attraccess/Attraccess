@@ -5,6 +5,11 @@
   "projectType": "application",
   "tags": ["scope:hardware"],
   "targets": {
+    "test-simulator-integration": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": { "command": "node apps/plugins/wago/cc100-runtime/integration/run.mjs" }
+    },
     "build": {
       "executor": "@nx/esbuild:esbuild",
       "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-runtime"],

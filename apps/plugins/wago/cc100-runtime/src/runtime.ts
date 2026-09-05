@@ -183,11 +183,17 @@ export class WagoRuntime {
           stateSaveFailed = true;
         }
       }
-      if (channel.disconnectPolicy.mode === 'watchdog')
-        this.watchdogs.set(
-          channel.id,
-          setTimeout(() => void this.ignoreTimerRejection(() => this.writeChannel(channel, false)), channel.disconnectPolicy.timeoutMs),
-        );
+      if (channel.disconnectPolicy.mode === 'watchdog') {
+        if (!this.watchdogs.has(channel.id)) {
+          this.watchdogs.set(
+            channel.id,
+            setTimeout(() => {
+              this.watchdogs.delete(channel.id);
+              void this.ignoreTimerRejection(() => this.writeChannel(channel, false));
+            }, channel.disconnectPolicy.timeoutMs),
+          );
+        }
+      }
     }
     if (stateSaveFailed) await this.options.store.save(this.state);
     await this.publishState();

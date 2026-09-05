@@ -8,6 +8,26 @@ Build and start the broker plus simulator:
 docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml up --build
 ```
 
+The compose broker listens only on loopback. Its RabbitMQ management UI is
+`http://127.0.0.1:15672` (local development credentials: `attraccess` / `password`).
+Configure this broker and its credential provisioning in Attraccess before
+creating the enrollment package. Discovery always uses `attraccess/wago/discovery`;
+the operational namespace comes from the claim, independently of discovery.
+
+For a separately configured local broker, build and run the image directly:
+
+```sh
+docker build -f apps/plugins/wago/cc100-runtime/Dockerfile.simulator -t wago-cc100-simulator .
+docker run --rm --name wago-cc100-simulator \
+  -e WAGO_MQTT_URL=mqtt://host.docker.internal:1883 \
+  -e WAGO_HARDWARE_ID -e WAGO_PAIRING_CODE -e WAGO_ENROLLMENT_SECRET \
+  -e WAGO_ENROLLMENT_USERNAME -e WAGO_ENROLLMENT_PASSWORD \
+  -v cc100-simulator-state:/var/lib/attraccess-wago wago-cc100-simulator
+```
+
+The host URL above is for Docker Desktop. On Linux, use your local Docker broker
+network and its service name instead.
+
 Before starting, create a WAGO enrollment package in Attraccess and export its values. The broker URL must point at the broker selected in the WAGO plugin; for the included broker it is `mqtt://localhost:1883` from Attraccess and `mqtt://mqtt:1883` from the simulator container.
 
 ```sh
@@ -19,6 +39,12 @@ export WAGO_ENROLLMENT_PASSWORD=the-enrollment-password
 ```
 
 The simulator persists the permanent credential, accepted configuration, output state, and command deduplication history in `cc100-simulator-state`. Remove that named volume only to simulate a factory-reset controller.
+
+It also persists the hardware ID. A claimed restart needs only `WAGO_MQTT_URL`
+and the same state volume; enrollment variables can be removed. Supplying a
+different hardware ID for an existing volume fails instead of reusing another
+controller's credentials. Volumes from older simulator versions need the original
+`WAGO_HARDWARE_ID` once to record that identity.
 
 `WAGO_INITIAL_VALUES` is a JSON map keyed by `<hardwareProfile>:<channel>`, for example `'{"751-9301:1":true,"879-3000:0":42}'`. `WAGO_MEASUREMENT_STEP` changes every numeric reading by a fixed amount at each measurement interval.
 `WAGO_CAPABILITIES` is a JSON list used in the discovery announcement; it defaults to the simulator's full protocol capability list and can be used to test compatibility failures.
@@ -33,3 +59,137 @@ Set `WAGO_SCENARIO` to one of:
 - `feedback-mismatch`: returns inverted feedback for written boolean points and publishes `feedback_mismatch` faults.
 
 Pulse and guard behavior are configured through the desired configuration and are executed by the shared runtime. Use an initial boolean value for the physical point that backs the guard channel to deterministically allow or deny commands.
+
+## Isolated broker integration tests (no Docker required)
+
+```sh
+pnpm nx run wago-cc100-runtime:test-simulator-integration
+```
+
+This builds the executable simulator, installs pinned Aedes 0.51.3 into a fresh
+temporary directory, binds a real MQTT broker to `127.0.0.1` on an ephemeral port,
+and removes broker dependencies and simulator state afterward. It requires npm
+registry access; it never reads the application's `.env` or connects to an
+existing broker. Authentication and topic policies come from the actual
+WagoService enrollment/claim requests. Repository storage and host SDK boundaries
+are in-memory test adapters; discovery, physical verification, claim, heartbeat
+parsing, configuration reconciliation, and WagoFlowService are real code.
+
+The strict CI target verifies measurement-to-output routing through the actual
+parser and flow service, then requires a runtime acknowledgement and physical
+output confirmation through a direct read of the in-memory device over parent IPC.
+The IPC channel exists only when the test parent starts the process with one; no
+network control port is exposed and no feedback field is synthesized. The test
+fails if ATT-978 is absent or runtime wire messages are
+incompatible. It does not fill in missing producer fields or accept log messages
+as proof. The runtime and ATT-979 owners must supply the reconciled producer
+contract before the complete target can pass.
+
+For staged integration against another **committed** branch without changing any
+worktree:
+
+```sh
+node apps/plugins/wago/cc100-runtime/integration/run.mjs --flow-ref=fleet/att-978-flow-freshness
+```
+
+The command prints the exact tested SHA and reads its backend TypeScript sources
+into temporary storage. For simulator-only work while those dependencies are
+pending, use `--lifecycle-only`; this explicitly skips the flow test and is not
+the CI acceptance target. The lifecycle checks include enrollment reconnect,
+permanent-identity TCP reconnect, commands after reconnect, persisted identity
+and outputs across process restart, plus offline, stale-heartbeat and rejected
+configuration scenarios.
+
+Both enrollment and operational MQTT connections use `clientId=username`, as
+required by provisioned RabbitMQ subscription-queue permissions. The broker tests
+reject wrong client IDs with otherwise valid credentials. Claim acknowledgement
+is published on the enrollment connection only after saving permanent credentials;
+the simulator waits for MQTT PUBACK before ending that connection. An injected
+state-write failure must produce neither an acknowledgement nor an operational
+connection; replaying the actual claim after storage recovers completes handoff.
+
+The runner also snapshots `origin/main` (or `--main-ref=<commit>`) and runs its real
+WagoService to capture the current claim payload and verify token acknowledgement
+and enrollment revocation. This is separate from the local heartbeat/parser test;
+no commissioning source is patched. Full git history is checked out in CI so the
+main source is available.
+
+The runner independently builds main's split runtime and verifies its command
+contract: missing/expired expiry and missing/wrong configuration revision are
+rejected without changing the device; a valid command is acknowledged and changes
+the actual output. This does not merge an older producer over main's runtime.
+
+To test a producer-owner commit alongside the flow-owner commit:
+
+```sh
+node apps/plugins/wago/cc100-runtime/integration/run.mjs \
+  --runtime-ref=<producer-commit> --flow-ref=<flow-commit>
+```
+
+`--runtime-ref` stages the exact committed runtime modules in temporary storage,
+overlays only the owned simulator entrypoint and device adapter, typechecks that
+combination, then builds it. It does not merge any runtime into this worktree or
+modify another worktree. The strict test sends commands with
+`expectedConfigurationRevision` and `expiresAt`; it expects physical percent 42
+to arrive as `kind: live`, `unit: millipercent`, `value: 42000`, with canonical ISO
+`timestamp`, a UUID `streamId` per boot and independent category counters. It
+keeps the same consumer alive across simulator restart to verify the new stream.
+It then stops the producer and advances only the consumer clock past the 90-second
+freshness bound, requiring an old matching value to time out. Producer wire
+timestamps are never rewritten.
+
+The `reject-configuration` scenario is implemented at the simulator's subscription
+boundary with shared `validateDesired`, so it works with the current runtime's
+explicit constructor. Normal desired configurations and all operational telemetry
+go through the unchanged shared runtime.
+
+`WAGO_HEARTBEAT_INTERVAL_MS` (default 30000) and
+`WAGO_MEASUREMENT_INTERVAL_MS` (default 5000) accept positive integer milliseconds
+and allow deterministic accelerated integration tests. `WAGO_STATE_PATH` selects
+the state file (default `/var/lib/attraccess-wago/state.json`). Keep separate state
+paths for separate simulator instances.
+
+This suite does not prove the browser UI, RabbitMQ management provisioning, or
+physical CC100 behavior. Hardware acceptance remains ATT-984.
+
+### Verified cross-branch integration (2026-09-05)
+
+The strict suite passes **8 tests, none skipped**, with these exact committed
+sources staged read-only:
+
+- Producer: `eb58308c87771a49eb15b8c41430b5ac938b1919` (runtime contract from `73995720`).
+- Flow service and parser: `f028f89b13a43d0503dd5dcaa53a66ec767e7b54`.
+- Main commissioning service and split command runtime: `9e0a1c47066d5b103ca09606f26f5d2ace6c3091`.
+
+```sh
+node apps/plugins/wago/cc100-runtime/integration/run.mjs \
+  --runtime-ref=eb58308c87771a49eb15b8c41430b5ac938b1919 \
+  --flow-ref=f028f89b13a43d0503dd5dcaa53a66ec767e7b54 \
+  --main-ref=9e0a1c47066d5b103ca09606f26f5d2ace6c3091
+```
+
+Evidence includes real producer measurement `42000 millipercent / live` through
+the actual parser and WagoFlowService, a resulting MQTT command and accepted
+acknowledgement, and a separate read confirming the device output changed.
+Independent category counters start at 1 within the same boot UUID; a process
+restart produces a different UUID and the same consumer accepts its samples.
+Once the producer stops, an old matching value cannot satisfy a wait after the
+freshness bound. All discovery, client-ID, durable claim, save-failure recovery,
+reconnect, configuration and main command-expiry/revision assertions also pass.
+
+These source snapshots prove the cross-branch contract without merging another
+owner's runtime into this branch. The default CI target uses the checkout's own
+producer/consumer and remains a strict gate: publication must integrate those
+dependencies first. It must not replace the gate with `--lifecycle-only`.
+
+### Earlier incompatible baseline
+
+With simulator base `250d49a8` and committed ATT-978 flow/parser `13b0c255`, the
+four isolated lifecycle/scenario checks pass. The strict flow check receives the
+runtime's real wire payload `{"channelId":"level","unit":"percent","value":42}`
+and fails in `parseOperationalMessage` with `operational timestamp is invalid`.
+That producer also lacks `sequence`; its state and acknowledgement messages lack
+both fields. ATT-979 additionally requires the owners to reconcile source timestamp,
+typed units/kinds and restart-safe stream identity. The harness must continue to
+use the shared producer unchanged while that contract is corrected. No successful
+measurement-to-output integration is claimed for this baseline.
