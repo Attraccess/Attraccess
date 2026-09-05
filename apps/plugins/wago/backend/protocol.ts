@@ -95,6 +95,7 @@ export type WagoStateMessage = WagoOperationalMessageBase & {
   contentHash: string | null;
   outputs: Record<string, boolean>;
   inputs?: Record<string, boolean>;
+  readiness?: { hardwareAvailable: boolean };
 };
 
 export type WagoMeasurementMessage = WagoOperationalMessageBase &
@@ -150,7 +151,12 @@ export function parseOperationalMessage(
       !isNullableInteger(value.revision) ||
       !isNullableString(value.contentHash) ||
       !isBooleanRecord(value.outputs) ||
-      (value.inputs !== undefined && !isBooleanRecord(value.inputs))
+      (value.inputs !== undefined && !isBooleanRecord(value.inputs)) ||
+      (value.readiness !== undefined &&
+        (!value.readiness ||
+          typeof value.readiness !== 'object' ||
+          Array.isArray(value.readiness) ||
+          typeof (value.readiness as Record<string, unknown>).hardwareAvailable !== 'boolean'))
     )
       throw new Error('invalid state message');
     return {
@@ -165,6 +171,9 @@ export function parseOperationalMessage(
         contentHash: value.contentHash as string | null,
         outputs: value.outputs as Record<string, boolean>,
         ...(value.inputs !== undefined ? { inputs: value.inputs as Record<string, boolean> } : {}),
+        ...(value.readiness !== undefined
+          ? { readiness: { hardwareAvailable: (value.readiness as { hardwareAvailable: boolean }).hardwareAvailable } }
+          : {}),
       },
     };
   }
