@@ -21,6 +21,8 @@ import {
   heartbeatTopic,
   normalizeOperationalPrefix,
   parseAnnouncement,
+  parseHeartbeat,
+  type WagoHeartbeat,
   type WagoAnnouncement,
 } from './protocol';
 import { WagoController } from './wago-controller.entity';
@@ -436,9 +438,7 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
       username: identity,
       vhost: '/',
       topicPolicy: {
-        publish: [
-          `${namespace}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${controller.hardwareId}/#`,
-        ],
+        publish: [`${namespace}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${controller.hardwareId}/#`],
         subscribe: [
           configurationDesiredTopic(namespace, controller.hardwareId),
           commandTopic(namespace, controller.hardwareId),
@@ -690,9 +690,9 @@ export class WagoService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async onHeartbeat(hardwareId: string, payload: Buffer): Promise<void> {
-    let heartbeat: WagoAnnouncement;
+    let heartbeat: WagoHeartbeat;
     try {
-      heartbeat = parseAnnouncement(payload);
+      heartbeat = parseHeartbeat(payload);
     } catch (error) {
       this.context.logger.warn(
         `Ignoring invalid WAGO heartbeat: ${error instanceof Error ? error.message : String(error)}`,
