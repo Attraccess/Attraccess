@@ -1049,6 +1049,57 @@ describe('WagoRuntime', () => {
     );
   });
 
+  it('does not postpone a watchdog shutdown for repeated disconnect notifications', async () => {
+    jest.useFakeTimers();
+    try {
+      const watchdogSnapshot: Snapshot = {
+        ...snapshot,
+        logicalChannels: [{ ...snapshot.logicalChannels[0], disconnectPolicy: { mode: 'watchdog', timeoutMs: 100 } }],
+      };
+      await transport.send(desired, {
+        protocolVersion: 1,
+        revision: 1,
+        contentHash: hash(watchdogSnapshot),
+        snapshot: watchdogSnapshot,
+      });
+      await transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'set', value: true }));
+
+      await runtime.setConnected(false);
+      await jest.advanceTimersByTimeAsync(90);
+      await runtime.setConnected(false);
+      await jest.advanceTimersByTimeAsync(10);
+
+      expect(device.values.get('751-9301:0')).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('cancels a pending watchdog shutdown when reconnecting', async () => {
+    jest.useFakeTimers();
+    try {
+      const watchdogSnapshot: Snapshot = {
+        ...snapshot,
+        logicalChannels: [{ ...snapshot.logicalChannels[0], disconnectPolicy: { mode: 'watchdog', timeoutMs: 100 } }],
+      };
+      await transport.send(desired, {
+        protocolVersion: 1,
+        revision: 1,
+        contentHash: hash(watchdogSnapshot),
+        snapshot: watchdogSnapshot,
+      });
+      await transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'set', value: true }));
+
+      await runtime.setConnected(false);
+      await runtime.setConnected(true);
+      await jest.advanceTimersByTimeAsync(100);
+
+      expect(device.values.get('751-9301:0')).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('retries the aggregate immediate shutdown state after a state-store failure', async () => {
     const twoOutputs: Snapshot = {
       ...snapshot,
@@ -1109,6 +1160,50 @@ describe('WagoRuntime', () => {
       expect.objectContaining({
         payload: expect.objectContaining({ connected: false, outputs: { load: false } }),
         retain: true,
+      }),
+    );
+  });
+
+  it('rejects numeric digital readback instead of publishing a false boolean', async () => {
+    const numericFeedbackDevice = {
+      write: async () => undefined,
+      read: async () => 1,
+    };
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+      transport,
+      device: numericFeedbackDevice,
+    });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+    await transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'set', value: true }));
+
+    expect(transport.published.filter((message) => message.topic.endsWith('/state')).at(-1)).toEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          outputs: {},
+          readiness: expect.objectContaining({ hardwareAvailable: false }),
+        }),
+      }),
+    );
+  });
+
+  it('excludes feedback for outputs removed from the active configuration', async () => {
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+    await transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'set', value: true }));
+    const noOutputs: Snapshot = { ...snapshot, logicalChannels: [] };
+    await transport.send(desired, {
+      protocolVersion: 1,
+      revision: 2,
+      contentHash: hash(noOutputs),
+      snapshot: noOutputs,
+    });
+
+    expect(transport.published.filter((message) => message.topic.endsWith('/state')).at(-1)).toEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({ outputs: {} }),
       }),
     );
   });

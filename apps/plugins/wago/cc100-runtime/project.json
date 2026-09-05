@@ -5,6 +5,11 @@
   "projectType": "application",
   "tags": ["scope:hardware", "type:plugin"],
   "targets": {
+    "test-simulator-integration": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": { "command": "node apps/plugins/wago/cc100-runtime/integration/run.mjs" }
+    },
     "build": {
       "executor": "@nx/esbuild:esbuild",
       "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-runtime"],
@@ -12,6 +17,21 @@
         "main": "apps/plugins/wago/cc100-runtime/src/main.ts",
         "tsConfig": "apps/plugins/wago/cc100-runtime/tsconfig.json",
         "outputPath": "dist/apps/wago-cc100-runtime",
+        "platform": "node",
+        "format": ["cjs"],
+        "bundle": true,
+        "thirdParty": true,
+        "generatePackageJson": true,
+        "esbuildOptions": { "target": "node24" }
+      }
+    },
+    "build-simulator": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-simulator"],
+      "options": {
+        "main": "apps/plugins/wago/cc100-runtime/src/simulator.ts",
+        "tsConfig": "apps/plugins/wago/cc100-runtime/tsconfig.json",
+        "outputPath": "dist/apps/wago-cc100-simulator",
         "platform": "node",
         "format": ["cjs"],
         "bundle": true,
