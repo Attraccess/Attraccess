@@ -89,14 +89,12 @@ export function validateSnapshot(value: unknown): ValidationError[] {
       });
     }
   });
-  const channelIds = new Set<string>();
   const channelsById = new Map<string, Snapshot['logicalChannels'][number]>();
   const channelIdCounts = new Map<string, number>();
   snapshot.logicalChannels.forEach((channel) => {
     if (typeof channel?.id !== 'string') {
       return;
     }
-    channelIds.add(channel.id);
     channelsById.set(channel.id, channel);
     channelIdCounts.set(channel.id, (channelIdCounts.get(channel.id) ?? 0) + 1);
   });
@@ -184,11 +182,19 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     if (channel.pulse) {
       validateKeys(channel.pulse as Record<string, unknown>, `${path}.pulse`, ['durationMs'], errors);
     }
-    if (channel?.guard && (!capabilities.includes('guard') || !channelIds.has(channel.guard.channelId))) {
+    const guardChannel = channel.guard ? channelsById.get(channel.guard.channelId) : undefined;
+    if (
+      channel?.guard &&
+      (!capabilities.includes('guard') ||
+        !Array.isArray(guardChannel?.capabilities) ||
+        !guardChannel.capabilities.includes('input') ||
+        !['on', 'off'].includes(channel.guard.when) ||
+        guardChannel.id === channel.id)
+    ) {
       errors.push({
         path: `${path}.guard`,
         code: 'invalid_guard',
-        message: 'guard requires guard capability and an existing channel',
+        message: 'guard requires guard capability, another input channel, and on/off condition',
       });
     }
     if (channel.guard) {
@@ -200,6 +206,7 @@ export function validateSnapshot(value: unknown): ValidationError[] {
       (!capabilities.includes('feedback') ||
         !feedbackChannel ||
         feedbackChannel.id === channel.id ||
+        !Array.isArray(feedbackChannel.capabilities) ||
         !feedbackChannel.capabilities.includes('input') ||
         !['match', 'inverse'].includes(channel.feedback.expected) ||
         !Number.isSafeInteger(channel.feedback.timeoutMs) ||
@@ -238,10 +245,9 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     if (
       channel.measurement &&
       (!capabilities.includes('measurement') ||
-        !['ampere', 'volt', 'watt', 'watt-hour', 'percent'].includes(channel.measurement.unit) ||
+        !['ampere', 'volt', 'watt', 'percent'].includes(channel.measurement.unit) ||
         !Number.isFinite(channel.measurement.scale) ||
-        !Number.isFinite(channel.measurement.offset) ||
-        (channel.measurement.kind !== undefined && !['live', 'cumulative'].includes(channel.measurement.kind)))
+        !Number.isFinite(channel.measurement.offset))
     ) {
       errors.push({
         path: `${path}.measurement`,

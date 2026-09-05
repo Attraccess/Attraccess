@@ -35,6 +35,8 @@ export interface Transport {
 }
 
 export interface DeviceAdapter {
+  validate?(snapshot: Snapshot): ValidationError[];
+  checkAvailability?(): Promise<void>;
   write(point: Snapshot['physicalPoints'][number], value: boolean): Promise<void>;
   read(point: Snapshot['physicalPoints'][number]): Promise<boolean | number>;
 }

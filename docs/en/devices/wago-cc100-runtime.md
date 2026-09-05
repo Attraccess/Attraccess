@@ -76,7 +76,7 @@ The runtime requires `WAGO_HARDWARE_ID`, `WAGO_MQTT_URL`, and `WAGO_PAIRING_CODE
 
 ### I/O paths and host access
 
-`WAGO_IO_PATHS` is a JSON object keyed as `<hardware-profile>:<channel>`. Each entry supplies an `input` and/or `output` file path. Firmware revisions can enumerate IIO devices differently, so determine these paths on the target before deployment. Do not reuse a path map from a different firmware release without verification.
+The digital runtime requires `WAGO_HARDWARE_PROFILE=cc100-751-9301-fw31-digital-v1`. The installer must verify model `751-9301` and firmware `31` before selecting it. Manual `WAGO_IO_PATHS` mappings are rejected; existing installations must republish the explicit digital mapping when upgrading.
 
 WAGO documents these relevant host paths:
 
@@ -86,21 +86,20 @@ WAGO documents these relevant host paths:
 - Calibration data: `/etc/calib`
 - RS-485: `/dev/serial` on the `751-9301`; its serial mode is RS-485 only
 
-The current image instantiates only the onboard I/O adapter. It can read or write the file paths supplied through `WAGO_IO_PATHS`, but does not read `/etc/calib` or implement calibration transforms. Its RS-485 and Modbus TCP adapter classes are not selected by the entry point, so RS-485 and Modbus deployment are not available in this artifact. The listed paths are WAGO host documentation and an input to future hardware validation, not a claim of current runtime support.
+The image instantiates the onboard digital adapter. Channels `0..3` are DO1..DO4 and `4..11` are DI1..DI8. Inputs are independent packed bits; output updates preserve other bits and are serialized across channels. Direction mismatches, duplicate output owners and unsupported points are rejected before configuration acceptance. Analog, Pt1000, RS-485 and Modbus are not selected by this artifact.
 
-The current runtime release declares `privileged: true`. This is a temporary hardware-access model from the release manifest, not an endorsement of broad host access. The image process itself runs as UID `10001`. The exact production device and bind-mount list is not yet validated and must be supplied by the ATT-984 hardware gate.
+The manifest declares `privileged: false`, UID `10001`, all capabilities dropped and no-new-privileges. Only the DIN file is mounted read-only and DOUT_DATA read-write. The installer must grant this UID the necessary file permissions and ensure exclusive output ownership. No second runtime, CODESYS program or host process may write the output register concurrently.
 
-Until then, do not claim a least-privilege deployment. The intended replacement model is:
+The documented layout is implemented and software-tested, but firmware-31 access permissions and reboot persistence remain unvalidated. Do not claim a hardware-validated least-privilege deployment until ATT-984 supplies evidence. The complete integration contract is in [`HARDWARE.md`](https://github.com/Attraccess/Attraccess/blob/main/apps/plugins/wago/cc100-runtime/HARDWARE.md). Commissioning-service integration is tracked separately in ATT-1057.
 
-- Bind only the specific configured sysfs/IIO files required for the controller's onboard I/O, read-only for inputs and read-write only for output files. These expose the physical I/O paths used by the adapter.
-- Add a read-only `/etc/calib` mount only after a runtime release reads it to implement analog or Pt1000 calibration. This preserves WAGO's production calibration without allowing modification.
-- Add only `--device /dev/serial` after a runtime release selects its RS-485 Modbus RTU adapter. This limits serial access to the documented CC100 interface rather than exposing `/dev`.
+- Bind only the two digital register files at the destinations below. Missing sources must fail installation.
+- Do not grant analog, calibration or serial access to this digital-only artifact.
 - Mount a named volume only at `/var/lib/attraccess-wago` so accepted configuration and command de-duplication survive replacement or reboot.
 - Do not mount the Docker socket, host root filesystem, or an unrestricted `/dev` directory. The runtime exposes no inbound network service and currently needs only outbound MQTT.
 
 ## Start the WIP runtime
 
-This command reflects the current manifest. Substitute the image digest and a target-specific I/O mapping only after reviewing them on the controller. The `WAGO_IO_PATHS` example is intentionally empty: no universal mapping is valid across CC100 firmware revisions.
+This is a deployment-contract example, not an instruction to operate unvalidated hardware. The installer must first verify firmware/model, grant the required UID permissions and ensure exclusive register ownership. Substitute the image digest only after completing that review. Do not use root or privileged mode as a fallback.
 
 ```sh
 export IMAGE='ghcr.io/attraccess/wago-cc100-runtime@sha256:<published-release-digest>'
@@ -108,9 +107,11 @@ docker volume create attraccess-wago-state
 docker run -d \
   --name attraccess-wago-cc100 \
   --restart unless-stopped \
-  --privileged \
+  --user 10001 --cap-drop ALL --security-opt no-new-privileges \
   --env-file /etc/attraccess-wago/runtime.env \
-  --env 'WAGO_IO_PATHS={}' \
+  --env WAGO_HARDWARE_PROFILE=cc100-751-9301-fw31-digital-v1 \
+  --mount type=bind,src=/sys/devices/platform/soc/44009000.spi/spi_master/spi0/spi0.0/din,dst=/run/attraccess-wago/io/din,readonly \
+  --mount type=bind,src=/sys/kernel/dout_drv/DOUT_DATA,dst=/run/attraccess-wago/io/dout \
   --mount type=volume,src=attraccess-wago-state,dst=/var/lib/attraccess-wago \
   "$IMAGE"
 ```
@@ -164,7 +165,7 @@ It subscribes with QoS 1 to:
 It publishes with QoS 1:
 
 - `configuration/reported` retained, including revision, content hash, and structured validation errors
-- `state` retained, including connection state, accepted revision/hash, and output states
+- `state` retained, including connection state, accepted revision/hash, independently measured boolean `inputs`/`outputs`, last `commandedOutputs`, and `readiness`. Configuration acceptance is not hardware readiness. Failed reads omit unavailable values and report errors rather than reporting false. Input changes are sampled every 250 ms; heartbeats refresh state every 30 seconds. Operational messages include timestamp and durable sequence metadata; ATT-978's consumer must ingest the input map.
 - `heartbeat` every 30 seconds with hardware ID, pairing code, protocol/runtime versions, capabilities, and a sequence value
 - `measurements` every 5 seconds for configured measurement channels
 - `faults` when a measurement read or device write fails
