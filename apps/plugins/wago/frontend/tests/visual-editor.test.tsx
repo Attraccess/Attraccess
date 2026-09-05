@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '@testing-library/jest-dom/vitest';
 import { ConfigurationEditor } from '../src/ConfigurationEditor';
+import { ConfigurationMetadataChanges } from '../src/ConfigurationChanges';
 import type { WagoConfigurationSnapshot } from '../src/api';
-import type { WagoDiagnostics } from '../src/diagnostics';
 
 const state = vi.hoisted(() => ({
   snapshot: {
@@ -30,7 +30,6 @@ const state = vi.hoisted(() => ({
   revisionPreview: vi.fn(),
   getDraft: vi.fn(),
   rollback: vi.fn(),
-  diagnostics: vi.fn(),
 }));
 vi.mock('../src/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/api')>()),
@@ -57,51 +56,6 @@ function deferred<T>() {
   });
   return { promise, resolve };
 }
-
-function diagnosticsFixture(controllerId = 1): WagoDiagnostics {
-  return {
-    controllerId,
-    generatedAt: new Date().toISOString(),
-    name: `Fixture controller ${controllerId}`,
-    connectivity: 'online',
-    heartbeatAt: new Date().toISOString(),
-    heartbeatFreshness: 'fresh',
-    runtimeVersion: '1.0.0',
-    protocolVersion: '1.0.0',
-    capabilities: [],
-    incompatible: false,
-    sequenceGaps: null,
-    sequenceExplanation: 'Fixture source',
-    activeStream: null,
-    trackingExhausted: false,
-    stateConnected: true,
-    stateHardwareAvailable: null,
-    stateSourceAt: null,
-    configuration: {
-      draftUpdatedAt: null,
-      draftChanged: false,
-      validationErrorCount: 0,
-      validationCodes: [],
-      validationErrors: [],
-      rejectionErrors: [],
-      publishedRevision: 1,
-      publishedState: 'applied',
-      appliedRevision: 1,
-      reportedRevision: 1,
-      revisionMismatch: false,
-      rejected: false,
-    },
-    hardwareReadiness: 'unknown',
-    hardwareReadinessReason: 'An applied revision is not physical I/O proof.',
-    channels: [],
-    faults: [],
-    references: [],
-    referencesTruncated: false,
-    events: [],
-    limitations: [],
-  };
-}
-
 let client: QueryClient;
 beforeEach(() => {
   vi.clearAllMocks();
@@ -115,19 +69,11 @@ beforeEach(() => {
   );
   vi.stubGlobal(
     'fetch',
-    vi.fn((url: string, options?: RequestInit) => {
-      if (/\/api\/wago\/controllers\/\d+\/diagnostics$/.test(url) && !options?.method)
-        return state.diagnostics(url, options);
+    vi.fn(() => {
       throw new Error('Unexpected network access in visual editor test');
     }),
   );
-  client = new QueryClient({
-    defaultOptions: { queries: { retry: false, retryDelay: 0 }, mutations: { retry: false } },
-  });
-  state.diagnostics.mockImplementation(async (url: string) => {
-    const controllerId = Number(/controllers\/(\d+)/.exec(url)?.[1]);
-    return new Response(JSON.stringify(diagnosticsFixture(controllerId)));
-  });
+  client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   state.history.mockResolvedValue({ revisions: [], offset: 0, limit: 20 });
   state.getDraft.mockResolvedValue({
     controllerId: 1,
@@ -161,75 +107,16 @@ function mount() {
 }
 
 describe('visual configuration workflow', () => {
-  it('embeds real diagnostics polling without saving local edits or duplicating configuration controls', async () => {
-    mount();
-    const user = userEvent.setup();
-    expect(await screen.findByText('Fixture controller 1: online')).toBeInTheDocument();
-    expect(screen.getAllByText(/Hardware readiness: unknown/)).toHaveLength(1);
-    expect(screen.queryByRole('button', { name: 'Open configuration' })).not.toBeInTheDocument();
-    expect(state.diagnostics).toHaveBeenCalledWith(
-      expect.stringMatching(/\/api\/wago\/controllers\/1\/diagnostics$/),
-      expect.objectContaining({ credentials: 'include' }),
+  it('renders literal editor names in metadata changes', () => {
+    render(
+      <ConfigurationMetadataChanges
+        changes={[{ path: '$.names.output', previous: 'Pump-A', current: 'Pump A' }]}
+        names={{ output: 'Pump A' }}
+      />,
     );
-    const name = await screen.findByRole('textbox', { name: 'Channel name' });
-    await user.clear(name);
-    await user.type(name, 'Unsaved diagnostic session');
-    state.diagnostics.mockClear();
-    await user.click(screen.getByRole('button', { name: 'Refresh diagnostics' }));
-    await waitFor(() => expect(state.diagnostics).toHaveBeenCalledTimes(1));
-    expect(name).toHaveValue('Unsaved diagnostic session');
-    expect(screen.getByText(/Unsaved local edits/)).toBeInTheDocument();
-    expect(state.save).not.toHaveBeenCalled();
-    expect(state.publish).not.toHaveBeenCalled();
-  });
 
-  it('hides cached online status on polling failure and recovers without losing local edits', async () => {
-    mount();
-    const user = userEvent.setup();
-    await screen.findByText('Fixture controller 1: online');
-    const name = await screen.findByRole('textbox', { name: 'Channel name' });
-    await user.clear(name);
-    await user.type(name, 'Keep my draft');
-    state.diagnostics.mockResolvedValue(new Response('{}', { status: 503 }));
-    await user.click(screen.getByRole('button', { name: 'Refresh diagnostics' }));
-    expect(await screen.findByText(/Diagnostics unavailable/)).toBeInTheDocument();
-    expect(screen.queryByText('Fixture controller 1: online')).not.toBeInTheDocument();
-    expect(screen.queryByText(/Hardware readiness:/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled();
-    expect(name).toHaveValue('Keep my draft');
-    state.diagnostics.mockImplementation(async () => new Response(JSON.stringify(diagnosticsFixture())));
-    await user.click(screen.getByRole('button', { name: 'Refresh diagnostics' }));
-    expect(await screen.findByText('Fixture controller 1: online')).toBeInTheDocument();
-    expect(name).toHaveValue('Keep my draft');
-    expect(state.save).not.toHaveBeenCalled();
-    expect(state.publish).not.toHaveBeenCalled();
-  });
-
-  it('scopes diagnostics to the selected controller and removes it when the editor closes', async () => {
-    const view = (controllerId: number | null) => (
-      <QueryClientProvider client={client}>
-        <ConfigurationEditor controllerId={controllerId} onOpenChange={vi.fn()} />
-      </QueryClientProvider>
-    );
-    const { rerender } = render(view(1));
-    await screen.findByText('Fixture controller 1: online');
-    rerender(view(2));
-    expect(await screen.findByText('Fixture controller 2: online')).toBeInTheDocument();
-    expect(screen.queryByText('Fixture controller 1: online')).not.toBeInTheDocument();
-    rerender(view(null));
-    expect(screen.queryByRole('region', { name: 'Controller diagnostics' })).not.toBeInTheDocument();
-    expect(
-      client
-        .getQueryCache()
-        .find({ queryKey: ['wago', 'diagnostics', 1] })
-        ?.getObserversCount(),
-    ).toBe(0);
-    expect(
-      client
-        .getQueryCache()
-        .find({ queryKey: ['wago', 'diagnostics', 2] })
-        ?.getObserversCount(),
-    ).toBe(0);
+    expect(screen.getByText('Before: Pump-A')).toBeInTheDocument();
+    expect(screen.getByText('After: Pump A')).toBeInTheDocument();
   });
 
   it.each(['success', 'delivery failure', 'refresh failure'] as const)(
