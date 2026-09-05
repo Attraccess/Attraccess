@@ -72,32 +72,88 @@ export class WagoDiagnosticsService {
         controllerIds.add(id);
       }
     }
-    const controllers = await Promise.all(
-      [...controllerIds].slice(0, 20).map(async (controllerId) => {
-        try {
-          const diagnostics = await this.get(controllerId);
-          return {
-            controllerId,
-            name: diagnostics.name,
-            unavailable: false,
-            references: diagnostics.references.filter((reference) => reference.resourceId === resourceId),
-            referencesTruncated: diagnostics.referencesTruncated,
-          };
-        } catch {
-          // A removed controller or corrupt snapshot must not hide healthy neighbours.
-          return {
-            controllerId,
-            name: `Controller ${controllerId}`,
-            unavailable: true,
-            references: [],
-            referencesTruncated: false,
-          };
-        }
-      }),
-    );
+    const selectedControllerIds = [...controllerIds].slice(0, 20);
+    if (!selectedControllerIds.length)
+      return { resourceId, controllers: [], invalidControllerReferences, truncated: nodes.length > 1000 };
+
+    const localNodes = nodes.slice(0, 1000);
+    const localChannelIds = [
+      ...new Set(
+        localNodes
+          .map((node) => node.data.channelId)
+          .filter((channelId): channelId is string => typeof channelId === 'string'),
+      ),
+    ];
+    const controllerIdsForQuery = selectedControllerIds.map(String);
+    const [controllers, appliedRevisions, conflictNodes] = await Promise.all([
+      this.context
+        .getRepository(WagoController)
+        .createQueryBuilder('controller')
+        .select(['controller.id', 'controller.name', 'controller.hardwareId'])
+        .where('controller.id IN (:...controllerIds)', { controllerIds: selectedControllerIds })
+        .getMany(),
+      this.context
+        .getRepository(WagoConfigurationRevision)
+        .createQueryBuilder('revision')
+        .select(['revision.controllerId', 'revision.revision', 'revision.snapshot'])
+        .distinctOn(['revision.controllerId'])
+        .where('revision.controllerId IN (:...controllerIds)', { controllerIds: selectedControllerIds })
+        .andWhere('revision.state = :state', { state: 'applied' })
+        .orderBy('revision.controllerId', 'ASC')
+        .addOrderBy('revision.revision', 'DESC')
+        .getMany(),
+      localChannelIds.length
+        ? this.context.dataSource
+            .getRepository(ResourceFlowNode)
+            .createQueryBuilder('node')
+            .where("node.data ->> 'controllerId' IN (:...controllerIds)", { controllerIds: controllerIdsForQuery })
+            .andWhere("node.data ->> 'channelId' IN (:...channelIds)", { channelIds: localChannelIds })
+            .andWhere('node.type = :type', { type: 'plugin.wago.command' })
+            .take(1001)
+            .getMany()
+        : Promise.resolve([]),
+    ]);
+    const controllersById = new Map(controllers.map((controller) => [controller.id, controller]));
+    const appliedByControllerId = new Map(appliedRevisions.map((revision) => [revision.controllerId, revision]));
+    const referencesTruncated = conflictNodes.length > 1000;
+    const conflictNodesByControllerId = new Map<number, ResourceFlowNode[]>();
+    for (const node of conflictNodes.slice(0, 1000)) {
+      const controllerId = node.data.controllerId;
+      if (typeof controllerId !== 'number') continue;
+      const matchingNodes = conflictNodesByControllerId.get(controllerId) ?? [];
+      matchingNodes.push(node);
+      conflictNodesByControllerId.set(controllerId, matchingNodes);
+    }
+    const controllersResult = selectedControllerIds.map((controllerId) => {
+      const controller = controllersById.get(controllerId);
+      if (!controller)
+        return {
+          controllerId,
+          name: `Controller ${controllerId}`,
+          unavailable: true,
+          references: [],
+          referencesTruncated: false,
+        };
+      const applied = appliedByControllerId.get(controllerId);
+      const appliedSnapshot = applied ? (JSON.parse(applied.snapshot) as WagoConfigurationSnapshot) : null;
+      const controllerNodes = localNodes.filter((node) => node.data.controllerId === controllerId);
+      const references = diagnosticReferences(
+        [...controllerNodes, ...(conflictNodesByControllerId.get(controllerId) ?? [])],
+        appliedSnapshot?.logicalChannels.map((channel) => channel.id) ?? [],
+        applied?.revision ?? null,
+        Object.fromEntries(appliedSnapshot?.logicalChannels.map((channel) => [channel.id, channel.capabilities]) ?? []),
+      ).filter((reference) => reference.resourceId === resourceId);
+      return {
+        controllerId,
+        name: controller.name ?? controller.hardwareId,
+        unavailable: false,
+        references,
+        referencesTruncated,
+      };
+    });
     return {
       resourceId,
-      controllers,
+      controllers: controllersResult,
       invalidControllerReferences,
       truncated: nodes.length > 1000 || controllerIds.size > 20,
     };
