@@ -22,6 +22,7 @@ type CachedState = {
   timestamp: string;
   sequence: number;
   receivedAt: number;
+  offline?: boolean;
 };
 type NodeKind = 'event' | 'read' | 'wait';
 type Waiter = (state?: CachedState, cancel?: boolean) => void;
@@ -35,6 +36,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   private controllerByHardwareId = new Map<string, { controller: WagoController; serverId: number }>();
   private readonly sequences = new Map<number, number>();
   private readonly sequenceTimestamps = new Map<number, number>();
+  private readonly offlineControllers = new Set<number>();
   private readonly channelCache = new Map<number, WagoConfigurationSnapshot['logicalChannels']>();
   private readonly waiters = new Set<Waiter>();
   private readonly waitersByKey = new Map<string, Set<Waiter>>();
@@ -73,6 +75,8 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     const settings = await this.settings.findOneBy({ id: 1 });
     if (!settings) return;
     const controllers = await this.controllers.find({ where: { trustState: 'claimed' } });
+    const controllerIds = new Set(controllers.map((controller) => controller.id));
+    for (const id of this.offlineControllers) if (!controllerIds.has(id)) this.offlineControllers.delete(id);
     this.channelCache.clear();
     const revisions = await this.loadLatestAppliedRevisions(controllers.map((controller) => controller.id));
     for (const revision of revisions) this.cacheChannels(revision);
@@ -197,8 +201,8 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       typeof config.timeoutMs === 'number' && Number.isFinite(config.timeoutMs) && config.timeoutMs > 0
         ? Math.min(config.timeoutMs, MAX_TIMEOUT_MS)
         : 30_000;
+    const waiterKey = this.cacheKey(config.controllerId, config.channelId, config.category);
     return new Promise((resolve) => {
-      const waiterKey = this.cacheKey(config.controllerId, config.channelId, config.category);
       const cleanup = () => {
         clearTimeout(timer);
         this.waiters.delete(wake);
@@ -237,8 +241,15 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     const { controller } = entry;
     const previous = this.sequences.get(controller.id);
     const eventTime = Date.parse(event.timestamp);
+    if (eventTime > Date.now()) {
+      this.context.logger.warn(`Ignoring future-dated WAGO event for ${controller.hardwareId}`);
+      return;
+    }
     const previousTime = this.sequenceTimestamps.get(controller.id);
-    if (previous !== undefined && event.sequence <= previous && (!previousTime || eventTime <= previousTime)) {
+    if (
+      previousTime !== undefined &&
+      (eventTime < previousTime || (event.sequence <= (previous ?? -1) && eventTime === previousTime))
+    ) {
       this.context.logger.warn(`Ignoring duplicate or out-of-order WAGO event for ${controller.hardwareId}`);
       return;
     }
@@ -250,6 +261,14 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       );
     this.sequences.set(controller.id, event.sequence);
     this.sequenceTimestamps.set(controller.id, eventTime);
+    if (event.category === 'state') {
+      if (event.connected) this.offlineControllers.delete(controller.id);
+      else {
+        this.offlineControllers.add(controller.id);
+        // Keep values readable, but reconnecting must not revive pre-disconnect samples.
+        for (const state of this.cache.values()) if (state.controllerId === controller.id) state.offline = true;
+      }
+    }
     const channelId = event.category === 'state' ? null : 'channelId' in event ? event.channelId : null;
     if (event.category === 'state')
       for (const [id, value] of Object.entries(event.outputs)) await this.store(controller, id, event, value);
@@ -272,6 +291,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       timestamp: event.timestamp,
       sequence: event.sequence,
       receivedAt: Date.now(),
+      offline: this.offlineControllers.has(controller.id),
     };
     const cacheKey = this.cacheKey(controller.id, channelId, event.category);
     const previous = this.cache.get(cacheKey);
@@ -337,14 +357,18 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   }
   private categories(channel?: WagoConfigurationSnapshot['logicalChannels'][number]): string[] {
     return [
-      ...(channel?.capabilities.includes('output') ? ['state'] : []),
+      ...(channel?.capabilities.some((capability) => capability === 'input' || capability === 'output')
+        ? ['state']
+        : []),
       ...(channel?.capabilities.includes('measurement') ? ['measurement'] : []),
       'fault',
     ];
   }
   private readCategories(channel?: WagoConfigurationSnapshot['logicalChannels'][number]): string[] {
     return [
-      ...(channel?.capabilities.includes('output') ? ['state'] : []),
+      ...(channel?.capabilities.some((capability) => capability === 'input' || capability === 'output')
+        ? ['state']
+        : []),
       ...(channel?.capabilities.includes('measurement') ? ['measurement'] : []),
     ];
   }
@@ -375,10 +399,16 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     return true;
   }
   private matchesCondition(state: CachedState, config: Record<string, unknown>): boolean {
-    return config.equals === undefined || state.value === config.equals;
+    return this.freshness(state).available && (config.equals === undefined || state.value === config.equals);
+  }
+  private freshness(state: CachedState): { stale: boolean; offline: boolean; available: boolean } {
+    const age = Date.now() - Date.parse(state.timestamp);
+    const stale = !Number.isFinite(age) || age < 0 || age > STALE_AFTER_MS;
+    const offline = state.offline === true || this.offlineControllers.has(state.controllerId);
+    return { stale, offline, available: !stale && !offline };
   }
   payload(state: CachedState): object {
-    return { ...state, stale: Date.now() - Date.parse(state.timestamp) > STALE_AFTER_MS };
+    return { ...state, ...this.freshness(state) };
   }
   private dispatch(): void {
     while (this.activeDispatches < MAX_CONCURRENT_DISPATCHES && this.dispatches.length) {
