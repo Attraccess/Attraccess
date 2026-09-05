@@ -348,6 +348,7 @@ export function validateModbusBindings(snapshot: {
         if (channel?.physicalPointId !== point.id) continue;
         const capabilities = Array.isArray(channel.capabilities) ? channel.capabilities : [];
         if (capabilities.includes('output') && !action) fail('output requires named action');
+        if (capabilities.includes('input') && !measurement) fail('input requires named measurement');
         if (
           capabilities.includes('measurement') &&
           (!measurement ||
