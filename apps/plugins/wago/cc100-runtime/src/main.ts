@@ -85,14 +85,19 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
           await runtime.publishDiscoveryAnnouncement();
           return;
         }
-        await runtime.start();
-        const hadPendingConnectionState = pendingConnectionStates.length > 0;
-        while (pendingConnectionStates.length > 0) {
-          const state = pendingConnectionStates.shift();
-          if (state !== undefined) await runtime.setConnected(state);
+        try {
+          await runtime.start();
+        } finally {
+          // start() subscribes before its first publications. Keep connection
+          // policies live even if a publication fails after those subscriptions.
+          initialized = true;
+          const hadPendingConnectionState = pendingConnectionStates.length > 0;
+          while (pendingConnectionStates.length > 0) {
+            const state = pendingConnectionStates.shift();
+            if (state !== undefined) await handleAsync(() => runtime.setConnected(state));
+          }
+          if (!hadPendingConnectionState && !connected) await handleAsync(() => runtime.setConnected(false));
         }
-        initialized = true;
-        if (!hadPendingConnectionState && !connected) await runtime.setConnected(false);
         heartbeatTimer = setInterval(() => void handleAsync(() => runtime.publishHeartbeat()), 30_000).unref();
         measurementTimer = setInterval(() => void handleAsync(() => runtime.publishMeasurements()), 5_000).unref();
         inputTimer = setInterval(() => void handleAsync(() => runtime.pollInputs()), 250).unref();
