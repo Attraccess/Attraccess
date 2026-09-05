@@ -769,13 +769,13 @@ importers:
         version: link:../../../../libs/attractap-hw-shared
       '@tscircuit/cli':
         specifier: 0.1.1399
-        version: 0.1.1399(tscircuit@0.0.1774(@gltf-transform/core@4.4.1)(@gltf-transform/extensions@4.4.1)(@gltf-transform/functions@4.4.1(@types/node@25.9.5))(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(esbuild-wasm@0.27.7)(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
+        version: 0.1.1399(tscircuit@0.0.2339(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
       playwright:
         specifier: 1.62.1
         version: 1.62.1
       tscircuit:
-        specifier: 0.0.1774
-        version: 0.0.1774(@gltf-transform/core@4.4.1)(@gltf-transform/extensions@4.4.1)(@gltf-transform/functions@4.4.1(@types/node@25.9.5))(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(esbuild-wasm@0.27.7)(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+        specifier: 0.0.2339
+        version: 0.0.2339(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       tsx:
         specifier: ^4.20.3
         version: 4.23.11
@@ -787,13 +787,13 @@ importers:
         version: link:../../../../libs/attractap-hw-shared
       '@tscircuit/cli':
         specifier: 0.1.1399
-        version: 0.1.1399(tscircuit@0.0.1774(@gltf-transform/core@4.4.1)(@gltf-transform/extensions@4.4.1)(@gltf-transform/functions@4.4.1(@types/node@25.9.5))(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(esbuild-wasm@0.27.7)(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
+        version: 0.1.1399(tscircuit@0.0.2339(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
       playwright:
         specifier: 1.62.1
         version: 1.62.1
       tscircuit:
-        specifier: 0.0.1774
-        version: 0.0.1774(@gltf-transform/core@4.4.1)(@gltf-transform/extensions@4.4.1)(@gltf-transform/functions@4.4.1(@types/node@25.9.5))(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(esbuild-wasm@0.27.7)(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+        specifier: 0.0.2339
+        version: 0.0.2339(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       tsx:
         specifier: ^4.20.3
         version: 4.23.11
@@ -801,8 +801,8 @@ importers:
   libs/attractap-hw-shared:
     dependencies:
       tscircuit:
-        specifier: 0.0.1774
-        version: 0.0.1774(@gltf-transform/core@4.4.1)(@gltf-transform/extensions@4.4.1)(@gltf-transform/functions@4.4.1(@types/node@25.9.5))(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(esbuild-wasm@0.27.7)(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+        specifier: 0.0.2339
+        version: 0.0.2339(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
     devDependencies:
       tsx:
         specifier: ^4.20.3
@@ -3211,15 +3211,6 @@ packages:
   '@gar/promisify@1.1.3':
     resolution: {integrity: sha512-k2Ty1JcVojjJFwrg/ThKi2ujJ7XNLYaFGNB/bWT9wGR+oSMJHMa5w+CUq6p/pVrKeNNgA7pCqEcjSnHVoqJQFw==}
 
-  '@gltf-transform/core@4.4.1':
-    resolution: {integrity: sha512-ygWWFOrj1HnfvBimHF1yHTY4abbeBjn3CvljijaWKoRLMRV/a8pWYQu9rfMFQhfpT5kYZTD5Mp+dizAXPbiTDQ==}
-
-  '@gltf-transform/extensions@4.4.1':
-    resolution: {integrity: sha512-dZZ9D/NdpNeJUmQKExtISYtd3W6OxU4njk8UI3IKm6j97uVskYQ24BNi2YP40uUpdWPiREsS/DhjNhWAbGU/1A==}
-
-  '@gltf-transform/functions@4.4.1':
-    resolution: {integrity: sha512-CAU6hczuRz7NIEtpn7BARuwVEwRawwIcGqmoMCaEwA4XC+CSUi3xptXuf2zDG/5AftFO7IeQxXl/56rDsck0GQ==}
-
   '@golevelup/ts-jest@3.0.0':
     resolution: {integrity: sha512-ei0cvUKrVv8cJBW6df54yeod8PyzR2LTYG6wJ1xm+213p7HnThw5ShQcRH0/hhhnXnJCLrpmJM7e6fkRjHUF1g==}
 
@@ -3726,9 +3717,6 @@ packages:
 
   '@jscad/modeling@2.13.0':
     resolution: {integrity: sha512-Thv/JJZZOMzQ9rfhP+75PbgrNbBTZduRL+ClaGfGFts9+JdIXcUueqRL3NtZZ/v/hyZCUBkPSRxHIi4icz04tQ==}
-
-  '@jscadui/3mf-export@0.5.0':
-    resolution: {integrity: sha512-y5vZktqCjyi7wA38zqNlLIdZUIRZoOO9vCjLzwmL4bR0hk7B/Zm1IeffzJPFe1vFc0C1IEv3hm8caDv3doRk9g==}
 
   '@jsdevtools/ono@7.1.3':
     resolution: {integrity: sha512-4JQNk+3mVzK3xh2rqd6RB4J46qUR19azEHBneZyTZM+c456qOrbbM/5xcR8huNCCcbVt7+UmizG6GuUvPvKUYg==}
@@ -5966,19 +5954,9 @@ packages:
       rollup:
         optional: true
 
-  '@rollup/rollup-android-arm-eabi@4.62.2':
-    resolution: {integrity: sha512-6o7ZLZK+BeenkZCFNDXqpbjw9bD6nuWonvS/lwQJp7NoVVxm6p3qE7qQ5jGuBjiFsgvqjD8mZAU5oWxTmbOeOg==}
-    cpu: [arm]
-    os: [android]
-
   '@rollup/rollup-android-arm-eabi@4.62.4':
     resolution: {integrity: sha512-RrPokAb7dmbxFoeO3TloqHyOjgye8RkBhSqmp4aJMIex4c9r46ZstPnleDQOq1t46VOVjwIuwNogIqbodV1Vvg==}
     cpu: [arm]
-    os: [android]
-
-  '@rollup/rollup-android-arm64@4.62.2':
-    resolution: {integrity: sha512-BaH7BllCACHoH1LguOU56UItGfUWjujlO65kS9LAodViaN4bwIKd7oeW/ZHJ/4ljr/7MIiENnNy3HJ0zXv8Zkw==}
-    cpu: [arm64]
     os: [android]
 
   '@rollup/rollup-android-arm64@4.62.4':
@@ -5986,19 +5964,9 @@ packages:
     cpu: [arm64]
     os: [android]
 
-  '@rollup/rollup-darwin-arm64@4.62.2':
-    resolution: {integrity: sha512-v39RCCvj4He82I9sFmk+M1VZ0PLM9sfsLVikjfx2hYBNALhrrOR2D3JjQA6AhlaSOgcR+RzrKY7e1+bT6SUO/A==}
-    cpu: [arm64]
-    os: [darwin]
-
   '@rollup/rollup-darwin-arm64@4.62.4':
     resolution: {integrity: sha512-krw5uS2STmvJ02x0uTXHbqQNuz+9eZ1iw+qXk9dmW2gvV4jV7O2hEoOnuhFrpOPiel1mBFtqbxYZZtC46hXLOw==}
     cpu: [arm64]
-    os: [darwin]
-
-  '@rollup/rollup-darwin-x64@4.62.2':
-    resolution: {integrity: sha512-yl0y2vq3S3lHeuXhEdss6TWfKW8vkujImO12tn4ZkG/4oghr09LvdYm2RElVjokTQiUvDUGXLGsYeLqUMCKpGA==}
-    cpu: [x64]
     os: [darwin]
 
   '@rollup/rollup-darwin-x64@4.62.4':
@@ -6006,19 +5974,9 @@ packages:
     cpu: [x64]
     os: [darwin]
 
-  '@rollup/rollup-freebsd-arm64@4.62.2':
-    resolution: {integrity: sha512-tT4pvt4qXD+vEoezupCWi+a1F0vvDiksiHc+PxRlYTOH1I6/X4id9jPxTP+Fg+545euaFT1jJVs4CEdHZAU1vw==}
-    cpu: [arm64]
-    os: [freebsd]
-
   '@rollup/rollup-freebsd-arm64@4.62.4':
     resolution: {integrity: sha512-GUOnQlyZe3yAXhWOtOMsn5Qkrv5E5mZXa0thbARWi5Ei2szlVXJFQhddZ4HbAzh8q92w5twp+CQvs/eFanz9YQ==}
     cpu: [arm64]
-    os: [freebsd]
-
-  '@rollup/rollup-freebsd-x64@4.62.2':
-    resolution: {integrity: sha512-6nU5F2wCW+qvCBhTn1pdIU3bzsIoF7EUwsCDRxilWGprQR6yd508YnH9+OKFCwpfS8pjZqDUmnCAr7exax0XCg==}
-    cpu: [x64]
     os: [freebsd]
 
   '@rollup/rollup-freebsd-x64@4.62.4':
@@ -6026,23 +5984,11 @@ packages:
     cpu: [x64]
     os: [freebsd]
 
-  '@rollup/rollup-linux-arm-gnueabihf@4.62.2':
-    resolution: {integrity: sha512-n1GJHPOvpIfhi3TmrCeh6S6URt9BFCt0KQE3qvexyGCTAKpR4Lg+eWvNZEqu7epxwus/8ElT3hacYEucm49SZg==}
-    cpu: [arm]
-    os: [linux]
-    libc: [glibc]
-
   '@rollup/rollup-linux-arm-gnueabihf@4.62.4':
     resolution: {integrity: sha512-81wiiX3v7aqy+T+bT61TJ78yJjRquqFFTTbAPt08imfQQzkPIW8t6aJbkTagtCCrXMNc9D66+geqlK7ydLPNqA==}
     cpu: [arm]
     os: [linux]
     libc: [glibc]
-
-  '@rollup/rollup-linux-arm-musleabihf@4.62.2':
-    resolution: {integrity: sha512-JqgflS8wEB+UXV/vS1RpRbifGBeN4D5lz8D8oOFbFZw4vedvdOgCFAjfBmIMdW3yL10XpQQ0Ambepw6MXrhOnA==}
-    cpu: [arm]
-    os: [linux]
-    libc: [musl]
 
   '@rollup/rollup-linux-arm-musleabihf@4.62.4':
     resolution: {integrity: sha512-9kmDIvNZqdoHOBZgNtpTBeLWYO/LVipM3H/j62P8848/l/VPEQL6N3uxU9pvP1oZAsXyC2MEnFP3ovRjo7WYNQ==}
@@ -6050,23 +5996,11 @@ packages:
     os: [linux]
     libc: [musl]
 
-  '@rollup/rollup-linux-arm64-gnu@4.62.2':
-    resolution: {integrity: sha512-wnFJkogWvN4jm/hQRF2UBaeUmk20j5+DmHvoyWii2b8HJDyvz1MF2OU/6ynXt2KR63rbZLWkFpoytpdc/yBuSA==}
-    cpu: [arm64]
-    os: [linux]
-    libc: [glibc]
-
   '@rollup/rollup-linux-arm64-gnu@4.62.4':
     resolution: {integrity: sha512-CcnXHWnXg69g+DX5VWL3FHts3qMRN2uVEHX+BZvGLdd07/gXkn3ePjYtO1LDJvxkGKVHMclKBRa1QUTH+6toYQ==}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
-
-  '@rollup/rollup-linux-arm64-musl@4.62.2':
-    resolution: {integrity: sha512-HVu2bp0zhvJ8xHEV9+UUs7S90VadmBSY3LcIMvozbPo4AuMGDWlz3ymHLHZPX4hR67TKTt8Qp5PJ5RBg/i+RMQ==}
-    cpu: [arm64]
-    os: [linux]
-    libc: [musl]
 
   '@rollup/rollup-linux-arm64-musl@4.62.4':
     resolution: {integrity: sha512-iFOibiHnTRuhrWLlRsOQFdZJJIa7S8OwkneJr4ocALP16u5yk6lWLINFwhHaEqBFMsKDUZofLkGos7+CPzGB3g==}
@@ -6074,23 +6008,11 @@ packages:
     os: [linux]
     libc: [musl]
 
-  '@rollup/rollup-linux-loong64-gnu@4.62.2':
-    resolution: {integrity: sha512-mQqqAV8QaoSgr9I2fKDLY2BAVvmKjWoGiu/cSYQonsLvtqwEn1E4QYfnCOcp5zoEqNhsDYin1s6jx/VJmrxlZg==}
-    cpu: [loong64]
-    os: [linux]
-    libc: [glibc]
-
   '@rollup/rollup-linux-loong64-gnu@4.62.4':
     resolution: {integrity: sha512-XnWYMI7euHlb5a871xPja+Gm7DRCFU+FGRrtS2sMq9N8FvqtpagUy6gD4YOemC5MRk9xbh8+jYMEJbigFQwsgA==}
     cpu: [loong64]
     os: [linux]
     libc: [glibc]
-
-  '@rollup/rollup-linux-loong64-musl@4.62.2':
-    resolution: {integrity: sha512-IxKLoxCQ2IWi6bT2akyDUBGsOImDKB+sPp4EsTmwFQ/fMwpCKm8uLSSgP/Kx/QYUgKis6SEZ5/Nlhup0DIA0PQ==}
-    cpu: [loong64]
-    os: [linux]
-    libc: [musl]
 
   '@rollup/rollup-linux-loong64-musl@4.62.4':
     resolution: {integrity: sha512-qGDAlO0U8xedCcsdRm9oaoQY8DAx/QT7uIxJWhCdx0ceIWX783UC9QSYkdpzAe29wNiVfp24+bZdQmn49o45SQ==}
@@ -6098,23 +6020,11 @@ packages:
     os: [linux]
     libc: [musl]
 
-  '@rollup/rollup-linux-ppc64-gnu@4.62.2':
-    resolution: {integrity: sha512-Mk5ha2RQSgyFfmYYLkBpPnUk8D8FriBxesO1u9O75X0mHgXL1UQcH5Itl2lurWL2tj0RxV9b9tJgipac0hRY9A==}
-    cpu: [ppc64]
-    os: [linux]
-    libc: [glibc]
-
   '@rollup/rollup-linux-ppc64-gnu@4.62.4':
     resolution: {integrity: sha512-ru4H6ezD7ysA5EiEK6qkkaEb4modH8CTej6kUy/gQi20u3kB3G7Zn8snXXkeJSCOFKG/rbPPtM/+9Wgas1961w==}
     cpu: [ppc64]
     os: [linux]
     libc: [glibc]
-
-  '@rollup/rollup-linux-ppc64-musl@4.62.2':
-    resolution: {integrity: sha512-CjvEnqJL/0/TQ3TXX3OPIJ/kmBellrWd4heXUmHeJlTnmwjKpSJzoehLaL6Xk0ZnMHBu9dZuFADNOrtjF4v+2w==}
-    cpu: [ppc64]
-    os: [linux]
-    libc: [musl]
 
   '@rollup/rollup-linux-ppc64-musl@4.62.4':
     resolution: {integrity: sha512-2W4MO5WQVJnbJaZdvDb9rhBDuFU1nKIepPFpJUBsTh2k1YY2g+ODViaWuyOAjQ5cOP7NvrvLzt3wvHOoiAvc7w==}
@@ -6122,23 +6032,11 @@ packages:
     os: [linux]
     libc: [musl]
 
-  '@rollup/rollup-linux-riscv64-gnu@4.62.2':
-    resolution: {integrity: sha512-1SiZbzwdkaDURsew/tSOrooKiYy7EQGT6m8ufavAi9NEyQb/6VuIxFXAL1fqa4iZe3g4NbNk4P7J32z2tw5Mgg==}
-    cpu: [riscv64]
-    os: [linux]
-    libc: [glibc]
-
   '@rollup/rollup-linux-riscv64-gnu@4.62.4':
     resolution: {integrity: sha512-+fxjfuoAmVMCYV5QyjoIpu0cp5DOiOTeqYFk1AVaxGr+/ravWLX89XfQmptsoWcaVy/TGf2hexzbUOrCQIL1CQ==}
     cpu: [riscv64]
     os: [linux]
     libc: [glibc]
-
-  '@rollup/rollup-linux-riscv64-musl@4.62.2':
-    resolution: {integrity: sha512-nQts12zJ3NQRoE6uYljOH89v7szzLDvG2JD/vsX+vGXU8w/At1GowTZ5/7qeFQ8m7L55rpR8Okugnuo5bgjy2Q==}
-    cpu: [riscv64]
-    os: [linux]
-    libc: [musl]
 
   '@rollup/rollup-linux-riscv64-musl@4.62.4':
     resolution: {integrity: sha512-jTn8JfHGL4djjFxPuM06LmNUJDsst2jeVlsd9OmIH6zc5sC9K6rIuO4YajXatLUpBmBKl6b35ro1QZocLi+tcA==}
@@ -6146,21 +6044,9 @@ packages:
     os: [linux]
     libc: [musl]
 
-  '@rollup/rollup-linux-s390x-gnu@4.62.2':
-    resolution: {integrity: sha512-E9/ll019jhPIJgpzfZoIkBGhcz+kKNgVWYRY0zr9srBdPPFVpvOKW8VaJKUbeK+eZXyQF9ltME+Kk6affeaPgg==}
-    cpu: [s390x]
-    os: [linux]
-    libc: [glibc]
-
   '@rollup/rollup-linux-s390x-gnu@4.62.4':
     resolution: {integrity: sha512-oCJCJL4pXsoDcP2QZ+JVlPTIRc6266zsIaeJJsWImmF7HO0W8nb6HuSgZlMWxJwaPf8ehbSw8yo0EUw925hKsA==}
     cpu: [s390x]
-    os: [linux]
-    libc: [glibc]
-
-  '@rollup/rollup-linux-x64-gnu@4.62.2':
-    resolution: {integrity: sha512-5BqxR/pshjey51iliyzTD5Xi3EN0aLmQ2lZ3lvefVV9c82BvrLo2/6OT55iifpWBufs6kdwWbuOKS841DrmK9A==}
-    cpu: [x64]
     os: [linux]
     libc: [glibc]
 
@@ -6170,51 +6056,25 @@ packages:
     os: [linux]
     libc: [glibc]
 
-  '@rollup/rollup-linux-x64-musl@4.62.2':
-    resolution: {integrity: sha512-uNN83XxQrRAh/w0/pmAfibcwyb6YWt4gP+dpnQKPVJshAloQ785ii8CT8ZCIxkGg9opVsvAlGhFitSm6D1Jjpg==}
-    cpu: [x64]
-    os: [linux]
-    libc: [musl]
-
   '@rollup/rollup-linux-x64-musl@4.62.4':
     resolution: {integrity: sha512-qiXbGG2jkjXhzXpsFZSR2Xpb8DN/UaxYsbb/STbuR/6fpaDgRmmaq1B/LmtF2wQFOFOSsK2jdE0RZ3a0zHn4QA==}
     cpu: [x64]
     os: [linux]
     libc: [musl]
 
-  '@rollup/rollup-openbsd-x64@4.62.2':
-    resolution: {integrity: sha512-srjEIxSH3LRnJN6THczDHWQplqEMFiAJrTab0msUryh9kwNpkICf3Ea6q6MN/2cZwRFUNx5w+h6Hpi4QuHS6Zg==}
-    cpu: [x64]
-    os: [openbsd]
-
   '@rollup/rollup-openbsd-x64@4.62.4':
     resolution: {integrity: sha512-nWeM//hxv8mIo6jD7Hu4o48DVmV9pbV6gsKaWU+4NFyqHoPKwrkRiZGLKUhOBk8qNmDmpwFtPKg80Bo/Tn4xiQ==}
     cpu: [x64]
     os: [openbsd]
-
-  '@rollup/rollup-openharmony-arm64@4.62.2':
-    resolution: {integrity: sha512-8hOJnxgbyObnCm5AlRA3A931xX19xq80RjVTKgJOvEKWqJruP/Uf12IbAOaDjjEXYRewwHLfmF0YRIdK3OwKWA==}
-    cpu: [arm64]
-    os: [openharmony]
 
   '@rollup/rollup-openharmony-arm64@4.62.4':
     resolution: {integrity: sha512-s62SQ/vgsRSvMwDkOEfTqfgASF0f26ZNaQuTA6Aok5lrikf89yI2W0gFHvZb2Jpgc6N8JnOKZgCK2iciO3CsxQ==}
     cpu: [arm64]
     os: [openharmony]
 
-  '@rollup/rollup-win32-arm64-msvc@4.62.2':
-    resolution: {integrity: sha512-mmF4AY1i0hG/bLWUctUq59gtmgaSIRa3cu/A3JFRp/sCNEme2bgDEiDS22P9FbnJB8NJNF4jPJiSP5RHQpUTDg==}
-    cpu: [arm64]
-    os: [win32]
-
   '@rollup/rollup-win32-arm64-msvc@4.62.4':
     resolution: {integrity: sha512-J6wGf8TVGbXJq+HH+ttTvrcfNKPbuZecV6KT1B8I18BC5IURUh5kl4Yl5OEP5eFIUoI5BWxCsyYMhFsDx8kekw==}
     cpu: [arm64]
-    os: [win32]
-
-  '@rollup/rollup-win32-ia32-msvc@4.62.2':
-    resolution: {integrity: sha512-DZgkknc6jhHrk46V25vbAM0zZkyP0nSDkJB8/dRkLTxv470dOmWDqGoEJl/9A0dFfS7yE3REOwNDxpHwSLSt0Q==}
-    cpu: [ia32]
     os: [win32]
 
   '@rollup/rollup-win32-ia32-msvc@4.62.4':
@@ -6222,18 +6082,8 @@ packages:
     cpu: [ia32]
     os: [win32]
 
-  '@rollup/rollup-win32-x64-gnu@4.62.2':
-    resolution: {integrity: sha512-T6xr6ucWSFto+VGajA8YH26LdpHRuP4YLHEKAtCWvJDOlnmWcDZVCI2Jmjr+IFHDlt2zRaTAKE4tfjTaWLgJBg==}
-    cpu: [x64]
-    os: [win32]
-
   '@rollup/rollup-win32-x64-gnu@4.62.4':
     resolution: {integrity: sha512-qPzHqdj9rfUD+w79dtE07zi/kFwKyCJqplp5K5ygeLTp7jLpAoc16OAH39HSmRC9UpozaecsleI8uAdEj6v2yw==}
-    cpu: [x64]
-    os: [win32]
-
-  '@rollup/rollup-win32-x64-msvc@4.62.2':
-    resolution: {integrity: sha512-BfzEnDJOt9T8M989/lA37EcJgat01wLRnoi5dQf3QzOH7jzpqTAzdDbVfRljVr5r+jzKqpbHeyOfAaXxAd0PAA==}
     cpu: [x64]
     os: [win32]
 
@@ -6891,11 +6741,14 @@ packages:
     peerDependencies:
       typescript: ^5.0.0
 
-  '@tscircuit/capacity-autorouter@0.0.523':
-    resolution: {integrity: sha512-VzkclsiNZreF69C3uwfNV2yaU4RpWjgOnnSG0bGmE0/uIJnNGz3LTgfyUIFGka2EERQ37QLVd2xGSkVfVK8OqQ==}
+  '@tscircuit/capacity-autorouter@0.0.718':
+    resolution: {integrity: sha512-DxWzF6sa+0ktVgIXaBEBa5jqyQacNaEPMPZFLjb2js0zUj2PcfihfaFBb456RTNDwRqEsjEIrqlvmAknMsiVVw==}
 
-  '@tscircuit/checks@0.0.130':
-    resolution: {integrity: sha512-USoO+oM3iYCBq1YrWwhMksrE0fMRcXKKSMZ8u7m7VBjSuLrbInCiTOWgECyJOXkYBLcgC4+l2p3zdLCASXrYNQ==}
+  '@tscircuit/capacity-autorouter@0.0.803':
+    resolution: {integrity: sha512-ydqZiYlXmljFPDNFsnzQgoTzgytyTB6yDKgJSdyuXifHH7YoY4lEoHofW842T49m+8YEBuPxcu+GiEpFKw1g/Q==}
+
+  '@tscircuit/checks@0.0.162':
+    resolution: {integrity: sha512-m8632p1dHCWN+9jWxTJz6lTqJGDLwtnedg99qdSdJKPE7qr9LhEg68xL2ohJjc496QRk+rfgLT31c30M4nhT7A==}
     peerDependencies:
       '@flatten-js/core': '*'
       '@tscircuit/math-utils': '*'
@@ -6903,8 +6756,8 @@ packages:
       circuit-json-to-connectivity-map: '*'
       typescript: ^5.5.3
 
-  '@tscircuit/circuit-json-util@0.0.94':
-    resolution: {integrity: sha512-kEYV6LzcZbRuw43IxsZ1cZL2pUx4nF07MYAHHhY9s90UzKYaIYfZ1q11s+F2wNwKecCcSyTUoAwWeqazLQEyVQ==}
+  '@tscircuit/circuit-json-util@0.0.106':
+    resolution: {integrity: sha512-7HxREkrIiC+EcuJYU4i5o9UbTRhgoeTOY03zCHeGhNUhUbUlrDdIciraI1Yn+qb+/ot5+QbhkrqZMTAV8lmpmw==}
     peerDependencies:
       circuit-json: '*'
       transformation-matrix: '*'
@@ -6916,17 +6769,25 @@ packages:
     peerDependencies:
       tscircuit: '*'
 
-  '@tscircuit/copper-pour-solver@0.0.29':
-    resolution: {integrity: sha512-hFg69kJu/dBMLzCdaKYAShxvn6e3Wf92sUmTzhnz2oT62YS/0uPL8uqDe5agYblYV/fnADBaV28UvzTFbl8UwA==}
+  '@tscircuit/cli@0.1.1936':
+    resolution: {integrity: sha512-JNYXZ4qpiEF39W7M+lxmJgNw0KnWS4UEceoDmRUWQSIq4H4vPnMLVm3eu7PVHVvgaLnh94Gvu5Zy7X/F/DkSPA==}
+    hasBin: true
+    peerDependencies:
+      circuit-json: ^0.0.464
+      tscircuit: '*'
+
+  '@tscircuit/copper-pour-solver@0.0.46':
+    resolution: {integrity: sha512-Ye3BSQn5DfOHLI61gUrcrt+9YHq2UtyYl2tuzEeBiBdBqfypduXAcZ83MSSBabEXLi2cRL7B/pXX5GOyL+c+nA==}
     peerDependencies:
       typescript: ^5
 
-  '@tscircuit/core@0.0.1258':
-    resolution: {integrity: sha512-dj10sQgO8N7xN6W/+KjrhTY13oDSopy4JRapxx6q9Eqo2NqFtEvDGuQCE4pB8sdm3ox/Xk8T/k7k3rwLDMer9Q==}
+  '@tscircuit/core@0.0.1687':
+    resolution: {integrity: sha512-K6vQ9vb48j259MMBOIr95MTMsu40LuMQC9QoHntTaEWkRIvSvMxtSK0FnKFSGOK861f2MbW/Z4I+/qcKUb2kUg==}
     peerDependencies:
       '@tscircuit/capacity-autorouter': '*'
       '@tscircuit/checks': '*'
       '@tscircuit/circuit-json-util': '*'
+      '@tscircuit/create-fdm-enclosure': '*'
       '@tscircuit/footprinter': '*'
       '@tscircuit/infgrid-ijump-astar': '*'
       '@tscircuit/matchpack': '*'
@@ -6937,45 +6798,58 @@ packages:
       circuit-json: '*'
       circuit-json-to-bpc: '*'
       circuit-json-to-connectivity-map: '*'
+      circuit-json-to-spice: '*'
       schematic-symbols: '*'
+      spicets: '*'
       typescript: ^5.0.0
 
-  '@tscircuit/eval@0.0.855':
-    resolution: {integrity: sha512-Z3Xdg5D9bm+y5SpMpavpDvhNMUVuzSIANC3+XPZ2vJbLvyu+LqZAVXzHd8tcMOmAcCQvNZHZSLndmMoKBtJkqQ==}
+  '@tscircuit/create-fdm-enclosure@0.0.4':
+    resolution: {integrity: sha512-mJzfM2lG7QIJScb2WwzM91mXBMSC5l9hbAKYl5rjnYB+jjQGdjwRPA61SiUUUcixiZ5fcxgY8k/szpOiyAorqg==}
+    peerDependencies:
+      typescript: ^5
+
+  '@tscircuit/eval@0.0.1207':
+    resolution: {integrity: sha512-cY7ZbrnCX1PP6elMESk/YqbCbykpvzwtdRbjEeKZ5xKF/EJvmt/pHNrJG5SDHSaVM9TgMJT3G8Z4tqQTvjK3tw==}
     peerDependencies:
       '@tscircuit/core': '*'
       circuit-json: '*'
       typescript: ^5.0.0
       zod: 3.25.76
 
-  '@tscircuit/footprinter@0.0.357':
-    resolution: {integrity: sha512-N4QjwY+GkRm1DvPDWQbTq+sRJU59v+ahMxiAIGemBJsoPVFjodVOnu50oN8q41ps4mCXQMS8/16blbLWkZlBkw==}
-    peerDependencies:
-      circuit-json: '*'
-
-  '@tscircuit/high-density-a01@0.0.37':
-    resolution: {integrity: sha512-I9WLfQ7HldeuXEkmHUWO4F2F374H8lXVqqdEmJCUrQ/J4CbO6oBShQUz8Q1AbcljdQUeyWDIAgO8LDa2LHyCPA==}
+  '@tscircuit/fanout-solver@0.0.25':
+    resolution: {integrity: sha512-cgCfXO8YCftjGo2OfLvnw6ie6t/5uc1GFrNUCJrOA0HhOBP0KbDwtmfZuM0LnTUH7QihEwcWw5ZZImjeVTTm3Q==}
     peerDependencies:
       typescript: ^5
 
-  '@tscircuit/infer-cable-insertion-point@0.0.2':
-    resolution: {integrity: sha512-k3JwlGtsdHRRZELJzjXBKP+9xdzn+v4dqllhJIFMcrMvlBIaOTt8CbxLO+vcxPvz8Csf+yFChnTos8/vYcSgNg==}
+  '@tscircuit/footprinter@0.0.418':
+    resolution: {integrity: sha512-V3LYtWXCxdQh2hdu3irbcugKmHaOgRFyr5JbzSikWC0wmuwUcHWdBLzgNqQVAlY4aEGQHmg7Jf7V4k6mbGMMXA==}
+    peerDependencies:
+      circuit-json: '*'
+
+  '@tscircuit/image-utils@0.0.8':
+    resolution: {integrity: sha512-/a/dyd0Ly+YSk73pNXi0M02nfaiZ1NQ8PVNDBTOHHESyTOrNHiVAT+NWxsWi44gHZ/ivLegAmjxSSbSSGfU+sQ==}
+
+  '@tscircuit/infer-cable-insertion-point@0.0.3':
+    resolution: {integrity: sha512-ENVSKEgVx5/isMC+ttHNPCK+Os3MjALEM1MDI5M9JKMDjGqq5iPjxb5qwD3/GFwkc5Xl/DtRdOyKFC1lvrw1hg==}
     peerDependencies:
       typescript: ^5
 
   '@tscircuit/infgrid-ijump-astar@0.0.35':
     resolution: {integrity: sha512-PZx3GyD7mDNEhLJn8+7n8NjrieOvrX03g7Gx1cvwXv9mmgSC4M+yTA0WC4DgOvcRdTnarf0R8xvwtDeJ4tMK9Q==}
 
-  '@tscircuit/internal-dynamic-import@0.0.2':
-    resolution: {integrity: sha512-cflWt1v+3O//e6jAQgHqmzPfgcu1QP0gDefhl1YxeTHWdginlecuvbGdFZ1V9ETxo4+xAwbHDfV+6fyXpvzK8A==}
+  '@tscircuit/internal-dynamic-import@0.0.11':
+    resolution: {integrity: sha512-Tr72DhEGXwysbe2PZ0+GiLC8/pGp0BA9Dl+2xTXxaukwcGam08+PMJF+AJpIOfXjafP6S1OZf1HmciDeD8PydA==}
 
   '@tscircuit/krt-wasm@0.1.6':
     resolution: {integrity: sha512-XRj8SIgWro1t56TieLhkOtRVsptq3cwzBtdbDEkRB2YiyX4V/r0zneii+c5I8F3D8rJUz4+GswGpPeO4eV8x8w==}
     peerDependencies:
       tscircuit: '*'
 
-  '@tscircuit/matchpack@0.0.16':
-    resolution: {integrity: sha512-F9QX7uQdml88XGKwe7kDkYnwHfG0kykr2cHD+JsnATKlgi32vYwFGuRaOR4tyRrkDGdmzt5T7YYb4Mhi9uncGA==}
+  '@tscircuit/manifold-2d@0.0.6':
+    resolution: {integrity: sha512-kYny1hDwPHOwRfMQtbfLh0nvCQ7nM91kkHy7pnj1UrqM6rcgDymZVCZB7ib5Cx1aZFIs8xCCF7lA51tq+giDcw==}
+
+  '@tscircuit/matchpack@0.0.80':
+    resolution: {integrity: sha512-I8mWsnAeA4ABBf6X/R6HfGKOevA2/XOi7hJNPlfI6V/Y1i2F1dfhtYgPICAaLZ+8s9AAGTkZFmN1zYOdS++EVg==}
     peerDependencies:
       typescript: ^5
 
@@ -6999,44 +6873,52 @@ packages:
     peerDependencies:
       typescript: ^5.0.0
 
-  '@tscircuit/ngspice-spice-engine@0.0.8':
-    resolution: {integrity: sha512-jubJ8Kgpm9FPRdHBiRBYkf5+B37bqkjDRKpCXOMqS08UZnbS+iCv2k4ACMW+s1zbK0Xa5v+9yjuoHlfKFW1v/Q==}
+  '@tscircuit/ngspice-spice-engine@0.0.20':
+    resolution: {integrity: sha512-dXjH51Wl95B6yEVkWCz65DpAHWTJRLHDyD/09eJUpGwLcYfd1F9m4E0XWbuiYZ8wKygYlACTozrSX9n3/LtfwA==}
     peerDependencies:
       '@tscircuit/props': '*'
       circuit-json: '*'
+      spicets: '*'
       typescript: ^5
 
-  '@tscircuit/props@0.0.531':
-    resolution: {integrity: sha512-c+fKxMXMcC9glbK/1P1SEfVf6vLbKp7cJN8cxRw3OdlwMiUS/7XKz3KW4M/1J0YwcTQZgc0GawGzwpCgGxcAzw==}
+  '@tscircuit/props@0.0.621':
+    resolution: {integrity: sha512-DtpFi9xTWVhuGEArlIXEBP92grJd7N6kmtCQV3+djqzL2Tw8eRcslKLMevwUyrj69EsddxkVSDKuQvnS21VZ9w==}
     peerDependencies:
       circuit-json: '*'
       react: 19.2.8
       zod: 3.25.76
 
-  '@tscircuit/runframe@0.0.1982':
-    resolution: {integrity: sha512-+UW7lmMuw1pCx26j3l1oiXYX6vBkuS4u+ot2e8+TTpcumwrkSdYcnwB+4Ca8rvUxqSbmocwWuF+UsNmnkTga2w==}
+  '@tscircuit/runframe@0.0.2476':
+    resolution: {integrity: sha512-B7e8+Npn9K7zCP+tMRr1pLsjJAlqax/jmee0SXhNiNmHiEsi9ciNU95tAqCmSbUGHPYaMi79SWKmtYokP/tHVg==}
 
   '@tscircuit/schematic-corpus@0.0.114':
     resolution: {integrity: sha512-jDQX+XDXP6PklB39X8AwUSuiqGRdn78esy1wD/qG8U3cCXkT5rtE3ousDVaKRxclCeED8FxJlD+ZvRtAe8mw8w==}
     peerDependencies:
       typescript: ^5
 
-  '@tscircuit/schematic-match-adapt@0.0.16':
-    resolution: {integrity: sha512-85e6Pq58zrhZqivyW4bPVZfGfg8xLBCj3yjHl5LZslwfsDRgtWVob4bjJMhCfNL/mLsPUQKnpiDNnFKl9ugUZw==}
+  '@tscircuit/schematic-match-adapt@0.0.18':
+    resolution: {integrity: sha512-LpXF7aSmP4xUZN1gdrU/YdAnotJ+oKW2a4YzGB6wNTXnw5+Yn0w/bPnReT4A+nNUrVJ9kyjgnXQkSlkhiejQGg==}
     peerDependencies:
       typescript: ^5
 
-  '@tscircuit/schematic-trace-solver@0.0.57':
-    resolution: {integrity: sha512-mBE9Y7xcNGQSQ+qawX6CAxS980CGKPvC2NLBJ6BCkuk99fo+LBydAw2KNds9B9d8WOJUsgQGsUteJ1pc0ZxZtg==}
+  '@tscircuit/schematic-trace-solver@0.0.129':
+    resolution: {integrity: sha512-P+a4TRT+2+83Zm4Knysw7AghC58AEuaNPwb4Q60NXpHTPkfJSlN5rEZ7CfDHF8I4VZjC6/BoQTb7RiqFz3bOiA==}
     peerDependencies:
       typescript: ^5
 
   '@tscircuit/simple-3d-svg@0.0.41':
     resolution: {integrity: sha512-2iwhHhMLElq5t0fcC0Gr7cCpZhEOAKh+6NN0NIJ9YWUCcsB7UN8uYko7jqNTxDlYOe6E0ZYaDZWsQ3amOZ3dlw==}
 
-  '@tscircuit/solver-utils@0.0.3':
-    resolution: {integrity: sha512-NMzqn7NM0SpeHnoWwewcnitxSNczaFsm/WENmBy8dxnFbUkGBdmSY5Gbky8C9e7q8+SzRcwj7GqXE7EWAHTirw==}
+  '@tscircuit/solver-utils@0.0.16':
+    resolution: {integrity: sha512-paeEsPt+NOrIdeEb1PQpoNGjl9bD5MfcDaBuhFkn7Hdsxez4cXhKUyxWj3WbJsZzq9nUDW3Utr/Dl3GD4UURZQ==}
     peerDependencies:
+      graphics-debug: '*'
+      typescript: ^5
+
+  '@tscircuit/solver-utils@0.0.19':
+    resolution: {integrity: sha512-UPUVgRRIrylSMJfKw7QwhSCvlODD+uAAwXc9jpOG06ipqteeeLRkj/HtHns31KQfLjRCSsGTvxMYBjmhaDDLGg==}
+    peerDependencies:
+      graphics-debug: '*'
       typescript: ^5
 
   '@tscircuit/solver-utils@0.0.7':
@@ -7323,9 +7205,6 @@ packages:
 
   '@types/multer@2.2.0':
     resolution: {integrity: sha512-3U1troeqGV8Ntp7Q3klwf4zr23VEoqYVocYXaswm9+8z3O9UHDYAqLxjJ/h550iRADTjKdOdhhasXw6gD6kYtg==}
-
-  '@types/ndarray@1.0.14':
-    resolution: {integrity: sha512-oANmFZMnFQvb219SSBIhI1Ih/r4CvHDOzkWyJS/XRqkMrGH5/kaPSA1hQhdIBzouaE+5KpE/f5ylI9cujmckQg==}
 
   '@types/node@18.19.130':
     resolution: {integrity: sha512-GRaXQx6jGfL8sKfaIDD6OupbIHBr9jv7Jnaml9tB7l4v068PAOXqfcujMMo5PhbIs6ggR1XODELqahT2R8v0fg==}
@@ -9099,8 +8978,8 @@ packages:
     resolution: {integrity: sha512-v+p6ongsrp0yTGbJXjgxPow2+DL93DASP4kXCDKb8/bwRtt9OEF3whggkkDkGNzgcWy2XaF4a8nZglC7uElscg==}
     engines: {node: '>=8'}
 
-  calculate-cell-boundaries@0.0.1:
-    resolution: {integrity: sha512-W0GKQ9kraaFc78jkzJHY4nXuO6LlpkT7bScUa+hiP8qON5kUcATsF2hmsgpL0UQp9HK+LswHdSFanzghb2fjPA==}
+  calculate-cell-boundaries@0.0.13:
+    resolution: {integrity: sha512-Pkc3DqRCGPhc5AiZMg07qoJdBvd06XN03KgihMF+dwLnXEDICDdmJMpTnRhAgGwqWo2X08ZAWTk6JDoJODYNTg==}
     peerDependencies:
       typescript: ^5
 
@@ -9109,8 +8988,8 @@ packages:
     peerDependencies:
       typescript: ^5
 
-  calculate-packing@0.0.73:
-    resolution: {integrity: sha512-HoaT1iaaZBS6znXInaBbCT9+tFMWfJWxe2dCfqxHjC6m57NpV322BfvM+Nt20XgDb5d4cvZBU0+CGiTUEgGRHw==}
+  calculate-packing@0.0.86:
+    resolution: {integrity: sha512-hT+FuMs5mlx+SJQmvDP+UQ9qc+48umYeMp1rd+UDhvKkaOxzR7zjMrmfwEOeauvniauVczuSiU6nka/gSDOw4g==}
     peerDependencies:
       '@tscircuit/circuit-json-util': '*'
       typescript: ^5
@@ -9280,13 +9159,13 @@ packages:
     peerDependencies:
       typescript: ^5.0.0
 
-  circuit-json-to-connectivity-map@0.0.23:
-    resolution: {integrity: sha512-DSOiXaXOTvjU+7et8ITXb2LjgKto6cQzLv3hReYdXuUNtLw2GVnpOly1G83VcIBcSQ4hRVHI4VMKRyZB3XVzdg==}
+  circuit-json-to-connectivity-map@0.0.27:
+    resolution: {integrity: sha512-DxAcRjtKjzuB4IQluF2hSOvVxlwiIkXCcLDsdHWwyDXp+dEfGx+BfDzPrflk2sbgSOuLJUBfj2FJInWPFCh70Q==}
     peerDependencies:
       typescript: ^5.9.3
 
-  circuit-json-to-gltf@0.0.96:
-    resolution: {integrity: sha512-7V1cj+WhyPBRsVbgghSCnbJNyWkx/KAhvnZU1Pdp7lZH+iHFIqRyIL/vNRRo657JDGM4bTlVFMUugo+RrseoKw==}
+  circuit-json-to-gltf@0.0.118:
+    resolution: {integrity: sha512-j0EZjW/xd2d2S+Ke8G7vrGa1+WUeyCWRgC5bWyesQV1jM/1P6X6JKuq248XZP4plrnUyvApUEnJ/OJuPgvhY6g==}
     peerDependencies:
       '@resvg/resvg-js': '2'
       '@resvg/resvg-wasm': '2'
@@ -9300,23 +9179,32 @@ packages:
       '@resvg/resvg-wasm':
         optional: true
 
+  circuit-json-to-pnp-csv@0.0.8:
+    resolution: {integrity: sha512-m3ycvl5Cx1woE3qNdf457f2r/6WBxBxwbbkYbXbB/a+eEe7Y1Kk9BIq8GBsq7j25MTBeR0mbDMGL6yZGqSAVDA==}
+    peerDependencies:
+      '@tscircuit/soup-util': '*'
+      typescript: ^5.0.0
+
   circuit-json-to-simple-3d@0.0.9:
     resolution: {integrity: sha512-thpCtDb9LpAQfGO+Z0hae19sxVAmJAMYM/It9UTMCtyXC3zoUHwRcp/oqtMO/ZIW+JDBhiR8AHmmtKScL2kW7Q==}
     peerDependencies:
       typescript: ^5
 
-  circuit-json-to-spice@0.0.34:
-    resolution: {integrity: sha512-59XyRHATq455875XlEiAfycIvxkOjaKnX4nzzlvY88UJyFcjkHSQCB9HCnbHJGsRxVBEmrTcELLyVIFmB+c4LA==}
+  circuit-json-to-spice@0.0.45:
+    resolution: {integrity: sha512-e8THrj+jWK0BEjpw0relCYNCuEYEFAy5dFRYUQgMxdnrTjs2h5WoGWRNGPndqNkrpV5b63AzdX3wVR7Mtqi1HQ==}
     peerDependencies:
       '@tscircuit/circuit-json-util': '*'
       circuit-json: '*'
+      spicets: '*'
       typescript: ^5.0.0
 
-  circuit-json@0.0.425:
-    resolution: {integrity: sha512-Iczj4kORXe8xRbDsQ0ZhMU9bewD+rJgxKDIcnj1ipt45adGGg2PeGB9b3dswWvpAGri19Y5Jgbb9CIxXcw6guQ==}
+  circuit-json@0.0.468:
+    resolution: {integrity: sha512-cnlY1krssE2xYgTu5O59AgQB2D6mhYMsojwVFCO6HFUIcq2OAy8QFtQq33tJMfuOobI+mKVCXD71O/DR8MHAyw==}
+    peerDependencies:
+      format-si-unit: '*'
 
-  circuit-to-svg@0.0.345:
-    resolution: {integrity: sha512-d+P+AFJhWlt9Bdpk9/0zdBBjPxIRgnJaFsGqW/4CG0vEAY2QNqK/OqSl8i0zpFpM4+tiQdeR0n8h1tsvMMhvkA==}
+  circuit-to-svg@0.0.400:
+    resolution: {integrity: sha512-Jw4MVukusbaLLy3q1lDpFi38HmjNbAu7o5Y8bCRvhwmBe6fLzftty57zSwqG53fRqe3otzFVYRJ6U+PjIHzMag==}
     peerDependencies:
       '@tscircuit/alphabet': '*'
 
@@ -9510,10 +9398,6 @@ packages:
 
   commander@12.1.0:
     resolution: {integrity: sha512-Vw8qHK3bZM9y/P10u3Vib8o/DdkvA2OtPtZvD871QKjy74Wj1WSKFILMPRPSdUSx5RFK1arlJzEtA4PkFgnbuA==}
-    engines: {node: '>=18'}
-
-  commander@13.1.0:
-    resolution: {integrity: sha512-/rFeCpNJQbhSZjGVwO9RFV3xPqbnERS8MmIQzCtD/zl6gpJuV/bMLuN92oG3F7d8oDEHHRrujSXNUr8fpjntKw==}
     engines: {node: '>=18'}
 
   commander@14.0.3:
@@ -9979,9 +9863,6 @@ packages:
   csv@6.6.3:
     resolution: {integrity: sha512-X2AnOgcxqV+OdLm1M2FOl+bPQrM1LK1jwo4FhEoq8hi8JTR0tQ8ZWv3x3N2gVMIuUmpb4CLrV08rTP49IdFQ8w==}
     engines: {node: '>= 0.1.90'}
-
-  cwise-compiler@1.1.3:
-    resolution: {integrity: sha512-WXlK/m+Di8DMMcCjcWr4i+XzcQra9eCdXIJrgh4TUgh0pIS/yJduLxS9JgefsHJ/YVLdgPtXm9r62W92MvanEQ==}
 
   d3-array@3.2.4:
     resolution: {integrity: sha512-tdQAmyA18i4J7wprpYq8ClcxZy3SC31QMeByyCFyRt7BVHdREQZ5lpzoe5mFEYZUWe+oq8HBvk9JjpibyEV4Jg==}
@@ -10501,9 +10382,6 @@ packages:
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
 
-  eecircuit-engine@1.7.0:
-    resolution: {integrity: sha512-ZDpr/w/H81uCH3n2vjf0vohxOQqQ4NCsvaXkoYwcH+LCxIGKpBdvAIvGN5IdozW6AFJ8tojquKvDya3337yjSQ==}
-
   effect@3.22.1:
     resolution: {integrity: sha512-TNoXushmPOBAjJlthF5d2QwnX2xBPEtcNJr5XKNKbRLbDvBcOYkXlYDfvGfSA0zriwLFuCll5MDtNMAdZL17PQ==}
 
@@ -10731,11 +10609,6 @@ packages:
 
   es6-weak-map@2.0.3:
     resolution: {integrity: sha512-p5um32HOTO1kP+w7PRnB+5lQ43Z6muuMuIMffvDN8ZB4GcnjLBV6zGStpbASIMk4DCAvEaamhe2zhyCb/QXXsA==}
-
-  esbuild-wasm@0.27.7:
-    resolution: {integrity: sha512-1k03e2/tGz+sLz3/xzoZmUsIqtaGIvJa8k4UqUeqCUry83nHmlxQYZUUES0WBFUYilSQUf7nDUGAciIIklljSg==}
-    engines: {node: '>=18'}
-    hasBin: true
 
   esbuild@0.20.2:
     resolution: {integrity: sha512-WdOOppmUNU+IbZ0PaDiTst80zjnrOkyJNHoKupIcVyU8Lvla3Ugx94VzkQ32Ijqd7UhHJy75gNWDMUekcrSJ6g==}
@@ -11095,6 +10968,9 @@ packages:
   fast-memoize@2.5.2:
     resolution: {integrity: sha512-Ue0LwpDYErFbmNnZSF0UH6eImUwDmogUO1jyE+JbN2gsQz/jICm1Ve7t9QT0rNSsfJt+Hs4/S3GnsDVjL4HVrw==}
 
+  fast-png@8.0.0:
+    resolution: {integrity: sha512-gCysNasJ8KEMgfdYIKd/wTDo6ENK1PWT0RJO7O+0pgmuHPw2O6tA1WvdxFRJoLf9V8yFYpG0FA1YgI8X97OhJA==}
+
   fast-safe-stringify@2.1.1:
     resolution: {integrity: sha512-W+KJc2dmILlPplD/H4K9l9LcAHAfPtP6BY84uVLXQ6Evcz9Lcg33Y2z1IVblT6xdY54PXYVHEv+0Wpq8Io6zkA==}
 
@@ -11336,8 +11212,8 @@ packages:
     resolution: {integrity: sha512-vKatAh4SlVfgbv+YtmhiRjhEMJsYpsG1Y2rMQtR+SVSbytsSD1YGzDIcrAJmdFec88u/+VoGmxnl+80gL1tRCQ==}
     engines: {node: '>= 6'}
 
-  format-si-unit@0.0.3:
-    resolution: {integrity: sha512-rhw1g1mOoLV497FtKNbzBPE4fJXfWRmIEPRO0DKXpEPvS54vRLjG8e1jE4vOcjZg4bsoOPJkM9jB6yGk+0XKmQ==}
+  format-si-unit@0.0.12:
+    resolution: {integrity: sha512-HeYwGhbKefmyyVmZrlp1S/RlnEOAoHkncQreW1RTvSmDSZ3BFHfDlIg2OOnDFyr/7n5bs//YXvUHzRhoVuPYgA==}
     peerDependencies:
       typescript: ^5.0.0
 
@@ -11651,12 +11527,28 @@ packages:
   grapheme-splitter@1.0.4:
     resolution: {integrity: sha512-bzh50DW9kTPM00T8y4o8vQg89Di9oLJVLW/KaOGIXJWP/iqCN6WKYkbNOF04vFLJhwcpYUh9ydh/+5vpOqV4YQ==}
 
-  graphics-debug@0.0.89:
-    resolution: {integrity: sha512-fklYB4qChWLkSssabMR1BqjSWWDk21C77IeHBYPREksF34llz/a+gLrW+Oax4eWPT/6TtHZanICMQBhoxGjFYw==}
+  graphics-debug@0.0.95:
+    resolution: {integrity: sha512-UETFrQErrBzGXaw5D+hq7t6Z91yrDoItOLJbk5hv8PFfcy0jyVDHb941KyTuCzz/h2rIqpyMODij136aKeM1wg==}
     hasBin: true
     peerDependencies:
       bun-match-svg: '*'
       looks-same: ^9.0.1
+      typescript: ^5.0.0
+
+  graphics-debug@0.0.96:
+    resolution: {integrity: sha512-o3CKFIWtbSL1GSrDYaaYMUidjtCM5PClqvc9/vZVakUT1c61I935bcE++8DnLTXoevJMM1+92y8Uinxl//SuBQ==}
+    hasBin: true
+    peerDependencies:
+      bun-match-svg: '*'
+      looks-same: ^9.0.1
+      typescript: ^5.0.0
+
+  graphics-debug@0.0.99:
+    resolution: {integrity: sha512-qXqfb95WY2E2EPKVqxkqr0nk6DyewgShcVTiBNefVX5JZy2wjJRS1WnbX1tpUzqu0lRD0mQvAYr8jDWqSluamA==}
+    hasBin: true
+    peerDependencies:
+      '@resvg/resvg-js': '*'
+      '@tscircuit/image-utils': '*'
       typescript: ^5.0.0
 
   gunzip-maybe@1.4.2:
@@ -12124,12 +12016,12 @@ packages:
   intl-pluralrules@2.0.1:
     resolution: {integrity: sha512-astxTLzIdXPeN0K9Rumi6LfMpm3rvNO0iJE+h/k8Kr/is+wPbRe4ikyDjlLr6VTh/mEfNv8RjN+gu3KwDiuhqg==}
 
+  iobuffer@6.0.1:
+    resolution: {integrity: sha512-SZWYkWNfjIXIBYSDpXDYIgshqtbOPsi4lviawAEceR1Kqk+sHDlcQjWrzNQsii80AyBY0q5c8HCTNjqo74ul+Q==}
+
   ioredis@5.11.1:
     resolution: {integrity: sha512-ehuGcf94bQXhfagULNXrJdfnWO38v070jxSx/qE87Kjzmu2fU7ro5EFAb+OPituLqgfyuQaym5DlrNydW2sJ9A==}
     engines: {node: '>=12.22.0'}
-
-  iota-array@1.0.0:
-    resolution: {integrity: sha512-pZ2xT+LOHckCatGQ3DcG/a+QuEqvoxqkiL7tvE8nn3uuu+f6i1TtpB5/FtWFbxUuVr5PZCx8KskuGatbJDXOWA==}
 
   ip-address@10.2.0:
     resolution: {integrity: sha512-/+S6j4E9AHvW9SWMSEY9Xfy66O5PWvVEJ08O0y5JGyEKQpojb0K0GKpz/v5HJ/G0vi3D2sjGK78119oXZeE0qA==}
@@ -12823,13 +12715,13 @@ packages:
   jsbn@0.1.1:
     resolution: {integrity: sha512-UVU9dibq2JcFWxQPA6KCqj5O42VOmAY3zQUfEKxU0KpTGXwNoCjkX1e13eHNvw/xPynt6pU0rZ1htjWTNTSXsg==}
 
-  jscad-electronics@0.0.129:
-    resolution: {integrity: sha512-bYdAxeaqwmzSshJw+BmW8iV/+BXmOXK3fRRmygNkwjMdV/U0YzwaQ4N1qSayt8+QbAJZ9lyrIeK6Q37tQSVvUA==}
+  jscad-electronics@0.0.146:
+    resolution: {integrity: sha512-YXpyFDUPjywIdn13IV/dOZGWxjQb/cgrymRt8USFbNkFA6J+UpqOgMw2zEfxYTewm9EliOphlJJ8RzfeHnGT+A==}
     peerDependencies:
       '@jscad/modeling': ^2.12.5
       '@tscircuit/alphabet': ^0.0.24
       '@tscircuit/footprinter': '*'
-      circuit-json: ^0.0.232
+      circuit-json: ^0.0.426
       jscad-fiber: ^0.0.85
       react: 19.2.8
       react-dom: 19.2.8
@@ -12840,6 +12732,11 @@ packages:
 
   jscad-planner@0.0.13:
     resolution: {integrity: sha512-Lkx7PDT0s90o25dhENrvcYLlgKRvSmhyX7H7LMMq85Hl5ICzirU4MAPxeveKWLlKrdS+4krybVAuKsJ9uvUppg==}
+    peerDependencies:
+      typescript: ^5.0.0
+
+  jscad-planner@0.0.14:
+    resolution: {integrity: sha512-HrS5C1iTrmIZDlvNk065vg36qjIHyeiil60MyW7wccNGaGJSy2SYgWqPNvLU58tUTTTKWECWgd1Wzah80z4Z3A==}
     peerDependencies:
       typescript: ^5.0.0
 
@@ -13043,13 +12940,13 @@ packages:
     resolution: {integrity: sha512-nIvXOYbjW2qzBqy7n+4zL8pfHABFH721U8zWCoTmKNQYuFzSO2ZvKPfiEHH+PSUB3b6Iu8hTg7fCrXft0rHNxw==}
     hasBin: true
 
-  kicad-to-circuit-json@0.0.60:
-    resolution: {integrity: sha512-lqYF0v0XNx4BmLb+sXW+3yImwy3bmIYlcB5B/jqa13Ebtl5qWJz+E3Trez8I1fMi/zwusnvhfiyU2ssgty2svw==}
+  kicad-to-circuit-json@0.0.117:
+    resolution: {integrity: sha512-JXIGIix7t39kcpqFEQP9m/eWqN/2MqeCFME628xbhrXRu8nNBSGD54vozKNh9GsFVqIpzGxciS6SGVxWrA+osw==}
     peerDependencies:
       typescript: ^5
 
-  kicadts@0.0.35:
-    resolution: {integrity: sha512-u86l0kLs1pMazriSLX1rINtBju1diGQFcHiFpGh9c+8ItqgTgobs1OafstCQ/Xbp0l3La34Oz4Oe6Ho5Vdo+Ag==}
+  kicadts@0.0.53:
+    resolution: {integrity: sha512-qXBtGBc11LhG93dF4iXlVeWbVjk5UUmeUANpP+cgvbRxZa+w7p2UvSCK7/4uv7KzGKhxzSJouEPSAZdastlXag==}
     peerDependencies:
       typescript: ^5
 
@@ -13071,9 +12968,6 @@ packages:
 
   kolorist@1.8.0:
     resolution: {integrity: sha512-Y+60/zizpJ3HRH8DCss+q95yr6145JXZo46OTpFvDZWLfRCE4qChOyk1b26nMaNpfHHgxagk9dXT5OP0Tfe+dQ==}
-
-  ktx-parse@1.1.0:
-    resolution: {integrity: sha512-mKp3y+FaYgR7mXWAbyyzpa/r1zDWeaunH+INJO4fou3hb45XuNSwar+7llrRyvpMWafxSIi99RNFJ05MHedaJQ==}
 
   language-subtag-registry@0.3.23:
     resolution: {integrity: sha512-0K65Lea881pHotoGEa5gDlMxt3pctLi2RplBb7Ezh4rRdLEOtgi7n4EwK9lamnUCkKBqaeKRVebTq6BAxSkpXQ==}
@@ -13594,15 +13488,6 @@ packages:
 
   makeerror@1.0.12:
     resolution: {integrity: sha512-JmqCvUhmt43madlpFzG4BQzG2Z3m6tvQDNKdClZnO3VbIudJYmxsT0FNJMeiB2+JTSlTQTSbU8QdesVmwJcmLg==}
-
-  manifold-3d@3.5.1:
-    resolution: {integrity: sha512-/+m6kxYMMhnPutcQ5oSmFJiJ+gyP/0fmuUCb9Qeaunvecm/bfqogKYDDJarsnWiFioSMtKheF+lGmSlnYCik9g==}
-    hasBin: true
-    peerDependencies:
-      '@gltf-transform/core': ^4.2.0
-      '@gltf-transform/extensions': ^4.2.0
-      '@gltf-transform/functions': ^4.2.0
-      esbuild-wasm: ^0.27.3
 
   markdown-it@12.3.2:
     resolution: {integrity: sha512-TchMembfxfNVpHkbtriWltGWc+m3xszaRD0CZup7GFFhzIgQqxIfn3eGj1yZpfuflzPvfkt611B2Q/Bsk1YnGg==}
@@ -14176,18 +14061,6 @@ packages:
     resolution: {integrity: sha512-PfGU8jYWdRl4FqJfCy0IzbkGyFHntfWygZg46nFk/dJD/XRrk2cj0SsKSX9n5u5gE0E0YfEpKWrEkfjnlZSTXA==}
     hasBin: true
 
-  ndarray-lanczos@0.3.0:
-    resolution: {integrity: sha512-5kBmmG3Zvyj77qxIAC4QFLKuYdDIBJwCG+DukT6jQHNa1Ft74/hPH1z5mbQXeHBt8yvGPBGVrr3wEOdJPYYZYg==}
-
-  ndarray-ops@1.2.2:
-    resolution: {integrity: sha512-BppWAFRjMYF7N/r6Ie51q6D4fs0iiGmeXIACKY66fLpnwIui3Wc3CXiD/30mgLbDjPpSLrsqcp3Z62+IcHZsDw==}
-
-  ndarray-pixels@5.2.0:
-    resolution: {integrity: sha512-lTh4tFKziAatVTa9crIsidUyn+lqujVOQpzfdBWvdFu2wo9Uo6z261lVX7SgMyP89xGmj3TMTPbbxl9YDnV4SA==}
-
-  ndarray@1.0.19:
-    resolution: {integrity: sha512-B4JHA4vdyZU30ELBw3g7/p9bZupyew5a7tX1Y/gGeF2hafrPaQZhgrGQfsvgfYbgdFZjYwuEcnaobeM/WMW+HQ==}
-
   ndjson@2.0.0:
     resolution: {integrity: sha512-nGl7LRGrzugTtaFcJMhLbpzJM6XdivmbkdlaGcrk/LXg2KL/YBC6z1g70xh0/al+oFuVFP8N8kiWRucmeEH/qQ==}
     engines: {node: '>=10'}
@@ -14730,6 +14603,9 @@ packages:
   pako@2.2.0:
     resolution: {integrity: sha512-zJq6RP/5q+TO2OpFV3FHzlPnFjmkb7Nc99a5SNjJE+uu/PkpChs+NIZSSzbBoD+6kjiISXjfYdwj1ZRQ81dz/w==}
 
+  papaparse@5.6.0:
+    resolution: {integrity: sha512-N2vuNQAYGK1/4vs6HJX86+VYU6OkiSTgdJz3JQfTk1y51cFCO/U8gnaeTF4iNE4r57Tt0sV47dUua1/19pxO6Q==}
+
   parcel@2.16.4:
     resolution: {integrity: sha512-RQlrqs4ujYNJpTQi+dITqPKNhRWEqpjPd1YBcGp50Wy3FcJHpwu0/iRm7XWz2dKU/Bwp2qCcVYPIeEDYi2uOUw==}
     engines: {node: '>= 16.0.0'}
@@ -15051,8 +14927,8 @@ packages:
     resolution: {integrity: sha512-PxkIc/2ZpLiEzQXu5YRDOUgBlfGYBY8156HY5ZcRAwwonMk5W/MrJP2LLkG/hF7GEQzaHo2aS7ho6ZLCOvf+6g==}
     engines: {node: '>=12.0.0'}
 
-  poppygl@0.0.16:
-    resolution: {integrity: sha512-A29z8dQRyupmLpBU8AurAeAdIYe0nIVuk+o/7PZlhEd4R+SZjt6eY98nnP7g85zcY8FinXtSPysKnMWoo7cz0g==}
+  poppygl@0.0.27:
+    resolution: {integrity: sha512-6bfYouOFsLOuXW+wLEjkJjV8T/wdLxhjA3dJDOwjpUDnSgYUZw4yHRN7TIRY7neM8mt1aFsljKVoWNECJNBhPA==}
     peerDependencies:
       typescript: ^5
 
@@ -15448,9 +15324,6 @@ packages:
   properties-reader@2.3.0:
     resolution: {integrity: sha512-z597WicA7nDZxK12kZqHr2TcvwNU1GCfA5UwfDY/HDp3hXPoPlb5rlEx9bwGTiJnc0OqbBTkU975jDToth8Gxw==}
     engines: {node: '>=14'}
-
-  property-graph@4.1.0:
-    resolution: {integrity: sha512-AvPcP7XECNWy4LGmFQ77k7un4lSKM4eS29PTvW4ck95uYeLxXPWJM7hLuBqK91FaHqCcgJvIUCuNJjjxKE7VKQ==}
 
   property-information@7.1.0:
     resolution: {integrity: sha512-TwEZ+X+yCJmYfL7TPUOcvBZ4QfoT5YenQiJuX//0th53DE6w0xxLEtfK3iyryQFddXuvkIk51EEgrJQ0WJkOmQ==}
@@ -16103,11 +15976,6 @@ packages:
     engines: {node: '>=10.0.0'}
     hasBin: true
 
-  rollup@4.62.2:
-    resolution: {integrity: sha512-RFnrW4lhXA3s3eqHDZvN654g8OTjzRfqpIRJYczCGB6HzphckVAi/Qh4tbPUbRuDi7s1Llv8g/NspLkttY3gTA==}
-    engines: {node: '>=18.0.0', npm: '>=8.0.0'}
-    hasBin: true
-
   rollup@4.62.4:
     resolution: {integrity: sha512-RXOqwaPsBGjMNMa4sQjDjHieHEZDFoj/Rdr46l2MU5DfEs16wHJPC2RPTPHWhNl+M3aI472LLqFkFKut4SblOg==}
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
@@ -16374,13 +16242,8 @@ packages:
     resolution: {integrity: sha512-eflK8wEtyOE6+hsaRVPxvUKYCpRgzLqDTb8krvAsRIwOGlHoSgYLgBXoubGgLd2fT41/OUYdb48v4k4WWHQurA==}
     engines: {node: '>= 10.13.0'}
 
-  schematic-symbols@0.0.202:
-    resolution: {integrity: sha512-zMdY7VaEg2Sc25T0h9LkWttEoyxGamgBfFDQKUXtYRoLSChrNDOKbNLaxU/GH2L2GbsasV8OLiHyHGb5u7NUpg==}
-    peerDependencies:
-      typescript: ^5.5.4
-
-  schematic-symbols@0.0.208:
-    resolution: {integrity: sha512-2vW3Kmouu1jVtwHuwa9HBgWLl4NKYoXk1T8rtOCa+tlZhCP/qQRX0YWwo4ZljSoY2fWPwZoEy7RX/CuEBuSA+Q==}
+  schematic-symbols@0.0.239:
+    resolution: {integrity: sha512-H+bx5oF+jj10jT42zz6SnGxzDxsHW1MrGz/15d4eDFT78lFnoK9zZ7DQBSLCSL60lqhc+LY+j7ttsokf84OLaA==}
     peerDependencies:
       typescript: ^5.5.4
 
@@ -16766,6 +16629,11 @@ packages:
   speedometer@1.0.0:
     resolution: {integrity: sha512-lgxErLl/7A5+vgIIXsh9MbeukOaCb2axgQ+bKCdIE+ibNT4XNYGNCR1qFEGq6F+YDASXK3Fh/c5FgtZchFolxw==}
 
+  spicets@0.0.4:
+    resolution: {integrity: sha512-qo2dAjKxCtLdxeALJHA3KXc5GC//EUMpeRMtvDwa+qV77FZuunS3uHuG0abjGwnHWmc7hU4sMfpS0zMM7GFpUA==}
+    peerDependencies:
+      typescript: ^5
+
   spicey@0.0.14:
     resolution: {integrity: sha512-iktSN1BteKEpou3158v25fxGJsNZ4MFeBVV0bZFZ5UZ5NnqusVxVQ1ZrPnCO+2FCmTIBqTD66n0GKMxF6+N/xg==}
     peerDependencies:
@@ -16816,6 +16684,11 @@ packages:
   ssri@8.0.1:
     resolution: {integrity: sha512-97qShzy1AiyxvPNIkLWoGua7xoQzzPjQ0HAH4B0rWKo7SZ6USuPcrUiAFrws0UH8RrbWmgq3LMTObhPIHbbBeQ==}
     engines: {node: '>= 8'}
+
+  stack-svgs@0.0.1:
+    resolution: {integrity: sha512-qcqBlwd5DZdXB+jEc+JUoh3o5zVYfjLrrgtwn7GCvjnoEGaXMPjWQnRotkDNh+uhpXVO7ssNln/JbNnLtIFNQw==}
+    peerDependencies:
+      typescript: ^5
 
   stack-utils@2.0.6:
     resolution: {integrity: sha512-XlkWvfIm6RmsWtNJx+uqtKLS8eqFbxUg0ZzLXqY0caEy9l7hruX8IpiDnjsLavoBgqCCR71TqWO8MaXYheJ3RQ==}
@@ -17563,8 +17436,8 @@ packages:
       '@swc/wasm':
         optional: true
 
-  tscircuit@0.0.1774:
-    resolution: {integrity: sha512-TWEyWq8RMy1BS6VAFI2fUHEb9Fdi/G0xoet2AXuT0PCwftMukaac2zja6Aaly5CWwj2UEo3RtiWsiu0gfsMIvA==}
+  tscircuit@0.0.2339:
+    resolution: {integrity: sha512-PBlDYOJu5h+Ux4L2Nh2B/HeQLQIRPWdvN31hH3uuH5iksc76RnUtappbd0OdbbDGzuOpe1KqO9+YYG72qgQspA==}
     hasBin: true
     peerDependencies:
       typescript: ^5.0.0
@@ -17880,9 +17753,6 @@ packages:
   union@0.5.0:
     resolution: {integrity: sha512-N6uOhuW6zO95P3Mel2I2zMsbsanvvtgn6jVqJv4vbVcz/JN0OkL9suomjQGmWtxJQXOCqUJvquc1sMeNz/IwlA==}
     engines: {node: '>= 0.8.0'}
-
-  uniq@1.0.1:
-    resolution: {integrity: sha512-Gw+zz50YNKPDKXs+9d+aKAjVwpjNwqzvNpLigIruT4HA9lMZNdMqs9x07kKHB/L9WRzqp4+DlTU5s4wG2esdoA==}
 
   unique-filename@1.1.1:
     resolution: {integrity: sha512-Vmp0jIp2ln35UTXuryvjzkjGdRyf9b2lTXuSYUiPmzRcl3FDtYqAwOnTJkAngD9SWhnoJzDbTKwaOrZ+STtxNQ==}
@@ -22348,26 +22218,6 @@ snapshots:
 
   '@gar/promisify@1.1.3': {}
 
-  '@gltf-transform/core@4.4.1':
-    dependencies:
-      property-graph: 4.1.0
-
-  '@gltf-transform/extensions@4.4.1':
-    dependencies:
-      '@gltf-transform/core': 4.4.1
-      ktx-parse: 1.1.0
-
-  '@gltf-transform/functions@4.4.1(@types/node@25.9.5)':
-    dependencies:
-      '@gltf-transform/core': 4.4.1
-      '@gltf-transform/extensions': 4.4.1
-      ktx-parse: 1.1.0
-      ndarray: 1.0.19
-      ndarray-lanczos: 0.3.0
-      ndarray-pixels: 5.2.0(@types/node@25.9.5)
-    transitivePeerDependencies:
-      - '@types/node'
-
   '@golevelup/ts-jest@3.0.0': {}
 
   '@grpc/grpc-js@1.14.4':
@@ -22889,8 +22739,6 @@ snapshots:
   '@js-sdsl/ordered-map@4.4.2': {}
 
   '@jscad/modeling@2.13.0': {}
-
-  '@jscadui/3mf-export@0.5.0': {}
 
   '@jsdevtools/ono@7.1.3': {}
 
@@ -25746,9 +25594,9 @@ snapshots:
     optionalDependencies:
       rollup: 4.62.4
 
-  '@rollup/plugin-commonjs@29.0.3(rollup@4.62.2)':
+  '@rollup/plugin-commonjs@29.0.3(rollup@4.62.4)':
     dependencies:
-      '@rollup/pluginutils': 5.4.0(rollup@4.62.2)
+      '@rollup/pluginutils': 5.4.0(rollup@4.62.4)
       commondir: 1.0.1
       estree-walker: 2.0.2
       fdir: 6.5.0(picomatch@4.0.5)
@@ -25756,7 +25604,7 @@ snapshots:
       magic-string: 0.30.21
       picomatch: 4.0.5
     optionalDependencies:
-      rollup: 4.62.2
+      rollup: 4.62.4
 
   '@rollup/plugin-image@3.0.3(rollup@4.62.4)':
     dependencies:
@@ -25764,12 +25612,6 @@ snapshots:
       mini-svg-data-uri: 1.4.4
     optionalDependencies:
       rollup: 4.62.4
-
-  '@rollup/plugin-json@6.1.0(rollup@4.62.2)':
-    dependencies:
-      '@rollup/pluginutils': 5.4.0(rollup@4.62.2)
-    optionalDependencies:
-      rollup: 4.62.2
 
   '@rollup/plugin-json@6.1.0(rollup@4.62.4)':
     dependencies:
@@ -25797,15 +25639,15 @@ snapshots:
     optionalDependencies:
       rollup: 4.62.4
 
-  '@rollup/plugin-node-resolve@16.0.3(rollup@4.62.2)':
+  '@rollup/plugin-node-resolve@16.0.3(rollup@4.62.4)':
     dependencies:
-      '@rollup/pluginutils': 5.4.0(rollup@4.62.2)
+      '@rollup/pluginutils': 5.4.0(rollup@4.62.4)
       '@types/resolve': 1.20.2
       deepmerge: 4.3.1
       is-module: 1.0.0
       resolve: 1.22.12
     optionalDependencies:
-      rollup: 4.62.2
+      rollup: 4.62.4
 
   '@rollup/plugin-replace@2.4.2(rollup@2.80.0)':
     dependencies:
@@ -25827,15 +25669,6 @@ snapshots:
       terser: 5.50.0
     optionalDependencies:
       rollup: 2.80.0
-
-  '@rollup/plugin-typescript@12.3.0(rollup@4.62.2)(tslib@2.8.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
-    dependencies:
-      '@rollup/pluginutils': 5.4.0(rollup@4.62.2)
-      resolve: 1.22.12
-      typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
-    optionalDependencies:
-      rollup: 4.62.2
-      tslib: 2.8.1
 
   '@rollup/plugin-typescript@12.3.0(rollup@4.62.4)(tslib@2.8.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
     dependencies:
@@ -25890,14 +25723,6 @@ snapshots:
     optionalDependencies:
       rollup: 2.80.0
 
-  '@rollup/pluginutils@5.4.0(rollup@4.62.2)':
-    dependencies:
-      '@types/estree': 1.0.9
-      estree-walker: 2.0.2
-      picomatch: 4.0.5
-    optionalDependencies:
-      rollup: 4.62.2
-
   '@rollup/pluginutils@5.4.0(rollup@4.62.4)':
     dependencies:
       '@types/estree': 1.0.9
@@ -25906,151 +25731,76 @@ snapshots:
     optionalDependencies:
       rollup: 4.62.4
 
-  '@rollup/rollup-android-arm-eabi@4.62.2':
-    optional: true
-
   '@rollup/rollup-android-arm-eabi@4.62.4':
-    optional: true
-
-  '@rollup/rollup-android-arm64@4.62.2':
     optional: true
 
   '@rollup/rollup-android-arm64@4.62.4':
     optional: true
 
-  '@rollup/rollup-darwin-arm64@4.62.2':
-    optional: true
-
   '@rollup/rollup-darwin-arm64@4.62.4':
-    optional: true
-
-  '@rollup/rollup-darwin-x64@4.62.2':
     optional: true
 
   '@rollup/rollup-darwin-x64@4.62.4':
     optional: true
 
-  '@rollup/rollup-freebsd-arm64@4.62.2':
-    optional: true
-
   '@rollup/rollup-freebsd-arm64@4.62.4':
-    optional: true
-
-  '@rollup/rollup-freebsd-x64@4.62.2':
     optional: true
 
   '@rollup/rollup-freebsd-x64@4.62.4':
     optional: true
 
-  '@rollup/rollup-linux-arm-gnueabihf@4.62.2':
-    optional: true
-
   '@rollup/rollup-linux-arm-gnueabihf@4.62.4':
-    optional: true
-
-  '@rollup/rollup-linux-arm-musleabihf@4.62.2':
     optional: true
 
   '@rollup/rollup-linux-arm-musleabihf@4.62.4':
     optional: true
 
-  '@rollup/rollup-linux-arm64-gnu@4.62.2':
-    optional: true
-
   '@rollup/rollup-linux-arm64-gnu@4.62.4':
-    optional: true
-
-  '@rollup/rollup-linux-arm64-musl@4.62.2':
     optional: true
 
   '@rollup/rollup-linux-arm64-musl@4.62.4':
     optional: true
 
-  '@rollup/rollup-linux-loong64-gnu@4.62.2':
-    optional: true
-
   '@rollup/rollup-linux-loong64-gnu@4.62.4':
-    optional: true
-
-  '@rollup/rollup-linux-loong64-musl@4.62.2':
     optional: true
 
   '@rollup/rollup-linux-loong64-musl@4.62.4':
     optional: true
 
-  '@rollup/rollup-linux-ppc64-gnu@4.62.2':
-    optional: true
-
   '@rollup/rollup-linux-ppc64-gnu@4.62.4':
-    optional: true
-
-  '@rollup/rollup-linux-ppc64-musl@4.62.2':
     optional: true
 
   '@rollup/rollup-linux-ppc64-musl@4.62.4':
     optional: true
 
-  '@rollup/rollup-linux-riscv64-gnu@4.62.2':
-    optional: true
-
   '@rollup/rollup-linux-riscv64-gnu@4.62.4':
-    optional: true
-
-  '@rollup/rollup-linux-riscv64-musl@4.62.2':
     optional: true
 
   '@rollup/rollup-linux-riscv64-musl@4.62.4':
     optional: true
 
-  '@rollup/rollup-linux-s390x-gnu@4.62.2':
-    optional: true
-
   '@rollup/rollup-linux-s390x-gnu@4.62.4':
-    optional: true
-
-  '@rollup/rollup-linux-x64-gnu@4.62.2':
     optional: true
 
   '@rollup/rollup-linux-x64-gnu@4.62.4':
     optional: true
 
-  '@rollup/rollup-linux-x64-musl@4.62.2':
-    optional: true
-
   '@rollup/rollup-linux-x64-musl@4.62.4':
-    optional: true
-
-  '@rollup/rollup-openbsd-x64@4.62.2':
     optional: true
 
   '@rollup/rollup-openbsd-x64@4.62.4':
     optional: true
 
-  '@rollup/rollup-openharmony-arm64@4.62.2':
-    optional: true
-
   '@rollup/rollup-openharmony-arm64@4.62.4':
-    optional: true
-
-  '@rollup/rollup-win32-arm64-msvc@4.62.2':
     optional: true
 
   '@rollup/rollup-win32-arm64-msvc@4.62.4':
     optional: true
 
-  '@rollup/rollup-win32-ia32-msvc@4.62.2':
-    optional: true
-
   '@rollup/rollup-win32-ia32-msvc@4.62.4':
     optional: true
 
-  '@rollup/rollup-win32-x64-gnu@4.62.2':
-    optional: true
-
   '@rollup/rollup-win32-x64-gnu@4.62.4':
-    optional: true
-
-  '@rollup/rollup-win32-x64-msvc@4.62.2':
     optional: true
 
   '@rollup/rollup-win32-x64-msvc@4.62.4':
@@ -26843,108 +26593,149 @@ snapshots:
     dependencies:
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
-  '@tscircuit/capacity-autorouter@0.0.523(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
+  '@tscircuit/capacity-autorouter@0.0.718(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
     dependencies:
-      '@tscircuit/high-density-a01': 0.0.37(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       fast-json-stable-stringify: 2.1.0
       object-hash: 3.0.0
+      stack-svgs: 0.0.1(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
     transitivePeerDependencies:
       - typescript
 
-  '@tscircuit/checks@0.0.130(@flatten-js/core@1.6.12)(@tscircuit/math-utils@0.0.36(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json-to-connectivity-map@0.0.23(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
+  '@tscircuit/capacity-autorouter@0.0.803(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
+    dependencies:
+      fast-json-stable-stringify: 2.1.0
+      object-hash: 3.0.0
+      stack-svgs: 0.0.1(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+    transitivePeerDependencies:
+      - typescript
+
+  '@tscircuit/checks@0.0.162(@flatten-js/core@1.6.12)(@tscircuit/math-utils@0.0.36(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json-to-connectivity-map@0.0.27(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
     dependencies:
       '@flatten-js/core': 1.6.12
       '@tscircuit/math-utils': 0.0.36(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      circuit-json: 0.0.425
-      circuit-json-to-connectivity-map: 0.0.23(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      circuit-json: 0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
+      circuit-json-to-connectivity-map: 0.0.27(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
-  '@tscircuit/circuit-json-util@0.0.94(circuit-json@0.0.425)(transformation-matrix@2.16.1)(zod@3.25.76)':
+  '@tscircuit/circuit-json-util@0.0.106(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(transformation-matrix@2.16.1)(zod@3.25.76)':
     dependencies:
-      circuit-json: 0.0.425
+      circuit-json: 0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
       parsel-js: 1.2.3
       transformation-matrix: 2.16.1
       zod: 3.25.76
 
-  '@tscircuit/cli@0.1.1399(tscircuit@0.0.1774(@gltf-transform/core@4.4.1)(@gltf-transform/extensions@4.4.1)(@gltf-transform/functions@4.4.1(@types/node@25.9.5))(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(esbuild-wasm@0.27.7)(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))':
+  '@tscircuit/cli@0.1.1399(tscircuit@0.0.2339(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))':
     dependencies:
-      tscircuit: 0.0.1774(@gltf-transform/core@4.4.1)(@gltf-transform/extensions@4.4.1)(@gltf-transform/functions@4.4.1(@types/node@25.9.5))(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(esbuild-wasm@0.27.7)(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      tscircuit: 0.0.2339(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
 
-  '@tscircuit/copper-pour-solver@0.0.29(@gltf-transform/core@4.4.1)(@gltf-transform/extensions@4.4.1)(@gltf-transform/functions@4.4.1(@types/node@25.9.5))(esbuild-wasm@0.27.7)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
+  '@tscircuit/cli@0.1.1936(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(tscircuit@0.0.2339(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))':
     dependencies:
-      manifold-3d: 3.5.1(@gltf-transform/core@4.4.1)(@gltf-transform/extensions@4.4.1)(@gltf-transform/functions@4.4.1(@types/node@25.9.5))(esbuild-wasm@0.27.7)
+      circuit-json: 0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
+      tscircuit: 0.0.2339(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+
+  '@tscircuit/copper-pour-solver@0.0.46(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
+    dependencies:
+      '@tscircuit/manifold-2d': 0.0.6
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
-    transitivePeerDependencies:
-      - '@gltf-transform/core'
-      - '@gltf-transform/extensions'
-      - '@gltf-transform/functions'
-      - esbuild-wasm
 
-  '@tscircuit/core@0.0.1258(04c1f7ab6dacb1bc4b306e1f3d6df403)':
+  '@tscircuit/core@0.0.1687(40e86051bacfce34ebe69f2ef5ebb71e)':
     dependencies:
       '@flatten-js/core': 1.6.12
       '@lume/kiwi': 0.4.4
-      '@tscircuit/capacity-autorouter': 0.0.523(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      '@tscircuit/checks': 0.0.130(@flatten-js/core@1.6.12)(@tscircuit/math-utils@0.0.36(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json-to-connectivity-map@0.0.23(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      '@tscircuit/circuit-json-util': 0.0.94(circuit-json@0.0.425)(transformation-matrix@2.16.1)(zod@3.25.76)
-      '@tscircuit/footprinter': 0.0.357(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/capacity-autorouter': 0.0.803(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/checks': 0.0.162(@flatten-js/core@1.6.12)(@tscircuit/math-utils@0.0.36(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json-to-connectivity-map@0.0.27(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/circuit-json-util': 0.0.106(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(transformation-matrix@2.16.1)(zod@3.25.76)
+      '@tscircuit/create-fdm-enclosure': 0.0.4(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/footprinter': 0.0.418(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       '@tscircuit/infgrid-ijump-astar': 0.0.35
-      '@tscircuit/matchpack': 0.0.16(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/matchpack': 0.0.80(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       '@tscircuit/math-utils': 0.0.36(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      '@tscircuit/props': 0.0.531(circuit-json@0.0.425)(react@19.2.8)(zod@3.25.76)
-      '@tscircuit/schematic-match-adapt': 0.0.16(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/props': 0.0.621(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(react@19.2.8)(zod@3.25.76)
+      '@tscircuit/schematic-match-adapt': 0.0.18(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       bpc-graph: 0.0.57(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      calculate-cell-boundaries: 0.0.1(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      calculate-packing: 0.0.73(@tscircuit/circuit-json-util@0.0.94(circuit-json@0.0.425)(transformation-matrix@2.16.1)(zod@3.25.76))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      circuit-json: 0.0.425
-      circuit-json-to-bpc: 0.0.13(bpc-graph@0.0.57(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      circuit-json-to-connectivity-map: 0.0.23(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      calculate-cell-boundaries: 0.0.13(graphics-debug@0.0.95(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      calculate-packing: 0.0.86(@tscircuit/circuit-json-util@0.0.106(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(transformation-matrix@2.16.1)(zod@3.25.76))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      circuit-json: 0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
+      circuit-json-to-bpc: 0.0.13(bpc-graph@0.0.57(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      circuit-json-to-connectivity-map: 0.0.27(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      circuit-json-to-spice: 0.0.45(@tscircuit/circuit-json-util@0.0.106(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(transformation-matrix@2.16.1)(zod@3.25.76))(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(spicets@0.0.4(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       css-select: 5.1.0
-      format-si-unit: 0.0.3(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      format-si-unit: 0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       nanoid: 5.1.16
       performance-now: 2.1.0
       react-reconciler: 0.32.0(react@19.2.8)
-      schematic-symbols: 0.0.208(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      schematic-symbols: 0.0.239(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      spicets: 0.0.4(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       svg-path-commander: 2.2.1
       transformation-matrix: 2.16.1
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
       zod: 3.25.76
     transitivePeerDependencies:
+      - graphics-debug
       - react
 
-  '@tscircuit/eval@0.0.855(@tscircuit/core@0.0.1258(04c1f7ab6dacb1bc4b306e1f3d6df403))(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))(zod@3.25.76)':
+  '@tscircuit/create-fdm-enclosure@0.0.4(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
     dependencies:
-      '@tscircuit/core': 0.0.1258(04c1f7ab6dacb1bc4b306e1f3d6df403)
-      circuit-json: 0.0.425
+      '@tscircuit/solver-utils': 0.0.19(graphics-debug@0.0.96(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      graphics-debug: 0.0.96(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      jscad-planner: 0.0.14(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
+    transitivePeerDependencies:
+      - bun-match-svg
+      - looks-same
+      - react
+      - react-dom
+
+  '@tscircuit/eval@0.0.1207(@tscircuit/core@0.0.1687(40e86051bacfce34ebe69f2ef5ebb71e))(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))(zod@3.25.76)':
+    dependencies:
+      '@tscircuit/core': 0.0.1687(40e86051bacfce34ebe69f2ef5ebb71e)
+      circuit-json: 0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
       zod: 3.25.76
 
-  '@tscircuit/footprinter@0.0.357(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
+  '@tscircuit/fanout-solver@0.0.25(@resvg/resvg-js@2.6.2)(@tscircuit/image-utils@0.0.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
+    dependencies:
+      '@tscircuit/capacity-autorouter': 0.0.718(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/solver-utils': 0.0.19(graphics-debug@0.0.99(@resvg/resvg-js@2.6.2)(@tscircuit/image-utils@0.0.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      graphics-debug: 0.0.99(@resvg/resvg-js@2.6.2)(@tscircuit/image-utils@0.0.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
+    transitivePeerDependencies:
+      - '@resvg/resvg-js'
+      - '@tscircuit/image-utils'
+      - react
+      - react-dom
+
+  '@tscircuit/footprinter@0.0.418(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
     dependencies:
       '@tscircuit/mm': 0.0.8(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      circuit-json: 0.0.425
+      circuit-json: 0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
       zod: 3.25.76
     transitivePeerDependencies:
       - typescript
 
-  '@tscircuit/high-density-a01@0.0.37(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
+  '@tscircuit/image-utils@0.0.8':
     dependencies:
-      flatbush: 4.6.2
-      typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
+      '@flatten-js/core': 1.6.12
+      color-diff: 1.4.0
+      fast-png: 8.0.0
+      svg-path-commander: 2.2.1
+      transformation-matrix: 2.16.1
 
-  '@tscircuit/infer-cable-insertion-point@0.0.2(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
+  '@tscircuit/infer-cable-insertion-point@0.0.3(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
     dependencies:
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
   '@tscircuit/infgrid-ijump-astar@0.0.35': {}
 
-  '@tscircuit/internal-dynamic-import@0.0.2': {}
+  '@tscircuit/internal-dynamic-import@0.0.11': {}
 
-  '@tscircuit/krt-wasm@0.1.6(tscircuit@0.0.1774(@gltf-transform/core@4.4.1)(@gltf-transform/extensions@4.4.1)(@gltf-transform/functions@4.4.1(@types/node@25.9.5))(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(esbuild-wasm@0.27.7)(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))':
+  '@tscircuit/krt-wasm@0.1.6(tscircuit@0.0.2339(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))':
     dependencies:
-      tscircuit: 0.0.1774(@gltf-transform/core@4.4.1)(@gltf-transform/extensions@4.4.1)(@gltf-transform/functions@4.4.1(@types/node@25.9.5))(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(esbuild-wasm@0.27.7)(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      tscircuit: 0.0.2339(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
 
-  '@tscircuit/matchpack@0.0.16(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
+  '@tscircuit/manifold-2d@0.0.6': {}
+
+  '@tscircuit/matchpack@0.0.80(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
     dependencies:
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
@@ -26964,26 +26755,28 @@ snapshots:
     dependencies:
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
-  '@tscircuit/ngspice-spice-engine@0.0.8(@tscircuit/props@0.0.531(circuit-json@0.0.425)(react@19.2.8)(zod@3.25.76))(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
+  '@tscircuit/ngspice-spice-engine@0.0.20(@tscircuit/props@0.0.621(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(react@19.2.8)(zod@3.25.76))(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(spicets@0.0.4(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
     dependencies:
-      '@tscircuit/props': 0.0.531(circuit-json@0.0.425)(react@19.2.8)(zod@3.25.76)
-      circuit-json: 0.0.425
-      eecircuit-engine: 1.7.0
+      '@tscircuit/props': 0.0.621(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(react@19.2.8)(zod@3.25.76)
+      circuit-json: 0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
+      spicets: 0.0.4(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
-  '@tscircuit/props@0.0.531(circuit-json@0.0.425)(react@19.2.8)(zod@3.25.76)':
+  '@tscircuit/props@0.0.621(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(react@19.2.8)(zod@3.25.76)':
     dependencies:
-      circuit-json: 0.0.425
+      circuit-json: 0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
       react: 19.2.8
       zod: 3.25.76
 
-  '@tscircuit/runframe@0.0.1982(@tscircuit/core@0.0.1258(04c1f7ab6dacb1bc4b306e1f3d6df403))(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))(zod@3.25.76)':
+  '@tscircuit/runframe@0.0.2476(@tscircuit/core@0.0.1687(40e86051bacfce34ebe69f2ef5ebb71e))(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))(zod@3.25.76)':
     dependencies:
-      '@tscircuit/eval': 0.0.855(@tscircuit/core@0.0.1258(04c1f7ab6dacb1bc4b306e1f3d6df403))(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))(zod@3.25.76)
+      '@tscircuit/eval': 0.0.1207(@tscircuit/core@0.0.1687(40e86051bacfce34ebe69f2ef5ebb71e))(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))(zod@3.25.76)
       '@tscircuit/solver-utils': 0.0.7(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      debug: 4.4.3(supports-color@7.2.0)
     transitivePeerDependencies:
       - '@tscircuit/core'
       - circuit-json
+      - supports-color
       - typescript
       - zod
 
@@ -26991,11 +26784,11 @@ snapshots:
     dependencies:
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
-  '@tscircuit/schematic-match-adapt@0.0.16(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
+  '@tscircuit/schematic-match-adapt@0.0.18(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
     dependencies:
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
-  '@tscircuit/schematic-trace-solver@0.0.57(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
+  '@tscircuit/schematic-trace-solver@0.0.129(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
     dependencies:
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
@@ -27004,17 +26797,33 @@ snapshots:
       fast-xml-parser: 5.10.0
       fflate: 0.8.3
 
-  '@tscircuit/solver-utils@0.0.3(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
+  '@tscircuit/solver-utils@0.0.16(graphics-debug@0.0.95(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
     dependencies:
+      graphics-debug: 0.0.95(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
+
+  '@tscircuit/solver-utils@0.0.19(graphics-debug@0.0.95(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
+    dependencies:
+      graphics-debug: 0.0.95(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
+
+  '@tscircuit/solver-utils@0.0.19(graphics-debug@0.0.96(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
+    dependencies:
+      graphics-debug: 0.0.96(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
+
+  '@tscircuit/solver-utils@0.0.19(graphics-debug@0.0.99(@resvg/resvg-js@2.6.2)(@tscircuit/image-utils@0.0.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
+    dependencies:
+      graphics-debug: 0.0.99(@resvg/resvg-js@2.6.2)(@tscircuit/image-utils@0.0.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
   '@tscircuit/solver-utils@0.0.7(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))':
     dependencies:
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
-  '@tscircuit/soup-util@0.0.41(circuit-json@0.0.425)(transformation-matrix@2.16.1)(zod@3.25.76)':
+  '@tscircuit/soup-util@0.0.41(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(transformation-matrix@2.16.1)(zod@3.25.76)':
     dependencies:
-      circuit-json: 0.0.425
+      circuit-json: 0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
       parsel-js: 1.2.3
       transformation-matrix: 2.16.1
       zod: 3.25.76
@@ -27342,8 +27151,6 @@ snapshots:
   '@types/multer@2.2.0':
     dependencies:
       '@types/express': 4.17.25
-
-  '@types/ndarray@1.0.14': {}
 
   '@types/node@18.19.130':
     dependencies:
@@ -29607,19 +29414,23 @@ snapshots:
       normalize-url: 6.1.0
       responselike: 2.0.1
 
-  calculate-cell-boundaries@0.0.1(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+  calculate-cell-boundaries@0.0.13(graphics-debug@0.0.95(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
     dependencies:
+      '@tscircuit/solver-utils': 0.0.19(graphics-debug@0.0.95(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      lucide-react: 1.30.0(react@19.2.8)
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
+    transitivePeerDependencies:
+      - graphics-debug
 
   calculate-elbow@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
     dependencies:
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
-  calculate-packing@0.0.73(@tscircuit/circuit-json-util@0.0.94(circuit-json@0.0.425)(transformation-matrix@2.16.1)(zod@3.25.76))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+  calculate-packing@0.0.86(@tscircuit/circuit-json-util@0.0.106(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(transformation-matrix@2.16.1)(zod@3.25.76))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
     dependencies:
-      '@tscircuit/circuit-json-util': 0.0.94(circuit-json@0.0.425)(transformation-matrix@2.16.1)(zod@3.25.76)
+      '@tscircuit/circuit-json-util': 0.0.106(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(transformation-matrix@2.16.1)(zod@3.25.76)
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
   call-bind-apply-helpers@1.0.2:
@@ -29793,10 +29604,10 @@ snapshots:
 
   ci-info@4.4.0: {}
 
-  circuit-json-to-bpc@0.0.13(bpc-graph@0.0.57(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+  circuit-json-to-bpc@0.0.13(bpc-graph@0.0.57(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
     dependencies:
       bpc-graph: 0.0.57(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      circuit-json: 0.0.425
+      circuit-json: 0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
   circuit-json-to-connectivity-map@0.0.22(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
@@ -29804,19 +29615,20 @@ snapshots:
       '@tscircuit/math-utils': 0.0.9(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
-  circuit-json-to-connectivity-map@0.0.23(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+  circuit-json-to-connectivity-map@0.0.27(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
     dependencies:
       '@tscircuit/math-utils': 0.0.9(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
-  circuit-json-to-gltf@0.0.96(@resvg/resvg-js@2.6.2)(@tscircuit/alphabet@0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(@tscircuit/circuit-json-util@0.0.94(circuit-json@0.0.425)(transformation-matrix@2.16.1)(zod@3.25.76))(@tscircuit/footprinter@0.0.357(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json@0.0.425)(circuit-to-svg@0.0.345(@tscircuit/alphabet@0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+  circuit-json-to-gltf@0.0.118(1ca75d3bf91c3296661adb478a00c0eb):
     dependencies:
       '@jscad/modeling': 2.13.0
-      '@tscircuit/circuit-json-util': 0.0.94(circuit-json@0.0.425)(transformation-matrix@2.16.1)(zod@3.25.76)
-      circuit-json: 0.0.425
-      circuit-to-svg: 0.0.345(@tscircuit/alphabet@0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/circuit-json-util': 0.0.106(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(transformation-matrix@2.16.1)(zod@3.25.76)
+      circuit-json: 0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
+      circuit-to-svg: 0.0.400(@tscircuit/alphabet@0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       earcut: 3.2.3
-      jscad-electronics: 0.0.129(@jscad/modeling@2.13.0)(@tscircuit/alphabet@0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(@tscircuit/footprinter@0.0.357(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json@0.0.425)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(three@0.185.1)
+      jscad-electronics: 0.0.146(@jscad/modeling@2.13.0)(@tscircuit/alphabet@0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(@tscircuit/footprinter@0.0.418(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      jscad-planner: 0.0.14(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       jscad-to-gltf: 0.0.5(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       occt-import-js: 0.0.23
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
@@ -29830,22 +29642,29 @@ snapshots:
       - react-dom
       - three
 
+  circuit-json-to-pnp-csv@0.0.8(@tscircuit/soup-util@0.0.41(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(transformation-matrix@2.16.1)(zod@3.25.76))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+    dependencies:
+      '@tscircuit/soup-util': 0.0.41(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(transformation-matrix@2.16.1)(zod@3.25.76)
+      papaparse: 5.6.0
+      typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
+
   circuit-json-to-simple-3d@0.0.9(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
     dependencies:
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
-  circuit-json-to-spice@0.0.34(@tscircuit/circuit-json-util@0.0.94(circuit-json@0.0.425)(transformation-matrix@2.16.1)(zod@3.25.76))(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+  circuit-json-to-spice@0.0.45(@tscircuit/circuit-json-util@0.0.106(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(transformation-matrix@2.16.1)(zod@3.25.76))(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(spicets@0.0.4(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
     dependencies:
-      '@tscircuit/circuit-json-util': 0.0.94(circuit-json@0.0.425)(transformation-matrix@2.16.1)(zod@3.25.76)
-      circuit-json: 0.0.425
+      '@tscircuit/circuit-json-util': 0.0.106(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(transformation-matrix@2.16.1)(zod@3.25.76)
+      circuit-json: 0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
       circuit-json-to-connectivity-map: 0.0.22(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      spicets: 0.0.4(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
-  circuit-json@0.0.425:
+  circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))):
     dependencies:
-      zod: 3.25.76
+      format-si-unit: 0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
 
-  circuit-to-svg@0.0.345(@tscircuit/alphabet@0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+  circuit-to-svg@0.0.400(@tscircuit/alphabet@0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
     dependencies:
       '@tscircuit/alphabet': 0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       '@types/node': 22.20.1
@@ -30032,8 +29851,6 @@ snapshots:
   commander@11.1.0: {}
 
   commander@12.1.0: {}
-
-  commander@13.1.0: {}
 
   commander@14.0.3: {}
 
@@ -30574,10 +30391,6 @@ snapshots:
       csv-parse: 7.0.2
       csv-stringify: 6.8.3
       stream-transform: 3.5.1
-
-  cwise-compiler@1.1.3:
-    dependencies:
-      uniq: 1.0.1
 
   d3-array@3.2.4:
     dependencies:
@@ -31125,8 +30938,6 @@ snapshots:
 
   ee-first@1.1.1: {}
 
-  eecircuit-engine@1.7.0: {}
-
   effect@3.22.1:
     dependencies:
       '@standard-schema/spec': 1.1.0
@@ -31567,8 +31378,6 @@ snapshots:
       es5-ext: 0.10.64
       es6-iterator: 2.0.3
       es6-symbol: 3.1.4
-
-  esbuild-wasm@0.27.7: {}
 
   esbuild@0.20.2:
     optionalDependencies:
@@ -32140,6 +31949,11 @@ snapshots:
 
   fast-memoize@2.5.2: {}
 
+  fast-png@8.0.0:
+    dependencies:
+      fflate: 0.8.3
+      iobuffer: 6.0.1
+
   fast-safe-stringify@2.1.1: {}
 
   fast-unique-numbers@9.0.27:
@@ -32419,7 +32233,7 @@ snapshots:
       hasown: 2.0.4
       mime-types: 2.1.35
 
-  format-si-unit@0.0.3(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+  format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
     dependencies:
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
@@ -32815,12 +32629,52 @@ snapshots:
 
   grapheme-splitter@1.0.4: {}
 
-  graphics-debug@0.0.89(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+  graphics-debug@0.0.95(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
     dependencies:
       '@react-hook/resize-observer': 2.0.2(react@19.2.8)
+      '@tscircuit/alphabet': 0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       '@types/react-router-dom': 5.3.3
       bun-match-svg: 0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      fast-png: 8.0.0
       looks-same: 9.0.1
+      polished: 4.3.1
+      react-router-dom: 6.30.4(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react-supergrid: 1.0.10(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(transformation-matrix@3.1.0)
+      svgson: 5.3.1
+      transformation-matrix: 3.1.0
+      typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
+      use-mouse-matrix-transform: 1.3.5(react@19.2.8)
+    transitivePeerDependencies:
+      - react
+      - react-dom
+
+  graphics-debug@0.0.96(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+    dependencies:
+      '@react-hook/resize-observer': 2.0.2(react@19.2.8)
+      '@tscircuit/alphabet': 0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@types/react-router-dom': 5.3.3
+      bun-match-svg: 0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      fast-png: 8.0.0
+      looks-same: 9.0.1
+      polished: 4.3.1
+      react-router-dom: 6.30.4(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react-supergrid: 1.0.10(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(transformation-matrix@3.1.0)
+      svgson: 5.3.1
+      transformation-matrix: 3.1.0
+      typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
+      use-mouse-matrix-transform: 1.3.5(react@19.2.8)
+    transitivePeerDependencies:
+      - react
+      - react-dom
+
+  graphics-debug@0.0.99(@resvg/resvg-js@2.6.2)(@tscircuit/image-utils@0.0.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+    dependencies:
+      '@react-hook/resize-observer': 2.0.2(react@19.2.8)
+      '@resvg/resvg-js': 2.6.2
+      '@tscircuit/alphabet': 0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/image-utils': 0.0.8
+      '@types/react-router-dom': 5.3.3
+      fast-png: 8.0.0
       polished: 4.3.1
       react-router-dom: 6.30.4(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react-supergrid: 1.0.10(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(transformation-matrix@3.1.0)
@@ -33357,6 +33211,8 @@ snapshots:
 
   intl-pluralrules@2.0.1: {}
 
+  iobuffer@6.0.1: {}
+
   ioredis@5.11.1:
     dependencies:
       '@ioredis/commands': 1.10.0
@@ -33368,8 +33224,6 @@ snapshots:
       standard-as-callback: 2.1.0
     transitivePeerDependencies:
       - supports-color
-
-  iota-array@1.0.0: {}
 
   ip-address@10.2.0: {}
 
@@ -34208,17 +34062,24 @@ snapshots:
 
   jsbn@0.1.1: {}
 
-  jscad-electronics@0.0.129(@jscad/modeling@2.13.0)(@tscircuit/alphabet@0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(@tscircuit/footprinter@0.0.357(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json@0.0.425)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(three@0.185.1):
+  jscad-electronics@0.0.146(@jscad/modeling@2.13.0)(@tscircuit/alphabet@0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(@tscircuit/footprinter@0.0.418(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
     dependencies:
       '@jscad/modeling': 2.13.0
       '@tscircuit/alphabet': 0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      '@tscircuit/footprinter': 0.0.357(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      circuit-json: 0.0.425
+      '@tscircuit/footprinter': 0.0.418(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/mm': 0.0.8(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      circuit-json: 0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
       three: 0.185.1
+    transitivePeerDependencies:
+      - typescript
 
   jscad-planner@0.0.13(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+    dependencies:
+      typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
+
+  jscad-planner@0.0.14(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
     dependencies:
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
@@ -34487,12 +34348,11 @@ snapshots:
 
   kicad-component-converter@0.1.41: {}
 
-  kicad-to-circuit-json@0.0.60(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+  kicad-to-circuit-json@0.0.117(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
     dependencies:
-      schematic-symbols: 0.0.202(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
-  kicadts@0.0.35(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+  kicadts@0.0.53(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
     dependencies:
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
@@ -34510,8 +34370,6 @@ snapshots:
   kleur@4.1.5: {}
 
   kolorist@1.8.0: {}
-
-  ktx-parse@1.1.0: {}
 
   language-subtag-registry@0.3.23: {}
 
@@ -35012,21 +34870,6 @@ snapshots:
   makeerror@1.0.12:
     dependencies:
       tmpl: 1.0.5
-
-  manifold-3d@3.5.1(@gltf-transform/core@4.4.1)(@gltf-transform/extensions@4.4.1)(@gltf-transform/functions@4.4.1(@types/node@25.9.5))(esbuild-wasm@0.27.7):
-    dependencies:
-      '@gltf-transform/core': 4.4.1
-      '@gltf-transform/extensions': 4.4.1
-      '@gltf-transform/functions': 4.4.1(@types/node@25.9.5)
-      '@jridgewell/resolve-uri': 3.1.2
-      '@jridgewell/trace-mapping': 0.3.31
-      '@jscadui/3mf-export': 0.5.0
-      commander: 13.1.0
-      convert-source-map: 2.0.0
-      esbuild-wasm: 0.27.7
-      fast-xml-parser: 5.10.0
-      fflate: 0.8.3
-      magic-string: 0.30.21
 
   markdown-it@12.3.2:
     dependencies:
@@ -36168,29 +36011,6 @@ snapshots:
 
   ncp@0.4.2: {}
 
-  ndarray-lanczos@0.3.0:
-    dependencies:
-      '@types/ndarray': 1.0.14
-      ndarray: 1.0.19
-
-  ndarray-ops@1.2.2:
-    dependencies:
-      cwise-compiler: 1.1.3
-
-  ndarray-pixels@5.2.0(@types/node@25.9.5):
-    dependencies:
-      '@types/ndarray': 1.0.14
-      ndarray: 1.0.19
-      ndarray-ops: 1.2.2
-      sharp: 0.35.3(@types/node@25.9.5)
-    transitivePeerDependencies:
-      - '@types/node'
-
-  ndarray@1.0.19:
-    dependencies:
-      iota-array: 1.0.0
-      is-buffer: 1.1.6
-
   ndjson@2.0.0:
     dependencies:
       json-stringify-safe: 5.0.1
@@ -36935,6 +36755,8 @@ snapshots:
 
   pako@2.2.0: {}
 
+  papaparse@5.6.0: {}
+
   parcel@2.16.4(@swc/helpers@0.5.23):
     dependencies:
       '@parcel/config-default': 2.16.4(@parcel/core@2.16.4(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)
@@ -37272,8 +37094,9 @@ snapshots:
 
   pony-cause@1.1.1: {}
 
-  poppygl@0.0.16(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+  poppygl@0.0.27(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
     dependencies:
+      fast-png: 8.0.0
       gl-matrix: 3.4.4
       pureimage: 0.4.18
       readable-stream: 4.7.0
@@ -37854,8 +37677,6 @@ snapshots:
   properties-reader@2.3.0:
     dependencies:
       mkdirp: 1.0.4
-
-  property-graph@4.1.0: {}
 
   property-information@7.1.0: {}
 
@@ -38651,13 +38472,13 @@ snapshots:
       '@rolldown/binding-win32-arm64-msvc': 1.2.3
       '@rolldown/binding-win32-x64-msvc': 1.2.3
 
-  rollup-plugin-dts@6.4.1(rollup@4.62.2)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+  rollup-plugin-dts@6.4.1(rollup@4.62.4)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
     dependencies:
       '@jridgewell/remapping': 2.3.5
       '@jridgewell/sourcemap-codec': 1.5.5
       convert-source-map: 2.0.0
       magic-string: 0.30.21
-      rollup: 4.62.2
+      rollup: 4.62.4
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
     optionalDependencies:
       '@babel/code-frame': 7.29.7
@@ -38674,37 +38495,6 @@ snapshots:
 
   rollup@2.80.0:
     optionalDependencies:
-      fsevents: 2.3.3
-
-  rollup@4.62.2:
-    dependencies:
-      '@types/estree': 1.0.9
-    optionalDependencies:
-      '@rollup/rollup-android-arm-eabi': 4.62.2
-      '@rollup/rollup-android-arm64': 4.62.2
-      '@rollup/rollup-darwin-arm64': 4.62.2
-      '@rollup/rollup-darwin-x64': 4.62.2
-      '@rollup/rollup-freebsd-arm64': 4.62.2
-      '@rollup/rollup-freebsd-x64': 4.62.2
-      '@rollup/rollup-linux-arm-gnueabihf': 4.62.2
-      '@rollup/rollup-linux-arm-musleabihf': 4.62.2
-      '@rollup/rollup-linux-arm64-gnu': 4.62.2
-      '@rollup/rollup-linux-arm64-musl': 4.62.2
-      '@rollup/rollup-linux-loong64-gnu': 4.62.2
-      '@rollup/rollup-linux-loong64-musl': 4.62.2
-      '@rollup/rollup-linux-ppc64-gnu': 4.62.2
-      '@rollup/rollup-linux-ppc64-musl': 4.62.2
-      '@rollup/rollup-linux-riscv64-gnu': 4.62.2
-      '@rollup/rollup-linux-riscv64-musl': 4.62.2
-      '@rollup/rollup-linux-s390x-gnu': 4.62.2
-      '@rollup/rollup-linux-x64-gnu': 4.62.2
-      '@rollup/rollup-linux-x64-musl': 4.62.2
-      '@rollup/rollup-openbsd-x64': 4.62.2
-      '@rollup/rollup-openharmony-arm64': 4.62.2
-      '@rollup/rollup-win32-arm64-msvc': 4.62.2
-      '@rollup/rollup-win32-ia32-msvc': 4.62.2
-      '@rollup/rollup-win32-x64-gnu': 4.62.2
-      '@rollup/rollup-win32-x64-msvc': 4.62.2
       fsevents: 2.3.3
 
   rollup@4.62.4:
@@ -38987,11 +38777,7 @@ snapshots:
       ajv-formats: 2.1.1(ajv@8.20.0)
       ajv-keywords: 5.1.0(ajv@8.20.0)
 
-  schematic-symbols@0.0.202(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
-    dependencies:
-      typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
-
-  schematic-symbols@0.0.208(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+  schematic-symbols@0.0.239(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
     dependencies:
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
@@ -39528,6 +39314,10 @@ snapshots:
 
   speedometer@1.0.0: {}
 
+  spicets@0.0.4(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+    dependencies:
+      typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
+
   spicey@0.0.14(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
     dependencies:
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
@@ -39591,6 +39381,10 @@ snapshots:
   ssri@8.0.1:
     dependencies:
       minipass: 3.3.6
+
+  stack-svgs@0.0.1(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+    dependencies:
+      typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
 
   stack-utils@2.0.6:
     dependencies:
@@ -40478,71 +40272,75 @@ snapshots:
     optionalDependencies:
       '@swc/core': 1.15.47(@swc/helpers@0.5.23)
 
-  tscircuit@0.0.1774(@gltf-transform/core@4.4.1)(@gltf-transform/extensions@4.4.1)(@gltf-transform/functions@4.4.1(@types/node@25.9.5))(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(esbuild-wasm@0.27.7)(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
+  tscircuit@0.0.2339(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)):
     dependencies:
       '@flatten-js/core': 1.6.12
       '@lume/kiwi': 0.4.4
       '@resvg/resvg-js': 2.6.2
-      '@rollup/plugin-commonjs': 29.0.3(rollup@4.62.2)
-      '@rollup/plugin-json': 6.1.0(rollup@4.62.2)
-      '@rollup/plugin-node-resolve': 16.0.3(rollup@4.62.2)
-      '@rollup/plugin-typescript': 12.3.0(rollup@4.62.2)(tslib@2.8.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@rollup/plugin-commonjs': 29.0.3(rollup@4.62.4)
+      '@rollup/plugin-json': 6.1.0(rollup@4.62.4)
+      '@rollup/plugin-node-resolve': 16.0.3(rollup@4.62.4)
+      '@rollup/plugin-typescript': 12.3.0(rollup@4.62.4)(tslib@2.8.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       '@tscircuit/alphabet': 0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      '@tscircuit/capacity-autorouter': 0.0.523(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      '@tscircuit/checks': 0.0.130(@flatten-js/core@1.6.12)(@tscircuit/math-utils@0.0.36(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json-to-connectivity-map@0.0.23(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      '@tscircuit/circuit-json-util': 0.0.94(circuit-json@0.0.425)(transformation-matrix@2.16.1)(zod@3.25.76)
-      '@tscircuit/cli': 0.1.1399(tscircuit@0.0.1774(@gltf-transform/core@4.4.1)(@gltf-transform/extensions@4.4.1)(@gltf-transform/functions@4.4.1(@types/node@25.9.5))(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(esbuild-wasm@0.27.7)(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
-      '@tscircuit/copper-pour-solver': 0.0.29(@gltf-transform/core@4.4.1)(@gltf-transform/extensions@4.4.1)(@gltf-transform/functions@4.4.1(@types/node@25.9.5))(esbuild-wasm@0.27.7)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      '@tscircuit/core': 0.0.1258(04c1f7ab6dacb1bc4b306e1f3d6df403)
-      '@tscircuit/eval': 0.0.855(@tscircuit/core@0.0.1258(04c1f7ab6dacb1bc4b306e1f3d6df403))(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))(zod@3.25.76)
-      '@tscircuit/footprinter': 0.0.357(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      '@tscircuit/infer-cable-insertion-point': 0.0.2(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/capacity-autorouter': 0.0.803(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/checks': 0.0.162(@flatten-js/core@1.6.12)(@tscircuit/math-utils@0.0.36(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json-to-connectivity-map@0.0.27(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/circuit-json-util': 0.0.106(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(transformation-matrix@2.16.1)(zod@3.25.76)
+      '@tscircuit/cli': 0.1.1936(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(tscircuit@0.0.2339(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
+      '@tscircuit/copper-pour-solver': 0.0.46(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/core': 0.0.1687(40e86051bacfce34ebe69f2ef5ebb71e)
+      '@tscircuit/create-fdm-enclosure': 0.0.4(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/eval': 0.0.1207(@tscircuit/core@0.0.1687(40e86051bacfce34ebe69f2ef5ebb71e))(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))(zod@3.25.76)
+      '@tscircuit/fanout-solver': 0.0.25(@resvg/resvg-js@2.6.2)(@tscircuit/image-utils@0.0.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/footprinter': 0.0.418(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/image-utils': 0.0.8
+      '@tscircuit/infer-cable-insertion-point': 0.0.3(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       '@tscircuit/infgrid-ijump-astar': 0.0.35
-      '@tscircuit/internal-dynamic-import': 0.0.2
-      '@tscircuit/krt-wasm': 0.1.6(tscircuit@0.0.1774(@gltf-transform/core@4.4.1)(@gltf-transform/extensions@4.4.1)(@gltf-transform/functions@4.4.1(@types/node@25.9.5))(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(esbuild-wasm@0.27.7)(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
-      '@tscircuit/matchpack': 0.0.16(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/internal-dynamic-import': 0.0.11
+      '@tscircuit/krt-wasm': 0.1.6(tscircuit@0.0.2339(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
+      '@tscircuit/matchpack': 0.0.80(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       '@tscircuit/math-utils': 0.0.36(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       '@tscircuit/miniflex': 0.0.4(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      '@tscircuit/ngspice-spice-engine': 0.0.8(@tscircuit/props@0.0.531(circuit-json@0.0.425)(react@19.2.8)(zod@3.25.76))(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      '@tscircuit/props': 0.0.531(circuit-json@0.0.425)(react@19.2.8)(zod@3.25.76)
-      '@tscircuit/runframe': 0.0.1982(@tscircuit/core@0.0.1258(04c1f7ab6dacb1bc4b306e1f3d6df403))(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))(zod@3.25.76)
-      '@tscircuit/schematic-match-adapt': 0.0.16(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      '@tscircuit/schematic-trace-solver': 0.0.57(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/ngspice-spice-engine': 0.0.20(@tscircuit/props@0.0.621(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(react@19.2.8)(zod@3.25.76))(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(spicets@0.0.4(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/props': 0.0.621(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(react@19.2.8)(zod@3.25.76)
+      '@tscircuit/runframe': 0.0.2476(@tscircuit/core@0.0.1687(40e86051bacfce34ebe69f2ef5ebb71e))(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))(zod@3.25.76)
+      '@tscircuit/schematic-match-adapt': 0.0.18(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/schematic-trace-solver': 0.0.129(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       '@tscircuit/simple-3d-svg': 0.0.41
-      '@tscircuit/solver-utils': 0.0.3(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      '@tscircuit/soup-util': 0.0.41(circuit-json@0.0.425)(transformation-matrix@2.16.1)(zod@3.25.76)
+      '@tscircuit/solver-utils': 0.0.16(graphics-debug@0.0.95(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      '@tscircuit/soup-util': 0.0.41(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(transformation-matrix@2.16.1)(zod@3.25.76)
       bpc-graph: 0.0.57(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      calculate-cell-boundaries: 0.0.1(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      calculate-cell-boundaries: 0.0.13(graphics-debug@0.0.95(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       calculate-elbow: 0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      calculate-packing: 0.0.73(@tscircuit/circuit-json-util@0.0.94(circuit-json@0.0.425)(transformation-matrix@2.16.1)(zod@3.25.76))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      circuit-json: 0.0.425
-      circuit-json-to-bpc: 0.0.13(bpc-graph@0.0.57(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      circuit-json-to-connectivity-map: 0.0.23(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      circuit-json-to-gltf: 0.0.96(@resvg/resvg-js@2.6.2)(@tscircuit/alphabet@0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(@tscircuit/circuit-json-util@0.0.94(circuit-json@0.0.425)(transformation-matrix@2.16.1)(zod@3.25.76))(@tscircuit/footprinter@0.0.357(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json@0.0.425)(circuit-to-svg@0.0.345(@tscircuit/alphabet@0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(three@0.185.1)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      calculate-packing: 0.0.86(@tscircuit/circuit-json-util@0.0.106(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(transformation-matrix@2.16.1)(zod@3.25.76))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      circuit-json: 0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))
+      circuit-json-to-bpc: 0.0.13(bpc-graph@0.0.57(@tscircuit/schematic-corpus@0.0.114(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      circuit-json-to-connectivity-map: 0.0.27(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      circuit-json-to-gltf: 0.0.118(1ca75d3bf91c3296661adb478a00c0eb)
+      circuit-json-to-pnp-csv: 0.0.8(@tscircuit/soup-util@0.0.41(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(transformation-matrix@2.16.1)(zod@3.25.76))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       circuit-json-to-simple-3d: 0.0.9(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      circuit-json-to-spice: 0.0.34(@tscircuit/circuit-json-util@0.0.94(circuit-json@0.0.425)(transformation-matrix@2.16.1)(zod@3.25.76))(circuit-json@0.0.425)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      circuit-to-svg: 0.0.345(@tscircuit/alphabet@0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      circuit-json-to-spice: 0.0.45(@tscircuit/circuit-json-util@0.0.106(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(transformation-matrix@2.16.1)(zod@3.25.76))(circuit-json@0.0.468(format-si-unit@0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))))(spicets@0.0.4(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      circuit-to-svg: 0.0.400(@tscircuit/alphabet@0.0.25(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       comlink: 4.4.2
       connectivity-map: 1.0.0(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       css-select: 5.1.0
       debug: 4.4.3(supports-color@7.2.0)
       flatbush: 4.6.2
-      format-si-unit: 0.0.3(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      graphics-debug: 0.0.89(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      format-si-unit: 0.0.12(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      graphics-debug: 0.0.95(bun-match-svg@0.0.15(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)))(looks-same@9.0.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       jscad-planner: 0.0.13(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       kicad-component-converter: 0.1.41
-      kicad-to-circuit-json: 0.0.60(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      kicadts: 0.0.35(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
-      manifold-3d: 3.5.1(@gltf-transform/core@4.4.1)(@gltf-transform/extensions@4.4.1)(@gltf-transform/functions@4.4.1(@types/node@25.9.5))(esbuild-wasm@0.27.7)
+      kicad-to-circuit-json: 0.0.117(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      kicadts: 0.0.53(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       minicssgrid: 0.0.9(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       performance-now: 2.1.0
-      poppygl: 0.0.16(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      poppygl: 0.0.27(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
-      rollup: 4.62.2
-      rollup-plugin-dts: 6.4.1(rollup@4.62.2)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      rollup: 4.62.4
+      rollup-plugin-dts: 6.4.1(rollup@4.62.4)(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       s-expression: 3.1.1
-      schematic-symbols: 0.0.208(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      schematic-symbols: 0.0.239(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
+      spicets: 0.0.4(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       spicey: 0.0.14(typescript@7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f))
       sucrase: 3.35.1
       svg-path-commander: 2.2.1
@@ -40551,13 +40349,9 @@ snapshots:
       typescript: 7.0.2(patch_hash=f3dc8313a25cb0824aad8b42fe75634a704b8518a6861579afffea94d528bc8f)
       zod: 3.25.76
     transitivePeerDependencies:
-      - '@gltf-transform/core'
-      - '@gltf-transform/extensions'
-      - '@gltf-transform/functions'
       - '@resvg/resvg-wasm'
       - '@tscircuit/schematic-corpus'
       - bun-match-svg
-      - esbuild-wasm
       - jscad-fiber
       - looks-same
       - supports-color
@@ -40851,8 +40645,6 @@ snapshots:
   union@0.5.0:
     dependencies:
       qs: 6.15.3
-
-  uniq@1.0.1: {}
 
   unique-filename@1.1.1:
     dependencies:
