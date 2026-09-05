@@ -35,6 +35,7 @@ export function validateSnapshot(value: unknown): ValidationError[] {
   }
   const snapshot = value as Partial<Snapshot>;
   const errors: ValidationError[] = [];
+  validateKeys(snapshot as Record<string, unknown>, 'snapshot', ['version', 'physicalPoints', 'logicalChannels'], errors);
   if (snapshot.version !== 1) {
     errors.push({ path: 'snapshot.version', code: 'unsupported_version', message: 'snapshot version must be 1' });
   }
@@ -46,6 +47,15 @@ export function validateSnapshot(value: unknown): ValidationError[] {
   }
   const pointIds = new Set<string>();
   snapshot.physicalPoints.forEach((point, index) => {
+    if (!point || typeof point !== 'object' || Array.isArray(point)) {
+      errors.push({
+        path: `snapshot.physicalPoints[${index}]`,
+        code: 'invalid_object',
+        message: 'physical point must be an object',
+      });
+      return;
+    }
+    validateKeys(point as Record<string, unknown>, `snapshot.physicalPoints[${index}]`, ['id', 'hardwareProfile', 'channel'], errors);
     if (!point?.id || pointIds.has(point.id)) {
       errors.push({
         path: `snapshot.physicalPoints[${index}].id`,
@@ -70,16 +80,39 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     }
   });
   const channelIds = new Set<string>();
+  const channelsById = new Map<string, Snapshot['logicalChannels'][number]>();
   const channelIdCounts = new Map<string, number>();
   snapshot.logicalChannels.forEach((channel) => {
     if (typeof channel?.id !== 'string') {
       return;
     }
     channelIds.add(channel.id);
+    channelsById.set(channel.id, channel);
     channelIdCounts.set(channel.id, (channelIdCounts.get(channel.id) ?? 0) + 1);
   });
   snapshot.logicalChannels.forEach((channel, index) => {
     const path = `snapshot.logicalChannels[${index}]`;
+    if (!channel || typeof channel !== 'object' || Array.isArray(channel)) {
+      errors.push({ path, code: 'invalid_object', message: 'logical channel must be an object' });
+      return;
+    }
+    validateKeys(
+      channel as Record<string, unknown>,
+      path,
+      [
+        'id',
+        'physicalPointId',
+        'profile',
+        'capabilities',
+        'disconnectPolicy',
+        'range',
+        'pulse',
+        'guard',
+        'feedback',
+        'measurement',
+      ],
+      errors,
+    );
     if (!channel?.id || channelIdCounts.get(channel.id) !== 1) {
       errors.push({ path: `${path}.id`, code: 'invalid_id', message: 'logical channel IDs must be unique' });
     }
@@ -93,6 +126,26 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     const capabilities = Array.isArray(channel?.capabilities) ? channel.capabilities : [];
     if (!capabilities.length) {
       errors.push({ path: `${path}.capabilities`, code: 'invalid_capabilities', message: 'capabilities are required' });
+    }
+    if (
+      capabilities.some(
+        (capability, capabilityIndex) =>
+          !['output', 'input', 'measurement', 'pulse', 'guard', 'feedback'].includes(capability) ||
+          capabilities.indexOf(capability) !== capabilityIndex,
+      )
+    ) {
+      errors.push({
+        path: `${path}.capabilities`,
+        code: 'invalid_capabilities',
+        message: 'capabilities must be unique supported values',
+      });
+    }
+    if (typeof channel.profile !== 'string' || !channel.profile.trim()) {
+      errors.push({
+        path: `${path}.profile`,
+        code: 'invalid_profile',
+        message: 'logical channel profile must be a non-empty string',
+      });
     }
     const policy = channel?.disconnectPolicy;
     if (
@@ -118,6 +171,9 @@ export function validateSnapshot(value: unknown): ValidationError[] {
         message: 'pulse requires pulse capability and positive duration',
       });
     }
+    if (channel.pulse) {
+      validateKeys(channel.pulse as Record<string, unknown>, `${path}.pulse`, ['durationMs'], errors);
+    }
     if (channel?.guard && (!capabilities.includes('guard') || !channelIds.has(channel.guard.channelId))) {
       errors.push({
         path: `${path}.guard`,
@@ -125,8 +181,75 @@ export function validateSnapshot(value: unknown): ValidationError[] {
         message: 'guard requires guard capability and an existing channel',
       });
     }
+    if (channel.guard) {
+      validateKeys(channel.guard as Record<string, unknown>, `${path}.guard`, ['channelId', 'when'], errors);
+    }
+    const feedbackChannel = channel.feedback ? channelsById.get(channel.feedback.channelId) : undefined;
+    if (
+      channel.feedback &&
+      (!capabilities.includes('feedback') ||
+        !feedbackChannel ||
+        feedbackChannel.id === channel.id ||
+        !feedbackChannel.capabilities.includes('input') ||
+        !['match', 'inverse'].includes(channel.feedback.expected) ||
+        !Number.isSafeInteger(channel.feedback.timeoutMs) ||
+        channel.feedback.timeoutMs <= 0)
+    ) {
+      errors.push({
+        path: `${path}.feedback`,
+        code: 'invalid_feedback',
+        message: 'feedback requires feedback capability, a channel, expectation, and positive timeout',
+      });
+    }
+    if (channel.feedback) {
+      validateKeys(channel.feedback as Record<string, unknown>, `${path}.feedback`, ['channelId', 'expected', 'timeoutMs'], errors);
+    }
+    if (
+      channel.range &&
+      (!['input', 'measurement'].some((capability) => capabilities.includes(capability)) ||
+        !Number.isFinite(channel.range.minimum) ||
+        !Number.isFinite(channel.range.maximum) ||
+        channel.range.minimum >= channel.range.maximum)
+    ) {
+      errors.push({
+        path: `${path}.range`,
+        code: 'invalid_range',
+        message: 'range requires input or measurement capability and finite ordered values',
+      });
+    }
+    if (channel.range) {
+      validateKeys(channel.range as Record<string, unknown>, `${path}.range`, ['minimum', 'maximum'], errors);
+    }
+    if (
+      channel.measurement &&
+      (!capabilities.includes('measurement') ||
+        !['ampere', 'volt', 'watt', 'percent'].includes(channel.measurement.unit) ||
+        !Number.isFinite(channel.measurement.scale) ||
+        !Number.isFinite(channel.measurement.offset))
+    ) {
+      errors.push({
+        path: `${path}.measurement`,
+        code: 'invalid_measurement',
+        message: 'measurement requires capability, supported unit, and finite transform',
+      });
+    }
+    if (channel.measurement) {
+      validateKeys(channel.measurement as Record<string, unknown>, `${path}.measurement`, ['unit', 'scale', 'offset'], errors);
+    }
   });
   return errors;
+}
+
+function validateKeys(value: Record<string, unknown>, path: string, allowed: string[], errors: ValidationError[]): void {
+  Object.keys(value)
+    .filter((key) => !allowed.includes(key))
+    .forEach((key) =>
+      errors.push({
+        path: `${path}.${key}`,
+        code: 'unknown_field',
+        message: 'field is not supported by configuration version 1',
+      }),
+    );
 }
 
 function sort(value: unknown): unknown {

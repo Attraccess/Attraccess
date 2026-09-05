@@ -1,5 +1,5 @@
 import { MemoryDeviceAdapter } from './adapters';
-import { JsonStateStore, WagoRuntime, hash, type Snapshot, type Transport } from './runtime';
+import { JsonStateStore, WagoRuntime, hash, validateSnapshot, type Snapshot, type Transport } from './runtime';
 
 class TestTransport implements Transport {
   readonly published: Array<{ topic: string; payload: unknown; retain?: boolean }> = [];
@@ -201,6 +201,34 @@ describe('WagoRuntime', () => {
     );
   });
 
+  it('rejects malformed channel definitions before they can reach device control', () => {
+    const errors = validateSnapshot({
+      ...snapshot,
+      unexpected: true,
+      logicalChannels: [
+        {
+          ...snapshot.logicalChannels[0],
+          profile: '',
+          capabilities: ['output', 'output', 'unsupported'],
+          feedback: { channelId: 'load', expected: 'unknown', timeoutMs: 0 },
+          range: { minimum: 1, maximum: 0 },
+          measurement: { unit: 'unknown', scale: Number.NaN, offset: Number.NaN },
+        },
+      ],
+    });
+
+    expect(errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'unknown_field' }),
+        expect.objectContaining({ code: 'invalid_profile' }),
+        expect.objectContaining({ code: 'invalid_capabilities' }),
+        expect.objectContaining({ code: 'invalid_feedback' }),
+        expect.objectContaining({ code: 'invalid_range' }),
+        expect.objectContaining({ code: 'invalid_measurement' }),
+      ]),
+    );
+  });
+
   it('rejects duplicate logical channel IDs', async () => {
     const duplicated = {
       ...snapshot,
@@ -380,6 +408,32 @@ describe('WagoRuntime', () => {
     );
   });
 
+  it('allows a command ID to be reused after its persisted expiry', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    await store.save({
+      accepted: { revision: 1, contentHash: hash(snapshot), snapshot },
+      outputs: {},
+      commandIds: ['expired-command'],
+      commandExpiries: { 'expired-command': '2000-01-01T00:00:00.000Z' },
+    });
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      store,
+      transport,
+      device,
+    });
+    await runtime.start();
+
+    await transport.send(commands, validCommand({ id: 'expired-command' }));
+
+    expect(device.values.get('751-9301:0')).toBe(true);
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({ payload: expect.objectContaining({ id: 'expired-command', status: 'accepted' }) }),
+    );
+  });
+
   it('allows a command to be retried after a failed device write', async () => {
     let attempts = 0;
     const flakyDevice = {
@@ -436,6 +490,32 @@ describe('WagoRuntime', () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
 
     expect(device.values.get('751-9301:0')).toBe(false);
+  });
+
+  it('retries a failed scheduled pulse shutdown', async () => {
+    const writes: boolean[] = [];
+    const flakyDevice = {
+      write: async (_point: Snapshot['physicalPoints'][number], value: boolean) => {
+        writes.push(value);
+        if (!value && writes.filter((written) => !written).length === 1) throw new Error('temporary shutdown failure');
+      },
+      read: async () => false,
+    };
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+      transport,
+      device: flakyDevice,
+    });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+    await transport.send(commands, validCommand({ action: 'pulse' }));
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(writes).toEqual([true, false, false]);
   });
 
   it('de-energizes active pulses before applying a replacement configuration', async () => {

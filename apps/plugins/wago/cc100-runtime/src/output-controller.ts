@@ -184,8 +184,10 @@ export class OutputController {
         () =>
           void this.ignoreRejection(() =>
             this.runForChannel(channel.id, async () => {
-              this.pulses.delete(channel.id);
-              await this.writePulseShutdown(channel, point);
+              const pulse = this.pulses.get(channel.id);
+              if (!pulse) return;
+              if (await this.writePulseShutdown(channel, point)) this.pulses.delete(channel.id);
+              else this.retryPulseShutdown(channel.id, pulse, 1);
             }),
           ),
         duration,

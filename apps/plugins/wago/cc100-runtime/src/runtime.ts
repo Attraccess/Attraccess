@@ -173,7 +173,8 @@ export class WagoRuntime {
     } catch {
       return;
     }
-    if (!command?.id || !command.channelId || !['set', 'pulse'].includes(command.action)) return;
+    if (typeof command?.id !== 'string' || !command.id || !command.channelId || !['set', 'pulse'].includes(command.action))
+      return;
     if (command.action === 'set' && typeof command.value !== 'boolean')
       return this.acknowledge(command.id, 'rejected', 'set commands require a boolean value', 'invalid_command');
     const expiresAt = command.expiresAt;
@@ -365,6 +366,7 @@ export class WagoRuntime {
     this.state.commandExpiries = Object.fromEntries(
       Object.entries(this.state.commandExpiries ?? {}).filter(([, expiresAt]) => Date.parse(expiresAt) > now),
     );
+    this.state.commandIds = this.state.commandIds.filter((id) => this.state.commandExpiries?.[id]);
   }
 
   private async runConfigurationUpdate<T>(operation: () => Promise<T>): Promise<T> {

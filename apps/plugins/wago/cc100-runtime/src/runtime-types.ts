@@ -9,6 +9,7 @@ export type Snapshot = {
     profile: string;
     capabilities: string[];
     disconnectPolicy: DisconnectPolicy;
+    range?: { minimum: number; maximum: number };
     pulse?: { durationMs: number };
     guard?: { channelId: string; when: 'on' | 'off' };
     feedback?: { channelId: string; expected: 'match' | 'inverse'; timeoutMs: number };
