@@ -20,7 +20,7 @@ export function runtimeBundleInstallScript(image: string, testRoot = ''): string
 function installScript(image: string, testRoot: string, locked = false): string {
   if (!/^\S+@sha256:[a-f0-9]{64}$/i.test(image)) throw new Error('Runtime image must be digest-pinned');
   return `${preamble(testRoot, locked)}
-test ! -e "$tx" && test ! -e "$cleanup" && test ! -e "$acceptedCleanup" || fail 'Runtime transaction exists; recover or accept it before retrying'
+test ! -e "$tx" && test ! -e "$cleanup" && test ! -e "$receipt" && test ! -e "$acceptedCleanup" || fail 'Runtime transaction exists; recover or accept it before retrying'
 test ! -e "$config/runtime.env.previous" || fail 'Unowned previous environment requires manual inspection'
 test -s "$config/runtime.env.next" && test ! -L "$config/runtime.env.next" || fail 'Missing staged runtime.env.next'
 test ! -L "$data" && test ! -L "$config/runtime.env" && test ! -L "$config/runtime-ca.pem" || fail 'Runtime paths must not be symlinks'
@@ -29,6 +29,11 @@ if grep -q ' attraccess-wago.previous$' "$config/containers.next"; then
   fail 'Unowned previous container requires manual inspection'
 fi
 mkdir -m 0700 "$tx"
+if [ -e "$config/delivery/token" ]; then
+  test -f "$config/delivery/token" && test ! -L "$config/delivery/token" || fail 'Invalid delivery ownership token'
+  cp "$config/delivery/token" "$tx/token"
+  chmod 0600 "$tx/token"
+fi
 touch "$tx/preparing"
 trap 'code=$?; trap - EXIT; if [ "$code" -ne 0 ]; then if ! rollback; then echo "Rollback incomplete; recovery snapshot retained at $tx" >&2; fi; fi; exit "$code"' EXIT
 trap 'trap - EXIT; echo "Interrupted; recovery snapshot retained at $tx" >&2; exit 130' HUP INT TERM
@@ -94,9 +99,12 @@ echo 'Runtime container started; readiness unverified; recovery snapshot retaine
 }
 
 /** Explicitly restore the snapshot, including the prior container running state. */
-export function runtimeBundleRecoveryScript(testRoot = ''): string {
+export function runtimeBundleRecoveryScript(testRoot = '', token?: string): string {
+  if (token && !/^[a-f0-9]{32}$/.test(token)) throw new Error('Invalid delivery token');
   return `${preamble(testRoot)}
 test ! -e "$acceptedCleanup" || fail 'Acceptance cleanup is pending; recovery is unavailable'
+${token ? `require_owner ${quote(token)}` : ''}
+if [ -d "$receipt" ]; then exit 0; fi
 if [ -d "$cleanup" ]; then
   rm -rf "$cleanup"
   rm -f "$root/tmp/attraccess-wago-runtime.tar"
@@ -110,9 +118,21 @@ if [ ! -d "$tx" ]; then
   exit 0
 fi
 test ! -e "$tx/accepting" || fail 'Acceptance already began; finish acceptance instead of recovery'
-rollback || fail 'Recovery incomplete; snapshot retained for another recovery attempt'
+rollback retained || fail 'Recovery incomplete; snapshot retained for another recovery attempt'
 rm -f "$root/tmp/attraccess-wago-runtime.tar"
 rm -rf "$config/delivery"
+`;
+}
+
+/** Remove a restored receipt only after the coordinator saved the restoration outcome. */
+export function runtimeBundleRecoveryAcknowledgementScript(testRoot: string, token: string): string {
+  if (!/^[a-f0-9]{32}$/.test(token)) throw new Error('Invalid delivery token');
+  return `${preamble(testRoot)}
+test ! -d "$tx" || fail 'Recovery is not complete'
+if [ -d "$receipt" ]; then
+  require_owner ${quote(token)}
+  rm -rf "$receipt"
+fi
 `;
 }
 
@@ -146,6 +166,7 @@ data="$root/var/lib/attraccess-wago"
 tx="$root/var/lib/attraccess-wago-install-transaction"
 cleanup="$tx.cleanup"
 acceptedCleanup="$tx.accepted-cleanup"
+receipt="$tx.restored"
 fail() { echo "$*" >&2; exit 1; }
 test ! -L "$config" || fail 'Runtime configuration must not be a symlink'
 mkdir -p "$config" "$root/var/lib"
@@ -157,7 +178,19 @@ ${
     : `exec 9>"$config/install.lock"
 flock -n 9 || fail 'Another runtime transaction holds the controller lock'`
 }
-test ! -e "$tx" || { test ! -e "$cleanup" && test ! -e "$acceptedCleanup"; } || fail 'Conflicting runtime journals require manual inspection'
+test ! -e "$tx" || { test ! -e "$cleanup" && test ! -e "$receipt" && test ! -e "$acceptedCleanup"; } || fail 'Conflicting runtime journals require manual inspection'
+require_owner() {
+  expected=$1
+  for journal in "$tx" "$receipt" "$cleanup" "$config/delivery"; do
+    if [ -d "$journal" ]; then
+      test -f "$journal/token" && test ! -L "$journal/token" || fail 'Runtime transaction has no ownership token'
+      actual=$(cat "$journal/token")
+      test "$actual" = "$expected" || fail 'Runtime transaction belongs to another commissioning session'
+      return 0
+    fi
+  done
+  fail 'No runtime transaction to recover'
+}
 validate_snapshot() {
   test -f "$tx/prepared" && test -f "$tx/old-id" && test ! -L "$tx/old-id" || return 1
   test "$(wc -l < "$tx/old-id" | tr -d ' ')" -le 1 || return 1
@@ -229,8 +262,13 @@ rollback() {
   rm -f "$config/runtime.env.next" "$config/runtime-ca.pem.next" || return 1
   # Once renamed, even a partially deleted journal is cleanup-only. No retry
   # may interpret its remaining files as instructions to restore again.
-  mv "$tx" "$cleanup" || return 1
-  rm -rf "$cleanup" || return 1
+  if [ "\${1:-}" = retained ]; then
+    mv "$tx" "$receipt" || return 1
+    rm -rf "$receipt/bundle" || return 1
+  else
+    mv "$tx" "$cleanup" || return 1
+    rm -rf "$cleanup" || return 1
+  fi
 }
 `;
 }
@@ -255,7 +293,7 @@ export function runtimeBundleDeliveryScript(
     throw new Error('Invalid delivery metadata');
   return `${runtimeBundlePreflightScript(bytes, testRoot)}
 ${preamble(testRoot)}
-test ! -e "$tx" && test ! -e "$cleanup" && test ! -e "$acceptedCleanup" && test ! -e "$config/runtime.env.next" && test ! -e "$config/runtime-ca.pem.next" || fail 'Recovery or acceptance required before delivery'
+test ! -e "$tx" && test ! -e "$cleanup" && test ! -e "$receipt" && test ! -e "$acceptedCleanup" && test ! -e "$config/runtime.env.next" && test ! -e "$config/runtime-ca.pem.next" || fail 'Recovery or acceptance required before delivery'
 mkdir -m 0700 "$config/delivery" || fail 'Delivery journal exists; explicit recovery required'
 printf '%s\\n' ${quote(token)} > "$config/delivery/token"
 printf '%s\\n' receiving > "$config/delivery/phase"

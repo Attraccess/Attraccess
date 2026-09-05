@@ -29,6 +29,7 @@ describe('WagoCommissioningService', () => {
       mqttServerId: 2,
       enrollmentId: null,
       pairingCode: 'encrypted:v1:opaque-ciphertext',
+      deliveryToken: 'a'.repeat(32),
       state: 'awaiting_delivery',
       controllerName: 'Test',
       auditLog: '[]',
@@ -542,7 +543,7 @@ describe('WagoCommissioningService', () => {
       pairingCode: null,
       enrollmentId: 7,
     });
-    const remote = jest.fn().mockResolvedValueOnce('').mockRejectedValue(new Error('No transaction remains'));
+    const remote = jest.fn().mockResolvedValue('');
     service['sudoRunScript'] = remote;
     wago.revokeEnrollmentById.mockRejectedValueOnce(new Error('Broker unavailable')).mockResolvedValue(undefined);
     const input = { confirmInstall: true, temporarySsh: { username: 'root', password: 'fixture' } };
@@ -552,7 +553,7 @@ describe('WagoCommissioningService', () => {
     await service.onApplicationBootstrap();
     expect(session.state).toBe('recovery_revocation_pending');
     await service.recover(1, input);
-    expect(remote).toHaveBeenCalledTimes(1);
+    expect(remote).toHaveBeenCalledTimes(3);
     expect(wago.revokeEnrollmentById).toHaveBeenCalledTimes(2);
     expect(session.state).toBe('revoked');
   });
