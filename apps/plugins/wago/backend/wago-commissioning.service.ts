@@ -623,6 +623,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     if (session.enrollmentId == null) return;
     try {
       await this.wago.revokeEnrollmentById(session.enrollmentId);
+      await this.wago.deleteEnrollmentById(session.enrollmentId);
     } catch {
       throw new ConflictException('Commissioning credential revocation requires attention.');
     }
@@ -681,19 +682,27 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
   }
 
   private async reconcileCompletedSessions(): Promise<void> {
+    let reconciliationFailed = false;
     for (let skip = 0; ; skip += 100) {
       const page = await this.sessions.find({ where: { state: 'completed' }, order: { id: 'ASC' }, take: 100, skip });
       for (const session of page) {
-        if (session.state === 'completed') await this.retireSupersededSessions(session.hardwareId, session.id);
+        if (session.state !== 'completed') continue;
+        try {
+          await this.retireSupersededSessions(session.hardwareId, session.id);
+        } catch {
+          reconciliationFailed = true;
+        }
       }
       if (page.length < 100) break;
     }
+    if (reconciliationFailed) throw new ConflictException('Superseded commissioning credential cleanup requires attention.');
   }
 
   private async retireSupersededSessions(hardwareId: string, completedSessionId: number): Promise<void> {
+    let retirementFailed = false;
     for (let skip = 0; ; skip += 100) {
       const sessions = await this.sessions.find({ where: { hardwareId }, order: { id: 'ASC' }, take: 100, skip });
-      await Promise.all(
+      const results = await Promise.allSettled(
         sessions
           .filter(
             (session) =>
@@ -713,8 +722,10 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             }),
           ),
       );
+      if (results.some((result) => result.status === 'rejected')) retirementFailed = true;
       if (sessions.length < 100) break;
     }
+    if (retirementFailed) throw new ConflictException('Superseded commissioning credential cleanup requires attention.');
   }
 
   private toResponse(session: WagoCommissioningSession): CommissioningSessionResponse {

@@ -40,6 +40,7 @@ describe('WagoCommissioningService', () => {
     const wago = {
       registerCommissioningDiscoveryHandler: jest.fn(),
       revokeEnrollmentById: jest.fn().mockResolvedValue(undefined),
+      deleteEnrollmentById: jest.fn().mockResolvedValue(undefined),
       createEnrollment: jest.fn(),
       claim: jest.fn(),
     };
@@ -289,6 +290,70 @@ describe('WagoCommissioningService', () => {
     expect(result.failureReason).toBe('Secure delivery failed; bootstrap credential revocation requires attention.');
   });
 
+  it('retains an enrollment reference when its revoked record cannot be deleted', async () => {
+    const { service, session, wago } = securityHarness({ enrollmentId: 7 });
+    wago.deleteEnrollmentById.mockRejectedValue(new Error('database unavailable'));
+
+    await expect(service['revokeSessionEnrollment'](session)).rejects.toThrow(
+      'Commissioning credential revocation requires attention.',
+    );
+
+    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(7);
+    expect(wago.deleteEnrollmentById).toHaveBeenCalledWith(7);
+    expect(session.enrollmentId).toBe(7);
+  });
+
+  it('continues superseded-session cleanup after revocation failures across pages and hardware groups', async () => {
+    const firstCompleted = { id: 1, hardwareId: 'cc100-first', state: 'completed' } as WagoCommissioningSession;
+    const secondCompleted = { id: 2, hardwareId: 'cc100-second', state: 'completed' } as WagoCommissioningSession;
+    const firstSuperseded = {
+      id: 3,
+      hardwareId: firstCompleted.hardwareId,
+      enrollmentId: 30,
+      state: 'awaiting_delivery',
+      pairingCode: 'encrypted:v1:one',
+      auditLog: '[]',
+    } as WagoCommissioningSession;
+    const secondSuperseded = {
+      id: 4,
+      hardwareId: secondCompleted.hardwareId,
+      enrollmentId: 40,
+      state: 'awaiting_delivery',
+      pairingCode: 'encrypted:v1:two',
+      auditLog: '[]',
+    } as WagoCommissioningSession;
+    const repository = {
+      find: jest.fn().mockImplementation(async ({ where, skip }: { where: { state?: string; hardwareId?: string }; skip: number }) => {
+        if (where.state === 'completed') return skip === 0 ? [firstCompleted, secondCompleted] : [];
+        if (where.hardwareId === firstCompleted.hardwareId) return skip === 0 ? [firstCompleted, firstSuperseded] : [];
+        return skip === 0 ? [secondCompleted, secondSuperseded] : [];
+      }),
+      findOneBy: jest.fn().mockImplementation(async ({ id }) =>
+        [firstSuperseded, secondSuperseded].find((session) => session.id === id) ?? null,
+      ),
+      save: jest.fn(async (value) => value),
+    };
+    const wago = {
+      revokeEnrollmentById: jest.fn().mockImplementation(async (id) => {
+        if (id === firstSuperseded.enrollmentId) throw new Error('broker unavailable');
+      }),
+      deleteEnrollmentById: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new WagoCommissioningService(
+      { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext,
+      wago as unknown as WagoService,
+    );
+    service['sessions'] = repository as never;
+
+    await expect(service['reconcileCompletedSessions']()).rejects.toThrow(
+      'Superseded commissioning credential cleanup requires attention.',
+    );
+
+    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(30);
+    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(40);
+    expect(secondSuperseded).toMatchObject({ state: 'revoked', enrollmentId: null, pairingCode: null });
+  });
+
   it('delivers with explicit consent, keeping the verifier encrypted in every saved record', async () => {
     const fs = require('node:fs/promises') as typeof import('node:fs/promises');
     const bundle = Buffer.from('mock signed bundle');
@@ -510,7 +575,10 @@ describe('WagoCommissioningService', () => {
     const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
     let releaseDelivery!: () => void;
     const delivery = new Promise<void>((resolve) => (releaseDelivery = resolve));
-    const wago = { revokeEnrollmentById: jest.fn().mockResolvedValue(undefined) } as unknown as WagoService;
+    const wago = {
+      revokeEnrollmentById: jest.fn().mockResolvedValue(undefined),
+      deleteEnrollmentById: jest.fn().mockResolvedValue(undefined),
+    } as unknown as WagoService;
     const service = new WagoCommissioningService(context, {
       ...wago,
       registerCommissioningDiscoveryHandler: jest.fn(),
