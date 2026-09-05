@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 import { CONFIGURATION_PROTOCOL_VERSION } from './protocol';
+import { type ModbusConfiguration, type ModbusPoint, validateModbus, validateModbusBindings } from '../modbus/model';
 
 export { CONFIGURATION_PROTOCOL_VERSION } from './protocol';
 
-const HARDWARE_PROFILES = ['751-9301', '879-3000', '879-1300'] as const;
+const HARDWARE_PROFILES = ['751-9301', '879-3000', '879-1300', 'modbus'] as const;
 const CHANNEL_PROFILES = [
   'metered-switched-load',
   'pulsed-lock-bank',
@@ -39,7 +40,13 @@ export const WAGO_PRESETS = [
 
 export interface WagoConfigurationSnapshot {
   version: typeof CONFIGURATION_PROTOCOL_VERSION;
-  physicalPoints: Array<{ id: string; hardwareProfile: (typeof HARDWARE_PROFILES)[number]; channel: number }>;
+  modbus?: ModbusConfiguration;
+  physicalPoints: Array<{
+    id: string;
+    hardwareProfile: (typeof HARDWARE_PROFILES)[number];
+    channel: number;
+    modbus?: ModbusPoint;
+  }>;
   logicalChannels: Array<{
     id: string;
     physicalPointId: string;
@@ -142,7 +149,9 @@ export function validateSnapshot(snapshot: unknown): ConfigurationValidationErro
     ];
   }
   const errors: ConfigurationValidationError[] = [];
-  exactKeys(value, '$', ['version', 'physicalPoints', 'logicalChannels'], errors);
+  exactKeys(value, '$', ['version', 'physicalPoints', 'logicalChannels', 'modbus'], errors, ['modbus']);
+  if (value.modbus !== undefined) errors.push(...validateModbus(value.modbus));
+  errors.push(...validateModbusBindings(value));
   if (value.version !== CONFIGURATION_PROTOCOL_VERSION)
     errors.push({
       path: 'version',
@@ -158,7 +167,7 @@ export function validateSnapshot(snapshot: unknown): ConfigurationValidationErro
   points.forEach((point, index) => {
     const path = `physicalPoints[${index}]`;
     if (!record(point, path, errors)) return;
-    exactKeys(point, path, ['id', 'hardwareProfile', 'channel'], errors);
+    exactKeys(point, path, ['id', 'hardwareProfile', 'channel', 'modbus'], errors, ['modbus']);
     addId(point.id, `${path}.id`, pointIds, errors);
     enumValue(point.hardwareProfile, `${path}.hardwareProfile`, HARDWARE_PROFILES, errors);
     if (typeof point.channel !== 'number' || !Number.isSafeInteger(point.channel) || point.channel < 0)
