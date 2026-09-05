@@ -6,6 +6,7 @@ import { encodeMeasurement } from '../../measurement-contract';
 import { hash, validateDesired } from './configuration';
 import { OutputController } from './output-controller';
 import {
+  WriteAdmissionError,
   type DeviceAdapter,
   type RuntimeState,
   type Snapshot,
@@ -35,6 +36,7 @@ export const CAPABILITIES = [
 export class WagoRuntime {
   private state: RuntimeState = { outputs: {}, commandIds: [], commandExpiries: {} };
   private connected = true;
+  private loaded = false;
   private configurationPending = false;
   private measurementsPending = false;
   private readonly streamId = randomUUID();
@@ -87,6 +89,9 @@ export class WagoRuntime {
       if (errors.length) throw new Error('persisted configuration is invalid');
       this.options.device.configure?.(this.state.accepted.snapshot);
     }
+    this.outputs.recoverPulses();
+    this.loaded = true;
+    await this.outputs.applyDisconnectPolicies(this.connected);
     await this.options.transport.subscribe(this.desiredTopic(), (payload) => this.receiveDesired(payload));
     await this.options.transport.subscribe(this.commandTopic(), (payload) => this.receiveCommand(payload));
     await activateConnectionHandling?.();
@@ -175,6 +180,7 @@ export class WagoRuntime {
         (this.outputs.busy ||
           this.inFlightCommandIds.size ||
           this.state.uncertainOutputChannelIds?.length ||
+          this.state.pendingPulseChannelIds?.length ||
           Object.values(this.state.outputs).some(Boolean))
       )
         return this.reportRejected(desired.revision, desired.contentHash, [
@@ -282,7 +288,8 @@ export class WagoRuntime {
         );
 
       // Keep the reservation through an unexpected exit after the physical write.
-      this.state.commandIds = [...this.state.commandIds, command.id].slice(-100);
+      // Unknown legacy expiries cannot safely be evicted; known IDs are pruned at expiry.
+      this.state.commandIds = [...this.state.commandIds, command.id];
       this.state.commandExpiries = { ...this.state.commandExpiries, [command.id]: expiresAt };
       await this.saveState();
       const failure = await this.outputs.runForCommand(channel.id, async () => {
@@ -304,18 +311,30 @@ export class WagoRuntime {
           await this.releaseCommand(command.id);
           return { error: 'operational guard is not satisfied', code: 'guard_rejected' };
         }
+        const admit = () => {
+          if (Date.parse(expiresAt) <= Date.now()) throw new WriteAdmissionError('expired');
+        };
         if (command.action === 'pulse') {
           const currentDuration = currentChannel.pulse?.durationMs;
           if (!currentDuration) return this.releaseFailedWrite(command.id, currentChannel.id);
           if (
-            !(await this.outputs.writeWhileQueued(currentChannel, true, () =>
-              this.outputs.schedulePulse(currentChannel, currentDuration),
+            !(await this.outputs.writeWhileQueued(
+              currentChannel,
+              true,
+              () => this.outputs.schedulePulse(currentChannel, currentDuration),
+              undefined,
+              admit,
+              currentDuration,
             ))
           )
             return this.releaseFailedWrite(command.id, currentChannel.id);
         } else if (
-          !(await this.outputs.writeWhileQueued(currentChannel, command.value, undefined, () =>
-            this.outputs.clearPulse(currentChannel.id),
+          !(await this.outputs.writeWhileQueued(
+            currentChannel,
+            command.value,
+            undefined,
+            () => this.outputs.clearPulse(currentChannel.id),
+            admit,
           ))
         )
           return this.releaseFailedWrite(command.id, currentChannel.id);
@@ -324,6 +343,11 @@ export class WagoRuntime {
       // Release the physical channel/configuration barrier before waiting on MQTT.
       await this.acknowledge(command.id, failure ? 'rejected' : 'accepted', failure?.error, failure?.code);
     } catch (error) {
+      if (error instanceof WriteAdmissionError) {
+        await this.releaseCommand(command.id);
+        await this.acknowledge(command.id, 'rejected', error.message, error.code);
+        return;
+      }
       if (!(error instanceof Error) || error.message !== 'channel write queue is full') throw error;
       await this.releaseCommand(command.id);
       await this.acknowledge(command.id, 'rejected', error.message, 'queue_full');
@@ -333,6 +357,10 @@ export class WagoRuntime {
   }
 
   async setConnected(connected: boolean): Promise<void> {
+    if (!this.loaded) {
+      this.connected = connected;
+      return;
+    }
     const transition = this.connectionPolicies.then(async () => {
       this.connected = connected;
       await this.outputs.applyDisconnectPolicies(connected);
@@ -622,13 +650,15 @@ export class WagoRuntime {
   }
   private pruneCommandExpiries(): void {
     const now = Date.now();
-    const previousExpiries = this.state.commandExpiries ?? {};
+    const expired = new Set(
+      Object.entries(this.state.commandExpiries ?? {})
+        .filter(([, expiresAt]) => Number.isFinite(Date.parse(expiresAt)) && Date.parse(expiresAt) <= now)
+        .map(([id]) => id),
+    );
     this.state.commandExpiries = Object.fromEntries(
-      Object.entries(this.state.commandExpiries ?? {}).filter(([, expiresAt]) => Date.parse(expiresAt) > now),
+      Object.entries(this.state.commandExpiries ?? {}).filter(([id]) => !expired.has(id)),
     );
-    this.state.commandIds = this.state.commandIds.filter(
-      (id) => !Object.prototype.hasOwnProperty.call(previousExpiries, id) || this.state.commandExpiries?.[id],
-    );
+    this.state.commandIds = this.state.commandIds.filter((id) => !expired.has(id));
   }
 
   private async runConfigurationUpdate<T>(operation: () => Promise<T>): Promise<T> {

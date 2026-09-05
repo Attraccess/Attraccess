@@ -308,6 +308,7 @@ export function validateModbusBindings(snapshot: {
   if (!Array.isArray(snapshot.physicalPoints)) return errors;
   const config = snapshot.modbus as ModbusConfiguration | undefined;
   const valid = config && validateModbus(config).length === 0;
+  const outputOwners = new Set<string>();
   for (const [i, point] of snapshot.physicalPoints.entries()) {
     if (point?.modbus === undefined) {
       if (point?.hardwareProfile === 'modbus')
@@ -347,6 +348,22 @@ export function validateModbusBindings(snapshot: {
       for (const channel of snapshot.logicalChannels) {
         if (channel?.physicalPointId !== point.id) continue;
         const capabilities = Array.isArray(channel.capabilities) ? channel.capabilities : [];
+        if (capabilities.includes('output') && action && device) {
+          // Connection endpoints are unique in a valid config. Device/profile/action names
+          // are aliases, while FC06 and FC16 share the same holding-register address space.
+          for (let offset = 0; offset < registerCount(action); offset++) {
+            const key = JSON.stringify([
+              device.connectionId,
+              device.unitId,
+              action.functionCode === 5 ? 'coil' : 'register',
+              wireAddress(action) + offset,
+            ]);
+            if (outputOwners.has(key)) fail('each physical Modbus output must have a single logical owner');
+            outputOwners.add(key);
+          }
+        }
+        if (capabilities.includes('input') && !capabilities.includes('measurement'))
+          fail('Modbus register inputs require measurement capability and its named measurement transform');
         if (capabilities.includes('output') && !action) fail('output requires named action');
         if (capabilities.includes('input') && !measurement) fail('input requires named measurement');
         if (
