@@ -171,7 +171,11 @@
     "typecheck-frontend-tests-baseline": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "node scripts/typecheck-wago-frontend-tests.mjs"
+        "commands": [
+          "node --test scripts/typecheck-wago-frontend-tests.test.mjs",
+          "node scripts/typecheck-wago-frontend-tests.mjs"
+        ],
+        "parallel": false
       }
     }
   }
