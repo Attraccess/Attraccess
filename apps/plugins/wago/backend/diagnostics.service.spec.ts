@@ -2,7 +2,9 @@ import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { diagnosticReferences, WagoDiagnosticsService } from './diagnostics.service';
 import { WagoController } from './wago-controller.entity';
 import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
+import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { WagoDiagnosticsStore } from './diagnostics-store';
+import { configurationHash } from './configuration';
 import { WagoService } from './wago.service';
 
 describe('diagnostic references', () => {
@@ -20,7 +22,7 @@ describe('diagnostic references', () => {
     );
     expect(refs.map((ref) => ref.conflict)).toEqual([true, true, false, false]);
     expect(refs.map((ref) => ref.invalid)).toEqual([true, true, false, true]);
-    expect(refs[3]).toMatchObject({ nodeId: 'd', href: '/resources/4/flows' });
+    expect(refs[3]).toMatchObject({ nodeId: 'd', href: '/resources/4/flows?node=d' });
   });
   it('does not conflict for read/event references or control on the same resource', () => {
     const refs = diagnosticReferences([node('a', 1), node('b', 1), node('c', 2, 'read')], ['relay'], 2);
@@ -38,9 +40,81 @@ describe('diagnostic references', () => {
     );
     expect(refs.every((ref) => !ref.invalid && ref.conflict)).toBe(true);
   });
+  it('encodes node IDs as a single query parameter', () => {
+    const id = 'node /?#&+%';
+    const [reference] = diagnosticReferences([node(id, 1)], ['relay'], 2);
+    const url = new URL(reference.href, 'https://example.test');
+    expect(url.pathname).toBe('/resources/1/flows');
+    expect(url.searchParams.get('node')).toBe(id);
+    expect([...url.searchParams]).toHaveLength(1);
+  });
 });
 
 describe('controller diagnostics', () => {
+  it('keeps healthy resource controllers available when another applied snapshot is corrupt', async () => {
+    const nodes = [
+      { id: 'broken', resourceId: 1, type: 'plugin.wago.command', data: { controllerId: 1, channelId: 'io' } },
+      { id: 'healthy', resourceId: 1, type: 'plugin.wago.command', data: { controllerId: 2, channelId: 'io' } },
+    ];
+    const query = (result: unknown[]) => {
+      const builder = {
+        select: jest.fn(),
+        distinctOn: jest.fn(),
+        where: jest.fn(),
+        andWhere: jest.fn(),
+        orderBy: jest.fn(),
+        addOrderBy: jest.fn(),
+        take: jest.fn(),
+        getMany: jest.fn().mockResolvedValue(result),
+      };
+      for (const method of ['select', 'distinctOn', 'where', 'andWhere', 'orderBy', 'addOrderBy', 'take'] as const)
+        builder[method].mockReturnValue(builder);
+      return builder;
+    };
+    const conflictQuery = query([]);
+    const resourceQueries = [query(nodes), conflictQuery];
+    const context = {
+      getRepository: (entity: unknown) => {
+        if (entity === WagoController)
+          return {
+            createQueryBuilder: () =>
+              query([
+                { id: 1, hardwareId: 'broken' },
+                { id: 2, hardwareId: 'healthy' },
+              ]),
+          };
+        if (entity === WagoConfigurationRevision)
+          return {
+            createQueryBuilder: () =>
+              query([
+                { controllerId: 1, revision: 1, snapshot: '{' },
+                {
+                  controllerId: 2,
+                  revision: 1,
+                  snapshot: JSON.stringify({
+                    version: 1,
+                    physicalPoints: [],
+                    logicalChannels: [{ id: 'io', capabilities: [] }],
+                  }),
+                },
+              ]),
+          };
+        throw new Error('unexpected repository');
+      },
+      dataSource: { getRepository: () => ({ createQueryBuilder: () => resourceQueries.shift() }) },
+    } as unknown as PluginContext;
+    const service = new WagoDiagnosticsService(context, {} as WagoService);
+
+    await expect(service.getResource(1)).resolves.toMatchObject({
+      controllers: [
+        { controllerId: 1, unavailable: true, references: [] },
+        { controllerId: 2, unavailable: false, references: [{ nodeId: 'healthy' }] },
+      ],
+    });
+    expect(conflictQuery.where).toHaveBeenCalledWith("node.data ->> 'controllerId' IN (:...controllerIds)", {
+      controllerIds: [1, 2],
+    });
+  });
   it('checkpoints heartbeat persistence while keeping permanent connectivity current', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-09-05T12:00:00Z'));
     try {
@@ -55,7 +129,6 @@ describe('controller diagnostics', () => {
       const payload = Buffer.from(
         JSON.stringify({
           hardwareId: 'cc100',
-          pairingCode: 'SECRET',
           protocolVersion: '1.0.0',
           runtimeVersion: '0.1.0',
           capabilities: ['claim', 'heartbeat', 'configuration-v1'],
@@ -89,7 +162,6 @@ describe('controller diagnostics', () => {
           Buffer.from(
             JSON.stringify({
               hardwareId: 'cc100',
-              pairingCode: 'SECRET',
               protocolVersion: '1.0.0',
               runtimeVersion,
               capabilities: ['claim', 'heartbeat', 'configuration-v1'],
@@ -204,7 +276,7 @@ describe('controller diagnostics', () => {
       jest.useRealTimers();
     }
   });
-  function setup(missing = false, controllerOverrides = {}) {
+  function setup(missing = false, controllerOverrides = {}, draft: unknown = null) {
     const snapshot = {
       version: 1,
       physicalPoints: [],
@@ -242,7 +314,7 @@ describe('controller diagnostics', () => {
                     },
             }
           : entity === WagoConfigurationDraft
-            ? { findOneBy: async () => null }
+            ? { findOneBy: async () => draft }
             : { findOne: async ({ where }: { where: { state?: string } }) => (where.state ? revision : latest) },
       dataSource: { getRepository: () => ({ createQueryBuilder: () => query }) },
     } as unknown as PluginContext;
@@ -257,6 +329,19 @@ describe('controller diagnostics', () => {
       snapshot,
     };
   }
+  it('reports metadata-only saved draft changes without replacing applied channel projection', async () => {
+    const draft = {
+      snapshot: '{}',
+      presetProvenance: JSON.stringify({ editor: { names: { io: 'Renamed' }, presets: [] } }),
+    };
+    const { service, latest, snapshot } = setup(false, {}, draft);
+    draft.snapshot = latest.snapshot;
+    latest.contentHash = configurationHash(snapshot);
+    expect((await service.get(1)).configuration.draftChanged).toBe(true);
+    Object.assign(latest, { presetProvenance: draft.presetProvenance });
+    expect((await service.get(1)).configuration.draftChanged).toBe(false);
+  });
+
   it('validates flows against applied mapping while reporting publication divergence', async () => {
     const { service, latest, query } = setup();
     latest.revision = 3;
@@ -272,6 +357,7 @@ describe('controller diagnostics', () => {
     ]);
     const result = await service.get(1);
     expect(result.references[0].invalid).toBe(false);
+    expect(result.channels.map((channel) => channel.id)).toEqual(['io']);
     expect(result.configuration.revisionMismatch).toBe(true);
   });
   it('only projects rejection summaries matching both latest revision and hash', async () => {
@@ -290,7 +376,7 @@ describe('controller diagnostics', () => {
     expect((await service.get(1)).configuration.rejectionErrors).toHaveLength(1);
   });
   it('does not synthesize samples or faults for prototype-named channel IDs', async () => {
-    const { service, latest, snapshot, diagnostics } = setup();
+    const { service, latest, revision, snapshot, diagnostics } = setup();
     latest.snapshot = JSON.stringify({
       ...snapshot,
       logicalChannels: ['toString', 'prototype', '__proto__', 'constructor'].map((id) => ({
@@ -298,6 +384,7 @@ describe('controller diagnostics', () => {
         id,
       })),
     });
+    revision.snapshot = latest.snapshot;
     const empty = await service.get(1);
     expect(
       empty.channels.every(

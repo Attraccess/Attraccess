@@ -119,7 +119,8 @@ fi
 if [ ! -d "$tx" ]; then
   test -d "$config/delivery" || fail 'No runtime transaction to recover'
   rm -f "$config/runtime.env.next" "$config/runtime-ca.pem.next" "$root/tmp/attraccess-wago-runtime.tar"
-  rm -rf "$config/delivery"
+  mv "$config/delivery" "$receipt"
+  rm -rf "$receipt/bundle"
   exit 0
 fi
 test ! -e "$tx/accepting" || fail 'Acceptance already began; finish acceptance instead of recovery'
