@@ -13,7 +13,7 @@ import {
   WagoRuntime,
 } from '../runtime';
 import { ModbusDeviceRouter } from './adapter';
-import { QueuedModbusTransport } from './transports';
+import { ModbusTransportError, QueuedModbusTransport } from './transports';
 import { readPdu, rtuFrame, writePdu } from './protocol';
 import { acquireMeasurements, measurementErrorCode } from './acquisition';
 
@@ -169,6 +169,8 @@ describe('ATT-1059 independent review regressions', () => {
           payload: expect.objectContaining({ id: 'ambiguous-on', status: 'rejected' }),
         }),
       );
+      await first.runtime.receiveCommand(command('ambiguous-on'));
+      expect(request).toHaveBeenCalledTimes(1);
       const next: Snapshot = structuredClone(s);
       if (mode === 'remove') {
         next.logicalChannels = [];
@@ -285,6 +287,18 @@ describe('ATT-1059 independent review regressions', () => {
     held.reject(new Error('disk failure'));
     await failure;
     expect(request).not.toHaveBeenCalled();
+  });
+  it('releases a command reservation when Modbus rejects it before transmission', async () => {
+    const s = snapshot();
+    const request = jest.fn(async () => {
+      throw new ModbusTransportError('modbus_queue_full', 'Modbus queue full');
+    });
+    const { runtime, store } = harness(s, new ModbusDeviceRouter(onboard, () => ({ request })));
+    await runtime.start();
+    await runtime.receiveCommand(command('queue-full'));
+    expect(store.saved.commandIds).toEqual([]);
+    await runtime.receiveCommand(command('queue-full'));
+    expect(request).toHaveBeenCalledTimes(2);
   });
   it.each(['disconnect', 'pulse'])(
     'attempts automatic %s OFF despite storage failure and keeps routing conservative',
@@ -444,7 +458,9 @@ describe('ATT-1059 independent review regressions', () => {
     delete s.logicalChannels[0].measurement;
     for (const validate of [validateBackend, validateRuntime])
       expect(validate(s)).toEqual(
-        expect.arrayContaining([expect.objectContaining({ code: 'invalid_modbus_binding', message: 'input requires named measurement' })]),
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'invalid_modbus_binding', message: 'input requires named measurement' }),
+        ]),
       );
   });
   it.each(['remove', 'rebind'])('cancels a queued router ON after device %s', async (mode) => {

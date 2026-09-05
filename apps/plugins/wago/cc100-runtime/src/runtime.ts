@@ -71,6 +71,8 @@ export interface DeviceAdapter {
   suspend?(): () => void;
   measurementSource?(point: Snapshot['physicalPoints'][number]): string;
   shouldPoll?(point: Snapshot['physicalPoints'][number], now: number): boolean;
+  /** True when a failed write may already have reached the physical device. */
+  writeMayHaveBeenTransmitted?(error: unknown): boolean;
   write(point: Snapshot['physicalPoints'][number], value: boolean): Promise<void>;
   read(point: Snapshot['physicalPoints'][number]): Promise<boolean | number>;
 }
@@ -304,6 +306,8 @@ export class WagoRuntime {
           undefined,
           true,
         );
+        if (result === 'uncertain')
+          return this.acknowledge(command.id, 'rejected', 'device write outcome is uncertain');
         if (result !== 'written')
           return this.rejectFailedWrite(
             command.id,
@@ -319,6 +323,8 @@ export class WagoRuntime {
           undefined,
           true,
         );
+        if (result === 'uncertain')
+          return this.acknowledge(command.id, 'rejected', 'device write outcome is uncertain');
         if (result !== 'written')
           return this.rejectFailedWrite(
             command.id,
@@ -431,7 +437,7 @@ export class WagoRuntime {
     shouldWrite?: () => boolean,
     rejectWhenQueued = false,
     configurationGeneration = this.configurationGeneration,
-  ): Promise<'written' | 'failed' | 'queue_full'> {
+  ): Promise<'written' | 'failed' | 'uncertain' | 'queue_full'> {
     return this.enqueueChannelWrite(
       channel.id,
       async () => {
@@ -456,7 +462,7 @@ export class WagoRuntime {
     feedbackGeneration: number,
     preservePulse: boolean,
     configurationGeneration: number,
-  ): Promise<'written' | 'failed'> {
+  ): Promise<'written' | 'failed' | 'uncertain'> {
     if (this.configurationPending || configurationGeneration !== this.configurationGeneration) return 'failed';
     const point = this.state.accepted?.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
     if (!point) return 'failed';
@@ -479,7 +485,7 @@ export class WagoRuntime {
       } catch {
         // A fault-publication failure must not turn a known failed write into an accepted command.
       }
-      return 'failed';
+      return this.options.device.writeMayHaveBeenTransmitted?.(error) ? 'uncertain' : 'failed';
     }
     const feedbackIsCurrent = this.commitFeedbackGeneration(channel.id, feedbackGeneration);
     // A pulse must always arrange its physical shutoff after it is written, even
