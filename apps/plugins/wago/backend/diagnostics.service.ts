@@ -134,22 +134,32 @@ export class WagoDiagnosticsService {
           references: [],
           referencesTruncated: false,
         };
-      const applied = appliedByControllerId.get(controllerId);
-      const appliedSnapshot = applied ? (JSON.parse(applied.snapshot) as WagoConfigurationSnapshot) : null;
-      const controllerNodes = localNodes.filter((node) => node.data.controllerId === controllerId);
-      const references = diagnosticReferences(
-        [...controllerNodes, ...(conflictNodesByControllerId.get(controllerId) ?? [])],
-        appliedSnapshot?.logicalChannels.map((channel) => channel.id) ?? [],
-        applied?.revision ?? null,
-        Object.fromEntries(appliedSnapshot?.logicalChannels.map((channel) => [channel.id, channel.capabilities]) ?? []),
-      ).filter((reference) => reference.resourceId === resourceId);
-      return {
-        controllerId,
-        name: controller.name ?? controller.hardwareId,
-        unavailable: false,
-        references,
-        referencesTruncated,
-      };
+      try {
+        const applied = appliedByControllerId.get(controllerId);
+        const appliedSnapshot = applied ? (JSON.parse(applied.snapshot) as WagoConfigurationSnapshot) : null;
+        const controllerNodes = localNodes.filter((node) => node.data.controllerId === controllerId);
+        const references = diagnosticReferences(
+          [...controllerNodes, ...(conflictNodesByControllerId.get(controllerId) ?? [])],
+          appliedSnapshot?.logicalChannels.map((channel) => channel.id) ?? [],
+          applied?.revision ?? null,
+          Object.fromEntries(appliedSnapshot?.logicalChannels.map((channel) => [channel.id, channel.capabilities]) ?? []),
+        ).filter((reference) => reference.resourceId === resourceId);
+        return {
+          controllerId,
+          name: controller.name ?? controller.hardwareId,
+          unavailable: false,
+          references,
+          referencesTruncated,
+        };
+      } catch {
+        return {
+          controllerId,
+          name: controller.name ?? controller.hardwareId,
+          unavailable: true,
+          references: [],
+          referencesTruncated: false,
+        };
+      }
     });
     return {
       resourceId,
