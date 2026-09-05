@@ -110,3 +110,11 @@ The frontend test typecheck reports the two explicitly pinned commissioning-owne
 diagnostics separately; any other diagnostic fails the gate. Remove that temporary
 allowlist when the commissioning owner supplies their corrected tip.
 These checks do not qualify physical hardware or supply durable audit storage.
+
+CI explicitly runs `plugin-wago:typecheck-acceptance`,
+`plugin-wago:typecheck-frontend-tests-baseline`, and `plugin-wago:production-fleet`;
+the production target also requires the six failed-startup cleanup regressions.
+`plugin-wago:typecheck-frontend-tests` is the raw frontend test typecheck and
+currently fails on the two commissioning-owned errors. The separately named
+baseline target prints that raw exit and those diagnostics, accepting only those
+exact two errors. Its passing status does not mean raw frontend tsc passed.

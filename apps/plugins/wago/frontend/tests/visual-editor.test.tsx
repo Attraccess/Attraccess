@@ -437,6 +437,18 @@ describe('visual configuration workflow', () => {
     await screen.findByRole('spinbutton', { name: 'Pulse duration (ms)' });
     expect(screen.getByText(/Unsaved local edits/)).toBeInTheDocument();
     expect(state.save).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
+    const application = { presetId: 'pulsed-lock-bank', channelId: 'output', physicalPointId: 'point' };
+    expect(state.save.mock.calls[0][2].presets).toEqual([application]);
+    // Reapply through the mounted UI, even when the copied settings are unchanged.
+    state.apply.mockResolvedValue({ snapshot: JSON.stringify(candidate) });
+    await user.click(screen.getByRole('button', { name: 'Preview preset' }));
+    await user.click(await screen.findByRole('button', { name: 'Copy selected changes to local edits' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(2));
+    expect(state.save.mock.calls[1][2].presets).toEqual([application, application]);
   });
 
   it('freezes editing and close during publication and keeps readiness unknown', async () => {

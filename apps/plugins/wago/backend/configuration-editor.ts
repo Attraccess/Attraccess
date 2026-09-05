@@ -14,6 +14,7 @@ import { findProfile } from '../modbus/model';
 /** Editor-only metadata, stored alongside provenance; never sent to a controller. */
 export interface ConfigurationEditorMetadata {
   names: Record<string, string>;
+  /** Apply-action history: append on explicit application, preserve during ordinary edits. */
   presets: WagoPresetApplication[];
 }
 

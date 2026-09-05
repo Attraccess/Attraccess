@@ -8,8 +8,21 @@
     "production-fleet": {
       "executor": "nx:run-commands",
       "cache": false,
+      "dependsOn": ["typecheck-acceptance", "test-production-fleet-cleanup"],
       "options": {
         "command": "node scripts/test-wago-production-fleet.mjs"
+      }
+    },
+    "typecheck-acceptance": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsc --noEmit -p apps/plugins/wago/acceptance/tsconfig.json"
+      }
+    },
+    "test-production-fleet-cleanup": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node --test scripts/test-wago-production-fleet.test.mjs"
       }
     },
     "typecheck": {
@@ -19,7 +32,7 @@
           "pnpm exec tsc --noEmit -p apps/plugins/wago/tsconfig.spec.json",
           "pnpm exec tsc --noEmit -p apps/plugins/wago/frontend/tsconfig.app.json",
           "node scripts/typecheck-wago-frontend-tests.mjs",
-          "pnpm exec tsc --noEmit -p apps/plugins/wago/tsconfig.acceptance.json"
+          "pnpm exec tsc --noEmit -p apps/plugins/wago/acceptance/tsconfig.json"
         ],
         "parallel": false
       }
@@ -147,6 +160,18 @@
           "node --test scripts/check-wago-acceptance.test.mjs"
         ],
         "parallel": false
+      }
+    },
+    "typecheck-frontend-tests": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsc --noEmit -p apps/plugins/wago/frontend/tsconfig.tests.json"
+      }
+    },
+    "typecheck-frontend-tests-baseline": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/typecheck-wago-frontend-tests.mjs"
       }
     }
   }

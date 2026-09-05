@@ -248,6 +248,10 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       const candidate = snapshot as WagoConfigurationSnapshot;
       let persist = () => this.saveDraftWhileLocked(controllerId, snapshot, validatedMetadata);
       if (principal && validateEditorSnapshot(snapshot).length === 0) {
+        // The editor appends provenance only for an explicit Apply action. Consume
+        // persisted occurrences so ordinary edits and retried saves are not reapplications.
+        const persistedApplications = previousMetadata.presets.map((entry) => configurationHash(entry));
+        const appliedPresets = new Set(previousMetadata.presets.map((entry) => `${entry.presetId}:${entry.channelId}`));
         for (const application of validatedMetadata?.presets ?? []) {
           if (
             !candidate.logicalChannels.some(
@@ -256,22 +260,14 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
             )
           )
             continue;
-          const old = previousMetadata.presets.find(
-            (entry) => entry.presetId === application.presetId && entry.channelId === application.channelId,
-          );
-          if (
-            old &&
-            configurationHash(old) === configurationHash(application) &&
-            configurationHash(
-              (before as WagoConfigurationSnapshot | null)?.logicalChannels.find(
-                (channel) => channel.id === application.channelId,
-              ) ?? null,
-            ) ===
-              configurationHash(
-                candidate.logicalChannels.find((channel) => channel.id === application.channelId) ?? null,
-              )
-          )
+          const persistedIndex = persistedApplications.indexOf(configurationHash(application));
+          if (persistedIndex !== -1) {
+            persistedApplications.splice(persistedIndex, 1);
             continue;
+          }
+          const presetChannel = `${application.presetId}:${application.channelId}`;
+          const reapplied = appliedPresets.has(presetChannel);
+          appliedPresets.add(presetChannel);
           const operation = persist;
           const details = {
             presetId: application.presetId,
@@ -282,7 +278,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
             new WagoAudit(this.context).run(
               principal,
               controllerId,
-              old ? 'preset_reapplication' : 'preset_application',
+              reapplied ? 'preset_reapplication' : 'preset_application',
               details,
               operation,
               (saved) => ({ ...details, after: wagoAuditSummary(JSON.parse(saved.snapshot)) }),

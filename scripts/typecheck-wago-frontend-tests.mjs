@@ -8,6 +8,7 @@ const result = spawnSync(
   { encoding: 'utf8', env: environment },
 );
 if (result.error) throw result.error;
+if (result.signal) throw new Error(`Frontend tsc terminated by ${result.signal}`);
 const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.replaceAll('\r\n', '\n');
 // Temporary, explicit owner boundary: these two invalid Testing Library options
 // are in the concurrently maintained commissioning modal. Every other diagnostic fails.
@@ -29,6 +30,8 @@ if (remaining.trim() || (result.status !== 0 && count === 0)) {
   process.stderr.write(output);
   process.exitCode = result.status || 1;
 } else {
-  process.stdout.write(`Frontend test typecheck: no unowned errors; ${count} known commissioning diagnostics.\n`);
+  process.stdout.write(
+    `Raw frontend test tsc exit: ${result.status}; commissioning baseline accepted ${count} known diagnostics and no others.\n`,
+  );
   if (count) process.stdout.write(output);
 }

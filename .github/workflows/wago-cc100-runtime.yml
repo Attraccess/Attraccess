@@ -5,6 +5,21 @@ on:
     paths:
       - 'apps/plugins/wago/cc100-runtime/**'
       - 'apps/plugins/wago/backend/**'
+      - 'apps/plugins/wago/acceptance/**'
+      - 'apps/plugins/wago/frontend/**'
+      - 'apps/plugins/wago/modbus/**'
+      - 'apps/plugins/wago/tsconfig.acceptance.json'
+      - 'scripts/typecheck-wago-frontend-tests.mjs'
+      - 'apps/frontend/src/app/resources/details/flows/**'
+      - 'apps/api/src/resources/flows/**'
+      - 'apps/api/src/plugin-system/plugin-flow-node-registry*'
+      - 'libs/plugins-frontend-sdk/**'
+      - 'apps/plugins/wago/project.json'
+      - 'apps/plugins/wago/tsconfig.spec.json'
+      - 'tsconfig.base.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'scripts/test-wago-production-fleet*'
       - 'apps/plugins/wago/measurement-contract.ts'
       - 'libs/plugins-backend-sdk/**'
       - '.github/workflows/wago-cc100-runtime.yml'
@@ -13,6 +28,21 @@ on:
     paths:
       - 'apps/plugins/wago/cc100-runtime/**'
       - 'apps/plugins/wago/backend/**'
+      - 'apps/plugins/wago/acceptance/**'
+      - 'apps/plugins/wago/frontend/**'
+      - 'apps/plugins/wago/modbus/**'
+      - 'apps/plugins/wago/tsconfig.acceptance.json'
+      - 'scripts/typecheck-wago-frontend-tests.mjs'
+      - 'apps/frontend/src/app/resources/details/flows/**'
+      - 'apps/api/src/resources/flows/**'
+      - 'apps/api/src/plugin-system/plugin-flow-node-registry*'
+      - 'libs/plugins-frontend-sdk/**'
+      - 'apps/plugins/wago/project.json'
+      - 'apps/plugins/wago/tsconfig.spec.json'
+      - 'tsconfig.base.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'scripts/test-wago-production-fleet*'
       - 'apps/plugins/wago/measurement-contract.ts'
       - 'libs/plugins-backend-sdk/**'
       - '.github/workflows/wago-cc100-runtime.yml'
@@ -39,6 +69,15 @@ jobs:
         run: pnpm exec tsc --noEmit -p apps/plugins/wago/cc100-runtime/integration/tsconfig.json
       - name: Verify simulator lifecycle and measurement flow on an isolated broker
         run: pnpm nx run wago-cc100-runtime:test-simulator-integration
+      - name: Typecheck production acceptance tests
+        run: pnpm nx run plugin-wago:typecheck-acceptance
+      - name: Typecheck frontend tests with explicit commissioning baseline
+        # The checker prints the raw two commissioning diagnostics and fails on any others.
+        run: pnpm nx run plugin-wago:typecheck-frontend-tests-baseline
+      - name: Verify production fleet flows on an isolated RabbitMQ fixture
+        env:
+          WAGO_FLEET_DOCKER_CONTEXT: default
+        run: pnpm nx run plugin-wago:production-fleet
       - uses: actions/upload-artifact@v4
         with:
           name: wago-cc100-runtime-manifest

@@ -85,8 +85,8 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
   let heldAcknowledgement: { topic: string; payload: unknown; release: () => Promise<void> } | undefined;
   const sockets = new Set<Socket>();
   const messages: Wire[] = [];
-  const errors: unknown[] = [];
   const processedAcknowledgements = new Set<string>();
+  const errors: unknown[] = [];
   const warnings: string[] = [];
   const logs: Log[] = [];
   const modbusRequests: Buffer[] = [];
@@ -300,7 +300,8 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
             )
               Promise.resolve(listener({ topic, payload, retain: packet.retain }))
                 .then(() => {
-                  if (filter.endsWith('/acknowledgements'))
+                  // Record only after the production acknowledgement subscription returns.
+                  if (filter.endsWith('/acknowledgements') && topic === `${base}/acknowledgements`)
                     processedAcknowledgements.add(JSON.parse(payload.toString()).id);
                 })
                 .catch((error) => errors.push(error));
@@ -472,6 +473,8 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
       { qos: 1 },
     );
     await eventually(() => expect(processedAcknowledgements.has(wrongId)).toBe(true));
+    // Drain command completion continuations without a timing-based negative assertion window.
+    await new Promise<void>((resolve) => setImmediate(resolve));
     expect(completed('input-3')).toHaveLength(0);
     holdAcknowledgement = false;
     await required(heldAcknowledgement).release();

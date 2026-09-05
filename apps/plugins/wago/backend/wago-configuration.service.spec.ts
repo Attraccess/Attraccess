@@ -691,7 +691,7 @@ describe('configuration editor service boundaries', () => {
     expect(audit.record).toHaveBeenLastCalledWith(expect.objectContaining({ details: { sourceRevision: 1 } }));
   });
 
-  it('audits preset metadata only at explicit persisted save and classifies reapplication from locked provenance', async () => {
+  it('audits explicit preset application and reapplication, never ordinary policy edits or save retries', async () => {
     const { service, audit } = fixture();
     const principal = { userId: 7, authenticationMethod: 'session' as const };
     const application = { presetId: 'generic-digital-output' as const, channelId: 'output', physicalPointId: 'point' };
@@ -712,6 +712,23 @@ describe('configuration editor service boundaries', () => {
       metadata,
       principal,
     );
+    expect(audit.record).not.toHaveBeenCalled();
+    const edited: WagoConfigurationSnapshot = {
+      ...snapshot,
+      logicalChannels: [{ ...snapshot.logicalChannels[0], disconnectPolicy: { mode: 'hold' } }],
+    };
+    const preview = await service.previewPreset(1, application, edited);
+    const reapplied = await service.applyPreset(
+      1,
+      application,
+      preview.diff.map((change) => change.path),
+      preview.draftHash,
+      edited,
+    );
+    expect(audit.record).not.toHaveBeenCalled();
+    // The mounted editor appends one occurrence only when Apply succeeds.
+    const reappliedMetadata = { ...metadata, presets: [...metadata.presets, application] };
+    await service.saveDraft(1, JSON.parse(reapplied.snapshot), reappliedMetadata, principal);
     expect(audit.record.mock.calls.map(([event]) => event.action)).toEqual([
       'wago.preset_reapplication',
       'wago.preset_reapplication',
@@ -728,6 +745,24 @@ describe('configuration editor service boundaries', () => {
         },
       }),
     );
+    // Retrying the same save cannot audit the same intent again.
+    await service.saveDraft(1, JSON.parse(reapplied.snapshot), reappliedMetadata, principal);
+    expect(audit.record).toHaveBeenCalledTimes(2);
+  });
+
+  it('audits a deliberate no-change reapplication but not saving its unchanged provenance again', async () => {
+    const { service, audit } = fixture();
+    const principal = { userId: 7, authenticationMethod: 'session' as const };
+    const application = { presetId: 'generic-digital-output' as const, channelId: 'output', physicalPointId: 'point' };
+    await service.saveDraft(1, snapshot, { names: {}, presets: [application] }, principal);
+    audit.record.mockClear();
+    const metadata = { names: {}, presets: [application, application] };
+    await service.saveDraft(1, snapshot, metadata, principal);
+    await service.saveDraft(1, snapshot, metadata, principal);
+    expect(audit.record.mock.calls.map(([event]) => [event.action, event.outcome])).toEqual([
+      ['wago.preset_reapplication', 'attempted'],
+      ['wago.preset_reapplication', 'succeeded'],
+    ]);
   });
 
   it('persists and audits acknowledgement of exactly the reviewed rejection once', async () => {
