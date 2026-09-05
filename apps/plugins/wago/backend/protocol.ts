@@ -18,16 +18,6 @@ export interface WagoAnnouncement {
 }
 
 export function parseAnnouncement(payload: Buffer): WagoAnnouncement {
-  const heartbeat = parseHeartbeat(payload);
-  const input = JSON.parse(payload.toString('utf8')) as Record<string, unknown>;
-  if (typeof input.pairingCode !== 'string' || !input.pairingCode.trim())
-    throw new Error('announcement pairingCode is required');
-  return { ...heartbeat, pairingCode: input.pairingCode.trim() };
-}
-
-export type WagoHeartbeat = Omit<WagoAnnouncement, 'pairingCode'>;
-
-export function parseHeartbeat(payload: Buffer): WagoHeartbeat {
   let value: unknown;
   try {
     value = JSON.parse(payload.toString('utf8'));
@@ -36,7 +26,7 @@ export function parseHeartbeat(payload: Buffer): WagoHeartbeat {
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('announcement must be an object');
   const input = value as Record<string, unknown>;
-  const required = ['hardwareId', 'protocolVersion', 'runtimeVersion'];
+  const required = ['hardwareId', 'pairingCode', 'protocolVersion', 'runtimeVersion'];
   for (const key of required)
     if (typeof input[key] !== 'string' || !input[key].trim()) throw new Error(`announcement ${key} is required`);
   if (!Array.isArray(input.capabilities) || input.capabilities.some((item) => typeof item !== 'string'))
@@ -45,6 +35,7 @@ export function parseHeartbeat(payload: Buffer): WagoHeartbeat {
     throw new Error('announcement sequence must be a non-negative integer');
   return {
     hardwareId: (input.hardwareId as string).trim(),
+    pairingCode: (input.pairingCode as string).trim(),
     enrollmentSecret: typeof input.enrollmentSecret === 'string' ? input.enrollmentSecret.trim() : undefined,
     fingerprint: typeof input.fingerprint === 'string' ? input.fingerprint.trim() : undefined,
     protocolVersion: (input.protocolVersion as string).trim(),
@@ -87,22 +78,6 @@ export function commandTopic(prefix: string, hardwareId: string): string {
   return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${hardwareId}/commands`;
 }
 
-export function acknowledgementTopic(prefix: string, hardwareId: string): string {
-  return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${hardwareId}/acknowledgements`;
-}
-
-export function acknowledgementWildcardTopic(prefix: string): string {
-  return acknowledgementTopic(prefix, '+');
-}
-
-export function acknowledgementHardwareId(prefix: string, topic: string): string | null {
-  const topicPrefix = `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/`;
-  const topicSuffix = '/acknowledgements';
-  if (!topic.startsWith(topicPrefix) || !topic.endsWith(topicSuffix)) return null;
-  const hardwareId = topic.slice(topicPrefix.length, -topicSuffix.length);
-  return hardwareId && !/[+/]/.test(hardwareId) ? hardwareId : null;
-}
-
 export function configurationReportedWildcardTopic(prefix: string): string {
   return configurationReportedTopic(prefix, '+');
 }
@@ -120,7 +95,6 @@ export type WagoStateMessage = WagoOperationalMessageBase & {
   contentHash: string | null;
   outputs: Record<string, boolean>;
   inputs?: Record<string, boolean>;
-  readiness?: { hardwareAvailable: boolean };
 };
 
 export type WagoMeasurementMessage = WagoOperationalMessageBase &
@@ -176,12 +150,7 @@ export function parseOperationalMessage(
       !isNullableInteger(value.revision) ||
       !isNullableString(value.contentHash) ||
       !isBooleanRecord(value.outputs) ||
-      (value.inputs !== undefined && !isBooleanRecord(value.inputs)) ||
-      (value.readiness !== undefined &&
-        (!value.readiness ||
-          typeof value.readiness !== 'object' ||
-          Array.isArray(value.readiness) ||
-          typeof (value.readiness as Record<string, unknown>).hardwareAvailable !== 'boolean'))
+      (value.inputs !== undefined && !isBooleanRecord(value.inputs))
     )
       throw new Error('invalid state message');
     return {
@@ -196,9 +165,6 @@ export function parseOperationalMessage(
         contentHash: value.contentHash as string | null,
         outputs: value.outputs as Record<string, boolean>,
         ...(value.inputs !== undefined ? { inputs: value.inputs as Record<string, boolean> } : {}),
-        ...(value.readiness !== undefined
-          ? { readiness: { hardwareAvailable: (value.readiness as { hardwareAvailable: boolean }).hardwareAvailable } }
-          : {}),
       },
     };
   }
