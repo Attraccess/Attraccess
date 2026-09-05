@@ -6,8 +6,8 @@ services:
       RABBITMQ_DEFAULT_USER: attraccess
       RABBITMQ_DEFAULT_PASS: password
     ports:
-      - '1883:1883'
-      - '15672:15672'
+      - '127.0.0.1:1883:1883'
+      - '127.0.0.1:15672:15672'
     healthcheck:
       test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
       interval: 5s
@@ -21,11 +21,11 @@ services:
       dockerfile: apps/plugins/wago/cc100-runtime/Dockerfile.simulator
     environment:
       WAGO_MQTT_URL: mqtt://mqtt:1883
-      WAGO_HARDWARE_ID: ${WAGO_HARDWARE_ID:-simulated-cc100-01}
+      WAGO_HARDWARE_ID: ${WAGO_HARDWARE_ID:-}
       WAGO_PAIRING_CODE: ${WAGO_PAIRING_CODE:-482931}
-      WAGO_ENROLLMENT_SECRET: ${WAGO_ENROLLMENT_SECRET:?Create an enrollment in Attraccess and set its secret}
-      WAGO_ENROLLMENT_USERNAME: ${WAGO_ENROLLMENT_USERNAME:?Set the enrollment username}
-      WAGO_ENROLLMENT_PASSWORD: ${WAGO_ENROLLMENT_PASSWORD:?Set the enrollment password}
+      WAGO_ENROLLMENT_SECRET: ${WAGO_ENROLLMENT_SECRET:-}
+      WAGO_ENROLLMENT_USERNAME: ${WAGO_ENROLLMENT_USERNAME:-}
+      WAGO_ENROLLMENT_PASSWORD: ${WAGO_ENROLLMENT_PASSWORD:-}
       WAGO_SCENARIO: ${WAGO_SCENARIO:-normal}
       WAGO_INITIAL_VALUES: ${WAGO_INITIAL_VALUES:-{}}
       WAGO_MEASUREMENT_STEP: ${WAGO_MEASUREMENT_STEP:-0}
