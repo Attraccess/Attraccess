@@ -197,7 +197,7 @@ describe('CC100 packed digital I/O', () => {
     );
   });
 
-  it('does not let stalled polling telemetry hold pulse shutdown or disconnect writes', async () => {
+  it('does not let stalled reconnect telemetry hold pulse shutdown or disconnect writes', async () => {
     await runtime.start();
     const pulsed = structuredClone(snapshot);
     pulsed.logicalChannels[0].capabilities.push('pulse');
@@ -214,9 +214,10 @@ describe('CC100 packed digital I/O', () => {
       await publish(topic, payload, options);
     });
     await writeFile(paths.input, '1');
-    const poll = runtime.pollInputs();
+    const reconnect = runtime.setConnected(true);
     await started.promise;
     try {
+      await reconnect;
       await command('DO1', true, 'pulse', 'pulse');
       await new Promise((resolve) => setTimeout(resolve, 80));
       expect(await readFile(paths.output, 'utf8')).toBe('0');
@@ -234,7 +235,6 @@ describe('CC100 packed digital I/O', () => {
       await disconnect;
     } finally {
       release.resolve();
-      await poll;
     }
   });
 

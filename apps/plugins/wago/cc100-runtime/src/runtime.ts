@@ -280,7 +280,9 @@ export class WagoRuntime {
   async setConnected(connected: boolean): Promise<void> {
     this.connected = connected;
     await this.outputs.applyDisconnectPolicies(connected);
-    await this.publishState();
+    // Connection callbacks must complete after the hardware policy. Otherwise a
+    // stalled MQTT state publish can delay a following disconnect shutdown.
+    this.requestStatePublication();
   }
 
   async publishHeartbeat(ignoreStatePublicationFailure = false): Promise<void> {
