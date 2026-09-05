@@ -73,11 +73,17 @@ function connectOperational(state: SimulatorState): void {
   device.restore(state.accepted?.snapshot, state.outputs);
   const operationalRuntime = runtime(operationalClient, state.credentials.prefix);
   let initialized = false;
+  let connectionGeneration = 0;
   operationalClient.once(
     'connect',
     () =>
       void handleAsync(async () => {
+        const generation = ++connectionGeneration;
         await operationalRuntime.start();
+        if (generation !== connectionGeneration) {
+          await operationalRuntime.setConnected(false);
+          return;
+        }
         initialized = true;
         await operationalRuntime.setConnected(true);
         process.stdout.write(`WAGO CC100 simulator connected as ${hardwareId}\n`);
@@ -90,10 +96,16 @@ function connectOperational(state: SimulatorState): void {
       }),
   );
   operationalClient.on('close', () => {
+    connectionGeneration++;
+    timers.forEach(clearInterval);
+    timers = [];
     if (initialized) void handleAsync(() => operationalRuntime.setConnected(false));
   });
   operationalClient.on('connect', () => {
-    if (initialized) void handleAsync(() => operationalRuntime.setConnected(true));
+    if (initialized) {
+      connectionGeneration++;
+      void handleAsync(() => operationalRuntime.setConnected(true));
+    }
   });
 }
 
