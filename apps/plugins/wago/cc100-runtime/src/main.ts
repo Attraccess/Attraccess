@@ -90,13 +90,14 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
         } finally {
           // start() subscribes before its first publications. Keep connection
           // policies live even if a publication fails after those subscriptions.
-          initialized = true;
-          const hadPendingConnectionState = pendingConnectionStates.length > 0;
+          if (!pendingConnectionStates.length && !connected) pendingConnectionStates.push(false);
           while (pendingConnectionStates.length > 0) {
             const state = pendingConnectionStates.shift();
             if (state !== undefined) await handleAsync(() => runtime.setConnected(state));
           }
-          if (!hadPendingConnectionState && !connected) await handleAsync(() => runtime.setConnected(false));
+          // Keep events received during replay in this queue so their order is
+          // preserved before live connection events can apply policies.
+          initialized = true;
         }
         heartbeatTimer = setInterval(() => void handleAsync(() => runtime.publishHeartbeat()), 30_000).unref();
         measurementTimer = setInterval(() => void handleAsync(() => runtime.publishMeasurements()), 5_000).unref();
