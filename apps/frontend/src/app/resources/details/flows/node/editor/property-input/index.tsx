@@ -11,7 +11,6 @@ import { useCallback, useMemo, useState } from 'react';
 import { dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
 import { CreateMqttServerForm } from '../../../../../../mqtt/servers/CreateMqttServerPage';
 import { getNumberFieldMinimum } from './number-field-minimum';
-import { initializeValue } from './schema-values';
 
 export interface Property<TValue> {
   type: 'string' | 'integer' | 'number' | 'object' | 'boolean' | 'array';
@@ -321,10 +320,7 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
           isRequired={isRequired}
           aria-label={label}
           value={Number(parsedValue)}
-          onChange={(newValue) => {
-            if (!isRequired && Number.isNaN(newValue)) onChange(undefined as TValue);
-            else setValue(newValue as TValue);
-          }}
+          onChange={(newValue) => setValue(newValue as TValue)}
           minValue={getNumberFieldMinimum(schema)}
           maxValue={schema.maximum}
           step={schema.multipleOf}
@@ -500,7 +496,20 @@ export function PropertyInput<TValue>(props: Props<TValue>) {
       }
 
       const handleAdd = () => {
-        const newItem = items ? initializeValue(items as Property<unknown>, undefined, true) : {};
+        let newItem: unknown = {};
+        if (items) {
+          if (items.type === 'object' && items.properties) {
+            newItem = {};
+          } else if (items.type === 'string') {
+            newItem = '';
+          } else if (items.type === 'number' || items.type === 'integer') {
+            newItem = 0;
+          } else if (items.type === 'boolean') {
+            newItem = false;
+          } else {
+            newItem = {};
+          }
+        }
         onChange([...(arrayValue ?? []), newItem] as TValue);
       };
 
