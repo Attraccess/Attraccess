@@ -2,13 +2,14 @@
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import {
   findProfile,
+  modbusHostIdentity,
   type ModbusConfiguration,
   type ModbusConnection,
   type ModbusMeasurement,
   validateModbus,
 } from '../../../modbus/model';
 import type { DeviceAdapter, Snapshot } from '../runtime';
-import { WriteAdmissionError } from '../runtime-types';
+import { type WriteAdmission, WriteAdmissionError } from '../runtime-types';
 import { decodeRaw, readPdu, writePdu } from './protocol';
 import { type ModbusTransport, ModbusTransportError, QueuedModbusTransport } from './transports';
 
@@ -176,7 +177,7 @@ export class ModbusDeviceRouter implements DeviceAdapter {
       ['modbus_queue_full', 'modbus_configuration_changed'].includes(error.code)
     );
   }
-  async write(point: Point, value: boolean, admit?: () => void): Promise<void> {
+  async write(point: Point, value: boolean, admit?: WriteAdmission): Promise<void> {
     admit?.();
     if (this.suspended) throw new Error('Modbus configuration persistence in progress');
     if (!point.modbus) {
@@ -190,10 +191,13 @@ export class ModbusDeviceRouter implements DeviceAdapter {
     await transport.request(
       device.unitId,
       writePdu(action.functionCode, action, value ? action.onValue : action.offValue),
-      () => {
-        admit?.();
-        return generation === this.generation;
-      },
+      Object.assign(
+        () => {
+          admit?.();
+          return generation === this.generation;
+        },
+        { expiresAt: admit?.expiresAt },
+      ),
     );
   }
 }
@@ -201,7 +205,7 @@ export class ModbusDeviceRouter implements DeviceAdapter {
 function sourceIdentity(connection: ModbusConnection, unit: number, m: ModbusMeasurement): string {
   const endpoint =
     connection.transport === 'tcp'
-      ? ['tcp', connection.host.toLowerCase(), connection.port]
+      ? ['tcp', modbusHostIdentity(connection.host), connection.port]
       : ['rtu', connection.path, connection.baudRate, connection.parity, connection.stopBits];
   return JSON.stringify([
     endpoint,

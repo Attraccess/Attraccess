@@ -589,7 +589,7 @@ describe('configuration editor service boundaries', () => {
         ),
       ).rejects.toThrow(/preview|review/);
       expect(mqtt.publish).not.toHaveBeenCalled();
-      if (changedLookup === 2) expect(draft()).toEqual(before);
+      expect(draft()).toEqual(before);
     },
   );
 

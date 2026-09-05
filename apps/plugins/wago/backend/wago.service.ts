@@ -534,15 +534,26 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
             snapshot,
           ),
         );
-        const replacement = await this.saveDraftWhileLocked(
+        const replacement = this.drafts.create({
+          ...draft,
           controllerId,
-          snapshot,
-          (source.presetProvenance ? JSON.parse(source.presetProvenance).editor : null) ?? { names: {}, presets: [] },
-        );
+          snapshot: canonicalSnapshot(snapshot),
+          presetProvenance: JSON.stringify({
+            editor: editorMetadata(
+              (source.presetProvenance ? JSON.parse(source.presetProvenance).editor : null) ?? {
+                names: {},
+                presets: [],
+              },
+            ),
+          }),
+          reviewedHash: null,
+          updatedAt: new Date().toISOString(),
+        });
         const approvedHash = this.reviewIdentity(replacement, current, approvedImpacts);
         replacement.reviewedHash = approvedHash;
-        await this.drafts.save(replacement);
-        return this.publishDraftWhileLocked(controllerId, force, approvedHash);
+        // Publication validates the prepared replacement before persisting either
+        // the draft or a revision, so late admission failures preserve editor work.
+        return this.publishDraftWhileLocked(controllerId, force, approvedHash, undefined, replacement);
       };
       return principal
         ? new WagoAudit(this.context).run(
@@ -764,10 +775,11 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     force = false,
     reviewedHash?: string,
     principal?: PluginAuditPrincipal,
+    preparedDraft?: WagoConfigurationDraft,
   ): Promise<WagoConfigurationRevision> {
     const controller = await this.claimedController(controllerId);
     this.requireConfigurationCompatibility(controller);
-    const draft = await this.drafts.findOneBy({ controllerId });
+    const draft = preparedDraft ?? (await this.drafts.findOneBy({ controllerId }));
     if (!draft) throw new NotFoundException(`WAGO controller ${controllerId} has no configuration draft`);
     const validation = validateEditorSnapshot(JSON.parse(draft.snapshot));
     if (validation.length)
@@ -788,6 +800,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     if (impacts.length && !force)
       throw new ConflictException({ message: 'acknowledge potential flow impacts before publishing', impacts });
     const persist = async () => {
+      if (preparedDraft) await this.drafts.save(preparedDraft);
       if (
         previous?.state === 'pending' &&
         previous.contentHash === contentHash &&

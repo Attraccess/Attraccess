@@ -1,8 +1,23 @@
+import ipaddr from 'ipaddr.js';
+
 /** Persisted engineering units, never wire milli-units. No hardware is qualified by this model. */
 export type ModbusConnection = { id: string; timeoutMs: number; reconnectMs: number; queueLimit: number } & (
   | { transport: 'tcp'; host: string; port: number }
   | { transport: 'rtu'; path: string; baudRate: number; parity: 'none' | 'even' | 'odd'; stopBits: 1 | 2 }
 );
+/** Pure numeric normalization, shared by validation and runtime bus ownership. No DNS lookup. */
+export function modbusHostIdentity(host: string): string {
+  if (ipaddr.isValid(host)) {
+    const address = ipaddr.parse(host);
+    if (address.kind() === 'ipv6') {
+      const ipv6 = address as ipaddr.IPv6;
+      if (ipv6.isIPv4MappedAddress() && !ipv6.zoneId) return ipv6.toIPv4Address().toString();
+    }
+    return address.toNormalizedString();
+  }
+  return host.toLowerCase();
+}
+
 export type RegisterFormat = {
   address: number;
   addressBase: 0 | 1;
@@ -166,7 +181,7 @@ export function validateModbus(value: unknown): Array<{ path: string; code: stri
     if (c.transport === 'tcp') {
       if (!name(c.host) || /[\s/]/.test(c.host) || !integer(c.port, 1, 65535))
         return void fail(path, 'TCP host and port 1..65535 required');
-      endpoint = `tcp:${c.host.toLowerCase()}:${c.port}`;
+      endpoint = `tcp:${modbusHostIdentity(c.host)}:${c.port}`;
     } else if (c.transport === 'rtu') {
       if (
         typeof c.path !== 'string' ||
