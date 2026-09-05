@@ -1,5 +1,5 @@
 import type { AuthenticatedRequest, PluginAuditEvent, PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
-import { WAGO_AUDIT_ACTIONS, WagoAudit, wagoAuditDetails, wagoAuditPrincipal, wagoAuditSummary } from './wago-audit';
+import { WAGO_AUDIT_ACTIONS, WagoAudit, wagoAuditDetails, wagoAuditPrincipal, wagoAuditSummary, type WagoProfileAuditResult } from './wago-audit';
 
 const principal: PluginAuditPrincipal = { userId: 7, authenticationMethod: 'api-token', apiTokenId: 9 };
 
@@ -36,6 +36,24 @@ describe('WAGO audit lifecycles', () => {
     await Promise.all([lifecycle.finish('succeeded', { result: 'acknowledged' }), lifecycle.finish('failed', { result: 'timeout' })]);
     expect(record).toHaveBeenCalledTimes(2);
     expect(record.mock.calls[1][0].details).toEqual({ channelId: 'lock-a', operation: 'pulse', commandId, result: 'acknowledged' });
+  });
+
+  it.each(['profile_creation', 'profile_change'] as const)('projects %s persisted identity without profile payloads', async (action) => {
+    const result = {
+      profileId: ' custom/meter: A ', profileVersion: 1_000_000,
+      before: { physicalPointCount: 1, logicalChannelCount: 2, password: 'SECRET' },
+      after: { physicalPointCount: 2, logicalChannelCount: 3, payload: 'SECRET' },
+      profile: { name: 'SECRET', measurements: ['SECRET'], actions: ['SECRET'] },
+      transport: { host: 'SECRET', password: 'SECRET' }, errors: ['SECRET'],
+    };
+    await expect(audit.run(principal, 12, action, {}, async () => result, (value: WagoProfileAuditResult) => value)).resolves.toBe(result);
+    expect(record.mock.calls[0][0].details).toEqual({});
+    expect(record.mock.calls[1][0].details).toEqual({
+      profileId: result.profileId, profileVersion: 1_000_000,
+      'before.physicalPointCount': 1, 'before.logicalChannelCount': 2,
+      'after.physicalPointCount': 2, 'after.logicalChannelCount': 3,
+    });
+    expect(JSON.stringify(record.mock.calls)).not.toContain('SECRET');
   });
 
   it('captures primitive identity and initial summaries before mutable inputs change', async () => {
@@ -76,7 +94,7 @@ describe('WAGO audit lifecycles', () => {
 describe('WAGO audit projection', () => {
   it('excludes unexpected fields at every level and allows only enum values and bounded identifiers', () => {
     const untrusted = {
-      revision: 2, sourceRevision: 1, profileId: 3, profileVersion: 4,
+      revision: 2, sourceRevision: 1, profileId: 'custom-meter', profileVersion: 4,
       presetId: 'generic-digital-output' as const, channelId: 'output-a',
       operation: 'set' as const, result: 'dispatched' as const,
       before: { physicalPointCount: 1, logicalChannelCount: 2, password: 'SECRET' },
@@ -84,15 +102,45 @@ describe('WAGO audit projection', () => {
       password: 'SECRET', claimSecret: 'SECRET', telemetry: 'SECRET', errors: ['SECRET'],
     };
     expect(wagoAuditDetails(untrusted)).toEqual({
-      revision: 2, sourceRevision: 1, profileId: 3, profileVersion: 4,
+      revision: 2, sourceRevision: 1, profileId: 'custom-meter', profileVersion: 4,
       presetId: 'generic-digital-output', channelId: 'output-a', operation: 'set', result: 'dispatched',
       'before.physicalPointCount': 1, 'before.logicalChannelCount': 2,
       'after.physicalPointCount': 1, 'after.logicalChannelCount': 3,
     });
     expect(wagoAuditDetails(JSON.parse(JSON.stringify({
-      revision: -1, profileId: 'SECRET', presetId: 'SECRET', operation: 'SECRET', result: 'SECRET',
+      revision: -1, profileId: 3, presetId: 'SECRET', operation: 'SECRET', result: 'SECRET',
       channelId: 'mqtt://SECRET', commandId: 'SECRET', before: { physicalPointCount: -2 },
     })))).toEqual({});
+  });
+
+  it.each([
+    'a', 'a'.repeat(160), ` ${'a'.repeat(158)} `,
+    'wago-879-3000-unverified', 'wago-879-1300-unverified',
+    ' custom/meter: A ', '\u00e9'.repeat(160), '\ud83d\udd0c'.repeat(80),
+  ])('preserves valid profile identity verbatim: %s', (profileId) => {
+    expect(wagoAuditDetails({ profileId })).toEqual({ profileId });
+  });
+
+  it.each([
+    undefined, null, 1, true, {}, ['custom-meter'], '', ' \t\n', '\u00a0',
+    'a'.repeat(161), ` ${'a'.repeat(160)}`, '\ud83d\udd0c'.repeat(81),
+  ])('drops invalid profile identity without coercion: %p', (profileId) => {
+    expect(wagoAuditDetails({ profileId } as never)).toEqual({});
+  });
+
+  it.each([1, 1_000_000])('accepts profile version boundary %p', (profileVersion) => {
+    expect(wagoAuditDetails({ profileVersion })).toEqual({ profileVersion });
+  });
+
+  it.each([undefined, null, 0, -1, 1.5, 1_000_001, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER + 1, NaN, Infinity, -Infinity, '1', true, {}, [1]])(
+    'drops invalid profile version without coercion: %p', (profileVersion) => {
+      expect(wagoAuditDetails({ profileVersion } as never)).toEqual({});
+    },
+  );
+
+  it('does not impose the profile version ceiling on configuration revisions', () => {
+    expect(wagoAuditDetails({ revision: Number.MAX_SAFE_INTEGER, sourceRevision: 1_000_001 }))
+      .toEqual({ revision: Number.MAX_SAFE_INTEGER, sourceRevision: 1_000_001 });
   });
 
   it('summarizes configuration shape without serializing points, channel values or telemetry', () => {
