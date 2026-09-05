@@ -8,7 +8,16 @@
     "production-fleet": {
       "executor": "nx:run-commands",
       "cache": false,
+      "dependsOn": ["typecheck-acceptance", "test-production-fleet-cleanup"],
       "options": { "command": "node scripts/test-wago-production-fleet.mjs" }
+    },
+    "typecheck-acceptance": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm exec tsc --noEmit -p apps/plugins/wago/acceptance/tsconfig.json" }
+    },
+    "test-production-fleet-cleanup": {
+      "executor": "nx:run-commands",
+      "options": { "command": "node --test scripts/test-wago-production-fleet.test.mjs" }
     },
     "typecheck": {
       "executor": "nx:run-commands",

@@ -5,6 +5,10 @@ on:
     paths:
       - 'apps/plugins/wago/cc100-runtime/**'
       - 'apps/plugins/wago/backend/**'
+      - 'apps/plugins/wago/acceptance/**'
+      - 'apps/plugins/wago/project.json'
+      - 'apps/plugins/wago/tsconfig.spec.json'
+      - 'scripts/test-wago-production-fleet*'
       - 'apps/plugins/wago/measurement-contract.ts'
       - 'libs/plugins-backend-sdk/**'
       - '.github/workflows/wago-cc100-runtime.yml'
@@ -13,6 +17,10 @@ on:
     paths:
       - 'apps/plugins/wago/cc100-runtime/**'
       - 'apps/plugins/wago/backend/**'
+      - 'apps/plugins/wago/acceptance/**'
+      - 'apps/plugins/wago/project.json'
+      - 'apps/plugins/wago/tsconfig.spec.json'
+      - 'scripts/test-wago-production-fleet*'
       - 'apps/plugins/wago/measurement-contract.ts'
       - 'libs/plugins-backend-sdk/**'
       - '.github/workflows/wago-cc100-runtime.yml'
@@ -39,6 +47,10 @@ jobs:
         run: pnpm exec tsc --noEmit -p apps/plugins/wago/cc100-runtime/integration/tsconfig.json
       - name: Verify simulator lifecycle and measurement flow on an isolated broker
         run: pnpm nx run wago-cc100-runtime:test-simulator-integration
+      - name: Verify production fleet flows on an isolated RabbitMQ fixture
+        env:
+          WAGO_FLEET_DOCKER_CONTEXT: default
+        run: pnpm nx run plugin-wago:production-fleet
       - uses: actions/upload-artifact@v4
         with:
           name: wago-cc100-runtime-manifest
