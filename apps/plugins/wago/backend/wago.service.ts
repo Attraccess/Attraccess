@@ -311,6 +311,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     previous: WagoConfigurationRevision | null;
     changed: boolean;
     diff: ReturnType<typeof configurationDiff>;
+    metadataDiff: ReturnType<typeof configurationDiff>;
   }> {
     return this.withConfigurationLock(controllerId, () => this.reviewDraftWhileLocked(controllerId));
   }
@@ -364,6 +365,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     draftHash: string;
     current: WagoConfigurationRevision | null;
     diff: ReturnType<typeof configurationDiff>;
+    metadataDiff: ReturnType<typeof configurationDiff>;
   }> {
     return this.withConfigurationLock(controllerId, async () => {
       await this.claimedController(controllerId);
@@ -382,12 +384,25 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
         revision: selected,
         current: current ?? null,
         diff: configurationDiff(current ? JSON.parse(current.snapshot) : null, JSON.parse(selected.snapshot)),
+        metadataDiff: configurationDiff(
+          this.metadataFromProvenance(current?.presetProvenance),
+          this.metadataFromProvenance(selected.presetProvenance),
+        ),
       };
     });
   }
 
   private draftIdentity(draft: WagoConfigurationDraft | null): string {
     return configurationHash(draft ? { snapshot: draft.snapshot, metadata: draft.presetProvenance ?? null } : null);
+  }
+
+  private metadataFromProvenance(provenance: string | null | undefined): ConfigurationEditorMetadata {
+    if (!provenance) return { names: {}, presets: [] };
+    try {
+      return editorMetadata(JSON.parse(provenance).editor);
+    } catch {
+      return { names: {}, presets: [] };
+    }
   }
 
   private async saveDraftWhileLocked(
@@ -421,6 +436,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     previous: WagoConfigurationRevision | null;
     changed: boolean;
     diff: ReturnType<typeof configurationDiff>;
+    metadataDiff: ReturnType<typeof configurationDiff>;
   }> {
     await this.claimedController(controllerId);
     const draft = await this.drafts.findOneBy({ controllerId });
@@ -435,11 +451,16 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     draft.reviewedHash = this.draftIdentity(draft);
     await this.drafts.save(draft);
     const diff = configurationDiff(previous ? JSON.parse(previous.snapshot) : null, JSON.parse(draft.snapshot));
+    const metadataDiff = configurationDiff(
+      this.metadataFromProvenance(previous?.presetProvenance),
+      this.metadataFromProvenance(draft.presetProvenance),
+    );
     return {
       draft,
       previous,
-      changed: diff.length > 0,
+      changed: diff.length > 0 || metadataDiff.length > 0,
       diff,
+      metadataDiff,
       impacts,
     };
   }

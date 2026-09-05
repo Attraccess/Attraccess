@@ -1,6 +1,6 @@
 import { Checkbox, Label } from '@heroui/react';
 import type { ConfigurationDiff, ConfigurationValidationError, WagoConfigurationSnapshot } from './api';
-import { changeLabel, readableChangeValue, readableStructuralChanges } from './configuration-model';
+import { changeLabel, readableChangeValue, readableStructuralChanges, readableValue } from './configuration-model';
 
 export function ConfigurationErrors({
   errors,
@@ -62,4 +62,35 @@ export function ConfigurationChanges({
       ))}
     </ul>
   );
+}
+
+export function ConfigurationMetadataChanges({
+  changes,
+  names,
+}: {
+  changes: ConfigurationDiff[];
+  names: Record<string, string>;
+}) {
+  if (!changes.length) return null;
+  return (
+    <section aria-label="Editor metadata changes">
+      <h3 className="wg:font-medium">Editor metadata changes</h3>
+      <ul className="wg:flex wg:flex-col wg:gap-3">
+        {changes.map((change) => (
+          <li key={change.path}>
+            <p className="wg:font-medium">{metadataChangeLabel(change.path, names)}</p>
+            <p className="wg:text-sm">Before: {readableValue(change.previous, names)}</p>
+            <p className="wg:text-sm">After: {readableValue(change.current, names)}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function metadataChangeLabel(path: string, names: Record<string, string>) {
+  const name = path.match(/^\$\.names\.([^.]*)$/);
+  if (name) return `Name for ${names[name[1]] ?? name[1]}`;
+  if (/^\$\.presets\[\d+\]/.test(path)) return 'Preset application';
+  return 'Editor metadata';
 }

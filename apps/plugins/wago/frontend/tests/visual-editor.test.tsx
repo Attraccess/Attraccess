@@ -211,6 +211,43 @@ describe('visual configuration workflow', () => {
     expect(state.publish).not.toHaveBeenCalled();
   });
 
+  it('reloads a refreshed saved draft while clean and blocks dirty local edits from overwriting it', async () => {
+    mount();
+    const user = userEvent.setup();
+    const name = await screen.findByRole('textbox', { name: 'Channel name' });
+    const cleanRefresh = {
+      controllerId: 1,
+      snapshot: JSON.stringify(state.snapshot),
+      presetProvenance: JSON.stringify({ editor: { names: { output: 'Clean refresh', point: 'DO1' }, presets: [] } }),
+      reviewedHash: null,
+      updatedAt: '2026-09-06',
+    };
+    await act(async () => {
+      client.setQueryData(['wago', 'configuration-draft', 1], cleanRefresh);
+    });
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Channel name' })).toHaveValue('Clean refresh'));
+    await user.clear(name);
+    await user.type(name, 'Local edit');
+    const refreshed = {
+      controllerId: 1,
+      snapshot: JSON.stringify(state.snapshot),
+      presetProvenance: JSON.stringify({ editor: { names: { output: 'Saved elsewhere', point: 'DO1' }, presets: [] } }),
+      reviewedHash: null,
+      updatedAt: '2026-09-07',
+    };
+    state.getDraft.mockResolvedValue(refreshed);
+
+    await act(async () => {
+      client.setQueryData(['wago', 'configuration-draft', 1], refreshed);
+    });
+
+    expect(await screen.findByText('Saved draft changed')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Reload saved draft' }));
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Channel name' })).toHaveValue('Saved elsewhere'));
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled();
+  });
+
   it('blocks Save draft while copying a preset and leaves copied settings unsaved', async () => {
     mount();
     const user = userEvent.setup();

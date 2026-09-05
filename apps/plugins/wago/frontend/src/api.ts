@@ -126,6 +126,7 @@ export interface ConfigurationReview {
   previous: (ConfigurationRevision & { snapshot: string }) | null;
   changed: boolean;
   diff: ConfigurationDiff[];
+  metadataDiff: ConfigurationDiff[];
   impacts: ConfigurationImpact[];
 }
 export interface RevisionPreview {
@@ -133,6 +134,7 @@ export interface RevisionPreview {
   revision: ConfigurationRevision & { snapshot: string };
   current: (ConfigurationRevision & { snapshot: string }) | null;
   diff: ConfigurationDiff[];
+  metadataDiff: ConfigurationDiff[];
   impacts: ConfigurationImpact[];
 }
 

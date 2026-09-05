@@ -50,6 +50,7 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
   const [metadata, setMetadata] = useState<ConfigurationEditorMetadata>(emptyMetadata);
   const [initialized, setInitialized] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [draftConflict, setDraftConflict] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   const [discard, setDiscard] = useState(false);
@@ -57,6 +58,7 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
   const [revisionBusy, setRevisionBusy] = useState(false);
   const [presetBusy, setPresetBusy] = useState(false);
   const editVersion = useRef(0);
+  const loadedDraft = useRef<string | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -65,7 +67,15 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
     };
   }, []);
   useEffect(() => {
-    if (initialized || draft.isPending || draft.isError) return;
+    if (draft.isPending || draft.isError) return;
+    const incoming = draft.data
+      ? `${draft.data.updatedAt}\u0000${draft.data.snapshot}\u0000${draft.data.presetProvenance ?? ''}`
+      : 'empty';
+    if (incoming === loadedDraft.current) return;
+    if (initialized && dirty) {
+      setDraftConflict(true);
+      return;
+    }
     try {
       const value = draft.data ? JSON.parse(draft.data.snapshot) : emptyConfiguration;
       if (value.version !== 1 || !Array.isArray(value.physicalPoints) || !Array.isArray(value.logicalChannels))
@@ -73,10 +83,13 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
       setSnapshot(value);
       setMetadata(readMetadata(draft.data?.presetProvenance ?? null));
       setInitialized(true);
+      setDirty(false);
+      setDraftConflict(false);
+      loadedDraft.current = incoming;
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Could not read draft.');
     }
-  }, [draft.data, draft.isPending, draft.isError, initialized]);
+  }, [draft.data, draft.isPending, draft.isError, dirty, initialized]);
   function changed() {
     editVersion.current++;
     setDirty(true);
@@ -110,7 +123,7 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
     }
   }
   async function saveDraft() {
-    if (busy) return;
+    if (busy || draftConflict) return;
     const savingVersion = editVersion.current;
     setError(null);
     setNotice('');
@@ -129,6 +142,12 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
     }
   }
   const busy = save.isPending || validate.isPending || revisionBusy || presetBusy;
+  function reloadSavedDraft() {
+    loadedDraft.current = null;
+    setDirty(false);
+    setDraftConflict(false);
+    void draft.refetch();
+  }
   function close() {
     if (busy) return;
     if (dirty) setDiscard(true);
@@ -166,13 +185,28 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
                 </Alert>
                 {draft.isPending && <p role="status">Loading draft…</p>}
                 {draft.isError && <p role="alert">Could not load draft: {draft.error.message}</p>}
+                {draftConflict && (
+                  <Alert status="danger">
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      <Alert.Title>Saved draft changed</Alert.Title>
+                      <Alert.Description>
+                        Another editor saved a newer draft. Reload it before editing, reviewing, or saving so your
+                        local changes do not overwrite it.
+                      </Alert.Description>
+                      <Button variant="secondary" onPress={reloadSavedDraft}>
+                        Reload saved draft
+                      </Button>
+                    </Alert.Content>
+                  </Alert>
+                )}
                 {initialized && (
                   <>
                     <p role="status">
                       {dirty ? 'Unsaved local edits' : draft.data ? 'Draft is saved' : 'No saved draft yet'} ·{' '}
                       {snapshot.logicalChannels.length} channels
                     </p>
-                    <fieldset disabled={busy} inert={busy} className="wg:flex wg:flex-col wg:gap-4">
+                    <fieldset disabled={busy || draftConflict} inert={busy || draftConflict} className="wg:flex wg:flex-col wg:gap-4">
                       <legend className="wg:sr-only">Digital configuration</legend>
                       <div className="wg:flex wg:gap-2">
                         <Button
@@ -272,7 +306,7 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
                       generation={generation}
                       controllerId={controllerId}
                       metadata={metadata}
-                      disabled={dirty || save.isPending || validate.isPending || presetBusy || !draft.data}
+                      disabled={dirty || draftConflict || save.isPending || validate.isPending || presetBusy || !draft.data}
                       onBusyChange={setRevisionBusy}
                       onRollback={async (failure) => {
                         try {
@@ -326,7 +360,7 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
                 <Button variant="secondary" isDisabled={busy} onPress={close}>
                   Close
                 </Button>
-                <Button type="submit" isDisabled={!initialized || busy} isPending={save.isPending}>
+                <Button type="submit" isDisabled={!initialized || busy || draftConflict} isPending={save.isPending}>
                   Save draft
                 </Button>
               </ModalFooter>
