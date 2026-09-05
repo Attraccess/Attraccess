@@ -210,11 +210,17 @@ describe('isolated broker / executable simulator', () => {
   });
 
   async function stop() {
-    if (!child || child.exitCode !== null) return;
-    const exited = once(child, 'exit');
-    child.kill('SIGTERM');
-    await exited;
+    const active = child;
     child = undefined;
+    if (!active || active.exitCode !== null || active.signalCode !== null) return;
+    const exited = once(active, 'exit');
+    const fallback = setTimeout(() => active.kill('SIGKILL'), 2000);
+    try {
+      active.kill('SIGTERM');
+      await exited;
+    } finally {
+      clearTimeout(fallback);
+    }
   }
   afterEach(async () => {
     await stop();
@@ -224,8 +230,8 @@ describe('isolated broker / executable simulator', () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
-  function launch(statePath: string, extra: Record<string, string> = {}) {
-    child = spawn(process.execPath, ['--disable-warning=DEP0169', join(temporary, 'simulator.cjs')], {
+  function launch(statePath: string, extra: Record<string, string> = {}, binary = 'simulator.cjs') {
+    child = spawn(process.execPath, ['--disable-warning=DEP0169', join(temporary, binary)], {
       env: {
         PATH: process.env.PATH,
         WAGO_MQTT_URL: url,
@@ -236,9 +242,29 @@ describe('isolated broker / executable simulator', () => {
         WAGO_INITIAL_VALUES: '{"879-3000:0":42}',
         ...extra,
       },
-      stdio: ['ignore', 'ignore', 'pipe'],
+      stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
     });
     child.stderr!.on('data', (data) => errors.push(data.toString()));
+  }
+
+  async function readDeviceChannel(channelId: string): Promise<unknown> {
+    const active = child!;
+    const id = `read-${channelId}-${Date.now()}`;
+    return new Promise((resolve, reject) => {
+      const onMessage = (message: { type?: string; id?: string; value?: unknown; error?: string }) => {
+        if (message.type !== 'simulator-read-result' || message.id !== id) return;
+        clearTimeout(timer);
+        active.off('message', onMessage);
+        if (message.error) reject(new Error(message.error));
+        else resolve(message.value);
+      };
+      const timer = setTimeout(() => {
+        active.off('message', onMessage);
+        reject(new Error('device inspection timed out'));
+      }, 2000);
+      active.on('message', onMessage);
+      active.send({ type: 'simulator-read', id, channelId });
+    });
   }
 
   async function expectRejectedIdentity(username: string, password?: string, clientId?: string) {
@@ -527,6 +553,68 @@ describe('isolated broker / executable simulator', () => {
   );
 
   const flowTest = process.env.WAGO_INTEGRATION_LIFECYCLE_ONLY === '1' ? it.skip : it;
+  it('enforces current main command expiry and configuration revision on the real broker', async () => {
+    const username = `wago-controller-${hardwareId}`;
+    identities.set(username, {
+      password: 'permanent',
+      publish: [`${base}/#`],
+      subscribe: [`${base}/commands`, `${base}/configuration/desired`],
+    });
+    const statePath = join(temporary, 'main-commands.json');
+    await writeFile(
+      statePath,
+      JSON.stringify({
+        simulatorHardwareId: hardwareId,
+        credentials: { username, password: 'permanent' },
+        operationalPrefix: prefix,
+        accepted: { revision: 1, contentHash: hash(snapshot), snapshot },
+        outputs: {},
+        commandIds: [],
+      }),
+    );
+    launch(statePath, {}, 'main-simulator.cjs');
+    await eventually(
+      () => expect(messages.some((item) => item.topic === `${base}/heartbeat`)).toBe(true),
+      'main runtime ready',
+    );
+    for (const command of [
+      { ...outputCommand('missing-revision'), expectedConfigurationRevision: undefined },
+      { ...outputCommand('missing-expiry'), expiresAt: undefined },
+      { ...outputCommand('expired'), expiresAt: new Date(Date.now() - 1000).toISOString() },
+      { ...outputCommand('wrong-revision'), expectedConfigurationRevision: 2 },
+    ]) {
+      await mqtt.publishAsync(`${base}/commands`, JSON.stringify(command), { qos: 1 });
+      await eventually(
+        () =>
+          expect(
+            messages.some(
+              (item) =>
+                item.topic === `${base}/acknowledgements` &&
+                JSON.parse(item.payload.toString()).id === command.id &&
+                JSON.parse(item.payload.toString()).status === 'rejected',
+            ),
+          ).toBe(true),
+        `main rejected ${command.id}`,
+      );
+    }
+    await expect(readDeviceChannel('load')).resolves.toBe(false);
+    await mqtt.publishAsync(`${base}/commands`, JSON.stringify(outputCommand('main-valid')), { qos: 1 });
+    await eventually(
+      () =>
+        expect(
+          messages.some(
+            (item) =>
+              item.topic === `${base}/acknowledgements` &&
+              JSON.parse(item.payload.toString()).id === 'main-valid' &&
+              JSON.parse(item.payload.toString()).status === 'accepted',
+          ),
+        ).toBe(true),
+      'main accepts correctly scoped unexpired command',
+    );
+    await expect(readDeviceChannel('load')).resolves.toBe(true);
+    expect(errors).toEqual([]);
+  });
+
   flowTest(
     'routes an unmodified runtime measurement through the actual parser and flow service to an output',
     async () => {
@@ -618,14 +706,12 @@ describe('isolated broker / executable simulator', () => {
           () =>
             expect(
               messages.some(
-                (item) =>
-                  item.topic === `${base}/state` &&
-                  JSON.parse(item.payload.toString()).outputs.load === true &&
-                  JSON.parse(item.payload.toString()).feedback.load === true,
+                (item) => item.topic === `${base}/state` && JSON.parse(item.payload.toString()).outputs.load === true,
               ),
             ).toBe(true),
-          'flow changed physical output and feedback',
+          'flow reported output',
         );
+        await expect(readDeviceChannel('load')).resolves.toBe(true);
         const firstState = JSON.parse(messages.find((item) => item.topic === `${base}/state`)!.payload.toString());
         const firstAck = JSON.parse(
           messages.find((item) => item.topic === `${base}/acknowledgements`)!.payload.toString(),
@@ -663,6 +749,19 @@ describe('isolated broker / executable simulator', () => {
           unit: 'millipercent',
           kind: 'live',
         });
+        expect(flow.payload(cached)).toMatchObject({ available: true, stale: false });
+        await stop();
+        // Advance only the consumer clock; never rewrite the captured producer
+        // timestamp. An offline producer cannot keep an old matching value usable.
+        const clock = jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 90_001);
+        try {
+          expect(flow.payload(cached)).toMatchObject({ available: false, stale: true });
+          await expect(
+            flow.wait({ controllerId: 1, channelId: 'level', category: 'measurement', equals: 42000, timeoutMs: 20 }),
+          ).resolves.toBeNull();
+        } finally {
+          clock.mockRestore();
+        }
         expect(errors).toEqual([]);
       } finally {
         flow.onModuleDestroy();
