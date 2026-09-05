@@ -1,6 +1,7 @@
 export * from './lib/plugin.interface';
 export * from './lib/plugin-flow-node';
 export * from './lib/plugin-context';
+export * from './lib/plugin-audit';
 export * from './lib/mqtt-credential-provisioning';
 export * from './lib/plugin-migrations';
 export * from './lib/entity';

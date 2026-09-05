@@ -5,7 +5,7 @@ import { join } from 'path';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ModuleRef } from '@nestjs/core';
 import { DataSource } from 'typeorm';
-import { PluginPermission, PluginPermissionError } from '@attraccess/plugins-backend-sdk';
+import { PluginPermission, PluginPermissionError, PLUGIN_AUDIT_HOST_PROVIDER } from '@attraccess/plugins-backend-sdk';
 import { PluginModule } from './plugin.module';
 import { PluginService } from './plugin.service';
 import { PluginSandboxService } from './plugin-sandbox.service';
@@ -192,6 +192,20 @@ describe('PluginModule', () => {
         version: '1.0.0',
         pluginDirectory: 'ctx-plugin',
       });
+    });
+
+    it('exposes the audit sink through the guarded context with host-bound plugin identity', async () => {
+      const record = jest.fn(async () => ({ status: 'recorded' as const }));
+      (moduleRef.get as jest.Mock).mockImplementation((token: unknown) =>
+        token === PLUGIN_AUDIT_HOST_PROVIDER ? { record } : undefined,
+      );
+      await expect(build([]).audit.record({
+        action: 'wago.claim', operationId: 'operation-id', outcome: 'succeeded',
+        principal: { userId: 7, authenticationMethod: 'session' },
+        subject: { type: 'wago.controller', id: 2 }, details: {},
+      })).resolves.toEqual({ status: 'recorded' });
+      expect(record).toHaveBeenCalledWith(expect.objectContaining({ pluginId: 'plugin-id' }));
+      expect(moduleRef.get).toHaveBeenCalledWith(PLUGIN_AUDIT_HOST_PROVIDER, { strict: false });
     });
 
     it('hands back the live host DataSource when DATABASE_ACCESS is granted', () => {
