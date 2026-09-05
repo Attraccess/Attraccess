@@ -50,12 +50,16 @@ export class WagoControllerApi {
   @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/deliver') deliverCommissioningSession(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { temporarySsh?: { username?: string; password?: string } },
+    @Body() body: { confirmInstall?: boolean; temporarySsh?: { username?: string; password?: string } },
   ) {
+    if (body?.confirmInstall !== true) throw new BadRequestException('Explicit installation consent is required');
+    if (typeof body.temporarySsh?.username !== 'string' || !body.temporarySsh.username.trim() ||
+        typeof body.temporarySsh.password !== 'string' || !body.temporarySsh.password) {
+      throw new BadRequestException('Temporary SSH username and password are required');
+    }
     return this.commissioning.deliver(id, {
-      temporarySsh: body?.temporarySsh
-        ? { username: body.temporarySsh.username ?? '', password: body.temporarySsh.password ?? '' }
-        : undefined,
+      confirmInstall: true,
+      temporarySsh: { username: body.temporarySsh.username, password: body.temporarySsh.password },
     });
   }
   @Auth('system.settings.manage')
