@@ -79,13 +79,18 @@ export function ConfigurationMetadataChanges({
         {changes.map((change) => (
           <li key={change.path}>
             <p className="wg:font-medium">{metadataChangeLabel(change.path, names)}</p>
-            <p className="wg:text-sm">Before: {readableValue(change.previous, names)}</p>
-            <p className="wg:text-sm">After: {readableValue(change.current, names)}</p>
+            <p className="wg:text-sm">Before: {readableMetadataValue(change.path, change.previous, names)}</p>
+            <p className="wg:text-sm">After: {readableMetadataValue(change.path, change.current, names)}</p>
           </li>
         ))}
       </ul>
     </section>
   );
+}
+
+function readableMetadataValue(path: string, value: unknown, names: Record<string, string>) {
+  if (path.startsWith('$.names.') && typeof value === 'string') return value;
+  return readableValue(value, names);
 }
 
 function metadataChangeLabel(path: string, names: Record<string, string>) {
