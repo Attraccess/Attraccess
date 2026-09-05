@@ -146,15 +146,24 @@ function connectOperational(state: SimulatorState): void {
   const operationalRuntime = new WagoRuntime(runtimeOptions);
   let started = false;
   let lifecycle = Promise.resolve();
+  let connectionGeneration = 0;
   operationalClient.on('connect', () => {
+    const generation = ++connectionGeneration;
     lifecycle = lifecycle.then(() =>
       handleAsync(async () => {
+        if (generation !== connectionGeneration) return;
         if (!started) {
           await operationalRuntime.start();
           started = true;
         } else {
           await operationalRuntime.setConnected(true);
           await operationalRuntime.publishHeartbeat();
+        }
+        // A disconnect can occur while startup awaits subscriptions or publishes.
+        // Do not let that stale completion restore an operational state or timers.
+        if (generation !== connectionGeneration) {
+          await operationalRuntime.setConnected(false);
+          return;
         }
         process.stdout.write(`WAGO CC100 simulator connected as ${hardwareId}\n`);
         timers.forEach(clearInterval);
@@ -168,8 +177,11 @@ function connectOperational(state: SimulatorState): void {
     );
   });
   operationalClient.on('close', () => {
+    connectionGeneration++;
     timers.forEach(clearInterval);
-    lifecycle = lifecycle.then(() => handleAsync(() => operationalRuntime.setConnected(false)));
+    timers = [];
+    // Safety shutdown must not wait for pending MQTT subscriptions or PUBACKs.
+    void handleAsync(() => operationalRuntime.setConnected(false));
   });
 }
 
