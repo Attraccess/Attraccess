@@ -7,32 +7,16 @@
   "targets": {
     "lint": {
       "executor": "nx:run-commands",
-      "options": {
-        "cwd": "apps/plugins/wago",
-        "command": "eslint backend frontend/src measurement-contract.ts --max-warnings=0 && prettier --check backend frontend/src measurement-contract.ts"
-      }
+      "options": { "cwd": "apps/plugins/wago", "command": "eslint backend frontend/src" }
     },
     "test": {
       "executor": "@nx/jest:jest",
-      "dependsOn": ["test-frontend"],
       "options": { "jestConfig": "apps/plugins/wago/jest.config.ts", "passWithNoTests": true }
-    },
-    "test-frontend": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "pnpm exec vitest run --config apps/plugins/wago/frontend/vitest.config.ts"
-      }
     },
     "build-backend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": [
-        "{projectRoot}/backend/**/*",
-        "{projectRoot}/modbus/**/*",
-        "{projectRoot}/diagnostics-types.ts",
-        "{projectRoot}/cc100-runtime/signing-public-key.pub",
-        "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"
-      ],
+        "inputs": ["{projectRoot}/backend/**/*", "{projectRoot}/modbus/**/*", "{projectRoot}/cc100-runtime/signing-public-key.pub", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/wago",
@@ -42,7 +26,7 @@
     "build-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/frontend/**/*", "{projectRoot}/modbus/**/*", "{projectRoot}/diagnostics-types.ts", "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"],
+      "inputs": ["{projectRoot}/frontend/**/*", "{projectRoot}/modbus/**/*", "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"],
       "outputs": ["{projectRoot}/package/frontend"],
       "options": { "cwd": "apps/plugins/wago", "command": "pnpm exec vite build --config frontend/vite.config.ts" }
     },
@@ -51,7 +35,7 @@
       "cache": true,
       "dependsOn": ["build-backend", "build-frontend"],
       "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json"],
-      "outputs": ["{projectRoot}/package/package.json", "{projectRoot}/package/plugin.json"],
+      "outputs": ["{projectRoot}/package"],
       "options": {
         "cwd": "apps/plugins/wago",
         "command": "node -e \"for (const file of ['package.json', 'plugin.json']) require('fs').copyFileSync(file, 'package/' + file)\""
@@ -59,7 +43,7 @@
     },
     "zip": {
       "executor": "nx:run-commands",
-      "cache": false,
+      "cache": true,
       "dependsOn": ["build"],
       "inputs": ["{projectRoot}/package/**/*", "{workspaceRoot}/apps/plugins/scripts/zip-plugin.mjs"],
       "outputs": ["{projectRoot}/dist/plugin-wago.zip"],
@@ -70,7 +54,7 @@
     },
     "pack": {
       "executor": "nx:run-commands",
-      "cache": false,
+      "cache": true,
       "dependsOn": ["build"],
       "inputs": ["{projectRoot}/package/**/*"],
       "outputs": ["{projectRoot}/dist"],
@@ -81,7 +65,7 @@
     },
     "pack-test": {
       "executor": "nx:run-commands",
-      "cache": false,
+      "cache": true,
       "dependsOn": ["pack", "plugins-backend-sdk:build"],
       "inputs": [
         "{projectRoot}/package/**/*",

@@ -236,7 +236,7 @@ export function ModbusProfileForm({
   onChange: (value: ModbusProfile) => void;
   isDisabled?: boolean;
 }) {
-  const readonly = isDisabled || BUILTIN_MODBUS_PROFILES.includes(value);
+  const readonly = isDisabled || BUILTIN_MODBUS_PROFILES.some((p) => p.id === value.id);
   return (
     <section className="flex flex-col gap-4">
       <header>
@@ -627,18 +627,13 @@ export function ModbusConfigurationForm({ value, onChange, isDisabled = false }:
       >
         Add device
       </Button>
-      {profiles.map((p, profileIndex) => (
+      {profiles.map((p) => (
         <div key={p.id}>
           <ModbusProfileForm
             value={p}
             isDisabled={isDisabled}
             onChange={(updated) =>
-              onChange({
-                ...value,
-                profiles: value.profiles.map((item, i) =>
-                  i === profileIndex - BUILTIN_MODBUS_PROFILES.length ? updated : item,
-                ),
-              })
+              onChange({ ...value, profiles: value.profiles.map((item) => (item.id === p.id ? updated : item)) })
             }
           />
           <Button

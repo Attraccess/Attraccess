@@ -7,9 +7,9 @@ import {
   type ModbusMeasurement,
   validateModbus,
 } from '../../../modbus/model';
-import type { DeviceAdapter, Snapshot, ValidationError } from '../runtime';
+import type { DeviceAdapter, Snapshot } from '../runtime';
 import { decodeRaw, readPdu, writePdu } from './protocol';
-import { type ModbusTransport, ModbusTransportError, QueuedModbusTransport } from './transports';
+import { type ModbusTransport, QueuedModbusTransport } from './transports';
 
 type Point = Snapshot['physicalPoints'][number];
 export class CumulativeCounter {
@@ -47,15 +47,6 @@ export class ModbusDeviceRouter implements DeviceAdapter {
   ) {}
   configure(snapshot: Snapshot): void {
     this.prepareConfiguration(snapshot)();
-  }
-  validate(snapshot: Snapshot): ValidationError[] {
-    const onboardPointIds = new Set(snapshot.physicalPoints.filter((point) => !point.modbus).map((point) => point.id));
-    if (!onboardPointIds.size || !this.onboard.validate) return [];
-    return this.onboard.validate({
-      ...snapshot,
-      physicalPoints: snapshot.physicalPoints.filter((point) => onboardPointIds.has(point.id)),
-      logicalChannels: snapshot.logicalChannels.filter((channel) => onboardPointIds.has(channel.physicalPointId)),
-    });
   }
   /** Build the next immutable routing table without changing active I/O or history. */
   prepareConfiguration(snapshot: Snapshot): () => void {
@@ -161,12 +152,6 @@ export class ModbusDeviceRouter implements DeviceAdapter {
     if (this.active.has(key) || now < (this.due.get(key) ?? 0)) return false;
     this.due.set(key, now + m.pollIntervalMs);
     return true;
-  }
-  writeMayHaveBeenTransmitted(error: unknown): boolean {
-    return !(
-      error instanceof ModbusTransportError &&
-      ['modbus_queue_full', 'modbus_configuration_changed'].includes(error.code)
-    );
   }
   async write(point: Point, value: boolean): Promise<void> {
     if (this.suspended) throw new Error('Modbus configuration persistence in progress');
