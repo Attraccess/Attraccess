@@ -98,6 +98,7 @@ export function configurationReportedWildcardTopic(prefix: string): string {
 
 type WagoOperationalMessageBase = {
   timestamp: string;
+  streamId: string;
   sequence: number;
 };
 
@@ -107,13 +108,12 @@ export type WagoStateMessage = WagoOperationalMessageBase & {
   revision: number | null;
   contentHash: string | null;
   outputs: Record<string, boolean>;
+  inputs?: Record<string, boolean>;
 };
 
-export type WagoMeasurementMessage = WagoOperationalMessageBase & {
+export type WagoMeasurementMessage = WagoOperationalMessageBase &
+  Measurement & {
   category: 'measurement';
-  channelId: string;
-  unit: string;
-  value: number;
 };
 
 export type WagoFaultMessage = WagoOperationalMessageBase & {
@@ -145,16 +145,26 @@ export function parseOperationalMessage(
   const root = `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/`;
   if (!topic.startsWith(root)) return null;
   const [hardwareId, suffix, extra] = topic.slice(root.length).split('/');
-  if (!hardwareId || extra || !['state', 'measurements', 'faults', 'acknowledgements'].includes(suffix)) return null;
+  if (
+    !hardwareId ||
+    /[+#]/.test(hardwareId) ||
+    extra !== undefined ||
+    !['state', 'measurements', 'faults', 'acknowledgements'].includes(suffix)
+  )
+    return null;
   const value = parseObject(payload, 'operational message');
   const timestamp = requiredTimestamp(value.timestamp);
   const sequence = requiredSequence(value.sequence);
+  if (typeof value.streamId !== 'string' || !value.streamId.trim() || value.streamId.length > 128)
+    throw new Error('operational streamId is invalid');
+  const streamId = value.streamId;
   if (suffix === 'state') {
     if (
       typeof value.connected !== 'boolean' ||
       !isNullableInteger(value.revision) ||
       !isNullableString(value.contentHash) ||
-      !isBooleanRecord(value.outputs)
+      !isBooleanRecord(value.outputs) ||
+      (value.inputs !== undefined && !isBooleanRecord(value.inputs))
     )
       throw new Error('invalid state message');
     return {
@@ -162,31 +172,25 @@ export function parseOperationalMessage(
       message: {
         category: 'state',
         timestamp,
+        streamId,
         sequence,
         connected: value.connected,
         revision: value.revision as number | null,
         contentHash: value.contentHash as string | null,
         outputs: value.outputs as Record<string, boolean>,
+        ...(value.inputs !== undefined ? { inputs: value.inputs as Record<string, boolean> } : {}),
       },
     };
   }
   if (suffix === 'measurements') {
-    if (
-      typeof value.channelId !== 'string' ||
-      typeof value.unit !== 'string' ||
-      typeof value.value !== 'number' ||
-      !Number.isFinite(value.value)
-    )
-      throw new Error('invalid measurement message');
     return {
       hardwareId,
       message: {
         category: 'measurement',
         timestamp,
+        streamId,
         sequence,
-        channelId: value.channelId,
-        unit: value.unit,
-        value: value.value,
+        ...parseMeasurement(value),
       },
     };
   }
@@ -198,6 +202,7 @@ export function parseOperationalMessage(
       message: {
         category: 'fault',
         timestamp,
+        streamId,
         sequence,
         channelId: value.channelId,
         code: value.code,
@@ -216,6 +221,7 @@ export function parseOperationalMessage(
     message: {
       category: 'acknowledgement',
       timestamp,
+      streamId,
       sequence,
       id: value.id,
       status: value.status as 'accepted' | 'duplicate' | 'rejected',
@@ -255,11 +261,17 @@ function parseObject(payload: Buffer, label: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 function requiredTimestamp(value: unknown): string {
-  if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) throw new Error('operational timestamp is invalid');
+  if (
+    typeof value !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) ||
+    Number.isNaN(Date.parse(value)) ||
+    new Date(value).toISOString() !== value
+  )
+    throw new Error('operational timestamp is invalid');
   return value;
 }
 function requiredSequence(value: unknown): number {
-  if (!Number.isSafeInteger(value) || (value as number) < 0) throw new Error('operational sequence is invalid');
+  if (!Number.isSafeInteger(value) || (value as number) < 1) throw new Error('operational sequence is invalid');
   return value as number;
 }
 function isNullableInteger(value: unknown): boolean {
@@ -276,3 +288,4 @@ function isBooleanRecord(value: unknown): boolean {
     Object.values(value).every((item) => typeof item === 'boolean')
   );
 }
+import { type Measurement, parseMeasurement } from '../measurement-contract';
