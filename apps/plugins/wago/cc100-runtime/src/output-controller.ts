@@ -6,7 +6,6 @@ type Pulse = { timer: ReturnType<typeof setTimeout>; channel: LogicalChannel; po
 
 const INITIAL_PULSE_SHUTDOWN_RETRY_DELAY_MS = 100;
 const MAX_PULSE_SHUTDOWN_RETRY_DELAY_MS = 5_000;
-const MAX_PULSE_SHUTDOWN_ATTEMPTS = 5;
 
 export class OutputController {
   private readonly pulses = new Map<string, Pulse>();
@@ -242,7 +241,6 @@ export class OutputController {
   private retryPulseShutdown(channelId: string, pulse: Pulse, attempt: number): void {
     // Keep the pulse so a subsequent configuration replacement cannot activate
     // a new snapshot until this captured physical point has been shut down.
-    if (attempt > MAX_PULSE_SHUTDOWN_ATTEMPTS) return;
     const delayMs = Math.min(
       INITIAL_PULSE_SHUTDOWN_RETRY_DELAY_MS * 2 ** (attempt - 1),
       MAX_PULSE_SHUTDOWN_RETRY_DELAY_MS,
