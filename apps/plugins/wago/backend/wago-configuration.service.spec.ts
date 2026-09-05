@@ -82,7 +82,7 @@ describe('configuration editor service boundaries', () => {
       revision,
       force,
       preview.revision.contentHash,
-      preview.current ? `${preview.current.revision}:${preview.current.contentHash}` : null,
+      preview.current?.contentHash ?? null,
       preview.draftHash,
     );
   }
@@ -114,24 +114,6 @@ describe('configuration editor service boundaries', () => {
     await service.publishDraft(1);
     expect(JSON.parse(String(mqtt.publish.mock.calls[0][2])).snapshot).toEqual(snapshot);
     expect(mqtt.publish.mock.calls[0][2]).not.toContain('Machine enable');
-  });
-
-  it('includes editor metadata changes in reviews and rollback previews', async () => {
-    const { service } = fixture();
-    await service.saveDraft(1, snapshot, { names: { output: 'Original' }, presets: [] });
-    await service.reviewDraft(1);
-    await service.publishDraft(1);
-    await service.saveDraft(1, snapshot, { names: { output: 'Renamed' }, presets: [] });
-    const review = await service.reviewDraft(1);
-
-    expect(review.changed).toBe(true);
-    expect(review.diff).toEqual([]);
-    expect(review.metadataDiff).toEqual([{ path: '$.names.output', previous: 'Original', current: 'Renamed' }]);
-
-    await service.publishDraft(1);
-    const preview = await service.previewRevision(1, 1);
-    expect(preview.diff).toEqual([]);
-    expect(preview.metadataDiff).toEqual([{ path: '$.names.output', previous: 'Renamed', current: 'Original' }]);
   });
 
   it('restores historical names and preset provenance with a rollback', async () => {
@@ -206,10 +188,7 @@ describe('configuration editor service boundaries', () => {
     await service.saveDraft(1, { ...snapshot, logicalChannels: [] });
     await service.reviewDraft(1);
     expect(review.draft.reviewedHash).toBe(
-      configurationHash({
-        draft: configurationHash({ snapshot: canonicalSnapshot(snapshot), metadata: null }),
-        impacts: [],
-      }),
+      configurationHash({ snapshot: canonicalSnapshot(snapshot), metadata: null }),
     );
     await expect(service.publishDraft(1, true, review.draft.reviewedHash ?? '')).rejects.toThrow('draft changed');
     expect(mqtt.publish).not.toHaveBeenCalled();
@@ -231,7 +210,7 @@ describe('configuration editor service boundaries', () => {
         1,
         true,
         preview.revision.contentHash,
-        preview.current ? `${preview.current.revision}:${preview.current.contentHash}` : null,
+        preview.current?.contentHash ?? null,
         preview.draftHash,
       ),
     ).rejects.toThrow('configuration changed');
@@ -436,20 +415,14 @@ describe('configuration editor service boundaries', () => {
           1,
           true,
           preview.revision.contentHash,
-          preview.current ? `${preview.current.revision}:${preview.current.contentHash}` : null,
+          preview.current?.contentHash ?? null,
           preview.draftHash,
         ),
       ).rejects.toThrow('configuration changed');
       expect(draft()).toEqual(before);
       expect(mqtt.publish).toHaveBeenCalledTimes(1);
       await expect(
-        service.rollback(
-          1,
-          1,
-          true,
-          preview.revision.contentHash,
-          preview.current ? `${preview.current.revision}:${preview.current.contentHash}` : null,
-        ),
+        service.rollback(1, 1, true, preview.revision.contentHash, preview.current?.contentHash ?? null),
       ).rejects.toThrow('configuration changed');
     },
   );

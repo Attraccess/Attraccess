@@ -6,7 +6,7 @@ import {
   useConfigurationRevisionsQuery,
   useConfigurationRevisionPreviewQuery,
 } from './queries';
-import { ConfigurationChanges, ConfigurationErrors, ConfigurationMetadataChanges } from './ConfigurationChanges';
+import { ConfigurationChanges, ConfigurationErrors } from './ConfigurationChanges';
 import { readMetadata } from './configuration-model';
 
 function ImpactWarning({
@@ -173,7 +173,6 @@ export function ConfigurationRevisions({
             after={JSON.parse(review.draft.snapshot)}
             names={reviewNames}
           />
-          <ConfigurationMetadataChanges changes={review.metadataDiff ?? []} names={reviewNames} />
           <ImpactWarning impacts={review.impacts} names={reviewNames} acknowledged={force} onChange={setForce} />
           <Button
             isDisabled={disabled || busy || !reviewedHash || (!!review.impacts.length && !force)}
@@ -197,6 +196,9 @@ export function ConfigurationRevisions({
           revision history.
         </p>
       )}
+      <p role="status">
+        Hardware readiness: unknown. An applied revision confirms configuration acceptance, not physical I/O readiness.
+      </p>
       <h3 className="wg:font-medium">Revision history and deployment progress</h3>
       {history.isPending && <p>Loading history…</p>}
       {history.isError && <p role="alert">Could not load history: {history.error.message}</p>}
@@ -258,7 +260,6 @@ export function ConfigurationRevisions({
             after={JSON.parse(preview.revision.snapshot)}
             names={rollbackNames}
           />
-          <ConfigurationMetadataChanges changes={preview.metadataDiff ?? []} names={rollbackNames} />
           <ImpactWarning
             impacts={preview.impacts}
             names={rollbackNames}
@@ -277,9 +278,8 @@ export function ConfigurationRevisions({
                     revision: preview.revision.revision,
                     force: rollbackForce,
                     sourceHash: preview.revision.contentHash,
-                    currentHash: preview.current ? `${preview.current.revision}:${preview.current.contentHash}` : null,
+                    currentHash: preview.current?.contentHash ?? null,
                     draftHash: preview.draftHash,
-                    impactHash: preview.impactHash,
                   });
                 } catch (error) {
                   failure = error;
