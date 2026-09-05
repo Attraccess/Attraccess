@@ -37,10 +37,10 @@ export function checkWagoAcceptance(evidence) {
     if (!text(evidence.controller?.[key])) errors.push(`controller.${key} is required.`);
   }
   for (const key of ['pluginCommit', 'runtimeCommit']) {
-    if (!/^[a-f0-9]{40}$/.test(evidence.build?.[key] ?? '')) errors.push(`build.${key} must be a full commit SHA.`);
+    if (typeof evidence.build?.[key] !== 'string' || !/^[a-f0-9]{40}$/.test(evidence.build[key])) errors.push(`build.${key} must be a full commit SHA.`);
   }
   for (const key of ['frontendDigest', 'backendDigest', 'runtimeDigest']) {
-    if (!/^sha256:[a-f0-9]{64}$/.test(evidence.build?.[key] ?? '')) errors.push(`build.${key} must be a SHA-256 digest.`);
+    if (typeof evidence.build?.[key] !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(evidence.build[key])) errors.push(`build.${key} must be a SHA-256 digest.`);
   }
   for (const key of ['protocolVersion', 'signedBundleEvidence', 'visualArtifactProvisioningEvidence']) {
     if (!text(evidence.build?.[key])) errors.push(`build.${key} is required.`);

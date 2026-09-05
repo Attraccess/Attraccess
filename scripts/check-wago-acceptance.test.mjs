@@ -60,3 +60,13 @@ test('requires exact baseline, artifact digests and qualified Modbus evidence', 
   evidence.modbus.qualificationEvidence = '';
   assert.equal(checkWagoAcceptance(evidence).length, 4);
 });
+
+test('does not coerce arrays or other JSON types into artifact identifiers', () => {
+  for (const key of ['pluginCommit', 'runtimeCommit', 'frontendDigest', 'backendDigest', 'runtimeDigest']) {
+    for (const wrongType of [[fixture().build[key]], null, {}, true, 123]) {
+      const evidence = fixture();
+      evidence.build[key] = wrongType;
+      assert.ok(checkWagoAcceptance(evidence).some((error) => error.startsWith(`build.${key}`)));
+    }
+  }
+});
