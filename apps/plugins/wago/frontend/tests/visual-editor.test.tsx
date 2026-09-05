@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import '@testing-library/jest-dom/vitest';
 import { ConfigurationEditor } from '../src/ConfigurationEditor';
+import { ConfigurationMetadataChanges } from '../src/ConfigurationChanges';
 import type { WagoConfigurationSnapshot } from '../src/api';
 
 const state = vi.hoisted(() => ({
@@ -106,6 +107,18 @@ function mount() {
 }
 
 describe('visual configuration workflow', () => {
+  it('renders literal editor names in metadata changes', () => {
+    render(
+      <ConfigurationMetadataChanges
+        changes={[{ path: '$.names.output', previous: 'Pump-A', current: 'Pump A' }]}
+        names={{ output: 'Pump A' }}
+      />,
+    );
+
+    expect(screen.getByText('Before: Pump-A')).toBeInTheDocument();
+    expect(screen.getByText('After: Pump A')).toBeInTheDocument();
+  });
+
   it.each(['success', 'delivery failure', 'refresh failure'] as const)(
     'reconciles rollback after %s and sends the previewed draft identity',
     async (outcome) => {
