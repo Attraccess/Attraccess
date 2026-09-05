@@ -38,6 +38,14 @@ into `build/<variant>/`, and writes `firmware_output/` containing per variant:
 - `<name>_<variant>.elf` — unstripped ELF for server-side coredump symbolication
 - `firmwares.json` — manifest consumed by the Attraccess API/frontend
 
+Build directories are retained so CMake and Ninja can reuse unchanged work on
+the next build. Pass `--clean` to discard that state, for example after a
+toolchain upgrade:
+
+```bash
+python3 build_firmwares.py --clean
+```
+
 Build a single variant during development:
 
 ```bash

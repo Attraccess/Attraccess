@@ -25,11 +25,32 @@ runs:
 
     - uses: ./.github/actions/esp-idf-toolchain
 
+    # Reuse the per-variant CMake/Ninja trees between PR, nightly, and release
+    # runs. A prefix restore gives Ninja the nearest prior tree when firmware
+    # sources changed; it then rebuilds only the affected compilation units.
+    - name: Restore firmware build cache
+      id: cache-firmware-build
+      uses: actions/cache/restore@v6
+      with:
+        path: apps/attractap/firmware/build
+        key: attractap-firmware-build-v1-${{ runner.os }}-${{ hashFiles('apps/attractap/firmware/CMakeLists.txt', 'apps/attractap/firmware/main/**', 'apps/attractap/firmware/variants/**', 'apps/attractap/firmware/sdkconfig.defaults', 'apps/attractap/firmware/version.txt', 'apps/attractap/firmware/partitions.csv', 'apps/attractap/firmware/include/**', 'apps/attractap/firmware/build_firmwares.py', 'apps/attractap/firmware/src/**', '!apps/attractap/firmware/src/certs/**', 'apps/attractap/firmware/tools/**', '.github/actions/esp-idf-toolchain/action.yml') }}
+        restore-keys: |
+          attractap-firmware-build-v1-${{ runner.os }}-
+
     - name: Build all firmware variants
       run: |
         cd apps/attractap/firmware
         python3 build_firmwares.py
       shell: bash
+
+    # Save only successful builds. Cache entries are immutable, so a failed
+    # build must never become the exact entry for subsequent workflow runs.
+    - name: Save firmware build cache
+      if: steps.cache-firmware-build.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: apps/attractap/firmware/build
+        key: attractap-firmware-build-v1-${{ runner.os }}-${{ hashFiles('apps/attractap/firmware/CMakeLists.txt', 'apps/attractap/firmware/main/**', 'apps/attractap/firmware/variants/**', 'apps/attractap/firmware/sdkconfig.defaults', 'apps/attractap/firmware/version.txt', 'apps/attractap/firmware/partitions.csv', 'apps/attractap/firmware/include/**', 'apps/attractap/firmware/build_firmwares.py', 'apps/attractap/firmware/src/**', '!apps/attractap/firmware/src/certs/**', 'apps/attractap/firmware/tools/**', '.github/actions/esp-idf-toolchain/action.yml') }}
 
     - name: Copy firmware into API assets
       run: node apps/api/copy-attractap-firmware-into-assets.js
