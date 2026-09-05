@@ -8,6 +8,10 @@ import { WagoConfigurationRevision } from './wago-configuration-revision.entity'
 import { configurationHash } from './configuration';
 
 describe('WagoService', () => {
+  const services: WagoService[] = [];
+  afterEach(() => {
+    services.splice(0).forEach((service) => service.onModuleDestroy());
+  });
   const controller = (): WagoController => ({
     id: 1,
     hardwareId: 'cc100-01',
@@ -85,7 +89,14 @@ describe('WagoService', () => {
     };
     settingsRepository.createQueryBuilder.mockReturnValue(settingsQuery);
     const subscriptions: Array<{ unsubscribe: jest.Mock }> = [];
+    const flowQuery = {
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    };
     const context = {
+      dataSource: { getRepository: () => ({ createQueryBuilder: () => flowQuery }) },
       getRepository: jest.fn((entity) => {
         if (entity === WagoController) return controllerRepository;
         if (entity === WagoEnrollment) return enrollmentRepository;
@@ -106,6 +117,7 @@ describe('WagoService', () => {
       getMqttCredentialProvisioning: jest.fn(),
     } as unknown as PluginContext;
     const service = new WagoService(context);
+    services.push(service);
     // Unit tests invoke service methods directly, outside Nest's module lifecycle.
     Object.assign(service, {
       controllers: controllerRepository,
@@ -485,7 +497,7 @@ describe('WagoService', () => {
     const snapshot = { version: 1, physicalPoints: [], logicalChannels: [] };
     draftRepository.findOneBy.mockResolvedValue({
       controllerId: claimed.id,
-      reviewedHash: configurationHash(snapshot),
+      reviewedHash: configurationHash({ snapshot: JSON.stringify(snapshot), metadata: null }),
       snapshot: JSON.stringify(snapshot),
     });
 
@@ -687,7 +699,10 @@ describe('WagoService', () => {
     const { service, context } = createService([first, second]);
     let releaseFirst!: () => void;
     const onConfigurationReported = jest
-      .spyOn(service as never, 'onConfigurationReported')
+      .spyOn(
+        service as unknown as { onConfigurationReported: WagoService['onConfigurationReported'] },
+        'onConfigurationReported',
+      )
       .mockImplementation((controllerId) =>
         controllerId === first.id ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve(),
       );
@@ -721,10 +736,15 @@ describe('WagoService', () => {
     const { service, context } = createService([claimed]);
     let releaseFirst!: () => void;
     const processed: Buffer[] = [];
-    jest.spyOn(service as never, 'onConfigurationReported').mockImplementation((_controllerId, payload) => {
-      processed.push(payload);
-      return processed.length === 1 ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve();
-    });
+    jest
+      .spyOn(
+        service as unknown as { onConfigurationReported: WagoService['onConfigurationReported'] },
+        'onConfigurationReported',
+      )
+      .mockImplementation((_controllerId, payload) => {
+        processed.push(payload);
+        return processed.length === 1 ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve();
+      });
 
     await service.onApplicationBootstrap();
 
@@ -751,10 +771,15 @@ describe('WagoService', () => {
     const { service, context } = createService([claimed]);
     let releaseFirst!: () => void;
     const processed: Buffer[] = [];
-    jest.spyOn(service as never, 'onConfigurationReported').mockImplementation((_controllerId, payload) => {
-      processed.push(payload);
-      return processed.length === 1 ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve();
-    });
+    jest
+      .spyOn(
+        service as unknown as { onConfigurationReported: WagoService['onConfigurationReported'] },
+        'onConfigurationReported',
+      )
+      .mockImplementation((_controllerId, payload) => {
+        processed.push(payload);
+        return processed.length === 1 ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve();
+      });
 
     await service.onApplicationBootstrap();
 
@@ -1083,7 +1108,9 @@ describe('WagoService', () => {
     await new Promise<void>((resolve) => setImmediate(resolve));
     const message = { topic: 'attraccess/wago/discovery/cc100-01', payload: Buffer.from('{}') };
 
-    const onDiscovery = jest.spyOn(service as never, 'onDiscovery').mockResolvedValue(undefined);
+    const onDiscovery = jest
+      .spyOn(service as unknown as { onDiscovery: WagoService['onDiscovery'] }, 'onDiscovery')
+      .mockResolvedValue(undefined);
     await secondCallback(message);
     expect(onDiscovery).not.toHaveBeenCalled();
 

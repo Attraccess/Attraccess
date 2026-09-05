@@ -11,12 +11,21 @@
     },
     "test": {
       "executor": "@nx/jest:jest",
+      "dependsOn": ["test-frontend"],
       "options": { "jestConfig": "apps/plugins/wago/jest.config.ts", "passWithNoTests": true }
+    },
+    "test-frontend": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm exec vitest run --config apps/plugins/wago/frontend/vitest.config.mts" }
     },
     "build-backend": {
       "executor": "nx:run-commands",
       "cache": true,
-        "inputs": ["{projectRoot}/backend/**/*", "{projectRoot}/cc100-runtime/signing-public-key.pub", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
+      "inputs": [
+        "{projectRoot}/backend/**/*",
+        "{projectRoot}/cc100-runtime/signing-public-key.pub",
+        "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"
+      ],
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/wago",
