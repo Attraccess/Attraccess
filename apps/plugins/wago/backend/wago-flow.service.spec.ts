@@ -789,6 +789,30 @@ describe('WagoFlowService', () => {
     );
   });
 
+  it('resets minimum-change comparisons when units, kinds or boot streams change', () => {
+    const { service } = createService();
+    const config = { controllerId: 1, channelId: 'power', category: 'measurement', minimumChange: 10 };
+    const previous = {
+      controllerId: 1,
+      hardwareId: 'cc100-01',
+      channelId: 'power',
+      category: 'measurement',
+      value: 500,
+      unit: 'milliampere',
+      kind: 'live',
+      timestamp: '2026-08-30T00:00:00.000Z',
+      sequence: 1,
+      streamId: STREAM_A,
+      receivedAt: 0,
+    } as const;
+
+    expect(service['matchesEvent'](config, 'node', { ...previous, value: 505 }, previous)).toBe(false);
+    expect(service['matchesEvent'](config, 'node', { ...previous, value: 520 }, previous)).toBe(true);
+    expect(service['matchesEvent'](config, 'node', { ...previous, unit: 'ampere' }, previous)).toBe(true);
+    expect(service['matchesEvent'](config, 'node', { ...previous, kind: 'cumulative' }, previous)).toBe(true);
+    expect(service['matchesEvent'](config, 'node', { ...previous, streamId: STREAM_B }, previous)).toBe(true);
+  });
+
   it('applies minimum intervals from the last dispatch for each trigger node', () => {
     const { service } = createService();
     const config = { controllerId: 1, channelId: 'door', category: 'state', minimumIntervalMs: 75 };
