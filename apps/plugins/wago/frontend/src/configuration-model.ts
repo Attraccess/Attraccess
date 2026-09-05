@@ -1,3 +1,4 @@
+import { BUILTIN_MODBUS_PROFILES } from '../../modbus/model';
 import type { ConfigurationDiff, ConfigurationEditorMetadata, WagoConfigurationSnapshot } from './api';
 import { availableDigitalTerminals, digitalTerminalLabel } from '../../backend/configuration-digital';
 
@@ -87,7 +88,8 @@ export function readableValue(value: unknown, names: Record<string, string>): st
     }
     return Object.entries(value)
       .map(
-        ([key, item]) => `${fieldLabels[key] ?? (key === 'id' ? 'Name' : words(key))}: ${readableValue(item, names)}`,
+        ([key, item]) =>
+          `${fieldLabels[key] ?? (key === 'id' ? 'Name' : words(key))}: ${['name', 'host', 'path'].includes(key) && typeof item === 'string' ? item : readableValue(item, names)}`,
       )
       .join('; ');
   }
@@ -101,6 +103,7 @@ export function readableChangeValue(
   snapshot: WagoConfigurationSnapshot | null,
   names: Record<string, string>,
 ) {
+  if (/\.(name|host|path)$/.test(path) && typeof value === 'string') return value;
   const point = path.match(/^(?:\$\.)?physicalPoints\[(\d+)\]\.channel$/);
   if (point && typeof value === 'number' && snapshot?.physicalPoints[Number(point[1])]?.hardwareProfile === '751-9301')
     return `CC100 ${digitalTerminalLabel(value)}`;
@@ -189,6 +192,14 @@ export function changeLabel(
     const label = names[id] ?? id;
     return `${label} · ${change.current === undefined ? 'Removed' : change.previous === undefined ? 'Added' : 'Changed'}`;
   }
+  const modbus = change.path.match(/^(?:\$\.)?modbus\.(connections|devices|profiles)\[(\d+)\](.*)$/);
+  if (modbus) {
+    const collection = modbus[1] as 'connections' | 'devices' | 'profiles';
+    const index = Number(modbus[2]);
+    const item = after.modbus?.[collection][index] ?? before?.modbus?.[collection][index];
+    const label = item && 'name' in item ? item.name : `Connection ${index + 1}`;
+    return `${label}${modbus[3] ? ` · ${names[modbus[3].slice(1)] ?? words(modbus[3].slice(1))}` : ''}`;
+  }
   const match = change.path.match(/^(?:\$\.)?(logicalChannels|physicalPoints)\[(\d+)\](.*)$/);
   if (!match) return change.path === '$' ? 'Configuration' : words(change.path.replace(/^\$\./, ''));
   const collection = match[1] as 'logicalChannels' | 'physicalPoints';
@@ -199,4 +210,20 @@ export function changeLabel(
       : `${collection === 'logicalChannels' ? 'Channel' : 'Physical point'} ${Number(match[2]) + 1}`;
   const field = match[3].slice(1);
   return `${label}${field ? ` · ${fieldLabels[field] ?? words(field)}` : ''}`;
+}
+
+export function configurationNames(snapshot: WagoConfigurationSnapshot | null, names: Record<string, string>) {
+  const modbus = snapshot?.modbus;
+  if (!modbus) return names;
+  return {
+    ...Object.fromEntries([
+      ...modbus.connections.map((c, index) => [c.id, `Connection ${index + 1}`]),
+      ...modbus.devices.map((d) => [d.id, d.name]),
+      ...[...BUILTIN_MODBUS_PROFILES, ...modbus.profiles].flatMap((p) => [
+        [p.id, p.name],
+        ...[...p.measurements, ...p.actions].map((entry) => [entry.id, entry.name]),
+      ]),
+    ]),
+    ...names,
+  };
 }
