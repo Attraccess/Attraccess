@@ -177,8 +177,30 @@ describe('WAGO producer-to-consumer measurement contract', () => {
   });
 
   it.each([
-    ['unknown unit', { unit: 'unrecognized', scale: 1, offset: 0 }, 1, 'unknown_measurement_unit'],
-    ['invalid transform', { unit: 'volt', scale: Infinity, offset: 0 }, 1, 'invalid_measurement_transform'],
+    ['unknown unit', { unit: 'unrecognized', scale: 1, offset: 0 }, 'unknown_measurement_unit'],
+    ['invalid transform', { unit: 'volt', scale: Infinity, offset: 0 }, 'invalid_measurement_transform'],
+  ])(
+    'rejects persisted %s before acquisition and preserves the encoder error contract',
+    async (_label, transform, code) => {
+      const invalid: Snapshot = {
+        ...snapshot,
+        logicalChannels: [{ ...snapshot.logicalChannels[0], measurement: transform }],
+      };
+      await store.save({
+        outputs: {},
+        commandIds: [],
+        accepted: { revision: 8, contentHash: hash(invalid), snapshot: invalid },
+      });
+      const read = jest.spyOn(device, 'read');
+      messages.length = 0;
+      await expect(createRuntime().start()).rejects.toThrow('persisted configuration is invalid');
+      expect(read).not.toHaveBeenCalled();
+      expect(messages).toEqual([]);
+      expect(() => encodeMeasurement('current', 1, transform)).toThrow(expect.objectContaining({ code }));
+    },
+  );
+
+  it.each([
     ['boolean reading', { unit: 'volt', scale: 1, offset: 0 }, false, 'invalid_measurement_value'],
     ['fractional milli-unit', { unit: 'volt', scale: 1, offset: 0 }, 0.0005, 'invalid_measurement_transform'],
     [
