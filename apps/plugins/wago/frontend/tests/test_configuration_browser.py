@@ -95,6 +95,29 @@ class ConfigurationBrowser(unittest.TestCase):
         self.assertEqual(self.fixture.count("/publish"), len(self.fixture.revisions))
         self.button("Publish reviewed draft").click()
 
+    def test_diagnostics_refresh_failure_and_recovery_preserve_local_edits(self):
+        diagnostics = self.dialog.get_by_role("region", name="Controller diagnostics", exact=True)
+        expect(diagnostics.get_by_text("QA diagnostics fixture: online", exact=True)).to_be_visible()
+        expect(self.dialog.get_by_text(re.compile("Hardware readiness: unknown"))).to_have_count(1)
+        expect(diagnostics.get_by_role("button", name="Open configuration", exact=True)).to_have_count(0)
+        self.add_output()
+        self.fixture.diagnostics_unavailable = True
+        self.button("Refresh diagnostics").click()
+        expect(diagnostics.get_by_text(re.compile("Diagnostics unavailable"))).to_be_visible()
+        expect(diagnostics.get_by_text("QA diagnostics fixture: online", exact=True)).to_have_count(0)
+        expect(self.button("Save draft")).to_be_enabled()
+        expect(self.dialog.get_by_role("textbox", name=re.compile(r"^Channel name"))).to_have_value("Workshop light")
+        self.fixture.diagnostics_unavailable = False
+        self.button("Refresh diagnostics").click()
+        expect(diagnostics.get_by_text("QA diagnostics fixture: online", exact=True)).to_be_visible()
+        self.assertEqual(self.fixture.count("/draft"), 0)
+        self.assertEqual(self.fixture.count("/publish"), 0)
+        self.assertIsNone(self.fixture.draft)
+        self.assertLessEqual(diagnostics.evaluate("element => element.scrollWidth - element.clientWidth"), 1)
+        bounds = diagnostics.bounding_box()
+        self.assertGreaterEqual(bounds["x"], -1)
+        self.assertLessEqual(bounds["x"] + bounds["width"], self.viewport["width"] + 1)
+
     def test_first_digital_setup_save_and_reload(self):
         self.add_output()
         self.button("Add digital input").click()

@@ -25,6 +25,7 @@ import { DigitalChannelEditor, PhysicalAssignments } from './DigitalChannelEdito
 import { ConfigurationPresets } from './ConfigurationPresets';
 import { ConfigurationRevisions } from './ConfigurationRevisions';
 import { ConfigurationErrors } from './ConfigurationChanges';
+import { ControllerDiagnostics } from './ControllerDiagnostics';
 import {
   availableDigitalTerminals,
   digitalTerminalLabel,
@@ -164,6 +165,7 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
                     </Alert.Description>
                   </Alert.Content>
                 </Alert>
+                <ControllerDiagnostics controllerId={controllerId} />
                 {draft.isPending && <p role="status">Loading draft…</p>}
                 {draft.isError && <p role="alert">Could not load draft: {draft.error.message}</p>}
                 {initialized && (
