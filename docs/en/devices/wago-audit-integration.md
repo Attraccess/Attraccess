@@ -83,7 +83,7 @@ the attempt. The handle is process-local, not persisted correlation state.
 | Forced publication | `forced_publication`; operation returns `WagoRevisionAuditResult` (`{ revision: number }`). |
 | Rejection acknowledgement | `rejection_acknowledgement`; begin with `{ revision }`, finish when the operator acknowledgement is persisted. This is an authenticated operator action, not a raw MQTT rejection/telemetry callback. |
 | Preset apply/reapply | Select `preset_application` or `preset_reapplication` from actual persisted provenance under the configuration lock. Return `WagoPresetAuditResult` (`presetId`, `channelId`, `before`, `after`) and project those fields. |
-| Hardware Profile create/change | `profile_creation` / `profile_change`; return `WagoProfileAuditResult` (`profileId`, `profileVersion`, `before`, `after`). IDs refer to persisted profiles and positive integer versions. No profile persistence operation exists in this checkout. |
+| Hardware Profile create/change | `profile_creation` / `profile_change`; return `WagoProfileAuditResult` (`profileId: string`, `profileVersion: number`, `before`, `after`). Capture identity from the validated profile embedded in `snapshot.modbus.profiles` at the owning configuration draft/publication persistence boundary, not a separate profile record or a local preview. |
 | Manual command | `manual_command`; allocate the real command UUID before `begin`, pass `{ channelId, operation, commandId }`, and finish with a result from `WagoManualCommandAuditResult`. For dispatch-only semantics use `dispatched`; for acknowledgement semantics wait for `acknowledged`, `rejected`, `timeout`, or `transport_failure`. The last three finish as `failed`. Never record command values or broker payloads. |
 
 `before` and `after` use `WagoAuditSummary`: only `physicalPointCount` and
@@ -92,9 +92,44 @@ actual persisted snapshots using `wagoAuditSummary`; no separate preflight reads
 that could race another write. These intentionally minimal summaries exclude
 configuration values. Preset identity is restricted to the catalog, channel IDs
 to 1–64 ASCII letters/digits/underscore/hyphen, command IDs to UUID syntax, and
-operations/results to explicit enums. Revisions, profile IDs and versions must
-be positive safe integers. Extra keys at every level are dropped. IDs must come
-from validated domain identities, never arbitrary request text or error strings.
+operations/results to explicit enums. Revisions must be positive safe integers.
+The profile contract matches ATT-1059 / Modbus commit `20ef1db4`: `profileId` is a
+string with a nonempty `trim()` result and original JavaScript `.length` at most
+160 (UTF-16 code units); `profileVersion` is a safe integer in `1..1000000`.
+Accepted IDs are preserved verbatim, never trimmed, truncated, coerced or
+restricted to UUID/ASCII syntax. Built-in references include
+`wago-879-3000-unverified` and `wago-879-1300-unverified`, version 1; custom IDs
+are user-editable strings. Invalid fields and extra keys at every level are
+dropped, not copied into error metadata. The length check is not secret detection:
+IDs must come from validated domain identities, never arbitrary request text or
+error strings. Full profiles, transport settings, credentials, measurement/action
+maps and raw errors must not be supplied as identity fields.
+
+### Locked preset and revision integration
+
+`WagoPresetAuditResult` is exactly `{ presetId, channelId, before, after }`;
+`presetId` is a catalog ID and both summaries are `WagoAuditSummary`.
+Inside the existing `withConfigurationLock` callback, read persisted provenance,
+select `preset_application` versus `preset_reapplication`, and compute `before`
+from the locked persisted snapshot. Call `audit.run` inside that same lock with
+the authenticated principal, controller ID, selected action and
+`{ presetId, channelId, before }`. Its operation callback must persist the
+mutation and return `WagoPresetAuditResult`, computing `after` from the actual
+saved snapshot before releasing the lock. Project only those four result fields
+in the completion callback. Do not nest another configuration lock or select the
+action via controller preflight reads. Local preview/apply does not persist and
+must not emit successful persisted preset application events.
+
+For `publication` / `forced_publication`, the operation returns
+`WagoRevisionAuditResult` (`{ revision: number }`) after publication persistence;
+project `{ revision: value.revision }`. Choose the action at the owner's actual
+validated publication boundary, and avoid double emission from an existing HTTP
+wrapper. For `rollback`, initial details are `{ sourceRevision }` and completion
+adds the newly allocated `{ revision }`. For `rejection_acknowledgement`, initial
+details are `{ revision }`; success follows persisted operator acknowledgement,
+not reception of a device rejection. A `Promise<void>` operation can omit the
+completion projector. None of these success events asserts hardware application
+or durable audit storage; the unavailable-sink behavior above still applies.
 
 Currently the preset routes call missing `presets`, `previewPreset` and
 `applyPreset` service methods. This integration does not claim those routes work

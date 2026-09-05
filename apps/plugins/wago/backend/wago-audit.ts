@@ -19,7 +19,7 @@ export interface WagoAuditSummary {
 export interface WagoAuditDetails {
   revision?: number;
   sourceRevision?: number;
-  profileId?: number;
+  profileId?: string;
   profileVersion?: number;
   presetId?: (typeof WAGO_PRESETS)[number]['id'];
   channelId?: string;
@@ -43,7 +43,9 @@ export interface WagoPresetAuditResult {
 }
 
 export interface WagoProfileAuditResult {
-  profileId: number;
+  /** Validated domain identity: trim-nonempty, at most 160 UTF-16 code units; preserved verbatim. */
+  profileId: string;
+  /** Safe integer in the persisted Modbus range 1..1000000. */
   profileVersion: number;
   before: WagoAuditSummary;
   after: WagoAuditSummary;
@@ -87,9 +89,11 @@ export function wagoAuditSummary(snapshot: unknown): WagoAuditSummary {
 /** Projection is also enforced at runtime: TypeScript types alone do not redact JSON. */
 export function wagoAuditDetails(input: WagoAuditDetails): Record<string, string | number> {
   const details: Record<string, string | number> = {};
-  for (const key of ['revision', 'sourceRevision', 'profileId', 'profileVersion'] as const) {
+  for (const key of ['revision', 'sourceRevision'] as const) {
     if (positiveInteger(input[key])) details[key] = input[key];
   }
+  if (typeof input.profileId === 'string' && input.profileId.length <= 160 && input.profileId.trim()) details.profileId = input.profileId;
+  if (positiveInteger(input.profileVersion) && input.profileVersion <= 1_000_000) details.profileVersion = input.profileVersion;
   if (WAGO_PRESETS.some((preset) => preset.id === input.presetId)) details.presetId = input.presetId;
   if (typeof input.channelId === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(input.channelId)) details.channelId = input.channelId;
   if (typeof input.commandId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.commandId)) details.commandId = input.commandId;
