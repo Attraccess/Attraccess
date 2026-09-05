@@ -108,16 +108,15 @@ the simulator waits for MQTT PUBACK before ending that connection. An injected
 state-write failure must produce neither an acknowledgement nor an operational
 connection; replaying the actual claim after storage recovers completes handoff.
 
-The runner also snapshots `origin/main` (or `--main-ref=<commit>`) and runs its real
-WagoService to capture the current claim payload and verify token acknowledgement
-and enrollment revocation. This is separate from the local heartbeat/parser test;
-no commissioning source is patched. Full git history is checked out in CI so the
-main source is available.
+The runner uses the working checkout's WagoService by default to capture the
+current claim payload and verify token acknowledgement and enrollment revocation.
+Use `--main-ref=<commit>` to snapshot a different committed backend/runtime into
+temporary storage. No commissioning source is patched.
 
-The runner independently builds main's split runtime and verifies its command
+The runner independently builds the selected split runtime and verifies its command
 contract: missing/expired expiry and missing/wrong configuration revision are
 rejected without changing the device; a valid command is acknowledged and changes
-the actual output. This does not merge an older producer over main's runtime.
+the actual output.
 
 To test a producer-owner commit alongside the flow-owner commit:
 

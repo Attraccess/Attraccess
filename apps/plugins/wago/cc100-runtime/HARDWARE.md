@@ -40,7 +40,10 @@ field. `src/onboard-profile.ts` is the editor/installer reference:
 | 4..11   | DI1..DI8 | input     | 0..7 in din       |
 
 Logical capabilities must agree with direction. Only digital I/O is implemented
-by this profile. Modbus, analog, Pt1000 and other firmware profiles are rejected.
+by this profile. Analog, Pt1000 and other onboard firmware profiles are rejected.
+The production router separately supports explicitly configured Modbus points;
+those points are not mapped onto the onboard digital registers. The built-in
+Modbus device profiles remain unqualified pending isolated hardware evidence.
 Output aliases and duplicate physical addresses are rejected to prevent
 conflicting pulse/policy owners. Unsupported snapshots never receive a success
 configuration report. Old manually mapped installations must republish the
@@ -50,7 +53,8 @@ corrected channel mapping; the runtime does not guess legacy input addresses.
 
 Retained `<prefix>/v1/controllers/<hardwareId>/state` contains:
 
-- `timestamp` (ISO 8601) and `sequence` (durably reserved monotonic integer).
+- `timestamp` (ISO 8601), per-boot `streamId`, and per-category `sequence`
+  (contiguous within a running stream, durably reserved across restarts).
 - `connected`, accepted `revision` and `contentHash`.
 - `inputs`: logical input ID to boolean, independently extracted from each bit.
 - `outputs`: logical output ID to boolean read from the output register.
@@ -65,12 +69,11 @@ publishes changed state only, and does not overlap. Heartbeats refresh state
 every 30 seconds. This is sampled state, not an edge-capture guarantee; pulses
 shorter than the sampling interval may be missed.
 
-ATT-978's consumer must parse boolean `inputs` as well as `outputs`, invalidate
-missing/unavailable channels, and expose their changes to flows. Its current
-open PR parses only `outputs`. The timestamp/sequence envelope also applies to
-measurements, faults and acknowledgements. ATT-978 and simulator PR #1797 touch
-runtime publication; integrate without replacing main's command expiry,
-revision guard, configuration barrier, or pulse-shutdown retry behavior.
+The composed flow consumer parses boolean `inputs` and `outputs`, invalidates
+missing/unavailable channels, and exposes their changes to flows. The canonical
+envelope also applies to heartbeats, measurements, faults and acknowledgements.
+The production runtime and simulator share this publication contract, command
+expiry, revision guards, configuration barriers and pulse-shutdown retries.
 
 ## Evidence And Limitations
 

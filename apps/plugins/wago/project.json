@@ -5,6 +5,10 @@
   "sourceRoot": "apps/plugins/wago",
   "tags": ["type:plugin"],
   "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm exec tsc --noEmit -p apps/plugins/wago/tsconfig.spec.json" }
+    },
     "lint": {
       "executor": "nx:run-commands",
       "options": { "cwd": "apps/plugins/wago", "command": "eslint backend frontend/src modbus measurement-contract.ts" }

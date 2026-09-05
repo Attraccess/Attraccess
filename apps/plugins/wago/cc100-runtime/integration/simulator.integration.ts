@@ -442,7 +442,7 @@ describe('isolated broker / executable simulator', () => {
       'physical output feedback',
     );
     const beforeReconnect = connections.filter((name) => name === `wago-controller-${hardwareId}`).length;
-    const lastHeartbeat = controller.lastHeartbeatAt;
+    const lastHeartbeat = (await service.list()).find((item) => item.id === controller.id)!.lastHeartbeatAt;
     Object.values(broker.clients).forEach((client: any) => {
       if (client.identity === `wago-controller-${hardwareId}`) client.conn.destroy();
     });
@@ -453,7 +453,11 @@ describe('isolated broker / executable simulator', () => {
         ),
       'TCP reconnect',
     );
-    await eventually(() => expect(controller.lastHeartbeatAt).not.toBe(lastHeartbeat), 'heartbeat after reconnect');
+    await eventually(async () => {
+      const current = (await service.list()).find((item) => item.id === controller.id)!;
+      expect(current.lastHeartbeatAt).not.toBe(lastHeartbeat);
+      expect(current.connectivity).toBe('online');
+    }, 'heartbeat after reconnect');
     await mqtt.publishAsync(`${base}/commands`, JSON.stringify(outputCommand('after-reconnect')), { qos: 1 });
     await eventually(
       () =>

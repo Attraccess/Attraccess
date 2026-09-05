@@ -73,6 +73,16 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
     void handleAsync(() => runtime.setConnected(state));
   };
 
+  const activateConnectionHandling = async (): Promise<void> => {
+    if (initialized) return;
+    if (!pendingConnectionStates.length && !connected) pendingConnectionStates.push(false);
+    while (pendingConnectionStates.length > 0) {
+      const state = pendingConnectionStates.shift();
+      if (state !== undefined) await handleAsync(() => runtime.setConnected(state));
+    }
+    initialized = true;
+  };
+
   activeClient.once(
     'connect',
     () =>
@@ -87,18 +97,10 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
           return;
         }
         try {
-          await runtime.start();
+          await runtime.start(activateConnectionHandling);
         } finally {
-          // start() subscribes before its first publications. Keep connection
-          // policies live even if a publication fails after those subscriptions.
-          if (!pendingConnectionStates.length && !connected) pendingConnectionStates.push(false);
-          while (pendingConnectionStates.length > 0) {
-            const state = pendingConnectionStates.shift();
-            if (state !== undefined) await handleAsync(() => runtime.setConnected(state));
-          }
-          // Keep events received during replay in this queue so their order is
-          // preserved before live connection events can apply policies.
-          initialized = true;
+          // Also activate if subscriptions fail after commands become reachable.
+          await activateConnectionHandling();
         }
         heartbeatTimer = setInterval(() => void handleAsync(() => runtime.publishHeartbeat()), 30_000).unref();
         measurementTimer = setInterval(() => void handleAsync(() => runtime.publishMeasurements()), 100).unref();

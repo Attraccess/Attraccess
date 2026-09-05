@@ -153,6 +153,51 @@ describe('WagoRuntime', () => {
     );
   });
 
+  it('activates disconnect handling before a stalled initial canonical heartbeat', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    await store.save({
+      accepted: { revision: 1, contentHash: hash(snapshot), snapshot },
+      outputs: { load: true },
+      commandIds: [],
+    });
+    device.values.set('751-9301:0', true);
+    let activated!: () => void;
+    const ready = new Promise<void>((resolve) => {
+      activated = resolve;
+    });
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const publish = transport.publish.bind(transport);
+    jest.spyOn(transport, 'publish').mockImplementation(async (topic, payload, options) => {
+      await publish(topic, payload, options);
+      if (topic.endsWith('/heartbeat')) await held;
+    });
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      store,
+      transport,
+      device,
+    });
+    const starting = runtime.start(async () => {
+      activated();
+    });
+    await ready;
+    await runtime.setConnected(false);
+    expect(device.values.get('751-9301:0')).toBe(false);
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/heartbeat',
+        payload: expect.objectContaining({ timestamp: expect.any(String), streamId: expect.any(String), sequence: 1 }),
+      }),
+    );
+    release();
+    await starting;
+  });
+
   it('starts when reserving initial state telemetry fails', async () => {
     const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
     await store.save({

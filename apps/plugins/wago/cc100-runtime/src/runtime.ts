@@ -77,7 +77,7 @@ export class WagoRuntime {
     });
   }
 
-  async start(): Promise<void> {
+  async start(activateConnectionHandling?: () => Promise<void>): Promise<void> {
     this.state = await this.options.store.load();
     this.sequence = this.state.sequence ?? 0;
     this.reservedSequence = this.sequence;
@@ -89,6 +89,7 @@ export class WagoRuntime {
     }
     await this.options.transport.subscribe(this.desiredTopic(), (payload) => this.receiveDesired(payload));
     await this.options.transport.subscribe(this.commandTopic(), (payload) => this.receiveCommand(payload));
+    await activateConnectionHandling?.();
     await this.publishHeartbeat(true);
   }
 
@@ -347,14 +348,17 @@ export class WagoRuntime {
     if (this.publishingHeartbeat) return;
     this.publishingHeartbeat = true;
     try {
-      await this.options.transport.publish(this.topic('heartbeat'), {
-        hardwareId: this.options.hardwareId,
-        pairingCode: this.options.pairingCode,
-        protocolVersion: '1.0.0',
-        runtimeVersion: '0.1.0',
-        capabilities: CAPABILITIES,
-        sequence: Date.now(),
-      });
+      try {
+        await this.publishOperational('heartbeat', {
+          hardwareId: this.options.hardwareId,
+          pairingCode: this.options.pairingCode,
+          protocolVersion: '1.0.0',
+          runtimeVersion: '0.1.0',
+          capabilities: CAPABILITIES,
+        });
+      } catch (error) {
+        if (!ignoreStatePublicationFailure) throw error;
+      }
       try {
         await this.publishState();
       } catch (error) {
