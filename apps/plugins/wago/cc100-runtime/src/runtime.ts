@@ -1,6 +1,8 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+// eslint-disable-next-line @nx/enforce-module-boundaries -- Runtime and backend share the operational wire contract.
+import { encodeMeasurement } from '../../measurement-contract';
 
 export const PROTOCOL_VERSION = 1;
 export const MAX_PENDING_CHANNEL_WRITES = 100;
@@ -85,6 +87,7 @@ export class JsonStateStore {
 
 export class WagoRuntime {
   private state: RuntimeState = { outputs: {}, commandIds: [] };
+  private readonly streamId = randomUUID();
   private connected = true;
   private readonly pulses = new Map<string, { generation: number; timer: ReturnType<typeof setTimeout> }>();
   private pulseSequence = 0;
@@ -325,9 +328,7 @@ export class WagoRuntime {
         const transform = channel.measurement ?? { unit: 'percent', scale: 1, offset: 0 };
         await this.publishOperational('measurements', {
           timestamp: new Date().toISOString(),
-          channelId: channel.id,
-          unit: transform.unit,
-          value: raw * transform.scale + transform.offset,
+          ...encodeMeasurement(channel.id, raw, transform),
         });
       } catch (error) {
         await this.publishOperational('faults', {
@@ -609,7 +610,11 @@ export class WagoRuntime {
     options?: { retain?: boolean },
   ): Promise<void> {
     const sequence = await this.nextSequence();
-    await this.options.transport.publish(this.topic(suffix), { sequence, ...payload }, options);
+    await this.options.transport.publish(
+      this.topic(suffix),
+      { streamId: this.streamId, sequence, ...payload },
+      options,
+    );
   }
   private desiredTopic(): string {
     return this.topic('configuration/desired');

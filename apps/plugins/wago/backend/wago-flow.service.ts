@@ -339,6 +339,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       for (const state of this.cache.values()) {
         if (state.controllerId !== controller.id) continue;
         if (
+          wasUnavailable ||
           !event.connected ||
           this.unavailableHardware.has(controller.id) ||
           this.unavailableConfiguration.has(controller.id) ||

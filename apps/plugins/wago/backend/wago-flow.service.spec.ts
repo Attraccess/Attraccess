@@ -694,6 +694,23 @@ describe('WagoFlowService', () => {
       await expect(waitingAfterRecovery).resolves.toMatchObject({ value: 500, sequence: 2 });
     });
 
+    it('invalidates a measurement from stale connection evidence when recovery has the same source timestamp', async () => {
+      const { service } = await setup();
+      const meter = { ...config, channelId: 'power', category: 'measurement', equals: 500, timeoutMs: 1_000 };
+      const sourceTimestamp = new Date().toISOString();
+      await snapshot(service, 1, { timestamp: new Date(Date.now() - 90_001).toISOString() });
+      await send(service, 'measurements', 1, { ...measurement, timestamp: sourceTimestamp });
+      await snapshot(service, 2, { timestamp: sourceTimestamp });
+
+      const cached = service.read(meter);
+      expect(cached && service.payload(cached)).toMatchObject({ available: false });
+      const waiting = service.wait(meter);
+      expect(service['waiters'].size).toBe(1);
+
+      await send(service, 'measurements', 2, { ...measurement, timestamp: sourceTimestamp });
+      await expect(waiting).resolves.toMatchObject({ sequence: 2 });
+    });
+
     it('drops queued events from a retired boot while keeping the dispatch queue bounded', async () => {
       const { service, trigger } = await setup();
       let release: () => void;
