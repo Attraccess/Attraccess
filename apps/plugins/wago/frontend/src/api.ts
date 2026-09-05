@@ -41,6 +41,9 @@ export type WagoCommissioningState =
   | 'awaiting_discovery'
   | 'awaiting_claim'
   | 'completed'
+  | 'awaiting_verification'
+  | 'claim_interrupted'
+  | 'recovery_revocation_pending'
   | 'revoked';
 export interface CommissioningSession {
   id: number;
@@ -125,10 +128,26 @@ export const confirmCommissioningHostKey = (id: number, hostKeyFingerprint: stri
 export const listCommissioningSessions = (limit = 100, offset = 0) =>
   api.request<CommissioningSession[]>(`/commissioning/sessions?limit=${limit}&offset=${offset}`);
 
+export interface CommissioningVerification {
+  permanentConnection: boolean;
+  enrollmentRevoked: boolean;
+  configurationApplied: boolean;
+  managementHardening: 'unverified';
+  hardwareReadiness: 'unverified';
+  ready: false;
+}
+
+export const getCommissioningVerification = (id: number) =>
+  api.request<CommissioningVerification>(`/commissioning/sessions/${id}/verification`);
+
 export const deliverCommissioningSession = (
   id: number,
-  input: { temporarySsh?: { username: string; password: string } } = {},
+  input: { confirmInstall: true; temporarySsh: { username: string; password: string } },
 ) => api.request<CommissioningSession>(`/commissioning/sessions/${id}/deliver`, { method: 'POST', body: input });
+export const recoverCommissioningSession = (
+  id: number,
+  input: Parameters<typeof deliverCommissioningSession>[1],
+) => api.request<CommissioningSession>(`/commissioning/sessions/${id}/recover`, { method: 'POST', body: input });
 export const revokeCommissioningSession = (id: number) =>
   api.request<CommissioningSession>(`/commissioning/sessions/${id}/revoke`, { method: 'POST' });
 export const removeCommissioningSession = (id: number) =>

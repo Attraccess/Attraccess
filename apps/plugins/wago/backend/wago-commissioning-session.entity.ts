@@ -8,6 +8,9 @@ export type WagoCommissioningState =
   | 'delivery_failed'
   | 'awaiting_discovery'
   | 'awaiting_claim'
+  | 'awaiting_verification'
+  | 'claim_interrupted'
+  | 'recovery_revocation_pending'
   | 'completed'
   | 'revoked';
 
@@ -24,6 +27,7 @@ export class WagoCommissioningSession {
   @Column({ type: 'varchar', name: 'enrollment_expires_at', nullable: true }) enrollmentExpiresAt!: string | null;
   @Column({ type: 'integer', name: 'enrollment_id', nullable: true }) enrollmentId!: number | null;
   @Column({ type: 'varchar', name: 'pairing_code', nullable: true }) pairingCode!: string | null;
+  @Column({ type: 'varchar', name: 'delivery_token', nullable: true }) deliveryToken!: string | null;
   @Column({ type: 'varchar', name: 'codesys_state', nullable: true }) codesysState!: string | null;
   @Column({ type: 'integer', name: 'progress_percent', nullable: true }) progressPercent!: number | null;
   @Column({ type: 'varchar', name: 'progress_step', nullable: true }) progressStep!: string | null;

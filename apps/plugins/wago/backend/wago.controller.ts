@@ -4,6 +4,17 @@ import { WagoService } from './wago.service';
 import { WagoCommissioningService } from './wago-commissioning.service';
 import type { WagoPresetApplication } from './configuration';
 
+type CommissioningAttemptInput = { confirmInstall?: boolean; temporarySsh?: { username?: string; password?: string } };
+
+function validateCommissioningAttempt(body: CommissioningAttemptInput, intent: 'installation' | 'recovery') {
+  if (body?.confirmInstall !== true) throw new BadRequestException(`Explicit ${intent} consent is required`);
+  if (typeof body.temporarySsh?.username !== 'string' || !body.temporarySsh.username.trim() ||
+      typeof body.temporarySsh.password !== 'string' || !body.temporarySsh.password) {
+    throw new BadRequestException('Temporary SSH username and password are required');
+  }
+  return { confirmInstall: true as const, temporarySsh: { username: body.temporarySsh.username, password: body.temporarySsh.password } };
+}
+
 @Auth('resources.update')
 @Controller('wago')
 export class WagoControllerApi {
@@ -50,13 +61,20 @@ export class WagoControllerApi {
   @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/deliver') deliverCommissioningSession(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { temporarySsh?: { username?: string; password?: string } },
+    @Body() body: CommissioningAttemptInput,
   ) {
-    return this.commissioning.deliver(id, {
-      temporarySsh: body?.temporarySsh
-        ? { username: body.temporarySsh.username ?? '', password: body.temporarySsh.password ?? '' }
-        : undefined,
-    });
+    return this.commissioning.deliver(id, validateCommissioningAttempt(body, 'installation'));
+  }
+  @Auth('system.settings.manage')
+  @Post('commissioning/sessions/:id/recover') recoverCommissioningSession(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: CommissioningAttemptInput,
+  ) {
+    return this.commissioning.recover(id, validateCommissioningAttempt(body, 'recovery'));
+  }
+  @Auth('system.settings.manage')
+  @Get('commissioning/sessions/:id/verification') commissioningVerification(@Param('id', ParseIntPipe) id: number) {
+    return this.commissioning.verification(id);
   }
   @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/revoke') revokeCommissioningSession(@Param('id', ParseIntPipe) id: number) {
