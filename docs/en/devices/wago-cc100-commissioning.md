@@ -50,9 +50,9 @@ After runtime delivery, the controller uses a restricted enrollment credential t
 
 The session remains **Verification required**. The UI separately checks a fresh permanent heartbeat, enrollment revocation and applied Desired/Reported Configuration. Management hardening and physical hardware readiness remain explicitly unverified. No successful install or MQTT claim makes this firmware baseline production-ready.
 
-### Verify configuration readiness
+### Configuration Readiness Limitation
 
-The no-code configuration journey is owned by ATT-1058. Until that integrated UI is available, the following API checks are developer diagnostics only, not an acceptable substitute for the supported operator journey. These endpoints require the `system.settings.manage` permission:
+The complete no-code configuration journey is owned by ATT-1058 and must be verified in the integrated build. The following endpoints are **developer integration references only**, requiring `resources.update`; their use does not satisfy ATT-984:
 
 1. Save the complete Desired Configuration to `POST /api/wago/controllers/:id/configuration/draft` with `{ "snapshot": { ... } }`. A draft saved through the UI is also valid input to the following steps.
 2. Validate it with `POST /api/wago/controllers/:id/configuration/validate`. Stop and correct every returned validation error.
@@ -60,7 +60,7 @@ The no-code configuration journey is owned by ATT-1058. Until that integrated UI
 4. Publish the reviewed draft with `POST /api/wago/controllers/:id/configuration/publish`. Record the returned `revision` and `contentHash`; Attraccess publishes that Desired Configuration to the controller.
 5. Poll `GET /api/wago/controllers/:id/configuration/revisions` until the recorded revision has `state: "applied"`, a non-empty `reportedAt`, and the same `contentHash` returned at publish. If its state is `rejected`, stop, correct the complete Desired Configuration, and repeat the workflow with a new revision.
 
-Also confirm a current heartbeat and the expected runtime version. Neither an applied configuration nor API checks prove physical I/O or baseline management hardening; ATT-984 evidence remains mandatory.
+Also confirm a current heartbeat and the expected runtime version. An applied configuration report proves acceptance of that revision, not physical hardware readiness or output feedback. Do not operate equipment based on an API response alone. Verify the integrated diagnostics and configuration screens in the exact tested build, and record physical/nontechnical evidence using [WAGO Acceptance Evidence](wago-acceptance-evidence.md).
 
 ## Recovery
 
@@ -92,7 +92,7 @@ If Attraccess restarts during claim publication, a saved `claimed` controller re
 - ATT-1056 must supply qualified device permissions/mounts and runtime health evidence before commissioning can advertise physical readiness. The installer does not invent GPIO mappings or add privileged hardware access.
 - One remote `flock` spans transfer, staging and replacement. Broker provisioning is not transactional with SSH across multiple Attraccess processes; do not run concurrent commissioning coordinators against the same controller.
 
-This guide describes the implementation on `main`, not future intended behavior. The following are not yet implemented and must not be assumed:
+This guide describes the composed implementation before visual integration, not future intended behavior. The following are not yet implemented and must not be assumed:
 
 - Attraccess does not create a unique non-root management identity, rotate SSH credentials, or disable root/password SSH login after delivery.
 - Signed runtime artifacts still require server-side configuration; normal artifact packaging/visual import is an outstanding no-code release blocker.
