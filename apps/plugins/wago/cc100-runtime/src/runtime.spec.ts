@@ -89,7 +89,9 @@ describe('WagoRuntime', () => {
     });
     await expect(
       runtime.receiveDiscoveryClaim(
-        Buffer.from('{"username":"controller","password":"secret","configuration":{"namespace":"customer/wago"},"acknowledgementToken":"claim-token"}'),
+        Buffer.from(
+          '{"username":"controller","password":"secret","configuration":{"namespace":"customer/wago"},"acknowledgementToken":"claim-token"}',
+        ),
       ),
     ).resolves.toEqual({ username: 'controller', password: 'secret', prefix: 'customer/wago' });
     expect(transport.published).toContainEqual({
@@ -123,6 +125,7 @@ describe('WagoRuntime', () => {
       accepted: { revision: 3, contentHash: hash(snapshot), snapshot },
       outputs: { load: true },
       commandIds: ['command-1'],
+      commandExpiries: {},
       credentials: { username: 'controller', password: 'secret' },
     });
   });

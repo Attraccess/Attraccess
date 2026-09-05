@@ -166,7 +166,7 @@ describe('WagoService', () => {
     const { service, context } = createService([], [], 2);
     (context.mqtt.subscribe as jest.Mock).mockRejectedValueOnce(new Error('broker unavailable'));
 
-    await expect(service.onModuleInit()).resolves.toBeUndefined();
+    await expect(service.onApplicationBootstrap()).resolves.toBeUndefined();
 
     expect(context.logger.warn).toHaveBeenCalledWith(
       expect.stringContaining('Could not establish WAGO MQTT subscriptions during startup'),
@@ -548,9 +548,15 @@ describe('WagoService', () => {
     await service.claim(candidate.id, 'Controller', 'fingerprint');
 
     expect(revoke).not.toHaveBeenCalled();
-    const claimPayload = JSON.parse((context.mqtt.publish as jest.Mock).mock.calls[0][2]) as { acknowledgementToken: string };
-    const acknowledgementHandler = (context.mqtt.subscribe as jest.Mock).mock.calls[0][2] as (message: { payload: Buffer }) => Promise<void>;
-    await acknowledgementHandler({ payload: Buffer.from(JSON.stringify({ acknowledgementToken: claimPayload.acknowledgementToken })) });
+    const claimPayload = JSON.parse((context.mqtt.publish as jest.Mock).mock.calls[0][2]) as {
+      acknowledgementToken: string;
+    };
+    const acknowledgementHandler = (context.mqtt.subscribe as jest.Mock).mock.calls[0][2] as (message: {
+      payload: Buffer;
+    }) => Promise<void>;
+    await acknowledgementHandler({
+      payload: Buffer.from(JSON.stringify({ acknowledgementToken: claimPayload.acknowledgementToken })),
+    });
 
     expect(revoke).toHaveBeenCalledWith(expect.objectContaining({ identity: enrollment.identity }));
   });

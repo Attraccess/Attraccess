@@ -44,6 +44,13 @@ const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 const STALE_AFTER_MS = 90_000;
 const MAX_PENDING_CONFIGURATION_REPORTS = 100;
 const ENROLLMENT_RETRY_MS = 60_000;
+
+class MqttSubscriptionError extends Error {
+  constructor(readonly mqttError: unknown) {
+    super(String(mqttError));
+  }
+}
+
 type WagoControllerSummary = Omit<WagoController, 'fingerprint' | 'pairingCodeHash'> & {
   connectivity: 'online' | 'stale' | 'untrusted';
 };
@@ -92,7 +99,10 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     try {
       await this.subscribeConfiguredServers();
     } catch (error) {
-      this.context.logger.warn(`Could not establish WAGO MQTT subscriptions during startup: ${String(error)}`);
+      if (!(error instanceof MqttSubscriptionError)) throw error;
+      this.context.logger.warn(
+        `Could not establish WAGO MQTT subscriptions during startup: ${String(error.mqttError)}`,
+      );
       this.scheduleSubscriptionRetry();
     }
   }
@@ -439,14 +449,13 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
         }
 
         if (controller.enrollmentId) await this.revokeEnrollmentById(controller.enrollmentId);
-        await Promise.all([
-          this.drafts.delete({ controllerId: id }),
-          this.revisions.delete({ controllerId: id }),
-        ]);
+        await Promise.all([this.drafts.delete({ controllerId: id }), this.revisions.delete({ controllerId: id })]);
         await this.controllers.delete(id);
         this.configurationReportQueues.delete(id);
         await this.subscribeConfiguredServers().catch((error) => {
-          this.context.logger.warn(`Could not refresh WAGO MQTT subscriptions after controller removal: ${String(error)}`);
+          this.context.logger.warn(
+            `Could not refresh WAGO MQTT subscriptions after controller removal: ${String(error)}`,
+          );
           this.scheduleSubscriptionRetry();
         });
         return controller.hardwareId;
@@ -653,7 +662,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     try {
       for (const serverId of serverIds) {
         replacements.push(
-          await this.context.mqtt.subscribe(serverId, `${DISCOVERY_ROOT}/+`, async (message) => {
+          await this.subscribeMqtt(serverId, `${DISCOVERY_ROOT}/+`, async (message) => {
             if (!this.isActiveSubscriptionGeneration(generation)) return;
             await this.onDiscovery(serverId, message.topic, message.payload);
           }),
@@ -669,7 +678,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
           claimedControllers.map((controller) => [controller.hardwareId, controller]),
         );
         replacements.push(
-          await this.context.mqtt.subscribe(
+          await this.subscribeMqtt(
             serverId,
             configurationReportedWildcardTopic(settings.operationalPrefix),
             (message) => {
@@ -681,16 +690,12 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
           ),
         );
         replacements.push(
-          await this.context.mqtt.subscribe(
-            serverId,
-            acknowledgementWildcardTopic(settings.operationalPrefix),
-            (message) => {
-              if (!this.isActiveSubscriptionGeneration(generation)) return;
-              const hardwareId = acknowledgementHardwareId(settings.operationalPrefix, message.topic);
-              const controller = hardwareId ? controllersByHardwareId.get(hardwareId) : undefined;
-              if (controller) this.onCommandAcknowledgement(controller.id, message.payload);
-            },
-          ),
+          await this.subscribeMqtt(serverId, acknowledgementWildcardTopic(settings.operationalPrefix), (message) => {
+            if (!this.isActiveSubscriptionGeneration(generation)) return;
+            const hardwareId = acknowledgementHardwareId(settings.operationalPrefix, message.topic);
+            const controller = hardwareId ? controllersByHardwareId.get(hardwareId) : undefined;
+            if (controller) this.onCommandAcknowledgement(controller.id, message.payload);
+          }),
         );
         if (this.destroyed) {
           replacements.forEach((subscription) => subscription.unsubscribe());
@@ -698,7 +703,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
         }
         for (const controller of claimedControllers) {
           replacements.push(
-            await this.context.mqtt.subscribe(
+            await this.subscribeMqtt(
               serverId,
               heartbeatTopic(settings.operationalPrefix, controller.hardwareId),
               async (message) => {
@@ -729,6 +734,16 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
 
   private unsubscribe(): void {
     this.subscriptions.splice(0).forEach((subscription) => subscription.unsubscribe());
+  }
+
+  private async subscribeMqtt(
+    ...args: Parameters<PluginContext['mqtt']['subscribe']>
+  ): Promise<PluginMqttSubscription> {
+    try {
+      return await this.context.mqtt.subscribe(...args);
+    } catch (error) {
+      throw new MqttSubscriptionError(error);
+    }
   }
 
   private isActiveSubscriptionGeneration(generation: number): boolean {
@@ -797,7 +812,9 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       try {
         await this.commissioningDiscoveryHandler(candidate);
       } catch (error) {
-        this.context.logger.warn(`Could not automatically claim commissioned WAGO controller ${candidate.hardwareId}: ${String(error)}`);
+        this.context.logger.warn(
+          `Could not automatically claim commissioned WAGO controller ${candidate.hardwareId}: ${String(error)}`,
+        );
       }
     }
   }
@@ -847,7 +864,9 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       try {
         await this.revokeEnrollment(prepared.enrollment);
       } catch (error) {
-        this.context.logger.warn(`Could not revoke acknowledged WAGO enrollment ${prepared.enrollment.id}: ${String(error)}`);
+        this.context.logger.warn(
+          `Could not revoke acknowledged WAGO enrollment ${prepared.enrollment.id}: ${String(error)}`,
+        );
       }
     });
     this.claimAcknowledgementSubscriptions.set(prepared.enrollment.id, subscription);
@@ -1132,8 +1151,4 @@ function isClaimAcknowledgement(payload: Buffer, token: string): boolean {
   } catch {
     return false;
   }
-}
-
-function positiveInteger(value: unknown): number | undefined {
-  return Number.isSafeInteger(value) && (value as number) > 0 ? (value as number) : undefined;
 }
