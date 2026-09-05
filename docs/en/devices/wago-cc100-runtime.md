@@ -1,6 +1,12 @@
 # WAGO CC100 Docker Runtime
 
-> **Work in progress.** This guide documents the current `attraccess-wago-cc100` runtime release. It is not hardware-validated yet: [ATT-984](https://linear.app/attraccess/issue/ATT-984/validate-the-four-wago-package-assemblies) is the release gate. Do not use it to control equipment until the required hardware evidence, image digest, and least-privilege deployment are published.
+> **Engineering reference, not the supported operator installation path.** This guide records the manual runtime baseline at `9e0a1c47`. It is not hardware-validated: [ATT-984](https://linear.app/attraccess/issue/ATT-984/prove-the-no-code-cc100-journey-on-hardware-with-a-nontechnical-user) is the release gate. Do not use it to control equipment until required hardware/user evidence exists. Follow [Guided Commissioning](wago-cc100-commissioning.md) for the SSH-only UI path and [Acceptance Evidence](wago-acceptance-evidence.md) for release prerequisites. Manual shell, registry, JSON mapping and credential-copy steps below do not satisfy that gate.
+
+## Deployment Paths Must Not Be Mixed
+
+The first usable beta targets CC100 `751-9301` firmware **31**. Broader firmware references below are hardware background, not additional supported baselines. Guided commissioning uses a locally verified signed offline bundle, not a controller-side registry pull or mandatory WBM setup. It currently names its container `attraccess-wago` and bind-mounts the controller directory `/var/lib/attraccess-wago` there. The legacy manual example below names its container `attraccess-wago-cc100` and uses a named Docker volume instead. Those storage locations are **not interchangeable**; identify the actual installation before any recovery. Do not run the manual install over a commissioned controller.
+
+Both paths use `/etc/attraccess-wago/runtime.env` and runtime state at `/var/lib/attraccess-wago/state.json` inside the container. Both can contain credentials. A local Attraccess backup is not proof that either device-side file or SSH recovery access has been backed up. Verify recoverability before credential changes and keep secrets out of support evidence.
 
 The runtime runs on a WAGO CC100 `751-9301` with WAGO Linux firmware and Docker. It does not use CODESYS and does not accept uploaded controller code. Its current protocol version is `1.0.0`; runtime version is `0.1.0`.
 
@@ -172,7 +178,7 @@ It publishes with QoS 1:
 
 Desired snapshots are validated before they are persisted. A rejected snapshot publishes field-level errors in Reported Configuration and leaves the last accepted configuration in place. Inspect the retained `configuration/reported` record after every update and compare its revision and hash with Desired Configuration. Do not send commands until the expected configuration is reported.
 
-Use the Attraccess controller detail and diagnostics views as the primary inspection surface. Broker-level topic inspection is restricted to authorised operators because messages can reveal controller topology and operating state.
+Use only diagnostics controls present in the exact tested plugin build. This manual baseline does not establish that a controller detail screen exists; verify the integrated UI before documenting its navigation. Broker-level topic inspection is an engineering tool, not normal operator acceptance, and messages can contain secrets as well as topology and operating state.
 
 ## Recovery
 

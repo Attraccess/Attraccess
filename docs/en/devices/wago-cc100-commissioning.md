@@ -50,9 +50,9 @@ After runtime delivery, the session shows **Waiting for the controller to connec
 
 The session is **Claimed** when its progress says **Commissioning complete** and **The controller is claimed and ready to configure**. Claiming is not sufficient to operate equipment.
 
-### Verify configuration readiness
+### Configuration Readiness Limitation
 
-The current **WAGO controllers** UI can save a configuration draft, but does not expose validation, review, publishing, revision history, or Reported Configuration verification. An authorized operator must complete the first configuration through the supported API before operating equipment. These endpoints require the `resources.update` permission:
+The UI at this guide's source baseline (`9e0a1c47`) can save a configuration draft, but does not expose validation, review, publishing, revision history, or Reported Configuration verification. This is a blocker for the required no-code operator journey, not a supported operator workaround. The following endpoints are **developer integration references only**, requiring `resources.update`; their use does not satisfy ATT-984:
 
 1. Save the complete Desired Configuration to `POST /api/wago/controllers/:id/configuration/draft` with `{ "snapshot": { ... } }`. A draft saved through the UI is also valid input to the following steps.
 2. Validate it with `POST /api/wago/controllers/:id/configuration/validate`. Stop and correct every returned validation error.
@@ -60,7 +60,7 @@ The current **WAGO controllers** UI can save a configuration draft, but does not
 4. Publish the reviewed draft with `POST /api/wago/controllers/:id/configuration/publish`. Record the returned `revision` and `contentHash`; Attraccess publishes that Desired Configuration to the controller.
 5. Poll `GET /api/wago/controllers/:id/configuration/revisions` until the recorded revision has `state: "applied"`, a non-empty `reportedAt`, and the same `contentHash` returned at publish. If its state is `rejected`, stop, correct the complete Desired Configuration, and repeat the workflow with a new revision.
 
-Also confirm a current heartbeat and the expected runtime version in the controllers table. Do not operate equipment until all of this readiness verification has completed through the API; there is currently no controller detail view that can perform it.
+Also confirm a current heartbeat and the expected runtime version. An applied configuration report proves acceptance of that revision, not physical hardware readiness or output feedback. Do not operate equipment based on an API response alone. Verify the integrated diagnostics and configuration screens in the exact tested build, and record physical/nontechnical evidence using [WAGO Acceptance Evidence](wago-acceptance-evidence.md).
 
 ## Recovery
 
@@ -80,7 +80,7 @@ Select **Cancel enrollment** only to abandon the session. It revokes the enrollm
 
 ## Current release limitations
 
-This guide describes the implementation on `main`, not future intended behavior. The following are not yet implemented and must not be assumed:
+This guide describes source baseline `9e0a1c47`, not future intended behavior. Recheck these limitations against the integrated build before publication; do not assume another branch has resolved them:
 
 - Attraccess does not create a unique non-root management identity, rotate SSH credentials, or disable root/password SSH login after delivery.
 - Delivery replaces the `attraccess-wago` container but does not snapshot and automatically restore a previous container configuration on failure.
