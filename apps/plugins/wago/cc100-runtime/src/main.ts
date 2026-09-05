@@ -1,5 +1,6 @@
 import { connect, type MqttClient } from 'mqtt';
 import { Cc100OnboardIoAdapter } from './adapters';
+import { ModbusDeviceRouter } from './modbus/adapter';
 import { JsonStateStore, WagoRuntime, type DiscoveryClaim, type Transport } from './runtime';
 
 const hardwareId = required('WAGO_HARDWARE_ID');
@@ -8,7 +9,7 @@ const statePath = process.env.WAGO_STATE_PATH ?? '/var/lib/attraccess-wago/state
 const pairingCode = required('WAGO_PAIRING_CODE');
 const enrollmentSecret = required('WAGO_ENROLLMENT_SECRET');
 const store = new JsonStateStore(statePath);
-const adapter = new Cc100OnboardIoAdapter(JSON.parse(process.env.WAGO_IO_PATHS ?? '{}'));
+const adapter = new ModbusDeviceRouter(new Cc100OnboardIoAdapter(JSON.parse(process.env.WAGO_IO_PATHS ?? '{}')));
 const mqttUrl = required('WAGO_MQTT_URL');
 let client: MqttClient | undefined;
 let heartbeatTimer: NodeJS.Timeout | undefined;
@@ -88,7 +89,7 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
         initialized = true;
         if (!hadPendingConnectionState && !connected) await runtime.setConnected(false);
         heartbeatTimer = setInterval(() => void handleAsync(() => runtime.publishHeartbeat()), 30_000).unref();
-        measurementTimer = setInterval(() => void handleAsync(() => runtime.publishMeasurements()), 5_000).unref();
+        measurementTimer = setInterval(() => void handleAsync(() => runtime.publishMeasurements()), 100).unref();
       }),
   );
   activeClient.on('close', () => applyConnectionState(false));

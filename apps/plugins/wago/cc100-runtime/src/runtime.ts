@@ -1,6 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { acquireMeasurements, measurementErrorCode } from './modbus/acquisition';
+// Shared pure configuration model is bundled into the standalone runtime.
+// eslint-disable-next-line @nx/enforce-module-boundaries
+import { type ModbusConfiguration, type ModbusPoint, validateModbus, validateModbusBindings } from '../../modbus/model';
 
 export const PROTOCOL_VERSION = 1;
 export const MAX_PENDING_CHANNEL_WRITES = 100;
@@ -18,7 +22,13 @@ export const CAPABILITIES = [
 type DisconnectPolicy = { mode: 'hold' | 'immediate' | 'watchdog'; timeoutMs?: number };
 export type Snapshot = {
   version: number;
-  physicalPoints: Array<{ id: string; hardwareProfile: '751-9301' | '879-3000' | '879-1300'; channel: number }>;
+  modbus?: ModbusConfiguration;
+  physicalPoints: Array<{
+    id: string;
+    hardwareProfile: '751-9301' | '879-3000' | '879-1300' | 'modbus';
+    channel: number;
+    modbus?: ModbusPoint;
+  }>;
   logicalChannels: Array<{
     id: string;
     physicalPointId: string;
@@ -54,6 +64,12 @@ export interface Transport {
 }
 
 export interface DeviceAdapter {
+  configure?(snapshot: Snapshot): void;
+  /** Prepare may throw; the returned synchronous installation must not throw. */
+  prepareConfiguration?(snapshot: Snapshot): () => void;
+  suspend?(): () => void;
+  measurementSource?(point: Snapshot['physicalPoints'][number]): string;
+  shouldPoll?(point: Snapshot['physicalPoints'][number], now: number): boolean;
   write(point: Snapshot['physicalPoints'][number], value: boolean): Promise<void>;
   read(point: Snapshot['physicalPoints'][number]): Promise<boolean | number>;
 }
@@ -101,8 +117,10 @@ export class WagoRuntime {
   private readonly feedbackGenerationSequences = new Map<string, number>();
   private readonly feedbackGenerations = new Map<string, number>();
   private configurationGeneration = 0;
+  private configurationPending = false;
   private readonly inFlightCommandIds = new Set<string>();
   private measurementSequence = 0;
+  private measurementsPending = false;
   private readonly measurementStreamId = randomUUID();
 
   constructor(
@@ -119,6 +137,11 @@ export class WagoRuntime {
 
   async start(): Promise<void> {
     this.state = await this.options.store.load();
+    if (this.state.accepted) {
+      const errors = validateSnapshot(this.state.accepted.snapshot);
+      if (errors.length) throw new Error('persisted configuration is invalid');
+      this.options.device.configure?.(this.state.accepted.snapshot);
+    }
     await this.options.transport.subscribe(this.desiredTopic(), (payload) => this.receiveDesired(payload));
     await this.options.transport.subscribe(this.commandTopic(), (payload) => this.receiveCommand(payload));
     await this.publishHeartbeat();
@@ -194,12 +217,47 @@ export class WagoRuntime {
       await this.publishReport(desired.revision, desired.contentHash, []);
       return;
     }
-    // Persist only after validation; a rejected snapshot cannot alter active I/O.
-    this.feedbackChecks.forEach(({ timer }) => clearTimeout(timer));
-    this.feedbackChecks.clear();
+    if (this.configurationPending)
+      return this.reportRejected(desired.revision, desired.contentHash, [
+        { path: 'snapshot', code: 'configuration_busy', message: 'configuration persistence is in progress' },
+      ]);
+    // A timed pulse must keep its old route until OFF completes; never suspend its shutoff during disk I/O.
+    if (
+      this.options.device.prepareConfiguration &&
+      (this.inFlightCommandIds.size ||
+        this.channelWrites.size ||
+        this.pulses.size ||
+        Object.values(this.state.outputs).some(Boolean))
+    )
+      return this.reportRejected(desired.revision, desired.contentHash, [
+        {
+          path: 'snapshot',
+          code: 'outputs_busy',
+          message: 'finish pending commands and switch outputs off before reconfiguration',
+        },
+      ]);
+    // Prepare is side-effect free. Keep the old snapshot and routing active as a pair until save succeeds.
+    const installRouting =
+      this.options.device.prepareConfiguration?.(desired.snapshot) ??
+      (() => this.options.device.configure?.(desired.snapshot));
+    this.configurationPending = true;
     this.configurationGeneration += 1;
-    this.state.accepted = { revision: desired.revision, contentHash: desired.contentHash, snapshot: desired.snapshot };
-    await this.options.store.save(this.state);
+    const resume = this.options.device.suspend?.();
+    try {
+      const candidate: RuntimeState = {
+        ...this.state,
+        accepted: { revision: desired.revision, contentHash: desired.contentHash, snapshot: desired.snapshot },
+      };
+      await this.options.store.save(candidate);
+      // No await between these two installations: callbacks cannot observe mixed generations.
+      installRouting();
+      this.state = candidate;
+      this.feedbackChecks.forEach(({ timer }) => clearTimeout(timer));
+      this.feedbackChecks.clear();
+    } finally {
+      resume?.();
+      this.configurationPending = false;
+    }
     await this.publishReport(desired.revision, desired.contentHash, []);
     await this.publishState();
   }
@@ -212,6 +270,8 @@ export class WagoRuntime {
       return;
     }
     if (!command?.id || !command.channelId || !['set', 'pulse'].includes(command.action)) return;
+    if (this.configurationPending)
+      return this.acknowledge(command.id, 'rejected', 'configuration persistence is in progress');
     if (command.action === 'set' && typeof command.value !== 'boolean')
       return this.acknowledge(command.id, 'rejected', 'set commands require a boolean value');
     if (this.state.commandIds.includes(command.id)) return this.acknowledge(command.id, 'duplicate');
@@ -313,43 +373,49 @@ export class WagoRuntime {
   }
 
   async publishMeasurements(): Promise<void> {
+    if (this.measurementsPending || this.configurationPending) return;
     const accepted = this.state.accepted;
     if (!accepted) return;
-    for (const channel of accepted.snapshot.logicalChannels.filter((item) =>
-      item.capabilities.includes('measurement'),
-    )) {
-      const point = accepted.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
-      if (!point) continue;
-      try {
-        const raw = await this.options.device.read(point);
-        if (typeof raw !== 'number') continue;
-        const transform = channel.measurement ?? { unit: 'percent', scale: 1, offset: 0 };
-        const scaledValue = raw * transform.scale + transform.offset;
-        const value = Math.round(scaledValue);
-        if (!Number.isSafeInteger(value) || Math.abs(scaledValue - value) > 1e-9) {
-          await this.options.transport.publish(this.topic('faults'), {
-            channelId: channel.id,
-            code: 'invalid_measurement_transform',
-            message: 'measurement transforms must produce an integer base-unit value',
-          });
-          continue;
+    this.measurementsPending = true;
+    try {
+      for await (const reading of acquireMeasurements(accepted.snapshot, this.options.device)) {
+        for (const channel of reading.channels) {
+          if (accepted !== this.state.accepted || this.configurationPending) return;
+          try {
+            if (reading.ok === false) throw reading.error;
+            const { raw, timestamp } = reading;
+            if (typeof raw !== 'number') continue;
+            const transform = channel.measurement ?? { unit: 'percent', scale: 1, offset: 0 };
+            const scaledValue = raw * transform.scale + transform.offset;
+            const value = Math.round(scaledValue);
+            if (!Number.isSafeInteger(value) || Math.abs(scaledValue - value) > 1e-9) {
+              await this.options.transport.publish(this.topic('faults'), {
+                channelId: channel.id,
+                code: 'invalid_measurement_transform',
+                message: 'measurement transforms must produce an integer base-unit value',
+              });
+              continue;
+            }
+            await this.options.transport.publish(this.topic('measurements'), {
+              channelId: channel.id,
+              unit: transform.unit,
+              value,
+              kind: transform.kind ?? 'live',
+              sourceTimestamp: timestamp,
+              streamId: this.measurementStreamId,
+              sequence: ++this.measurementSequence,
+            });
+          } catch (error) {
+            await this.options.transport.publish(this.topic('faults'), {
+              channelId: channel.id,
+              code: measurementErrorCode(error),
+              message: error instanceof Error ? error.message : String(error),
+            });
+          }
         }
-        await this.options.transport.publish(this.topic('measurements'), {
-          channelId: channel.id,
-          unit: transform.unit,
-          value,
-          kind: transform.kind ?? 'live',
-          sourceTimestamp: new Date().toISOString(),
-          streamId: this.measurementStreamId,
-          sequence: ++this.measurementSequence,
-        });
-      } catch (error) {
-        await this.options.transport.publish(this.topic('faults'), {
-          channelId: channel.id,
-          code: 'measurement_read_failed',
-          message: error instanceof Error ? error.message : String(error),
-        });
       }
+    } finally {
+      this.measurementsPending = false;
     }
   }
 
@@ -388,6 +454,7 @@ export class WagoRuntime {
     preservePulse: boolean,
     configurationGeneration: number,
   ): Promise<'written' | 'failed'> {
+    if (this.configurationPending || configurationGeneration !== this.configurationGeneration) return 'failed';
     const point = this.state.accepted?.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
     if (!point) return 'failed';
     try {
@@ -645,9 +712,11 @@ export function validateSnapshot(value: unknown): ValidationError[] {
   validateKeys(
     snapshot as Record<string, unknown>,
     'snapshot',
-    ['version', 'physicalPoints', 'logicalChannels'],
+    ['version', 'physicalPoints', 'logicalChannels', 'modbus'],
     errors,
   );
+  if (snapshot.modbus !== undefined) errors.push(...validateModbus(snapshot.modbus));
+  errors.push(...validateModbusBindings(snapshot));
   if (snapshot.version !== 1)
     errors.push({ path: 'snapshot.version', code: 'unsupported_version', message: 'snapshot version must be 1' });
   if (!Array.isArray(snapshot.physicalPoints) || !Array.isArray(snapshot.logicalChannels))
@@ -668,7 +737,7 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     validateKeys(
       point as Record<string, unknown>,
       `snapshot.physicalPoints[${index}]`,
-      ['id', 'hardwareProfile', 'channel'],
+      ['id', 'hardwareProfile', 'channel', 'modbus'],
       errors,
     );
     if (!point?.id || pointIds.has(point.id))
@@ -678,7 +747,7 @@ export function validateSnapshot(value: unknown): ValidationError[] {
         message: 'physical point IDs must be unique',
       });
     pointIds.add(point?.id);
-    if (!['751-9301', '879-3000', '879-1300'].includes(point?.hardwareProfile ?? ''))
+    if (!['751-9301', '879-3000', '879-1300', 'modbus'].includes(point?.hardwareProfile ?? ''))
       errors.push({
         path: `snapshot.physicalPoints[${index}].hardwareProfile`,
         code: 'unsupported_profile',

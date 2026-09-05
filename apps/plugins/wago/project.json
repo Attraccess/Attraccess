@@ -16,7 +16,7 @@
     "build-backend": {
       "executor": "nx:run-commands",
       "cache": true,
-        "inputs": ["{projectRoot}/backend/**/*", "{projectRoot}/cc100-runtime/signing-public-key.pub", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
+        "inputs": ["{projectRoot}/backend/**/*", "{projectRoot}/modbus/**/*", "{projectRoot}/cc100-runtime/signing-public-key.pub", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/wago",
@@ -26,7 +26,7 @@
     "build-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/frontend/**/*", "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"],
+      "inputs": ["{projectRoot}/frontend/**/*", "{projectRoot}/modbus/**/*", "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"],
       "outputs": ["{projectRoot}/package/frontend"],
       "options": { "cwd": "apps/plugins/wago", "command": "pnpm exec vite build --config frontend/vite.config.ts" }
     },
