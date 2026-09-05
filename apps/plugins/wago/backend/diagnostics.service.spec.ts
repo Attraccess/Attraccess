@@ -2,6 +2,7 @@ import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { diagnosticReferences, WagoDiagnosticsService } from './diagnostics.service';
 import { WagoController } from './wago-controller.entity';
 import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
+import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { WagoDiagnosticsStore } from './diagnostics-store';
 import { WagoService } from './wago.service';
 
@@ -49,6 +50,56 @@ describe('diagnostic references', () => {
 });
 
 describe('controller diagnostics', () => {
+  it('keeps healthy resource controllers available when another applied snapshot is corrupt', async () => {
+    const nodes = [
+      { id: 'broken', resourceId: 1, type: 'plugin.wago.command', data: { controllerId: 1, channelId: 'io' } },
+      { id: 'healthy', resourceId: 1, type: 'plugin.wago.command', data: { controllerId: 2, channelId: 'io' } },
+    ];
+    const query = (result: unknown[]) => {
+      const builder = {
+        select: jest.fn(),
+        distinctOn: jest.fn(),
+        where: jest.fn(),
+        andWhere: jest.fn(),
+        orderBy: jest.fn(),
+        addOrderBy: jest.fn(),
+        take: jest.fn(),
+        getMany: jest.fn().mockResolvedValue(result),
+      };
+      for (const method of ['select', 'distinctOn', 'where', 'andWhere', 'orderBy', 'addOrderBy', 'take'] as const)
+        builder[method].mockReturnValue(builder);
+      return builder;
+    };
+    const resourceQueries = [query(nodes), query([])];
+    const context = {
+      getRepository: (entity: unknown) => {
+        if (entity === WagoController)
+          return { createQueryBuilder: () => query([{ id: 1, hardwareId: 'broken' }, { id: 2, hardwareId: 'healthy' }]) };
+        if (entity === WagoConfigurationRevision)
+          return {
+            createQueryBuilder: () =>
+              query([
+                { controllerId: 1, revision: 1, snapshot: '{' },
+                {
+                  controllerId: 2,
+                  revision: 1,
+                  snapshot: JSON.stringify({ version: 1, physicalPoints: [], logicalChannels: [{ id: 'io', capabilities: [] }] }),
+                },
+              ]),
+          };
+        throw new Error('unexpected repository');
+      },
+      dataSource: { getRepository: () => ({ createQueryBuilder: () => resourceQueries.shift() }) },
+    } as unknown as PluginContext;
+    const service = new WagoDiagnosticsService(context, {} as WagoService);
+
+    await expect(service.getResource(1)).resolves.toMatchObject({
+      controllers: [
+        { controllerId: 1, unavailable: true, references: [] },
+        { controllerId: 2, unavailable: false, references: [{ nodeId: 'healthy' }] },
+      ],
+    });
+  });
   it('checkpoints heartbeat persistence while keeping permanent connectivity current', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-09-05T12:00:00Z'));
     try {
