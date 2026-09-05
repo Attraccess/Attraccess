@@ -6,7 +6,7 @@ import {
   useConfigurationRevisionsQuery,
   useConfigurationRevisionPreviewQuery,
 } from './queries';
-import { ConfigurationChanges, ConfigurationErrors } from './ConfigurationChanges';
+import { ConfigurationChanges, ConfigurationErrors, ConfigurationMetadataChanges } from './ConfigurationChanges';
 import { readMetadata } from './configuration-model';
 
 function ImpactWarning({
@@ -173,6 +173,7 @@ export function ConfigurationRevisions({
             after={JSON.parse(review.draft.snapshot)}
             names={reviewNames}
           />
+          <ConfigurationMetadataChanges changes={review.metadataDiff ?? []} names={reviewNames} />
           <ImpactWarning impacts={review.impacts} names={reviewNames} acknowledged={force} onChange={setForce} />
           <Button
             isDisabled={disabled || busy || !reviewedHash || (!!review.impacts.length && !force)}
@@ -257,6 +258,7 @@ export function ConfigurationRevisions({
             after={JSON.parse(preview.revision.snapshot)}
             names={rollbackNames}
           />
+          <ConfigurationMetadataChanges changes={preview.metadataDiff ?? []} names={rollbackNames} />
           <ImpactWarning
             impacts={preview.impacts}
             names={rollbackNames}

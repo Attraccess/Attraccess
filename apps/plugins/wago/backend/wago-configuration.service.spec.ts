@@ -116,6 +116,24 @@ describe('configuration editor service boundaries', () => {
     expect(mqtt.publish.mock.calls[0][2]).not.toContain('Machine enable');
   });
 
+  it('includes editor metadata changes in reviews and rollback previews', async () => {
+    const { service } = fixture();
+    await service.saveDraft(1, snapshot, { names: { output: 'Original' }, presets: [] });
+    await service.reviewDraft(1);
+    await service.publishDraft(1);
+    await service.saveDraft(1, snapshot, { names: { output: 'Renamed' }, presets: [] });
+    const review = await service.reviewDraft(1);
+
+    expect(review.changed).toBe(true);
+    expect(review.diff).toEqual([]);
+    expect(review.metadataDiff).toEqual([{ path: '$.names.output', previous: 'Original', current: 'Renamed' }]);
+
+    await service.publishDraft(1);
+    const preview = await service.previewRevision(1, 1);
+    expect(preview.diff).toEqual([]);
+    expect(preview.metadataDiff).toEqual([{ path: '$.names.output', previous: 'Renamed', current: 'Original' }]);
+  });
+
   it('restores historical names and preset provenance with a rollback', async () => {
     const { service, draft } = fixture();
     const metadata = { names: { output: 'Workshop light', point: 'Cabinet output' }, presets: [] };
