@@ -1100,6 +1100,34 @@ describe('WagoService', () => {
     expect(subscriptions[0].unsubscribe).toHaveBeenCalledTimes(1);
   });
 
+  it('preserves retained state delivered before replacement subscriptions activate', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, context } = createService([claimed], [], 2);
+    const subscribeConfiguredServers = (Reflect.get(service, 'subscribeConfiguredServers') as () => Promise<void>).bind(
+      service,
+    );
+    await subscribeConfiguredServers();
+    const retained = Buffer.from(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        streamId: '00000000-0000-4000-8000-000000000001',
+        sequence: 1,
+        connected: true,
+        revision: 1,
+        contentHash: 'a'.repeat(64),
+        outputs: { relay: true },
+      }),
+    );
+    (context.mqtt.subscribe as jest.Mock).mockImplementation(async (_serverId, topic, callback) => {
+      if (topic.endsWith('/state')) await callback({ topic, payload: retained });
+      return { unsubscribe: jest.fn() };
+    });
+
+    await subscribeConfiguredServers();
+
+    expect(service.diagnostics.read(claimed.id).outputs.relay.value).toBe(true);
+  });
+
   it('unsubscribes an in-flight replacement when the module is destroyed', async () => {
     let finishSubscribe!: () => void;
     const { service, context, subscriptions } = createService([], [], 2);
