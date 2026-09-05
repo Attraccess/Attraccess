@@ -104,7 +104,12 @@ export function runtimeBundleRecoveryScript(testRoot = '', token?: string): stri
   return `${preamble(testRoot)}
 test ! -e "$acceptedCleanup" || fail 'Acceptance cleanup is pending; recovery is unavailable'
 ${token ? `require_owner ${quote(token)}` : ''}
-if [ -d "$receipt" ]; then exit 0; fi
+if [ -d "$receipt" ]; then
+  rm -rf "$receipt/bundle"
+  rm -f "$root/tmp/attraccess-wago-runtime.tar"
+  rm -rf "$config/delivery"
+  exit 0
+fi
 if [ -d "$cleanup" ]; then
   rm -rf "$cleanup"
   rm -f "$root/tmp/attraccess-wago-runtime.tar"
