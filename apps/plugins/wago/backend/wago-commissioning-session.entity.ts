@@ -8,6 +8,9 @@ export type WagoCommissioningState =
   | 'delivery_failed'
   | 'awaiting_discovery'
   | 'awaiting_claim'
+  | 'awaiting_verification'
+  | 'claim_interrupted'
+  | 'recovery_revocation_pending'
   | 'completed'
   | 'revoked';
 
