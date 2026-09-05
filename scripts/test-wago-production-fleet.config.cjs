@@ -2,8 +2,13 @@ module.exports = {
   displayName: 'production-fleet-fixture',
   rootDir: '..',
   testEnvironment: 'node',
+  // Crawl source packages, not duplicate manifests restored in Nx/build artifacts.
+  roots: ['<rootDir>/apps', '<rootDir>/libs'],
   testMatch: ['<rootDir>/apps/plugins/wago/acceptance/production-fleet*.spec.ts'],
-  modulePathIgnorePatterns: ['<rootDir>/dist/', '<rootDir>/apps/plugins/[^/]+/package/'],
+  modulePathIgnorePatterns: [
+    '<rootDir>/(?:[.]nx|dist|build|output|coverage)/',
+    '<rootDir>/apps/plugins/[^/]+/package/',
+  ],
   transform: {
     '^.+\\.[tj]s$': [
       'ts-jest',
