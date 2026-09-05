@@ -35,7 +35,12 @@ export function validateSnapshot(value: unknown): ValidationError[] {
   }
   const snapshot = value as Partial<Snapshot>;
   const errors: ValidationError[] = [];
-  validateKeys(snapshot as Record<string, unknown>, 'snapshot', ['version', 'physicalPoints', 'logicalChannels'], errors);
+  validateKeys(
+    snapshot as Record<string, unknown>,
+    'snapshot',
+    ['version', 'physicalPoints', 'logicalChannels'],
+    errors,
+  );
   if (snapshot.version !== 1) {
     errors.push({ path: 'snapshot.version', code: 'unsupported_version', message: 'snapshot version must be 1' });
   }
@@ -55,7 +60,12 @@ export function validateSnapshot(value: unknown): ValidationError[] {
       });
       return;
     }
-    validateKeys(point as Record<string, unknown>, `snapshot.physicalPoints[${index}]`, ['id', 'hardwareProfile', 'channel'], errors);
+    validateKeys(
+      point as Record<string, unknown>,
+      `snapshot.physicalPoints[${index}]`,
+      ['id', 'hardwareProfile', 'channel'],
+      errors,
+    );
     if (!point?.id || pointIds.has(point.id)) {
       errors.push({
         path: `snapshot.physicalPoints[${index}].id`,
@@ -79,14 +89,12 @@ export function validateSnapshot(value: unknown): ValidationError[] {
       });
     }
   });
-  const channelIds = new Set<string>();
   const channelsById = new Map<string, Snapshot['logicalChannels'][number]>();
   const channelIdCounts = new Map<string, number>();
   snapshot.logicalChannels.forEach((channel) => {
     if (typeof channel?.id !== 'string') {
       return;
     }
-    channelIds.add(channel.id);
     channelsById.set(channel.id, channel);
     channelIdCounts.set(channel.id, (channelIdCounts.get(channel.id) ?? 0) + 1);
   });
@@ -174,11 +182,19 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     if (channel.pulse) {
       validateKeys(channel.pulse as Record<string, unknown>, `${path}.pulse`, ['durationMs'], errors);
     }
-    if (channel?.guard && (!capabilities.includes('guard') || !channelIds.has(channel.guard.channelId))) {
+    const guardChannel = channel.guard ? channelsById.get(channel.guard.channelId) : undefined;
+    if (
+      channel?.guard &&
+      (!capabilities.includes('guard') ||
+        !Array.isArray(guardChannel?.capabilities) ||
+        !guardChannel.capabilities.includes('input') ||
+        !['on', 'off'].includes(channel.guard.when) ||
+        guardChannel.id === channel.id)
+    ) {
       errors.push({
         path: `${path}.guard`,
         code: 'invalid_guard',
-        message: 'guard requires guard capability and an existing channel',
+        message: 'guard requires guard capability, another input channel, and on/off condition',
       });
     }
     if (channel.guard) {
@@ -190,6 +206,7 @@ export function validateSnapshot(value: unknown): ValidationError[] {
       (!capabilities.includes('feedback') ||
         !feedbackChannel ||
         feedbackChannel.id === channel.id ||
+        !Array.isArray(feedbackChannel.capabilities) ||
         !feedbackChannel.capabilities.includes('input') ||
         !['match', 'inverse'].includes(channel.feedback.expected) ||
         !Number.isSafeInteger(channel.feedback.timeoutMs) ||
@@ -202,7 +219,12 @@ export function validateSnapshot(value: unknown): ValidationError[] {
       });
     }
     if (channel.feedback) {
-      validateKeys(channel.feedback as Record<string, unknown>, `${path}.feedback`, ['channelId', 'expected', 'timeoutMs'], errors);
+      validateKeys(
+        channel.feedback as Record<string, unknown>,
+        `${path}.feedback`,
+        ['channelId', 'expected', 'timeoutMs'],
+        errors,
+      );
     }
     if (
       channel.range &&
@@ -234,13 +256,23 @@ export function validateSnapshot(value: unknown): ValidationError[] {
       });
     }
     if (channel.measurement) {
-      validateKeys(channel.measurement as Record<string, unknown>, `${path}.measurement`, ['unit', 'scale', 'offset'], errors);
+      validateKeys(
+        channel.measurement as Record<string, unknown>,
+        `${path}.measurement`,
+        ['unit', 'scale', 'offset'],
+        errors,
+      );
     }
   });
   return errors;
 }
 
-function validateKeys(value: Record<string, unknown>, path: string, allowed: string[], errors: ValidationError[]): void {
+function validateKeys(
+  value: Record<string, unknown>,
+  path: string,
+  allowed: string[],
+  errors: ValidationError[],
+): void {
   Object.keys(value)
     .filter((key) => !allowed.includes(key))
     .forEach((key) =>

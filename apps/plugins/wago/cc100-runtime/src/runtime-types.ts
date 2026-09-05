@@ -25,6 +25,8 @@ export type RuntimeState = {
   outputs: Record<string, boolean>;
   commandIds: string[];
   commandExpiries?: Record<string, string>;
+  /** Highest reserved operational sequence; skipped unused values are intentional. */
+  sequence?: number;
 };
 
 export interface Transport {
@@ -33,6 +35,8 @@ export interface Transport {
 }
 
 export interface DeviceAdapter {
+  validate?(snapshot: Snapshot): ValidationError[];
+  checkAvailability?(): Promise<void>;
   write(point: Snapshot['physicalPoints'][number], value: boolean): Promise<void>;
   read(point: Snapshot['physicalPoints'][number]): Promise<boolean | number>;
 }
