@@ -40,7 +40,7 @@ import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { WagoCommandError, WagoCommandHandler } from './wago-command-handler';
 import { freshness, WagoDiagnosticsStore } from './diagnostics-store';
-import { canonicalEnvelope, validEnvelope } from './diagnostics-envelope';
+import { canonicalEnvelope, sourceTime, validEnvelope } from './diagnostics-envelope';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 const STALE_AFTER_MS = 90_000;
@@ -880,9 +880,16 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       : typeof rawHeartbeat.timestamp === 'string'
         ? rawHeartbeat.timestamp
         : undefined;
+    const persistedHeartbeatAt = sourceTime(controller.lastHeartbeatAt);
     // A full bounded diagnostic cache must not disable permanent heartbeat checkpoints.
     // Other canonical rejections remain invalid and never use receipt time as liveness.
-    if (canonical && (!validEnvelope(rawHeartbeat, Date.now()) || (canTrackDiagnostics && !admitted) || !heartbeatAt))
+    if (
+      canonical &&
+      (!validEnvelope(rawHeartbeat, Date.now()) ||
+        (canTrackDiagnostics && !admitted) ||
+        !heartbeatAt ||
+        (persistedHeartbeatAt !== null && sourceTime(heartbeatAt) < persistedHeartbeatAt))
+    )
       return;
     // Connectivity is process-local between bounded persistence checkpoints.
     // Avoid a database write for every permanent heartbeat.

@@ -478,6 +478,44 @@ describe('WagoService', () => {
     );
   });
 
+  it('does not regress a persisted heartbeat with an older canonical heartbeat when the diagnostics cache is full', async () => {
+    const timestamp = new Date(Date.now() - 60_000).toISOString();
+    const claimed = {
+      ...controller(),
+      id: 257,
+      trustState: 'claimed' as const,
+      lastHeartbeatAt: new Date(Date.now()).toISOString(),
+      lastSeenAt: new Date(Date.now() - 31_000).toISOString(),
+    };
+    const { service, controllerRepository } = createService([claimed]);
+    const streamId = '00000000-0000-4000-8000-000000000001';
+    for (let id = 1; id <= 256; id++) {
+      service.diagnostics.ingest(id, 'heartbeat', Buffer.from(JSON.stringify({ timestamp, streamId, sequence: 1 })));
+    }
+    const onHeartbeat = (
+      Reflect.get(service, 'onHeartbeat') as (hardwareId: string, payload: Buffer) => Promise<void>
+    ).bind(service);
+
+    await onHeartbeat(
+      claimed.hardwareId,
+      Buffer.from(
+        JSON.stringify({
+          hardwareId: claimed.hardwareId,
+          pairingCode: '482931',
+          protocolVersion: '1.0.0',
+          runtimeVersion: '1.0.0',
+          capabilities: ['claim', 'heartbeat', 'configuration-v1'],
+          timestamp,
+          streamId,
+          sequence: 1,
+        }),
+      ),
+    );
+
+    expect(controllerRepository.save).not.toHaveBeenCalled();
+    expect(claimed.lastHeartbeatAt).not.toBe(timestamp);
+  });
+
   it('publishes a retained, content-addressed revision only after validation', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
     const { service, draftRepository, revisionRepository, context } = createService([claimed]);
