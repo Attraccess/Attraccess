@@ -1,16 +1,22 @@
-import { BadRequestException, Body, Controller, Delete, Get, Inject, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Inject, Param, ParseIntPipe, Post, Query, Req } from '@nestjs/common';
 import { Auth } from '@attraccess/plugins-backend-sdk';
+import type { AuthenticatedRequest, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { WagoService } from './wago.service';
 import { WagoCommissioningService } from './wago-commissioning.service';
 import type { WagoPresetApplication } from './configuration';
+import { WagoAudit, wagoAuditPrincipal } from './wago-audit';
 
 @Auth('resources.update')
 @Controller('wago')
 export class WagoControllerApi {
+  private readonly audit: WagoAudit;
   constructor(
     @Inject(WagoService) private readonly wago: WagoService,
     @Inject(WagoCommissioningService) private readonly commissioning: WagoCommissioningService,
-  ) {}
+    @Inject(Symbol.for('attraccess.plugin.context')) context: PluginContext,
+  ) {
+    this.audit = new WagoAudit(context);
+  }
   @Get('controllers') list() {
     return this.wago.list();
   }
@@ -69,11 +75,14 @@ export class WagoControllerApi {
   @Post('controllers/:id/claim') claim(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { name?: string; verifier?: string; mqttServerId?: number },
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.wago.claim(id, body?.name ?? '', body?.verifier ?? '', body?.mqttServerId);
+    return this.audit.run(wagoAuditPrincipal(request), id, 'claim', {}, () =>
+      this.wago.claim(id, body?.name ?? '', body?.verifier ?? '', body?.mqttServerId),
+    );
   }
-  @Delete('controllers/:id') async removeController(@Param('id', ParseIntPipe) id: number) {
-    const hardwareId = await this.wago.remove(id);
+  @Delete('controllers/:id') async removeController(@Param('id', ParseIntPipe) id: number, @Req() request: AuthenticatedRequest) {
+    const hardwareId = await this.audit.run(wagoAuditPrincipal(request), id, 'unclaim', {}, () => this.wago.remove(id));
     await this.commissioning.removeByHardwareId(hardwareId);
   }
   @Get('controllers/:id/configuration/draft') draft(@Param('id', ParseIntPipe) id: number) {
@@ -115,14 +124,17 @@ export class WagoControllerApi {
   ) {
     return this.wago.revisionsFor(id, Number(offset), Number(limit));
   }
-  @Post('controllers/:id/configuration/publish') publishDraft(@Param('id', ParseIntPipe) id: number) {
-    return this.wago.publishDraft(id);
+  @Post('controllers/:id/configuration/publish') publishDraft(@Param('id', ParseIntPipe) id: number, @Req() request: AuthenticatedRequest) {
+    return this.audit.run(wagoAuditPrincipal(request), id, 'publication', {}, () => this.wago.publishDraft(id),
+      (published) => ({ revision: published.revision }));
   }
   @Post('controllers/:id/configuration/rollback/:revision') rollback(
     @Param('id', ParseIntPipe) id: number,
     @Param('revision', ParseIntPipe) revision: number,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.wago.rollback(id, revision);
+    return this.audit.run(wagoAuditPrincipal(request), id, 'rollback', { sourceRevision: revision }, () => this.wago.rollback(id, revision),
+      (published) => ({ revision: published.revision }));
   }
   @Get('controllers/:id/configuration/revisions/:revision/preview') previewRevision(
     @Param('id', ParseIntPipe) id: number,
