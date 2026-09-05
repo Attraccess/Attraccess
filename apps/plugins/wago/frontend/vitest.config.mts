@@ -11,7 +11,10 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    include: ['apps/plugins/wago/frontend/tests/visual-editor.test.tsx'],
+    include: [
+      'apps/plugins/wago/frontend/tests/*.test.tsx',
+      'apps/plugins/wago/frontend/src/ModbusConfigurationForm.spec.tsx',
+    ],
     testTimeout: 15_000,
   },
   esbuild: { jsx: 'automatic' },

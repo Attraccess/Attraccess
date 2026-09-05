@@ -25,6 +25,10 @@ import { DigitalChannelEditor, PhysicalAssignments } from './DigitalChannelEdito
 import { ConfigurationPresets } from './ConfigurationPresets';
 import { ConfigurationRevisions } from './ConfigurationRevisions';
 import { ConfigurationErrors } from './ConfigurationChanges';
+import { ModbusConfigurationForm, ModbusPointForm } from './ModbusConfigurationForm';
+import { ModbusChannels } from './ModbusChannels';
+import { addModbusChannel, bindModbusPoint, emptyModbus, updateModbusConfiguration } from './modbus-editor';
+import { validateModbus, validateModbusBindings } from '../../modbus/model';
 import { ControllerDiagnostics } from './ControllerDiagnostics';
 import {
   availableDigitalTerminals,
@@ -123,8 +127,12 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
       setError(error instanceof Error ? error.message : 'No terminal available.');
     }
   }
+  const modbusErrors = [
+    ...(snapshot.modbus ? validateModbus(snapshot.modbus) : []),
+    ...validateModbusBindings(snapshot),
+  ];
   async function saveDraft() {
-    if (busy || draftConflict) return;
+    if (busy || draftConflict || modbusErrors.length) return;
     const savingVersion = editVersion.current;
     setError(null);
     setNotice('');
@@ -217,7 +225,7 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
                       inert={busy || draftConflict}
                       className="wg:flex wg:flex-col wg:gap-4"
                     >
-                      <legend className="wg:sr-only">Digital configuration</legend>
+                      <legend className="wg:sr-only">I/O configuration</legend>
                       <div className="wg:flex wg:gap-2">
                         <Button
                           variant="secondary"
@@ -242,13 +250,31 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
                         <p>Add an input or output, name it, and confirm its physical assignment below.</p>
                       )}
                       {snapshot.logicalChannels.map((channel) =>
-                        isEditableDigitalChannel(snapshot, channel) ? (
+                        isEditableDigitalChannel(snapshot, channel) ||
+                        snapshot.physicalPoints.find((point) => point.id === channel.physicalPointId)
+                          ?.hardwareProfile === 'modbus' ? (
                           <DigitalChannelEditor
                             key={channel.id}
                             channel={channel}
                             snapshot={snapshot}
                             metadata={metadata}
                             onRename={rename}
+                            assignment={
+                              snapshot.physicalPoints.find((point) => point.id === channel.physicalPointId)
+                                ?.hardwareProfile === 'modbus' ? (
+                                <ModbusPointForm
+                                  configuration={snapshot.modbus ?? emptyModbus}
+                                  value={
+                                    snapshot.physicalPoints.find((point) => point.id === channel.physicalPointId)
+                                      ?.modbus ?? { deviceId: '' }
+                                  }
+                                  isDisabled={busy || draftConflict}
+                                  onChange={(binding) =>
+                                    edit(bindModbusPoint(snapshot, channel.physicalPointId, binding))
+                                  }
+                                />
+                              ) : undefined
+                            }
                             onChange={(value) =>
                               edit({
                                 ...snapshot,
@@ -269,6 +295,14 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
                               edit({
                                 ...snapshot,
                                 logicalChannels: snapshot.logicalChannels.filter((item) => item.id !== channel.id),
+                                physicalPoints: snapshot.physicalPoints.filter(
+                                  (point) =>
+                                    point.hardwareProfile !== 'modbus' ||
+                                    point.id !== channel.physicalPointId ||
+                                    snapshot.logicalChannels.some(
+                                      (item) => item.id !== channel.id && item.physicalPointId === point.id,
+                                    ),
+                                ),
                               })
                             }
                           />
@@ -283,6 +317,30 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
                         ),
                       )}
                       <PhysicalAssignments snapshot={snapshot} metadata={metadata} onChange={edit} />
+                      <ModbusConfigurationForm
+                        value={snapshot.modbus ?? emptyModbus}
+                        showIdentifiers={false}
+                        showValidationErrors={false}
+                        collapseProfiles
+                        isDisabled={busy || draftConflict}
+                        onChange={(modbus) => edit(updateModbusConfiguration(snapshot, modbus))}
+                      />
+                      <ModbusChannels
+                        configuration={snapshot.modbus ?? emptyModbus}
+                        onAdd={(binding, name) => {
+                          const next = addModbusChannel(snapshot, binding);
+                          edit(next.snapshot);
+                          setMetadata((current) => ({
+                            ...current,
+                            names: {
+                              ...current.names,
+                              [next.channel.id]: name.slice(0, 120),
+                              [next.point.id]: name.slice(0, 120),
+                            },
+                          }));
+                        }}
+                      />
+                      <ConfigurationErrors errors={modbusErrors} snapshot={snapshot} names={metadata.names} />
                       <ConfigurationPresets
                         controllerId={controllerId}
                         snapshot={snapshot}
@@ -317,7 +375,13 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
                       controllerId={controllerId}
                       metadata={metadata}
                       disabled={
-                        dirty || draftConflict || save.isPending || validate.isPending || presetBusy || !draft.data
+                        dirty ||
+                        draftConflict ||
+                        modbusErrors.length > 0 ||
+                        save.isPending ||
+                        validate.isPending ||
+                        presetBusy ||
+                        !draft.data
                       }
                       onBusyChange={setRevisionBusy}
                       onRollback={async (failure) => {
@@ -372,7 +436,11 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
                 <Button variant="secondary" isDisabled={busy} onPress={close}>
                   Close
                 </Button>
-                <Button type="submit" isDisabled={!initialized || busy || draftConflict} isPending={save.isPending}>
+                <Button
+                  type="submit"
+                  isDisabled={!initialized || busy || draftConflict || modbusErrors.length > 0}
+                  isPending={save.isPending}
+                >
                   Save draft
                 </Button>
               </ModalFooter>

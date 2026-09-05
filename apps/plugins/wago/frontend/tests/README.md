@@ -41,7 +41,7 @@ this runner. Do not use broad `test_*browser.py` discovery for an isolated run.
 
 ## Coverage
 
-Ten configuration browser scenarios run at 1440x1000 desktop and 390x844 touch/mobile:
+Twelve configuration browser scenarios run at 1440x1000 desktop and 390x844 touch/mobile:
 
 1. First input/output setup, names, physical assignments, save and reload.
 2. Selected preset preview/copy and custom pulse duration without implicit save/publish.
@@ -54,8 +54,11 @@ Ten configuration browser scenarios run at 1440x1000 desktop and 390x844 touch/m
 9. Embedded diagnostics refresh failure hides cached online status, recovers, and preserves unsaved edits without saving or publishing; the panel fits both viewports.
 10. Metadata-only renames appear in review and rollback preview; rollback restores the prior label without changing the hardware snapshot.
 
+11. Modbus TCP/device/named measurement setup, explicit save/publication, cumulative rebinding with stable IDs, and rollback restoring the complete snapshot.
+12. Locked unqualified built-ins, custom profile duplication and selection, and invalid register address save blocking.
+
 Together with isolation, rollback-identity, and metadata-aware review contract tests,
-the configuration suite executes 23 tests. Rollback requests must carry the previewed draft
+the configuration suite executes 27 tests. Rollback requests must carry the previewed draft
 identity; review identities include metadata and remain separate from content hashes. All editor
 interactions use browser clicks, typed fields, and checkboxes, not React state
 manipulation. Screenshots are evidence, not pixel-diff baselines. Fixture validation,
@@ -64,7 +67,7 @@ real controller acceptance, physical readiness, or host integration correctness.
 
 ## Isolated Command Forms
 
-Two command scenarios run at both viewport sizes (4 more tests; **27 total**):
+Two command scenarios run at both viewport sizes (4 more tests; **31 total**):
 
 1. Labelled controller/channel/operation choices, absence of input-only choices,
    Pulse invalidation when switching to a set-only output, read-only revision,

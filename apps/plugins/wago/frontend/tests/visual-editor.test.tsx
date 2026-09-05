@@ -6,6 +6,8 @@ import '@testing-library/jest-dom/vitest';
 import { ConfigurationEditor } from '../src/ConfigurationEditor';
 import { ConfigurationMetadataChanges } from '../src/ConfigurationChanges';
 import type { WagoConfigurationSnapshot } from '../src/api';
+import { validateEditorSnapshot } from '../../backend/configuration-editor';
+import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../../modbus/model';
 import type { WagoDiagnostics } from '../src/diagnostics';
 
 const state = vi.hoisted(() => ({
@@ -32,6 +34,7 @@ const state = vi.hoisted(() => ({
   getDraft: vi.fn(),
   rollback: vi.fn(),
   diagnostics: vi.fn(),
+  validate: vi.fn(),
 }));
 vi.mock('../src/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/api')>()),
@@ -41,7 +44,7 @@ vi.mock('../src/api', async (importOriginal) => ({
     { id: 'generic-digital-output', name: 'Generic digital output', description: 'Output' },
   ]),
   listConfigurationRevisions: state.history,
-  validateConfiguration: vi.fn(async () => ({ valid: true, errors: [] })),
+  validateConfiguration: state.validate,
   saveDraft: state.save,
   previewPreset: state.preview,
   applyPreset: state.apply,
@@ -106,6 +109,7 @@ function diagnosticsFixture(controllerId = 1): WagoDiagnostics {
 let client: QueryClient;
 beforeEach(() => {
   vi.clearAllMocks();
+  state.validate.mockResolvedValue({ valid: true, errors: [] });
   vi.stubGlobal(
     'ResizeObserver',
     class {
@@ -474,5 +478,208 @@ describe('visual configuration workflow', () => {
     expect(await screen.findByText('Door lock · Physical terminal: Select a compatible terminal')).toBeInTheDocument();
     expect(screen.getByText(/Rejected by controller/)).toBeInTheDocument();
     expect(screen.queryByText(/logicalChannels\[0\]/)).not.toBeInTheDocument();
+  });
+});
+
+describe('mounted Modbus configuration', () => {
+  async function addMeter() {
+    mount();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Add connection', exact: true }));
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    await user.type(screen.getByRole('textbox', { name: 'Host', exact: true }), 'meter.fixture.invalid');
+    await user.click(screen.getByRole('button', { name: 'Add device', exact: true }));
+    await user.clear(screen.getByRole('textbox', { name: 'Device name' }));
+    await user.type(screen.getByRole('textbox', { name: 'Device name' }), 'Workshop meter');
+    await user.click(screen.getByRole('button', { name: 'Add Active power from Workshop meter' }));
+    return user;
+  }
+
+  it('mounts named bindings and saves exact Modbus configuration with stable identities', async () => {
+    const user = await addMeter();
+    expect(screen.queryByRole('textbox', { name: 'Device ID' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Connection ID' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Modbus device/ })).toHaveTextContent('Workshop meter');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
+    const [, first] = state.save.mock.calls[0];
+    expect(validateEditorSnapshot(first)).toEqual([]);
+    expect(first.modbus.devices[0]).toMatchObject({
+      name: 'Workshop meter',
+      profileId: 'wago-879-3000-unverified',
+      profileVersion: 1,
+    });
+    expect(first.physicalPoints[1]).toMatchObject({
+      hardwareProfile: 'modbus',
+      channel: 0,
+      modbus: { deviceId: first.modbus.devices[0].id, measurementId: 'active-power' },
+    });
+    expect(first.logicalChannels[1]).toMatchObject({
+      physicalPointId: first.physicalPoints[1].id,
+      capabilities: ['input', 'measurement'],
+      measurement: { unit: 'watt', kind: 'live', scale: 1, offset: 0 },
+    });
+    await user.click(screen.getByRole('button', { name: /Named measurement/ }));
+    await user.click(await screen.findByRole('option', { name: /Imported energy/ }));
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(2));
+    const [, second] = state.save.mock.calls[1];
+    expect(second.physicalPoints[1].id).toBe(first.physicalPoints[1].id);
+    expect(second.logicalChannels[1].id).toBe(first.logicalChannels[1].id);
+    expect(second.physicalPoints[1].modbus.measurementId).toBe('import-energy');
+    expect(second.logicalChannels[1].measurement).toEqual({
+      unit: 'watt-hour',
+      kind: 'cumulative',
+      scale: 1,
+      offset: 0,
+    });
+    expect(second.logicalChannels[0]).toEqual(first.logicalChannels[0]);
+    expect(state.publish).not.toHaveBeenCalled();
+  });
+
+  it('blocks invalid transport and binding edits and displays server validation', async () => {
+    const user = await addMeter();
+    const port = screen.getByRole('textbox', { name: 'Port', exact: true });
+    await user.clear(port);
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    await user.type(port, '502');
+    state.validate.mockResolvedValue({
+      valid: false,
+      errors: [{ path: 'modbus.devices[0].unitId', code: 'invalid_modbus', message: 'Fixture unit is unavailable' }],
+    });
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByText('Workshop meter · unit Id: Fixture unit is unavailable')).toBeInTheDocument();
+    expect(state.save).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Remove device', exact: true }));
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    expect(screen.getByText(/existing device and named measurement\/action required/)).toBeInTheDocument();
+  });
+
+  it('freezes Modbus controls and rejects saving a dirty editor over a refreshed draft', async () => {
+    const user = await addMeter();
+    const fresh = {
+      controllerId: 1,
+      snapshot: JSON.stringify(state.snapshot),
+      presetProvenance: null,
+      reviewedHash: null,
+      updatedAt: '2026-09-07',
+    };
+    await act(async () => {
+      client.setQueryData(['wago', 'configuration-draft', 1], fresh);
+    });
+    expect(await screen.findByText('Saved draft changed')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Host', exact: true })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(state.save).not.toHaveBeenCalled();
+  });
+});
+
+describe('Modbus output and serial composition', () => {
+  it('binds a named action and live measurement, retaining output controls and valid metered payloads', async () => {
+    const profile = duplicateProfile(BUILTIN_MODBUS_PROFILES[0], 'fixture-map');
+    profile.actions = [
+      {
+        id: 'switch',
+        name: 'Relay',
+        functionCode: 5,
+        address: 0,
+        addressBase: 0,
+        dataType: 'uint16',
+        byteOrder: 'big',
+        wordOrder: 'big',
+        scale: 1,
+        offset: 0,
+        onValue: 1,
+        offValue: 0,
+      },
+    ];
+    const snapshot = {
+      ...state.snapshot,
+      modbus: {
+        profiles: [profile],
+        connections: [
+          {
+            id: 'connection',
+            transport: 'tcp',
+            host: 'meter.fixture.invalid',
+            port: 502,
+            timeoutMs: 1000,
+            reconnectMs: 250,
+            queueLimit: 16,
+          },
+        ],
+        devices: [
+          {
+            id: 'meter',
+            name: 'Meter',
+            connectionId: 'connection',
+            unitId: 1,
+            profileId: profile.id,
+            profileVersion: 1,
+          },
+        ],
+      },
+    };
+    state.getDraft.mockResolvedValue({
+      controllerId: 1,
+      snapshot: JSON.stringify(snapshot),
+      presetProvenance: null,
+      reviewedHash: null,
+      updatedAt: 'initial',
+    });
+    mount();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Add Relay from Meter' }));
+    await user.click(screen.getByRole('button', { name: /Named measurement/ }));
+    await user.click(await screen.findByRole('option', { name: /Active power/ }));
+    await user.click(screen.getAllByRole('checkbox', { name: 'Pulse output' })[1]);
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
+    const [, saved] = state.save.mock.calls[0];
+    expect(validateEditorSnapshot(saved)).toEqual([]);
+    expect(saved.modbus).toEqual(snapshot.modbus);
+    expect(saved.physicalPoints[1].modbus).toEqual({
+      deviceId: 'meter',
+      actionId: 'switch',
+      measurementId: 'active-power',
+    });
+    expect(saved.logicalChannels[1]).toMatchObject({
+      profile: 'metered-switched-load',
+      capabilities: ['output', 'measurement', 'pulse'],
+      pulse: { durationMs: 500 },
+      disconnectPolicy: { mode: 'immediate' },
+    });
+    await user.click(screen.getByRole('button', { name: /Named action/ }));
+    await user.click(await screen.findByRole('option', { name: 'None', exact: true }));
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    expect(screen.getByRole('spinbutton', { name: 'Pulse duration (ms)' })).toHaveValue(500);
+    await user.click(screen.getByRole('button', { name: /Named action/ }));
+    await user.click(await screen.findByRole('option', { name: 'Relay', exact: true }));
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(2));
+    expect(state.save.mock.calls[1][1]).toEqual(saved);
+  });
+
+  it('uses the actual transport selector to replace TCP fields with valid serial configuration', async () => {
+    mount();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Add connection', exact: true }));
+    await user.click(screen.getByRole('button', { name: /Transport/ }));
+    await user.click(await screen.findByRole('option', { name: 'rtu', exact: true }));
+    expect(screen.queryByRole('textbox', { name: 'Host', exact: true })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
+    const [, saved] = state.save.mock.calls[0];
+    expect(validateEditorSnapshot(saved)).toEqual([]);
+    expect(saved.modbus.connections[0]).toMatchObject({
+      transport: 'rtu',
+      path: '/dev/serial',
+      baudRate: 19200,
+      parity: 'even',
+      stopBits: 1,
+    });
+    expect(saved.modbus.connections[0]).not.toHaveProperty('host');
+    expect(saved.modbus.connections[0]).not.toHaveProperty('port');
   });
 });

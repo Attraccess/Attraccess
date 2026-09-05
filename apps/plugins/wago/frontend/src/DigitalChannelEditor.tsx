@@ -1,4 +1,5 @@
 import { Button, Checkbox, Input, Label, ListBox, Select, TextField } from '@heroui/react';
+import type { ReactNode } from 'react';
 import type { Channel } from './configuration-model';
 import { pointLabel } from './configuration-model';
 import type { ConfigurationEditorMetadata, WagoConfigurationSnapshot } from './api';
@@ -79,6 +80,7 @@ export function DigitalChannelEditor({
   onRename,
   onRemove,
   onAssign,
+  assignment,
 }: {
   channel: Channel;
   snapshot: WagoConfigurationSnapshot;
@@ -87,6 +89,7 @@ export function DigitalChannelEditor({
   onRename: (id: string, name: string) => void;
   onRemove: () => void;
   onAssign: (terminal: number) => void;
+  assignment?: ReactNode;
 }) {
   const inputs = snapshot.logicalChannels
     .filter((item) => item.id !== channel.id && item.capabilities.includes('input'))
@@ -120,15 +123,17 @@ export function DigitalChannelEditor({
           onChange={(event) => onRename(channel.id, event.target.value)}
         />
       </TextField>
-      <Choice
-        label="Physical terminal"
-        value={String(point.channel)}
-        options={availableDigitalTerminals(snapshot, output ? 'output' : 'input', point.id).map((terminal) => ({
-          id: String(terminal.channel),
-          label: `CC100 ${terminal.label}`,
-        }))}
-        onChange={(value) => onAssign(Number(value))}
-      />
+      {assignment ?? (
+        <Choice
+          label="Physical terminal"
+          value={String(point.channel)}
+          options={availableDigitalTerminals(snapshot, output ? 'output' : 'input', point.id).map((terminal) => ({
+            id: String(terminal.channel),
+            label: `CC100 ${terminal.label}`,
+          }))}
+          onChange={(value) => onAssign(Number(value))}
+        />
+      )}
       <TextField isRequired>
         <Label>Physical point label</Label>
         <Input

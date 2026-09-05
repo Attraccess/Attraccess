@@ -1,6 +1,12 @@
 import { Checkbox, Label } from '@heroui/react';
 import type { ConfigurationDiff, ConfigurationValidationError, WagoConfigurationSnapshot } from './api';
-import { changeLabel, readableChangeValue, readableStructuralChanges, readableValue } from './configuration-model';
+import {
+  configurationNames,
+  changeLabel,
+  readableChangeValue,
+  readableStructuralChanges,
+  readableValue,
+} from './configuration-model';
 
 export function ConfigurationErrors({
   errors,
@@ -11,10 +17,11 @@ export function ConfigurationErrors({
   snapshot: WagoConfigurationSnapshot;
   names: Record<string, string>;
 }) {
+  names = configurationNames(snapshot, names);
   return (
     <ul>
-      {errors.map((error) => (
-        <li key={error.path + error.code}>
+      {errors.map((error, index) => (
+        <li key={error.path + error.code + index}>
           {changeLabel({ path: error.path, previous: undefined, current: undefined }, snapshot, snapshot, names)}:{' '}
           {Object.entries(names).reduce((message, [id, name]) => message.replaceAll(id, name), error.message)}
         </li>
@@ -38,6 +45,7 @@ export function ConfigurationChanges({
   selected?: string[];
   onSelect?: (path: string, selected: boolean) => void;
 }) {
+  names = configurationNames(after, configurationNames(before, names));
   const displayed = onSelect ? changes : readableStructuralChanges(changes, before, after);
   if (!displayed.length) return <p>No configuration changes.</p>;
   return (
