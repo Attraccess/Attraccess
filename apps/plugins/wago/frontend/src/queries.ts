@@ -4,6 +4,7 @@ import {
   confirmCommissioningHostKey,
   createCommissioningSession,
   deliverCommissioningSession,
+  recoverCommissioningSession,
   applyPreset,
   getSettings,
   getDraft,
@@ -100,6 +101,14 @@ export function useConfirmCommissioningHostKeyMutation() {
 }
 
 export function useDeliverCommissioningSessionMutation() {
+  return useCommissioningAttemptMutation(deliverCommissioningSession, 'installation');
+}
+
+export function useRecoverCommissioningSessionMutation() {
+  return useCommissioningAttemptMutation(recoverCommissioningSession, 'recovery');
+}
+
+function useCommissioningAttemptMutation(attempt: typeof deliverCommissioningSession, intent: 'installation' | 'recovery') {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -112,9 +121,10 @@ export function useDeliverCommissioningSessionMutation() {
       // React Query retains mutation variables, including after reset/unmount.
       // Scrub credentials and approval before starting the request.
       variables.temporarySsh.password = '';
+      variables.temporarySsh.username = '';
       variables.confirmInstall = false;
-      if (confirmInstall !== true) throw new Error('Explicit installation consent is required');
-      return deliverCommissioningSession(variables.id, { confirmInstall, temporarySsh });
+      if (confirmInstall !== true) throw new Error(`Explicit ${intent} consent is required`);
+      return attempt(variables.id, { confirmInstall, temporarySsh });
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.controllers });
