@@ -2,8 +2,12 @@ module.exports = {
   displayName: 'plugin-wago',
   preset: '../../../jest.preset.js',
   testEnvironment: 'node',
-  testMatch: ['<rootDir>/backend/**/*.spec.ts'],
-  transform: { '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json', isolatedModules: true }] },
-  moduleFileExtensions: ['ts', 'js'],
+  testMatch: [
+    '<rootDir>/backend/**/*.spec.ts',
+    '<rootDir>/frontend/src/ControllerDiagnostics.spec.tsx',
+    '<rootDir>/frontend/src/ResourceDiagnostics.spec.tsx',
+  ],
+  transform: { '^.+\\.[tj]sx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json', isolatedModules: true }] },
+  moduleFileExtensions: ['ts', 'tsx', 'js'],
   moduleNameMapper: { '^@attraccess/(.*)$': '<rootDir>/../../../libs/$1/src/index.ts' },
 };

@@ -1,3 +1,4 @@
+import { WagoAudit, wagoAuditSummary } from './wago-audit';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import {
   ConflictException,
@@ -7,7 +8,12 @@ import {
   OnApplicationBootstrap,
   OnModuleDestroy,
 } from '@nestjs/common';
-import type { PluginContext, PluginMqttSubscription, Repository } from '@attraccess/plugins-backend-sdk';
+import type {
+  PluginAuditPrincipal,
+  PluginContext,
+  PluginMqttSubscription,
+  Repository,
+} from '@attraccess/plugins-backend-sdk';
 import {
   CONFIGURATION_PROTOCOL_VERSION,
   DISCOVERY_ROOT,
@@ -45,6 +51,8 @@ import {
 import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { WagoCommandError, WagoCommandHandler } from './wago-command-handler';
+import { freshness, WagoDiagnosticsStore } from './diagnostics-store';
+import { canonicalEnvelope, sourceTime, validEnvelope } from './diagnostics-envelope';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 const STALE_AFTER_MS = 90_000;
@@ -63,6 +71,7 @@ type WagoControllerSummary = Omit<WagoController, 'fingerprint' | 'pairingCodeHa
 
 @Injectable()
 export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
+  readonly diagnostics = new WagoDiagnosticsStore();
   private controllers!: Repository<WagoController>;
   private settings!: Repository<WagoSettings>;
   private enrollments!: Repository<WagoEnrollment>;
@@ -81,6 +90,8 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     claimedController: (id) => this.claimedController(id),
     getSettings: () => this.getSettings(),
     appliedRevision: (id) => this.appliedRevision(id),
+    onCommand: (controllerId, channelId, id) => this.diagnostics.command(controllerId, channelId, id),
+    onCommandFailure: (id, status) => this.diagnostics.commandFailed(id, status),
   });
   private claimConfigurationLock = Promise.resolve();
   private subscriptionRebuild = Promise.resolve();
@@ -158,7 +169,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       runtimeVersion: controller.runtimeVersion,
       capabilities: controller.capabilities,
       lastSequence: controller.lastSequence,
-      lastHeartbeatAt: controller.lastHeartbeatAt,
+      lastHeartbeatAt: this.diagnostics.read(controller.id).heartbeatAt ?? controller.lastHeartbeatAt,
       lastSeenAt: controller.lastSeenAt,
       compatibilityError: controller.compatibilityError,
       createdAt: controller.createdAt,
@@ -254,6 +265,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     application: WagoPresetApplication,
     selectedPaths: string[],
     previewedDraftHash: string,
+    principal?: PluginAuditPrincipal,
   ): Promise<WagoConfigurationDraft> {
     return this.withConfigurationLock(controllerId, async () => {
       const draft = await this.draftForPreset(controllerId);
@@ -265,14 +277,52 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       const validPaths = new Set(diff.map((change) => change.path));
       if (!Array.isArray(selectedPaths) || selectedPaths.some((path) => !validPaths.has(path)))
         throw new ConflictException('selected preset changes no longer match the configuration draft');
-      draft.snapshot = canonicalSnapshot(applySelectedChanges(snapshot, diff, selectedPaths));
-      draft.reviewedHash = null;
-      draft.presetProvenance = JSON.stringify([
-        ...parsePresetProvenance(draft.presetProvenance).slice(-99),
-        { presetId: application.presetId, appliedAt: new Date().toISOString(), selectedPaths },
-      ]);
-      draft.updatedAt = new Date().toISOString();
-      return this.drafts.save(draft);
+      const updatedSnapshot = applySelectedChanges(snapshot, diff, selectedPaths);
+      if (configurationHash(updatedSnapshot) === configurationHash(snapshot)) return draft;
+      const provenance = parsePresetProvenance(draft.presetProvenance);
+      const reapplied = provenance.some((entry) => {
+        if (!entry || typeof entry !== 'object') return false;
+        const previous = entry as { presetId?: string; channelId?: string };
+        return (
+          previous.presetId === application.presetId &&
+          (previous.channelId === application.channelId ||
+            (!previous.channelId &&
+              snapshot.logicalChannels.some(
+                (channel) => channel.id === application.channelId && channel.profile === application.presetId,
+              )))
+        );
+      });
+      const details = {
+        presetId: application.presetId,
+        channelId: application.channelId,
+        before: wagoAuditSummary(snapshot),
+      };
+      const persist = async () => {
+        draft.snapshot = canonicalSnapshot(updatedSnapshot);
+        draft.reviewedHash = null;
+        draft.presetProvenance = JSON.stringify([
+          ...provenance.slice(-99),
+          {
+            presetId: application.presetId,
+            channelId: application.channelId,
+            appliedAt: new Date().toISOString(),
+            selectedPaths,
+          },
+        ]);
+        draft.updatedAt = new Date().toISOString();
+        return this.drafts.save(draft);
+      };
+      // Classification and before/after evidence belong to this same configuration lock.
+      return principal
+        ? new WagoAudit(this.context).run(
+            principal,
+            controllerId,
+            reapplied ? 'preset_reapplication' : 'preset_application',
+            details,
+            persist,
+            (saved) => ({ ...details, after: wagoAuditSummary(JSON.parse(saved.snapshot)) }),
+          )
+        : persist();
     });
   }
 
@@ -722,6 +772,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     });
     const generation = this.activeSubscriptionGeneration + 1;
     const replacements: PluginMqttSubscription[] = [];
+    const retainedStates = new Map<number, Buffer>();
     try {
       for (const serverId of serverIds) {
         replacements.push(
@@ -748,7 +799,10 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
               if (!this.isActiveSubscriptionGeneration(generation)) return;
               const hardwareId = configurationReportedHardwareId(settings.operationalPrefix, message.topic);
               const controller = hardwareId ? controllersByHardwareId.get(hardwareId) : undefined;
-              if (controller) this.enqueueConfigurationReport(controller.id, message.payload);
+              if (controller) {
+                this.diagnostics.ingest(controller.id, 'configuration/reported', message.payload);
+                this.enqueueConfigurationReport(controller.id, message.payload);
+              }
             },
           ),
         );
@@ -757,7 +811,10 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
             if (!this.isActiveSubscriptionGeneration(generation)) return;
             const hardwareId = acknowledgementHardwareId(settings.operationalPrefix, message.topic);
             const controller = hardwareId ? controllersByHardwareId.get(hardwareId) : undefined;
-            if (controller) this.onCommandAcknowledgement(controller.id, message.payload);
+            if (controller) {
+              this.diagnostics.ingest(controller.id, 'acknowledgements', message.payload);
+              this.onCommandAcknowledgement(controller.id, message.payload);
+            }
           }),
         );
         if (this.destroyed) {
@@ -765,6 +822,21 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
           return;
         }
         for (const controller of claimedControllers) {
+          for (const suffix of ['state', 'measurements', 'faults']) {
+            replacements.push(
+              await this.subscribeMqtt(
+                serverId,
+                `${settings.operationalPrefix}/v1/controllers/${controller.hardwareId}/${suffix}`,
+                (message) => {
+                  if (this.isActiveSubscriptionGeneration(generation))
+                    this.diagnostics.ingest(controller.id, suffix, message.payload);
+                  // MQTT may deliver a retained snapshot before the generation swap completes.
+                  else if (!this.destroyed && suffix === 'state' && message.payload.length <= 65_536)
+                    retainedStates.set(controller.id, Buffer.from(message.payload));
+                },
+              ),
+            );
+          }
           replacements.push(
             await this.subscribeMqtt(
               serverId,
@@ -791,6 +863,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     }
     // New handlers are inert until this synchronous generation swap disables the old set.
     this.activeSubscriptionGeneration = generation;
+    retainedStates.forEach((payload, controllerId) => this.diagnostics.ingest(controllerId, 'state', payload));
     this.unsubscribe();
     this.subscriptions.push(...replacements);
   }
@@ -893,19 +966,61 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       return;
     }
     if (heartbeat.hardwareId !== hardwareId) return;
+    let rawHeartbeat: Record<string, unknown>;
+    try {
+      rawHeartbeat = JSON.parse(payload.toString('utf8'));
+    } catch {
+      return;
+    }
+    const canonical = canonicalEnvelope(rawHeartbeat, 'heartbeat');
     const controller = await this.controllers.findOneBy({ hardwareId });
     if (
       !controller ||
       controller.trustState !== 'claimed' ||
-      (heartbeat.sequence !== undefined && heartbeat.sequence < controller.lastSequence)
+      (!canonical && heartbeat.sequence !== undefined && heartbeat.sequence < controller.lastSequence)
     )
       return;
     const now = new Date().toISOString();
+    const canTrackDiagnostics = this.diagnostics.canTrack(controller.id);
+    const admitted = this.diagnostics.ingest(controller.id, 'heartbeat', payload);
+    const heartbeatAt = admitted
+      ? this.diagnostics.read(controller.id).heartbeatAt
+      : typeof rawHeartbeat.timestamp === 'string'
+        ? rawHeartbeat.timestamp
+        : undefined;
+    const persistedHeartbeatAt = sourceTime(controller.lastHeartbeatAt);
+    // A full bounded diagnostic cache must not disable permanent heartbeat checkpoints.
+    // Other canonical rejections remain invalid and never use receipt time as liveness.
+    if (
+      canonical &&
+      (!validEnvelope(rawHeartbeat, Date.now()) ||
+        (canTrackDiagnostics && !admitted) ||
+        !heartbeatAt ||
+        (persistedHeartbeatAt !== null && sourceTime(heartbeatAt) < persistedHeartbeatAt))
+    )
+      return;
+    // Connectivity is process-local between bounded persistence checkpoints.
+    // Avoid a database write for every permanent heartbeat.
+    const metadataChanged =
+      controller.protocolVersion !== heartbeat.protocolVersion ||
+      controller.runtimeVersion !== heartbeat.runtimeVersion ||
+      controller.capabilities !== JSON.stringify(heartbeat.capabilities) ||
+      controller.compatibilityError !== compatibilityError(heartbeat);
+    if (
+      controller.lastHeartbeatAt &&
+      freshness(controller.lastSeenAt, Date.now(), 30_000) === 'fresh' &&
+      !metadataChanged
+    )
+      return;
     controller.protocolVersion = heartbeat.protocolVersion;
     controller.runtimeVersion = heartbeat.runtimeVersion;
     controller.capabilities = JSON.stringify(heartbeat.capabilities);
-    controller.lastSequence = heartbeat.sequence ?? controller.lastSequence;
-    controller.lastHeartbeatAt = now;
+    if (!canonical) {
+      controller.lastSequence = this.diagnostics.read(controller.id).legacyHeartbeatSequence ?? controller.lastSequence;
+      controller.lastHeartbeatAt = now;
+    } else {
+      controller.lastHeartbeatAt = heartbeatAt;
+    }
     controller.lastSeenAt = now;
     controller.compatibilityError = compatibilityError(heartbeat);
     controller.updatedAt = now;
@@ -1041,9 +1156,8 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
 
   private connectivity(controller: WagoController): 'online' | 'stale' | 'untrusted' {
     if (controller.trustState === 'untrusted') return 'untrusted';
-    return controller.lastHeartbeatAt && Date.now() - Date.parse(controller.lastHeartbeatAt) <= STALE_AFTER_MS
-      ? 'online'
-      : 'stale';
+    const heartbeatAt = this.diagnostics.read(controller.id).heartbeatAt ?? controller.lastHeartbeatAt;
+    return freshness(heartbeatAt, Date.now(), STALE_AFTER_MS) === 'fresh' ? 'online' : 'stale';
   }
   private async appliedRevision(controllerId: number): Promise<WagoConfigurationRevision | null> {
     const [revision] = await this.revisions.find({

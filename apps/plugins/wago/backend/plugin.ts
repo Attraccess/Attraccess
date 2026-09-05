@@ -1,4 +1,4 @@
-import type { PluginBackendModule, PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginBackendModule, PluginContext, PluginFlowNodeDefinition } from '@attraccess/plugins-backend-sdk';
 import { DynamicModule } from '@nestjs/common';
 import { WagoControllerApi } from './wago.controller';
 import { WagoController } from './wago-controller.entity';
@@ -11,6 +11,8 @@ import { WagoCommissioningSession } from './wago-commissioning-session.entity';
 import { WagoCommissioningService } from './wago-commissioning.service';
 import { createWagoCommandNode } from './wago-command-node';
 import { WagoFlowService } from './wago-flow.service';
+import { WagoDiagnosticsController } from './diagnostics.controller';
+import { WagoDiagnosticsService } from './diagnostics.service';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 class WagoPluginModule {}
@@ -25,7 +27,7 @@ const plugin: PluginBackendModule = {
     WagoConfigurationRevision,
     WagoCommissioningSession,
   ],
-  flowNodes: (context) => [
+  flowNodes: (context): PluginFlowNodeDefinition[] => [
     createWagoCommandNode(context),
     {
       type: 'plugin.wago.event-received',
@@ -69,10 +71,11 @@ const plugin: PluginBackendModule = {
     flowService = new WagoFlowService(context);
     return {
       module: WagoPluginModule,
-      controllers: [WagoControllerApi],
+      controllers: [WagoControllerApi, WagoDiagnosticsController],
       providers: [
         { provide: PLUGIN_CONTEXT, useValue: context },
         WagoService,
+        WagoDiagnosticsService,
         WagoCommissioningService,
         { provide: WagoFlowService, useValue: flowService },
       ],

@@ -23,6 +23,7 @@
       "executor": "nx:run-commands",
       "cache": true,
       "inputs": [
+        "{projectRoot}/diagnostics-types.ts",
         "{projectRoot}/backend/**/*",
         "{projectRoot}/modbus/**/*",
         "{projectRoot}/measurement-contract.ts",
@@ -39,6 +40,7 @@
       "executor": "nx:run-commands",
       "cache": true,
       "inputs": [
+        "{projectRoot}/diagnostics-types.ts",
         "{projectRoot}/frontend/**/*",
         "{projectRoot}/modbus/**/*",
         "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"

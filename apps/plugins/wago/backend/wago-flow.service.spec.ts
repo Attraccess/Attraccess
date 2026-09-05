@@ -63,10 +63,15 @@ describe('WagoFlowService', () => {
     const held = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const channels = jest.spyOn(service as never, 'channels').mockImplementationOnce(async () => {
-      await held;
-      return [{ id: 'door', capabilities: ['output'] }];
-    });
+    const channels = jest
+      .spyOn(
+        service as unknown as { channels(id: number): Promise<Array<{ id: string; capabilities: string[] }>> },
+        'channels',
+      )
+      .mockImplementationOnce(async () => {
+        await held;
+        return [{ id: 'door', capabilities: ['output'] }];
+      });
     const topic = 'attraccess/wago/v1/controllers/cc100-01/state';
     const event = (sequence: number) =>
       Buffer.from(
