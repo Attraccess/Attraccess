@@ -2,7 +2,14 @@ import { connect, type MqttClient } from 'mqtt';
 import { JsonStateStore, WagoRuntime, type RuntimeState, type Transport } from './runtime';
 import { SimulatorDeviceAdapter } from './simulator-device';
 
+type SimulatorState = RuntimeState & {
+  simulatorHardwareId?: string;
+  simulatorPairingCode?: string;
+  operationalPrefix?: string;
+};
+
 let hardwareId: string;
+let pairingCode: string;
 const mqttUrl = required('WAGO_MQTT_URL');
 const prefix = process.env.WAGO_MQTT_PREFIX ?? 'attraccess/wago';
 const statePath = process.env.WAGO_STATE_PATH ?? '/var/lib/attraccess-wago/state.json';
@@ -25,19 +32,21 @@ void start().catch((error: unknown) => {
 });
 
 async function start(): Promise<void> {
-  const state = (await store.load()) as RuntimeState & { simulatorHardwareId?: string };
+  const state = (await store.load()) as SimulatorState;
   hardwareId = state.simulatorHardwareId ?? required('WAGO_HARDWARE_ID');
+  pairingCode = state.credentials
+    ? state.simulatorPairingCode || process.env.WAGO_PAIRING_CODE || ''
+    : required('WAGO_PAIRING_CODE');
   if (process.env.WAGO_HARDWARE_ID && process.env.WAGO_HARDWARE_ID !== hardwareId)
     throw new Error('WAGO_HARDWARE_ID does not match the persisted simulator identity');
   if (!hardwareId.trim() || /[/+#]/.test(hardwareId) || hardwareId.includes(String.fromCharCode(0)))
     throw new Error('invalid WAGO_HARDWARE_ID');
-  await store.save(Object.assign(state, { simulatorHardwareId: hardwareId }));
+  await store.save(Object.assign(state, { simulatorHardwareId: hardwareId, simulatorPairingCode: pairingCode }));
   if (state.credentials) return connectOperational(state);
   return connectEnrollment();
 }
 
 function connectEnrollment(): void {
-  const pairingCode = required('WAGO_PAIRING_CODE');
   const enrollmentSecret = required('WAGO_ENROLLMENT_SECRET');
   const enrollmentClient = connect(mqttUrl, credentials('WAGO_ENROLLMENT'));
   client = enrollmentClient;
@@ -56,6 +65,7 @@ function connectEnrollment(): void {
               username: string;
               password: string;
               configuration?: { namespace?: string };
+              acknowledgementToken?: string;
             };
             if (
               typeof claim?.username !== 'string' ||
@@ -66,13 +76,25 @@ function connectEnrollment(): void {
             )
               throw new Error('claim does not include permanent MQTT credentials and configuration namespace');
             const operationalPrefix = normalizeOperationalPrefix(claim.configuration.namespace);
+            if (
+              claim.acknowledgementToken !== undefined &&
+              (typeof claim.acknowledgementToken !== 'string' || !claim.acknowledgementToken)
+            )
+              throw new Error('claim acknowledgementToken must be a non-empty string');
             claiming = true;
             try {
-              await store.save({
+              const claimedState: SimulatorState = {
                 ...(await store.load()),
                 credentials: { username: claim.username, password: claim.password },
                 operationalPrefix,
-              });
+              };
+              await store.save(claimedState);
+              // Never acknowledge delivery until permanent credentials are durable.
+              // Wait for MQTT PUBACK before ending the enrollment connection.
+              if (claim.acknowledgementToken)
+                await publish(enrollmentClient, `${discovery}/claim/ack`, {
+                  acknowledgementToken: claim.acknowledgementToken,
+                });
             } catch (error) {
               claiming = false;
               throw error;
@@ -100,17 +122,21 @@ function connectEnrollment(): void {
   );
 }
 
-function connectOperational(state: RuntimeState): void {
+function connectOperational(state: SimulatorState): void {
   if (!state.credentials) throw new Error('permanent MQTT credentials are required');
   const operationalClient = connect(mqttUrl, {
+    clientId: state.credentials.username,
     username: state.credentials.username,
     password: state.credentials.password,
   });
   client = operationalClient;
   operationalClient.on('error', logConnectionError);
   device.restore(state.accepted?.snapshot, state.outputs);
-  const operationalRuntime = new WagoRuntime({
+  // Current main requires pairingCode; keeping it on the options object also
+  // permits the older runtime base whose structural interface omits that field.
+  const runtimeOptions: ConstructorParameters<typeof WagoRuntime>[0] & { pairingCode: string } = {
     hardwareId,
+    pairingCode,
     prefix: state.operationalPrefix ?? prefix,
     store,
     transport: transport(operationalClient),
@@ -119,7 +145,8 @@ function connectOperational(state: RuntimeState): void {
       scenario === 'reject-configuration'
         ? { path: '$', code: 'simulated_rejection', message: 'configuration rejected by simulator scenario' }
         : undefined,
-  });
+  };
+  const operationalRuntime = new WagoRuntime(runtimeOptions);
   let started = false;
   let lifecycle = Promise.resolve();
   operationalClient.on('connect', () => {
@@ -157,8 +184,9 @@ function transport(mqtt: MqttClient): Transport {
   };
 }
 
-function credentials(prefix: string): { username?: string; password?: string } {
-  return { username: process.env[`${prefix}_USERNAME`], password: process.env[`${prefix}_PASSWORD`] };
+function credentials(prefix: string): { clientId: string; username: string; password: string } {
+  const username = required(`${prefix}_USERNAME`);
+  return { clientId: username, username, password: required(`${prefix}_PASSWORD`) };
 }
 function parseValues(value: string | undefined): Record<string, boolean | number> {
   if (!value) return {};
