@@ -2,13 +2,7 @@ export type DisconnectPolicy = { mode: 'hold' | 'immediate' | 'watchdog'; timeou
 
 export type Snapshot = {
   version: number;
-  modbus?: ModbusConfiguration;
-  physicalPoints: Array<{
-    id: string;
-    hardwareProfile: '751-9301' | '879-3000' | '879-1300' | 'modbus';
-    channel: number;
-    modbus?: ModbusPoint;
-  }>;
+  physicalPoints: Array<{ id: string; hardwareProfile: '751-9301' | '879-3000' | '879-1300'; channel: number }>;
   logicalChannels: Array<{
     id: string;
     physicalPointId: string;
@@ -19,7 +13,7 @@ export type Snapshot = {
     pulse?: { durationMs: number };
     guard?: { channelId: string; when: 'on' | 'off' };
     feedback?: { channelId: string; expected: 'match' | 'inverse'; timeoutMs: number };
-    measurement?: { unit: string; scale: number; offset: number; kind?: 'live' | 'cumulative' };
+    measurement?: { unit: string; scale: number; offset: number };
   }>;
 };
 
@@ -31,7 +25,7 @@ export type RuntimeState = {
   outputs: Record<string, boolean>;
   commandIds: string[];
   commandExpiries?: Record<string, string>;
-  /** Highest sequence number durably reserved for operational messages. */
+  /** Highest reserved operational sequence; skipped unused values are intentional. */
   sequence?: number;
 };
 
@@ -42,12 +36,6 @@ export interface Transport {
 
 export interface DeviceAdapter {
   validate?(snapshot: Snapshot): ValidationError[];
-  activate?(snapshot: Snapshot): void;
-  configure?(snapshot: Snapshot): void;
-  prepareConfiguration?(snapshot: Snapshot): () => void;
-  suspend?(): () => void;
-  measurementSource?(point: Snapshot['physicalPoints'][number]): string;
-  shouldPoll?(point: Snapshot['physicalPoints'][number], now: number): boolean;
   checkAvailability?(): Promise<void>;
   write(point: Snapshot['physicalPoints'][number], value: boolean): Promise<void>;
   read(point: Snapshot['physicalPoints'][number]): Promise<boolean | number>;
@@ -57,5 +45,3 @@ export interface StateStore {
   load(): Promise<RuntimeState>;
   save(state: RuntimeState): Promise<void>;
 }
-// eslint-disable-next-line @nx/enforce-module-boundaries
-import type { ModbusConfiguration, ModbusPoint } from '../../modbus/model';

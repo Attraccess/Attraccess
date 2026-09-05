@@ -2,7 +2,6 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Cc100OnboardIoAdapter } from './adapters';
-import { ModbusDeviceRouter } from './modbus/adapter';
 import { CC100_DIGITAL_PROFILE } from './onboard-profile';
 import { hash, JsonStateStore, WagoRuntime, type Snapshot, type Transport } from './runtime';
 
@@ -170,15 +169,6 @@ describe('CC100 packed digital I/O', () => {
     expect((await store.load()).accepted).toBeUndefined();
   });
 
-  it('retains onboard validation when installed through the Modbus router', () => {
-    const invalid = structuredClone(snapshot);
-    invalid.logicalChannels.push({ ...snapshot.logicalChannels[0], id: 'DO1-alias' });
-    const router = new ModbusDeviceRouter(adapter);
-    expect(router.validate(invalid)).toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: 'duplicate_output' })]),
-    );
-  });
-
   it('reports malformed referenced guard capabilities instead of throwing', async () => {
     await runtime.start();
     const invalid = {
@@ -207,7 +197,7 @@ describe('CC100 packed digital I/O', () => {
     );
   });
 
-  it('does not let stalled reconnect telemetry hold pulse shutdown or disconnect writes', async () => {
+  it('does not let stalled polling telemetry hold pulse shutdown or disconnect writes', async () => {
     await runtime.start();
     const pulsed = structuredClone(snapshot);
     pulsed.logicalChannels[0].capabilities.push('pulse');
@@ -224,10 +214,9 @@ describe('CC100 packed digital I/O', () => {
       await publish(topic, payload, options);
     });
     await writeFile(paths.input, '1');
-    const reconnect = runtime.setConnected(true);
+    const poll = runtime.pollInputs();
     await started.promise;
     try {
-      await reconnect;
       await command('DO1', true, 'pulse', 'pulse');
       await new Promise((resolve) => setTimeout(resolve, 80));
       expect(await readFile(paths.output, 'utf8')).toBe('0');
@@ -245,6 +234,7 @@ describe('CC100 packed digital I/O', () => {
       await disconnect;
     } finally {
       release.resolve();
+      await poll;
     }
   });
 
