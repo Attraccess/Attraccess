@@ -10,6 +10,8 @@ import { WagoConfigurationRevision } from './wago-configuration-revision.entity'
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
 import { WagoCommissioningService } from './wago-commissioning.service';
 import { createWagoCommandNode } from './wago-command-node';
+import { WagoDiagnosticsController } from './diagnostics.controller';
+import { WagoDiagnosticsService } from './diagnostics.service';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 class WagoPluginModule {}
@@ -27,8 +29,8 @@ const plugin: PluginBackendModule = {
   register(context: PluginContext): DynamicModule {
     return {
       module: WagoPluginModule,
-      controllers: [WagoControllerApi],
-      providers: [{ provide: PLUGIN_CONTEXT, useValue: context }, WagoService, WagoCommissioningService],
+      controllers: [WagoControllerApi, WagoDiagnosticsController],
+      providers: [{ provide: PLUGIN_CONTEXT, useValue: context }, WagoService, WagoCommissioningService, WagoDiagnosticsService],
     };
   },
 };

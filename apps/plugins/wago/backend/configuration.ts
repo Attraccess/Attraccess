@@ -116,7 +116,7 @@ export function parseConfigurationReport(value: unknown): WagoConfigurationRepor
   )
     return null;
   const errors = report.errors ?? [];
-  if (!errors.every(isConfigurationValidationError)) return null;
+  if (!Array.isArray(errors) || !errors.every(isConfigurationValidationError)) return null;
   return { revision: report.revision as number, contentHash: report.contentHash, errors };
 }
 
@@ -149,7 +149,7 @@ export function validateSnapshot(snapshot: unknown): ConfigurationValidationErro
     exactKeys(point, path, ['id', 'hardwareProfile', 'channel'], errors);
     addId(point.id, `${path}.id`, pointIds, errors);
     enumValue(point.hardwareProfile, `${path}.hardwareProfile`, HARDWARE_PROFILES, errors);
-    if (!Number.isSafeInteger(point.channel) || point.channel < 0)
+    if (typeof point.channel !== 'number' || !Number.isSafeInteger(point.channel) || point.channel < 0)
       errors.push({
         path: `${path}.channel`,
         code: 'invalid_channel',
