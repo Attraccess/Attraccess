@@ -1,5 +1,5 @@
 import { connect, type MqttClient } from 'mqtt';
-import { JsonStateStore, WagoRuntime, type RuntimeState, type Transport } from './runtime';
+import { JsonStateStore, WagoRuntime, validateDesired, type RuntimeState, type Transport } from './runtime';
 import { SimulatorDeviceAdapter } from './simulator-device';
 
 type SimulatorState = RuntimeState & {
@@ -29,6 +29,7 @@ let timers: NodeJS.Timeout[] = [];
 void start().catch((error: unknown) => {
   process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
   process.exitCode = 1;
+  if (process.connected) process.disconnect();
 });
 
 async function start(): Promise<void> {
@@ -141,10 +142,6 @@ function connectOperational(state: SimulatorState): void {
     store,
     transport: transport(operationalClient),
     device,
-    configurationError: () =>
-      scenario === 'reject-configuration'
-        ? { path: '$', code: 'simulated_rejection', message: 'configuration rejected by simulator scenario' }
-        : undefined,
   };
   const operationalRuntime = new WagoRuntime(runtimeOptions);
   let started = false;
@@ -180,8 +177,47 @@ function transport(mqtt: MqttClient): Transport {
   return {
     publish: (topic, payload, options) =>
       mqtt.connected ? publish(mqtt, topic, payload, options?.retain) : Promise.resolve(),
-    subscribe: (topic, listener) => subscribe(mqtt, topic, listener),
+    subscribe: (topic, listener) =>
+      subscribe(mqtt, topic, (payload) =>
+        scenario === 'reject-configuration' && topic.endsWith('/configuration/desired')
+          ? rejectDesired(mqtt, topic, payload)
+          : listener(payload),
+      ),
   };
+}
+
+// Rejection is a simulator protocol scenario, not an optional production-runtime
+// constructor hook. Normal configuration always reaches the shared runtime.
+async function rejectDesired(mqtt: MqttClient, topic: string, payload: Buffer): Promise<void> {
+  let desired;
+  try {
+    desired = JSON.parse(payload.toString('utf8'));
+  } catch {
+    await publish(
+      mqtt,
+      topic.replace(/desired$/, 'reported'),
+      {
+        revision: 0,
+        contentHash: '',
+        errors: [{ path: '$', code: 'invalid_json', message: 'desired configuration is not valid JSON' }],
+      },
+      true,
+    );
+    return;
+  }
+  await publish(
+    mqtt,
+    topic.replace(/desired$/, 'reported'),
+    {
+      revision: desired?.revision ?? 0,
+      contentHash: desired?.contentHash ?? '',
+      errors: [
+        ...validateDesired(desired),
+        { path: '$', code: 'simulated_rejection', message: 'configuration rejected by simulator scenario' },
+      ],
+    },
+    true,
+  );
 }
 
 function credentials(prefix: string): { clientId: string; username: string; password: string } {
@@ -261,5 +297,25 @@ function logConnectionError(error: Error): void {
 }
 process.on('SIGTERM', () => {
   timers.forEach(clearInterval);
-  client?.end(true, () => process.exit(0));
+  if (client) client.end(true, () => process.exit(0));
+  else process.exit(0);
+});
+
+// An IPC parent can inspect the actual in-memory device independently of MQTT
+// reported state. There is no listener or control port in ordinary CLI/Docker use.
+process.on('message', (message: unknown) => {
+  if (!process.send || !message || typeof message !== 'object') return;
+  const request = message as { type?: string; id?: string; channelId?: string };
+  if (request.type !== 'simulator-read' || typeof request.id !== 'string' || typeof request.channelId !== 'string')
+    return;
+  void handleAsync(async () => {
+    const snapshot = (await store.load()).accepted?.snapshot;
+    const channel = snapshot?.logicalChannels.find((item) => item.id === request.channelId);
+    const point = snapshot?.physicalPoints.find((item) => item.id === channel?.physicalPointId);
+    if (!point) {
+      process.send?.({ type: 'simulator-read-result', id: request.id, error: 'unknown channel' });
+      return;
+    }
+    process.send?.({ type: 'simulator-read-result', id: request.id, value: await device.read(point) });
+  });
 });
