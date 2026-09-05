@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import {
   runtimeBundleAcceptScript,
   runtimeBundleDeliveryScript,
+  runtimeBundleRecoveryAcknowledgementScript,
   runtimeBundleStreamReceiver,
   runtimeBundleInstallScript,
   runtimeBundleRecoveryScript,
@@ -206,6 +207,19 @@ else if (args[0] === 'container' && args[1] === 'ls') {
     expect(existsSync(`${tx}.restored/bundle`)).toBe(false);
     expect(existsSync(join(config, 'delivery'))).toBe(false);
     expect(existsSync(join(root, 'tmp/attraccess-wago-runtime.tar'))).toBe(false);
+  });
+
+  it('retains a delivery-only recovery receipt until the coordinator acknowledges it', () => {
+    mkdirSync(join(config, 'delivery'));
+    write(join(config, 'delivery/token'), 'a'.repeat(32));
+    write(join(root, 'tmp/attraccess-wago-runtime.tar'), 'stale bundle');
+
+    expect(run(runtimeBundleRecoveryScript(root, 'a'.repeat(32))).status).toBe(0);
+    expect(existsSync(`${tx}.restored/token`)).toBe(true);
+    expect(run(runtimeBundleRecoveryAcknowledgementScript(root, 'b'.repeat(32))).status).not.toBe(0);
+    expect(existsSync(`${tx}.restored`)).toBe(true);
+    expect(run(runtimeBundleRecoveryAcknowledgementScript(root, 'a'.repeat(32))).status).toBe(0);
+    expect(existsSync(`${tx}.restored`)).toBe(false);
   });
 
   it('delivers one stream under flock and rolls the old CA back with prior data', () => {

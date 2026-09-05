@@ -240,22 +240,22 @@ export class OutputController {
     if (!point) return;
     const existingPulse = this.pulses.get(channel.id);
     if (existingPulse) clearTimeout(existingPulse.timer);
-    this.pulses.set(channel.id, {
+    const pulse: Pulse = {
       channel,
       point,
       timer: setTimeout(
         () =>
           void this.ignoreRejection(() =>
             this.runForChannel(channel.id, async () => {
-              const pulse = this.pulses.get(channel.id);
-              if (!pulse) return;
+              if (this.pulses.get(channel.id) !== pulse) return;
               if (await this.writePulseShutdown(channel, point)) this.pulses.delete(channel.id);
               else this.retryPulseShutdown(channel.id, pulse, 1);
             }),
           ),
         duration,
       ),
-    });
+    };
+    this.pulses.set(channel.id, pulse);
   }
 
   recoverPulses(): void {
@@ -325,7 +325,7 @@ export class OutputController {
 
   private async writePulseShutdown(channel: LogicalChannel, point: PhysicalPoint): Promise<boolean> {
     try {
-      return await this.writePointWhileQueued(channel, point, false, undefined, undefined, -1);
+      return await this.writePointWhileQueued(channel, point, false);
     } catch {
       // A confirmed OFF whose durable commit failed still needs a retry/recovery obligation.
       return false;

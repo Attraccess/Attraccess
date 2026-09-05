@@ -1681,7 +1681,7 @@ describe('WagoRuntime', () => {
     );
   });
 
-  it('preserves feedback verification for the active phase of a short pulse', async () => {
+  it('verifies the final OFF feedback state for a short pulse', async () => {
     const monitored: Snapshot = {
       ...snapshot,
       physicalPoints: [...snapshot.physicalPoints, { id: 'input-1', hardwareProfile: '751-9301', channel: 1 }],
@@ -1713,7 +1713,7 @@ describe('WagoRuntime', () => {
     await transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'pulse' }));
     await new Promise((resolve) => setTimeout(resolve, 25));
 
-    expect(transport.published).toContainEqual(
+    expect(transport.published).not.toContainEqual(
       expect.objectContaining({
         topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
         payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),

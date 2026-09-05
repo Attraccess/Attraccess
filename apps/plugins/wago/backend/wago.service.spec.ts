@@ -349,6 +349,44 @@ describe('WagoService', () => {
     ).rejects.toThrow('command expired');
   });
 
+  it('ignores null acknowledgements and rejects while publication is stalled', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, context, revisionRepository } = createService([claimed], [], 2);
+    revisionRepository.find.mockResolvedValue([
+      {
+        controllerId: claimed.id,
+        revision: 3,
+        state: 'applied',
+        snapshot: JSON.stringify({
+          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'] }],
+        }),
+      },
+    ]);
+    (context.mqtt.publish as jest.Mock).mockImplementation(() => {
+      const command = JSON.parse((context.mqtt.publish as jest.Mock).mock.calls[0][2]) as { id: string };
+      const acknowledge = Reflect.get(service, 'onCommandAcknowledgement') as (
+        controllerId: number,
+        payload: Buffer,
+      ) => void;
+      acknowledge.call(service, claimed.id, Buffer.from('null'));
+      acknowledge.call(
+        service,
+        claimed.id,
+        Buffer.from(JSON.stringify({ id: command.id, status: 'rejected', error: 'command expired' })),
+      );
+      return new Promise<void>(() => undefined);
+    });
+
+    await expect(
+      service.executeCommand({
+        controllerId: claimed.id,
+        channelId: 'pump',
+        action: 'pulse',
+        expectedConfigurationRevision: 3,
+      }),
+    ).rejects.toThrow('command expired');
+  });
+
   it('creates default settings when none have been persisted', async () => {
     const { service, settingsRepository, settingsQuery } = createService();
     settingsRepository.findOneBy.mockResolvedValue(null);

@@ -71,7 +71,8 @@ describe('controller diagnostics', () => {
         builder[method].mockReturnValue(builder);
       return builder;
     };
-    const resourceQueries = [query(nodes), query([])];
+    const conflictQuery = query([]);
+    const resourceQueries = [query(nodes), conflictQuery];
     const context = {
       getRepository: (entity: unknown) => {
         if (entity === WagoController)
@@ -109,6 +110,9 @@ describe('controller diagnostics', () => {
         { controllerId: 1, unavailable: true, references: [] },
         { controllerId: 2, unavailable: false, references: [{ nodeId: 'healthy' }] },
       ],
+    });
+    expect(conflictQuery.where).toHaveBeenCalledWith("node.data ->> 'controllerId' IN (:...controllerIds)", {
+      controllerIds: [1, 2],
     });
   });
   it('checkpoints heartbeat persistence while keeping permanent connectivity current', async () => {

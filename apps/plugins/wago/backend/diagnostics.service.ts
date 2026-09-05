@@ -84,7 +84,7 @@ export class WagoDiagnosticsService {
           .filter((channelId): channelId is string => typeof channelId === 'string'),
       ),
     ];
-    const controllerIdsForQuery = selectedControllerIds.map(String);
+    const controllerIdsForQuery = selectedControllerIds;
     const [controllers, appliedRevisions, conflictNodes] = await Promise.all([
       this.context
         .getRepository(WagoController)

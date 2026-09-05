@@ -232,14 +232,25 @@ export class WagoCommandHandler {
       completionBehavior === 'acknowledged'
         ? this.waitForAcknowledgement(id, controllerId, acknowledgementTimeoutSeconds)
         : undefined;
+    // Observe rejection immediately: publication can stall after the controller rejects or times out.
+    const acknowledgementFailure = acknowledgement
+      ? new Promise<never>((_resolve, reject) =>
+          acknowledgement.then(
+            () => undefined,
+            (error) => reject({ acknowledgementError: error }),
+          ),
+        )
+      : undefined;
     try {
-      await this.dependencies.context.mqtt.publish(
+      const publication = this.dependencies.context.mqtt.publish(
         controller.mqttServerId,
         commandTopic(settings.operationalPrefix, controller.hardwareId),
         command,
         { qos: 1, retain: false },
       );
+      await (acknowledgementFailure ? Promise.race([publication, acknowledgementFailure]) : publication);
     } catch (error) {
+      if (isAcknowledgementFailure(error)) throw error.acknowledgementError;
       this.dependencies.onCommandFailure?.(id, 'dispatch-failed');
       const dispatchError = new WagoCommandError(
         `Failed to publish WAGO command: ${String(error)}`,
@@ -260,6 +271,8 @@ export class WagoCommandHandler {
       return;
     }
     if (
+      !acknowledgement ||
+      typeof acknowledgement !== 'object' ||
       typeof acknowledgement.id !== 'string' ||
       !['accepted', 'duplicate', 'rejected'].includes(acknowledgement.status as string)
     )
@@ -417,6 +430,15 @@ export class WagoCommandHandler {
     context.set(key, value);
     return value;
   }
+}
+
+function isAcknowledgementFailure(error: unknown): error is { acknowledgementError: Error } {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'acknowledgementError' in error &&
+    (error as { acknowledgementError: unknown }).acknowledgementError instanceof Error
+  );
 }
 
 function positiveInteger(value: unknown): number | undefined {
