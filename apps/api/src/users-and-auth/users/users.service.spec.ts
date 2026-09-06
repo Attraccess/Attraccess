@@ -159,7 +159,11 @@ describe('UsersService', () => {
   describe('rollbackFailedRegistration', () => {
     it('hard-deletes the unregistered user without updating user metrics', async () => {
       const manager = { delete: jest.fn().mockResolvedValue(undefined) };
-      dataSource.transaction.mockImplementation(async (callback) => callback(manager as EntityManager));
+      dataSource.transaction.mockImplementation(async (isolationOrCallback, suppliedCallback) => {
+        const callback = typeof isolationOrCallback === 'function' ? isolationOrCallback : suppliedCallback;
+        if (!callback) throw new Error('Missing transaction callback');
+        return callback(manager as unknown as EntityManager);
+      });
 
       await service.rollbackFailedRegistration(14);
 
@@ -192,7 +196,7 @@ describe('UsersService', () => {
     it('a subsequent user should be assigned default roles via RBAC', async () => {
       jest.spyOn(userRepository, 'findOne').mockResolvedValue(null);
       jest.spyOn(userRepository, 'save').mockImplementation(async (data) => {
-        return { id: 1, ...data } as User;
+        return { id: 1, ...data } as unknown as User;
       });
       jest.spyOn(userRepository, 'count').mockResolvedValue(1);
 
@@ -338,7 +342,7 @@ describe('UsersService', () => {
           failedLoginAttempts: 0,
           firstFailedLoginAt: null,
           locale: 'en',
-        } as User,
+        } as unknown as User,
         {
           id: 2,
           username: 'user2',
@@ -378,7 +382,7 @@ describe('UsersService', () => {
           failedLoginAttempts: 0,
           firstFailedLoginAt: null,
           locale: 'en',
-        } as User,
+        } as unknown as User,
       ];
 
       userRepository.findAndCount.mockResolvedValue([mockUsers, 2]);
@@ -398,17 +402,17 @@ describe('UsersService', () => {
       await service.findMany({ page: 1, limit: 10 });
 
       expect(userRepository.findAndCount).toHaveBeenCalledWith(expect.objectContaining({ order: { username: 'ASC' } }));
-     });
+    });
 
-     it('should filter users by role assignment', async () => {
-       userRepository.findAndCount.mockResolvedValue([[], 0]);
+    it('should filter users by role assignment', async () => {
+      userRepository.findAndCount.mockResolvedValue([[], 0]);
 
       await service.findMany({ page: 1, limit: 10, roleId: 42 });
 
       expect(userRepository.findAndCount).toHaveBeenCalledWith(
-         expect.objectContaining({ where: { userRoles: { roleId: 42 } } }),
-       );
-     });
+        expect.objectContaining({ where: { userRoles: { roleId: 42 } } }),
+      );
+    });
 
     it('should retain the role assignment filter when searching', async () => {
       userRepository.findAndCount.mockResolvedValue([[], 0]);
@@ -872,7 +876,11 @@ describe('UsersService', () => {
           return sessionRepo;
         }),
       } as unknown as EntityManager;
-      dataSource.transaction.mockImplementation(async (callback) => callback(manager));
+      dataSource.transaction.mockImplementation(async (isolationOrCallback, suppliedCallback) => {
+        const callback = typeof isolationOrCallback === 'function' ? isolationOrCallback : suppliedCallback;
+        if (!callback) throw new Error('Missing transaction callback');
+        return callback(manager);
+      });
 
       userRepository.findOne.mockResolvedValue(user);
 

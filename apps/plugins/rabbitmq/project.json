@@ -18,7 +18,14 @@
     "test": {
       "executor": "@nx/jest:jest",
       "cache": true,
-      "inputs": ["default", "^production", "{workspaceRoot}/jest.preset.js", { "externalDependencies": ["jest"] }],
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/jest.preset.js",
+        {
+          "externalDependencies": ["jest"]
+        }
+      ],
       "outputs": ["{workspaceRoot}/coverage/apps/plugins/rabbitmq"],
       "options": {
         "jestConfig": "apps/plugins/rabbitmq/jest.config.ts",
@@ -32,7 +39,9 @@
         "default",
         "^production",
         "{workspaceRoot}/jest.preset.js",
-        { "externalDependencies": ["jest", "testcontainers", "mqtt"] }
+        {
+          "externalDependencies": ["jest", "testcontainers", "mqtt"]
+        }
       ],
       "outputs": ["{workspaceRoot}/coverage/apps/plugins/rabbitmq-e2e"],
       "options": {
@@ -114,6 +123,18 @@
       "options": {
         "cwd": "apps/plugins/rabbitmq",
         "command": "node ../scripts/publish-plugin.mjs package dist"
+      }
+    },
+    "typecheck-tests": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsc --noEmit -p apps/plugins/rabbitmq/tsconfig.spec.json"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsc --noEmit -p apps/plugins/rabbitmq/tsconfig.spec.json"
       }
     }
   }

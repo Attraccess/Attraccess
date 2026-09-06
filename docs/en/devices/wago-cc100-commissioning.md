@@ -17,7 +17,7 @@ Attraccess uses an SSH-only commissioning flow. WAGO Web-Based Management (WBM) 
 - Before authorizing delivery, compare the selected controller's physical label and service-network location with the target controller, then obtain its SSH fingerprint from a trusted inventory or an authorized technician over an independent channel. Copying the scanned fingerprint back into the form is not independent identity authentication. Do not assume the CC100 displays its SSH fingerprint.
 - USB-C service access and WBM are break-glass recovery paths only. Use WAGO's firmware-specific recovery instructions locally when SSH is unavailable; do not use WBM to work around an Attraccess commissioning error.
 
-The server verifies the host key, activates Docker, verifies a locally stored signed runtime bundle, transfers it over SSH, starts the runtime, and completes MQTT enrollment and claim. It never contacts an image registry or the Internet during commissioning.
+The server verifies the pinned host key and an imported signed runtime release, checks the platform, transfers the release over SSH and starts enrollment. An installed but stopped Docker runtime can be started as a separately reviewed action. The controller never needs an image registry or Internet connection for installation.
 
 ## Preconditions
 
@@ -26,17 +26,18 @@ The server verifies the host key, activates Docker, verifies a locally stored si
 - Configure the target local MQTT server with TLS and certificate verification enabled. Use the certificate DNS name as the broker hostname. Import the issuing CA PEM bundle in MQTT settings for a private CA; expired/not-yet-valid certificates require checking clocks and certificate renewal, not disabling verification.
 - Obtain a temporary SSH username and password from the customer. These are entered for the delivery attempt and are not stored in the commissioning session, UI, or audit log.
 - Ensure the temporary SSH identity can run the required commands. Non-root identities require `sudo` access. Credentials are never prefilled or guessed, and must be entered again for each install or recovery attempt.
-- Ensure the local Attraccess server is configured with an immutable `@sha256:` runtime image reference and the locally stored runtime bundle, checksum, and signature. Commissioning is disabled without all of these artifacts.
+- Obtain the signed runtime bundle from the official WAGO runtime build artifacts or your software distributor. Extract the download and select its `.tar`, `.sha256` and `.sig` files in **CC100 runtime release**. No server file path, environment variable, signing key, JSON or command line is needed. Only the built-in release signing key is trusted.
 - Ensure the controller can reach the selected local MQTT broker. No external registry, DNS, or Internet access is required or used.
 
 ## Commission a controller
 
 1. Open **WAGO controllers** and select **Commission controller**.
 2. Enter a **Controller name**, then select **Continue**.
-3. Enter the **Controller IP address** and select the local **MQTT server**. Verify the physical controller label and its network location before selecting **Start automatic commissioning**.
-4. Attraccess scans the controller's Ed25519 SSH key and shows **Verify the controller SSH key**. Compare **Scanned SSH host-key fingerprint** with the physical controller or trusted inventory record, enter it exactly, and select **Confirm host key**.
-5. Enter the customer-supplied **Temporary SSH username** and **Temporary SSH password**, review the interruption/replacement warning and explicitly confirm the installation. Select **Install runtime**. Closing or submitting clears the password and consent.
-6. Watch the saved session in the controllers table or select **View progress**. It is safe to close the drawer while the session progresses.
+3. Enter the **Controller IP address**, select the local **MQTT server** and import/select the signed runtime release. Scanning is disabled while import is in progress. Verify the physical controller label and its network location, then select **Scan controller for review**. The session pins the selected digest; another administrator importing a release cannot change this job or its retries.
+4. Compare the scanned Ed25519 fingerprint with an independent trusted record and select **Confirm host key**. Alternatively, explicitly attest the physical label and a service network with only that controller attached. This alternative is first-key pinning on an isolated connection, not independent cryptographic authentication; do not use it on a shared LAN.
+5. **Inspect installation prerequisites** can show firmware, register access, output ownership and Docker status without changing the controller. If the supported action is **Start installed Docker runtime**, review and approve it with fresh credentials. Missing vendor packages or unqualified firmware transitions are reported, not guessed or redirected to WBM.
+6. Enter the customer-supplied **Temporary SSH username** and **Temporary SSH password**, review the pinned release and replacement warning, and explicitly confirm installation. Select **Install runtime**. Installation repeats the preflight checks. Closing or submitting clears the password and consent; no system SSH-agent or factory-password fallback is used.
+7. Watch the saved session in the controllers table or select **View progress**. Once claimed, **Configure inputs and outputs** opens the existing visual configuration editor and resets the commissioning drawer for the next controller.
 
 The saved progress describes identity, package and controller preflight, transfer, enrollment, configuration and runtime installation. Restarting Attraccess never retries SSH with remembered or factory credentials.
 
@@ -48,7 +49,13 @@ An active CODESYS workload cannot be replaced until its firmware-specific backup
 
 After runtime delivery, the controller uses a restricted enrollment credential to announce through the selected local MQTT broker. Attraccess sends permanent controller-scoped credentials. Publication of that claim is not proof that the runtime has reconnected or that the enrollment credential has been revoked.
 
-The session remains **Verification required**. The UI separately checks a fresh permanent heartbeat, enrollment revocation and applied Desired/Reported Configuration. Management hardening and physical hardware readiness remain explicitly unverified. No successful install or MQTT claim makes this firmware baseline production-ready.
+The session remains **Verification required**. The UI separately checks a fresh permanent heartbeat, enrollment revocation, applied Desired/Reported Configuration and a fresh matching runtime `state.readiness` probe. A stale or mismatched probe is not ready. Management status is read from its saved security transaction. Physical qualification remains required; no successful install, key enrollment or MQTT claim is hardware acceptance evidence.
+
+### Management security
+
+The **Management security** panel provides inspection, review, apply and recovery. Inspection reports firmware, SSH implementation and possible management listeners without changing access. The built-in provider supports reversible additive key enrollment only for an existing non-root OpenSSH account. It creates a unique key, encrypts its private material in Attraccess, arms rollback and verifies a separate pinned key-only connection. Private key material is passed through a dedicated short-lived agent rather than written to a temporary key file.
+
+Adding a key leaves existing passwords/default access unchanged and does **not** count as hardened. Remaining WBM/service exposure and unqualified privileges are explicit residuals. A full baseline cannot be applied until its firmware-31 commands, minimum privileges and reboot-safe recovery are qualified. The framework orders key verification before restriction and supplies the verified key for post-restriction checks; it never invents vendor commands. No mandatory WBM setup gate is introduced.
 
 ### Configuration Readiness Limitation
 
@@ -82,22 +89,27 @@ Select **Cancel enrollment** only to abandon the session. It revokes the enrollm
 
 If Attraccess restarts during claim publication, a saved `claimed` controller record alone does not prove permanent credentials were delivered. **Claim recovery required** blocks automatic reinstallation and preserves the verifier until explicit recovery. After recovering a claimed or interrupted-claim installation, remove its existing controller registration and create a new commissioning session; the UI does not offer an unusable retry with a cleared verifier.
 
+**Recover Docker provisioning** restores an explicitly started daemon only after runtime recovery and only when no containers remain. **Recover saved access** restores the management-key snapshot. Registration removal is serialized with these operations and retains their recovery records rather than deleting the only rollback token. Merely inspecting management never makes cancellation require rollback.
+
+An interrupted coordinator has a durable operation lease. It is never silently stolen on restart. The UI shows the safe recovery time; after the previous instance has stopped, explicit recovery uses fresh credentials to check that device locks are idle before releasing the expired lease. This releases coordination ownership only, not runtime or management snapshots.
+
 ## Current release limitations
 
 ### Integration contract
 
 - Installation and recovery endpoints require `{ confirmInstall: true, temporarySsh: { username, password } }` for that explicit request only. The recovery endpoint is `POST /api/wago/commissioning/sessions/:id/recover`.
-- `GET /api/wago/commissioning/sessions/:id/verification` returns non-secret `permanentConnection`, `enrollmentRevoked`, `configurationApplied`, `managementHardening`, `hardwareReadiness` and `ready` fields. The last three deliberately remain unverified/false until qualified checks are implemented. Configuration application alone is not hardware readiness.
+- `GET /api/wago/commissioning/sessions/:id/verification` returns non-secret `controllerId`, `permanentConnection`, `enrollmentRevoked`, `configurationApplied`, `managementHardening`, `hardwareReadiness`, `softwareReady`, `physicalQualification` and `ready` fields. Configuration application alone is not hardware readiness. `ready` stays false while physical qualification is required.
 - Runtime uses a fresh `/var/lib/attraccess-wago` per enrollment. The prior directory remains in the recovery journal. Private CA trust uses `NODE_EXTRA_CA_CERTS=/var/lib/attraccess-wago/mqtt-ca.pem` with an additional read-only bind mount; runtime code must not replace or bypass that trust.
 - ATT-1056 must supply qualified device permissions/mounts and runtime health evidence before commissioning can advertise physical readiness. The installer does not invent GPIO mappings or add privileged hardware access.
-- One remote `flock` spans transfer, staging and replacement. Broker provisioning is not transactional with SSH across multiple Attraccess processes; do not run concurrent commissioning coordinators against the same controller.
+- A durable fingerprint-scoped lease serializes cooperating coordinator processes, and one remote `flock` spans transfer/staging/replacement. Guard checks propagate through broker enrollment, claim, revocation and removal continuations. This is serialization, not a cross-system database/broker/SSH transaction.
+- Compose ATT-983 / PR #1802's shared `context.audit` bridge; this code supplies no second audit sink. Automatic claim carries the persisted authenticated initiator. For HTTP unclaim, keep its single audit wrapper inside `removeControllerSafely(id, assertOwned => audit.run(..., () => wago.remove(id, assertOwned)))`, not before lease acquisition. Audit receipt availability is independent of operation success; no durable storage is invented when the host reports unavailable.
 
 This guide describes the composed implementation before visual integration, not future intended behavior. The following are not yet implemented and must not be assumed:
 
-- Attraccess does not create a unique non-root management identity, rotate SSH credentials, or disable root/password SSH login after delivery.
-- Signed runtime artifacts still require server-side configuration; normal artifact packaging/visual import is an outstanding no-code release blocker.
+- Additive, verified key enrollment for an existing non-root OpenSSH account is implemented. Firmware-specific account creation, password/default credential removal and root-login restrictions remain disabled until their minimum-privilege and rollback behavior is qualified.
+- The signed packager and visual importer are implemented. Existing server-configured two-member bundles retain their legacy delivery path, but new visual imports use the signed manifest format and hardware profile contract. The publishing workflow requires ATT-1056's profile-aware runtime to be integrated before producing these releases.
 - Active CODESYS workload preservation, unique minimum-privilege SSH management access and the remaining management-service baseline require firmware-31 qualification.
-- Delivery starts the container but does not perform a container-health check before MQTT enrollment. Operators must verify the Ready criteria above.
+- Container start is not success evidence. Fresh permanent heartbeat and matching runtime readiness/configuration probes are required, followed by physical qualification.
 - The current runtime deployment remains subject to the image digest, least-privilege model, and hardware verification evidence documented in [WAGO CC100 Docker Runtime](wago-cc100-runtime.md).
 
 Do not use these gaps as reasons to bypass host-key, bundle, or MQTT credential verification. Escalate them through the release process and attach hardware evidence to [ATT-984](https://linear.app/attraccess/issue/ATT-984/validate-the-four-wago-package-assemblies).

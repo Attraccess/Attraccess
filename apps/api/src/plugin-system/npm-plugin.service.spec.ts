@@ -1,12 +1,15 @@
 import { createHash } from 'crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { lookup } from 'dns/promises';
+import type { LookupAddress } from 'node:dns';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import * as tar from 'tar';
 import axios from 'axios';
 import { PluginService } from './plugin.service';
 import { MAX_CONFIGURED_REGISTRIES, NpmPluginService } from './npm-plugin.service';
+
+const lookupAll = lookup as (hostname: string, options: { all: true }) => Promise<LookupAddress[]>;
 
 jest.mock('dns/promises', () => ({ lookup: jest.fn() }));
 
@@ -78,7 +81,7 @@ describe('NpmPluginService', () => {
     };
     const service = new NpmPluginService(settings as unknown as never);
     const axiosGet = jest.spyOn(axios, 'get').mockResolvedValue({ data: { versions: {} } });
-    jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+    jest.mocked(lookupAll).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
 
     await service.packageMetadata('example');
 
@@ -99,7 +102,7 @@ describe('NpmPluginService', () => {
     } as never);
     const internals = service as unknown as ServiceInternals;
     jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+    jest.mocked(lookupAll).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
     jest.spyOn(axios, 'get').mockResolvedValue({
       data: {
         objects: [
@@ -141,7 +144,7 @@ describe('NpmPluginService', () => {
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
     const internals = service as unknown as ServiceInternals;
     jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+    jest.mocked(lookupAll).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
     jest.spyOn(axios, 'get').mockResolvedValue({
       data: {
         objects: [{ package: { name: '@example/plugin', version: '1.2.3' } }],
@@ -206,7 +209,7 @@ describe('NpmPluginService', () => {
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
     const internals = service as unknown as ServiceInternals;
     jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+    jest.mocked(lookupAll).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
     jest.spyOn(axios, 'get').mockResolvedValue({ data: { objects: [] } });
     jest.spyOn(service, 'packageMetadata').mockImplementation(async (name) => ({
       name,
@@ -241,7 +244,7 @@ describe('NpmPluginService', () => {
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
     const internals = service as unknown as ServiceInternals;
     jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+    jest.mocked(lookupAll).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
     jest.spyOn(axios, 'get').mockResolvedValue({
       data: { objects: [{ package: { name: '@attraccess/plugin-shelly' } }] },
     });
@@ -279,7 +282,7 @@ describe('NpmPluginService', () => {
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
     const internals = service as unknown as ServiceInternals;
     jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+    jest.mocked(lookupAll).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
     jest.spyOn(axios, 'get').mockResolvedValue({
       data: {
         objects: [{ package: { name: '@example/stale' } }, { package: { name: '@example/plugin' } }],
@@ -414,7 +417,7 @@ describe('NpmPluginService', () => {
     const service = new NpmPluginService(settings as unknown as never);
     const internals = service as unknown as ServiceInternals;
     jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
+    jest.mocked(lookupAll).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
     const axiosGet = jest.spyOn(axios, 'get').mockResolvedValue({
       data: { objects: [{ package: { name: '@private/plugin' } }] },
     });
@@ -463,7 +466,7 @@ describe('NpmPluginService', () => {
     };
     const service = new NpmPluginService(settings as unknown as never);
     const axiosGet = jest.spyOn(axios, 'get');
-    jest.mocked(lookup).mockResolvedValue([{ address: '127.0.0.1', family: 4 }]);
+    jest.mocked(lookupAll).mockResolvedValue([{ address: '127.0.0.1', family: 4 }]);
 
     await expect(service.packageMetadata('example', 'private')).rejects.toThrow('public addresses');
     expect(axiosGet).not.toHaveBeenCalled();
@@ -885,7 +888,10 @@ describe('NpmPluginService', () => {
     });
 
     expect(service.listInstalled()).toEqual([
-      expect.objectContaining({ state: 'quarantined', lastError: expect.stringContaining('quarantine cleanup failed') }),
+      expect.objectContaining({
+        state: 'quarantined',
+        lastError: expect.stringContaining('quarantine cleanup failed'),
+      }),
     ]);
     expect(existsSync(join(root, `npm-${Buffer.from(name).toString('base64url')}`))).toBe(true);
     expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
@@ -1199,6 +1205,14 @@ describe('NpmPluginService', () => {
         version: '1.1.0',
         publishedAt: null,
         direction: 'newer',
+        classification: 'community',
+        classificationReason: 'Fixture',
+        deprecated: null,
+        integrity: null,
+        repository: null,
+        homepage: null,
+        semverImpact: 'minor',
+        matchesRequestedSpec: true,
         compatible: true,
         reason: null,
         permissions: ['READ_USERS'],
@@ -1248,6 +1262,14 @@ describe('NpmPluginService', () => {
         version: '1.2.3',
         publishedAt: null,
         direction: 'newer',
+        classification: 'community',
+        classificationReason: 'Fixture',
+        deprecated: null,
+        integrity: null,
+        repository: null,
+        homepage: null,
+        semverImpact: 'minor',
+        matchesRequestedSpec: true,
         compatible: true,
         reason: null,
         permissions: [],

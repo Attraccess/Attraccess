@@ -19,15 +19,20 @@ vi.mock('../../../../../../components/standardDrawer', () => ({
     isOpen ? <div>{children}</div> : null,
 }));
 
-const base: ResourceFlowNodeSchemaDto = {
+const base = {
   type: 'test',
+  inputs: [],
+  outputs: [],
+  supportedByResource: true,
+  isInput: false,
+  isOutput: false,
   configSchema: {
     dynamic: true,
     properties: { command: { type: 'string', title: 'Command', refreshesSchema: true, default: 'first' } },
   },
-} as ResourceFlowNodeSchemaDto;
+} satisfies ResourceFlowNodeSchemaDto;
 
-function editor(schema = base) {
+function editor(schema: ResourceFlowNodeSchemaDto = base) {
   return (
     <NodeEditor schema={schema} tNodeTranslations={(key) => key}>
       {(open) => <button onClick={open}>Open</button>}
@@ -36,7 +41,7 @@ function editor(schema = base) {
 }
 
 const pending: Array<(response: Response) => void> = [];
-async function respond(index: number, schema = base, ok = true) {
+async function respond(index: number, schema: ResourceFlowNodeSchemaDto = base, ok = true) {
   await act(async () => pending[index]({ ok, json: async () => schema, text: async () => 'failed' } as Response));
 }
 function submit() {
@@ -179,14 +184,19 @@ describe('dynamic node editor', () => {
   it('allows an optional defaulted numeric field to be cleared before saving', async () => {
     vi.useRealTimers();
     const user = userEvent.setup();
-    render(editor({
-      ...base,
-      configSchema: {
-        ...base.configSchema,
-        dynamic: false,
-        properties: { ...base.configSchema.properties, timeout: { type: 'number', title: 'Optional timeout', default: 15 } },
-      },
-    }));
+    render(
+      editor({
+        ...base,
+        configSchema: {
+          ...base.configSchema,
+          dynamic: false,
+          properties: {
+            ...base.configSchema.properties,
+            timeout: { type: 'number', title: 'Optional timeout', default: 15 },
+          },
+        },
+      }),
+    );
     fireEvent.click(screen.getByText('Open'));
     const timeout = screen.getByRole('textbox', { name: /Optional timeout/ });
     await user.clear(timeout);

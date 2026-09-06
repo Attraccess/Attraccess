@@ -43,6 +43,7 @@ const schema: ResourceFlowNodeSchemaDto = {
   inputs: [],
   outputs: ['out'],
   isOutput: false,
+  isInput: false,
   supportedByResource: true,
   configSchema: { properties: {} },
 };

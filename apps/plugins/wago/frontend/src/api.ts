@@ -49,6 +49,11 @@ export type WagoCommissioningState =
   | 'recovery_revocation_pending'
   | 'revoked';
 export interface CommissioningSession {
+  runtimeRecoveryAvailable?: boolean;
+  managementControllerId?: number | null;
+  dockerProvisionState?: string | null;
+  platformReport?: string | null;
+  runtimeArtifactDigest?: string | null;
   id: number;
   hardwareId: string;
   mqttServerId: number;
@@ -69,6 +74,7 @@ export interface CommissioningSession {
 }
 
 export interface CreateCommissioningSessionInput {
+  runtimeArtifactDigest?: string;
   targetHost: string;
   mqttServerId: number;
   name: string;
@@ -161,21 +167,35 @@ export const claimController = (id: number, input: ClaimControllerInput) =>
 export const createCommissioningSession = (input: CreateCommissioningSessionInput) =>
   api.request<CommissioningSession>('/commissioning/sessions', { method: 'POST', body: input });
 
-export const confirmCommissioningHostKey = (id: number, hostKeyFingerprint: string) =>
+export const getCommissioningSupport = () =>
+  api.request<{ ready: boolean; firmwareBaseline: string | null }>('/commissioning/support');
+
+export const confirmCommissioningHostKey = (
+  id: number,
+  hostKeyFingerprint: string,
+  physicalIdentityConfirmed = false,
+) =>
   api.request<CommissioningSession>(`/commissioning/sessions/${id}/confirm-host-key`, {
     method: 'POST',
-    body: { hostKeyFingerprint },
+    body: {
+      hostKeyFingerprint,
+      physicalIdentityConfirmed,
+      trustMethod: physicalIdentityConfirmed ? 'isolated_service_connection' : 'trusted_inventory',
+    },
   });
 
 export const listCommissioningSessions = (limit = 100, offset = 0) =>
   api.request<CommissioningSession[]>(`/commissioning/sessions?limit=${limit}&offset=${offset}`);
 
 export interface CommissioningVerification {
+  controllerId: number | null;
   permanentConnection: boolean;
   enrollmentRevoked: boolean;
   configurationApplied: boolean;
-  managementHardening: 'unverified';
-  hardwareReadiness: 'unverified';
+  managementHardening: 'unverified' | 'verified' | 'supported' | 'UNSUPPORTED' | 'qualification_required';
+  softwareReady: boolean;
+  hardwareReadiness: 'unverified' | 'stale' | 'ready' | 'not_ready';
+  physicalQualification: 'required';
   ready: false;
 }
 
@@ -186,10 +206,8 @@ export const deliverCommissioningSession = (
   id: number,
   input: { confirmInstall: true; temporarySsh: { username: string; password: string } },
 ) => api.request<CommissioningSession>(`/commissioning/sessions/${id}/deliver`, { method: 'POST', body: input });
-export const recoverCommissioningSession = (
-  id: number,
-  input: Parameters<typeof deliverCommissioningSession>[1],
-) => api.request<CommissioningSession>(`/commissioning/sessions/${id}/recover`, { method: 'POST', body: input });
+export const recoverCommissioningSession = (id: number, input: Parameters<typeof deliverCommissioningSession>[1]) =>
+  api.request<CommissioningSession>(`/commissioning/sessions/${id}/recover`, { method: 'POST', body: input });
 export const revokeCommissioningSession = (id: number) =>
   api.request<CommissioningSession>(`/commissioning/sessions/${id}/revoke`, { method: 'POST' });
 export const removeCommissioningSession = (id: number) =>

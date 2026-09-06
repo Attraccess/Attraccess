@@ -1,3 +1,4 @@
+import type { NodeProcessingResult } from './node-executors';
 import { ResourceFlowsExecutorService } from './resource-flows-executor.service';
 import { FlowLogRecorderService } from './flow-log-recorder.service';
 import { Logger } from '@nestjs/common';
@@ -195,9 +196,24 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       },
     ]);
     initialNodes = [
-      createNode({ id: 'matching', type: 'plugin.executor-test.trigger' as ResourceFlowNodeType, resourceId: 1, data: { match: true } }),
-      createNode({ id: 'throws', type: 'plugin.executor-test.trigger' as ResourceFlowNodeType, resourceId: 2, data: { throws: true } }),
-      createNode({ id: 'skipped', type: 'plugin.executor-test.trigger' as ResourceFlowNodeType, resourceId: 3, data: { match: false } }),
+      createNode({
+        id: 'matching',
+        type: 'plugin.executor-test.trigger' as ResourceFlowNodeType,
+        resourceId: 1,
+        data: { match: true },
+      }),
+      createNode({
+        id: 'throws',
+        type: 'plugin.executor-test.trigger' as ResourceFlowNodeType,
+        resourceId: 2,
+        data: { throws: true },
+      }),
+      createNode({
+        id: 'skipped',
+        type: 'plugin.executor-test.trigger' as ResourceFlowNodeType,
+        resourceId: 3,
+        data: { match: false },
+      }),
     ];
 
     await service.triggerPluginFlows(
@@ -230,7 +246,10 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       },
     ]);
     initialNodes = Array.from({ length: 101 }, (_, index) =>
-      createNode({ id: `node-${String(index).padStart(3, '0')}`, type: 'plugin.pagination-test.trigger' as ResourceFlowNodeType }),
+      createNode({
+        id: `node-${String(index).padStart(3, '0')}`,
+        type: 'plugin.pagination-test.trigger' as ResourceFlowNodeType,
+      }),
     );
 
     let inFlight = 0;
@@ -274,9 +293,9 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       },
     ]);
 
-    await expect(service.triggerPluginFlows('other-plugin', 'plugin.owner-test.trigger', () => true, {})).rejects.toThrow(
-      /not a registered trigger node/,
-    );
+    await expect(
+      service.triggerPluginFlows('other-plugin', 'plugin.owner-test.trigger', () => true, {}),
+    ).rejects.toThrow(/not a registered trigger node/);
   });
 
   it('rejects a plugin trigger type that collides with a built-in flow node', async () => {
@@ -673,12 +692,20 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     };
 
     await expectLegacyFailure(
-      createNode({ id: 'http-1', type: ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST, data: { url: 'https://example.com', method: 'POST' } }),
+      createNode({
+        id: 'http-1',
+        type: ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST,
+        data: { url: 'https://example.com', method: 'POST' },
+      }),
       () => (axios.request as jest.Mock).mockRejectedValueOnce(new Error('HTTP unavailable')),
       'HTTP unavailable',
     );
     await expectLegacyFailure(
-      createNode({ id: 'mqtt-1', type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE, data: { serverId: 1, topic: 'devices/state' } }),
+      createNode({
+        id: 'mqtt-1',
+        type: ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE,
+        data: { serverId: 1, topic: 'devices/state' },
+      }),
       () => (mqttClientService.publish as jest.Mock).mockRejectedValueOnce(new Error('MQTT unavailable')),
       'MQTT unavailable',
     );

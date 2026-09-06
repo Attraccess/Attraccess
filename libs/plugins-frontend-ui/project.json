@@ -12,6 +12,18 @@
         "registry": "https://registry.npmjs.org/",
         "access": "public"
       }
+    },
+    "typecheck-tests": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsc --noEmit -p libs/plugins-frontend-ui/tsconfig.spec.json"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsc --noEmit -p libs/plugins-frontend-ui/tsconfig.spec.json"
+      }
     }
   }
 }

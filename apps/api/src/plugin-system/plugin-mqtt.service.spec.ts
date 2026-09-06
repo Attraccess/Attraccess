@@ -61,7 +61,14 @@ describe('PluginMqttService', () => {
         }),
     );
 
-    const subscription = service.subscribe('plugin-id', 'test-plugin', new Logger('Plugin:test-plugin'), 1, 'events/#', () => undefined);
+    const subscription = service.subscribe(
+      'plugin-id',
+      'test-plugin',
+      new Logger('Plugin:test-plugin'),
+      1,
+      'events/#',
+      () => undefined,
+    );
     await Promise.resolve();
 
     expect(mqtt.subscribe).toHaveBeenCalledWith(1, 'events/#', undefined, true);
@@ -81,7 +88,14 @@ describe('PluginMqttService', () => {
         }),
     );
 
-    const pending = service.subscribe('pending', 'pending', new Logger('Plugin:pending'), 1, 'events/#', () => undefined);
+    const pending = service.subscribe(
+      'pending',
+      'pending',
+      new Logger('Plugin:pending'),
+      1,
+      'events/#',
+      () => undefined,
+    );
     await Promise.resolve();
 
     service.clearPlugin('pending');
@@ -109,7 +123,9 @@ describe('PluginMqttService', () => {
   });
 
   it('gives every subscriber an isolated payload buffer', async () => {
-    const mutatingHandler = jest.fn(({ payload }: { payload: Buffer }) => payload.fill(0));
+    const mutatingHandler = jest.fn(({ payload }: { payload: Buffer }) => {
+      payload.fill(0);
+    });
     const receivingHandler = jest.fn();
     await service.subscribe('mutating', 'mutating', new Logger('Plugin:mutating'), 1, 'events/#', mutatingHandler);
     await service.subscribe('receiving', 'receiving', new Logger('Plugin:receiving'), 1, 'events/#', receivingHandler);

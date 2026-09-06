@@ -8,18 +8,17 @@ describe('ResourceIntroductionsController', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
-    controller = new ResourceIntroductionsController(resourceIntroductionsService as ResourceIntroductionsService);
+    controller = new ResourceIntroductionsController(
+      resourceIntroductionsService as unknown as ResourceIntroductionsService,
+    );
   });
 
-  it.each(['grant', 'revoke'] as const)(
-    'delegates the authenticated user on introduction %s',
-    async (action) => {
-      const data = { comment: 'Approved' };
-      const req = { user: { id: 9 } } as AuthenticatedRequest;
+  it.each(['grant', 'revoke'] as const)('delegates the authenticated user on introduction %s', async (action) => {
+    const data = { comment: 'Approved' };
+    const req = { user: { id: 9 } } as AuthenticatedRequest;
 
-      await controller[action](7, 3, data, req);
+    await controller[action](7, 3, data, req);
 
-      expect(resourceIntroductionsService[action]).toHaveBeenCalledWith(7, 3, data, { performedByUserId: 9 });
-    },
-  );
+    expect(resourceIntroductionsService[action]).toHaveBeenCalledWith(7, 3, data, { performedByUserId: 9 });
+  });
 });

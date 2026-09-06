@@ -46,7 +46,7 @@ interface SetAuthBody {
   password?: string;
 }
 
-interface FirmwareUpdateBody extends DeviceInfoQuery {
+interface FirmwareUpdateBody extends DeviceInfoBody {
   stage?: FirmwareStage;
 }
 
@@ -150,10 +150,7 @@ export class ShellyController {
   }
 
   @Get('devices/:id/firmware')
-  async firmwareStatus(
-    @Param('id', ParseIntPipe) id: number,
-    @Query() query: DeviceInfoQuery,
-  ): Promise<FirmwareStatus> {
+  async firmwareStatus(@Param('id', ParseIntPipe) id: number, @Query() query: DeviceInfoBody): Promise<FirmwareStatus> {
     const device = await this.requireDeviceWithGeneration(id);
     return this.firmware.getStatus({
       ipAddress: device.ipAddress,

@@ -1,5 +1,5 @@
 import { type ReactElement } from 'react';
-import { TableCell, Chip, type TableCellProps, type TableRowProps } from '@heroui/react';
+import { TableCell, Chip, type TableCellProps } from '@heroui/react';
 import { Resource, ResourceUsage } from '@attraccess/react-query-client';
 import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { DurationDisplay, DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
@@ -16,7 +16,7 @@ export function generateRowCells(
   showAllUsers: boolean,
   canUpdateResources: boolean,
   projectCellRenderer?: (session: ResourceUsage) => ReactElement,
-): TableRowProps<ResourceUsage>['children'] {
+): ReactElement<TableCellProps>[] {
   const cells: ReactElement<TableCellProps>[] = [];
 
   // Only show user cell if we're showing all users (requires canUpdateResources)
@@ -48,9 +48,7 @@ export function generateRowCells(
               </Chip>
             }
           />
-          {hasNotes && (
-            <MessageSquareText className="w-4 h-4" role="img" aria-label={t('rows.machine.hasNotes')} />
-          )}
+          {hasNotes && <MessageSquareText className="w-4 h-4" role="img" aria-label={t('rows.machine.hasNotes')} />}
         </div>
       </TableCell>,
       <TableCell key={`project-${session.id}`} className="hidden 2xl:table-cell">

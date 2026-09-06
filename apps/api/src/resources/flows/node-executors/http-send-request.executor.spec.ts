@@ -180,7 +180,7 @@ describe('HttpSendRequestExecutor', () => {
 
   it.each(['ECONNABORTED', 'ETIMEDOUT'])('classifies Axios %s response timeouts separately', (code) => {
     const error = Object.assign(new Error('timeout'), { code });
-    (axios.isAxiosError as jest.Mock).mockReturnValue(true);
+    jest.mocked(axios.isAxiosError).mockReturnValue(true);
 
     expect(executor.getFailureKind(error)).toBe('acknowledgement-timeout');
   });

@@ -13,6 +13,7 @@ describe('WagoControllerApi', () => {
     recover: jest.fn(),
   } as unknown as WagoCommissioningService;
   const controller = new WagoControllerApi(service, commissioning, {} as PluginContext);
+  const request = { user: { id: 42, authenticationMethod: 'session' } } as AuthenticatedRequest;
 
   beforeEach(() => jest.clearAllMocks());
 
@@ -24,7 +25,7 @@ describe('WagoControllerApi', () => {
       { confirmInstall: true, temporarySsh: { username: ' ', password: 'secret' } },
       { confirmInstall: true, temporarySsh: { username: 'operator', password: '' } },
     ])('rejects missing consent or credentials: %j', (body) => {
-      expect(() => controller[method](7, body)).toThrow(BadRequestException);
+      expect(() => controller[method](7, body, request)).toThrow(BadRequestException);
       expect(commissioning.deliver).not.toHaveBeenCalled();
       expect(commissioning.recover).not.toHaveBeenCalled();
     });
@@ -36,18 +37,19 @@ describe('WagoControllerApi', () => {
       .mocked(commissioning.recover)
       .mockResolvedValue(response as Awaited<ReturnType<WagoCommissioningService['recover']>>);
     const input = { confirmInstall: true, temporarySsh: { username: 'operator', password: 'test-only-secret' } };
-    await expect(controller.recoverCommissioningSession(7, input)).resolves.toEqual(response);
-    expect(commissioning.recover).toHaveBeenCalledWith(7, input);
+    await expect(controller.recoverCommissioningSession(7, input, request)).resolves.toEqual(response);
+    expect(commissioning.recover).toHaveBeenCalledWith(7, input, { userId: 42, authenticationMethod: 'session' });
     expect(commissioning.deliver).not.toHaveBeenCalled();
   });
 
   it('propagates safe recovery errors', async () => {
     jest.mocked(commissioning.recover).mockRejectedValue(new BadRequestException('Runtime snapshot unavailable'));
     await expect(
-      controller.recoverCommissioningSession(7, {
-        confirmInstall: true,
-        temporarySsh: { username: 'operator', password: 'test-only-secret' },
-      }),
+      controller.recoverCommissioningSession(
+        7,
+        { confirmInstall: true, temporarySsh: { username: 'operator', password: 'test-only-secret' } },
+        request,
+      ),
     ).rejects.toThrow('Runtime snapshot unavailable');
   });
 
@@ -65,8 +67,8 @@ describe('WagoControllerApi', () => {
   });
 
   it('requires automatic-claim details when creating a commissioning session', () => {
-    expect(() => controller.createCommissioningSession({ mqttServerId: 1, targetHost: '192.168.1.10' })).toThrow(
-      new BadRequestException('controller name is required'),
-    );
+    expect(() =>
+      controller.createCommissioningSession({ mqttServerId: 1, targetHost: '192.168.1.10' }, request),
+    ).toThrow(new BadRequestException('controller name is required'));
   });
 });

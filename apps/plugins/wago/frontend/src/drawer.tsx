@@ -12,15 +12,17 @@ export function StandardDrawer({
   isOpen,
   onOpenChange,
   children,
+  ariaLabel,
 }: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   children: ReactNode;
+  ariaLabel?: string;
 }) {
   return (
     <DrawerBackdrop isOpen={isOpen} onOpenChange={onOpenChange}>
       <DrawerContent>
-        <DrawerDialog className={DRAWER_DIALOG_CLASSNAME} style={FIELD_CONTRAST_STYLE}>
+        <DrawerDialog aria-label={ariaLabel} className={DRAWER_DIALOG_CLASSNAME} style={FIELD_CONTRAST_STYLE}>
           {children}
         </DrawerDialog>
       </DrawerContent>

@@ -31,7 +31,7 @@
         "commands": [
           "pnpm exec tsc --noEmit -p apps/plugins/wago/tsconfig.spec.json",
           "pnpm exec tsc --noEmit -p apps/plugins/wago/frontend/tsconfig.app.json",
-          "node scripts/typecheck-wago-frontend-tests.mjs",
+          "pnpm exec tsc --noEmit -p apps/plugins/wago/frontend/tsconfig.tests.json",
           "pnpm exec tsc --noEmit -p apps/plugins/wago/acceptance/tsconfig.json"
         ],
         "parallel": false
@@ -97,7 +97,7 @@
       "cache": true,
       "dependsOn": ["build-backend", "build-frontend"],
       "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json"],
-      "outputs": ["{projectRoot}/package"],
+      "outputs": ["{projectRoot}/package/package.json", "{projectRoot}/package/plugin.json"],
       "options": {
         "cwd": "apps/plugins/wago",
         "command": "node -e \"for (const file of ['package.json', 'plugin.json']) require('fs').copyFileSync(file, 'package/' + file)\""
@@ -105,7 +105,7 @@
     },
     "zip": {
       "executor": "nx:run-commands",
-      "cache": true,
+      "cache": false,
       "dependsOn": ["build"],
       "inputs": ["{projectRoot}/package/**/*", "{workspaceRoot}/apps/plugins/scripts/zip-plugin.mjs"],
       "outputs": ["{projectRoot}/dist/plugin-wago.zip"],
@@ -116,7 +116,7 @@
     },
     "pack": {
       "executor": "nx:run-commands",
-      "cache": true,
+      "cache": false,
       "dependsOn": ["build"],
       "inputs": ["{projectRoot}/package/**/*"],
       "outputs": ["{projectRoot}/dist"],
@@ -127,7 +127,7 @@
     },
     "pack-test": {
       "executor": "nx:run-commands",
-      "cache": true,
+      "cache": false,
       "dependsOn": ["pack", "plugins-backend-sdk:build"],
       "inputs": [
         "{projectRoot}/package/**/*",
@@ -168,7 +168,7 @@
         "command": "pnpm exec tsc --noEmit -p apps/plugins/wago/frontend/tsconfig.tests.json"
       }
     },
-    "typecheck-frontend-tests-baseline": {
+    "test-typecheck-frontend-gate": {
       "executor": "nx:run-commands",
       "options": {
         "commands": [

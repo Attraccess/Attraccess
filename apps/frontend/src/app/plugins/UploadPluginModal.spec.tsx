@@ -125,11 +125,11 @@ describe('UploadPluginModal', () => {
   });
 
   it('does not upload an invalid file even if upload is triggered', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ applyAccept: false });
     render(<UploadPluginModal isOpen onClose={vi.fn()} />);
 
     const file = new File(['content'], 'bad.txt', { type: 'text/plain' });
-    await user.upload(fileInput(), file, { applyAccept: false });
+    await user.upload(fileInput(), file);
     await user.click(uploadButton());
 
     expect(hoisted.uploadMutateMock).not.toHaveBeenCalled();

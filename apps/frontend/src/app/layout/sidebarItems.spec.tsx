@@ -11,7 +11,7 @@ const ALL_ITEMS = [
 ];
 
 // `isGroup` discriminates the union, so this narrows to SidebarItem[] without a cast.
-const navigableItems = ALL_ITEMS.flatMap((item) => (item.isGroup ? item.items : [item]));
+const navigableItems = ALL_ITEMS.flatMap((item) => ('items' in item ? item.items : [item]));
 
 describe('sidebar items', () => {
   it('gives every navigable entry a distinct icon', () => {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { isValidElement } from 'react';
 import { Resource, ResourceUsage } from '@attraccess/react-query-client';
 import { generateRowCells } from './tableRows';
 
@@ -21,7 +22,9 @@ describe('generateRowCells', () => {
     const supervisorCell = cells.find((cell) => cell.key === 'supervisor-1');
     const endTimeCell = cells.find((cell) => cell.key === 'end-1');
 
-    expect(supervisorCell?.props.children.props.variant).toBe('mini');
+    const supervisor = supervisorCell?.props.children;
+    if (!isValidElement<{ variant: string }>(supervisor)) throw new Error('Missing supervisor element');
+    expect(supervisor.props.variant).toBe('mini');
     expect(endTimeCell?.props.className).toContain('hidden lg:table-cell');
   });
 });

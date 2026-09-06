@@ -14,7 +14,8 @@ describe('WAGO HTTP administration audit hooks', () => {
     rollback: jest.fn(),
     acknowledgeRejection: jest.fn(),
   };
-  const commissioning = { removeByHardwareId: jest.fn() };
+  const assertOwned = jest.fn<Promise<void>, []>();
+  const commissioning = { removeControllerSafely: jest.fn(), removeByHardwareId: jest.fn() };
   const request = { user: { id: 7, authenticationMethod: 'session' }, body: { userId: 999 } } as AuthenticatedRequest;
   const controller = new WagoControllerApi(
     service as unknown as WagoService,
@@ -24,6 +25,11 @@ describe('WAGO HTTP administration audit hooks', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     record.mockResolvedValue({ status: 'recorded' });
+    assertOwned.mockResolvedValue(undefined);
+    commissioning.removeControllerSafely.mockImplementation(async (_id, remove) => {
+      const hardwareId = await remove(assertOwned);
+      await commissioning.removeByHardwareId(hardwareId);
+    });
   });
 
   const routes = [
@@ -50,6 +56,7 @@ describe('WAGO HTTP administration audit hooks', () => {
     });
     await route.call();
     expect(record).toHaveBeenCalledTimes(2);
+    if (route.action === 'unclaim') expect(service.remove).toHaveBeenCalledWith(12, assertOwned);
     expect(record).toHaveBeenLastCalledWith(
       expect.objectContaining({
         action: `wago.${route.action}`,

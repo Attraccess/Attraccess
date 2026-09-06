@@ -4,7 +4,11 @@ import { ResourceOperatingIntervalService } from './resource-operating-interval.
 
 describe('ResourceOperatingIntervalService', () => {
   let openInterval: ResourceOperatingInterval | null;
-  let repository: jest.Mocked<Pick<Repository<ResourceOperatingInterval>, 'findOne' | 'create' | 'save'>>;
+  let repository: {
+    findOne: jest.Mock<Promise<ResourceOperatingInterval | null>, []>;
+    create: jest.Mock<ResourceOperatingInterval, [Partial<ResourceOperatingInterval>]>;
+    save: jest.Mock<Promise<ResourceOperatingInterval>, [ResourceOperatingInterval]>;
+  };
   let service: ResourceOperatingIntervalService;
 
   beforeEach(() => {

@@ -9,6 +9,11 @@ import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
 import { WagoCommissioningService } from './wago-commissioning.service';
+import { WagoRuntimeArtifactsService } from './wago-runtime-artifacts';
+import { WagoArtifactsController, WagoArtifactUploadInterceptor } from './wago-artifacts.controller';
+import { WagoCommissioningReadiness } from './wago-commissioning-readiness';
+import { WagoManagementEntity } from './wago-management.entity';
+import { WagoCommissioningLeaseEntity } from './wago-commissioning-lease.entity';
 import { createWagoCommandNode } from './wago-command-node';
 import { WagoFlowService } from './wago-flow.service';
 import { WagoDiagnosticsController } from './diagnostics.controller';
@@ -26,6 +31,8 @@ const plugin: PluginBackendModule = {
     WagoConfigurationDraft,
     WagoConfigurationRevision,
     WagoCommissioningSession,
+    WagoManagementEntity,
+    WagoCommissioningLeaseEntity,
   ],
   flowNodes: (context): PluginFlowNodeDefinition[] => [
     createWagoCommandNode(context),
@@ -71,12 +78,15 @@ const plugin: PluginBackendModule = {
     flowService = new WagoFlowService(context);
     return {
       module: WagoPluginModule,
-      controllers: [WagoControllerApi, WagoDiagnosticsController],
+      controllers: [WagoControllerApi, WagoDiagnosticsController, WagoArtifactsController],
       providers: [
         { provide: PLUGIN_CONTEXT, useValue: context },
         WagoService,
         WagoDiagnosticsService,
         WagoCommissioningService,
+        WagoRuntimeArtifactsService,
+        WagoArtifactUploadInterceptor,
+        WagoCommissioningReadiness,
         { provide: WagoFlowService, useValue: flowService },
       ],
     };

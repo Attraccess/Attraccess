@@ -233,7 +233,7 @@ describe('SsoController', () => {
         },
       };
 
-      const result = await controller.createOne(createDto);
+      const result = await controller.createOne(createDto, { user: { id: 1 } } as AuthenticatedRequest);
 
       expect(result).toEqual(mockSSOProvider);
       expect(ssoService.createProvider).toHaveBeenCalledWith(createDto);
@@ -252,7 +252,9 @@ describe('SsoController', () => {
         oidcConfiguration: { ...mockSSOProvider.oidcConfiguration, roleMappings: {} },
       } as SSOProvider);
 
-      const mockReq = { user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) } } as unknown as AuthenticatedRequest;
+      const mockReq = {
+        user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) },
+      } as unknown as AuthenticatedRequest;
       const result = await controller.updateOne('1', updateDto, mockReq);
 
       expect(result).toEqual(mockSSOProvider);
@@ -314,9 +316,7 @@ describe('SsoController', () => {
       (authService.findSSOAuthenticationDetail as jest.Mock).mockResolvedValue(existingSSODetail);
       (authService.updateSSOSubject as jest.Mock).mockResolvedValue(undefined);
       (authService.validateAuthenticationDetails as jest.Mock).mockResolvedValue(passwordOk);
-      (authService.findUserIdBySSO as jest.Mock).mockResolvedValue(
-        ssoSubjectExistsForOtherUser ? 999 : null,
-      );
+      (authService.findUserIdBySSO as jest.Mock).mockResolvedValue(ssoSubjectExistsForOtherUser ? 999 : null);
       (authService.addAuthenticationDetails as jest.Mock).mockResolvedValue(undefined);
       (authService.removeAuthenticationDetails as jest.Mock).mockResolvedValue(undefined);
       (usersService.updateOne as jest.Mock).mockResolvedValue(undefined);
@@ -391,9 +391,9 @@ describe('SsoController', () => {
           passwordOk: false,
         });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'wrong' }),
-        ).rejects.toThrow(UnauthorizedException);
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'wrong' })).rejects.toThrow(
+          UnauthorizedException,
+        );
 
         expect(authService.updateSSOSubject).not.toHaveBeenCalled();
       });
@@ -420,9 +420,9 @@ describe('SsoController', () => {
           ssoSubjectExistsForOtherUser: true,
         });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow(BadRequestException);
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          BadRequestException,
+        );
 
         expect(authService.updateSSOSubject).not.toHaveBeenCalled();
       });
@@ -441,9 +441,9 @@ describe('SsoController', () => {
       it('rejects linking when user is already linked to a different provider', async () => {
         const { authService } = setupLinkMocks({ existingSSODetail: existingSSODetailDifferentProvider });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow(BadRequestException);
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          BadRequestException,
+        );
 
         expect(authService.addAuthenticationDetails).not.toHaveBeenCalled();
         expect(authService.updateSSOSubject).not.toHaveBeenCalled();
@@ -452,17 +452,17 @@ describe('SsoController', () => {
       it('throws SSO_ALREADY_LINKED error message for cross-provider linking', async () => {
         setupLinkMocks({ existingSSODetail: existingSSODetailDifferentProvider });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow('SSO_ALREADY_LINKED');
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          'SSO_ALREADY_LINKED',
+        );
       });
 
       it('does not validate password when rejecting cross-provider link', async () => {
         const { authService } = setupLinkMocks({ existingSSODetail: existingSSODetailDifferentProvider });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow(BadRequestException);
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          BadRequestException,
+        );
 
         expect(authService.validateAuthenticationDetails).not.toHaveBeenCalled();
       });
@@ -472,49 +472,49 @@ describe('SsoController', () => {
       it('throws UnauthorizedException when user not found by email', async () => {
         setupLinkMocks({ userExists: false });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow(UnauthorizedException);
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          UnauthorizedException,
+        );
       });
 
       it('rejects when no local password is present', async () => {
         setupLinkMocks({ hasLocalPassword: false });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow(BadRequestException);
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          BadRequestException,
+        );
       });
 
       it('throws PASSWORD_REQUIRED when no local password exists', async () => {
         setupLinkMocks({ hasLocalPassword: false });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow('PASSWORD_REQUIRED');
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          'PASSWORD_REQUIRED',
+        );
       });
 
       it('rejects when password verification fails', async () => {
         setupLinkMocks({ passwordOk: false });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow(UnauthorizedException);
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          UnauthorizedException,
+        );
       });
 
       it('rejects when SSO subject is already linked to another user', async () => {
         setupLinkMocks({ ssoSubjectExistsForOtherUser: true });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow(BadRequestException);
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          BadRequestException,
+        );
       });
 
       it('throws SSO_SUBJECT_ALREADY_LINKED for subject collision', async () => {
         setupLinkMocks({ ssoSubjectExistsForOtherUser: true });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow('SSO_SUBJECT_ALREADY_LINKED');
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          'SSO_SUBJECT_ALREADY_LINKED',
+        );
       });
     });
   });
@@ -627,9 +627,7 @@ describe('SsoController', () => {
         mockResponse as unknown as Response,
       );
 
-      expect(mockResponse.redirect).toHaveBeenCalledWith(
-        expect.stringContaining(redirectFromState),
-      );
+      expect(mockResponse.redirect).toHaveBeenCalledWith(expect.stringContaining(redirectFromState));
     });
   });
 
@@ -743,7 +741,9 @@ describe('SsoController', () => {
         headers: { authorization: 'Bearer saml-secret' },
       } as unknown as AuthenticatedRequest;
 
-      const result = await controller.samlDeleteUser('2', mockRequest as unknown as Request, { subject: 'saml-user-2' });
+      const result = await controller.samlDeleteUser('2', mockRequest as unknown as Request, {
+        subject: 'saml-user-2',
+      });
 
       expect(result).toEqual({ OK: true });
       expect(usersService.deleteOne).toHaveBeenCalledWith(102);

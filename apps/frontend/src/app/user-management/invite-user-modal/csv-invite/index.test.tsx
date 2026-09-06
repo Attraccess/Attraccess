@@ -58,7 +58,7 @@ describe('CsvInvite', () => {
 
     const heading = screen.getByRole('heading', { name: 'Import errors' });
     const anchor = heading.closest('[data-slot="badge-anchor"]');
-    const badge = anchor?.querySelector('[data-slot="badge"]');
+    const badge = anchor?.querySelector<HTMLElement>('[data-slot="badge"]');
 
     expect(heading).toBeInTheDocument();
     expect(anchor).toBeInTheDocument();
