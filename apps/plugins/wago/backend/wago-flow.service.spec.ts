@@ -5,6 +5,7 @@ import { WagoFlowService } from './wago-flow.service';
 import { WagoSettings } from './wago-settings.entity';
 import { parseOperationalMessage } from './protocol';
 import { encodeMeasurement } from '../measurement-contract';
+import plugin from './plugin';
 
 const STREAM_A = '11111111-1111-4111-8111-111111111111';
 const STREAM_B = '22222222-2222-4222-8222-222222222222';
@@ -55,6 +56,55 @@ describe('WagoFlowService', () => {
     } as unknown as PluginContext;
     return { service: new WagoFlowService(context), trigger, context, revisionQuery, revisionRepository };
   }
+
+  it('registers the plugin before the host datasource is available', () => {
+    const { context } = createService();
+    const getRepository = jest.spyOn(context, 'getRepository').mockImplementation(() => {
+      throw new Error('Host DataSource is not available yet');
+    });
+    getRepository.mockClear();
+    expect(() => plugin.register(context)).not.toThrow();
+    expect(getRepository).not.toHaveBeenCalled();
+  });
+
+  it('serializes concurrent controller messages before asynchronous channel resolution', async () => {
+    const { service } = createService();
+    await service.refresh();
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const channels = jest
+      .spyOn(
+        service as unknown as { channels(id: number): Promise<Array<{ id: string; capabilities: string[] }>> },
+        'channels',
+      )
+      .mockImplementationOnce(async () => {
+        await held;
+        return [{ id: 'door', capabilities: ['output'] }];
+      });
+    const topic = 'attraccess/wago/v1/controllers/cc100-01/state';
+    const event = (sequence: number) =>
+      Buffer.from(
+        JSON.stringify({
+          streamId: STREAM_A,
+          sequence,
+          timestamp: new Date().toISOString(),
+          connected: true,
+          revision: 1,
+          contentHash: 'hash',
+          outputs: { door: sequence === 2 },
+        }),
+      );
+    const first = service['onMessage'](2, 'attraccess/wago', topic, event(1));
+    const second = service['onMessage'](2, 'attraccess/wago', topic, event(2));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(channels).toHaveBeenCalledTimes(1);
+    release();
+    await Promise.all([first, second]);
+    expect(service.read({ controllerId: 1, channelId: 'door' })).toMatchObject({ sequence: 2, value: true });
+  });
 
   it('caches a validated retained state and dispatches matching trigger nodes', async () => {
     const { service, trigger, context } = createService();
