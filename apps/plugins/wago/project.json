@@ -44,7 +44,7 @@
       "cache": true,
       "dependsOn": ["build-backend", "build-frontend"],
       "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json"],
-      "outputs": ["{projectRoot}/package"],
+      "outputs": ["{projectRoot}/package/package.json", "{projectRoot}/package/plugin.json"],
       "options": {
         "cwd": "apps/plugins/wago",
         "command": "node -e \"for (const file of ['package.json', 'plugin.json']) require('fs').copyFileSync(file, 'package/' + file)\""
