@@ -525,6 +525,11 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
     const project = JSON.parse(await readFile(join(__dirname, '../project.json'), 'utf8'));
     expect(project.targets.build.outputs).toEqual(['{projectRoot}/package/package.json', '{projectRoot}/package/plugin.json']);
   });
+
+  it('always packages and verifies the fresh generated outputs instead of restoring cached archives', async () => {
+    const project = JSON.parse(await readFile(join(__dirname, '../project.json'), 'utf8'));
+    for (const target of ['pack', 'pack-test', 'zip']) expect(project.targets[target].cache).toBe(false);
+  });
   it('uses existing STORAGE_ROOT without accessing the plugin context or host ModuleRef', async () => {
     const previous = process.env.STORAGE_ROOT;
     process.env.STORAGE_ROOT = root;
