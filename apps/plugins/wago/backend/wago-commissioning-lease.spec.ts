@@ -109,8 +109,10 @@ describe('commissioning leases on two independent connections to temporary SQLit
 
   it('renews while work runs, and invalidates the guard after completion', async () => {
     const renewed = deferred<void>();
+    const initialRead = deferred<void>();
     const original = storeA.renew.bind(storeA);
     jest.spyOn(storeA, 'renew').mockImplementation(async (...args) => {
+      await initialRead.promise;
       const result = await original(...args);
       renewed.resolve();
       return result;
@@ -119,6 +121,7 @@ describe('commissioning leases on two independent connections to temporary SQLit
     await new WagoCommissioningLeaseService(storeA, { renewMs: 20 }).run(fingerprint, async (guard) => {
       savedGuard = guard;
       const before = await storeB.read(key);
+      initialRead.resolve();
       await renewed.promise;
       const after = await storeB.read(key);
       expect(Number(after?.leaseUntil)).toBeGreaterThan(Number(before?.leaseUntil));

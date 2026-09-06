@@ -413,6 +413,69 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
         remove.mockRestore();
       }
     });
+
+    it('ends the receipt deadline before import and does not report failure while activation is pending', async () => {
+      const timers = jest.spyOn(global, 'setTimeout');
+      const clear = jest.spyOn(global, 'clearTimeout');
+      const source = Object.assign(new PassThrough(), {
+        headers: { 'content-type': 'multipart/form-data; boundary=accepted-body', 'transfer-encoding': 'chunked' },
+      });
+      sources.push(source);
+      const controller = new WagoArtifactsController(catalog as WagoRuntimeArtifactsService);
+      let finish!: () => void;
+      let entered!: () => void;
+      const started = new Promise<void>((resolve) => {
+        entered = resolve;
+      });
+      const pending = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      const originalImport = catalog.import.bind(catalog);
+      jest.spyOn(catalog, 'import').mockImplementation(async (input) => {
+        entered();
+        await pending;
+        return originalImport(input);
+      });
+      const req = Object.assign(source, { files: {} });
+      const response = interceptor.intercept(uploadContext(req), {
+        handle: () => defer(() => controller.import(req.files)),
+      });
+      const data = bundle();
+      const parts: [string, Buffer][] = [
+        ['bundle', data],
+        ['checksum', Buffer.from(createHash('sha256').update(data).digest('hex'))],
+        ['signature', Buffer.from(signature(data))],
+      ];
+      source.end(
+        Buffer.concat([
+          ...parts.map(([name, bytes]) =>
+            Buffer.concat([
+              Buffer.from(
+                `--accepted-body\r\nContent-Disposition: form-data; name="${name}"; filename="fixture"\r\nContent-Type: application/octet-stream\r\n\r\n`,
+              ),
+              bytes,
+              Buffer.from('\r\n'),
+            ]),
+          ),
+          Buffer.from('--accepted-body--\r\n'),
+        ]),
+      );
+      const result = lastValueFrom(await response);
+      await started;
+      try {
+        const index = timers.mock.calls.findIndex(([, delay]) => delay === 10 * 60 * 1000);
+        expect(index).toBeGreaterThanOrEqual(0);
+        expect(clear).toHaveBeenCalledWith(timers.mock.results[index].value);
+        // Even a callback already queued at body acceptance cannot cancel import.
+        timers.mock.calls[index][0]();
+        source.emit('aborted');
+      } finally {
+        finish();
+      }
+      const imported = await result;
+      expect((await catalog.current()).digest).toBe(imported.digest);
+      expect(await readdir(staging)).toEqual([]);
+    });
   });
   it('uses exactly cwd/storage when the existing application setting is absent', async () => {
     const previous = process.env.STORAGE_ROOT;
@@ -523,7 +586,10 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
 
   it('does not let the manifest-copy task cache and restore stale runtime/frontend bundles', async () => {
     const project = JSON.parse(await readFile(join(__dirname, '../project.json'), 'utf8'));
-    expect(project.targets.build.outputs).toEqual(['{projectRoot}/package/package.json', '{projectRoot}/package/plugin.json']);
+    expect(project.targets.build.outputs).toEqual([
+      '{projectRoot}/package/package.json',
+      '{projectRoot}/package/plugin.json',
+    ]);
   });
 
   it('always packages and verifies the fresh generated outputs instead of restoring cached archives', async () => {

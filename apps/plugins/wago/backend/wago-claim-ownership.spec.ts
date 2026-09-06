@@ -46,7 +46,7 @@ describe('commissioning ownership through WAGO broker continuations', () => {
     return { service, provider, context, controllers, enrollment, enrollments };
   }
 
-  it('does not save, publish or rollback a claim after its provisioning continuation loses ownership', async () => {
+  it('retains permanent provisioning intent after lease loss and revokes it on later removal', async () => {
     const { service, provider, context, controllers } = fixture();
     let resolve!: (value: object) => void;
     let entered!: () => void;
@@ -65,12 +65,25 @@ describe('commissioning ownership through WAGO broker continuations', () => {
     };
     const claim = service.claim(1, 'Fixture', 'fixture-code', 1, assertOwned);
     await started;
+    expect(controllers.save).toHaveBeenCalledTimes(1);
+    expect(controllers.save).toHaveBeenCalledWith(
+      expect.objectContaining({ credentialMqttServerId: 1, trustState: 'untrusted' }),
+    );
     owned = false;
     resolve({ username: 'permanent-fixture', password: 'synthetic-only' });
     await expect(claim).rejects.toThrow('lease_lost');
-    expect(controllers.save).not.toHaveBeenCalled();
+    expect(controllers.save).toHaveBeenCalledTimes(1);
     expect(context.mqtt.publish).not.toHaveBeenCalled();
     expect(provider.revoke).not.toHaveBeenCalled();
+    const persisted = structuredClone(controllers.save.mock.calls[0][0]);
+    // Simulate reloading durable state after explicit lease recovery. Later
+    // discovery selecting another broker cannot redirect permanent revocation.
+    controllers.findOneBy.mockResolvedValue({ ...persisted, mqttServerId: 2 });
+    await service.remove(1);
+    expect(provider.revoke).toHaveBeenCalledWith(
+      expect.objectContaining({ mqttServerId: 1, identity: 'wago-controller-fixture' }),
+    );
+    expect(controllers.delete).toHaveBeenCalledWith(1);
     service.onModuleDestroy();
   });
 

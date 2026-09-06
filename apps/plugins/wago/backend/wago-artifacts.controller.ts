@@ -45,6 +45,7 @@ export class WagoArtifactUploadInterceptor implements NestInterceptor {
     let creating: Promise<void> | undefined;
     let cleanupPromise: Promise<void> | undefined;
     let stopped = false;
+    let bodyAccepted = false;
     let timer: NodeJS.Timeout | undefined;
     let cancellationError: BadRequestException | undefined;
     let rejectUpload!: (error: BadRequestException) => void;
@@ -77,7 +78,7 @@ export class WagoArtifactUploadInterceptor implements NestInterceptor {
       return cleanupPromise;
     };
     const cancel = (message: string) => {
-      if (stopped) return;
+      if (stopped || bodyAccepted) return;
       cancellationError = new BadRequestException(message);
       rejectUpload(cancellationError);
       void cleanup().catch(() => undefined);
@@ -88,6 +89,7 @@ export class WagoArtifactUploadInterceptor implements NestInterceptor {
       request.once('error', abort);
       timer = setTimeout(
         () => {
+          if (bodyAccepted || stopped) return;
           cancel('Runtime upload timed out. Retry with the signed release files.');
           request.destroy();
         },
@@ -156,6 +158,12 @@ export class WagoArtifactUploadInterceptor implements NestInterceptor {
         new Interceptor().intercept(context, {
           handle: () => {
             if (stopped) throw cancellationError;
+            // The deadline governs body receipt only. Import owns activation once
+            // Multer has accepted all files; do not report cancellation mid-import.
+            bodyAccepted = true;
+            clearTimeout(timer);
+            request.off('aborted', abort);
+            request.off('error', abort);
             return next.handle();
           },
         }),

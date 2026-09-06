@@ -1,5 +1,5 @@
-import { WagoAudit, wagoAuditSummary } from './wago-audit';
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { WagoAudit, wagoAuditSummary, type WagoAuditLifecycle, type WagoManualCommandAuditResult } from './wago-audit';
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
@@ -152,6 +152,46 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
 
   async executeCommand(config: Record<string, unknown>): Promise<void> {
     return this.commands.execute(config);
+  }
+
+  async manualCommand(
+    controllerId: number,
+    input: Record<string, unknown>,
+    principal: PluginAuditPrincipal,
+  ): Promise<WagoManualCommandAuditResult> {
+    const keys = ['channelId', 'action', 'value', 'expectedConfigurationRevision', 'acknowledgementTimeoutSeconds'];
+    if (
+      !input ||
+      typeof input !== 'object' ||
+      Array.isArray(input) ||
+      Object.keys(input).some((key) => !keys.includes(key))
+    )
+      throw new BadRequestException('Invalid manual command');
+    if (typeof input.channelId !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(input.channelId))
+      throw new BadRequestException('Invalid Logical Channel');
+    const config = { ...input, controllerId, completionBehavior: 'acknowledged' };
+    const errors = await this.commands.validate(config);
+    if (errors.length) throw new BadRequestException('Manual command does not match the applied configuration');
+    const commandId = randomUUID();
+    const details = { commandId, channelId: input.channelId, operation: input.action as 'set' | 'pulse' };
+    const lifecycle = new WagoAudit(this.context).begin(principal, controllerId, 'manual_command', details);
+    await lifecycle.attempt();
+    let result: WagoManualCommandAuditResult['result'];
+    try {
+      await this.commands.execute(config, commandId);
+      result = 'acknowledged';
+    } catch (error) {
+      result =
+        error instanceof WagoCommandError
+          ? error.kind === 'controller-rejection'
+            ? 'rejected'
+            : error.kind === 'acknowledgement-timeout'
+              ? 'timeout'
+              : 'transport_failure'
+          : 'transport_failure';
+    }
+    await lifecycle.finish(result === 'acknowledged' ? 'succeeded' : 'failed', { result });
+    return { ...details, result };
   }
 
   commandFailureBehavior(config: Record<string, unknown>) {
@@ -519,6 +559,10 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
           message: 'acknowledge potential flow impacts before publishing',
           impacts: approvedImpacts,
         });
+      let allocatedRevision: number | undefined;
+      const lifecycle = principal
+        ? new WagoAudit(this.context).begin(principal, controllerId, 'rollback', { sourceRevision: revision })
+        : undefined;
       const persist = async () => {
         // Flow edits use a separate lock. Recheck before replacing the draft, then
         // carry the original consent into publication instead of silently re-reviewing.
@@ -549,18 +593,11 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
         replacement.reviewedHash = approvedHash;
         // Publication validates the prepared replacement before persisting either
         // the draft or a revision, so late admission failures preserve editor work.
-        return this.publishDraftWhileLocked(controllerId, force, approvedHash, undefined, replacement);
+        return this.publishDraftWhileLocked(controllerId, force, approvedHash, undefined, replacement, (value) => {
+          allocatedRevision = value;
+        });
       };
-      return principal
-        ? new WagoAudit(this.context).run(
-            principal,
-            controllerId,
-            'rollback',
-            { sourceRevision: revision },
-            persist,
-            (published) => ({ revision: published.revision }),
-          )
-        : persist();
+      return this.auditRevision(lifecycle, persist, () => allocatedRevision);
     });
   }
 
@@ -772,6 +809,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     reviewedHash?: string,
     principal?: PluginAuditPrincipal,
     preparedDraft?: WagoConfigurationDraft,
+    onAllocated?: (revision: number) => void,
   ): Promise<WagoConfigurationRevision> {
     const controller = await this.claimedController(controllerId);
     this.requireConfigurationCompatibility(controller);
@@ -795,6 +833,15 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       throw new ConflictException('review the current configuration draft before publishing it');
     if (impacts.length && !force)
       throw new ConflictException({ message: 'acknowledge potential flow impacts before publishing', impacts });
+    let allocatedRevision: number | undefined;
+    const dispatch = (revision: WagoConfigurationRevision) => {
+      allocatedRevision = revision.revision;
+      onAllocated?.(revision.revision);
+      return this.publishRevision(controller, revision);
+    };
+    const lifecycle = principal
+      ? new WagoAudit(this.context).begin(principal, controllerId, force ? 'forced_publication' : 'publication')
+      : undefined;
     const persist = async () => {
       if (preparedDraft) await this.drafts.save(preparedDraft);
       if (
@@ -802,7 +849,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
         previous.contentHash === contentHash &&
         (previous.presetProvenance ?? null) === (draft.presetProvenance ?? null)
       )
-        return this.publishRevision(controller, previous);
+        return dispatch(previous);
       const revision = this.revisions.create({
         controllerId,
         revision: (previous?.revision ?? 0) + 1,
@@ -814,18 +861,25 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
         publishedAt: new Date().toISOString(),
         reportedAt: null,
       });
-      return this.publishRevision(controller, await this.revisions.save(revision));
+      return dispatch(await this.revisions.save(revision));
     };
-    return principal
-      ? new WagoAudit(this.context).run(
-          principal,
-          controllerId,
-          force ? 'forced_publication' : 'publication',
-          {},
-          persist,
-          (published) => ({ revision: published.revision }),
-        )
-      : persist();
+    return this.auditRevision(lifecycle, persist, () => allocatedRevision);
+  }
+
+  private async auditRevision(
+    lifecycle: WagoAuditLifecycle | undefined,
+    operation: () => Promise<WagoConfigurationRevision>,
+    allocated: () => number | undefined,
+  ): Promise<WagoConfigurationRevision> {
+    await lifecycle?.attempt();
+    try {
+      const result = await operation();
+      await lifecycle?.finish('succeeded', { revision: result.revision });
+      return result;
+    } catch (error) {
+      await lifecycle?.finish('failed', { revision: allocated() });
+      throw error;
+    }
   }
 
   private async latestRevision(controllerId: number): Promise<WagoConfigurationRevision | null> {
@@ -940,11 +994,13 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
         const controller = await this.controllers.findOneBy({ id });
         if (!controller) throw new NotFoundException(`WAGO controller ${id} not found`);
 
-        if (controller.trustState === 'claimed' && controller.mqttServerId) {
+        const credentialServerId =
+          controller.credentialMqttServerId ?? (controller.trustState === 'claimed' ? controller.mqttServerId : null);
+        if (credentialServerId) {
           const identity = `wago-controller-${controller.hardwareId}`;
           await assertOwned();
           const manual = await this.context.getMqttCredentialProvisioning().revoke({
-            mqttServerId: controller.mqttServerId,
+            mqttServerId: credentialServerId,
             identity,
             username: identity,
             vhost: '/',
@@ -970,21 +1026,64 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     );
   }
 
+  async completeManualCredentials(
+    id: number,
+    input: { name: string; verifier: string; username: string; password: string },
+    principal: PluginAuditPrincipal,
+    assertOwned: () => Promise<void> = async () => undefined,
+  ): Promise<{ controllerId: number; result: 'acknowledged' }> {
+    const controller = await this.controllers.findOneBy({ id });
+    if (!controller) throw new NotFoundException('controller not found');
+    if (
+      input.username !== `wago-controller-${controller.hardwareId}` ||
+      !input.password ||
+      input.password.length > 4096
+    )
+      throw new BadRequestException('Supply the controller identity and provisioned password');
+    return new WagoAudit(this.context).run(principal, id, 'manual_credential_fallback', {}, async () => {
+      let acknowledged!: () => void;
+      const receipt = new Promise<void>((resolve) => {
+        acknowledged = resolve;
+      });
+      await this.claim(id, input.name, input.verifier, undefined, assertOwned, {
+        credentials: { username: input.username, password: input.password },
+        acknowledged,
+      });
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          receipt,
+          new Promise<never>((_resolve, reject) => {
+            timer = setTimeout(
+              () => reject(new ConflictException('Controller credential acknowledgement timed out')),
+              30_000,
+            );
+          }),
+        ]);
+        await assertOwned();
+        return { controllerId: id, result: 'acknowledged' as const };
+      } finally {
+        clearTimeout(timer);
+      }
+    });
+  }
+
   async claim(
     id: number,
     name: string,
     verifier: string,
     mqttServerId?: number,
     assertOwned: () => Promise<void> = async () => undefined,
+    manual?: { credentials: { username: string; password: string }; acknowledged: () => void },
   ): Promise<WagoController> {
     return this.withClaimLock(id, async () => {
       const prepared = await this.withClaimConfigurationLock(() =>
-        this.prepareClaim(id, name, verifier, mqttServerId, assertOwned),
+        this.prepareClaim(id, name, verifier, mqttServerId, assertOwned, manual?.credentials),
       );
       try {
         const acknowledgementToken = randomBytes(24).toString('base64url');
         await assertOwned();
-        await this.watchClaimAcknowledgement(prepared, acknowledgementToken);
+        await this.watchClaimAcknowledgement(prepared, acknowledgementToken, manual?.acknowledged);
         await assertOwned();
         await this.context.mqtt.publish(
           prepared.mqttServerId,
@@ -1023,6 +1122,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     verifier: string,
     mqttServerId?: number,
     assertOwned: () => Promise<void> = async () => undefined,
+    manualCredentials?: { username: string; password: string },
   ): Promise<{
     controller: WagoController;
     enrollment: WagoEnrollment;
@@ -1055,23 +1155,44 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     const identity = `wago-controller-${controller.hardwareId}`;
     const settings = await this.getSettings();
     const namespace = normalizeOperationalPrefix(settings.operationalPrefix);
+    if (
+      manualCredentials &&
+      (await this.context.getMqttCredentialProvisioning().availableProviders(selectedServerId)).length
+    )
+      throw new ConflictException(
+        'This broker uses automatic credential provisioning; use the standard claim operation',
+      );
+    if (
+      controller.credentialMqttServerId &&
+      (!manualCredentials || controller.credentialMqttServerId !== selectedServerId)
+    )
+      throw new ConflictException(
+        'Remove the controller registration to revoke its unfinished permanent credential before claiming again.',
+      );
+    // Persist the exact broker before provisioning. Discovery may later update
+    // mqttServerId; removal must still revoke this identity on its original broker.
     await assertOwned();
-    const credential = await this.context.getMqttCredentialProvisioning().provision({
-      mqttServerId: selectedServerId,
-      identity,
-      username: identity,
-      vhost: '/',
-      topicPolicy: {
-        publish: [`${namespace}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${controller.hardwareId}/#`],
-        subscribe: [
-          configurationDesiredTopic(namespace, controller.hardwareId),
-          commandTopic(namespace, controller.hardwareId),
-        ],
-      },
-    });
-    if (!('password' in credential)) {
-      throw new ConflictException(`Manual credential provisioning is required: ${credential.instructions.join(' ')}`);
-    }
+    controller.credentialMqttServerId = selectedServerId;
+    await this.controllers.save(controller);
+    await assertOwned();
+    const provisioned =
+      manualCredentials ??
+      (await this.context.getMqttCredentialProvisioning().provision({
+        mqttServerId: selectedServerId,
+        identity,
+        username: identity,
+        vhost: '/',
+        topicPolicy: {
+          publish: [`${namespace}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${controller.hardwareId}/#`],
+          subscribe: [
+            configurationDesiredTopic(namespace, controller.hardwareId),
+            commandTopic(namespace, controller.hardwareId),
+          ],
+        },
+      }));
+    await assertOwned();
+    const credential = 'password' in provisioned ? provisioned : manualCredentials;
+    if (!credential) throw new ConflictException('Manual credential provisioning is required');
     const previousController = {
       trustState: controller.trustState,
       name: controller.name,
@@ -1157,10 +1278,12 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     assertOwned: () => Promise<void> = async () => undefined,
   ): Promise<void> {
     await assertOwned();
-    await this.context
+    const manual = await this.context
       .getMqttCredentialProvisioning()
-      .revoke({ mqttServerId, identity, username: identity, vhost: '/' })
-      .catch(() => undefined);
+      .revoke({ mqttServerId, identity, username: identity, vhost: '/' });
+    if (manual) throw new ConflictException('Manual permanent credential revocation is required.');
+    await assertOwned();
+    controller.credentialMqttServerId = null;
     Object.assign(controller, previousController);
     await assertOwned();
     await this.controllers.save(controller).catch((rollbackError) => {
@@ -1457,10 +1580,12 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       mqttServerId: number;
     },
     acknowledgementToken: string,
+    acknowledged?: () => void,
   ): Promise<void> {
     const topic = `${discoveryTopic(prepared.controller.hardwareId)}/claim/ack`;
     const subscription = await this.subscribeMqtt(prepared.mqttServerId, topic, async (message) => {
       if (!isClaimAcknowledgement(message.payload, acknowledgementToken)) return;
+      acknowledged?.();
       this.clearClaimAcknowledgement(prepared.enrollment.id);
       try {
         await this.revokeEnrollment(prepared.enrollment);

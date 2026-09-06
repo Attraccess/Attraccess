@@ -69,6 +69,16 @@ class FixtureMqtt implements PluginMqttClient {
       },
     };
   }
+  async receive(topic: string, payload: object) {
+    const parts = topic.split('/');
+    for (const [filter, handlers] of this.handlers) {
+      const expected = filter.split('/');
+      if (expected.length !== parts.length || !expected.every((part, index) => part === '+' || part === parts[index]))
+        continue;
+      for (const handler of [...handlers])
+        await handler({ serverId: 1, topic, payload: Buffer.from(JSON.stringify(payload)) });
+    }
+  }
   async announce(hardwareId: string, enrollmentSecret: string) {
     const handlers = [...(this.handlers.get('attraccess/wago/discovery/+') ?? [])];
     expect(handlers).toHaveLength(1);
@@ -228,12 +238,15 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
           provide: ApiTokenService,
           useValue: {
             authenticate: async (token: string) =>
-              token === 'fixture-token'
+              ['fixture-token', 'command-token'].includes(token)
                 ? {
                     user: { id: principal.userId },
                     apiToken: {
                       id: principal.apiTokenId,
-                      permissionKeys: ['resources.update', 'system.settings.manage'],
+                      permissionKeys:
+                        token === 'command-token'
+                          ? ['resources.update']
+                          : ['resources.update', 'system.settings.manage'],
                     },
                   }
                 : null,
@@ -272,11 +285,8 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     jest.restoreAllMocks();
   });
 
-  function post(path: string, body: object = {}) {
-    return httpRequest(app.getHttpServer())
-      .post(`/wago/${path}`)
-      .set('Authorization', 'Bearer fixture-token')
-      .send(body);
+  function post(path: string, body: object = {}, token = 'fixture-token') {
+    return httpRequest(app.getHttpServer()).post(`/wago/${path}`).set('Authorization', `Bearer ${token}`).send(body);
   }
   function remove(id: number) {
     return httpRequest(app.getHttpServer())
@@ -478,7 +488,174 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     expect(records.map((row) => row.outcome)).toEqual(['attempted', 'failed']);
     expect(records[0].operationId).toBe(records[1].operationId);
     expect(JSON.stringify(records)).not.toContain(privateValue);
-    // The parent configuration owner must add the allocated revision to this failed completion.
-    // Do not assert its absence: this integration test must also accept that owner fix.
+    expect(records[1].details).toEqual({ revision: revision.revision });
+  });
+
+  it('retains source and allocated revision on rollback dispatch failure without duplicate publication events', async () => {
+    const controller = await deliverAndClaim();
+    const source = await saveAndPublish(controller.id);
+    const { body: preview } = await httpRequest(app.getHttpServer())
+      .get(`/wago/controllers/${controller.id}/configuration/revisions/${source.revision}/preview`)
+      .set('Authorization', 'Bearer fixture-token')
+      .expect(200);
+    mqtt.publish.mockRejectedValueOnce(new Error(privateValue));
+    await post(`controllers/${controller.id}/configuration/rollback/${source.revision}`, {
+      force: true,
+      sourceHash: source.contentHash,
+      currentHash: preview.current?.contentHash ?? null,
+      draftHash: preview.draftHash,
+    }).expect(500);
+    const pending = await db
+      .getRepository(WagoConfigurationRevision)
+      .findOneByOrFail({ controllerId: controller.id, state: 'pending' });
+    expect(pending.revision).toBe(source.revision + 1);
+    await lifecycle('rollback', controller.id, 'failed', {
+      sourceRevision: source.revision,
+      revision: pending.revision,
+    });
+    expect(await rows('publication')).toHaveLength(2);
+    expect(await rows('forced_publication')).toHaveLength(0);
+    expect(JSON.stringify(await rows('rollback'))).not.toContain(privateValue);
+  });
+
+  it('retains the reused pending revision on repeated forced-publication dispatch failure', async () => {
+    const controller = await deliverAndClaim();
+    await post(`controllers/${controller.id}/configuration/draft`, { snapshot }).expect(201);
+    await post(`controllers/${controller.id}/configuration/review`).expect(201);
+    mqtt.publish.mockRejectedValue(new Error(privateValue));
+    await post(`controllers/${controller.id}/configuration/publish`, { force: true }).expect(500);
+    await post(`controllers/${controller.id}/configuration/review`).expect(201);
+    await post(`controllers/${controller.id}/configuration/publish`, { force: true }).expect(500);
+    const revisions = await db
+      .getRepository(WagoConfigurationRevision)
+      .find({ where: { controllerId: controller.id } });
+    expect(revisions).toHaveLength(1);
+    const records = await rows('forced_publication');
+    expect(records.map((row) => row.outcome)).toEqual(['attempted', 'failed', 'attempted', 'failed']);
+    expect(records[1].details).toEqual({ revision: revisions[0].revision });
+    expect(records[3].details).toEqual({ revision: revisions[0].revision });
+    expect(records[0].operationId).toBe(records[1].operationId);
+    expect(records[2].operationId).toBe(records[3].operationId);
+    expect(records[0].operationId).not.toBe(records[2].operationId);
+  });
+
+  it.each(['accepted', 'rejected', 'transport_failure', 'timeout', 'stalled_dispatch', 'shutdown'] as const)(
+    'persists an authenticated manual command with its real dispatched UUID and %s result',
+    async (status) => {
+      const controller = await deliverAndClaim();
+      const revision = await saveAndPublish(controller.id);
+      await wago['onConfigurationReported'](
+        controller.id,
+        Buffer.from(JSON.stringify({ revision: revision.revision, contentHash: revision.contentHash })),
+      );
+      let commandId: string;
+      mqtt.publish.mockImplementation(async (_server, topic, payload) => {
+        if (!topic.endsWith('/commands')) return;
+        const command = JSON.parse(payload.toString());
+        commandId = command.id;
+        expect((await rows('manual_command')).map((row) => row.outcome)).toEqual(['attempted']);
+        expect((await rows('manual_command'))[0].details).toEqual({ commandId, channelId: 'output', operation: 'set' });
+        if (status === 'transport_failure') throw new Error(privateValue);
+        if (status === 'timeout') return;
+        if (status === 'stalled_dispatch') return new Promise<void>(() => undefined);
+        if (status === 'shutdown') {
+          wago.onModuleDestroy();
+          return;
+        }
+        const acknowledgement = { id: commandId, status, message: privateValue };
+        await mqtt.receive(`attraccess/wago/v1/controllers/other-controller/acknowledgements`, acknowledgement);
+        expect(await rows('manual_command')).toHaveLength(1);
+        await mqtt.receive(`attraccess/wago/v1/controllers/${controller.hardwareId}/acknowledgements`, acknowledgement);
+      });
+      const { body: result } = await post(
+        `controllers/${controller.id}/commands`,
+        {
+          channelId: 'output',
+          action: 'set',
+          value: true,
+          expectedConfigurationRevision: revision.revision,
+          acknowledgementTimeoutSeconds: 1,
+        },
+        'command-token',
+      ).expect(201);
+      const expectedResult =
+        status === 'accepted'
+          ? 'acknowledged'
+          : status === 'stalled_dispatch'
+            ? 'timeout'
+            : status === 'shutdown'
+              ? 'transport_failure'
+              : status;
+      expect(result).toEqual({ commandId, channelId: 'output', operation: 'set', result: expectedResult });
+      expect(commandId).toMatch(/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i);
+      await lifecycle('manual_command', controller.id, status === 'accepted' ? 'succeeded' : 'failed', result);
+      await mqtt.receive(`attraccess/wago/v1/controllers/${controller.hardwareId}/acknowledgements`, {
+        id: commandId,
+        status: 'accepted',
+      });
+      expect(await rows('manual_command')).toHaveLength(2);
+      expect(JSON.stringify(await rows('manual_command'))).not.toContain(privateValue);
+      expect((await rows('manual_command'))[1].details).not.toHaveProperty('value');
+    },
+  );
+
+  async function manuallyEnrolledController() {
+    const enrollment = await wago.createEnrollment('manual-fixture', 1);
+    await mqtt.announce('manual-fixture', enrollment.claimSecret);
+    const controller = await db.getRepository(WagoController).findOneByOrFail({ hardwareId: 'manual-fixture' });
+    expect(controller.trustState).toBe('untrusted');
+    const provisioner = context.getMqttCredentialProvisioning();
+    const provision = jest.fn(provisioner.provision);
+    jest
+      .spyOn(context, 'getMqttCredentialProvisioning')
+      .mockReturnValue({ ...provisioner, availableProviders: async () => [], provision });
+    return { controller, provision };
+  }
+
+  it('persists manual credential fallback only after matching acknowledgement through the authenticated API', async () => {
+    const { controller, provision } = await manuallyEnrolledController();
+    mqtt.publish.mockImplementation(async (_server, topic, payload) => {
+      if (!topic.endsWith('/claim')) return;
+      const credentials = JSON.parse(payload.toString());
+      expect(credentials.password).toBe(privateValue);
+      expect((await rows('manual_credential_fallback')).map((row) => row.outcome)).toEqual(['attempted']);
+      await mqtt.receive(`${topic}/ack`, { acknowledgementToken: 'incorrect-token' });
+      expect(await rows('manual_credential_fallback')).toHaveLength(1);
+      await mqtt.receive(`${topic}/ack`, { acknowledgementToken: credentials.acknowledgementToken });
+    });
+    const input = {
+      name: 'Manual fixture',
+      verifier,
+      username: 'wago-controller-manual-fixture',
+      password: privateValue,
+    };
+    await post(`controllers/${controller.id}/credentials/manual/complete`, input, 'command-token').expect(403);
+    expect(await rows('manual_credential_fallback')).toHaveLength(0);
+    await post(`controllers/${controller.id}/credentials/manual/complete`, input).expect(201, {
+      controllerId: controller.id,
+      result: 'acknowledged',
+    });
+    await lifecycle('manual_credential_fallback', controller.id);
+    expect(provision).not.toHaveBeenCalled();
+    expect((await db.getRepository(WagoController).findOneByOrFail({ id: controller.id })).trustState).toBe('claimed');
+    expect(JSON.stringify(await rows('manual_credential_fallback'))).not.toContain(privateValue);
+  });
+
+  it('persists failed manual fallback with no credential dispatch when the physical verifier is wrong', async () => {
+    const { controller, provision } = await manuallyEnrolledController();
+    mqtt.publish.mockClear();
+    await post(`controllers/${controller.id}/credentials/manual/complete`, {
+      name: 'Manual fixture',
+      verifier: 'incorrect-verifier',
+      username: 'wago-controller-manual-fixture',
+      password: privateValue,
+    }).expect(409);
+    await lifecycle('manual_credential_fallback', controller.id, 'failed');
+    expect(provision).not.toHaveBeenCalled();
+    expect(mqtt.publish).not.toHaveBeenCalled();
+    expect((await db.getRepository(WagoController).findOneByOrFail({ id: controller.id })).trustState).toBe(
+      'untrusted',
+    );
+    expect(JSON.stringify(await rows('manual_credential_fallback'))).not.toContain(privateValue);
   });
 });

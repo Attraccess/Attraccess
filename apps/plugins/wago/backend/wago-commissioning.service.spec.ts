@@ -13,6 +13,7 @@ import {
 } from './wago-commissioning.service';
 import { WagoService } from './wago.service';
 import { WagoController } from './wago-controller.entity';
+import type { CommissioningOperationGuard } from './wago-commissioning-lease';
 
 jest.mock('node:child_process', () => ({ spawn: jest.fn() }));
 jest.mock('./wago-commissioning-lease', () => ({
@@ -34,6 +35,78 @@ const secrets = {
 };
 
 describe('WagoCommissioningService', () => {
+  it.each([null, 7])('checks ownership immediately before session deletion (enrollment %p)', async (enrollmentId) => {
+    const { service, repository, wago } = securityHarness({ deliveryToken: null, enrollmentId });
+    const remove = jest.fn();
+    Object.assign(repository, { delete: remove });
+    let owned = true;
+    Object.assign(wago, {
+      deleteEnrollmentById: jest.fn(async () => {
+        owned = false;
+      }),
+    });
+    const guard: CommissioningOperationGuard = {
+      assertOwned: async () => {
+        if (!owned) throw new Error('lease_lost');
+      },
+      signal: new AbortController().signal,
+      deadline: Date.now() + 60_000,
+    };
+    // Isolate the final local guard from the lease runner's eventual final check.
+    jest.spyOn(service['leases'], 'run').mockImplementation(async (_fingerprint, operation) => {
+      if (enrollmentId === null) owned = false;
+      return operation(guard);
+    });
+    await expect(service.remove(1)).rejects.toThrow('lease_lost');
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it('releases a settled local rejection so a corrected request can retry', async () => {
+    const { service } = securityHarness();
+    const release = jest.fn();
+    jest.spyOn(service['leases'], 'run').mockImplementation(async (_fingerprint, operation) => {
+      const value = await operation({
+        assertOwned: async () => undefined,
+        signal: new AbortController().signal,
+        deadline: Date.now() + 60_000,
+      });
+      release();
+      return value;
+    });
+    await expect(
+      service['withControllerLock'](1, async () => {
+        throw new Error('qualification_required');
+      }),
+    ).rejects.toThrow('qualification_required');
+    expect(release).toHaveBeenCalledTimes(1);
+    await expect(service['withControllerLock'](1, async () => 'retry')).resolves.toBe('retry');
+    expect(release).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([false, true])('does not resolve the lease callback after a remote failure (caught %p)', async (caught) => {
+    const { service } = securityHarness();
+    const release = jest.fn();
+    jest.spyOn(service['leases'], 'run').mockImplementation(async (_fingerprint, operation) => {
+      const value = await operation({
+        assertOwned: async () => undefined,
+        signal: new AbortController().signal,
+        deadline: Date.now() + 60_000,
+      });
+      release();
+      return value;
+    });
+    await expect(
+      service['withControllerLock'](1, async () => {
+        const remote = service['remoteOperation'](async () => {
+          throw new Error('transport disconnected');
+        });
+        if (caught) return remote.catch(() => ({ state: 'delivery_failed' }));
+        return remote;
+      }),
+    ).rejects.toThrow(caught ? 'Remote completion is uncertain' : 'transport disconnected');
+    expect(release).not.toHaveBeenCalled();
+  });
+
   function securityHarness(overrides: Partial<WagoCommissioningSession> = {}, Service = WagoCommissioningService) {
     const session = {
       id: 1,
@@ -128,10 +201,10 @@ describe('WagoCommissioningService', () => {
       pairingCode: 'legacy-secret',
     });
     const firstPage = Array.from({ length: 100 }, (_, i) => ({ ...session, id: i + 1 }));
-    repository.findOneBy.mockImplementation(async ({ id }) => id === session.id ? session : firstPage.find((entry) => entry.id === id));
-    repository.find
-      .mockResolvedValueOnce(firstPage)
-      .mockResolvedValueOnce([session]);
+    repository.findOneBy.mockImplementation(async ({ id }) =>
+      id === session.id ? session : firstPage.find((entry) => entry.id === id),
+    );
+    repository.find.mockResolvedValueOnce(firstPage).mockResolvedValueOnce([session]);
     wago.revokeEnrollmentById.mockImplementation(async () => {
       expect(wago.registerCommissioningDiscoveryHandler).not.toHaveBeenCalled();
     });

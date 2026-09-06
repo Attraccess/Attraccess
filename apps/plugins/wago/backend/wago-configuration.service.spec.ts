@@ -688,7 +688,35 @@ describe('configuration editor service boundaries', () => {
       ['wago.rollback', 'attempted'],
       ['wago.rollback', 'failed'],
     ]);
-    expect(audit.record).toHaveBeenLastCalledWith(expect.objectContaining({ details: { sourceRevision: 1 } }));
+    expect(audit.record).toHaveBeenLastCalledWith(
+      expect.objectContaining({ details: { sourceRevision: 1, revision: 2 } }),
+    );
+  });
+
+  it('retains the allocated revision for failed publication and its retry', async () => {
+    const { service, audit, mqtt } = fixture();
+    const principal = { userId: 7, authenticationMethod: 'session' as const };
+    await service.saveDraft(1, snapshot);
+    await service.reviewDraft(1);
+    mqtt.publish.mockRejectedValue(new Error('private transport detail'));
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await service.reviewDraft(1);
+      await expect(service.publishDraft(1, false, undefined, principal)).rejects.toThrow('private transport detail');
+      expect(audit.record).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          action: 'wago.publication',
+          outcome: 'failed',
+          details: { revision: 1 },
+        }),
+      );
+    }
+    expect(audit.record.mock.calls.map(([event]) => event.outcome)).toEqual([
+      'attempted',
+      'failed',
+      'attempted',
+      'failed',
+    ]);
+    expect(JSON.stringify(audit.record.mock.calls)).not.toContain('private transport detail');
   });
 
   it('audits explicit preset application and reapplication, never ordinary policy edits or save retries', async () => {
