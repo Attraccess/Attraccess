@@ -196,6 +196,9 @@ export class OutputController {
     }
     onWritten?.();
     this.options.getState().outputs = { ...this.options.getState().outputs, [channel.id]: value };
+    // Feedback follows confirmed hardware state. Disk persistence may stall while a
+    // pulse shuts off; the old ON check must not survive that physical transition.
+    if (configurationGeneration === this.configurationGeneration) this.scheduleFeedbackCheck(channel, value);
     if (this.options.device.prepareConfiguration)
       this.options.getState().uncertainOutputChannelIds = (
         this.options.getState().uncertainOutputChannelIds ?? []
@@ -215,7 +218,6 @@ export class OutputController {
       throw new Error('failed to persist channel state');
     }
     onCommitted?.();
-    if (configurationGeneration === this.configurationGeneration) this.scheduleFeedbackCheck(channel, value);
     // Telemetry must not hold the physical channel queue: a pending MQTT ack
     // could otherwise prevent the pulse timer or disconnect policy from writing off.
     this.options.publishState();
