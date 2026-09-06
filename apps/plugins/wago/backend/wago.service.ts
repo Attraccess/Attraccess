@@ -352,6 +352,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     hardwareId: string,
     mqttServerId?: number,
     manualCredentials?: { username: string; password: string },
+    assertOwned: () => Promise<void> = async () => undefined,
   ): Promise<{
     id: number;
     broker: { host: string; port: number; useTls: boolean };
@@ -371,6 +372,21 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     const claimSecret = randomBytes(24).toString('base64url');
     const identity = `wago-enrollment-${randomBytes(8).toString('hex')}`;
     const expiresAt = new Date(Date.now() + 15 * 60_000).toISOString();
+    // Persist the broker identity before external provisioning so expiry recovery can
+    // revoke an ambiguous provision result if coordinator ownership is lost mid-request.
+    await assertOwned();
+    const enrollment = await this.enrollments.save(
+      this.enrollments.create({
+        mqttServerId: selectedServerId,
+        hardwareId: normalizedHardwareId,
+        secretHash: hash(claimSecret),
+        identity,
+        createdAt: new Date().toISOString(),
+        expiresAt,
+      }),
+    );
+    this.scheduleEnrollmentExpiry(enrollment);
+    await assertOwned();
     const provisionedCredential = await this.context.getMqttCredentialProvisioning().provision({
       mqttServerId: selectedServerId,
       identity,
@@ -388,17 +404,11 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     const credential = 'password' in provisionedCredential ? provisionedCredential : manualCredentials;
     if (!credential?.username.trim() || !credential.password)
       throw new ConflictException('a manual discovery username and password are required');
-    const enrollment = await this.enrollments.save(
-      this.enrollments.create({
-        mqttServerId: selectedServerId,
-        hardwareId: normalizedHardwareId,
-        secretHash: hash(claimSecret),
-        identity: credential.username,
-        createdAt: new Date().toISOString(),
-        expiresAt,
-      }),
-    );
-    this.scheduleEnrollmentExpiry(enrollment);
+    await assertOwned();
+    if (!('password' in provisionedCredential)) {
+      enrollment.identity = credential.username;
+      await this.enrollments.save(enrollment);
+    }
     await this.subscribeConfiguredServers().catch((error) => {
       this.context.logger.warn(`Could not refresh WAGO MQTT subscriptions after enrollment: ${String(error)}`);
       this.scheduleSubscriptionRetry();

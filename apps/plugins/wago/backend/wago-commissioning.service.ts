@@ -173,12 +173,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     if (input.runtimeArtifactDigest !== undefined) {
       if (!this.artifacts || !/^[a-f0-9]{64}$/.test(input.runtimeArtifactDigest))
         throw new ConflictException('Select a verified runtime release.');
-      const selected = await this.artifacts.acquire(input.runtimeArtifactDigest);
-      try {
-        runtimeArtifactDigest = selected.digest;
-      } finally {
-        await selected.cleanup();
-      }
+      runtimeArtifactDigest = (await this.artifacts.get(input.runtimeArtifactDigest)).digest;
     }
     const session = await this.sessions.save(
       this.sessions.create({
