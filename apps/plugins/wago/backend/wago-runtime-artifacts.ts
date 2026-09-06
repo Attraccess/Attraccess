@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { constants, Dir } from 'node:fs';
-import { lstat, mkdir, open, opendir, readdir, realpath, rename, rm, chmod } from 'node:fs/promises';
+import { lstat, mkdir, open, opendir, readdir, realpath, rm, chmod } from 'node:fs/promises';
+import filesystem from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
@@ -233,8 +234,21 @@ export class WagoRuntimeArtifactCatalog {
     }
   }
   private async writeMetadata(directory: string, metadata: RuntimeArtifactMetadata) {
-    await writeArtifactStream(join(directory, 'metadata.json'), Readable.from([JSON.stringify(metadata)]), 4096);
-    await chmod(join(directory, 'metadata.json'), 0o400);
+    const path = join(directory, 'metadata.json');
+    const temporary = join(directory, `.metadata-${randomUUID()}`);
+    try {
+      await writeArtifactStream(temporary, Readable.from([JSON.stringify(metadata)]), 4096);
+      await chmod(temporary, 0o400);
+      await filesystem.rename(temporary, path);
+      const handle = await open(directory, constants.O_RDONLY | constants.O_NOFOLLOW);
+      try {
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
+    } finally {
+      await rm(temporary, { force: true });
+    }
   }
   private async backfillMetadata(directory: string, metadata: RuntimeArtifactMetadata) {
     try {
@@ -298,7 +312,7 @@ export class WagoRuntimeArtifactCatalog {
       }
       const destination = join(root, 'objects', metadata.digest);
       try {
-        await rename(directory, destination);
+        await filesystem.rename(directory, destination);
       } catch (error) {
         if (!['EEXIST', 'ENOTEMPTY'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error;
         const existing = await lstat(destination);
@@ -318,7 +332,7 @@ export class WagoRuntimeArtifactCatalog {
       const pointer = join(root, temporaryName('current'));
       try {
         await writeArtifactStream(pointer, Readable.from([metadata.digest]), 64);
-        await rename(pointer, join(root, 'current'));
+        await filesystem.rename(pointer, join(root, 'current'));
         const handle = await open(root, constants.O_RDONLY);
         try {
           await handle.sync();
