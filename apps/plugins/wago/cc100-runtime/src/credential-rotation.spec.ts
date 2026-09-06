@@ -11,10 +11,23 @@ describe('runtime credential rotation persistence and reconnect acknowledgement'
   const listeners = new Map<string, (payload: Buffer) => void | Promise<void>>();
   const publish = jest.fn();
   const reconnect = jest.fn();
-  const old = { username: 'wago-controller-fixture', password: 'old-fixture', prefix: 'attraccess/wago' };
+  const credentialEpoch = '11111111-1111-4111-8111-111111111111';
+  const old = {
+    credentialEpoch,
+    username: 'wago-controller-fixture',
+    password: 'old-fixture',
+    prefix: 'attraccess/wago',
+  };
   const next = { ...old, password: 'new-fixture' };
   const topic = 'attraccess/wago/v1/controllers/fixture/credentials/rotate';
-  const input = { username: next.username, password: next.password, revision: 1, token: 'a'.repeat(43) };
+  const input = {
+    username: next.username,
+    password: next.password,
+    revision: 1,
+    token: 'a'.repeat(43),
+    credentialEpoch,
+    expiresAt: '',
+  };
   const transport: Transport = {
     publish,
     subscribe: async (name, listener) => {
@@ -36,6 +49,7 @@ describe('runtime credential rotation persistence and reconnect acknowledgement'
   };
 
   beforeEach(async () => {
+    input.expiresAt = new Date(Date.now() + 30_000).toISOString();
     jest.clearAllMocks();
     listeners.clear();
     directory = await mkdtemp(join(tmpdir(), 'wago-rotation-fixture-'));
@@ -48,6 +62,7 @@ describe('runtime credential rotation persistence and reconnect acknowledgement'
     publish.mockClear();
   });
   afterEach(async () => {
+    jest.restoreAllMocks();
     await rm(directory, { recursive: true, force: true });
   });
 
@@ -63,7 +78,7 @@ describe('runtime credential rotation persistence and reconnect acknowledgement'
     await runtime.acknowledgeCredentialRotation(next);
     expect(publish).toHaveBeenCalledWith(
       `${topic}/ack`,
-      { revision: 1, token: input.token, status: 'reconnected' },
+      { revision: 1, token: input.token, credentialEpoch, status: 'reconnected' },
       { retain: true },
     );
   });
@@ -103,4 +118,111 @@ describe('runtime credential rotation persistence and reconnect acknowledgement'
       expect((await store.load()).credentials).toEqual(old);
     },
   );
+
+  it('binds revisions to a fresh enrollment epoch without accepting old-epoch replay', async () => {
+    await send({ ...input, revision: 2 });
+    const nextEpoch = '22222222-2222-4222-8222-222222222222';
+    await expect(
+      runtime.receiveDiscoveryClaim(
+        Buffer.from(
+          JSON.stringify({
+            username: old.username,
+            password: 'fresh-claim',
+            credentialEpoch: nextEpoch,
+            configuration: { namespace: old.prefix },
+            expiresAt: input.expiresAt,
+          }),
+        ),
+      ),
+    ).resolves.toMatchObject({ credentialEpoch: nextEpoch });
+    expect((await store.load()).credentialRotation).toBeUndefined();
+    await send({ ...input, credentialEpoch: nextEpoch, password: 'fresh-rotation' });
+    expect((await store.load()).credentialRotation?.revision).toBe(1);
+    reconnect.mockClear();
+    await send({ ...input, revision: 3 });
+    expect(reconnect).not.toHaveBeenCalled();
+    expect((await store.load()).credentials?.password).toBe('fresh-rotation');
+  });
+
+  it('does not downgrade an enrolled epoch or reset a rotation with a replayed same-epoch claim', async () => {
+    await send(input);
+    await expect(
+      runtime.receiveDiscoveryClaim(
+        Buffer.from(JSON.stringify({ username: old.username, password: old.password, credentialEpoch })),
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      runtime.receiveDiscoveryClaim(Buffer.from(JSON.stringify({ username: old.username, password: old.password }))),
+    ).resolves.toBeUndefined();
+    expect((await store.load()).credentials).toEqual(next);
+    expect((await store.load()).credentialRotation?.revision).toBe(1);
+  });
+
+  it.each([undefined, 'invalid', new Date(0).toISOString()])(
+    'rejects missing or invalid rotation expiry %p',
+    async (expiresAt) => {
+      await send({ ...input, expiresAt });
+      expect(reconnect).not.toHaveBeenCalled();
+      expect((await store.load()).credentials).toEqual(old);
+    },
+  );
+
+  it('rejects a rotation that expires while queued behind another disk write', async () => {
+    let time = Date.now();
+    jest.spyOn(Date, 'now').mockImplementation(() => time);
+    let finish!: () => void;
+    let entered!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const pending = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const save = store.save.bind(store);
+    jest.spyOn(store, 'save').mockImplementationOnce(async (value) => {
+      entered();
+      await pending;
+      await save(value);
+    });
+    const prior = runtime.receiveClaim(old);
+    await started;
+    const handoff = send(input);
+    await new Promise((resolve) => setImmediate(resolve));
+    time += 30_001;
+    finish();
+    await Promise.all([prior, handoff]);
+    expect(reconnect).not.toHaveBeenCalled();
+    expect((await store.load()).credentials).toEqual(old);
+  });
+
+  it('continues core startup when rotation ACL is missing and advertises rotation only after retry succeeds', async () => {
+    let permitted = false;
+    const runtime = new WagoRuntime({
+      hardwareId: 'fixture',
+      prefix: old.prefix,
+      pairingCode: 'fixture',
+      store,
+      device: new MemoryDeviceAdapter(),
+      reconnectCredentials: reconnect,
+      transport: {
+        publish,
+        subscribe: async (name, listener) => {
+          if (name === topic && !permitted) throw new Error('fixture_acl_denied');
+          listeners.set(name, listener);
+        },
+      },
+    });
+    publish.mockClear();
+    await expect(runtime.start()).resolves.toBeUndefined();
+    expect(publish.mock.calls.find(([name]) => name.endsWith('/heartbeat'))?.[1].capabilities).not.toContain(
+      'credential-rotation-v1',
+    );
+    permitted = true;
+    await runtime.retryCredentialRotationSubscription();
+    publish.mockClear();
+    await runtime.publishHeartbeat();
+    expect(publish.mock.calls.find(([name]) => name.endsWith('/heartbeat'))?.[1].capabilities).toContain(
+      'credential-rotation-v1',
+    );
+  });
 });

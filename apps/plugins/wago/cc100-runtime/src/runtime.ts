@@ -20,7 +20,8 @@ export { MAX_PENDING_CHANNEL_WRITES } from './output-controller';
 export { JsonStateStore } from './state-store';
 export type { DeviceAdapter, RuntimeState, Snapshot, Transport, ValidationError } from './runtime-types';
 
-export type DiscoveryClaim = { username: string; password: string; prefix?: string };
+export type DiscoveryClaim = { username: string; password: string; prefix?: string; credentialEpoch?: string };
+const CREDENTIAL_EPOCH = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const CAPABILITIES = [
   'claim',
@@ -55,6 +56,7 @@ export class WagoRuntime {
   private polling = false;
   private publishingHeartbeat = false;
   private credentialUpdates = Promise.resolve();
+  private credentialRotationSubscribed = false;
   private sequence = 0;
   private reservedSequence = 0;
   private initialSequence = 0;
@@ -98,10 +100,7 @@ export class WagoRuntime {
     await this.outputs.applyDisconnectPolicies(this.connected);
     await this.options.transport.subscribe(this.desiredTopic(), (payload) => this.receiveDesired(payload));
     await this.options.transport.subscribe(this.commandTopic(), (payload) => this.receiveCommand(payload));
-    if (this.options.reconnectCredentials)
-      await this.options.transport.subscribe(this.credentialRotationTopic(), (payload) =>
-        this.receiveCredentialRotation(payload),
-      );
+    await this.retryCredentialRotationSubscription();
     await activateConnectionHandling?.();
     await this.publishHeartbeat(true);
   }
@@ -109,6 +108,19 @@ export class WagoRuntime {
   async receiveClaim(credentials: DiscoveryClaim): Promise<void> {
     this.state.credentials = credentials;
     await this.saveState();
+  }
+
+  /** An optional ACL upgrade must not prevent ordinary telemetry/command startup. */
+  async retryCredentialRotationSubscription(): Promise<void> {
+    if (!this.options.reconnectCredentials || this.credentialRotationSubscribed) return;
+    try {
+      await this.options.transport.subscribe(this.credentialRotationTopic(), (payload) =>
+        this.receiveCredentialRotation(payload),
+      );
+      this.credentialRotationSubscribed = true;
+    } catch {
+      this.credentialRotationSubscribed = false;
+    }
   }
 
   /** Persist before disconnecting; the acknowledgement is emitted only by the authenticated new connection. */
@@ -135,6 +147,16 @@ export class WagoRuntime {
         input.password.length > 4096
       )
         return;
+      const expiry = typeof input.expiresAt === 'string' ? Date.parse(input.expiresAt) : NaN;
+      if (
+        !Number.isFinite(expiry) ||
+        new Date(expiry).toISOString() !== input.expiresAt ||
+        expiry <= Date.now() ||
+        expiry - Date.now() > 30_000 ||
+        !this.state.credentials.credentialEpoch ||
+        input.credentialEpoch !== this.state.credentials.credentialEpoch
+      )
+        return;
       const previous = this.state.credentialRotation;
       if (
         previous &&
@@ -143,10 +165,17 @@ export class WagoRuntime {
             (input.token !== previous.token || input.password !== this.state.credentials.password)))
       )
         return;
-      this.state.credentials = { ...this.state.credentials, password: input.password };
-      this.state.credentialRotation = { revision: input.revision as number, token: input.token };
-      await this.saveState();
-      await this.options.reconnectCredentials(this.state.credentials);
+      const nextCredentials = { ...this.state.credentials, password: input.password };
+      const nextRotation = { revision: input.revision as number, token: input.token };
+      let saved = false;
+      await this.queueStateUpdate(async () => {
+        if (expiry <= Date.now()) return;
+        this.state.credentials = nextCredentials;
+        this.state.credentialRotation = nextRotation;
+        await this.options.store.save(this.state);
+        saved = true;
+      });
+      if (saved && this.state.credentials) await this.options.reconnectCredentials(this.state.credentials);
     });
     this.credentialUpdates = update.catch(() => undefined);
     return update;
@@ -159,12 +188,13 @@ export class WagoRuntime {
       !this.loaded ||
       !rotation ||
       authenticated.username !== this.state.credentials?.username ||
+      authenticated.credentialEpoch !== this.state.credentials.credentialEpoch ||
       authenticated.password !== this.state.credentials.password
     )
       return;
     await this.options.transport.publish(
       `${this.credentialRotationTopic()}/ack`,
-      { ...rotation, status: 'reconnected' },
+      { ...rotation, credentialEpoch: this.state.credentials.credentialEpoch, status: 'reconnected' },
       { retain: true },
     );
   }
@@ -181,8 +211,16 @@ export class WagoRuntime {
       return undefined;
     }
     if (!claim || typeof claim !== 'object') return undefined;
-    const { username, password, configuration, acknowledgementToken, expiresAt } = claim as Record<string, unknown>;
+    const { username, password, configuration, acknowledgementToken, expiresAt, credentialEpoch } = claim as Record<
+      string,
+      unknown
+    >;
     if (typeof username !== 'string' || !username || typeof password !== 'string' || !password) return undefined;
+    if (
+      credentialEpoch !== undefined &&
+      (typeof credentialEpoch !== 'string' || !CREDENTIAL_EPOCH.test(credentialEpoch))
+    )
+      return undefined;
     const expiry = expiresAt === undefined ? undefined : typeof expiresAt === 'string' ? Date.parse(expiresAt) : NaN;
     if (
       expiry !== undefined &&
@@ -201,11 +239,20 @@ export class WagoRuntime {
       username,
       password,
       ...(typeof namespace === 'string' ? { prefix: namespace } : {}),
+      ...(typeof credentialEpoch === 'string' ? { credentialEpoch } : {}),
     };
     this.state = await this.options.store.load();
     let saved = false;
     await this.queueStateUpdate(async () => {
       if (expiry !== undefined && expiry <= Date.now()) return;
+      if (this.state.credentials?.credentialEpoch && !credentialEpoch) return;
+      if (
+        this.state.credentialRotation &&
+        this.state.credentials?.credentialEpoch === credentialEpoch &&
+        (this.state.credentials?.username !== username || this.state.credentials?.password !== password)
+      )
+        return;
+      if (this.state.credentials?.credentialEpoch !== credentialEpoch) delete this.state.credentialRotation;
       this.state.credentials = credentials;
       await this.options.store.save(this.state);
       saved = true;
@@ -473,9 +520,10 @@ export class WagoRuntime {
           pairingCode: this.options.pairingCode,
           protocolVersion: '1.0.0',
           runtimeVersion: '0.1.0',
-          capabilities: this.options.reconnectCredentials
-            ? CAPABILITIES
-            : CAPABILITIES.filter((value) => value !== 'credential-rotation-v1'),
+          capabilities:
+            this.credentialRotationSubscribed && this.state.credentials?.credentialEpoch
+              ? CAPABILITIES
+              : CAPABILITIES.filter((value) => value !== 'credential-rotation-v1'),
         });
       } catch (error) {
         if (!ignoreStatePublicationFailure) throw error;

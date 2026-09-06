@@ -7,7 +7,7 @@ import type { PluginContext, PluginMqttMessage } from '@attraccess/plugins-backe
 import { WagoController } from './wago-controller.entity';
 import { WagoCredentialRotationEntity } from './wago-credential-rotation.entity';
 import { WagoCredentialRotation1780010610000 } from './wago-credential-rotation.migration';
-import { WagoCredentialRotationService } from './wago-credential-rotation';
+import { WagoCredentialRotationService, WagoCredentialRotationUncertainError } from './wago-credential-rotation';
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import { WagoRuntime, type RuntimeState } from '../cc100-runtime/src/runtime';
 // eslint-disable-next-line @nx/enforce-module-boundaries
@@ -23,6 +23,7 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
   let abort: AbortController;
   const principal = { userId: 12, authenticationMethod: 'session' as const };
   const identity = 'wago-controller-fixture';
+  const credentialEpoch = '11111111-1111-4111-8111-111111111111';
   const credential = {
     providerId: 'fixture',
     identity,
@@ -67,6 +68,8 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+    await db.query('ALTER TABLE plugin_wago_controllers ADD COLUMN credential_epoch varchar');
+    await db.query('UPDATE plugin_wago_controllers SET credential_epoch = ? WHERE id = 1', [credentialEpoch]);
     const key = randomBytes(32);
     context = {
       getRepository: (entity) => db.getRepository(entity),
@@ -102,7 +105,7 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
       await receive({
         serverId,
         topic: `${topic}/ack`,
-        payload: Buffer.from(JSON.stringify({ revision, token, status: 'reconnected' })),
+        payload: Buffer.from(JSON.stringify({ revision, token, credentialEpoch, status: 'reconnected' })),
       });
     });
     service = new WagoCredentialRotationService(context);
@@ -136,13 +139,13 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
         await receive({
           serverId,
           topic: `${topic}/ack`,
-          payload: Buffer.from(JSON.stringify({ revision, token, status: 'reconnected' })),
+          payload: Buffer.from(JSON.stringify({ revision, token, credentialEpoch, status: 'reconnected' })),
         });
       };
       await receive({
         serverId,
         topic: `${topic}/ack`,
-        payload: Buffer.from(JSON.stringify({ revision, token: 'wrong', status: 'reconnected' })),
+        payload: Buffer.from(JSON.stringify({ revision, token: 'wrong', credentialEpoch, status: 'reconnected' })),
       });
       started();
     });
@@ -174,7 +177,7 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
       started();
     });
     const operation = service.rotate(1, 'attraccess/wago', principal, guard());
-    const failure = expect(operation).rejects.toThrow('incomplete');
+    const failure = expect(operation).rejects.toBeInstanceOf(WagoCredentialRotationUncertainError);
     await dispatched;
     const firstPayload = publish.mock.calls[0][2];
     await jest.advanceTimersByTimeAsync(30_000);
@@ -189,12 +192,15 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
       synchronize: false,
     }).initialize();
     publish.mockImplementation(async (serverId, topic, payload) => {
-      expect(payload).toBe(firstPayload);
+      const retried = JSON.parse(payload);
+      const first = JSON.parse(firstPayload);
+      expect({ ...retried, expiresAt: first.expiresAt }).toEqual(first);
+      expect(Date.parse(retried.expiresAt)).toBeGreaterThan(Date.now());
       const { revision, token } = JSON.parse(payload);
       await receive({
         serverId,
         topic: `${topic}/ack`,
-        payload: Buffer.from(JSON.stringify({ revision, token, status: 'reconnected' })),
+        payload: Buffer.from(JSON.stringify({ revision, token, credentialEpoch, status: 'reconnected' })),
       });
     });
     await expect(
@@ -234,6 +240,37 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
     expect(await row()).toBeNull();
   });
 
+  it('requires the persisted registration epoch before any broker mutation', async () => {
+    await db.query('UPDATE plugin_wago_controllers SET credential_epoch = NULL WHERE id = 1');
+    await expect(service.rotate(1, 'attraccess/wago', principal, guard())).rejects.toThrow('credential epoch');
+    expect(rotate).not.toHaveBeenCalled();
+  });
+
+  it('returns the typed uncertain error when MQTT dispatch stalls past its deadline', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+    let entered!: () => void;
+    let finish!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const pending = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    publish.mockImplementation(async () => {
+      entered();
+      await pending;
+    });
+    const operation = service.rotate(1, 'attraccess/wago', principal, guard());
+    const rejected = expect(operation).rejects.toBeInstanceOf(WagoCredentialRotationUncertainError);
+    await started;
+    const payload = JSON.parse(publish.mock.calls[0][2]);
+    expect(Date.parse(payload.expiresAt) - Date.now()).toBeLessThanOrEqual(30_000);
+    await jest.advanceTimersByTimeAsync(30_000);
+    await rejected;
+    finish();
+    expect((await row())?.phase).toBe('pending');
+  });
+
   it('does not call manual instructions a completed rotation', async () => {
     rotate.mockResolvedValue({ username: identity, instructions: ['synthetic-manual-instruction'] });
     await expect(service.rotate(1, 'attraccess/wago', principal, guard())).rejects.toThrow('incomplete');
@@ -255,8 +292,10 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
   it('creates the actual migration and clears recovery state only when its controller registration is deleted', async () => {
     const runner = db.createQueryRunner();
     await runner.query('DROP TABLE "plugin_wago_credential_rotations"');
+    await runner.query('ALTER TABLE plugin_wago_controllers DROP COLUMN credential_epoch');
     const migration = new WagoCredentialRotation1780010610000();
     await migration.up(runner);
+    await db.query('UPDATE plugin_wago_controllers SET credential_epoch = ? WHERE id = 1', [credentialEpoch]);
     await service.rotate(1, 'attraccess/wago', principal, guard());
     expect(await service.status(1)).toEqual({ state: 'completed', revision: 1 });
     await expect(migration.down(runner)).rejects.toThrow('rotation history');
@@ -268,7 +307,7 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
 
   it('composes the real backend and runtime across persistence, fixture authentication and reconnect acknowledgement', async () => {
     let persisted: RuntimeState = {
-      credentials: { username: identity, password: 'old-fixture', prefix: 'attraccess/wago' },
+      credentials: { username: identity, password: 'old-fixture', prefix: 'attraccess/wago', credentialEpoch },
       outputs: {},
       commandIds: [],
     };

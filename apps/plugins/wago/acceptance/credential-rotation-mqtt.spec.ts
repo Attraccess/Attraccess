@@ -120,8 +120,14 @@ describe('credential reconnect against an owned OrbStack RabbitMQ fixture', () =
     clients.push(client);
     const topic = 'attraccess/wago/v1/controllers/rotation-fixture/credentials/rotate';
     const token = 'a'.repeat(43);
+    const credentialEpoch = randomUUID();
     const store = new JsonStateStore(join(directory, 'state.json'));
-    let authenticated: DiscoveryClaim = { username: identity, password: 'old-fixture', prefix: 'attraccess/wago' };
+    let authenticated: DiscoveryClaim = {
+      username: identity,
+      password: 'old-fixture',
+      prefix: 'attraccess/wago',
+      credentialEpoch,
+    };
     await store.save({ credentials: authenticated, outputs: {}, commandIds: [] });
     const transport: Transport = {
       publish: async (topic, payload, options) => {
@@ -169,10 +175,17 @@ describe('credential reconnect against an owned OrbStack RabbitMQ fixture', () =
     await request(`/users/${identity}`, { password: 'rotated-fixture', tags: '' });
     await administrator.publishAsync(
       topic,
-      JSON.stringify({ username: identity, password: 'rotated-fixture', revision: 1, token }),
+      JSON.stringify({
+        username: identity,
+        password: 'rotated-fixture',
+        revision: 1,
+        token,
+        credentialEpoch,
+        expiresAt: new Date(Date.now() + 30_000).toISOString(),
+      }),
       { qos: 1, retain: false },
     );
-    await expect(acknowledgement).resolves.toEqual({ revision: 1, token, status: 'reconnected' });
+    await expect(acknowledgement).resolves.toEqual({ revision: 1, token, credentialEpoch, status: 'reconnected' });
     expect(reconnects).toBe(1);
     expect((await store.load()).credentials?.password).toBe('rotated-fixture');
   });

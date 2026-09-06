@@ -5,6 +5,7 @@ import { Column, Entity, PrimaryColumn } from '@attraccess/plugins-backend-sdk';
 export class WagoCredentialRotationEntity {
   @PrimaryColumn({ type: 'integer', name: 'controller_id' }) controllerId!: number;
   @Column({ type: 'integer' }) revision!: number;
+  @Column({ type: 'varchar', name: 'credential_epoch' }) credentialEpoch!: string;
   @Column({ type: 'varchar' }) phase!: 'provisioning' | 'pending' | 'completed';
   @Column({ type: 'integer', name: 'mqtt_server_id' }) mqttServerId!: number;
   @Column({ type: 'varchar' }) prefix!: string;
