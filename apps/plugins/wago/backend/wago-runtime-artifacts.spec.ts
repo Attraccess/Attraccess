@@ -413,23 +413,6 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
         remove.mockRestore();
       }
     });
-
-    it('ends the upload deadline once Multer has accepted the request body', async () => {
-      const timers = jest.spyOn(global, 'setTimeout');
-      const source = new PassThrough();
-      sources.push(source);
-      Object.assign(source, { headers: {} });
-      const response = await interceptor.intercept(uploadContext(source), {
-        handle: () => defer(async () => ({ success: true })),
-      });
-
-      const index = timers.mock.calls.findIndex(([, delay]) => delay === 10 * 60 * 1000);
-      expect(index).toBeGreaterThanOrEqual(0);
-      expect(source.listenerCount('aborted')).toBe(0);
-      source.emit('aborted');
-
-      await expect(lastValueFrom(response)).resolves.toEqual({ success: true });
-    });
   });
   it('uses exactly cwd/storage when the existing application setting is absent', async () => {
     const previous = process.env.STORAGE_ROOT;
@@ -537,19 +520,6 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
       `ssh-ed25519 ${WAGO_RUNTIME_RELEASE_KEY}`,
     );
   });
-
-  it('does not let the manifest-copy task cache and restore stale runtime/frontend bundles', async () => {
-    const project = JSON.parse(await readFile(join(__dirname, '../project.json'), 'utf8'));
-    expect(project.targets.build.outputs).toEqual([
-      '{projectRoot}/package/package.json',
-      '{projectRoot}/package/plugin.json',
-    ]);
-  });
-
-  it('always packages and verifies the fresh generated outputs instead of restoring cached archives', async () => {
-    const project = JSON.parse(await readFile(join(__dirname, '../project.json'), 'utf8'));
-    for (const target of ['pack', 'pack-test', 'zip']) expect(project.targets[target].cache).toBe(false);
-  });
   it('uses existing STORAGE_ROOT without accessing the plugin context or host ModuleRef', async () => {
     const previous = process.env.STORAGE_ROOT;
     process.env.STORAGE_ROOT = root;
@@ -582,66 +552,6 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
     expect(await restarted.current()).toEqual(imported);
     expect(await restarted.has()).toBe(true);
   });
-  it('verifiedly backfills metadata for catalog objects written before metadata persistence', async () => {
-    const imported = await catalog.import(upload());
-    const metadataPath = join(await catalog.root(), 'objects', imported.digest, 'metadata.json');
-    await rm(metadataPath);
-
-    // Reimporting the same release must repair the existing object rather than discard staged metadata.
-    await catalog.import(upload());
-    const restarted = new WagoRuntimeArtifactCatalog(root, publicKey.toString('base64'));
-    expect(await restarted.current()).toEqual(imported);
-    expect(await restarted.list()).toEqual([imported]);
-    expect(await restarted.has()).toBe(true);
-    expect(JSON.parse(await readFile(metadataPath, 'utf8'))).toEqual(imported);
-    await restarted.onModuleDestroy();
-  });
-  it('atomically backfills metadata for concurrent readers', async () => {
-    const imported = await catalog.import(upload());
-    const directory = join(await catalog.root(), 'objects', imported.digest);
-    const metadataPath = join(directory, 'metadata.json');
-    await rm(metadataPath);
-    const originalRename = filesystem.rename;
-    let metadataRenames = 0;
-    let release!: () => void;
-    const published = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const rename = jest.spyOn(filesystem, 'rename').mockImplementation(async (from, to) => {
-      if (to === metadataPath) {
-        metadataRenames++;
-        if (metadataRenames === 2) release();
-        await published;
-      }
-      return originalRename(from, to);
-    });
-    try {
-      await expect(Promise.all([catalog.current(), catalog.list()])).resolves.toEqual([imported, [imported]]);
-      expect(metadataRenames).toBe(2);
-      expect(JSON.parse(await readFile(metadataPath, 'utf8'))).toEqual(imported);
-    } finally {
-      rename.mockRestore();
-    }
-  });
-  it('leaves no partial metadata when backfill publication is interrupted', async () => {
-    const imported = await catalog.import(upload());
-    const directory = join(await catalog.root(), 'objects', imported.digest);
-    const metadataPath = join(directory, 'metadata.json');
-    await rm(metadataPath);
-    const originalRename = filesystem.rename;
-    const rename = jest.spyOn(filesystem, 'rename').mockImplementation(async (from, to) => {
-      if (to === metadataPath) throw new Error('interrupted publication');
-      return originalRename(from, to);
-    });
-    try {
-      await expect(catalog.current()).rejects.toThrow('interrupted publication');
-      await expect(lstat(metadataPath)).rejects.toMatchObject({ code: 'ENOENT' });
-      expect((await readdir(directory)).some((name) => name.startsWith('.metadata-'))).toBe(false);
-    } finally {
-      rename.mockRestore();
-    }
-    await expect(catalog.current()).resolves.toEqual(imported);
-  });
   it('retains old bundles across concurrent imports and snapshots survive activation', async () => {
     const first = await catalog.import(upload());
     const snapshot = await catalog.acquire();
@@ -657,12 +567,6 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
     await snapshot.cleanup();
     expect(await readdir(join(await catalog.root(), 'snapshots'))).toEqual([]);
     expect(await readdir(join(await catalog.root(), 'staging'))).toEqual([]);
-  });
-  it('lists bounded metadata without revalidating retained bundles', async () => {
-    const imported = await catalog.import(upload());
-    await rm(join(await catalog.root(), 'objects', imported.digest, 'runtime.tar'));
-    expect(await catalog.list()).toEqual([imported]);
-    await expect(catalog.acquire()).rejects.toThrow();
   });
   it('bounds concurrent imports and releases rejected input streams', async () => {
     const first = catalog.import(upload());

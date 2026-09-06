@@ -51,7 +51,6 @@ describe('hardware deployment shell fixtures (isolated files and fake management
       mkdir: '/bin/mkdir',
       mktemp: '/usr/bin/mktemp',
       mv: '/bin/mv',
-      ls: '/bin/ls',
       chmod: '/bin/chmod',
       rm: '/bin/rm',
       touch: '/usr/bin/touch',
@@ -67,7 +66,7 @@ describe('hardware deployment shell fixtures (isolated files and fake management
     file('bin/dockerd', '#!/bin/sh\nexit 99\n', 0o700);
     file(
       'bin/ps',
-      '#!/bin/sh\n[ "$FAULT" != ps-failed ] || exit 1\nif [ "$FAULT" = codesys ]; then echo CODESYSControl; fi\nif [ "$FAULT" = docker-info-failed ]; then echo dockerd; fi\n',
+      '#!/bin/sh\n[ "$FAULT" != ps-failed ] || exit 1\nif [ "$FAULT" = codesys ]; then echo CODESYSControl; fi\n',
       0o700,
     );
     file(
@@ -108,7 +107,7 @@ const fs = require('node:fs');
 const root = process.env.FIXTURE_ROOT;
 const args = process.argv.slice(2);
 if (args.shift() !== '--host' || args.shift() !== 'unix:///var/run/docker.sock') process.exit(99);
-if (args[0] === 'info') process.exit(process.env.FAULT === 'docker-info-failed' ? 1 : fs.readFileSync(root + '/daemon', 'utf8') === 'running' ? 0 : 1);
+if (args[0] === 'info') process.exit(fs.readFileSync(root + '/daemon', 'utf8') === 'running' ? 0 : 1);
 if (fs.readFileSync(root + '/daemon', 'utf8') !== 'running') process.exit(1);
 const containers = JSON.parse(fs.readFileSync(root + '/containers.json', 'utf8'));
 if (args[0] === 'container' && args[1] === 'ls') {
@@ -132,7 +131,6 @@ const state = fs.readFileSync(root + '/daemon', 'utf8');
 if (action === 'status') process.exit(process.env.FAULT === 'unknown-status' ? 4 : state === 'running' ? 0 : 3);
 fs.appendFileSync(root + '/mutations', action + '\\n');
 if (action === 'start') {
-  fs.mkdirSync(root + '/var/lib/docker/containers', { recursive: true });
   fs.writeFileSync(root + '/daemon', 'running');
   if (process.env.FAULT === 'start-failed') process.exit(1);
   if (process.env.FAULT === 'start-killed') process.kill(process.ppid, 'SIGKILL');
@@ -257,22 +255,6 @@ if (action === 'start') {
     expect(readFileSync(join(root, 'daemon'), 'utf8')).toBe('stopped');
   });
 
-  it('can activate again after recovery leaves initialized but empty Docker storage', () => {
-    file('daemon', 'stopped');
-    expect(provision().status).toBe(0);
-    expect(recover().status).toBe(0);
-    expect(run(wagoDockerProvisionFinishScript(token, 'restored', root)).status).toBe(0);
-    expect(existsSync(join(root, 'var/lib/docker/containers'))).toBe(true);
-    expect(provision().status).toBe(0);
-  });
-
-  it('refuses initialized storage containing container metadata', () => {
-    file('daemon', 'stopped');
-    file('var/lib/docker/containers/existing/config.v2.json', '{}');
-    expect(provision().status).not.toBe(0);
-    expect(existsSync(join(root, 'mutations'))).toBe(false);
-  });
-
   it('keeps an already-running daemon unchanged and refuses concurrent delivery/lock conflicts', () => {
     expect(provision().status).not.toBe(0);
     file('daemon', 'stopped');
@@ -287,13 +269,6 @@ if (action === 'start') {
     expect(provision().status).toBe(0);
     file('containers.json', JSON.stringify([{ id: 'external', name: 'external', mounts: [] }]));
     expect(recover().stderr).toContain('workloads exist');
-    expect(readFileSync(join(root, 'mutations'), 'utf8')).toBe('start\n');
-  });
-
-  it('does not stop Docker when the workload inspection is unavailable', () => {
-    file('daemon', 'stopped');
-    expect(provision().status).toBe(0);
-    expect(recover('docker-info-failed').stderr).toContain('Cannot inspect Docker workloads');
     expect(readFileSync(join(root, 'mutations'), 'utf8')).toBe('start\n');
   });
 

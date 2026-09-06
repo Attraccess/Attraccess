@@ -69,12 +69,6 @@ unset DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH
 docker_cli=$(command -v docker || :)
 daemon_cli=$(command -v dockerd || :)
 docker() { command docker --host unix:///var/run/docker.sock "$@"; }
-empty_container_store() {
-  if test ! -e "$1" && test ! -L "$1"; then return 0; fi
-  test -d "$1" && test ! -L "$1" || return 1
-  entries=$(ls -A -- "$1") || return 1
-  test -z "$entries"
-}
 config_docker=missing
 [ ! -x "$root/etc/config-tools/config_docker" ] || config_docker=present
 platform=unsupported-firmware
@@ -134,7 +128,7 @@ EOF_MOUNTS
     # LSB stopped status, no live daemon, no custom storage or existing workloads.
     if [ "$status" = 3 ] && ! printf '%s\\n' "$processes" | grep -iq dockerd &&
       [ ! -e "$root/etc/docker/daemon.json" ] &&
-      empty_container_store "$root/home/docker/containers" && empty_container_store "$root/var/lib/docker/containers"; then
+      [ ! -e "$root/home/docker/containers" ] && [ ! -e "$root/var/lib/docker/containers" ]; then
       docker_state=installed-stopped
       provision=review-start-installed-runtime
     fi
@@ -230,18 +224,8 @@ unset DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH
 if command docker --host unix:///var/run/docker.sock info >/dev/null 2>&1; then
   containers=$(command docker --host unix:///var/run/docker.sock container ls -a -q) || fail 'Cannot inspect Docker workloads'
   test -z "$containers" || fail 'Docker workloads exist; refusing to stop daemon'
-  docker_running=1
-else
-  # An unavailable API cannot prove that no workloads are present. Only continue when
-  # the init script and process list independently prove the daemon is already stopped.
-  status=0
-  "$root/etc/init.d/dockerd" status >/dev/null 2>&1 || status=$?
-  test "$status" = 3 || fail 'Cannot inspect Docker workloads'
-  processes=$(ps -eo comm=) || fail 'Cannot verify daemon absence'
-  if printf '%s\n' "$processes" | grep -iq dockerd; then fail 'Cannot inspect Docker workloads'; fi
-  docker_running=0
 fi
-if test -e "$journal/start-intent" && test "$docker_running" = 1; then
+if test -e "$journal/start-intent"; then
   "$root/etc/init.d/dockerd" stop >&2 || fail 'Docker stop failed; recovery retained'
   status=0
   "$root/etc/init.d/dockerd" status >/dev/null 2>&1 || status=$?

@@ -1,7 +1,6 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { constants, Dir } from 'node:fs';
-import { lstat, mkdir, open, opendir, readdir, realpath, rm, chmod } from 'node:fs/promises';
-import filesystem from 'node:fs/promises';
+import { lstat, mkdir, open, opendir, readdir, realpath, rename, rm, chmod } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
@@ -10,7 +9,6 @@ import { pipeline } from 'node:stream/promises';
 import {
   inspectRuntimeTar,
   RuntimeArtifactManifest,
-  validateRuntimeManifest,
   verifyRuntimeSignature,
   WAGO_RUNTIME_MAX_BYTES,
   WAGO_RUNTIME_RELEASE_KEY,
@@ -120,23 +118,6 @@ async function smallFile(path: string, limit: number) {
     await file.close();
   }
 }
-function storedMetadata(value: unknown, maxBytes: number): RuntimeArtifactMetadata {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid catalog metadata');
-  const data = value as Record<string, unknown>;
-  if (
-    Object.keys(data).sort().join(',') !== 'bytes,digest,image,manifest' ||
-    typeof data.digest !== 'string' ||
-    !digestPattern.test(data.digest) ||
-    !Number.isSafeInteger(data.bytes) ||
-    data.bytes < 1 ||
-    data.bytes > maxBytes ||
-    typeof data.image !== 'string'
-  )
-    throw new Error('Invalid catalog metadata');
-  const manifest = validateRuntimeManifest(data.manifest);
-  if (data.image !== manifest.image) throw new Error('Invalid catalog metadata');
-  return Object.freeze({ digest: data.digest, bytes: data.bytes, image: data.image, manifest });
-}
 
 /** Internal catalog. Trust-key injection exists for isolated signing fixtures; HTTP never supplies it. */
 export class WagoRuntimeArtifactCatalog {
@@ -233,58 +214,6 @@ export class WagoRuntimeArtifactCatalog {
       await file.close();
     }
   }
-  private async writeMetadata(directory: string, metadata: RuntimeArtifactMetadata) {
-    const path = join(directory, 'metadata.json');
-    const temporary = join(directory, `.metadata-${randomUUID()}`);
-    try {
-      await writeArtifactStream(temporary, Readable.from([JSON.stringify(metadata)]), 4096);
-      await chmod(temporary, 0o400);
-      await filesystem.rename(temporary, path);
-      const handle = await open(directory, constants.O_RDONLY | constants.O_NOFOLLOW);
-      try {
-        await handle.sync();
-      } finally {
-        await handle.close();
-      }
-    } finally {
-      await rm(temporary, { force: true });
-    }
-  }
-  private async backfillMetadata(directory: string, metadata: RuntimeArtifactMetadata) {
-    try {
-      await this.writeMetadata(directory, metadata);
-    } catch (error) {
-      // Concurrent readers may verify the same legacy object and race to backfill it.
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-    }
-  }
-  private async metadata(root: string, digest: string) {
-    const directory = join(root, 'objects', digest);
-    const info = await lstat(directory);
-    if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('Invalid catalog object');
-    try {
-      const metadata = storedMetadata(
-        JSON.parse(await smallFile(join(directory, 'metadata.json'), 4096)),
-        this.maxBytes,
-      );
-      if (metadata.digest !== digest) throw new Error('Invalid catalog digest');
-      return metadata;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-      // Catalogs written before metadata.json are verified before becoming readable again.
-      const metadata = await this.verifiedMetadata(root, digest);
-      await this.backfillMetadata(directory, metadata);
-      return metadata;
-    }
-  }
-  private async verifiedMetadata(root: string, digest: string) {
-    const directory = join(root, 'objects', digest);
-    const info = await lstat(directory);
-    if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('Invalid catalog object');
-    const metadata = await this.verify(directory);
-    if (metadata.digest !== digest) throw new Error('Invalid catalog digest');
-    return metadata;
-  }
   async import(upload: RuntimeArtifactUpload): Promise<RuntimeArtifactMetadata> {
     if (this.activeImports >= 2) {
       for (const source of Object.values(upload)) source.destroy();
@@ -303,9 +232,8 @@ export class WagoRuntimeArtifactCatalog {
       if (results.some((result) => result.status === 'rejected'))
         throw new Error('Invalid or oversized artifact upload');
       const metadata = await this.verify(directory);
-      await this.writeMetadata(directory, metadata);
       const root = await this.root();
-      for (const name of ['runtime.tar', 'runtime.tar.sha256', 'runtime.tar.sig', 'metadata.json'])
+      for (const name of ['runtime.tar', 'runtime.tar.sha256', 'runtime.tar.sig'])
         await chmod(join(directory, name), 0o400);
       const stageHandle = await open(directory, constants.O_RDONLY | constants.O_NOFOLLOW);
       try {
@@ -315,14 +243,16 @@ export class WagoRuntimeArtifactCatalog {
       }
       const destination = join(root, 'objects', metadata.digest);
       try {
-        await filesystem.rename(directory, destination);
+        await rename(directory, destination);
       } catch (error) {
         if (!['EEXIST', 'ENOTEMPTY'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error;
         const existing = await lstat(destination);
-        if (!existing.isDirectory() || existing.isSymbolicLink()) throw new Error('Invalid catalog object');
-        const existingMetadata = await this.verify(destination);
-        if (existingMetadata.digest !== metadata.digest) throw new Error('Invalid catalog object');
-        await this.backfillMetadata(destination, existingMetadata);
+        if (
+          !existing.isDirectory() ||
+          existing.isSymbolicLink() ||
+          (await this.verify(destination)).digest !== metadata.digest
+        )
+          throw new Error('Invalid catalog object');
       }
       const objectsHandle = await open(join(root, 'objects'), constants.O_RDONLY | constants.O_NOFOLLOW);
       try {
@@ -334,7 +264,7 @@ export class WagoRuntimeArtifactCatalog {
       const pointer = join(root, temporaryName('current'));
       try {
         await writeArtifactStream(pointer, Readable.from([metadata.digest]), 64);
-        await filesystem.rename(pointer, join(root, 'current'));
+        await rename(pointer, join(root, 'current'));
         const handle = await open(root, constants.O_RDONLY);
         try {
           await handle.sync();
@@ -371,6 +301,14 @@ export class WagoRuntimeArtifactCatalog {
     if (!digestPattern.test(digest)) throw new Error('Invalid current runtime artifact');
     return this.metadata(root, digest);
   }
+  private async metadata(root: string, digest: string) {
+    const directory = join(root, 'objects', digest);
+    const info = await lstat(directory);
+    if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('Invalid catalog object');
+    const metadata = await this.verify(directory);
+    if (metadata.digest !== digest) throw new Error('Invalid catalog digest');
+    return metadata;
+  }
   async list(): Promise<RuntimeArtifactMetadata[]> {
     const root = await this.root();
     const result: RuntimeArtifactMetadata[] = [];
@@ -381,10 +319,7 @@ export class WagoRuntimeArtifactCatalog {
   }
   async has(): Promise<boolean> {
     try {
-      const current = await this.current();
-      if (!current) return false;
-      await this.verifiedMetadata(await this.root(), current.digest);
-      return true;
+      return (await this.current()) !== null;
     } catch {
       return false;
     }
@@ -395,7 +330,7 @@ export class WagoRuntimeArtifactCatalog {
     if (!selected || !digestPattern.test(selected))
       throw new ConflictException('Import a verified runtime release first');
     const root = await this.root();
-    await this.verifiedMetadata(root, selected);
+    await this.metadata(root, selected);
     const directory = await this.createTemporaryDirectory(join(root, 'snapshots'), 'delivery');
     const cleanup = () => rm(directory, { recursive: true, force: true });
     try {
