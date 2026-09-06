@@ -9,6 +9,7 @@ import { Readable, Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import {
   inspectRuntimeTar,
+  loadRuntimeArtifactSigningKey,
   RuntimeArtifactManifest,
   validateRuntimeManifest,
   verifyRuntimeSignature,
@@ -138,7 +139,7 @@ function storedMetadata(value: unknown, maxBytes: number): RuntimeArtifactMetada
   return Object.freeze({ digest: data.digest, bytes: data.bytes, image: data.image, manifest });
 }
 
-/** Internal catalog. Trust-key injection exists for isolated signing fixtures; HTTP never supplies it. */
+/** Internal catalog. The host-selected trust key is pinned for its lifetime; HTTP never supplies it. */
 export class WagoRuntimeArtifactCatalog {
   private activeImports = 0;
   private readonly scans = new Map<string, Dir>();
@@ -419,12 +420,15 @@ export class WagoRuntimeArtifactCatalog {
   }
 }
 
-/** Register this provider alongside WagoArtifactsController. No operator path/key/env input. */
+/** Register alongside WagoArtifactsController. Only trusted host configuration can select a development key. */
 @Injectable()
 export class WagoRuntimeArtifactsService extends WagoRuntimeArtifactCatalog {
   constructor() {
     // Existing application setting and exact default from apps/api/src/config/storage.config.ts.
     // Plugin providers are constructed before the host ModuleRef is available.
-    super(resolve(process.env.STORAGE_ROOT ?? join(process.cwd(), 'storage')));
+    super(
+      resolve(process.env.STORAGE_ROOT ?? join(process.cwd(), 'storage')),
+      loadRuntimeArtifactSigningKey(process.env.NODE_ENV, process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH),
+    );
   }
 }
