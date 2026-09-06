@@ -1,10 +1,7 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import { ManagementError, WagoManagementService } from './wago-management';
 import { generateManagementKey } from './wago-management-key';
 import { WagoManagementProvider } from './wago-management-provider';
-import type { CommissioningLeaseRunner } from './wago-commissioning-lease';
-import { CommissioningLeaseError } from './wago-commissioning-lease';
 import type {
   ManagementAdapter,
   ManagementInspection,
@@ -71,14 +68,6 @@ function harness() {
   };
   const calls: string[] = [];
   let keyFingerprint = '';
-  const lease: CommissioningLeaseRunner = {
-    run: async (_fingerprint, operation) =>
-      operation({
-        assertOwned: async () => undefined,
-        signal: new AbortController().signal,
-        deadline: Number.MAX_SAFE_INTEGER,
-      }),
-  };
   const operation = (name: string) =>
     jest.fn(async () => {
       calls.push(name);
@@ -130,7 +119,7 @@ function harness() {
     rollback: operation('rollback'),
   } satisfies ManagementAdapter;
   let clock = 1000000;
-  const service = new WagoManagementService(store, secrets, adapter, lease, () => clock);
+  const service = new WagoManagementService(store, secrets, adapter, () => clock);
   const review = async () => {
     await service.inspect(target, credential);
     return service.review(target.controllerId, { mode: 'baseline', exceptions: [] });
@@ -141,7 +130,6 @@ function harness() {
     store,
     secrets,
     adapter,
-    lease,
     service,
     calls,
     review,
@@ -277,7 +265,7 @@ describe('management transition orchestration (no device or broker connections)'
     h.store.records.set(7, structuredClone(h.store.history.find((entry) => entry.state === 'restricting_access')!));
     h.store.leases.set(7, { owner: 'crashed-process', until: h.now() + 300000 });
     h.calls.length = 0;
-    const restarted = new WagoManagementService(h.store, h.secrets, h.adapter, h.lease, h.now);
+    const restarted = new WagoManagementService(h.store, h.secrets, h.adapter, h.now);
     expect(await restarted.status(7)).toMatchObject({ recoveryRequired: true, hardened: false });
     expect(h.calls).toEqual([]);
     await expect(restarted.recover(7, { confirm: true, temporarySsh: credential })).rejects.toMatchObject({
@@ -302,7 +290,7 @@ describe('management transition orchestration (no device or broker connections)'
   it('invalid generated key or encryption failure never reaches the controller', async () => {
     const h = harness();
     const review = await h.review();
-    const service = new WagoManagementService(h.store, h.secrets, h.adapter, h.lease, h.now, () => ({
+    const service = new WagoManagementService(h.store, h.secrets, h.adapter, h.now, () => ({
       ...generateManagementKey(),
       publicKey: 'ssh-ed25519 invalid',
     }));
@@ -342,7 +330,7 @@ describe('management transition orchestration (no device or broker connections)'
     );
     const first = h.apply(review.reviewToken!);
     while (!resume) await new Promise((resolve) => setImmediate(resolve));
-    const second = new WagoManagementService(h.store, h.secrets, h.adapter, h.lease, h.now);
+    const second = new WagoManagementService(h.store, h.secrets, h.adapter, h.now);
     await expect(
       second.apply(7, { reviewToken: review.reviewToken!, confirm: true, temporarySsh: credential }),
     ).rejects.toMatchObject({ code: 'busy' });
@@ -431,7 +419,7 @@ describe('management transition orchestration (no device or broker connections)'
     const h = harness(),
       review = await h.review();
     await h.apply(review.reviewToken!);
-    const restarted = new WagoManagementService(h.store, h.secrets, h.adapter, h.lease, h.now);
+    const restarted = new WagoManagementService(h.store, h.secrets, h.adapter, h.now);
     const result = await restarted.recover(7, { confirm: true, temporarySsh: credential });
     expect(result.state).toBe('recovered');
     expect(h.adapter.rollback).toHaveBeenCalledWith(
@@ -441,83 +429,5 @@ describe('management transition orchestration (no device or broker connections)'
     );
     expect(JSON.stringify(result)).not.toContain('PRIVATE KEY');
     expect(h.store.records.get(7)?.encryptedPrivateKey).toBeNull();
-  });
-
-  it('does not admit a successor after an expired management lease without explicit commissioning recovery', async () => {
-    const h = harness();
-    await h.review();
-    const blockedLease: CommissioningLeaseRunner = {
-      run: async () => {
-        throw new CommissioningLeaseError('lease_recovery_required');
-      },
-    };
-    const restarted = new WagoManagementService(h.store, h.secrets, h.adapter, blockedLease, h.now);
-    const review = await h.service.review(7, { mode: 'baseline', exceptions: [] });
-    await expect(
-      restarted.apply(7, { reviewToken: review.reviewToken!, confirm: true, temporarySsh: credential }),
-    ).rejects.toMatchObject({
-      code: 'recovery_required',
-    });
-    expect(h.calls).toEqual([]);
-  });
-
-  it.each([
-    {
-      name: 'expired review',
-      operation: async (service: WagoManagementService, h: ReturnType<typeof harness>) => {
-        const review = await h.review();
-        h.advance(300001);
-        await service.apply(7, { reviewToken: review.reviewToken!, confirm: true, temporarySsh: credential });
-      },
-      code: 'review_required',
-    },
-    {
-      name: 'unsupported qualification',
-      operation: async (service: WagoManagementService, h: ReturnType<typeof harness>) => {
-        const review = await h.review();
-        h.adapter.qualify.mockReturnValue({
-          support: 'UNSUPPORTED',
-          evidence: 'missing-fw31-command-evidence',
-          minimumPrivileges: false,
-          rebootSafeWatchdog: false,
-        });
-        await service.apply(7, { reviewToken: review.reviewToken!, confirm: true, temporarySsh: credential });
-      },
-      code: 'UNSUPPORTED',
-    },
-    {
-      name: 'wrong recovery username',
-      operation: async (service: WagoManagementService, h: ReturnType<typeof harness>) => {
-        const review = await h.review();
-        await h.apply(review.reviewToken!);
-        await service.recover(7, { confirm: true, temporarySsh: { ...credential, username: 'other' } });
-      },
-      code: 'credentials_required',
-    },
-  ])('releases the shared commissioning lease after a $name', async ({ operation, code }) => {
-    const h = harness();
-    let held = false;
-    const lease: CommissioningLeaseRunner = {
-      run: async (_fingerprint, callback) => {
-        if (held) throw new CommissioningLeaseError('lease_busy');
-        held = true;
-        const result = await callback({
-          assertOwned: async () => undefined,
-          signal: new AbortController().signal,
-          deadline: Number.MAX_SAFE_INTEGER,
-        });
-        held = false;
-        return result;
-      },
-    };
-    const service = new WagoManagementService(h.store, h.secrets, h.adapter, lease, h.now);
-
-    await expect(operation(service, h)).rejects.toMatchObject({ code });
-    await expect(lease.run(target.hostKeyFingerprint, async () => undefined)).resolves.toBeUndefined();
-    expect(h.calls).toEqual(
-      code === 'credentials_required'
-        ? ['prepare', 'arm', 'install', 'verify', 'restrict', 'verify', 'baseline', 'commit']
-        : [],
-    );
   });
 });

@@ -186,7 +186,6 @@ export class WagoCommissioningLeaseService implements CommissioningLeaseRunner {
     let heartbeatStopped = false;
     let renewal: Promise<void> | undefined;
     let heartbeat: ReturnType<typeof setTimeout> | undefined;
-    let leaseExpiry: ReturnType<typeof setTimeout> | undefined;
     let rejectLost!: (error: Error) => void;
     const lost = new Promise<never>((_, reject) => {
       rejectLost = reject;
@@ -200,13 +199,6 @@ export class WagoCommissioningLeaseService implements CommissioningLeaseRunner {
         rejectLost(error);
       }
       return error;
-    };
-    // A renewal can stall in the database. Keep an independent timer for the last
-    // lease expiry confirmed by the store, rather than relying on the operation
-    // deadline (which may be much later).
-    const armLeaseExpiry = (until: number) => {
-      clearTimeout(leaseExpiry);
-      leaseExpiry = setTimeout(fail, Math.max(0, until - this.now()));
     };
     const assertOwned = async () => {
       if (stopped || controller.signal.aborted || this.now() >= deadline) throw fail();
@@ -229,9 +221,7 @@ export class WagoCommissioningLeaseService implements CommissioningLeaseRunner {
         renewal = (async () => {
           try {
             const now = this.now();
-            const until = Math.min(now + this.leaseMs, deadline);
-            if (!(await this.store.renew(key, owner, now, until))) fail();
-            else armLeaseExpiry(until);
+            if (!(await this.store.renew(key, owner, now, Math.min(now + this.leaseMs, deadline)))) fail();
           } catch {
             fail();
           }
@@ -240,7 +230,6 @@ export class WagoCommissioningLeaseService implements CommissioningLeaseRunner {
       }, this.renewMs);
     };
     const maximum = setTimeout(fail, Math.max(0, deadline - this.now()));
-    armLeaseExpiry(Math.min(started + this.leaseMs, deadline));
     schedule();
     try {
       return await Promise.race([
@@ -262,7 +251,6 @@ export class WagoCommissioningLeaseService implements CommissioningLeaseRunner {
       stopped = true;
       clearTimeout(heartbeat);
       clearTimeout(maximum);
-      clearTimeout(leaseExpiry);
       controller.abort(new CommissioningLeaseError('lease_lost'));
     }
   }
