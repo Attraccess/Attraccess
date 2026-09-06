@@ -1,6 +1,7 @@
 /** FW31 vendor lifecycle and narrow digital I/O deployment. Physical qualification is separate. */
 import { wagoFw31IdentityCheck } from './wago-firmware-identity';
 import { wagoShellFilesystemGuard } from './wago-shell-filesystem';
+import { wagoShellStat } from './wago-shell-stat';
 import { wagoHostIoGuardShell } from './wago-host-io-guard';
 import { wagoRuntimeSupervisorAcknowledgeShell, wagoRuntimeSupervisorLaunchShell } from './wago-runtime-supervisor';
 
@@ -71,6 +72,7 @@ function rootValue(testRoot: string): string {
 
 function checks(testRoot: string, boundedDocker = true): string {
   return `set -eu
+${wagoShellStat()}
 root=${rootValue(testRoot)}
 # Never inherit a remote Docker context or TCP endpoint from the login shell.
 unset DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH

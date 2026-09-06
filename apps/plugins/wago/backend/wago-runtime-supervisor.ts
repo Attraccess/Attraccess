@@ -1,10 +1,13 @@
+import { wagoShellStat } from './wago-shell-stat';
+
 /**
  * The caller holds install.lock and defines config, hook and fail(). Release
  * that lock for a completed supervisor gate, then reacquire it before returning
  * to the caller's transaction cleanup. A receipt alone never proves liveness.
  */
 export function wagoRuntimeSupervisorLaunchShell(): string {
-  return `launch_runtime_supervisor() {
+  return `${wagoShellStat()}
+launch_runtime_supervisor() {
   command -v nohup >/dev/null && command -v sleep >/dev/null || return 1
   test -f "$hook" && test ! -L "$hook" &&
     test "$(stat -c '%u:%g:%a:%h' "$hook")" = 0:0:700:1 || return 1
@@ -77,7 +80,8 @@ launch_runtime_supervisor || fail 'Runtime supervisor launch unverified'`;
 
 /** Acknowledge the request paths captured in "$@" before the successful gate. */
 export function wagoRuntimeSupervisorAcknowledgeShell(): string {
-  return `acknowledge_supervisor_request() {
+  return `${wagoShellStat()}
+acknowledge_supervisor_request() {
   test -d "$supervisor_request" && test ! -L "$supervisor_request" &&
     test "$(stat -c '%u:%g:%a' "$supervisor_request")" = 0:0:700 || return 1
   if test -e "$supervisor_request/ready" || test -L "$supervisor_request/ready"; then
