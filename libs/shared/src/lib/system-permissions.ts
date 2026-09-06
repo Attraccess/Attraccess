@@ -16,6 +16,7 @@ export type SystemPermission =
   | 'users.roles.manage'
   | 'users.api-tokens.manage'
   | 'system.settings.manage'
+  | 'system.audit.read'
   | 'system.sso.manage'
   | 'system.plugins.manage'
   | 'billing.read'

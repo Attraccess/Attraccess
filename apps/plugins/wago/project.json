@@ -156,6 +156,7 @@
           "pnpm nx run-many -p plugin-wago,wago-cc100-runtime -t test,typecheck,lint,build --parallel=2",
           "node apps/plugins/wago/cc100-runtime/integration/run.mjs",
           "pnpm nx run plugin-wago:production-fleet",
+          "pnpm nx run plugin-wago:test-commissioning-acceptance",
           "bash apps/plugins/wago/frontend/tests/run_browser_tests.sh",
           "node --test scripts/check-wago-acceptance.test.mjs"
         ],
@@ -174,6 +175,19 @@
         "commands": [
           "node --test scripts/typecheck-wago-frontend-tests.test.mjs",
           "node scripts/typecheck-wago-frontend-tests.mjs"
+        ],
+        "parallel": false
+      }
+    },
+    "test-commissioning-acceptance": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["typecheck-acceptance", "typecheck-frontend-tests"],
+      "options": {
+        "commands": [
+          "pnpm exec jest --config scripts/test-wago-commissioning.config.cjs --runInBand",
+          "pnpm exec vite build --config apps/plugins/wago/frontend/tests/commissioning-harness/vite.config.mts",
+          "pnpm exec jest --config scripts/test-wago-commissioning-browser.config.cjs --runInBand"
         ],
         "parallel": false
       }
