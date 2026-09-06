@@ -14,6 +14,7 @@ import {
 import { WagoService, WagoCredentialOperationUncertainError } from './wago.service';
 import { WagoController } from './wago-controller.entity';
 import type { CommissioningOperationGuard } from './wago-commissioning-lease';
+import { fw31IdentityOutput, fw31OsRelease } from './fixtures/fw31-identity';
 
 jest.mock('node:child_process', () => ({ spawn: jest.fn() }));
 jest.mock('./wago-commissioning-lease', () => ({
@@ -515,7 +516,7 @@ describe('WagoCommissioningService', () => {
           configuredService(),
         );
         inspect.mockResolvedValue({
-          firmware: 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"\nVERSION="4.9.1(31)"',
+          firmware: fw31IdentityOutput(),
           codesys: scenario === 'codesys' ? 'active' : 'inactive',
         });
         const copy = jest.fn().mockResolvedValue(undefined);
@@ -707,12 +708,10 @@ describe('WagoCommissioningService', () => {
     );
   });
 
-  it('requires a release identity as well as the PTXdist BSP version', () => {
-    expect(isSupportedController('PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"', '31')).toBe(false);
-    expect(
-      isSupportedController('PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"\nVERSION="4.9.1(31)"', '31'),
-    ).toBe(true);
-    expect(isSupportedController('PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"', '32')).toBe(false);
+  it('requires framed FW31 identity including REVISIONS and the supported baseline', () => {
+    expect(isSupportedController(fw31IdentityOutput(fw31OsRelease, ''), '31')).toBe(false);
+    expect(isSupportedController(fw31IdentityOutput(), '31')).toBe(true);
+    expect(isSupportedController(fw31IdentityOutput(), '32')).toBe(false);
   });
 
   it('defers repository access until plugin module initialization', async () => {

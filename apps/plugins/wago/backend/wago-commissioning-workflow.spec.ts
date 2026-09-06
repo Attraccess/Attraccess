@@ -11,6 +11,7 @@ import { WagoManagementEntity } from './wago-management.entity';
 import { WagoService } from './wago.service';
 import { WagoController } from './wago-controller.entity';
 import { AddWagoCommissioningPrincipal1780000000009 } from './migrations/1780000000009-add-wago-commissioning-principal';
+import { fw31IdentityOutput } from './fixtures/fw31-identity';
 
 describe('commissioning workflows with a real isolated database and mocked device transport', () => {
   let db: DataSource;
@@ -83,7 +84,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
     });
     jest
       .spyOn(service as never, 'inspect')
-      .mockResolvedValue({ firmware: 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="31"', codesys: 'inactive' } as never);
+      .mockResolvedValue({ firmware: fw31IdentityOutput(), codesys: 'inactive' } as never);
   });
   afterEach(async () => {
     await db.destroy();
@@ -245,7 +246,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
 
   it('fails closed before enrollment or delivery when active CODESYS cannot be disabled', async () => {
     jest.spyOn(service as never, 'inspect').mockResolvedValue({
-      firmware: 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="31"',
+      firmware: fw31IdentityOutput(),
       codesys: 'active',
     } as never);
     jest.spyOn(service as never, 'sudoRunScript').mockRejectedValue(new Error('private remote output') as never);

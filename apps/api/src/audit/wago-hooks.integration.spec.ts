@@ -30,6 +30,7 @@ import { WagoControllerApi } from '../../../plugins/wago/backend/wago.controller
 import { WagoController } from '../../../plugins/wago/backend/wago-controller.entity';
 import { WagoCommissioningService } from '../../../plugins/wago/backend/wago-commissioning.service';
 import { CLOCK_INSPECTION_SCRIPT } from '../../../plugins/wago/backend/wago-commissioning-clock';
+import { fw31IdentityOutput } from '../../../plugins/wago/backend/fixtures/fw31-identity';
 import { WagoCommissioningSession } from '../../../plugins/wago/backend/wago-commissioning-session.entity';
 import { commissioningFingerprintHash } from '../../../plugins/wago/backend/wago-commissioning-lease';
 import { WagoCommissioningLeaseEntity } from '../../../plugins/wago/backend/wago-commissioning-lease.entity';
@@ -231,7 +232,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
         // Sample at invocation time so the real clock gate verifies fresh, aligned UTC.
         return `epoch=${Math.floor(Date.now() / 1000)}\nuptime=120.00\nboot=11111111-1111-4111-8111-111111111111\ntool=supported\n`;
       }
-      return 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="31"\nCODESYS=\n';
+      return `${fw31IdentityOutput()}\nCODESYS=\n`;
     });
     commissioning['copyTo'] = jest.fn(async () => undefined);
     await commissioning.onApplicationBootstrap();
