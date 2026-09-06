@@ -24,6 +24,8 @@ describe('commissioning workflows with a real isolated database and mocked devic
   const digest = 'a'.repeat(64);
   const stoppedReport =
     'version=1\nplatform=supported\nhardware=accessible\nexclusivity=clear\ndocker=installed-stopped\nconfigDocker=present\nprovision=review-start-installed-runtime\nqualification=required\n';
+  const clockOutput = () =>
+    `epoch=${Math.floor(Date.now() / 1000)}\nuptime=100.00\nboot=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\ntool=supported\n`;
   const wago = {
     registerCommissioningDiscoveryHandler: jest.fn(),
     revokeEnrollmentById: jest.fn().mockResolvedValue(undefined),
@@ -87,6 +89,87 @@ describe('commissioning workflows with a real isolated database and mocked devic
     await db.destroy();
     await rm(directory, { recursive: true, force: true });
     jest.restoreAllMocks();
+  });
+
+  it.each(['verified', 'stale', 'unsupported', 'failed'])(
+    'gates enrollment and TLS runtime delivery on %s clock correction',
+    async (scenario) => {
+      wago.createEnrollment.mockClear();
+      const old = `epoch=1654436642\nuptime=100.00\nboot=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\ntool=${scenario === 'unsupported' ? 'unsupported' : 'supported'}\n`;
+      let corrected = false;
+      const order: string[] = [];
+      const remote = jest.spyOn(service as never, 'sudoRunScript').mockImplementation((async (
+        host,
+        pin,
+        passedCredential,
+        script: string,
+        limits,
+      ) => {
+        expect(host).toBe(session.targetHost);
+        expect(pin).toBe(session.hostKeyFingerprint);
+        expect(passedCredential).toEqual(credential);
+        if (script.includes("printf 'epoch=")) {
+          expect(limits).toEqual({ timeoutMs: 30000, maxOutputBytes: 4096 });
+          order.push(corrected ? 'postcheck' : 'inspection');
+          expect(wago.createEnrollment).not.toHaveBeenCalled();
+          return corrected && scenario !== 'stale' ? clockOutput() : old;
+        }
+        if (script.includes('/etc/config-tools/config_clock type=utc')) {
+          order.push('correct');
+          expect(wago.createEnrollment).not.toHaveBeenCalled();
+          if (scenario === 'failed') throw new Error('clock setter failed');
+          corrected = true;
+        }
+        return '';
+      }) as never);
+      const copy = jest.spyOn(service as never, 'copyTo').mockImplementation((async () => {
+        order.push('runtime');
+        expect(wago.createEnrollment).toHaveBeenCalledTimes(1);
+      }) as never);
+      const result = await service.deliver(session.id, { confirmInstall: true, temporarySsh: credential }, principal);
+      if (scenario === 'verified') {
+        expect(result.state).toBe('awaiting_discovery');
+        expect(order).toEqual(['inspection', 'correct', 'postcheck', 'runtime']);
+        expect(JSON.parse(result.platformReport ?? 'null').clock).toMatchObject({
+          result: 'synchronized',
+          action: 'synchronize',
+          skewSeconds: 0,
+        });
+      } else {
+        expect(result.state).toBe('delivery_failed');
+        expect(result.failureReason).toContain('UTC');
+        expect(JSON.parse(result.platformReport ?? 'null').clock.result).toBe('failed');
+        expect(wago.createEnrollment).not.toHaveBeenCalled();
+        expect(copy).not.toHaveBeenCalled();
+      }
+      remote.mockRestore();
+    },
+  );
+
+  it('never inspects or changes the clock when install consent is absent', async () => {
+    const remote = jest.spyOn(service as never, 'sudoRunScript');
+    wago.createEnrollment.mockClear();
+    await expect(service.deliver(session.id, { temporarySsh: credential }, principal)).rejects.toThrow();
+    expect(remote).not.toHaveBeenCalled();
+    expect(wago.createEnrollment).not.toHaveBeenCalled();
+  });
+
+  it('rechecks clock continuity after enrollment revocation and before issuing a credential', async () => {
+    const now = Date.now();
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    jest
+      .spyOn(service as never, 'sudoRunScript')
+      .mockImplementation((async (_host, _pin, _credential, script: string) =>
+        script.includes("printf 'epoch=") ? clockOutput() : '') as never);
+    jest.spyOn(service as never, 'revokeSessionEnrollment').mockImplementation((async () => {
+      jest.spyOn(Date, 'now').mockReturnValue(now + 10_000);
+    }) as never);
+    wago.createEnrollment.mockClear();
+    const copy = jest.spyOn(service as never, 'copyTo');
+    const result = await service.deliver(session.id, { confirmInstall: true, temporarySsh: credential }, principal);
+    expect(result.state).toBe('delivery_failed');
+    expect(wago.createEnrollment).not.toHaveBeenCalled();
+    expect(copy).not.toHaveBeenCalled();
   });
 
   it('blocks an unfinished preparation before any further host mutation', async () => {
@@ -204,7 +287,12 @@ describe('commissioning workflows with a real isolated database and mocked devic
   });
 
   it('pins the artifact and carries an existing Docker token into the runtime transaction', async () => {
-    const remote = jest.spyOn(service as never, 'sudoRunScript').mockResolvedValue(stoppedReport as never);
+    jest
+      .spyOn(service as never, 'sudoRunScript')
+      .mockImplementation((async (_host, _pin, _credential, script: string) =>
+        script.includes("printf 'epoch=")
+          ? `epoch=${Math.floor(Date.now() / 1000)}\nuptime=100.00\nboot=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\ntool=supported\n`
+          : stoppedReport) as never);
     await service.platform(session.id, 'inspect', { temporarySsh: credential }, principal);
     await db.getRepository(WagoCommissioningSession).update(session.id, {
       dockerProvisionToken: 'c'.repeat(32),
@@ -212,7 +300,6 @@ describe('commissioning workflows with a real isolated database and mocked devic
     });
     const saved = await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id });
     expect(saved.dockerProvisionToken).toMatch(/^[a-f0-9]{32}$/);
-    remote.mockResolvedValue('' as never);
     const copy = jest.spyOn(service as never, 'copyTo').mockResolvedValue(undefined as never);
     const delivered = await service.deliver(session.id, { confirmInstall: true, temporarySsh: credential }, principal);
     expect(delivered.state).toBe('awaiting_discovery');
@@ -255,7 +342,10 @@ describe('commissioning workflows with a real isolated database and mocked devic
 
   it('retains matching preparation ownership for cleanup when upload fails before a remote runtime journal exists', async () => {
     const repository = db.getRepository(WagoCommissioningSession);
-    const remote = jest.spyOn(service as never, 'sudoRunScript').mockResolvedValue('' as never);
+    const remote = jest
+      .spyOn(service as never, 'sudoRunScript')
+      .mockImplementation((async (_host, _pin, _credential, script: string) =>
+        script.includes("printf 'epoch=") ? clockOutput() : '') as never);
     jest.spyOn(service as never, 'copyTo').mockRejectedValue(new Error('connection failed before stdin') as never);
     const input = { confirmInstall: true, temporarySsh: credential };
     expect(await service.deliver(session.id, input, principal)).toMatchObject({
@@ -279,12 +369,13 @@ describe('commissioning workflows with a real isolated database and mocked devic
     const ready = new Promise<void>((resolve) => {
       entered = resolve;
     });
-    jest.spyOn(service as never, 'sudoRunScript').mockImplementation(() => {
+    jest.spyOn(service as never, 'sudoRunScript').mockImplementation(((_host, _pin, _credential, script: string) => {
+      if (script.includes("printf 'epoch=")) return Promise.resolve(clockOutput());
       entered();
       return new Promise((resolve) => {
         release = resolve;
       }) as never;
-    });
+    }) as never);
     const other = new WagoCommissioningService(context, wago as unknown as WagoService);
     // Binding the shared repository is enough; do not run startup recovery against active work.
     other['sessions'] = db.getRepository(WagoCommissioningSession);

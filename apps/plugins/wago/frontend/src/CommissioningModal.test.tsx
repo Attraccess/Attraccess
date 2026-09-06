@@ -64,6 +64,32 @@ function fillRecoveryCredentials() {
 }
 
 describe('FW31 software support boundary', () => {
+  it('shows saved UTC skew, action and result without claiming live synchronization', () => {
+    activeSession.platformReport = JSON.stringify({
+      clock: {
+        hostUtc: '2026-09-06T18:00:00.000Z',
+        controllerUtc: '2026-09-06T18:00:00.000Z',
+        previousSkewSeconds: -134972158,
+        skewSeconds: 0,
+        uncertaintySeconds: 1,
+        observation: 'after-action',
+        tool: 'supported',
+        action: 'synchronize',
+        result: 'synchronized',
+      },
+    });
+    mount();
+    expect(screen.getByText('Saved clock result (not live)')).toBeTruthy();
+    expect(screen.getByText('synchronized')).toBeTruthy();
+    expect(screen.getByText('-134972158 seconds')).toBeTruthy();
+    expect(screen.getByText('supported / synchronize')).toBeTruthy();
+    expect(
+      screen.getByRole('checkbox', {
+        name: /synchronization of controller system and hardware clocks to application UTC/,
+      }),
+    ).toBeTruthy();
+    expect(requests.some(({ url }) => url.endsWith('/deliver') || url.endsWith('/inspect'))).toBe(false);
+  });
   it.each([null, 'starting'] as const)('suppresses stale saved activation while retaining pending recovery (%s)', (state) => {
     activeSession.platformReport = JSON.stringify({
       version: '1', platform: 'supported', hardware: 'accessible', exclusivity: 'clear',

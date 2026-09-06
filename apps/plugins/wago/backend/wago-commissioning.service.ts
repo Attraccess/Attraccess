@@ -1,4 +1,6 @@
 import { isCc100Fw31Identity } from './wago-firmware-identity';
+import { commissionClock } from './wago-commissioning-clock';
+import type { WagoCommissioningPreflightReport } from '../shared/commissioning';
 import { MANAGEMENT_INSPECTION_COMMAND } from './wago-management-inspection';
 import { ManagementPeerVersion } from './wago-management-peer-version';
 import {
@@ -312,13 +314,20 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
               throw new ConflictException('Finish identity confirmation and any active delivery first.');
             try {
               if (action === 'inspect') {
-                const report = parseWagoHardwareDeploymentReport(
+                session.platformReport = null;
+                const report: WagoCommissioningPreflightReport = parseWagoHardwareDeploymentReport(
                   await this.sudoRunScript(
                     session.targetHost,
                     session.hostKeyFingerprint,
                     credential,
                     wagoHardwareDeploymentReportScript(),
                   ),
+                );
+                report.clock = await commissionClock(
+                  (script, limits) =>
+                    this.sudoRunScript(session.targetHost, session.hostKeyFingerprint, credential, script, limits),
+                  false,
+                  async () => undefined,
                 );
                 session.platformReport = JSON.stringify(report);
               } else if (action === 'activate') {
@@ -748,11 +757,42 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         credential,
         'set -eu; if test -f /etc/attraccess-wago/install.lock; then (exec 8</etc/attraccess-wago/install.lock; flock -n 8); fi; for path in /etc/attraccess-wago/delivery /var/lib/attraccess-wago-install-transaction /var/lib/attraccess-wago-install-transaction.restored /var/lib/attraccess-wago-install-transaction.cleanup /var/lib/attraccess-wago-install-transaction.accepted-cleanup; do test ! -e "$path"; done',
       );
+      safeFailure =
+        'Controller UTC inspection or synchronization failed. Enrollment is blocked; retry with fresh install consent and SSH credentials. Check the application UTC clock and supported FW31 clock tool. Clock changes are not rolled back by cleanup.';
+      const previousReport: WagoCommissioningPreflightReport = JSON.parse(session.platformReport ?? '{}');
+      delete previousReport.clock;
+      session.platformReport = JSON.stringify(previousReport);
+      await this.updateProgress(
+        session,
+        45,
+        'Checking controller UTC',
+        'Comparing controller UTC with authoritative application UTC before enrollment.',
+      );
+      const clock = await commissionClock(
+        (script, limits) =>
+          this.sudoRunScript(session.targetHost, session.hostKeyFingerprint, credential, script, limits),
+        input.confirmInstall === true,
+        async (clock) => {
+          session.platformReport = JSON.stringify({ ...JSON.parse(session.platformReport ?? '{}'), clock });
+          await this.updateProgress(
+            session,
+            45,
+            'Controller UTC',
+            `${clock.result}; controller ${clock.controllerUtc}; application ${clock.hostUtc}; skew ${clock.skewSeconds}s; action ${clock.action}.`,
+          );
+        },
+      );
+      if (!['within-tolerance', 'synchronized'].includes(clock.result)) throw new Error(safeFailure);
       credentialsTouched = true;
       safeFailure =
         'Secure enrollment or runtime delivery failed. Clean up the retained installation before retrying; previous workloads will not be restored.';
       await this.revokeSessionEnrollment(session);
       await this.operationContext.getStore()?.assertOwned();
+      safeFailure =
+        'Application UTC changed or controller clock verification expired before enrollment. No new enrollment credential was issued; retry with fresh install consent.';
+      clock.assertFresh();
+      safeFailure =
+        'Secure enrollment or runtime delivery failed. Clean up the retained installation before retrying; previous workloads will not be restored.';
       const enrollment = await this.wago.createEnrollment(
         session.hardwareId,
         session.mqttServerId,
@@ -1205,14 +1245,16 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     credential: TemporarySshCredential,
     command: string,
     input?: string,
+    limits?: { timeoutMs: number; maxOutputBytes: number },
   ): Promise<string> {
-    if (credential.username === 'root') return this.run(host, fingerprint, credential, command, input);
+    if (credential.username === 'root') return this.run(host, fingerprint, credential, command, input, limits);
     return this.run(
       host,
       fingerprint,
       credential,
       `sudo -S sh -c ${shellQuote(command)}`,
       `${credential.password}\n${input ?? ''}`,
+      limits,
     );
   }
 
@@ -1221,8 +1263,16 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     fingerprint: string,
     credential: TemporarySshCredential,
     script: string,
+    limits?: { timeoutMs: number; maxOutputBytes: number },
   ): Promise<string> {
-    return this.sudoRun(host, fingerprint, credential, 'base64 -d | sh', Buffer.from(script).toString('base64'));
+    return this.sudoRun(
+      host,
+      fingerprint,
+      credential,
+      'base64 -d | sh',
+      Buffer.from(script).toString('base64'),
+      limits,
+    );
   }
 
   private async remoteOperation<T>(operation: () => Promise<T>): Promise<T> {
