@@ -16,6 +16,13 @@ const CAPABILITY = 'credential-rotation-v1';
 const WAIT_MS = 30_000;
 type Credential = { username: string; password: string };
 
+/** The shared commissioning lease owner must retain exclusion for this failure. */
+export class WagoCredentialRotationUncertainError extends ConflictException {
+  constructor() {
+    super('Credential rotation is incomplete. Inspect its recovery state and retry the pending handoff.');
+  }
+}
+
 /** Caller supplies the existing shared controller-operation lease; no independent competing lock. */
 @Injectable()
 export class WagoCredentialRotationService {
@@ -63,6 +70,16 @@ export class WagoCredentialRotationService {
     }
     if (!Array.isArray(capabilities) || !capabilities.includes(CAPABILITY))
       throw new ConflictException('Install a runtime supporting credential-rotation-v1 before rotating credentials.');
+    const [epochRow] = await this.repository.query(
+      'SELECT credential_epoch AS epoch FROM plugin_wago_controllers WHERE id = ?',
+      [controllerId],
+    );
+    const credentialEpoch: unknown = epochRow?.epoch;
+    if (
+      typeof credentialEpoch !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(credentialEpoch)
+    )
+      throw new ConflictException('Re-enroll this controller with a credential epoch before rotating credentials.');
     prefix = normalizeOperationalPrefix(prefix);
     const identity = `wago-controller-${controller.hardwareId}`;
     const previous = await this.repository
@@ -70,6 +87,8 @@ export class WagoCredentialRotationService {
       .addSelect('rotation.encryptedCredentials')
       .where('rotation.controllerId = :controllerId', { controllerId })
       .getOne();
+    if (previous && previous.credentialEpoch !== credentialEpoch)
+      throw new ConflictException('Recover the previous credential registration before rotating again.');
     if (previous && previous.phase !== 'completed' && !retry)
       throw new ConflictException('Retry the pending credential handoff instead of rotating again.');
     if (retry && (!previous || previous.phase === 'provisioning'))
@@ -81,6 +100,7 @@ export class WagoCredentialRotationService {
       throw new ConflictException('Credential rotation must use its original broker and namespace.');
     const lifecycle = new WagoAudit(this.context).begin(principal, controllerId, 'credential_rotation');
     await lifecycle.attempt();
+    let uncertain = retry;
     try {
       let row = previous;
       if (!retry) {
@@ -89,6 +109,7 @@ export class WagoCredentialRotationService {
         row = this.repository.create({
           controllerId,
           revision,
+          credentialEpoch,
           phase: 'provisioning',
           mqttServerId: controller.mqttServerId,
           prefix,
@@ -99,6 +120,7 @@ export class WagoCredentialRotationService {
         await this.repository.save(row);
         await guard.assertOwned();
         const root = `${prefix}/v1/controllers/${controller.hardwareId}`;
+        uncertain = true;
         const credential = await this.context.getMqttCredentialProvisioning().rotate({
           mqttServerId: row.mqttServerId,
           identity,
@@ -111,6 +133,7 @@ export class WagoCredentialRotationService {
         });
         await guard.assertOwned();
         if (!('password' in credential)) {
+          uncertain = false;
           // The manual-provider response is instructions only, not a completed broker mutation.
           if (previous) await this.repository.save(previous);
           else await this.repository.delete(controllerId);
@@ -146,6 +169,7 @@ export class WagoCredentialRotationService {
       return { state: 'completed' as const, revision: row.revision };
     } catch {
       await lifecycle.finish('failed');
+      if (uncertain) throw new WagoCredentialRotationUncertainError();
       throw new ConflictException(
         'Credential rotation is incomplete. Inspect its recovery state and retry the pending handoff.',
       );
@@ -159,6 +183,7 @@ export class WagoCredentialRotationService {
     guard: CommissioningOperationGuard,
   ) {
     const topic = `${row.prefix}/v1/controllers/${hardwareId}/credentials/rotate`;
+    const expiry = Math.min(Date.now() + WAIT_MS, guard.deadline);
     let subscription: PluginMqttSubscription | undefined;
     let closed = false;
     let acknowledge!: () => void;
@@ -169,7 +194,7 @@ export class WagoCredentialRotationService {
     const cancelled = new Promise<never>((_resolve, fail) => {
       reject = () => fail(new Error('rotation_incomplete'));
     });
-    const timer = setTimeout(reject, WAIT_MS);
+    const timer = setTimeout(reject, Math.max(0, expiry - Date.now()));
     guard.signal.addEventListener('abort', reject, { once: true });
     if (guard.signal.aborted) reject();
     try {
@@ -187,7 +212,12 @@ export class WagoCredentialRotationService {
               return;
             try {
               const ack = JSON.parse(message.payload.toString('utf8'));
-              if (ack?.revision === row.revision && ack?.token === row.token && ack?.status === 'reconnected')
+              if (
+                ack?.credentialEpoch === row.credentialEpoch &&
+                ack?.revision === row.revision &&
+                ack?.token === row.token &&
+                ack?.status === 'reconnected'
+              )
                 acknowledge();
             } catch {
               /* Ignore untrusted broker data. */
@@ -203,7 +233,13 @@ export class WagoCredentialRotationService {
           await this.context.mqtt.publish(
             row.mqttServerId,
             topic,
-            JSON.stringify({ ...credential, revision: row.revision, token: row.token }),
+            JSON.stringify({
+              ...credential,
+              credentialEpoch: row.credentialEpoch,
+              revision: row.revision,
+              token: row.token,
+              expiresAt: new Date(expiry).toISOString(),
+            }),
             { qos: 1, retain: false },
           );
           await acknowledged;

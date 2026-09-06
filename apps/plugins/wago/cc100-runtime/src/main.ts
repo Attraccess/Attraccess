@@ -79,6 +79,7 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
       return;
     }
     void handleAsync(async () => {
+      if (state) await runtime.retryCredentialRotationSubscription();
       await runtime.setConnected(state);
       if (state && credentials) await runtime.acknowledgeCredentialRotation(credentials);
     });
