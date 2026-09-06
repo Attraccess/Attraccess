@@ -35,9 +35,16 @@ type Waiter = (state?: CachedState, cancel?: boolean) => void;
 
 @Injectable()
 export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
-  private readonly controllers: Repository<WagoController>;
-  private readonly revisions: Repository<WagoConfigurationRevision>;
-  private readonly settings: Repository<WagoSettings>;
+  // Plugin registration precedes the host datasource; resolve repositories only when used.
+  private get controllers(): Repository<WagoController> {
+    return this.context.getRepository(WagoController);
+  }
+  private get revisions(): Repository<WagoConfigurationRevision> {
+    return this.context.getRepository(WagoConfigurationRevision);
+  }
+  private get settings(): Repository<WagoSettings> {
+    return this.context.getRepository(WagoSettings);
+  }
   private readonly cache = new Map<string, CachedState>();
   private controllerByHardwareId = new Map<string, { controller: WagoController; serverId: number }>();
   private readonly streams = new Map<
@@ -66,11 +73,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   private readonly controllerMessages = new Map<string, Promise<void>>();
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {
-    this.controllers = context.getRepository(WagoController);
-    this.revisions = context.getRepository(WagoConfigurationRevision);
-    this.settings = context.getRepository(WagoSettings);
-  }
+  constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
 
   async onModuleInit(): Promise<void> {
     await this.refresh();
