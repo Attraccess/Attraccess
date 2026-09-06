@@ -46,6 +46,11 @@ describe('destructive runtime shell transaction and signed offline stream fixtur
   };
   beforeEach(() => {
     fixture = fw31ShellFixture();
+    fixture.file(
+      'bin/df',
+      '#!/bin/sh\nprintf "Filesystem 1024-blocks Used Available Capacity Mounted on\\nfixture 999999 0 999999 0%% /\\n"\n',
+      0o700,
+    );
     fixture.file(config + '/runtime.env.next', 'NEW=enrollment');
     fixture.file('bundle/image-reference', image + '\n');
     fixture.file('bundle/image.tar', 'fixture image bytes');
