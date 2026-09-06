@@ -29,6 +29,7 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
     /* Unknown status is not approval. */
   }
   const recovery = !!current.dockerProvisionState && current.runtimeRecoveryAvailable !== true;
+  const codesysDisabled = current.codesysState === 'disabled';
 
   async function run(action: 'inspect' | 'recover') {
     if (busy || !form.current?.reportValidity() || (action !== 'inspect' && !approved)) return;
@@ -69,8 +70,16 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
         Optionally inspect firmware, digital I/O access, CODESYS and Docker before installation. Inspection does not
         change the controller. Installation checks these again under your destructive-install approval.
       </p>
+      {codesysDisabled && (
+        <p role="status">
+          Controller preparation verified CODESYS stopped and permanently disabled. This is a saved result, not a
+          live controller status check.
+        </p>
+      )}
       {report && (
         <dl>
+          <dt>Report source</dt>
+          <dd>Saved inspection snapshot; these values are not live controller status.</dd>
           <dt>Platform</dt>
           <dd>{report.platform}</dd>
           <dt>Hardware access</dt>
@@ -114,14 +123,14 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
           will not create substitute directories.
         </p>
       )}
-      {report?.exclusivity === 'codesys-active' && (
+      {!codesysDisabled && report?.exclusivity === 'codesys-active' && (
         <p>
           CODESYS is active. Destructive installation will stop and permanently disable it. Existing PLC applications
           and data may be lost; Attraccess will not preserve, back up, or restore them. Installation fails if CODESYS
           cannot be verified stopped and disabled before I/O.
         </p>
       )}
-      {report?.exclusivity === 'codesys-boot-enabled' && (
+      {!codesysDisabled && report?.exclusivity === 'codesys-boot-enabled' && (
         <p>
           CODESYS is configured to start at boot. Destructive installation must disable that startup and verify
           CODESYS is stopped before I/O. A stopped process alone is insufficient. No separate PLC preservation or
