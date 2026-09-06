@@ -1341,6 +1341,27 @@ describe('WagoService', () => {
     await expect(service.createEnrollment(hardwareId)).rejects.toThrow('without MQTT separators or wildcards');
   });
 
+  it('persists an enrollment recovery record before provisioning the broker credential', async () => {
+    const { service, context, enrollmentRepository } = createService([], [], 2);
+    const provision = jest.fn().mockResolvedValue({ username: 'ignored', password: 'secret' });
+    const assertOwned = jest
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('lease lost'));
+    (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = jest
+      .fn()
+      .mockResolvedValue({ host: 'mqtt.example.test', port: 8883, useTls: true });
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({ provision });
+
+    await expect(service.createEnrollment('cc100-01', undefined, undefined, assertOwned)).rejects.toThrow('lease lost');
+
+    expect(enrollmentRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ hardwareId: 'cc100-01', identity: expect.stringMatching(/^wago-enrollment-/) }),
+    );
+    expect(enrollmentRepository.save.mock.invocationCallOrder[0]).toBeLessThan(provision.mock.invocationCallOrder[0]);
+  });
+
   it('leaves bootstrap credentials available until expiry after a post-delivery claim failure', async () => {
     const enrollment = {
       id: 3,

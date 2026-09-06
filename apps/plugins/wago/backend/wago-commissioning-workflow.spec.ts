@@ -18,7 +18,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
   let service: WagoCommissioningService;
   let context: PluginContext;
   let session: WagoCommissioningSession;
-  let artifacts: { has: jest.Mock; acquire: jest.Mock };
+  let artifacts: { has: jest.Mock; get: jest.Mock; acquire: jest.Mock };
   const principal = { userId: 42, authenticationMethod: 'session' as const };
   const credential = { username: 'root', password: 'fixture-only' };
   const digest = 'a'.repeat(64);
@@ -50,6 +50,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
     } as unknown as PluginContext;
     artifacts = {
       has: jest.fn().mockResolvedValue(true),
+      get: jest.fn().mockResolvedValue({ digest }),
       acquire: jest.fn().mockResolvedValue({
         digest,
         bytes: 512,
