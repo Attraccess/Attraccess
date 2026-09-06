@@ -1,4 +1,6 @@
 import { wagoHardwareDeploymentDockerArgs, wagoHardwareDeploymentPreflightScript } from './wago-hardware-deployment';
+import { wagoShellFilesystemGuard } from './wago-shell-filesystem';
+import { wagoRuntimeSupervisorLaunchShell } from './wago-runtime-supervisor';
 
 /**
  * The caller must authenticate the bundle signature/checksum before uploading it
@@ -10,9 +12,9 @@ import { wagoHardwareDeploymentDockerArgs, wagoHardwareDeploymentPreflightScript
  * exists. Never write runtime.env directly. Bundle uploads must also be serialized
  * with staging/install. Keep the lock file: unlinking it defeats flock.
  *
- * A successful start retains the transaction for explicit recovery or acceptance
- * after coordinator readiness checks. It does not prove runtime health. Recovery
- * restores old credentials verbatim; it cannot undo broker-side revocation.
+ * A successful start retains ownership for explicit recovery or acceptance after
+ * coordinator readiness checks. Recovery stops/removes the failed new runtime;
+ * destructive commissioning never restores old workloads or revoked credentials.
  * testRoot is only for isolated shell fixtures; production callers must omit it.
  */
 export function runtimeBundleInstallScript(image: string, testRoot = ''): string {
@@ -23,27 +25,32 @@ function installScript(image: string, testRoot: string, locked = false): string 
   if (!/^\S+@sha256:[a-f0-9]{64}$/i.test(image)) throw new Error('Runtime image must be digest-pinned');
   return `${preamble(testRoot, locked)}
 test ! -e "$tx" && test ! -e "$cleanup" && test ! -e "$receipt" && test ! -e "$acceptedCleanup" || fail 'Runtime transaction exists; recover or accept it before retrying'
-test ! -e "$config/runtime.env.previous" || fail 'Unowned previous environment requires manual inspection'
 test -s "$config/runtime.env.next" && test ! -L "$config/runtime.env.next" || fail 'Missing staged runtime.env.next'
 test ! -L "$data" && test ! -L "$config/runtime.env" && test ! -L "$config/runtime-ca.pem" || fail 'Runtime paths must not be symlinks'
+test -x "$root/etc/rc.d/S99_zz_attraccess_wago" && test ! -L "$root/etc/rc.d/S99_zz_attraccess_wago" || fail 'Controller preparation required'
+test "$(stat -c '%u:%g:%a:%h' "$root/etc/rc.d/S99_zz_attraccess_wago")" = 0:0:700:1 || fail 'Unsafe controller boot hook'
+command -v nohup >/dev/null || fail 'Runtime supervisor launch tool unavailable'
 if [ -e "$config/docker-provision" ]; then
   test -f "$config/docker-provision/started" && test ! -e "$config/docker-provision/restored" || fail 'Docker provisioning recovery required'
   test -f "$config/delivery/token" && test "$(cat "$config/docker-provision/token")" = "$(cat "$config/delivery/token")" || fail 'Docker provisioning belongs to another delivery'
 fi
 ${wagoHardwareDeploymentPreflightScript(testRoot)}
+${boundedDocker()}
 docker container ls -a --no-trunc --format '{{.ID}} {{.Names}}' > "$config/containers.next"
-if grep -q ' attraccess-wago.previous$' "$config/containers.next"; then
-  fail 'Unowned previous container requires manual inspection'
-fi
-mkdir -m 0700 "$tx"
+stage=$(mktemp -d "$root/var/lib/attraccess-wago-install-stage.XXXXXX")
+trap 'rm -rf "$stage"' EXIT
+trap 'exit 130' HUP INT TERM
+printf '%s\\n' destructive > "$stage/mode"
 if [ -e "$config/delivery/token" ]; then
   test -f "$config/delivery/token" && test ! -L "$config/delivery/token" || fail 'Invalid delivery ownership token'
-  cp "$config/delivery/token" "$tx/token"
-  chmod 0600 "$tx/token"
+  cp "$config/delivery/token" "$stage/token"
+  chmod 0600 "$stage/token"
 fi
-touch "$tx/preparing"
-trap 'code=$?; trap - EXIT; if [ "$code" -ne 0 ]; then if ! rollback; then echo "Rollback incomplete; recovery snapshot retained at $tx" >&2; fi; fi; exit "$code"' EXIT
-trap 'trap - EXIT; echo "Interrupted; recovery snapshot retained at $tx" >&2; exit 130' HUP INT TERM
+touch "$stage/preparing"
+mv "$stage" "$tx"
+trap - EXIT HUP INT TERM
+trap 'code=$?; trap - EXIT; if [ "$code" -ne 0 ]; then if ! rollback; then echo "Cleanup incomplete; recovery journal retained" >&2; fi; fi; exit "$code"' EXIT
+trap 'trap - EXIT; echo "Interrupted; recovery journal retained" >&2; exit 130' HUP INT TERM
 mkdir "$tx/bundle"
 # Stream only the two expected members into regular files; never unpack archive
 # paths, links, permissions or device nodes into the controller filesystem.
@@ -51,36 +58,28 @@ tar --warning=no-timestamp --warning=no-unknown-keyword -xOf "$root/tmp/attracce
 test "$(cat "$tx/bundle/image-reference")" = ${quote(image)} || fail 'Runtime image reference mismatch'
 tar --warning=no-timestamp --warning=no-unknown-keyword -xOf "$root/tmp/attraccess-wago-runtime.tar" image.tar > "$tx/bundle/image.tar"
 test -s "$tx/bundle/image.tar" || fail 'Empty runtime image archive'
-awk '$2 == "attraccess-wago" { print $1 }' "$config/containers.next" > "$tx/old-id"
-printf '%s\\n' false > "$tx/old-running"
-if [ -s "$tx/old-id" ]; then
-  docker inspect --format '{{.State.Running}}' "$(cat "$tx/old-id")" > "$tx/old-running"
-  grep -Eq '^(true|false)$' "$tx/old-running" || fail 'Cannot determine previous running state'
-fi
-if [ -e "$data" ]; then echo true; else echo false; fi > "$tx/had-data"
-if [ -e "$config/runtime.env" ]; then echo true; else echo false; fi > "$tx/had-env"
-if [ -e "$config/runtime-ca.pem" ]; then echo true; else echo false; fi > "$tx/had-ca"
+awk '$2 == "attraccess-wago" || $2 == "attraccess-wago.previous" { print $1 }' "$config/containers.next" > "$tx/old-id"
 touch "$tx/prepared"
 rm -f "$tx/preparing"
-if [ -s "$tx/old-id" ]; then
-  docker stop "$(cat "$tx/old-id")" >/dev/null
-  docker rename "$(cat "$tx/old-id")" attraccess-wago.previous
-fi
-# Intent markers precede mutations so recovery also handles interruption between
-# a rename and its following command. Saved directories are never copied live.
+rm -f "$config/runtime-enabled"
+for old_id in $(cat "$tx/old-id"); do
+  remove_owned_container "$old_id" || fail 'Previous owned runtime containment failed'
+done
+# No prior-workload snapshots: these fixed owned paths are replaced only after
+# the signed bundle is staged and the predecessor is stopped and removed.
 touch "$tx/data-changing"
-if [ "$(cat "$tx/had-data")" = true ]; then mv "$data" "$tx/data.previous"; fi
+rm -rf "$data"
 mkdir -m 0700 "$data"
 chown 10001:10001 "$data"
 touch "$tx/ca-changing"
-if [ "$(cat "$tx/had-ca")" = true ]; then mv "$config/runtime-ca.pem" "$tx/ca.previous"; fi
+rm -f "$config/runtime-ca.pem"
 if [ -e "$config/runtime-ca.pem.next" ]; then
   test -f "$config/runtime-ca.pem.next" && test ! -L "$config/runtime-ca.pem.next" || fail 'Invalid staged CA'
   mv "$config/runtime-ca.pem.next" "$config/runtime-ca.pem"
   chmod 0444 "$config/runtime-ca.pem"
 fi
 touch "$tx/env-changing"
-if [ "$(cat "$tx/had-env")" = true ]; then mv "$config/runtime.env" "$config/runtime.env.previous"; fi
+rm -f "$config/runtime.env.previous"
 mv "$config/runtime.env.next" "$config/runtime.env"
 chmod 0600 "$config/runtime.env"
 # Do not pipe docker load into sed: POSIX sh would hide a failing load exit code.
@@ -93,23 +92,50 @@ docker image inspect "$runtime_image" >/dev/null
 touch "$tx/new-container"
 # The parent of the host CA is root-owned and private. A nested read-only bind
 # prevents the runtime from unlinking/replacing trust via its writable data mount.
-# This stable source survives acceptance and is restored before restarting on rollback.
+# This stable source survives acceptance.
 set --
 if [ -f "$config/runtime-ca.pem" ]; then
   set -- -v "$config/runtime-ca.pem:/var/lib/attraccess-wago/mqtt-ca.pem:ro"
 fi
-docker run -d --pull=never --name attraccess-wago --restart unless-stopped --env-file "$config/runtime.env" ${wagoHardwareDeploymentDockerArgs(testRoot)} -v "$data:/var/lib/attraccess-wago" "$@" "$runtime_image"
+${wagoHardwareDeploymentPreflightScript(testRoot)}
+${boundedDocker()}
+# Every subsequent start must pass the host gate again. Docker's own restart
+# manager cannot run that gate and must never restart a physical I/O writer.
+docker run -d --pull=never --name attraccess-wago --restart no --env-file "$config/runtime.env" ${wagoHardwareDeploymentDockerArgs(testRoot)} -v "$data:/var/lib/attraccess-wago" "$@" "$runtime_image"
 touch "$tx/started"
+touch "$config/runtime-enabled"
+${wagoRuntimeSupervisorLaunchShell()}
 trap - EXIT HUP INT TERM
-echo 'Runtime container started; readiness unverified; recovery snapshot retained'
+echo 'Runtime container started; readiness unverified; recovery journal retained'
 `;
 }
 
-/** Explicitly restore the snapshot, including the prior container running state. */
+/** Stop and remove the failed owned runtime without restoring previous workloads. */
 export function runtimeBundleRecoveryScript(testRoot = '', token?: string): string {
   if (token && !/^[a-f0-9]{32}$/.test(token)) throw new Error('Invalid delivery token');
   return `${preamble(testRoot)}
 test ! -e "$acceptedCleanup" || fail 'Acceptance cleanup is pending; recovery is unavailable'
+${
+  token
+    ? `if test ! -e "$tx" && test ! -e "$receipt" && test ! -e "$cleanup" && test ! -e "$config/delivery"; then
+  preparation="$config/docker-provision"
+  if test ! -e "$preparation"; then
+    preparation="$config/docker-provision.completed-${token}"
+    test -f "$preparation/restored" && test ! -L "$preparation/restored" || fail 'No preparation recovery ownership'
+  fi
+  test -d "$preparation" && test ! -L "$preparation" &&
+    test -f "$preparation/token" && test ! -L "$preparation/token" && test "$(cat "$preparation/token")" = ${quote(token)} &&
+    test -f "$preparation/mode" && test ! -L "$preparation/mode" && test "$(cat "$preparation/mode")" = destructive || fail 'No preparation recovery ownership'
+  test ! -e "$config/runtime.env.next" && test ! -e "$config/runtime-ca.pem.next" || fail 'Unowned staged runtime configuration'
+  stage=$(mktemp -d "$root/var/lib/attraccess-wago-recovery-stage.XXXXXX")
+  trap 'rm -rf "$stage"' EXIT
+  trap 'exit 130' HUP INT TERM
+  printf '%s\\n' ${quote(token)} > "$stage/token"
+  mv "$stage" "$receipt"
+  trap - EXIT HUP INT TERM
+fi`
+    : ''
+}
 ${token ? `require_owner ${quote(token)}` : ''}
 if [ -d "$receipt" ]; then
   rm -rf "$receipt/bundle"
@@ -131,7 +157,7 @@ if [ ! -d "$tx" ]; then
   exit 0
 fi
 test ! -e "$tx/accepting" || fail 'Acceptance already began; finish acceptance instead of recovery'
-rollback retained || fail 'Recovery incomplete; snapshot retained for another recovery attempt'
+rollback retained || fail 'Recovery incomplete; journal retained for another recovery attempt'
 rm -f "$root/tmp/attraccess-wago-runtime.tar"
 rm -rf "$config/delivery"
 `;
@@ -142,14 +168,22 @@ export function runtimeBundleRecoveryAcknowledgementScript(testRoot: string, tok
   if (!/^[a-f0-9]{32}$/.test(token)) throw new Error('Invalid delivery token');
   return `${preamble(testRoot)}
 test ! -d "$tx" || fail 'Recovery is not complete'
+acknowledged="$receipt.acknowledged-${token}"
+if test -e "$acknowledged" || test -L "$acknowledged"; then
+  test -d "$acknowledged" && test ! -L "$acknowledged" || fail 'Invalid acknowledgement cleanup'
+  rm -rf "$acknowledged"
+fi
 if [ -d "$receipt" ]; then
   require_owner ${quote(token)}
-  rm -rf "$receipt"
+  acknowledged="$receipt.acknowledged-${token}"
+  test ! -e "$acknowledged" && test ! -L "$acknowledged" || fail 'Recovery acknowledgement cleanup required'
+  mv "$receipt" "$acknowledged"
+  rm -rf "$acknowledged"
 fi
 `;
 }
 
-/** Call only after the coordinator accepts the new runtime; discards rollback data. */
+/** Call only after the coordinator accepts the new runtime; discards recovery metadata. */
 export function runtimeBundleAcceptScript(testRoot = ''): string {
   return `${preamble(testRoot)}
 test ! -e "$cleanup" || fail 'Recovery cleanup is pending; acceptance is unavailable'
@@ -158,11 +192,6 @@ test -f "$tx/started" || fail 'No started runtime transaction to accept'
 test ! -e "$tx/recovering" || fail 'Recovery already began; finish recovery instead of acceptance'
 validate_snapshot || fail 'Incomplete runtime transaction metadata'
 touch "$tx/accepting"
-docker container ls -a --no-trunc --format '{{.ID}} {{.Names}}' > "$tx/containers"
-if [ -s "$tx/old-id" ] && grep -q "^$(cat "$tx/old-id") " "$tx/containers"; then
-  docker rm "$(cat "$tx/old-id")" >/dev/null
-fi
-rm -f "$config/runtime.env.previous"
 mv "$tx" "$acceptedCleanup"
 rm -rf "$acceptedCleanup"
 `;
@@ -175,24 +204,23 @@ function preamble(testRoot: string, locked = false): string {
 umask 077
 root=${quote(testRoot.replace(/\/$/, ''))}
 unset DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH
-docker() { command docker --host unix:///var/run/docker.sock "$@"; }
+${boundedDocker()}
 config="$root/etc/attraccess-wago"
+hook="$root/etc/rc.d/S99_zz_attraccess_wago"
 data="$root/var/lib/attraccess-wago"
 tx="$root/var/lib/attraccess-wago-install-transaction"
 cleanup="$tx.cleanup"
 acceptedCleanup="$tx.accepted-cleanup"
 receipt="$tx.restored"
 fail() { echo "$*" >&2; exit 1; }
-test ! -L "$config" || fail 'Runtime configuration must not be a symlink'
-mkdir -p "$config" "$root/var/lib"
-chown 0:0 "$config"
-chmod 0700 "$config"
-${
-  locked
-    ? ''
-    : `exec 9>"$config/install.lock"
-flock -n 9 || fail 'Another runtime transaction holds the controller lock'`
-}
+${wagoShellFilesystemGuard({ acquireLock: !locked })}
+wago_require_root_directory_or_alias "$root/var" && wago_require_root_directory_or_alias "$root/var/lib" || fail 'Unsafe runtime journal parent'
+for journal in "$tx" "$cleanup" "$acceptedCleanup" "$receipt" "$config/delivery" "$config/docker-provision" "$config"/docker-provision.completed-*; do
+  if test -e "$journal" || test -L "$journal"; then
+    test -d "$journal" && test ! -L "$journal" &&
+      test "$(stat -c '%u:%g:%a' "$journal")" = 0:0:700 || fail 'Unsafe runtime journal ownership, permissions or file type'
+  fi
+done
 test ! -e "$tx" || { test ! -e "$cleanup" && test ! -e "$receipt" && test ! -e "$acceptedCleanup"; } || fail 'Conflicting runtime journals require manual inspection'
 require_owner() {
   expected=$1
@@ -207,13 +235,31 @@ require_owner() {
   fail 'No runtime transaction to recover'
 }
 validate_snapshot() {
+  if test -e "$tx/mode" || test -L "$tx/mode"; then
+    test -f "$tx/mode" && test ! -L "$tx/mode" && test "$(cat "$tx/mode")" = destructive || return 1
+  else
+    # Valid base transactions may be contained, but never restore their former
+    # containers, data or credentials under the destructive product policy.
+    for field in old-running had-data had-env had-ca; do
+      test -f "$tx/$field" && test ! -L "$tx/$field" || return 1
+      case "$(cat "$tx/$field")" in true|false) ;; *) return 1 ;; esac
+    done
+  fi
   test -f "$tx/prepared" && test -f "$tx/old-id" && test ! -L "$tx/old-id" || return 1
-  test "$(wc -l < "$tx/old-id" | tr -d ' ')" -le 1 || return 1
-  if [ -s "$tx/old-id" ]; then grep -Eq '^[a-zA-Z0-9-]+$' "$tx/old-id" || return 1; fi
-  for field in old-running had-data had-env had-ca; do
-    test -f "$tx/$field" && test ! -L "$tx/$field" || return 1
-    case "$(cat "$tx/$field")" in true|false) ;; *) return 1 ;; esac
-  done
+  test "$(wc -l < "$tx/old-id" | tr -d ' ')" -le 2 || return 1
+  grep -Eq '[^a-zA-Z0-9-]|^$' "$tx/old-id" && return 1
+  test "$?" = 1 || return 1
+}
+remove_owned_container() {
+  remove_id=$1
+  docker update --restart=no "$remove_id" >/dev/null || return 1
+  test "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$remove_id")" = no || return 1
+  docker stop "$remove_id" >/dev/null || return 1
+  test "$(docker inspect --format '{{.State.Running}}' "$remove_id")" = false || return 1
+  docker rm "$remove_id" >/dev/null || return 1
+  docker container ls -a --no-trunc --format '{{.ID}}' > "$tx/remaining-containers" || return 1
+  grep -Fxq "$remove_id" "$tx/remaining-containers" && return 1
+  test "$?" = 1 || return 1
 }
 rollback() {
   # Never infer absence from lost metadata. An unprepared transaction may only
@@ -227,52 +273,28 @@ rollback() {
     done
   fi
   touch "$tx/recovering" || return 1
+  rm -f "$config/runtime-enabled" || return 1
   if [ -f "$tx/prepared" ]; then
     # Any failed Docker query is an error, never evidence of container absence.
-    if [ -f "$tx/new-container" ]; then
-      docker container ls -a --no-trunc --format '{{.ID}} {{.Names}}' > "$tx/containers" || return 1
-      new_id=$(awk '$2 == "attraccess-wago" { print $1 }' "$tx/containers")
-      if [ -n "$new_id" ] && [ "$new_id" != "$(cat "$tx/old-id")" ]; then
-        docker rm -f "$new_id" >/dev/null || return 1
-      fi
+    docker container ls -a --no-trunc --format '{{.ID}} {{.Names}}' > "$tx/containers" || return 1
+    # Validate every recorded predecessor before removing any owned container.
+    # This also contains interrupted destructive installs that failed before
+    # their predecessor was stopped; it never restores a previous workload.
+    if test -s "$tx/old-id"; then
+      for old_id in $(cat "$tx/old-id"); do
+        old_name=$(awk -v id="$old_id" '$1 == id { print $2 }' "$tx/containers")
+        case "$old_name" in
+          ''|attraccess-wago|attraccess-wago.previous) ;;
+          *) return 1 ;;
+        esac
+      done
     fi
-    if [ -f "$tx/data-changing" ] && [ ! -f "$tx/data-restored" ]; then
-      if [ -d "$tx/data.previous" ]; then
-        rm -rf "$data" || return 1
-        mv "$tx/data.previous" "$data" || return 1
-      elif [ "$(cat "$tx/had-data")" = false ]; then
-        rm -rf "$data" || return 1
-      fi
-      touch "$tx/data-restored" || return 1
-    fi
-    if [ -f "$tx/env-changing" ] && [ ! -f "$tx/env-restored" ]; then
-      if [ -f "$config/runtime.env.previous" ]; then
-        mv -f "$config/runtime.env.previous" "$config/runtime.env" || return 1
-      elif [ "$(cat "$tx/had-env")" = false ]; then
-        rm -f "$config/runtime.env" || return 1
-      fi
-      touch "$tx/env-restored" || return 1
-    fi
-    if [ -f "$tx/ca-changing" ] && [ ! -f "$tx/ca-restored" ]; then
-      if [ -f "$tx/ca.previous" ]; then
-        mv -f "$tx/ca.previous" "$config/runtime-ca.pem" || return 1
-      elif [ "$(cat "$tx/had-ca")" = false ]; then
-        rm -f "$config/runtime-ca.pem" || return 1
-      fi
-      touch "$tx/ca-restored" || return 1
-    fi
-    if [ -s "$tx/old-id" ]; then
-      old_id=$(cat "$tx/old-id")
-      old_name=$(docker inspect --format '{{.Name}}' "$old_id") || return 1
-      if [ "$old_name" != /attraccess-wago ]; then
-        docker rename "$old_id" attraccess-wago || return 1
-      fi
-      if [ "$(cat "$tx/old-running")" = true ]; then
-        docker start "$old_id" >/dev/null || return 1
-      else
-        docker stop "$old_id" >/dev/null || return 1
-      fi
-    fi
+    for owned_id in $(awk '$2 == "attraccess-wago" || $2 == "attraccess-wago.previous" { print $1 }' "$tx/containers"); do
+      remove_owned_container "$owned_id" || return 1
+    done
+    if [ -f "$tx/data-changing" ]; then rm -rf "$data" || return 1; fi
+    if [ -f "$tx/env-changing" ]; then rm -f "$config/runtime.env" || return 1; fi
+    if [ -f "$tx/ca-changing" ]; then rm -f "$config/runtime-ca.pem" || return 1; fi
   fi
   rm -f "$config/runtime.env.next" "$config/runtime-ca.pem.next" || return 1
   # Once renamed, even a partially deleted journal is cleanup-only. No retry
@@ -286,6 +308,10 @@ rollback() {
   fi
 }
 `;
+}
+
+function boundedDocker(): string {
+  return 'docker() { timeout -k 5 45 docker --host unix:///var/run/docker.sock "$@"; }';
 }
 
 function quote(value: string): string {
@@ -313,9 +339,14 @@ if [ -e "$config/docker-provision" ]; then
   test -f "$config/docker-provision/started" && test ! -e "$config/docker-provision/restored" || fail 'Docker provisioning recovery required'
   test "$(cat "$config/docker-provision/token")" = ${quote(token)} || fail 'Docker provisioning belongs to another delivery'
 fi
-mkdir -m 0700 "$config/delivery" || fail 'Delivery journal exists; explicit recovery required'
-printf '%s\\n' ${quote(token)} > "$config/delivery/token"
-printf '%s\\n' receiving > "$config/delivery/phase"
+test ! -e "$config/delivery" && test ! -L "$config/delivery" || fail 'Delivery journal exists; explicit recovery required'
+stage=$(mktemp -d "$config/delivery-stage.XXXXXX")
+trap 'rm -rf "$stage"' EXIT
+trap 'exit 130' HUP INT TERM
+printf '%s\\n' ${quote(token)} > "$stage/token"
+printf '%s\\n' receiving > "$stage/phase"
+mv "$stage" "$config/delivery"
+trap - EXIT HUP INT TERM
 cat > "$config/delivery/bundle"
 test "$(wc -c < "$config/delivery/bundle" | tr -d ' ')" = ${bytes} || fail 'Incomplete runtime upload'
 printf '%s  %s\\n' ${quote(digest)} "$config/delivery/bundle" | sha256sum -c - >/dev/null
@@ -350,8 +381,6 @@ tar --version | grep -q 'GNU tar'
 docker_root=$(docker info --format '{{.DockerRootDir}}')
 test -n "$docker_root" && test -d "$docker_root"
 test "$(df -Pk "$docker_root" | awk 'END {print $4}')" -ge ${Math.ceil((bytes * 3) / 1024) + 16384}
-processes=$(ps -eo comm=)
-if printf '%s' "$processes" | grep -iq '[c]odesys'; then echo 'CODESYS workload preservation unavailable' >&2; exit 1; fi
 ${['/tmp', '/var/lib', '/etc'].map((path) => `test "$(df -Pk ${quote(testRoot + path)} | awk 'END {print $4}')" -ge ${Math.ceil((bytes * 3) / 1024) + 16384}`).join('\n')}
 `;
 }

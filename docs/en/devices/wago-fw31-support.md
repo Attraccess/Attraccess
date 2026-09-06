@@ -1,11 +1,133 @@
 # CC100 FW31 software support boundaries
 
+## 2026-09-06 supersession: destructive commissioning
+
+The product decision on **2026-09-06** supersedes the prior-workload preservation
+and restoration requirements recorded below. Commissioning takes over the CC100:
+existing applications and workloads may stop working or be erased. Attraccess
+does not preserve, back up, or restore preexisting CODESYS programs, retained PLC
+data, other workloads, or their host settings. There is one destructive-install
+consequence confirmation; no separate PLC backup approval or mandatory WBM gate.
+
+The current delivery contract always stops and permanently disables CODESYS and
+verifies both process and boot state **before granting digital I/O**. Failure to
+verify prevents enrollment/runtime launch. This applies even when CODESYS was
+already stopped. Supported vendor Docker activation/install and persistent narrow
+I/O preparation are part of delivery; unsupported components, missing registers,
+and independent output writers still fail closed. See the current
+[platform contract](wago-commissioning-platform.md) and
+[operator walkthrough](wago-cc100-commissioning.md).
+
+Cleanup reconciles the failed installation and its credentials; it does not undo
+the destructive takeover or re-enable CODESYS. Integrity journals, pinned SSH,
+signed offline artifacts, TLS enrollment, fresh credentials/consent on retry, and
+management-access recovery remain required. Full management hardening and physical
+acceptance are separate and are **not complete** merely because installation or
+software fixtures succeed.
+
+The source observations below remain decision history, including destructive
+vendor side effects and the limits of FW30 evidence. Their old preservation gates
+and blanket statements that Docker/I/O preparation is unimplemented are superseded,
+not instructions for the current operator workflow. Source compatibility checks
+remain necessary; the product decision is not proof that arbitrary firmware or
+unknown component versions are supported.
+
+### Security follow-up on 2026-09-06
+
+The later security revision supersedes the intermediate `on-failure:5` Docker
+restart design. Current deployment uses Docker restart policy `no` and a root-owned
+host supervisor. Each of at most five crash restarts per supervisor run repeats
+the full CODESYS, ownership and narrow-permission gate; running writers are also
+checked periodically. Observation failures, conflicts and retry exhaustion disable
+enablement and attempt bounded containment. An unavailable daemon or unverified
+container stop remains a failure with recovery ownership retained.
+
+The later spec correction also supersedes the intermediate instruction to invoke
+the boot hook after any supervisor failure. Ordinary daemon-only restart permits
+checked startup only while enablement remains present. Containment removes that
+enablement; hook `start` currently exits `0` without restarting, and reboot does
+not clear the latch. Current guided sessions retain the tokened
+[wizard cleanup/recommissioning route](wago-cc100-commissioning.md#recover-after-latched-containment):
+cleanup, then retry an unclaimed installation or remove the claimed registration
+and commission anew. Only installation recreates enablement; no manual marker
+creation or new UI/API re-enable operation is claimed. Missing recovery ownership
+or unverified cleanup remains a blocker.
+
+The host guard rejects UID/GID 10001 account/group collisions, unrelated processes
+using that identity, unverified namespace mappings and unowned writable DOUT
+descriptors, including inode aliases. Owned runtime exemptions require full Docker
+ID, namespace and cgroup checks. Configuration/lock paths and staged boot publication
+must satisfy root-ownership, permission and file-type checks. This is software
+enforcement with observation/race limits, not physical or safety qualification.
+
+The independent fleet gate and eight desktop/mobile commissioning cases passed
+on the snapshot captured **2026-09-06T17:11:46.494036Z**, checked for source freshness
+at **17:17:33.628037Z**. Those results predate this security revision and do not
+verify it. A refreshed gate and browser run are required for the final source;
+neither run supplies hardware, FW31 reboot or full management-hardening evidence.
+
+### Exact extension source and captured FW31 evidence
+
+The 2026-09-06 exact-source audit examined the unofficial student extension
+[`WAGO-education.vscode-wago-cc100`](https://marketplace.visualstudio.com/items?itemName=WAGO-education.vscode-wago-cc100),
+source version/tag **0.2.10 / v0.2.10**, at commit
+[`02a0956faeb33ed2a22d7b7f2627ad62411d327b`](https://github.com/wago-enterprise-education/vscode-wago-cc100/tree/02a0956faeb33ed2a22d7b7f2627ad62411d327b).
+Its description lists FW28/FW30, not FW31. Acquired source blobs were checked
+against their Git object IDs. Marketplace VSIX byte equality with this source or
+the GitHub release remains **unknown**; release metadata is not an acquired VSIX.
+
+Its [V02 upload path](https://github.com/wago-enterprise-education/vscode-wago-cc100/blob/02a0956faeb33ed2a22d7b7f2627ad62411d327b/src/extensionCore/projectVersions/V02.ts#L1129-L1228)
+attempts to stop `codesys3`, calls `/etc/config-tools/config_runtime runtime-version=0`, then
+`/etc/config-tools/config_docker activate` with a fixed one-second delay. Image
+layers are obtained on the development host, uploaded as `/home/image.tar`, and
+loaded with `docker load`; this is not an engine installer or device-side pull.
+Attraccess intentionally does not copy the
+[SSH wrapper's ignored exit status/stderr](https://github.com/wago-enterprise-education/vscode-wago-cc100/blob/02a0956faeb33ed2a22d7b7f2627ad62411d327b/src/extension/connectionManager.ts#L865-L887),
+[unawaited script callbacks](https://github.com/wago-enterprise-education/vscode-wago-cc100/blob/02a0956faeb33ed2a22d7b7f2627ad62411d327b/src/extension/connectionManager.ts#L244-L270),
+the missing stop/boot verification, or
+[`res/scripts/dockerCommand.sh`](https://github.com/wago-enterprise-education/vscode-wago-cc100/blob/02a0956faeb33ed2a22d7b7f2627ad62411d327b/res/scripts/dockerCommand.sh)'s
+broad writable analog/serial/config-tool mounts and `unless-stopped` startup.
+That script has no explicit UID override; its effective image UID is unverified.
+The extension reset re-enables CODESYS and is not Attraccess cleanup.
+
+Separately, the audit read existing offline device files captured at
+**2026-09-06T12:28:12.112768Z**, identifying **751-9301 / 04.09.01(31) / Docker
+25.0.4**. This supersedes the earlier statement that only FW30 shell evidence was
+available. Captured `/etc/config-tools/config_docker` lines 70–77 merely check
+activation state for `install`: they **download or extract nothing and install
+no binaries**. `activate` moves an existing `S99_docker` boot entry and changes vendor
+routing/firewall state before starting the daemon. `remove` deletes `/home/docker`;
+neither it nor deactivation is application cleanup. The captured file's SHA-256 is
+`5da3a5422a53be78507a8db51b9a8f3ef57750059a104261a49540364c8aeb82`,
+matching the original capture fingerprint. Missing Docker binaries remain unsupported.
+
+Captured runtime scripts likewise require independent process, `rtsversion=0`
+and boot-entry checks: selection 0 alone can be a no-op, and version switching
+can delete `/home/codesys/*`. Some sourced helpers and complete compiled/driver
+build provenance remain unavailable; this is not evidence that those helpers
+are absent on the device. Current software checks release identity, required
+tools, getter results and postconditions, not a complete FW31 byte/build attestation.
+The current preparation source explicitly stops both vendor runtime selections,
+then calls `config_runtime --wait runtime-version=0 force-new-version=yes restart-server=NO`.
+It checks absent PLC processes, a regular `rtsversion` containing exactly `0`,
+absent `S98_runtime` and alternate enabled boot entries resolving to known PLC
+executables, repeating disablement checks after `sync`. It independently checks
+the boot medium before vendor install/activation, rejecting empty or `sd-card`
+results, and requires executable `S99_docker` to resolve to `/etc/init.d/dockerd`,
+an `active` getter result and Docker server version `25.0.4`. These source changes
+supersede their earlier listing as implementation follow-ups; hardware behavior
+and validation of the final revision remain separate.
+The audit performed no new device operations and proves neither sysfs permission
+persistence, physical I/O, reboot behavior nor management hardening.
+
+## Decision history before the 2026-09-06 scope change
+
 Fresh CC100 751-9301 commissioning remains incomplete. Hardware tests cannot
 substitute for the missing lifecycle and access-control transactions below. The
 operator interface remains guided commissioning; engineering captures below are
 not manual operator setup instructions.
 
-## Implemented subset
+### Implemented subset (historical)
 
 Host and shell checks require unambiguous CC100 FW31 identity. A BSP label alone
 is insufficient. Runtime delivery retains interrupted-delivery recovery, minimum
@@ -49,7 +171,7 @@ separately in `reconciliation/`, without inventing historical evidence. Partial
 modern snapshots are not treated as legacy. The `accepted` finish helper has no
 production caller and provides no guided lifecycle closure.
 
-## Actual source and unresolved contracts
+### Actual source and unresolved contracts (historical)
 
 Inspected source: official [WAGO SDK FW30-V04.08.09](https://github.com/WAGO/cc100-firmware-sdk/tree/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0),
 commit `b2a09cc66ad07af54a34701d6cfc90f31aca5cd0`. This is **not FW31 compatibility
@@ -77,7 +199,7 @@ scripts and events. CC100 `board_specific_defines` contains the build substituti
 `@CT_EXTENSION_PREFIX@`. Source-template hashes and unknown FW31 compiled-binary
 hashes cannot establish matching installed implementations.
 
-## Minimal additional read-only capture
+### Minimal additional read-only capture (historical)
 
 The smallest offline input is the official `Firmware_CC100_040901_31.zip`,
 277551981 bytes, publisher SHA-256

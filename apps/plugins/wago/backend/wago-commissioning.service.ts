@@ -39,6 +39,7 @@ import {
   parseWagoHardwareDeploymentReport,
   wagoDockerProvisionRecoveryScript,
   wagoDockerProvisionFinishScript,
+  wagoCommissioningPreparationScript,
 } from './wago-hardware-deployment';
 import {
   runtimeBundleDeliveryScript,
@@ -291,10 +292,6 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     },
     principal: CommissioningPrincipal | null = null,
   ): Promise<CommissioningSessionResponse> {
-    if (action === 'activate')
-      throw new ConflictException(
-        'unsupported-lifecycle-dependencies: Docker activation requires complete FW31 lifecycle checks and restoration support.',
-      );
     const credential = requireDeliveryCredentials({ temporarySsh: input.temporarySsh, confirmInstall: true });
     if (action !== 'inspect' && input.reviewedDockerActivation !== true)
       throw new ConflictException('Explicit Docker activation or recovery approval is required.');
@@ -324,29 +321,12 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
                   ),
                 );
                 session.platformReport = JSON.stringify(report);
+              } else if (action === 'activate') {
+                await this.prepareController(session, credential);
               } else {
                 if (!session.dockerProvisionToken)
                   throw new ConflictException('No Docker provisioning attempt to recover.');
-                if (session.dockerProvisionState !== 'restored') {
-                  session.dockerProvisionState = 'recovering';
-                  await this.save(session, 'docker_recovery_requested');
-                  await this.sudoRunScript(
-                    session.targetHost,
-                    session.hostKeyFingerprint,
-                    credential,
-                    wagoDockerProvisionRecoveryScript(session.dockerProvisionToken),
-                  );
-                  session.dockerProvisionState = 'restored';
-                  await this.save(session, 'docker_restored');
-                }
-                await this.sudoRunScript(
-                  session.targetHost,
-                  session.hostKeyFingerprint,
-                  credential,
-                  wagoDockerProvisionFinishScript(session.dockerProvisionToken, 'restored'),
-                );
-                session.dockerProvisionToken = null;
-                session.dockerProvisionState = null;
+                await this.cleanupControllerPreparation(session, credential);
               }
               session.failureReason = null;
               return this.toResponse(await this.save(session, `platform_${action}_succeeded`));
@@ -356,13 +336,72 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
               session.failureReason =
                 action === 'inspect'
                   ? 'Controller preflight could not be read. Check the explicit SSH credential and supported firmware tools.'
-                  : 'Docker recovery remains unverified. Restore any runtime transaction first. A saved start attempt requires source-grounded reconciliation of lifecycle effects; daemon absence alone cannot prove restoration. The recovery token is retained.';
+                  : action === 'activate'
+                    ? 'Controller preparation failed. CODESYS must be stopped and permanently disabled before IO or runtime startup. Clean up the retained preparation attempt before retrying.'
+                    : 'Controller preparation cleanup remains unverified. Clean up any runtime transaction first, then retry preparation cleanup. The recovery token is retained; previous workloads are not restored.';
               return this.toResponse(await this.save(session, `platform_${action}_failed`));
             }
           }),
         ),
       (result) => !result.failureReason,
     );
+  }
+
+  private async cleanupControllerPreparation(
+    session: WagoCommissioningSession,
+    credential: TemporarySshCredential,
+  ): Promise<void> {
+    if (!session.dockerProvisionToken) return;
+    if (session.dockerProvisionState !== 'restored') {
+      session.dockerProvisionState = 'recovering';
+      await this.save(session, 'controller_preparation_cleanup_started');
+      await this.sudoRunScript(
+        session.targetHost,
+        session.hostKeyFingerprint,
+        credential,
+        wagoDockerProvisionRecoveryScript(session.dockerProvisionToken),
+      );
+      session.dockerProvisionState = 'restored';
+      await this.save(session, 'controller_preparation_cleanup_verified');
+    }
+    await this.sudoRunScript(
+      session.targetHost,
+      session.hostKeyFingerprint,
+      credential,
+      wagoDockerProvisionFinishScript(session.dockerProvisionToken, 'restored'),
+    );
+    session.dockerProvisionToken = null;
+    session.dockerProvisionState = null;
+    await this.save(session, 'controller_preparation_cleaned_up');
+  }
+
+  /** Persist ownership before destructive host changes so interruption is recoverable. */
+  private async prepareController(
+    session: WagoCommissioningSession,
+    credential: TemporarySshCredential,
+  ): Promise<void> {
+    if (session.deliveryToken)
+      throw new ConflictException('Clean up the retained runtime installation before preparing the controller.');
+    if (session.dockerProvisionToken && session.dockerProvisionState !== 'started')
+      throw new ConflictException('Clean up the retained controller preparation before retrying.');
+    session.dockerProvisionToken ??= randomBytes(16).toString('hex');
+    session.dockerProvisionState = 'starting';
+    await this.save(session, 'controller_preparation_started');
+    try {
+      await this.sudoRunScript(
+        session.targetHost,
+        session.hostKeyFingerprint,
+        credential,
+        wagoCommissioningPreparationScript(session.dockerProvisionToken),
+      );
+      session.dockerProvisionState = 'started';
+      session.codesysState = 'disabled';
+      await this.save(session, 'controller_prepared');
+    } catch (error) {
+      session.dockerProvisionState = 'recovery_required';
+      await this.save(session, 'controller_preparation_failed');
+      throw error;
+    }
   }
 
   async managementStatus(id: number) {
@@ -686,11 +725,17 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         safeFailure = 'Unsupported CC100 model or firmware baseline.';
         throw new Error(safeFailure);
       }
-      if (inspection.codesys !== 'inactive') {
-        safeFailure =
-          'CODESYS is active or unknown. Delivery blocked because workload configuration cannot be safely preserved and restored.';
-        throw new Error(safeFailure);
-      }
+      await this.updateProgress(
+        session,
+        20,
+        'Preparing controller',
+        'Permanently disabling CODESYS, activating vendor Docker and preparing exclusive onboard IO.',
+      );
+      safeFailure =
+        'Controller preparation failed. CODESYS must be stopped and permanently disabled before IO or runtime startup. Clean up the retained preparation attempt before retrying.';
+      await this.prepareController(session, credential);
+      safeFailure =
+        'Runtime prerequisites failed. Check vendor Docker, exclusive onboard IO, available storage and required firmware tools.';
       await this.sudoRunScript(
         session.targetHost,
         session.hostKeyFingerprint,
@@ -704,6 +749,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         'set -eu; if test -f /etc/attraccess-wago/install.lock; then (exec 8</etc/attraccess-wago/install.lock; flock -n 8); fi; for path in /etc/attraccess-wago/delivery /var/lib/attraccess-wago-install-transaction /var/lib/attraccess-wago-install-transaction.restored /var/lib/attraccess-wago-install-transaction.cleanup /var/lib/attraccess-wago-install-transaction.accepted-cleanup; do test ! -e "$path"; done',
       );
       credentialsTouched = true;
+      safeFailure =
+        'Secure enrollment or runtime delivery failed. Clean up the retained installation before retrying; previous workloads will not be restored.';
       await this.revokeSessionEnrollment(session);
       await this.operationContext.getStore()?.assertOwned();
       const enrollment = await this.wago.createEnrollment(
@@ -785,7 +832,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       session.enrollmentExpiresAt = null;
       session.progressStep = 'Delivery failed';
       session.progressDetail =
-        'Review the blocker. If delivery was interrupted, explicitly recover the controller snapshot before retrying.';
+        'Review the blocker. Clean up any interrupted preparation or runtime installation before retrying. Cleanup will not restore CODESYS or previous workloads.';
       session.failureReason = safeFailure;
       return this.toResponse(await this.save(session, 'delivery_failed'));
     } finally {
@@ -833,8 +880,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
           throw new ConflictException('commissioning session has no runtime recovery ownership token');
         let restored = session.state === 'recovery_revocation_pending';
         try {
-          // Recovery restores the old environment verbatim. Broker availability must
-          // not prevent restoring a controller; no new credentials are provisioned.
+          // Cleanup must remain available even when the broker is unavailable.
+          // Destructive commissioning never promises restoration of old workloads.
           if (!restored)
             await this.sudoRunScript(
               session.targetHost,
@@ -845,9 +892,9 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
           restored = true;
           if (requiresNewSession) session.pairingCode = null;
           session.state = 'recovery_revocation_pending';
-          session.progressStep = 'Runtime snapshot restored';
+          session.progressStep = 'Runtime installation cleaned up';
           session.progressDetail =
-            'Previous container, environment and data restored. Readiness is unverified; restored broker credentials may have been revoked.';
+            'Failed runtime installation cleaned up. CODESYS remains disabled; previous workloads are not restored.';
           if (!session.pairingCode)
             session.progressDetail +=
               ' Remove the existing controller registration before creating a new commissioning session.';
@@ -859,6 +906,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             credential,
             runtimeBundleRecoveryAcknowledgementScript('', session.deliveryToken),
           );
+          await this.cleanupControllerPreparation(session, credential);
           await this.revokeSessionEnrollment(session);
           session.state = session.pairingCode ? 'delivery_failed' : 'revoked';
           session.deliveryToken = null;
@@ -871,10 +919,10 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
               : 'delivery_failed';
           session.progressStep = 'Recovery requires attention';
           session.progressDetail = restored
-            ? 'Runtime restored. Retry recovery to finish broker credential revocation; the controller will not be restored again.'
+            ? 'Runtime cleanup completed. Retry recovery to finish preparation cleanup and broker credential revocation.'
             : 'Recovery could not be confirmed. An active lock is never removed; retry explicit recovery after the active operation ends.';
           session.failureReason =
-            'Runtime recovery or credential revocation failed; inspect the retained snapshot before retrying delivery.';
+            'Installation cleanup or credential revocation failed; finish the retained recovery before retrying delivery.';
           return this.toResponse(await this.save(session, 'runtime_recovery_failed'));
         }
       }),
@@ -943,9 +991,9 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         const session = await this.sessions.findOneBy({ id });
         if (!session) throw new NotFoundException('commissioning session not found');
         if (session.deliveryToken)
-          throw new ConflictException('Recover the retained runtime snapshot before deleting this session.');
+          throw new ConflictException('Clean up the retained runtime installation before deleting this session.');
         if (session.dockerProvisionToken)
-          throw new ConflictException('Recover the saved Docker provisioning state before deleting this session.');
+          throw new ConflictException('Clean up the retained controller preparation before deleting this session.');
         if (session.managementControllerId) {
           const security = await this.management.status(session.managementControllerId);
           if (security && (security.recoveryRequired || ['key_enrolled', 'hardened'].includes(security.state)))
@@ -1145,7 +1193,10 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     const markerIndex = output.indexOf(marker);
     const firmware = markerIndex >= 0 ? output.slice(0, markerIndex) : output;
     const processes = markerIndex >= 0 ? output.slice(markerIndex + marker.length) : '';
-    return { firmware, codesys: markerIndex < 0 ? 'unknown' : /codesys/i.test(processes) ? 'active' : 'inactive' };
+    return {
+      firmware,
+      codesys: markerIndex < 0 ? 'unknown' : /codesys|plclinux_rt/i.test(processes) ? 'active' : 'inactive',
+    };
   }
 
   private sudoRun(
@@ -1408,6 +1459,15 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             const session = await this.sessions.findOneBy({ id: candidate.id });
             if (!session || session.state === 'recovery_revocation_pending') return;
             if (
+              session.dockerProvisionToken &&
+              ['starting', 'recovering'].includes(session.dockerProvisionState ?? '')
+            ) {
+              session.dockerProvisionState = 'recovery_required';
+              session.failureReason =
+                'Controller preparation was interrupted. Clean up the retained attempt before retrying.';
+              await this.save(session, 'controller_preparation_interrupted');
+            }
+            if (
               ['completed', 'awaiting_verification', 'claim_interrupted'].includes(session.state) &&
               !session.pairingCode
             )
@@ -1442,7 +1502,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             if (session.state === 'delivering') {
               session.state = 'delivery_failed';
               session.progressStep = 'Delivery interrupted';
-              session.progressDetail = 'Retry with explicit SSH credentials and installation confirmation.';
+              session.progressDetail =
+                'Clean up the retained preparation or runtime installation before retrying with explicit SSH credentials.';
               session.failureReason = 'Commissioning was interrupted.';
               await this.save(session, 'delivery_interrupted');
               await this.revokeSessionEnrollment(session);

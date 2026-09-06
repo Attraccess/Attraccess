@@ -19,7 +19,7 @@ export function RemoveControllerDrawer({
       <DrawerBody>
         <div className="wg:space-y-4">
           <p>Remove <strong>{controller?.name ?? controller?.hardwareId}</strong> from Attraccess?</p>
-          <Alert status="warning"><Alert.Indicator /><Alert.Content><Alert.Description>This revokes MQTT access and removes the controller registration and configuration. Recoverable commissioning records are retained until their runtime, Docker and management snapshots are restored. The runtime remains installed on the CC100. An active operation blocks removal.</Alert.Description></Alert.Content></Alert>
+          <Alert status="warning"><Alert.Indicator /><Alert.Content><Alert.Description>This revokes MQTT access and removes the controller registration and configuration. Commissioning records with unfinished installation cleanup or management access recovery are retained. The runtime remains installed on the CC100. Removing a registration does not restore preexisting applications or data, or re-enable CODESYS. An active operation blocks removal.</Alert.Description></Alert.Content></Alert>
           {removeMutation.isError && <Alert status="danger"><Alert.Indicator /><Alert.Content><Alert.Description>{removeMutation.error instanceof Error ? removeMutation.error.message : 'Could not remove the controller.'}</Alert.Description></Alert.Content></Alert>}
         </div>
       </DrawerBody>

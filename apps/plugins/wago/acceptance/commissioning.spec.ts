@@ -90,7 +90,10 @@ describe('signed import to commissioning through real controllers and services (
         .send({ temporarySsh: credential })
         .expect(201)
     ).body;
-    expect(JSON.parse(inspected.platformReport)).toMatchObject({ docker: 'running', qualification: 'required' });
+    expect(JSON.parse(inspected.platformReport)).toMatchObject({
+      docker: 'running',
+      qualification: 'software-supported',
+    });
     await request(fixture.app.getHttpServer())
       .post(`${endpoint}/deliver`)
       .send({ temporarySsh: credential })
@@ -122,7 +125,7 @@ describe('signed import to commissioning through real controllers and services (
       .body;
     expect(recovered).toMatchObject({
       state: 'delivery_failed',
-      progressStep: 'Runtime snapshot restored',
+      progressStep: 'Runtime installation cleaned up',
       runtimeArtifactDigest: fixture.first.digest,
     });
     fixture.transport.failDelivery = false;

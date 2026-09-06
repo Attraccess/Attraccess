@@ -135,7 +135,7 @@ export async function commissioningFixture() {
     service['sudoRunScript'] = async (_host, _fingerprint, _credential, script) => {
       if (script.includes('version=1') && script.includes('platform=')) {
         transport.platformCalls++;
-        return 'version=1\nplatform=supported\nhardware=accessible\nexclusivity=clear\ndocker=running\nconfigDocker=present\nprovision=none\nqualification=required\n';
+        return 'version=1\nplatform=supported\nhardware=accessible\nexclusivity=clear\ndocker=running\nconfigDocker=present\nprovision=prepare-controller\nqualification=software-supported\n';
       }
       if (script.includes('rollback retained')) {
         transport.recoveryCalls++;
