@@ -15,6 +15,7 @@ assert(
 );
 const teal = '#256D7B'; // Screen approximation of RAL 5021, not a print color conversion.
 const tealRgb = [37, 109, 123];
+const whiteRgb = [255, 255, 255];
 const pngOptions = { compressionLevel: 9, adaptiveFiltering: false, palette: false };
 const assets = new Map();
 const read = (path) => readFile(resolve(root, path));
@@ -38,7 +39,6 @@ function render(image, width, height) {
 
 const { data, info } = await sharp(original).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
 const colored = Buffer.from(data);
-const ink = Buffer.from(data);
 const whiteShape = Buffer.from(data);
 const rose = [197, 121, 130];
 let recolored = 0;
@@ -51,16 +51,12 @@ for (let i = 0; i < data.length; i += 4) {
   // pixels rather than replacing their full RGB, retaining the original antialiasing.
   const isRose = data[i + 3] > 0 && redChroma / r > 0.25 && roseHue >= 0.035 && roseHue <= 0.235;
   const coverage = Math.min(1, redChroma / (rose[0] - rose[1]));
-  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  const white = Math.min(1, Math.max(0, (luminance - 16) / 224));
   for (let channel = 0; channel < 3; channel++) {
     if (isRose)
       colored[i + channel] = Math.max(
         0,
         Math.min(255, Math.round(data[i + channel] + coverage * (tealRgb[channel] - rose[channel]))),
       );
-    // Keep the hand-drawn tonal details instead of thresholding away eyes and coat patches.
-    ink[i + channel] = isRose ? 255 : Math.round(tealRgb[channel] + (255 - tealRgb[channel]) * white);
     whiteShape[i + channel] = 255;
     if (!isRose) assert.equal(colored[i + channel], data[i + channel], 'Non-rose artwork must remain unchanged');
   }
@@ -72,7 +68,6 @@ assert(
   'Expected the original rose keyhole, not an already generated image',
 );
 const portrait = await sharp(colored, { raw: info }).png(pngOptions).toBuffer();
-const flat = await sharp(ink, { raw: info }).png(pngOptions).toBuffer();
 const silhouette = await sharp(whiteShape, { raw: info }).png(pngOptions).toBuffer();
 const logo = await render(portrait, 150, 300);
 const lockup = embed(portrait);
@@ -101,7 +96,9 @@ async function icon(size, { maskable = false, small = false, badge = false } = {
   const width = Math.round(height / 2);
   const left = Math.floor((size - width) / 2);
   const top = Math.floor((size - height) / 2);
-  const foreground = await render(small || badge ? silhouette : flat, width, height);
+  // Use the same full-color artwork as logo.png. Only tiny favicons and the
+  // alpha-only notification badge use a silhouette; never tint the mascot.
+  const foreground = await render(small || badge ? silhouette : portrait, width, height);
   if (maskable) {
     const alpha = await sharp(foreground).extractChannel('alpha').raw().toBuffer();
     for (let y = 0; y < height; y++) {
@@ -115,21 +112,38 @@ async function icon(size, { maskable = false, small = false, badge = false } = {
     }
   }
   const output = await sharp({
-    create: { width: size, height: size, channels: 4, background: badge ? '#00000000' : teal },
+    create: { width: size, height: size, channels: 4, background: badge ? '#00000000' : small ? teal : '#ffffff' },
   })
     .composite([{ input: foreground, left, top }])
     .png(pngOptions)
     .toBuffer();
   const pixels = await sharp(output).raw().toBuffer();
+  let warmCoatPixels = 0;
+  let neutralInkPixels = 0;
   for (let i = 0; i < pixels.length; i += 4) {
     if (badge) {
       // Undo RGB rounding from premultiplied-alpha resizing; badge shape is alpha-only.
       pixels[i] = pixels[i + 1] = pixels[i + 2] = 255;
     } else {
       assert.equal(pixels[i + 3], 255, 'App icons must be opaque; the OS applies its own mask');
+      const [r, g, b] = pixels.subarray(i, i + 3);
+      if (r > g + 20 && g > b + 5) warmCoatPixels++;
+      if (Math.max(r, g, b) < 100 && Math.max(r, g, b) - Math.min(r, g, b) < 20) neutralInkPixels++;
     }
   }
-  if (!badge) assert.deepEqual([...pixels.subarray(0, 3)], tealRgb, 'App background must be flat RAL 5021 teal');
+  if (!small && !badge) {
+    // A teal tint can preserve every outline and alpha byte while losing the
+    // actual artwork. Check the rendered icons still contain brown coat patches
+    // and dark neutral ink, including the smallest full-color Windows frame.
+    assert(warmCoatPixels > 0, `${size}px icon must retain the mascot's warm coat colors`);
+    assert(neutralInkPixels > 0, `${size}px icon must retain the mascot's dark neutral ink`);
+  }
+  if (!badge)
+    assert.deepEqual(
+      [...pixels.subarray(0, 3)],
+      small ? tealRgb : whiteRgb,
+      'Icons must use a white background, or RAL 5021 teal behind the small white silhouette',
+    );
   return badge
     ? sharp(pixels, { raw: { width: size, height: size, channels: 4 } })
         .png(pngOptions)
@@ -163,7 +177,7 @@ for (const size of [192, 512]) {
 }
 assets.set('apps/frontend/public/apple-touch-icon.png', await icon(180));
 assets.set('apps/frontend/public/badge-72.png', await icon(72, { badge: true }));
-assets.set('apps/frontend/Attraccess.icon/Assets/key-hole.png', flat);
+assets.set('apps/frontend/Attraccess.icon/Assets/key-hole.png', portrait);
 const favicon = await ico([16, 32]);
 assets.set('apps/frontend/public/favicon.ico', favicon);
 assets.set('docs/_media/favicon.ico', favicon);
@@ -174,7 +188,7 @@ const solid = composer.fill.solid?.replace('srgb:', '').split(',').map(Number);
 assert(solid, 'Icon Composer must have a solid sRGB background');
 assert.deepEqual(
   solid.slice(0, 3).map((channel) => Math.round(channel * 255)),
-  tealRgb,
+  whiteRgb,
 );
 assert.equal(solid[3], 1);
 assert.equal(composer.groups[0].shadow.opacity, 0, 'Icon Composer must not add a shadow');

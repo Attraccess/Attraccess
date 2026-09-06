@@ -30,6 +30,8 @@ Das gleiche Design passt sich kleineren Bildschirmen an.
 
 Die Markenbilder werden mit `node scripts/generate-brand-assets.mjs` aus dem ursprünglichen Maskottchen und der Vektor-Wortmarke erzeugt. Mit `--check` prüft das Skript Logos, Symbolgrößen, Transparenz und maskierbare Bereiche, ohne Dateien zu ändern.
 
+Logos und App-Symbole behalten die ursprünglichen Farben, Schattierungen und Flicken des Maskottchens bei; nur das rosafarbene Schlüsselloch wird zu RAL 5021 Wasserblau. App-Symbole haben einen weißen Hintergrund. Die Favicon-Größen 16 und 32 px verwenden für gute Erkennbarkeit eine weiße Schlüsselloch-Silhouette auf Wasserblau, das Benachrichtigungssymbol eine weiße Silhouette auf transparentem Hintergrund.
+
 ## E-Mail-Layout
 
 Das Standard-E-Mail-Layout verwendet einen weißen Hintergrund und petrolfarbene Links und Schaltflächen. Ein Update von Attraccess stellt das ursprüngliche, unveränderte Standardlayout automatisch auf das neue Erscheinungsbild um. Individuell angepasste Layouts bleiben erhalten.
