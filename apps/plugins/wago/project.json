@@ -5,24 +5,72 @@
   "sourceRoot": "apps/plugins/wago",
   "tags": ["type:plugin"],
   "targets": {
+    "production-fleet": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["typecheck-acceptance", "test-production-fleet-cleanup"],
+      "options": {
+        "command": "node scripts/test-wago-production-fleet.mjs"
+      }
+    },
+    "typecheck-acceptance": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsc --noEmit -p apps/plugins/wago/acceptance/tsconfig.json"
+      }
+    },
+    "test-production-fleet-cleanup": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node --test scripts/test-wago-production-fleet.test.mjs"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "pnpm exec tsc --noEmit -p apps/plugins/wago/tsconfig.spec.json",
+          "pnpm exec tsc --noEmit -p apps/plugins/wago/frontend/tsconfig.app.json",
+          "pnpm exec tsc --noEmit -p apps/plugins/wago/frontend/tsconfig.tests.json",
+          "pnpm exec tsc --noEmit -p apps/plugins/wago/acceptance/tsconfig.json"
+        ],
+        "parallel": false
+      }
+    },
     "lint": {
       "executor": "nx:run-commands",
-      "options": { "cwd": "apps/plugins/wago", "command": "eslint backend frontend/src modbus measurement-contract.ts" }
+      "options": {
+        "cwd": "apps/plugins/wago",
+        "command": "eslint backend frontend/src frontend/tests acceptance modbus measurement-contract.ts"
+      }
     },
     "test": {
       "executor": "@nx/jest:jest",
-      "options": { "jestConfig": "apps/plugins/wago/jest.config.ts", "passWithNoTests": true }
+      "dependsOn": ["test-frontend"],
+      "options": {
+        "jestConfig": "apps/plugins/wago/jest.config.ts",
+        "passWithNoTests": true
+      }
     },
     "test-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
       "inputs": ["{projectRoot}/frontend/**/*", "{projectRoot}/modbus/**/*"],
-      "options": { "cwd": "apps/plugins/wago", "command": "pnpm exec vitest run --root frontend" }
+      "options": {
+        "command": "pnpm exec vitest run --config apps/plugins/wago/frontend/vitest.config.mts"
+      }
     },
     "build-backend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/backend/**/*", "{projectRoot}/modbus/**/*", "{projectRoot}/measurement-contract.ts", "{projectRoot}/cc100-runtime/signing-public-key.pub", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
+      "inputs": [
+        "{projectRoot}/diagnostics-types.ts",
+        "{projectRoot}/backend/**/*",
+        "{projectRoot}/modbus/**/*",
+        "{projectRoot}/measurement-contract.ts",
+        "{projectRoot}/cc100-runtime/signing-public-key.pub",
+        "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"
+      ],
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/wago",
@@ -32,16 +80,24 @@
     "build-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/frontend/**/*", "{projectRoot}/modbus/**/*", "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"],
+      "inputs": [
+        "{projectRoot}/diagnostics-types.ts",
+        "{projectRoot}/frontend/**/*",
+        "{projectRoot}/modbus/**/*",
+        "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"
+      ],
       "outputs": ["{projectRoot}/package/frontend"],
-      "options": { "cwd": "apps/plugins/wago", "command": "pnpm exec vite build --config frontend/vite.config.ts" }
+      "options": {
+        "cwd": "apps/plugins/wago",
+        "command": "pnpm exec vite build --config frontend/vite.config.ts"
+      }
     },
     "build": {
       "executor": "nx:run-commands",
       "cache": true,
       "dependsOn": ["build-backend", "build-frontend"],
       "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json"],
-      "outputs": ["{projectRoot}/package"],
+      "outputs": ["{projectRoot}/package/package.json", "{projectRoot}/package/plugin.json"],
       "options": {
         "cwd": "apps/plugins/wago",
         "command": "node -e \"for (const file of ['package.json', 'plugin.json']) require('fs').copyFileSync(file, 'package/' + file)\""
@@ -49,7 +105,7 @@
     },
     "zip": {
       "executor": "nx:run-commands",
-      "cache": true,
+      "cache": false,
       "dependsOn": ["build"],
       "inputs": ["{projectRoot}/package/**/*", "{workspaceRoot}/apps/plugins/scripts/zip-plugin.mjs"],
       "outputs": ["{projectRoot}/dist/plugin-wago.zip"],
@@ -60,7 +116,7 @@
     },
     "pack": {
       "executor": "nx:run-commands",
-      "cache": true,
+      "cache": false,
       "dependsOn": ["build"],
       "inputs": ["{projectRoot}/package/**/*"],
       "outputs": ["{projectRoot}/dist"],
@@ -71,7 +127,7 @@
     },
     "pack-test": {
       "executor": "nx:run-commands",
-      "cache": true,
+      "cache": false,
       "dependsOn": ["pack", "plugins-backend-sdk:build"],
       "inputs": [
         "{projectRoot}/package/**/*",
@@ -90,6 +146,59 @@
       "options": {
         "cwd": "apps/plugins/wago",
         "command": "node ../scripts/publish-plugin.mjs package dist"
+      }
+    },
+    "fleet-acceptance": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "commands": [
+          "pnpm nx run-many -p plugin-wago,wago-cc100-runtime -t test,typecheck,lint,build --parallel=2",
+          "node apps/plugins/wago/cc100-runtime/integration/run.mjs",
+          "pnpm nx run plugin-wago:production-fleet",
+          "pnpm nx run plugin-wago:test-credential-rotation",
+          "pnpm nx run plugin-wago:test-commissioning-acceptance",
+          "bash apps/plugins/wago/frontend/tests/run_browser_tests.sh",
+          "node --test scripts/check-wago-acceptance.test.mjs"
+        ],
+        "parallel": false
+      }
+    },
+    "typecheck-frontend-tests": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsc --noEmit -p apps/plugins/wago/frontend/tsconfig.tests.json"
+      }
+    },
+    "test-typecheck-frontend-gate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "node --test scripts/typecheck-wago-frontend-tests.test.mjs",
+          "node scripts/typecheck-wago-frontend-tests.mjs"
+        ],
+        "parallel": false
+      }
+    },
+    "test-commissioning-acceptance": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["typecheck-acceptance", "typecheck-frontend-tests"],
+      "options": {
+        "commands": [
+          "pnpm exec jest --config scripts/test-wago-commissioning.config.cjs --runInBand",
+          "pnpm exec vite build --config apps/plugins/wago/frontend/tests/commissioning-harness/vite.config.mts",
+          "pnpm exec jest --config scripts/test-wago-commissioning-browser.config.cjs --runInBand"
+        ],
+        "parallel": false
+      }
+    },
+    "test-credential-rotation": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["typecheck-acceptance"],
+      "options": {
+        "command": "pnpm exec jest --config scripts/test-wago-credential-rotation.config.cjs --runInBand"
       }
     }
   }

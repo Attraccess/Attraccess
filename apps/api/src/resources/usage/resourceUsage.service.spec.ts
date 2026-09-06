@@ -1264,7 +1264,10 @@ describe('ResourceUsageService', () => {
       const updateQueryBuilder = createMockQueryBuilder(null);
 
       resourceUsageRepository.findOne.mockImplementation(async ({ where }) => {
-        if (where?.id === usage.id || (where?.resourceId === usage.resourceId && usage.endTime === null)) {
+        if (
+          !Array.isArray(where) &&
+          (where?.id === usage.id || (where?.resourceId === usage.resourceId && usage.endTime === null))
+        ) {
           return usage;
         }
         return null;
@@ -1900,7 +1903,7 @@ describe('ResourceUsageService', () => {
   });
 
   describe('canControllResource (cache)', () => {
-    const mockUser: User = { id: 1, systemPermissions: { canManageResources: false } } as User;
+    const mockUser: User = { id: 1, systemPermissions: { canManageResources: false } } as unknown as User;
     const resourceId = 42;
 
     beforeEach(() => {
@@ -1978,7 +1981,7 @@ describe('ResourceUsageService', () => {
     });
 
     it('clears only the specific entry on ResourceIntroducerChangedEvent', async () => {
-      const otherUser: User = { id: 2, systemPermissions: { canManageResources: false } } as User;
+      const otherUser: User = { id: 2, systemPermissions: { canManageResources: false } } as unknown as User;
       await service.canControllResource(resourceId, mockUser);
       await service.canControllResource(resourceId, otherUser);
       expect(resourceIntroductionService.hasValidIntroduction).toHaveBeenCalledTimes(2);
@@ -2032,7 +2035,7 @@ describe('ResourceUsageService', () => {
     });
 
     it('evicts only the changed user without scanning other authorization entries', async () => {
-      const otherUser: User = { id: 2, systemPermissions: { canManageResources: false } } as User;
+      const otherUser: User = { id: 2, systemPermissions: { canManageResources: false } } as unknown as User;
       await service.canControllResource(resourceId, mockUser);
       await service.canControllResource(resourceId, otherUser);
 

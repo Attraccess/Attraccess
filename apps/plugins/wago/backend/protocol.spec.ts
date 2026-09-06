@@ -1,6 +1,9 @@
 import {
   compatibilityError,
   configurationDesiredTopic,
+  acknowledgementHardwareId,
+  acknowledgementTopic,
+  acknowledgementWildcardTopic,
   configurationReportedHardwareId,
   configurationReportedTopic,
   configurationReportedWildcardTopic,
@@ -8,6 +11,7 @@ import {
   discoveryTopic,
   heartbeatTopic,
   parseAnnouncement,
+  parseHeartbeat,
 } from './protocol';
 
 describe('WAGO protocol', () => {
@@ -27,6 +31,23 @@ describe('WAGO protocol', () => {
       'attraccess/wago/v1/controllers/cc100-01/heartbeat',
     );
   });
+  it('accepts permanent heartbeats without discovery pairing credentials', () => {
+    const heartbeat = { ...valid, pairingCode: undefined };
+    const payload = Buffer.from(JSON.stringify(heartbeat));
+    expect(parseHeartbeat(payload)).toMatchObject({ hardwareId: valid.hardwareId, sequence: 3 });
+    expect(parseHeartbeat(payload)).not.toHaveProperty('pairingCode');
+    expect(() => parseAnnouncement(payload)).toThrow('pairingCode');
+  });
+
+  it('accepts runtime heartbeats without weakening physical discovery verification', () => {
+    const heartbeat = { ...valid };
+    delete heartbeat.pairingCode;
+    const payload = Buffer.from(JSON.stringify(heartbeat));
+    expect(parseHeartbeat(payload)).toEqual(heartbeat);
+    expect(() => parseAnnouncement(payload)).toThrow('pairingCode is required');
+    expect(() => parseHeartbeat(Buffer.from(JSON.stringify({ ...heartbeat, sequence: -1 })))).toThrow();
+    expect(() => parseHeartbeat(Buffer.from(JSON.stringify({ ...heartbeat, hardwareId: '' })))).toThrow();
+  });
 
   it('uses a versioned configuration protocol below the configurable operational prefix', () => {
     expect(configurationDesiredTopic('customer/wago/', 'cc100-01')).toBe(
@@ -38,13 +59,19 @@ describe('WAGO protocol', () => {
     expect(configurationReportedWildcardTopic('customer/wago')).toBe(
       'customer/wago/v1/controllers/+/configuration/reported',
     );
+    expect(acknowledgementTopic('customer/wago', 'cc100-01')).toBe(
+      'customer/wago/v1/controllers/cc100-01/acknowledgements',
+    );
+    expect(acknowledgementWildcardTopic('customer/wago')).toBe('customer/wago/v1/controllers/+/acknowledgements');
+    expect(acknowledgementHardwareId('customer/wago', 'customer/wago/v1/controllers/cc100-01/acknowledgements')).toBe(
+      'cc100-01',
+    );
     expect(
-      configurationReportedHardwareId(
-        'customer/wago',
-        'customer/wago/v1/controllers/cc100-01/configuration/reported',
-      ),
+      configurationReportedHardwareId('customer/wago', 'customer/wago/v1/controllers/cc100-01/configuration/reported'),
     ).toBe('cc100-01');
-    expect(configurationReportedHardwareId('customer/wago', 'customer/wago/v1/controllers/+/configuration/reported')).toBeNull();
+    expect(
+      configurationReportedHardwareId('customer/wago', 'customer/wago/v1/controllers/+/configuration/reported'),
+    ).toBeNull();
   });
 
   it.each(['', '/', 'customer//wago', 'customer/+/wago', 'customer/#/wago'])(

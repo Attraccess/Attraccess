@@ -9,6 +9,10 @@ export class WagoController {
   @Column({ type: 'varchar', name: 'trust_state' }) trustState!: WagoTrustState;
   @Column({ type: 'varchar', nullable: true }) name!: string | null;
   @Column({ type: 'integer', name: 'mqtt_server_id', nullable: true }) mqttServerId!: number | null;
+  /** Durable permanent-identity provisioning intent, retained until confirmed revocation. */
+  @Column({ type: 'integer', name: 'credential_mqtt_server_id', nullable: true }) credentialMqttServerId?:
+    number | null;
+  @Column({ type: 'varchar', name: 'credential_epoch', nullable: true }) credentialEpoch?: string | null;
   @Column({ type: 'integer', name: 'enrollment_id', nullable: true }) enrollmentId!: number | null;
   @Column({ type: 'varchar', name: 'pairing_code_hash' }) pairingCodeHash!: string;
   @Column({ type: 'varchar', nullable: true }) fingerprint!: string | null;

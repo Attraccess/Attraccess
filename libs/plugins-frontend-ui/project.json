@@ -12,6 +12,20 @@
         "registry": "https://registry.npmjs.org/",
         "access": "public"
       }
+    },
+    "typecheck-tests": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["react-query-client:generate"],
+      "options": {
+        "command": "pnpm exec tsc --noEmit -p libs/plugins-frontend-ui/tsconfig.spec.json"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["react-query-client:generate"],
+      "options": {
+        "command": "pnpm exec tsc --noEmit -p libs/plugins-frontend-ui/tsconfig.spec.json"
+      }
     }
   }
 }

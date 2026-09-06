@@ -36,8 +36,9 @@
     "styles": "frontend/style.css",
     "permissions": [
       "DATABASE_ACCESS",
-       "ACCESS_MQTT_SERVERS",
-       "MANAGE_SECRETS"
+      "ACCESS_MQTT_SERVERS",
+      "MANAGE_SECRETS",
+      "TRIGGER_FLOWS"
     ],
     "sdk": {
       "backend": "^1.9.0",

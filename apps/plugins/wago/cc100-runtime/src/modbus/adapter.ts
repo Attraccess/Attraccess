@@ -2,12 +2,14 @@
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import {
   findProfile,
+  modbusHostIdentity,
   type ModbusConfiguration,
   type ModbusConnection,
   type ModbusMeasurement,
   validateModbus,
 } from '../../../modbus/model';
 import type { DeviceAdapter, Snapshot } from '../runtime';
+import { type WriteAdmission, WriteAdmissionError } from '../runtime-types';
 import { decodeRaw, readPdu, writePdu } from './protocol';
 import { type ModbusTransport, ModbusTransportError, QueuedModbusTransport } from './transports';
 
@@ -45,6 +47,21 @@ export class ModbusDeviceRouter implements DeviceAdapter {
     private readonly onboard: DeviceAdapter,
     private readonly factory: (c: ModbusConnection) => ModbusTransport = (c) => new QueuedModbusTransport(c),
   ) {}
+  validate(snapshot: Snapshot) {
+    const points = snapshot.physicalPoints.filter((point) => !point.modbus);
+    const ids = new Set(points.map((point) => point.id));
+    return (
+      this.onboard.validate?.({
+        ...snapshot,
+        modbus: undefined,
+        physicalPoints: points,
+        logicalChannels: snapshot.logicalChannels.filter((channel) => ids.has(channel.physicalPointId)),
+      }) ?? []
+    );
+  }
+  checkAvailability(): Promise<void> {
+    return this.onboard.checkAvailability?.() ?? Promise.resolve();
+  }
   configure(snapshot: Snapshot): void {
     this.prepareConfiguration(snapshot)();
   }
@@ -154,16 +171,18 @@ export class ModbusDeviceRouter implements DeviceAdapter {
     return true;
   }
   writeMayHaveBeenTransmitted(error: unknown): boolean {
+    if (error instanceof WriteAdmissionError) return false;
     return !(
       error instanceof ModbusTransportError &&
       ['modbus_queue_full', 'modbus_configuration_changed'].includes(error.code)
     );
   }
-  async write(point: Point, value: boolean): Promise<void> {
+  async write(point: Point, value: boolean, admit?: WriteAdmission): Promise<void> {
+    admit?.();
     if (this.suspended) throw new Error('Modbus configuration persistence in progress');
     if (!point.modbus) {
       if (point.hardwareProfile !== '751-9301') throw new Error('meter outputs require an explicit custom action');
-      return this.onboard.write(point, value);
+      return this.onboard.write(point, value, admit);
     }
     const { binding, device, profile, transport } = this.resolve(point);
     const action = profile.actions.find((a) => a.id === binding.actionId);
@@ -172,7 +191,13 @@ export class ModbusDeviceRouter implements DeviceAdapter {
     await transport.request(
       device.unitId,
       writePdu(action.functionCode, action, value ? action.onValue : action.offValue),
-      () => generation === this.generation,
+      Object.assign(
+        () => {
+          admit?.();
+          return generation === this.generation;
+        },
+        { expiresAt: admit?.expiresAt },
+      ),
     );
   }
 }
@@ -180,7 +205,7 @@ export class ModbusDeviceRouter implements DeviceAdapter {
 function sourceIdentity(connection: ModbusConnection, unit: number, m: ModbusMeasurement): string {
   const endpoint =
     connection.transport === 'tcp'
-      ? ['tcp', connection.host.toLowerCase(), connection.port]
+      ? ['tcp', modbusHostIdentity(connection.host), connection.port]
       : ['rtu', connection.path, connection.baudRate, connection.parity, connection.stopBits];
   return JSON.stringify([
     endpoint,

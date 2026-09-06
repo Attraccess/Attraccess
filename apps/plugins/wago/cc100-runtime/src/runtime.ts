@@ -1,18 +1,31 @@
-import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { acquireMeasurements, measurementErrorCode } from './modbus/acquisition';
-// Shared pure configuration model is bundled into the standalone runtime.
-// eslint-disable-next-line @nx/enforce-module-boundaries
-import { type ModbusConfiguration, type ModbusPoint, validateModbus, validateModbusBindings } from '../../modbus/model';
-// The standalone runtime bundles the same plugin-owned wire schema as its consumer.
+// The standalone runtime bundles the plugin-owned measurement contract.
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import { encodeMeasurement } from '../../measurement-contract';
+import { hash, validateDesired } from './configuration';
+import { OutputController } from './output-controller';
+import {
+  WriteAdmissionError,
+  type DeviceAdapter,
+  type RuntimeState,
+  type Snapshot,
+  type StateStore,
+  type Transport,
+  type ValidationError,
+} from './runtime-types';
 
-export const PROTOCOL_VERSION = 1;
-export const MAX_PENDING_CHANNEL_WRITES = 100;
+export { PROTOCOL_VERSION, hash, validateDesired, validateSnapshot } from './configuration';
+export { MAX_PENDING_CHANNEL_WRITES } from './output-controller';
+export { JsonStateStore } from './state-store';
+export type { DeviceAdapter, RuntimeState, Snapshot, Transport, ValidationError } from './runtime-types';
+
+export type DiscoveryClaim = { username: string; password: string; prefix?: string; credentialEpoch?: string };
+const CREDENTIAL_EPOCH = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const CAPABILITIES = [
   'claim',
+  'claim-expiry-v1',
   'heartbeat',
   'configuration-v1',
   'commands',
@@ -20,114 +33,35 @@ export const CAPABILITIES = [
   'measurement',
   'fault',
   'acknowledgement',
+  'credential-rotation-v1',
 ];
 
-type DisconnectPolicy = { mode: 'hold' | 'immediate' | 'watchdog'; timeoutMs?: number };
-export type Snapshot = {
-  version: number;
-  modbus?: ModbusConfiguration;
-  physicalPoints: Array<{
-    id: string;
-    hardwareProfile: '751-9301' | '879-3000' | '879-1300' | 'modbus';
-    channel: number;
-    modbus?: ModbusPoint;
-  }>;
-  logicalChannels: Array<{
-    id: string;
-    physicalPointId: string;
-    profile: string;
-    capabilities: string[];
-    disconnectPolicy: DisconnectPolicy;
-    range?: { minimum: number; maximum: number };
-    pulse?: { durationMs: number };
-    guard?: { channelId: string; when: 'on' | 'off' };
-    feedback?: { channelId: string; expected: 'match' | 'inverse'; timeoutMs: number };
-    measurement?: {
-      unit: string;
-      scale: number;
-      offset: number;
-      kind?: 'live' | 'cumulative';
-    };
-  }>;
-};
-
-export type ValidationError = { path: string; code: string; message: string };
-export type DiscoveryClaim = { username: string; password: string; prefix?: string };
-
-export type RuntimeState = {
-  credentials?: DiscoveryClaim;
-  accepted?: { revision: number; contentHash: string; snapshot: Snapshot };
-  outputs: Record<string, boolean>;
-  uncertainOutputChannelIds?: string[];
-  commandIds: string[];
-};
-
-export interface Transport {
-  publish(topic: string, payload: unknown, options?: { retain?: boolean }): Promise<void>;
-  subscribe(topic: string, listener: (payload: Buffer) => void | Promise<void>): Promise<void>;
-}
-
-export interface DeviceAdapter {
-  configure?(snapshot: Snapshot): void;
-  /** Prepare may throw; the returned synchronous installation must not throw. */
-  prepareConfiguration?(snapshot: Snapshot): () => void;
-  suspend?(): () => void;
-  measurementSource?(point: Snapshot['physicalPoints'][number]): string;
-  shouldPoll?(point: Snapshot['physicalPoints'][number], now: number): boolean;
-  /** True when a failed write may already have reached the physical device. */
-  writeMayHaveBeenTransmitted?(error: unknown): boolean;
-  write(point: Snapshot['physicalPoints'][number], value: boolean): Promise<void>;
-  read(point: Snapshot['physicalPoints'][number]): Promise<boolean | number>;
-}
-
-export class JsonStateStore {
-  private saveQueue: Promise<void> = Promise.resolve();
-
-  constructor(private readonly path: string) {}
-
-  async load(): Promise<RuntimeState> {
-    try {
-      const state = JSON.parse(await readFile(this.path, 'utf8')) as RuntimeState;
-      return { outputs: {}, commandIds: [], ...state };
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { outputs: {}, commandIds: [] };
-      throw error;
-    }
-  }
-
-  async save(state: RuntimeState): Promise<void> {
-    const contents = JSON.stringify(state);
-    const save = this.saveQueue.then(async () => {
-      await mkdir(dirname(this.path), { recursive: true });
-      const temporary = `${this.path}.next`;
-      await writeFile(temporary, contents, { mode: 0o600 });
-      await rename(temporary, this.path);
-    });
-    this.saveQueue = save.catch(() => undefined);
-    await save;
-  }
-}
-
 export class WagoRuntime {
-  private state: RuntimeState = { outputs: {}, commandIds: [] };
+  private state: RuntimeState = { outputs: {}, commandIds: [], commandExpiries: {} };
   private connected = true;
-  private readonly pulses = new Map<string, { generation: number; timer: ReturnType<typeof setTimeout> }>();
-  private pulseSequence = 0;
-  private readonly channelWrites = new Map<string, { tail: Promise<void>; pending: number }>();
-  private readonly watchdogs = new Map<string, ReturnType<typeof setTimeout>>();
-  private readonly feedbackChecks = new Map<
-    string,
-    { timer: ReturnType<typeof setTimeout>; channelId: string; generation: number }
-  >();
-  private feedbackCheckSequence = 0;
-  private readonly feedbackGenerationSequences = new Map<string, number>();
-  private readonly feedbackGenerations = new Map<string, number>();
-  private configurationGeneration = 0;
+  private loaded = false;
   private configurationPending = false;
-  private readonly inFlightCommandIds = new Set<string>();
   private measurementsPending = false;
   private readonly streamId = randomUUID();
-  private readonly sequences = { state: 0, measurements: 0, faults: 0, acknowledgements: 0 };
+  private connectionPolicies = Promise.resolve();
+  private readonly inFlightCommandIds = new Set<string>();
+  private readonly outputs: OutputController;
+  private configurationUpdates = Promise.resolve();
+  private statePublication?: Promise<void>;
+  private stateRefreshRequested = false;
+  private forceStateRefresh = false;
+  private operationalPublications = Promise.resolve();
+  private statePersistence = Promise.resolve();
+  private lastPublishedState?: string;
+  private polling = false;
+  private publishingHeartbeat = false;
+  private credentialUpdates = Promise.resolve();
+  private credentialRotationSubscribed = false;
+  private sequence = 0;
+  private reservedSequence = 0;
+  private initialSequence = 0;
+  private readonly categorySequences = new Map<string, number>();
+  private readonly pendingFaults = new Set<string>();
 
   constructor(
     private readonly options: {
@@ -135,28 +69,138 @@ export class WagoRuntime {
       prefix: string;
       pairingCode: string;
       enrollmentSecret?: string;
-      store: JsonStateStore;
+      store: StateStore;
       transport: Transport;
       device: DeviceAdapter;
+      reconnectCredentials?: (credentials: DiscoveryClaim) => Promise<void>;
     },
-  ) {}
+  ) {
+    this.outputs = new OutputController({
+      device: options.device,
+      getSnapshot: () => this.state.accepted?.snapshot,
+      getState: () => this.state,
+      saveState: () => this.saveState(),
+      publishState: () => this.requestStatePublication(),
+      publishFault: (channelId, error) => this.publishFault(channelId, error),
+    });
+  }
 
-  async start(): Promise<void> {
+  async start(activateConnectionHandling?: () => Promise<void>): Promise<void> {
     this.state = await this.options.store.load();
+    this.sequence = this.state.sequence ?? 0;
+    this.reservedSequence = this.sequence;
+    this.initialSequence = this.sequence;
     if (this.state.accepted) {
-      const errors = validateSnapshot(this.state.accepted.snapshot);
+      const errors = validateDesired({ protocolVersion: 1, ...this.state.accepted });
       if (errors.length) throw new Error('persisted configuration is invalid');
       this.options.device.configure?.(this.state.accepted.snapshot);
     }
+    this.outputs.recoverPulses();
+    this.loaded = true;
+    await this.outputs.applyDisconnectPolicies(this.connected);
     await this.options.transport.subscribe(this.desiredTopic(), (payload) => this.receiveDesired(payload));
     await this.options.transport.subscribe(this.commandTopic(), (payload) => this.receiveCommand(payload));
-    await this.publishHeartbeat();
-    await this.publishState();
+    await this.retryCredentialRotationSubscription();
+    await activateConnectionHandling?.();
+    await this.publishHeartbeat(true);
   }
 
   async receiveClaim(credentials: DiscoveryClaim): Promise<void> {
     this.state.credentials = credentials;
-    await this.options.store.save(this.state);
+    await this.saveState();
+  }
+
+  /** An optional ACL upgrade must not prevent ordinary telemetry/command startup. */
+  async retryCredentialRotationSubscription(): Promise<void> {
+    if (!this.options.reconnectCredentials || this.credentialRotationSubscribed) return;
+    try {
+      await this.options.transport.subscribe(this.credentialRotationTopic(), (payload) =>
+        this.receiveCredentialRotation(payload),
+      );
+      this.credentialRotationSubscribed = true;
+    } catch {
+      this.credentialRotationSubscribed = false;
+    }
+  }
+
+  /** Persist before disconnecting; the acknowledgement is emitted only by the authenticated new connection. */
+  receiveCredentialRotation(payload: Buffer): Promise<void> {
+    const update = this.credentialUpdates.then(async () => {
+      if (!this.loaded || !this.options.reconnectCredentials || !this.state.credentials || payload.length > 8192)
+        return;
+      let input: Record<string, unknown>;
+      try {
+        input = JSON.parse(payload.toString('utf8'));
+      } catch {
+        return;
+      }
+      if (
+        !input ||
+        typeof input !== 'object' ||
+        !Number.isSafeInteger(input.revision) ||
+        (input.revision as number) < 1 ||
+        typeof input.token !== 'string' ||
+        !/^[A-Za-z0-9_-]{43}$/.test(input.token) ||
+        input.username !== this.state.credentials.username ||
+        typeof input.password !== 'string' ||
+        !input.password ||
+        input.password.length > 4096
+      )
+        return;
+      const expiry = typeof input.expiresAt === 'string' ? Date.parse(input.expiresAt) : NaN;
+      if (
+        !Number.isFinite(expiry) ||
+        new Date(expiry).toISOString() !== input.expiresAt ||
+        expiry <= Date.now() ||
+        expiry - Date.now() > 30_000 ||
+        !this.state.credentials.credentialEpoch ||
+        input.credentialEpoch !== this.state.credentials.credentialEpoch
+      )
+        return;
+      const previous = this.state.credentialRotation;
+      if (
+        previous &&
+        ((input.revision as number) < previous.revision ||
+          (input.revision === previous.revision &&
+            (input.token !== previous.token || input.password !== this.state.credentials.password)))
+      )
+        return;
+      const nextCredentials = { ...this.state.credentials, password: input.password };
+      const nextRotation = { revision: input.revision as number, token: input.token };
+      let saved = false;
+      await this.queueStateUpdate(async () => {
+        if (expiry <= Date.now()) return;
+        this.state.credentials = nextCredentials;
+        this.state.credentialRotation = nextRotation;
+        await this.options.store.save(this.state);
+        saved = true;
+      });
+      if (saved && this.state.credentials) await this.options.reconnectCredentials(this.state.credentials);
+    });
+    this.credentialUpdates = update.catch(() => undefined);
+    return update;
+  }
+
+  /** Call only after MQTT CONNECT succeeds with these credentials, including process restart. */
+  async acknowledgeCredentialRotation(authenticated: DiscoveryClaim): Promise<void> {
+    const rotation = this.state.credentialRotation;
+    if (
+      !this.loaded ||
+      !rotation ||
+      authenticated.username !== this.state.credentials?.username ||
+      authenticated.credentialEpoch !== this.state.credentials.credentialEpoch ||
+      authenticated.password !== this.state.credentials.password
+    )
+      return;
+    await this.options.transport.publish(
+      `${this.credentialRotationTopic()}/ack`,
+      { ...rotation, credentialEpoch: this.state.credentials.credentialEpoch, status: 'reconnected' },
+      { retain: true },
+    );
+  }
+
+  private credentialRotationTopic(): string {
+    return this.topic('credentials/rotate');
   }
 
   async receiveDiscoveryClaim(payload: Buffer): Promise<DiscoveryClaim | undefined> {
@@ -167,8 +211,25 @@ export class WagoRuntime {
       return undefined;
     }
     if (!claim || typeof claim !== 'object') return undefined;
-    const { username, password, configuration, acknowledgementToken } = claim as Record<string, unknown>;
+    const { username, password, configuration, acknowledgementToken, expiresAt, credentialEpoch } = claim as Record<
+      string,
+      unknown
+    >;
     if (typeof username !== 'string' || !username || typeof password !== 'string' || !password) return undefined;
+    if (
+      credentialEpoch !== undefined &&
+      (typeof credentialEpoch !== 'string' || !CREDENTIAL_EPOCH.test(credentialEpoch))
+    )
+      return undefined;
+    const expiry = expiresAt === undefined ? undefined : typeof expiresAt === 'string' ? Date.parse(expiresAt) : NaN;
+    if (
+      expiry !== undefined &&
+      (!Number.isFinite(expiry) ||
+        new Date(expiry).toISOString() !== expiresAt ||
+        expiry <= Date.now() ||
+        expiry - Date.now() > 60_000)
+    )
+      return undefined;
     const namespace =
       configuration && typeof configuration === 'object'
         ? (configuration as Record<string, unknown>).namespace
@@ -178,9 +239,25 @@ export class WagoRuntime {
       username,
       password,
       ...(typeof namespace === 'string' ? { prefix: namespace } : {}),
+      ...(typeof credentialEpoch === 'string' ? { credentialEpoch } : {}),
     };
     this.state = await this.options.store.load();
-    await this.receiveClaim(credentials);
+    let saved = false;
+    await this.queueStateUpdate(async () => {
+      if (expiry !== undefined && expiry <= Date.now()) return;
+      if (this.state.credentials?.credentialEpoch && !credentialEpoch) return;
+      if (
+        this.state.credentialRotation &&
+        this.state.credentials?.credentialEpoch === credentialEpoch &&
+        (this.state.credentials?.username !== username || this.state.credentials?.password !== password)
+      )
+        return;
+      if (this.state.credentials?.credentialEpoch !== credentialEpoch) delete this.state.credentialRotation;
+      this.state.credentials = credentials;
+      await this.options.store.save(this.state);
+      saved = true;
+    });
+    if (!saved) return undefined;
     if (typeof acknowledgementToken === 'string' && acknowledgementToken)
       await this.options.transport.publish(`${this.discoveryClaimTopic()}/ack`, { acknowledgementToken });
     return credentials;
@@ -195,7 +272,8 @@ export class WagoRuntime {
         enrollmentSecret: this.options.enrollmentSecret,
         protocolVersion: '1.0.0',
         runtimeVersion: '0.1.0',
-        capabilities: CAPABILITIES,
+        // Discovery proves enrollment reachability, not the permanent credential subscription.
+        capabilities: CAPABILITIES.filter((value) => value !== 'credential-rotation-v1'),
         sequence,
       },
       { retain: true },
@@ -205,7 +283,6 @@ export class WagoRuntime {
   discoveryClaimTopic(): string {
     return `${this.discoveryTopic()}/claim`;
   }
-
   async receiveDesired(payload: Buffer): Promise<void> {
     let desired: { protocolVersion: number; revision: number; contentHash: string; snapshot: Snapshot };
     try {
@@ -215,173 +292,251 @@ export class WagoRuntime {
         { path: '$', code: 'invalid_json', message: 'desired configuration is not valid JSON' },
       ]);
     }
-    const errors = validateDesired(desired);
-    if (!errors.length && desired.contentHash !== hash(desired.snapshot))
-      errors.push({ path: 'contentHash', code: 'hash_mismatch', message: 'content hash does not match snapshot' });
-    if (errors.length) return this.reportRejected(desired.revision, desired.contentHash, errors);
-    if (this.state.accepted?.revision === desired.revision && this.state.accepted.contentHash === desired.contentHash) {
+    await this.runConfigurationUpdate(async () => {
+      const errors = validateDesired(desired);
+      if (!errors.length && desired.contentHash !== hash(desired.snapshot))
+        errors.push({ path: 'contentHash', code: 'hash_mismatch', message: 'content hash does not match snapshot' });
+      if (!errors.length) errors.push(...(this.options.device.validate?.(desired.snapshot) ?? []));
+      if (errors.length) return this.reportRejected(desired.revision, desired.contentHash, errors);
+      if (
+        this.state.accepted?.revision === desired.revision &&
+        this.state.accepted.contentHash === desired.contentHash
+      ) {
+        await this.publishReport(desired.revision, desired.contentHash, []);
+        return;
+      }
+      if ((this.state.accepted?.revision ?? 0) > desired.revision)
+        return this.reportRejected(desired.revision, desired.contentHash, [
+          { path: 'revision', code: 'stale_revision', message: 'configuration revision is stale' },
+        ]);
+      if (
+        this.options.device.prepareConfiguration &&
+        (this.outputs.busy ||
+          this.inFlightCommandIds.size ||
+          this.state.uncertainOutputChannelIds?.length ||
+          this.state.pendingPulseChannelIds?.length ||
+          Object.values(this.state.outputs).some(Boolean))
+      )
+        return this.reportRejected(desired.revision, desired.contentHash, [
+          {
+            path: 'snapshot',
+            code: 'outputs_busy',
+            message:
+              'finish pending commands and confirm outputs off, including uncertain outputs, before reconfiguration',
+          },
+        ]);
+      const installRouting =
+        this.options.device.prepareConfiguration?.(desired.snapshot) ??
+        (() => this.options.device.configure?.(desired.snapshot));
+      // Keep the command barrier through this commit so old-revision commands cannot cross the boundary.
+      try {
+        await this.outputs.replaceConfiguration(async () => {
+          const accepted = {
+            revision: desired.revision,
+            contentHash: desired.contentHash,
+            snapshot: desired.snapshot,
+          };
+          this.configurationPending = true;
+          const resume = this.options.device.suspend?.();
+          try {
+            await this.queueStateUpdate(async () => {
+              await this.options.store.save({ ...this.state, accepted });
+              installRouting();
+              this.state.accepted = accepted;
+            });
+          } finally {
+            resume?.();
+            this.configurationPending = false;
+          }
+        });
+      } catch {
+        return this.reportRejected(desired.revision, desired.contentHash, [
+          { path: 'snapshot', code: 'pulse_shutdown_failed', message: 'failed to de-energize active pulse' },
+        ]);
+      }
       await this.publishReport(desired.revision, desired.contentHash, []);
-      return;
-    }
-    if (this.configurationPending)
-      return this.reportRejected(desired.revision, desired.contentHash, [
-        { path: 'snapshot', code: 'configuration_busy', message: 'configuration persistence is in progress' },
-      ]);
-    // A timed pulse must keep its old route until OFF completes; never suspend its shutoff during disk I/O.
-    if (
-      this.options.device.prepareConfiguration &&
-      (this.inFlightCommandIds.size ||
-        this.channelWrites.size ||
-        this.pulses.size ||
-        this.state.uncertainOutputChannelIds?.length ||
-        Object.values(this.state.outputs).some(Boolean))
-    )
-      return this.reportRejected(desired.revision, desired.contentHash, [
-        {
-          path: 'snapshot',
-          code: 'outputs_busy',
-          message:
-            'finish pending commands and confirm outputs off, including uncertain outputs, before reconfiguration',
-        },
-      ]);
-    // Prepare is side-effect free. Keep the old snapshot and routing active as a pair until save succeeds.
-    const installRouting =
-      this.options.device.prepareConfiguration?.(desired.snapshot) ??
-      (() => this.options.device.configure?.(desired.snapshot));
-    this.configurationPending = true;
-    this.configurationGeneration += 1;
-    const resume = this.options.device.suspend?.();
-    try {
-      const candidate: RuntimeState = {
-        ...this.state,
-        accepted: { revision: desired.revision, contentHash: desired.contentHash, snapshot: desired.snapshot },
-      };
-      await this.options.store.save(candidate);
-      // No await between these two installations: callbacks cannot observe mixed generations.
-      installRouting();
-      this.state = candidate;
-      this.feedbackChecks.forEach(({ timer }) => clearTimeout(timer));
-      this.feedbackChecks.clear();
-    } finally {
-      resume?.();
-      this.configurationPending = false;
-    }
-    await this.publishReport(desired.revision, desired.contentHash, []);
-    await this.publishState();
+      await this.publishState();
+    });
   }
 
   async receiveCommand(payload: Buffer): Promise<void> {
-    let command: { id: string; channelId: string; action: 'set' | 'pulse'; value?: boolean };
+    let command: {
+      id: string;
+      expiresAt?: unknown;
+      channelId: string;
+      action: 'set' | 'pulse';
+      value?: boolean;
+      expectedConfigurationRevision?: unknown;
+    };
     try {
       command = JSON.parse(payload.toString('utf8'));
     } catch {
       return;
     }
-    if (!command?.id || !command.channelId || !['set', 'pulse'].includes(command.action)) return;
-    if (this.configurationPending)
-      return this.acknowledge(command.id, 'rejected', 'configuration persistence is in progress');
+    if (
+      typeof command?.id !== 'string' ||
+      !command.id ||
+      !command.channelId ||
+      !['set', 'pulse'].includes(command.action)
+    )
+      return;
     if (command.action === 'set' && typeof command.value !== 'boolean')
-      return this.acknowledge(command.id, 'rejected', 'set commands require a boolean value');
-    if (this.state.commandIds.includes(command.id)) return this.acknowledge(command.id, 'duplicate');
+      return this.acknowledge(command.id, 'rejected', 'set commands require a boolean value', 'invalid_command');
+    const expiresAt = command.expiresAt;
+    if (typeof expiresAt !== 'string' || !Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) <= Date.now())
+      return this.acknowledge(command.id, 'rejected', 'command has expired', 'expired');
+    const expectedConfigurationRevision = command.expectedConfigurationRevision;
+    if (
+      typeof expectedConfigurationRevision !== 'number' ||
+      !Number.isSafeInteger(expectedConfigurationRevision) ||
+      expectedConfigurationRevision <= 0
+    )
+      return this.acknowledge(command.id, 'rejected', 'command requires a configuration revision', 'invalid_command');
+    if (this.configurationPending)
+      return this.acknowledge(command.id, 'rejected', 'configuration persistence is in progress', 'configuration_busy');
+    this.pruneCommandExpiries();
+    if (this.state.commandIds.includes(command.id) || this.state.commandExpiries?.[command.id])
+      return this.acknowledge(command.id, 'duplicate');
     if (this.inFlightCommandIds.has(command.id)) return this.acknowledge(command.id, 'duplicate');
     this.inFlightCommandIds.add(command.id);
     try {
+      if (this.state.accepted?.revision !== expectedConfigurationRevision)
+        return this.acknowledge(command.id, 'rejected', 'controller configuration revision is stale', 'stale_revision');
+      if (this.state.accepted && this.options.device.validate?.(this.state.accepted.snapshot).length)
+        return this.acknowledge(
+          command.id,
+          'rejected',
+          'stored configuration is unsupported by this hardware profile; publish a corrected configuration',
+          'unsupported_point',
+        );
       const channel = this.state.accepted?.snapshot.logicalChannels.find((item) => item.id === command.channelId);
       if (!channel || !channel.capabilities.includes('output'))
-        return this.acknowledge(command.id, 'rejected', 'unknown output channel');
-      if (!(await this.isGuardSatisfied(channel)))
-        return this.acknowledge(command.id, 'rejected', 'operational guard is not satisfied');
+        return this.acknowledge(command.id, 'rejected', 'unknown output channel', 'unknown_channel');
       const duration = command.action === 'pulse' ? channel.pulse?.durationMs : undefined;
       if (command.action === 'pulse' && !duration)
-        return this.acknowledge(command.id, 'rejected', 'channel does not define a pulse duration');
+        return this.acknowledge(
+          command.id,
+          'rejected',
+          'channel does not define a pulse duration',
+          'unsupported_operation',
+        );
 
       // Keep the reservation through an unexpected exit after the physical write.
-      this.state.commandIds = [...this.state.commandIds, command.id].slice(-100);
-      await this.options.store.save(this.state);
-      if (command.action === 'pulse') {
-        const generation = this.reserveFeedbackGeneration(channel.id);
-        const result = await this.writeChannel(
-          channel,
-          true,
-          (configurationGeneration) => this.schedulePulse(channel, duration, generation, configurationGeneration),
-          generation,
-          true,
-          undefined,
-          true,
+      // Unknown legacy expiries cannot safely be evicted; known IDs are pruned at expiry.
+      this.state.commandIds = [...this.state.commandIds, command.id];
+      this.state.commandExpiries = { ...this.state.commandExpiries, [command.id]: expiresAt };
+      await this.saveState();
+      const failure = await this.outputs.runForCommand(channel.id, async () => {
+        const currentChannel = this.state.accepted?.snapshot.logicalChannels.find(
+          (item) => item.id === command.channelId,
         );
-        if (result === 'uncertain')
-          return this.acknowledge(command.id, 'rejected', 'device write outcome is uncertain');
-        if (result !== 'written')
-          return this.rejectFailedWrite(
-            command.id,
-            result === 'queue_full' ? 'channel write queue is full' : undefined,
-          );
-      } else {
-        const result = await this.writeChannel(
-          channel,
-          command.value,
-          undefined,
-          this.reserveFeedbackGeneration(channel.id),
-          false,
-          undefined,
-          true,
+        if (
+          this.state.accepted?.revision !== expectedConfigurationRevision ||
+          !currentChannel?.capabilities.includes('output')
+        ) {
+          await this.releaseCommand(command.id);
+          return { error: 'controller configuration revision is stale', code: 'stale_revision' };
+        }
+        if (Date.parse(expiresAt) <= Date.now()) {
+          await this.releaseCommand(command.id);
+          return { error: 'command has expired', code: 'expired' };
+        }
+        if (!(await this.outputs.isGuardSatisfied(currentChannel))) {
+          await this.releaseCommand(command.id);
+          return { error: 'operational guard is not satisfied', code: 'guard_rejected' };
+        }
+        const admit = Object.assign(
+          () => {
+            if (Date.parse(expiresAt) <= Date.now()) throw new WriteAdmissionError('expired');
+          },
+          { expiresAt: Date.parse(expiresAt) },
         );
-        if (result === 'uncertain')
-          return this.acknowledge(command.id, 'rejected', 'device write outcome is uncertain');
-        if (result !== 'written')
-          return this.rejectFailedWrite(
-            command.id,
-            result === 'queue_full' ? 'channel write queue is full' : undefined,
-          );
+        if (command.action === 'pulse') {
+          const currentDuration = currentChannel.pulse?.durationMs;
+          if (!currentDuration) return this.releaseFailedWrite(command.id, currentChannel.id);
+          if (
+            !(await this.outputs.writeWhileQueued(
+              currentChannel,
+              true,
+              () => this.outputs.schedulePulse(currentChannel, currentDuration),
+              undefined,
+              admit,
+              currentDuration,
+            ))
+          )
+            return this.releaseFailedWrite(command.id, currentChannel.id);
+        } else if (
+          !(await this.outputs.writeWhileQueued(
+            currentChannel,
+            command.value,
+            undefined,
+            () => this.outputs.clearPulse(currentChannel.id),
+            admit,
+          ))
+        )
+          return this.releaseFailedWrite(command.id, currentChannel.id);
+        return undefined;
+      });
+      // Release the physical channel/configuration barrier before waiting on MQTT.
+      await this.acknowledge(command.id, failure ? 'rejected' : 'accepted', failure?.error, failure?.code);
+    } catch (error) {
+      if (error instanceof WriteAdmissionError) {
+        await this.releaseCommand(command.id);
+        await this.acknowledge(command.id, 'rejected', error.message, error.code);
+        return;
       }
-      await this.acknowledge(command.id, 'accepted');
+      if (!(error instanceof Error) || error.message !== 'channel write queue is full') throw error;
+      await this.releaseCommand(command.id);
+      await this.acknowledge(command.id, 'rejected', error.message, 'queue_full');
     } finally {
       this.inFlightCommandIds.delete(command.id);
     }
   }
 
   async setConnected(connected: boolean): Promise<void> {
-    this.connected = connected;
-    if (connected) {
-      this.watchdogs.forEach(clearTimeout);
-      this.watchdogs.clear();
-      await this.publishState();
+    if (!this.loaded) {
+      this.connected = connected;
       return;
     }
-    let stateSaveFailed = false;
-    for (const channel of this.state.accepted?.snapshot.logicalChannels ?? []) {
-      if (!channel.capabilities.includes('output')) continue;
-      if (channel.disconnectPolicy.mode === 'immediate') {
-        try {
-          const result = await this.writeChannel(channel, false);
-          if (result !== 'written') stateSaveFailed = true;
-        } catch {
-          // Continue the safety shutdown even when durable state cannot be updated for one output.
-          stateSaveFailed = true;
-        }
-      }
-      if (channel.disconnectPolicy.mode === 'watchdog')
-        this.watchdogs.set(
-          channel.id,
-          setTimeout(
-            () => void this.ignoreTimerRejection(() => this.writeChannel(channel, false)),
-            channel.disconnectPolicy.timeoutMs,
-          ),
-        );
-    }
-    if (stateSaveFailed) await this.options.store.save(this.state);
-    await this.publishState();
+    const transition = this.connectionPolicies.then(async () => {
+      this.connected = connected;
+      await this.outputs.applyDisconnectPolicies(connected);
+    });
+    this.connectionPolicies = transition.catch(() => undefined);
+    await transition;
+    // Connection callbacks must complete after the hardware policy. Otherwise a
+    // stalled MQTT state publish can delay a following disconnect shutdown.
+    this.requestStatePublication();
   }
 
-  async publishHeartbeat(): Promise<void> {
-    await this.options.transport.publish(this.topic('heartbeat'), {
-      hardwareId: this.options.hardwareId,
-      pairingCode: this.options.pairingCode,
-      protocolVersion: '1.0.0',
-      runtimeVersion: '0.1.0',
-      capabilities: CAPABILITIES,
-      sequence: Date.now(),
-    });
+  async publishHeartbeat(ignoreStatePublicationFailure = false): Promise<void> {
+    if (this.publishingHeartbeat) return;
+    this.publishingHeartbeat = true;
+    try {
+      try {
+        await this.publishOperational('heartbeat', {
+          hardwareId: this.options.hardwareId,
+          pairingCode: this.options.pairingCode,
+          protocolVersion: '1.0.0',
+          runtimeVersion: '0.1.0',
+          capabilities:
+            this.credentialRotationSubscribed && this.state.credentials?.credentialEpoch
+              ? CAPABILITIES
+              : CAPABILITIES.filter((value) => value !== 'credential-rotation-v1'),
+        });
+      } catch (error) {
+        if (!ignoreStatePublicationFailure) throw error;
+      }
+      try {
+        await this.publishState();
+      } catch (error) {
+        // State telemetry reserves a durable sequence. A read-only state volume
+        // must not prevent startup or disconnect safety policies from running.
+        if (!ignoreStatePublicationFailure) throw error;
+      }
+    } finally {
+      this.publishingHeartbeat = false;
+    }
   }
 
   async publishMeasurements(): Promise<void> {
@@ -398,7 +553,13 @@ export class WagoRuntime {
             const { raw, timestamp } = reading;
             const transform = channel.measurement ?? { unit: 'percent', scale: 1, offset: 0 };
             const measurement = encodeMeasurement(channel.id, raw, transform);
-            await this.publishOperational('measurements', measurement, undefined, timestamp);
+            await this.publishOperational(
+              'measurements',
+              measurement,
+              undefined,
+              () => accepted === this.state.accepted && !this.configurationPending,
+              timestamp,
+            );
           } catch (error) {
             await this.publishOperational('faults', {
               channelId: channel.id,
@@ -413,237 +574,108 @@ export class WagoRuntime {
     }
   }
 
-  private async writeChannel(
-    channel: Snapshot['logicalChannels'][number],
-    value: boolean,
-    onWritten?: (configurationGeneration: number) => void,
-    feedbackGeneration = this.reserveFeedbackGeneration(channel.id),
-    preservePulse = false,
-    shouldWrite?: () => boolean,
-    rejectWhenQueued = false,
-    configurationGeneration = this.configurationGeneration,
-  ): Promise<'written' | 'failed' | 'uncertain' | 'queue_full'> {
-    return this.enqueueChannelWrite(
-      channel.id,
-      async () => {
-        if (shouldWrite && !shouldWrite()) return 'failed';
-        return this.writeChannelWhileQueued(
-          channel,
-          value,
-          onWritten,
-          feedbackGeneration,
-          preservePulse,
-          configurationGeneration,
-        );
-      },
-      rejectWhenQueued,
-    );
-  }
-
-  private async writeChannelWhileQueued(
-    channel: Snapshot['logicalChannels'][number],
-    value: boolean,
-    onWritten: ((configurationGeneration: number) => void) | undefined,
-    feedbackGeneration: number,
-    preservePulse: boolean,
-    configurationGeneration: number,
-  ): Promise<'written' | 'failed' | 'uncertain'> {
-    if (this.configurationPending || configurationGeneration !== this.configurationGeneration) return 'failed';
-    const point = this.state.accepted?.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
-    if (!point) return 'failed';
-    if (this.options.device.prepareConfiguration) {
-      // Persist before ON; disk failure must not suppress OFF. Prior durable ON/uncertainty remains conservative.
-      this.state.uncertainOutputChannelIds = [
-        ...new Set([...(this.state.uncertainOutputChannelIds ?? []), channel.id]),
-      ];
-      if (value) await this.options.store.save(this.state);
-    }
+  async pollInputs(): Promise<void> {
+    // Slow I/O/MQTT must not create an unbounded interval backlog.
+    if (this.polling || !this.connected) return;
+    this.polling = true;
     try {
-      await this.options.device.write(point, value);
-    } catch (error) {
-      try {
-        await this.publishOperational('faults', {
-          channelId: channel.id,
-          code: 'device_write_failed',
-          message: error instanceof Error ? error.message : String(error),
-        });
-      } catch {
-        // A fault-publication failure must not turn a known failed write into an accepted command.
-      }
-      return this.options.device.writeMayHaveBeenTransmitted?.(error) ? 'uncertain' : 'failed';
+      await this.publishState(false);
+    } finally {
+      this.polling = false;
     }
-    const feedbackIsCurrent = this.commitFeedbackGeneration(channel.id, feedbackGeneration);
-    // A pulse must always arrange its physical shutoff after it is written, even
-    // when a newer command has superseded its feedback generation.
-    onWritten?.(configurationGeneration);
-    this.state.outputs[channel.id] = value;
-    if (this.options.device.prepareConfiguration)
-      this.state.uncertainOutputChannelIds = (this.state.uncertainOutputChannelIds ?? []).filter(
-        (id) => id !== channel.id,
-      );
-    if (feedbackIsCurrent && configurationGeneration === this.configurationGeneration)
-      this.scheduleFeedbackCheck(channel, value, feedbackGeneration, configurationGeneration);
-    try {
-      await this.options.store.save(this.state);
-    } catch {
-      if (this.options.device.prepareConfiguration)
-        this.state.uncertainOutputChannelIds = [
-          ...new Set([...(this.state.uncertainOutputChannelIds ?? []), channel.id]),
-        ];
-      // Do not acknowledge an operation whose durable output state is stale.
-      throw new Error('failed to persist channel state');
-    }
-    // Only an accepted newer output write cancels a pending pulse shutoff.
-    if (!preservePulse) this.clearPulse(channel.id);
-    try {
-      await this.publishState();
-    } catch {
-      // Retained-state publication does not change the durable state of a successful write.
-    }
-    return 'written';
   }
 
-  private schedulePulse(
-    channel: Snapshot['logicalChannels'][number],
-    duration: number,
-    feedbackGeneration: number,
-    configurationGeneration: number,
-  ): void {
-    this.clearPulse(channel.id);
-    const generation = ++this.pulseSequence;
-    const timer = setTimeout(
-      () =>
-        void this.ignoreTimerRejection(() =>
-          this.writeChannel(
-            channel,
-            false,
-            undefined,
-            feedbackGeneration,
-            true,
-            () => {
-              if (this.pulses.get(channel.id)?.generation !== generation) return false;
-              this.pulses.delete(channel.id);
-              return true;
-            },
-            false,
-            configurationGeneration,
-          ),
-        ),
-      duration,
-    );
-    this.pulses.set(channel.id, { generation, timer });
-  }
-
-  private clearPulse(channelId: string): void {
-    const pulse = this.pulses.get(channelId);
-    if (!pulse) return;
-    clearTimeout(pulse.timer);
-    this.pulses.delete(channelId);
-  }
-
-  private async enqueueChannelWrite<T>(
-    channelId: string,
-    write: () => Promise<T>,
-    rejectWhenQueued = false,
-  ): Promise<T | 'queue_full'> {
-    const queue = this.channelWrites.get(channelId) ?? { tail: Promise.resolve(), pending: 0 };
-    if (rejectWhenQueued && queue.pending >= MAX_PENDING_CHANNEL_WRITES) return 'queue_full';
-    queue.pending += 1;
-    const next = queue.tail.then(write);
-    queue.tail = next.then(
-      () => undefined,
-      () => undefined,
-    );
-    this.channelWrites.set(channelId, queue);
-    void queue.tail.finally(() => {
-      queue.pending -= 1;
-      if (queue.pending === 0) this.channelWrites.delete(channelId);
-    });
-    return next;
-  }
-  private reserveFeedbackGeneration(channelId: string): number {
-    const generation = (this.feedbackGenerationSequences.get(channelId) ?? 0) + 1;
-    this.feedbackGenerationSequences.set(channelId, generation);
-    return generation;
-  }
-  private commitFeedbackGeneration(channelId: string, generation: number): boolean {
-    this.feedbackGenerations.set(channelId, generation);
-    for (const [checkId, check] of this.feedbackChecks) {
-      if (check.channelId === channelId && check.generation !== generation) {
-        clearTimeout(check.timer);
-        this.feedbackChecks.delete(checkId);
-      }
-    }
-    return true;
-  }
-  private scheduleFeedbackCheck(
-    channel: Snapshot['logicalChannels'][number],
-    value: boolean,
-    generation: number,
-    configurationGeneration: number,
-  ): void {
-    if (!channel.feedback) return;
-    const checkId = `${channel.id}:${++this.feedbackCheckSequence}`;
-    const timer = setTimeout(() => {
-      this.feedbackChecks.delete(checkId);
-      void this.ignoreTimerRejection(() => this.verifyFeedback(channel, value, generation, configurationGeneration));
-    }, channel.feedback.timeoutMs);
-    this.feedbackChecks.set(checkId, { timer, channelId: channel.id, generation });
-  }
-  private async verifyFeedback(
-    channel: Snapshot['logicalChannels'][number],
-    value: boolean,
-    generation: number,
-    configurationGeneration: number,
-  ): Promise<void> {
-    if (
-      this.feedbackGenerations.get(channel.id) !== generation ||
-      this.configurationGeneration !== configurationGeneration
-    )
+  private requestStatePublication(): void {
+    if (this.statePublication) {
+      this.stateRefreshRequested = true;
+      this.forceStateRefresh = true;
       return;
-    const feedback = channel.feedback;
-    const snapshot = this.state.accepted?.snapshot;
-    const feedbackChannel = snapshot?.logicalChannels.find((item) => item.id === feedback?.channelId);
-    const point = snapshot?.physicalPoints.find((item) => item.id === feedbackChannel?.physicalPointId);
-    if (!feedback || !point) return;
-    try {
-      const actual = Boolean(await this.options.device.read(point));
-      const expected = feedback.expected === 'match' ? value : !value;
-      if (
-        actual !== expected &&
-        this.feedbackGenerations.get(channel.id) === generation &&
-        this.configurationGeneration === configurationGeneration
-      )
-        await this.publishOperational('faults', {
-          channelId: channel.id,
-          code: 'feedback_mismatch',
-          message: 'configured feedback does not match the requested output state',
+    }
+    void this.publishState().catch(() => undefined);
+  }
+
+  private publishState(force = true): Promise<void> {
+    this.stateRefreshRequested = true;
+    this.forceStateRefresh ||= force;
+    if (!this.statePublication) {
+      this.statePublication = Promise.resolve()
+        .then(async () => {
+          while (this.stateRefreshRequested) {
+            const refreshForced = this.forceStateRefresh;
+            this.stateRefreshRequested = false;
+            this.forceStateRefresh = false;
+            await this.readAndPublishState(refreshForced);
+          }
+        })
+        .finally(() => {
+          this.statePublication = undefined;
+          if (this.stateRefreshRequested) this.requestStatePublication();
         });
+    }
+    return this.statePublication;
+  }
+
+  private async readAndPublishState(force: boolean): Promise<void> {
+    const accepted = this.state.accepted;
+    const inputs: Record<string, boolean> = Object.create(null);
+    const outputs: Record<string, boolean> = Object.create(null);
+    const commandedOutputs: Record<string, boolean> = Object.create(null);
+    const errors = accepted ? [...(this.options.device.validate?.(accepted.snapshot) ?? [])] : [];
+    const supported = errors.length === 0;
+    try {
+      await this.options.device.checkAvailability?.();
     } catch (error) {
-      if (
-        this.feedbackGenerations.get(channel.id) !== generation ||
-        this.configurationGeneration !== configurationGeneration
-      )
-        return;
-      await this.publishOperational('faults', {
-        channelId: channel.id,
-        code: 'feedback_read_failed',
-        message: error instanceof Error ? error.message : String(error),
+      errors.push({
+        path: 'hardware',
+        code: 'hardware_unavailable',
+        message: `Check firmware profile, DIN/DOUT mounts and runtime UID permissions: ${error instanceof Error ? error.message : String(error)}`,
       });
     }
-  }
-
-  private async publishState(): Promise<void> {
-    await this.publishOperational(
-      'state',
-      {
-        connected: this.connected,
-        revision: this.state.accepted?.revision ?? null,
-        contentHash: this.state.accepted?.contentHash ?? null,
-        outputs: this.state.outputs,
+    if (accepted && supported) {
+      for (const channel of accepted.snapshot.logicalChannels) {
+        const output = channel.capabilities.includes('output');
+        if (!output && !channel.capabilities.includes('input')) continue;
+        if (output && typeof this.state.outputs[channel.id] === 'boolean')
+          commandedOutputs[channel.id] = this.state.outputs[channel.id];
+        const point = accepted.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
+        if (!point || point.modbus) continue;
+        try {
+          const value = await this.options.device.read(point);
+          if (typeof value !== 'boolean') throw new Error('digital state requires a boolean value');
+          (output ? outputs : inputs)[channel.id] = value;
+        } catch (error) {
+          errors.push({
+            path: channel.id,
+            code: 'digital_read_failed',
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+    // A read started on an old configuration must never populate the new revision.
+    if (accepted !== this.state.accepted) return;
+    const payload = {
+      connected: this.connected,
+      revision: accepted?.revision ?? null,
+      contentHash: accepted?.contentHash ?? null,
+      inputs,
+      outputs,
+      commandedOutputs,
+      readiness: {
+        configurationAccepted: Boolean(accepted),
+        hardwareAvailable: !errors.length,
+        ready: Boolean(accepted) && !errors.length && this.connected,
+        errors,
       },
-      { retain: true },
-    );
+    };
+    const signature = JSON.stringify(payload);
+    if (!force && signature === this.lastPublishedState) return;
+    for (const error of errors) {
+      if (error.code === 'digital_read_failed')
+        void this.publishFault(error.path, { code: error.code, message: error.message }).catch(() => undefined);
+    }
+    await this.publishOperational('state', payload, { retain: true }, () => accepted === this.state.accepted);
+    if (accepted === this.state.accepted) this.lastPublishedState = signature;
   }
   private publishReport(revision: number, contentHash: string, errors: ValidationError[]): Promise<void> {
     return this.options.transport.publish(
@@ -655,25 +687,83 @@ export class WagoRuntime {
   private reportRejected(revision: number, contentHash: string, errors: ValidationError[]): Promise<void> {
     return this.publishReport(revision, contentHash, errors);
   }
-  private acknowledge(id: string, status: 'accepted' | 'duplicate' | 'rejected', error?: string): Promise<void> {
-    return this.publishOperational('acknowledgements', { id, status, error });
+  private publishFault(channelId: string, error: unknown): Promise<void> {
+    const fault =
+      error && typeof error === 'object' && 'code' in error && 'message' in error
+        ? (error as { code: string; message: string })
+        : {
+            code: 'device_write_failed',
+            message: error instanceof Error ? error.message : String(error),
+          };
+    const key = JSON.stringify([channelId, fault.code]);
+    // Repeated failed reads/shutoff retries must not accumulate pending MQTT
+    // publications. Retained readiness still carries every current read error.
+    if (this.pendingFaults.has(key) || this.pendingFaults.size >= 100) return Promise.resolve();
+    this.pendingFaults.add(key);
+    return this.publishOperational('faults', { channelId, ...fault }).finally(() => {
+      this.pendingFaults.delete(key);
+    });
   }
-  private publishOperational(
-    category: keyof WagoRuntime['sequences'],
-    payload: object,
-    options?: { retain?: boolean },
-    timestamp = new Date().toISOString(),
+  private acknowledge(
+    id: string,
+    status: 'accepted' | 'duplicate' | 'rejected',
+    error?: string,
+    code?: string,
   ): Promise<void> {
-    return this.options.transport.publish(
-      this.topic(category),
-      {
-        ...payload,
-        timestamp,
-        streamId: this.streamId,
-        sequence: ++this.sequences[category],
-      },
-      options,
+    return this.publishOperational('acknowledgements', { id, status, error, code });
+  }
+
+  private publishOperational(
+    suffix: string,
+    payload: Record<string, unknown>,
+    options?: { retain?: boolean },
+    isCurrent = () => true,
+    timestamp?: string,
+  ): Promise<void> {
+    const reservation = this.operationalPublications.then(async () => {
+      // Reserve before publishing. Other state saves retain this high-water mark;
+      // restart skips unused reservations rather than replaying sequence numbers.
+      const nextSequence = (this.categorySequences.get(suffix) ?? this.initialSequence) + 1;
+      if (nextSequence > this.reservedSequence) {
+        const reserved = this.sequence + 100;
+        await this.queueStateUpdate(async () => {
+          await this.options.store.save({ ...this.state, sequence: reserved });
+          this.state.sequence = reserved;
+          this.reservedSequence = reserved;
+        });
+      }
+      this.categorySequences.set(suffix, nextSequence);
+      this.sequence = Math.max(this.sequence, nextSequence);
+      return { timestamp: timestamp ?? new Date().toISOString(), sequence: nextSequence, streamId: this.streamId };
+    });
+    // Serialize sequence allocation, not broker acknowledgements: an in-flight
+    // retained-state publish must not hold up a feedback fault or command ack.
+    this.operationalPublications = reservation.then(
+      () => undefined,
+      () => undefined,
     );
+    return reservation.then((metadata) =>
+      isCurrent()
+        ? this.options.transport.publish(
+            this.topic(suffix),
+            {
+              ...payload,
+              ...metadata,
+            },
+            options,
+          )
+        : undefined,
+    );
+  }
+
+  private saveState(): Promise<void> {
+    return this.queueStateUpdate(() => this.options.store.save(this.state));
+  }
+
+  private queueStateUpdate(update: () => Promise<void>): Promise<void> {
+    const queued = this.statePersistence.then(update);
+    this.statePersistence = queued.catch(() => undefined);
+    return queued;
   }
   private topic(suffix: string): string {
     return `${this.options.prefix.replace(/^\/+|\/+$/g, '')}/v1/controllers/${this.options.hardwareId}/${suffix}`;
@@ -687,282 +777,41 @@ export class WagoRuntime {
   private commandTopic(): string {
     return this.topic('commands');
   }
-  private async isGuardSatisfied(channel: Snapshot['logicalChannels'][number]): Promise<boolean> {
-    if (!channel.guard) return true;
-    const snapshot = this.state.accepted?.snapshot;
-    const guardChannel = snapshot?.logicalChannels.find((item) => item.id === channel.guard?.channelId);
-    const guardPoint = snapshot?.physicalPoints.find((item) => item.id === guardChannel?.physicalPointId);
-    if (!guardPoint) return false;
-    try {
-      return Boolean(await this.options.device.read(guardPoint)) === (channel.guard.when === 'on');
-    } catch {
-      return false;
-    }
+  private async releaseFailedWrite(id: string, channelId: string): Promise<{ error: string; code: string }> {
+    if (this.outputs.isWriteUncertain(channelId))
+      return { error: 'device write outcome is uncertain', code: 'device_write_uncertain' };
+    await this.releaseCommand(id);
+    return { error: 'device write failed', code: 'device_write_failed' };
   }
-  private async rejectFailedWrite(id: string, error = 'device write failed'): Promise<void> {
+  private async releaseCommand(id: string): Promise<void> {
     this.state.commandIds = this.state.commandIds.filter((commandId) => commandId !== id);
-    await this.options.store.save(this.state);
-    await this.acknowledge(id, 'rejected', error);
+    if (this.state.commandExpiries) delete this.state.commandExpiries[id];
+    await this.saveState();
   }
-  private ignoreTimerRejection(callback: () => Promise<unknown>): void {
-    void callback().catch(() => undefined);
+  private pruneCommandExpiries(): void {
+    const now = Date.now();
+    const expired = new Set(
+      Object.entries(this.state.commandExpiries ?? {})
+        .filter(([, expiresAt]) => Number.isFinite(Date.parse(expiresAt)) && Date.parse(expiresAt) <= now)
+        .map(([id]) => id),
+    );
+    this.state.commandExpiries = Object.fromEntries(
+      Object.entries(this.state.commandExpiries ?? {}).filter(([id]) => !expired.has(id)),
+    );
+    this.state.commandIds = this.state.commandIds.filter((id) => !expired.has(id));
   }
-}
 
-export function hash(value: unknown): string {
-  return createHash('sha256')
-    .update(JSON.stringify(sort(value)))
-    .digest('hex');
-}
-
-export function validateDesired(value: unknown): ValidationError[] {
-  if (!value || typeof value !== 'object')
-    return [{ path: '$', code: 'invalid_snapshot', message: 'desired configuration must be an object' }];
-  const desired = value as Record<string, unknown>;
-  const errors: ValidationError[] = [];
-  if (desired.protocolVersion !== PROTOCOL_VERSION)
-    errors.push({ path: 'protocolVersion', code: 'unsupported_version', message: 'protocolVersion must be 1' });
-  if (!Number.isSafeInteger(desired.revision) || (desired.revision as number) < 1)
-    errors.push({ path: 'revision', code: 'invalid_revision', message: 'revision must be a positive integer' });
-  if (typeof desired.contentHash !== 'string')
-    errors.push({ path: 'contentHash', code: 'invalid_hash', message: 'contentHash is required' });
-  errors.push(...validateSnapshot(desired.snapshot));
-  return errors;
-}
-
-export function validateSnapshot(value: unknown): ValidationError[] {
-  if (!value || typeof value !== 'object' || Array.isArray(value))
-    return [{ path: 'snapshot', code: 'invalid_snapshot', message: 'snapshot must be an object' }];
-  const snapshot = value as Partial<Snapshot>;
-  const errors: ValidationError[] = [];
-  validateKeys(
-    snapshot as Record<string, unknown>,
-    'snapshot',
-    ['version', 'physicalPoints', 'logicalChannels', 'modbus'],
-    errors,
-  );
-  if (snapshot.modbus !== undefined) errors.push(...validateModbus(snapshot.modbus));
-  errors.push(...validateModbusBindings(snapshot));
-  if (snapshot.version !== 1)
-    errors.push({ path: 'snapshot.version', code: 'unsupported_version', message: 'snapshot version must be 1' });
-  if (!Array.isArray(snapshot.physicalPoints) || !Array.isArray(snapshot.logicalChannels))
-    return [
-      ...errors,
-      { path: 'snapshot', code: 'invalid_collection', message: 'physicalPoints and logicalChannels must be arrays' },
-    ];
-  const pointIds = new Set<string>();
-  snapshot.physicalPoints.forEach((point, index) => {
-    if (!point || typeof point !== 'object' || Array.isArray(point)) {
-      errors.push({
-        path: `snapshot.physicalPoints[${index}]`,
-        code: 'invalid_object',
-        message: 'physical point must be an object',
-      });
-      return;
+  private async runConfigurationUpdate<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = this.configurationUpdates;
+    let release!: () => void;
+    this.configurationUpdates = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
     }
-    validateKeys(
-      point as Record<string, unknown>,
-      `snapshot.physicalPoints[${index}]`,
-      ['id', 'hardwareProfile', 'channel', 'modbus'],
-      errors,
-    );
-    if (!point?.id || pointIds.has(point.id))
-      errors.push({
-        path: `snapshot.physicalPoints[${index}].id`,
-        code: 'invalid_id',
-        message: 'physical point IDs must be unique',
-      });
-    pointIds.add(point?.id);
-    if (!['751-9301', '879-3000', '879-1300', 'modbus'].includes(point?.hardwareProfile ?? ''))
-      errors.push({
-        path: `snapshot.physicalPoints[${index}].hardwareProfile`,
-        code: 'unsupported_profile',
-        message: 'unsupported hardware profile',
-      });
-    if (!Number.isSafeInteger(point?.channel) || (point?.channel ?? -1) < 0)
-      errors.push({
-        path: `snapshot.physicalPoints[${index}].channel`,
-        code: 'invalid_channel',
-        message: 'channel must be non-negative',
-      });
-  });
-  const channelIds = new Set<string>();
-  const channelsById = new Map<string, Snapshot['logicalChannels'][number]>();
-  const channelIdCounts = new Map<string, number>();
-  snapshot.logicalChannels.forEach((channel) => {
-    if (typeof channel?.id !== 'string') return;
-    channelIds.add(channel.id);
-    channelsById.set(channel.id, channel);
-    channelIdCounts.set(channel.id, (channelIdCounts.get(channel.id) ?? 0) + 1);
-  });
-  snapshot.logicalChannels.forEach((channel, index) => {
-    const path = `snapshot.logicalChannels[${index}]`;
-    if (!channel || typeof channel !== 'object' || Array.isArray(channel)) {
-      errors.push({ path, code: 'invalid_object', message: 'logical channel must be an object' });
-      return;
-    }
-    validateKeys(
-      channel as Record<string, unknown>,
-      path,
-      [
-        'id',
-        'physicalPointId',
-        'profile',
-        'capabilities',
-        'disconnectPolicy',
-        'range',
-        'pulse',
-        'guard',
-        'feedback',
-        'measurement',
-      ],
-      errors,
-    );
-    if (!channel?.id || channelIdCounts.get(channel.id) !== 1)
-      errors.push({ path: `${path}.id`, code: 'invalid_id', message: 'logical channel IDs must be unique' });
-    if (!pointIds.has(channel?.physicalPointId ?? ''))
-      errors.push({
-        path: `${path}.physicalPointId`,
-        code: 'missing_reference',
-        message: 'physical point does not exist',
-      });
-    const capabilities = Array.isArray(channel?.capabilities) ? channel.capabilities : [];
-    if (!capabilities.length)
-      errors.push({ path: `${path}.capabilities`, code: 'invalid_capabilities', message: 'capabilities are required' });
-    if (
-      capabilities.some(
-        (capability, capabilityIndex) =>
-          !['output', 'input', 'measurement', 'pulse', 'guard', 'feedback'].includes(capability) ||
-          capabilities.indexOf(capability) !== capabilityIndex,
-      )
-    )
-      errors.push({
-        path: `${path}.capabilities`,
-        code: 'invalid_capabilities',
-        message: 'capabilities must be unique supported values',
-      });
-    if (typeof channel.profile !== 'string' || !channel.profile.trim())
-      errors.push({
-        path: `${path}.profile`,
-        code: 'invalid_profile',
-        message: 'logical channel profile must be a non-empty string',
-      });
-    const policy = channel?.disconnectPolicy;
-    if (
-      !policy ||
-      !['hold', 'immediate', 'watchdog'].includes(policy.mode) ||
-      (policy.mode === 'watchdog' && (!Number.isSafeInteger(policy.timeoutMs) || (policy.timeoutMs ?? 0) <= 0))
-    )
-      errors.push({
-        path: `${path}.disconnectPolicy`,
-        code: 'invalid_disconnect_policy',
-        message: 'every channel needs hold, immediate, or watchdog disconnect behavior',
-      });
-    if (
-      channel?.pulse &&
-      (!capabilities.includes('pulse') ||
-        !Number.isSafeInteger(channel.pulse.durationMs) ||
-        channel.pulse.durationMs <= 0)
-    )
-      errors.push({
-        path: `${path}.pulse`,
-        code: 'invalid_pulse',
-        message: 'pulse requires pulse capability and positive duration',
-      });
-    if (channel?.pulse) validateKeys(channel.pulse as Record<string, unknown>, `${path}.pulse`, ['durationMs'], errors);
-    if (channel?.guard && (!capabilities.includes('guard') || !channelIds.has(channel.guard.channelId)))
-      errors.push({
-        path: `${path}.guard`,
-        code: 'invalid_guard',
-        message: 'guard requires guard capability and an existing channel',
-      });
-    if (channel?.guard)
-      validateKeys(channel.guard as Record<string, unknown>, `${path}.guard`, ['channelId', 'when'], errors);
-    const feedbackChannel = channel?.feedback ? channelsById.get(channel.feedback.channelId) : undefined;
-    if (
-      channel?.feedback &&
-      (!capabilities.includes('feedback') ||
-        !feedbackChannel ||
-        feedbackChannel.id === channel.id ||
-        !Array.isArray(feedbackChannel.capabilities) ||
-        !feedbackChannel.capabilities.includes('input') ||
-        !['match', 'inverse'].includes(channel.feedback.expected) ||
-        !Number.isSafeInteger(channel.feedback.timeoutMs) ||
-        channel.feedback.timeoutMs <= 0)
-    )
-      errors.push({
-        path: `${path}.feedback`,
-        code: 'invalid_feedback',
-        message: 'feedback requires feedback capability, a channel, expectation, and positive timeout',
-      });
-    if (channel?.feedback)
-      validateKeys(
-        channel.feedback as Record<string, unknown>,
-        `${path}.feedback`,
-        ['channelId', 'expected', 'timeoutMs'],
-        errors,
-      );
-    if (
-      channel?.range &&
-      (!['input', 'measurement'].some((capability) => capabilities.includes(capability)) ||
-        !Number.isFinite(channel.range.minimum) ||
-        !Number.isFinite(channel.range.maximum) ||
-        channel.range.minimum >= channel.range.maximum)
-    )
-      errors.push({
-        path: `${path}.range`,
-        code: 'invalid_range',
-        message: 'range requires input or measurement capability and finite ordered values',
-      });
-    if (channel?.range)
-      validateKeys(channel.range as Record<string, unknown>, `${path}.range`, ['minimum', 'maximum'], errors);
-    if (
-      channel?.measurement &&
-      (!capabilities.includes('measurement') ||
-        !['ampere', 'volt', 'watt', 'watt-hour', 'percent'].includes(channel.measurement.unit) ||
-        !Number.isFinite(channel.measurement.scale) ||
-        !Number.isFinite(channel.measurement.offset) ||
-        (channel.measurement.kind !== undefined && !['live', 'cumulative'].includes(channel.measurement.kind)))
-    )
-      errors.push({
-        path: `${path}.measurement`,
-        code: 'invalid_measurement',
-        message: 'measurement requires capability, supported unit, finite transform, and a valid kind',
-      });
-    if (channel?.measurement)
-      validateKeys(
-        channel.measurement as Record<string, unknown>,
-        `${path}.measurement`,
-        ['unit', 'scale', 'offset', 'kind'],
-        errors,
-      );
-  });
-  return errors;
-}
-
-function validateKeys(
-  value: Record<string, unknown>,
-  path: string,
-  allowed: string[],
-  errors: ValidationError[],
-): void {
-  Object.keys(value)
-    .filter((key) => !allowed.includes(key))
-    .forEach((key) =>
-      errors.push({
-        path: `${path}.${key}`,
-        code: 'unknown_field',
-        message: 'field is not supported by configuration version 1',
-      }),
-    );
-}
-
-function sort(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sort);
-  if (!value || typeof value !== 'object') return value;
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, item]) => [key, sort(item)]),
-  );
+  }
 }

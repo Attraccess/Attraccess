@@ -14,6 +14,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 import { StandardDrawer } from '../../../../../../components/standardDrawer';
 import { getBaseUrl } from '../../../../../../api';
+import { initializeValue, isValueValid } from './property-input/schema-values';
+
+const configProperty = (schema: ResourceFlowNodeSchemaDto) =>
+  ({ ...schema.configSchema, type: 'object' }) as Property<unknown>;
 
 interface Props {
   schema: ResourceFlowNodeSchemaDto;
@@ -40,29 +44,29 @@ export function NodeEditor(props: Props) {
   const schemaResolutionTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const dataRef = useRef(data);
 
-  useEffect(() => {
-    setData(currentData?.data ?? {});
-  }, [currentData]);
-
-  useEffect(() => {
-    dataRef.current = data;
-  }, [data]);
-
-  useEffect(() => {
-    setResolvedSchema(schema);
-    setSchemaError(undefined);
-  }, [schema]);
+  const canSave = useRef(false);
+  const invalidateRequest = useCallback(() => {
+    canSave.current = false;
+    schemaRequest.current += 1;
+    schemaAbortController.current?.abort();
+    clearTimeout(schemaResolutionTimeout.current);
+    schemaResolutionTimeout.current = undefined;
+  }, []);
+  const onClose = useCallback(() => {
+    invalidateRequest();
+    close();
+  }, [close, invalidateRequest]);
 
   const onSave = useCallback(() => {
-    if (!formRef.current) {
+    if (!canSave.current || !isValueValid(configProperty(resolvedSchema), dataRef.current, true) || !formRef.current) {
       return;
     }
     if (!formRef.current.checkValidity()) {
       return;
     }
-    updateNodeData(nodeId as string, data);
-    close();
-  }, [nodeId, data, updateNodeData, close]);
+    updateNodeData(nodeId as string, dataRef.current);
+    onClose();
+  }, [nodeId, resolvedSchema, updateNodeData, onClose]);
 
   const onFormSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -70,6 +74,7 @@ export function NodeEditor(props: Props) {
   }, [onSave]);
 
   const resolveSchema = useCallback(async (config: Record<string, unknown>) => {
+    canSave.current = false;
     schemaAbortController.current?.abort();
     const abortController = new AbortController();
     schemaAbortController.current = abortController;
@@ -95,12 +100,14 @@ export function NodeEditor(props: Props) {
       if (request !== schemaRequest.current) return;
 
       setResolvedSchema(nextSchema);
-      const properties = nextSchema.configSchema.properties as Record<string, unknown> | undefined;
-      const nextData = Object.fromEntries(
-        Object.entries(dataRef.current).filter(([name]) => properties?.[name] !== undefined),
+      const properties = configProperty(nextSchema).properties ?? {};
+      const retainedData = Object.fromEntries(
+        Object.entries(dataRef.current).filter(([name]) => Object.hasOwn(properties, name)),
       );
+      const nextData = initializeValue(configProperty(nextSchema), retainedData, true) as Record<string, unknown>;
       dataRef.current = nextData;
       setData(nextData);
+      canSave.current = true;
     } catch (error) {
       if (request === schemaRequest.current && !(error instanceof Error && error.name === 'AbortError')) {
         setSchemaError('Unable to refresh this plugin configuration. Please try again.');
@@ -111,38 +118,38 @@ export function NodeEditor(props: Props) {
   }, [resourceId, schema.type]);
 
   const scheduleSchemaResolution = useCallback((config: Record<string, unknown>) => {
-    schemaAbortController.current?.abort();
-    schemaRequest.current += 1;
-    if (schemaResolutionTimeout.current) {
-      clearTimeout(schemaResolutionTimeout.current);
-    }
+    invalidateRequest();
+    setIsResolvingSchema(true);
+    setSchemaError(undefined);
     schemaResolutionTimeout.current = setTimeout(() => {
       schemaResolutionTimeout.current = undefined;
       void resolveSchema(config);
     }, 300);
-  }, [resolveSchema]);
-
-  useEffect(() => () => {
-    if (schemaResolutionTimeout.current) {
-      clearTimeout(schemaResolutionTimeout.current);
-    }
-    schemaAbortController.current?.abort();
-  }, []);
+  }, [resolveSchema, invalidateRequest]);
 
   useEffect(() => {
-    if (isOpen && schema.configSchema.dynamic === true) {
-      void resolveSchema(dataRef.current);
+    invalidateRequest();
+    if (isOpen) {
+      const initial = initializeValue(configProperty(schema), currentData?.data ?? {}, true) as Record<string, unknown>;
+      dataRef.current = initial;
+      setData(initial);
+      setResolvedSchema(schema);
+      setSchemaError(undefined);
+      setIsResolvingSchema(schema.configSchema.dynamic === true);
+      if (schema.configSchema.dynamic === true) void resolveSchema(initial);
+      else canSave.current = true;
     }
-  }, [isOpen, resolveSchema, schema]);
+    return invalidateRequest;
+  }, [isOpen, resolveSchema, schema, currentData, invalidateRequest]);
 
   const onInputChange = useCallback((propertyName: string, value: unknown, refreshesSchema?: boolean) => {
     const next = { ...dataRef.current, [propertyName]: value };
     dataRef.current = next;
     setData(next);
-    if (resolvedSchema.configSchema.dynamic === true && refreshesSchema) {
+    if (schema.configSchema.dynamic === true && refreshesSchema) {
       scheduleSchemaResolution(next);
     }
-  }, [resolvedSchema.configSchema.dynamic, scheduleSchemaResolution]);
+  }, [schema.configSchema.dynamic, scheduleSchemaResolution]);
 
   const titleKey = 'nodes.' + resolvedSchema.type + '.title';
   const descriptionKey = 'nodes.' + resolvedSchema.type + '.description';
@@ -154,7 +161,7 @@ export function NodeEditor(props: Props) {
   return (
     <>
       {props.children(open)}
-      <StandardDrawer isOpen={isOpen} onOpenChange={setOpen}>
+      <StandardDrawer isOpen={isOpen} onOpenChange={(nextOpen) => nextOpen ? setOpen(true) : onClose()}>
         <DrawerHeader className="flex flex-col gap-1">
           <h2 className="text-lg font-semibold">{nodeTitle}</h2>
           <p className="text-sm text-default-500">{nodeDescription}</p>
@@ -163,6 +170,11 @@ export function NodeEditor(props: Props) {
         <DrawerBody className="flex flex-col gap-2">
           <Form onSubmit={onFormSubmit} ref={formRef} className="flex flex-col gap-4">
             {schemaError ? <p role="alert" className="text-sm text-danger">{schemaError}</p> : null}
+            {schemaError ? (
+              <Button type="button" variant="secondary" onPress={() => void resolveSchema(dataRef.current)}>
+                Retry
+              </Button>
+            ) : null}
             {isResolvingSchema ? <p className="text-sm text-default-500">Refreshing configuration...</p> : null}
             {Object.entries((resolvedSchema.configSchema.properties ?? {}) as Record<string, Property<unknown>>).map(
               ([propertyName, property]) => (
@@ -184,10 +196,14 @@ export function NodeEditor(props: Props) {
         </DrawerBody>
 
         <DrawerFooter className="flex flex-wrap gap-2 justify-end">
-          <Button variant="ghost" onPress={close}>
+          <Button variant="ghost" onPress={onClose}>
             {t('editor.buttons.cancel')}
           </Button>
-          <Button variant="primary" onPress={onSave}>
+          <Button
+            variant="primary"
+            onPress={onSave}
+            isDisabled={isResolvingSchema || !!schemaError || !isValueValid(configProperty(resolvedSchema), data, true)}
+          >
             {t('editor.buttons.save')}
           </Button>
         </DrawerFooter>

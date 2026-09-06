@@ -1,19 +1,32 @@
 import { connect } from 'node:net';
 import { spawn } from 'node:child_process';
+import { Readable } from 'node:stream';
+import { WriteAdmissionError } from '../runtime-types';
 import { posix } from 'node:path';
 // Shared pure configuration model is bundled into the standalone runtime.
 // eslint-disable-next-line @nx/enforce-module-boundaries
-import type { ModbusConnection } from '../../../modbus/model';
+import { type ModbusConnection, modbusHostIdentity } from '../../../modbus/model';
 import { crc16, rtuFrame, validateResponse, validateRequest, ModbusException } from './protocol';
+
+type TransactionAdmission = (() => boolean) & { expiresAt?: number };
+
+/** Internal proof: Python was denied before any transmission was authorized. */
+class SerialAdmissionRejected extends Error {
+  constructor(readonly reason: unknown) {
+    super('RTU admission rejected before transmission');
+  }
+}
 
 export type SerialExchange = (
   connection: Extract<ModbusConnection, { transport: 'rtu' }>,
   request: Buffer,
   /** Resolve/reject only after teardown; observe abort to stop a timed-out transaction. */
   signal?: AbortSignal,
+  /** Recheck after preparation/readiness, immediately before authorizing the first byte. */
+  isCurrent?: TransactionAdmission,
 ) => Promise<Buffer>;
 export interface ModbusTransport {
-  request(unit: number, pdu: Buffer, isCurrent?: () => boolean): Promise<Buffer>;
+  request(unit: number, pdu: Buffer, isCurrent?: TransactionAdmission): Promise<Buffer>;
 }
 export class ModbusTransportError extends Error {
   constructor(
@@ -39,7 +52,7 @@ export class QueuedModbusTransport implements ModbusTransport {
     private readonly connection: ModbusConnection,
     private readonly serial: SerialExchange = serialExchange,
   ) {}
-  request(unit: number, pdu: Buffer, isCurrent?: () => boolean): Promise<Buffer> {
+  request(unit: number, pdu: Buffer, isCurrent?: TransactionAdmission): Promise<Buffer> {
     try {
       validateRequest(unit, pdu);
     } catch (error) {
@@ -47,7 +60,7 @@ export class QueuedModbusTransport implements ModbusTransport {
     }
     const key =
       this.connection.transport === 'tcp'
-        ? `tcp:${this.connection.host.toLowerCase()}:${this.connection.port}`
+        ? `tcp:${modbusHostIdentity(this.connection.host)}:${this.connection.port}`
         : `rtu:${posix.normalize(this.connection.path).replace(/\/$/, '')}`;
     let bus = buses.get(key);
     if (!bus) {
@@ -72,10 +85,10 @@ export class QueuedModbusTransport implements ModbusTransport {
       try {
         let response: Buffer;
         if (this.connection.transport === 'tcp')
-          response = await tcpExchange(this.connection, ++this.transaction & 0xffff, unit, pdu);
+          response = await tcpExchange(this.connection, ++this.transaction & 0xffff, unit, pdu, isCurrent);
         else {
           const abort = new AbortController();
-          const operation = this.serial(this.connection, rtuFrame(unit, pdu), abort.signal);
+          const operation = this.serial(this.connection, rtuFrame(unit, pdu), abort.signal, isCurrent);
           // The public deadline is bounded, but the bus remains owned until teardown settles.
           teardown = operation.catch(() => undefined);
           const frame = await deadline(operation, this.connection.timeoutMs, () => {
@@ -93,6 +106,7 @@ export class QueuedModbusTransport implements ModbusTransport {
         }
         return validateResponse(pdu, response);
       } catch (error) {
+        if (error instanceof SerialAdmissionRejected) throw error.reason;
         // A valid exception response completes a transaction. Every ambiguous RTU failure fails closed.
         if (this.connection.transport === 'rtu' && !(error instanceof ModbusException))
           quarantineBus(
@@ -148,6 +162,7 @@ function tcpExchange(
   transaction: number,
   unit: number,
   pdu: Buffer,
+  isCurrent?: TransactionAdmission,
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const socket = connect({ host: c.host, port: c.port });
@@ -163,6 +178,16 @@ function tcpExchange(
     };
     const timer = setTimeout(() => finish(new Error('Modbus TCP timeout')), c.timeoutMs);
     socket.once('connect', () => {
+      try {
+        if (isCurrent && !isCurrent())
+          throw new ModbusTransportError(
+            'modbus_configuration_changed',
+            'Modbus configuration changed before transmission',
+          );
+      } catch (error) {
+        finish(error as Error);
+        return;
+      }
       const header = Buffer.alloc(7);
       header.writeUInt16BE(transaction);
       header.writeUInt16BE(pdu.length + 1, 4);
@@ -195,7 +220,8 @@ function tcpExchange(
  */
 const SERIAL_PROGRAM = `
 import os,sys,termios,select,time,fcntl
-path,baud,parity,stop,timeout,hexdata=sys.argv[1:]
+path,baud,parity,stop,timeout,hexdata,expires=sys.argv[1:]
+end=time.monotonic()+float(timeout)/1000
 fd=os.open(path,os.O_RDWR|os.O_NOCTTY|os.O_NONBLOCK)
 try:
  fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -208,10 +234,18 @@ try:
  termios.tcsetattr(fd,termios.TCSANOW,a)
  time.sleep(max(0.00175,3.5*11/int(baud)))
  termios.tcflush(fd,termios.TCIOFLUSH)
- request=bytes.fromhex(hexdata); end=time.monotonic()+float(timeout)/1000
+ request=bytes.fromhex(hexdata); started=False
  while request:
   if not select.select([], [fd], [], max(0,end-time.monotonic()))[1]: raise TimeoutError('serial write timeout')
-  n=os.write(fd,request); request=request[n:]
+  if not started:
+   # All potentially slow preparation and readiness waits precede admission.
+   os.write(3,b'R')
+   if sys.stdin.buffer.readline()!=b'GO\\n': raise RuntimeError('serial admission denied')
+   if expires and time.time()*1000>=float(expires): sys.exit(75)
+  if time.monotonic()>=end: raise TimeoutError('serial write timeout')
+  n=os.write(fd,request)
+  if n<=0: raise RuntimeError('serial write made no progress')
+  started=True; request=request[n:]
  response=b''
  while time.monotonic()<end:
   if not select.select([fd],[],[],max(0,end-time.monotonic()))[0]: break
@@ -229,6 +263,7 @@ export function serialExchange(
   c: Extract<ModbusConnection, { transport: 'rtu' }>,
   request: Buffer,
   signal?: AbortSignal,
+  isCurrent?: TransactionAdmission,
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -246,17 +281,45 @@ export function serialExchange(
         String(c.stopBits),
         String(c.timeoutMs),
         request.toString('hex'),
+        isCurrent?.expiresAt === undefined ? '' : String(isCurrent.expiresAt),
       ],
-      { stdio: ['ignore', 'pipe', 'pipe'] },
+      { stdio: ['pipe', 'pipe', 'pipe', 'pipe'] },
     );
     let output = Buffer.alloc(0);
     let failure: Error | undefined;
+    let authorized = false;
     const abort = () => {
-      failure = new Error('RTU exchange timed out or aborted');
+      failure ??= new Error('RTU exchange timed out or aborted');
       child.kill('SIGKILL');
     };
     signal?.addEventListener('abort', abort, { once: true });
     const timer = setTimeout(abort, c.timeoutMs);
+    const fail = (error: Error) => {
+      failure ??= error;
+      child.kill('SIGKILL');
+    };
+    // A private pipe carries exactly one readiness byte; stdout remains binary RTU data.
+    (child.stdio[3] as Readable).on('data', (chunk: Buffer) => {
+      if (failure) return;
+      if (authorized || chunk.length !== 1 || chunk[0] !== 82) {
+        fail(new Error('invalid serial admission handshake'));
+        return;
+      }
+      try {
+        if (isCurrent && !isCurrent())
+          throw new ModbusTransportError(
+            'modbus_configuration_changed',
+            'Modbus configuration changed before transmission',
+          );
+      } catch (error) {
+        fail(new SerialAdmissionRejected(error));
+        return;
+      }
+      authorized = true;
+      child.stdin.end('GO\n');
+    });
+    (child.stdio[3] as Readable).on('error', fail);
+    child.stdin.on('error', fail);
     child.stdout.on('data', (chunk: Buffer) => {
       output = Buffer.concat([output, chunk]);
       if (output.length > 256) {
@@ -273,7 +336,10 @@ export function serialExchange(
       clearTimeout(timer);
       signal?.removeEventListener('abort', abort);
       if (failure) reject(failure);
-      else if (code !== 0) reject(new Error('RTU exchange failed or timed out (Python3/POSIX serial required)'));
+      else if (code === 75 && authorized && output.length === 0 && isCurrent?.expiresAt !== undefined)
+        reject(new SerialAdmissionRejected(new WriteAdmissionError('expired')));
+      else if (code !== 0 || !authorized)
+        reject(new Error('RTU exchange failed or timed out (Python3/POSIX serial required)'));
       else resolve(output);
     });
   });

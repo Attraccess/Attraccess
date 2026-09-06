@@ -797,10 +797,14 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         .spyOn(resourceRepository, 'find')
         .mockResolvedValue([{ id: 1, createdAt: new Date('2024-01-01T00:00:00.000Z') } as Resource]);
 
-      jest.spyOn(scheduleRepository.manager, 'transaction').mockImplementation(async (callback) => {
-        await callback({ query: jest.fn().mockResolvedValue([]) } as never);
-        throw new Error('transaction commit failed');
-      });
+      jest
+        .spyOn(scheduleRepository.manager, 'transaction')
+        .mockImplementation(async (isolationOrCallback, suppliedCallback) => {
+          const callback = typeof isolationOrCallback === 'function' ? isolationOrCallback : suppliedCallback;
+          if (!callback) throw new Error('Missing transaction callback');
+          await callback({ query: jest.fn().mockResolvedValue([]) } as never);
+          throw new Error('transaction commit failed');
+        });
 
       await expect(service.evaluateAll()).resolves.toBeUndefined();
 

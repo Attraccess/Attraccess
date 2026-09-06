@@ -31,8 +31,8 @@ function buildBaseContext(events: EventEmitter2): PluginContext {
       subscribe: () => Promise.resolve({ unsubscribe: () => undefined }),
       publish: () => Promise.resolve(),
     },
-    getRepository: (entity) => ({ entity } as never),
-    get: (token) => ({ token } as never),
+    getRepository: (entity) => ({ entity }) as never,
+    get: (token) => ({ token }) as never,
     onEvent: () => ({ off: () => undefined }),
     emitEvent: () => undefined,
     getMqttServerConfig: (serverId) =>
@@ -46,6 +46,9 @@ function buildBaseContext(events: EventEmitter2): PluginContext {
         password: 'secret',
         clientId: null,
       }),
+    getMqttCredentialProvisioning: () => {
+      throw new Error('Unused fixture provisioning');
+    },
     flows: {
       trigger: jest.fn(async () => undefined),
     },
@@ -74,7 +77,7 @@ describe('PluginSandboxService', () => {
 
     it('throws on an unknown permission', () => {
       expect(() => PluginSandboxService.validateDeclaredPermissions('p', ['NOT_A_PERMISSION'])).toThrow(
-        /unknown permission "NOT_A_PERMISSION"/
+        /unknown permission "NOT_A_PERMISSION"/,
       );
     });
 
@@ -126,7 +129,7 @@ describe('PluginSandboxService', () => {
         PluginPermission.LISTEN_EVENTS,
       ]);
       expect(() => (ctx.events as unknown as { removeAllListeners: () => void }).removeAllListeners()).toThrow(
-        /does not expose/
+        /does not expose/,
       );
       expect(() => (ctx.events as unknown as { listenTo: () => void }).listenTo()).toThrow(/does not expose/);
       expect(() => (ctx.events as unknown as { eventNames: () => void }).eventNames()).toThrow(/does not expose/);
@@ -160,15 +163,15 @@ describe('PluginSandboxService', () => {
 
     it('throws when emitting a SystemEvent without EMIT_EVENTS', () => {
       const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), []);
-      expect(() => ctx.emitEvent(SystemEvent.RESOURCE_USAGE_ENDED, { resource: {} as never, user: {} as never })).toThrow(
-        /EMIT_EVENTS/
-      );
+      expect(() =>
+        ctx.emitEvent(SystemEvent.RESOURCE_USAGE_ENDED, { resource: {} as never, user: {} as never }),
+      ).toThrow(/EMIT_EVENTS/);
     });
 
     it('allows emitting a SystemEvent with EMIT_EVENTS', () => {
       const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), [PluginPermission.EMIT_EVENTS]);
       expect(() =>
-        ctx.emitEvent(SystemEvent.RESOURCE_USAGE_ENDED, { resource: {} as never, user: {} as never })
+        ctx.emitEvent(SystemEvent.RESOURCE_USAGE_ENDED, { resource: {} as never, user: {} as never }),
       ).not.toThrow();
     });
 
@@ -185,14 +188,18 @@ describe('PluginSandboxService', () => {
     });
 
     it('resolves entity permission from TypeORM metadata for string table names', () => {
-      const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), [PluginPermission.DATABASE_ACCESS]);
+      const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), [
+        PluginPermission.DATABASE_ACCESS,
+      ]);
       // 'user' is the table name; the guard must still require READ_USERS, not fall back to DATABASE_ACCESS.
       expect(() => ctx.getRepository('user')).toThrow(/READ_USERS/);
       expect(() => ctx.getRepository('resource')).toThrow(/ACCESS_RESOURCES/);
     });
 
     it('resolves entity permission from metadata for a spoofed entity object', () => {
-      const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), [PluginPermission.DATABASE_ACCESS]);
+      const ctx = PluginSandboxService.createGuardedContext(buildBaseContext(events), [
+        PluginPermission.DATABASE_ACCESS,
+      ]);
       const spoofed = { name: 'User', options: { name: 'Decoy' } } as never;
       expect(() => ctx.getRepository(spoofed)).toThrow(/READ_USERS/);
     });
@@ -248,7 +255,9 @@ describe('PluginSandboxService', () => {
       expect(() => denied.mqtt.subscribe(1, 'sensors/+', () => undefined)).toThrow(PluginPermissionError);
       expect(() => denied.mqtt.publish(1, 'sensors/kitchen', 'on')).toThrow(PluginPermissionError);
 
-      const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [PluginPermission.ACCESS_MQTT_SERVERS]);
+      const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [
+        PluginPermission.ACCESS_MQTT_SERVERS,
+      ]);
       await expect(granted.mqtt.subscribe(1, 'sensors/+', () => undefined)).resolves.toEqual({
         unsubscribe: expect.any(Function),
       });
@@ -270,7 +279,9 @@ describe('PluginSandboxService', () => {
       const denied = PluginSandboxService.createGuardedContext(buildBaseContext(events), []);
       expect(() => denied.secrets.encrypt('secret')).toThrow(/MANAGE_SECRETS/);
 
-      const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [PluginPermission.MANAGE_SECRETS]);
+      const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [
+        PluginPermission.MANAGE_SECRETS,
+      ]);
       expect(granted.secrets.decrypt(granted.secrets.encrypt('secret'))).toBe('secret');
     });
   });

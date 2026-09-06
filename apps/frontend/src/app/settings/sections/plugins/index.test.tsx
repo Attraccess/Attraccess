@@ -294,7 +294,7 @@ describe('PluginsSection', () => {
     let registryLoads = 0;
     vi.stubGlobal(
       'fetch',
-      vi.fn((input: { url?: string } | string, init?: { method?: string }) => {
+      vi.fn((input: { url?: string; method?: string } | string, init?: { method?: string }) => {
         const request = typeof input === 'string' ? { url: input, method: init?.method } : input;
         if (request.url?.endsWith('/api/plugins/registries')) {
           if (request.method === 'POST') return Promise.resolve({ ok: true });
@@ -331,7 +331,7 @@ describe('PluginsSection', () => {
     let registryLoads = 0;
     vi.stubGlobal(
       'fetch',
-      vi.fn((input: { url?: string } | string, init?: { method?: string }) => {
+      vi.fn((input: { url?: string; method?: string } | string, init?: { method?: string }) => {
         const request = typeof input === 'string' ? { url: input, method: init?.method } : input;
         if (request.url?.endsWith('/api/plugins/registries')) {
           if (request.method === 'POST') return Promise.resolve({ ok: true });
@@ -644,7 +644,8 @@ describe('PluginsSection', () => {
       'fetch',
       vi.fn((input: { url?: string } | string) => {
         const url = typeof input === 'string' ? input : (input.url ?? '');
-        if (url.endsWith('/api/plugins/status')) return Promise.resolve({ ok: true, json: async () => ({ disabled: true }) });
+        if (url.endsWith('/api/plugins/status'))
+          return Promise.resolve({ ok: true, json: async () => ({ disabled: true }) });
         if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
         if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
         return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });

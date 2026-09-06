@@ -1,12 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Resource, User } from '@attraccess/database-entities';
-import {
-  PluginContext,
-  PluginPermission,
-  SystemEvent,
-  SystemEventPayload,
-} from '@attraccess/plugins-backend-sdk';
+import { PluginContext, PluginPermission, SystemEvent, SystemEventPayload } from '@attraccess/plugins-backend-sdk';
 import { PluginSandboxService } from './plugin-sandbox.service';
 import { PluginEventsService } from './plugin-events.service';
 
@@ -56,7 +51,9 @@ describe('PluginEventsService', () => {
   });
 
   it('isolates a throwing handler so emit never throws into the core flow', () => {
-    jest.spyOn((service as unknown as { logger: { error: () => void } }).logger, 'error').mockImplementation(() => undefined);
+    jest
+      .spyOn((service as unknown as { logger: { error: () => void } }).logger, 'error')
+      .mockImplementation(() => undefined);
     service.onEvent(SystemEvent.RESOURCE_USAGE_STARTED, () => {
       throw new Error('plugin blew up');
     });
@@ -76,6 +73,12 @@ function baseContext(events: EventEmitter2, name: string): PluginContext {
     onEvent: () => ({ off: () => undefined }),
     emitEvent: () => undefined,
     getMqttServerConfig: () => Promise.resolve(null),
+    mqtt: { subscribe: async () => ({ unsubscribe: () => undefined }), publish: async () => undefined },
+    getMqttCredentialProvisioning: () => {
+      throw new Error('Unused fixture provisioning');
+    },
+    flows: { trigger: async () => undefined },
+    secrets: { encrypt: (value) => value, decrypt: (value) => value },
   };
 }
 

@@ -39,6 +39,8 @@ import { MqttCredentialProvisioningService } from '../mqtt/mqtt-credential-provi
 import { join } from 'path';
 import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
 import { EncryptionService } from '../encryption/encryption.service';
+import { PLUGIN_AUDIT_HOST_PROVIDER, PluginAuditHostProvider } from '@attraccess/plugins-backend-sdk';
+import { createPluginAuditContext } from './plugin-audit-context';
 
 @Global()
 @Module({})
@@ -144,8 +146,12 @@ export class PluginModule {
     // resolvable so the plugin can use context.getRepository(Entity).
     PluginModule.registerPluginEntities(manifest, (exported as PluginBackendModule)?.entities);
 
+    const context = PluginModule.createPluginContext(manifest);
+
     // Register any custom flow nodes contributed by this plugin.
-    const pluginFlowNodes = (exported as PluginBackendModule)?.flowNodes;
+    const configuredFlowNodes = (exported as PluginBackendModule)?.flowNodes;
+    const pluginFlowNodes =
+      typeof configuredFlowNodes === 'function' ? configuredFlowNodes(context) : configuredFlowNodes;
     if (pluginFlowNodes?.length) {
       registerPluginFlowNodes(manifest.name, pluginFlowNodes);
       this.logger.log(`Registered ${pluginFlowNodes.length} flow node(s) from plugin ${manifest.name}`);
@@ -158,7 +164,6 @@ export class PluginModule {
       return exported as DynamicModule;
     }
 
-    const context = PluginModule.createPluginContext(manifest);
     const pluginModule = (exported as PluginBackendModule).register(context);
     const credentialProvider = (exported as PluginBackendModule).credentialProvisioningProvider;
     if (credentialProvider) {
@@ -224,6 +229,12 @@ export class PluginModule {
 
   private static createPluginContext(manifest: LoadedPluginManifest): PluginContext {
     const base: PluginContext = {
+      audit: createPluginAuditContext(manifest.id, () =>
+        PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get<PluginAuditHostProvider>(
+          PLUGIN_AUDIT_HOST_PROVIDER,
+          { strict: false },
+        ),
+      ),
       manifest: PluginService.toManifestInfo(manifest),
       logger: new Logger(`Plugin:${manifest.name}`),
       mqtt: {

@@ -18,6 +18,16 @@ export interface WagoAnnouncement {
 }
 
 export function parseAnnouncement(payload: Buffer): WagoAnnouncement {
+  const heartbeat = parseHeartbeat(payload);
+  const input = JSON.parse(payload.toString('utf8')) as Record<string, unknown>;
+  if (typeof input.pairingCode !== 'string' || !input.pairingCode.trim())
+    throw new Error('announcement pairingCode is required');
+  return { ...heartbeat, pairingCode: input.pairingCode.trim() };
+}
+
+export type WagoHeartbeat = Omit<WagoAnnouncement, 'pairingCode'>;
+
+export function parseHeartbeat(payload: Buffer): WagoHeartbeat {
   let value: unknown;
   try {
     value = JSON.parse(payload.toString('utf8'));
@@ -26,7 +36,7 @@ export function parseAnnouncement(payload: Buffer): WagoAnnouncement {
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('announcement must be an object');
   const input = value as Record<string, unknown>;
-  const required = ['hardwareId', 'pairingCode', 'protocolVersion', 'runtimeVersion'];
+  const required = ['hardwareId', 'protocolVersion', 'runtimeVersion'];
   for (const key of required)
     if (typeof input[key] !== 'string' || !input[key].trim()) throw new Error(`announcement ${key} is required`);
   if (!Array.isArray(input.capabilities) || input.capabilities.some((item) => typeof item !== 'string'))
@@ -35,7 +45,6 @@ export function parseAnnouncement(payload: Buffer): WagoAnnouncement {
     throw new Error('announcement sequence must be a non-negative integer');
   return {
     hardwareId: (input.hardwareId as string).trim(),
-    pairingCode: (input.pairingCode as string).trim(),
     enrollmentSecret: typeof input.enrollmentSecret === 'string' ? input.enrollmentSecret.trim() : undefined,
     fingerprint: typeof input.fingerprint === 'string' ? input.fingerprint.trim() : undefined,
     protocolVersion: (input.protocolVersion as string).trim(),
@@ -76,6 +85,22 @@ export function configurationReportedTopic(prefix: string, hardwareId: string): 
 
 export function commandTopic(prefix: string, hardwareId: string): string {
   return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${hardwareId}/commands`;
+}
+
+export function acknowledgementTopic(prefix: string, hardwareId: string): string {
+  return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${hardwareId}/acknowledgements`;
+}
+
+export function acknowledgementWildcardTopic(prefix: string): string {
+  return acknowledgementTopic(prefix, '+');
+}
+
+export function acknowledgementHardwareId(prefix: string, topic: string): string | null {
+  const topicPrefix = `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/`;
+  const topicSuffix = '/acknowledgements';
+  if (!topic.startsWith(topicPrefix) || !topic.endsWith(topicSuffix)) return null;
+  const hardwareId = topic.slice(topicPrefix.length, -topicSuffix.length);
+  return hardwareId && !/[+/]/.test(hardwareId) ? hardwareId : null;
 }
 
 export function configurationReportedWildcardTopic(prefix: string): string {
@@ -277,7 +302,7 @@ function isNullableString(value: unknown): boolean {
 }
 function isBooleanRecord(value: unknown): boolean {
   return (
-    Boolean(value) &&
+    value !== null &&
     typeof value === 'object' &&
     !Array.isArray(value) &&
     Object.values(value).every((item) => typeof item === 'boolean')

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ClaimControllerModal } from './ClaimControllerModal';
 import { ConfigurationEditor } from './ConfigurationEditor';
 import { ControllersTable } from './ControllersTable';
+import { ControllerDiagnostics } from './ControllerDiagnostics';
 import { CommissioningModal } from './CommissioningModal';
 import { MqttSettingsModal } from './MqttSettingsModal';
 import type { CommissioningSession, WagoController } from './api';
@@ -14,6 +15,7 @@ export function ControllersPage() {
   const controllersQuery = useControllersQuery();
   const sessionsQuery = useCommissioningSessionsQuery();
   const [claimControllerId, setClaimControllerId] = useState<number | null>(null);
+  const [diagnosticsControllerId, setDiagnosticsControllerId] = useState<number | null>(null);
   const [configurationControllerId, setConfigurationControllerId] = useState<number | null>(null);
   const [isCommissioningOpen, setCommissioningOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
@@ -72,6 +74,7 @@ export function ControllersPage() {
             sessions={sessionsQuery.data ?? []}
             onClaim={setClaimControllerId}
             onConfigure={setConfigurationControllerId}
+            onDiagnostics={setDiagnosticsControllerId}
             onRemove={setRemovingController}
             onResume={(session) => {
               setCommissioningSession(session);
@@ -80,6 +83,10 @@ export function ControllersPage() {
         />
       )}
 
+      {diagnosticsControllerId !== null && <>
+        <Button variant="secondary" onPress={() => setDiagnosticsControllerId(null)}>Close diagnostics</Button>
+        <ControllerDiagnostics controllerId={diagnosticsControllerId} onConfigure={() => setConfigurationControllerId(diagnosticsControllerId)} />
+      </>}
       <ClaimControllerModal
         controllerId={claimControllerId}
         onOpenChange={(isOpen) => {
@@ -95,6 +102,11 @@ export function ControllersPage() {
       <CommissioningModal
         isOpen={isCommissioningOpen}
         session={commissioningSession}
+        onConfigure={(controllerId) => {
+          setCommissioningOpen(false);
+          setCommissioningSession(null);
+          setConfigurationControllerId(controllerId);
+        }}
         onOpenChange={(open) => {
           setCommissioningOpen(open);
           if (!open) setCommissioningSession(null);

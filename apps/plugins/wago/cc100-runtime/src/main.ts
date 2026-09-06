@@ -1,6 +1,7 @@
 import { connect, type MqttClient } from 'mqtt';
 import { Cc100OnboardIoAdapter } from './adapters';
 import { ModbusDeviceRouter } from './modbus/adapter';
+import { CC100_DIGITAL_PROFILE } from './onboard-profile';
 import { JsonStateStore, WagoRuntime, type DiscoveryClaim, type Transport } from './runtime';
 
 const hardwareId = required('WAGO_HARDWARE_ID');
@@ -9,11 +10,16 @@ const statePath = process.env.WAGO_STATE_PATH ?? '/var/lib/attraccess-wago/state
 const pairingCode = required('WAGO_PAIRING_CODE');
 const enrollmentSecret = required('WAGO_ENROLLMENT_SECRET');
 const store = new JsonStateStore(statePath);
-const adapter = new ModbusDeviceRouter(new Cc100OnboardIoAdapter(JSON.parse(process.env.WAGO_IO_PATHS ?? '{}')));
+if (process.env.WAGO_IO_PATHS)
+  throw new Error('WAGO_IO_PATHS is no longer supported; redeploy with the firmware-31 digital hardware profile');
+if (required('WAGO_HARDWARE_PROFILE') !== CC100_DIGITAL_PROFILE.id)
+  throw new Error(`unsupported WAGO_HARDWARE_PROFILE; expected ${CC100_DIGITAL_PROFILE.id}`);
+const adapter = new ModbusDeviceRouter(new Cc100OnboardIoAdapter());
 const mqttUrl = required('WAGO_MQTT_URL');
 let client: MqttClient | undefined;
 let heartbeatTimer: NodeJS.Timeout | undefined;
 let measurementTimer: NodeJS.Timeout | undefined;
+let inputTimer: NodeJS.Timeout | undefined;
 
 void handleAsync(start);
 
@@ -52,6 +58,14 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
     store,
     transport,
     device: adapter,
+    reconnectCredentials: async (next) => {
+      if (activeClient !== client) throw new Error('Credential handoff connection is no longer active');
+      await runtime.setConnected(false);
+      credentials = next;
+      activeClient.options.username = next.username;
+      activeClient.options.password = next.password;
+      activeClient.reconnect();
+    },
   });
   let initialized = false;
   let connected = false;
@@ -64,7 +78,21 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
       pendingConnectionStates.push(state);
       return;
     }
-    void handleAsync(() => runtime.setConnected(state));
+    void handleAsync(async () => {
+      if (state) await runtime.retryCredentialRotationSubscription();
+      await runtime.setConnected(state);
+      if (state && credentials) await runtime.acknowledgeCredentialRotation(credentials);
+    });
+  };
+
+  const activateConnectionHandling = async (): Promise<void> => {
+    if (initialized) return;
+    if (!pendingConnectionStates.length && !connected) pendingConnectionStates.push(false);
+    while (pendingConnectionStates.length > 0) {
+      const state = pendingConnectionStates.shift();
+      if (state !== undefined) await handleAsync(() => runtime.setConnected(state));
+    }
+    initialized = true;
   };
 
   activeClient.once(
@@ -80,16 +108,16 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
           await runtime.publishDiscoveryAnnouncement();
           return;
         }
-        await runtime.start();
-        const hadPendingConnectionState = pendingConnectionStates.length > 0;
-        while (pendingConnectionStates.length > 0) {
-          const state = pendingConnectionStates.shift();
-          if (state !== undefined) await runtime.setConnected(state);
+        try {
+          await runtime.start(activateConnectionHandling);
+        } finally {
+          // Also activate if subscriptions fail after commands become reachable.
+          await activateConnectionHandling();
         }
-        initialized = true;
-        if (!hadPendingConnectionState && !connected) await runtime.setConnected(false);
+        if (connected && credentials) await runtime.acknowledgeCredentialRotation(credentials);
         heartbeatTimer = setInterval(() => void handleAsync(() => runtime.publishHeartbeat()), 30_000).unref();
         measurementTimer = setInterval(() => void handleAsync(() => runtime.publishMeasurements()), 100).unref();
+        inputTimer = setInterval(() => void handleAsync(() => runtime.pollInputs()), 250).unref();
       }),
   );
   activeClient.on('close', () => applyConnectionState(false));
@@ -99,6 +127,7 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
 process.on('SIGTERM', () => {
   if (heartbeatTimer) clearInterval(heartbeatTimer);
   if (measurementTimer) clearInterval(measurementTimer);
+  if (inputTimer) clearInterval(inputTimer);
   client?.end(true, () => process.exit(0));
 });
 

@@ -1,4 +1,5 @@
 // Import entities
+import { AuditLog } from './entities/audit-log.entity';
 import { EmailTemplate } from './entities/email-template.entity';
 import { EmailTemplateTranslation } from './entities/email-template-translation.entity';
 import { AuthenticationDetail } from './entities/authenticationDetail.entity';
@@ -106,6 +107,7 @@ import { ResourceOperatingInterval } from './entities/resource-operating-interva
 
 // Export all entities individually
 export {
+  AuditLog,
   AuthenticationDetail,
   MqttServer,
   Resource,
@@ -224,6 +226,7 @@ export {
 
 // Export the entities object
 export const entities = {
+  AuditLog,
   User,
   AuthenticationDetail,
   Session,

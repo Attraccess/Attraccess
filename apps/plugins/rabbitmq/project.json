@@ -12,13 +12,20 @@
       "outputs": [],
       "options": {
         "cwd": "apps/plugins/rabbitmq",
-        "command": "eslint backend frontend/src"
+        "command": "eslint backend frontend/src --max-warnings=0 && prettier --check backend frontend/src"
       }
     },
     "test": {
       "executor": "@nx/jest:jest",
       "cache": true,
-      "inputs": ["default", "^production", "{workspaceRoot}/jest.preset.js", { "externalDependencies": ["jest"] }],
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/jest.preset.js",
+        {
+          "externalDependencies": ["jest"]
+        }
+      ],
       "outputs": ["{workspaceRoot}/coverage/apps/plugins/rabbitmq"],
       "options": {
         "jestConfig": "apps/plugins/rabbitmq/jest.config.ts",
@@ -28,7 +35,14 @@
     "e2e": {
       "executor": "@nx/jest:jest",
       "cache": false,
-      "inputs": ["default", "^production", "{workspaceRoot}/jest.preset.js", { "externalDependencies": ["jest", "testcontainers", "mqtt"] }],
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/jest.preset.js",
+        {
+          "externalDependencies": ["jest", "testcontainers", "mqtt"]
+        }
+      ],
       "outputs": ["{workspaceRoot}/coverage/apps/plugins/rabbitmq-e2e"],
       "options": {
         "jestConfig": "apps/plugins/rabbitmq/jest.e2e.config.ts",
@@ -109,6 +123,23 @@
       "options": {
         "cwd": "apps/plugins/rabbitmq",
         "command": "node ../scripts/publish-plugin.mjs package dist"
+      }
+    },
+    "typecheck-tests": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsc --noEmit -p apps/plugins/rabbitmq/tsconfig.spec.json"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "pnpm exec tsc --noEmit -p apps/plugins/rabbitmq/backend/tsconfig.json",
+          "pnpm exec tsc --noEmit -p apps/plugins/rabbitmq/frontend/tsconfig.json",
+          "pnpm exec tsc --noEmit -p apps/plugins/rabbitmq/tsconfig.spec.json"
+        ],
+        "parallel": false
       }
     }
   }

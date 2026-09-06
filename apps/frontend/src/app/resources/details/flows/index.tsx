@@ -37,6 +37,7 @@ import { EdgeWithDeleteButton } from './edgeWithDeleteButton';
 import JSConfetti from 'js-confetti';
 import { LogViewer } from './logViewer';
 import { VariablesModal } from './variablesModal';
+import { FlowNodeQuerySelection } from './FlowNodeQuerySelection';
 import de from './de.json';
 import en from './en.json';
 import nodesDeTranslations from './node/de.json';
@@ -164,6 +165,7 @@ function FlowsPageInner() {
     addLiveLogReceiver,
     removeLiveLogReceiver,
     flowNodeTypes,
+    setValidationErrors,
     copySelectedNodes,
     cutSelectedNodes,
     pasteNodes,
@@ -182,8 +184,11 @@ function FlowsPageInner() {
     if (originalFlowData) {
       setNodes(originalFlowData.nodes);
       setEdges(originalFlowData.edges);
+      setValidationErrors(
+        ((originalFlowData as unknown as { validationErrors?: Array<{ nodeId: string; message: string }> }).validationErrors ?? []),
+      );
     }
-  }, [originalFlowData, setNodes, setEdges]);
+  }, [originalFlowData, setNodes, setEdges, setValidationErrors]);
 
   const nodesHaveChanged = useMemo(() => {
     const originalNodes = originalFlowData?.nodes ?? [];
@@ -439,6 +444,7 @@ function FlowsPageInner() {
             edgeTypes={edgeTypes}
           >
             <Controls />
+            <FlowNodeQuerySelection key={resourceId} nodes={nodes} setNodes={setNodes} />
             <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
 
             <Panel position="top-right" className="flex flex-row flex-wrap gap-2">

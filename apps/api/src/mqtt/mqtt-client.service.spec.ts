@@ -344,7 +344,7 @@ describe('MqttClientService', () => {
       await service.subscribe(1, 'devices/#');
       (client.subscribe as jest.Mock).mockClear();
 
-      client.emit('connect');
+      client.emit('connect', { cmd: 'connack', sessionPresent: false, returnCode: 0 });
 
       expect(client.subscribe).toHaveBeenCalledWith('devices/#', { qos: 0 }, expect.any(Function));
     });
@@ -358,17 +358,17 @@ describe('MqttClientService', () => {
 
       const servicePrivate = service as unknown as MqttClientServicePrivate;
       const client = await servicePrivate.getOrCreateClient(1);
-      servicePrivate.subscriptions.set(
-        1,
-        new Map([['devices/#', { qosCounts: new Map([[0, 1]]), effectiveQos: 2 }]]),
-      );
-      client.subscribe = jest.fn(
-        (_topic: string, _options: mqtt.IClientSubscribeOptions, callback?: (error?: Error) => void) => {
-          callback?.(new Error('Subscribe error'));
-        },
-      );
+      servicePrivate.subscriptions.set(1, new Map([['devices/#', { qosCounts: new Map([[0, 1]]), effectiveQos: 2 }]]));
+      jest
+        .mocked(client.subscribe)
+        .mockImplementation(
+          (_topic: string, _options?: mqtt.IClientSubscribeOptions, callback?: (error?: Error) => void) => {
+            callback?.(new Error('Subscribe error'));
+            return client;
+          },
+        );
 
-      client.emit('connect');
+      client.emit('connect', { cmd: 'connack', sessionPresent: false, returnCode: 0 });
 
       expect(servicePrivate.subscriptions.get(1)?.get('devices/#')?.effectiveQos).toBeUndefined();
     });
@@ -401,11 +401,14 @@ describe('MqttClientService', () => {
 
     it('rejects acknowledgement-required subscriptions when the broker rejects them', async () => {
       const mockClient = mqtt.connect({});
-      mockClient.subscribe = jest.fn(
-        (_topic: string, _options: mqtt.IClientSubscribeOptions, callback?: (error?: Error) => void) => {
-          callback?.(new Error('Subscribe error'));
-        },
-      );
+      jest
+        .mocked(mockClient.subscribe)
+        .mockImplementation(
+          (_topic: string, _options?: mqtt.IClientSubscribeOptions, callback?: (error?: Error) => void) => {
+            callback?.(new Error('Subscribe error'));
+            return mockClient;
+          },
+        );
       jest.spyOn(service as unknown as MqttClientServicePrivate, 'getOrCreateClient').mockResolvedValue(mockClient);
 
       await expect(service.subscribe(1, 'sensors/+', undefined, true)).rejects.toThrow('Subscribe error');
@@ -460,11 +463,14 @@ describe('MqttClientService', () => {
       (service as unknown as MqttClientServicePrivate).clients.set(1, mockClient);
       await service.subscribe(1, 'sensors/+', 0);
       await service.subscribe(1, 'sensors/+', 2);
-      mockClient.subscribe = jest.fn(
-        (_topic: string, _options: mqtt.IClientSubscribeOptions, callback?: (error?: Error) => void) => {
-          callback?.(new Error('Subscribe error'));
-        },
-      );
+      jest
+        .mocked(mockClient.subscribe)
+        .mockImplementation(
+          (_topic: string, _options?: mqtt.IClientSubscribeOptions, callback?: (error?: Error) => void) => {
+            callback?.(new Error('Subscribe error'));
+            return mockClient;
+          },
+        );
 
       await expect(service.unsubscribe(1, 'sensors/+', 2)).rejects.toThrow('Subscribe error');
 
@@ -482,15 +488,18 @@ describe('MqttClientService', () => {
       (mockClient.subscribe as jest.Mock).mockClear();
 
       let finishLowerQos!: () => void;
-      mockClient.subscribe = jest.fn(
-        (_topic: string, options: mqtt.IClientSubscribeOptions, callback?: (error?: Error) => void) => {
-          if (options.qos === 0) {
-            finishLowerQos = () => callback?.();
-          } else {
-            callback?.();
-          }
-        },
-      );
+      jest
+        .mocked(mockClient.subscribe)
+        .mockImplementation(
+          (_topic: string, options?: mqtt.IClientSubscribeOptions, callback?: (error?: Error) => void) => {
+            if (options?.qos === 0) {
+              finishLowerQos = () => callback?.();
+            } else {
+              callback?.();
+            }
+            return mockClient;
+          },
+        );
 
       const lowerQos = service.unsubscribe(1, 'sensors/+', 2);
       await new Promise(setImmediate);

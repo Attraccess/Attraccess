@@ -1,5 +1,5 @@
 import { Button, Description, Input, Label, ListBox, Select, TextField } from '@heroui/react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   BUILTIN_MODBUS_PROFILES,
   duplicateProfile,
@@ -15,6 +15,9 @@ export interface ModbusConfigurationFormProps {
   value: ModbusConfiguration;
   onChange: (value: ModbusConfiguration) => void;
   isDisabled?: boolean;
+  showIdentifiers?: boolean;
+  collapseProfiles?: boolean;
+  showValidationErrors?: boolean;
 }
 /** Host editor sets hardwareProfile=modbus and channel=0; binding uses names, not channel offsets. */
 export function ModbusPointForm({
@@ -31,18 +34,19 @@ export function ModbusPointForm({
   const device = configuration.devices.find((d) => d.id === value.deviceId);
   const profile = device && findProfile(configuration, device);
   return (
-    <div className="flex flex-col gap-3">
+    <div className="wg:flex wg:flex-col wg:gap-3">
       <Choice
         label="Modbus device"
         value={value.deviceId}
         options={configuration.devices.map((d) => d.id)}
+        labels={Object.fromEntries(configuration.devices.map((d) => [d.id, d.name]))}
         disabled={isDisabled}
         onChange={(deviceId) => onChange({ deviceId })}
       />
       <Select
         isDisabled={isDisabled}
-        selectedKey={value.measurementId ?? ''}
-        onSelectionChange={(key) => onChange({ ...value, measurementId: key ? String(key) : undefined })}
+        value={value.measurementId ?? ''}
+        onChange={(key) => onChange({ ...value, measurementId: key ? String(key) : undefined })}
       >
         <Label>Named measurement</Label>
         <Select.Trigger>
@@ -64,8 +68,8 @@ export function ModbusPointForm({
       </Select>
       <Select
         isDisabled={isDisabled}
-        selectedKey={value.actionId ?? ''}
-        onSelectionChange={(key) => onChange({ ...value, actionId: key ? String(key) : undefined })}
+        value={value.actionId ?? ''}
+        onChange={(key) => onChange({ ...value, actionId: key ? String(key) : undefined })}
       >
         <Label>Named action</Label>
         <Select.Trigger>
@@ -117,21 +121,21 @@ function Field({
   disabled?: boolean;
 }) {
   const display = Number.isNaN(value) ? '' : String(value);
-  const [draft, setDraft] = useState(display);
-  const [focused, setFocused] = useState(false);
-  useEffect(() => {
-    if (!focused) setDraft(display);
-  }, [display, focused]);
+  // Keep incomplete numeric text only while it still represents our own emitted value.
+  // An authoritative replacement must take precedence, including while focused.
+  const [edit, setEdit] = useState<{ text: string; value: string | number } | null>(null);
+  const currentEdit = edit && Object.is(edit.value, value) ? edit : null;
+  if (edit && !currentEdit) setEdit(null);
   return (
     <TextField
       isDisabled={disabled}
       isInvalid={numeric && Number.isNaN(value)}
-      value={focused ? draft : display}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
+      value={currentEdit?.text ?? display}
+      onBlur={() => setEdit(null)}
       onChange={(text) => {
-        setDraft(text);
-        onChange(numeric && !allowEmpty && text.trim() === '' ? 'NaN' : text);
+        const emitted = numeric && !allowEmpty && text.trim() === '' ? 'NaN' : text;
+        setEdit({ text, value: numeric && !(allowEmpty && text === '') ? Number(emitted) : emitted });
+        onChange(emitted);
       }}
     >
       <Label>{label}</Label>
@@ -145,19 +149,17 @@ function Choice({
   options,
   onChange,
   disabled = false,
+  labels = {},
 }: {
   label: string;
   value: string | number;
+  labels?: Record<string, string>;
   options: readonly (string | number)[];
   onChange: (value: string) => void;
   disabled?: boolean;
 }) {
   return (
-    <Select
-      isDisabled={disabled}
-      selectedKey={String(value)}
-      onSelectionChange={(key) => key !== null && onChange(String(key))}
-    >
+    <Select isDisabled={disabled} value={String(value)} onChange={(key) => key !== null && onChange(String(key))}>
       <Label>{label}</Label>
       <Select.Trigger>
         <Select.Value />
@@ -166,8 +168,8 @@ function Choice({
       <Select.Popover>
         <ListBox>
           {options.map((option) => (
-            <ListBox.Item id={String(option)} key={option} textValue={String(option)}>
-              {option}
+            <ListBox.Item id={String(option)} key={option} textValue={labels[String(option)] ?? String(option)}>
+              {labels[String(option)] ?? option}
               <ListBox.ItemIndicator />
             </ListBox.Item>
           ))}
@@ -186,7 +188,7 @@ function FormatFields({
   disabled: boolean;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2">
+    <div className="wg:grid wg:gap-3 wg:md:grid-cols-2">
       {(['address', 'scale', 'offset'] as const).map((key) => (
         <Field
           key={key}
@@ -214,7 +216,7 @@ function FormatFields({
       {(['byteOrder', 'wordOrder'] as const).map((key) => (
         <Choice
           key={key}
-          label={key}
+          label={key === 'byteOrder' ? 'Byte order' : 'Word order'}
           value={value[key]}
           options={['big', 'little']}
           disabled={disabled}
@@ -231,14 +233,16 @@ export function ModbusProfileForm({
   value,
   onChange,
   isDisabled = false,
+  showIdentifiers = true,
 }: {
   value: ModbusProfile;
   onChange: (value: ModbusProfile) => void;
   isDisabled?: boolean;
+  showIdentifiers?: boolean;
 }) {
   const readonly = isDisabled || BUILTIN_MODBUS_PROFILES.includes(value);
   return (
-    <section className="flex flex-col gap-4">
+    <section className="wg:flex wg:flex-col wg:gap-4">
       <header>
         <h3>{value.name}</h3>
         <p>
@@ -247,8 +251,15 @@ export function ModbusProfileForm({
             : 'Custom register map — verify against the device manual before use.'}
         </p>
       </header>
-      <div className="flex flex-col gap-4">
-        <Field label="Profile ID" value={value.id} disabled={readonly} onChange={(id) => onChange({ ...value, id })} />
+      <div className="wg:flex wg:flex-col wg:gap-4">
+        {showIdentifiers && (
+          <Field
+            label="Profile ID"
+            value={value.id}
+            disabled={readonly}
+            onChange={(id) => onChange({ ...value, id })}
+          />
+        )}
         <Field
           label="Profile name"
           value={value.name}
@@ -269,10 +280,12 @@ export function ModbusProfileForm({
               measurements: value.measurements.map((item, i) => (i === index ? { ...item, ...patch } : item)),
             });
           return (
-            <section key={index} className="flex flex-col gap-3">
+            <section key={index} className="wg:flex wg:flex-col wg:gap-3">
               <h4>Measurement: {m.name}</h4>
-              <div className="flex flex-col gap-3">
-                <Field label="Measurement ID" value={m.id} disabled={readonly} onChange={(id) => update({ id })} />
+              <div className="wg:flex wg:flex-col wg:gap-3">
+                {showIdentifiers && (
+                  <Field label="Measurement ID" value={m.id} disabled={readonly} onChange={(id) => update({ id })} />
+                )}
                 <Field label="Name" value={m.name} disabled={readonly} onChange={(name) => update({ name })} />
                 <Choice
                   label="Read function"
@@ -356,10 +369,12 @@ export function ModbusProfileForm({
               actions: value.actions.map((item, i) => (i === index ? { ...item, ...patch } : item)),
             });
           return (
-            <section key={index} className="flex flex-col gap-3">
+            <section key={index} className="wg:flex wg:flex-col wg:gap-3">
               <h4>Action: {a.name}</h4>
-              <div className="flex flex-col gap-3">
-                <Field label="Action ID" value={a.id} disabled={readonly} onChange={(id) => update({ id })} />
+              <div className="wg:flex wg:flex-col wg:gap-3">
+                {showIdentifiers && (
+                  <Field label="Action ID" value={a.id} disabled={readonly} onChange={(id) => update({ id })} />
+                )}
                 <Field label="Name" value={a.name} disabled={readonly} onChange={(name) => update({ name })} />
                 <Choice
                   label="Write function: 5 coil / 6 register / 16 registers"
@@ -414,11 +429,19 @@ export function ModbusProfileForm({
   );
 }
 
-export function ModbusConfigurationForm({ value, onChange, isDisabled = false }: ModbusConfigurationFormProps) {
+export function ModbusConfigurationForm({
+  value,
+  onChange,
+  isDisabled = false,
+  showIdentifiers = true,
+  collapseProfiles = false,
+  showValidationErrors = true,
+}: ModbusConfigurationFormProps) {
+  const [openProfiles, setOpenProfiles] = useState<Set<number>>(new Set());
   const errors = validateModbus(value);
   const profiles = [...BUILTIN_MODBUS_PROFILES, ...value.profiles];
   return (
-    <section aria-label="Modbus configuration" className="flex flex-col gap-4">
+    <section aria-label="Modbus configuration" className="wg:flex wg:min-w-0 wg:flex-col wg:gap-4">
       <p>No hardware is qualified. Built-in maps are unverified manual-derived candidates; no rollover is assumed.</p>
       {value.connections.map((c, index) => {
         const update = (patch: object) =>
@@ -427,10 +450,14 @@ export function ModbusConfigurationForm({ value, onChange, isDisabled = false }:
             connections: value.connections.map((item, i) => (i === index ? { ...item, ...patch } : item)),
           });
         return (
-          <section key={index} className="flex flex-col gap-3">
-            <h3>Connection: {c.id}</h3>
-            <div className="grid gap-3 md:grid-cols-2">
-              <Field label="Connection ID" value={c.id} disabled={isDisabled} onChange={(id) => update({ id })} />
+          <section key={index} className="wg:flex wg:flex-col wg:gap-3">
+            <h3>
+              Connection {index + 1}: {c.transport === 'tcp' ? c.host || 'TCP' : c.path}
+            </h3>
+            <div className="wg:grid wg:gap-3 wg:md:grid-cols-2">
+              {showIdentifiers && (
+                <Field label="Connection ID" value={c.id} disabled={isDisabled} onChange={(id) => update({ id })} />
+              )}
               <Choice
                 label="Transport"
                 value={c.transport}
@@ -506,7 +533,13 @@ export function ModbusConfigurationForm({ value, onChange, isDisabled = false }:
               {(['timeoutMs', 'reconnectMs', 'queueLimit'] as const).map((key) => (
                 <Field
                   key={key}
-                  label={key}
+                  label={
+                    {
+                      timeoutMs: 'Response timeout (ms)',
+                      reconnectMs: 'Reconnect delay (ms)',
+                      queueLimit: 'Queue limit',
+                    }[key]
+                  }
                   value={c[key]}
                   numeric
                   disabled={isDisabled}
@@ -551,15 +584,23 @@ export function ModbusConfigurationForm({ value, onChange, isDisabled = false }:
         const update = (patch: Partial<typeof d>) =>
           onChange({ ...value, devices: value.devices.map((item, i) => (i === index ? { ...item, ...patch } : item)) });
         return (
-          <section key={index} className="flex flex-col gap-3">
+          <section key={index} className="wg:flex wg:flex-col wg:gap-3">
             <h3>Device: {d.name}</h3>
-            <div className="grid gap-3 md:grid-cols-2">
-              <Field label="Device ID" value={d.id} disabled={isDisabled} onChange={(id) => update({ id })} />
+            <div className="wg:grid wg:gap-3 wg:md:grid-cols-2">
+              {showIdentifiers && (
+                <Field label="Device ID" value={d.id} disabled={isDisabled} onChange={(id) => update({ id })} />
+              )}
               <Field label="Device name" value={d.name} disabled={isDisabled} onChange={(name) => update({ name })} />
               <Choice
                 label="Connection"
                 value={d.connectionId}
                 options={value.connections.map((c) => c.id)}
+                labels={Object.fromEntries(
+                  value.connections.map((c, i) => [
+                    c.id,
+                    `Connection ${i + 1}: ${c.transport === 'tcp' ? c.host || 'TCP' : c.path}`,
+                  ]),
+                )}
                 disabled={isDisabled}
                 onChange={(connectionId) => update({ connectionId })}
               />
@@ -572,8 +613,8 @@ export function ModbusConfigurationForm({ value, onChange, isDisabled = false }:
               />
               <Select
                 isDisabled={isDisabled}
-                selectedKey={`${d.profileId}@${d.profileVersion}`}
-                onSelectionChange={(key) => {
+                value={`${d.profileId}@${d.profileVersion}`}
+                onChange={(key) => {
                   const p = profiles.find((p) => `${p.id}@${p.version}` === key);
                   if (p) update({ profileId: p.id, profileVersion: p.version });
                 }}
@@ -629,20 +670,39 @@ export function ModbusConfigurationForm({ value, onChange, isDisabled = false }:
       </Button>
       {profiles.map((p, profileIndex) => (
         // Profiles are appended and edited in place; the editable ID must not control mount identity.
-        <div key={profileIndex}>
-          <ModbusProfileForm
-            value={p}
-            isDisabled={isDisabled}
-            onChange={(updated) =>
-              onChange({
-                ...value,
-                profiles: value.profiles.map((item, i) =>
-                  i === profileIndex - BUILTIN_MODBUS_PROFILES.length ? updated : item,
-                ),
-              })
-            }
-          />
+        <details
+          key={profileIndex}
+          open={!collapseProfiles || openProfiles.has(profileIndex)}
+          onToggle={(event) => {
+            const open = event.currentTarget.open;
+            setOpenProfiles((current) => {
+              const next = new Set(current);
+              if (open) next.add(profileIndex);
+              else next.delete(profileIndex);
+              return next;
+            });
+          }}
+        >
+          <summary className="wg:whitespace-normal wg:break-words">
+            {p.name} v{p.version}
+          </summary>
+          {(!collapseProfiles || openProfiles.has(profileIndex)) && (
+            <ModbusProfileForm
+              value={p}
+              showIdentifiers={showIdentifiers}
+              isDisabled={isDisabled}
+              onChange={(updated) =>
+                onChange({
+                  ...value,
+                  profiles: value.profiles.map((item, i) =>
+                    i === profileIndex - BUILTIN_MODBUS_PROFILES.length ? updated : item,
+                  ),
+                })
+              }
+            />
+          )}
           <Button
+            className="wg:h-auto wg:min-h-10 wg:whitespace-normal wg:py-2"
             isDisabled={isDisabled}
             variant="secondary"
             onPress={() =>
@@ -651,7 +711,7 @@ export function ModbusConfigurationForm({ value, onChange, isDisabled = false }:
           >
             Duplicate {p.name}
           </Button>
-        </div>
+        </details>
       ))}
       <Button
         isDisabled={isDisabled}
@@ -668,7 +728,7 @@ export function ModbusConfigurationForm({ value, onChange, isDisabled = false }:
       >
         Create custom profile
       </Button>
-      {errors.length > 0 && (
+      {showValidationErrors && errors.length > 0 && (
         <ul role="alert">
           {errors.map((error, i) => (
             <li key={i}>

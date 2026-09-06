@@ -4,15 +4,57 @@ on:
   pull_request:
     paths:
       - 'apps/plugins/wago/cc100-runtime/**'
+      - 'apps/plugins/wago/backend/**'
+      - 'apps/plugins/wago/acceptance/**'
+      - 'apps/plugins/wago/frontend/**'
+      - 'apps/plugins/wago/modbus/**'
+      - 'apps/plugins/wago/tsconfig.acceptance.json'
+      - 'scripts/typecheck-wago-frontend-tests*.mjs'
+      - 'apps/frontend/src/app/resources/details/flows/**'
+      - 'apps/api/src/resources/flows/**'
+      - 'apps/api/src/plugin-system/plugin-flow-node-registry*'
+      - 'libs/plugins-frontend-sdk/**'
+      - 'apps/plugins/wago/project.json'
+      - 'apps/plugins/wago/tsconfig.spec.json'
+      - 'tsconfig.base.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'scripts/test-wago-production-fleet*'
+      - 'scripts/test-wago-credential-rotation*'
+      - 'scripts/test-wago-commissioning*'
+      - 'apps/plugins/wago/measurement-contract.ts'
+      - 'libs/plugins-backend-sdk/**'
       - 'apps/plugins/wago/backend/protocol.ts'
       - 'apps/plugins/wago/backend/wago.service.ts'
+      - 'apps/plugins/wago/scripts/package-runtime-artifact.mjs'
       - '.github/workflows/wago-cc100-runtime.yml'
   push:
     branches: [main]
     paths:
       - 'apps/plugins/wago/cc100-runtime/**'
+      - 'apps/plugins/wago/backend/**'
+      - 'apps/plugins/wago/acceptance/**'
+      - 'apps/plugins/wago/frontend/**'
+      - 'apps/plugins/wago/modbus/**'
+      - 'apps/plugins/wago/tsconfig.acceptance.json'
+      - 'scripts/typecheck-wago-frontend-tests*.mjs'
+      - 'apps/frontend/src/app/resources/details/flows/**'
+      - 'apps/api/src/resources/flows/**'
+      - 'apps/api/src/plugin-system/plugin-flow-node-registry*'
+      - 'libs/plugins-frontend-sdk/**'
+      - 'apps/plugins/wago/project.json'
+      - 'apps/plugins/wago/tsconfig.spec.json'
+      - 'tsconfig.base.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'scripts/test-wago-production-fleet*'
+      - 'scripts/test-wago-credential-rotation*'
+      - 'scripts/test-wago-commissioning*'
+      - 'apps/plugins/wago/measurement-contract.ts'
+      - 'libs/plugins-backend-sdk/**'
       - 'apps/plugins/wago/backend/protocol.ts'
       - 'apps/plugins/wago/backend/wago.service.ts'
+      - 'apps/plugins/wago/scripts/package-runtime-artifact.mjs'
       - '.github/workflows/wago-cc100-runtime.yml'
 
 permissions:
@@ -24,12 +66,46 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
+      - name: Typecheck host and plugin test sources without diagnostic exceptions
+        run: pnpm nx run-many -p api,frontend,plugin-rabbitmq,plugins-backend-sdk,plugins-frontend-sdk,plugins-frontend-ui -t typecheck-tests
       - run: pnpm nx run wago-cc100-runtime:typecheck
       - run: pnpm nx run wago-cc100-runtime:test
       - run: pnpm nx run wago-cc100-runtime:build
+      - run: pnpm nx run wago-cc100-runtime:build-simulator
+      - name: Typecheck simulator integration harness
+        run: pnpm exec tsc --noEmit -p apps/plugins/wago/cc100-runtime/integration/tsconfig.json
+      - name: Verify simulator lifecycle and measurement flow on an isolated broker
+        run: pnpm nx run wago-cc100-runtime:test-simulator-integration
+      - name: Typecheck production acceptance tests
+        run: pnpm nx run plugin-wago:typecheck-acceptance
+      - name: Verify frontend typecheck rejects diagnostics
+        run: pnpm nx run plugin-wago:test-typecheck-frontend-gate
+      - name: Typecheck all frontend tests
+        run: pnpm nx run plugin-wago:typecheck-frontend-tests
+      - name: Verify production fleet flows on an isolated RabbitMQ fixture
+        env:
+          WAGO_FLEET_DOCKER_CONTEXT: default
+        run: pnpm nx run plugin-wago:production-fleet
+      - name: Verify credential rotation and reconnect on an isolated RabbitMQ fixture
+        env:
+          WAGO_FLEET_DOCKER_CONTEXT: default
+        run: pnpm nx run plugin-wago:test-credential-rotation
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - name: Install fixture browser
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Verify signed commissioning, recovery, and mounted desktop/mobile navigation
+        env:
+          PYTHON: python
+        run: pnpm nx run plugin-wago:test-commissioning-acceptance
       - uses: actions/upload-artifact@v4
         with:
           name: wago-cc100-runtime-manifest
@@ -69,14 +145,12 @@ jobs:
           docker pull --platform linux/arm/v7 "$IMAGE@$DIGEST"
           docker tag "$IMAGE@$DIGEST" "$IMAGE"
           docker save "$IMAGE" -o image.tar
-          printf '%s@%s\n' "$IMAGE" "$DIGEST" > image-reference
-          tar --mtime='@0' -cf wago-cc100-runtime.tar image.tar image-reference
-          rm -f image.tar image-reference
-          sha256sum wago-cc100-runtime.tar > wago-cc100-runtime.tar.sha256
           umask 077
           printf '%s\n' "$WAGO_RUNTIME_SIGNING_PRIVATE_KEY" > signing-private-key
-          ssh-keygen -Y sign -f signing-private-key -n attraccess-wago-runtime wago-cc100-runtime.tar
-          rm -f signing-private-key
+          trap 'rm -f signing-private-key image.tar' EXIT
+          VERSION=$(node -p "require('./apps/plugins/wago/cc100-runtime/manifest.json').runtimeVersion")
+          node -e "if(require('./apps/plugins/wago/cc100-runtime/manifest.json').deployment.hardwareProfile !== 'cc100-751-9301-fw31-digital-v1') throw new Error('Integrate the ATT-1056 hardware runtime before publishing commissioning artifacts')"
+          node apps/plugins/wago/scripts/package-runtime-artifact.mjs --image-archive image.tar --image "$IMAGE@$DIGEST" --version "$VERSION" --signing-key signing-private-key --out runtime-release
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'push'
         with:
@@ -87,6 +161,6 @@ jobs:
         with:
           name: wago-cc100-runtime-bundle
           path: |
-            wago-cc100-runtime.tar
-            wago-cc100-runtime.tar.sha256
-            wago-cc100-runtime.tar.sig
+            runtime-release/cc100-*/wago-cc100-runtime.tar
+            runtime-release/cc100-*/wago-cc100-runtime.tar.sha256
+            runtime-release/cc100-*/wago-cc100-runtime.tar.sig

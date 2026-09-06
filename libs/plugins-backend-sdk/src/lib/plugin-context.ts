@@ -6,6 +6,7 @@ import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscri
 import type { PluginEntityClass } from './entity';
 import type { MqttCredentialProvisioningProviderFactory } from './mqtt-credential-provisioning';
 import type { MqttCredentialProvisioningHostProvider } from './mqtt-credential-provisioning';
+import type { PluginAuditContext } from './plugin-audit';
 
 /**
  * DI token under which a plugin's own services can inject the PluginContext.
@@ -42,6 +43,11 @@ export interface MqttServerConnectionConfig {
   readonly host: string;
   readonly port: number;
   readonly useTls: boolean;
+  /** PEM trust anchors for private PKI. Omitted by older hosts. */
+  readonly caCert?: string | null;
+  /** Integrations requiring authenticated TLS must reject this setting. */
+  readonly tlsInsecure?: boolean;
+  readonly tlsServername?: string | null;
   readonly username: string | null;
   /** Resolved (decrypted) password. Only ever provided to permitted plugins. */
   readonly password: string | null;
@@ -99,7 +105,7 @@ export interface PluginFlowsContext {
    * Starts a flow from every persisted trigger node of nodeType whose saved
    * configuration matches the supplied external event.
    */
-  trigger(nodeType: string, matches: (config: Record<string, unknown>) => boolean, payload: object): Promise<void>;
+  trigger(nodeType: string, matches: (config: Record<string, unknown>, nodeId: string) => boolean, payload: object): Promise<void>;
 }
 
 /** Host-managed encryption for plugin-owned secrets. Plaintext is never persisted by the host. */
@@ -114,6 +120,8 @@ export interface PluginSecretsContext {
  * a minor SDK bump; removing/changing one is a major bump.
  */
 export interface PluginContext {
+  /** Optional for compatibility with hosts predating generic plugin audit support. */
+  readonly audit?: PluginAuditContext;
   /** This plugin's own manifest (name, version, directory, id). */
   readonly manifest: PluginManifestInfo;
 
@@ -194,7 +202,7 @@ export interface PluginBackendModule {
    *
    * Type naming convention: "plugin.<pluginName>.<nodeName>".
    */
-  flowNodes?: PluginFlowNodeDefinition[];
+  flowNodes?: PluginFlowNodeDefinition[] | ((context: PluginContext) => PluginFlowNodeDefinition[]);
 
   /** Optional broker credential provider offered to other integrations by this plugin. */
   credentialProvisioningProvider?: MqttCredentialProvisioningProviderFactory;

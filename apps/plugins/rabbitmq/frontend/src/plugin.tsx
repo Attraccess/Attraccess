@@ -15,7 +15,7 @@ import type {
   PluginSlotContribution,
   RouteConfig,
 } from '@attraccess/plugins-frontend-sdk';
-import type { IPluginStore } from 'react-pluggable';
+import type { PluginStore } from 'react-pluggable';
 import { useDetection } from './detection';
 import { RabbitmqListBadge } from './RabbitmqListBadge';
 import { RabbitmqStatusPanel } from './RabbitmqStatusPanel';
@@ -63,9 +63,9 @@ function RabbitmqPage() {
       <Card className="rmq:border rmq:border-default-200 rmq:dark:border-default-100">
         <Card.Content>
           <p className="rmq:text-sm rmq:text-default-500">
-            RabbitMQ management plugin. RabbitMQ MQTT servers show a detection badge and connection-status panel in
-            the MQTT settings, and broker users can be managed (create, edit, permissions, delete) from the MQTT
-            server detail view.
+            RabbitMQ management plugin. RabbitMQ MQTT servers show a detection badge and connection-status panel in the
+            MQTT settings, and broker users can be managed (create, edit, permissions, delete) from the MQTT server
+            detail view.
           </p>
         </Card.Content>
       </Card>
@@ -74,6 +74,7 @@ function RabbitmqPage() {
 }
 
 export default class RabbitmqPlugin implements AttraccessFrontendPlugin {
+  pluginStore: PluginStore;
   getPluginName(): string {
     return 'rabbitmq-plugin@0.1.0';
   }
@@ -82,8 +83,8 @@ export default class RabbitmqPlugin implements AttraccessFrontendPlugin {
     return [];
   }
 
-  init(_store: IPluginStore): void {
-    // No setup needed.
+  init(store: PluginStore): void {
+    this.pluginStore = store;
   }
 
   activate(): void {

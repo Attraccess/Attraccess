@@ -3,6 +3,7 @@ import { execFileSync } from 'child_process';
 import * as os from 'os';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import type { Repository } from 'typeorm';
 import { GenericContainer, StartedTestContainer, Wait } from 'testcontainers';
@@ -17,6 +18,7 @@ import {
   UserRole,
   Role,
   Permission,
+  RolePermission,
   SSOProviderType,
   UserRoleSource,
   entities,
@@ -49,11 +51,7 @@ class TestOidcStateStore {
     cb(null, handle);
   }
 
-  verify(
-    _req: unknown,
-    handle: string,
-    cb: (err: Error | null, ctx: unknown, appState?: unknown) => void,
-  ): void {
+  verify(_req: unknown, handle: string, cb: (err: Error | null, ctx: unknown, appState?: unknown) => void): void {
     const saved = this.states.get(handle);
     if (!saved) {
       return cb(null, false as unknown as null, { message: 'OIDC state handle not found' });
@@ -163,7 +161,15 @@ describe('SSO OIDC integration (e2e with testcontainers)', () => {
     } as unknown as LicenseService;
 
     const tokenHashService = new TokenHashService(mockConfigService);
-    rbacService = new RbacService(userRoleRepo, roleRepo, permissionRepo);
+    rbacService = new RbacService(
+      userRoleRepo,
+      roleRepo,
+      permissionRepo,
+      userRepo,
+      dataSource.getRepository(RolePermission),
+      new EventEmitter2(),
+      null,
+    );
     usersService = new UsersService(
       userRepo,
       authDetailRepo,
@@ -176,13 +182,7 @@ describe('SSO OIDC integration (e2e with testcontainers)', () => {
       mockMetricsService,
       rbacService,
     );
-    authService = new AuthService(
-      mockEmailService,
-      authDetailRepo,
-      usersService,
-      tokenHashService,
-      mockMetricsService,
-    );
+    authService = new AuthService(mockEmailService, authDetailRepo, usersService, tokenHashService, mockMetricsService);
 
     mockModuleRef = {
       get: (token: unknown): unknown => {
@@ -197,8 +197,8 @@ describe('SSO OIDC integration (e2e with testcontainers)', () => {
     stateStore = new TestOidcStateStore();
 
     // ── 4. Discover endpoints from the running container ─────────────────────
-    const discovery = await fetch(`${oidcBaseUrl}/.well-known/openid-configuration`).then((r) =>
-      r.json() as Promise<Record<string, string>>,
+    const discovery = await fetch(`${oidcBaseUrl}/.well-known/openid-configuration`).then(
+      (r) => r.json() as Promise<Record<string, string>>,
     );
 
     oidcConfig = {

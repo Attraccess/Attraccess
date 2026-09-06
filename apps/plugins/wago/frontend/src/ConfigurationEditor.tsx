@@ -1,11 +1,7 @@
 import {
   Alert,
   Button,
-  Card,
-  Checkbox,
   Form,
-  Input,
-  Label,
   Modal,
   ModalBackdrop,
   ModalBody,
@@ -14,20 +10,31 @@ import {
   ModalFooter,
   ModalHeader,
   ModalHeading,
-  TextArea,
-  TextField,
 } from '@heroui/react';
 import { useEffect, useRef, useState } from 'react';
-import type { PresetPreview, WagoPreset, WagoPresetApplication } from './api';
+import type { ConfigurationEditorMetadata, WagoConfigurationSnapshot } from './api';
+import { useConfigurationActions, useDraftQuery, useSaveDraftMutation } from './queries';
 import {
-  useApplyPresetMutation,
-  useDraftQuery,
-  usePresetsQuery,
-  usePreviewPresetMutation,
-  useSaveDraftMutation,
-} from './queries';
-
-const emptySnapshot = { version: 1, physicalPoints: [], logicalChannels: [] };
+  addDigitalChannel,
+  emptyConfiguration,
+  emptyMetadata,
+  metadataForSnapshot,
+  readMetadata,
+} from './configuration-model';
+import { DigitalChannelEditor, PhysicalAssignments } from './DigitalChannelEditor';
+import { ConfigurationPresets } from './ConfigurationPresets';
+import { ConfigurationRevisions } from './ConfigurationRevisions';
+import { ConfigurationErrors } from './ConfigurationChanges';
+import { ModbusConfigurationForm, ModbusPointForm } from './ModbusConfigurationForm';
+import { ModbusChannels } from './ModbusChannels';
+import { addModbusChannel, bindModbusPoint, emptyModbus, updateModbusConfiguration } from './modbus-editor';
+import { validateModbus, validateModbusBindings } from '../../modbus/model';
+import { ControllerDiagnostics } from './ControllerDiagnostics';
+import {
+  availableDigitalTerminals,
+  digitalTerminalLabel,
+  isEditableDigitalChannel,
+} from '../../backend/configuration-digital';
 
 export function ConfigurationEditor({
   controllerId,
@@ -36,96 +43,132 @@ export function ConfigurationEditor({
   controllerId: number | null;
   onOpenChange: (open: boolean) => void;
 }) {
-  const draftQuery = useDraftQuery(controllerId);
-  const presetsQuery = usePresetsQuery();
-  const [snapshot, setSnapshot] = useState(JSON.stringify(emptySnapshot, null, 2));
-  const [preset, setPreset] = useState<WagoPreset | null>(null);
-  const [channelId, setChannelId] = useState('channel-1');
-  const [physicalPointId, setPhysicalPointId] = useState('point-1');
-  const [guardChannelId, setGuardChannelId] = useState('');
-  const [feedbackChannelId, setFeedbackChannelId] = useState('');
-  const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
-  const [presetPreview, setPresetPreview] = useState<PresetPreview | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
-  const previewGeneration = useRef(0);
-  const saveDraft = useSaveDraftMutation(controllerId ?? 0);
-  const previewPreset = usePreviewPresetMutation(controllerId ?? 0);
-  const applyPreset = useApplyPresetMutation();
+  if (controllerId === null) return null;
+  return <ConfigurationSession key={controllerId} controllerId={controllerId} onClose={() => onOpenChange(false)} />;
+}
 
+function ConfigurationSession({ controllerId, onClose }: { controllerId: number; onClose: () => void }) {
+  const draft = useDraftQuery(controllerId);
+  const save = useSaveDraftMutation(controllerId);
+  const { validate } = useConfigurationActions(controllerId);
+  const [snapshot, setSnapshot] = useState<WagoConfigurationSnapshot>(emptyConfiguration);
+  const [metadata, setMetadata] = useState<ConfigurationEditorMetadata>(emptyMetadata);
+  const [initialized, setInitialized] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [draftConflict, setDraftConflict] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
+  const [discard, setDiscard] = useState(false);
+  const [generation, setGeneration] = useState(0);
+  const [revisionBusy, setRevisionBusy] = useState(false);
+  const [presetBusy, setPresetBusy] = useState(false);
+  const editVersion = useRef(0);
+  const loadedDraft = useRef<string | null>(null);
+  const mounted = useRef(true);
   useEffect(() => {
-    setSnapshot(JSON.stringify(emptySnapshot, null, 2));
-  }, [controllerId]);
-
-  useEffect(() => {
-    if (draftQuery.data) setSnapshot(JSON.stringify(JSON.parse(draftQuery.data.snapshot), null, 2));
-    else if (!draftQuery.isPending) setSnapshot(JSON.stringify(emptySnapshot, null, 2));
-  }, [draftQuery.data, draftQuery.isPending]);
-
-  useEffect(() => {
-    previewGeneration.current += 1;
-    previewPreset.reset();
-    setSelectedPaths([]);
-    setPresetPreview(null);
-  }, [controllerId, preset, channelId, physicalPointId, guardChannelId, feedbackChannelId]);
-
-  function application(): WagoPresetApplication | null {
-    if (!preset) return null;
-    return {
-      presetId: preset.id,
-      channelId,
-      physicalPointId,
-      ...(guardChannelId ? { guardChannelId } : {}),
-      ...(feedbackChannelId ? { feedbackChannelId } : {}),
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
     };
-  }
-
-  function parsedSnapshot(): unknown {
-    return JSON.parse(snapshot);
-  }
-
-  async function preview() {
-    const generation = previewGeneration.current;
+  }, []);
+  useEffect(() => {
+    if (draft.isPending || draft.isError) return;
+    const incoming = draft.data
+      ? `${draft.data.updatedAt}\u0000${draft.data.snapshot}\u0000${draft.data.presetProvenance ?? ''}`
+      : 'empty';
+    if (incoming === loadedDraft.current) return;
+    if (initialized && dirty) {
+      setDraftConflict(true);
+      return;
+    }
     try {
-      setFormError(null);
-      const selected = application();
-      if (!selected || draftQuery.isPending) return;
-      await saveDraft.mutateAsync(parsedSnapshot());
-      const result = await previewPreset.mutateAsync(selected);
-      if (generation !== previewGeneration.current) return;
-      setPresetPreview(result);
-      setSelectedPaths(result.diff.map((change) => change.path));
+      const value = draft.data ? JSON.parse(draft.data.snapshot) : emptyConfiguration;
+      if (value.version !== 1 || !Array.isArray(value.physicalPoints) || !Array.isArray(value.logicalChannels))
+        throw new Error('This draft has an unsupported configuration structure.');
+      setSnapshot(value);
+      setMetadata(readMetadata(draft.data?.presetProvenance ?? null));
+      setInitialized(true);
+      setDirty(false);
+      setDraftConflict(false);
+      loadedDraft.current = incoming;
     } catch (error) {
-      if (generation === previewGeneration.current)
-        setFormError(error instanceof Error ? error.message : 'Could not preview preset changes.');
+      setError(error instanceof Error ? error.message : 'Could not read draft.');
+    }
+  }, [draft.data, draft.isPending, draft.isError, dirty, initialized]);
+  function changed() {
+    editVersion.current++;
+    setDirty(true);
+    setError(null);
+    setNotice('');
+    setGeneration((value) => value + 1);
+    validate.reset();
+  }
+  function edit(value: WagoConfigurationSnapshot) {
+    changed();
+    setSnapshot(value);
+  }
+  function rename(id: string, name: string) {
+    changed();
+    setMetadata((current) => ({ ...current, names: { ...current.names, [id]: name } }));
+  }
+  function add(direction: 'input' | 'output') {
+    try {
+      const next = addDigitalChannel(snapshot, direction);
+      edit(next.snapshot);
+      setMetadata((current) => ({
+        ...current,
+        names: {
+          ...current.names,
+          [next.channel.id]: `Digital ${direction} ${digitalTerminalLabel(next.point.channel)}`,
+          [next.point.id]: digitalTerminalLabel(next.point.channel),
+        },
+      }));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'No terminal available.');
     }
   }
-
-  async function apply() {
-    const generation = previewGeneration.current;
+  const modbusErrors = [
+    ...(snapshot.modbus ? validateModbus(snapshot.modbus) : []),
+    ...validateModbusBindings(snapshot),
+  ];
+  async function saveDraft() {
+    if (busy || draftConflict || modbusErrors.length) return;
+    const savingVersion = editVersion.current;
+    setError(null);
+    setNotice('');
     try {
-      setFormError(null);
-      const selected = application();
-      if (!selected || controllerId === null || draftQuery.isPending) return;
-      const draft = await applyPreset.mutateAsync({
-        controllerId,
-        application: selected,
-        selectedPaths,
-        previewedDraftHash: presetPreview?.draftHash ?? '',
-      });
-      if (generation !== previewGeneration.current) return;
-      setSnapshot(JSON.stringify(JSON.parse(draft.snapshot), null, 2));
-      previewPreset.reset();
-      setPresetPreview(null);
+      const result = await validate.mutateAsync(snapshot);
+      if (!mounted.current || savingVersion !== editVersion.current || !result.valid) return;
+      const savedMetadata = metadataForSnapshot(snapshot, metadata);
+      await save.mutateAsync({ snapshot, metadata: savedMetadata });
+      if (!mounted.current || savingVersion !== editVersion.current) return;
+      setDirty(false);
+      setMetadata(savedMetadata);
+      setNotice('Draft saved. Review and publish separately to send it to the controller.');
+      setGeneration((value) => value + 1);
     } catch (error) {
-      if (generation === previewGeneration.current)
-        setFormError(error instanceof Error ? error.message : 'Could not apply preset changes.');
+      if (mounted.current) setError(error instanceof Error ? error.message : 'Could not save draft.');
     }
   }
-
-  const error = saveDraft.error ?? applyPreset.error;
-  const isApplyingPreset = applyPreset.isPending;
+  const busy = save.isPending || validate.isPending || revisionBusy || presetBusy;
+  function reloadSavedDraft() {
+    loadedDraft.current = null;
+    setDirty(false);
+    setDraftConflict(false);
+    void draft.refetch();
+  }
+  function close() {
+    if (busy) return;
+    if (dirty) setDiscard(true);
+    else onClose();
+  }
   return (
-    <Modal isOpen={controllerId !== null} onOpenChange={onOpenChange}>
+    <Modal
+      isOpen
+      onOpenChange={(open) => {
+        if (!open) close();
+      }}
+    >
       <ModalBackdrop>
         <ModalContainer size="lg">
           <ModalDialog>
@@ -135,18 +178,10 @@ export function ConfigurationEditor({
             <Form
               onSubmit={(event) => {
                 event.preventDefault();
-                if (draftQuery.isPending) return;
-                try {
-                  setFormError(null);
-                  void saveDraft
-                    .mutateAsync(parsedSnapshot())
-                    .catch((error) => setFormError(error instanceof Error ? error.message : 'Could not save draft.'));
-                } catch (error) {
-                  setFormError(error instanceof Error ? error.message : 'Configuration must be valid JSON.');
-                }
+                void saveDraft();
               }}
             >
-              <ModalBody className="wg:flex wg:max-h-[75vh] wg:flex-col wg:gap-4 wg:overflow-y-auto">
+              <ModalBody className="wg:flex wg:max-h-[75vh] wg:flex-col wg:gap-4 wg:overflow-y-auto wg:[&>*]:shrink-0">
                 <Alert status="warning">
                   <Alert.Indicator />
                   <Alert.Content>
@@ -157,134 +192,254 @@ export function ConfigurationEditor({
                     </Alert.Description>
                   </Alert.Content>
                 </Alert>
-                <TextField className="wg:w-full">
-                  <Label>Editable configuration draft</Label>
-                  <TextArea
-                    isDisabled={draftQuery.isPending || isApplyingPreset}
-                    value={snapshot}
-                    onChange={(event) => {
-                      previewGeneration.current += 1;
-                      previewPreset.reset();
-                      setSelectedPaths([]);
-                      setPresetPreview(null);
-                      setSnapshot(event.target.value);
-                    }}
-                    rows={14}
-                    className="wg:font-mono"
-                  />
-                </TextField>
-                <Card>
-                  <Card.Header>
-                    <h2 className="wg:font-medium">Apply editable preset foundation</h2>
-                  </Card.Header>
-                  <Card.Content className="wg:flex wg:flex-col wg:gap-3">
-                    <div className="wg:flex wg:flex-wrap wg:gap-2">
-                      {presetsQuery.data?.map((item) => (
-                        <Button
-                          key={item.id}
-                          size="sm"
-                          variant={preset?.id === item.id ? 'primary' : 'secondary'}
-                          isDisabled={isApplyingPreset}
-                          onPress={() => setPreset(item)}
-                        >
-                          {item.name}
-                        </Button>
-                      ))}
-                    </div>
-                    {preset && <p className="wg:text-sm wg:text-muted">{preset.description}</p>}
-                    <TextField isRequired>
-                      <Label>Logical channel ID</Label>
-                      <Input
-                        isDisabled={isApplyingPreset}
-                        value={channelId}
-                        onChange={(event) => setChannelId(event.target.value)}
-                      />
-                    </TextField>
-                    <TextField isRequired>
-                      <Label>Physical point ID</Label>
-                      <Input
-                        isDisabled={isApplyingPreset}
-                        value={physicalPointId}
-                        onChange={(event) => setPhysicalPointId(event.target.value)}
-                      />
-                    </TextField>
-                    {preset?.id === 'guarded-enable-request' && (
-                      <TextField isRequired>
-                        <Label>Guard input channel ID</Label>
-                        <Input
-                          isDisabled={isApplyingPreset}
-                          value={guardChannelId}
-                          onChange={(event) => setGuardChannelId(event.target.value)}
-                        />
-                      </TextField>
-                    )}
-                    {preset?.id === 'generic-digital-output' && (
-                      <TextField>
-                        <Label>Optional feedback channel ID</Label>
-                        <Input
-                          value={feedbackChannelId}
-                          isDisabled={isApplyingPreset}
-                          onChange={(event) => setFeedbackChannelId(event.target.value)}
-                        />
-                      </TextField>
-                    )}
-                    <Button
-                      isDisabled={!preset || draftQuery.isPending || isApplyingPreset}
-                      isPending={saveDraft.isPending || previewPreset.isPending}
-                      onPress={() => void preview()}
-                    >
-                      Preview changes
-                    </Button>
-                    {presetPreview && (
-                      <div className="wg:flex wg:flex-col wg:gap-2">
-                        <p className="wg:text-sm wg:font-medium">Select preset changes to copy into this draft</p>
-                        {presetPreview.diff.map((change) => (
-                          <Checkbox
-                            key={change.path}
-                            isDisabled={isApplyingPreset}
-                            isSelected={selectedPaths.includes(change.path)}
-                            onChange={(selected) =>
-                              setSelectedPaths((paths) =>
-                                selected ? [...paths, change.path] : paths.filter((path) => path !== change.path),
-                              )
-                            }
-                          >
-                            <code>{change.path}</code>
-                          </Checkbox>
-                        ))}
-                        <Button
-                          isDisabled={draftQuery.isPending || isApplyingPreset}
-                          isPending={applyPreset.isPending}
-                          onPress={() => void apply()}
-                        >
-                          Apply selected changes
-                        </Button>
-                      </div>
-                    )}
-                  </Card.Content>
-                </Card>
-                {draftQuery.data?.presetProvenance && (
-                  <p className="wg:text-xs wg:text-muted">Preset provenance: {draftQuery.data.presetProvenance}</p>
-                )}
-                {(formError || error) && (
+                <ControllerDiagnostics controllerId={controllerId} />
+                <p>
+                  Diagnostics compares controller settings only. Review saved draft below also checks channel names and
+                  preset metadata before publication.
+                </p>
+                {draft.isPending && <p role="status">Loading draft…</p>}
+                {draft.isError && <p role="alert">Could not load draft: {draft.error.message}</p>}
+                {draftConflict && (
                   <Alert status="danger">
                     <Alert.Indicator />
                     <Alert.Content>
+                      <Alert.Title>Saved draft changed</Alert.Title>
                       <Alert.Description>
-                        {formError ?? (error instanceof Error ? error.message : 'Could not update the draft.')}
+                        Another editor saved a newer draft. Reload it before editing, reviewing, or saving so your local
+                        changes do not overwrite it.
                       </Alert.Description>
+                      <Button variant="secondary" onPress={reloadSavedDraft}>
+                        Reload saved draft
+                      </Button>
+                    </Alert.Content>
+                  </Alert>
+                )}
+                {initialized && (
+                  <>
+                    <p role="status">
+                      {dirty ? 'Unsaved local edits' : draft.data ? 'Draft is saved' : 'No saved draft yet'} ·{' '}
+                      {snapshot.logicalChannels.length} channels
+                    </p>
+                    <fieldset
+                      disabled={busy || draftConflict}
+                      inert={busy || draftConflict}
+                      className="wg:flex wg:flex-col wg:gap-4"
+                    >
+                      <legend className="wg:sr-only">I/O configuration</legend>
+                      <div className="wg:flex wg:gap-2">
+                        <Button
+                          variant="secondary"
+                          isDisabled={!availableDigitalTerminals(snapshot, 'input').length}
+                          onPress={() => add('input')}
+                        >
+                          Add digital input
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          isDisabled={!availableDigitalTerminals(snapshot, 'output').length}
+                          onPress={() => add('output')}
+                        >
+                          Add digital output
+                        </Button>
+                      </div>
+                      <p>
+                        {availableDigitalTerminals(snapshot, 'input').length} of 8 input terminals available ·{' '}
+                        {availableDigitalTerminals(snapshot, 'output').length} of 4 output terminals available
+                      </p>
+                      {!snapshot.logicalChannels.length && (
+                        <p>Add an input or output, name it, and confirm its physical assignment below.</p>
+                      )}
+                      {snapshot.logicalChannels.map((channel) =>
+                        isEditableDigitalChannel(snapshot, channel) ||
+                        snapshot.physicalPoints.find((point) => point.id === channel.physicalPointId)
+                          ?.hardwareProfile === 'modbus' ? (
+                          <DigitalChannelEditor
+                            key={channel.id}
+                            channel={channel}
+                            snapshot={snapshot}
+                            metadata={metadata}
+                            onRename={rename}
+                            assignment={
+                              snapshot.physicalPoints.find((point) => point.id === channel.physicalPointId)
+                                ?.hardwareProfile === 'modbus' ? (
+                                <ModbusPointForm
+                                  configuration={snapshot.modbus ?? emptyModbus}
+                                  value={
+                                    snapshot.physicalPoints.find((point) => point.id === channel.physicalPointId)
+                                      ?.modbus ?? { deviceId: '' }
+                                  }
+                                  isDisabled={busy || draftConflict}
+                                  onChange={(binding) =>
+                                    edit(bindModbusPoint(snapshot, channel.physicalPointId, binding))
+                                  }
+                                />
+                              ) : undefined
+                            }
+                            onChange={(value) =>
+                              edit({
+                                ...snapshot,
+                                logicalChannels: snapshot.logicalChannels.map((item) =>
+                                  item.id === value.id ? value : item,
+                                ),
+                              })
+                            }
+                            onAssign={(terminal) =>
+                              edit({
+                                ...snapshot,
+                                physicalPoints: snapshot.physicalPoints.map((point) =>
+                                  point.id === channel.physicalPointId ? { ...point, channel: terminal } : point,
+                                ),
+                              })
+                            }
+                            onRemove={() =>
+                              edit({
+                                ...snapshot,
+                                logicalChannels: snapshot.logicalChannels.filter((item) => item.id !== channel.id),
+                                physicalPoints: snapshot.physicalPoints.filter(
+                                  (point) =>
+                                    point.hardwareProfile !== 'modbus' ||
+                                    point.id !== channel.physicalPointId ||
+                                    snapshot.logicalChannels.some(
+                                      (item) => item.id !== channel.id && item.physicalPointId === point.id,
+                                    ),
+                                ),
+                              })
+                            }
+                          />
+                        ) : (
+                          <section key={channel.id}>
+                            <h3>{metadata.names[channel.id] ?? channel.id}</h3>
+                            <p>
+                              Existing {channel.profile.replaceAll('-', ' ')} configuration is preserved. Editing
+                              requires its dedicated hardware/Modbus editor.
+                            </p>
+                          </section>
+                        ),
+                      )}
+                      <PhysicalAssignments snapshot={snapshot} metadata={metadata} onChange={edit} />
+                      <ModbusConfigurationForm
+                        value={snapshot.modbus ?? emptyModbus}
+                        showIdentifiers={false}
+                        showValidationErrors={false}
+                        collapseProfiles
+                        isDisabled={busy || draftConflict}
+                        onChange={(modbus) => edit(updateModbusConfiguration(snapshot, modbus))}
+                      />
+                      <ModbusChannels
+                        configuration={snapshot.modbus ?? emptyModbus}
+                        onAdd={(binding, name) => {
+                          const next = addModbusChannel(snapshot, binding);
+                          edit(next.snapshot);
+                          setMetadata((current) => ({
+                            ...current,
+                            names: {
+                              ...current.names,
+                              [next.channel.id]: name.slice(0, 120),
+                              [next.point.id]: name.slice(0, 120),
+                            },
+                          }));
+                        }}
+                      />
+                      <ConfigurationErrors errors={modbusErrors} snapshot={snapshot} names={metadata.names} />
+                      <ConfigurationPresets
+                        controllerId={controllerId}
+                        snapshot={snapshot}
+                        metadata={metadata}
+                        onBusyChange={setPresetBusy}
+                        onApply={(value, application) => {
+                          edit(value);
+                          setMetadata((current) => ({ ...current, presets: [...current.presets, application] }));
+                        }}
+                      />
+                    </fieldset>
+                    <Button
+                      variant="secondary"
+                      isDisabled={busy}
+                      onPress={() => {
+                        setError(null);
+                        void validate.mutateAsync(snapshot).catch((error) => setError(error.message));
+                      }}
+                    >
+                      Validate local edits
+                    </Button>
+                    {validate.data && (
+                      <div role="status">
+                        {validate.data.valid
+                          ? 'Configuration contract is valid.'
+                          : 'Resolve these configuration fields:'}
+                        <ConfigurationErrors errors={validate.data.errors} snapshot={snapshot} names={metadata.names} />
+                      </div>
+                    )}
+                    <ConfigurationRevisions
+                      generation={generation}
+                      controllerId={controllerId}
+                      metadata={metadata}
+                      disabled={
+                        dirty ||
+                        draftConflict ||
+                        modbusErrors.length > 0 ||
+                        save.isPending ||
+                        validate.isPending ||
+                        presetBusy ||
+                        !draft.data
+                      }
+                      onBusyChange={setRevisionBusy}
+                      onRollback={async (failure) => {
+                        try {
+                          const refreshed = await draft.refetch({ throwOnError: true });
+                          const value = refreshed.data ? JSON.parse(refreshed.data.snapshot) : emptyConfiguration;
+                          if (
+                            value.version !== 1 ||
+                            !Array.isArray(value.physicalPoints) ||
+                            !Array.isArray(value.logicalChannels)
+                          )
+                            throw new Error('This draft has an unsupported configuration structure.');
+                          setSnapshot(value);
+                          setMetadata(readMetadata(refreshed.data?.presetProvenance ?? null));
+                          setDirty(false);
+                          setGeneration((value) => value + 1);
+                          setNotice(
+                            'Reloaded the saved draft after the rollback attempt. Check revision history for delivery status.',
+                          );
+                          setError(failure ? (failure instanceof Error ? failure.message : 'Rollback failed.') : null);
+                        } catch (error) {
+                          setInitialized(false);
+                          setNotice('');
+                          setError(
+                            `Could not reconcile the saved draft after rollback. Close and reopen the editor before continuing. ${error instanceof Error ? error.message : ''}`,
+                          );
+                        } finally {
+                          setRevisionBusy(false);
+                        }
+                      }}
+                    />
+                  </>
+                )}
+                {(error || validate.error) && <p role="alert">{error ?? validate.error?.message}</p>}
+                {notice && <p role="status">{notice}</p>}
+                {discard && (
+                  <Alert status="warning">
+                    <Alert.Content>
+                      <Alert.Title>Discard unsaved local edits?</Alert.Title>
+                      <Alert.Description>Your last saved draft will remain available.</Alert.Description>
+                      <Button variant="danger" onPress={onClose}>
+                        Discard edits and close
+                      </Button>
+                      <Button variant="secondary" onPress={() => setDiscard(false)}>
+                        Keep editing
+                      </Button>
                     </Alert.Content>
                   </Alert>
                 )}
               </ModalBody>
               <ModalFooter>
-                <Button variant="secondary" onPress={() => onOpenChange(false)}>
+                <Button variant="secondary" isDisabled={busy} onPress={close}>
                   Close
                 </Button>
                 <Button
                   type="submit"
-                  isDisabled={draftQuery.isPending || isApplyingPreset}
-                  isPending={saveDraft.isPending}
+                  isDisabled={!initialized || busy || draftConflict || modbusErrors.length > 0}
+                  isPending={save.isPending}
                 >
                   Save draft
                 </Button>

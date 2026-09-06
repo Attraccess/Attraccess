@@ -46,7 +46,7 @@ interface SetAuthBody {
   password?: string;
 }
 
-interface FirmwareUpdateBody extends DeviceInfoQuery {
+interface FirmwareUpdateBody extends DeviceInfoBody {
   stage?: FirmwareStage;
 }
 
@@ -73,7 +73,7 @@ export class ShellyController {
     @Inject(ShellyProbeService) private readonly probe: ShellyProbeService,
     @Inject(DiscoveryService) private readonly discovery: DiscoveryService,
     @Inject(ShellyDeviceApiService) private readonly deviceApi: ShellyDeviceApiService,
-    @Inject(ShellyFirmwareService) private readonly firmware: ShellyFirmwareService
+    @Inject(ShellyFirmwareService) private readonly firmware: ShellyFirmwareService,
   ) {}
 
   // Runs inline rather than as a background job: a /24 is ~250 probes at a 1s
@@ -145,15 +145,12 @@ export class ShellyController {
         } catch (err) {
           return { deviceId: device.id, status: null, error: err instanceof Error ? err.message : String(err) };
         }
-      })
+      }),
     );
   }
 
   @Get('devices/:id/firmware')
-  async firmwareStatus(
-    @Param('id', ParseIntPipe) id: number,
-    @Query() query: DeviceInfoQuery
-  ): Promise<FirmwareStatus> {
+  async firmwareStatus(@Param('id', ParseIntPipe) id: number, @Query() query: DeviceInfoBody): Promise<FirmwareStatus> {
     const device = await this.requireDeviceWithGeneration(id);
     return this.firmware.getStatus({
       ipAddress: device.ipAddress,
@@ -166,7 +163,7 @@ export class ShellyController {
   @Post('devices/:id/firmware/update')
   async startFirmwareUpdate(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: FirmwareUpdateBody
+    @Body() body: FirmwareUpdateBody,
   ): Promise<{ started: true; stage: FirmwareStage }> {
     const stage = body?.stage ?? 'stable';
     if (stage !== 'stable' && stage !== 'beta') {
@@ -180,7 +177,7 @@ export class ShellyController {
         username: body?.username,
         currentPassword: body?.currentPassword,
       },
-      stage
+      stage,
     );
     return { started: true, stage };
   }

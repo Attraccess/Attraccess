@@ -158,7 +158,7 @@ describe('UsersAdminController', () => {
             billingFactor: 2,
             isEmailVerified: false,
             authenticationDetails: [{ providerType: 'local_password' }],
-          } as User,
+          } as unknown as User,
         ],
       });
 
@@ -181,7 +181,7 @@ describe('UsersAdminController', () => {
         billingFactor: 2,
         isEmailVerified: true,
         authenticationDetails: [{ providerType: 'sso' }],
-      } as User;
+      } as unknown as User;
       jest.spyOn(usersService, 'findMany').mockResolvedValue({ ...paginated(1, 10, 1), data: [user] });
 
       const result = await controller.findMany({ page: 1, limit: 10 }, makeRequest(['users.read']));
