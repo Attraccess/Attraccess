@@ -936,12 +936,51 @@ describe('WagoService', () => {
 
     expect(enrollment).toMatchObject({ username: 'manual-$&', password: 'secret' });
     expect(enrollment.manualInstructions).toEqual(['Create a scoped broker user named manual-$& manually.']);
+    service.onModuleDestroy();
+  });
+
+  it('discards a manual enrollment recovery record when credentials are not supplied', async () => {
+    const { service, context, enrollmentRepository } = createService([], [], 2);
+    enrollmentRepository.save.mockImplementation(async (value) => ({ ...value, id: 17 }));
+    (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = jest
+      .fn()
+      .mockResolvedValue({ host: 'mqtt.example.test', port: 8883, useTls: true });
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({
+      provision: jest.fn().mockResolvedValue({ instructions: ['Create the scoped broker user manually.'] }),
+    });
+
+    await expect(service.createEnrollment('cc100-01')).rejects.toThrow('Manual discovery credentials are required');
+
+    expect(enrollmentRepository.delete).toHaveBeenCalledWith(17);
+    expect(service['enrollmentExpiryTimers'].size).toBe(0);
   });
 
   it.each(['cc100/+1', 'cc100/#1'])('rejects MQTT wildcard characters in hardware IDs', async (hardwareId) => {
     const { service } = createService();
 
     await expect(service.createEnrollment(hardwareId)).rejects.toThrow('without MQTT separators or wildcards');
+  });
+
+  it('persists an enrollment recovery record before provisioning the broker credential', async () => {
+    const { service, context, enrollmentRepository } = createService([], [], 2);
+    const provision = jest.fn().mockResolvedValue({ username: 'ignored', password: 'secret' });
+    const assertOwned = jest
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('lease lost'));
+    (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = jest
+      .fn()
+      .mockResolvedValue({ host: 'mqtt.example.test', port: 8883, useTls: true });
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({ provision });
+
+    await expect(service.createEnrollment('cc100-01', undefined, undefined, assertOwned)).rejects.toThrow('lease lost');
+
+    expect(enrollmentRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ hardwareId: 'cc100-01', identity: expect.stringMatching(/^wago-enrollment-/) }),
+    );
+    expect(enrollmentRepository.save.mock.invocationCallOrder[0]).toBeLessThan(provision.mock.invocationCallOrder[0]);
+    service.onModuleDestroy();
   });
 
   it('leaves bootstrap credentials available until expiry after a post-delivery claim failure', async () => {

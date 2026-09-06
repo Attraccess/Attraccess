@@ -11,12 +11,21 @@
     },
     "test": {
       "executor": "@nx/jest:jest",
+      "dependsOn": ["test-frontend"],
       "options": { "jestConfig": "apps/plugins/wago/jest.config.ts", "passWithNoTests": true }
+    },
+    "test-frontend": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm exec vitest run --config apps/plugins/wago/frontend/vitest.config.ts" }
     },
     "build-backend": {
       "executor": "nx:run-commands",
       "cache": true,
-        "inputs": ["{projectRoot}/backend/**/*", "{projectRoot}/cc100-runtime/signing-public-key.pub", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
+      "inputs": [
+        "{projectRoot}/backend/**/*",
+        "{projectRoot}/cc100-runtime/signing-public-key.pub",
+        "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"
+      ],
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/wago",
@@ -35,7 +44,7 @@
       "cache": true,
       "dependsOn": ["build-backend", "build-frontend"],
       "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json"],
-      "outputs": ["{projectRoot}/package"],
+      "outputs": ["{projectRoot}/package/package.json", "{projectRoot}/package/plugin.json"],
       "options": {
         "cwd": "apps/plugins/wago",
         "command": "node -e \"for (const file of ['package.json', 'plugin.json']) require('fs').copyFileSync(file, 'package/' + file)\""
@@ -43,7 +52,7 @@
     },
     "zip": {
       "executor": "nx:run-commands",
-      "cache": true,
+      "cache": false,
       "dependsOn": ["build"],
       "inputs": ["{projectRoot}/package/**/*", "{workspaceRoot}/apps/plugins/scripts/zip-plugin.mjs"],
       "outputs": ["{projectRoot}/dist/plugin-wago.zip"],
@@ -54,7 +63,7 @@
     },
     "pack": {
       "executor": "nx:run-commands",
-      "cache": true,
+      "cache": false,
       "dependsOn": ["build"],
       "inputs": ["{projectRoot}/package/**/*"],
       "outputs": ["{projectRoot}/dist"],
@@ -65,7 +74,7 @@
     },
     "pack-test": {
       "executor": "nx:run-commands",
-      "cache": true,
+      "cache": false,
       "dependsOn": ["pack", "plugins-backend-sdk:build"],
       "inputs": [
         "{projectRoot}/package/**/*",

@@ -12,6 +12,7 @@ import {
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { WAGO_DIN, WAGO_DOUT } from './wago-hardware-deployment';
 import {
   runtimeBundleAcceptScript,
   runtimeBundleDeliveryScript,
@@ -63,6 +64,11 @@ describe('runtime install shell transaction (no Docker daemon or network)', () =
     for (const directory of [config, join(root, 'var/lib'), join(root, 'tmp'), join(root, 'bin'), join(root, 'bundle')])
       mkdirSync(directory, { recursive: true });
     write(join(config, 'runtime.env.next'), 'NEW=enrollment');
+    write(join(root, 'etc/os-release'), 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"\n');
+    for (const register of [WAGO_DIN, WAGO_DOUT]) {
+      mkdirSync(join(root, register, '..'), { recursive: true });
+      write(join(root, register), '0');
+    }
     write(join(root, 'docker.json'), '[]');
     write(join(root, 'bundle/image-reference'), `${image}\n`);
     write(join(root, 'bundle/image.tar'), 'fake image bytes');
@@ -83,6 +89,24 @@ describe('runtime install shell transaction (no Docker daemon or network)', () =
       '#!/bin/sh\nif [ "$1" = --version ]; then echo "GNU tar fixture"; exit 0; fi\nshift 2\nexec /usr/bin/tar "$@"\n',
     );
     executable('ps', '#!/bin/sh\nif [ "$FAULT" = codesys ]; then echo codesys3; fi\n');
+    executable('dockerd', '#!/bin/sh\nexit 99\n');
+    executable(
+      'setpriv',
+      `#!${process.execPath}
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+if (!['--reuid=10001', '--regid=10001', '--clear-groups', '--bounding-set=-all', '--inh-caps=-all', '--ambient-caps=-all', '--no-new-privs'].every(flag => args.includes(flag))) process.exit(99);
+if (args.at(-1).includes('id -u')) process.exit(0);
+for (const file of args.slice(-2)) if (!file.startsWith(process.env.FIXTURE_ROOT + '/') || !fs.statSync(file).isFile()) process.exit(1);
+process.exit(process.env.FAULT === 'io-permissions' ? 1 : 0);
+`,
+    );
+    executable(
+      'readlink',
+      `#!${process.execPath}
+console.log(require('node:fs').realpathSync(process.argv.at(-1)));
+`,
+    );
     executable(
       'df',
       '#!/bin/sh\nif [ "$FAULT" = storage ]; then echo "disk 100 99 1"; else echo "disk 999999 0 999999"; fi\n',
@@ -112,6 +136,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const root = process.env.FIXTURE_ROOT;
 const args = process.argv.slice(2);
+if (args.shift() !== '--host' || args.shift() !== 'unix:///var/run/docker.sock') process.exit(99);
 const fault = process.env.FAULT;
 let state = JSON.parse(fs.readFileSync(path.join(root, 'docker.json'), 'utf8'));
 const save = () => fs.writeFileSync(path.join(root, 'docker.json'), JSON.stringify(state));
@@ -120,10 +145,10 @@ fs.appendFileSync(path.join(root, 'docker.log'), args.join(' ') + '\\n');
 if (args[0] === 'info') { console.log(path.join(root, 'var/lib')); process.exit(fault === 'docker-info' ? 1 : 0); }
 else if (args[0] === 'container' && args[1] === 'ls') {
   if (fault === 'list') process.exit(1);
-  state.forEach(c => console.log(c.id + ' ' + c.name));
+  state.forEach(c => console.log(args.at(-1) === '{{.ID}}' ? c.id : c.id + ' ' + c.name));
 } else if (args[0] === 'inspect') {
   const c = find(args.at(-1)); if (!c) process.exit(1);
-  console.log(args[2] === '{{.Name}}' ? '/' + c.name : String(c.running));
+  console.log(args[2] === '{{.Name}}' ? '/' + c.name : args[2].includes('.Mounts') ? (c.mounts || []).join('\\n') : String(c.running));
 } else if (args[0] === 'stop' || args[0] === 'start') {
   const c = find(args[1]); if (!c || (fault === 'rollback' && args[0] === 'start')) process.exit(1);
   c.running = args[0] === 'start'; save();
@@ -144,6 +169,11 @@ else if (args[0] === 'container' && args[1] === 'ls') {
 } else if (args[0] === 'run') {
   if (find('attraccess-wago')) process.exit(1);
   if (!args.includes('--pull=never')) process.exit(1);
+  if (args[args.indexOf('--user') + 1] !== '10001:10001' || args[args.indexOf('--cap-drop') + 1] !== 'ALL' || args[args.indexOf('--security-opt') + 1] !== 'no-new-privileges') process.exit(98);
+  if (!args.includes('WAGO_HARDWARE_PROFILE=cc100-751-9301-fw31-digital-v1')) process.exit(98);
+  const expectedMounts = ['type=bind,src=' + root + '${WAGO_DIN},dst=/run/attraccess-wago/io/din,readonly', 'type=bind,src=' + root + '${WAGO_DOUT},dst=/run/attraccess-wago/io/dout'];
+  if (!expectedMounts.every(m => args.includes(m))) process.exit(98);
+  for (const mount of expectedMounts) if (!fs.statSync(mount.split(',')[1].slice(4)).isFile()) process.exit(98);
   const volume = args[args.indexOf('-v') + 1].split(':')[0];
   if (fs.existsSync(path.join(volume, 'credentials.json'))) process.exit(2);
   fs.writeFileSync(path.join(volume, 'new-state'), 'new enrollment state');
@@ -160,6 +190,25 @@ else if (args[0] === 'container' && args[1] === 'ls') {
 
   afterEach(() => rmSync(root, { recursive: true, force: true }));
 
+  it('fails before stopping the predecessor when a register is absent or inaccessible', () => {
+    prior();
+    expect(install('io-permissions').stderr).toContain('uid10001-access-denied');
+    rmSync(join(root, WAGO_DOUT));
+    expect(install().stderr).toContain('missing-register');
+    expect(existsSync(join(root, WAGO_DOUT))).toBe(false);
+    expect(containers()).toEqual([{ id: 'old-id', name: 'attraccess-wago', running: true }]);
+    expect(existsSync(tx)).toBe(false);
+  });
+
+  it('rejects a stopped competing container binding the output or its parent', () => {
+    write(
+      join(root, 'docker.json'),
+      JSON.stringify([{ id: 'other', name: 'other', running: false, mounts: [join(root, 'sys')] }]),
+    );
+    expect(install().stderr).toContain('output-container-conflict');
+    expect(existsSync(tx)).toBe(false);
+  });
+
   function delivery() {
     const bundle = readFileSync(join(root, 'tmp/attraccess-wago-runtime.tar'));
     return {
@@ -175,6 +224,21 @@ else if (args[0] === 'container' && args[1] === 'ls') {
       ),
     };
   }
+
+  it('binds runtime delivery to the reviewed Docker provisioning token', () => {
+    rmSync(join(config, 'runtime.env.next'));
+    mkdirSync(join(config, 'docker-provision'));
+    write(join(config, 'docker-provision/token'), 'b'.repeat(32));
+    write(join(config, 'docker-provision/started'), '');
+    const { script, bundle } = delivery();
+    expect(run(script, '', bundle).stderr).toContain('Docker provisioning belongs to another delivery');
+    expect(existsSync(join(config, 'delivery'))).toBe(false);
+    write(join(config, 'docker-provision/token'), 'a'.repeat(32));
+    expect(run(script, '', bundle).status).toBe(0);
+    expect(run(runtimeBundleRecoveryScript(root, 'a'.repeat(32))).status).toBe(0);
+    expect(existsSync(`${tx}.restored/token`)).toBe(true);
+    expect(existsSync(join(config, 'docker-provision/started'))).toBe(true);
+  });
 
   it('binds recovery to the delivery token and leaves a retryable restored receipt', () => {
     prior();

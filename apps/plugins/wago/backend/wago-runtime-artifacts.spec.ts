@@ -520,6 +520,16 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
       `ssh-ed25519 ${WAGO_RUNTIME_RELEASE_KEY}`,
     );
   });
+
+  it('does not let the manifest-copy task cache and restore stale runtime/frontend bundles', async () => {
+    const project = JSON.parse(await readFile(join(__dirname, '../project.json'), 'utf8'));
+    expect(project.targets.build.outputs).toEqual(['{projectRoot}/package/package.json', '{projectRoot}/package/plugin.json']);
+  });
+
+  it('always packages and verifies the fresh generated outputs instead of restoring cached archives', async () => {
+    const project = JSON.parse(await readFile(join(__dirname, '../project.json'), 'utf8'));
+    for (const target of ['pack', 'pack-test', 'zip']) expect(project.targets[target].cache).toBe(false);
+  });
   it('uses existing STORAGE_ROOT without accessing the plugin context or host ModuleRef', async () => {
     const previous = process.env.STORAGE_ROOT;
     process.env.STORAGE_ROOT = root;
@@ -567,6 +577,12 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
     await snapshot.cleanup();
     expect(await readdir(join(await catalog.root(), 'snapshots'))).toEqual([]);
     expect(await readdir(join(await catalog.root(), 'staging'))).toEqual([]);
+  });
+  it('validates a selected catalog artifact without creating a delivery snapshot', async () => {
+    const imported = await catalog.import(upload());
+
+    expect(await catalog.get(imported.digest)).toEqual(imported);
+    expect(await readdir(join(await catalog.root(), 'snapshots'))).toEqual([]);
   });
   it('bounds concurrent imports and releases rejected input streams', async () => {
     const first = catalog.import(upload());
