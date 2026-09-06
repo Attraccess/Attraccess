@@ -47,13 +47,13 @@ describe('RefreshDefaultEmailLayout1783700000000', () => {
     expect(body).toContain('{{content}}');
   });
 
-  it.each(['\r\n', '\r'])('preserves stock content that was edited', async (lineEnding) => {
+  it.each(['\r\n', '\r'])('upgrades historical stock content with %s line endings', async (lineEnding) => {
     const editedLayout = originalLayout.replace(/\r?\n/g, lineEnding);
-    await queryRunner.query(`UPDATE "setting" SET "value" = ?, "updatedAt" = '2021-01-01'`, [editedLayout]);
+    await queryRunner.query(`UPDATE "setting" SET "value" = ?`, [editedLayout]);
 
     await migration.up(queryRunner);
 
-    expect(await readLayout()).toBe(editedLayout);
+    expect(await readLayout()).toBe(readDefaultLayoutBody());
   });
 
   it.each([
@@ -63,7 +63,7 @@ describe('RefreshDefaultEmailLayout1783700000000', () => {
     ['spacing', '<mjml>', '<mjml> '],
   ])('preserves even a small %s customization', async (_name, from, to) => {
     const customLayout = originalLayout.replace(from, to);
-    await queryRunner.query(`UPDATE "setting" SET "value" = ?, "updatedAt" = '2021-01-01'`, [customLayout]);
+    await queryRunner.query(`UPDATE "setting" SET "value" = ?`, [customLayout]);
 
     await migration.up(queryRunner);
 
@@ -125,7 +125,7 @@ describe('RefreshDefaultEmailLayout1783700000000', () => {
     const query = queryRunner.query.bind(queryRunner);
     jest.spyOn(queryRunner, 'query').mockImplementationOnce(async (sql, parameters) => {
       const rows = await query(sql, parameters);
-      await query(`UPDATE "setting" SET "value" = ?, "updatedAt" = '2021-01-01'`, [customLayout]);
+      await query(`UPDATE "setting" SET "value" = ?`, [customLayout]);
       return rows;
     });
 
