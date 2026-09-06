@@ -6,13 +6,14 @@ The controller obtains user identity from the guard-authenticated `request.user`
 using `wagoAuditPrincipal`; request bodies, JWT values and credentials are never
 used as principal metadata.
 
-## Storage dependency
+## Durable storage
 
-This checkout does **not** contain the generic audit storage foundation
-(ATT-906 / ATT-917). Existing authentication logging and password-policy audit
-storage are specialized and are not repurposed for WAGO. No durable WAGO audit
-history is claimed until the foundation registers a host provider under
+The core `AuditModule` registers `AuditService` under
 `PLUGIN_AUDIT_HOST_PROVIDER` (`Symbol.for('attraccess.plugin.auditHostProvider')`).
+It writes the shared `audit_log` table through the existing SDK bridge, not a
+WAGO-owned table or commissioning progress log. Existing authentication logging
+and password-policy audit storage remain separate; this does not implement every
+domain or the full admin UI from ATT-906 / ATT-917 / ATT-235.
 
 The exported `PluginAuditHostProvider.record` contract is:
 
@@ -21,16 +22,80 @@ record(event: PluginAuditEvent & { pluginId: string }): Promise<PluginAuditRecei
 // PluginAuditReceipt = { status: 'recorded' } | { status: 'unavailable' }
 ```
 
-Return `recorded` only after durable acceptance. The storage owner must assign a
-server timestamp, enforce retention/access controls, and preserve the principal,
-controller subject, operation ID and revision/profile references. The host bridge
+`recorded` means a completed autocommitted insert on a separate connection to the
+host SQLite file with `synchronous=FULL`. Rows have server timestamps, actor and
+API-token IDs, plugin identity, operation UUID, outcome, subject and safe details.
+Historical identifiers have no cascading foreign keys: deleting a controller,
+principal, token or plugin does not delete its history. A database trigger rejects
+row updates; retention is the intentional deletion path. The host bridge
 overrides any caller-supplied plugin ID. It returns `unavailable` on missing
 providers, storage exceptions or a one-second provider deadline; it never serializes errors as fallback records.
 WAGO emits only the fixed warning `WAGO audit storage unavailable` in this case.
 Timed-out calls are not retried; a late provider response cannot change the domain result.
 Domain operations continue; this is explicitly best-effort capture, not a durable
-outbox or transactional audit guarantee. Upgrade the host SDK before deploying a
+outbox or transactional audit guarantee. Calls during an active host transaction
+return `unavailable` rather than falsely acknowledging a savepoint that might roll
+back. Call at the committed operation boundary when transaction-scoped capture is
+required. The provider bounds outstanding writes and does not enqueue or retry
+rejected work. `:memory:` sources cannot support a separate durable connection and
+remain unavailable; persistence tests use isolated on-disk SQLite fixtures.
+Upgrade the host SDK before deploying a
 plugin expecting this bridge. Older contexts without `audit` remain supported.
+
+### Migration and query contract
+
+Core migration `DurableAudit1783700000000` creates `audit_log`, its query indexes,
+the immutable-row trigger and `system.audit.read`. The permission is granted only
+to the built-in administrator role on upgrade. Existing roles, controller data and
+specialized audit tables are left intact. The normal host migration runner applies
+it before module startup; no runtime schema synchronization is used. Its `down`
+migration removes the audit table/history and its permission, so export or retain
+the database before an intentional downgrade that needs this history.
+
+`GET /api/admin/audit-log` requires `system.audit.read`. Session permissions and
+API-token permission ceilings use the existing authentication/RBAC guards; having
+`system.settings.manage` alone does not grant access to audit history.
+
+The response is `{ items: AuditLog[], nextCursor: number | null }`. Rows are ordered
+by descending row ID. Send `beforeId=nextCursor` for the next page. `limit` defaults
+to 50 and is bounded to 1..100; invalid or unknown query fields are rejected.
+Supported filters are `domain=wago`, exact `action`, `eventPrefix` (for example
+`wago.commissioning.`), `outcome`, `operationId`, `actorId`, `subjectType`,
+`subjectId`, and inclusive ISO timestamp bounds `from`/`to`. Subject types are
+`wago.controller` and `wago.commissioning`. Dates are returned as ISO timestamps.
+Rows retain identifiers and explicitly safe metadata, not actor names, command
+values, credential values, arbitrary error strings or raw configuration snapshots.
+
+`GET /api/settings/audit` and `PATCH /api/settings/audit` require the existing
+`system.settings.manage` permission. Settings use `SettingsStoreService` with
+parent `audit` and the following JSON-encoded keys:
+
+| Key | Default | Bounds |
+| --- | --- | --- |
+| `enabled` | `true` | Boolean master switch. |
+| `domains` | `["wago"]` | All currently registered domains; `[]` disables capture. |
+| `retention_days` | `90` | Integer 1..3650. |
+
+PATCH accepts these fields, for example `{ "retention_days": 30 }`. Invalid
+persisted settings fail closed rather than silently enabling capture or purging
+with an invented retention period. Writes read settings before storage submission;
+the existing settings cache is updated by local PATCH calls and can take up to one
+minute to refresh on another process. No environment-only second settings store
+is introduced.
+
+The sink admits at most eight outstanding writes and retains no retry queue.
+Details are bounded to 4 KiB and validated against per-action allowlists. Caller
+objects are snapshotted once from data properties; accessors, custom prototypes,
+unknown fields and unsupported events are rejected before persistence. Extending
+the generic store to another domain requires an explicit reviewed event policy,
+not permission to submit arbitrary JSON. In particular, telemetry events are not
+accepted.
+
+Retention runs at startup and hourly, deleting expired rows in batches of 1,000
+and yielding between batches until the backlog is drained. Only deletion counts
+are logged. Expired rows are excluded from queries immediately, including when a
+cleanup attempt fails. Disabling capture does not disable retention or erase
+currently retained history.
 
 ## Wired HTTP lifecycles
 
@@ -130,16 +195,74 @@ adds the newly allocated `{ revision }`. For `rejection_acknowledgement`, initia
 details are `{ revision }`; success follows persisted operator acknowledgement,
 not reception of a device rejection. A `Promise<void>` operation can omit the
 completion projector. None of these success events asserts hardware application
-or durable audit storage; the unavailable-sink behavior above still applies.
+or a successful audit receipt; the unavailable-sink behavior above still applies.
 
 The composed preset routes implement catalog, preview and persisted application.
 Application/reapplication audit selection, summaries and persistence run inside
-the configuration lock, with the authenticated HTTP principal. Preview and no-op
-applications emit no successful persisted application event. Publication and forced publication select their audit action after review and impact
+the configuration lock, with the authenticated HTTP principal. Preview emits no
+successful persisted application event. An explicit editor reapplication can emit
+an event even when configuration values are unchanged; a retried save without new
+application provenance does not. Publication and forced publication select their audit action after review and impact
 validation under the configuration lock. Rollback emits one lifecycle with source
 and resulting revision. Validated custom Modbus profile creates/changes are audited
-at explicit draft persistence. Rotation, rejection acknowledgement and manual-command
-HTTP operations remain absent. Flow-node commands are not automatically classified as
-manual commands. No automatic claim or asynchronous command-handler wiring was
-added to the services owned by other tasks. Those gaps and the missing durable
-foundation remain acceptance dependencies for ATT-983.
+at explicit draft persistence. Rejection acknowledgement emits its lifecycle after
+validation under the configuration lock; an already acknowledged revision is a
+no-op. Rotation, manual-credential-fallback completion and manual-command HTTP
+operations remain absent on integration `491054ab`. Flow-node commands are not
+automatically classified as manual commands. Helper tests for these action names
+are not evidence of runtime hookup.
+
+### Commissioning stack composition
+
+Commissioning PR #1817 at `f136365b` emits through the same host bridge. Its
+`auditCommissioning` helper uses `wago.commissioning` subjects (the persisted
+session ID) for `wago.commissioning.install`, `recover`, `security_inspect`,
+`security_review`, `security_apply`, `security_recover`, `platform_inspect`,
+`platform_activate`, `platform_recover`, and `lease_recover`. Details are empty.
+Automatic claim instead emits `wago.claim` against the real `wago.controller` ID.
+The authenticated initiating principal is persisted in commissioning sessions;
+legacy sessions without a valid initiator must not invent one.
+
+That commissioning stack predates the composed configuration hooks. The integrator
+must preserve the integration branch's HTTP claim and locked configuration hooks,
+not replace them with the commissioning branch's older controller/service snapshot.
+For unclaim, preserve commissioning ownership checks and put the existing audit
+wrapper inside its safe-removal callback:
+
+```ts
+const principal = wagoAuditPrincipal(request);
+await this.commissioning.removeControllerSafely(id, (assertOwned) =>
+  this.audit.run(principal, id, 'unclaim', {}, () =>
+    this.wago.remove(id, assertOwned),
+  ),
+);
+```
+
+This preserves successful unclaim even if subsequent session cleanup fails. Compose
+the commissioning principal migration with its owner stack; do not transplant or
+duplicate it in the core audit migration. Automatic claim needs exactly one
+lifecycle, not both the commissioning helper and another `WagoAudit` wrapper.
+
+### Remaining owner hooks
+
+- Credential owner: expose an authenticated manual-fallback completion or rotation
+  operation, resolve the real persisted controller ID, and wrap actual completion
+  with `manual_credential_fallback` or `credential_rotation`. Enrollment IDs are not
+  controller IDs. Returning credentials or instructions is not completed fallback.
+- Command owner: add an explicitly authenticated manual command entry point. Pass
+  the initiating principal to execution, allocate the real command UUID before
+  `begin`, then use `attempt` and exactly one `finish` at dispatch/acknowledgement or
+  failure. Map timeout, rejection and transport/shutdown failure to the existing
+  result enums. Never label automatic flow execution as manual or persist values.
+- Configuration owner: retain an allocated/reused revision number on the failure
+  path. Current publication/rollback can persist a pending revision and then fail
+  dispatch; `run` only receives the revision on success. Use one owner-managed
+  lifecycle inside the existing lock, add `{ revision }` to failed completion after
+  allocation, and preserve rollback's `sourceRevision` without an inner duplicate
+  publication lifecycle. Validation failures before lifecycle admission currently
+  emit no attempted event.
+
+These instructions describe owner work not performed by the durable-sink change.
+They remain acceptance gaps, separately from whether existing emitted events are
+durably stored. Software fixtures do not establish controller qualification or
+close the live release gate.
