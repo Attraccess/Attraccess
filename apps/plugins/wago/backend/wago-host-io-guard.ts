@@ -1,9 +1,12 @@
+import { wagoShellStat } from './wago-shell-stat';
+
 /** Host checks shared by commissioning and every runtime start. The caller supplies
  * root, dout and a bounded local-socket docker() function. Errors return to the
  * caller so its containment handler remains responsible for stopping the writer.
  */
 export function wagoHostIoGuardShell(): string {
   return `
+${wagoShellStat()}
 wago_host_io_error() {
   host_io_guard_reason="$1"
   return 1

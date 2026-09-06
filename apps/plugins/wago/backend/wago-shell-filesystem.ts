@@ -1,3 +1,5 @@
+import { wagoShellStat } from './wago-shell-stat';
+
 /**
  * Shared root-owned configuration and flock boundary. The caller defines root,
  * config and fail(), and uses umask 077. Existing untrusted paths are rejected;
@@ -44,7 +46,8 @@ validate_controller_lock || fail 'Controller lock changed during acquisition'`
 
 /** Define a check for a root-owned directory with no group/other write access. */
 export function wagoShellRootDirectoryCheck(): string {
-  return `wago_require_root_directory() {
+  return `${wagoShellStat()}
+wago_require_root_directory() {
   test ! -L "$1" && wago_require_root_directory_or_alias "$1"
 }
 wago_directory_metadata_safe() {

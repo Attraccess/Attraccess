@@ -1,4 +1,5 @@
 import { assertManagementPublicKey } from './wago-management-key';
+import { wagoShellStat } from './wago-shell-stat';
 
 export type ManagementShellAction = 'prepare' | 'arm' | 'install' | 'commit' | 'rollback' | 'watchdog';
 const quote = (value: string) => `'${value.replace(/'/g, `'"'"'`)}'`;
@@ -27,6 +28,7 @@ export function managementKeyCommand(
   // These limit the new key only. Shell access still has the existing account's privileges.
   const entry = `no-agent-forwarding,no-port-forwarding,no-pty,no-X11-forwarding ${selectedKey}`;
   const helpers = String.raw`set -eu
+${wagoShellStat()}
 now() {
   IFS='. ' read -r whole fraction idle < /proc/uptime
   case "$whole" in *[!0-9]*|'') exit 1;; esac
@@ -64,6 +66,7 @@ active() {
 }
 `;
   const script = String.raw`set -eu
+${wagoShellStat()}
 umask 077
 uid=$(id -u)
 test "$uid" -gt 0
