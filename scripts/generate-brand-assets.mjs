@@ -197,6 +197,44 @@ async function ico(sizes) {
   return Buffer.concat([directory, ...frames]);
 }
 
+async function imageMatches(actual, expected) {
+  const [actualImage, expectedImage] = await Promise.all(
+    [actual, expected].map(async (image) => {
+      const { data, info } = await sharp(image).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+      return { data, info };
+    }),
+  );
+  return (
+    actualImage.info.width === expectedImage.info.width &&
+    actualImage.info.height === expectedImage.info.height &&
+    actualImage.data.equals(expectedImage.data)
+  );
+}
+
+function icoFrames(file) {
+  assert.equal(file.readUInt16LE(0), 0, 'ICO must start with a reserved value of zero');
+  assert.equal(file.readUInt16LE(2), 1, 'Expected an ICO file');
+  const count = file.readUInt16LE(4);
+  return Array.from({ length: count }, (_, index) => {
+    const entry = 6 + index * 16;
+    const size = file.readUInt32LE(entry + 8);
+    const offset = file.readUInt32LE(entry + 12);
+    return file.subarray(offset, offset + size);
+  });
+}
+
+async function assetMatches(path, actual, expected) {
+  if (path.endsWith('.png')) return imageMatches(actual, expected);
+  if (!path.endsWith('.ico')) return actual.equals(expected);
+
+  const actualFrames = icoFrames(actual);
+  const expectedFrames = icoFrames(expected);
+  if (actualFrames.length !== expectedFrames.length) return false;
+  return (await Promise.all(actualFrames.map((frame, index) => imageMatches(frame, expectedFrames[index])))).every(
+    Boolean,
+  );
+}
+
 for (const size of [192, 512]) {
   assets.set(`apps/frontend/public/icon-${size}.png`, await icon(size));
   assets.set(`apps/frontend/public/icon-${size}-maskable.png`, await icon(size, { maskable: true }));
@@ -227,7 +265,7 @@ for (const [path, expected] of assets) {
       if (error.code !== 'ENOENT') throw error;
       return null;
     });
-    if (!actual?.equals(expected)) {
+    if (!actual || !(await assetMatches(path, actual, expected))) {
       process.stderr.write(`Stale or missing brand asset: ${path}\n`);
       stale++;
     }
