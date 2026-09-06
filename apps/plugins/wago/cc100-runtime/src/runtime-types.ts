@@ -29,6 +29,7 @@ export type ValidationError = { path: string; code: string; message: string };
 
 export type RuntimeState = {
   credentials?: { username: string; password: string; prefix?: string };
+  credentialRotation?: { revision: number; token: string };
   accepted?: { revision: number; contentHash: string; snapshot: Snapshot };
   outputs: Record<string, boolean>;
   uncertainOutputChannelIds?: string[];
