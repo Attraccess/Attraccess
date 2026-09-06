@@ -64,6 +64,14 @@ function fillRecoveryCredentials() {
 }
 
 describe('explicit recovery approval', () => {
+  it('exposes guarded record deletion for revoked commissioning history', async () => {
+    activeSession.state = 'revoked';
+    const { onOpenChange } = mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete commissioning record' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm cancellation' }));
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(vi.mocked(fetch).mock.calls.some(([url, options]) => String(url).endsWith('/commissioning/sessions/7') && options?.method === 'DELETE')).toBe(true);
+  });
   it('opens the existing visual configuration workflow without claiming hardware qualification', async () => {
     activeSession.state = 'awaiting_verification';
     verificationControllerId = 5;

@@ -1,5 +1,7 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { auditCommissioning, commissioningPrincipal } from './wago-commissioning-audit';
+import { WagoCommissioningService } from './wago-commissioning.service';
+import type { WagoService } from './wago.service';
 
 describe('commissioning uses the shared ATT-983 audit sink', () => {
   const principal = { userId: 42, authenticationMethod: 'session' as const };
@@ -42,6 +44,15 @@ describe('commissioning uses the shared ATT-983 audit sink', () => {
       (value) => value.state === 'awaiting_discovery',
     );
     expect(record.mock.calls[1][0].outcome).toBe('failed');
+  });
+
+  it('classifies recovery by its outcome rather than its display heading', async () => {
+    const service = new WagoCommissioningService(context, {} as WagoService);
+    service['recoverWhileAudited'] = jest
+      .fn()
+      .mockResolvedValue({ state: 'revoked', failureReason: null, progressStep: 'A renamed heading' });
+    await service.recover(8, {}, principal);
+    expect(record.mock.calls[1][0].outcome).toBe('succeeded');
   });
 
   it('does not invent principals for legacy jobs and has no fallback audit sink', async () => {

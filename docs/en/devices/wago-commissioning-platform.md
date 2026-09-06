@@ -65,10 +65,10 @@ Only the `start-installed-runtime` plan is executable. Its explicit review flag 
 `reviewedDockerActivation: true`. Under the same `install.lock`, it rechecks the
 platform, rejects CODESYS, requires both Docker binaries, requires the existing
 `/etc/init.d/dockerd status` to return stopped status 3, and rejects a live dockerd,
-custom `/etc/docker/daemon.json`, or existing container storage under either
+custom `/etc/docker/daemon.json`, or nonempty/ambiguous container storage under either
 `/home/docker/containers` or `/var/lib/docker/containers`. Unsupported status
 semantics, configured storage, or previous workloads require further platform
-support rather than guessing. These conservative checks do not qualify arbitrary
+support rather than guessing. Initialized but empty container directories left by a verified recovery permit another activation attempt. These conservative checks do not qualify arbitrary
 customized init scripts or daemon arguments; those remain outside this baseline.
 
 The reviewed action calls the vendor-documented `/etc/init.d/dockerd start` and
