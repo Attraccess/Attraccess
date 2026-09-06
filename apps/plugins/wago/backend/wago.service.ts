@@ -398,10 +398,15 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
         subscribe: [`${discoveryTopic(normalizedHardwareId)}/claim`],
       },
     });
-    if (!('password' in provisionedCredential) && !manualCredentials)
+    if (!('password' in provisionedCredential) && !manualCredentials) {
+      const timer = this.enrollmentExpiryTimers.get(enrollment.id);
+      if (timer) clearTimeout(timer);
+      this.enrollmentExpiryTimers.delete(enrollment.id);
+      await this.enrollments.delete(enrollment.id);
       throw new ConflictException(
         `Manual discovery credentials are required: ${provisionedCredential.instructions.join(' ')}`,
       );
+    }
     const credential = 'password' in provisionedCredential ? provisionedCredential : manualCredentials;
     if (!credential?.username.trim() || !credential.password)
       throw new ConflictException('a manual discovery username and password are required');
