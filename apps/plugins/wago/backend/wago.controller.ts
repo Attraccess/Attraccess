@@ -211,6 +211,41 @@ export class WagoControllerApi {
       this.wago.claim(id, body?.name ?? '', body?.verifier ?? '', body?.mqttServerId),
     );
   }
+  @Auth('system.settings.manage')
+  @Post('controllers/:id/credentials/manual/complete')
+  completeManualCredentials(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { name?: string; verifier?: string; username?: string; password?: string },
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const principal = wagoAuditPrincipal(request);
+    if (
+      !body ||
+      Object.keys(body).some((key) => !['name', 'verifier', 'username', 'password'].includes(key)) ||
+      typeof body.name !== 'string' ||
+      !body.name ||
+      typeof body.verifier !== 'string' ||
+      !body.verifier ||
+      typeof body.username !== 'string' ||
+      !body.username ||
+      typeof body.password !== 'string' ||
+      !body.password
+    )
+      throw new BadRequestException('Controller name, physical verifier and provisioned credentials are required');
+    const input = { name: body.name, verifier: body.verifier, username: body.username, password: body.password };
+    return this.commissioning.operateControllerSafely(id, (assertOwned) =>
+      this.wago.completeManualCredentials(id, input, principal, assertOwned),
+    );
+  }
+  @Auth('resources.update')
+  @Post('controllers/:id/commands')
+  manualCommand(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: Record<string, unknown>,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.wago.manualCommand(id, body, wagoAuditPrincipal(request));
+  }
   @Delete('controllers/:id') async removeController(
     @Param('id', ParseIntPipe) id: number,
     @Req() request: AuthenticatedRequest,

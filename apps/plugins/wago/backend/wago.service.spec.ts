@@ -1433,7 +1433,10 @@ describe('WagoService', () => {
       revoke: jest.fn().mockResolvedValue(undefined),
     });
     (context.mqtt.publish as jest.Mock).mockRejectedValue(claimError);
-    controllerRepository.save.mockResolvedValueOnce(candidate).mockRejectedValueOnce(rollbackError);
+    controllerRepository.save
+      .mockResolvedValueOnce(candidate) // provisioning intent
+      .mockResolvedValueOnce(candidate) // claimed state
+      .mockRejectedValueOnce(rollbackError);
     enrollmentRepository.findOneBy.mockResolvedValue(enrollment);
 
     await expect(service.claim(candidate.id, 'Controller', 'fingerprint')).rejects.toBe(claimError);

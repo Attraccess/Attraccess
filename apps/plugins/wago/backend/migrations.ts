@@ -12,3 +12,4 @@ export * from './migrations/1780010590000-add-wago-rejection-acknowledgement';
 export * from './migrations/1780000000009-add-wago-commissioning-principal';
 export * from './wago-management.migration';
 export * from './wago-commissioning-lease.migration';
+export * from './migrations/1780010600000-add-wago-claim-intent';
