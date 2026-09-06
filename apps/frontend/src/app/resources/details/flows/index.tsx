@@ -1,6 +1,16 @@
 import { useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Background, BackgroundVariant, Controls, ReactFlow, Node, Panel, Edge, useReactFlow, SelectionMode } from '@xyflow/react';
+import {
+  Background,
+  BackgroundVariant,
+  Controls,
+  ReactFlow,
+  Node,
+  Panel,
+  Edge,
+  useReactFlow,
+  SelectionMode,
+} from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { ButtonGroup, Spinner } from '@heroui/react';
 import {
@@ -13,7 +23,7 @@ import {
   useResourceFlowsServiceSaveResourceFlow,
 } from '@attraccess/react-query-client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useTheme } from '@heroui/react';
+import { useAppTheme } from '@attraccess/ui';
 import { usePtrStore } from '../../../../stores/ptr.store';
 import Dagre from '@dagrejs/dagre';
 import { Button } from '../../../../components/button';
@@ -93,7 +103,7 @@ const jsConfetti = new JSConfetti();
 
 function FlowsPageInner() {
   const { id: resourceId } = useParams();
-  const { theme } = useTheme();
+  const { resolvedTheme } = useAppTheme();
   const { t, tExists } = useTranslations({
     en: {
       ...en,
@@ -118,13 +128,13 @@ function FlowsPageInner() {
     };
   }, [setPullToRefreshIsEnabled]);
 
-  const { data: originalFlowData, isFetching: isFlowFetching, isError: isFlowError } = useResourceFlowsServiceGetResourceFlow(
-    { resourceId: Number(resourceId) },
-    undefined,
-    {
-      enabled: !!resourceId,
-    },
-  );
+  const {
+    data: originalFlowData,
+    isFetching: isFlowFetching,
+    isError: isFlowError,
+  } = useResourceFlowsServiceGetResourceFlow({ resourceId: Number(resourceId) }, undefined, {
+    enabled: !!resourceId,
+  });
   const isFlowLoading = !originalFlowData && isFlowFetching;
 
   const toast = useToastMessage();
@@ -184,7 +194,8 @@ function FlowsPageInner() {
       setNodes(originalFlowData.nodes);
       setEdges(originalFlowData.edges);
       setValidationErrors(
-        ((originalFlowData as unknown as { validationErrors?: Array<{ nodeId: string; message: string }> }).validationErrors ?? []),
+        (originalFlowData as unknown as { validationErrors?: Array<{ nodeId: string; message: string }> })
+          .validationErrors ?? [],
       );
     }
   }, [originalFlowData, setNodes, setEdges, setValidationErrors]);
@@ -316,9 +327,7 @@ function FlowsPageInner() {
     }
     return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
   }, []);
-  const [interactionMode, setInteractionMode] = useState<'pan' | 'select'>(() =>
-    isCoarsePointer ? 'pan' : 'select',
-  );
+  const [interactionMode, setInteractionMode] = useState<'pan' | 'select'>(() => (isCoarsePointer ? 'pan' : 'select'));
   // @xyflow/react's mouse-button array in panOnDrag doesn't apply to touch, so for select mode on touch we must disable pan entirely.
   const panOnDrag = interactionMode === 'pan' ? true : isCoarsePointer ? false : [1, 2];
   const selectionOnDrag = interactionMode === 'select';
@@ -405,7 +414,7 @@ function FlowsPageInner() {
 
   return (
     <div className="h-full w-full flex flex-col">
-      <div className="flex flex-row w-full flex-1 min-h-0 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
+      <div className="flex flex-row w-full flex-1 min-h-0 rounded-lg overflow-hidden border border-border">
         <NodeCatalogPanel
           ref={nodeCatalogRef}
           resourceId={Number(resourceId)}
@@ -419,7 +428,14 @@ function FlowsPageInner() {
           }}
         >
           <ReactFlow
-            className="[--xy-background-color:var(--background)] [--xy-selection-background-color:var(--accent-soft)] [--xy-selection-border:1px_dotted_var(--accent)]"
+            className="[--xy-background-color:var(--background)] [--xy-background-pattern-color:var(--border)]
+              [--xy-edge-stroke:var(--muted)] [--xy-edge-stroke-selected:var(--accent)]
+              [--xy-connectionline-stroke:var(--accent)]
+              [--xy-handle-background-color:var(--foreground)] [--xy-handle-border-color:var(--surface)]
+              [--xy-controls-button-background-color:var(--surface)] [--xy-controls-button-background-color-hover:var(--surface-secondary)]
+              [--xy-controls-button-color:var(--foreground)] [--xy-controls-button-color-hover:var(--foreground)]
+              [--xy-controls-button-border-color:var(--border)] [--xy-controls-box-shadow:var(--surface-shadow)]
+              [--xy-selection-background-color:var(--accent-soft)] [--xy-selection-border:1px_dotted_var(--accent)]"
             nodes={nodes}
             edges={edgesWithCorrectType}
             onNodesChange={onNodesChange}
@@ -432,7 +448,7 @@ function FlowsPageInner() {
             selectionMode={SelectionMode.Partial}
             deleteKeyCode={['Backspace', 'Delete']}
             multiSelectionKeyCode="Shift"
-            colorMode={theme === 'dark' ? 'dark' : 'light'}
+            colorMode={resolvedTheme}
             fitView
             // ponytail: fixed floor, derive it from the graph bounding box if 0.02 ever bites.
             // React Flow's default minZoom of 0.5 clamps fitView on flows taller than the pane,
@@ -476,7 +492,12 @@ function FlowsPageInner() {
               >
                 <SaveIcon />
               </Button>
-              <Button isIconOnly onPress={handleImportClick} aria-label={t('actions.import')} isDisabled={isFlowLoading}>
+              <Button
+                isIconOnly
+                onPress={handleImportClick}
+                aria-label={t('actions.import')}
+                isDisabled={isFlowLoading}
+              >
                 <UploadIcon />
               </Button>
               <Button isIconOnly onPress={handleExport} aria-label={t('actions.export')} isDisabled={isFlowLoading}>

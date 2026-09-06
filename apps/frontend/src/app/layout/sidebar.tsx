@@ -41,6 +41,7 @@ import { SidebarItem, SidebarItemGroup, useSidebarItems, useSidebarEndItems } fr
 import { NavLink as RouterNavLink, useNavigate } from 'react-router-dom';
 import usePluginState from '../plugins/plugin.state';
 import type { PluginSidebarItem } from '@attraccess/plugins-frontend-sdk';
+import { ThemeToggle } from '../../components/themeToggle';
 
 interface NavLinkProps {
   href: string;
@@ -461,6 +462,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
 
         {/* User section at bottom */}
         <div className={isCollapsed ? 'p-2' : 'p-4'}>
+          <ThemeToggle showLabel={!isCollapsed} className={cn('mb-2', !isCollapsed && 'w-full justify-start')} />
           {user && (
             <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
               {!isCollapsed && (

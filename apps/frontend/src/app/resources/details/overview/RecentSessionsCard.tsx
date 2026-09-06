@@ -23,7 +23,7 @@ export function RecentSessionsCard({ resourceId, className }: RecentSessionsCard
   const { data, isLoading } = useResourcesServiceResourceUsageGetHistory(
     { resourceId, page: 1, limit: 3, userId: user?.id },
     undefined,
-    { enabled: !!user?.id }
+    { enabled: !!user?.id },
   );
 
   const sessions = useMemo(() => data?.data ?? [], [data]);
@@ -36,7 +36,7 @@ export function RecentSessionsCard({ resourceId, className }: RecentSessionsCard
       actions={
         <Link
           to={`/resources/${resourceId}/history`}
-          className="text-sm text-primary hover:underline"
+          className="text-sm text-accent hover:underline"
           data-cy="recent-sessions-view-all"
         >
           {t('viewAll')}
@@ -48,17 +48,17 @@ export function RecentSessionsCard({ resourceId, className }: RecentSessionsCard
           <Spinner size="sm" />
         </div>
       ) : sessions.length === 0 ? (
-        <div data-cy="recent-sessions-empty" className="text-sm text-foreground-500 py-2">
+        <div data-cy="recent-sessions-empty" className="text-sm text-muted py-2">
           {t('empty')}
         </div>
       ) : (
         <ul className="divide-y divide-divider">
           {sessions.map((session) => (
             <li key={session.id} data-cy="recent-sessions-row" className="flex items-center gap-3 py-2 text-sm">
-              <span className="flex-1 text-foreground-700">
+              <span className="flex-1 text-foreground">
                 <DateTimeDisplay date={session.startTime} />
               </span>
-              <span className="text-foreground-500">
+              <span className="text-muted">
                 <DurationDisplay
                   minutes={session.usageInMinutes >= 0 ? session.usageInMinutes : null}
                   alternativeText={t('status.running')}

@@ -1,12 +1,12 @@
 import { Outlet, Route, Routes, useNavigate } from 'react-router-dom';
 import { Unauthorized } from './unauthorized/unauthorized';
-import { PropsWithChildren, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { PropsWithChildren, useEffect, useMemo, useState } from 'react';
 import { Layout } from './layout/layout';
 import { useAuth } from '../hooks/useAuth';
 import { useAllRoutes } from './routes';
 import { VerifyEmail } from './verify-email';
 import { ToastProvider } from '../components/toastProvider';
-import { I18nProvider, RouterProvider, Spinner, useTheme } from '@heroui/react';
+import { I18nProvider, RouterProvider, Spinner } from '@heroui/react';
 import { OpenAPI } from '@attraccess/react-query-client';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
 import { hasRequiredPermissions } from './routes/routeAccess';
@@ -30,6 +30,7 @@ import { KioskGuard } from './kiosk/KioskGuard';
 import { useLocaleSync } from '../hooks/useLocaleSync';
 import usePluginState from './plugins/plugin.state';
 import { NotFound } from './not-found';
+import { ThemeToggle } from '../components/themeToggle';
 
 // Exported for settingsAccess.spec.tsx, which drives the real route table through this gate.
 export function useRoutesWithAuthElements(routes: RouteConfig[]) {
@@ -92,7 +93,7 @@ function useIsTouchDevice() {
 }
 
 function AppLayout(props: PropsWithChildren) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, needsTwoFactorSetup } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -106,6 +107,11 @@ function AppLayout(props: PropsWithChildren) {
     <RouterProvider navigate={navigate}>
       <I18nProvider locale={language}>
         <ToastProvider>
+          {(!isAuthenticated || needsTwoFactorSetup) && (
+            <div className="fixed top-4 right-4 z-30">
+              <ThemeToggle />
+            </div>
+          )}
           <ReactFlowProvider>
             <AttraccessUserActionsBridge>
               {props.children}
@@ -204,12 +210,7 @@ function AppContent() {
 
 export function App() {
   const { isInitialized } = useAuth();
-  const { setTheme } = useTheme('light');
   useLocaleSync();
-
-  useLayoutEffect(() => {
-    setTheme('light');
-  }, [setTheme]);
 
   OpenAPI.BASE = getBaseUrl();
 

@@ -2,6 +2,7 @@ import React, { useCallback, useMemo } from 'react';
 import { Toaster, toast } from 'sonner';
 import { AlertCircle, CheckCircle2, Info, XCircle } from 'lucide-react';
 import { getTranslationKeyForApiError, Props as ApiErrorToastProps } from '../utils/apiError';
+import { useAppTheme } from '@attraccess/ui';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -28,12 +29,13 @@ interface ToastProviderProps {
 }
 
 export function ToastProvider({ children }: ToastProviderProps) {
+  const { resolvedTheme } = useAppTheme();
   return (
     <>
       {children}
       <Toaster
         position="bottom-right"
-        theme="light"
+        theme={resolvedTheme}
         closeButton
         toastOptions={{
           style: {

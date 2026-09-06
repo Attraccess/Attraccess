@@ -9,12 +9,12 @@ import {
   ModalHeader,
   ModalHeading,
   Spinner,
-  useTheme,
 } from '@heroui/react';
 import { ArrowLeft, Palette, RotateCcw } from 'lucide-react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import { Button } from '../../components/button';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useAppTheme } from '@attraccess/ui';
 import { useToastMessage } from '../../components/toastProvider';
 import { StandardDrawer } from '../../components/standardDrawer';
 import { StandardModal } from '../../components/standardModal';
@@ -41,12 +41,14 @@ const placeholderSection = (label: string) =>
   `<mj-column><mj-text align="center" color="#64748B" font-size="14px">${label}</mj-text></mj-column>` +
   `</mj-section>`;
 
-const toEditable = (body: string, label: string) =>
-  body.replace(CONTENT_PLACEHOLDER, () => placeholderSection(label));
+const toEditable = (body: string, label: string) => body.replace(CONTENT_PLACEHOLDER, () => placeholderSection(label));
 
 const toStorable = (editedDoc: string, head: string) =>
   editedDoc
-    .replace(new RegExp(`<mj-section[^>]*css-class="[^"]*${PLACEHOLDER_CLASS}[^"]*"[\\s\\S]*?</mj-section>`), () => CONTENT_PLACEHOLDER)
+    .replace(
+      new RegExp(`<mj-section[^>]*css-class="[^"]*${PLACEHOLDER_CLASS}[^"]*"[\\s\\S]*?</mj-section>`),
+      () => CONTENT_PLACEHOLDER,
+    )
     // Tolerate attributes on the root tag (<mjml owa="desktop" lang="de">…) —
     // a literal '<mjml>' match would silently drop the head for such layouts.
     .replace(/<mjml([^>]*)>/, (_match, attrs) => `<mjml${attrs}>${head}`);
@@ -55,7 +57,7 @@ export function EmailLayoutPage() {
   const navigate = useNavigate();
   const basePath = '/settings/email';
   const { t, language } = useTranslations({ en, de });
-  const { theme } = useTheme();
+  const { resolvedTheme } = useAppTheme();
   const toast = useToastMessage();
 
   const layout = useEmailLayoutServiceEmailLayoutControllerFindGlobal();
@@ -163,12 +165,7 @@ export function EmailLayoutPage() {
         </div>
 
         <div className="flex items-center gap-2 ml-auto">
-          <Button
-            variant="ghost"
-            size="sm"
-            onPress={openStyles}
-            data-cy="email-layout-styles-button"
-          >
+          <Button variant="ghost" size="sm" onPress={openStyles} data-cy="email-layout-styles-button">
             <Palette size={16} />
             <span className="hidden sm:inline">{t('actions.styles')}</span>
           </Button>
@@ -219,11 +216,7 @@ export function EmailLayoutPage() {
         )}
       </div>
 
-      <StandardDrawer
-        isOpen={stylesOpen}
-        onOpenChange={setStylesOpen}
-        dialogProps={{ className: 'md:max-w-4xl' }}
-      >
+      <StandardDrawer isOpen={stylesOpen} onOpenChange={setStylesOpen} dialogProps={{ className: 'md:max-w-4xl' }}>
         <DrawerHeader>
           <h2 className="text-lg font-semibold">{t('styles.title')}</h2>
         </DrawerHeader>
@@ -232,7 +225,7 @@ export function EmailLayoutPage() {
             <p className="text-sm text-default-500">{t('styles.description')}</p>
             <div className="h-[300px] md:h-[60vh]">
               <Editor
-                theme={theme === 'dark' ? 'vs-dark' : 'vs-light'}
+                theme={resolvedTheme === 'dark' ? 'vs-dark' : 'vs-light'}
                 defaultLanguage="mjml"
                 value={headDraft}
                 onChange={(v) => setHeadDraft(v ?? '')}

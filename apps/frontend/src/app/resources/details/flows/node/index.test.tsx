@@ -9,6 +9,7 @@ import {
 } from '@attraccess/react-query-client';
 import type { NodeProps } from '@xyflow/react';
 import { AttraccessNode } from './index';
+import { useNodePreviewRows } from './preview';
 
 const flowContext = vi.hoisted(() => ({
   addLiveLogReceiver: vi.fn<(receiver: (log: ResourceFlowLog) => void) => void>(),
@@ -25,7 +26,7 @@ vi.mock('./editor', () => ({
 }));
 
 vi.mock('./preview', () => ({
-  useNodePreviewRows: () => [],
+  useNodePreviewRows: vi.fn(() => []),
 }));
 
 vi.mock('@xyflow/react', async (importOriginal) => {
@@ -76,7 +77,26 @@ describe('AttraccessNode', () => {
   it('shows the description on nodes without configuration', () => {
     render(<AttraccessNode schema={schema} tNodeTranslations={tStub} tNodeExists={() => true} />);
 
-    expect(screen.getByText('Use to display Attraccess.')).toBeInTheDocument();
+    expect(screen.getByText('Use to display Attraccess.')).toHaveClass('text-muted');
+  });
+
+  it('uses semantic surfaces and muted labels for node previews', () => {
+    vi.mocked(useNodePreviewRows).mockReturnValueOnce([
+      { label: 'Timeout', value: '30 seconds' },
+      { label: 'Variables', entries: [{ fields: [{ label: 'Key', value: 'status' }] }] },
+    ]);
+
+    const { container } = render(<AttraccessNode schema={schema} tNodeTranslations={tStub} />);
+    const card = container.querySelector('.card');
+
+    expect(card).toHaveClass('bg-surface', 'border-border');
+    expect(card?.querySelector('.rounded-full')).toHaveClass('bg-muted');
+    expect(screen.getByText('Timeout')).toHaveClass('text-muted');
+    expect(screen.getByText('Variables')).toHaveClass('text-muted');
+    expect(screen.getByText('Key')).toHaveClass('text-muted');
+    expect(screen.getByText('Key').closest('.border')).toHaveClass('border-border');
+    expect(screen.getByText('30 seconds')).toBeInTheDocument();
+    expect(screen.getByText('status')).toBeInTheDocument();
   });
 
   it('uses the brand accent only while an idle node is selected', () => {
@@ -89,7 +109,7 @@ describe('AttraccessNode', () => {
 
     rerender(<AttraccessNode schema={schema} tNodeTranslations={tStub} />);
 
-    expect(card).toHaveClass('border-gray-500');
+    expect(card).toHaveClass('border-border');
     expect(card).not.toHaveClass('border-accent', 'ring-2');
   });
 
