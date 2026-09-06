@@ -112,7 +112,7 @@ export function UserSearch(props: Readonly<UserSearchProps>) {
     const seen = new Map<number, User>();
     for (const page of data?.pages ?? []) {
       for (const user of page.data) {
-        seen.set(user.id, user);
+        seen.set(user.id, user as User);
       }
     }
     return [...seen.values()];

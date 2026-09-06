@@ -17,6 +17,8 @@ import {
   EntityTarget,
   ObjectLiteral,
   Repository,
+  PLUGIN_AUDIT_HOST_PROVIDER,
+  PluginAuditHostProvider,
 } from '@attraccess/plugins-backend-sdk';
 import { dataSourceConfig } from '../database/datasource';
 import { LoadedPluginManifest } from './plugin.manifest';
@@ -27,6 +29,7 @@ import { PluginController } from './plugin.controller';
 import { loadPluginEntryExports } from './plugin-loader';
 import { registerPluginFlowNodes } from './plugin-flow-node-registry';
 import { join } from 'path';
+import { createPluginAuditContext } from './plugin-audit-context';
 
 @Global()
 @Module({})
@@ -176,6 +179,12 @@ export class PluginModule {
 
   private static createPluginContext(manifest: LoadedPluginManifest): PluginContext {
     const base: PluginContext = {
+      audit: createPluginAuditContext(manifest.id, () =>
+        PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get<PluginAuditHostProvider>(
+          PLUGIN_AUDIT_HOST_PROVIDER,
+          { strict: false },
+        ),
+      ),
       manifest: PluginService.toManifestInfo(manifest),
       logger: new Logger(`Plugin:${manifest.name}`),
       get events(): EventEmitter2 {

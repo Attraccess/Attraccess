@@ -1,5 +1,6 @@
+import { AuditSettingsDto, UpdateAuditSettingsDto } from './dto/audit-settings.dto';
 import { Body, Controller, Delete, ForbiddenException, Get, Patch, Post } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { SettingsService } from './settings.service';
 import { FirstTimeSetupStatusDto } from './dto/first-time-setup-status.dto';
@@ -17,6 +18,22 @@ import { UpdateMessagingRateLimitSettingsDto } from './dto/update-messaging-rate
 @Controller('settings')
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
+
+  @Get('audit')
+  @Auth('system.settings.manage')
+  @ApiResponse({ status: 200, type: AuditSettingsDto })
+  getAuditSettings(): Promise<AuditSettingsDto> {
+    return this.settingsService.getAuditSettings();
+  }
+
+  @Patch('audit')
+  @Auth('system.settings.manage')
+  @ApiBody({ type: UpdateAuditSettingsDto })
+  @ApiResponse({ status: 200, type: AuditSettingsDto })
+  // Keep raw JSON for strict schema validation: global implicit conversion coerces "false" to true.
+  updateAuditSettings(@Body() body: unknown): Promise<AuditSettingsDto> {
+    return this.settingsService.updateAuditSettings(body);
+  }
 
   @Get()
   @Auth('system.settings.manage')

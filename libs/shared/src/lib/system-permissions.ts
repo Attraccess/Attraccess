@@ -15,6 +15,7 @@ export type SystemPermission =
   | 'users.delete'
   | 'users.roles.manage'
   | 'system.settings.manage'
+  | 'system.audit.read'
   | 'system.sso.manage'
   | 'system.plugins.manage'
   | 'billing.read'

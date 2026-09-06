@@ -4,6 +4,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
 import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscription } from './plugin.interface';
 import type { PluginEntityClass } from './entity';
+import type { PluginAuditContext } from './plugin-audit';
 
 /**
  * DI token under which a plugin's own services can inject the PluginContext.
@@ -62,6 +63,8 @@ export interface MqttServerHostProvider {
  * a minor SDK bump; removing/changing one is a major bump.
  */
 export interface PluginContext {
+  /** Optional for compatibility with hosts predating generic plugin audit support. */
+  readonly audit?: PluginAuditContext;
   /** This plugin's own manifest (name, version, directory, id). */
   readonly manifest: PluginManifestInfo;
 

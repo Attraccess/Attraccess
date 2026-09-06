@@ -140,7 +140,7 @@ export const UserManagementPage: React.FC = () => {
                 </TableColumn>
               </TableHeader>
 
-              <TableBody items={searchResult?.data ?? []} renderEmptyState={() => <EmptyState />}>
+              <TableBody items={(searchResult?.data as UserWithAuthDetails[] | undefined) ?? []} renderEmptyState={() => <EmptyState />}>
                 {(user) => {
                   const ssoDetails =
                     (user as UserWithAuthDetails).authenticationDetails?.filter(
@@ -185,7 +185,7 @@ export const UserManagementPage: React.FC = () => {
                       </TableCell>
                       <TableCell>{user.id}</TableCell>
                       <TableCell>
-                        <AttraccessUser user={user} />
+                        <AttraccessUser user={user as User} />
                       </TableCell>
                       <TableCell className="hidden md:table-cell">{user.externalIdentifier}</TableCell>
                       <TableCell className="hidden lg:table-cell">
