@@ -78,6 +78,32 @@ assets.set('apps/api/src/assets/logo.png', apiLogo);
 assets.set('apps/api/src/assets/logo.svg', Buffer.from(lockup));
 assets.set('apps/companion/src/assets/logo.svg', Buffer.from(lockup));
 
+// LVGL 9 RGB565A8: little-endian RGB565 plane followed by an A8 plane.
+// ESP-IDF embeds these binary assets; no generated C++ arrays are committed.
+for (const [width, height] of [
+  [133, 40],
+  [400, 120],
+]) {
+  const rgba = await sharp(await render(lockup, width, height))
+    .ensureAlpha()
+    .raw()
+    .toBuffer();
+  const pixelCount = width * height;
+  const image = Buffer.alloc(pixelCount * 3);
+  for (let pixel = 0; pixel < pixelCount; pixel++) {
+    const offset = pixel * 4;
+    const rgb565 = ((rgba[offset] >> 3) << 11) | ((rgba[offset + 1] >> 2) << 5) | (rgba[offset + 2] >> 3);
+    image.writeUInt16LE(rgb565, pixel * 2);
+    image[pixelCount * 2 + pixel] = rgba[offset + 3];
+    const decoded = image.readUInt16LE(pixel * 2);
+    assert(Math.abs(((decoded >> 11) << 3) - rgba[offset]) <= 7);
+    assert(Math.abs((((decoded >> 5) & 63) << 2) - rgba[offset + 1]) <= 3);
+    assert(Math.abs(((decoded & 31) << 3) - rgba[offset + 2]) <= 7);
+    assert.equal(image[pixelCount * 2 + pixel], rgba[offset + 3]);
+  }
+  assets.set(`apps/attractap/firmware/src/display/images/logo_${width}x${height}.rgb565a8`, image);
+}
+
 for (const [input, output, width, height] of [
   [original, logo, 150, 300],
   [embed(original), apiLogo, 400, 120],
@@ -202,21 +228,21 @@ for (const [path, expected] of assets) {
       return null;
     });
     if (!actual?.equals(expected)) {
-      console.error(`Stale or missing brand asset: ${path}`);
+      process.stderr.write(`Stale or missing brand asset: ${path}\n`);
       stale++;
     }
   } else {
     const destination = resolve(root, path);
     await mkdir(dirname(destination), { recursive: true });
     await writeFile(destination, expected);
-    console.log(`Generated ${path}`);
+    process.stdout.write(`Generated ${path}\n`);
   }
 }
 if (stale) {
-  console.error('Run node scripts/generate-brand-assets.mjs to regenerate.');
+  process.stderr.write('Run node scripts/generate-brand-assets.mjs to regenerate.\n');
   process.exitCode = 1;
 } else {
-  console.log(
-    `${check ? 'Verified' : 'Generated'} ${assets.size} brand assets; wordmark, alpha, flat backgrounds, and maskable safe areas verified.`,
+  process.stdout.write(
+    `${check ? 'Verified' : 'Generated'} ${assets.size} brand assets; wordmark, alpha, flat backgrounds, and maskable safe areas verified.\n`,
   );
 }

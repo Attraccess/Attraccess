@@ -11,9 +11,7 @@
         "command": "cd apps/attractap/firmware && python3 build_firmwares.py",
         "cwd": "."
       },
-      "outputs": [
-        "{projectRoot}/firmware_output"
-      ],
+      "outputs": ["{projectRoot}/firmware_output"],
       "inputs": [
         "{projectRoot}/CMakeLists.txt",
         "{projectRoot}/main/**/*",
@@ -30,7 +28,15 @@
     "test": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "rm -rf /tmp/attractap-supervision-flow-tests && cmake -S apps/attractap/firmware/tests/supervision -B /tmp/attractap-supervision-flow-tests && cmake --build /tmp/attractap-supervision-flow-tests && ctest --test-dir /tmp/attractap-supervision-flow-tests --output-on-failure",
+        "commands": [
+          "cmake -S apps/attractap/firmware/tests/supervision -B apps/attractap/firmware/tests/supervision/build",
+          "cmake --build apps/attractap/firmware/tests/supervision/build",
+          "ctest --test-dir apps/attractap/firmware/tests/supervision/build --output-on-failure",
+          "cmake -S apps/attractap/firmware/tests/display-theme -B apps/attractap/firmware/tests/display-theme/build",
+          "cmake --build apps/attractap/firmware/tests/display-theme/build --parallel 2",
+          "ctest --test-dir apps/attractap/firmware/tests/display-theme/build --output-on-failure"
+        ],
+        "parallel": false,
         "cwd": "."
       },
       "cache": false

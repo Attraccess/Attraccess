@@ -34,6 +34,8 @@ void ResourceDetailsScreen::showActionProgress(const char *)
    if (!this->activeActionSpinner || !lv_obj_is_valid(this->activeActionSpinner))
    {
       this->activeActionSpinner = lv_spinner_create(this->activeActionButton);
+      lv_obj_set_style_arc_color(this->activeActionSpinner, DisplayTheme::border(), LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_set_style_arc_color(this->activeActionSpinner, DisplayTheme::muted(), LV_PART_INDICATOR | LV_STATE_DEFAULT);
       lv_obj_update_layout(this->activeActionButton);
       const lv_coord_t labelHeight = this->activeActionLabel ? lv_obj_get_height(this->activeActionLabel) : 20;
       lv_obj_set_size(this->activeActionSpinner, labelHeight, labelHeight);
@@ -84,20 +86,20 @@ void ResourceDetailsScreen::showSuccessToast(const char *text, uint16_t ms)
       lv_obj_remove_style_all(this->successToast);
       lv_obj_set_size(this->successToast, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
       lv_obj_set_align(this->successToast, LV_ALIGN_BOTTOM_MID);
-      lv_obj_set_style_bg_color(this->successToast, lv_color_hex(0x10B981), LV_PART_MAIN | LV_STATE_DEFAULT); // green
-      lv_obj_set_style_bg_opa(this->successToast, 230, LV_PART_MAIN | LV_STATE_DEFAULT);
+      DisplayTheme::applySurface(this->successToast);
+      lv_obj_set_style_bg_color(this->successToast, DisplayTheme::success(), LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_set_style_border_color(this->successToast, DisplayTheme::success(), LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_obj_set_style_pad_left(this->successToast, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_obj_set_style_pad_right(this->successToast, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_obj_set_style_pad_top(this->successToast, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_obj_set_style_pad_bottom(this->successToast, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_obj_set_style_radius(this->successToast, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 
    // Replace content
    lv_obj_clean(this->successToast);
    lv_obj_t *lbl = lv_label_create(this->successToast);
    lv_label_set_text(lbl, text ? text : "Erfolgreich");
-   lv_obj_set_style_text_color(lbl, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(lbl, DisplayTheme::onPrimary(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Show now
    lv_obj_clear_flag(this->successToast, LV_OBJ_FLAG_HIDDEN);

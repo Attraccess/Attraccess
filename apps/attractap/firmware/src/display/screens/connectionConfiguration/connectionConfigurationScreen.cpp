@@ -1,4 +1,5 @@
 #include "connectionConfigurationScreen.hpp"
+#include "display/theme.hpp"
 #include <string>
 
 // Screen construction (tabs/widgets) and lifecycle. Behaviour-specific logic
@@ -20,6 +21,7 @@ void ConnectionConfigurationScreen::init()
    DeviceConfig deviceConfig = Settings::getDeviceConfig();
 
    this->screen = lv_obj_create(NULL);
+   DisplayTheme::applyScreen(this->screen);
    lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN_WRAP);
    lv_obj_set_flex_align(this->screen, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
@@ -30,12 +32,7 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_height(this->tabs, lv_pct(100));
    lv_obj_set_align(this->tabs, LV_ALIGN_CENTER);
    lv_obj_remove_flag(this->tabs, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_bg_color(this->tabs, lv_color_hex(0x1F2C47), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(this->tabs, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_grad_color(this->tabs, lv_color_hex(0x364C7C), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_main_stop(this->tabs, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_grad_stop(this->tabs, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_grad_dir(this->tabs, LV_GRAD_DIR_VER, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::applyScreen(this->tabs);
 
    lv_obj_t *wifiTab = lv_tabview_add_tab(this->tabs, "WLAN");
    lv_obj_set_flex_flow(wifiTab, LV_FLEX_FLOW_COLUMN);
@@ -46,9 +43,10 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_height(labelForWifiSelectNetwork, LV_SIZE_CONTENT);
    lv_obj_set_align(labelForWifiSelectNetwork, LV_ALIGN_CENTER);
    lv_label_set_text(labelForWifiSelectNetwork, "WLAN Netzwerk");
-   lv_obj_set_style_text_color(labelForWifiSelectNetwork, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(labelForWifiSelectNetwork, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->wifiSelectNetwork = lv_dropdown_create(wifiTab);
+   DisplayTheme::field(this->wifiSelectNetwork);
    lv_dropdown_set_options(this->wifiSelectNetwork, "Suche WLANs...");
    lv_obj_set_width(this->wifiSelectNetwork, lv_pct(100));
    lv_obj_set_height(this->wifiSelectNetwork, LV_SIZE_CONTENT);
@@ -61,10 +59,11 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_height(this->labelForWifiSSID, LV_SIZE_CONTENT);
    lv_obj_set_align(this->labelForWifiSSID, LV_ALIGN_CENTER);
    lv_label_set_text(this->labelForWifiSSID, "SSID*");
-   lv_obj_set_style_text_color(this->labelForWifiSSID, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->labelForWifiSSID, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    this->labelForWifiSSIDDefaultColor = lv_obj_get_style_text_color(this->labelForWifiSSID, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->wifiSSID = lv_textarea_create(wifiTab);
+   DisplayTheme::field(this->wifiSSID);
    lv_obj_set_width(this->wifiSSID, lv_pct(100));
    lv_obj_set_height(this->wifiSSID, LV_SIZE_CONTENT);
    lv_obj_set_align(this->wifiSSID, LV_ALIGN_CENTER);
@@ -78,10 +77,11 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_height(this->labelForWifiPassword, LV_SIZE_CONTENT);
    lv_obj_set_align(this->labelForWifiPassword, LV_ALIGN_CENTER);
    lv_label_set_text(this->labelForWifiPassword, "Passwort*");
-   lv_obj_set_style_text_color(this->labelForWifiPassword, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->labelForWifiPassword, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    this->labelForWifiPasswordDefaultColor = lv_obj_get_style_text_color(this->labelForWifiPassword, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->wifiPassword = lv_textarea_create(wifiTab);
+   DisplayTheme::field(this->wifiPassword);
    lv_obj_set_width(this->wifiPassword, lv_pct(100));
    lv_obj_set_height(this->wifiPassword, LV_SIZE_CONTENT);
    lv_obj_set_align(this->wifiPassword, LV_ALIGN_CENTER);
@@ -105,10 +105,11 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_height(this->labelForServerHostname, LV_SIZE_CONTENT);
    lv_obj_set_align(this->labelForServerHostname, LV_ALIGN_CENTER);
    lv_label_set_text(this->labelForServerHostname, "Attraccess API URL");
-   lv_obj_set_style_text_color(this->labelForServerHostname, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->labelForServerHostname, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    this->labelForServerHostnameDefaultColor = lv_obj_get_style_text_color(this->labelForServerHostname, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->serverHostname = lv_textarea_create(apiTab);
+   DisplayTheme::field(this->serverHostname);
    lv_obj_set_width(this->serverHostname, lv_pct(100));
    lv_obj_set_height(this->serverHostname, LV_SIZE_CONTENT);
    lv_obj_set_align(this->serverHostname, LV_ALIGN_CENTER);
@@ -146,14 +147,14 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_height(this->labelForUseSSLSwitch, LV_SIZE_CONTENT);
    lv_obj_set_align(this->labelForUseSSLSwitch, LV_ALIGN_CENTER);
    lv_label_set_text(this->labelForUseSSLSwitch, "SSL verwenden");
-   lv_obj_set_style_text_color(this->labelForUseSSLSwitch, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->labelForUseSSLSwitch, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *sslInfoLabel = lv_label_create(apiTab);
    lv_obj_set_width(sslInfoLabel, lv_pct(100));
    lv_obj_set_height(sslInfoLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(sslInfoLabel, LV_ALIGN_CENTER);
    lv_label_set_text(sslInfoLabel, "Selbst-Signierte Zertifikate werden (aktuell) nicht unterstuetzt. Eine Verbindung ohne SSL ist sehr unsicher und sollte vermieden werden.");
-   lv_obj_set_style_text_color(sslInfoLabel, lv_color_hex(0xFF8000), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(sslInfoLabel, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Reset the locked certificate decision (ATT-714): once a cert worked it is
    // pinned forever, this is the only way to unpin it after a server cert change.
@@ -162,14 +163,12 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_height(this->resetCertButton, LV_SIZE_CONTENT);
    lv_obj_set_align(this->resetCertButton, LV_ALIGN_CENTER);
    lv_obj_remove_flag(this->resetCertButton, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_bg_color(this->resetCertButton, lv_color_hex(0xFF8000), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(this->resetCertButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::button(this->resetCertButton, DisplayTheme::warning());
    lv_obj_add_event_cb(this->resetCertButton, &ConnectionConfigurationScreen::onResetCertificateButtonEvent, LV_EVENT_CLICKED, this);
 
    this->resetCertLabel = lv_label_create(this->resetCertButton);
    lv_obj_set_align(this->resetCertLabel, LV_ALIGN_CENTER);
    lv_label_set_text(this->resetCertLabel, "Zertifikat zuruecksetzen");
-   lv_obj_set_style_text_color(this->resetCertLabel, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *containerForSaveButton = this->createSaveContainer(apiTab);
    this->createSaveButton(containerForSaveButton);
@@ -184,10 +183,11 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_height(this->labelForDevicePin, LV_SIZE_CONTENT);
    lv_obj_set_align(this->labelForDevicePin, LV_ALIGN_CENTER);
    lv_label_set_text(this->labelForDevicePin, "Geraete PIN*");
-   lv_obj_set_style_text_color(this->labelForDevicePin, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->labelForDevicePin, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    this->labelForDevicePinDefaultColor = lv_obj_get_style_text_color(this->labelForDevicePin, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->devicePin = lv_textarea_create(deviceTab);
+   DisplayTheme::field(this->devicePin);
    lv_obj_set_width(this->devicePin, lv_pct(100));
    lv_obj_set_height(this->devicePin, LV_SIZE_CONTENT);
    lv_obj_set_align(this->devicePin, LV_ALIGN_CENTER);
@@ -201,7 +201,7 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_height(labelForBeeperEnabled, LV_SIZE_CONTENT);
    lv_obj_set_align(labelForBeeperEnabled, LV_ALIGN_CENTER);
    lv_label_set_text(labelForBeeperEnabled, "Beeper");
-   lv_obj_set_style_text_color(labelForBeeperEnabled, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(labelForBeeperEnabled, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->beeperEnabled = lv_switch_create(deviceTab);
    lv_obj_set_width(this->beeperEnabled, 50);
@@ -219,6 +219,7 @@ void ConnectionConfigurationScreen::init()
    this->createSaveButton(containerForSaveButtonDevice);
 
    this->keyboard = lv_keyboard_create(this->screen);
+   DisplayTheme::keyboard(this->keyboard);
    lv_obj_set_width(this->keyboard, lv_pct(100));
    lv_obj_set_height(this->keyboard, lv_pct(48));
    lv_obj_set_align(this->keyboard, LV_ALIGN_CENTER);

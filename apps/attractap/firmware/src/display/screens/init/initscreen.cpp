@@ -1,4 +1,5 @@
 #include "initscreen.hpp"
+#include "display/theme.hpp"
 #include <string>
 #include <functional>
 
@@ -19,19 +20,19 @@ void InitScreen::finalizeState(lv_obj_t *spinner, lv_obj_t *label, lv_color_t co
 
 void InitScreen::markStateAsSuccess(lv_obj_t *spinner, lv_obj_t *label)
 {
-   this->finalizeState(spinner, label, lv_color_hex(0x00FF00));
+   this->finalizeState(spinner, label, DisplayTheme::success());
 }
 
 void InitScreen::markStateAsError(lv_obj_t *spinner, lv_obj_t *label)
 {
-   this->finalizeState(spinner, label, lv_color_hex(0xFF0000));
+   this->finalizeState(spinner, label, DisplayTheme::danger());
 }
 
 void InitScreen::markStateAsWarning(lv_obj_t *spinner, lv_obj_t *label)
 {
    // Amber: stage is actively working/retrying (e.g. sweeping CA certs) rather
    // than cleanly succeeded or hard-failed.
-   this->finalizeState(spinner, label, lv_color_hex(0xFFA500));
+   this->finalizeState(spinner, label, DisplayTheme::warning());
 }
 
 std::string InitScreen::formatIp(esp_ip4_addr_t ip)
@@ -43,15 +44,15 @@ std::string InitScreen::formatIp(esp_ip4_addr_t ip)
 
 void InitScreen::resetState(lv_obj_t *spinner, lv_obj_t *label)
 {
-   lv_obj_set_style_arc_color(spinner, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_arc_color(spinner, DisplayTheme::surfaceSecondary(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_arc_opa(spinner, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_arc_width(spinner, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   lv_obj_set_style_arc_color(spinner, lv_color_hex(0x007ffd), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_set_style_arc_color(spinner, DisplayTheme::primary(), LV_PART_INDICATOR | LV_STATE_DEFAULT);
    lv_obj_set_style_arc_width(spinner, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT);
    lv_obj_set_style_arc_opa(spinner, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
-   lv_obj_set_style_text_color(label, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(label, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 
 void InitScreen::init()
@@ -62,10 +63,7 @@ void InitScreen::init()
    }
    this->screen = lv_obj_create(NULL);
    lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_bg_color(this->screen, lv_color_hex(0x1F2C47), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(this->screen, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_grad_color(this->screen, lv_color_hex(0x364C7C), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_grad_dir(this->screen, LV_GRAD_DIR_VER, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::applyScreen(this->screen);
 
    lv_obj_t *logo = lv_image_create(this->screen);
    lv_image_set_src(logo, &logo_400w_png);
@@ -227,7 +225,7 @@ void InitScreen::init()
    lv_obj_set_height(this->serverTargetLabel, LV_SIZE_CONTENT);
    lv_label_set_text(this->serverTargetLabel, "");
    lv_obj_set_style_text_font(this->serverTargetLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->serverTargetLabel, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->serverTargetLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->certLabel = lv_label_create(detailsContainer);
    lv_obj_set_width(this->certLabel, lv_pct(100));
@@ -235,16 +233,17 @@ void InitScreen::init()
    lv_label_set_long_mode(this->certLabel, LV_LABEL_LONG_DOT);
    lv_label_set_text(this->certLabel, "");
    lv_obj_set_style_text_font(this->certLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->certLabel, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->certLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->connectionStateLabel = lv_label_create(detailsContainer);
    lv_obj_set_width(this->connectionStateLabel, lv_pct(100));
    lv_obj_set_height(this->connectionStateLabel, LV_SIZE_CONTENT);
    lv_label_set_text(this->connectionStateLabel, "");
    lv_obj_set_style_text_font(this->connectionStateLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->connectionStateLabel, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->connectionStateLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *openSettingsButton = lv_btn_create(statesContainer);
+   DisplayTheme::button(openSettingsButton);
    lv_obj_set_width(openSettingsButton, LV_SIZE_CONTENT);
    lv_obj_set_height(openSettingsButton, LV_SIZE_CONTENT);
    lv_obj_set_align(openSettingsButton, LV_ALIGN_CENTER);
@@ -256,6 +255,7 @@ void InitScreen::init()
    lv_obj_set_height(openSettingsButtonLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(openSettingsButtonLabel, LV_ALIGN_CENTER);
    lv_label_set_text(openSettingsButtonLabel, "Einstellungen");
+   lv_obj_set_style_text_color(openSettingsButtonLabel, DisplayTheme::onPrimary(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(openSettingsButtonLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_add_event_cb(openSettingsButton, &InitScreen::onOpenSettingsButtonEvent, LV_EVENT_CLICKED, this);

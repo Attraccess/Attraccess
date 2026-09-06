@@ -1,4 +1,5 @@
 #include "lockscreen.hpp"
+#include "display/theme.hpp"
 #include <string>
 
 #include <cstring>
@@ -11,7 +12,7 @@ void Lockscreen::init()
     }
     this->screen = lv_obj_create(NULL);
     lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_image_src(this->screen, &lockscreen_background_image, LV_PART_MAIN | LV_STATE_DEFAULT);
+    DisplayTheme::applyScreen(this->screen);
 
     lv_obj_t *label = lv_label_create(this->screen);
     lv_obj_set_width(label, LV_SIZE_CONTENT);
@@ -22,7 +23,7 @@ void Lockscreen::init()
     lv_label_set_text(label, "Bitte mit NFC \n        Karte/Tag anmelden");
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_AUTO, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_32, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(label, lv_color_hex(0xffffff), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(label, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_t *header = lv_obj_create(this->screen);
     lv_obj_remove_style_all(header);
@@ -65,7 +66,7 @@ void Lockscreen::init()
     lv_obj_set_height(this->resourceNameLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(this->resourceNameLabel, LV_ALIGN_CENTER);
     lv_label_set_text(this->resourceNameLabel, "???");
-    lv_obj_set_style_text_color(this->resourceNameLabel, lv_color_hex(0xffffff), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->resourceNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
     this->usageInfoLabel = lv_label_create(resourceInfo);
     lv_obj_set_width(this->usageInfoLabel, LV_SIZE_CONTENT);
@@ -125,17 +126,17 @@ void Lockscreen::updateUsageInfo()
     {
         std::string usageText = std::string("In Verwendung: ") + this->username;
         lv_label_set_text(this->usageInfoLabel, usageText.c_str());
-        lv_obj_set_style_text_color(this->usageInfoLabel, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(this->usageInfoLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
     else if (this->isUnderMaintenance)
     {
         lv_label_set_text(this->usageInfoLabel, "In Wartung");
-        lv_obj_set_style_text_color(this->usageInfoLabel, lv_color_hex(0xF5A524), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(this->usageInfoLabel, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
     else
     {
         lv_label_set_text(this->usageInfoLabel, "Verfuegbar");
-        lv_obj_set_style_text_color(this->usageInfoLabel, lv_color_hex(0x00FF00), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(this->usageInfoLabel, DisplayTheme::success(), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
 }
 

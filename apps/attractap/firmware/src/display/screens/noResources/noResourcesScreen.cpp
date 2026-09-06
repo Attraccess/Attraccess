@@ -1,4 +1,5 @@
 #include "noResourcesScreen.hpp"
+#include "display/theme.hpp"
 #include <string>
 
 void NoResourcesScreen::init()
@@ -11,7 +12,7 @@ void NoResourcesScreen::init()
    lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(this->screen, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_set_style_bg_image_src(this->screen, &lockscreen_background_image, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::applyScreen(this->screen);
    lv_obj_set_style_pad_left(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_right(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_top(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -25,7 +26,7 @@ void NoResourcesScreen::init()
    State::ApiState apiState = State::getApiState();
    lv_label_set_text(noResourcesMessage, "Keine Ressourcen mit diesem Lesegeraet verknuepft, bitte konfigurieren Sie das Lesegeraet in der Attraccess Administration");
    lv_obj_set_style_text_font(noResourcesMessage, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(noResourcesMessage, lv_color_hex(0xff0000), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(noResourcesMessage, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 
 lv_obj_t *NoResourcesScreen::getScreen()

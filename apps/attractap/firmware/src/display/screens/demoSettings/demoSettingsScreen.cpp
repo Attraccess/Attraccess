@@ -1,25 +1,10 @@
 #ifdef DEMO_MODE
 
 #include "demoSettingsScreen.hpp"
+#include "display/theme.hpp"
 #include <string>
 #include <cstdio>
 #include "platform.hpp"
-
-// ---------------------------------------------------------------------------
-// Colour palette
-// ---------------------------------------------------------------------------
-#define DEMO_BG      0x1A1A2E
-#define DEMO_PANEL   0x16213E
-#define DEMO_ACCENT  0x0F3460
-#define DEMO_CARD_BG 0x1F2B47
-#define DEMO_TEXT    0xE0E0E0
-#define DEMO_TITLE   0x9EB8D9
-#define DEMO_GREEN   0x4CD964
-#define DEMO_YELLOW  0xFFC107
-#define DEMO_RED     0xFF5252
-#define DEMO_BTN_ADD 0x2E7D32
-#define DEMO_BTN_DEL 0xC62828
-#define DEMO_BTN_SCAN 0x1565C0
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -32,8 +17,7 @@ void DemoSettingsScreen::init()
 
     _screen = lv_obj_create(NULL);
     lv_obj_remove_flag(_screen, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_color(_screen, lv_color_hex(DEMO_BG), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(_screen, 255, LV_PART_MAIN);
+    DisplayTheme::applyScreen(_screen);
     lv_obj_set_style_pad_all(_screen, 16, LV_PART_MAIN);
     // Flex column: title bar fixed height, list area grows to fill the rest.
     // (Overlays added later are flagged IGNORE_LAYOUT so they float centered.)
@@ -45,17 +29,16 @@ void DemoSettingsScreen::init()
     lv_obj_t *titleBar = lv_obj_create(_screen);
     lv_obj_remove_flag(titleBar, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_size(titleBar, lv_pct(100), 56);
-    lv_obj_set_style_bg_color(titleBar, lv_color_hex(DEMO_ACCENT), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(titleBar, 255, LV_PART_MAIN);
+    DisplayTheme::applySurface(titleBar);
+    lv_obj_set_style_bg_color(titleBar, DisplayTheme::primarySoft(), LV_PART_MAIN);
     lv_obj_set_style_border_width(titleBar, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(titleBar, 12, LV_PART_MAIN);
     lv_obj_set_flex_flow(titleBar, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(titleBar, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_hor(titleBar, 16, LV_PART_MAIN);
 
     lv_obj_t *title = lv_label_create(titleBar);
     lv_label_set_text(title, "Demo Einstellungen");
-    lv_obj_set_style_text_color(title, lv_color_hex(DEMO_TEXT), LV_PART_MAIN);
+    lv_obj_set_style_text_color(title, DisplayTheme::onPrimarySoft(), LV_PART_MAIN);
     lv_obj_set_style_text_font(title, &lv_font_montserrat_24, LV_PART_MAIN);
 
     // Right-aligned action button group (add card, + power off on V4 demo).
@@ -72,14 +55,12 @@ void DemoSettingsScreen::init()
     // "Add card" button
     lv_obj_t *addBtn = lv_button_create(actions);
     lv_obj_set_size(addBtn, 160, 40);
-    lv_obj_set_style_bg_color(addBtn, lv_color_hex(DEMO_BTN_ADD), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(addBtn, 255, LV_PART_MAIN);
-    lv_obj_set_style_radius(addBtn, 8, LV_PART_MAIN);
+    DisplayTheme::button(addBtn);
     lv_obj_add_event_cb(addBtn, &DemoSettingsScreen::onAddCardBtn, LV_EVENT_CLICKED, this);
     lv_obj_t *addLbl = lv_label_create(addBtn);
     lv_label_set_text(addLbl, "Karte hinzufuegen");
     lv_obj_set_align(addLbl, LV_ALIGN_CENTER);
-    lv_obj_set_style_text_color(addLbl, lv_color_hex(DEMO_TEXT), LV_PART_MAIN);
+    lv_obj_set_style_text_color(addLbl, DisplayTheme::onPrimary(), LV_PART_MAIN);
     lv_obj_set_style_text_font(addLbl, &lv_font_montserrat_16, LV_PART_MAIN);
 
 #ifdef HAS_POWER_BUTTON
@@ -91,10 +72,9 @@ void DemoSettingsScreen::init()
     lv_obj_t *listArea = lv_obj_create(_screen);
     lv_obj_set_width(listArea, lv_pct(100));
     lv_obj_set_flex_grow(listArea, 1);
-    lv_obj_set_style_bg_color(listArea, lv_color_hex(DEMO_PANEL), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(listArea, 255, LV_PART_MAIN);
+    DisplayTheme::applySurface(listArea);
+    lv_obj_set_style_bg_color(listArea, DisplayTheme::surfaceSecondary(), LV_PART_MAIN);
     lv_obj_set_style_border_width(listArea, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(listArea, 12, LV_PART_MAIN);
     lv_obj_set_style_pad_all(listArea, 10, LV_PART_MAIN);
     lv_obj_set_style_pad_row(listArea, 8, LV_PART_MAIN);
     lv_obj_set_flex_flow(listArea, LV_FLEX_FLOW_COLUMN);
@@ -159,7 +139,7 @@ void DemoSettingsScreen::rebuildCardList()
     {
         lv_obj_t *emptyLbl = lv_label_create(_cardList);
         lv_label_set_text(emptyLbl, "Noch keine Karten registriert.");
-        lv_obj_set_style_text_color(emptyLbl, lv_color_hex(DEMO_TITLE), LV_PART_MAIN);
+        lv_obj_set_style_text_color(emptyLbl, DisplayTheme::muted(), LV_PART_MAIN);
         lv_obj_set_style_text_font(emptyLbl, &lv_font_montserrat_20, LV_PART_MAIN);
         return;
     }
@@ -172,10 +152,8 @@ void DemoSettingsScreen::rebuildCardList()
         lv_obj_t *row = lv_obj_create(_cardList);
         lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_set_size(row, lv_pct(100), 60);
-        lv_obj_set_style_bg_color(row, lv_color_hex(DEMO_CARD_BG), LV_PART_MAIN);
-        lv_obj_set_style_bg_opa(row, 255, LV_PART_MAIN);
+        DisplayTheme::applySurface(row);
         lv_obj_set_style_border_width(row, 0, LV_PART_MAIN);
-        lv_obj_set_style_radius(row, 8, LV_PART_MAIN);
         lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
         lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
         lv_obj_set_style_pad_hor(row, 12, LV_PART_MAIN);
@@ -208,33 +186,31 @@ void DemoSettingsScreen::rebuildCardList()
         const char *displayName = (card.label[0] != '\0') ? card.label : uidShort;
         lv_label_set_text(nameLbl, displayName);
         lv_label_set_long_mode(nameLbl, LV_LABEL_LONG_DOT);
-        lv_obj_set_style_text_color(nameLbl, lv_color_hex(DEMO_TEXT), LV_PART_MAIN);
+        lv_obj_set_style_text_color(nameLbl, DisplayTheme::text(), LV_PART_MAIN);
         lv_obj_set_style_text_font(nameLbl, &lv_font_montserrat_20, LV_PART_MAIN);
 
         lv_obj_t *roleLbl = lv_label_create(nameCol);
         lv_obj_set_width(roleLbl, lv_pct(100));
         lv_label_set_text(roleLbl, DemoStore::roleName(card.role));
-        uint32_t roleColor = DEMO_TITLE;
+        lv_color_t roleColor = DisplayTheme::muted();
         switch (card.role) {
-        case DemoStore::UserRole::INTRODUCED: roleColor = DEMO_GREEN; break;
-        case DemoStore::UserRole::ADMIN:      roleColor = DEMO_YELLOW; break;
-        default:                              roleColor = DEMO_RED; break;
+        case DemoStore::UserRole::INTRODUCED: roleColor = DisplayTheme::success(); break;
+        case DemoStore::UserRole::ADMIN:      roleColor = DisplayTheme::warning(); break;
+        default:                            roleColor = DisplayTheme::danger(); break;
         }
-        lv_obj_set_style_text_color(roleLbl, lv_color_hex(roleColor), LV_PART_MAIN);
+        lv_obj_set_style_text_color(roleLbl, roleColor, LV_PART_MAIN);
         lv_obj_set_style_text_font(roleLbl, &lv_font_montserrat_16, LV_PART_MAIN);
 
         // Delete button
         lv_obj_t *delBtn = lv_button_create(row);
         lv_obj_set_size(delBtn, 72, 40);
-        lv_obj_set_style_bg_color(delBtn, lv_color_hex(DEMO_BTN_DEL), LV_PART_MAIN);
-        lv_obj_set_style_bg_opa(delBtn, 255, LV_PART_MAIN);
-        lv_obj_set_style_radius(delBtn, 8, LV_PART_MAIN);
+        DisplayTheme::button(delBtn, DisplayTheme::danger());
         _delPayloads[i] = {this, i};
         lv_obj_add_event_cb(delBtn, &DemoSettingsScreen::onDeleteCardBtn, LV_EVENT_CLICKED, &_delPayloads[i]);
         lv_obj_t *delBtnInner = lv_label_create(delBtn);
         lv_label_set_text(delBtnInner, "Loeschen");
         lv_obj_set_align(delBtnInner, LV_ALIGN_CENTER);
-        lv_obj_set_style_text_color(delBtnInner, lv_color_hex(DEMO_TEXT), LV_PART_MAIN);
+        lv_obj_set_style_text_color(delBtnInner, DisplayTheme::onPrimary(), LV_PART_MAIN);
         lv_obj_set_style_text_font(delBtnInner, &lv_font_montserrat_14, LV_PART_MAIN);
     }
 }
@@ -252,7 +228,7 @@ void DemoSettingsScreen::showScanOverlay()
     lv_obj_add_flag(_scanOverlay, LV_OBJ_FLAG_IGNORE_LAYOUT);
     lv_obj_set_size(_scanOverlay, lv_pct(100), lv_pct(100));
     lv_obj_align(_scanOverlay, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_bg_color(_scanOverlay, lv_color_hex(0x000000), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(_scanOverlay, lv_color_black(), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(_scanOverlay, 200, LV_PART_MAIN);
     lv_obj_set_style_border_width(_scanOverlay, 0, LV_PART_MAIN);
     lv_obj_set_style_radius(_scanOverlay, 0, LV_PART_MAIN);
@@ -262,20 +238,18 @@ void DemoSettingsScreen::showScanOverlay()
 
     lv_obj_t *lbl = lv_label_create(_scanOverlay);
     lv_label_set_text(lbl, "Karte ans Lesegeraet halten...");
-    lv_obj_set_style_text_color(lbl, lv_color_hex(DEMO_TEXT), LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl, DisplayTheme::onPrimary(), LV_PART_MAIN);
     lv_obj_set_style_text_font(lbl, &lv_font_montserrat_24, LV_PART_MAIN);
     lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
 
     lv_obj_t *cancelBtn = lv_button_create(_scanOverlay);
     lv_obj_set_size(cancelBtn, 200, 52);
-    lv_obj_set_style_bg_color(cancelBtn, lv_color_hex(DEMO_BTN_SCAN), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(cancelBtn, 255, LV_PART_MAIN);
-    lv_obj_set_style_radius(cancelBtn, 10, LV_PART_MAIN);
+    DisplayTheme::button(cancelBtn);
     lv_obj_add_event_cb(cancelBtn, &DemoSettingsScreen::onCancelScanBtn, LV_EVENT_CLICKED, this);
     lv_obj_t *cancelLbl = lv_label_create(cancelBtn);
     lv_label_set_text(cancelLbl, "Abbrechen");
     lv_obj_set_align(cancelLbl, LV_ALIGN_CENTER);
-    lv_obj_set_style_text_color(cancelLbl, lv_color_hex(DEMO_TEXT), LV_PART_MAIN);
+    lv_obj_set_style_text_color(cancelLbl, DisplayTheme::onPrimary(), LV_PART_MAIN);
     lv_obj_set_style_text_font(cancelLbl, &lv_font_montserrat_20, LV_PART_MAIN);
 
     _waitingForCard = true;
@@ -310,10 +284,8 @@ void DemoSettingsScreen::showRolePicker(const std::string &uid)
     lv_obj_add_flag(_rolePicker, LV_OBJ_FLAG_IGNORE_LAYOUT);
     lv_obj_set_size(_rolePicker, lv_pct(90), LV_SIZE_CONTENT);
     lv_obj_align(_rolePicker, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_bg_color(_rolePicker, lv_color_hex(DEMO_PANEL), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(_rolePicker, 255, LV_PART_MAIN);
+    DisplayTheme::applySurface(_rolePicker);
     lv_obj_set_style_border_width(_rolePicker, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(_rolePicker, 16, LV_PART_MAIN);
     lv_obj_set_flex_flow(_rolePicker, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(_rolePicker, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_all(_rolePicker, 20, LV_PART_MAIN);
@@ -323,16 +295,16 @@ void DemoSettingsScreen::showRolePicker(const std::string &uid)
     snprintf(titleBuf, sizeof(titleBuf), "Rolle fuer Karte %s", uid.c_str());
     lv_obj_t *titleLbl = lv_label_create(_rolePicker);
     lv_label_set_text(titleLbl, titleBuf);
-    lv_obj_set_style_text_color(titleLbl, lv_color_hex(DEMO_TEXT), LV_PART_MAIN);
+    lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN);
     lv_obj_set_style_text_font(titleLbl, &lv_font_montserrat_20, LV_PART_MAIN);
     lv_label_set_long_mode(titleLbl, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(titleLbl, lv_pct(100));
 
-    struct RoleEntry { const char *label; DemoStore::UserRole role; uint32_t color; };
+    struct RoleEntry { const char *label; DemoStore::UserRole role; lv_color_t color; };
     static const RoleEntry roles[] = {
-        { "Kein Zugang",  DemoStore::UserRole::NO_PERMISSION, DEMO_RED    },
-        { "Eingewiesen",  DemoStore::UserRole::INTRODUCED,    DEMO_GREEN  },
-        { "Admin",        DemoStore::UserRole::ADMIN,         DEMO_YELLOW },
+        { "Kein Zugang",  DemoStore::UserRole::NO_PERMISSION, DisplayTheme::danger()  },
+        { "Eingewiesen",  DemoStore::UserRole::INTRODUCED,    DisplayTheme::success() },
+        { "Admin",        DemoStore::UserRole::ADMIN,        DisplayTheme::warning() },
     };
 
     for (uint8_t j = 0; j < 3; j++)
@@ -341,9 +313,7 @@ void DemoSettingsScreen::showRolePicker(const std::string &uid)
         lv_obj_t *btn = lv_button_create(_rolePicker);
         lv_obj_set_width(btn, lv_pct(100));
         lv_obj_set_height(btn, 52);
-        lv_obj_set_style_bg_color(btn, lv_color_hex(entry.color), LV_PART_MAIN);
-        lv_obj_set_style_bg_opa(btn, 220, LV_PART_MAIN);
-        lv_obj_set_style_radius(btn, 10, LV_PART_MAIN);
+        DisplayTheme::button(btn, entry.color);
 
         _rolePayloads[j] = {this, entry.role};
         lv_obj_add_event_cb(btn, &DemoSettingsScreen::onRolePickerBtn, LV_EVENT_CLICKED, &_rolePayloads[j]);
@@ -351,7 +321,7 @@ void DemoSettingsScreen::showRolePicker(const std::string &uid)
         lv_obj_t *lbl = lv_label_create(btn);
         lv_label_set_text(lbl, entry.label);
         lv_obj_set_align(lbl, LV_ALIGN_CENTER);
-        lv_obj_set_style_text_color(lbl, lv_color_hex(DEMO_TEXT), LV_PART_MAIN);
+        lv_obj_set_style_text_color(lbl, DisplayTheme::onPrimary(), LV_PART_MAIN);
         lv_obj_set_style_text_font(lbl, &lv_font_montserrat_24, LV_PART_MAIN);
     }
 }

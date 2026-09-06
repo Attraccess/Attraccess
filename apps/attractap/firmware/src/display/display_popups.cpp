@@ -1,4 +1,5 @@
 #include "display.hpp"
+#include "display/theme.hpp"
 #include <string>
 #include <functional>
 #include <cstdlib>
@@ -32,9 +33,7 @@ void Display::showErrorPopup(const std::string &title, const std::string &messag
     lv_obj_set_width(dialog, lv_pct(80));
     lv_obj_set_height(dialog, LV_SIZE_CONTENT);
     lv_obj_set_align(dialog, LV_ALIGN_CENTER);
-    lv_obj_set_style_bg_color(dialog, lv_color_hex(0x2A2A2A), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(dialog, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(dialog, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+    DisplayTheme::applySurface(dialog);
     lv_obj_set_style_pad_left(dialog, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_right(dialog, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_top(dialog, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -45,13 +44,13 @@ void Display::showErrorPopup(const std::string &title, const std::string &messag
     // Title
     lv_obj_t *titleLbl = lv_label_create(dialog);
     lv_label_set_text(titleLbl, title.c_str());
-    lv_obj_set_style_text_color(titleLbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(titleLbl, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     // Message
     lv_obj_t *msgLbl = lv_label_create(dialog);
     lv_label_set_text(msgLbl, message.c_str());
-    lv_obj_set_style_text_color(msgLbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(msgLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(msgLbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_width(msgLbl, lv_pct(100));
 
@@ -66,8 +65,7 @@ void Display::showErrorPopup(const std::string &title, const std::string &messag
     lv_obj_t *okBtn = lv_button_create(footer);
     lv_obj_set_height(okBtn, LV_SIZE_CONTENT);
     lv_obj_set_width(okBtn, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_color(okBtn, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(okBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    DisplayTheme::button(okBtn, DisplayTheme::danger());
 
     lv_obj_t *okLbl = lv_label_create(okBtn);
     lv_label_set_text(okLbl, "OK");
@@ -107,9 +105,7 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
     lv_obj_set_width(dialog, lv_pct(80));
     lv_obj_set_height(dialog, LV_SIZE_CONTENT);
     lv_obj_set_align(dialog, LV_ALIGN_CENTER);
-    lv_obj_set_style_bg_color(dialog, lv_color_hex(0x2A2A2A), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(dialog, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(dialog, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+    DisplayTheme::applySurface(dialog);
     lv_obj_set_style_pad_left(dialog, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_right(dialog, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_top(dialog, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -120,20 +116,20 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
     // Title
     lv_obj_t *titleLbl = lv_label_create(dialog);
     lv_label_set_text(titleLbl, "Unzureichendes Guthaben");
-    lv_obj_set_style_text_color(titleLbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(titleLbl, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     // Message
     lv_obj_t *msgLbl = lv_label_create(dialog);
     lv_label_set_text(msgLbl, "Ihr Guthaben reicht nicht aus, um die Aktion auszuführen. Bitte laden Sie Ihr Guthaben auf.");
-    lv_obj_set_style_text_color(msgLbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(msgLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(msgLbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_width(msgLbl, lv_pct(100));
 
     // Amount label
     lv_obj_t *amountLbl = lv_label_create(dialog);
     lv_label_set_text(amountLbl, "Betrag (EUR)");
-    lv_obj_set_style_text_color(amountLbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(amountLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(amountLbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     // Amount input
@@ -142,15 +138,14 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
     lv_textarea_set_max_length(amountTa, 6); // e.g., up to 999999
     lv_textarea_set_accepted_chars(amountTa, "0123456789");
     lv_obj_set_width(amountTa, lv_pct(100));
-    lv_obj_set_style_bg_color(amountTa, lv_color_hex(0x3A3A3A), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(amountTa, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    DisplayTheme::field(amountTa);
     lv_obj_set_style_pad_left(amountTa, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_right(amountTa, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     // Inline error label (initially empty)
     lv_obj_t *errorLbl = lv_label_create(dialog);
     lv_label_set_text(errorLbl, "");
-    lv_obj_set_style_text_color(errorLbl, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(errorLbl, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(errorLbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     // Footer with buttons
@@ -181,6 +176,7 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
 
     // On-screen keyboard (hidden by default)
     lv_obj_t *keyboard = lv_keyboard_create(overlay);
+    DisplayTheme::keyboard(keyboard);
     lv_obj_set_width(keyboard, lv_pct(100));
     lv_obj_set_align(keyboard, LV_ALIGN_BOTTOM_MID);
     lv_keyboard_set_mode(keyboard, LV_KEYBOARD_MODE_NUMBER);
@@ -217,8 +213,7 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
     lv_obj_t *cancelBtn = lv_button_create(footer);
     lv_obj_set_height(cancelBtn, LV_SIZE_CONTENT);
     lv_obj_set_width(cancelBtn, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_color(cancelBtn, lv_color_hex(0x6B7280), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(cancelBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    DisplayTheme::secondaryButton(cancelBtn);
     lv_obj_t *cancelLbl = lv_label_create(cancelBtn);
     lv_label_set_text(cancelLbl, "Abbrechen");
 
@@ -226,8 +221,7 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
     lv_obj_t *startBtn = lv_button_create(footer);
     lv_obj_set_height(startBtn, LV_SIZE_CONTENT);
     lv_obj_set_width(startBtn, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_color(startBtn, lv_color_hex(0x10B981), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(startBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    DisplayTheme::button(startBtn);
     lv_obj_t *startLbl = lv_label_create(startBtn);
     lv_label_set_text(startLbl, "Aufladen");
 
@@ -269,7 +263,7 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
         lv_obj_clean(dialog);
         lv_obj_t *infoLbl = lv_label_create(dialog);
         lv_label_set_text(infoLbl, "Bitte am Zahlungsterminal fortfahren …");
-        lv_obj_set_style_text_color(infoLbl, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(infoLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_obj_set_style_text_font(infoLbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
         if (c->onStart) c->onStart(amountCents);

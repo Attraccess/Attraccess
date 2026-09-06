@@ -1,4 +1,5 @@
 #include "display.hpp"
+#include "display/theme.hpp"
 
 #include <cstdlib>
 #include <cstring>
@@ -39,7 +40,7 @@ void Display::initDeviceOverlay()
     lv_obj_set_align(Display::deviceNameLabel, LV_ALIGN_CENTER);
     lv_label_set_text(Display::deviceNameLabel, Display::deviceNameInitValue.c_str());
 
-    lv_obj_set_style_text_color(Display::deviceNameLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(Display::deviceNameLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(Display::deviceNameLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(Display::deviceNameLabel, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -48,7 +49,7 @@ void Display::initDeviceOverlay()
     lv_obj_set_height(firmwareLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(firmwareLabel, LV_ALIGN_CENTER);
     lv_label_set_text(firmwareLabel, (std::string(FIRMWARE_FRIENDLY_NAME) + " v" + FIRMWARE_VERSION).c_str());
-    lv_obj_set_style_text_color(firmwareLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(firmwareLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(firmwareLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(firmwareLabel, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -58,10 +59,10 @@ void Display::initDeviceOverlay()
     lv_obj_set_align(Display::networkQualityContainer, LV_ALIGN_TOP_RIGHT);
     lv_obj_set_x(Display::networkQualityContainer, -12);
     lv_obj_set_y(Display::networkQualityContainer, 12);
-    lv_obj_set_style_radius(Display::networkQualityContainer, 15, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(Display::networkQualityContainer, 225, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(Display::networkQualityContainer, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(Display::networkQualityContainer, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(Display::networkQualityContainer, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_color(Display::networkQualityContainer, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_color(Display::networkQualityContainer, DisplayTheme::border(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_flex_flow(Display::networkQualityContainer, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(Display::networkQualityContainer, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_remove_flag(Display::networkQualityContainer, LV_OBJ_FLAG_CLICKABLE);
@@ -70,7 +71,7 @@ void Display::initDeviceOverlay()
 
     Display::networkQualityLabel = lv_label_create(Display::networkQualityContainer);
     lv_label_set_text(Display::networkQualityLabel, "! NET");
-    lv_obj_set_style_text_color(Display::networkQualityLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(Display::networkQualityLabel, DisplayTheme::onPrimary(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(Display::networkQualityLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 
@@ -94,18 +95,18 @@ void Display::updateNetworkQualityOverlay()
     {
     case State::NETWORK_QUALITY_GOOD:
         lv_obj_remove_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_style_bg_color(Display::networkQualityContainer, lv_color_hex(0x16A34A), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_color(Display::networkQualityContainer, DisplayTheme::success(), LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_label_set_text(Display::networkQualityLabel, "OK NET");
         break;
     case State::NETWORK_QUALITY_DEGRADED:
         lv_obj_remove_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_style_bg_color(Display::networkQualityContainer, lv_color_hex(0xD97706), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_color(Display::networkQualityContainer, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_label_set_text(Display::networkQualityLabel, "! NET");
         break;
     case State::NETWORK_QUALITY_OFFLINE:
     default:
         lv_obj_remove_flag(Display::networkQualityContainer, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_style_bg_color(Display::networkQualityContainer, lv_color_hex(0xDC2626), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_color(Display::networkQualityContainer, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_label_set_text(Display::networkQualityLabel, "x NET");
         break;
     }
