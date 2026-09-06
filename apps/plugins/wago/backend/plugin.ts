@@ -9,9 +9,12 @@ import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
 import { WagoCommissioningService } from './wago-commissioning.service';
+import { WagoRuntimeArtifactsService } from './wago-runtime-artifacts';
+import { WagoArtifactsController, WagoArtifactUploadInterceptor } from './wago-artifacts.controller';
+import { WagoCommissioningReadiness } from './wago-commissioning-readiness';
+import { WagoManagementEntity } from './wago-management.entity';
+import { WagoCommissioningLeaseEntity } from './wago-commissioning-lease.entity';
 import { createWagoCommandNode } from './wago-command-node';
-import { WagoDiagnosticsController } from './diagnostics.controller';
-import { WagoDiagnosticsService } from './diagnostics.service';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 class WagoPluginModule {}
@@ -24,13 +27,22 @@ const plugin: PluginBackendModule = {
     WagoConfigurationDraft,
     WagoConfigurationRevision,
     WagoCommissioningSession,
+    WagoManagementEntity,
+    WagoCommissioningLeaseEntity,
   ],
   flowNodes: (context) => [createWagoCommandNode(context)],
   register(context: PluginContext): DynamicModule {
     return {
       module: WagoPluginModule,
-      controllers: [WagoControllerApi, WagoDiagnosticsController],
-      providers: [{ provide: PLUGIN_CONTEXT, useValue: context }, WagoService, WagoCommissioningService, WagoDiagnosticsService],
+      controllers: [WagoControllerApi, WagoArtifactsController],
+      providers: [
+        { provide: PLUGIN_CONTEXT, useValue: context },
+        WagoService,
+        WagoRuntimeArtifactsService,
+        WagoArtifactUploadInterceptor,
+        WagoCommissioningReadiness,
+        WagoCommissioningService,
+      ],
     };
   },
 };

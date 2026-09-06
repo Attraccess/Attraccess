@@ -15,6 +15,18 @@ import { WagoService } from './wago.service';
 import { WagoController } from './wago-controller.entity';
 
 jest.mock('node:child_process', () => ({ spawn: jest.fn() }));
+jest.mock('./wago-commissioning-lease', () => ({
+  ...jest.requireActual('./wago-commissioning-lease'),
+  createWagoCommissioningLeaseService: () => ({
+    run: async (_fingerprint: string, operation: (guard: unknown) => Promise<unknown>) =>
+      operation({
+        assertOwned: async () => undefined,
+        signal: new AbortController().signal,
+        deadline: Date.now() + 60_000,
+      }),
+    status: async () => ({ state: 'available' }),
+  }),
+}));
 const verifier = 'v'.repeat(43);
 const secrets = {
   encrypt: jest.fn().mockReturnValue('opaque-ciphertext'),
@@ -102,7 +114,7 @@ describe('WagoCommissioningService', () => {
     await service.onApplicationBootstrap();
     expect(session.state).toBe('delivery_failed');
     expect(session.enrollmentId).toBeNull();
-    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(7);
+    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(7, expect.any(Function));
     expect(inspect).not.toHaveBeenCalled();
     expect(wago.registerCommissioningDiscoveryHandler).toHaveBeenCalledTimes(1);
     await expect(service.deliver(1, { confirmInstall: true })).rejects.toThrow('explicit valid SSH');
@@ -110,12 +122,15 @@ describe('WagoCommissioningService', () => {
 
   it('revokes and clears legacy plaintext before registering discovery, using bounded pages', async () => {
     const { service, session, repository, wago, context } = securityHarness({
+      id: 101,
       state: 'awaiting_discovery',
       enrollmentId: 7,
       pairingCode: 'legacy-secret',
     });
+    const firstPage = Array.from({ length: 100 }, (_, i) => ({ ...session, id: i + 1 }));
+    repository.findOneBy.mockImplementation(async ({ id }) => id === session.id ? session : firstPage.find((entry) => entry.id === id));
     repository.find
-      .mockResolvedValueOnce(Array.from({ length: 100 }, (_, i) => ({ ...session, id: i + 1 })))
+      .mockResolvedValueOnce(firstPage)
       .mockResolvedValueOnce([session]);
     wago.revokeEnrollmentById.mockImplementation(async () => {
       expect(wago.registerCommissioningDiscoveryHandler).not.toHaveBeenCalled();
@@ -125,6 +140,8 @@ describe('WagoCommissioningService', () => {
     expect(repository.find).toHaveBeenNthCalledWith(2, { order: { id: 'ASC' }, take: 100, skip: 100 });
     expect(session.state).toBe('revoked');
     expect(session.pairingCode).toBeNull();
+    expect(firstPage.every((entry) => entry.pairingCode === null && entry.state === 'revoked')).toBe(true);
+    expect(wago.revokeEnrollmentById).toHaveBeenCalledTimes(101);
     expect(context.secrets.decrypt).not.toHaveBeenCalled();
     expect(wago.registerCommissioningDiscoveryHandler).toHaveBeenCalledTimes(1);
   });
@@ -161,12 +178,13 @@ describe('WagoCommissioningService', () => {
     const { service, session, repository, wago } = securityHarness({ pairingCode: 'legacy', enrollmentId: 7 });
     const later = { ...session, id: 2, enrollmentId: 8 };
     repository.find.mockResolvedValue([session, later]);
+    repository.findOneBy.mockImplementation(async ({ id }) => (id === later.id ? later : session));
     wago.revokeEnrollmentById.mockRejectedValueOnce(new Error('broker unavailable'));
     await service.onApplicationBootstrap();
     expect(session).toMatchObject({ state: 'revoked', pairingCode: null, enrollmentId: 7 });
     expect(later).toMatchObject({ state: 'revoked', pairingCode: null, enrollmentId: null });
     expect(later.progressStep).toBe('Commissioning session revoked');
-    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(8);
+    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(8, expect.any(Function));
     expect(wago.registerCommissioningDiscoveryHandler).not.toHaveBeenCalled();
   });
 
@@ -179,7 +197,7 @@ describe('WagoCommissioningService', () => {
     await service.claimDiscovered({ id: 4, hardwareId: session.hardwareId, mqttServerId: 2, enrollmentId: 7 });
     expect(wago.claim).not.toHaveBeenCalled();
     expect(session.state).toBe('revoked');
-    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(7);
+    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(7, expect.any(Function));
   });
 
   it('does not emit arbitrary broker claim errors', async () => {
@@ -225,7 +243,7 @@ describe('WagoCommissioningService', () => {
         : repository,
     );
     await service['reconcileDiscovery']();
-    expect(wago.claim).toHaveBeenCalledWith(4, 'Test', verifier, 2);
+    expect(wago.claim).toHaveBeenCalledWith(4, 'Test', verifier, 2, expect.any(Function));
     expect(session.state).toBe('awaiting_verification');
   });
 
@@ -462,7 +480,7 @@ describe('WagoCommissioningService', () => {
         expect(result.state).toBe('awaiting_discovery');
         expect(sudo).not.toHaveBeenCalled();
         expect(copy).toHaveBeenCalledTimes(1);
-        expect(install).toHaveBeenCalledTimes(1);
+        expect(install).toHaveBeenCalledTimes(2);
         expect(copy.mock.calls[0][4]).toContain('flock -n 9');
         expect(copy.mock.calls[0][4]).toContain(
           Buffer.from(
@@ -742,14 +760,14 @@ describe('WagoCommissioningService', () => {
     const revoke = service.revoke(session.id);
     await Promise.resolve();
 
-    expect(repository.findOneBy).not.toHaveBeenCalled();
+    expect(wago.revokeEnrollmentById).not.toHaveBeenCalled();
 
     releaseDelivery();
     await inProgressDelivery;
     await revoke;
 
     expect(repository.findOneBy).toHaveBeenCalledWith({ id: session.id });
-    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(2);
+    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(2, expect.any(Function));
     expect(session.state).toBe('revoked');
   });
 
@@ -830,8 +848,8 @@ describe('WagoCommissioningService', () => {
 
     await service.remove(session.id);
 
-    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(session.enrollmentId);
-    expect(wago.deleteEnrollmentById).toHaveBeenCalledWith(session.enrollmentId);
+    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(session.enrollmentId, expect.any(Function));
+    expect(wago.deleteEnrollmentById).toHaveBeenCalledWith(session.enrollmentId, expect.any(Function));
     expect(repository.delete).toHaveBeenCalledWith(session.id);
   });
 
@@ -902,8 +920,8 @@ describe('WagoCommissioningService', () => {
       }),
     ]);
 
-    expect(wago.claim).toHaveBeenCalledWith(9, 'Boiler room', verifier, 2);
-    expect(wago.claim).toHaveBeenCalledWith(10, 'Pump room', verifier, 2);
+    expect(wago.claim).toHaveBeenCalledWith(9, 'Boiler room', verifier, 2, expect.any(Function));
+    expect(wago.claim).toHaveBeenCalledWith(10, 'Pump room', verifier, 2, expect.any(Function));
     expect(first.state).toBe('awaiting_verification');
     expect(second.state).toBe('awaiting_verification');
     expect(first.pairingCode).toBeNull();

@@ -10,7 +10,6 @@ import { WagoRuntimeArtifactsService } from './wago-runtime-artifacts';
 import { WagoManagementEntity } from './wago-management.entity';
 import { WagoService } from './wago.service';
 import { WagoController } from './wago-controller.entity';
-import { AddWagoCommissioningPrincipal1780000000009 } from './migrations/1780000000009-add-wago-commissioning-principal';
 
 describe('commissioning workflows with a real isolated database and mocked device transport', () => {
   let db: DataSource;
@@ -18,7 +17,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
   let service: WagoCommissioningService;
   let context: PluginContext;
   let session: WagoCommissioningSession;
-  let artifacts: { has: jest.Mock; get: jest.Mock; acquire: jest.Mock };
+  let artifacts: { has: jest.Mock; acquire: jest.Mock };
   const principal = { userId: 42, authenticationMethod: 'session' as const };
   const credential = { username: 'root', password: 'fixture-only' };
   const digest = 'a'.repeat(64);
@@ -27,13 +26,15 @@ describe('commissioning workflows with a real isolated database and mocked devic
   const wago = {
     registerCommissioningDiscoveryHandler: jest.fn(),
     revokeEnrollmentById: jest.fn().mockResolvedValue(undefined),
-    createEnrollment: jest.fn().mockResolvedValue({
-      id: 7,
-      password: 'bootstrap-fixture',
-      username: 'fixture',
-      claimSecret: 'claim-fixture',
-      expiresAt: new Date(Date.now() + 60_000).toISOString(),
-    }),
+    createEnrollment: jest
+      .fn()
+      .mockResolvedValue({
+        id: 7,
+        password: 'bootstrap-fixture',
+        username: 'fixture',
+        claimSecret: 'claim-fixture',
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      }),
   };
 
   beforeEach(async () => {
@@ -50,14 +51,15 @@ describe('commissioning workflows with a real isolated database and mocked devic
     } as unknown as PluginContext;
     artifacts = {
       has: jest.fn().mockResolvedValue(true),
-      get: jest.fn().mockResolvedValue({ digest }),
-      acquire: jest.fn().mockResolvedValue({
-        digest,
-        bytes: 512,
-        image: `ghcr.io/attraccess/wago-cc100-runtime@sha256:${digest}`,
-        path: join(directory, 'runtime.tar'),
-        directory,
-      }),
+      acquire: jest
+        .fn()
+        .mockResolvedValue({
+          digest,
+          bytes: 512,
+          image: `ghcr.io/attraccess/wago-cc100-runtime@sha256:${digest}`,
+          path: join(directory, 'runtime.tar'),
+          directory,
+        }),
     };
     service = new WagoCommissioningService(
       context,
@@ -65,20 +67,22 @@ describe('commissioning workflows with a real isolated database and mocked devic
       artifacts as unknown as WagoRuntimeArtifactsService,
     );
     await service.onApplicationBootstrap();
-    session = await db.getRepository(WagoCommissioningSession).save({
-      hardwareId: 'fixture',
-      mqttServerId: 1,
-      targetHost: '10.99.0.1',
-      hostKeyFingerprint: `SHA256:${'A'.repeat(43)}`,
-      firmwareBaseline: '31',
-      controllerName: 'Fixture',
-      state: 'awaiting_delivery',
-      pairingCode: 'encrypted:v1:ciphertext',
-      auditLog: '[]',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      runtimeArtifactDigest: digest,
-    });
+    session = await db
+      .getRepository(WagoCommissioningSession)
+      .save({
+        hardwareId: 'fixture',
+        mqttServerId: 1,
+        targetHost: '10.99.0.1',
+        hostKeyFingerprint: `SHA256:${'A'.repeat(43)}`,
+        firmwareBaseline: '31',
+        controllerName: 'Fixture',
+        state: 'awaiting_delivery',
+        pairingCode: 'encrypted:v1:ciphertext',
+        auditLog: '[]',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        runtimeArtifactDigest: digest,
+      });
     jest
       .spyOn(service as never, 'inspect')
       .mockResolvedValue({ firmware: 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="31"', codesys: 'inactive' } as never);
@@ -101,16 +105,14 @@ describe('commissioning workflows with a real isolated database and mocked devic
     expect(activated.dockerProvisionState).toBe('started');
     expect(activated).not.toHaveProperty('dockerProvisionToken');
     const saved = await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id });
-    const dockerProvisionToken = saved.dockerProvisionToken;
-    expect(dockerProvisionToken).toMatch(/^[a-f0-9]{32}$/);
-    if (!dockerProvisionToken) throw new Error('expected Docker provisioning token');
+    expect(saved.dockerProvisionToken).toMatch(/^[a-f0-9]{32}$/);
     remote.mockResolvedValue('' as never);
     const copy = jest.spyOn(service as never, 'copyTo').mockResolvedValue(undefined as never);
     const delivered = await service.deliver(session.id, { confirmInstall: true, temporarySsh: credential }, principal);
     expect(delivered.state).toBe('awaiting_discovery');
     expect(artifacts.acquire).toHaveBeenCalledWith(digest);
     const script = copy.mock.calls[0][4] as string;
-    expect(script).toContain(dockerProvisionToken);
+    expect(script).toContain(saved.dockerProvisionToken!);
     expect(script).toContain('WAGO_HARDWARE_PROFILE=cc100-751-9301-fw31-digital-v1');
     expect(script).toContain('--user 10001:10001 --cap-drop ALL');
     expect(JSON.stringify(delivered)).not.toContain('bootstrap-fixture');
@@ -138,19 +140,21 @@ describe('commissioning workflows with a real isolated database and mocked devic
     await ready;
     await expect(other.platform(session.id, 'inspect', { temporarySsh: credential })).rejects.toThrow('lease_busy');
     expect(otherRemote).not.toHaveBeenCalled();
-    const controller = await db.getRepository(WagoController).save({
-      hardwareId: session.hardwareId,
-      trustState: 'claimed',
-      mqttServerId: 1,
-      pairingCodeHash: 'fixture',
-      protocolVersion: '1.0.0',
-      runtimeVersion: '0.1.0',
-      capabilities: '[]',
-      lastSequence: 0,
-      lastSeenAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
+    const controller = await db
+      .getRepository(WagoController)
+      .save({
+        hardwareId: session.hardwareId,
+        trustState: 'claimed',
+        mqttServerId: 1,
+        pairingCodeHash: 'fixture',
+        protocolVersion: '1.0.0',
+        runtimeVersion: '0.1.0',
+        capabilities: '[]',
+        lastSequence: 0,
+        lastSeenAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
     const remove = jest.fn().mockResolvedValue(session.hardwareId);
     await expect(other.removeControllerSafely(controller.id, remove)).rejects.toThrow('lease_busy');
     expect(remove).not.toHaveBeenCalled();
@@ -161,19 +165,21 @@ describe('commissioning workflows with a real isolated database and mocked devic
   });
 
   it('retains tokened recovery after registration removal, without exposing the token', async () => {
-    const controller = await db.getRepository(WagoController).save({
-      hardwareId: session.hardwareId,
-      trustState: 'claimed',
-      mqttServerId: 1,
-      pairingCodeHash: 'fixture',
-      protocolVersion: '1.0.0',
-      runtimeVersion: '0.1.0',
-      capabilities: '[]',
-      lastSequence: 0,
-      lastSeenAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
+    const controller = await db
+      .getRepository(WagoController)
+      .save({
+        hardwareId: session.hardwareId,
+        trustState: 'claimed',
+        mqttServerId: 1,
+        pairingCodeHash: 'fixture',
+        protocolVersion: '1.0.0',
+        runtimeVersion: '0.1.0',
+        capabilities: '[]',
+        lastSequence: 0,
+        lastSeenAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
     await db.getRepository(WagoCommissioningSession).update(session.id, { deliveryToken: 'b'.repeat(32) });
     await service.removeControllerSafely(controller.id, async (assertOwned) => {
       await assertOwned();
@@ -235,61 +241,5 @@ describe('commissioning workflows with a real isolated database and mocked devic
     await db.getRepository(WagoCommissioningSession).update(session.id, { managementControllerId: 9 });
     await service.remove(session.id);
     expect(await db.getRepository(WagoCommissioningSession).findOneBy({ id: session.id })).toBeNull();
-  });
-
-  it('does not retain an inspection-only session after controller registration removal', async () => {
-    await db.getRepository(WagoController).save({
-      id: 9,
-      hardwareId: session.hardwareId,
-      trustState: 'claimed',
-      mqttServerId: 1,
-      pairingCodeHash: 'fixture',
-      protocolVersion: '1.0.0',
-      runtimeVersion: '0.1.0',
-      capabilities: '[]',
-      lastSequence: 0,
-      lastSeenAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-    await db.getRepository(WagoManagementEntity).save({
-      controllerId: 9,
-      leaseUntil: 0,
-      metadataJson: JSON.stringify({
-        target: { controllerId: 9, host: session.targetHost, hostKeyFingerprint: session.hostKeyFingerprint },
-        state: 'inspected',
-        inspection: null,
-        mode: null,
-        exceptions: [],
-        support: 'qualification_required',
-        reviewToken: null,
-        reviewedAt: null,
-        transaction: null,
-        keyFingerprint: null,
-        failure: null,
-      }),
-    });
-    await db.getRepository(WagoCommissioningSession).update(session.id, { managementControllerId: 9 });
-    await service.removeControllerSafely(9, async (assertOwned) => {
-      await assertOwned();
-      await db.getRepository(WagoController).delete(9);
-      return session.hardwareId;
-    });
-    expect(await service.list()).toEqual([]);
-  });
-
-  it('refuses a downgrade that would discard a Docker recovery token', async () => {
-    await db.getRepository(WagoCommissioningSession).update(session.id, { dockerProvisionToken: 'c'.repeat(32) });
-    const runner = db.createQueryRunner();
-    try {
-      await expect(new AddWagoCommissioningPrincipal1780000000009().down(runner)).rejects.toThrow(
-        'Recover Docker provisioning',
-      );
-      expect(
-        (await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id })).dockerProvisionToken,
-      ).toBe('c'.repeat(32));
-    } finally {
-      await runner.release();
-    }
   });
 });

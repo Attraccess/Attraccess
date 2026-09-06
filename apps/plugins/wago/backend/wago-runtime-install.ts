@@ -1,3 +1,5 @@
+import { wagoHardwareDeploymentDockerArgs, wagoHardwareDeploymentPreflightScript } from './wago-hardware-deployment';
+
 /**
  * The caller must authenticate the bundle signature/checksum before uploading it
  * to /tmp/attraccess-wago-runtime.tar over pinned SSH. This script checks the
@@ -24,6 +26,11 @@ test ! -e "$tx" && test ! -e "$cleanup" && test ! -e "$receipt" && test ! -e "$a
 test ! -e "$config/runtime.env.previous" || fail 'Unowned previous environment requires manual inspection'
 test -s "$config/runtime.env.next" && test ! -L "$config/runtime.env.next" || fail 'Missing staged runtime.env.next'
 test ! -L "$data" && test ! -L "$config/runtime.env" && test ! -L "$config/runtime-ca.pem" || fail 'Runtime paths must not be symlinks'
+if [ -e "$config/docker-provision" ]; then
+  test -f "$config/docker-provision/started" && test ! -e "$config/docker-provision/restored" || fail 'Docker provisioning recovery required'
+  test -f "$config/delivery/token" && test "$(cat "$config/docker-provision/token")" = "$(cat "$config/delivery/token")" || fail 'Docker provisioning belongs to another delivery'
+fi
+${wagoHardwareDeploymentPreflightScript(testRoot)}
 docker container ls -a --no-trunc --format '{{.ID}} {{.Names}}' > "$config/containers.next"
 if grep -q ' attraccess-wago.previous$' "$config/containers.next"; then
   fail 'Unowned previous container requires manual inspection'
@@ -91,7 +98,7 @@ set --
 if [ -f "$config/runtime-ca.pem" ]; then
   set -- -v "$config/runtime-ca.pem:/var/lib/attraccess-wago/mqtt-ca.pem:ro"
 fi
-docker run -d --pull=never --name attraccess-wago --restart unless-stopped --env-file "$config/runtime.env" -v "$data:/var/lib/attraccess-wago" "$@" "$runtime_image"
+docker run -d --pull=never --name attraccess-wago --restart unless-stopped --env-file "$config/runtime.env" ${wagoHardwareDeploymentDockerArgs(testRoot)} -v "$data:/var/lib/attraccess-wago" "$@" "$runtime_image"
 touch "$tx/started"
 trap - EXIT HUP INT TERM
 echo 'Runtime container started; readiness unverified; recovery snapshot retained'
@@ -167,6 +174,8 @@ function preamble(testRoot: string, locked = false): string {
   return `set -eu
 umask 077
 root=${quote(testRoot.replace(/\/$/, ''))}
+unset DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH
+docker() { command docker --host unix:///var/run/docker.sock "$@"; }
 config="$root/etc/attraccess-wago"
 data="$root/var/lib/attraccess-wago"
 tx="$root/var/lib/attraccess-wago-install-transaction"
@@ -300,6 +309,10 @@ export function runtimeBundleDeliveryScript(
   return `${runtimeBundlePreflightScript(bytes, testRoot)}
 ${preamble(testRoot)}
 test ! -e "$tx" && test ! -e "$cleanup" && test ! -e "$receipt" && test ! -e "$acceptedCleanup" && test ! -e "$config/runtime.env.next" && test ! -e "$config/runtime-ca.pem.next" || fail 'Recovery or acceptance required before delivery'
+if [ -e "$config/docker-provision" ]; then
+  test -f "$config/docker-provision/started" && test ! -e "$config/docker-provision/restored" || fail 'Docker provisioning recovery required'
+  test "$(cat "$config/docker-provision/token")" = ${quote(token)} || fail 'Docker provisioning belongs to another delivery'
+fi
 mkdir -m 0700 "$config/delivery" || fail 'Delivery journal exists; explicit recovery required'
 printf '%s\\n' ${quote(token)} > "$config/delivery/token"
 printf '%s\\n' receiving > "$config/delivery/phase"
@@ -328,6 +341,7 @@ rm -rf "$config/delivery"
 export function runtimeBundlePreflightScript(bytes: number, testRoot = ''): string {
   if (!Number.isSafeInteger(bytes) || bytes < 0) throw new Error('Invalid bundle size');
   return `set -eu
+${wagoHardwareDeploymentPreflightScript(testRoot)}
 command -v flock >/dev/null
 command -v docker >/dev/null
 command -v sha256sum >/dev/null

@@ -102,6 +102,11 @@ export function ControllersPage() {
       <CommissioningModal
         isOpen={isCommissioningOpen}
         session={commissioningSession}
+        onConfigure={(controllerId) => {
+          setCommissioningOpen(false);
+          setCommissioningSession(null);
+          setConfigurationControllerId(controllerId);
+        }}
         onOpenChange={(open) => {
           setCommissioningOpen(open);
           if (!open) setCommissioningSession(null);

@@ -9,12 +9,31 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { commissioningPrincipal } from './wago-commissioning-audit';
 import { WagoService } from './wago.service';
 import { WagoCommissioningService } from './wago-commissioning.service';
-import type { WagoPresetApplication, WagoConfigurationSnapshot } from './configuration';
-import type { ConfigurationEditorMetadata } from './configuration-editor';
+import type { WagoPresetApplication } from './configuration';
+
+type CommissioningAttemptInput = { confirmInstall?: boolean; temporarySsh?: { username?: string; password?: string } };
+
+function validateCommissioningAttempt(body: CommissioningAttemptInput, intent: 'installation' | 'recovery') {
+  if (body?.confirmInstall !== true) throw new BadRequestException(`Explicit ${intent} consent is required`);
+  if (
+    typeof body.temporarySsh?.username !== 'string' ||
+    !body.temporarySsh.username.trim() ||
+    typeof body.temporarySsh.password !== 'string' ||
+    !body.temporarySsh.password
+  ) {
+    throw new BadRequestException('Temporary SSH username and password are required');
+  }
+  return {
+    confirmInstall: true as const,
+    temporarySsh: { username: body.temporarySsh.username, password: body.temporarySsh.password },
+  };
+}
 
 @Auth('resources.update')
 @Controller('wago')
@@ -48,32 +67,123 @@ export class WagoControllerApi {
   }
   @Auth('system.settings.manage')
   @Post('commissioning/sessions')
-  createCommissioningSession(@Body() body: { mqttServerId?: number; targetHost?: string; name?: string }) {
+  createCommissioningSession(
+    @Body() body: { mqttServerId?: number; targetHost?: string; name?: string; runtimeArtifactDigest?: string },
+    @Req() request: AuthenticatedRequest,
+  ) {
     if (!body?.mqttServerId) throw new BadRequestException('MQTT server is required');
     if (!body.name?.trim()) throw new BadRequestException('controller name is required');
-    return this.commissioning.create({
-      mqttServerId: body.mqttServerId,
-      targetHost: body.targetHost ?? '',
-      name: body.name,
-    });
+    return this.commissioning.create(
+      {
+        mqttServerId: body.mqttServerId,
+        targetHost: body.targetHost ?? '',
+        name: body.name,
+        runtimeArtifactDigest: body.runtimeArtifactDigest,
+      },
+      commissioningPrincipal(request),
+    );
   }
   @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/confirm-host-key')
-  confirmCommissioningHostKey(@Param('id', ParseIntPipe) id: number, @Body() body: { hostKeyFingerprint?: string }) {
+  confirmCommissioningHostKey(
+    @Param('id', ParseIntPipe) id: number,
+    @Body()
+    body: {
+      hostKeyFingerprint?: string;
+      trustMethod?: 'trusted_inventory' | 'isolated_service_connection';
+      physicalIdentityConfirmed?: boolean;
+    },
+  ) {
     if (!body?.hostKeyFingerprint) throw new BadRequestException('SSH host-key fingerprint is required');
-    return this.commissioning.confirmHostKey(id, body.hostKeyFingerprint);
+    return this.commissioning.confirmHostKey(
+      id,
+      body.hostKeyFingerprint,
+      body.trustMethod,
+      body.physicalIdentityConfirmed,
+    );
   }
   @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/deliver')
   deliverCommissioningSession(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { temporarySsh?: { username?: string; password?: string } },
+    @Body() body: CommissioningAttemptInput,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.commissioning.deliver(id, {
-      temporarySsh: body?.temporarySsh
-        ? { username: body.temporarySsh.username ?? '', password: body.temporarySsh.password ?? '' }
-        : undefined,
-    });
+    return this.commissioning.deliver(
+      id,
+      validateCommissioningAttempt(body, 'installation'),
+      commissioningPrincipal(request),
+    );
+  }
+  @Auth('system.settings.manage')
+  @Post('commissioning/sessions/:id/recover')
+  recoverCommissioningSession(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: CommissioningAttemptInput,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.commissioning.recover(
+      id,
+      validateCommissioningAttempt(body, 'recovery'),
+      commissioningPrincipal(request),
+    );
+  }
+  @Auth('system.settings.manage')
+  @Get('commissioning/sessions/:id/verification')
+  commissioningVerification(@Param('id', ParseIntPipe) id: number) {
+    return this.commissioning.verification(id);
+  }
+  @Auth('system.settings.manage')
+  @Get('commissioning/sessions/:id/management')
+  managementStatus(@Param('id', ParseIntPipe) id: number) {
+    return this.commissioning.managementStatus(id);
+  }
+  @Auth('system.settings.manage')
+  @Get('commissioning/sessions/:id/operation')
+  operationStatus(@Param('id', ParseIntPipe) id: number) {
+    return this.commissioning.operationStatus(id);
+  }
+  @Auth('system.settings.manage')
+  @Post('commissioning/sessions/:id/operation/recover')
+  recoverOperation(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: Parameters<WagoCommissioningService['recoverOperation']>[1],
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.commissioning.recoverOperation(id, body ?? {}, commissioningPrincipal(request));
+  }
+  @Auth('system.settings.manage')
+  @Post('commissioning/sessions/:id/platform/:action')
+  platformAction(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('action') action: string,
+    @Body() body: Parameters<WagoCommissioningService['platform']>[2],
+    @Req() request: AuthenticatedRequest,
+  ) {
+    if (!['inspect', 'activate', 'recover'].includes(action)) throw new BadRequestException('Unknown platform action');
+    return this.commissioning.platform(
+      id,
+      action as Parameters<WagoCommissioningService['platform']>[1],
+      body ?? {},
+      commissioningPrincipal(request),
+    );
+  }
+  @Auth('system.settings.manage')
+  @Post('commissioning/sessions/:id/management/:action')
+  manageSecurity(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('action') action: string,
+    @Body() body: Parameters<WagoCommissioningService['manageSecurity']>[2],
+    @Req() request: AuthenticatedRequest,
+  ) {
+    if (!['inspect', 'review', 'apply', 'recover'].includes(action))
+      throw new BadRequestException('Unknown management action');
+    return this.commissioning.manageSecurity(
+      id,
+      action as Parameters<WagoCommissioningService['manageSecurity']>[1],
+      body ?? {},
+      commissioningPrincipal(request),
+    );
   }
   @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/revoke')
@@ -92,8 +202,7 @@ export class WagoControllerApi {
     return this.wago.claim(id, body?.name ?? '', body?.verifier ?? '', body?.mqttServerId);
   }
   @Delete('controllers/:id') async removeController(@Param('id', ParseIntPipe) id: number) {
-    const hardwareId = await this.wago.remove(id);
-    await this.commissioning.removeByHardwareId(hardwareId);
+    await this.commissioning.removeControllerSafely(id, (assertOwned) => this.wago.remove(id, assertOwned));
   }
   @Get('controllers/:id/configuration/draft') draft(@Param('id', ParseIntPipe) id: number) {
     return this.wago.getDraft(id);
@@ -103,41 +212,26 @@ export class WagoControllerApi {
   }
   @Post('controllers/:id/configuration/presets/preview') previewPreset(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { application?: WagoPresetApplication; snapshot?: WagoConfigurationSnapshot },
+    @Body() body: { application?: WagoPresetApplication },
   ) {
     if (!body?.application) throw new BadRequestException('application is required');
-    return this.wago.previewPreset(id, body.application, body.snapshot);
+    return this.wago.previewPreset(id, body.application);
   }
   @Post('controllers/:id/configuration/presets/apply') applyPreset(
     @Param('id', ParseIntPipe) id: number,
-    @Body()
-    body: {
-      application?: WagoPresetApplication;
-      selectedPaths?: string[];
-      previewedDraftHash?: string;
-      snapshot?: WagoConfigurationSnapshot;
-    },
+    @Body() body: { application?: WagoPresetApplication; selectedPaths?: string[]; previewedDraftHash?: string },
   ) {
     if (!body?.application) throw new BadRequestException('application is required');
-    return this.wago.applyPreset(
-      id,
-      body.application,
-      body.selectedPaths ?? [],
-      body.previewedDraftHash ?? '',
-      body.snapshot,
-    );
+    return this.wago.applyPreset(id, body.application, body.selectedPaths ?? [], body.previewedDraftHash ?? '');
   }
   @Post('controllers/:id/configuration/draft') saveDraft(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { snapshot?: unknown; metadata?: ConfigurationEditorMetadata },
+    @Body() body: { snapshot?: unknown },
   ) {
-    return this.wago.saveDraft(id, body?.snapshot, body?.metadata);
+    return this.wago.saveDraft(id, body?.snapshot);
   }
-  @Post('controllers/:id/configuration/validate') validateDraft(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body?: { snapshot?: unknown },
-  ) {
-    return this.wago.validateDraft(id, body?.snapshot);
+  @Post('controllers/:id/configuration/validate') validateDraft(@Param('id', ParseIntPipe) id: number) {
+    return this.wago.validateDraft(id);
   }
   @Post('controllers/:id/configuration/review') reviewDraft(@Param('id', ParseIntPipe) id: number) {
     return this.wago.reviewDraft(id);
@@ -149,18 +243,14 @@ export class WagoControllerApi {
   ) {
     return this.wago.revisionsFor(id, Number(offset), Number(limit));
   }
-  @Post('controllers/:id/configuration/publish') publishDraft(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body?: { force?: boolean; reviewedHash?: string },
-  ) {
-    return this.wago.publishDraft(id, body?.force === true, body?.reviewedHash);
+  @Post('controllers/:id/configuration/publish') publishDraft(@Param('id', ParseIntPipe) id: number) {
+    return this.wago.publishDraft(id);
   }
   @Post('controllers/:id/configuration/rollback/:revision') rollback(
     @Param('id', ParseIntPipe) id: number,
     @Param('revision', ParseIntPipe) revision: number,
-    @Body() body?: { force?: boolean; sourceHash?: string; currentHash?: string | null; draftHash?: string },
   ) {
-    return this.wago.rollback(id, revision, body?.force === true, body?.sourceHash, body?.currentHash, body?.draftHash);
+    return this.wago.rollback(id, revision);
   }
   @Get('controllers/:id/configuration/revisions/:revision/preview') previewRevision(
     @Param('id', ParseIntPipe) id: number,
