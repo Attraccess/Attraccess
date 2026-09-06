@@ -65,7 +65,7 @@ describe('runtime install shell transaction (no Docker daemon or network)', () =
     for (const directory of [config, join(root, 'var/lib'), join(root, 'tmp'), join(root, 'bin'), join(root, 'bundle')])
       mkdirSync(directory, { recursive: true });
     write(join(config, 'runtime.env.next'), 'NEW=enrollment');
-    write(join(root, 'etc/os-release'), 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"\n');
+    write(join(root, 'etc/os-release'), 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"\nVERSION="4.9.1(31)"\n');
     for (const register of [WAGO_DIN, WAGO_DOUT]) {
       mkdirSync(join(root, register, '..'), { recursive: true });
       write(join(root, register), '0');

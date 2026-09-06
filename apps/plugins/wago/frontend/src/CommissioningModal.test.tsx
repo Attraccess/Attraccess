@@ -63,6 +63,53 @@ function fillRecoveryCredentials() {
   fireEvent.change(screen.getByLabelText('Recovery SSH password'), { target: { value: 'recovery-secret' } });
 }
 
+describe('FW31 software support boundary', () => {
+  it.each([null, 'starting'] as const)('suppresses stale saved activation while retaining pending recovery (%s)', (state) => {
+    activeSession.platformReport = JSON.stringify({
+      version: '1', platform: 'supported', hardware: 'accessible', exclusivity: 'clear',
+      docker: 'installed-stopped', configDocker: 'present',
+      provision: 'review-start-installed-runtime', qualification: 'required',
+    });
+    activeSession.dockerProvisionState = state;
+    mount();
+    expect(screen.queryByRole('button', { name: 'Start installed Docker runtime' })).toBeNull();
+    expect(!!screen.queryByRole('button', { name: 'Recover Docker provisioning' })).toBe(!!state);
+    expect(requests.some(({ url }) => url.endsWith('/activate'))).toBe(false);
+  });
+  it('explains the source dependency blocker and preserves a stopped PLC boot configuration', () => {
+    activeSession.platformReport = JSON.stringify({
+      version: '1',
+      platform: 'supported',
+      hardware: 'uid10001-access-denied',
+      exclusivity: 'codesys-boot-enabled',
+      docker: 'installed-stopped',
+      configDocker: 'present',
+      provision: 'unsupported-lifecycle-dependencies',
+      qualification: 'required',
+    });
+    mount();
+    expect(screen.queryByRole('button', { name: 'Start installed Docker runtime' })).toBeNull();
+    expect(screen.getByText(/CODESYS is configured to start at boot/)).toBeTruthy();
+    expect(screen.getByText(/stopping Docker runs networking event scripts/)).toBeTruthy();
+  });
+  it('does not offer activation for an unsupported firmware report even when an installed runtime is stopped', () => {
+    activeSession.platformReport = JSON.stringify({
+      version: '1',
+      platform: 'unsupported-firmware',
+      hardware: 'accessible',
+      exclusivity: 'clear',
+      docker: 'installed-stopped',
+      configDocker: 'present',
+      provision: 'review-start-installed-runtime',
+      qualification: 'required',
+    });
+    mount();
+    expect(screen.queryByRole('button', { name: 'Start installed Docker runtime' })).toBeNull();
+    expect(screen.getByText(/BSP version alone is insufficient/)).toBeTruthy();
+    expect(requests.some(({ url }) => url.endsWith('/activate'))).toBe(false);
+  });
+});
+
 describe('explicit recovery approval', () => {
   it('exposes guarded record deletion for revoked commissioning history', async () => {
     activeSession.state = 'revoked';

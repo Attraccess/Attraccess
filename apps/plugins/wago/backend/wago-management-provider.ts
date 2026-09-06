@@ -13,7 +13,7 @@ import type {
 
 const limits = Object.freeze({ timeoutMs: 15000, maxOutputBytes: 16384 });
 
-/** Built-in provider: executable inspection and reversible additive OpenSSH key enrollment.
+/** Built-in provider: executable inspection and reversible additive OpenSSH/Dropbear key enrollment.
  * It does not expose an arbitrary privileged executor, use sudo, change passwords, configure WBM,
  * install users or reload daemons. Firmware-specific baseline methods fail closed.
  */
@@ -25,7 +25,7 @@ export class WagoManagementProvider implements ManagementAdapter {
   }
 
   qualify(inspection: ManagementInspection, mode: ManagementMode): ManagementQualification {
-    if (inspection.firmware === 'unsupported')
+    if (inspection.firmware !== '31' || inspection.model !== 'cc100')
       return {
         support: 'UNSUPPORTED',
         evidence: 'missing-fw31-command-evidence',
@@ -36,20 +36,20 @@ export class WagoManagementProvider implements ManagementAdapter {
       mode === 'key_only' &&
       inspection.model === 'cc100' &&
       inspection.firmware === '31' &&
-      inspection.ssh === 'openssh' &&
+      (inspection.ssh === 'openssh' || (inspection.ssh === 'dropbear' && inspection.dropbearVersion === '2025.88')) &&
       inspection.uid !== null &&
       inspection.uid > 0
     ) {
       return {
         support: 'supported',
-        evidence: 'openssh-authorized-keys',
+        evidence: inspection.ssh === 'openssh' ? 'openssh-authorized-keys' : 'dropbear-2025.88-authorized-keys',
         minimumPrivileges: false,
         rebootSafeWatchdog: false,
       };
     }
     return {
-      support: 'qualification_required',
-      evidence: 'missing-fw31-command-evidence',
+      support: 'UNSUPPORTED',
+      evidence: mode === 'baseline' ? 'fw31-baseline-not-implemented' : 'supported-ssh-nonroot-account-required',
       minimumPrivileges: false,
       rebootSafeWatchdog: false,
     };
@@ -72,10 +72,10 @@ export class WagoManagementProvider implements ManagementAdapter {
     return this.ssh.verifyNewKeyConnection(tx.target, tx.username, privateKey, nonce, limits);
   }
   async restrictAccess(): Promise<never> {
-    throw new Error('qualification_required');
+    throw new Error('fw31-baseline-not-implemented');
   }
   async verifyBaseline(): Promise<never> {
-    throw new Error('qualification_required');
+    throw new Error('fw31-baseline-not-implemented');
   }
   async commit(tx: ManagementTransaction, credential: SessionCredential): Promise<void> {
     await this.action('commit', tx, credential);

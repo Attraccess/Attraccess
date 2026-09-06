@@ -41,6 +41,29 @@ describe('hardware deployment shell fixtures (isolated files and fake management
   const report = (fault = '') => run(wagoHardwareDeploymentReportScript(root), fault);
   const provision = (fault = '') => run(wagoDockerProvisionScript(review, root), fault);
   const recover = (fault = '') => run(wagoDockerProvisionRecoveryScript(token, root), fault);
+  // Journal with snapshots written by the first-pass implementation.
+  const snapshotStarted = () => {
+    const journal = 'etc/attraccess-wago/docker-provision';
+    file(`${journal}/token`, token);
+    file(`${journal}/prior`, 'stopped');
+    file(`${journal}/os-release`, readFileSync(join(root, 'etc/os-release'), 'utf8'));
+    file(`${journal}/dockerd`, readFileSync(join(root, 'etc/init.d/dockerd'), 'utf8'));
+    file(`${journal}/start-intent`, '');
+    file(`${journal}/started`, '');
+    file('daemon', 'running');
+  };
+  const legacyStarted = () => {
+    snapshotStarted();
+    // Exact base journal shape: no os-release or dockerd historical snapshots.
+    rmSync(join(root, 'etc/attraccess-wago/docker-provision/os-release'));
+    rmSync(join(root, 'etc/attraccess-wago/docker-provision/dockerd'));
+  };
+  const preparedOnly = () => {
+    legacyStarted();
+    rmSync(join(root, 'etc/attraccess-wago/docker-provision/start-intent'));
+    rmSync(join(root, 'etc/attraccess-wago/docker-provision/started'));
+    file('daemon', 'stopped');
+  };
 
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'wago-hardware-fixture-'));
@@ -48,6 +71,10 @@ describe('hardware deployment shell fixtures (isolated files and fake management
     for (const [name, path] of Object.entries({
       sh: '/bin/sh',
       cat: '/bin/cat',
+      cp: '/bin/cp',
+      cmp: '/usr/bin/cmp',
+      awk: '/usr/bin/awk',
+      od: '/usr/bin/od',
       mkdir: '/bin/mkdir',
       mktemp: '/usr/bin/mktemp',
       mv: '/bin/mv',
@@ -59,7 +86,7 @@ describe('hardware deployment shell fixtures (isolated files and fake management
     })) {
       symlinkSync(path, join(root, 'bin', name));
     }
-    file('etc/os-release', 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"\n');
+    file('etc/os-release', 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"\nVERSION="4.9.1(31)"\n');
     file(WAGO_DIN, '5', 0o400);
     file(WAGO_DOUT, '2', 0o600);
     file('containers.json', '[]');
@@ -169,6 +196,18 @@ if (action === 'start') {
     expect(run(wagoHardwareDeploymentPreflightScript(root)).status).not.toBe(0);
   });
 
+  it.each(['VERSION_ID="2024.12.0"', 'VERSION_ID="31"\nVERSION="30"', 'VERSION_ID="32"'])(
+    'refuses provisioning and runtime installation on ambiguous or unknown firmware: %s',
+    (version) => {
+      file('etc/os-release', `PTXDIST_PLATFORM_NAME="cc100"\n${version}\n`);
+      file('daemon', 'stopped');
+      expect(provision().stderr).toContain('unsupported-firmware');
+      expect(run(wagoHardwareDeploymentPreflightScript(root)).status).not.toBe(0);
+      expect(existsSync(join(root, 'mutations'))).toBe(false);
+      expect(existsSync(join(root, 'etc/attraccess-wago/docker-provision'))).toBe(false);
+    },
+  );
+
   it.each(['missing', 'directory', 'symlink'])('rejects %s registers without creating a directory', (kind) => {
     rmSync(join(root, WAGO_DOUT));
     if (kind === 'directory') mkdirSync(join(root, WAGO_DOUT));
@@ -192,6 +231,17 @@ if (action === 'start') {
     expect(report('docker-list-failed').status).not.toBe(0);
   });
 
+  it.each(['file', 'dangling-link'])('preserves a stopped PLC with a configured boot %s', (kind) => {
+    file('etc/rc.d/placeholder', '');
+    if (kind === 'file') file('etc/rc.d/S98_runtime', '# runtime boot hook\n');
+    else symlinkSync('/absent-fixture-runtime', join(root, 'etc/rc.d/S98_runtime'));
+    const before = readFileSync(join(root, WAGO_DOUT), 'utf8');
+    expect(report().stdout).toContain('exclusivity=codesys-boot-enabled');
+    expect(run(wagoHardwareDeploymentPreflightScript(root)).stderr).toContain('codesys-boot-enabled');
+    expect(readFileSync(join(root, WAGO_DOUT), 'utf8')).toBe(before);
+    expect(existsSync(join(root, 'mutations'))).toBe(false);
+  });
+
   it.each([WAGO_DOUT, '/sys/kernel', '/sys', '/'])('detects competing stopped containers with bind %s', (source) => {
     file(
       'containers.json',
@@ -206,12 +256,16 @@ if (action === 'start') {
     expect(report().stdout).toContain('exclusivity=clear');
   });
 
-  it('distinguishes missing package, installed stopped runtime and unknown service status', () => {
+  it('distinguishes missing binaries and an unavailable daemon without executing an init status action', () => {
     file('daemon', 'stopped');
     expect(report().stdout).toContain(
-      'docker=installed-stopped\nconfigDocker=missing\nprovision=review-start-installed-runtime',
+      'docker=installed-stopped\nconfigDocker=missing\nprovision=unsupported-lifecycle-dependencies',
     );
-    expect(report('unknown-status').stdout).toContain('docker=unsupported-tool-state');
+    expect(report('unknown-status').stdout).toContain('docker=installed-stopped');
+    file('etc/docker/daemon.json', '{"data-root":"/home/docker"}');
+    expect(report().stdout).toContain('docker=installed-stopped');
+    file('var/run/docker.pid', '123');
+    expect(report().stdout).toContain('docker=unsupported-tool-state');
     rmSync(join(root, 'bin/dockerd'));
     expect(report().stdout).toContain('docker=unsupported-tool-state');
     rmSync(join(root, 'bin/docker'));
@@ -237,34 +291,68 @@ if (action === 'start') {
     expect(() => wagoDockerProvisionScript({ ...review, token: 'invalid' })).toThrow('token');
   });
 
-  it('starts only a reviewed stopped runtime, and preserves an idempotent restoration receipt', () => {
-    file('daemon', 'stopped');
-    expect(provision().status).toBe(0);
-    expect(readFileSync(join(root, 'daemon'), 'utf8')).toBe('running');
+  it('retains an old start intent even after the daemon stopped and a restored receipt exists', () => {
+    snapshotStarted();
     expect(run(wagoDockerProvisionRecoveryScript('b'.repeat(32), root)).status).not.toBe(0);
-    expect(recover().status).toBe(0);
-    expect(recover().status).toBe(0);
-    expect(readFileSync(join(root, 'mutations'), 'utf8')).toBe('start\nstop\n');
-    expect(run(wagoDockerProvisionFinishScript(token, 'restored', root)).status).toBe(0);
-    expect(existsSync(join(root, 'etc/attraccess-wago/docker-provision'))).toBe(false);
+    expect(recover().stderr).toContain('unresolved-lifecycle-effects');
+    file('daemon', 'stopped');
+    expect(recover().status).not.toBe(0);
+    file('etc/attraccess-wago/docker-provision/restored', '');
+    expect(recover().status).not.toBe(0);
+    expect(existsSync(join(root, 'mutations'))).toBe(false);
+    expect(run(wagoDockerProvisionFinishScript(token, 'restored', root)).stderr).toContain('unresolved-lifecycle-effects');
+    expect(existsSync(join(root, 'etc/attraccess-wago/docker-provision'))).toBe(true);
   });
 
-  it.each(['start-failed', 'start-killed'])('recovers a partial activation: %s', (fault) => {
-    file('daemon', 'stopped');
-    expect(provision(fault).status).not.toBe(0);
-    expect(recover('stop-failed').status).not.toBe(0);
+  it('reconciles a prepared legacy journal with no start attempt without inventing historical snapshots', () => {
+    preparedOnly();
     expect(recover().status).toBe(0);
-    expect(readFileSync(join(root, 'daemon'), 'utf8')).toBe('stopped');
-  });
-
-  it('can activate again after recovery leaves initialized but empty Docker storage', () => {
-    file('daemon', 'stopped');
-    expect(provision().status).toBe(0);
+    const journal = join(root, 'etc/attraccess-wago/docker-provision');
+    expect(existsSync(join(journal, 'os-release'))).toBe(false);
+    expect(existsSync(join(journal, 'dockerd'))).toBe(false);
+    expect(readFileSync(join(journal, 'reconciliation/os-release'), 'utf8')).toBe(
+      readFileSync(join(root, 'etc/os-release'), 'utf8'),
+    );
     expect(recover().status).toBe(0);
     expect(run(wagoDockerProvisionFinishScript(token, 'restored', root)).status).toBe(0);
-    expect(existsSync(join(root, 'var/lib/docker/containers'))).toBe(true);
-    expect(provision().status).toBe(0);
+    expect(existsSync(journal)).toBe(false);
+    expect(existsSync(join(root, 'mutations'))).toBe(false);
   });
+
+  it('retains a legacy activation without fabricating snapshots or treating a running daemon as closure', () => {
+    legacyStarted();
+    expect(run(wagoDockerProvisionFinishScript(token, 'accepted', root)).stderr).toContain('unresolved-lifecycle-effects');
+    expect(readFileSync(join(root, 'daemon'), 'utf8')).toBe('running');
+    expect(existsSync(join(root, 'mutations'))).toBe(false);
+  });
+
+  it('retains legacy reconciliation on a concurrent firmware change', () => {
+    preparedOnly();
+    expect(recover().status).toBe(0);
+    file('etc/os-release', 'changed\n');
+    expect(recover().stderr).toContain('Firmware changed');
+    expect(run(wagoDockerProvisionFinishScript(token, 'restored', root)).status).not.toBe(0);
+    expect(existsSync(join(root, 'etc/attraccess-wago/docker-provision/restored'))).toBe(true);
+  });
+
+  it('does not treat a partially missing modern snapshot as a legacy journal', () => {
+    snapshotStarted();
+    rmSync(join(root, 'etc/attraccess-wago/docker-provision/dockerd'));
+    file('daemon', 'stopped');
+    expect(recover().stderr).toContain('Incomplete firmware/service context');
+    expect(run(wagoDockerProvisionFinishScript(token, 'accepted', root)).status).not.toBe(0);
+  });
+
+  it.each(['start-failed', 'start-killed'])(
+    'does not invoke unclosed vendor start even if it could partially succeed: %s',
+    (fault) => {
+      file('daemon', 'stopped');
+      expect(provision(fault).status).not.toBe(0);
+      expect(recover().stderr).toContain('no saved Docker journal');
+      expect(readFileSync(join(root, 'daemon'), 'utf8')).toBe('stopped');
+      expect(existsSync(join(root, 'mutations'))).toBe(false);
+    },
+  );
 
   it('refuses initialized storage containing container metadata', () => {
     file('daemon', 'stopped');
@@ -283,25 +371,62 @@ if (action === 'start') {
   });
 
   it('does not stop Docker when containers appeared after activation', () => {
-    file('daemon', 'stopped');
-    expect(provision().status).toBe(0);
+    preparedOnly();
+    file('daemon', 'running');
     file('containers.json', JSON.stringify([{ id: 'external', name: 'external', mounts: [] }]));
     expect(recover().stderr).toContain('workloads exist');
-    expect(readFileSync(join(root, 'mutations'), 'utf8')).toBe('start\n');
+    expect(existsSync(join(root, 'mutations'))).toBe(false);
   });
 
   it('does not stop Docker when the workload inspection is unavailable', () => {
-    file('daemon', 'stopped');
-    expect(provision().status).toBe(0);
+    preparedOnly();
     expect(recover('docker-info-failed').stderr).toContain('Cannot inspect Docker workloads');
-    expect(readFileSync(join(root, 'mutations'), 'utf8')).toBe('start\n');
+    expect(existsSync(join(root, 'mutations'))).toBe(false);
   });
 
-  it('accepts successful activation without stopping or losing runtime data', () => {
+  it('does not claim restoration when an external daemon started before the recorded start intent', () => {
+    snapshotStarted();
+    rmSync(join(root, 'etc/attraccess-wago/docker-provision/start-intent'));
+    expect(recover().status).not.toBe(0);
+    expect(existsSync(join(root, 'etc/attraccess-wago/docker-provision/restored'))).toBe(false);
+    expect(existsSync(join(root, 'mutations'))).toBe(false);
+  });
+
+  it('does not acknowledge missing-snapshot recovery while a daemon PID file remains', () => {
     file('daemon', 'stopped');
-    expect(provision().status).toBe(0);
-    expect(run(wagoDockerProvisionFinishScript(token, 'accepted', root)).status).toBe(0);
+    file('var/run/docker.pid', '123');
+    expect(recover().stderr).toContain('no saved Docker journal');
+  });
+
+  it('retains successful activation effects without stopping or losing runtime data', () => {
+    snapshotStarted();
+    expect(run(wagoDockerProvisionFinishScript(token, 'accepted', root)).stderr).toContain('unresolved-lifecycle-effects');
     expect(readFileSync(join(root, 'daemon'), 'utf8')).toBe('running');
+  });
+
+  it.each(['etc/os-release', 'etc/init.d/dockerd'])('retains recovery when %s changed concurrently', (path) => {
+    snapshotStarted();
+    file(path, '# changed externally\n');
+    expect(recover().stderr).toContain('changed; recovery retained');
+    expect(run(wagoDockerProvisionFinishScript(token, 'accepted', root)).status).not.toBe(0);
+    expect(existsSync(join(root, 'mutations'))).toBe(false);
+    expect(existsSync(join(root, 'etc/attraccess-wago/docker-provision'))).toBe(true);
+  });
+
+  it('does not consume a restored receipt or stop a daemon restarted by another administrator', () => {
+    preparedOnly();
+    expect(recover().status).toBe(0);
+    file('daemon', 'running');
+    expect(recover().stderr).toContain('changed after restoration');
+    expect(run(wagoDockerProvisionFinishScript(token, 'restored', root)).status).not.toBe(0);
+    expect(existsSync(join(root, 'mutations'))).toBe(false);
+  });
+
+  it('does not accept an activation when the daemon has subsequently stopped', () => {
+    snapshotStarted();
+    file('daemon', 'stopped');
+    expect(run(wagoDockerProvisionFinishScript(token, 'accepted', root)).stderr).toContain('unresolved-lifecycle-effects');
+    expect(recover().status).not.toBe(0);
   });
 
   it('emits only the contracted mounts and restrictions', () => {

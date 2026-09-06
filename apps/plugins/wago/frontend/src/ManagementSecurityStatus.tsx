@@ -112,9 +112,12 @@ export function ManagementSecurityStatus(props: ManagementSecurityStatusProps) {
           <Alert.Indicator />
           <Alert.Content>
             <Alert.Description>
-              Firmware 31 service controls, minimum privileges and reboot-safe recovery require qualification. Adding a
-              key does not disable passwords, default access or WBM. Exceptions never count as hardened. WBM setup is
-              not a commissioning prerequisite. Hardware readiness is a separate qualification.
+              Automatic FW31 management hardening is not implemented. Missing operations are a restricted management
+              account, root/password restrictions, WBM and service restrictions, and recovery that survives reboot. The
+              FW31 vendor procedure for applying, restoring and persisting these changes is still needed. Key enrollment
+              supports an existing non-root OpenSSH account or a detected Dropbear 2025.88 account. The new key disables
+              forwarding and PTY allocation; account privileges and existing access remain enabled. Exceptions never
+              count as hardened. Physical hardware verification is separate.
             </Alert.Description>
           </Alert.Content>
         </Alert>
@@ -124,6 +127,12 @@ export function ManagementSecurityStatus(props: ManagementSecurityStatusProps) {
             <dd>
               {status.inspection.firmware} / {status.inspection.ssh} / {status.inspection.serviceControl}
             </dd>
+            {status.inspection.ssh === 'dropbear' && (
+              <>
+                <dt>Connected SSH peer version</dt>
+                <dd>{status.inspection.dropbearVersion ?? 'unknown'}</dd>
+              </>
+            )}
             <dt>Possible WBM listeners (HTTP/HTTPS)</dt>
             <dd>{status.inspection.wbm}</dd>
             <dt>Other management listeners</dt>
@@ -137,7 +146,7 @@ export function ManagementSecurityStatus(props: ManagementSecurityStatusProps) {
         <p>Socket observations do not verify firewall reachability, WBM credentials or TLS.</p>
         {status?.keyFingerprint && (
           <p>
-            Generated management key: <code>{status.keyFingerprint}</code>
+            Generated management key: <code className="wg:break-all">{status.keyFingerprint}</code>
           </p>
         )}
         {status?.failure && (

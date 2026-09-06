@@ -7,10 +7,67 @@ import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { WagoCommissioningService, shellQuote } from './wago-commissioning.service';
 import { WagoService } from './wago.service';
 import { generateManagementKey } from './wago-management-key';
-import { MANAGEMENT_INSPECTION_COMMAND } from './wago-management-inspection';
+import { MANAGEMENT_INSPECTION_COMMAND, parseManagementInspection } from './wago-management-inspection';
+import { WagoManagementProvider } from './wago-management-provider';
 
 describe('commissioning SSH transport boundaries', () => {
   afterEach(() => jest.restoreAllMocks());
+
+  it.each([
+    ['dropbear_2025.88', 0, 'supported'],
+    ['dropbear_2026.1', 0, 'UNSUPPORTED'],
+    ['dropbear_2025.88', 1, 'rejected'],
+  ])(
+    'observes a non-root connection peer %s only after successful pinned SSH (exit %s)',
+    async (version, exit, support) => {
+      const key = generateManagementKey();
+      const host = '192.0.2.1';
+      const observation = 'BEGIN=1\nMODEL=cc100\nFW=31\nUID=1004\nSSH=dropbear\nSSH=dropbear\nEND=1\n';
+      jest.spyOn(jest.requireActual<typeof processTools>('node:child_process'), 'spawn').mockImplementation(((
+        command: string,
+        args: string[],
+      ) => {
+        const child = Object.assign(new EventEmitter(), {
+          stdout: new EventEmitter(),
+          stderr: new EventEmitter(),
+          kill: jest.fn(),
+          stdin: Object.assign(new EventEmitter(), {
+            end: () => {
+              if (command === 'ssh-keyscan') child.stdout.emit('data', `${host} ${key.publicKey}\n`);
+              else if (command === 'ssh-keygen') child.stdout.emit('data', `256 ${key.fingerprint} fixture\n`);
+              else if (command === 'ssh') {
+                expect(args).toContain('-v');
+                expect(args).toContain('operator@192.0.2.1');
+                expect(args).toContain('StrictHostKeyChecking=yes');
+                expect(args.join(' ')).not.toContain('/exe');
+                child.stderr.emit(
+                  'data',
+                  Buffer.from(`debug1: Remote protocol version 2.0, remote software version ${version}\r\n`),
+                );
+                child.stdout.emit('data', observation);
+              } else throw new Error('Unexpected fixture process');
+              child.emit('close', command === 'ssh' ? exit : 0);
+            },
+          }),
+        });
+        return child;
+      }) as never);
+      const service = new WagoCommissioningService({} as PluginContext, {} as WagoService);
+      const result = service['run'](
+        host,
+        key.fingerprint,
+        { username: 'operator', password: 'fixture-only' },
+        MANAGEMENT_INSPECTION_COMMAND,
+      );
+      if (exit) await expect(result).rejects.toThrow();
+      else {
+        const parsed = parseManagementInspection(await result);
+        const provider = new WagoManagementProvider({ execute: jest.fn(), verifyNewKeyConnection: jest.fn() });
+        expect(provider.qualify(parsed, 'key_only').support).toBe(support);
+        expect(provider.qualify(parsed, 'baseline').support).toBe('UNSUPPORTED');
+      }
+    },
+  );
 
   it('preserves nested POSIX quotes and the complete management inspection script', () => {
     const command = `printf '%s\\n' 'value=quoted' | awk '/^value=/ {print $0}'`;

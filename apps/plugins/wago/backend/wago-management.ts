@@ -420,6 +420,7 @@ function cleanInspection(value: ManagementInspection): ManagementInspection {
     model: pick(value.model, ['cc100', 'unknown']),
     firmware: pick(value.firmware, ['31', 'unsupported', 'unknown']),
     ssh: pick(value.ssh, ['openssh', 'dropbear', 'mixed', 'unknown']),
+    dropbearVersion: pick(value.dropbearVersion ?? 'unknown', ['2025.88', 'unknown']),
     serviceControl: pick(value.serviceControl, ['systemd', 'sysv', 'unknown']),
     uid: value.uid,
     wbm: pick(value.wbm, ['listening', 'not_observed', 'unknown']),

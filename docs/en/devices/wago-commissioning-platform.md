@@ -8,9 +8,10 @@ or persistent-permission qualification is claimed.** ATT-984 remains a release g
 
 ## Hardware deployment
 
-The installer requires the CC100 platform and firmware 31 (including the existing
-commissioning BSP identity `VERSION_ID="2024.12.0"`). It reads `/etc/os-release`
-as text; it never sources it. Other identities fail closed.
+The installer requires an exact CC100 platform field and firmware 31 release
+identity. `VERSION_ID="2024.12.0"` alone is insufficient; a matching release
+`VERSION` must also be present. It reads `/etc/os-release` as text, rejects duplicate
+or conflicting version fields and never sources it. See [FW31 support boundaries](wago-fw31-support.md).
 
 Every new container receives:
 
@@ -61,61 +62,35 @@ missing vendor binaries, and ambiguous/unsupported tool state. It independently
 reports whether `/etc/config-tools/config_docker` exists and is executable.
 Presence of that tool is not evidence of a safe firmware-specific transition.
 
-Only the `start-installed-runtime` plan is executable. Its explicit review flag is
-`reviewedDockerActivation: true`. Under the same `install.lock`, it rechecks the
-platform, rejects CODESYS, requires both Docker binaries, requires the existing
-`/etc/init.d/dockerd status` to return stopped status 3, and rejects a live dockerd,
-custom `/etc/docker/daemon.json`, or nonempty/ambiguous container storage under either
-`/home/docker/containers` or `/var/lib/docker/containers`. Unsupported status
-semantics, configured storage, or previous workloads require further platform
-support rather than guessing. Initialized but empty container directories left by a verified recovery permit another activation attempt. These conservative checks do not qualify arbitrary
-customized init scripts or daemon arguments; those remain outside this baseline.
+The former `start-installed-runtime` action is disabled. Actual WAGO source
+implements start/stop/restart, without the previously assumed LSB stopped status.
+Start changes a Docker network namespace; stop invokes every networking event.
+A daemon-only journal cannot restore this operation. Inspection therefore does
+not invoke any init action; an unavailable installed daemon reports
+`unsupported-lifecycle-dependencies`. A normal vendor `daemon.json` is not a
+reason by itself to classify binaries as missing.
 
-The reviewed action calls the vendor-documented `/etc/init.d/dockerd start` and
-verifies `docker info`. It does not install a package, enable boot-time startup,
-stop PLC programs, or edit network configuration. It retains a tokened
-`/etc/attraccess-wago/docker-provision` journal recording the stopped prior state
-and start intent before invoking the service. A failed or interrupted start may
-have started Docker and therefore requires explicit recovery. No automatic
-success or rollback is inferred from a command failure.
+Existing tokened journals are retained. Any `start-intent` or `started` marker
+blocks recovery acknowledgement and journal deletion, including old `restored`
+receipts and interrupted cleanup. A failed vendor start can leave namespace effects
+while the daemon is absent. Missing journals also leave recovery unresolved. No vendor
+stop is called. Only a prepared journal without either start marker can be reconciled
+after stopped-state, firmware/service context and token checks. The base implementation
+never wrote historical snapshots: current context for a prepared legacy journal is
+recorded separately in `reconciliation/`. Missing only one modern snapshot is
+corruption, not a legacy journal. The `accepted` helper has no production caller
+and cannot provide product closure for existing activations.
 
-Recovery must follow runtime recovery and acknowledgement. It refuses to stop
-Docker if any containers remain, calls `/etc/init.d/dockerd stop`, verifies stopped
-status and absence of dockerd, and retains a `restored` receipt. Repeated recovery
-is read-only once restored. Failed recovery keeps the journal for retry. Persist
-the outcome before acknowledging and deleting this receipt. Acceptance removes
-the successful provisioning journal without stopping Docker. The prior disabled
-boot configuration is never changed; reboot persistence is not promised.
+## Source evidence
 
-## Vendor evidence and unsupported fresh-firmware path
-
-Evidence was retrieved on 2026-09-05/06:
-
-- [WAGO docker-ipk repository](https://github.com/WAGO/docker-ipk) lists CC100
-  751-9301 and documents `docker info` and the installed daemon's
-  `/etc/init.d/dockerd stop` / `start` commands in its storage migration guide.
-  Its older IPK tutorial does not establish a FW31 provisioning transaction.
-- [WAGO CC100 howtos](https://github.com/WAGO/cc100-howtos) identifies its onboard
-  I/O example as FW21. The runtime contract uses that documented layout; physical
-  FW31 validation remains separate.
-- [util-linux setpriv manual](https://man7.org/linux/man-pages/man1/setpriv.1.html)
-  documents the UID/GID, groups, capabilities and no-new-privileges options used
-  for permission probing. Runtime detection is required; installation is not
-  assumed.
-- [Docker bind mount documentation](https://docs.docker.com/engine/storage/bind-mounts/)
-  documents `--mount` missing-source failure and default read/write access.
-
-Searches also surfaced community posts naming `config_docker activate` and
-`config_docker remove`. No official CC100 FW31 command contract establishing the
-package, configuration, persistent activation state, and non-destructive inverse
-was retrieved. In particular, `remove` must not be guessed to mean only “stop”.
-The software therefore does not execute either command and does not invent an
-IPK/opkg installation command or require a WBM click. A controller missing both
-binaries reports `vendor-package-missing` with
-`unsupported-fw31-package-activation`; partial installations and unrecognized
-service states report `unsupported-tool-state`. To support fresh-firmware package
-activation, obtain the official FW31 tool/state contract and a verified restoration
-procedure, then add that distinct reviewed action with interruption fixtures.
+The actual official SDK scripts, build rules, bundled Dropbear/kernel source and
+compiled config-tool source were inspected at WAGO commit
+`b2a09cc66ad07af54a34701d6cfc90f31aca5cd0` (FW30-V04.08.09). A byte-identical MPL
+init fixture executes with external effects stubbed in the test suite. FW30 is
+not assumed compatible with FW31. [FW31 support boundaries](wago-fw31-support.md)
+records each documented operation, non-inverse side effects, dependency blockers
+and minimal read-only captures. Hardware proof remains separate from these code
+and source-identity requirements.
 
 ## Parent service integration contract
 
@@ -128,9 +103,9 @@ All new exports are from `apps/plugins/wago/backend/wago-hardware-deployment.ts`
 | `WagoHardwareDeploymentReport`                                   | Typed report contract below.                                                               |
 | `WAGO_DOCKER_PROVISION_REVIEW_FLAG`                              | Literal `reviewedDockerActivation`.                                                        |
 | `WagoDockerProvisionReview`                                      | `{ reviewedDockerActivation: boolean, action: 'start-installed-runtime', token: string }`. |
-| `wagoDockerProvisionScript(review, testRoot = '')`               | Generate explicitly reviewed activation; token is 32 lowercase hex characters.             |
-| `wagoDockerProvisionRecoveryScript(token, testRoot = '')`        | Restore the stopped prior daemon state and retain receipt.                                 |
-| `wagoDockerProvisionFinishScript(token, outcome, testRoot = '')` | `outcome` is `accepted` or `restored`; consume the corresponding verified journal.         |
+| `wagoDockerProvisionScript(review, testRoot = '')`               | Legacy signature; refuses activation with the source dependency blocker.                   |
+| `wagoDockerProvisionRecoveryScript(token, testRoot = '')`        | Acknowledge an already stopped daemon; retain unresolved legacy journals.                   |
+| `wagoDockerProvisionFinishScript(token, outcome, testRoot = '')` | Acknowledge a verified prepared journal; start effects block deletion. `accepted` has no production caller. |
 | `wagoHardwareDeploymentPreflightScript(testRoot = '')`           | Read-only fail-closed install prerequisites. Already embedded in installer.                |
 | `wagoHardwareDeploymentDockerArgs(testRoot = '')`                | Fixed hardware arguments. Already embedded in installer.                                   |
 
@@ -158,17 +133,15 @@ qualification=required
 
 `platform`: `supported | unsupported-firmware`.
 `hardware`: `accessible | missing-register | uid10001-access-denied | permission-tool-unavailable`.
-`exclusivity`: `clear | codesys-active | output-container-conflict | unknown`.
+`exclusivity`: `clear | codesys-active | codesys-boot-enabled | output-container-conflict | unknown`.
 `docker`: `running | installed-stopped | vendor-package-missing | unsupported-tool-state`.
 `configDocker`: `present | missing`.
-`provision`: `none | review-start-installed-runtime | unsupported-fw31-package-activation | unsupported-tool-state`.
+`provision`: `none | review-start-installed-runtime | unsupported-fw31-package-activation | unsupported-tool-state | unsupported-lifecycle-dependencies`.
 `qualification` is always `required`. Reports describe independent observations;
 the provision action still revalidates its gates under lock. A nonzero exit makes
 the entire report incomplete and must never be interpreted as an empty workload.
 
-After successful delivery, accept the runtime only after coordinator readiness
-checks, then finish provisioning as `accepted`. To abandon a deployment, restore
-the runtime first, persist and acknowledge its restored receipt, then restore
-Docker and persist/acknowledge the provisioning receipt. This ordering preserves
-the daemon needed for runtime recovery. No service, controller, frontend, or
-management-adapter integration is implemented by these files.
+Runtime recovery must precede Docker reconciliation because it needs the daemon.
+The coordinator and UI expose explicit inspection and recovery. Recorded Docker
+start effects remain blocked until their source-grounded restoration is implemented;
+successful runtime delivery does not acknowledge or erase them.

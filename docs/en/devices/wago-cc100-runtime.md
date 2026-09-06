@@ -28,18 +28,13 @@ Before deployment, confirm all of the following:
 
 ## Enable Docker
 
-Use the WAGO-supported Docker lifecycle through SSH. `config_docker activate` installs Docker if necessary, enables it at startup, enables IP forwarding, and starts the daemon.
-
-```sh
-config_docker install
-config_docker activate
-docker version
-docker info
-```
-
-Use the WBM Docker controls only if they perform the same install and activation lifecycle. Do not manually copy daemon binaries or enable an alternative container engine. If activation fails, collect the command output and WAGO system logs before making configuration changes.
-
-> WAGO's lifecycle script refuses a controller booted from an SD card. Treat that result as a deployment blocker and follow the WAGO-supported storage arrangement.
+Fresh FW31 Docker activation is not implemented. Actual FW30 SDK source documents
+`config_docker install` / `activate`, including startup, routing and firewall changes.
+Its deactivation is not a complete inverse and FW31 dependency compatibility has
+not been established. The former installed-daemon action is also disabled because
+its assumed status contract and daemon-only recovery do not match vendor source.
+See [FW31 support boundaries](wago-fw31-support.md) for the exact missing contracts
+and read-only evidence needed. WBM is not a required commissioning step.
 
 ## Obtain and verify the image
 

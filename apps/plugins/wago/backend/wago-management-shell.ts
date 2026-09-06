@@ -3,7 +3,7 @@ import { assertManagementPublicKey } from './wago-management-key';
 export type ManagementShellAction = 'prepare' | 'arm' | 'install' | 'commit' | 'rollback' | 'watchdog';
 const quote = (value: string) => `'${value.replace(/'/g, `'"'"'`)}'`;
 
-/** Additive OpenSSH authorized_keys transaction for the authenticated NON-ROOT account only.
+/** Additive OpenSSH / source-identified Dropbear authorized_keys transaction for a NON-ROOT account.
  * Standard Linux stat/flock/timeout/nohup are checked, never installed. No WAGO-specific service
  * command is inferred. Baseline restriction is deliberately absent. Watchdog survives SSH/server
  * loss but not device reboot; additive enrollment never removes existing login access.
@@ -23,6 +23,9 @@ export function managementKeyCommand(
     throw new Error('invalid_transaction');
   const selectedKey = publicKey ?? '';
   if (action === 'install') assertManagementPublicKey(selectedKey);
+  // OpenSSH authorized_keys(5) and bundled Dropbear 2025.88 svr-authpubkeyoptions.c.
+  // These limit the new key only. Shell access still has the existing account's privileges.
+  const entry = `no-agent-forwarding,no-port-forwarding,no-pty,no-X11-forwarding ${selectedKey}`;
   const helpers = String.raw`set -eu
 now() {
   IFS='. ' read -r whole fraction idle < /proc/uptime
@@ -154,9 +157,9 @@ touch "$tx/armed"`;
 safe_keys
 test ! -e "$tx/installing"
 if [ -e "$tx/had_keys" ]; then cmp -s authorized_keys "$tx/previous"; else test ! -e authorized_keys; fi
-test "$(wc -c < "$tx/previous")" -le ${65536 - Buffer.byteLength(selectedKey) - 2}
+test "$(wc -c < "$tx/previous")" -le ${65536 - Buffer.byteLength(entry) - 2}
 cp "$tx/previous" "$tx/installed"
-printf '\\n%s\\n' ${quote(selectedKey)} >> "$tx/installed"
+printf '\\n%s\\n' ${quote(entry)} >> "$tx/installed"
 cp "$tx/installed" "$tx/next"
 chmod 0600 "$tx/next"
 touch "$tx/installing"

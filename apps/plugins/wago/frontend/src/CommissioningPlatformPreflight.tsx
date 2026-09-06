@@ -30,7 +30,7 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
   }
   const recovery = !!current.dockerProvisionState;
 
-  async function run(action: 'inspect' | 'activate' | 'recover') {
+  async function run(action: 'inspect' | 'recover') {
     if (busy || !form.current?.reportValidity() || (action !== 'inspect' && !approved)) return;
     const values = new FormData(form.current);
     const temporarySsh = {
@@ -83,16 +83,29 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
           <dd>{report.provision}</dd>
         </dl>
       )}
+      {report?.platform === 'unsupported-firmware' && (
+        <p>
+          The controller has not reported an unambiguous CC100 FW31 release identity. A BSP version alone is
+          insufficient.
+        </p>
+      )}
+      {report && (
+        <p>
+          Automatic Docker lifecycle changes and persistent digital-register permissions are not implemented. Vendor
+          source identifies boot and networking side effects that require complete dependency checks and restoration.
+          Physical hardware verification is a separate step.
+        </p>
+      )}
       {report?.hardware === 'uid10001-access-denied' && (
         <p>
-          The runtime account cannot access the digital registers with minimum permissions. A firmware-qualified
-          permission setup is required; installation will not switch to root or privileged mode.
+          The runtime account cannot access the digital registers with minimum permissions. Persistent permission setup
+          and restoration are not implemented; installation is blocked.
         </p>
       )}
       {report?.hardware === 'permission-tool-unavailable' && (
         <p>
-          This firmware cannot yet verify runtime-account permissions with the available tools. Qualification is
-          required before installation.
+          The available tools cannot verify runtime-account permissions. A supported permission probe is needed before
+          installation can proceed.
         </p>
       )}
       {report?.hardware === 'missing-register' && (
@@ -103,8 +116,15 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
       )}
       {report?.exclusivity === 'codesys-active' && (
         <p>
-          A PLC workload is active. Attraccess will not stop it until a recoverable firmware-specific transition is
-          qualified. This is not a WBM setup step.
+          A PLC workload is active. CODESYS application, retained-state and boot-state preservation and restoration are
+          not implemented. Installation is blocked to preserve the existing workload.
+        </p>
+      )}
+      {report?.exclusivity === 'codesys-boot-enabled' && (
+        <p>
+          CODESYS is configured to start at boot. A stopped PLC is not exclusive output access after reboot. Its
+          application and startup configuration are preserved; installation is blocked until a supported preservation
+          and restoration procedure is implemented.
         </p>
       )}
       {report?.exclusivity === 'output-container-conflict' && (
@@ -117,16 +137,24 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
           <Alert.Indicator />
           <Alert.Content>
             <Alert.Description>
-              The vendor Docker package is unavailable. Firmware-31 package activation and restoration must be qualified
-              before automatic activation. This is not a WBM setup requirement.
+              The vendor Docker package is unavailable. Fresh FW31 package activation and restoration are not
+              implemented. The vendor procedure and its effects on startup, storage and networking are still needed.
             </Alert.Description>
           </Alert.Content>
         </Alert>
       )}
+      {report?.provision === 'unsupported-lifecycle-dependencies' && (
+        <p>
+          Docker lifecycle changes are blocked: the vendor scripts change boot links, routing and firewall state, and
+          stopping Docker runs networking event scripts. Their complete FW31 dependencies and restoration snapshot must
+          be supported before activation can proceed. No vendor status command is run.
+        </p>
+      )}
       {current.dockerProvisionState && (
         <p role="status">
-          Saved Docker operation: {current.dockerProvisionState}. Restore any installed runtime snapshot before
-          restoring the Docker stopped state.
+          Saved Docker operation: {current.dockerProvisionState}. Restore any installed runtime snapshot first.
+          Recorded start attempts remain unresolved until their networking and boot effects can be reconciled;
+          a stopped daemon alone does not prove restoration.
         </p>
       )}
       {current.failureReason && <p role="alert">{current.failureReason}</p>}
@@ -142,24 +170,22 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
         <Button type="button" variant="secondary" isDisabled={busy} onPress={() => void run('inspect')}>
           Inspect installation prerequisites
         </Button>
-        {(report?.provision === 'review-start-installed-runtime' || recovery) && (
+        {recovery && (
           <>
             <Checkbox isSelected={approved} onChange={setApproved} isDisabled={busy}>
               <Checkbox.Control>
                 <Checkbox.Indicator />
               </Checkbox.Control>
               <Checkbox.Content>
-                {recovery
-                  ? 'I approve restoring the saved Docker stopped state after runtime recovery.'
-                  : 'I approve starting the already-installed Docker runtime. No vendor package will be installed or removed.'}
+                I approve checking the saved Docker recovery state after runtime recovery.
               </Checkbox.Content>
             </Checkbox>
             <Button
               type="button"
               isDisabled={busy || !approved}
-              onPress={() => void run(recovery ? 'recover' : 'activate')}
+              onPress={() => void run('recover')}
             >
-              {recovery ? 'Recover Docker provisioning' : 'Start installed Docker runtime'}
+              Recover Docker provisioning
             </Button>
           </>
         )}
