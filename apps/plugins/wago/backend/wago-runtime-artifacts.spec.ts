@@ -552,6 +552,20 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
     expect(await restarted.current()).toEqual(imported);
     expect(await restarted.has()).toBe(true);
   });
+  it('verifiedly backfills metadata for catalog objects written before metadata persistence', async () => {
+    const imported = await catalog.import(upload());
+    const metadataPath = join(await catalog.root(), 'objects', imported.digest, 'metadata.json');
+    await rm(metadataPath);
+
+    // Reimporting the same release must repair the existing object rather than discard staged metadata.
+    await catalog.import(upload());
+    const restarted = new WagoRuntimeArtifactCatalog(root, publicKey.toString('base64'));
+    expect(await restarted.current()).toEqual(imported);
+    expect(await restarted.list()).toEqual([imported]);
+    expect(await restarted.has()).toBe(true);
+    expect(JSON.parse(await readFile(metadataPath, 'utf8'))).toEqual(imported);
+    await restarted.onModuleDestroy();
+  });
   it('retains old bundles across concurrent imports and snapshots survive activation', async () => {
     const first = await catalog.import(upload());
     const snapshot = await catalog.acquire();
