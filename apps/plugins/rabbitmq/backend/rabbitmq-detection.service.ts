@@ -158,8 +158,8 @@ export class RabbitmqDetectionService {
   }
 
   // Builds the management API base URL from the generic MQTT config. The
-  // management API runs on its own port, so we substitute the conventional
-  // management port for the MQTT one and pick the scheme from useTls.
+  // management API uses its configured port or the provider default, independently
+  // of the MQTT port. The scheme still comes from useTls.
   private managementApiBase(config: MqttServerConnectionConfig): string {
     return managementApiBase(config);
   }

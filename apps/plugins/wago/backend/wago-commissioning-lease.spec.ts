@@ -52,6 +52,7 @@ describe('commissioning leases on two independent connections to temporary SQLit
   });
 
   afterEach(async () => {
+    jest.useRealTimers();
     jest.restoreAllMocks();
     await Promise.all([first?.isInitialized && first.destroy(), second?.isInitialized && second.destroy()]);
     await rm(directory, { recursive: true, force: true });
@@ -161,19 +162,113 @@ describe('commissioning leases on two independent connections to temporary SQLit
   );
 
   it('enforces the absolute operation limit even when the callback ignores cancellation', async () => {
-    const finish = deferred<void>();
+    // Keep SQLite I/O real, but advance the service clock and timers together.
+    jest.useFakeTimers({ now: 1000, doNotFake: ['nextTick', 'setImmediate'] });
+    const entered = deferred<void>();
+    let renewed = deferred<boolean>();
+    const original = storeA.renew.bind(storeA);
+    jest.spyOn(storeA, 'renew').mockImplementation(async (...args) => {
+      const result = await original(...args);
+      renewed.resolve(result);
+      return result;
+    });
+    const release = jest.spyOn(storeA, 'release');
     let guard!: CommissioningOperationGuard;
-    const service = new WagoCommissioningLeaseService(storeA, { renewMs: 20, leaseMs: 100, operationMs: 200 });
-    await expect(
-      service.run(fingerprint, async (value) => {
-        guard = value;
-        await finish.promise;
-      }),
-    ).rejects.toThrow('lease_lost');
+    const service = new WagoCommissioningLeaseService(storeA, {
+      now: () => Date.now(),
+      renewMs: 20,
+      leaseMs: 100,
+      operationMs: 200,
+    });
+    const run = service.run(fingerprint, async (value) => {
+      guard = value;
+      entered.resolve();
+      await new Promise<void>(() => undefined);
+    });
+    const rejected = expect(run).rejects.toThrow('lease_lost');
+    await entered.promise;
+    const initial = await storeB.read(key);
+    expect(guard.deadline).toBe(1200);
+    for (let elapsed = 20; elapsed < 200; elapsed += 20) {
+      renewed = deferred<boolean>();
+      await jest.advanceTimersByTimeAsync(20);
+      // Timer advancement alone does not drain native SQLite callbacks.
+      await expect(renewed.promise).resolves.toBe(true);
+      await guard.assertOwned();
+    }
+    await jest.advanceTimersByTimeAsync(19);
+    await guard.assertOwned();
+    expect(guard.signal.aborted).toBe(false);
+    expect(await service.status(fingerprint)).toMatchObject({
+      state: 'active',
+      leaseUntil: guard.deadline,
+      operationUntil: guard.deadline,
+    });
+
+    await jest.advanceTimersByTimeAsync(1);
+    await rejected;
     expect(guard.signal.aborted).toBe(true);
+    await expect(guard.assertOwned()).rejects.toThrow('lease_lost');
     expect(await service.status(fingerprint)).toMatchObject({ state: 'stale' });
-    expect(await storeB.read(key)).not.toBeNull();
-    finish.resolve();
+    await jest.advanceTimersByTimeAsync(WAGO_COMMISSIONING_MAX_REMOTE_COMMAND_MS);
+    expect(await storeB.read(key)).toEqual({ ...initial, leaseUntil: guard.deadline });
+    const takeover = jest.fn();
+    await expect(new WagoCommissioningLeaseService(storeB).run(fingerprint, takeover)).rejects.toThrow(
+      'lease_recovery_required',
+    );
+    expect(takeover).not.toHaveBeenCalled();
+    expect(release).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('retains recovery ownership when a persisted renewal is not confirmed before expiry', async () => {
+    jest.useFakeTimers({ now: 1000, doNotFake: ['nextTick', 'setImmediate'] });
+    const entered = deferred<void>();
+    const persisted = deferred<void>();
+    const unblock = deferred<void>();
+    const original = storeA.renew.bind(storeA);
+    const renew = jest.spyOn(storeA, 'renew').mockImplementation(async (...args) => {
+      const result = await original(...args);
+      persisted.resolve();
+      await unblock.promise;
+      return result;
+    });
+    const release = jest.spyOn(storeA, 'release');
+    const service = new WagoCommissioningLeaseService(storeA, {
+      now: () => Date.now(),
+      renewMs: 20,
+      leaseMs: 100,
+      operationMs: 200,
+    });
+    const run = service.run(fingerprint, async () => {
+      entered.resolve();
+      await new Promise<void>(() => undefined);
+    });
+    const rejected = expect(run).rejects.toThrow('lease_lost');
+    await entered.promise;
+    const initial = await storeB.read(key);
+    await jest.advanceTimersByTimeAsync(20);
+    await persisted.promise;
+    await jest.advanceTimersByTimeAsync(80);
+    await rejected;
+    try {
+      // Local confirmation expired, although the persisted renewal is still active.
+      expect(await service.status(fingerprint)).toMatchObject({
+        state: 'active',
+        owner: initial?.owner,
+        leaseUntil: 1120,
+        operationUntil: 1200,
+      });
+      await expect(service.run(fingerprint, async () => undefined)).rejects.toThrow('lease_busy');
+    } finally {
+      unblock.resolve();
+      await renew.mock.results[0].value;
+    }
+    await jest.advanceTimersByTimeAsync(20);
+    expect(await service.status(fingerprint)).toMatchObject({ state: 'stale', owner: initial?.owner });
+    expect(await storeB.read(key)).toEqual({ ...initial, leaseUntil: 1120 });
+    expect(release).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(0);
   });
 
   it('bounds a stalled renewal and prevents its late continuation from releasing the row', async () => {
