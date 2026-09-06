@@ -17,12 +17,12 @@ Attraccess uses an SSH-only commissioning flow. WAGO Web-Based Management (WBM) 
 - Before authorizing delivery, compare the selected controller's physical label and service-network location with the target controller, then obtain its SSH fingerprint from a trusted inventory or an authorized technician over an independent channel. Copying the scanned fingerprint back into the form is not independent identity authentication. Do not assume the CC100 displays its SSH fingerprint.
 - USB-C service access and WBM are break-glass recovery paths only. Use WAGO's firmware-specific recovery instructions locally when SSH is unavailable; do not use WBM to work around an Attraccess commissioning error.
 
-The server verifies the pinned host key and an imported signed runtime release, checks the platform, transfers the release over SSH and starts enrollment. An installed but stopped Docker runtime can be started as a separately reviewed action. The controller never needs an image registry or Internet connection for installation.
+The server verifies the pinned host key and an imported signed runtime release, checks the platform, transfers the release over SSH and starts enrollment. Docker must already be running; automatic lifecycle changes remain blocked pending complete source-gated restoration support. The controller never needs an image registry or Internet connection for installation.
 
 ## Preconditions
 
 - Confirm the controller order number is `751-9301` and it is on a private IPv4 network: `10.0.0.0/8`, `172.16.0.0/12`, or `192.168.0.0/16`.
-- Confirm the supported firmware baseline in **WAGO controllers**. The current default baseline is WAGO CC100 firmware `31`; the implementation also recognizes reported version `2024.12.0` for that baseline.
+- Confirm the supported firmware baseline in **WAGO controllers**. The current default baseline is WAGO CC100 firmware `31`; BSP version `2024.12.0` alone does not identify that firmware. See [FW31 support boundaries](wago-fw31-support.md) for missing software operations and the vendor evidence required.
 - Configure the target local MQTT server with TLS and certificate verification enabled. Use the certificate DNS name as the broker hostname. Import the issuing CA PEM bundle in MQTT settings for a private CA; expired/not-yet-valid certificates require checking clocks and certificate renewal, not disabling verification.
 - Obtain a temporary SSH username and password from the customer. These are entered for the delivery attempt and are not stored in the commissioning session, UI, or audit log.
 - Ensure the temporary SSH identity can run the required commands. Non-root identities require `sudo` access. Credentials are never prefilled or guessed, and must be entered again for each install or recovery attempt.
@@ -53,7 +53,7 @@ The session remains **Verification required**. The UI separately checks a fresh 
 
 ### Management security
 
-The **Management security** panel provides inspection, review, apply and recovery. Inspection reports firmware, SSH implementation and possible management listeners without changing access. The built-in provider supports reversible additive key enrollment only for an existing non-root OpenSSH account. It creates a unique key, encrypts its private material in Attraccess, arms rollback and verifies a separate pinned key-only connection. Private key material is passed through a dedicated short-lived agent rather than written to a temporary key file.
+The **Management security** panel provides inspection, review, apply and recovery. Inspection reports firmware, SSH implementation and possible management listeners without changing access. The built-in provider supports reversible additive key enrollment for an existing non-root OpenSSH account or a detected running Dropbear 2025.88 account. It creates a unique key with forwarding and PTY disabled, encrypts its private material in Attraccess, arms rollback and verifies a separate pinned key-only connection. Private key material is passed through a dedicated short-lived agent rather than written to a temporary key file. Existing account privileges and other login methods remain enabled.
 
 Adding a key leaves existing passwords/default access unchanged and does **not** count as hardened. Remaining WBM/service exposure and unqualified privileges are explicit residuals. A full baseline cannot be applied until its firmware-31 commands, minimum privileges and reboot-safe recovery are qualified. The framework orders key verification before restriction and supplies the verified key for post-restriction checks; it never invents vendor commands. No mandatory WBM setup gate is introduced.
 
@@ -89,7 +89,7 @@ Select **Cancel enrollment** only to abandon the session. It revokes the enrollm
 
 If Attraccess restarts during claim publication, a saved `claimed` controller record alone does not prove permanent credentials were delivered. **Claim recovery required** blocks automatic reinstallation and preserves the verifier until explicit recovery. After recovering a claimed or interrupted-claim installation, remove its existing controller registration and create a new commissioning session; the UI does not offer an unusable retry with a cleared verifier.
 
-**Recover Docker provisioning** restores an explicitly started daemon only after runtime recovery and only when no containers remain. **Recover saved access** restores the management-key snapshot. Registration removal is serialized with these operations and retains their recovery records rather than deleting the only rollback token. Merely inspecting management never makes cancellation require rollback.
+**Recover Docker provisioning** checks the saved journal after runtime recovery. It does not run vendor lifecycle commands. Any recorded start attempt remains unresolved: a stopped daemon does not prove that networking or boot effects were restored. Missing journals also retain the recovery requirement. Only a prepared journal with no recorded start attempt can be acknowledged after stopped-state and context checks. **Recover saved access** restores the management-key snapshot. Registration removal is serialized with these operations and retains their recovery records rather than deleting the only rollback token. Merely inspecting management never makes cancellation require rollback.
 
 An interrupted coordinator has a durable operation lease. It is never silently stolen on restart. The UI shows the safe recovery time; after the previous instance has stopped, explicit recovery uses fresh credentials to check that device locks are idle before releasing the expired lease. This releases coordination ownership only, not runtime or management snapshots.
 
@@ -106,7 +106,7 @@ An interrupted coordinator has a durable operation lease. It is never silently s
 
 This guide describes the composed implementation before visual integration, not future intended behavior. The following are not yet implemented and must not be assumed:
 
-- Additive, verified key enrollment for an existing non-root OpenSSH account is implemented. Firmware-specific account creation, password/default credential removal and root-login restrictions remain disabled until their minimum-privilege and rollback behavior is qualified.
+- Additive, verified key enrollment for an existing non-root OpenSSH or detected Dropbear 2025.88 account is implemented. Firmware-specific account creation, password/default credential removal and root-login restrictions are not implemented; complete dependency gates and lockout-safe restoration are still required.
 - The signed packager and visual importer are implemented. Existing server-configured two-member bundles retain their legacy delivery path, but new visual imports use the signed manifest format and hardware profile contract. The publishing workflow requires ATT-1056's profile-aware runtime to be integrated before producing these releases.
 - Active CODESYS workload preservation, unique minimum-privilege SSH management access and the remaining management-service baseline require firmware-31 qualification.
 - Container start is not success evidence. Fresh permanent heartbeat and matching runtime readiness/configuration probes are required, followed by physical qualification.

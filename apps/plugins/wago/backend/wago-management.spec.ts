@@ -219,7 +219,7 @@ describe('management transition orchestration (no device or broker connections)'
     h.adapter.qualify.mockImplementation((...args) => provider.qualify(...args));
     const review = await h.review();
     await expect(h.apply(review.reviewToken!)).rejects.toMatchObject({
-      code: firmware === 'unsupported' ? 'UNSUPPORTED' : 'qualification_required',
+      code: 'UNSUPPORTED',
     });
     expect(h.calls).toEqual([]);
   });
@@ -456,9 +456,16 @@ describe('management transition orchestration (no device or broker connections)'
     expect(JSON.stringify(h.store.history)).not.toContain('private output');
     const ssh = { execute: jest.fn(), verifyNewKeyConnection: jest.fn() };
     const provider = new WagoManagementProvider(ssh);
-    expect(provider.qualify(observation, 'baseline').support).toBe('qualification_required');
-    expect(provider.qualify({ ...observation, uid: 0 }, 'key_only').support).toBe('qualification_required');
-    await expect(provider.restrictAccess()).rejects.toThrow('qualification_required');
+    expect(provider.qualify(observation, 'baseline')).toMatchObject({
+      support: 'UNSUPPORTED',
+      evidence: 'fw31-baseline-not-implemented',
+    });
+    expect(provider.qualify({ ...observation, uid: 0 }, 'key_only')).toMatchObject({
+      support: 'UNSUPPORTED',
+      evidence: 'supported-ssh-nonroot-account-required',
+    });
+    await expect(provider.restrictAccess()).rejects.toThrow('fw31-baseline-not-implemented');
+    await expect(provider.verifyBaseline()).rejects.toThrow('fw31-baseline-not-implemented');
     expect(ssh.execute).not.toHaveBeenCalled();
   });
 

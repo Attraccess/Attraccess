@@ -1,3 +1,6 @@
+import { isCc100Fw31Identity } from './wago-firmware-identity';
+import { MANAGEMENT_INSPECTION_COMMAND } from './wago-management-inspection';
+import { ManagementPeerVersion } from './wago-management-peer-version';
 import {
   ConflictException,
   Inject,
@@ -35,7 +38,6 @@ import { restoreManagementKey } from './wago-management-key';
 import {
   wagoHardwareDeploymentReportScript,
   parseWagoHardwareDeploymentReport,
-  wagoDockerProvisionScript,
   wagoDockerProvisionRecoveryScript,
   wagoDockerProvisionFinishScript,
 } from './wago-hardware-deployment';
@@ -290,6 +292,10 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     },
     principal: CommissioningPrincipal | null = null,
   ): Promise<CommissioningSessionResponse> {
+    if (action === 'activate')
+      throw new ConflictException(
+        'unsupported-lifecycle-dependencies: Docker activation requires complete FW31 lifecycle checks and restoration support.',
+      );
     const credential = requireDeliveryCredentials({ temporarySsh: input.temporarySsh, confirmInstall: true });
     if (action !== 'inspect' && input.reviewedDockerActivation !== true)
       throw new ConflictException('Explicit Docker activation or recovery approval is required.');
@@ -319,28 +325,6 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
                   ),
                 );
                 session.platformReport = JSON.stringify(report);
-              } else if (action === 'activate') {
-                if (session.dockerProvisionToken)
-                  throw new ConflictException('Recover the previous Docker provisioning attempt first.');
-                if (session.deliveryToken)
-                  throw new ConflictException('Recover the runtime delivery before changing Docker.');
-                const report = session.platformReport ? JSON.parse(session.platformReport) : null;
-                if (report?.provision !== 'review-start-installed-runtime')
-                  throw new ConflictException('Inspect the controller and review its supported Docker action first.');
-                session.dockerProvisionToken = randomBytes(16).toString('hex');
-                session.dockerProvisionState = 'starting';
-                await this.save(session, 'docker_start_requested');
-                await this.sudoRunScript(
-                  session.targetHost,
-                  session.hostKeyFingerprint,
-                  credential,
-                  wagoDockerProvisionScript({
-                    reviewedDockerActivation: true,
-                    action: 'start-installed-runtime',
-                    token: session.dockerProvisionToken,
-                  }),
-                );
-                session.dockerProvisionState = 'started';
               } else {
                 if (!session.dockerProvisionToken)
                   throw new ConflictException('No Docker provisioning attempt to recover.');
@@ -369,12 +353,11 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
               return this.toResponse(await this.save(session, `platform_${action}_succeeded`));
             } catch (error) {
               if (error instanceof ConflictException) throw error;
-              if (action !== 'inspect' && session.dockerProvisionState !== 'restored')
-                session.dockerProvisionState = 'recovery_required';
+              if (action !== 'inspect') session.dockerProvisionState = 'recovery_required';
               session.failureReason =
                 action === 'inspect'
                   ? 'Controller preflight could not be read. Check the explicit SSH credential and supported firmware tools.'
-                  : 'Docker provisioning needs recovery. Restore any runtime transaction first, then retry Docker recovery.';
+                  : 'Docker recovery remains unverified. Restore any runtime transaction first. A saved start attempt requires source-grounded reconciliation of lifecycle effects; daemon absence alone cannot prove restoration. The recovery token is retained.';
               return this.toResponse(await this.save(session, `platform_${action}_failed`));
             }
           }),
@@ -1225,14 +1208,16 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     const dir = await mkdtemp(join(tmpdir(), 'attraccess-cc100-'));
     const knownHosts = join(dir, 'known_hosts');
     const askPass = join(dir, 'askpass');
+    const peer = command === MANAGEMENT_INSPECTION_COMMAND ? new ManagementPeerVersion() : undefined;
     try {
       await writeFile(knownHosts, await pinnedHostKey(host, fingerprint), { mode: 0o600 });
       await writeFile(askPass, '#!/bin/sh\nprintf \'%s\\n\' "$ATTRACCESS_SSH_PASSWORD"\n', { mode: 0o700 });
-      return await this.remoteOperation(() =>
+      const output = await this.remoteOperation(() =>
         runProcess(
           'ssh',
           [
             ...BOOTSTRAP_SSH_OPTIONS,
+            ...(peer ? ['-v'] : []),
             '-o',
             'BatchMode=no',
             '-o',
@@ -1259,9 +1244,13 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             timeoutMs: limits?.timeoutMs ?? SSH_TIMEOUT_MS,
             maxOutputBytes: limits?.maxOutputBytes ?? 65_536,
             signal: guard?.signal,
+            peerVersion: peer,
           },
         ),
       );
+      // -v's identification belongs to this authenticated, pinned SSH session.
+      // Root /proc executable access is unnecessary for a non-root account.
+      return peer ? output.replace(/\nEND=1\n$/, `\nDROPBEAR=${peer.result()}\nEND=1\n`) : output;
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -1591,7 +1580,7 @@ function runProcess(
   args: string[],
   input?: string | Buffer,
   environment?: Record<string, string>,
-  limits: { timeoutMs: number; maxOutputBytes: number; signal?: AbortSignal } = {
+  limits: { timeoutMs: number; maxOutputBytes: number; signal?: AbortSignal; peerVersion?: ManagementPeerVersion } = {
     timeoutMs: SSH_TIMEOUT_MS,
     maxOutputBytes: 65_536,
   },
@@ -1621,7 +1610,7 @@ function runProcess(
         stop();
       } else stdout += chunk;
     });
-    child.stderr.on('data', () => undefined);
+    child.stderr.on('data', (chunk: Buffer) => limits.peerVersion?.write(chunk));
     child.on('error', () => {
       clearTimeout(timer);
       limits.signal?.removeEventListener('abort', stop);
@@ -1777,12 +1766,7 @@ function escapeRegExp(value: string): string {
 }
 
 export function isSupportedController(inspection: string, firmwareBaseline: string): boolean {
-  if (!inspection.includes('PTXDIST_PLATFORM_NAME="cc100"')) return false;
-  const reportedFirmware = inspection.match(/^VERSION_ID=["']?([^"'\r\n]+)["']?$/m)?.[1]?.trim();
-  if (reportedFirmware === firmwareBaseline.trim()) return true;
-
-  // WAGO CC100 firmware revision 31 is built on the 2024.12.0 PTXdist BSP.
-  return firmwareBaseline.trim() === '31' && reportedFirmware === '2024.12.0';
+  return firmwareBaseline.trim() === '31' && isCc100Fw31Identity(inspection);
 }
 
 export function resolveRuntimeSigningPublicKeyPath(

@@ -233,6 +233,23 @@ class CommissioningDesktop(unittest.TestCase):
         expect(security.get_by_text("Rollback could not be verified. The recovery journal and encrypted key are retained.", exact=True)).to_be_visible()
         expect(security.get_by_label("Temporary SSH password", exact=True)).to_have_value("")
         self.capture("management-recovery-required")
+        fingerprint = security.locator("code").filter(has_text=re.compile(r"^SHA256:"))
+        expect(fingerprint).to_have_text(re.compile(r"^SHA256:[A-Za-z0-9+/]{43}$"))
+        fingerprint.scroll_into_view_if_needed()
+        # Check rendered text fragments, not just the page width: the modal can
+        # clip an unwrapped fingerprint without overflowing the document.
+        fragments = fingerprint.evaluate("""element => {
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            return [...range.getClientRects()].map(rect => ({left: rect.left, right: rect.right}));
+        }""")
+        content_bounds = security.bounding_box()
+        self.assertIsNotNone(content_bounds)
+        self.assertTrue(fragments)
+        for fragment in fragments:
+            self.assertGreaterEqual(fragment["left"], max(0, content_bounds["x"]) - 1)
+            self.assertLessEqual(fragment["right"], min(self.viewport["width"], content_bounds["x"] + content_bounds["width"]) + 1)
+        self.capture("management-fingerprint")
         self.resume()
         security = self.page.get_by_role("region", name="Management security", exact=True)
         expect(security.get_by_text("Rollback could not be verified. The recovery journal and encrypted key are retained.", exact=True)).to_be_visible()

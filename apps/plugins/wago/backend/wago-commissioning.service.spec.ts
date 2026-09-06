@@ -515,7 +515,7 @@ describe('WagoCommissioningService', () => {
           configuredService(),
         );
         inspect.mockResolvedValue({
-          firmware: 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"',
+          firmware: 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"\nVERSION="4.9.1(31)"',
           codesys: scenario === 'codesys' ? 'active' : 'inactive',
         });
         const copy = jest.fn().mockResolvedValue(undefined);
@@ -701,8 +701,11 @@ describe('WagoCommissioningService', () => {
     );
   });
 
-  it('recognizes WAGO firmware revision 31 by its PTXdist BSP version', () => {
-    expect(isSupportedController('PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"', '31')).toBe(true);
+  it('requires a release identity as well as the PTXdist BSP version', () => {
+    expect(isSupportedController('PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"', '31')).toBe(false);
+    expect(
+      isSupportedController('PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"\nVERSION="4.9.1(31)"', '31'),
+    ).toBe(true);
     expect(isSupportedController('PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"', '32')).toBe(false);
   });
 
