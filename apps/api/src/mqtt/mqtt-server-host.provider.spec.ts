@@ -14,6 +14,7 @@ describe('MqttServerHostProviderService', () => {
       name: 'Workshop',
       host: 'mqtt.example.com',
       port: 8883,
+      managementPort: 25671,
       useTls: true,
       caCert: 'fixture-private-ca',
       tlsInsecure: false,
@@ -33,6 +34,7 @@ describe('MqttServerHostProviderService', () => {
       name: 'Workshop',
       host: 'mqtt.example.com',
       port: 8883,
+      managementPort: 25671,
       useTls: true,
       caCert: 'fixture-private-ca',
       tlsInsecure: false,
@@ -48,6 +50,11 @@ describe('MqttServerHostProviderService', () => {
     const provider = buildProvider(findOne);
 
     await expect(provider.getServerConfig(999)).resolves.toBeNull();
+  });
+
+  it.each([null, undefined])('preserves the provider default when managementPort is %s', async (managementPort) => {
+    const provider = buildProvider(jest.fn().mockResolvedValue({ id: 42, port: 28883, managementPort }));
+    expect(await provider.getServerConfig(42)).toMatchObject({ port: 28883, managementPort });
   });
 
   it('rethrows unexpected errors', async () => {

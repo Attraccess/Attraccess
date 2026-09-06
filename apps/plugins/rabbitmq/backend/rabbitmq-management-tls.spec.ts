@@ -75,35 +75,39 @@ describe('RabbitMQ management TLS trust', () => {
     jest.useRealTimers();
   });
 
-  it('uses identical verified CA and server-name options for detection and every provisioning request', async () => {
-    expect((await detection.detect(4)).isRabbitMQ).toBe(true);
-    const credential = await provider.provision({
-      mqttServerId: 4,
-      identity: 'device-a',
-      username: 'device-a',
-      vhost: '/',
-      topicPolicy: { publish: ['devices/device-a/#'], subscribe: [] },
-    });
-    expect(credential.password).toEqual(expect.any(String));
-    expect(httpsMock.mock.calls.length).toBeGreaterThan(4);
-    for (const [url, options] of httpsMock.mock.calls as [string, RequestOptions][]) {
-      expect(url).toMatch(/^https:\/\/broker\.invalid:15671\/api\//);
-      expect(options).toMatchObject({
-        ca: pem,
-        servername: 'management.invalid',
-        rejectUnauthorized: true,
-        agent: false,
+  it.each([undefined, null, 25671, 15672])(
+    'uses the management port %s with identical verified trust for detection and provisioning',
+    async (managementPort) => {
+      config = { ...config, port: 28883, managementPort };
+      expect((await detection.detect(4)).isRabbitMQ).toBe(true);
+      const credential = await provider.provision({
+        mqttServerId: 4,
+        identity: 'device-a',
+        username: 'device-a',
+        vhost: '/',
+        topicPolicy: { publish: ['devices/device-a/#'], subscribe: [] },
       });
-      expect(options.checkServerIdentity).toBeUndefined();
-      expect(options.headers).toMatchObject({
-        authorization: `Basic ${Buffer.from('admin:private-password').toString('base64')}`,
-      });
-    }
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
+      expect(credential.password).toEqual(expect.any(String));
+      expect(httpsMock.mock.calls.length).toBeGreaterThan(4);
+      for (const [url, options] of httpsMock.mock.calls as [string, RequestOptions][]) {
+        expect(url.startsWith(`https://broker.invalid:${managementPort ?? 15671}/api/`)).toBe(true);
+        expect(options).toMatchObject({
+          ca: pem,
+          servername: 'management.invalid',
+          rejectUnauthorized: true,
+          agent: false,
+        });
+        expect(options.checkServerIdentity).toBeUndefined();
+        expect(options.headers).toMatchObject({
+          authorization: `Basic ${Buffer.from('admin:private-password').toString('base64')}`,
+        });
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
 
   it('keeps system trust and default hostname verification when optional settings are absent', async () => {
-    config = { ...config, caCert: undefined, tlsServername: undefined };
+    config = { ...config, managementPort: 25671, caCert: undefined, tlsServername: undefined };
     await client.request(config, 'GET', '/overview');
     expect(httpsMock.mock.calls[0][1]).toMatchObject({ rejectUnauthorized: true });
     expect(httpsMock.mock.calls[0][1]).not.toHaveProperty('ca');
@@ -146,7 +150,7 @@ describe('RabbitMQ management TLS trust', () => {
     [{ tlsServername: 'https://management.invalid:15671' }, 'DNS hostname'],
     [{ tlsServername: '127.0.0.1' }, 'DNS hostname'],
   ])('rejects invalid trust options before either transport opens a connection: %j', async (overrides, message) => {
-    config = { ...config, ...overrides };
+    config = { ...config, managementPort: 25671, ...overrides };
     await expect(client.request(config, 'GET', '/overview')).rejects.toThrow(message);
     const result = await detection.detect(4);
     expect(result).toMatchObject({ reachable: false, isRabbitMQ: false });
@@ -165,6 +169,7 @@ describe('RabbitMQ management TLS trust', () => {
     ['ECONNREFUSED', 'connection refused'],
     ['UNEXPECTED_FAILURE', 'Check connectivity'],
   ])('reports %s safely and never falls back to HTTP', async (code, message) => {
+    config = { ...config, managementPort: 25671 };
     failureCode = code;
     await expect(client.request(config, 'PUT', '/users/device', { password: 'secret' })).rejects.toThrow(message);
     const result = await detection.detect(4);
@@ -200,16 +205,35 @@ describe('RabbitMQ management TLS trust', () => {
     await expect(client.request(config, 'GET', '/overview')).rejects.not.toThrow('upstream-secret');
   });
 
-  it('preserves HTTP development detection and management', async () => {
-    config = { ...config, useTls: false, caCert: undefined, tlsServername: undefined };
-    fetchMock.mockImplementation(async () => new Response(responseBody, { status: 200 }));
-    expect((await detection.detect(4)).isRabbitMQ).toBe(true);
-    await client.request(config, 'PUT', '/users/device', { tags: '' });
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://broker.invalid:15672/api/users/device',
-      expect.objectContaining({ method: 'PUT', body: '{"tags":""}' }),
+  it.each([undefined, null, 25672])(
+    'uses management port %s for HTTP detection and management',
+    async (managementPort) => {
+      config = { ...config, port: 28883, managementPort, useTls: false, caCert: undefined, tlsServername: undefined };
+      fetchMock.mockImplementation(async () => new Response(responseBody, { status: 200 }));
+      expect((await detection.detect(4)).isRabbitMQ).toBe(true);
+      await client.request(config, 'PUT', '/users/device', { tags: '' });
+      expect(fetchMock).toHaveBeenCalledWith(
+        `http://broker.invalid:${managementPort ?? 15672}/api/users/device`,
+        expect.objectContaining({ method: 'PUT', body: '{"tags":""}' }),
+      );
+      expect(httpsMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([true, false])('preserves IPv6 addressing with a custom management port (TLS: %s)', (useTls) => {
+    expect(client.managementApiBase({ ...config, host: '::1', managementPort: 25671, useTls })).toBe(
+      `${useTls ? 'https' : 'http'}://[::1]:25671`,
     );
-    expect(httpsMock).not.toHaveBeenCalled();
+  });
+
+  it('invalidates cached detection after the management port changes', async () => {
+    expect((await detection.detect(4)).isRabbitMQ).toBe(true);
+    expect((await detection.detect(4)).isRabbitMQ).toBe(true);
+    expect(httpsMock).toHaveBeenCalledTimes(1);
+    config = { ...config, managementPort: 25671 };
+    expect((await detection.detect(4)).isRabbitMQ).toBe(true);
+    expect(httpsMock).toHaveBeenCalledTimes(2);
+    expect(httpsMock.mock.calls[1][0]).toBe('https://broker.invalid:25671/api/overview');
   });
 
   it('invalidates a cached successful detection after trust changes', async () => {
