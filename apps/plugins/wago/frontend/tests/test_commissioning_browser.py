@@ -11,9 +11,9 @@ from urllib.parse import urlparse
 from urllib.request import Request, ProxyHandler, HTTPRedirectHandler, build_opener
 
 from playwright.sync_api import sync_playwright, expect
-from browser_fixture import ROOT, WagoFixture
+from browser_fixture import BROWSER_ARTIFACTS_ROOT, WagoFixture
 
-ARTIFACTS = ROOT / "output/playwright/att-973-commissioning"
+ARTIFACTS = BROWSER_ARTIFACTS_ROOT / "att-973-commissioning"
 
 
 class NoRedirect(HTTPRedirectHandler):
