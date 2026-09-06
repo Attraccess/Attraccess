@@ -134,7 +134,12 @@
     "typecheck": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "pnpm exec tsc --noEmit -p apps/plugins/rabbitmq/tsconfig.spec.json"
+        "commands": [
+          "pnpm exec tsc --noEmit -p apps/plugins/rabbitmq/backend/tsconfig.json",
+          "pnpm exec tsc --noEmit -p apps/plugins/rabbitmq/frontend/tsconfig.json",
+          "pnpm exec tsc --noEmit -p apps/plugins/rabbitmq/tsconfig.spec.json"
+        ],
+        "parallel": false
       }
     }
   }

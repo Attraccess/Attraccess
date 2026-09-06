@@ -230,8 +230,18 @@ unset DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH
 if command docker --host unix:///var/run/docker.sock info >/dev/null 2>&1; then
   containers=$(command docker --host unix:///var/run/docker.sock container ls -a -q) || fail 'Cannot inspect Docker workloads'
   test -z "$containers" || fail 'Docker workloads exist; refusing to stop daemon'
+  docker_running=1
+else
+  # An unavailable API cannot prove that no workloads are present. Only continue when
+  # the init script and process list independently prove the daemon is already stopped.
+  status=0
+  "$root/etc/init.d/dockerd" status >/dev/null 2>&1 || status=$?
+  test "$status" = 3 || fail 'Cannot inspect Docker workloads'
+  processes=$(ps -eo comm=) || fail 'Cannot verify daemon absence'
+  if printf '%s\n' "$processes" | grep -iq dockerd; then fail 'Cannot inspect Docker workloads'; fi
+  docker_running=0
 fi
-if test -e "$journal/start-intent"; then
+if test -e "$journal/start-intent" && test "$docker_running" = 1; then
   "$root/etc/init.d/dockerd" stop >&2 || fail 'Docker stop failed; recovery retained'
   status=0
   "$root/etc/init.d/dockerd" status >/dev/null 2>&1 || status=$?

@@ -15,7 +15,7 @@ import type {
   PluginSlotContribution,
   RouteConfig,
 } from '@attraccess/plugins-frontend-sdk';
-import type { IPluginStore } from 'react-pluggable';
+import type { PluginStore } from 'react-pluggable';
 import { useDetection } from './detection';
 import { RabbitmqListBadge } from './RabbitmqListBadge';
 import { RabbitmqStatusPanel } from './RabbitmqStatusPanel';
@@ -74,6 +74,7 @@ function RabbitmqPage() {
 }
 
 export default class RabbitmqPlugin implements AttraccessFrontendPlugin {
+  pluginStore: PluginStore;
   getPluginName(): string {
     return 'rabbitmq-plugin@0.1.0';
   }
@@ -82,8 +83,8 @@ export default class RabbitmqPlugin implements AttraccessFrontendPlugin {
     return [];
   }
 
-  init(_store: IPluginStore): void {
-    // No setup needed.
+  init(store: PluginStore): void {
+    this.pluginStore = store;
   }
 
   activate(): void {
