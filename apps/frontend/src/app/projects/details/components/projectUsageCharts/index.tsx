@@ -42,9 +42,11 @@ const TOOLTIP_CONTAINER_CLASS =
 const TOOLTIP_LABEL_CLASS = 'text-xs font-medium text-default-500';
 const TOOLTIP_DOT_CLASS = 'h-2 w-2 rounded-full';
 const TOOLTIP_VALUE_CLASS = 'ml-auto font-semibold text-foreground';
-const BAR_COLORS = {
-  sessions: { base: '#0ea5e9', active: '#38bdf8' },
-  minutes: { base: '#10b981', active: '#34d399' },
+// RAL 5021 anchors the palette; all series and active colors exceed 4.5:1 contrast on white.
+const CHART_COLORS = {
+  sessions: { base: '#9A5500', active: '#7A4300' },
+  minutes: { base: '#256D7B', active: '#1C5260' },
+  spend: '#775799',
 };
 type ChartTooltipProps = TooltipContentProps;
 type ChartTooltipPayload = TooltipPayload;
@@ -183,7 +185,7 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                 <Line
                   type="monotone"
                   dataKey="minutes"
-                  stroke="#10b981"
+                  stroke={CHART_COLORS.minutes.base}
                   yAxisId="minutes"
                   name={t('tooltip.minutes')}
                   strokeWidth={2}
@@ -192,10 +194,11 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                 <Line
                   type="monotone"
                   dataKey="spend"
-                  stroke="#2563eb"
+                  stroke={CHART_COLORS.spend}
                   yAxisId="spend"
                   name={`${t('tooltip.spend')} (${data?.summary.currency ?? ''})`}
                   strokeWidth={2}
+                  strokeDasharray="6 4"
                   dot={false}
                 />
               </LineChart>
@@ -233,24 +236,24 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                       <Legend />
                       <Bar
                         dataKey="sessions"
-                        fill={BAR_COLORS.sessions.base}
+                        fill={CHART_COLORS.sessions.base}
                         name={t('tooltip.sessions')}
                         activeBar={
                           <Rectangle
-                            fill={BAR_COLORS.sessions.active}
-                            stroke={BAR_COLORS.sessions.base}
+                            fill={CHART_COLORS.sessions.active}
+                            stroke={CHART_COLORS.sessions.base}
                             strokeWidth={2}
                           />
                         }
                       />
                       <Bar
                         dataKey="minutes"
-                        fill={BAR_COLORS.minutes.base}
+                        fill={CHART_COLORS.minutes.base}
                         name={t('tooltip.minutes')}
                         activeBar={
                           <Rectangle
-                            fill={BAR_COLORS.minutes.active}
-                            stroke={BAR_COLORS.minutes.base}
+                            fill={CHART_COLORS.minutes.active}
+                            stroke={CHART_COLORS.minutes.base}
                             strokeWidth={2}
                           />
                         }

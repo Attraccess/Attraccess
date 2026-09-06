@@ -1,14 +1,14 @@
 import { useTheme } from '@heroui/react';
-import { PropsWithChildren, useEffect } from 'react';
+import { PropsWithChildren, useLayoutEffect } from 'react';
 
 interface ProvidersProps extends PropsWithChildren {
   defaultTheme?: 'dark' | 'light' | 'system';
 }
 
-export function Providers({ children, defaultTheme = 'system' }: ProvidersProps) {
-  const { setTheme } = useTheme();
+export function Providers({ children, defaultTheme = 'light' }: ProvidersProps) {
+  const { setTheme } = useTheme(defaultTheme);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (defaultTheme === 'system') {
       const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       setTheme(systemTheme);

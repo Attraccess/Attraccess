@@ -1,12 +1,5 @@
 import { ReactNode } from 'react';
-import {
-  cn,
-  Dropdown,
-  DropdownItem,
-  DropdownMenu,
-  DropdownPopover,
-  DropdownTrigger,
-} from '@heroui/react';
+import { cn, Dropdown, DropdownItem, DropdownMenu, DropdownPopover, DropdownTrigger } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { Button } from '../button';
 import { MoreVerticalIcon } from 'lucide-react';
@@ -27,7 +20,7 @@ interface PageActionBase {
 }
 
 export interface PageActionTriggerProps {
-  variant: 'outline';
+  variant: 'primary' | 'outline';
   size: 'sm';
   isDisabled?: boolean;
   isPending?: boolean;
@@ -59,7 +52,7 @@ const DEFAULT_MAX_VISIBLE = 6;
 
 function buildTriggerProps(action: PageAction): PageActionTriggerProps {
   return {
-    variant: 'outline',
+    variant: action.variant === 'primary' ? 'primary' : 'outline',
     size: 'sm',
     isDisabled: action.isDisabled,
     isPending: action.isPending,
@@ -84,9 +77,7 @@ function renderInlineAction(action: PageAction) {
     return <span key={action.key}>{action.renderTrigger(triggerProps)}</span>;
   }
 
-  return (
-    <Button key={action.key} {...triggerProps} onPress={(action as PageActionPress).onPress} />
-  );
+  return <Button key={action.key} {...triggerProps} onPress={(action as PageActionPress).onPress} />;
 }
 
 function renderOverflowItem(action: PageActionPress) {
@@ -114,18 +105,11 @@ export function PageHeaderActions({ actions, maxVisible = DEFAULT_MAX_VISIBLE, m
   const visibleActions = actions.filter((a) => !a.isHidden);
   if (visibleActions.length === 0) return null;
 
-  const destructive = visibleActions.filter(
-    (a): a is PageActionPress => a.variant === 'destructive' && 'onPress' in a,
-  );
+  const destructive = visibleActions.filter((a): a is PageActionPress => a.variant === 'destructive' && 'onPress' in a);
   const nonDestructive = visibleActions.filter((a) => a.variant !== 'destructive');
 
   const lockedCount = nonDestructive.filter((a) => 'renderTrigger' in a && a.renderTrigger).length;
-  const overflowBudget =
-    destructive.length > 0
-      ? maxVisible === 0
-        ? 0
-        : Math.max(1, maxVisible - 1)
-      : maxVisible;
+  const overflowBudget = destructive.length > 0 ? (maxVisible === 0 ? 0 : Math.max(1, maxVisible - 1)) : maxVisible;
   const collapsibleSlots = Math.max(0, overflowBudget - lockedCount);
 
   const inline: PageAction[] = [];
@@ -166,9 +150,7 @@ export function PageHeaderActions({ actions, maxVisible = DEFAULT_MAX_VISIBLE, m
             <MoreVerticalIcon className="w-4 h-4" />
           </DropdownTrigger>
           <DropdownPopover>
-            <DropdownMenu aria-label={triggerLabel}>
-              {overflowItems.map(renderOverflowItem)}
-            </DropdownMenu>
+            <DropdownMenu aria-label={triggerLabel}>{overflowItems.map(renderOverflowItem)}</DropdownMenu>
           </DropdownPopover>
         </Dropdown>
       )}

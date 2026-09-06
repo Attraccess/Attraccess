@@ -1,9 +1,6 @@
 {
   "fill" : {
-    "linear-gradient" : [
-      "display-p3:0.41269,0.47191,0.63101,1.00000",
-      "srgb:0.21176,0.29804,0.48627,1.00000"
-    ]
+    "solid" : "srgb:0.14510,0.42745,0.48235,1.00000"
   },
   "groups" : [
     {
@@ -12,21 +9,21 @@
           "image-name" : "key-hole.png",
           "name" : "key-hole",
           "position" : {
-            "scale" : 0.4,
+            "scale" : 0.48,
             "translation-in-points" : [
-              -4.160812805768032,
-              -8.448852973170581
+              0,
+              0
             ]
           }
         }
       ],
       "shadow" : {
         "kind" : "neutral",
-        "opacity" : 0.5
+        "opacity" : 0
       },
       "translucency" : {
-        "enabled" : true,
-        "value" : 0.5
+        "enabled" : false,
+        "value" : 0
       }
     }
   ],

@@ -1,4 +1,8 @@
 {
+  "title": "Ressourcen",
+  "subtitle": "Deine Werkstatt, bereit für deine nächste Idee.",
+  "filter": "Ressourcen filtern",
+  "scan": "Ressourcen-QR-Code scannen",
   "searchPlaceholder": "Ressourcen suchen...",
   "addResource": "Ressource hinzufügen"
 }

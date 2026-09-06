@@ -1,6 +1,6 @@
 import { Outlet, Route, Routes, useNavigate } from 'react-router-dom';
 import { Unauthorized } from './unauthorized/unauthorized';
-import { PropsWithChildren, useEffect, useMemo, useState } from 'react';
+import { PropsWithChildren, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { Layout } from './layout/layout';
 import { useAuth } from '../hooks/useAuth';
 import { useAllRoutes } from './routes';
@@ -187,10 +187,7 @@ export function AppRoutes() {
         {layoutRouteElements}
         {/* Without this a logged-in operator on an unknown path matched nothing at all, so the
             layout route never rendered and the document came up blank (ATT-869). */}
-        <Route
-          path="*"
-          element={<NotFound isAuthenticated={isAuthenticated} />}
-        />
+        <Route path="*" element={<NotFound isAuthenticated={isAuthenticated} />} />
       </Route>
     </Routes>
   );
@@ -207,23 +204,11 @@ function AppContent() {
 
 export function App() {
   const { isInitialized } = useAuth();
-  const { setTheme } = useTheme();
+  const { setTheme } = useTheme('light');
   useLocaleSync();
 
-  useEffect(() => {
-    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    setTheme(systemTheme);
-
-    let metaTheme = document.querySelector('meta[name="theme-color"]');
-    if (!metaTheme) {
-      metaTheme = document.createElement('meta');
-      metaTheme.setAttribute('name', 'theme-color');
-    }
-
-    const darkBackground = 'rgb(0,0,0)';
-    const lightBackground = 'rgb(255,255,255)';
-
-    metaTheme.setAttribute('content', systemTheme === 'dark' ? darkBackground : lightBackground);
+  useLayoutEffect(() => {
+    setTheme('light');
   }, [setTheme]);
 
   OpenAPI.BASE = getBaseUrl();
