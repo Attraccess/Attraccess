@@ -184,12 +184,14 @@ describe('commissioning leases on two independent connections to temporary SQLit
       return result;
     });
     const release = jest.spyOn(storeA, 'release');
-    const service = new WagoCommissioningLeaseService(storeA, { renewMs: 20, leaseMs: 100, operationMs: 200 });
+    const service = new WagoCommissioningLeaseService(storeA, { renewMs: 20, leaseMs: 100, operationMs: 500 });
+    const started = Date.now();
     await expect(
       service.run(fingerprint, async () => {
         await renewing.promise;
       }),
     ).rejects.toThrow('lease_lost');
+    expect(Date.now() - started).toBeLessThan(300);
     unblock.resolve();
     await new Promise<void>((resolve) => setImmediate(resolve));
     expect(release).not.toHaveBeenCalled();

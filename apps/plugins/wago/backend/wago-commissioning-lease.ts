@@ -186,6 +186,8 @@ export class WagoCommissioningLeaseService implements CommissioningLeaseRunner {
     let heartbeatStopped = false;
     let renewal: Promise<void> | undefined;
     let heartbeat: ReturnType<typeof setTimeout> | undefined;
+    let expiry: ReturnType<typeof setTimeout> | undefined;
+    let confirmedLeaseUntil = started + this.leaseMs;
     let rejectLost!: (error: Error) => void;
     const lost = new Promise<never>((_, reject) => {
       rejectLost = reject;
@@ -216,12 +218,23 @@ export class WagoCommissioningLeaseService implements CommissioningLeaseRunner {
         throw fail();
       }
     };
+    const scheduleExpiry = () => {
+      clearTimeout(expiry);
+      expiry = setTimeout(fail, Math.max(0, confirmedLeaseUntil - this.now()));
+    };
     const schedule = () => {
       heartbeat = setTimeout(() => {
         renewal = (async () => {
           try {
             const now = this.now();
-            if (!(await this.store.renew(key, owner, now, Math.min(now + this.leaseMs, deadline)))) fail();
+            const until = Math.min(now + this.leaseMs, deadline);
+            if (!(await this.store.renew(key, owner, now, until))) fail();
+            else if (!stopped && !controller.signal.aborted && this.now() < confirmedLeaseUntil) {
+              confirmedLeaseUntil = until;
+              scheduleExpiry();
+            } else {
+              fail();
+            }
           } catch {
             fail();
           }
@@ -230,6 +243,7 @@ export class WagoCommissioningLeaseService implements CommissioningLeaseRunner {
       }, this.renewMs);
     };
     const maximum = setTimeout(fail, Math.max(0, deadline - this.now()));
+    scheduleExpiry();
     schedule();
     try {
       return await Promise.race([
@@ -251,6 +265,7 @@ export class WagoCommissioningLeaseService implements CommissioningLeaseRunner {
       stopped = true;
       clearTimeout(heartbeat);
       clearTimeout(maximum);
+      clearTimeout(expiry);
       controller.abort(new CommissioningLeaseError('lease_lost'));
     }
   }
