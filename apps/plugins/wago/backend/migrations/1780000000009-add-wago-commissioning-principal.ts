@@ -18,6 +18,8 @@ export class AddWagoCommissioningPrincipal1780000000009 implements MigrationInte
     await queryRunner.query('ALTER TABLE "plugin_wago_commissioning_sessions" ADD COLUMN "platform_report" text');
   }
   async down(queryRunner: QueryRunner): Promise<void> {
+    const rows = await queryRunner.query('SELECT COUNT(*) AS count FROM "plugin_wago_commissioning_sessions" WHERE "docker_provision_token" IS NOT NULL');
+    if (Number(rows[0].count) !== 0) throw new Error('Recover Docker provisioning before removing its saved ownership tokens');
     await queryRunner.query('ALTER TABLE "plugin_wago_commissioning_sessions" DROP COLUMN "initiating_principal"');
     await queryRunner.query('ALTER TABLE "plugin_wago_commissioning_sessions" DROP COLUMN "runtime_artifact_digest"');
     await queryRunner.query('ALTER TABLE "plugin_wago_commissioning_sessions" DROP COLUMN "management_controller_id"');

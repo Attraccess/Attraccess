@@ -69,6 +69,12 @@ unset DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH
 docker_cli=$(command -v docker || :)
 daemon_cli=$(command -v dockerd || :)
 docker() { command docker --host unix:///var/run/docker.sock "$@"; }
+empty_container_store() {
+  if test ! -e "$1" && test ! -L "$1"; then return 0; fi
+  test -d "$1" && test ! -L "$1" || return 1
+  entries=$(ls -A -- "$1") || return 1
+  test -z "$entries"
+}
 config_docker=missing
 [ ! -x "$root/etc/config-tools/config_docker" ] || config_docker=present
 platform=unsupported-firmware
@@ -128,7 +134,7 @@ EOF_MOUNTS
     # LSB stopped status, no live daemon, no custom storage or existing workloads.
     if [ "$status" = 3 ] && ! printf '%s\\n' "$processes" | grep -iq dockerd &&
       [ ! -e "$root/etc/docker/daemon.json" ] &&
-      [ ! -e "$root/home/docker/containers" ] && [ ! -e "$root/var/lib/docker/containers" ]; then
+      empty_container_store "$root/home/docker/containers" && empty_container_store "$root/var/lib/docker/containers"; then
       docker_state=installed-stopped
       provision=review-start-installed-runtime
     fi

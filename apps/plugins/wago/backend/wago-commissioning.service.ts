@@ -666,7 +666,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       }
       const providers = await this.context.getMqttCredentialProvisioning().availableProviders(session.mqttServerId);
       if (!providers.length) {
-        safeFailure = 'Automatic MQTT credential provisioning is unavailable. Check management HTTPS access, the issuing CA, certificate DNS name and validity, and the broker/server clocks in MQTT settings.';
+        safeFailure =
+          'Automatic MQTT credential provisioning is unavailable. Check management HTTPS access, the issuing CA, certificate DNS name and validity, and the broker/server clocks in MQTT settings.';
         throw new Error(safeFailure);
       }
       bundle =
@@ -809,7 +810,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       id,
       'recover',
       () => this.recoverWhileAudited(id, input),
-      (result) => result.progressStep === 'Runtime snapshot restored' && result.state !== 'recovery_revocation_pending',
+      (result) => result.failureReason === null && ['delivery_failed', 'revoked'].includes(result.state),
     );
   }
 
@@ -988,6 +989,11 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
           const session = await this.sessions.findOneBy({ id: candidate.id });
           if (!session) return;
           await this.revokeSessionEnrollment(session);
+          if (session.managementControllerId) {
+            const security = await this.management.status(session.managementControllerId);
+            if (!security || (!security.recoveryRequired && !['key_enrolled', 'hardened'].includes(security.state)))
+              session.managementControllerId = null;
+          }
           if (session.deliveryToken || session.dockerProvisionToken || session.managementControllerId) {
             session.state = 'revoked';
             session.pairingCode = null;
