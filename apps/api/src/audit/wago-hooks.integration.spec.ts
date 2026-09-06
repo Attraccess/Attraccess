@@ -93,7 +93,7 @@ class FixtureMqtt implements PluginMqttClient {
             enrollmentSecret,
             protocolVersion: '1.0.0',
             runtimeVersion: '0.1.0',
-            capabilities: ['claim', 'heartbeat', 'configuration-v1'],
+            capabilities: ['claim', 'claim-expiry-v1', 'heartbeat', 'configuration-v1'],
           }),
         ),
       });
@@ -618,6 +618,8 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
       if (!topic.endsWith('/claim')) return;
       const credentials = JSON.parse(payload.toString());
       expect(credentials.password).toBe(privateValue);
+      expect(Date.parse(credentials.expiresAt)).toBeGreaterThan(Date.now());
+      expect(Date.parse(credentials.expiresAt)).toBeLessThanOrEqual(Date.now() + 30_000);
       expect((await rows('manual_credential_fallback')).map((row) => row.outcome)).toEqual(['attempted']);
       await mqtt.receive(`${topic}/ack`, { acknowledgementToken: 'incorrect-token' });
       expect(await rows('manual_credential_fallback')).toHaveLength(1);
@@ -657,5 +659,51 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
       'untrusted',
     );
     expect(JSON.stringify(await rows('manual_credential_fallback'))).not.toContain(privateValue);
+  });
+
+  it('preserves acknowledged credentials and the durable recovery lease when the later publish receipt fails', async () => {
+    const { controller, provision } = await manuallyEnrolledController();
+    // Associate the manually enrolled controller with a real pinned commissioning session.
+    await db.getRepository(WagoCommissioningSession).update(session.id, {
+      hardwareId: controller.hardwareId,
+    });
+    mqtt.publish.mockImplementation(async (_server, topic, payload) => {
+      if (!topic.endsWith('/claim')) return;
+      const credentials = JSON.parse(payload.toString());
+      await mqtt.receive(`${topic}/ack`, { acknowledgementToken: credentials.acknowledgementToken });
+      throw new Error(privateValue);
+    });
+    await post(`controllers/${controller.id}/credentials/manual/complete`, {
+      name: 'Manual fixture',
+      verifier,
+      username: 'wago-controller-manual-fixture',
+      password: privateValue,
+    }).expect(409);
+    await lifecycle('manual_credential_fallback', controller.id, 'failed');
+    expect(provision).not.toHaveBeenCalled();
+    expect(revoke.mock.calls).not.toContainEqual([
+      expect.objectContaining({ identity: 'wago-controller-manual-fixture' }),
+    ]);
+    expect((await db.getRepository(WagoController).findOneByOrFail({ id: controller.id })).trustState).toBe('claimed');
+    const leases = await db.getRepository(WagoCommissioningLeaseEntity).find();
+    expect(leases).toHaveLength(1);
+    expect(leases[0].fingerprintHash).toBe(commissioningFingerprintHash(session.hostKeyFingerprint));
+    await remove(controller.id).expect(409);
+    expect(await rows('unclaim')).toHaveLength(0);
+    expect(JSON.stringify(await rows('manual_credential_fallback'))).not.toContain(privateValue);
+  });
+
+  it('rejects a manual handoff to a runtime without expiry support before dispatch or audit admission', async () => {
+    const { controller } = await manuallyEnrolledController();
+    await db.getRepository(WagoController).update(controller.id, { capabilities: '["claim","configuration-v1"]' });
+    mqtt.publish.mockClear();
+    await post(`controllers/${controller.id}/credentials/manual/complete`, {
+      name: 'Manual fixture',
+      verifier,
+      username: 'wago-controller-manual-fixture',
+      password: privateValue,
+    }).expect(409);
+    expect(mqtt.publish).not.toHaveBeenCalled();
+    expect(await rows('manual_credential_fallback')).toHaveLength(0);
   });
 });

@@ -103,16 +103,19 @@ currently retained history.
 | --- | --- | --- |
 | `POST controllers/:id/claim` | `wago.claim` | Existing `claim` service resolves after credential dispatch; does not assert controller acknowledgement. |
 | `DELETE controllers/:id` | `wago.unclaim` | Existing `remove` resolves after revocation/removal. Later commissioning-history cleanup failure does not erase successful unclaim. |
-| `POST controllers/:id/configuration/publish` | `wago.publication` | Existing publication resolves; completion includes returned `revision`. Does not assert controller application. |
-| `POST controllers/:id/configuration/rollback/:revision` | `wago.rollback` | Publication resolves; includes requested `sourceRevision` and newly returned `revision`. |
+| `POST controllers/:id/configuration/publish` | `wago.publication` / `wago.forced_publication` | Publication dispatch resolves; completion includes the allocated or reused `revision`. Forced publication uses the same locked admission boundary. Does not assert controller application. |
+| `POST controllers/:id/configuration/rollback/:revision` | `wago.rollback` | Publication resolves; includes requested `sourceRevision` and resulting `revision`. No nested publication lifecycle. |
+| `POST controllers/:id/credentials/manual/complete` | `wago.manual_credential_fallback` | A matching expiring claim acknowledgement is received while the operation still owns its guard. |
+| `POST controllers/:id/commands` | `wago.manual_command` | The real command UUID is acknowledged; rejected, timed-out, transport-failed and shutdown outcomes finish as failed. |
 
 Each operation records `attempted` followed by `succeeded` or `failed`, sharing
 one generated UUID operation ID. A service rejection is rethrown unchanged to the
 caller; its message, stack, response body and payload never enter audit details.
 An attempt has no invented revision when the service has not allocated one yet.
-Failures after partial service mutations cannot report an allocated revision if
-the current service throws without returning it; service owners must supply that
-link at the actual mutation boundary.
+Publication and rollback record the allocated or reused revision at the dispatch
+boundary. A subsequent dispatch or persistence failure includes that revision in
+the failed completion; rollback also retains `sourceRevision`. Failures before
+allocation have no invented revision.
 
 ## Reusable integration contract for remaining owners
 
@@ -207,14 +210,13 @@ validation under the configuration lock. Rollback emits one lifecycle with sourc
 and resulting revision. Validated custom Modbus profile creates/changes are audited
 at explicit draft persistence. Rejection acknowledgement emits its lifecycle after
 validation under the configuration lock; an already acknowledged revision is a
-no-op. Rotation, manual-credential-fallback completion and manual-command HTTP
-operations remain absent on integration `491054ab`. Flow-node commands are not
-automatically classified as manual commands. Helper tests for these action names
-are not evidence of runtime hookup.
+no-op. Manual fallback and manual-command HTTP operations are also wired, as
+described below. Flow-node commands are not classified as manual commands.
+Helper tests for action names alone are not evidence of runtime hookup.
 
 ### Commissioning stack composition
 
-Commissioning PR #1817 at `f136365b` emits through the same host bridge. Its
+The composed commissioning stack emits through the same host bridge. Its
 `auditCommissioning` helper uses `wago.commissioning` subjects (the persisted
 session ID) for `wago.commissioning.install`, `recover`, `security_inspect`,
 `security_review`, `security_apply`, `security_recover`, `platform_inspect`,
@@ -243,26 +245,57 @@ the commissioning principal migration with its owner stack; do not transplant or
 duplicate it in the core audit migration. Automatic claim needs exactly one
 lifecycle, not both the commissioning helper and another `WagoAudit` wrapper.
 
-### Remaining owner hooks
+### Manual credential completion
 
-- Credential owner: expose an authenticated manual-fallback completion or rotation
-  operation, resolve the real persisted controller ID, and wrap actual completion
-  with `manual_credential_fallback` or `credential_rotation`. Enrollment IDs are not
-  controller IDs. Returning credentials or instructions is not completed fallback.
-- Command owner: add an explicitly authenticated manual command entry point. Pass
-  the initiating principal to execution, allocate the real command UUID before
-  `begin`, then use `attempt` and exactly one `finish` at dispatch/acknowledgement or
-  failure. Map timeout, rejection and transport/shutdown failure to the existing
-  result enums. Never label automatic flow execution as manual or persist values.
-- Configuration owner: retain an allocated/reused revision number on the failure
-  path. Current publication/rollback can persist a pending revision and then fail
-  dispatch; `run` only receives the revision on success. Use one owner-managed
-  lifecycle inside the existing lock, add `{ revision }` to failed completion after
-  allocation, and preserve rollback's `sourceRevision` without an inner duplicate
-  publication lifecycle. Validation failures before lifecycle admission currently
-  emit no attempted event.
+`POST controllers/:id/credentials/manual/complete` requires
+`system.settings.manage`, the physical pairing verifier, the deterministic
+`wago-controller-<hardwareId>` identity and its externally provisioned password.
+It is available only when the broker has no automatic provisioning provider and
+the runtime advertises `claim-expiry-v1`. It does not invent an enrollment ID as
+the audit subject or treat returned instructions as completed provisioning.
 
-These instructions describe owner work not performed by the durable-sink change.
-They remain acceptance gaps, separately from whether existing emitted events are
-durably stored. Software fixtures do not establish controller qualification or
-close the live release gate.
+The handoff carries a server-generated 30-second expiry. The operation waits for
+the matching acknowledgement and retains ownership assertions across pending
+continuations. Success returns `{ controllerId, result: "acknowledged" }` and
+records no credential values. Acknowledgement proves the runtime accepted the
+handoff; it does not establish hardware qualification. A matching receipt also
+prevents permanent credential rollback if the broker's publish receipt later
+fails. An uncertain dispatched handoff fails the HTTP operation and audit
+lifecycle, and a pinned commissioning session retains its durable recovery lease.
+Removal and subsequent commissioning writes remain blocked until explicit
+recovery. Timed-out continuations cannot perform later guarded mutations.
+
+### Authenticated manual commands
+
+`POST controllers/:id/commands` requires `resources.update`. Its body accepts
+`channelId`, `action` (`set` or `pulse`), `value` for `set`, the
+`expectedConfigurationRevision`, and optional `acknowledgementTimeoutSeconds`.
+Unknown fields are rejected. Execution validates against the applied configuration,
+allocates the actual command UUID before the audit attempt, and waits for bounded
+acknowledgement. Acknowledgements for another controller or a completed command
+do not change the lifecycle.
+
+The response is `{ commandId, channelId, operation, result }`, where `result` is
+`acknowledged`, `rejected`, `timeout`, or `transport_failure`. Only
+`acknowledged` finishes as succeeded. Dispatch rejection and shutdown use
+`transport_failure`; absent acknowledgements and stalled dispatch use `timeout`.
+Audit details contain this bounded identity/result projection, never the command
+value, raw acknowledgement, broker payload or transport error. Automatic flow
+commands continue through their existing execution path without manual audit
+events.
+
+### Fixture acceptance and remaining integration
+
+`apps/api/src/audit/wago-hooks.integration.spec.ts` mounts the actual WAGO HTTP
+controller with the host authentication and permission guards, real WAGO services,
+registered migrations, the SDK bridge and a separate durable SQLite audit
+connection. Token validation, runtime artifact acquisition, broker/SSH transport
+and credential-provider boundaries use isolated fixtures. It covers automatic claim, reopen persistence,
+publication/rollback failure correlation, guarded unclaim, manual-command terminal
+results, manual-fallback permission/expiry admission and acknowledgement ordering.
+
+Credential rotation remains a separate operation-owner integration; its final
+route and completion contract must be documented with that implementation. The
+shared `credential_rotation` event policy is already available. Software fixtures
+do not establish controller qualification or close the physical acceptance and
+release gates.

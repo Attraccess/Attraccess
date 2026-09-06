@@ -67,6 +67,8 @@ const STALE_AFTER_MS = 90_000;
 const MAX_PENDING_CONFIGURATION_REPORTS = 100;
 const ENROLLMENT_RETRY_MS = 60_000;
 
+export class WagoCredentialOperationUncertainError extends ConflictException {}
+
 class MqttSubscriptionError extends Error {
   constructor(readonly mqttError: unknown) {
     super(String(mqttError));
@@ -1040,30 +1042,61 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       input.password.length > 4096
     )
       throw new BadRequestException('Supply the controller identity and provisioned password');
+    if (!(JSON.parse(controller.capabilities) as string[]).includes('claim-expiry-v1'))
+      throw new ConflictException('Install a runtime supporting expiring claims before manual credential fallback');
     return new WagoAudit(this.context).run(principal, id, 'manual_credential_fallback', {}, async () => {
+      let active = true;
+      let dispatched = false;
+      const expiresAt = new Date(Date.now() + 30_000).toISOString();
+      const assertActive = async () => {
+        if (!active) throw new ConflictException('Controller credential operation ended');
+        await assertOwned();
+        if (!active) throw new ConflictException('Controller credential operation ended');
+      };
       let acknowledged!: () => void;
       const receipt = new Promise<void>((resolve) => {
         acknowledged = resolve;
       });
-      await this.claim(id, input.name, input.verifier, undefined, assertOwned, {
-        credentials: { username: input.username, password: input.password },
-        acknowledged,
-      });
       let timer: ReturnType<typeof setTimeout> | undefined;
+      const expiration = new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          active = false;
+          reject(
+            dispatched
+              ? new WagoCredentialOperationUncertainError('Controller credential acknowledgement timed out')
+              : new ConflictException('Controller credential acknowledgement timed out'),
+          );
+        }, 30_000);
+      });
       try {
+        // A timed-out continuation keeps the claim lock until its await settles;
+        // assertActive prevents any later persistence, publication or revocation.
         await Promise.race([
-          receipt,
-          new Promise<never>((_resolve, reject) => {
-            timer = setTimeout(
-              () => reject(new ConflictException('Controller credential acknowledgement timed out')),
-              30_000,
-            );
-          }),
+          (async () => {
+            await this.claim(id, input.name, input.verifier, undefined, assertActive, {
+              credentials: { username: input.username, password: input.password },
+              acknowledged,
+              expiresAt,
+              dispatched: () => {
+                dispatched = true;
+              },
+            });
+            await receipt;
+            await assertActive();
+          })(),
+          expiration,
         ]);
-        await assertOwned();
         return { controllerId: id, result: 'acknowledged' as const };
+      } catch (error) {
+        if (dispatched && !(error instanceof WagoCredentialOperationUncertainError))
+          throw new WagoCredentialOperationUncertainError(
+            'Controller credential handoff is uncertain; recover the controller operation before retrying',
+          );
+        throw error;
       } finally {
+        active = false;
         clearTimeout(timer);
+        if (controller.enrollmentId) this.clearClaimAcknowledgement(controller.enrollmentId);
       }
     });
   }
@@ -1074,7 +1107,12 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     verifier: string,
     mqttServerId?: number,
     assertOwned: () => Promise<void> = async () => undefined,
-    manual?: { credentials: { username: string; password: string }; acknowledged: () => void },
+    manual?: {
+      credentials: { username: string; password: string };
+      acknowledged: () => void;
+      expiresAt: string;
+      dispatched: () => void;
+    },
   ): Promise<WagoController> {
     return this.withClaimLock(id, async () => {
       const prepared = await this.withClaimConfigurationLock(() =>
@@ -1083,8 +1121,13 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       try {
         const acknowledgementToken = randomBytes(24).toString('base64url');
         await assertOwned();
-        await this.watchClaimAcknowledgement(prepared, acknowledgementToken, manual?.acknowledged);
+        await this.watchClaimAcknowledgement(
+          prepared,
+          acknowledgementToken,
+          manual ? { acknowledged: manual.acknowledged, assertOwned } : undefined,
+        );
         await assertOwned();
+        manual?.dispatched();
         await this.context.mqtt.publish(
           prepared.mqttServerId,
           `${discoveryTopic(prepared.controller.hardwareId)}/claim`,
@@ -1093,6 +1136,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
             password: prepared.credential.password,
             configuration: prepared.configuration,
             acknowledgementToken,
+            ...(manual ? { expiresAt: manual.expiresAt } : {}),
           }),
           { qos: 1 },
         );
@@ -1108,10 +1152,17 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
         if (!prepared.credentialDelivered) await this.restoreUnclaimedController(prepared, assertOwned);
         throw error;
       } finally {
-        await this.subscribeConfiguredServers().catch((error) => {
-          this.context.logger.warn(`Could not refresh WAGO MQTT subscriptions after claim: ${String(error)}`);
-          this.scheduleSubscriptionRetry();
-        });
+        const mayRefresh =
+          !manual ||
+          (await assertOwned().then(
+            () => true,
+            () => false,
+          ));
+        if (mayRefresh)
+          await this.subscribeConfiguredServers().catch((error) => {
+            this.context.logger.warn(`Could not refresh WAGO MQTT subscriptions after claim: ${String(error)}`);
+            this.scheduleSubscriptionRetry();
+          });
       }
     });
   }
@@ -1578,23 +1629,50 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       controller: WagoController;
       enrollment: WagoEnrollment;
       mqttServerId: number;
+      credentialDelivered?: boolean;
     },
     acknowledgementToken: string,
-    acknowledged?: () => void,
+    manual?: { acknowledged: () => void; assertOwned: () => Promise<void> },
   ): Promise<void> {
     const topic = `${discoveryTopic(prepared.controller.hardwareId)}/claim/ack`;
     const subscription = await this.subscribeMqtt(prepared.mqttServerId, topic, async (message) => {
       if (!isClaimAcknowledgement(message.payload, acknowledgementToken)) return;
-      acknowledged?.();
+      if (
+        manual &&
+        !(await manual.assertOwned().then(
+          () => true,
+          () => false,
+        ))
+      )
+        return;
+      prepared.credentialDelivered = true;
       this.clearClaimAcknowledgement(prepared.enrollment.id);
       try {
-        await this.revokeEnrollment(prepared.enrollment);
+        await this.revokeEnrollment(prepared.enrollment, manual?.assertOwned);
       } catch (error) {
         this.context.logger.warn(
           `Could not revoke acknowledged WAGO enrollment ${prepared.enrollment.id}: ${String(error)}`,
         );
       }
+      if (
+        manual &&
+        (await manual.assertOwned().then(
+          () => true,
+          () => false,
+        ))
+      )
+        manual.acknowledged();
     });
+    if (
+      manual &&
+      !(await manual.assertOwned().then(
+        () => true,
+        () => false,
+      ))
+    ) {
+      subscription.unsubscribe();
+      return;
+    }
     this.claimAcknowledgementSubscriptions.set(prepared.enrollment.id, subscription);
   }
 

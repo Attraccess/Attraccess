@@ -18,7 +18,7 @@ function fixture(claimed = true) {
     pairingCodeHash: createHash('sha256').update('pair').digest('hex'),
     compatibilityError: null,
     protocolVersion: '1.0.0',
-    capabilities: '["configuration-v1"]',
+    capabilities: '["configuration-v1","claim-expiry-v1"]',
   });
   const enrollment = Object.assign(new WagoEnrollment(), {
     id: 3,
@@ -171,6 +171,86 @@ describe('real manual administration lifecycle boundaries', () => {
     expect(JSON.stringify(h.record.mock.calls)).not.toContain(privateValue);
     h.service.onModuleDestroy();
   });
+  it('preserves acknowledged permanent credentials when the broker publish callback later rejects', async () => {
+    const h = fixture(false);
+    h.publish.mockImplementation(async (_server, topic, payload) => {
+      if (!topic.endsWith('/claim')) return;
+      const message = JSON.parse(payload);
+      expect(Date.parse(message.expiresAt)).toBeGreaterThan(Date.now());
+      await h.acknowledge(`${topic}/ack`, { acknowledgementToken: message.acknowledgementToken });
+      throw new Error('lost broker acknowledgement');
+    });
+    await expect(
+      h.service.completeManualCredentials(
+        7,
+        { name: 'Fixture', verifier: 'pair', username: 'wago-controller-fixture', password: privateValue },
+        principal,
+      ),
+    ).rejects.toThrow('handoff is uncertain');
+    expect(h.controller.trustState).toBe('claimed');
+    expect(h.provider.revoke.mock.calls.map(([request]) => request.identity)).toEqual(['enrollment-fixture']);
+    expect(h.record.mock.calls.map(([event]) => event.outcome)).toEqual(['attempted', 'failed']);
+    h.service.onModuleDestroy();
+  });
+
+  it.each([false, true])(
+    'bounds stalled fallback dispatch and forbids its late continuation (early ack %p)',
+    async (earlyAck) => {
+      jest.useFakeTimers();
+      const h = fixture(false);
+      let finishPublish!: () => void;
+      h.publish.mockImplementation(async (_server, topic, payload) => {
+        if (!topic.endsWith('/claim')) return;
+        if (earlyAck)
+          await h.acknowledge(`${topic}/ack`, { acknowledgementToken: JSON.parse(payload).acknowledgementToken });
+        await new Promise<void>((resolve) => {
+          finishPublish = resolve;
+        });
+      });
+      const result = h.service.completeManualCredentials(
+        7,
+        { name: 'Fixture', verifier: 'pair', username: 'wago-controller-fixture', password: privateValue },
+        principal,
+      );
+      const rejected = expect(result).rejects.toThrow('acknowledgement timed out');
+      await jest.advanceTimersByTimeAsync(30_001);
+      await rejected;
+      expect(h.record.mock.calls.map(([event]) => event.outcome)).toEqual(['attempted', 'failed']);
+      expect(h.controller).toMatchObject({ trustState: 'claimed', credentialMqttServerId: 2 });
+      const revocations = h.provider.revoke.mock.calls.length;
+      finishPublish();
+      await jest.advanceTimersByTimeAsync(1);
+      expect(h.publish).toHaveBeenCalledTimes(1);
+      expect(h.provider.revoke).toHaveBeenCalledTimes(revocations);
+      h.service.onModuleDestroy();
+    },
+  );
+  it('ignores a late acknowledgement after timeout and ownership loss', async () => {
+    jest.useFakeTimers();
+    const h = fixture(false);
+    let owned = true;
+    let token = '';
+    h.publish.mockImplementation(async (_server, topic, payload) => {
+      if (topic.endsWith('/claim')) token = JSON.parse(payload).acknowledgementToken;
+    });
+    const result = h.service.completeManualCredentials(
+      7,
+      { name: 'Fixture', verifier: 'pair', username: 'wago-controller-fixture', password: privateValue },
+      principal,
+      async () => {
+        if (!owned) throw new Error('lease_lost');
+      },
+    );
+    const rejected = expect(result).rejects.toThrow('acknowledgement timed out');
+    await jest.advanceTimersByTimeAsync(30_001);
+    await rejected;
+    owned = false;
+    await h.acknowledge('attraccess/wago/discovery/fixture/claim/ack', { acknowledgementToken: token });
+    expect(h.provider.revoke).not.toHaveBeenCalled();
+    expect(h.record.mock.calls.map(([event]) => event.outcome)).toEqual(['attempted', 'failed']);
+    h.service.onModuleDestroy();
+  });
+
   it('does not audit successful fallback or revoke permanent credentials when acknowledgement is missing', async () => {
     jest.useFakeTimers();
     const h = fixture(false);

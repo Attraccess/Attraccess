@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PLUGIN_CONTEXT, PluginContext, Repository } from '@attraccess/plugins-backend-sdk';
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
-import { WagoService } from './wago.service';
+import { WagoService, WagoCredentialOperationUncertainError } from './wago.service';
 import { commissioningVerification } from './wago-commissioning-verification';
 import { WagoController } from './wago-controller.entity';
 import { assertCommissioningBroker } from './wago-commissioning-preflight';
@@ -915,6 +915,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
           try {
             outcome = { value: await operation() };
           } catch (error) {
+            if (error instanceof WagoCredentialOperationUncertainError) this.uncertainRemoteOperations.add(guard);
             outcome = { error };
           }
           if (this.uncertainRemoteOperations.has(guard)) {
