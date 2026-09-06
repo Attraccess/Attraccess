@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -109,6 +109,15 @@ function diagnosticsFixture(controllerId = 1): WagoDiagnostics {
 }
 
 let client: QueryClient;
+const originalScrollTo = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTo');
+beforeAll(() => {
+  // JSDOM has no layout scrolling; React Aria calls this when opening a collection.
+  Object.defineProperty(Element.prototype, 'scrollTo', { configurable: true, value: vi.fn() });
+});
+afterAll(() => {
+  if (originalScrollTo) Object.defineProperty(Element.prototype, 'scrollTo', originalScrollTo);
+  else Reflect.deleteProperty(Element.prototype, 'scrollTo');
+});
 beforeEach(() => {
   vi.clearAllMocks();
   state.validate.mockResolvedValue({ valid: true, errors: [] });

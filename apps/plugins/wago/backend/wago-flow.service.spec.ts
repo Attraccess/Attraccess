@@ -5,6 +5,7 @@ import { WagoFlowService } from './wago-flow.service';
 import { WagoSettings } from './wago-settings.entity';
 import { parseOperationalMessage } from './protocol';
 import { encodeMeasurement } from '../measurement-contract';
+import plugin from './plugin';
 
 const STREAM_A = '11111111-1111-4111-8111-111111111111';
 const STREAM_B = '22222222-2222-4222-8222-222222222222';
@@ -55,6 +56,16 @@ describe('WagoFlowService', () => {
     } as unknown as PluginContext;
     return { service: new WagoFlowService(context), trigger, context, revisionQuery, revisionRepository };
   }
+
+  it('registers the plugin before the host datasource is available', () => {
+    const { context } = createService();
+    const getRepository = jest.spyOn(context, 'getRepository').mockImplementation(() => {
+      throw new Error('Host DataSource is not available yet');
+    });
+    getRepository.mockClear();
+    expect(() => plugin.register(context)).not.toThrow();
+    expect(getRepository).not.toHaveBeenCalled();
+  });
 
   it('serializes concurrent controller messages before asynchronous channel resolution', async () => {
     const { service } = createService();
