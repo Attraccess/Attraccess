@@ -83,6 +83,25 @@ describe('runtime credential rotation persistence and reconnect acknowledgement'
     );
   });
 
+  it('never advertises rotation in discovery, even after an operational subscription succeeds', async () => {
+    const beforeStart = create();
+    await beforeStart.publishDiscoveryAnnouncement();
+    const discovery = 'attraccess/wago/discovery/fixture';
+    expect(publish.mock.calls.find(([name]) => name === discovery)?.[1].capabilities).not.toContain(
+      'credential-rotation-v1',
+    );
+    publish.mockClear();
+    await runtime.publishDiscoveryAnnouncement();
+    expect(publish.mock.calls.find(([name]) => name === discovery)?.[1].capabilities).not.toContain(
+      'credential-rotation-v1',
+    );
+    publish.mockClear();
+    await runtime.publishHeartbeat();
+    expect(publish.mock.calls.find(([name]) => name.endsWith('/heartbeat'))?.[1].capabilities).toContain(
+      'credential-rotation-v1',
+    );
+  });
+
   it('replays its completion after process restart and rejects superseded credential handoffs', async () => {
     await send(input);
     runtime = create();

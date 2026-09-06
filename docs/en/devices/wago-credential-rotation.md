@@ -6,7 +6,12 @@ up to 30 seconds for the controller to reconnect with the persisted credentials.
 Only that reconnect acknowledgement completes `wago.credential_rotation`. The API
 returns a rotation revision and state, never the password or recovery token.
 
-The operation requires runtime capability `credential-rotation-v1`. Its broker topic
+The operation requires runtime capability `credential-rotation-v1` from a permanent
+connection heartbeat received within 90 seconds. Discovery never advertises this
+capability: the runtime must first connect with its claimed credentials and subscribe
+successfully before a new broker password can be issued. Pending retries do not
+require another heartbeat because they reuse the already issued password.
+Its broker topic
 policy must allow the controller to subscribe to
 `<namespace>/v1/controllers/<hardwareId>/credentials/rotate` and publish under its
 own controller namespace. Initial credential provisioning must include this
@@ -53,10 +58,10 @@ All operations run within the existing controller-operation lease. The owner mus
 pass its `assertOwned`, abort signal, and deadline into the rotation service,
 retain the lease on `WagoCredentialRotationUncertainError`, and call
 `assertRemovalBroker` before existing removal revokes credentials. The module owns
-no second controller lock. Register `WagoCredentialRotationEntity`,
-`WagoCredentialRotationService`, and `WagoCredentialRotation1780010610000` in the
-plugin. The HTTP owner must authenticate with `system.settings.manage`, derive the
-principal from the authenticated request, and require explicit rotation/retry intent.
+no second controller lock. The plugin registers `WagoCredentialRotationEntity` and
+`WagoCredentialRotation1780010610000`; `WagoService` owns the rotation service.
+The HTTP entry point authenticates with `system.settings.manage`, derives the
+principal from the authenticated request, and requires explicit rotation/retry intent.
 
 Completed rows retain the monotonically increasing revision. Downgrade refuses to
 erase any rotation history while its controller registration remains. Recovery
