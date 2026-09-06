@@ -1,4 +1,4 @@
-import { isCc100Fw31Identity } from './wago-firmware-identity';
+import { isCc100Fw31Identity, wagoFw31IdentityRead } from './wago-firmware-identity';
 import { MANAGEMENT_INSPECTION_COMMAND } from './wago-management-inspection';
 import { ManagementPeerVersion } from './wago-management-peer-version';
 import {
@@ -1195,7 +1195,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       host,
       fingerprint,
       credential,
-      "cat /etc/os-release; printf '\\nCODESYS='; ps -eo comm=",
+      `${wagoFw31IdentityRead()}; printf '\\nCODESYS='; ps -eo comm=`,
     );
     const marker = '\nCODESYS=';
     const markerIndex = output.indexOf(marker);

@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { WAGO_DIN, WAGO_DOUT, wagoRuntimeBootScript } from '../wago-hardware-deployment';
+import { fw31Model, fw31OsRelease, fw31Revisions } from './fw31-identity';
 
 export interface FixtureContainer {
   id: string;
@@ -59,7 +60,9 @@ export function fw31ShellFixture() {
   file('proc/1/stat', '1 (init) S 0 ' + '0 '.repeat(17) + '1\n');
   file('proc/1/cgroup', '0::/\n');
   mkdirSync(join(root, 'proc/1/fd'));
-  file('etc/os-release', 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"\nVERSION="4.9.1(31)"\n');
+  file('etc/os-release', fw31OsRelease);
+  file('etc/REVISIONS', fw31Revisions);
+  file('sys/firmware/devicetree/base/model', fw31Model);
   file('etc/specific/rtsversion', '0');
   file(WAGO_DIN, '5', 0o400);
   file(WAGO_DOUT, '2', 0o600);

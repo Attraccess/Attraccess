@@ -29,6 +29,7 @@ import { WagoService } from '../../../plugins/wago/backend/wago.service';
 import { WagoControllerApi } from '../../../plugins/wago/backend/wago.controller';
 import { WagoController } from '../../../plugins/wago/backend/wago-controller.entity';
 import { WagoCommissioningService } from '../../../plugins/wago/backend/wago-commissioning.service';
+import { fw31IdentityOutput } from '../../../plugins/wago/backend/fixtures/fw31-identity';
 import { WagoCommissioningSession } from '../../../plugins/wago/backend/wago-commissioning-session.entity';
 import { commissioningFingerprintHash } from '../../../plugins/wago/backend/wago-commissioning-lease';
 import { WagoCommissioningLeaseEntity } from '../../../plugins/wago/backend/wago-commissioning-lease.entity';
@@ -225,7 +226,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     });
     commissioning = new WagoCommissioningService(context, wago, artifacts);
     // Replace only transport boundaries; delivery, inspection, leases and automatic claim remain real.
-    commissioning['run'] = jest.fn(async () => 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="31"\nCODESYS=\n');
+    commissioning['run'] = jest.fn(async () => `${fw31IdentityOutput()}\nCODESYS=\n`);
     commissioning['copyTo'] = jest.fn(async () => undefined);
     await commissioning.onApplicationBootstrap();
     await mountApi();
