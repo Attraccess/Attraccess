@@ -46,7 +46,9 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
                   aria-current={isActive ? 'page' : undefined}
                   className={cn(
                     'rounded-lg px-3 py-2 text-sm',
-                    isActive ? 'bg-surface-secondary font-medium text-foreground' : 'text-muted hover:text-foreground',
+                    isActive
+                      ? 'bg-accent-soft font-medium text-accent-soft-foreground'
+                      : 'text-muted hover:text-foreground',
                   )}
                 >
                   {t(`sections.${section.key}.label`)}

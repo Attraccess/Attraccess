@@ -2,9 +2,9 @@
   <mj-head>
     <mj-attributes>
       <mj-all font-family="Helvetica, Arial, sans-serif" />
-      <mj-text font-size="16px" line-height="1.5" color="#1F2937" />
+      <mj-text font-size="16px" line-height="1.5" color="#202B30" />
       <mj-button
-        background-color="#2563EB"
+        background-color="#256D7B"
         color="#FFFFFF"
         font-size="16px"
         font-weight="bold"
@@ -14,10 +14,10 @@
       />
     </mj-attributes>
     <mj-style>
-      a { color: #2563EB; text-decoration: none; }
+      a { color: #256D7B; text-decoration: none; }
     </mj-style>
   </mj-head>
-  <mj-body background-color="#F8FAFC" width="600px">
+  <mj-body background-color="#FFFFFF" width="600px">
     <mj-section background-color="#FFFFFF" padding="24px 0 16px 0">
       <mj-column>
         <mj-image
@@ -32,7 +32,7 @@
 
     <mj-section padding="0">
       <mj-column>
-        <mj-divider border-color="#E2E8F0" border-width="1px" />
+        <mj-divider border-color="#D6DEDE" border-width="1px" />
       </mj-column>
     </mj-section>
 
@@ -40,17 +40,17 @@
 
     <mj-section padding="0">
       <mj-column>
-        <mj-divider border-color="#E2E8F0" border-width="1px" />
+        <mj-divider border-color="#D6DEDE" border-width="1px" />
       </mj-column>
     </mj-section>
     <mj-section background-color="#FFFFFF" padding="16px 20px">
       <mj-column>
-        <mj-text font-size="12px" color="#9CA3AF" align="center" padding="0">
-          <a href="https://attraccess.org" style="color:#9CA3AF;">attraccess.org</a>
+        <mj-text font-size="12px" color="#536369" align="center" padding="0">
+          <a href="https://attraccess.org" style="color:#536369;">attraccess.org</a>
           &nbsp;·&nbsp;
-          <a href="{{host.frontend}}" style="color:#9CA3AF;">{{host.frontend}}</a>
+          <a href="{{host.frontend}}" style="color:#536369;">{{host.frontend}}</a>
           &nbsp;·&nbsp;
-          <a href="{{host.notificationPreferencesUrl}}" style="color:#9CA3AF;">Notification preferences</a>
+          <a href="{{host.notificationPreferencesUrl}}" style="color:#536369;">Notification preferences</a>
         </mj-text>
       </mj-column>
     </mj-section>

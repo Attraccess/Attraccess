@@ -99,8 +99,8 @@ export function AttraccessNode(props: Props) {
 
     return cn(baseClasses, {
       'border-2 border-gray-500': processingState === ProcessingState.IDLE && !isSelected,
-      'border-2 border-primary-500 ring-2 ring-primary-300 dark:ring-primary-700': isSelected && processingState === ProcessingState.IDLE,
-      'animate-pulse border-2 border-blue-500': processingState === ProcessingState.PROCESSING,
+      'border-2 border-accent ring-2 ring-accent/30': isSelected && processingState === ProcessingState.IDLE,
+      'animate-pulse border-2 border-accent': processingState === ProcessingState.PROCESSING,
       'border-2 border-red-500': processingState === ProcessingState.FAILED,
       'border-2 border-green-500': processingState === ProcessingState.COMPLETED,
       'border-2 border-warning': Boolean(validationError),
@@ -204,7 +204,7 @@ export function AttraccessNode(props: Props) {
                         className={cn(
                           'w-2 h-2 rounded-full shrink-0',
                           processingState === ProcessingState.PROCESSING
-                            ? 'bg-blue-500 animate-pulse'
+                            ? 'bg-accent animate-pulse'
                             : processingState === ProcessingState.COMPLETED
                               ? 'bg-green-500'
                               : processingState === ProcessingState.FAILED

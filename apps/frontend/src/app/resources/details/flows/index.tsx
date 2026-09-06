@@ -419,6 +419,7 @@ function FlowsPageInner() {
           }}
         >
           <ReactFlow
+            className="[--xy-background-color:var(--background)] [--xy-selection-background-color:var(--accent-soft)] [--xy-selection-border:1px_dotted_var(--accent)]"
             nodes={nodes}
             edges={edgesWithCorrectType}
             onNodesChange={onNodesChange}

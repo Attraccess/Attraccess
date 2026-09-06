@@ -11,8 +11,8 @@ const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'wheel',
 
 /**
  * Screensaver for the unauthenticated kiosk login screen. After {@link IDLE_MS} of no input it blanks
- * the screen to match the companion's secondary-display lock (dimmed "Locked by" + Attraccess logo on
- * a dark field). Any input dismisses it and reveals the login form again.
+ * the screen with neutral "Locked by" copy and the brand-colored Attraccess logo on white.
+ * Any input dismisses it and reveals the login form again.
  */
 export function KioskScreensaver({ enabled }: { enabled: boolean }) {
   const { t } = useTranslations({ en, de });
@@ -46,11 +46,11 @@ export function KioskScreensaver({ enabled }: { enabled: boolean }) {
   // a button on the login form underneath. The window listeners above clear `active` and re-arm.
   return (
     <div
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-[#0f172a] text-slate-300"
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-white text-accent"
       onPointerDown={(e) => e.preventDefault()}
     >
-      <span className="text-sm tracking-wide opacity-[0.55]">{t('lockedBy')}</span>
-      <AttraccessLogo className="w-[38vw] max-w-[520px] opacity-[0.55]" />
+      <span className="text-sm tracking-wide text-zinc-600">{t('lockedBy')}</span>
+      <AttraccessLogo className="w-[38vw] max-w-[520px]" />
     </div>
   );
 }

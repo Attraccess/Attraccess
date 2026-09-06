@@ -147,7 +147,7 @@ export function AttractapDiagnostics(props: Readonly<Props>) {
                 <div
                   key={report.id}
                   className="flex-1 rounded-t-sm min-w-[6px]"
-                  style={{ height: `${heightPct}%`, backgroundColor: 'oklch(0.62 0.195 253.83)' }}
+                  style={{ height: `${heightPct}%`, backgroundColor: 'var(--accent)' }}
                   title={`${formatBytes(report.heapFreeBytes, fallback)} — ${new Date(
                     report.createdAt,
                   ).toLocaleString()}`}

@@ -49,9 +49,7 @@ export function Layout({ children }: LayoutProps) {
   };
 
   // Desktop-only: collapse the sidebar to an icon rail for more content space
-  const [isCollapsed, setIsCollapsed] = useState(
-    () => localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true',
-  );
+  const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true');
   const toggleCollapsed = useCallback(() => {
     setIsCollapsed((prev) => {
       localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(!prev));
@@ -126,7 +124,9 @@ export function Layout({ children }: LayoutProps) {
         <GlobalPushNotifications enabled={isAuthenticated && !needsTwoFactorSetup} />
 
         {/* Page Content */}
-        <main className="flex-1 min-h-0 overflow-auto p-4 bg-background app-scroll-container">{children}</main>
+        <main className="flex-1 min-h-0 overflow-auto p-4 md:p-6 lg:p-8 bg-background app-scroll-container">
+          {children}
+        </main>
 
         {/* Global donation prompt for eligible users */}
         <DonationPrompt />

@@ -57,7 +57,7 @@ function RabbitmqPage() {
   return (
     <div className="rmq:flex rmq:flex-col rmq:gap-6 rmq:p-6 rmq:max-w-4xl rmq:mx-auto">
       <div className="rmq:flex rmq:items-center rmq:gap-3">
-        <RabbitIcon className="rmq:w-6 rmq:h-6 rmq:text-primary" />
+        <RabbitIcon className="rmq:w-6 rmq:h-6 rmq:text-accent-soft-foreground" />
         <h1 className="rmq:text-2xl rmq:font-semibold rmq:text-default-800">RabbitMQ</h1>
       </div>
       <Card className="rmq:border rmq:border-default-200 rmq:dark:border-default-100">

@@ -9,7 +9,7 @@ if (!rootEl) throw new Error('Missing #root element');
 
 createRoot(rootEl).render(
   <StrictMode>
-    <Providers defaultTheme="dark">
+    <Providers defaultTheme="light">
       <WizardApp />
     </Providers>
   </StrictMode>
