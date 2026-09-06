@@ -519,7 +519,13 @@ describe('WagoCommissioningService', () => {
           codesys: scenario === 'codesys' ? 'active' : 'inactive',
         });
         const copy = jest.fn().mockResolvedValue(undefined);
-        const install = jest.fn().mockResolvedValue('');
+        const install = jest
+          .fn()
+          .mockImplementation(async (_host, _pin, _credential, script: string) =>
+            script.includes("printf 'epoch=")
+              ? `epoch=${Math.floor(Date.now() / 1000)}\nuptime=100.00\nboot=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\ntool=supported\n`
+              : '',
+          );
         service['copyTo'] = copy;
         service['sudoRunScript'] = install;
         if (scenario === 'prerequisites') install.mockRejectedValue(new Error('private output'));
@@ -571,7 +577,7 @@ describe('WagoCommissioningService', () => {
         expect(result.state).toBe('awaiting_discovery');
         expect(sudo).not.toHaveBeenCalled();
         expect(copy).toHaveBeenCalledTimes(1);
-        expect(install).toHaveBeenCalledTimes(3);
+        expect(install).toHaveBeenCalledTimes(4);
         expect(session.codesysState).toBe('disabled');
         expect(install.mock.calls[0][3]).toContain('runtime-version=0');
         expect(copy.mock.calls[0][4]).toContain('flock -n 9');
@@ -745,6 +751,7 @@ describe('WagoCommissioningService', () => {
       { username: 'root', password: 'wago' },
       'base64 -d | sh',
       'script',
+      undefined,
     );
   });
 
@@ -767,6 +774,7 @@ describe('WagoCommissioningService', () => {
       { username: 'operator', password: 'secret' },
       "sudo -S sh -c 'base64 -d | sh'",
       'secret\nscript',
+      undefined,
     );
   });
 

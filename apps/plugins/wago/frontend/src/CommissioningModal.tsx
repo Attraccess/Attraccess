@@ -751,8 +751,9 @@ function DeliveryStep({
               <Checkbox.Indicator />
             </Checkbox.Control>
             <Checkbox.Content>
-              I approve this destructive installation, including permanent CODESYS disablement and possible loss of
-              existing applications and data, without preservation, backup, or restoration by Attraccess.
+              I approve this destructive installation, including synchronization of controller system and hardware
+              clocks to application UTC, permanent CODESYS disablement and possible loss of existing applications and
+              data, without preservation, backup, or restoration by Attraccess.
             </Checkbox.Content>
           </Checkbox>
           <p className="wg:text-sm wg:text-muted">

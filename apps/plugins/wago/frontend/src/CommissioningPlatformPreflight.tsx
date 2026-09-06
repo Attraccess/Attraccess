@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
 import type { CommissioningSession } from './api';
-import type { WagoHardwareDeploymentReport } from '../../shared/commissioning';
+import type { WagoCommissioningPreflightReport } from '../../shared/commissioning';
 
 const api = createPluginApiClient('/api/wago/commissioning/sessions');
 export function CommissioningPlatformPreflight({ session }: { session: CommissioningSession }) {
@@ -22,7 +22,7 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
     [],
   );
   const current = updated && updated.updatedAt >= session.updatedAt ? updated : session;
-  let report: WagoHardwareDeploymentReport | null = null;
+  let report: WagoCommissioningPreflightReport | null = null;
   try {
     report = JSON.parse(current.platformReport ?? 'null');
   } catch {
@@ -67,8 +67,9 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
     <section className="wg:space-y-3" aria-label="Controller installation preflight">
       <h3>Controller installation preflight</h3>
       <p>
-        Optionally inspect firmware, digital I/O access, CODESYS and Docker before installation. Inspection does not
-        change the controller. Installation checks these again under your destructive-install approval.
+        Optionally inspect firmware, UTC clock skew, digital I/O access, CODESYS and Docker before installation.
+        Inspection does not change the controller. Installation checks these again under your destructive-install
+        approval.
       </p>
       {codesysDisabled && (
         <p role="status">
@@ -76,7 +77,40 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
           live controller status check.
         </p>
       )}
-      {report && (
+      {report?.clock && (
+        <dl>
+          <dt>Saved clock result (not live)</dt>
+          <dd>{report.clock.result}</dd>
+          <dt>Application UTC reference</dt>
+          <dd>{report.clock.hostUtc}</dd>
+          <dt>Controller UTC</dt>
+          <dd>{report.clock.controllerUtc}</dd>
+          <dt>Clock observation</dt>
+          <dd>
+            {report.clock.observation}; uncertainty {report.clock.uncertaintySeconds} seconds. A failed action does not
+            prove the clock was unchanged.
+          </dd>
+          <dt>Clock skew (controller minus application)</dt>
+          <dd>{report.clock.skewSeconds} seconds</dd>
+          {report.clock.previousSkewSeconds !== undefined && (
+            <>
+              <dt>Before correction</dt>
+              <dd>{report.clock.previousSkewSeconds} seconds</dd>
+            </>
+          )}
+          <dt>Clock tool / action</dt>
+          <dd>
+            {report.clock.tool} / {report.clock.action}
+          </dd>
+        </dl>
+      )}
+      {report?.clock?.result === 'correction-required' && (
+        <p>
+          Installation will synchronize supported FW31 clocks to application UTC under your install approval, then
+          verify the result before enrollment. Inspection never changes time.
+        </p>
+      )}
+      {report?.platform && (
         <dl>
           <dt>Report source</dt>
           <dd>Saved inspection snapshot; these values are not live controller status.</dd>

@@ -29,6 +29,7 @@ import { WagoService } from '../../../plugins/wago/backend/wago.service';
 import { WagoControllerApi } from '../../../plugins/wago/backend/wago.controller';
 import { WagoController } from '../../../plugins/wago/backend/wago-controller.entity';
 import { WagoCommissioningService } from '../../../plugins/wago/backend/wago-commissioning.service';
+import { CLOCK_INSPECTION_SCRIPT } from '../../../plugins/wago/backend/wago-commissioning-clock';
 import { WagoCommissioningSession } from '../../../plugins/wago/backend/wago-commissioning-session.entity';
 import { commissioningFingerprintHash } from '../../../plugins/wago/backend/wago-commissioning-lease';
 import { WagoCommissioningLeaseEntity } from '../../../plugins/wago/backend/wago-commissioning-lease.entity';
@@ -225,7 +226,13 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     });
     commissioning = new WagoCommissioningService(context, wago, artifacts);
     // Replace only transport boundaries; delivery, inspection, leases and automatic claim remain real.
-    commissioning['run'] = jest.fn(async () => 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="31"\nCODESYS=\n');
+    commissioning['run'] = jest.fn(async (_host, _fingerprint, _credential, _command, input) => {
+      if (input === Buffer.from(CLOCK_INSPECTION_SCRIPT).toString('base64')) {
+        // Sample at invocation time so the real clock gate verifies fresh, aligned UTC.
+        return `epoch=${Math.floor(Date.now() / 1000)}\nuptime=120.00\nboot=11111111-1111-4111-8111-111111111111\ntool=supported\n`;
+      }
+      return 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="31"\nCODESYS=\n';
+    });
     commissioning['copyTo'] = jest.fn(async () => undefined);
     await commissioning.onApplicationBootstrap();
     await mountApi();
@@ -333,6 +340,15 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     return records;
   }
   async function deliverAndClaim() {
+    jest.mocked(wago.createEnrollment).mockImplementationOnce(async (...args) => {
+      const persisted = await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id });
+      expect(JSON.parse(persisted.platformReport).clock).toMatchObject({
+        observation: 'before-action',
+        action: 'none',
+        result: 'within-tolerance',
+      });
+      return WagoService.prototype.createEnrollment.apply(wago, args);
+    });
     const { body: delivered } = await post(`commissioning/sessions/${session.id}/deliver`, {
       confirmInstall: true,
       temporarySsh: { username: 'root', password: privateValue },
