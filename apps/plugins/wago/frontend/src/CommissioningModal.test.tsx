@@ -108,7 +108,10 @@ describe('FW31 software support boundary', () => {
     expect(screen.getByText(/BSP version alone is insufficient/)).toBeTruthy();
     expect(requests.some(({ url }) => url.endsWith('/activate'))).toBe(false);
   });
-  it.each(['codesys-active', 'codesys-boot-enabled'])('distinguishes saved %s inspection from verified preparation after a later failure', (exclusivity) => {
+  it.each([
+    ['codesys-active', /CODESYS is active/],
+    ['codesys-boot-enabled', /CODESYS is configured to start at boot/],
+  ])('keeps a fresh %s inspection warning despite saved disablement', (exclusivity, warning) => {
     activeSession.state = 'delivery_failed';
     activeSession.dockerProvisionState = 'started';
     activeSession.codesysState = 'disabled';
@@ -121,8 +124,7 @@ describe('FW31 software support boundary', () => {
     expect(screen.getByText(/Controller preparation verified CODESYS stopped and permanently disabled/)).toBeTruthy();
     expect(screen.getByText(/Saved inspection snapshot; these values are not live controller status/)).toBeTruthy();
     expect(screen.getByText(exclusivity, { exact: true })).toBeTruthy();
-    expect(screen.queryByText(/CODESYS is active/)).toBeNull();
-    expect(screen.queryByText(/CODESYS is configured to start at boot/)).toBeNull();
+    expect(screen.getByText(warning)).toBeTruthy();
   });
   it('retains the active CODESYS warning when disabling failed', () => {
     activeSession.state = 'delivery_failed';

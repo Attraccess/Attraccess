@@ -123,14 +123,14 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
           will not create substitute directories.
         </p>
       )}
-      {!codesysDisabled && report?.exclusivity === 'codesys-active' && (
+      {report?.exclusivity === 'codesys-active' && (
         <p>
           CODESYS is active. Destructive installation will stop and permanently disable it. Existing PLC applications
           and data may be lost; Attraccess will not preserve, back up, or restore them. Installation fails if CODESYS
           cannot be verified stopped and disabled before I/O.
         </p>
       )}
-      {!codesysDisabled && report?.exclusivity === 'codesys-boot-enabled' && (
+      {report?.exclusivity === 'codesys-boot-enabled' && (
         <p>
           CODESYS is configured to start at boot. Destructive installation must disable that startup and verify
           CODESYS is stopped before I/O. A stopped process alone is insufficient. No separate PLC preservation or

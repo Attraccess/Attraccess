@@ -37,7 +37,7 @@ export class AuditService implements PluginAuditHostProvider, OnModuleInit, OnMo
     });
     try {
       await storage.initialize();
-      await storage.query('PRAGMA busy_timeout = 100');
+      await storage.query('PRAGMA busy_timeout = 10');
       await storage.query('PRAGMA synchronous = FULL');
       this.storage = storage;
       await this.cleanup();
