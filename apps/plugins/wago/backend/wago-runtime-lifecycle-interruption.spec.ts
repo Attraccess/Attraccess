@@ -23,6 +23,11 @@ describe('published runtime boot hook and interrupted journal disposal (isolated
 
   beforeEach(() => {
     fixture = fw31ShellFixture();
+    fixture.file(
+      'bin/df',
+      '#!/bin/sh\nprintf "Filesystem 1024-blocks Used Available Capacity Mounted on\\nfixture 999999 0 999999 0%% /\\n"\n',
+      0o700,
+    );
   });
   afterEach(() => fixture.dispose());
 
