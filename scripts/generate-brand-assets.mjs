@@ -20,7 +20,7 @@ const pngOptions = { compressionLevel: 9, adaptiveFiltering: false, palette: fal
 const assets = new Map();
 const read = (path) => readFile(resolve(root, path));
 
-const source = (await read('scripts/brand/lockup-original.svg')).toString().replace(/<!--.*?-->\s*/s, '');
+const source = (await read('scripts/brand/lockup-original.svg')).toString();
 const original = await read('scripts/brand/keyhole-original.png');
 assert.equal((source.match(/href="keyhole-original.png"/g) ?? []).length, 1, 'Expected the original raster reference');
 const wordmark = source.match(/<path d="([^"]+)" fill="currentcolor">\s*<\/path>/);
