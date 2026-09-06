@@ -20,6 +20,8 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'scripts/test-wago-production-fleet*'
+      - 'scripts/test-wago-credential-rotation*'
+      - 'scripts/test-wago-commissioning*'
       - 'apps/plugins/wago/measurement-contract.ts'
       - 'libs/plugins-backend-sdk/**'
       - 'apps/plugins/wago/backend/protocol.ts'
@@ -46,6 +48,8 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'scripts/test-wago-production-fleet*'
+      - 'scripts/test-wago-credential-rotation*'
+      - 'scripts/test-wago-commissioning*'
       - 'apps/plugins/wago/measurement-contract.ts'
       - 'libs/plugins-backend-sdk/**'
       - 'apps/plugins/wago/backend/protocol.ts'
@@ -87,6 +91,21 @@ jobs:
         env:
           WAGO_FLEET_DOCKER_CONTEXT: default
         run: pnpm nx run plugin-wago:production-fleet
+      - name: Verify credential rotation and reconnect on an isolated RabbitMQ fixture
+        env:
+          WAGO_FLEET_DOCKER_CONTEXT: default
+        run: pnpm nx run plugin-wago:test-credential-rotation
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - name: Install fixture browser
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Verify signed commissioning, recovery, and mounted desktop/mobile navigation
+        env:
+          PYTHON: python
+        run: pnpm nx run plugin-wago:test-commissioning-acceptance
       - uses: actions/upload-artifact@v4
         with:
           name: wago-cc100-runtime-manifest

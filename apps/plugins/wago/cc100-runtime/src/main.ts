@@ -58,6 +58,14 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
     store,
     transport,
     device: adapter,
+    reconnectCredentials: async (next) => {
+      if (activeClient !== client) throw new Error('Credential handoff connection is no longer active');
+      await runtime.setConnected(false);
+      credentials = next;
+      activeClient.options.username = next.username;
+      activeClient.options.password = next.password;
+      activeClient.reconnect();
+    },
   });
   let initialized = false;
   let connected = false;
@@ -70,7 +78,11 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
       pendingConnectionStates.push(state);
       return;
     }
-    void handleAsync(() => runtime.setConnected(state));
+    void handleAsync(async () => {
+      if (state) await runtime.retryCredentialRotationSubscription();
+      await runtime.setConnected(state);
+      if (state && credentials) await runtime.acknowledgeCredentialRotation(credentials);
+    });
   };
 
   const activateConnectionHandling = async (): Promise<void> => {
@@ -102,6 +114,7 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
           // Also activate if subscriptions fail after commands become reachable.
           await activateConnectionHandling();
         }
+        if (connected && credentials) await runtime.acknowledgeCredentialRotation(credentials);
         heartbeatTimer = setInterval(() => void handleAsync(() => runtime.publishHeartbeat()), 30_000).unref();
         measurementTimer = setInterval(() => void handleAsync(() => runtime.publishMeasurements()), 100).unref();
         inputTimer = setInterval(() => void handleAsync(() => runtime.pollInputs()), 250).unref();

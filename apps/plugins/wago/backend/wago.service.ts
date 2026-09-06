@@ -35,6 +35,8 @@ import {
   type WagoAnnouncement,
 } from './protocol';
 import { WagoController } from './wago-controller.entity';
+import { WagoCredentialRotationService } from './wago-credential-rotation';
+import type { CommissioningOperationGuard } from './wago-commissioning-lease';
 import { WagoSettings } from './wago-settings.entity';
 import { WagoEnrollment } from './wago-enrollment.entity';
 import {
@@ -82,6 +84,7 @@ type WagoControllerSummary = Omit<WagoController, 'fingerprint' | 'pairingCodeHa
 @Injectable()
 export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
   readonly diagnostics = new WagoDiagnosticsStore();
+  private readonly credentialRotation = new WagoCredentialRotationService(this.context);
   private controllers!: Repository<WagoController>;
   private settings!: Repository<WagoSettings>;
   private enrollments!: Repository<WagoEnrollment>;
@@ -999,6 +1002,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
         const credentialServerId =
           controller.credentialMqttServerId ?? (controller.trustState === 'claimed' ? controller.mqttServerId : null);
         if (credentialServerId) {
+          if (controller.credentialEpoch) await this.credentialRotation.assertRemovalBroker(id, credentialServerId);
           const identity = `wago-controller-${controller.hardwareId}`;
           await assertOwned();
           const manual = await this.context.getMqttCredentialProvisioning().revoke({
@@ -1024,6 +1028,20 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
           this.scheduleSubscriptionRetry();
         });
         return controller.hardwareId;
+      }),
+    );
+  }
+
+  credentialRotationStatus(id: number) {
+    return this.credentialRotation.status(id);
+  }
+
+  rotateCredentials(id: number, principal: PluginAuditPrincipal, guard: CommissioningOperationGuard, retry = false) {
+    return this.withClaimLock(id, () =>
+      this.withClaimConfigurationLock(async () => {
+        await guard.assertOwned();
+        const settings = await this.getSettings();
+        return this.credentialRotation.rotate(id, settings.operationalPrefix, principal, guard, retry);
       }),
     );
   }
@@ -1136,6 +1154,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
             password: prepared.credential.password,
             configuration: prepared.configuration,
             acknowledgementToken,
+            credentialEpoch: prepared.controller.credentialEpoch,
             ...(manual ? { expiresAt: manual.expiresAt } : {}),
           }),
           { qos: 1 },
@@ -1224,6 +1243,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     // mqttServerId; removal must still revoke this identity on its original broker.
     await assertOwned();
     controller.credentialMqttServerId = selectedServerId;
+    controller.credentialEpoch ??= randomUUID();
     await this.controllers.save(controller);
     await assertOwned();
     const provisioned =
@@ -1238,6 +1258,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
           subscribe: [
             configurationDesiredTopic(namespace, controller.hardwareId),
             commandTopic(namespace, controller.hardwareId),
+            `${namespace}/v1/controllers/${controller.hardwareId}/credentials/rotate`,
           ],
         },
       }));

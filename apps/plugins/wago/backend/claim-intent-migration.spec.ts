@@ -9,6 +9,8 @@ it('preserves interrupted credential revocation metadata through a full-registry
   }).initialize();
   try {
     await database.runMigrations();
+    // Rotation has no history yet; its newer schema can be removed before checking claim intent.
+    await database.undoLastMigration();
     await database.query(`INSERT INTO plugin_wago_controllers
       (hardware_id, trust_state, pairing_code_hash, protocol_version, runtime_version, capabilities, last_seen_at, created_at, updated_at, credential_mqtt_server_id)
       VALUES ('fixture', 'untrusted', 'fixture', '1', '1', '[]', 'fixture', 'fixture', 'fixture', 19)`);
@@ -16,7 +18,7 @@ it('preserves interrupted credential revocation metadata through a full-registry
     expect(await database.query('SELECT hardware_id, credential_mqtt_server_id FROM plugin_wago_controllers')).toEqual([
       { hardware_id: 'fixture', credential_mqtt_server_id: 19 },
     ]);
-    expect(await database.showMigrations()).toBe(false);
+    expect(await database.showMigrations()).toBe(true);
     await database.query('DELETE FROM plugin_wago_controllers');
     for (let i = 0; i < Object.keys(migrations).length; i++) await database.undoLastMigration();
     expect(await database.showMigrations()).toBe(true);

@@ -70,11 +70,11 @@ values, credential values, arbitrary error strings or raw configuration snapshot
 `system.settings.manage` permission. Settings use `SettingsStoreService` with
 parent `audit` and the following JSON-encoded keys:
 
-| Key | Default | Bounds |
-| --- | --- | --- |
-| `enabled` | `true` | Boolean master switch. |
-| `domains` | `["wago"]` | All currently registered domains; `[]` disables capture. |
-| `retention_days` | `90` | Integer 1..3650. |
+| Key              | Default    | Bounds                                                   |
+| ---------------- | ---------- | -------------------------------------------------------- |
+| `enabled`        | `true`     | Boolean master switch.                                   |
+| `domains`        | `["wago"]` | All currently registered domains; `[]` disables capture. |
+| `retention_days` | `90`       | Integer 1..3650.                                         |
 
 PATCH accepts these fields, for example `{ "retention_days": 30 }`. Invalid
 persisted settings fail closed rather than silently enabling capture or purging
@@ -99,14 +99,14 @@ currently retained history.
 
 ## Wired HTTP lifecycles
 
-| Route | Action | Success boundary |
-| --- | --- | --- |
-| `POST controllers/:id/claim` | `wago.claim` | Existing `claim` service resolves after credential dispatch; does not assert controller acknowledgement. |
-| `DELETE controllers/:id` | `wago.unclaim` | Existing `remove` resolves after revocation/removal. Later commissioning-history cleanup failure does not erase successful unclaim. |
-| `POST controllers/:id/configuration/publish` | `wago.publication` / `wago.forced_publication` | Publication dispatch resolves; completion includes the allocated or reused `revision`. Forced publication uses the same locked admission boundary. Does not assert controller application. |
-| `POST controllers/:id/configuration/rollback/:revision` | `wago.rollback` | Publication resolves; includes requested `sourceRevision` and resulting `revision`. No nested publication lifecycle. |
-| `POST controllers/:id/credentials/manual/complete` | `wago.manual_credential_fallback` | A matching expiring claim acknowledgement is received while the operation still owns its guard. |
-| `POST controllers/:id/commands` | `wago.manual_command` | The real command UUID is acknowledged; rejected, timed-out, transport-failed and shutdown outcomes finish as failed. |
+| Route                                                   | Action                                         | Success boundary                                                                                                                                                                           |
+| ------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST controllers/:id/claim`                            | `wago.claim`                                   | Existing `claim` service resolves after credential dispatch; does not assert controller acknowledgement.                                                                                   |
+| `DELETE controllers/:id`                                | `wago.unclaim`                                 | Existing `remove` resolves after revocation/removal. Later commissioning-history cleanup failure does not erase successful unclaim.                                                        |
+| `POST controllers/:id/configuration/publish`            | `wago.publication` / `wago.forced_publication` | Publication dispatch resolves; completion includes the allocated or reused `revision`. Forced publication uses the same locked admission boundary. Does not assert controller application. |
+| `POST controllers/:id/configuration/rollback/:revision` | `wago.rollback`                                | Publication resolves; includes requested `sourceRevision` and resulting `revision`. No nested publication lifecycle.                                                                       |
+| `POST controllers/:id/credentials/manual/complete`      | `wago.manual_credential_fallback`              | A matching expiring claim acknowledgement is received while the operation still owns its guard.                                                                                            |
+| `POST controllers/:id/commands`                         | `wago.manual_command`                          | The real command UUID is acknowledged; rejected, timed-out, transport-failed and shutdown outcomes finish as failed.                                                                       |
 
 Each operation records `attempted` followed by `succeeded` or `failed`, sharing
 one generated UUID operation ID. A service rejection is rethrown unchanged to the
@@ -127,7 +127,10 @@ to import core audit implementation details.
 const audit = new WagoAudit(context);
 const principal = wagoAuditPrincipal(request); // authenticated request only
 const result = await audit.run(
-  principal, controllerId, 'forced_publication', {},
+  principal,
+  controllerId,
+  'forced_publication',
+  {},
   () => serviceOperation(), // Promise<WagoRevisionAuditResult>
   (value) => ({ revision: value.revision }),
 );
@@ -145,15 +148,15 @@ Repeated attempt/finish calls on the same handle emit at most one attempt and
 one terminal event; the first terminal call wins. Finishing implicitly awaits
 the attempt. The handle is process-local, not persisted correlation state.
 
-| Operation owner | Action and required integration data |
-| --- | --- |
-| Commissioning automatic claim | Call `claim` lifecycle around the actual automatic claim, carrying the authenticated initiating principal through the session/job. The existing service-internal call bypasses the HTTP claim hook. Never synthesize an actor from controller data. |
-| Credential rotation/manual enrollment | `credential_rotation` / `manual_credential_fallback`; begin with persisted controller ID and authenticated principal, finish only after actual rotation/fallback completion. A `Promise<void>` operation needs no completion projector. Never pass provisioned credentials or manual instructions. |
-| Forced publication | `forced_publication`; operation returns `WagoRevisionAuditResult` (`{ revision: number }`). |
-| Rejection acknowledgement | `rejection_acknowledgement`; begin with `{ revision }`, finish when the operator acknowledgement is persisted. This is an authenticated operator action, not a raw MQTT rejection/telemetry callback. |
-| Preset apply/reapply | Select `preset_application` or `preset_reapplication` from actual persisted provenance under the configuration lock. Return `WagoPresetAuditResult` (`presetId`, `channelId`, `before`, `after`) and project those fields. |
-| Hardware Profile create/change | `profile_creation` / `profile_change`; return `WagoProfileAuditResult` (`profileId: string`, `profileVersion: number`, `before`, `after`). Capture identity from the validated profile embedded in `snapshot.modbus.profiles` at the owning configuration draft/publication persistence boundary, not a separate profile record or a local preview. |
-| Manual command | `manual_command`; allocate the real command UUID before `begin`, pass `{ channelId, operation, commandId }`, and finish with a result from `WagoManualCommandAuditResult`. For dispatch-only semantics use `dispatched`; for acknowledgement semantics wait for `acknowledged`, `rejected`, `timeout`, or `transport_failure`. The last three finish as `failed`. Never record command values or broker payloads. |
+| Operation owner                       | Action and required integration data                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Commissioning automatic claim         | Call `claim` lifecycle around the actual automatic claim, carrying the authenticated initiating principal through the session/job. The existing service-internal call bypasses the HTTP claim hook. Never synthesize an actor from controller data.                                                                                                                                                               |
+| Credential rotation/manual enrollment | `credential_rotation` / `manual_credential_fallback`; begin with persisted controller ID and authenticated principal, finish only after actual rotation/fallback completion. A `Promise<void>` operation needs no completion projector. Never pass provisioned credentials or manual instructions.                                                                                                                |
+| Forced publication                    | `forced_publication`; operation returns `WagoRevisionAuditResult` (`{ revision: number }`).                                                                                                                                                                                                                                                                                                                       |
+| Rejection acknowledgement             | `rejection_acknowledgement`; begin with `{ revision }`, finish when the operator acknowledgement is persisted. This is an authenticated operator action, not a raw MQTT rejection/telemetry callback.                                                                                                                                                                                                             |
+| Preset apply/reapply                  | Select `preset_application` or `preset_reapplication` from actual persisted provenance under the configuration lock. Return `WagoPresetAuditResult` (`presetId`, `channelId`, `before`, `after`) and project those fields.                                                                                                                                                                                        |
+| Hardware Profile create/change        | `profile_creation` / `profile_change`; return `WagoProfileAuditResult` (`profileId: string`, `profileVersion: number`, `before`, `after`). Capture identity from the validated profile embedded in `snapshot.modbus.profiles` at the owning configuration draft/publication persistence boundary, not a separate profile record or a local preview.                                                               |
+| Manual command                        | `manual_command`; allocate the real command UUID before `begin`, pass `{ channelId, operation, commandId }`, and finish with a result from `WagoManualCommandAuditResult`. For dispatch-only semantics use `dispatched`; for acknowledgement semantics wait for `acknowledged`, `rejected`, `timeout`, or `transport_failure`. The last three finish as `failed`. Never record command values or broker payloads. |
 
 `before` and `after` use `WagoAuditSummary`: only `physicalPointCount` and
 `logicalChannelCount`. Compute both within the owner’s mutation lock from the
@@ -234,9 +237,7 @@ wrapper inside its safe-removal callback:
 ```ts
 const principal = wagoAuditPrincipal(request);
 await this.commissioning.removeControllerSafely(id, (assertOwned) =>
-  this.audit.run(principal, id, 'unclaim', {}, () =>
-    this.wago.remove(id, assertOwned),
-  ),
+  this.audit.run(principal, id, 'unclaim', {}, () => this.wago.remove(id, assertOwned)),
 );
 ```
 
@@ -294,8 +295,40 @@ and credential-provider boundaries use isolated fixtures. It covers automatic cl
 publication/rollback failure correlation, guarded unclaim, manual-command terminal
 results, manual-fallback permission/expiry admission and acknowledgement ordering.
 
-Credential rotation remains a separate operation-owner integration; its final
-route and completion contract must be documented with that implementation. The
-shared `credential_rotation` event policy is already available. Software fixtures
-do not establish controller qualification or close the physical acceptance and
-release gates.
+Credential rotation is exposed through authenticated administration routes requiring
+`system.settings.manage`:
+
+- `GET controllers/:id/credentials/rotation` returns only the recovery phase
+  (`none`, `provisioning`, `pending`, or `completed`) and its revision when present.
+- `POST controllers/:id/credentials/rotate` requires `{ "confirm": true }`.
+  `{ "confirm": true, "retry": true }` retries a persisted pending handoff without
+  rotating the broker password again. A pinned commissioning session and its
+  durable operation lease are required; sessionless rotation is refused.
+
+The owner emits one `wago.credential_rotation` lifecycle through the existing host
+bridge. Success follows a matching acknowledgement sent only after the runtime
+persists the new credential and reconnects using it. A provider response alone is
+not completion. Responses and audit details contain no passwords, recovery tokens
+or encrypted credential blobs. The private plugin recovery row persists the
+original broker, credential epoch, revision, token and encrypted pending credential.
+A provisioning interruption without a persisted credential fails closed and cannot
+silently rotate again. Uncertain handoff errors retain the commissioning lease;
+explicit operation recovery precedes another attempt.
+
+Rotation messages expire, carry the registration's UUID credential epoch, and use
+monotonic revisions within that epoch. Fresh enrollment creates a new epoch; an
+old registration's higher revision cannot replace its credentials. Claim and
+rotation expiry are checked again at queued persistence. Existing registrations
+without an epoch must be safely re-enrolled before rotation. The runtime must
+advertise `credential-rotation-v1`. Initial provisioning grants its dedicated
+`credentials/rotate` subscription. Existing broker identities need that topic ACL
+and a reconnect; denied optional rotation subscriptions leave ordinary runtime
+startup available and withhold the rotation capability until subscription succeeds.
+
+Explicit controller removal validates the original rotation broker before existing
+guarded credential revocation. Deleting the controller then cascades its private
+rotation recovery row. Failed revocation preserves the controller and recovery
+metadata. Downgrades refuse to discard active credential recovery metadata.
+
+Software fixtures do not establish controller qualification or close the physical
+acceptance and release gates.

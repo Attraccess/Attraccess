@@ -156,6 +156,7 @@
           "pnpm nx run-many -p plugin-wago,wago-cc100-runtime -t test,typecheck,lint,build --parallel=2",
           "node apps/plugins/wago/cc100-runtime/integration/run.mjs",
           "pnpm nx run plugin-wago:production-fleet",
+          "pnpm nx run plugin-wago:test-credential-rotation",
           "pnpm nx run plugin-wago:test-commissioning-acceptance",
           "bash apps/plugins/wago/frontend/tests/run_browser_tests.sh",
           "node --test scripts/check-wago-acceptance.test.mjs"
@@ -190,6 +191,14 @@
           "pnpm exec jest --config scripts/test-wago-commissioning-browser.config.cjs --runInBand"
         ],
         "parallel": false
+      }
+    },
+    "test-credential-rotation": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["typecheck-acceptance"],
+      "options": {
+        "command": "pnpm exec jest --config scripts/test-wago-credential-rotation.config.cjs --runInBand"
       }
     }
   }

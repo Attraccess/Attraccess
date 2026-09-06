@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { WagoService } from './wago.service';
+import { WagoCredentialRotationEntity } from './wago-credential-rotation.entity';
 
 describe('commissioning ownership through WAGO broker continuations', () => {
   function fixture(claimed = false) {
@@ -24,6 +25,10 @@ describe('commissioning ownership through WAGO broker continuations', () => {
     };
     const provider = { provision: jest.fn(), revoke: jest.fn().mockResolvedValue(undefined) };
     const context = {
+      getRepository: (entity: unknown) => {
+        if (entity !== WagoCredentialRotationEntity) throw new Error('Unexpected fixture repository');
+        return { findOneBy: jest.fn().mockResolvedValue(null) };
+      },
       getMqttServerConfig: jest.fn().mockResolvedValue({}),
       getMqttCredentialProvisioning: () => provider,
       mqtt: { publish: jest.fn(), subscribe: jest.fn() },

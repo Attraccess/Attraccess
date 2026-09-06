@@ -212,6 +212,32 @@ export class WagoControllerApi {
     );
   }
   @Auth('system.settings.manage')
+  @Get('controllers/:id/credentials/rotation')
+  credentialRotationStatus(@Param('id', ParseIntPipe) id: number) {
+    return this.wago.credentialRotationStatus(id);
+  }
+  @Auth('system.settings.manage')
+  @Post('controllers/:id/credentials/rotate')
+  rotateCredentials(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { confirm?: boolean; retry?: boolean },
+    @Req() request: AuthenticatedRequest,
+  ) {
+    const principal = wagoAuditPrincipal(request);
+    if (
+      !body ||
+      body.confirm !== true ||
+      Object.keys(body).some((key) => !['confirm', 'retry'].includes(key)) ||
+      (body.retry !== undefined && typeof body.retry !== 'boolean')
+    )
+      throw new BadRequestException('Explicit credential rotation confirmation is required');
+    return this.commissioning.operateControllerSafely(
+      id,
+      (_assertOwned, guard) => this.wago.rotateCredentials(id, principal, guard, body.retry === true),
+      true,
+    );
+  }
+  @Auth('system.settings.manage')
   @Post('controllers/:id/credentials/manual/complete')
   completeManualCredentials(
     @Param('id', ParseIntPipe) id: number,

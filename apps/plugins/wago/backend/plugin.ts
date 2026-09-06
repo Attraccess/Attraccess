@@ -2,6 +2,7 @@ import type { PluginBackendModule, PluginContext, PluginFlowNodeDefinition } fro
 import { DynamicModule } from '@nestjs/common';
 import { WagoControllerApi } from './wago.controller';
 import { WagoController } from './wago-controller.entity';
+import { WagoCredentialRotationEntity } from './wago-credential-rotation.entity';
 import { WagoService } from './wago.service';
 import { WagoSettings } from './wago-settings.entity';
 import { WagoEnrollment } from './wago-enrollment.entity';
@@ -26,6 +27,7 @@ let flowService: WagoFlowService;
 const plugin: PluginBackendModule = {
   entities: [
     WagoController,
+    WagoCredentialRotationEntity,
     WagoSettings,
     WagoEnrollment,
     WagoConfigurationDraft,
