@@ -11,7 +11,7 @@ import {
   runtimeBundleInstallScript,
   WagoCommissioningService,
 } from './wago-commissioning.service';
-import { WagoService } from './wago.service';
+import { WagoService, WagoCredentialOperationUncertainError } from './wago.service';
 import { WagoController } from './wago-controller.entity';
 import type { CommissioningOperationGuard } from './wago-commissioning-lease';
 
@@ -81,6 +81,26 @@ describe('WagoCommissioningService', () => {
     expect(release).toHaveBeenCalledTimes(1);
     await expect(service['withControllerLock'](1, async () => 'retry')).resolves.toBe('retry');
     expect(release).toHaveBeenCalledTimes(2);
+  });
+
+  it('retains the controller lease for an uncertain manual MQTT handoff', async () => {
+    const { service } = securityHarness();
+    const release = jest.fn();
+    jest.spyOn(service['leases'], 'run').mockImplementation(async (_fingerprint, operation) => {
+      const value = await operation({
+        assertOwned: async () => undefined,
+        signal: new AbortController().signal,
+        deadline: Date.now() + 60_000,
+      });
+      release();
+      return value;
+    });
+    await expect(
+      service['withControllerLock'](1, async () => {
+        throw new WagoCredentialOperationUncertainError('fixture timeout');
+      }),
+    ).rejects.toThrow('fixture timeout');
+    expect(release).not.toHaveBeenCalled();
   });
 
   it.each([false, true])('does not resolve the lease callback after a remote failure (caught %p)', async (caught) => {
