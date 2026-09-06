@@ -511,14 +511,17 @@ describe('CC100 packed digital I/O', () => {
     await command('DO1', true, 'allowed');
     expect(await readFile(paths.output, 'utf8')).toBe('1');
     await writeFile(paths.input, '1');
+    const publish = transport.publish;
+    const feedback = new Promise<void>((resolve) => {
+      jest.spyOn(transport, 'publish').mockImplementation(async (...args) => {
+        await publish(...args);
+        if ((args[1] as { code?: string }).code === 'feedback_mismatch') resolve();
+      });
+    });
     await jest.advanceTimersByTimeAsync(10);
-    // Timer callbacks perform real file I/O; flush until the feedback read finishes.
-    for (
-      let attempt = 0;
-      attempt < 100 && !messages.some(({ payload }) => payload.code === 'feedback_mismatch');
-      attempt++
-    )
-      await new Promise<void>((resolve) => setImmediate(resolve));
+    // Wait for the actual file-I/O completion event. A fixed number of event-loop
+    // spins can finish before the filesystem callback on a busy CI runner.
+    await feedback;
     expect(messages.some(({ payload }) => payload.code === 'feedback_mismatch')).toBe(true);
   });
 

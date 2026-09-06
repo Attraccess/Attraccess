@@ -198,7 +198,7 @@ export class WagoCommandHandler {
     return [];
   }
 
-  async execute(config: Record<string, unknown>): Promise<void> {
+  async execute(config: Record<string, unknown>, commandId = randomUUID()): Promise<void> {
     const errors = await this.validate(config);
     if (errors.length)
       throw new WagoCommandError(errors.map((error) => error.message).join(' '), 'controller-rejection');
@@ -218,7 +218,7 @@ export class WagoCommandHandler {
     if (!controller.mqttServerId)
       throw new WagoCommandError(`WAGO controller ${controllerId} has no MQTT server`, 'transport-dispatch');
     const settings = await this.dependencies.getSettings();
-    const id = randomUUID();
+    const id = commandId;
     this.dependencies.onCommand?.(controllerId, channelId, id);
     const command = JSON.stringify({
       id,
@@ -241,6 +241,13 @@ export class WagoCommandHandler {
           ),
         )
       : undefined;
+    let dispatchTimer: ReturnType<typeof setTimeout> | undefined;
+    const dispatchDeadline = new Promise<never>((_resolve, reject) => {
+      dispatchTimer = setTimeout(
+        () => reject(new WagoCommandError('WAGO command dispatch timed out', 'acknowledgement-timeout')),
+        acknowledgementTimeoutSeconds * 1000,
+      );
+    });
     try {
       const publication = this.dependencies.context.mqtt.publish(
         controller.mqttServerId,
@@ -248,17 +255,19 @@ export class WagoCommandHandler {
         command,
         { qos: 1, retain: false },
       );
-      await (acknowledgementFailure ? Promise.race([publication, acknowledgementFailure]) : publication);
+      await Promise.race([publication, dispatchDeadline, ...(acknowledgementFailure ? [acknowledgementFailure] : [])]);
     } catch (error) {
       if (isAcknowledgementFailure(error)) throw error.acknowledgementError;
       this.dependencies.onCommandFailure?.(id, 'dispatch-failed');
-      const dispatchError = new WagoCommandError(
-        `Failed to publish WAGO command: ${String(error)}`,
-        'transport-dispatch',
-      );
+      const dispatchError =
+        error instanceof WagoCommandError
+          ? error
+          : new WagoCommandError(`Failed to publish WAGO command: ${String(error)}`, 'transport-dispatch');
       this.reject(id, dispatchError);
       if (acknowledgement) await acknowledgement.catch(() => undefined);
       throw dispatchError;
+    } finally {
+      clearTimeout(dispatchTimer);
     }
     await acknowledgement;
   }

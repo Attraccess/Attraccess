@@ -142,6 +142,53 @@ function harness() {
 }
 
 describe('management transition orchestration (no device or broker connections)', () => {
+  it('does not persist a review after outer ownership is lost during the read', async () => {
+    const h = harness();
+    await h.service.inspect(target, credential);
+    const original = await h.store.load(7);
+    let finish!: (record: ManagementRecord | null) => void;
+    let entered!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    jest.spyOn(h.store, 'load').mockImplementationOnce(() => {
+      entered();
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    });
+    let owned = true;
+    const review = h.service.review(7, { mode: 'baseline', exceptions: [] }, async () => {
+      if (!owned) throw new Error('outer_lease_lost');
+    });
+    await started;
+    owned = false;
+    finish(original);
+    await expect(review).rejects.toMatchObject({ code: 'operation_failed' });
+    expect(h.store.history).toHaveLength(1);
+    expect(h.store.records.get(7)?.state).toBe('inspected');
+    expect(h.store.records.get(7)?.reviewToken).toBeNull();
+  });
+
+  it('does not start rollback after outer ownership is lost during persistence', async () => {
+    const h = harness();
+    const reviewed = await h.review();
+    const save = h.store.save.bind(h.store);
+    let owned = true;
+    jest.spyOn(h.store, 'save').mockImplementation(async (...args) => {
+      await save(...args);
+      owned = false;
+    });
+    await expect(
+      h.service.apply(7, { reviewToken: reviewed.reviewToken!, confirm: true, temporarySsh: credential }, async () => {
+        if (!owned) throw new Error('outer_lease_lost');
+      }),
+    ).rejects.toMatchObject({ code: 'operation_failed' });
+    expect(h.adapter.prepare).not.toHaveBeenCalled();
+    expect(h.adapter.rollback).not.toHaveBeenCalled();
+    expect(h.store.records.get(7)?.state).toBe('preparing');
+  });
+
   it('requires explicit inspect and review, and serializes the complete verify-before-disable transition', async () => {
     const h = harness();
     await expect(h.service.review(7, { mode: 'baseline', exceptions: [] })).rejects.toMatchObject({

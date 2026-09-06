@@ -89,6 +89,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
   private management!: WagoManagementService;
   private readonly leases = createWagoCommissioningLeaseService(this.context);
   private readonly operationContext = new AsyncLocalStorage<CommissioningOperationGuard>();
+  private readonly uncertainRemoteOperations = new WeakSet<CommissioningOperationGuard>();
   private readonly controllerLocks = new Map<string, Promise<void>>();
   private readonly deliveryLocks = new Map<number, Promise<void>>();
   private readonly transferWrites = new Map<number, Promise<void>>();
@@ -494,19 +495,32 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             return await this.management.inspect(
               { controllerId: subject, host: session.targetHost, hostKeyFingerprint: session.hostKeyFingerprint },
               input.temporarySsh,
+              this.operationContext.getStore()?.assertOwned,
             );
           if (action === 'review')
-            return await this.management.review(subject, { mode: input.mode, exceptions: input.exceptions });
+            return await this.management.review(
+              subject,
+              { mode: input.mode, exceptions: input.exceptions },
+              this.operationContext.getStore()?.assertOwned,
+            );
           if (action === 'apply')
-            return await this.management.apply(subject, {
-              reviewToken: input.reviewToken,
+            return await this.management.apply(
+              subject,
+              {
+                reviewToken: input.reviewToken,
+                confirm: input.confirm as true,
+                temporarySsh: input.temporarySsh,
+              },
+              this.operationContext.getStore()?.assertOwned,
+            );
+          return await this.management.recover(
+            subject,
+            {
               confirm: input.confirm as true,
               temporarySsh: input.temporarySsh,
-            });
-          return await this.management.recover(subject, {
-            confirm: input.confirm as true,
-            temporarySsh: input.temporarySsh,
-          });
+            },
+            this.operationContext.getStore()?.assertOwned,
+          );
         } catch (error) {
           throw new ConflictException(
             error instanceof ManagementError
@@ -573,20 +587,22 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       // A dedicated short-lived agent holds only this generated identity. The key
       // enters via stdin, never argv or a disk file; the agent exits with SSH and
       // its 30-second key TTL also bounds credentials after a client crash.
-      const output = await runProcess(
-        'ssh-agent',
-        [
-          '-t',
-          '30',
-          '-a',
-          socket,
-          'sh',
-          '-c',
-          `ssh-add -t 30 - >/dev/null 2>&1 && exec ssh ${sshArguments.map(shellQuote).join(' ')}`,
-        ],
-        privateKey,
-        {},
-        { ...limits, signal: guard?.signal },
+      const output = await this.remoteOperation(() =>
+        runProcess(
+          'ssh-agent',
+          [
+            '-t',
+            '30',
+            '-a',
+            socket,
+            'sh',
+            '-c',
+            `ssh-add -t 30 - >/dev/null 2>&1 && exec ssh ${sshArguments.map(shellQuote).join(' ')}`,
+          ],
+          privateKey,
+          {},
+          { ...limits, signal: guard?.signal },
+        ),
       );
       const match = output.match(new RegExp(`^${nonce}\\n([0-9]+)\\n$`));
       if (!match) throw new Error('Management key proof failed');
@@ -895,13 +911,21 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     try {
       const outcome = await this.leases.run(session.hostKeyFingerprint, (guard) =>
         this.operationContext.run(guard, async () => {
-          // Domain failures have settled locally and retain their remote recovery journals.
-          // A lost lease/crashed worker instead leaves the durable lease for explicit recovery.
+          let outcome: { value: T } | { error: unknown };
           try {
-            return { value: await operation() };
+            outcome = { value: await operation() };
           } catch (error) {
-            return { error };
+            outcome = { error };
           }
+          if (this.uncertainRemoteOperations.has(guard)) {
+            if ('error' in outcome) throw outcome.error;
+            throw new ConflictException(
+              'Remote completion is uncertain. Explicit controller operation recovery is required.',
+            );
+          }
+          // The lease runner validates ownership before release. Settled local
+          // failures may release, while uncertain transport failures above may not.
+          return outcome;
         }),
       );
       if ('error' in outcome) throw outcome.error;
@@ -951,6 +975,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             throw new ConflictException('Commissioning enrollment removal failed.');
           }
         }
+        await this.operationContext.getStore()?.assertOwned();
         await this.sessions.delete(id);
       }),
     );
@@ -959,6 +984,36 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
   async removeByHardwareId(hardwareId: string): Promise<void> {
     const sessions = await this.sessions.find({ where: { hardwareId } });
     await Promise.all(sessions.map((session) => this.remove(session.id)));
+  }
+
+  async operateControllerSafely<T>(
+    id: number,
+    operation: (assertOwned: () => Promise<void>, guard: CommissioningOperationGuard) => Promise<T>,
+  ): Promise<T> {
+    const controller = await this.context.getRepository(WagoController).findOneBy({ id });
+    if (!controller) throw new NotFoundException('controller not found');
+    const sessions = await this.sessions.find({ where: { hardwareId: controller.hardwareId }, order: { id: 'DESC' } });
+    if (!sessions.length) {
+      const controller = new AbortController();
+      const guard = {
+        assertOwned: async () => {
+          if (controller.signal.aborted) throw new ConflictException('Controller operation ended');
+        },
+        signal: controller.signal,
+        deadline: Date.now() + 60_000,
+      };
+      try {
+        return await operation(guard.assertOwned, guard);
+      } finally {
+        controller.abort();
+      }
+    }
+    return this.withControllerLock(sessions[0].id, async () => {
+      const guard = this.operationContext.getStore();
+      if (!guard) throw new ConflictException('Controller operation ownership is unavailable.');
+      await guard.assertOwned();
+      return operation(guard.assertOwned, guard);
+    });
   }
 
   /** The HTTP audit wrapper belongs inside remove(), so removal is audited once by ATT-983. */
@@ -1135,6 +1190,19 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     return this.sudoRun(host, fingerprint, credential, 'base64 -d | sh', Buffer.from(script).toString('base64'));
   }
 
+  private async remoteOperation<T>(operation: () => Promise<T>): Promise<T> {
+    const guard = this.operationContext.getStore();
+    await guard?.assertOwned();
+    try {
+      return await operation();
+    } catch (error) {
+      // A local transport rejection cannot establish remote termination, even
+      // when a domain handler saves a failure response or attempts recovery.
+      if (guard) this.uncertainRemoteOperations.add(guard);
+      throw error;
+    }
+  }
+
   private async run(
     host: string,
     fingerprint: string,
@@ -1151,37 +1219,39 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     try {
       await writeFile(knownHosts, await pinnedHostKey(host, fingerprint), { mode: 0o600 });
       await writeFile(askPass, '#!/bin/sh\nprintf \'%s\\n\' "$ATTRACCESS_SSH_PASSWORD"\n', { mode: 0o700 });
-      return await runProcess(
-        'ssh',
-        [
-          ...BOOTSTRAP_SSH_OPTIONS,
-          '-o',
-          'BatchMode=no',
-          '-o',
-          'NumberOfPasswordPrompts=1',
-          '-o',
-          'HostKeyAlgorithms=ssh-ed25519',
-          '-o',
-          'StrictHostKeyChecking=yes',
-          '-o',
-          `UserKnownHostsFile=${knownHosts}`,
-          '-o',
-          'ConnectTimeout=15',
-          `${credential.username}@${host}`,
-          `sh -c ${shellQuote(command)}`,
-        ],
-        input,
-        {
-          SSH_ASKPASS: askPass,
-          SSH_ASKPASS_REQUIRE: 'force',
-          DISPLAY: 'attraccess',
-          ATTRACCESS_SSH_PASSWORD: credential.password,
-        },
-        {
-          timeoutMs: limits?.timeoutMs ?? SSH_TIMEOUT_MS,
-          maxOutputBytes: limits?.maxOutputBytes ?? 65_536,
-          signal: guard?.signal,
-        },
+      return await this.remoteOperation(() =>
+        runProcess(
+          'ssh',
+          [
+            ...BOOTSTRAP_SSH_OPTIONS,
+            '-o',
+            'BatchMode=no',
+            '-o',
+            'NumberOfPasswordPrompts=1',
+            '-o',
+            'HostKeyAlgorithms=ssh-ed25519',
+            '-o',
+            'StrictHostKeyChecking=yes',
+            '-o',
+            `UserKnownHostsFile=${knownHosts}`,
+            '-o',
+            'ConnectTimeout=15',
+            `${credential.username}@${host}`,
+            `sh -c ${shellQuote(command)}`,
+          ],
+          input,
+          {
+            SSH_ASKPASS: askPass,
+            SSH_ASKPASS_REQUIRE: 'force',
+            DISPLAY: 'attraccess',
+            ATTRACCESS_SSH_PASSWORD: credential.password,
+          },
+          {
+            timeoutMs: limits?.timeoutMs ?? SSH_TIMEOUT_MS,
+            maxOutputBytes: limits?.maxOutputBytes ?? 65_536,
+            signal: guard?.signal,
+          },
+        ),
       );
     } finally {
       await rm(dir, { recursive: true, force: true });
@@ -1207,34 +1277,36 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       // Keep the credential-bearing script off the API host's process arguments.
       // read consumes one line; the installer receives the remaining binary stream.
       const receiver = runtimeBundleStreamReceiver;
-      await uploadFile(
-        source,
-        [
-          ...BOOTSTRAP_SSH_OPTIONS,
-          '-o',
-          'BatchMode=no',
-          '-o',
-          'NumberOfPasswordPrompts=1',
-          '-o',
-          'HostKeyAlgorithms=ssh-ed25519',
-          '-o',
-          'StrictHostKeyChecking=yes',
-          '-o',
-          `UserKnownHostsFile=${knownHosts}`,
-          '-o',
-          'ConnectTimeout=15',
-          `${credential.username}@${host}`,
-          credential.username === 'root' ? `sh -c ${shellQuote(receiver)}` : `sudo -S sh -c ${shellQuote(receiver)}`,
-        ],
-        {
-          SSH_ASKPASS: askPass,
-          SSH_ASKPASS_REQUIRE: 'force',
-          DISPLAY: 'attraccess',
-          ATTRACCESS_SSH_PASSWORD: credential.password,
-        },
-        onProgress,
-        `${credential.username === 'root' ? '' : `${credential.password}\n`}${Buffer.from(script).toString('base64')}\n`,
-        guard?.signal,
+      await this.remoteOperation(() =>
+        uploadFile(
+          source,
+          [
+            ...BOOTSTRAP_SSH_OPTIONS,
+            '-o',
+            'BatchMode=no',
+            '-o',
+            'NumberOfPasswordPrompts=1',
+            '-o',
+            'HostKeyAlgorithms=ssh-ed25519',
+            '-o',
+            'StrictHostKeyChecking=yes',
+            '-o',
+            `UserKnownHostsFile=${knownHosts}`,
+            '-o',
+            'ConnectTimeout=15',
+            `${credential.username}@${host}`,
+            credential.username === 'root' ? `sh -c ${shellQuote(receiver)}` : `sudo -S sh -c ${shellQuote(receiver)}`,
+          ],
+          {
+            SSH_ASKPASS: askPass,
+            SSH_ASKPASS_REQUIRE: 'force',
+            DISPLAY: 'attraccess',
+            ATTRACCESS_SSH_PASSWORD: credential.password,
+          },
+          onProgress,
+          `${credential.username === 'root' ? '' : `${credential.password}\n`}${Buffer.from(script).toString('base64')}\n`,
+          guard?.signal,
+        ),
       );
     } finally {
       await rm(dir, { recursive: true, force: true });

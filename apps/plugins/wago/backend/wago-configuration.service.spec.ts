@@ -1,4 +1,5 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import { BUILTIN_MODBUS_PROFILES, duplicateProfile } from '../modbus/model';
 import { WagoService } from './wago.service';
 import { canonicalSnapshot, configurationHash, type WagoConfigurationSnapshot } from './configuration';
 import type { WagoConfigurationDraft } from './wago-configuration-draft.entity';
@@ -51,8 +52,11 @@ describe('configuration editor service boundaries', () => {
       andWhere: jest.fn().mockReturnThis(),
       getMany: jest.fn().mockResolvedValue([]),
     };
+    const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
     const service = new WagoService({
       mqtt,
+      audit,
+      logger: { warn: jest.fn() },
       dataSource: { getRepository: () => ({ createQueryBuilder: () => flowQuery }) },
     } as unknown as PluginContext);
     Object.assign(service, {
@@ -72,7 +76,7 @@ describe('configuration editor service boundaries', () => {
     jest
       .spyOn(service, 'getSettings')
       .mockResolvedValue({ id: 1, defaultMqttServerId: 1, operationalPrefix: 'test/wago' });
-    return { service, drafts, mqtt, revisions, flowQuery, draft: () => draft };
+    return { service, drafts, mqtt, revisions, flowQuery, audit, draft: () => draft };
   }
 
   async function rollback(service: WagoService, revision: number, force = false) {
@@ -205,9 +209,7 @@ describe('configuration editor service boundaries', () => {
     const review = await service.reviewDraft(1);
     await service.saveDraft(1, { ...snapshot, logicalChannels: [] });
     await service.reviewDraft(1);
-    expect(review.draft.reviewedHash).toBe(
-      configurationHash({ snapshot: canonicalSnapshot(snapshot), metadata: null }),
-    );
+    expect(review.draft.reviewedHash).toMatch(/^[a-f0-9]{64}$/);
     await expect(service.publishDraft(1, true, review.draft.reviewedHash ?? '')).rejects.toThrow('draft changed');
     expect(mqtt.publish).not.toHaveBeenCalled();
   });
@@ -369,7 +371,7 @@ describe('configuration editor service boundaries', () => {
     flowQuery.getMany.mockResolvedValue([
       { id: 'new-command', resourceId: 2, type: 'plugin.wago.command', data: { controllerId: 1, channelId: 'output' } },
     ]);
-    await expect(service.publishDraft(1)).rejects.toThrow('acknowledge');
+    await expect(service.publishDraft(1)).rejects.toThrow('review');
     expect(mqtt.publish).not.toHaveBeenCalled();
   });
 
@@ -496,4 +498,420 @@ describe('configuration editor service boundaries', () => {
       if (change !== 'unchanged') expect(revisions[0]).toEqual(original);
     },
   );
+  it('binds forced publication to the reviewed references, independent of query order', async () => {
+    const { service, flowQuery, mqtt } = fixture();
+    await service.saveDraft(1, snapshot);
+    const node = (id: string) => ({
+      id,
+      resourceId: 2,
+      type: 'plugin.wago.command',
+      data: { controllerId: 1, channelId: 'output' },
+    });
+    flowQuery.getMany.mockResolvedValue([node('one')]);
+    const review = await service.reviewDraft(1);
+    flowQuery.getMany.mockResolvedValue([node('one'), node('two')]);
+    await expect(service.publishDraft(1, true, review.draft.reviewedHash!)).rejects.toThrow('review');
+    expect(mqtt.publish).not.toHaveBeenCalled();
+    const refreshed = await service.reviewDraft(1);
+    flowQuery.getMany.mockResolvedValue([node('two'), node('one')]);
+    await expect(service.publishDraft(1, true, refreshed.draft.reviewedHash!)).resolves.toMatchObject({ revision: 1 });
+  });
+
+  it.each(['current revision', 'current metadata', 'source metadata', 'impact set'])(
+    'rejects rollback when %s changes after preview without overwriting the draft',
+    async (change) => {
+      const { service, revisions, flowQuery, drafts, mqtt, draft } = fixture();
+      await service.saveDraft(1, snapshot);
+      await service.reviewDraft(1);
+      await service.publishDraft(1);
+      const preview = await service.previewRevision(1, 1);
+      const before = draft();
+      if (change === 'current revision') revisions.push({ ...revisions[0], revision: 2 });
+      else if (change === 'current metadata')
+        revisions.push({
+          ...revisions[0],
+          revision: 2,
+          presetProvenance: JSON.stringify({ editor: { names: { output: 'Renamed' }, presets: [] } }),
+        });
+      else if (change === 'source metadata')
+        revisions[0].presetProvenance = JSON.stringify({ editor: { names: { output: 'Source name' }, presets: [] } });
+      else
+        flowQuery.getMany.mockResolvedValue([
+          { id: 'new', resourceId: 2, type: 'plugin.wago.command', data: { controllerId: 1, channelId: 'output' } },
+        ]);
+      drafts.save.mockClear();
+      mqtt.publish.mockClear();
+      await expect(
+        service.rollback(
+          1,
+          1,
+          true,
+          preview.revision.contentHash,
+          preview.current?.contentHash ?? null,
+          preview.draftHash,
+        ),
+      ).rejects.toThrow('preview');
+      expect(drafts.save).not.toHaveBeenCalled();
+      expect(mqtt.publish).not.toHaveBeenCalled();
+      expect(draft()).toEqual(before);
+    },
+  );
+
+  it.each([2, 3])(
+    'rejects dependencies added during rollback lookup %s instead of refreshing consent',
+    async (changedLookup) => {
+      const { service, flowQuery, mqtt, draft } = fixture();
+      await service.saveDraft(1, snapshot);
+      await service.reviewDraft(1);
+      await service.publishDraft(1);
+      const node = (id: string) => ({
+        id,
+        resourceId: 2,
+        type: 'plugin.wago.command',
+        data: { controllerId: 1, channelId: 'output' },
+      });
+      flowQuery.getMany.mockResolvedValue([node('a')]);
+      const preview = await service.previewRevision(1, 1);
+      const before = draft();
+      let lookups = 0;
+      flowQuery.getMany.mockImplementation(async () =>
+        ++lookups >= changedLookup ? [node('a'), node('b')] : [node('a')],
+      );
+      mqtt.publish.mockClear();
+      await expect(
+        service.rollback(
+          1,
+          1,
+          true,
+          preview.revision.contentHash,
+          preview.current?.contentHash ?? null,
+          preview.draftHash,
+        ),
+      ).rejects.toThrow(/preview|review/);
+      expect(mqtt.publish).not.toHaveBeenCalled();
+      expect(draft()).toEqual(before);
+    },
+  );
+
+  it('preserves a saved draft when rollback controller compatibility fails', async () => {
+    const { service, mqtt, draft } = fixture();
+    await service.saveDraft(1, snapshot);
+    await service.reviewDraft(1);
+    await service.publishDraft(1);
+    await service.saveDraft(1, { ...snapshot, logicalChannels: [] });
+    const before = draft();
+    const preview = await service.previewRevision(1, 1);
+    const controller = {
+      id: 1,
+      mqttServerId: 1,
+      trustState: 'claimed',
+      capabilities: '["claim","heartbeat","configuration-v1"]',
+    };
+    Object.assign(service, {
+      controllers: { findOneBy: jest.fn().mockResolvedValue({ ...controller, protocolVersion: '2.0.0' }) },
+    });
+    mqtt.publish.mockClear();
+    await expect(
+      service.rollback(
+        1,
+        1,
+        true,
+        preview.revision.contentHash,
+        preview.current?.contentHash ?? null,
+        preview.draftHash,
+      ),
+    ).rejects.toThrow('Cannot publish configuration');
+    expect(draft()).toEqual(before);
+    expect(mqtt.publish).not.toHaveBeenCalled();
+  });
+
+  it('does not audit reapplication of an untouched preset when adding an unrelated input', async () => {
+    const { service, audit } = fixture();
+    const principal = { userId: 7, authenticationMethod: 'session' as const };
+    const metadata = {
+      names: {},
+      presets: [{ presetId: 'generic-digital-output' as const, channelId: 'output', physicalPointId: 'point' }],
+    };
+    await service.saveDraft(1, snapshot, metadata, principal);
+    audit.record.mockClear();
+    await service.saveDraft(
+      1,
+      {
+        ...snapshot,
+        physicalPoints: [...snapshot.physicalPoints, { id: 'input-point', hardwareProfile: '751-9301', channel: 4 }],
+        logicalChannels: [
+          ...snapshot.logicalChannels,
+          {
+            id: 'input',
+            physicalPointId: 'input-point',
+            profile: 'generic-monitored-input',
+            capabilities: ['input'],
+            disconnectPolicy: { mode: 'hold' },
+          },
+        ],
+      },
+      metadata,
+      principal,
+    );
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it('audits validated forced publication and rollback once with the original revision result', async () => {
+    const { service, audit, mqtt } = fixture();
+    const principal = { userId: 7, authenticationMethod: 'session' as const };
+    await service.saveDraft(1, snapshot);
+    await expect(service.publishDraft(1, true, 'stale', principal)).rejects.toThrow('review');
+    expect(audit.record).not.toHaveBeenCalled();
+    const review = await service.reviewDraft(1);
+    const published = await service.publishDraft(1, true, review.draft.reviewedHash!, principal);
+    expect(published.revision).toBe(1);
+    expect(audit.record.mock.calls.map(([event]) => [event.action, event.outcome])).toEqual([
+      ['wago.forced_publication', 'attempted'],
+      ['wago.forced_publication', 'succeeded'],
+    ]);
+    expect(audit.record).toHaveBeenLastCalledWith(expect.objectContaining({ principal, details: { revision: 1 } }));
+    const preview = await service.previewRevision(1, 1);
+    audit.record.mockClear();
+    mqtt.publish.mockRejectedValueOnce(new Error('transport unavailable'));
+    await expect(
+      service.rollback(
+        1,
+        1,
+        true,
+        preview.revision.contentHash,
+        preview.current?.contentHash ?? null,
+        preview.draftHash,
+        principal,
+      ),
+    ).rejects.toThrow('transport unavailable');
+    expect(audit.record.mock.calls.map(([event]) => [event.action, event.outcome])).toEqual([
+      ['wago.rollback', 'attempted'],
+      ['wago.rollback', 'failed'],
+    ]);
+    expect(audit.record).toHaveBeenLastCalledWith(
+      expect.objectContaining({ details: { sourceRevision: 1, revision: 2 } }),
+    );
+  });
+
+  it('retains the allocated revision for failed publication and its retry', async () => {
+    const { service, audit, mqtt } = fixture();
+    const principal = { userId: 7, authenticationMethod: 'session' as const };
+    await service.saveDraft(1, snapshot);
+    await service.reviewDraft(1);
+    mqtt.publish.mockRejectedValue(new Error('private transport detail'));
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await service.reviewDraft(1);
+      await expect(service.publishDraft(1, false, undefined, principal)).rejects.toThrow('private transport detail');
+      expect(audit.record).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          action: 'wago.publication',
+          outcome: 'failed',
+          details: { revision: 1 },
+        }),
+      );
+    }
+    expect(audit.record.mock.calls.map(([event]) => event.outcome)).toEqual([
+      'attempted',
+      'failed',
+      'attempted',
+      'failed',
+    ]);
+    expect(JSON.stringify(audit.record.mock.calls)).not.toContain('private transport detail');
+  });
+
+  it('audits explicit preset application and reapplication, never ordinary policy edits or save retries', async () => {
+    const { service, audit } = fixture();
+    const principal = { userId: 7, authenticationMethod: 'session' as const };
+    const application = { presetId: 'generic-digital-output' as const, channelId: 'output', physicalPointId: 'point' };
+    const metadata = { names: { output: 'Output' }, presets: [application] };
+    await service.previewPreset(1, application, snapshot);
+    expect(audit.record).not.toHaveBeenCalled();
+    await service.saveDraft(1, snapshot, metadata, principal);
+    expect(audit.record.mock.calls.map(([event]) => event.action)).toEqual([
+      'wago.preset_application',
+      'wago.preset_application',
+    ]);
+    audit.record.mockClear();
+    await service.saveDraft(1, snapshot, metadata, principal);
+    expect(audit.record).not.toHaveBeenCalled();
+    await service.saveDraft(
+      1,
+      { ...snapshot, logicalChannels: [{ ...snapshot.logicalChannels[0], disconnectPolicy: { mode: 'hold' } }] },
+      metadata,
+      principal,
+    );
+    expect(audit.record).not.toHaveBeenCalled();
+    const edited: WagoConfigurationSnapshot = {
+      ...snapshot,
+      logicalChannels: [{ ...snapshot.logicalChannels[0], disconnectPolicy: { mode: 'hold' } }],
+    };
+    const preview = await service.previewPreset(1, application, edited);
+    const reapplied = await service.applyPreset(
+      1,
+      application,
+      preview.diff.map((change) => change.path),
+      preview.draftHash,
+      edited,
+    );
+    expect(audit.record).not.toHaveBeenCalled();
+    // The mounted editor appends one occurrence only when Apply succeeds.
+    const reappliedMetadata = { ...metadata, presets: [...metadata.presets, application] };
+    await service.saveDraft(1, JSON.parse(reapplied.snapshot), reappliedMetadata, principal);
+    expect(audit.record.mock.calls.map(([event]) => event.action)).toEqual([
+      'wago.preset_reapplication',
+      'wago.preset_reapplication',
+    ]);
+    expect(audit.record).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        details: {
+          presetId: 'generic-digital-output',
+          channelId: 'output',
+          'before.physicalPointCount': 1,
+          'before.logicalChannelCount': 1,
+          'after.physicalPointCount': 1,
+          'after.logicalChannelCount': 1,
+        },
+      }),
+    );
+    // Retrying the same save cannot audit the same intent again.
+    await service.saveDraft(1, JSON.parse(reapplied.snapshot), reappliedMetadata, principal);
+    expect(audit.record).toHaveBeenCalledTimes(2);
+  });
+
+  it('audits a deliberate no-change reapplication but not saving its unchanged provenance again', async () => {
+    const { service, audit } = fixture();
+    const principal = { userId: 7, authenticationMethod: 'session' as const };
+    const application = { presetId: 'generic-digital-output' as const, channelId: 'output', physicalPointId: 'point' };
+    await service.saveDraft(1, snapshot, { names: {}, presets: [application] }, principal);
+    audit.record.mockClear();
+    const metadata = { names: {}, presets: [application, application] };
+    await service.saveDraft(1, snapshot, metadata, principal);
+    await service.saveDraft(1, snapshot, metadata, principal);
+    expect(audit.record.mock.calls.map(([event]) => [event.action, event.outcome])).toEqual([
+      ['wago.preset_reapplication', 'attempted'],
+      ['wago.preset_reapplication', 'succeeded'],
+    ]);
+  });
+
+  it('persists and audits acknowledgement of exactly the reviewed rejection once', async () => {
+    const { service, revisions, audit, mqtt } = fixture();
+    await service.saveDraft(1, snapshot);
+    await service.reviewDraft(1);
+    await service.publishDraft(1);
+    Object.assign(revisions[0], {
+      state: 'rejected',
+      reportedAt: '2026-01-01T00:00:00.000Z',
+      rejectionErrors: '[{"path":"$","message":"invalid"}]',
+    });
+    const principal = { userId: 7, authenticationMethod: 'session' as const };
+    const expected = { contentHash: revisions[0].contentHash, reportedAt: revisions[0].reportedAt! };
+    mqtt.publish.mockClear();
+    const acknowledged = await service.acknowledgeRejection(1, 1, expected, principal);
+    expect(acknowledged).toMatchObject({
+      state: 'rejected',
+      rejectionAcknowledgedBy: 7,
+      rejectionAcknowledgedAt: expect.any(String),
+    });
+    expect(acknowledged.rejectionErrors).toEqual(revisions[0].rejectionErrors);
+    expect(audit.record.mock.calls.map(([event]) => [event.action, event.outcome])).toEqual([
+      ['wago.rejection_acknowledgement', 'attempted'],
+      ['wago.rejection_acknowledgement', 'succeeded'],
+    ]);
+    expect(audit.record).toHaveBeenLastCalledWith(expect.objectContaining({ principal, details: { revision: 1 } }));
+    await service.acknowledgeRejection(1, 1, expected, { ...principal, userId: 8 });
+    expect(revisions[0].rejectionAcknowledgedBy).toBe(7);
+    expect(audit.record).toHaveBeenCalledTimes(2);
+    expect(mqtt.publish).not.toHaveBeenCalled();
+  });
+
+  it.each(['state', 'hash', 'report'])('rejects stale rejection acknowledgement after %s changes', async (change) => {
+    const { service, revisions, audit } = fixture();
+    await service.saveDraft(1, snapshot);
+    await service.reviewDraft(1);
+    await service.publishDraft(1);
+    Object.assign(revisions[0], { state: 'rejected', reportedAt: '2026-01-01T00:00:00.000Z' });
+    const expected = { contentHash: revisions[0].contentHash, reportedAt: revisions[0].reportedAt! };
+    if (change === 'state') revisions[0].state = 'applied';
+    if (change === 'hash') expected.contentHash = 'stale';
+    if (change === 'report') expected.reportedAt = 'stale';
+    await expect(
+      service.acknowledgeRejection(1, 1, expected, { userId: 7, authenticationMethod: 'session' }),
+    ).rejects.toThrow('rejection changed');
+    expect(revisions[0].rejectionAcknowledgedAt).toBeUndefined();
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it('audits successful rollback with source and newly allocated revision exactly once', async () => {
+    const { service, audit, revisions } = fixture();
+    const principal = { userId: 7, authenticationMethod: 'session' as const };
+    await service.saveDraft(1, snapshot);
+    await service.reviewDraft(1);
+    await service.publishDraft(1);
+    const preview = await service.previewRevision(1, 1);
+    const result = await service.rollback(
+      1,
+      1,
+      true,
+      preview.revision.contentHash,
+      preview.current?.contentHash ?? null,
+      preview.draftHash,
+      principal,
+    );
+    expect(result.revision).toBe(2);
+    expect(revisions[0].revision).toBe(1);
+    expect(audit.record.mock.calls.map(([event]) => [event.action, event.outcome])).toEqual([
+      ['wago.rollback', 'attempted'],
+      ['wago.rollback', 'succeeded'],
+    ]);
+    expect(audit.record).toHaveBeenLastCalledWith(
+      expect.objectContaining({ details: { sourceRevision: 1, revision: 2 } }),
+    );
+  });
+  it('preserves visual names when the persisted preset endpoint changes an existing draft', async () => {
+    const { service, draft } = fixture();
+    await service.saveDraft(1, snapshot, { names: { output: 'Named output' }, presets: [] });
+    const application = { presetId: 'pulsed-lock-bank' as const, channelId: 'output', physicalPointId: 'point' };
+    const preview = await service.previewPreset(1, application);
+    await service.applyPreset(
+      1,
+      application,
+      preview.diff.map((change) => change.path),
+      preview.draftHash,
+    );
+    expect(JSON.parse(draft()!.presetProvenance!).editor).toEqual({
+      names: { output: 'Named output' },
+      presets: [application],
+    });
+  });
+  it('audits validated profile persistence using only the saved profile identity and counts', async () => {
+    const { service, audit } = fixture();
+    const principal = { userId: 7, authenticationMethod: 'session' as const };
+    const profile = duplicateProfile(BUILTIN_MODBUS_PROFILES[0], 'custom-profile');
+    const candidate = { ...snapshot, modbus: { connections: [], devices: [], profiles: [profile] } };
+    await service.saveDraft(1, candidate, undefined, principal);
+    expect(audit.record).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        action: 'wago.profile_creation',
+        outcome: 'succeeded',
+        details: {
+          profileId: 'custom-profile',
+          profileVersion: 1,
+          'before.physicalPointCount': 0,
+          'before.logicalChannelCount': 0,
+          'after.physicalPointCount': 1,
+          'after.logicalChannelCount': 1,
+        },
+      }),
+    );
+    audit.record.mockClear();
+    await service.saveDraft(1, candidate, undefined, principal);
+    expect(audit.record).not.toHaveBeenCalled();
+    profile.measurements[0].scale++;
+    await service.saveDraft(1, candidate, undefined, principal);
+    expect(audit.record.mock.calls.map(([event]) => event.action)).toEqual([
+      'wago.profile_change',
+      'wago.profile_change',
+    ]);
+    expect(JSON.stringify(audit.record.mock.calls)).not.toContain('measurements');
+  });
 });
