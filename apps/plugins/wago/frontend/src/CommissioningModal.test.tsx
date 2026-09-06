@@ -23,6 +23,7 @@ let requests: Array<{ url: string; body: string | undefined }>;
 let failInstall: boolean;
 let failRecovery: boolean;
 let activeSession: CommissioningSession;
+let verificationControllerId: number | null;
 
 beforeEach(() => {
   client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: 3 } } });
@@ -30,11 +31,12 @@ beforeEach(() => {
   failInstall = false;
   failRecovery = false;
   activeSession = { ...session };
+  verificationControllerId = null;
   vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
     requests.push({ url, body: options?.body as string | undefined });
     const isInstall = url.endsWith('/deliver');
     const isRecovery = url.endsWith('/recover');
-    const data = isInstall || isRecovery ? activeSession : url.endsWith('/verification') ? { permanentConnection: false, enrollmentRevoked: false, configurationApplied: false } : url.includes('/commissioning/sessions') ? [activeSession] : url.endsWith('/settings') ? { defaultMqttServerId: 1 } : [];
+    const data = isInstall || isRecovery ? activeSession : url.endsWith('/management') ? null : url.endsWith('/operation') ? { state: 'available' } : url.endsWith('/verification') ? { controllerId: verificationControllerId, permanentConnection: false, enrollmentRevoked: false, configurationApplied: false } : url.includes('/commissioning/sessions') ? [activeSession] : url.endsWith('/settings') ? { defaultMqttServerId: 1 } : [];
     return { ok: !(isInstall && failInstall) && !(isRecovery && failRecovery), status: 400, json: async () => ({ message: isRecovery ? 'Runtime snapshot unavailable' : 'Installation failed' }), text: async () => JSON.stringify(data) };
   }));
 });
@@ -62,6 +64,15 @@ function fillRecoveryCredentials() {
 }
 
 describe('explicit recovery approval', () => {
+  it('opens the existing visual configuration workflow without claiming hardware qualification', async () => {
+    activeSession.state = 'awaiting_verification';
+    verificationControllerId = 5;
+    const onConfigure = vi.fn();
+    render(<QueryClientProvider client={client}><CommissioningModal isOpen session={activeSession} onOpenChange={vi.fn()} onConfigure={onConfigure} /></QueryClientProvider>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Configure inputs and outputs' }));
+    expect(onConfigure).toHaveBeenCalledWith(5);
+    expect(screen.getByText('Physical qualification: required before production use')).toBeTruthy();
+  });
   it.each(['delivery_failed', 'awaiting_discovery', 'awaiting_verification'] as const)('offers manual recovery in %s without starting it', (state) => {
     activeSession.state = state;
     mount();
@@ -76,7 +87,7 @@ describe('explicit recovery approval', () => {
     mount();
     const recover = screen.getByRole('button', { name: 'Recover saved runtime' });
     fillCredentials();
-    fireEvent.click(screen.getByRole('checkbox', { name: /I approve CODESYS/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /I approve interruption/ }));
     expect((screen.getByLabelText('Recovery SSH password') as HTMLInputElement).value).toBe('');
     fillRecoveryCredentials();
     expect(recover.hasAttribute('disabled')).toBe(true);
@@ -105,7 +116,7 @@ describe('explicit recovery approval', () => {
     const { rerender, view } = mount();
     fillRecoveryCredentials();
     fireEvent.click(screen.getByRole('checkbox', { name: /I approve interrupting/ }));
-    if (mode === 'button') fireEvent.click(screen.getByRole('button', { name: 'Close', exact: true }));
+    if (mode === 'button') fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     if (mode === 'session') activeSession = { ...activeSession, id: 8 };
     else rerender(view(false));
     rerender(view(true));
@@ -144,7 +155,7 @@ describe('explicit install approval', () => {
     expect(install.hasAttribute('disabled')).toBe(true);
     fillCredentials();
     expect(install.hasAttribute('disabled')).toBe(true);
-    fireEvent.click(screen.getByRole('checkbox', { name: /I approve CODESYS/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /I approve interruption/ }));
     fireEvent.click(install);
     expect((screen.getByLabelText('Temporary SSH password') as HTMLInputElement).value).toBe('');
     await waitFor(() => expect(requests.filter(({ url }) => url.endsWith('/deliver'))).toHaveLength(1));
@@ -176,7 +187,7 @@ describe('explicit install approval', () => {
     const { rerender, view, onOpenChange } = mount();
     fillCredentials();
     fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.click(screen.getByRole('button', { name: 'Close', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
     rerender(view(false));
     rerender(view(true));

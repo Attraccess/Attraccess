@@ -29,11 +29,13 @@ describe('commissioning verification', () => {
 
   it('does not claim hardware or hardening success from MQTT evidence alone', async () => {
     expect(await commissioningVerification(context(), session)).toEqual({
+      controllerId: 1,
       permanentConnection: true,
       enrollmentRevoked: true,
       configurationApplied: true,
       managementHardening: 'unverified',
       hardwareReadiness: 'unverified',
+      physicalQualification: 'required',
       ready: false,
     });
   });
