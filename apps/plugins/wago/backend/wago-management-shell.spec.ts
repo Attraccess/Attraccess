@@ -14,6 +14,7 @@ const exec = promisify(execFile);
 jest.setTimeout(15_000);
 const token = '1234567890abcdef1234567890abcdef';
 const key = generateManagementKey();
+const keyEntry = `no-agent-forwarding,no-port-forwarding,no-pty,no-X11-forwarding ${key.publicKey}`;
 let root: string, home: string, bin: string;
 let watchdogPid: number | undefined;
 const path = (...parts: string[]) => join(home, '.ssh', ...parts);
@@ -106,7 +107,7 @@ describe('executable isolated management shell fixtures', () => {
   it('adds only the generated public key, preserves the snapshot, and restores exactly on explicit recovery', async () => {
     await prepared();
     await run('install');
-    expect(await readFile(path('authorized_keys'), 'utf8')).toBe(`# existing key\n\n${key.publicKey}\n`);
+    expect(await readFile(path('authorized_keys'), 'utf8')).toBe(`# existing key\n\n${keyEntry}\n`);
     await run('commit');
     await run('watchdog'); // committed watchdog must leave the key in place
     expect(await readFile(path('authorized_keys'), 'utf8')).toContain(key.publicKey);
@@ -194,7 +195,7 @@ describe('executable isolated management shell fixtures', () => {
   }, 15000);
 
   it('reserves append space and rolls back an installed image of exactly 65536 bytes', async () => {
-    const previous = '#'.repeat(65536 - Buffer.byteLength(key.publicKey) - 2);
+    const previous = '#'.repeat(65536 - Buffer.byteLength(keyEntry) - 2);
     await writeFile(path('authorized_keys'), previous, { mode: 0o600 });
     await run('prepare');
     await writeFile(path('.attraccess-management-transaction', 'armed'), '');
@@ -205,7 +206,7 @@ describe('executable isolated management shell fixtures', () => {
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe(previous);
   });
 
-  it.each([65536 - Buffer.byteLength(key.publicKey) - 1, 65536])(
+  it.each([65536 - Buffer.byteLength(keyEntry) - 1, 65536])(
     'refuses an append that would overflow (%i existing bytes)',
     async (size) => {
       const previous = '#'.repeat(size);
@@ -313,7 +314,7 @@ describe('executable isolated management shell fixtures', () => {
     await mkdir(join(proc, '2'));
     await mkdir(join(proc, 'net'));
     await mkdir(join(etc, 'init.d'), { recursive: true });
-    await writeFile(join(etc, 'os-release'), 'NAME="WAGO CC100"\nVERSION_ID="4.9.1(31)"\n');
+    await writeFile(join(etc, 'os-release'), 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="4.9.1(31)"\n');
     await writeFile(join(proc, '1', 'comm'), 'init\n');
     await writeFile(join(proc, '2', 'comm'), 'dropbear\n');
     for (const family of ['tcp', 'tcp6', 'udp', 'udp6'])
@@ -334,8 +335,8 @@ describe('executable isolated management shell fixtures', () => {
     });
     expect(output.stdout).not.toContain('00000000');
     const provider = new WagoManagementProvider({ execute: jest.fn(), verifyNewKeyConnection: jest.fn() });
-    expect(provider.qualify(inspection, 'baseline').support).toBe('qualification_required');
-    expect(provider.qualify(inspection, 'key_only').support).toBe('qualification_required');
+    expect(provider.qualify(inspection, 'baseline').support).toBe('UNSUPPORTED');
+    expect(provider.qualify(inspection, 'key_only').support).toBe('UNSUPPORTED');
   });
 
   it('reports mixed/unknown daemons and BSP-only firmware conservatively; rejects oversized/raw output', () => {
@@ -343,6 +344,46 @@ describe('executable isolated management shell fixtures', () => {
     expect(inspection).toMatchObject({ firmware: 'unknown', ssh: 'mixed', wbm: 'unknown', serviceControl: 'unknown' });
     expect(() => parseManagementInspection(`BEGIN=1\n${'secret'.repeat(5000)}\nEND=1\n`)).toThrow('inspection_failed');
     expect(() => parseManagementInspection('BEGIN=1\nPASSWORD=secret\nEND=1\n')).toThrow('inspection_failed');
+  });
+
+  it.each([
+    ['31', '2025.88', 'dropbear', 1004, 'supported'],
+    ['31', 'unknown', 'dropbear', 1004, 'UNSUPPORTED'],
+    ['31', '', 'dropbear', 1004, 'UNSUPPORTED'],
+    ['unrecognized', '2025.88', 'dropbear', 1004, 'UNSUPPORTED'],
+    ['31', '2025.88', 'dropbear', 0, 'UNSUPPORTED'],
+    ['31', '2025.88', 'dropbear\nSSH=openssh', 1004, 'UNSUPPORTED'],
+    ['31', '2025.88\nDROPBEAR=unknown', 'dropbear', 1004, 'UNSUPPORTED'],
+  ])(
+    'gates Dropbear enrollment by live version, firmware and non-root identity (%s/%s/%s/%s)',
+    (firmware, version, daemon, uid, support) => {
+      const inspection = parseManagementInspection(
+        `BEGIN=1\nMODEL=cc100\nFW=${firmware}\nUID=${uid}\nSSH=${daemon}\n${version ? `DROPBEAR=${version}\n` : ''}END=1\n`,
+      );
+      const provider = new WagoManagementProvider({ execute: jest.fn(), verifyNewKeyConnection: jest.fn() });
+      expect(provider.qualify(inspection, 'key_only').support).toBe(support);
+      expect(provider.qualify(inspection, 'baseline').support).toBe('UNSUPPORTED');
+    },
+  );
+
+  it('does not attempt root process executable reads or execute an installed daemon to infer its version', async () => {
+    const proc = join(root, 'proc'),
+      etc = join(root, 'etc');
+    await mkdir(etc);
+    await writeFile(join(etc, 'os-release'), 'PTXDIST_PLATFORM_NAME=cc100\nVERSION_ID=31\n');
+    for (const pid of ['2', '3']) {
+      await mkdir(join(proc, pid), { recursive: true });
+      await writeFile(join(proc, pid, 'comm'), 'dropbear\n');
+      // Permission-realistic model: no readable executable for a root daemon.
+      await symlink('/unreadable-root-daemon-executable', join(proc, pid, 'exe'));
+    }
+    const script = MANAGEMENT_INSPECTION_COMMAND.replaceAll('/proc/', `${proc}/`).replaceAll('/etc/', `${etc}/`);
+    expect(script).not.toMatch(/\/exe| -V/);
+    const result = await exec('/bin/sh', ['-c', script], { env: env(), timeout: 5000 });
+    expect(parseManagementInspection(result.stdout)).toMatchObject({ ssh: 'dropbear', dropbearVersion: 'unknown' });
+    // Only the authenticated transport can supply the version of its selected peer.
+    const provider = new WagoManagementProvider({ execute: jest.fn(), verifyNewKeyConnection: jest.fn() });
+    expect(provider.qualify(parseManagementInspection(result.stdout), 'key_only').support).toBe('UNSUPPORTED');
   });
 });
 

@@ -31,6 +31,8 @@ export interface ManagementInspection {
   model: 'cc100' | 'unknown';
   firmware: '31' | 'unsupported' | 'unknown';
   ssh: 'openssh' | 'dropbear' | 'mixed' | 'unknown';
+  /** Version of this authenticated, pinned SSH peer, never inferred from installed binaries. */
+  dropbearVersion?: '2025.88' | 'unknown';
   serviceControl: 'systemd' | 'sysv' | 'unknown';
   uid: number | null;
   wbm: Exposure;
@@ -43,7 +45,13 @@ export interface ManagementInspection {
 export interface ManagementQualification {
   support: ManagementSupport;
   /** Fixed identifier from trusted provider code; never a user attestation. */
-  evidence: 'openssh-authorized-keys' | 'fw31-qualified-baseline' | 'missing-fw31-command-evidence';
+  evidence:
+    | 'openssh-authorized-keys'
+    | 'dropbear-2025.88-authorized-keys'
+    | 'fw31-qualified-baseline'
+    | 'missing-fw31-command-evidence'
+    | 'fw31-baseline-not-implemented'
+    | 'supported-ssh-nonroot-account-required';
   minimumPrivileges: boolean;
   rebootSafeWatchdog: boolean;
 }

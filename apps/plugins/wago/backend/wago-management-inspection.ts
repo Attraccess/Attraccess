@@ -1,4 +1,5 @@
 import type { ManagementInspection } from './wago-management.types';
+import { wagoFw31IdentityCheck } from './wago-firmware-identity';
 
 /** Public evidence ledger, reviewed 2026-09-05. These sources are NOT CC100 FW31 qualification.
  * WAGO release identity: https://downloadcenter.wago.com/latest/firmware-cc (4.9.1(31)).
@@ -19,6 +20,8 @@ export const MANAGEMENT_EVIDENCE = Object.freeze({
   accounts: 'https://github.com/WAGO/pfc-howtos/tree/master/HowTo_AddUserOrGroup',
   wbmIdentity: 'https://github.com/WAGO/pfc-howtos/tree/master/HowTo_SplitAdminUser',
   keys: 'https://man.openbsd.org/sshd.8',
+  dropbear:
+    'https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/src/dropbear-2025.88.tar.bz2',
 });
 
 /** Constant, read-only commands. Never source os-release, read shadow/private keys, inspect
@@ -29,14 +32,20 @@ export const MANAGEMENT_EVIDENCE = Object.freeze({
 export const MANAGEMENT_INSPECTION_COMMAND = String.raw`set -eu
 printf 'BEGIN=1\n'
 if [ -r /etc/os-release ]; then
-  awk -F= '($1 == "NAME" || $1 == "PRETTY_NAME") && $2 ~ /CC100/ { print "MODEL=cc100" }
-    $1 == "VERSION_ID" || $1 == "VERSION" {gsub(/"/, "", $2); if ($2 == "31" || $2 == "4.9.1(31)" || $2 == "04.09.01(31)") print "FW=31"; else if ($2 == "2024.12.0") print "FW=bsp_only"; else if ($1 == "VERSION_ID") print "FW=unrecognized"}' /etc/os-release
+  if ${wagoFw31IdentityCheck()}; then
+    printf 'MODEL=cc100\nFW=31\n'
+  else
+    printf 'FW=unrecognized\n'
+  fi
 fi
 printf 'UID=%s\n' "$(id -u)"
 for comm in /proc/[0-9]*/comm; do
   [ -r "$comm" ] || continue
   IFS= read -r name < "$comm" || continue
-  case "$name" in sshd|sshd-session|sshd-auth) printf 'SSH=openssh\n';; dropbear) printf 'SSH=dropbear\n';; esac
+  case "$name" in
+    sshd|sshd-session|sshd-auth) printf 'SSH=openssh\n';;
+    dropbear) printf 'SSH=dropbear\n';;
+  esac
 done
 if [ -r /proc/1/comm ]; then
   IFS= read -r init < /proc/1/comm || init=unknown
@@ -56,7 +65,7 @@ export function parseManagementInspection(output: string): ManagementInspection 
     throw new Error('inspection_failed');
   const lines = new Set(output.trim().split('\n'));
   const recognized = [...lines].every((line) =>
-    /^(BEGIN=1|END=1|MODEL=cc100|FW=(31|unrecognized|bsp_only)|UID=\d{1,10}|SSH=(openssh|dropbear)|CONTROL=(systemd|sysv)|SOCKETS=(tcp6?|udp6?)|PORT=[A-Fa-f0-9]{4})$/.test(
+    /^(BEGIN=1|END=1|MODEL=cc100|FW=(31|unrecognized|bsp_only)|UID=\d{1,10}|SSH=(openssh|dropbear)|DROPBEAR=(2025\.88|unknown)|CONTROL=(systemd|sysv)|SOCKETS=(tcp6?|udp6?)|PORT=[A-Fa-f0-9]{4})$/.test(
       line,
     ),
   );
@@ -77,6 +86,8 @@ export function parseManagementInspection(output: string): ManagementInspection 
         ? 'unsupported'
         : 'unknown',
     ssh: openssh && dropbear ? 'mixed' : openssh ? 'openssh' : dropbear ? 'dropbear' : 'unknown',
+    dropbearVersion:
+      dropbear && !openssh && lines.has('DROPBEAR=2025.88') && !lines.has('DROPBEAR=unknown') ? '2025.88' : 'unknown',
     serviceControl:
       lines.has('CONTROL=systemd') && !lines.has('CONTROL=sysv')
         ? 'systemd'

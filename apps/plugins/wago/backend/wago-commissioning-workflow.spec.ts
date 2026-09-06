@@ -89,17 +89,46 @@ describe('commissioning workflows with a real isolated database and mocked devic
     jest.restoreAllMocks();
   });
 
-  it('pins the artifact and carries the reviewed Docker token into the runtime transaction', async () => {
+  it.each([null, 'c'.repeat(32)])('rejects obsolete saved activation before any mutation, preserving pending token %s', async (token) => {
+    const repository = db.getRepository(WagoCommissioningSession);
+    await repository.update(session.id, {
+      platformReport: JSON.stringify({ platform: 'supported', provision: 'review-start-installed-runtime' }),
+      dockerProvisionToken: token,
+      dockerProvisionState: token ? 'starting' : null,
+    });
+    const before = await repository.findOneByOrFail({ id: session.id });
+    const remote = jest.spyOn(service as never, 'sudoRunScript');
+    const save = jest.spyOn(service as never, 'save');
+    const lock = jest.spyOn(service as never, 'withControllerLock');
+    await expect(service.platform(session.id, 'activate', {
+      temporarySsh: credential, reviewedDockerActivation: true,
+    }, principal)).rejects.toThrow('unsupported-lifecycle-dependencies');
+    expect(await repository.findOneByOrFail({ id: session.id })).toEqual(before);
+    expect(remote).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+    expect(lock).not.toHaveBeenCalled();
+  });
+
+  it('retains an old restored token when final lifecycle reconciliation fails', async () => {
+    const token = 'c'.repeat(32);
+    await db.getRepository(WagoCommissioningSession).update(session.id, {
+      dockerProvisionToken: token, dockerProvisionState: 'restored',
+    });
+    jest.spyOn(service as never, 'sudoRunScript').mockRejectedValue(new Error('unresolved-lifecycle-effects') as never);
+    const result = await service.platform(session.id, 'recover', {
+      temporarySsh: credential, reviewedDockerActivation: true,
+    }, principal);
+    expect(result.dockerProvisionState).toBe('recovery_required');
+    expect(result.failureReason).toContain('daemon absence alone cannot prove restoration');
+    expect((await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id })).dockerProvisionToken).toBe(token);
+  });
+
+  it('pins the artifact and carries an existing Docker token into the runtime transaction', async () => {
     const remote = jest.spyOn(service as never, 'sudoRunScript').mockResolvedValue(stoppedReport as never);
     await service.platform(session.id, 'inspect', { temporarySsh: credential }, principal);
-    const activated = await service.platform(
-      session.id,
-      'activate',
-      { temporarySsh: credential, reviewedDockerActivation: true },
-      principal,
-    );
-    expect(activated.dockerProvisionState).toBe('started');
-    expect(activated).not.toHaveProperty('dockerProvisionToken');
+    await db.getRepository(WagoCommissioningSession).update(session.id, {
+      dockerProvisionToken: 'c'.repeat(32), dockerProvisionState: 'started',
+    });
     const saved = await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id });
     expect(saved.dockerProvisionToken).toMatch(/^[a-f0-9]{32}$/);
     remote.mockResolvedValue('' as never);

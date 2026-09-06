@@ -1,4 +1,6 @@
 /** Software contract from ATT-1056 eafdbe04, reviewed at f3248534. No hardware qualification implied. */
+import { wagoFw31IdentityCheck } from './wago-firmware-identity';
+
 export const WAGO_HARDWARE_PROFILE = 'cc100-751-9301-fw31-digital-v1';
 export const WAGO_DIN = '/sys/devices/platform/soc/44009000.spi/spi_master/spi0/spi0.0/din';
 export const WAGO_DOUT = '/sys/kernel/dout_drv/DOUT_DATA';
@@ -22,7 +24,7 @@ export function parseWagoHardwareDeploymentReport(output: string): WagoHardwareD
     version: ['1'],
     platform: ['supported', 'unsupported-firmware'],
     hardware: ['accessible', 'missing-register', 'uid10001-access-denied', 'permission-tool-unavailable'],
-    exclusivity: ['clear', 'codesys-active', 'output-container-conflict', 'unknown'],
+    exclusivity: ['clear', 'codesys-active', 'codesys-boot-enabled', 'output-container-conflict', 'unknown'],
     docker: ['running', 'installed-stopped', 'vendor-package-missing', 'unsupported-tool-state'],
     configDocker: ['present', 'missing'],
     provision: [
@@ -30,6 +32,7 @@ export function parseWagoHardwareDeploymentReport(output: string): WagoHardwareD
       'review-start-installed-runtime',
       'unsupported-fw31-package-activation',
       'unsupported-tool-state',
+      'unsupported-lifecycle-dependencies',
     ],
     qualification: ['required'],
   };
@@ -69,18 +72,11 @@ unset DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH
 docker_cli=$(command -v docker || :)
 daemon_cli=$(command -v dockerd || :)
 docker() { command docker --host unix:///var/run/docker.sock "$@"; }
-empty_container_store() {
-  if test ! -e "$1" && test ! -L "$1"; then return 0; fi
-  test -d "$1" && test ! -L "$1" || return 1
-  entries=$(ls -A -- "$1") || return 1
-  test -z "$entries"
-}
 config_docker=missing
 [ ! -x "$root/etc/config-tools/config_docker" ] || config_docker=present
 platform=unsupported-firmware
 if test -f "$root/etc/os-release" &&
-  grep -qx 'PTXDIST_PLATFORM_NAME="cc100"' "$root/etc/os-release" &&
-  grep -Eq '^VERSION_ID="(31|2024\\.12\\.0)"$' "$root/etc/os-release"; then platform=supported; fi
+  ${wagoFw31IdentityCheck(true)}; then platform=supported; fi
 din="$root${WAGO_DIN}"
 dout="$root${WAGO_DOUT}"
 hardware=accessible
@@ -96,6 +92,11 @@ fi
 exclusivity=unknown
 processes=$(ps -eo comm=) || exit 1
 if printf '%s\\n' "$processes" | grep -iq codesys; then exclusivity=codesys-active; fi
+# WAGO config_runtime/init runtime use S98_runtime. A stopped PLC can return
+# at reboot; process absence is not permission to replace its output ownership.
+if [ "$exclusivity" = unknown ] && { test -e "$root/etc/rc.d/S98_runtime" || test -L "$root/etc/rc.d/S98_runtime"; }; then
+  exclusivity=codesys-boot-enabled
+fi
 docker_state=vendor-package-missing
 provision=unsupported-fw31-package-activation
 if [ -n "$docker_cli" ] || [ -n "$daemon_cli" ]; then
@@ -106,7 +107,7 @@ if [ -n "$docker_cli" ] && [ -n "$daemon_cli" ]; then
   if docker info >/dev/null 2>&1; then
     docker_state=running
     provision=none
-    if [ "$exclusivity" != codesys-active ] && [ "$hardware" != missing-register ]; then
+    if [ "$exclusivity" = unknown ] && [ "$hardware" != missing-register ]; then
       exclusivity=clear
       output_canonical=$(readlink -f "$dout") || exit 1
       containers=$(docker container ls -a --no-trunc --format '{{.ID}}') || exit 1
@@ -128,15 +129,14 @@ EOF_MOUNTS
         [ "$conflict" = 0 ] || exclusivity=output-container-conflict
       done
     fi
-  elif [ -x "$root/etc/init.d/dockerd" ]; then
-    status=0
-    "$root/etc/init.d/dockerd" status >/dev/null 2>&1 || status=$?
-    # LSB stopped status, no live daemon, no custom storage or existing workloads.
-    if [ "$status" = 3 ] && ! printf '%s\\n' "$processes" | grep -iq dockerd &&
-      [ ! -e "$root/etc/docker/daemon.json" ] &&
-      empty_container_store "$root/home/docker/containers" && empty_container_store "$root/var/lib/docker/containers"; then
+  elif [ "$platform" = supported ] && [ -x "$root/etc/init.d/dockerd" ]; then
+    # The pinned WAGO init implements start/stop/restart, NOT LSB status.
+    # Its stop dispatches every networking event. A daemon-only snapshot cannot
+    # restore these effects; do not execute it, even for inspection.
+    provision=unsupported-lifecycle-dependencies
+    if ! printf '%s\\n' "$processes" | grep -iq dockerd &&
+      test ! -e "$root/var/run/docker.pid" && test ! -L "$root/var/run/docker.pid"; then
       docker_state=installed-stopped
-      provision=review-start-installed-runtime
     fi
   fi
 fi
@@ -184,8 +184,8 @@ token=${quote(token)}
 `;
 }
 
-/** Reviewed, installed-runtime-only start. Retains a tokened intent for interruption recovery.
- * config_docker activate/remove is NOT treated as a reversible FW31 install API.
+/** Kept for existing coordinator/API compatibility. Do not run the old ungrounded
+ * LSB start/stop transaction: vendor stop invokes unsnapshotted networking hooks.
  */
 export function wagoDockerProvisionScript(review: WagoDockerProvisionReview, testRoot = ''): string {
   if (review.reviewedDockerActivation !== true || review.action !== 'start-installed-runtime')
@@ -195,66 +195,103 @@ test ! -e "$journal" || fail 'Docker provisioning recovery or acceptance require
 ${checks(testRoot)}
 [ "$platform" = supported ] || fail "$platform"
 [ "$exclusivity" != codesys-active ] || fail "$exclusivity"
-[ "$docker_state" = installed-stopped ] || fail "$docker_state: $provision"
-stage=$(mktemp -d "$config/docker-provision.prepare.XXXXXX")
-printf '%s\\n' "$token" > "$stage/token"
-printf '%s\\n' stopped > "$stage/prior"
-mv "$stage" "$journal"
-touch "$journal/start-intent"
-trap 'echo "Docker activation interrupted; tokened recovery required" >&2; exit 130' HUP INT TERM
-if "$root/etc/init.d/dockerd" start >&2 && docker info >/dev/null 2>&1; then
-  touch "$journal/started"
-  echo 'docker-provision=started; recovery retained'
-else
-  # Retain intent even when start failed: it may have partially started the daemon.
-  echo 'Docker activation failed; tokened recovery required' >&2
-  exit 1
-fi
+fail 'unsupported-lifecycle-dependencies: Docker networking and boot restoration require a complete source gate'
+`;
+}
+
+/** Shared passive state checks and explicit reconciliation of base-version journals.
+ * Reconciliation captures CURRENT context under a separate name, never fabricates
+ * historical firmware/service snapshots that the base implementation did not save.
+ */
+function dockerReconciliationHelpers(): string {
+  return `
+unset DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH
+docker_stopped() {
+  test ! -e "$root/var/run/docker.pid" && test ! -L "$root/var/run/docker.pid" || return 1
+  if command docker --host unix:///var/run/docker.sock info >/dev/null 2>&1; then return 1; fi
+  processes=$(ps -eo comm=) || return 1
+  if printf '%s\\n' "$processes" | grep -iq dockerd; then return 1; fi
+}
+require_no_start_effects() {
+  for marker in start-intent started; do
+    if test -e "$journal/$marker" || test -L "$journal/$marker"; then
+      fail 'unresolved-lifecycle-effects: saved Docker start may have changed WAGO_DOCKER_IPT and networking state; daemon absence cannot prove restoration; recovery retained'
+    fi
+  done
+}
+check_context() {
+  test -d "$context" && test ! -L "$context" || fail 'Invalid reconciliation context'
+  for name in os-release dockerd; do
+    test -f "$context/$name" && test ! -L "$context/$name" || fail 'Incomplete firmware/service context; recovery retained'
+  done
+  cmp -s "$root/etc/os-release" "$context/os-release" || fail 'Firmware changed; recovery retained'
+  cmp -s "$root/etc/init.d/dockerd" "$context/dockerd" || fail 'Docker service changed; recovery retained'
+}
+journal_context() {
+  legacy=0
+  context="$journal"
+  if test -e "$journal/os-release" || test -L "$journal/os-release" || test -e "$journal/dockerd" || test -L "$journal/dockerd"; then
+    check_context
+  else
+    legacy=1
+    context="$journal/reconciliation"
+    if test -e "$context" || test -L "$context"; then check_context; else context=''; fi
+  fi
+}
+capture_legacy_context() {
+  if test "$legacy" = 1 && test -z "$context"; then
+    stage=$(mktemp -d "$journal/reconcile.XXXXXX") || fail 'Cannot retain reconciliation context'
+    cp "$root/etc/os-release" "$stage/os-release" && cp "$root/etc/init.d/dockerd" "$stage/dockerd" || fail 'Cannot capture current context'
+    mv "$stage" "$journal/reconciliation" || fail 'Cannot retain reconciliation context'
+    context="$journal/reconciliation"
+  fi
+  check_context
+}
 `;
 }
 
 /** Call after runtime recovery, before acknowledging provisioning restoration. Never removes packages. */
 export function wagoDockerProvisionRecoveryScript(token: string, testRoot = ''): string {
   return `${provisionLock(token, testRoot)}
+${dockerReconciliationHelpers()}
 if test ! -e "$journal"; then
-  if command docker --host unix:///var/run/docker.sock info >/dev/null 2>&1; then fail 'No saved Docker snapshot; running daemon cannot be restored'; fi
-  processes=$(ps -eo comm=) || fail 'Cannot verify daemon absence'
-  if printf '%s\\n' "$processes" | grep -iq dockerd; then fail 'Docker daemon still running'; fi
-  echo 'docker-provision=restored'; exit 0
+  fail 'unresolved-lifecycle-effects: no saved Docker journal; daemon absence cannot prove restoration; recovery retained'
 fi
 test -d "$journal" && test ! -L "$journal" || fail 'No Docker provisioning journal'
 test "$(cat "$journal/token")" = "$token" || fail 'Docker provisioning token mismatch'
 test "$(cat "$journal/prior")" = stopped || fail 'Invalid Docker provisioning snapshot'
-if test -e "$journal/restored"; then echo 'docker-provision=restored'; exit 0; fi
-unset DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH
+journal_context
+require_no_start_effects
+if test "$legacy" = 0; then
+  ${wagoFw31IdentityCheck(true)} || fail 'Unsupported firmware; recovery retained'
+fi
 if command docker --host unix:///var/run/docker.sock info >/dev/null 2>&1; then
   containers=$(command docker --host unix:///var/run/docker.sock container ls -a -q) || fail 'Cannot inspect Docker workloads'
   test -z "$containers" || fail 'Docker workloads exist; refusing to stop daemon'
   docker_running=1
 else
-  # An unavailable API cannot prove that no workloads are present. Only continue when
-  # the init script and process list independently prove the daemon is already stopped.
-  status=0
-  "$root/etc/init.d/dockerd" status >/dev/null 2>&1 || status=$?
-  test "$status" = 3 || fail 'Cannot inspect Docker workloads'
-  processes=$(ps -eo comm=) || fail 'Cannot verify daemon absence'
-  if printf '%s\n' "$processes" | grep -iq dockerd; then fail 'Cannot inspect Docker workloads'; fi
+  # An unavailable API cannot prove that no workloads are present. Only acknowledge
+  # an already stopped daemon; never invoke the vendor init's unsupported status.
+  docker_stopped || fail 'Cannot inspect Docker workloads'
   docker_running=0
 fi
-if test -e "$journal/start-intent" && test "$docker_running" = 1; then
-  "$root/etc/init.d/dockerd" stop >&2 || fail 'Docker stop failed; recovery retained'
-  status=0
-  "$root/etc/init.d/dockerd" status >/dev/null 2>&1 || status=$?
-  test "$status" = 3 || fail 'Docker stopped state unverified'
-  processes=$(ps -eo comm=) || fail 'Cannot verify daemon absence'
-  if printf '%s\\n' "$processes" | grep -iq dockerd; then fail 'Docker daemon still running'; fi
+if test -e "$journal/restored"; then
+  test "$docker_running" = 0 || fail 'Docker changed after restoration; recovery retained'
+  capture_legacy_context
+  docker_stopped || fail 'Docker changed during reconciliation; recovery retained'
+  echo 'docker-provision=restored'; exit 0
 fi
+if test "$docker_running" = 1; then
+  fail 'unsupported-lifecycle-dependencies: vendor stop invokes unsnapshotted networking events; recovery retained'
+fi
+capture_legacy_context
+docker_stopped || fail 'Docker changed during reconciliation; recovery retained'
 touch "$journal/restored"
 echo 'docker-provision=restored'
 `;
 }
 
-/** Explicit coordinator acceptance, or acknowledgement after persisting the restored receipt. */
+/** Acknowledge a verified, never-started journal. Legacy acceptance has no production caller. */
 export function wagoDockerProvisionFinishScript(
   token: string,
   outcome: 'accepted' | 'restored',
@@ -262,13 +299,27 @@ export function wagoDockerProvisionFinishScript(
 ): string {
   if (outcome !== 'accepted' && outcome !== 'restored') throw new Error('Invalid provisioning outcome');
   return `${provisionLock(token, testRoot)}
+${dockerReconciliationHelpers()}
 cleanup="$journal.${outcome}-$token"
-if test -d "$cleanup" && test ! -e "$journal"; then rm -rf "$cleanup"; exit 0; fi
-${outcome === 'restored' ? 'if test ! -e "$journal"; then exit 0; fi' : ''}
+if test -d "$cleanup" && test ! -e "$journal"; then
+  journal="$cleanup"
+  require_no_start_effects
+  rm -rf "$cleanup"; exit 0
+fi
 test -d "$journal" && test ! -L "$journal" || fail 'No Docker provisioning journal'
 test "$(cat "$journal/token")" = "$token" || fail 'Docker provisioning token mismatch'
+test "$(cat "$journal/prior")" = stopped || fail 'Invalid Docker provisioning snapshot'
 test -f "$journal/${outcome === 'accepted' ? 'started' : 'restored'}" || fail 'Provisioning outcome not verified'
+journal_context
+require_no_start_effects
+${
+  outcome === 'accepted'
+    ? `command docker --host unix:///var/run/docker.sock info >/dev/null 2>&1 || fail 'Docker no longer running; recovery retained'`
+    : `docker_stopped || fail 'Docker no longer stopped; recovery retained'`
+}
 ${outcome === 'accepted' ? `test ! -e "$journal/restored" || fail 'Docker provisioning was restored'` : ''}
+capture_legacy_context
+${outcome === 'accepted' ? `command docker --host unix:///var/run/docker.sock info >/dev/null 2>&1 || fail 'Docker changed during reconciliation'` : `docker_stopped || fail 'Docker changed during reconciliation'`}
 mv "$journal" "$cleanup"
 rm -rf "$cleanup"
 `;
