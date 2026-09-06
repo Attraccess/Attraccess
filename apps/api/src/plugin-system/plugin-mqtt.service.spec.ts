@@ -168,7 +168,7 @@ describe('PluginMqttService', () => {
 
   it('does not clone payloads dropped from a full queue', async () => {
     let releaseHandler!: () => void;
-    await service.subscribe(
+    const subscription = await service.subscribe(
       'slow',
       'slow',
       new Logger('Plugin:slow'),
@@ -182,14 +182,20 @@ describe('PluginMqttService', () => {
     const payload = Buffer.from('message');
     const clonePayload = jest.spyOn(Buffer, 'from');
 
-    for (let index = 0; index < 102; index++) {
-      events.emit(MqttMessageEvent.EVENT_NAME, new MqttMessageEvent(1, `events/${index}`, {}, payload));
+    try {
+      for (let index = 0; index < 102; index++) {
+        events.emit(MqttMessageEvent.EVENT_NAME, new MqttMessageEvent(1, `events/${index}`, {}, payload));
+      }
+      await Promise.resolve();
+
+      // Nest's overflow logger also converts its formatted string with Buffer.from.
+      // Count copies of the source payload: one active delivery and 100 queued messages.
+      expect(clonePayload.mock.calls.filter(([value]) => value === payload)).toHaveLength(101);
+    } finally {
+      clonePayload.mockRestore();
+      subscription.unsubscribe();
+      releaseHandler();
     }
-    await Promise.resolve();
-
-    expect(clonePayload).toHaveBeenCalledTimes(101);
-
-    releaseHandler();
   });
 
   it('releases every plugin subscription to the shared MQTT client', async () => {

@@ -72,6 +72,7 @@
     },
     "typecheck-tests": {
       "executor": "nx:run-commands",
+      "dependsOn": ["react-query-client:generate"],
       "options": {
         "command": "pnpm exec tsc --noEmit -p apps/frontend/tsconfig.spec.json"
       }
