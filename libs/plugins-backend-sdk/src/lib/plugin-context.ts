@@ -42,6 +42,8 @@ export interface MqttServerConnectionConfig {
   readonly name: string;
   readonly host: string;
   readonly port: number;
+  /** Management API port on the same host (1-65535). Null/omitted uses the provider default. */
+  readonly managementPort?: number | null;
   readonly useTls: boolean;
   readonly username: string | null;
   /** Resolved (decrypted) password. Only ever provided to permitted plugins. */

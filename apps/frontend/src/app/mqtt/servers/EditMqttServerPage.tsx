@@ -1,5 +1,6 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Form, Input, Label, Spinner, TextField } from '@heroui/react';
+import { Description, FieldError, Form, Input, Label, Spinner, TextField } from '@heroui/react';
+import { MqttManagementPort, parseManagementPort } from './managementPort';
 import { TlsSection } from './TlsSection';
 import { Button } from '../../../components/button';
 import { Select } from '../../../components/select';
@@ -27,6 +28,8 @@ export function EditMqttServerPage() {
   const navigate = useNavigate();
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
+  const [managementPortInput, setManagementPortInput] = useState('');
+  const managementPort = parseManagementPort(managementPortInput);
 
   const [formValues, setFormValues] = useState<CreateMqttServerDto>({
     name: '',
@@ -52,6 +55,7 @@ export function EditMqttServerPage() {
 
   useEffect(() => {
     if (server) {
+      setManagementPortInput(String((server as typeof server & MqttManagementPort).managementPort ?? ''));
       setFormValues({
         name: server.name,
         host: server.host,
@@ -93,11 +97,12 @@ export function EditMqttServerPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!serverId) return;
+    if (!serverId || managementPort === undefined) return;
 
+    const requestBody: CreateMqttServerDto & MqttManagementPort = { ...formValues, managementPort };
     updateMqttServer.mutate({
       id: Number(serverId),
-      requestBody: formValues,
+      requestBody,
     });
   };
 
@@ -172,6 +177,24 @@ export function EditMqttServerPage() {
               />
             </TextField>
           </div>
+          <TextField
+            value={managementPortInput}
+            onChange={setManagementPortInput}
+            isInvalid={managementPort === undefined}
+            className="w-full"
+          >
+            <Label>{t('managementPortLabel')}</Label>
+            <Input
+              name="managementPort"
+              type="number"
+              min={1}
+              max={65535}
+              step={1}
+              data-cy="edit-mqtt-server-form-management-port-input"
+            />
+            <Description>{t('managementPortDescription')}</Description>
+            <FieldError>{t('managementPortInvalid')}</FieldError>
+          </TextField>
         </section>
 
         <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">
