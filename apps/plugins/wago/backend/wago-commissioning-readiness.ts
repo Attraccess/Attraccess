@@ -1,11 +1,13 @@
 import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import { PLUGIN_CONTEXT, PluginContext, PluginMqttSubscription } from '@attraccess/plugins-backend-sdk';
+import { admitEnvelope, emptyStream, type DiagnosticStream } from './diagnostics-envelope';
+import { normalizeOperationalPrefix, parseOperationalMessage } from './protocol';
 
 export interface CommissioningRuntimeState {
   timestamp: number;
   sequence: number;
-  revision: number;
-  contentHash: string;
+  revision: number | null;
+  contentHash: string | null;
   connected: boolean;
   configurationAccepted: boolean;
   hardwareAvailable: boolean;
@@ -17,7 +19,12 @@ export interface CommissioningRuntimeState {
 export class WagoCommissioningReadiness implements OnModuleDestroy {
   private readonly entries = new Map<
     string,
-    { lastRead: number; state?: CommissioningRuntimeState; subscription?: PluginMqttSubscription }
+    {
+      lastRead: number;
+      stream: DiagnosticStream;
+      state?: CommissioningRuntimeState;
+      subscription?: PluginMqttSubscription;
+    }
   >();
   private readonly cleanup = setInterval(() => {
     for (const [key, entry] of this.entries)
@@ -30,52 +37,77 @@ export class WagoCommissioningReadiness implements OnModuleDestroy {
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
 
   observe(serverId: number, hardwareId: string, prefix: string): CommissioningRuntimeState | undefined {
-    const topic = `${prefix.replace(/\/$/, '')}/v1/controllers/${hardwareId}/state`;
+    const topic = `${normalizeOperationalPrefix(prefix)}/v1/controllers/${hardwareId}/state`;
     const key = `${serverId}:${topic}`;
     let entry = this.entries.get(key);
     if (!entry) {
       if (this.entries.size >= 200) return undefined;
-      entry = { lastRead: Date.now() };
+      entry = { lastRead: Date.now(), stream: emptyStream() };
       this.entries.set(key, entry);
       const current = entry;
       void this.context.mqtt
         .subscribe(serverId, topic, (message) => {
-          if (message.payload.length > 65_536 || message.serverId !== serverId || message.topic !== topic) return;
+          if (message.serverId !== serverId || message.topic !== topic) return;
+          if (message.payload.length > 65_536) {
+            current.state = undefined;
+            return;
+          }
           try {
-            const value = JSON.parse(message.payload.toString('utf8'));
-            const timestamp = typeof value.timestamp === 'string' ? Date.parse(value.timestamp) : NaN;
+            const parsed = parseOperationalMessage(prefix, topic, message.payload);
+            if (!parsed || parsed.hardwareId !== hardwareId || parsed.message.category !== 'state') {
+              current.state = undefined;
+              return;
+            }
+            const event = parsed.message;
+            const timestamp = Date.parse(event.timestamp);
+            const now = Date.now();
+            // The operational decoder deliberately projects readiness to hardware availability.
+            // Validate the additional commissioning fields from the already decoded payload.
+            const value = JSON.parse(message.payload.toString('utf8')) as Record<string, unknown>;
+            const readiness = value.readiness;
             if (
-              !Number.isFinite(timestamp) ||
-              timestamp > Date.now() ||
-              !Number.isSafeInteger(value.revision) ||
-              value.revision < 1 ||
-              !Number.isSafeInteger(value.sequence) ||
-              value.sequence < 0 ||
-              typeof value.contentHash !== 'string' ||
-              !/^[a-f0-9]{64}$/.test(value.contentHash) ||
-              typeof value.connected !== 'boolean' ||
-              typeof value.readiness?.configurationAccepted !== 'boolean' ||
-              typeof value.readiness?.hardwareAvailable !== 'boolean' ||
-              typeof value.readiness?.ready !== 'boolean'
+              timestamp > now ||
+              (event.contentHash !== null && !/^[a-f0-9]{64}$/i.test(event.contentHash)) ||
+              !readiness ||
+              typeof readiness !== 'object' ||
+              !('configurationAccepted' in readiness) ||
+              typeof readiness.configurationAccepted !== 'boolean' ||
+              !('hardwareAvailable' in readiness) ||
+              typeof readiness.hardwareAvailable !== 'boolean' ||
+              !('ready' in readiness) ||
+              typeof readiness.ready !== 'boolean'
             ) {
               current.state = undefined;
               return;
             }
             if (
-              current.state &&
-              (timestamp < current.state.timestamp ||
-                (timestamp === current.state.timestamp && value.sequence <= current.state.sequence))
+              current.stream.activeStream &&
+              current.stream.activeStream !== event.streamId &&
+              timestamp <= current.stream.lastSourceTime
             )
               return;
+            // Keep admission history when usable readiness is invalidated. A malformed
+            // publication must never allow an older ready sample or retired boot back in.
+            if (admitEnvelope(current.stream, event, 'state', now) === 'rejected') {
+              if (current.stream.trackingExhausted) current.state = undefined;
+              return;
+            }
             current.state = {
               timestamp,
-              sequence: value.sequence,
-              revision: value.revision,
-              contentHash: value.contentHash,
-              connected: value.connected,
-              configurationAccepted: value.readiness.configurationAccepted,
-              hardwareAvailable: value.readiness.hardwareAvailable,
-              ready: value.readiness.ready,
+              sequence: event.sequence,
+              revision: event.revision,
+              contentHash: event.contentHash,
+              connected: event.connected,
+              configurationAccepted: readiness.configurationAccepted,
+              hardwareAvailable: readiness.hardwareAvailable,
+              ready:
+                event.connected &&
+                readiness.configurationAccepted &&
+                readiness.hardwareAvailable &&
+                event.revision !== null &&
+                event.revision > 0 &&
+                event.contentHash !== null &&
+                readiness.ready,
             };
           } catch {
             current.state = undefined;
