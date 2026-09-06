@@ -6,7 +6,7 @@
 
 #include "../IScreen.hpp"
 #include "../../../logger/logger.hpp"
-#include "../../images/lockscreen_background_image.hpp"
+#include "display/theme.hpp"
 #include "../../../utils.hpp"
 #include "../../../api/api.hpp"
 
