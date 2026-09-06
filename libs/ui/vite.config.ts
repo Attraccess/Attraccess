@@ -11,7 +11,7 @@ export default defineConfig({
   plugins: [
     react(),
     nxViteTsPaths(),
-    nxCopyAssetsPlugin(['*.md']),
+    nxCopyAssetsPlugin(['*.md', { input: 'src', glob: 'tokens.css', output: '.' }]),
     dts({ entryRoot: 'src', tsconfigPath: path.join(__dirname, 'tsconfig.lib.json') }),
   ],
   build: {
@@ -25,7 +25,7 @@ export default defineConfig({
       formats: ['es'],
     },
     rollupOptions: {
-      external: ['react', 'react-dom', 'react/jsx-runtime', '@heroui/react'],
+      external: ['react', 'react-dom', 'react/jsx-runtime', '@heroui/react', 'lucide-react'],
     },
   },
 });

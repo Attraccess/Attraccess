@@ -1,17 +1,43 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html class="light" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <title>Attraccess</title>
     <base href="/" />
 
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#256d7b" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <script id="theme-init">
+      (() => {
+        let theme = 'light';
+        try {
+          const savedTheme = localStorage.getItem('heroui-theme');
+          if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system') {
+            theme =
+              savedTheme === 'system'
+                ? window.matchMedia('(prefers-color-scheme: dark)').matches
+                  ? 'dark'
+                  : 'light'
+                : savedTheme;
+          }
+        } catch {
+          // Keep the light default when storage is unavailable.
+        }
+        const root = document.documentElement;
+        root.classList.remove('light', 'dark');
+        root.classList.add(theme);
+        root.dataset.theme = theme;
+        root.style.colorScheme = theme;
+      })();
+    </script>
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
-  <body>
+  <body class="bg-background text-foreground">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

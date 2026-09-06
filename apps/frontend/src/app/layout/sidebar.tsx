@@ -29,6 +29,7 @@ import {
   AccordionPanel,
   AccordionBody,
   Separator,
+  cn,
 } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { useAllRoutes } from '../routes';
@@ -37,9 +38,10 @@ import de from './sidebar.de.json';
 import en from './sidebar.en.json';
 import { Logo } from '../../components/logo';
 import { SidebarItem, SidebarItemGroup, useSidebarItems, useSidebarEndItems } from './sidebarItems';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { NavLink as RouterNavLink, useNavigate } from 'react-router-dom';
 import usePluginState from '../plugins/plugin.state';
 import type { PluginSidebarItem } from '@attraccess/plugins-frontend-sdk';
+import { ThemeToggle } from '../../components/themeToggle';
 
 interface NavLinkProps {
   href: string;
@@ -58,7 +60,7 @@ function NavLink({ href, label, icon, isExternal, target, indent, badgeCount, co
   const paddingClass = indent && !collapsed ? 'pl-6 pr-2' : 'px-2';
   const className = `${
     collapsed ? 'relative justify-center' : ''
-  } flex items-center ${paddingClass} py-2 rounded-md text-sm text-default-foreground no-underline hover:bg-default hover:text-default-foreground`;
+  } flex items-center ${paddingClass} py-2.5 rounded-lg border-l-2 border-transparent text-sm text-foreground no-underline hover:bg-surface-secondary focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2`;
   const badge =
     badgeCount && badgeCount > 0 ? (
       collapsed ? (
@@ -88,11 +90,23 @@ function NavLink({ href, label, icon, isExternal, target, indent, badgeCount, co
   }
 
   return (
-    <RouterLink {...rest} to={href} target={resolvedTarget} className={className} title={collapsed ? label : undefined}>
+    <RouterNavLink
+      {...rest}
+      to={href}
+      target={resolvedTarget}
+      className={({ isActive }) =>
+        cn(
+          className,
+          isActive &&
+            'border-l-accent bg-accent-soft text-accent-soft-foreground font-semibold hover:bg-accent-soft-hover',
+        )
+      }
+      title={collapsed ? label : undefined}
+    >
       <span className={collapsed ? '' : 'mr-3'}>{icon}</span>
       {!collapsed && <span className="flex-1">{label}</span>}
       {badge}
-    </RouterLink>
+    </RouterNavLink>
   );
 }
 
@@ -121,9 +135,7 @@ function CollapsedGroupDropdown({ label, icon, items, ...rest }: CollapsedGroupD
             <DropdownItem
               key={item.key}
               id={item.key}
-              onPress={() =>
-                item.isExternal ? window.open(item.path, '_blank', 'noreferrer') : navigate(item.path)
-              }
+              onPress={() => (item.isExternal ? window.open(item.path, '_blank', 'noreferrer') : navigate(item.path))}
             >
               {item.icon}
               {item.label}
@@ -262,7 +274,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
     <>
       {/* Mobile backdrop */}
       <div
-        className={`fixed inset-0 z-40 bg-gray-600 bg-opacity-75 transition-opacity duration-300 md:hidden ${
+        className={`fixed inset-0 z-40 bg-backdrop transition-opacity duration-300 md:hidden ${
           isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={toggleSidebar}
@@ -272,7 +284,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 ${isCollapsed ? 'w-16' : 'w-64'} bg-surface border-r border-separator/40 transform ${
+        className={`fixed inset-y-0 left-0 z-50 ${isCollapsed ? 'w-16' : 'w-64'} bg-surface border-r border-separator border-t-4 border-t-accent transform ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         } transition-[transform,width] duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col`}
       >
@@ -291,7 +303,8 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
             {isCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
           </Button>
 
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
             aria-label="Close sidebar"
             isIconOnly
             className="md:hidden"
@@ -346,9 +359,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
             ) : (
               <Accordion>
                 {otherGroups.map((group) => (
-                  <AccordionItem
-                    key={group.translationKey} id={group.translationKey}
-                  >
+                  <AccordionItem key={group.translationKey} id={group.translationKey}>
                     <AccordionHeading>
                       <AccordionTrigger className="px-2 py-2 text-sm font-normal rounded-md">
                         <span className="flex items-center">
@@ -403,10 +414,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
             ) : (
               <Accordion>
                 {sidebarEndGroups.map((group) => (
-                  <AccordionItem
-                    key={group.translationKey} id={group.translationKey}
-                    className="text-sm"
-                  >
+                  <AccordionItem key={group.translationKey} id={group.translationKey} className="text-sm">
                     <AccordionHeading>
                       <AccordionTrigger className="px-2 py-2 text-sm font-normal rounded-md">
                         <span className="flex items-center">
@@ -454,6 +462,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
 
         {/* User section at bottom */}
         <div className={isCollapsed ? 'p-2' : 'p-4'}>
+          <ThemeToggle showLabel={!isCollapsed} className={cn('mb-2', !isCollapsed && 'w-full justify-start')} />
           {user && (
             <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
               {!isCollapsed && (
@@ -505,12 +514,7 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
                       <User className="h-4 w-4" />
                       {t('account')}
                     </DropdownItem>
-                    <DropdownItem
-                      key="logout"
-                      id="logout"
-                      onPress={() => logout()}
-                      data-cy="sidebar-logout-button"
-                    >
+                    <DropdownItem key="logout" id="logout" onPress={() => logout()} data-cy="sidebar-logout-button">
                       <LogOut />
                       {t('logout')}
                     </DropdownItem>

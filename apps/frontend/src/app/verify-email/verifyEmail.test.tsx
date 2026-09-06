@@ -7,6 +7,7 @@ import { VerifyEmail } from './index';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '../../components/toastProvider';
+import { Providers } from '@attraccess/ui';
 
 const verifyMutateMock = vi.fn();
 const resendMutateMock = vi.fn();
@@ -75,11 +76,13 @@ function renderWithRoute(initialEntry: string) {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialEntry]}>
-        <ToastProvider>
-          <Routes>
-            <Route path="/verify-email" element={<VerifyEmail />} />
-          </Routes>
-        </ToastProvider>
+        <Providers>
+          <ToastProvider>
+            <Routes>
+              <Route path="/verify-email" element={<VerifyEmail />} />
+            </Routes>
+          </ToastProvider>
+        </Providers>
       </MemoryRouter>
     </QueryClientProvider>,
   );

@@ -5,6 +5,7 @@ import { MemoryRouter, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SystemPermission } from '@attraccess/shared';
 import type { RouteConfig } from '@attraccess/plugins-frontend-sdk';
+import { Providers } from '@attraccess/ui';
 
 // The changelog page reads CHANGELOG.md from the repo root with `?raw`, which lives outside the
 // frontend's vite root and is therefore unreadable here. Nothing in this spec touches it.
@@ -80,7 +81,9 @@ function byCy(value: string) {
 function renderSidebar() {
   return render(
     <MemoryRouter initialEntries={['/resources']}>
-      <Sidebar isOpen toggleSidebar={vi.fn()} isCollapsed={false} toggleCollapsed={vi.fn()} />
+      <Providers>
+        <Sidebar isOpen toggleSidebar={vi.fn()} isCollapsed={false} toggleCollapsed={vi.fn()} />
+      </Providers>
     </MemoryRouter>,
   );
 }

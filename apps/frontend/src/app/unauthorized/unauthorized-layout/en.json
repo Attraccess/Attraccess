@@ -1,4 +1,8 @@
 {
-    "title": "Welcome to Attraccess",
-    "subtitle": "Your friendly Makerspace companion! Manage access to machines, tools, and resources in your Fab Lab or Makerspace with just a few clicks. No more hassle, just making."
+  "eyebrow": "Your makerspace. Connected.",
+  "title": "More space for making.",
+  "subtitle": "Machines, access, and your community. Everything you need to run your makerspace, together in one place.",
+  "access": "Simple, secure access",
+  "resources": "Tools ready when you are",
+  "community": "Built for your community"
 }

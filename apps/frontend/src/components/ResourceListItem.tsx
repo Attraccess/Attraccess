@@ -12,19 +12,23 @@ interface ResourceListItemProps {
 
 export function ResourceListItem({ resource, onPress }: ResourceListItemProps) {
   return (
-    <div className="flex items-center gap-2">
-      <Button variant="ghost" className="flex-1 h-auto justify-start p-4 gap-4" onPress={onPress}>
+    <div className="flex items-center gap-2 min-w-0">
+      <Button
+        variant="ghost"
+        className="flex-1 min-w-0 h-auto justify-start p-3 gap-3 flex-wrap sm:flex-nowrap"
+        onPress={onPress}
+      >
         <ResourceImage
           imageFilename={resource.imageFilename}
           name={resource.name}
-          className="w-12 h-12 rounded-lg shrink-0"
+          className="w-12 h-12 rounded-lg shrink-0 border border-separator"
         />
-        <div className="flex-1 min-w-0 text-left">
+        <div className="flex-1 min-w-24 text-left">
           <p className="font-semibold truncate">{resource.name}</p>
-          {resource.description && <p className="text-sm text-default-500 truncate">{resource.description}</p>}
+          {resource.description && <p className="text-sm text-muted truncate">{resource.description}</p>}
         </div>
         <StatusChip resourceId={resource.id} />
-        <ChevronRight className="w-4 h-4 text-default-400 shrink-0" />
+        <ChevronRight className="w-4 h-4 text-accent shrink-0" />
       </Button>
       <PluginSlot<ResourceSlotContext> slotId={RESOURCE_LIST_ROW_SLOT} context={{ resourceId: resource.id }} />
     </div>

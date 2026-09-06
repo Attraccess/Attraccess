@@ -12,6 +12,8 @@ One firmware per hardware flavor, defined by a file in `variants/`:
 | `attractap-touch-v2` | ESP32-S3 DevKitC (V4 hardware) | as above, 16-bit PCA9555-compatible expander @0x24, PN532 @0x64 |
 | `attractap-touch-ethernet` | Adafruit Qualia S3 RGB666 | TL040WVS03 panel via XCA9554 expander, FocalTech touch, W5500 ethernet |
 | `attractap-lite-ethernet` | Adafruit Qualia S3 | headless, WS2812 24-LED ring, W5500 ethernet |
+| `attractap-touch-demo` | V3 display hardware | Offline demo API and demo settings |
+| `attractap-touch-v2-demo` | V4 display hardware | Offline demo API, demo settings and power button |
 
 Each variant file sets the compile definitions (pins, feature flags, firmware
 name) and the source subtrees excluded for that hardware. The firmware version
@@ -55,6 +57,34 @@ idf.py -B build/dbg -DATTRACTAP_VARIANT=attractap-touch \
 Note: `tools/build_individual_ca_certs.py` needs network access on the first
 run (it downloads Mozilla's CA bundle, cached for 7 days). Run it once before
 `idf.py` when building without `build_firmwares.py`.
+
+## Display Theme
+
+All display variants use white backgrounds, RAL 5021 water-blue accents
+(`#256D7B`), dark text, small corners and restrained borders. Shared styles live
+in `src/display/theme.hpp` and `theme.cpp`, including pressed, disabled, focused
+and keyboard states. Green, amber and red retain their status/safety meanings.
+This is the firmware's light theme; the web application's saved dark-mode
+preference does not configure a reader. Lite's LED status colors are unchanged.
+
+The logos preserve the approved full-color mascot. From the repository root,
+run `node scripts/generate-brand-assets.mjs` to regenerate the 133 x 40 and
+400 x 120 `*.rgb565a8` assets alongside the web artwork, or add `--check` to
+verify them without writing files. They contain a little-endian RGB565 color
+plane followed by an A8 alpha plane. ESP-IDF embeds these binary assets only
+for display variants; the small image-descriptor headers are handwritten.
+No generated C++ pixel arrays or full-screen white wallpaper are needed.
+
+## Host Tests
+
+From the repository root, run `pnpm nx run attractap-firmware:test`. It runs
+SupervisionFlow logic tests and the [real LVGL host-rendering harness](tests/display-theme/README.md).
+The latter checks theme states, both logo assets, selected production screens
+and deterministic 480 x 480 rendering. The dedicated firmware CI runs both.
+
+Host renders are not photographs or tests of a physical panel. Confirm actual
+device colors, touch/keyboard interactions and heap headroom on the target
+hardware before deployment.
 
 ## Flashing
 

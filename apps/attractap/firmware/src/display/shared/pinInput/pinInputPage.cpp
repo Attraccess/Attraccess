@@ -1,4 +1,5 @@
 #include "pinInputPage.hpp"
+#include "display/theme.hpp"
 #include <string>
 #include <functional>
 
@@ -10,12 +11,7 @@ lv_obj_t *PinInputPage::init(const char *title, lv_obj_t *parent)
     lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(this->screen, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    lv_obj_set_style_bg_color(this->screen, lv_color_hex(0x1F2C47), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(this->screen, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_grad_color(this->screen, lv_color_hex(0x364C7C), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_main_stop(this->screen, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_grad_stop(this->screen, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_grad_dir(this->screen, LV_GRAD_DIR_VER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    DisplayTheme::applyScreen(this->screen);
     lv_obj_set_style_pad_left(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_right(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_top(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -38,9 +34,10 @@ lv_obj_t *PinInputPage::init(const char *title, lv_obj_t *parent)
     lv_label_set_text(this->labelForDevicePin, title);
     lv_obj_set_style_text_align(this->labelForDevicePin, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->labelForDevicePin, &lv_font_montserrat_32, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(this->labelForDevicePin, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->labelForDevicePin, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
     this->devicePin = lv_textarea_create(containerForDevicePinInputAndLabel);
+    DisplayTheme::field(this->devicePin);
     lv_obj_set_width(this->devicePin, lv_pct(100));
     lv_obj_set_height(this->devicePin, LV_SIZE_CONTENT);
     lv_obj_set_x(this->devicePin, -128);
@@ -60,7 +57,7 @@ lv_obj_t *PinInputPage::init(const char *title, lv_obj_t *parent)
     lv_obj_set_x(this->keyboardForDevicePin, -48);
     lv_obj_set_y(this->keyboardForDevicePin, 45);
     lv_obj_set_align(this->keyboardForDevicePin, LV_ALIGN_CENTER);
-    lv_obj_set_style_radius(this->keyboardForDevicePin, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+    DisplayTheme::keyboard(this->keyboardForDevicePin);
 
     lv_keyboard_set_textarea(this->keyboardForDevicePin, this->devicePin);
     lv_obj_add_event_cb(this->keyboardForDevicePin, PinInputPage::onKeyboardEvent, LV_EVENT_ALL, this);
@@ -103,7 +100,7 @@ void PinInputPage::onKeyboardEvent(lv_event_t *e)
                 lv_textarea_set_text(self->devicePin, "");
             }
 
-            lv_obj_set_style_text_color(self->labelForDevicePin, success ? lv_color_hex(0xFFFFFF) : lv_color_hex(0xFF4D4D), LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_color(self->labelForDevicePin, success ? DisplayTheme::text() : DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
         }
 
         // Keep the keyboard open; prevent default behavior
@@ -137,10 +134,10 @@ void PinInputPage::onTextChanged(lv_event_t *e)
     const char *text = lv_textarea_get_text(self->devicePin);
     if (text != nullptr && strlen(text) >= 4)
     {
-        lv_obj_set_style_text_color(self->labelForDevicePin, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(self->labelForDevicePin, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
     else
     {
-        lv_obj_set_style_text_color(self->labelForDevicePin, lv_color_hex(0xFF4D4D), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(self->labelForDevicePin, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
 }

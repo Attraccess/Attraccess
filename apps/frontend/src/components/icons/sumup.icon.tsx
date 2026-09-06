@@ -1,5 +1,4 @@
-import { useTheme } from '@heroui/react';
-import { useMemo } from 'react';
+import { useAppTheme } from '@attraccess/ui';
 
 function SumUpIconDarkTheme(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -43,11 +42,9 @@ function SumUpIconLightTheme(props: React.SVGProps<SVGSVGElement>) {
 }
 
 export function SumUpIcon(props: React.SVGProps<SVGSVGElement>) {
-  const { theme } = useTheme();
+  const { resolvedTheme } = useAppTheme();
 
-  const isDarkTheme = useMemo(() => theme === 'dark', [theme]);
-
-  if (isDarkTheme) {
+  if (resolvedTheme === 'dark') {
     return <SumUpIconDarkTheme width={16} height={16} {...props} />;
   }
 

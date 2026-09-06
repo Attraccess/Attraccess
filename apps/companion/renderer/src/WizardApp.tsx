@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ThemeToggle } from '@attraccess/ui';
 import type { Step, Permissions, CompanionSettings } from './types';
 import { LoadingStep } from './steps/LoadingStep';
 import { PermissionsStep } from './steps/PermissionsStep';
@@ -28,7 +29,11 @@ export function WizardApp() {
   const [pinEntry, setPinEntry] = useState('');
   const [pinEntryError, setPinEntryError] = useState('');
 
-  const [appSettings, setAppSettings] = useState<CompanionSettings>({ idleTimeoutMinutes: 15, foregroundApp: true, usbDevices: true });
+  const [appSettings, setAppSettings] = useState<CompanionSettings>({
+    idleTimeoutMinutes: 15,
+    foregroundApp: true,
+    usbDevices: true,
+  });
 
   useEffect(() => {
     window.companion.onInit(async ({ serverUrl: saved, requirePin, registered: reg, connected: conn }) => {
@@ -37,7 +42,10 @@ export function WizardApp() {
       setConnected(conn);
 
       // Load settings on init
-      window.companion.getSettings().then(setAppSettings).catch(() => undefined);
+      window.companion
+        .getSettings()
+        .then(setAppSettings)
+        .catch(() => undefined);
 
       if (requirePin) {
         setPendingAction(requirePin);
@@ -45,10 +53,7 @@ export function WizardApp() {
         return;
       }
 
-      const [p, pinSet] = await Promise.all([
-        window.companion.getPermissions(),
-        window.companion.isPinSet(),
-      ]);
+      const [p, pinSet] = await Promise.all([window.companion.getPermissions(), window.companion.isPinSet()]);
       setPerms(p);
 
       // PIN is mandatory: route to setup whenever none is set, not just on a
@@ -75,10 +80,7 @@ export function WizardApp() {
   useEffect(() => {
     if (step !== 'permissions') return;
     const id = setInterval(async () => {
-      const [p, pinSet] = await Promise.all([
-        window.companion.getPermissions(),
-        window.companion.isPinSet(),
-      ]);
+      const [p, pinSet] = await Promise.all([window.companion.getPermissions(), window.companion.isPinSet()]);
       setPerms(p);
       if (p.accessibility) {
         clearInterval(id);
@@ -172,66 +174,88 @@ export function WizardApp() {
   }
 
   return (
-    <div className="flex items-center justify-center h-full p-6 bg-background">
-      <section className="w-full max-w-md flex flex-col gap-4 p-8">
-        {step === 'loading' && <LoadingStep />}
-        {step === 'permissions' && <PermissionsStep perms={perms} onGrant={handleGrantAccessibility} />}
-        {step === 'pin-setup' && (
-          <PinSetupStep
-            pinInput={pinInput}
-            pinConfirm={pinConfirm}
-            error={pinSetupError}
-            onPinInputChange={setPinInput}
-            onPinConfirmChange={setPinConfirm}
-            onSubmit={handleSetPin}
-          />
-        )}
-        {step === 'pin-entry' && (() => {
-          const pinCopy = {
-            quit: { title: 'Confirm quit', description: 'Enter your PIN to quit Attraccess Companion.', submitLabel: 'Quit' },
-            'admin-override': { title: 'Admin override', description: 'Enter your admin PIN to unlock the kiosk and ignore server commands.', submitLabel: 'Enable override' },
-            settings: { title: 'Access settings', description: 'Enter your PIN to access settings.', submitLabel: 'Confirm' },
-          }[pendingAction ?? 'settings'] ?? { title: 'Access settings', description: 'Enter your PIN to access settings.', submitLabel: 'Confirm' };
-          return (
-            <PinEntryStep
-              title={pinCopy.title}
-              description={pinCopy.description}
-              submitLabel={pinCopy.submitLabel}
-              pinEntry={pinEntry}
-              error={pinEntryError}
-              onPinEntryChange={setPinEntry}
-              onSubmit={handleVerifyPin}
+    <div className="flex h-full flex-col bg-background">
+      <header className="flex shrink-0 justify-end px-4 pt-2">
+        <ThemeToggle label="Dark mode" />
+      </header>
+      <main className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
+        <section className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center gap-4 px-8 py-4">
+          {step === 'loading' && <LoadingStep />}
+          {step === 'permissions' && <PermissionsStep perms={perms} onGrant={handleGrantAccessibility} />}
+          {step === 'pin-setup' && (
+            <PinSetupStep
+              pinInput={pinInput}
+              pinConfirm={pinConfirm}
+              error={pinSetupError}
+              onPinInputChange={setPinInput}
+              onPinConfirmChange={setPinConfirm}
+              onSubmit={handleSetPin}
             />
-          );
-        })()}
-        {step === 'url' && (
-          <UrlStep
-            serverUrl={serverUrl}
-            connectError={connectError}
-            connecting={connecting}
-            registered={registered}
-            connected={connected}
-            onServerUrlChange={setServerUrl}
-            onConnect={handleConnect}
-            onDisconnect={handleDisconnect}
-            onChangePin={pendingAction === 'settings' ? () => setStep('pin-setup') : undefined}
-            onOpenSettings={pendingAction === 'settings' ? () => setStep('settings') : undefined}
-          />
-        )}
-        {step === 'settings' && (
-          <SettingsStep
-            settings={appSettings}
-            onSave={async (s) => {
-              await window.companion.saveSettings(s);
-              setAppSettings(s);
-              setStep('url');
-            }}
-            onBack={() => setStep('url')}
-          />
-        )}
-        {step === 'register' && <RegisterStep statusText={statusText} />}
-        {step === 'done' && <DoneStep deviceId={deviceId} />}
-      </section>
+          )}
+          {step === 'pin-entry' &&
+            (() => {
+              const pinCopy = {
+                quit: {
+                  title: 'Confirm quit',
+                  description: 'Enter your PIN to quit Attraccess Companion.',
+                  submitLabel: 'Quit',
+                },
+                'admin-override': {
+                  title: 'Admin override',
+                  description: 'Enter your admin PIN to unlock the kiosk and ignore server commands.',
+                  submitLabel: 'Enable override',
+                },
+                settings: {
+                  title: 'Access settings',
+                  description: 'Enter your PIN to access settings.',
+                  submitLabel: 'Confirm',
+                },
+              }[pendingAction ?? 'settings'] ?? {
+                title: 'Access settings',
+                description: 'Enter your PIN to access settings.',
+                submitLabel: 'Confirm',
+              };
+              return (
+                <PinEntryStep
+                  title={pinCopy.title}
+                  description={pinCopy.description}
+                  submitLabel={pinCopy.submitLabel}
+                  pinEntry={pinEntry}
+                  error={pinEntryError}
+                  onPinEntryChange={setPinEntry}
+                  onSubmit={handleVerifyPin}
+                />
+              );
+            })()}
+          {step === 'url' && (
+            <UrlStep
+              serverUrl={serverUrl}
+              connectError={connectError}
+              connecting={connecting}
+              registered={registered}
+              connected={connected}
+              onServerUrlChange={setServerUrl}
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
+              onChangePin={pendingAction === 'settings' ? () => setStep('pin-setup') : undefined}
+              onOpenSettings={pendingAction === 'settings' ? () => setStep('settings') : undefined}
+            />
+          )}
+          {step === 'settings' && (
+            <SettingsStep
+              settings={appSettings}
+              onSave={async (s) => {
+                await window.companion.saveSettings(s);
+                setAppSettings(s);
+                setStep('url');
+              }}
+              onBack={() => setStep('url')}
+            />
+          )}
+          {step === 'register' && <RegisterStep statusText={statusText} />}
+          {step === 'done' && <DoneStep deviceId={deviceId} />}
+        </section>
+      </main>
     </div>
   );
 }
