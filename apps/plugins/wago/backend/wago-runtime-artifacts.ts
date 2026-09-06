@@ -9,6 +9,7 @@ import { pipeline } from 'node:stream/promises';
 import {
   inspectRuntimeTar,
   RuntimeArtifactManifest,
+  validateRuntimeManifest,
   verifyRuntimeSignature,
   WAGO_RUNTIME_MAX_BYTES,
   WAGO_RUNTIME_RELEASE_KEY,
@@ -118,6 +119,23 @@ async function smallFile(path: string, limit: number) {
     await file.close();
   }
 }
+function storedMetadata(value: unknown, maxBytes: number): RuntimeArtifactMetadata {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid catalog metadata');
+  const data = value as Record<string, unknown>;
+  if (
+    Object.keys(data).sort().join(',') !== 'bytes,digest,image,manifest' ||
+    typeof data.digest !== 'string' ||
+    !digestPattern.test(data.digest) ||
+    !Number.isSafeInteger(data.bytes) ||
+    data.bytes < 1 ||
+    data.bytes > maxBytes ||
+    typeof data.image !== 'string'
+  )
+    throw new Error('Invalid catalog metadata');
+  const manifest = validateRuntimeManifest(data.manifest);
+  if (data.image !== manifest.image) throw new Error('Invalid catalog metadata');
+  return Object.freeze({ digest: data.digest, bytes: data.bytes, image: data.image, manifest });
+}
 
 /** Internal catalog. Trust-key injection exists for isolated signing fixtures; HTTP never supplies it. */
 export class WagoRuntimeArtifactCatalog {
@@ -214,6 +232,25 @@ export class WagoRuntimeArtifactCatalog {
       await file.close();
     }
   }
+  private async writeMetadata(directory: string, metadata: RuntimeArtifactMetadata) {
+    await writeArtifactStream(join(directory, 'metadata.json'), Readable.from([JSON.stringify(metadata)]), 4096);
+  }
+  private async metadata(root: string, digest: string) {
+    const directory = join(root, 'objects', digest);
+    const info = await lstat(directory);
+    if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('Invalid catalog object');
+    const metadata = storedMetadata(JSON.parse(await smallFile(join(directory, 'metadata.json'), 4096)), this.maxBytes);
+    if (metadata.digest !== digest) throw new Error('Invalid catalog digest');
+    return metadata;
+  }
+  private async verifiedMetadata(root: string, digest: string) {
+    const directory = join(root, 'objects', digest);
+    const info = await lstat(directory);
+    if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('Invalid catalog object');
+    const metadata = await this.verify(directory);
+    if (metadata.digest !== digest) throw new Error('Invalid catalog digest');
+    return metadata;
+  }
   async import(upload: RuntimeArtifactUpload): Promise<RuntimeArtifactMetadata> {
     if (this.activeImports >= 2) {
       for (const source of Object.values(upload)) source.destroy();
@@ -232,8 +269,9 @@ export class WagoRuntimeArtifactCatalog {
       if (results.some((result) => result.status === 'rejected'))
         throw new Error('Invalid or oversized artifact upload');
       const metadata = await this.verify(directory);
+      await this.writeMetadata(directory, metadata);
       const root = await this.root();
-      for (const name of ['runtime.tar', 'runtime.tar.sha256', 'runtime.tar.sig'])
+      for (const name of ['runtime.tar', 'runtime.tar.sha256', 'runtime.tar.sig', 'metadata.json'])
         await chmod(join(directory, name), 0o400);
       const stageHandle = await open(directory, constants.O_RDONLY | constants.O_NOFOLLOW);
       try {
@@ -301,14 +339,6 @@ export class WagoRuntimeArtifactCatalog {
     if (!digestPattern.test(digest)) throw new Error('Invalid current runtime artifact');
     return this.metadata(root, digest);
   }
-  private async metadata(root: string, digest: string) {
-    const directory = join(root, 'objects', digest);
-    const info = await lstat(directory);
-    if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('Invalid catalog object');
-    const metadata = await this.verify(directory);
-    if (metadata.digest !== digest) throw new Error('Invalid catalog digest');
-    return metadata;
-  }
   async list(): Promise<RuntimeArtifactMetadata[]> {
     const root = await this.root();
     const result: RuntimeArtifactMetadata[] = [];
@@ -319,7 +349,10 @@ export class WagoRuntimeArtifactCatalog {
   }
   async has(): Promise<boolean> {
     try {
-      return (await this.current()) !== null;
+      const current = await this.current();
+      if (!current) return false;
+      await this.verifiedMetadata(await this.root(), current.digest);
+      return true;
     } catch {
       return false;
     }
@@ -330,7 +363,7 @@ export class WagoRuntimeArtifactCatalog {
     if (!selected || !digestPattern.test(selected))
       throw new ConflictException('Import a verified runtime release first');
     const root = await this.root();
-    await this.metadata(root, selected);
+    await this.verifiedMetadata(root, selected);
     const directory = await this.createTemporaryDirectory(join(root, 'snapshots'), 'delivery');
     const cleanup = () => rm(directory, { recursive: true, force: true });
     try {

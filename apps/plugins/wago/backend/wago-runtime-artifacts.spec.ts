@@ -568,6 +568,12 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
     expect(await readdir(join(await catalog.root(), 'snapshots'))).toEqual([]);
     expect(await readdir(join(await catalog.root(), 'staging'))).toEqual([]);
   });
+  it('lists bounded metadata without revalidating retained bundles', async () => {
+    const imported = await catalog.import(upload());
+    await rm(join(await catalog.root(), 'objects', imported.digest, 'runtime.tar'));
+    expect(await catalog.list()).toEqual([imported]);
+    await expect(catalog.acquire()).rejects.toThrow();
+  });
   it('bounds concurrent imports and releases rejected input streams', async () => {
     const first = catalog.import(upload());
     const second = catalog.import(upload());

@@ -66,7 +66,7 @@ describe('hardware deployment shell fixtures (isolated files and fake management
     file('bin/dockerd', '#!/bin/sh\nexit 99\n', 0o700);
     file(
       'bin/ps',
-      '#!/bin/sh\n[ "$FAULT" != ps-failed ] || exit 1\nif [ "$FAULT" = codesys ]; then echo CODESYSControl; fi\n',
+      '#!/bin/sh\n[ "$FAULT" != ps-failed ] || exit 1\nif [ "$FAULT" = codesys ]; then echo CODESYSControl; fi\nif [ "$FAULT" = docker-info-failed ]; then echo dockerd; fi\n',
       0o700,
     );
     file(
@@ -107,7 +107,7 @@ const fs = require('node:fs');
 const root = process.env.FIXTURE_ROOT;
 const args = process.argv.slice(2);
 if (args.shift() !== '--host' || args.shift() !== 'unix:///var/run/docker.sock') process.exit(99);
-if (args[0] === 'info') process.exit(fs.readFileSync(root + '/daemon', 'utf8') === 'running' ? 0 : 1);
+if (args[0] === 'info') process.exit(process.env.FAULT === 'docker-info-failed' ? 1 : fs.readFileSync(root + '/daemon', 'utf8') === 'running' ? 0 : 1);
 if (fs.readFileSync(root + '/daemon', 'utf8') !== 'running') process.exit(1);
 const containers = JSON.parse(fs.readFileSync(root + '/containers.json', 'utf8'));
 if (args[0] === 'container' && args[1] === 'ls') {
@@ -269,6 +269,13 @@ if (action === 'start') {
     expect(provision().status).toBe(0);
     file('containers.json', JSON.stringify([{ id: 'external', name: 'external', mounts: [] }]));
     expect(recover().stderr).toContain('workloads exist');
+    expect(readFileSync(join(root, 'mutations'), 'utf8')).toBe('start\n');
+  });
+
+  it('does not stop Docker when the workload inspection is unavailable', () => {
+    file('daemon', 'stopped');
+    expect(provision().status).toBe(0);
+    expect(recover('docker-info-failed').stderr).toContain('Cannot inspect Docker workloads');
     expect(readFileSync(join(root, 'mutations'), 'utf8')).toBe('start\n');
   });
 
