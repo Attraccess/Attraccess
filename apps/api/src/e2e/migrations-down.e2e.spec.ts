@@ -5,6 +5,7 @@ import type { DataSource, DeepPartial, Repository } from 'typeorm';
 import {
   Attractap,
   AttractapCrashReport,
+  AuditLog,
   CompanionDevice,
   AuthenticationDetail,
   AuthenticationType,
@@ -138,6 +139,21 @@ const ensureUsers = async (dataSource: DataSource, seedTag: string) => {
 const seedDatabase = async (dataSource: DataSource) => {
   const seedTag = Date.now().toString(36);
   const { primaryUser, secondaryUser } = await ensureUsers(dataSource, seedTag);
+
+  await ensureEntity(dataSource.getRepository(AuditLog), () => ({
+    at: new Date(),
+    domain: 'wago',
+    pluginId: 'abcdefghijklmnopqrstu',
+    action: 'wago.publication',
+    operationId: '00000000-0000-4000-8000-000000000001',
+    actorId: primaryUser.id,
+    authenticationMethod: 'session',
+    apiTokenId: null,
+    outcome: 'succeeded',
+    subjectType: 'wago.controller',
+    subjectId: 7,
+    details: { revision: 1 },
+  }));
 
   const resourceGroupRepo = dataSource.getRepository(ResourceGroup);
   const resourceRepo = dataSource.getRepository(Resource);
