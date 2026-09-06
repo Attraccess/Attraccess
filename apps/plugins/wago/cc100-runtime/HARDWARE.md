@@ -1,6 +1,7 @@
 # CC100 Digital Hardware Contract
 
-Status: implemented and software-tested, **not physically validated**. ATT-1056
+Status: implemented, **not physically validated**. Software evidence applies only
+to its recorded source snapshot, not later security revisions. ATT-1056
 and ATT-984 remain open. Do not operate production equipment with this artifact.
 No runtime behavior is safety-rated.
 
@@ -9,6 +10,11 @@ No runtime behavior is safety-rated.
 The commissioning service owns deployment; this runtime does not change host
 permissions, stop PLC software, or mount hardware itself.
 
+- Commissioning is destructive as of 2026-09-06: existing applications/workloads
+  may stop working or be erased. Attraccess does not preserve, back up, or restore
+  preexisting CODESYS programs or other workloads. The installer must always stop
+  and permanently disable CODESYS, then verify its process and boot state before
+  granting I/O access. Failure must block runtime launch.
 - Verify model `751-9301` and firmware `31` before selecting
   `WAGO_HARDWARE_PROFILE=cc100-751-9301-fw31-digital-v1`.
 - Mount only the two files listed in `manifest.json` at their exact container
@@ -16,13 +22,43 @@ permissions, stop PLC software, or mount hardware itself.
   installation, not become directories. No manual `WAGO_IO_PATHS` is supported.
 - Run UID 10001, drop all capabilities, enable no-new-privileges. Provision only
   the necessary read access to DIN and read/write access to DOUT on the host.
-  The firmware-specific way to grant and preserve this access across reboot is
-  still a physical validation gate. Do not fall back to root or privileged mode.
+  The installer persists this narrow grant through a supported boot hook. It must
+  recheck CODESYS disablement and register access before starting Attraccess after
+  reboot; failure blocks startup. Physical persistence/reboot validation remains
+  required. Do not fall back to root or privileged mode.
 - Ensure a single writer: no concurrent CODESYS program, second runtime
   container, or direct register writer. The runtime lock serializes its own
-  writes, not independent host processes.
-- Preserve the existing `/var/lib/attraccess-wago` state volume and MQTT
-  enrollment contract. Do not mount `/sys`, `/dev`, host root, or Docker socket.
+  writes, not independent host processes. The installer/host supervisor rejects
+  UID/GID 10001 account or group collisions, unrelated processes using that
+  identity, unverified user-namespace mappings, and unowned open writable DOUT
+  descriptors, including aliases to the same inode. Owned-process exemptions
+  require the full Docker ID, namespace mapping and cgroup. Unknown observations
+  block startup. Repeated checks cannot prevent every privileged host race.
+- Keep accepted runtime state in `/var/lib/attraccess-wago` across ordinary
+  runtime restarts. A new enrollment uses fresh storage and credentials; cleanup
+  is not a backup or restoration of preexisting workloads. Do not mount `/sys`,
+  `/dev`, host root, or Docker socket.
+- Guided deployment uses Docker restart policy `no`. The root-owned boot hook
+  `/etc/rc.d/S99_zz_attraccess_wago start` starts host supervision, which repeats
+  the complete gate before each of at most five crash restarts per supervisor
+  run and periodically checks a running writer. Failed observation, conflict or
+  retry exhaustion disables runtime enablement and attempts bounded containment.
+  Unverified stopping remains a failure requiring recovery. After an ordinary
+  daemon-only restart, the supervisor or checked hook can resume only while
+  enablement remains present. Containment removes that enablement; hook `start`
+  then exits `0` without starting anything, and reboot does not clear the latch.
+  Resolve the cause and use the [wizard cleanup/recommissioning route](../../../../docs/en/devices/wago-cc100-commissioning.md#recover-after-latched-containment).
+  Only installation recreates enablement. Do not recreate its marker manually or
+  start the container directly with Docker. This corrects the earlier hook-only
+  recovery instruction and supersedes the intermediate restart policy
+  recorded in the [2026-09-06 decision ledger](../../../../docs/en/devices/wago-fw31-support.md#security-follow-up-on-2026-09-06).
+- Require root-owned, restrictive configuration/lock paths and validated boot-hook
+  publication. Before I/O, verify CODESYS processes are absent, runtime selection
+  is `0`, standard and alternative enabled PLC boot entries are absent, and the
+  executable Docker boot entry resolves to the expected vendor daemon script.
+- Cleanup must verify the owned runtime is stopped or absent. An unavailable
+  Docker daemon does not establish this; failed verification retains the error
+  and recovery ownership. Cleanup never re-enables CODESYS or restores old workloads.
 - Check retained `state.readiness` after deployment, not only
   `configuration/reported`. Readiness is a current software probe, not proof of
   correct wiring or relay operation. An actual command can still fail after a

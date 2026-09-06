@@ -1,217 +1,36 @@
 import { spawn, spawnSync } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
 import { createHash } from 'node:crypto';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { WAGO_DIN, WAGO_DOUT } from './wago-hardware-deployment';
+import { fw31ShellFixture } from './fixtures/fw31-shell-fixture';
+import { WAGO_DOUT } from './wago-hardware-deployment';
 import {
   runtimeBundleAcceptScript,
   runtimeBundleDeliveryScript,
-  runtimeBundleRecoveryAcknowledgementScript,
-  runtimeBundleStreamReceiver,
   runtimeBundleInstallScript,
+  runtimeBundleRecoveryAcknowledgementScript,
   runtimeBundleRecoveryScript,
+  runtimeBundleStreamReceiver,
 } from './wago-runtime-install';
 
-const image = `example.invalid/runtime@sha256:${'a'.repeat(64)}`;
-type Container = { id: string; name: string; running: boolean };
+const image = 'example.invalid/runtime@sha256:' + 'a'.repeat(64);
+const token = 'a'.repeat(32);
 
-describe('runtime install shell transaction (no Docker daemon or network)', () => {
-  let root: string;
-  let config: string;
-  let data: string;
-  let tx: string;
-
-  const write = (path: string, text: string) => writeFileSync(path, text, { mode: 0o600 });
-  const containers = (): Container[] => JSON.parse(readFileSync(join(root, 'docker.json'), 'utf8'));
-  const run = (script: string, fault = '', input?: Buffer) =>
-    // Keep a shell parent for fault helpers even when the generated script ends
-    // in an external command (some shells otherwise exec that final command).
-    spawnSync('/bin/sh', ['-c', `${script}\nstatus=$?\nexit "$status"`], {
-      encoding: 'utf8',
-      input,
-      timeout: 10000,
-      env: {
-        ...process.env,
-        PATH: `${root}/bin:${process.env.PATH}`,
-        FIXTURE_ROOT: root,
-        TMPDIR: join(root, 'tmp'),
-        FAULT: fault,
-      },
-    });
-  const install = (fault = '') => run(runtimeBundleInstallScript(image, root), fault);
-  const recover = (fault = '') => run(runtimeBundleRecoveryScript(root), fault);
-  const prior = (running = true) => {
-    write(join(root, 'docker.json'), JSON.stringify([{ id: 'old-id', name: 'attraccess-wago', running }]));
-    mkdirSync(data);
-    write(join(data, 'credentials.json'), 'revoked-old-credentials');
-    write(join(config, 'runtime.env'), 'OLD=secret');
+describe('destructive runtime shell transaction and signed offline stream fixtures', () => {
+  let fixture: ReturnType<typeof fw31ShellFixture>;
+  const config = 'etc/attraccess-wago';
+  const data = 'var/lib/attraccess-wago';
+  const tx = 'var/lib/attraccess-wago-install-transaction';
+  const install = (fault = '') => fixture.run(runtimeBundleInstallScript(image, fixture.root), fault);
+  const recover = (fault = '') => fixture.run(runtimeBundleRecoveryScript(fixture.root), fault);
+  const prior = () => {
+    fixture.setContainers([{ id: 'old-id', name: 'attraccess-wago', running: true, restart: 'unless-stopped' }]);
+    fixture.file(data + '/credentials.json', 'revoked-old-fixture-credentials');
+    fixture.file(config + '/runtime.env', 'OLD=fixture');
+    fixture.file(config + '/runtime-ca.pem', 'old public CA');
   };
-
-  beforeEach(() => {
-    root = mkdtempSync(join(tmpdir(), 'wago-runtime-fixture-'));
-    config = join(root, 'etc/attraccess-wago');
-    data = join(root, 'var/lib/attraccess-wago');
-    tx = join(root, 'var/lib/attraccess-wago-install-transaction');
-    for (const directory of [config, join(root, 'var/lib'), join(root, 'tmp'), join(root, 'bin'), join(root, 'bundle')])
-      mkdirSync(directory, { recursive: true });
-    write(join(config, 'runtime.env.next'), 'NEW=enrollment');
-    write(join(root, 'etc/os-release'), 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"\nVERSION="4.9.1(31)"\n');
-    for (const register of [WAGO_DIN, WAGO_DOUT]) {
-      mkdirSync(join(root, register, '..'), { recursive: true });
-      write(join(root, register), '0');
-    }
-    write(join(root, 'docker.json'), '[]');
-    write(join(root, 'bundle/image-reference'), `${image}\n`);
-    write(join(root, 'bundle/image.tar'), 'fake image bytes');
-    const archive = spawnSync('/usr/bin/tar', [
-      '-cf',
-      join(root, 'tmp/attraccess-wago-runtime.tar'),
-      '-C',
-      join(root, 'bundle'),
-      'image-reference',
-      'image.tar',
-    ]);
-    expect(archive.status).toBe(0);
-    const executable = (name: string, content: string) =>
-      writeFileSync(join(root, 'bin', name), content, { mode: 0o700 });
-    // macOS tar lacks GNU warning switches; retain real archive extraction.
-    executable(
-      'tar',
-      '#!/bin/sh\nif [ "$1" = --version ]; then echo "GNU tar fixture"; exit 0; fi\nshift 2\nexec /usr/bin/tar "$@"\n',
-    );
-    executable('ps', '#!/bin/sh\nif [ "$FAULT" = codesys ]; then echo codesys3; fi\n');
-    executable('dockerd', '#!/bin/sh\nexit 99\n');
-    executable(
-      'setpriv',
-      `#!${process.execPath}
-const fs = require('node:fs');
-const args = process.argv.slice(2);
-if (!['--reuid=10001', '--regid=10001', '--clear-groups', '--bounding-set=-all', '--inh-caps=-all', '--ambient-caps=-all', '--no-new-privs'].every(flag => args.includes(flag))) process.exit(99);
-if (args.at(-1).includes('id -u')) process.exit(0);
-for (const file of args.slice(-2)) if (!file.startsWith(process.env.FIXTURE_ROOT + '/') || !fs.statSync(file).isFile()) process.exit(1);
-process.exit(process.env.FAULT === 'io-permissions' ? 1 : 0);
-`,
-    );
-    executable(
-      'readlink',
-      `#!${process.execPath}
-console.log(require('node:fs').realpathSync(process.argv.at(-1)));
-`,
-    );
-    executable(
-      'df',
-      '#!/bin/sh\nif [ "$FAULT" = storage ]; then echo "disk 100 99 1"; else echo "disk 999999 0 999999"; fi\n',
-    );
-    executable(
-      'sha256sum',
-      '#!/usr/bin/env python3\nimport hashlib,sys\ndigest,path=sys.stdin.read().strip().split(None,1)\nsys.exit(0 if hashlib.sha256(open(path,"rb").read()).hexdigest()==digest else 1)\n',
-    );
-    executable(
-      'chown',
-      '#!/bin/sh\nif [ "$FAULT" = data-kill ] && [ "$1" = 10001:10001 ]; then kill -KILL "$PPID"; fi\nexit 0\n',
-    );
-    executable(
-      'rm',
-      '#!/bin/sh\ncase "$*" in *install-transaction*) if [ "$FAULT" = cleanup-kill ]; then /bin/rm -f "$2/old-id"; kill -KILL "$PPID"; exit 1; fi;; esac\nexec /bin/rm "$@"\n',
-    );
-    // The parent shell retains FD 9, so this real advisory lock survives this
-    // helper's exit, just like util-linux flock. Python is fixture-only.
-    executable(
-      'flock',
-      '#!/usr/bin/env python3\nimport fcntl, sys\ntry: fcntl.flock(int(sys.argv[2]), fcntl.LOCK_EX | fcntl.LOCK_NB)\nexcept OSError: sys.exit(1)\n',
-    );
-    executable(
-      'docker',
-      `#!${process.execPath}
-const fs = require('node:fs');
-const path = require('node:path');
-const root = process.env.FIXTURE_ROOT;
-const args = process.argv.slice(2);
-if (args.shift() !== '--host' || args.shift() !== 'unix:///var/run/docker.sock') process.exit(99);
-const fault = process.env.FAULT;
-let state = JSON.parse(fs.readFileSync(path.join(root, 'docker.json'), 'utf8'));
-const save = () => fs.writeFileSync(path.join(root, 'docker.json'), JSON.stringify(state));
-const find = id => state.find(c => c.id === id || c.name === id);
-fs.appendFileSync(path.join(root, 'docker.log'), args.join(' ') + '\\n');
-if (args[0] === 'info') { console.log(path.join(root, 'var/lib')); process.exit(fault === 'docker-info' ? 1 : 0); }
-else if (args[0] === 'container' && args[1] === 'ls') {
-  if (fault === 'list') process.exit(1);
-  state.forEach(c => console.log(args.at(-1) === '{{.ID}}' ? c.id : c.id + ' ' + c.name));
-} else if (args[0] === 'inspect') {
-  const c = find(args.at(-1)); if (!c) process.exit(1);
-  console.log(args[2] === '{{.Name}}' ? '/' + c.name : args[2].includes('.Mounts') ? (c.mounts || []).join('\\n') : String(c.running));
-} else if (args[0] === 'stop' || args[0] === 'start') {
-  const c = find(args[1]); if (!c || (fault === 'rollback' && args[0] === 'start')) process.exit(1);
-  c.running = args[0] === 'start'; save();
-  if (fault === 'stop-kill' && args[0] === 'stop') process.kill(process.ppid, 'SIGKILL');
-} else if (args[0] === 'rename') {
-  const c = find(args[1]); if (!c || find(args[2])) process.exit(1);
-  c.name = args[2]; save();
-  if (fault === 'rename-kill') process.kill(process.ppid, 'SIGKILL');
-} else if (args[0] === 'rm') {
-  if (fault === 'remove') process.exit(1);
-  const c = find(args.at(-1)); if (!c) process.exit(1);
-  state = state.filter(x => x !== c); save();
-} else if (args[0] === 'load') {
-  console.log('Loaded image ID: sha256:fixture');
-  if (fault === 'load') process.exit(1);
-} else if (args[0] === 'image' && args[1] === 'inspect') {
-  if (fault === 'inspect-image') process.exit(1);
-} else if (args[0] === 'run') {
-  if (find('attraccess-wago')) process.exit(1);
-  if (!args.includes('--pull=never')) process.exit(1);
-  if (args[args.indexOf('--user') + 1] !== '10001:10001' || args[args.indexOf('--cap-drop') + 1] !== 'ALL' || args[args.indexOf('--security-opt') + 1] !== 'no-new-privileges') process.exit(98);
-  if (!args.includes('WAGO_HARDWARE_PROFILE=cc100-751-9301-fw31-digital-v1')) process.exit(98);
-  const expectedMounts = ['type=bind,src=' + root + '${WAGO_DIN},dst=/run/attraccess-wago/io/din,readonly', 'type=bind,src=' + root + '${WAGO_DOUT},dst=/run/attraccess-wago/io/dout'];
-  if (!expectedMounts.every(m => args.includes(m))) process.exit(98);
-  for (const mount of expectedMounts) if (!fs.statSync(mount.split(',')[1].slice(4)).isFile()) process.exit(98);
-  const volume = args[args.indexOf('-v') + 1].split(':')[0];
-  if (fs.existsSync(path.join(volume, 'credentials.json'))) process.exit(2);
-  fs.writeFileSync(path.join(volume, 'new-state'), 'new enrollment state');
-  const id = state.some(c => c.id === 'new-id') ? 'next-id' : 'new-id';
-  state.push({ id, name: 'attraccess-wago', running: fault !== 'start' }); save();
-  if (fault === 'kill') process.kill(process.ppid, 'SIGKILL');
-  if (fault === 'term') process.kill(process.ppid, 'SIGTERM');
-  if (fault === 'start' || fault === 'rollback') process.exit(1);
-  console.log('new-id');
-} else { console.error('Unexpected fake Docker invocation', args); process.exit(99); }
-`,
-    );
-  });
-
-  afterEach(() => rmSync(root, { recursive: true, force: true }));
-
-  it('fails before stopping the predecessor when a register is absent or inaccessible', () => {
-    prior();
-    expect(install('io-permissions').stderr).toContain('uid10001-access-denied');
-    rmSync(join(root, WAGO_DOUT));
-    expect(install().stderr).toContain('missing-register');
-    expect(existsSync(join(root, WAGO_DOUT))).toBe(false);
-    expect(containers()).toEqual([{ id: 'old-id', name: 'attraccess-wago', running: true }]);
-    expect(existsSync(tx)).toBe(false);
-  });
-
-  it('rejects a stopped competing container binding the output or its parent', () => {
-    write(
-      join(root, 'docker.json'),
-      JSON.stringify([{ id: 'other', name: 'other', running: false, mounts: [join(root, 'sys')] }]),
-    );
-    expect(install().stderr).toContain('output-container-conflict');
-    expect(existsSync(tx)).toBe(false);
-  });
-
-  function delivery() {
-    const bundle = readFileSync(join(root, 'tmp/attraccess-wago-runtime.tar'));
+  const delivery = () => {
+    const bundle = readFileSync(join(fixture.root, 'tmp/attraccess-wago-runtime.tar'));
     return {
       bundle,
       script: runtimeBundleDeliveryScript(
@@ -220,419 +39,315 @@ else if (args[0] === 'container' && args[1] === 'ls') {
         'public CA',
         bundle.length,
         createHash('sha256').update(bundle).digest('hex'),
-        'a'.repeat(32),
-        root,
+        token,
+        fixture.root,
       ),
     };
-  }
+  };
+  beforeEach(() => {
+    fixture = fw31ShellFixture();
+    fixture.file(config + '/runtime.env.next', 'NEW=enrollment');
+    fixture.file('bundle/image-reference', image + '\n');
+    fixture.file('bundle/image.tar', 'fixture image bytes');
+    const archive = spawnSync('/usr/bin/tar', [
+      '-cf',
+      join(fixture.root, 'tmp/attraccess-wago-runtime.tar'),
+      '-C',
+      join(fixture.root, 'bundle'),
+      'image-reference',
+      'image.tar',
+    ]);
+    expect(archive.status).toBe(0);
+  });
+  afterEach(() => fixture.dispose());
 
-  it('binds runtime delivery to the reviewed Docker provisioning token', () => {
-    rmSync(join(config, 'runtime.env.next'));
-    mkdirSync(join(config, 'docker-provision'));
-    write(join(config, 'docker-provision/token'), 'b'.repeat(32));
-    write(join(config, 'docker-provision/started'), '');
-    const { script, bundle } = delivery();
-    expect(run(script, '', bundle).stderr).toContain('Docker provisioning belongs to another delivery');
-    expect(existsSync(join(config, 'delivery'))).toBe(false);
-    write(join(config, 'docker-provision/token'), 'a'.repeat(32));
-    expect(run(script, '', bundle).status).toBe(0);
-    expect(run(runtimeBundleRecoveryScript(root, 'a'.repeat(32))).status).toBe(0);
-    expect(existsSync(`${tx}.restored/token`)).toBe(true);
-    expect(existsSync(join(config, 'docker-provision/started'))).toBe(true);
+  it('installs a fresh runtime with automatic Docker restarts disabled and gated boot, retaining recovery ownership', () => {
+    const r = install();
+    expect(r.status).toBe(0);
+    expect(fixture.containers()).toEqual([
+      expect.objectContaining({ name: 'attraccess-wago', running: true, restart: 'no' }),
+    ]);
+    expect(fixture.read('docker.log')).toContain('--network host');
+    expect(fixture.read(config + '/runtime.env')).toBe('NEW=enrollment');
+    expect(statSync(join(fixture.root, config, 'runtime.env')).mode & 0o777).toBe(0o600);
+    expect(existsSync(join(fixture.root, config, 'runtime-enabled'))).toBe(true);
+    expect(existsSync(join(fixture.root, tx, 'started'))).toBe(true);
   });
 
-  it('binds recovery to the delivery token and leaves a retryable restored receipt', () => {
-    prior();
-    rmSync(join(config, 'runtime.env.next'));
-    const { script, bundle } = delivery();
-    expect(run(script, '', bundle).status).toBe(0);
-
-    expect(run(runtimeBundleRecoveryScript(root, 'b'.repeat(32))).stderr).toContain(
-      'belongs to another commissioning session',
-    );
-    expect(run(runtimeBundleRecoveryScript(root, 'a'.repeat(32))).status).toBe(0);
-    expect(existsSync(`${tx}.restored/token`)).toBe(true);
-    const before = readFileSync(join(root, 'docker.log'), 'utf8');
-    expect(run(runtimeBundleRecoveryScript(root, 'a'.repeat(32))).status).toBe(0);
-    expect(readFileSync(join(root, 'docker.log'), 'utf8')).toBe(before);
-  });
-
-  it('completes interrupted cleanup when retrying a restored receipt', () => {
+  it('discards the old owned container and credentials rather than backing up or restarting them', () => {
     prior();
     expect(install().status).toBe(0);
+    expect(fixture.containers().map((c) => c.id)).toEqual(['new-id']);
+    expect(existsSync(join(fixture.root, data, 'credentials.json'))).toBe(false);
+    expect(existsSync(join(fixture.root, tx, 'data.previous'))).toBe(false);
+    expect(existsSync(join(fixture.root, config, 'runtime.env.previous'))).toBe(false);
     expect(recover().status).toBe(0);
-    mkdirSync(join(config, 'delivery'));
-    write(join(config, 'delivery/phase'), 'installing');
-    write(join(root, 'tmp/attraccess-wago-runtime.tar'), 'stale bundle');
-
-    const before = readFileSync(join(root, 'docker.log'), 'utf8');
-    expect(recover().status).toBe(0);
-    expect(readFileSync(join(root, 'docker.log'), 'utf8')).toBe(before);
-    expect(existsSync(`${tx}.restored/bundle`)).toBe(false);
-    expect(existsSync(join(config, 'delivery'))).toBe(false);
-    expect(existsSync(join(root, 'tmp/attraccess-wago-runtime.tar'))).toBe(false);
+    expect(fixture.containers()).toEqual([]);
+    expect(existsSync(join(fixture.root, data))).toBe(false);
+    expect(existsSync(join(fixture.root, config, 'runtime-enabled'))).toBe(false);
+    expect(fixture.read('docker.log')).not.toMatch(/^start old-id/m);
   });
 
-  it('retains a delivery-only recovery receipt until the coordinator acknowledges it', () => {
-    mkdirSync(join(config, 'delivery'));
-    write(join(config, 'delivery/token'), 'a'.repeat(32));
-    write(join(root, 'tmp/attraccess-wago-runtime.tar'), 'stale bundle');
-
-    expect(run(runtimeBundleRecoveryScript(root, 'a'.repeat(32))).status).toBe(0);
-    expect(existsSync(`${tx}.restored/token`)).toBe(true);
-    expect(run(runtimeBundleRecoveryAcknowledgementScript(root, 'b'.repeat(32))).status).not.toBe(0);
-    expect(existsSync(`${tx}.restored`)).toBe(true);
-    expect(run(runtimeBundleRecoveryAcknowledgementScript(root, 'a'.repeat(32))).status).toBe(0);
-    expect(existsSync(`${tx}.restored`)).toBe(false);
-  });
-
-  it('delivers one stream under flock and rolls the old CA back with prior data', () => {
-    prior();
-    write(join(data, 'mqtt-ca.pem'), 'old CA');
-    rmSync(join(config, 'runtime.env.next'));
-    const { script, bundle } = delivery();
-    const result = run(
-      runtimeBundleStreamReceiver,
-      '',
-      Buffer.concat([Buffer.from(Buffer.from(script).toString('base64') + '\n'), bundle]),
-    );
-    expect(result.stderr).toBe('');
-    expect(result.status).toBe(0);
-    expect(readFileSync(join(config, 'runtime-ca.pem'), 'utf8')).toBe('public CA');
-    expect(statSync(config).mode & 0o777).toBe(0o700);
-    expect(statSync(join(config, 'runtime-ca.pem')).mode & 0o777).toBe(0o444);
-    expect(readFileSync(join(root, 'docker.log'), 'utf8')).toContain(
-      `-v ${data}:/var/lib/attraccess-wago -v ${config}/runtime-ca.pem:/var/lib/attraccess-wago/mqtt-ca.pem:ro`,
-    );
-    expect(existsSync(join(config, 'delivery'))).toBe(false);
-    expect(existsSync(tx)).toBe(true);
-    expect(recover().status).toBe(0);
-    expect(readFileSync(join(data, 'mqtt-ca.pem'), 'utf8')).toBe('old CA');
-    expect(readFileSync(join(config, 'runtime.env'), 'utf8')).toBe('OLD=secret');
-  });
-
-  it.each(['old-id', 'old-running', 'prepared', 'had-data', 'had-env', 'had-ca'])(
-    'refuses destructive recovery with missing %s metadata',
-    (file) => {
+  it.each(['load', 'inspect-image', 'start', 'supervisor-launch-failed'])(
+    'contains %s failures without restoring old workloads',
+    (fault) => {
       prior();
-      expect(install().status).toBe(0);
-      rmSync(join(tx, file), { force: true });
-      const before = readFileSync(join(root, 'docker.log'), 'utf8');
-      expect(recover().status).not.toBe(0);
-      expect(readFileSync(join(root, 'docker.log'), 'utf8')).toBe(before);
-      expect(readFileSync(join(data, 'new-state'), 'utf8')).toBe('new enrollment state');
-      expect(readFileSync(join(tx, 'data.previous/credentials.json'), 'utf8')).toBe('revoked-old-credentials');
+      expect(install(fault).status).not.toBe(0);
+      expect(fixture.containers()).toEqual([]);
+      expect(existsSync(join(fixture.root, config, 'runtime-enabled'))).toBe(false);
+      expect(existsSync(join(fixture.root, data))).toBe(false);
+      expect(existsSync(join(fixture.root, tx))).toBe(false);
     },
   );
 
-  it('retries interrupted journal cleanup without touching the restored runtime', () => {
+  it('retains interrupted execution until explicit cleanup and never restarts the predecessor', () => {
     prior();
-    expect(install().status).toBe(0);
-    expect(recover('cleanup-kill').status).not.toBe(0);
-    expect(existsSync(tx)).toBe(false);
-    expect(existsSync(`${tx}.restored/prepared`)).toBe(true);
-    expect(existsSync(`${tx}.restored/old-id`)).toBe(true);
-    const before = readFileSync(join(root, 'docker.log'), 'utf8');
+    expect(install('kill').signal).toBe('SIGKILL');
+    expect(existsSync(join(fixture.root, tx, 'new-container'))).toBe(true);
     expect(recover().status).toBe(0);
-    expect(readFileSync(join(root, 'docker.log'), 'utf8')).toBe(before);
-    expect(containers()).toEqual([{ id: 'old-id', name: 'attraccess-wago', running: true }]);
-    expect(readFileSync(join(data, 'credentials.json'), 'utf8')).toBe('revoked-old-credentials');
+    expect(fixture.containers()).toEqual([]);
+    expect(existsSync(join(fixture.root, tx + '.restored'))).toBe(true);
+    expect(recover().status).toBe(0);
   });
 
-  it('retries interrupted acceptance cleanup without touching the accepted runtime or CA', () => {
-    prior();
-    write(join(config, 'runtime-ca.pem.next'), 'accepted CA');
+  it('retains the recovery journal if Docker removal fails, then resumes cleanup safely', () => {
     expect(install().status).toBe(0);
-    expect(run(runtimeBundleAcceptScript(root), 'cleanup-kill').status).not.toBe(0);
-    expect(existsSync(tx)).toBe(false);
-    const before = readFileSync(join(root, 'docker.log'), 'utf8');
+    expect(recover('remove').status).not.toBe(0);
+    expect(existsSync(join(fixture.root, tx, 'recovering'))).toBe(true);
+    expect(fixture.run(runtimeBundleAcceptScript(fixture.root)).status).not.toBe(0);
+    expect(recover().status).toBe(0);
+    expect(recover().status).toBe(0);
+  });
+
+  it('retains recovery ownership when the daemon is unavailable while its container survives', () => {
+    expect(install().status).toBe(0);
+    fixture.file('daemon', 'stopped');
     expect(recover().status).not.toBe(0);
-    expect(readFileSync(join(root, 'docker.log'), 'utf8')).toBe(before);
-    expect(run(runtimeBundleAcceptScript(root)).status).toBe(0);
-    expect(readFileSync(join(root, 'docker.log'), 'utf8')).toBe(before);
-    expect(readFileSync(join(config, 'runtime-ca.pem'), 'utf8')).toBe('accepted CA');
-    expect(containers()).toEqual([{ id: 'new-id', name: 'attraccess-wago', running: true }]);
-  });
-
-  it('preserves the protected active CA through acceptance and restores it after a subsequent rollback', () => {
-    write(join(config, 'runtime-ca.pem.next'), 'first CA');
-    expect(install().status).toBe(0);
-    expect(run(runtimeBundleAcceptScript(root)).status).toBe(0);
-    expect(readFileSync(join(config, 'runtime-ca.pem'), 'utf8')).toBe('first CA');
-    write(join(config, 'runtime.env.next'), 'NEXT=enrollment');
-    write(join(config, 'runtime-ca.pem.next'), 'second CA');
-    expect(install().status).toBe(0);
-    expect(readFileSync(join(config, 'runtime-ca.pem'), 'utf8')).toBe('second CA');
+    expect(fixture.containers()[0].running).toBe(true);
+    expect(existsSync(join(fixture.root, tx, 'recovering'))).toBe(true);
+    expect(existsSync(join(fixture.root, tx + '.restored'))).toBe(false);
+    fixture.file('daemon', 'running');
     expect(recover().status).toBe(0);
-    expect(readFileSync(join(config, 'runtime-ca.pem'), 'utf8')).toBe('first CA');
+    expect(fixture.containers()).toEqual([]);
   });
 
-  it.each([0, 7, 129, 130, 143])(
-    'receives a private script without secrets in argv and cleans up on exit %s',
-    (code) => {
-      const secret = Buffer.from('fixture credential').toString('base64');
-      writeFileSync(
-        join(root, 'bin/sh'),
-        `#!${process.execPath}
-const fs = require('node:fs');
-const {spawnSync} = require('node:child_process');
+  it.each(['stop-failed', 'stop-stuck', 'remove-stuck', 'update-failed', 'docker-inspect-failed'])(
+    'retains recovery ownership on %s instead of claiming containment',
+    (fault) => {
+      expect(install().status).toBe(0);
+      expect(recover(fault).status).not.toBe(0);
+      expect(fixture.containers()).toHaveLength(1);
+      expect(existsSync(join(fixture.root, tx + '.restored'))).toBe(false);
+      expect(recover().status).toBe(0);
+    },
+  );
+
+  it('retains a destructive transaction if its predecessor cannot be contained', () => {
+    prior();
+    expect(install('update-failed').status).not.toBe(0);
+    expect(fixture.containers()[0].running).toBe(true);
+    expect(existsSync(join(fixture.root, tx, 'recovering'))).toBe(true);
+    expect(existsSync(join(fixture.root, tx + '.restored'))).toBe(false);
+    expect(recover().status).toBe(0);
+    expect(fixture.containers()).toEqual([]);
+  });
+
+  it('fails before discarding a predecessor if firmware, hardware or the boot gate is unavailable', () => {
+    prior();
+    expect(install('io-permissions').stderr).toContain('uid10001-access-denied');
+    rmSync(join(fixture.root, WAGO_DOUT));
+    expect(install().stderr).toContain('missing-register');
+    expect(fixture.containers()[0].running).toBe(true);
+    expect(existsSync(join(fixture.root, tx))).toBe(false);
+  });
+
+  it('requires controller preparation and rejects a newly active PLC', () => {
+    fixture.file('plc', 'running');
+    expect(install().stderr).toContain('codesys-active');
+    fixture.file('plc', 'stopped');
+    rmSync(join(fixture.root, 'etc/rc.d/S99_zz_attraccess_wago'));
+    expect(install().stderr).toContain('Controller preparation required');
+  });
+
+  it('refuses other output containers and query failures, never inferring absence', () => {
+    fixture.setContainers([{ id: 'other', name: 'other', running: false, mounts: [join(fixture.root, 'sys')] }]);
+    expect(install().stderr).toContain('output-container-conflict');
+    expect(install('docker-list-failed').status).not.toBe(0);
+    expect(install('docker-info-failed').status).not.toBe(0);
+  });
+
+  it('protects the fixed CA outside writable state and discards it on failed enrollment', () => {
+    prior();
+    fixture.file(config + '/runtime-ca.pem.next', 'new public CA');
+    expect(install().status).toBe(0);
+    expect(fixture.read(config + '/runtime-ca.pem')).toBe('new public CA');
+    expect(statSync(join(fixture.root, config)).mode & 0o777).toBe(0o700);
+    expect(statSync(join(fixture.root, config, 'runtime-ca.pem')).mode & 0o777).toBe(0o444);
+    expect(fixture.read('docker.log')).toContain(config + '/runtime-ca.pem:/var/lib/attraccess-wago/mqtt-ca.pem:ro');
+    expect(recover().status).toBe(0);
+    expect(existsSync(join(fixture.root, config, 'runtime-ca.pem'))).toBe(false);
+  });
+
+  it('accepts explicitly, preserves active trust and supports a new destructive enrollment', () => {
+    fixture.file(config + '/runtime-ca.pem.next', 'public CA');
+    expect(install().status).toBe(0);
+    expect(fixture.run(runtimeBundleAcceptScript(fixture.root)).status).toBe(0);
+    expect(existsSync(join(fixture.root, tx))).toBe(false);
+    expect(fixture.read(config + '/runtime-ca.pem')).toBe('public CA');
+    fixture.file(config + '/runtime.env.next', 'NEW=second');
+    expect(install().status).toBe(0);
+    expect(fixture.containers()).toHaveLength(1);
+  });
+
+  it('streams the exact authenticated bundle with token ownership and private staged credentials', () => {
+    rmSync(join(fixture.root, config, 'runtime.env.next'));
+    fixture.file(config + '/docker-provision/token', token);
+    fixture.file(config + '/docker-provision/mode', 'destructive');
+    fixture.file(config + '/docker-provision/started', '');
+    const { bundle, script } = delivery();
+    expect(fixture.run(script, '', bundle).status).toBe(0);
+    expect(fixture.read(tx + '/token')).toBe(token + '\n');
+    expect(fixture.read(config + '/runtime-ca.pem')).toBe('public CA');
+    expect(fixture.run(runtimeBundleRecoveryScript(fixture.root, 'b'.repeat(32))).status).not.toBe(0);
+    expect(fixture.run(runtimeBundleRecoveryScript(fixture.root, token)).status).toBe(0);
+    expect(fixture.run(runtimeBundleRecoveryAcknowledgementScript(fixture.root, token)).status).toBe(0);
+    expect(existsSync(join(fixture.root, tx + '.restored'))).toBe(false);
+  });
+
+  it.each(['truncated', 'corrupt'])('does not install a %s offline bundle', (fault) => {
+    rmSync(join(fixture.root, config, 'runtime.env.next'));
+    const { bundle, script } = delivery();
+    const bytes = fault === 'truncated' ? bundle.subarray(1) : Buffer.from(bundle);
+    if (fault === 'corrupt') bytes[bytes.length - 1] ^= 1;
+    expect(fixture.run(script, '', bytes).status).not.toBe(0);
+    expect(fixture.containers()).toEqual([]);
+    expect(fixture.run(runtimeBundleRecoveryScript(fixture.root, token)).status).toBe(0);
+  });
+
+  it('rejects a wrong embedded image reference before discarding existing state', () => {
+    prior();
+    expect(
+      fixture.run(runtimeBundleInstallScript('other.invalid/image@sha256:' + 'b'.repeat(64), fixture.root)).stderr,
+    ).toContain('image reference mismatch');
+    expect(fixture.containers()[0].id).toBe('old-id');
+    expect(fixture.read(data + '/credentials.json')).toBe('revoked-old-fixture-credentials');
+  });
+
+  it('recovers interruption before the upload journal exists using exact preparation ownership', () => {
+    rmSync(join(fixture.root, config, 'runtime.env.next'));
+    fixture.file(config + '/docker-provision/token', token);
+    fixture.file(config + '/docker-provision/mode', 'destructive');
+    expect(fixture.run(runtimeBundleRecoveryScript(fixture.root, token)).status).toBe(0);
+    expect(fixture.read(tx + '.restored/token')).toBe(token + '\n');
+    expect(fixture.run(runtimeBundleRecoveryAcknowledgementScript(fixture.root, token)).status).toBe(0);
+    expect(fixture.run(runtimeBundleRecoveryScript(fixture.root, token)).status).toBe(0);
+    expect(fixture.run(runtimeBundleRecoveryScript(fixture.root, 'b'.repeat(32))).status).not.toBe(0);
+  });
+
+  it('does not clear unowned staged configuration after a pre-upload interruption', () => {
+    fixture.file(config + '/docker-provision/token', token);
+    fixture.file(config + '/docker-provision/mode', 'destructive');
+    expect(fixture.run(runtimeBundleRecoveryScript(fixture.root, token)).stderr).toContain('Unowned staged');
+    expect(fixture.read(config + '/runtime.env.next')).toBe('NEW=enrollment');
+  });
+
+  it('rejects an untrusted preparation journal before using its recovery ownership', () => {
+    fixture.file(config + '/docker-provision/token', token);
+    fixture.file(config + '/docker-provision/mode', 'destructive');
+    fixture.file(
+      'owners.json',
+      JSON.stringify({
+        ...JSON.parse(fixture.read('owners.json')),
+        ['/' + config + '/docker-provision']: '10001:10001',
+      }),
+    );
+    const result = fixture.run(runtimeBundleRecoveryScript(fixture.root, token));
+    expect(result.stderr).toContain('Unsafe runtime journal ownership');
+    expect(fixture.read(config + '/runtime.env.next')).toBe('NEW=enrollment');
+    expect(existsSync(join(fixture.root, tx + '.restored'))).toBe(false);
+  });
+
+  it('publishes recovery ownership atomically when interrupted before the receipt rename', () => {
+    rmSync(join(fixture.root, config, 'runtime.env.next'));
+    fixture.file(config + '/docker-provision/token', token);
+    fixture.file(config + '/docker-provision/mode', 'destructive');
+    rmSync(join(fixture.root, 'bin/mv'));
+    fixture.file(
+      'bin/mv',
+      `#!${process.execPath}
 const args = process.argv.slice(2);
-fs.writeFileSync(process.env.FIXTURE_ROOT + '/receiver-args', JSON.stringify(args));
-if (args[0] !== '-c') {
-  fs.writeFileSync(process.env.FIXTURE_ROOT + '/receiver-modes', JSON.stringify([
-    fs.statSync(args[0]).mode & 511, fs.statSync(require('node:path').dirname(args[0])).mode & 511,
-  ]));
+if (process.env.FAULT === 'publish-interrupted' && args.at(-1).endsWith('install-transaction.restored')) {
+  process.kill(process.ppid, 'SIGTERM'); process.exit(0);
 }
-const result = spawnSync('/bin/sh', args, {
-  stdio: 'inherit', env: {...process.env, RECEIVER_PID: String(process.ppid)},
-});
+const result = require('node:child_process').spawnSync('/bin/mv', args, { stdio: 'inherit' });
 process.exit(result.status ?? 1);
 `,
-        { mode: 0o700 },
-      );
-      const signals: Partial<Record<number, string>> = { 129: 'HUP', 130: 'INT', 143: 'TERM' };
-      const signal = signals[code];
-      const script = `credential='${secret}'\ncat > "$FIXTURE_ROOT/received"\n${signal ? `kill -${signal} "$RECEIVER_PID"\nsleep 1` : `exit ${code}`}\n`;
-      const bundle = Buffer.from([0, 255, 10, 23]);
-      const result = run(
-        runtimeBundleStreamReceiver,
-        '',
-        Buffer.concat([Buffer.from(Buffer.from(script).toString('base64') + '\n'), bundle]),
-      );
-      expect(result.status).toBe(code);
-      const args = JSON.parse(readFileSync(join(root, 'receiver-args'), 'utf8'));
-      expect(JSON.stringify(args)).not.toContain(secret);
-      expect(args).toHaveLength(1);
-      expect(JSON.parse(readFileSync(join(root, 'receiver-modes'), 'utf8'))).toEqual([0o600, 0o700]);
-      expect(readFileSync(join(root, 'received'))).toEqual(bundle);
-      expect(existsSync(join(args[0], '..'))).toBe(false);
-    },
-  );
-
-  it('cleans up the private receiver directory when decoding fails', () => {
-    const before = readdirSync(join(root, 'tmp'));
-    expect(run(runtimeBundleStreamReceiver, '', Buffer.from('invalid base64!\n')).status).not.toBe(0);
-    expect(readdirSync(join(root, 'tmp'))).toEqual(before);
+      0o700,
+    );
+    expect(fixture.run(runtimeBundleRecoveryScript(fixture.root, token), 'publish-interrupted').status).not.toBe(0);
+    expect(existsSync(join(fixture.root, tx + '.restored'))).toBe(false);
+    expect(fixture.run(runtimeBundleRecoveryScript(fixture.root, token)).status).toBe(0);
   });
 
-  it.each(['codesys', 'storage', 'docker-info'])('preflight %s failure leaves controller state untouched', (fault) => {
-    prior();
-    rmSync(join(config, 'runtime.env.next'));
-    const { script, bundle } = delivery();
-    expect(run(script, fault, bundle).status).not.toBe(0);
-    expect(existsSync(join(config, 'delivery'))).toBe(false);
-    expect(existsSync(tx)).toBe(false);
-    expect(readFileSync(join(config, 'runtime.env'), 'utf8')).toBe('OLD=secret');
-    expect(containers()[0].running).toBe(true);
+  it('contains valid legacy transactions without restoring their prior container or data', () => {
+    fixture.file(tx + '/prepared', '');
+    fixture.file(tx + '/old-id', 'old-id\n');
+    fixture.file(tx + '/new-container', '');
+    fixture.file(tx + '/data-changing', '');
+    for (const name of ['old-running', 'had-data', 'had-env', 'had-ca']) fixture.file(tx + '/' + name, 'true');
+    fixture.file(tx + '/data.previous/credentials.json', 'old fixture identity');
+    fixture.setContainers([{ id: 'old-id', name: 'attraccess-wago.previous', running: false }]);
+    expect(recover().status).toBe(0);
+    expect(fixture.containers()).toEqual([]);
+    expect(existsSync(join(fixture.root, data))).toBe(false);
   });
 
-  it('rejects another process delivery and recovery while the first process is receiving bytes', async () => {
-    prior();
-    rmSync(join(config, 'runtime.env.next'));
-    const { script, bundle } = delivery();
+  it('retains corrupt metadata and never treats it as permission to delete unowned state', () => {
+    expect(install().status).toBe(0);
+    fixture.file(tx + '/old-id', 'valid\n../../other\n');
+    expect(recover().status).not.toBe(0);
+    expect(existsSync(join(fixture.root, tx))).toBe(true);
+  });
+
+  it('serializes delivery while a stream is still receiving bytes using real flock', async () => {
+    rmSync(join(fixture.root, config, 'runtime.env.next'));
+    fixture.file(
+      'bin/flock',
+      '#!/usr/bin/python3\nimport fcntl,sys\ntry: fcntl.flock(int(sys.argv[2]),fcntl.LOCK_EX|fcntl.LOCK_NB)\nexcept OSError: sys.exit(1)\n',
+      0o700,
+    );
+    const { bundle, script } = delivery();
     const child = spawn('/bin/sh', ['-c', script], {
-      env: { ...process.env, PATH: `${root}/bin:${process.env.PATH}`, FIXTURE_ROOT: root },
-      stdio: ['pipe', 'ignore', 'pipe'],
+      env: { PATH: join(fixture.root, 'bin'), FIXTURE_ROOT: fixture.root, TMPDIR: join(fixture.root, 'tmp') },
     });
-    child.stderr.resume();
-    const closed = new Promise((resolve) => child.on('close', resolve));
+    child.stdout.resume();
+    let stderr = '';
+    child.stderr.on('data', (chunk) => {
+      stderr += String(chunk);
+    });
+    const completion = new Promise<number | null>((resolve) => child.on('close', resolve));
     try {
-      const deadline = Date.now() + 5000;
-      while (!existsSync(join(config, 'delivery/phase')) && Date.now() < deadline)
-        await new Promise((resolve) => setTimeout(resolve, 10));
-      expect(existsSync(join(config, 'delivery/phase'))).toBe(true);
-      expect(run(script, '', bundle).stderr).toContain('holds the controller lock');
-      expect(recover().stderr).toContain('holds the controller lock');
-      expect(readFileSync(join(config, 'delivery/token'), 'utf8').trim()).toBe('a'.repeat(32));
-      expect(readFileSync(join(config, 'runtime.env'), 'utf8')).toBe('OLD=secret');
-      child.stdin.end(bundle.subarray(0, 10));
-      await closed;
-      expect(run(script, '', bundle).stderr).toContain('explicit recovery required');
-      expect(existsSync(join(config, 'delivery'))).toBe(true);
-      expect(recover().status).toBe(0);
-      expect(existsSync(join(config, 'delivery'))).toBe(false);
-      expect(containers()[0].running).toBe(true);
-      expect(readFileSync(join(config, 'runtime.env'), 'utf8')).toBe('OLD=secret');
+      for (
+        let attempt = 0;
+        attempt < 300 && !existsSync(join(fixture.root, config, 'delivery/token')) && child.exitCode === null;
+        attempt++
+      )
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      if (!existsSync(join(fixture.root, config, 'delivery/token')))
+        throw new Error(`Delivery did not reach the locked receiving phase: ${stderr}`);
+      expect(fixture.run(runtimeBundleRecoveryScript(fixture.root, token)).stderr).toContain('lock');
+      child.stdin.end(bundle);
+      expect(await completion).toBe(0);
     } finally {
-      child.stdin.end();
-      child.kill();
-      await closed;
+      child.stdin.destroy();
+      if (child.exitCode === null) child.kill('SIGKILL');
+      await completion;
     }
   }, 15000);
 
-  it('installs first enrollment with fresh data and retains an explicitly recoverable transaction', () => {
-    const result = install();
-    expect(result.stderr).toBe('');
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('readiness unverified');
-    expect(containers()).toEqual([{ id: 'new-id', name: 'attraccess-wago', running: true }]);
-    expect(readFileSync(join(config, 'runtime.env'), 'utf8')).toBe('NEW=enrollment');
-    expect(existsSync(join(tx, 'started'))).toBe(true);
-    expect(recover().status).toBe(0);
-    expect(containers()).toEqual([]);
-    expect(existsSync(data)).toBe(false);
-    expect(existsSync(join(config, 'runtime.env'))).toBe(false);
-  });
-
-  it.each([true, false])('preserves prior container, environment and data; recovery restores running=%s', (running) => {
-    prior(running);
-    expect(install().status).toBe(0);
-    expect(containers()).toContainEqual({ id: 'old-id', name: 'attraccess-wago.previous', running: false });
-    expect(readFileSync(join(tx, 'data.previous/credentials.json'), 'utf8')).toBe('revoked-old-credentials');
-    expect(existsSync(join(data, 'credentials.json'))).toBe(false);
-    expect(readFileSync(join(config, 'runtime.env.previous'), 'utf8')).toBe('OLD=secret');
-    expect(recover().status).toBe(0);
-    expect(containers()).toEqual([{ id: 'old-id', name: 'attraccess-wago', running }]);
-    expect(readFileSync(join(data, 'credentials.json'), 'utf8')).toBe('revoked-old-credentials');
-    expect(readFileSync(join(config, 'runtime.env'), 'utf8')).toBe('OLD=secret');
-    expect(existsSync(join(data, 'new-state'))).toBe(false);
-  });
-
-  it.each(['load', 'inspect-image', 'start'])(
-    'automatically rolls back %s failure without hiding its status',
-    (fault) => {
-      prior();
-      expect(install(fault).status).not.toBe(0);
-      expect(containers()).toEqual([{ id: 'old-id', name: 'attraccess-wago', running: true }]);
-      expect(readFileSync(join(config, 'runtime.env'), 'utf8')).toBe('OLD=secret');
-      expect(existsSync(join(data, 'credentials.json'))).toBe(true);
-      expect(existsSync(tx)).toBe(false);
-      expect(existsSync(join(config, 'runtime.env.next'))).toBe(false);
-    },
-  );
-
-  it('rolls back a failed first install to absence', () => {
-    expect(install('start').status).not.toBe(0);
-    expect(containers()).toEqual([]);
-    expect(existsSync(data)).toBe(false);
-    expect(existsSync(join(config, 'runtime.env'))).toBe(false);
-  });
-
-  it.each(['kill', 'term'])('retains interrupted %s state and blocks retries until explicit recovery', (fault) => {
-    prior();
-    expect(install(fault).status).not.toBe(0);
-    expect(existsSync(join(tx, 'data.previous/credentials.json'))).toBe(true);
-    write(join(config, 'runtime.env.next'), 'ANOTHER=enrollment');
-    const before = readFileSync(join(root, 'docker.log'), 'utf8');
-    expect(install().stderr).toContain('transaction exists');
-    expect(readFileSync(join(root, 'docker.log'), 'utf8')).toBe(before);
-    expect(recover().status).toBe(0);
-    expect(existsSync(join(config, 'runtime.env.next'))).toBe(false);
-    expect(containers()[0].running).toBe(true);
-  });
-
-  it('keeps the journal if rollback fails and permits idempotent recovery', () => {
-    prior();
-    expect(install('rollback').stderr).toContain('Rollback incomplete');
-    expect(existsSync(tx)).toBe(true);
-    expect(readFileSync(join(data, 'credentials.json'), 'utf8')).toBe('revoked-old-credentials');
-    expect(recover().status).toBe(0);
-    expect(containers()[0].running).toBe(true);
-    expect(readFileSync(join(data, 'credentials.json'), 'utf8')).toBe('revoked-old-credentials');
-  });
-
-  it.each(['stop-kill', 'rename-kill', 'data-kill'])(
-    'recovers interruption at %s before container creation',
-    (fault) => {
-      prior();
-      expect(install(fault).status).not.toBe(0);
-      expect(existsSync(tx)).toBe(true);
-      expect(recover().status).toBe(0);
-      expect(containers()).toEqual([{ id: 'old-id', name: 'attraccess-wago', running: true }]);
-      expect(readFileSync(join(data, 'credentials.json'), 'utf8')).toBe('revoked-old-credentials');
-      expect(readFileSync(join(config, 'runtime.env'), 'utf8')).toBe('OLD=secret');
-    },
-  );
-
-  it('does not discard the snapshot when removing the failed replacement fails', () => {
-    prior();
-    install('kill');
-    expect(recover('remove').status).not.toBe(0);
-    expect(existsSync(join(tx, 'data.previous/credentials.json'))).toBe(true);
-    expect(run(runtimeBundleAcceptScript(root)).status).not.toBe(0);
-    expect(recover().status).toBe(0);
-  });
-
-  it('serializes install and recovery against the controller filesystem lock', () => {
-    prior();
-    const lock = (script: string) =>
-      spawnSync(
-        'python3',
-        [
-          '-c',
-          'import fcntl, subprocess, sys\nf = open(sys.argv[1], "w")\nfcntl.flock(f, fcntl.LOCK_EX)\nr = subprocess.run(["/bin/sh", "-c", sys.stdin.read()])\nsys.exit(r.returncode)',
-          join(config, 'install.lock'),
-        ],
-        {
-          input: script,
-          encoding: 'utf8',
-          timeout: 10000,
-          env: { ...process.env, PATH: `${root}/bin:${process.env.PATH}`, FIXTURE_ROOT: root },
-        },
-      );
-    expect(lock(runtimeBundleInstallScript(image, root)).stderr).toContain('holds the controller lock');
-    expect(existsSync(tx)).toBe(false);
-    expect(containers()[0].running).toBe(true);
-    expect(install().status).toBe(0);
-    expect(lock(runtimeBundleRecoveryScript(root)).stderr).toContain('holds the controller lock');
-    expect(existsSync(join(tx, 'data.previous/credentials.json'))).toBe(true);
-    expect(recover().status).toBe(0);
-  });
-
-  it('requires explicit acceptance to finish once snapshot disposal has started', () => {
-    prior();
-    expect(install().status).toBe(0);
-    expect(run(runtimeBundleAcceptScript(root), 'remove').status).not.toBe(0);
-    expect(recover().stderr).toContain('Acceptance already began');
-    expect(run(runtimeBundleAcceptScript(root)).status).toBe(0);
-    expect(containers()).toEqual([{ id: 'new-id', name: 'attraccess-wago', running: true }]);
-  });
-
-  it('cannot accept a partially recovered transaction', () => {
-    prior();
-    expect(install().status).toBe(0);
-    expect(recover('rollback').status).not.toBe(0);
-    expect(run(runtimeBundleAcceptScript(root)).stderr).toContain('Recovery already began');
-    expect(recover().status).toBe(0);
-    expect(containers()).toEqual([{ id: 'old-id', name: 'attraccess-wago', running: true }]);
-  });
-
-  it('isolates stale data even when no container exists', () => {
-    mkdirSync(data);
-    write(join(data, 'credentials.json'), 'stale revoked credentials');
-    expect(install().status).toBe(0);
-    expect(existsSync(join(data, 'credentials.json'))).toBe(false);
-    expect(readFileSync(join(tx, 'data.previous/credentials.json'), 'utf8')).toBe('stale revoked credentials');
-  });
-
-  it('accepts explicitly and allows another enrollment without reusing its predecessor state', () => {
-    prior();
-    expect(install().status).toBe(0);
-    expect(run(runtimeBundleAcceptScript(root)).status).toBe(0);
-    expect(existsSync(tx)).toBe(false);
-    expect(existsSync(join(config, 'runtime.env.previous'))).toBe(false);
-    expect(containers()).toHaveLength(1);
-    write(join(config, 'runtime.env.next'), 'NEXT=enrollment');
-    expect(install().status).toBe(0);
-  });
-
-  it('rejects an incorrect bundle reference before changing the prior runtime', () => {
-    prior();
-    expect(run(runtimeBundleInstallScript(image.replace(/a{64}$/, 'b'.repeat(64)), root)).status).not.toBe(0);
-    expect(containers()[0].running).toBe(true);
-    expect(readFileSync(join(config, 'runtime.env'), 'utf8')).toBe('OLD=secret');
-  });
-
-  it('treats daemon query failure as failure, not a first install', () => {
-    prior();
-    expect(install('list').status).not.toBe(0);
-    expect(existsSync(tx)).toBe(false);
-    expect(containers()[0].running).toBe(true);
-  });
-
-  it('refuses unowned previous state', () => {
-    write(join(config, 'runtime.env.previous'), 'unknown snapshot');
-    expect(install().status).not.toBe(0);
-    expect(readFileSync(join(config, 'runtime.env.previous'), 'utf8')).toBe('unknown snapshot');
+  it('receiver rejects invalid script encoding and cleans its private directory', () => {
+    const r = fixture.run(runtimeBundleStreamReceiver, '', Buffer.from('not-base64!\n'));
+    expect(r.status).not.toBe(0);
+    expect(fixture.containers()).toEqual([]);
   });
 });

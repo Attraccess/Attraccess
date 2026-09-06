@@ -1,124 +1,142 @@
 # CC100 commissioning platform software
 
-This implements the digital deployment contract introduced in `eafdbe04`,
-reviewed against `origin/att-1056-digital-io` at `f3248534`: `HARDWARE.md`,
-`manifest.json`, and `src/onboard-profile.ts`. Tests use temporary register files
-and fake Docker/service commands. **No hardware, relay, broker, firmware-reboot,
-or persistent-permission qualification is claimed.** ATT-984 remains a release gate.
+As of **2026-09-06**, commissioning is destructive. Existing applications and
+workloads may stop working or be erased. Attraccess does not preserve, back up,
+or restore preexisting CODESYS applications, retained PLC data, other workloads,
+or their host settings. The [earlier preservation decision and vendor-source
+findings](wago-fw31-support.md) remain history. Tests use temporary files and fake
+device transports; **no physical I/O, firmware-reboot or management-hardening
+acceptance is claimed**. ATT-984 remains a release gate.
 
-## Hardware deployment
+## Guided delivery
 
-The installer requires an exact CC100 platform field and firmware 31 release
-identity. `VERSION_ID="2024.12.0"` alone is insufficient; a matching release
-`VERSION` must also be present. It reads `/etc/os-release` as text, rejects duplicate
-or conflicting version fields and never sources it. See [FW31 support boundaries](wago-fw31-support.md).
+The existing delivery request carries `confirmInstall: true` and fresh temporary
+SSH credentials. One consequence confirmation authorizes destructive preparation;
+there is no separate workload-preservation, Docker or mandatory WBM gate.
 
-Every new container receives:
+Delivery validates the pinned SSH identity, signed offline runtime and broker
+requirements, then prepares the controller under its operation lock:
+
+1. Verify the CC100 `751-9301` FW31 identity, required firmware-installed tools
+   and expected vendor getter results.
+   Read `/etc/os-release` as text; reject duplicate/conflicting fields.
+   BSP `VERSION_ID="2024.12.0"` alone is insufficient.
+2. Always stop and permanently disable CODESYS, including an active PLC or a
+   stopped PLC enabled at boot. Verify process and boot state before granting I/O.
+   Failure stops commissioning before enrollment or runtime launch.
+3. Prepare the firmware-installed vendor Docker runtime and activate it as needed.
+   Do not pull a replacement engine or image from an external registry.
+   Unsupported packages, missing tools and ambiguous service states fail closed.
+4. Establish persistent access limited to the required digital registers and
+   recheck output ownership and runtime-account permissions.
+5. Complete restricted enrollment and locked signed runtime delivery, then wait
+   for permanent discovery and independent readiness verification.
+
+`codesysState=disabled` is recorded only after successful verified preparation.
+Preparation failures produce `delivery_failed`; credentials and consent are not
+reused. Retry requires fresh credentials and destructive-install approval.
+Inspecting prerequisites remains read-only and optional; saved reports never
+authorize preparation without the current request and its server-side checks.
+
+The current path requires local Docker client/daemon binaries and the firmware's
+Docker/runtime tools. An `install-vendor-runtime` report selects the vendor
+`config_docker install` command; in the captured FW31 implementation this only
+checks activation state and downloads or extracts nothing. Its install-status
+getter is not a binary/version inventory. Absent binaries/tools remain unsupported.
+A running, boot-enabled Docker daemon is not unconditionally deactivated or
+reinstalled. Before vendor install/activation, preparation independently checks
+the boot medium and rejects an empty result or `sd-card`. It verifies that the
+executable `S99_docker` resolves to `/etc/init.d/dockerd`, the activation getter
+returns `active`, and the daemon reports Docker `25.0.4`.
+See the [exact-source findings](wago-fw31-support.md#exact-extension-source-and-captured-fw31-evidence)
+for captured behavior and the remaining dependency-provenance limits.
+
+## Hardware and reboot boundary
+
+The installer follows the [runtime hardware contract](../../../apps/plugins/wago/cc100-runtime/HARDWARE.md)
+and deploys with:
 
 ```text
 --user 10001:10001 --cap-drop ALL --security-opt no-new-privileges
+--network host --restart no
 --env WAGO_HARDWARE_PROFILE=cc100-751-9301-fw31-digital-v1
 --mount type=bind,src=/sys/devices/platform/soc/44009000.spi/spi_master/spi0/spi0.0/din,dst=/run/attraccess-wago/io/din,readonly
 --mount type=bind,src=/sys/kernel/dout_drv/DOUT_DATA,dst=/run/attraccess-wago/io/dout
 ```
 
-The second bind is read/write by Docker default. Both sources must be existing
-regular files, not directories or final-component symlinks. `--mount` deliberately
-omits `bind-create-src`: Docker fails on missing sources rather than making
-directories. No root fallback, privileged mode, extra device access, broad host
-mount, or socket mount is emitted. The existing state-volume, nested CA mount,
-environment staging, delivery token, flock, snapshot, recovery receipt and
-acceptance flow are retained.
+Both sources must exist as the expected regular files, not substitute directories
+or final-component symlinks. No root fallback, privileged mode, broad `/sys`,
+`/dev`, host-root or Docker-socket mount is permitted. The protected runtime
+state directory and separate read-only private CA mount retain their TLS contract.
 
-Read-only preflight detects util-linux `setpriv` and verifies that it can run with
-UID/GID 10001, no supplementary groups, an empty capability bounding/inheritable/
-ambient set, and no-new-privileges. In that context, shell `test -r` checks DIN;
-`test -r` and `test -w` check DOUT. No register is opened for writing and no test
-value is written. Missing or incompatible privilege tooling produces
-`permission-tool-unavailable`; denied access produces `uid10001-access-denied`.
-Host path traversal checks can be stricter than access through the container
-mount. There is no permissive fallback or automatic chmod/chown/ACL change to
-hardware. Qualify the firmware-specific persistent method for granting only DIN
-read and DOUT read/write access to UID 10001, including after reboot.
+The persistent boot hook `/etc/rc.d/S99_zz_attraccess_wago start` verifies CODESYS
+disablement, ownership and narrow register access before starting Attraccess.
+Docker's restart policy is `no`. A root-owned host supervisor permits at most five
+crash restarts per supervisor run, repeating the complete host gate before each
+start. It also checks the running writer on each cycle, with a two-second pause
+between cycles. Observation errors, conflicts and retry exhaustion disable runtime
+enablement and attempt bounded containment. Failed or unverifiable stopping remains
+a failure requiring recovery; it is never reported as successful containment.
+Startup also requires a bounded acknowledgement from a supervisor holding its
+own lock; launching a background process alone is not a successful start receipt.
 
-Preflight enumerates CODESYS process names and all containers, including stopped
-containers, and inspects their bind sources. Exact output-file, ancestor-directory,
-and canonical symlink-alias binds conflict. Only the exact `attraccess-wago`
-predecessor is excluded because the locked installer stops it before replacement.
-Query failures fail the check. `clear` means these observations found no competing
-owner; it cannot prove absence of a direct host register writer or prevent an
-external administrator racing the operation. Exclusive ownership remains a
-qualification and operating requirement. Recheck retained `state.readiness` after
-deployment; configuration acceptance alone does not prove usable hardware.
+A Docker-daemon restart does not itself start the container. While runtime
+enablement remains present, the supervisor or checked hook can resume it through
+the full gate and within its limits. A failed observation during a daemon outage
+can instead latch containment by removing `/etc/attraccess-wago/runtime-enabled`.
+After that latch, neither hook startup nor controller reboot re-enables the runtime.
+Hook `start` currently exits `0` without starting when enablement is absent; this
+is a disabled no-op, not a successful runtime start.
 
-Docker CLI calls explicitly select the local Unix endpoint and discard inherited
-remote-context environment variables. These are generated remote scripts, never
-instructions to use a developer machine's Docker daemon.
+Resolve the cause and use the existing
+[wizard cleanup/recommissioning route](wago-cc100-commissioning.md#recover-after-latched-containment).
+For current guided sessions, the UI exposes cleanup only with retained runtime
+ownership; `/recover` reconciles its tokened journal and credentials. An unclaimed
+session can then retry delivery, while a claimed session requires registration
+removal and a new session. Only a fresh approved installation recreates enablement.
+There is no re-enable button or marker-edit step. Missing ownership or failed
+cleanup remains a blocker. Boot ordering and fixture success do not establish
+physical reboot behavior. The
+[2026-09-06 security supersession](wago-fw31-support.md#security-follow-up-on-2026-09-06)
+records the replaced intermediate restart policy.
 
-## Docker inspection and reviewed provisioning
+Preflight verifies permissions as UID/GID 10001, without supplementary groups or
+capabilities, using compatible privilege tooling and no-new-privileges. It tests
+DIN read and DOUT read/write access without writing register test values.
+Missing tooling, missing registers and unverifiable permissions fail closed.
+Persistent software setup still requires physical reboot validation.
 
-The report distinguishes a working daemon, an installed but stopped runtime,
-missing vendor binaries, and ambiguous/unsupported tool state. It independently
-reports whether `/etc/config-tools/config_docker` exists and is executable.
-Presence of that tool is not evidence of a safe firmware-specific transition.
+Preparation explicitly stops both vendor runtime selections before forcing
+selection `0`. It verifies absent PLC processes, a regular `rtsversion` containing
+exactly `0`, absent `S98_runtime`, and no other enabled boot entry resolving to a
+known PLC/runtime executable. The checks repeat after a persistence flush and
+before runtime starts.
 
-The former `start-installed-runtime` action is disabled. Actual WAGO source
-implements start/stop/restart, without the previously assumed LSB stopped status.
-Start changes a Docker network namespace; stop invokes every networking event.
-A daemon-only journal cannot restore this operation. Inspection therefore does
-not invoke any init action; an unavailable installed daemon reports
-`unsupported-lifecycle-dependencies`. A normal vendor `daemon.json` is not a
-reason by itself to classify binaries as missing.
+Output ownership inspection checks CODESYS processes/boot state and all containers,
+including stopped containers. Exact output-file, ancestor-directory and canonical
+symlink-alias mounts and other privileged containers conflict. Only the exact
+`attraccess-wago` predecessor is excluded because the locked installer controls
+its replacement. Before granting permissions, that predecessor must be verified
+stopped with restart disabled.
 
-Existing tokened journals are retained. Any `start-intent` or `started` marker
-blocks recovery acknowledgement and journal deletion, including old `restored`
-receipts and interrupted cleanup. A failed vendor start can leave namespace effects
-while the daemon is absent. Missing journals also leave recovery unresolved. No vendor
-stop is called. Only a prepared journal without either start marker can be reconciled
-after stopped-state, firmware/service context and token checks. The base implementation
-never wrote historical snapshots: current context for a prepared legacy journal is
-recorded separately in `reconciliation/`. Missing only one modern snapshot is
-corruption, not a legacy journal. The `accepted` helper has no production caller
-and cannot provide product closure for existing activations.
+The host guard rejects host account/group use of UID/GID 10001, unrelated processes
+using that numeric identity, unverified user-namespace mappings and open writable
+DOUT descriptors, including paths aliasing the same device/inode. An owned runtime
+process is exempt only after full Docker ID, namespace mapping and cgroup checks.
+Unknown or failed observations block startup. These are repeated observations,
+not protection against every privileged host writer racing a check; exclusive
+ownership remains an operating and physical-qualification requirement.
 
-## Source evidence
+Configuration directories and locks must have the expected root ownership,
+restrictive permissions and file types. Boot publication uses a unique regular
+staging file in the validated boot directory. Unsafe existing paths are rejected.
 
-The actual official SDK scripts, build rules, bundled Dropbear/kernel source and
-compiled config-tool source were inspected at WAGO commit
-`b2a09cc66ad07af54a34701d6cfc90f31aca5cd0` (FW30-V04.08.09). A byte-identical MPL
-init fixture executes with external effects stubbed in the test suite. FW30 is
-not assumed compatible with FW31. [FW31 support boundaries](wago-fw31-support.md)
-records each documented operation, non-inverse side effects, dependency blockers
-and minimal read-only captures. Hardware proof remains separate from these code
-and source-identity requirements.
+Docker commands select the controller's local Unix endpoint and discard inherited
+remote-context settings. They never target the developer machine's daemon.
 
-## Parent service integration contract
+## Reports, cleanup and security
 
-All new exports are from `apps/plugins/wago/backend/wago-hardware-deployment.ts`:
-
-| Export                                                           | Use                                                                                        |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `wagoHardwareDeploymentReportScript(testRoot = '')`              | Read-only inspection over pinned SSH; require exit 0.                                      |
-| `parseWagoHardwareDeploymentReport(output)`                      | Strict version-1 parser; rejects incomplete, duplicate or unknown fields.                  |
-| `WagoHardwareDeploymentReport`                                   | Typed report contract below.                                                               |
-| `WAGO_DOCKER_PROVISION_REVIEW_FLAG`                              | Literal `reviewedDockerActivation`.                                                        |
-| `WagoDockerProvisionReview`                                      | `{ reviewedDockerActivation: boolean, action: 'start-installed-runtime', token: string }`. |
-| `wagoDockerProvisionScript(review, testRoot = '')`               | Legacy signature; refuses activation with the source dependency blocker.                   |
-| `wagoDockerProvisionRecoveryScript(token, testRoot = '')`        | Acknowledge an already stopped daemon; retain unresolved legacy journals.                   |
-| `wagoDockerProvisionFinishScript(token, outcome, testRoot = '')` | Acknowledge a verified prepared journal; start effects block deletion. `accepted` has no production caller. |
-| `wagoHardwareDeploymentPreflightScript(testRoot = '')`           | Read-only fail-closed install prerequisites. Already embedded in installer.                |
-| `wagoHardwareDeploymentDockerArgs(testRoot = '')`                | Fixed hardware arguments. Already embedded in installer.                                   |
-
-`testRoot` exists solely for local isolated fixtures. Production must omit it.
-All existing runtime installer exports retain their signatures. Use the same
-server-issued token for provisioning and delivery; the installer rejects a foreign
-or incomplete provisioning journal. Do not accept client-authored scripts or
-trust a client-provided inspection report. The parent must persist the reviewed
-action/token and recovery requirement before invoking provisioning, handle SSH
-timeout as indeterminate, retain recovery credentials, and surface unsupported
-statuses without claiming completion.
-
-Example report (exactly eight newline-terminated `key=value` fields):
+The version-1 report contains exactly eight newline-terminated fields:
 
 ```text
 version=1
@@ -131,17 +149,69 @@ provision=none
 qualification=required
 ```
 
-`platform`: `supported | unsupported-firmware`.
-`hardware`: `accessible | missing-register | uid10001-access-denied | permission-tool-unavailable`.
-`exclusivity`: `clear | codesys-active | codesys-boot-enabled | output-container-conflict | unknown`.
-`docker`: `running | installed-stopped | vendor-package-missing | unsupported-tool-state`.
-`configDocker`: `present | missing`.
-`provision`: `none | review-start-installed-runtime | unsupported-fw31-package-activation | unsupported-tool-state | unsupported-lifecycle-dependencies`.
-`qualification` is always `required`. Reports describe independent observations;
-the provision action still revalidates its gates under lock. A nonzero exit makes
-the entire report incomplete and must never be interpreted as an empty workload.
+Current provisioning states include `prepare-controller` and
+`install-vendor-runtime`. Supported preparation can resolve `codesys-active`,
+`codesys-boot-enabled` and `uid10001-access-denied`; these observations are not
+unconditional UI blockers. Unsupported firmware/components, missing registers,
+unknown ownership and independent output writers remain blockers.
+Historical `qualification=required` reports and old provisioning states remain
+readable. `software-supported` means the report found a preparation path through
+the expected vendor tools/getters; it is not a byte/build attestation of the
+entire FW31 dependency set or physical qualification. An already running daemon
+with no preparation path can still report `qualification=required`, as above.
+Incomplete or unknown report fields are not an empty workload.
 
-Runtime recovery must precede Docker reconciliation because it needs the daemon.
-The coordinator and UI expose explicit inspection and recovery. Recorded Docker
-start effects remain blocked until their source-grounded restoration is implemented;
-successful runtime delivery does not acknowledge or erase them.
+The platform activation endpoint retains the existing
+`reviewedDockerActivation: true` contract for explicitly reviewed destructive
+preparation. The guided UI uses the single delivery action. Server-issued
+ownership tokens and preparation states are persisted before remote mutation;
+timeouts remain indeterminate until explicit reconciliation. Clients do not
+supply scripts, internal tokens or trusted inspection reports.
+
+**Clean up failed installation** uses the existing recovery endpoint with fresh
+SSH credentials and explicit cleanup approval. It reconciles the runtime
+installation, credentials and preparation journal. **Clean up controller
+preparation** handles preparation-only failures; runtime cleanup takes precedence
+when runtime installation began. Neither action restores preexisting PLC programs,
+workloads, data or Docker host settings, nor re-enables CODESYS. Foreign or
+inconsistent integrity records remain errors. A delivery token saved before
+upload can reconcile a missing runtime journal through matching destructive
+preparation ownership. Preparation failures before remote journal publication
+have an explicit cleanup path; durable tokened receipts make lost-response and
+coordinator-save retries repeatable. The absence of a journal is not a claim that
+previous workloads were restored. Legacy journals retain integrity checks.
+For a journaled installation, cleanup verifies restart is disabled and the owned
+container is stopped or absent before recording success. Runtime removal also
+verifies absence afterward. A missing/unreachable daemon or failed Docker query
+is not proof of a stopped writer; the error and recovery ownership are retained.
+
+Pinned SSH, signed artifacts, TLS and enrollment revocation remain enforced.
+Management-key enrollment and **Recover saved access** retain their separate
+security/recovery contract. Full management hardening remains unsupported where
+its vendor dependency and lockout-safe recovery requirements are unmet; that
+status does not make supported Docker/I/O preparation unavailable.
+
+Container start, cleanup or `codesysState=disabled` alone is not completion.
+Require a fresh permanent heartbeat, enrollment revocation, matching applied
+configuration and current runtime `state.readiness`. Physical qualification and
+the remaining management baseline must be shown accurately.
+
+## Source evidence and decision history
+
+WAGO's [direct I/O guide](https://github.com/WAGO/cc100-howtos/blob/main/HowTo_Access_Onboard_IO/README.md)
+documents the exact registers, packed decimal access and least-significant bit
+mapping. The official [CC100 firmware SDK](https://github.com/WAGO/cc100-firmware-sdk/tree/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0)
+provides the vendor Docker, runtime and boot contracts inspected during the
+original review. That revision is FW30-V04.08.09, not blanket FW31 evidence.
+The later exact-source audit separately inspected hashed, captured FW31 Docker,
+runtime and boot files. Its findings supersede assumptions about archive extraction
+from the older SDK variants; the current [support ledger](wago-fw31-support.md#exact-extension-source-and-captured-fw31-evidence)
+records the capture provenance and distinguishes it from the unofficial extension.
+
+Vendor activation can change boot links, routing, firewall and storage; the
+vendor deactivate/remove actions are not general inverses. The destructive
+product decision removes the obligation to restore old workloads/settings. It
+does not remove component compatibility checks, durable operation ownership,
+postcondition verification, minimum I/O privileges or physical acceptance.
+The [FW31 support record](wago-fw31-support.md) preserves the original findings
+and explicitly identifies their supersession.

@@ -12,9 +12,11 @@ export interface WagoHardwareDeploymentReport {
   configDocker: 'present' | 'missing';
   provision:
     | 'none'
+    | 'prepare-controller'
+    | 'install-vendor-runtime'
     | 'review-start-installed-runtime'
     | 'unsupported-fw31-package-activation'
     | 'unsupported-tool-state'
     | 'unsupported-lifecycle-dependencies';
-  qualification: 'required';
+  qualification: 'software-supported' | 'required';
 }

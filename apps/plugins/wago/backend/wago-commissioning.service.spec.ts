@@ -494,7 +494,7 @@ describe('WagoCommissioningService', () => {
   });
 
   it.each(['success', 'codesys', 'prerequisites', 'ca'])(
-    'delivery %s preserves secrets and cleans verified artifacts',
+    'delivery %s protects secrets and cleans verified artifacts',
     async (scenario) => {
       const fs = require('node:fs/promises') as typeof import('node:fs/promises');
       const bundle = Buffer.from('mock signed bundle');
@@ -511,7 +511,7 @@ describe('WagoCommissioningService', () => {
       }) as never);
       try {
         const { service, session, repository, wago, inspect, sudo, context } = securityHarness(
-          { firmwareBaseline: '31' },
+          { firmwareBaseline: '31', deliveryToken: null },
           configuredService(),
         );
         inspect.mockResolvedValue({
@@ -559,21 +559,21 @@ describe('WagoCommissioningService', () => {
           temporarySsh: { username: 'root', password: 'explicit-ssh' },
         });
         expect(fs.rm).toHaveBeenCalledWith('/mock/staging', { recursive: true, force: true });
-        if (scenario === 'codesys' || scenario === 'prerequisites') {
+        if (scenario === 'prerequisites') {
           expect(result.state).toBe('delivery_failed');
           expect(copy).not.toHaveBeenCalled();
           expect(wago.createEnrollment).not.toHaveBeenCalled();
           expect(sudo).not.toHaveBeenCalled();
-          if (scenario === 'codesys') {
-            expect(result.failureReason).toContain('workload configuration cannot be safely preserved');
-            expect(install).not.toHaveBeenCalled();
-          }
+          expect(result.failureReason).toContain('permanently disabled');
+          expect(result.dockerProvisionState).toBe('recovery_required');
           return;
         }
         expect(result.state).toBe('awaiting_discovery');
         expect(sudo).not.toHaveBeenCalled();
         expect(copy).toHaveBeenCalledTimes(1);
-        expect(install).toHaveBeenCalledTimes(2);
+        expect(install).toHaveBeenCalledTimes(3);
+        expect(session.codesysState).toBe('disabled');
+        expect(install.mock.calls[0][3]).toContain('runtime-version=0');
         expect(copy.mock.calls[0][4]).toContain('flock -n 9');
         expect(copy.mock.calls[0][4]).toContain(
           Buffer.from(
@@ -616,7 +616,7 @@ describe('WagoCommissioningService', () => {
       confirmInstall: true,
       temporarySsh: { username: 'root', password: 'secret' },
     });
-    expect(result.progressStep).toBe('Runtime snapshot restored');
+    expect(result.progressStep).toBe('Runtime installation cleaned up');
     expect(result.state).toBe('revoked');
     expect(result.progressDetail).toContain('new commissioning session');
     expect(script.mock.calls[0][3]).toContain('flock -n 9');
