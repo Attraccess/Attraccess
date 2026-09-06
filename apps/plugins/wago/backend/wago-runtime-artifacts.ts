@@ -234,14 +234,31 @@ export class WagoRuntimeArtifactCatalog {
   }
   private async writeMetadata(directory: string, metadata: RuntimeArtifactMetadata) {
     await writeArtifactStream(join(directory, 'metadata.json'), Readable.from([JSON.stringify(metadata)]), 4096);
+    await chmod(join(directory, 'metadata.json'), 0o400);
+  }
+  private async backfillMetadata(directory: string, metadata: RuntimeArtifactMetadata) {
+    try {
+      await this.writeMetadata(directory, metadata);
+    } catch (error) {
+      // Concurrent readers may verify the same legacy object and race to backfill it.
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
   }
   private async metadata(root: string, digest: string) {
     const directory = join(root, 'objects', digest);
     const info = await lstat(directory);
     if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('Invalid catalog object');
-    const metadata = storedMetadata(JSON.parse(await smallFile(join(directory, 'metadata.json'), 4096)), this.maxBytes);
-    if (metadata.digest !== digest) throw new Error('Invalid catalog digest');
-    return metadata;
+    try {
+      const metadata = storedMetadata(JSON.parse(await smallFile(join(directory, 'metadata.json'), 4096)), this.maxBytes);
+      if (metadata.digest !== digest) throw new Error('Invalid catalog digest');
+      return metadata;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      // Catalogs written before metadata.json are verified before becoming readable again.
+      const metadata = await this.verifiedMetadata(root, digest);
+      await this.backfillMetadata(directory, metadata);
+      return metadata;
+    }
   }
   private async verifiedMetadata(root: string, digest: string) {
     const directory = join(root, 'objects', digest);
@@ -285,12 +302,11 @@ export class WagoRuntimeArtifactCatalog {
       } catch (error) {
         if (!['EEXIST', 'ENOTEMPTY'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error;
         const existing = await lstat(destination);
-        if (
-          !existing.isDirectory() ||
-          existing.isSymbolicLink() ||
-          (await this.verify(destination)).digest !== metadata.digest
-        )
+        if (!existing.isDirectory() || existing.isSymbolicLink()) throw new Error('Invalid catalog object');
+        const existingMetadata = await this.verify(destination);
+        if (existingMetadata.digest !== metadata.digest)
           throw new Error('Invalid catalog object');
+        await this.backfillMetadata(destination, existingMetadata);
       }
       const objectsHandle = await open(join(root, 'objects'), constants.O_RDONLY | constants.O_NOFOLLOW);
       try {
