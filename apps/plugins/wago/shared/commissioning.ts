@@ -20,3 +20,20 @@ export interface WagoHardwareDeploymentReport {
     | 'unsupported-lifecycle-dependencies';
   qualification: 'software-supported' | 'required';
 }
+
+/** Optional inspection and installation can independently populate this saved snapshot. */
+export type WagoCommissioningPreflightReport = Partial<WagoHardwareDeploymentReport> & {
+  clock?: WagoCommissioningClockReport;
+};
+
+export interface WagoCommissioningClockReport {
+  hostUtc: string;
+  controllerUtc: string;
+  skewSeconds: number;
+  uncertaintySeconds: number;
+  observation: 'before-action' | 'after-action';
+  previousSkewSeconds?: number;
+  tool: 'supported' | 'unsupported';
+  action: 'none' | 'synchronize';
+  result: 'within-tolerance' | 'correction-required' | 'correcting' | 'synchronized' | 'failed';
+}
