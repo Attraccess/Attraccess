@@ -108,6 +108,35 @@ describe('FW31 software support boundary', () => {
     expect(screen.getByText(/BSP version alone is insufficient/)).toBeTruthy();
     expect(requests.some(({ url }) => url.endsWith('/activate'))).toBe(false);
   });
+  it.each(['codesys-active', 'codesys-boot-enabled'])('distinguishes saved %s inspection from verified preparation after a later failure', (exclusivity) => {
+    activeSession.state = 'delivery_failed';
+    activeSession.dockerProvisionState = 'started';
+    activeSession.codesysState = 'disabled';
+    activeSession.platformReport = JSON.stringify({
+      version: '1', platform: 'supported', hardware: 'accessible', exclusivity,
+      docker: 'running', configDocker: 'present', provision: 'prepare-controller',
+      qualification: 'software-supported',
+    });
+    mount();
+    expect(screen.getByText(/Controller preparation verified CODESYS stopped and permanently disabled/)).toBeTruthy();
+    expect(screen.getByText(/Saved inspection snapshot; these values are not live controller status/)).toBeTruthy();
+    expect(screen.getByText(exclusivity, { exact: true })).toBeTruthy();
+    expect(screen.queryByText(/CODESYS is active/)).toBeNull();
+    expect(screen.queryByText(/CODESYS is configured to start at boot/)).toBeNull();
+  });
+  it('retains the active CODESYS warning when disabling failed', () => {
+    activeSession.state = 'delivery_failed';
+    activeSession.dockerProvisionState = 'recovery_required';
+    activeSession.codesysState = 'active';
+    activeSession.platformReport = JSON.stringify({
+      version: '1', platform: 'supported', hardware: 'accessible', exclusivity: 'codesys-active',
+      docker: 'running', configDocker: 'present', provision: 'prepare-controller',
+      qualification: 'software-supported',
+    });
+    mount();
+    expect(screen.getByText(/CODESYS is active/)).toBeTruthy();
+    expect(screen.queryByText(/Controller preparation verified CODESYS stopped and permanently disabled/)).toBeNull();
+  });
 });
 
 describe('explicit recovery approval', () => {
