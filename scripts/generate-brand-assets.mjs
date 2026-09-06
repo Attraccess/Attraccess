@@ -219,7 +219,10 @@ function icoFrames(file) {
     const entry = 6 + index * 16;
     const size = file.readUInt32LE(entry + 8);
     const offset = file.readUInt32LE(entry + 12);
-    return file.subarray(offset, offset + size);
+    return {
+      header: file.subarray(entry, entry + 8),
+      image: file.subarray(offset, offset + size),
+    };
   });
 }
 
@@ -230,9 +233,10 @@ async function assetMatches(path, actual, expected) {
   const actualFrames = icoFrames(actual);
   const expectedFrames = icoFrames(expected);
   if (actualFrames.length !== expectedFrames.length) return false;
-  return (await Promise.all(actualFrames.map((frame, index) => imageMatches(frame, expectedFrames[index])))).every(
-    Boolean,
-  );
+  if (!actualFrames.every((frame, index) => frame.header.equals(expectedFrames[index].header))) return false;
+  return (
+    await Promise.all(actualFrames.map((frame, index) => imageMatches(frame.image, expectedFrames[index].image)))
+  ).every(Boolean);
 }
 
 for (const size of [192, 512]) {
