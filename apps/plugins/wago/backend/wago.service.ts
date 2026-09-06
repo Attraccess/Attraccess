@@ -372,6 +372,21 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     const claimSecret = randomBytes(24).toString('base64url');
     const identity = `wago-enrollment-${randomBytes(8).toString('hex')}`;
     const expiresAt = new Date(Date.now() + 15 * 60_000).toISOString();
+
+    // Persist the broker identity before its external creation so expiry recovery can revoke an
+    // ambiguous provision result if coordinator ownership disappears mid-request.
+    await assertOwned();
+    const enrollment = await this.enrollments.save(
+      this.enrollments.create({
+        mqttServerId: selectedServerId,
+        hardwareId: normalizedHardwareId,
+        secretHash: hash(claimSecret),
+        identity,
+        createdAt: new Date().toISOString(),
+        expiresAt,
+      }),
+    );
+    this.scheduleEnrollmentExpiry(enrollment);
     await assertOwned();
     const provisionedCredential = await this.context.getMqttCredentialProvisioning().provision({
       mqttServerId: selectedServerId,
@@ -391,17 +406,10 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     if (!credential?.username.trim() || !credential.password)
       throw new ConflictException('a manual discovery username and password are required');
     await assertOwned();
-    const enrollment = await this.enrollments.save(
-      this.enrollments.create({
-        mqttServerId: selectedServerId,
-        hardwareId: normalizedHardwareId,
-        secretHash: hash(claimSecret),
-        identity: credential.username,
-        createdAt: new Date().toISOString(),
-        expiresAt,
-      }),
-    );
-    this.scheduleEnrollmentExpiry(enrollment);
+    if (!('password' in provisionedCredential)) {
+      enrollment.identity = credential.username;
+      await this.enrollments.save(enrollment);
+    }
     await this.subscribeConfiguredServers().catch((error) => {
       this.context.logger.warn(`Could not refresh WAGO MQTT subscriptions after enrollment: ${String(error)}`);
       this.scheduleSubscriptionRetry();

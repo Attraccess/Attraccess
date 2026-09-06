@@ -324,13 +324,18 @@ export class WagoRuntimeArtifactCatalog {
       return false;
     }
   }
+  /** Verifies a catalog object without taking a delivery snapshot. */
+  async get(digest: string): Promise<RuntimeArtifactMetadata> {
+    if (!digestPattern.test(digest)) throw new ConflictException('Import a verified runtime release first');
+    return this.metadata(await this.root(), digest);
+  }
   /** Copies to an owned snapshot and re-verifies it; later imports never change this delivery. */
   async acquire(digest?: string): Promise<VerifiedRuntimeArtifact> {
     const selected = digest ?? (await this.current())?.digest;
     if (!selected || !digestPattern.test(selected))
       throw new ConflictException('Import a verified runtime release first');
     const root = await this.root();
-    await this.metadata(root, selected);
+    await this.get(selected);
     const directory = await this.createTemporaryDirectory(join(root, 'snapshots'), 'delivery');
     const cleanup = () => rm(directory, { recursive: true, force: true });
     try {
