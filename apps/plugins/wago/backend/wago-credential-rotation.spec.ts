@@ -64,6 +64,7 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
       protocolVersion: '1.0.0',
       runtimeVersion: '0.1.0',
       capabilities: '["credential-rotation-v1"]',
+      lastHeartbeatAt: new Date().toISOString(),
       lastSeenAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -191,6 +192,8 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
       entities: [WagoController, WagoCredentialRotationEntity],
       synchronize: false,
     }).initialize();
+    // Recovery resends the already rotated credential even when liveness has been lost.
+    await db.getRepository(WagoController).update(1, { lastHeartbeatAt: null });
     publish.mockImplementation(async (serverId, topic, payload) => {
       const retried = JSON.parse(payload);
       const first = JSON.parse(firstPayload);
@@ -244,6 +247,22 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
     await db.query('UPDATE plugin_wago_controllers SET credential_epoch = NULL WHERE id = 1');
     await expect(service.rotate(1, 'attraccess/wago', principal, guard())).rejects.toThrow('credential epoch');
     expect(rotate).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    null,
+    'invalid',
+    new Date(Date.now() - 90_001).toISOString(),
+    new Date(Date.now() + 3_600_000).toISOString(),
+  ])('refuses a claimed controller without fresh permanent heartbeat evidence (%p)', async (lastHeartbeatAt) => {
+    await db.getRepository(WagoController).update(1, { lastHeartbeatAt });
+    await expect(service.rotate(1, 'attraccess/wago', principal, guard())).rejects.toThrow(
+      'permanent controller heartbeat',
+    );
+    expect(rotate).not.toHaveBeenCalled();
+    expect(publish).not.toHaveBeenCalled();
+    expect(record).not.toHaveBeenCalled();
+    expect(await row()).toBeNull();
   });
 
   it('returns the typed uncertain error when MQTT dispatch stalls past its deadline', async () => {
