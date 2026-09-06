@@ -8,6 +8,7 @@ import {
 } from '@attraccess/plugins-backend-sdk';
 import type { CommissioningOperationGuard } from './wago-commissioning-lease';
 import { normalizeOperationalPrefix } from './protocol';
+import { sourceTime } from './diagnostics-envelope';
 import { WagoAudit } from './wago-audit';
 import { WagoController } from './wago-controller.entity';
 import { WagoCredentialRotationEntity } from './wago-credential-rotation.entity';
@@ -70,6 +71,12 @@ export class WagoCredentialRotationService {
     }
     if (!Array.isArray(capabilities) || !capabilities.includes(CAPABILITY))
       throw new ConflictException('Install a runtime supporting credential-rotation-v1 before rotating credentials.');
+    const heartbeatAt = sourceTime(controller.lastHeartbeatAt);
+    const now = Date.now();
+    // A discovery announcement cannot establish that the permanent runtime is subscribed.
+    // Retry only delivers an already rotated credential; allow recovery without a fresh heartbeat.
+    if (!retry && (heartbeatAt === null || heartbeatAt > now || now - heartbeatAt >= 90_000))
+      throw new ConflictException('Wait for a fresh permanent controller heartbeat before rotating credentials.');
     const [epochRow] = await this.repository.query(
       'SELECT credential_epoch AS epoch FROM plugin_wago_controllers WHERE id = ?',
       [controllerId],

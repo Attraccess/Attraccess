@@ -294,6 +294,11 @@ connection. Token validation, runtime artifact acquisition, broker/SSH transport
 and credential-provider boundaries use isolated fixtures. It covers automatic claim, reopen persistence,
 publication/rollback failure correlation, guarded unclaim, manual-command terminal
 results, manual-fallback permission/expiry admission and acknowledgement ordering.
+Rotation coverage exercises operational heartbeat admission, permission/confirmation/session
+guards, correlated reconnect acknowledgements, a real 30-second dispatch timeout,
+original-broker removal, and encrypted pending credentials across database/service reopen.
+Recovery uses the mounted operation-recovery API after advancing only fixture lease
+timestamps; retry delivers the persisted credential without a second provider mutation.
 
 Credential rotation is exposed through authenticated administration routes requiring
 `system.settings.manage`:
@@ -320,7 +325,10 @@ monotonic revisions within that epoch. Fresh enrollment creates a new epoch; an
 old registration's higher revision cannot replace its credentials. Claim and
 rotation expiry are checked again at queued persistence. Existing registrations
 without an epoch must be safely re-enrolled before rotation. The runtime must
-advertise `credential-rotation-v1`. Initial provisioning grants its dedicated
+advertise `credential-rotation-v1` through a fresh canonical operational heartbeat;
+discovery cannot establish rotation readiness. New rotations require that heartbeat
+to be less than 90 seconds old and not in the future. Pending retries remain available
+without fresh liveness. Initial provisioning grants its dedicated
 `credentials/rotate` subscription. Existing broker identities need that topic ACL
 and a reconnect; denied optional rotation subscriptions leave ordinary runtime
 startup available and withhold the rotation capability until subscription succeeds.

@@ -272,9 +272,8 @@ export class WagoRuntime {
         enrollmentSecret: this.options.enrollmentSecret,
         protocolVersion: '1.0.0',
         runtimeVersion: '0.1.0',
-        capabilities: this.options.reconnectCredentials
-          ? CAPABILITIES
-          : CAPABILITIES.filter((value) => value !== 'credential-rotation-v1'),
+        // Discovery proves enrollment reachability, not the permanent credential subscription.
+        capabilities: CAPABILITIES.filter((value) => value !== 'credential-rotation-v1'),
         sequence,
       },
       { retain: true },

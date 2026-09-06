@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import { EncryptionService } from '../encryption/encryption.service';
 import type { INestApplication } from '@nestjs/common';
 import httpRequest from 'supertest';
 import cookieParser from 'cookie-parser';
@@ -31,8 +33,9 @@ import { WagoCommissioningSession } from '../../../plugins/wago/backend/wago-com
 import { commissioningFingerprintHash } from '../../../plugins/wago/backend/wago-commissioning-lease';
 import { WagoCommissioningLeaseEntity } from '../../../plugins/wago/backend/wago-commissioning-lease.entity';
 import { WagoRuntimeArtifactsService } from '../../../plugins/wago/backend/wago-runtime-artifacts';
+import { WagoCredentialRotationEntity } from '../../../plugins/wago/backend/wago-credential-rotation.entity';
 import { WagoConfigurationRevision } from '../../../plugins/wago/backend/wago-configuration-revision.entity';
-import { discoveryTopic } from '../../../plugins/wago/backend/protocol';
+import { discoveryTopic, heartbeatTopic } from '../../../plugins/wago/backend/protocol';
 import type { WagoConfigurationSnapshot } from '../../../plugins/wago/backend/configuration';
 
 const pluginId = 'abcdefghijklmnopqrstu';
@@ -111,6 +114,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
   let mqtt: FixtureMqtt;
   let context: PluginContext;
   let session: WagoCommissioningSession;
+  let artifacts: WagoRuntimeArtifactsService;
   const revoke = jest.fn(async () => undefined);
 
   beforeAll(async () => {
@@ -152,6 +156,9 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
       providerId: 'fixture',
       password: privateValue,
     });
+    const encryption = new EncryptionService(
+      new ConfigService({ app: { AUTH_SESSION_SECRET: 'isolated-audit-fixture-encryption-key' } }),
+    );
     context = {
       manifest: { id: pluginId, name: 'wago-fixture', version: '1.0.0', pluginDirectory: directory },
       dataSource: db,
@@ -166,7 +173,10 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
       onEvent: () => ({ off: () => undefined }),
       emitEvent: () => undefined,
       flows: { trigger: async () => undefined },
-      secrets: { encrypt: () => 'fixture-ciphertext', decrypt: () => verifier },
+      secrets: {
+        encrypt: (value) => encryption.encryptForPlugin(pluginId, value),
+        decrypt: (value) => encryption.decryptForPlugin(pluginId, value),
+      },
       getMqttServerConfig: async () => ({
         id: 1,
         name: 'fixture',
@@ -187,7 +197,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     wago = new WagoService(context);
     jest.spyOn(wago, 'createEnrollment');
     await wago.onApplicationBootstrap();
-    const artifacts = new WagoRuntimeArtifactsService();
+    artifacts = new WagoRuntimeArtifactsService();
     jest.spyOn(artifacts, 'has').mockResolvedValue(true);
     const artifactDirectory = join(directory, 'artifact');
     await mkdir(artifactDirectory);
@@ -218,6 +228,33 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     commissioning['run'] = jest.fn(async () => 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="31"\nCODESYS=\n');
     commissioning['copyTo'] = jest.fn(async () => undefined);
     await commissioning.onApplicationBootstrap();
+    await mountApi();
+    session = await db.getRepository(WagoCommissioningSession).save({
+      hardwareId: 'audit-fixture',
+      mqttServerId: 1,
+      targetHost: '10.99.0.1',
+      hostKeyFingerprint: `SHA256:${'A'.repeat(43)}`,
+      firmwareBaseline: '31',
+      controllerName: 'Fixture',
+      state: 'awaiting_delivery',
+      pairingCode: `encrypted:v1:${context.secrets.encrypt(verifier)}`,
+      auditLog: '[]',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      runtimeArtifactDigest: 'a'.repeat(64),
+    });
+  });
+
+  afterEach(async () => {
+    await app?.close();
+    wago?.onModuleDestroy();
+    await audit?.onModuleDestroy();
+    if (db?.isInitialized) await db.destroy();
+    await rm(directory, { recursive: true, force: true });
+    jest.restoreAllMocks();
+  });
+
+  async function mountApi() {
     const module = await Test.createTestingModule({
       controllers: [WagoControllerApi],
       providers: [
@@ -260,30 +297,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     app.useLogger(false);
     await app.init();
     await app.listen(0, '127.0.0.1');
-    session = await db.getRepository(WagoCommissioningSession).save({
-      hardwareId: 'audit-fixture',
-      mqttServerId: 1,
-      targetHost: '10.99.0.1',
-      hostKeyFingerprint: `SHA256:${'A'.repeat(43)}`,
-      firmwareBaseline: '31',
-      controllerName: 'Fixture',
-      state: 'awaiting_delivery',
-      pairingCode: 'encrypted:v1:fixture-ciphertext',
-      auditLog: '[]',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      runtimeArtifactDigest: 'a'.repeat(64),
-    });
-  });
-
-  afterEach(async () => {
-    await app?.close();
-    wago?.onModuleDestroy();
-    await audit?.onModuleDestroy();
-    if (db?.isInitialized) await db.destroy();
-    await rm(directory, { recursive: true, force: true });
-    jest.restoreAllMocks();
-  });
+  }
 
   function post(path: string, body: object = {}, token = 'fixture-token') {
     return httpRequest(app.getHttpServer()).post(`/wago/${path}`).set('Authorization', `Bearer ${token}`).send(body);
@@ -346,6 +360,241 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
       await post(`controllers/${id}/configuration/publish`, { force, reviewedHash: review.contentHash }).expect(201)
     ).body;
   }
+
+  async function rotationReady(controller: WagoController) {
+    const timestamp = new Date().toISOString();
+    await mqtt.receive(heartbeatTopic('attraccess/wago', controller.hardwareId), {
+      hardwareId: controller.hardwareId,
+      protocolVersion: '1.0.0',
+      runtimeVersion: '0.1.0',
+      capabilities: ['claim', 'claim-expiry-v1', 'heartbeat', 'configuration-v1', 'credential-rotation-v1'],
+      timestamp,
+      streamId: 'fixture-operational-boot',
+      sequence: 1,
+    });
+    const updated = await db.getRepository(WagoController).findOneByOrFail({ id: controller.id });
+    expect(updated.lastHeartbeatAt).toBe(timestamp);
+    expect(JSON.parse(updated.capabilities)).toContain('credential-rotation-v1');
+  }
+
+  function observeRotationProvider() {
+    const provider = context.getMqttCredentialProvisioning();
+    const rotate = jest.fn(provider.rotate);
+    jest.spyOn(context, 'getMqttCredentialProvisioning').mockReturnValue({ ...provider, rotate });
+    return rotate;
+  }
+
+  function rotationRecord(controllerId: number) {
+    return db
+      .getRepository(WagoCredentialRotationEntity)
+      .createQueryBuilder('rotation')
+      .addSelect('rotation.encryptedCredentials')
+      .where('rotation.controllerId = :controllerId', { controllerId })
+      .getOneOrFail();
+  }
+
+  it('rejects rotation without permission, confirmation, a fresh operational heartbeat or a pinned session before broker mutation', async () => {
+    const controller = await deliverAndClaim();
+    const rotate = observeRotationProvider();
+    const path = `controllers/${controller.id}/credentials/rotate`;
+    await post(path, { confirm: true }, 'command-token').expect(403);
+    await post(path, {}).expect(400);
+    await post(path, { confirm: true, retry: 'yes' }).expect(400);
+    // Successful discovery/claim alone cannot establish permanent runtime readiness.
+    await post(path, { confirm: true }).expect(409);
+    expect(
+      JSON.parse((await db.getRepository(WagoController).findOneByOrFail({ id: controller.id })).capabilities),
+    ).not.toContain('credential-rotation-v1');
+    await rotationReady(controller);
+    await db
+      .getRepository(WagoController)
+      .update(controller.id, { lastHeartbeatAt: new Date(Date.now() - 91_000).toISOString() });
+    await post(path, { confirm: true }).expect(409);
+    await db.getRepository(WagoController).update(controller.id, { lastHeartbeatAt: new Date().toISOString() });
+    await db.getRepository(WagoCommissioningSession).delete(session.id);
+    await post(path, { confirm: true }).expect(409);
+    expect(rotate).not.toHaveBeenCalled();
+    expect(await rows('credential_rotation')).toHaveLength(0);
+    expect(await db.getRepository(WagoCredentialRotationEntity).count()).toBe(0);
+  });
+
+  it('completes rotation only on the correlated reconnect, redacts recovery status and preserves audit through original-broker removal', async () => {
+    const controller = await deliverAndClaim();
+    await rotationReady(controller);
+    const rotate = observeRotationProvider();
+    let dispatched!: (message: {
+      topic: string;
+      ack: { credentialEpoch: string; revision: number; token: string; status: string };
+    }) => void;
+    const dispatch = new Promise<Parameters<typeof dispatched>[0]>((resolve) => {
+      dispatched = resolve;
+    });
+    mqtt.publish.mockImplementation(async (serverId, topic, payload, options) => {
+      expect(serverId).toBe(1);
+      expect(options).toEqual({ qos: 1, retain: false });
+      expect(topic).toBe(`attraccess/wago/v1/controllers/${controller.hardwareId}/credentials/rotate`);
+      const packet = JSON.parse(String(payload));
+      const pending = await rotationRecord(controller.id);
+      expect(pending.phase).toBe('pending');
+      expect(pending.encryptedCredentials).not.toContain(privateValue);
+      expect(JSON.parse(context.secrets.decrypt(pending.encryptedCredentials))).toEqual({
+        username: `wago-controller-${controller.hardwareId}`,
+        password: privateValue,
+      });
+      const ack = {
+        credentialEpoch: packet.credentialEpoch,
+        revision: packet.revision,
+        token: packet.token,
+        status: 'reconnected',
+      };
+      dispatched({ topic, ack });
+    });
+    let settled = false;
+    const response = post(`controllers/${controller.id}/credentials/rotate`, { confirm: true })
+      .expect(201)
+      .then((value) => {
+        settled = true;
+        return value;
+      });
+    const { topic, ack } = await dispatch;
+    for (const invalid of [
+      { token: 'unrelated' },
+      { credentialEpoch: 'old-enrollment' },
+      { revision: ack.revision + 1 },
+      { status: 'persisted' },
+    ]) {
+      await mqtt.receive(`${topic}/ack`, { ...ack, ...invalid });
+      // Publication has resolved: invalid replies must not settle the waiting HTTP operation.
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      expect(settled).toBe(false);
+      expect((await rotationRecord(controller.id)).phase).toBe('pending');
+      expect(await rows('credential_rotation')).toHaveLength(1);
+    }
+    await mqtt.receive(`${topic}/ack`, ack);
+    const { body } = await response;
+    expect(body).toEqual({ state: 'completed', revision: 1 });
+    const completed = await rotationRecord(controller.id);
+    expect(completed).toMatchObject({
+      phase: 'completed',
+      encryptedCredentials: null,
+      credentialEpoch: controller.credentialEpoch,
+    });
+    const evidence = await lifecycle('credential_rotation', controller.id);
+    expect(JSON.stringify(evidence)).not.toContain(privateValue);
+    expect(JSON.stringify(evidence)).not.toContain(completed.token);
+    const status = await httpRequest(app.getHttpServer())
+      .get(`/wago/controllers/${controller.id}/credentials/rotation`)
+      .set('Authorization', 'Bearer fixture-token')
+      .expect(200);
+    expect(status.body).toEqual(body);
+    await post(`controllers/${controller.id}/credentials/rotate`, { confirm: true, retry: true }).expect(201, body);
+    expect(rotate).toHaveBeenCalledTimes(1);
+    expect(await rows('credential_rotation')).toHaveLength(2);
+    // Discovery broker changes must not redirect revocation of the original credential identity.
+    await db.getRepository(WagoController).update(controller.id, { mqttServerId: 2 });
+    revoke.mockClear();
+    await remove(controller.id).expect(200);
+    expect(revoke).toHaveBeenCalledWith(
+      expect.objectContaining({ mqttServerId: 1, identity: `wago-controller-${controller.hardwareId}` }),
+    );
+    expect(await db.getRepository(WagoCredentialRotationEntity).count()).toBe(0);
+    expect(await rows('credential_rotation')).toEqual(evidence);
+    await lifecycle('unclaim', controller.id);
+  });
+
+  it('reopens encrypted pending rotation and retries the same handoff only after explicit operation recovery', async () => {
+    const controller = await deliverAndClaim();
+    await rotationReady(controller);
+    const rotate = observeRotationProvider();
+    let firstPacket: Record<string, unknown>;
+    mqtt.publish.mockImplementation(async (_serverId, _topic, payload) => {
+      firstPacket = JSON.parse(String(payload));
+      throw new Error(privateValue);
+    });
+    await post(`controllers/${controller.id}/credentials/rotate`, { confirm: true }).expect(409);
+    const pending = await rotationRecord(controller.id);
+    expect(pending).toMatchObject({ phase: 'pending', revision: 1 });
+    expect(pending.encryptedCredentials).not.toContain(privateValue);
+    const failedEvidence = await lifecycle('credential_rotation', controller.id, 'failed');
+    const lease = await db
+      .getRepository(WagoCommissioningLeaseEntity)
+      .findOneByOrFail({ fingerprintHash: commissioningFingerprintHash(session.hostKeyFingerprint) });
+    await remove(controller.id).expect(409);
+    await app.close();
+    wago.onModuleDestroy();
+    await audit.onModuleDestroy();
+    await db.destroy();
+    await db.initialize();
+    audit = new AuditService(db, new SettingsStoreService(db.getRepository(Setting), null));
+    await audit.onModuleInit();
+    wago = new WagoService(context);
+    commissioning = new WagoCommissioningService(context, wago, artifacts);
+    commissioning['run'] = jest.fn(async () => '');
+    commissioning['copyTo'] = jest.fn(async () => undefined);
+    await mountApi();
+    expect(await rotationRecord(controller.id)).toEqual(pending);
+    expect(await rows('credential_rotation')).toEqual(failedEvidence);
+    await post(`controllers/${controller.id}/credentials/rotate`, { confirm: true, retry: true }).expect(409);
+    // Advance only this isolated fixture's lease timestamps to represent the real recovery waiting period.
+    await db.getRepository(WagoCommissioningLeaseEntity).update(
+      { fingerprintHash: lease.fingerprintHash },
+      {
+        leaseUntil: Date.now() - 3_000,
+        operationUntil: Date.now() - 2_000,
+        recoveryAfter: Date.now() - 1_000,
+      },
+    );
+    await post(`commissioning/sessions/${session.id}/operation/recover`, {
+      owner: lease.owner,
+      previousWorkerStopped: true,
+      temporarySsh: { username: 'root', password: privateValue },
+    }).expect(201, { state: 'available' });
+    // Broker credentials have already changed: recovery remains possible without fresh runtime liveness.
+    await db
+      .getRepository(WagoController)
+      .update(controller.id, { lastHeartbeatAt: new Date(Date.now() - 91_000).toISOString() });
+    mqtt.publish.mockImplementation(async (_serverId, topic, payload) => {
+      const packet = JSON.parse(String(payload));
+      expect(packet).toMatchObject({
+        token: firstPacket.token,
+        revision: firstPacket.revision,
+        credentialEpoch: firstPacket.credentialEpoch,
+        password: privateValue,
+      });
+      await mqtt.receive(`${topic}/ack`, { ...packet, status: 'reconnected' });
+    });
+    await post(`controllers/${controller.id}/credentials/rotate`, { confirm: true, retry: true }).expect(201, {
+      state: 'completed',
+      revision: 1,
+    });
+    expect(rotate).toHaveBeenCalledTimes(1);
+    expect((await rotationRecord(controller.id)).encryptedCredentials).toBeNull();
+    expect(await db.getRepository(WagoCommissioningLeaseEntity).count()).toBe(0);
+    const evidence = await rows('credential_rotation');
+    expect(evidence.map((row) => row.outcome)).toEqual(['attempted', 'failed', 'attempted', 'succeeded']);
+    expect(evidence[2].operationId).toBe(evidence[3].operationId);
+    expect(evidence[2].operationId).not.toBe(evidence[0].operationId);
+    expect(JSON.stringify(evidence)).not.toContain(privateValue);
+    expect(JSON.stringify(evidence)).not.toContain(pending.token);
+  });
+
+  it('bounds a stalled rotation dispatch and retains encrypted recovery plus the commissioning lease', async () => {
+    const controller = await deliverAndClaim();
+    await rotationReady(controller);
+    const rotate = observeRotationProvider();
+    mqtt.publish.mockImplementation(() => new Promise(() => undefined));
+    const started = Date.now();
+    await post(`controllers/${controller.id}/credentials/rotate`, { confirm: true }).expect(409);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(29_000);
+    expect(Date.now() - started).toBeLessThan(40_000);
+    expect(rotate).toHaveBeenCalledTimes(1);
+    expect((await rotationRecord(controller.id)).phase).toBe('pending');
+    expect((await rotationRecord(controller.id)).encryptedCredentials).not.toContain(privateValue);
+    await lifecycle('credential_rotation', controller.id, 'failed');
+    expect(await db.getRepository(WagoCommissioningLeaseEntity).count()).toBe(1);
+    await remove(controller.id).expect(409);
+    expect(await rows('unclaim')).toHaveLength(0);
+  }, 45_000);
 
   it('rejects unauthenticated lifecycle requests before creating audit evidence', async () => {
     await httpRequest(app.getHttpServer())
