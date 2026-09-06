@@ -1,6 +1,7 @@
 import { Menu } from 'lucide-react';
 import { Button } from '@heroui/react';
 import { Logo } from '../../components/logo';
+import { ThemeToggle } from '../../components/themeToggle';
 
 interface HeaderProps {
   toggleSidebar: () => void;
@@ -13,7 +14,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
         <Menu className="h-6 w-6" />
       </Button>
       <Logo />
-      <div className="w-6" aria-hidden="true" />
+      <ThemeToggle />
     </header>
   );
 }

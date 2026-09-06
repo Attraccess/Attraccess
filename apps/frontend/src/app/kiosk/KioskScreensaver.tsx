@@ -46,10 +46,10 @@ export function KioskScreensaver({ enabled }: { enabled: boolean }) {
   // a button on the login form underneath. The window listeners above clear `active` and re-arm.
   return (
     <div
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-white text-accent"
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-background text-accent"
       onPointerDown={(e) => e.preventDefault()}
     >
-      <span className="text-sm tracking-wide text-zinc-600">{t('lockedBy')}</span>
+      <span className="text-sm tracking-wide text-muted">{t('lockedBy')}</span>
       <AttraccessLogo className="w-[38vw] max-w-[520px]" />
     </div>
   );

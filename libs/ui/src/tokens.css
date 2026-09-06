@@ -27,6 +27,12 @@
     --focus: var(--accent);
     --link: var(--accent);
 
+    --chart-sessions: #9a5500;
+    --chart-sessions-active: #7a4300;
+    --chart-minutes: #256d7b;
+    --chart-minutes-active: #1c5260;
+    --chart-spend: #775799;
+
     --border: #d5dede;
     --separator: #e0e6e6;
     --field-background: #ffffff;
@@ -43,8 +49,7 @@
     --overlay-shadow: 0 8px 32px rgb(32 39 41 / 12%), 0 0 0 1px var(--border);
   }
 
-  /* Explicit dark surfaces (such as editor previews) retain a matching palette.
-     The applications themselves always start in the white brand theme. */
+  /* Water-blue tints retain contrast on dark surfaces without changing status colors. */
   .dark,
   [data-theme='dark'] {
     color-scheme: dark;
@@ -69,8 +74,15 @@
     --focus: var(--accent);
     --link: var(--accent);
     --field-border: #64787c;
+    --field-border-hover: #9fb1b5;
     --field-border-focus: var(--accent);
     --overlay: #293639;
     --overlay-shadow: 0 8px 32px rgb(0 0 0 / 30%), 0 0 0 1px var(--field-border);
+
+    --chart-sessions: #e8b36d;
+    --chart-sessions-active: #f5cd95;
+    --chart-minutes: #82c4ce;
+    --chart-minutes-active: #a1d5dc;
+    --chart-spend: #c3a0e0;
   }
 }

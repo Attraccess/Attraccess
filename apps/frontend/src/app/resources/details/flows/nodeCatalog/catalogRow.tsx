@@ -44,11 +44,11 @@ export function CatalogRow({ node, tNodeTranslations, onSelect }: Props) {
         <span className="block text-sm font-medium truncate">
           {node.schema.label ?? tNodeTranslations('nodes.' + node.schema.type + '.title')}
         </span>
-        <span className="block text-xs text-default-500 truncate">
+        <span className="block text-xs text-muted truncate">
           {node.schema.description ?? tNodeTranslations('nodes.' + node.schema.type + '.description')}
         </span>
       </span>
-      <span aria-label={dirLabel} className="flex-none text-default-400">
+      <span aria-label={dirLabel} className="flex-none text-muted">
         <DirIcon className="w-4 h-4" />
       </span>
     </button>

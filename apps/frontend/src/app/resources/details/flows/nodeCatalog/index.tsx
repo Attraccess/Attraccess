@@ -26,8 +26,9 @@ export const NodeCatalogPanel = forwardRef<NodeCatalogHandle, Props>(function No
   ref,
 ) {
   const { t } = useTranslations({ de, en });
-  const { groups, isLoading, isError, collapsed, setCollapsed, isDomainExpanded, setDomainExpanded } =
-    useNodeCatalog({ resourceId });
+  const { groups, isLoading, isError, collapsed, setCollapsed, isDomainExpanded, setDomainExpanded } = useNodeCatalog({
+    resourceId,
+  });
   const { isOpen, setOpen } = useOverlayState();
 
   const loadingSpinner = isLoading ? (
@@ -58,11 +59,11 @@ export const NodeCatalogPanel = forwardRef<NodeCatalogHandle, Props>(function No
       <aside
         role="region"
         aria-label={t('title')}
-        className={`hidden md:flex flex-col h-full min-h-0 border-r border-default-200 dark:border-default-100 bg-background transition-[width] duration-200 ${
+        className={`hidden md:flex flex-col h-full min-h-0 border-r border-border bg-background transition-[width] duration-200 ${
           collapsed ? 'w-12' : 'w-72'
         }`}
       >
-        <div className="flex items-center justify-between px-2 py-2 border-b border-default-200 dark:border-default-100">
+        <div className="flex items-center justify-between px-2 py-2 border-b border-border">
           {!collapsed && <span className="text-sm font-semibold">{t('title')}</span>}
           <Button
             isIconOnly
@@ -75,43 +76,44 @@ export const NodeCatalogPanel = forwardRef<NodeCatalogHandle, Props>(function No
           </Button>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-2">
-          {loadingSpinner ?? (collapsed ? (
-            <ul className="flex flex-col items-center gap-1">
-              {groups.map((group) => {
-                const def = getDomainDef(group.domain);
-                const Icon = def.icon;
-                const label = getPluginDomainLabel(group.domain) ?? t('domains.' + group.domain);
-                return (
-                  <li key={group.domain}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCollapsed(false);
-                        requestAnimationFrame(() => {
-                          document
-                            .getElementById('node-catalog-domain-' + group.domain)
-                            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        });
-                      }}
-                      aria-label={label}
-                      className={`flex items-center justify-center w-8 h-8 rounded-md ${def.iconBg} ${def.iconFg} hover:ring-2 hover:ring-primary-300 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none`}
-                    >
-                      <Icon className="w-4 h-4" />
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <CatalogContent
-              groups={groups}
-              isDomainExpanded={isDomainExpanded}
-              setDomainExpanded={setDomainExpanded}
-              onSelect={onSelect}
-              tCatalog={t}
-              tNodeTranslations={tNodeTranslations}
-            />
-          ))}
+          {loadingSpinner ??
+            (collapsed ? (
+              <ul className="flex flex-col items-center gap-1">
+                {groups.map((group) => {
+                  const def = getDomainDef(group.domain);
+                  const Icon = def.icon;
+                  const label = getPluginDomainLabel(group.domain) ?? t('domains.' + group.domain);
+                  return (
+                    <li key={group.domain}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCollapsed(false);
+                          requestAnimationFrame(() => {
+                            document
+                              .getElementById('node-catalog-domain-' + group.domain)
+                              ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          });
+                        }}
+                        aria-label={label}
+                        className={`flex items-center justify-center w-8 h-8 rounded-md ${def.iconBg} ${def.iconFg} hover:ring-2 hover:ring-primary-300 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none`}
+                      >
+                        <Icon className="w-4 h-4" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <CatalogContent
+                groups={groups}
+                isDomainExpanded={isDomainExpanded}
+                setDomainExpanded={setDomainExpanded}
+                onSelect={onSelect}
+                tCatalog={t}
+                tNodeTranslations={tNodeTranslations}
+              />
+            ))}
         </div>
       </aside>
 
