@@ -30,6 +30,8 @@ The same theme adapts to smaller screens.
 
 Brand assets are generated from the original mascot and vector wordmark using `node scripts/generate-brand-assets.mjs`. Run it with `--check` to verify logos, icon sizes, transparency, and maskable safe areas without changing files.
 
+Logos and app icons preserve the mascot's original colors, shading, and coat patches; only the rose keyhole becomes RAL 5021 water blue. App icons use a white background. The 16 and 32 px favicon frames use a white keyhole silhouette on water blue for readability, and the notification badge uses a white silhouette on transparency.
+
 ## Email Layout
 
 The default email layout uses a white background and teal links and buttons. Updating Attraccess automatically upgrades the original, unmodified stock layout to the new branding. Customized layouts are retained.
