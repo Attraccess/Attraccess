@@ -28,6 +28,7 @@ export function ManagementSecurityStatus(props: ManagementSecurityStatusProps) {
   const [mode, setMode] = useState<ManagementMode>('baseline');
   const [exceptions, setExceptions] = useState<ManagementException[]>([]);
   const [confirmed, setConfirmed] = useState(false);
+  const [credentialGeneration, setCredentialGeneration] = useState(0);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const form = useRef<HTMLFormElement>(null);
@@ -65,7 +66,9 @@ export function ManagementSecurityStatus(props: ManagementSecurityStatusProps) {
       username: String(values.get('managementUsername') ?? ''),
       password: String(values.get('managementPassword') ?? ''),
     };
-    form.current.reset();
+    // Remount only the credential fields. Resetting the whole Form also resets
+    // React Aria's exception checkboxes and invalidates the submitted review.
+    setCredentialGeneration((current) => current + 1);
     setConfirmed(false);
     setPending(true);
     setFailed(false);
@@ -152,11 +155,11 @@ export function ManagementSecurityStatus(props: ManagementSecurityStatusProps) {
           </p>
         )}
         <Form ref={form} onSubmit={(event) => event.preventDefault()} aria-label="Management security actions">
-          <TextField name="managementUsername" isRequired isDisabled={pending}>
+          <TextField key={`username-${credentialGeneration}`} name="managementUsername" isRequired isDisabled={pending}>
             <Label>Temporary SSH username</Label>
             <Input autoComplete="off" maxLength={32} />
           </TextField>
-          <TextField name="managementPassword" isRequired isDisabled={pending}>
+          <TextField key={`password-${credentialGeneration}`} name="managementPassword" isRequired isDisabled={pending}>
             <Label>Temporary SSH password</Label>
             <Input type="password" autoComplete="off" maxLength={4096} />
           </TextField>
