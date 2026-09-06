@@ -95,7 +95,7 @@ export function useCreateCommissioningSessionMutation() {
 export function useConfirmCommissioningHostKeyMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, hostKeyFingerprint }: { id: number; hostKeyFingerprint: string }) => confirmCommissioningHostKey(id, hostKeyFingerprint),
+    mutationFn: ({ id, hostKeyFingerprint, physicalIdentityConfirmed }: { id: number; hostKeyFingerprint: string; physicalIdentityConfirmed?: boolean }) => confirmCommissioningHostKey(id, hostKeyFingerprint, physicalIdentityConfirmed),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.commissioningSessions }),
   });
 }

@@ -420,13 +420,13 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** Server-side commissioning revokes the enrollment it created without exposing credentials to a browser. */
-  async revokeEnrollmentById(id: number): Promise<void> {
+  async revokeEnrollmentById(id: number, assertOwned: () => Promise<void> = async () => undefined): Promise<void> {
     const enrollment = await this.enrollments.findOneBy({ id });
-    // Expiry limits enrollment use but does not revoke the provisioned broker credential.
-    if (enrollment && !enrollment.consumedAt) await this.revokeEnrollment(enrollment);
+    if (enrollment && !enrollment.revokedAt) await this.revokeEnrollment(enrollment, assertOwned);
   }
 
-  async deleteEnrollmentById(id: number): Promise<void> {
+  async deleteEnrollmentById(id: number, assertOwned: () => Promise<void> = async () => undefined): Promise<void> {
+    await assertOwned();
     await this.enrollments.delete(id);
   }
 

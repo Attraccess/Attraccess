@@ -29,7 +29,7 @@ export function ControllersTable({ controllers, sessions, onClaim, onConfigure, 
   const activeSessions = sessions.filter(
     (session) =>
       session.state !== 'completed' &&
-      session.state !== 'revoked',
+      (session.state !== 'revoked' || !!session.runtimeRecoveryAvailable || !!session.dockerProvisionState || !!session.managementControllerId),
   );
   const rows: TableRowData[] = [
     ...controllers.map((controller) => ({
@@ -92,7 +92,7 @@ function ControllerRow({ row, onClaim, onConfigure, onRemove, onResume }: { row:
           {controller.trustState === 'untrusted' ? (!session &&
             <Button size="sm" onPress={() => onClaim(controller.id)}>Claim</Button>
           ) : <Button size="sm" variant="secondary" onPress={() => onConfigure(controller.id)}>Configure</Button>}
-          <Button color="danger" size="sm" variant="ghost" onPress={() => onRemove(controller)}>Remove</Button>
+          <Button size="sm" variant="danger" onPress={() => onRemove(controller)}>Remove</Button>
         </div>
       </TableCell>
     </TableRow>

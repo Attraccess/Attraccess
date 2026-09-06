@@ -28,6 +28,12 @@ export class WagoCommissioningSession {
   @Column({ type: 'integer', name: 'enrollment_id', nullable: true }) enrollmentId!: number | null;
   @Column({ type: 'varchar', name: 'pairing_code', nullable: true }) pairingCode!: string | null;
   @Column({ type: 'varchar', name: 'delivery_token', nullable: true }) deliveryToken!: string | null;
+  @Column({ type: 'text', name: 'initiating_principal', nullable: true }) initiatingPrincipal!: string | null;
+  @Column({ type: 'varchar', name: 'runtime_artifact_digest', nullable: true }) runtimeArtifactDigest!: string | null;
+  @Column({ type: 'integer', name: 'management_controller_id', nullable: true }) managementControllerId!: number | null;
+  @Column({ type: 'varchar', name: 'docker_provision_token', nullable: true }) dockerProvisionToken!: string | null;
+  @Column({ type: 'varchar', name: 'docker_provision_state', nullable: true }) dockerProvisionState!: string | null;
+  @Column({ type: 'text', name: 'platform_report', nullable: true }) platformReport!: string | null;
   @Column({ type: 'varchar', name: 'codesys_state', nullable: true }) codesysState!: string | null;
   @Column({ type: 'integer', name: 'progress_percent', nullable: true }) progressPercent!: number | null;
   @Column({ type: 'varchar', name: 'progress_step', nullable: true }) progressStep!: string | null;
