@@ -73,10 +73,10 @@ describe('FW31 software support boundary', () => {
     activeSession.dockerProvisionState = state;
     mount();
     expect(screen.queryByRole('button', { name: 'Start installed Docker runtime' })).toBeNull();
-    expect(!!screen.queryByRole('button', { name: 'Recover Docker provisioning' })).toBe(!!state);
+    expect(!!screen.queryByRole('button', { name: 'Clean up controller preparation' })).toBe(!!state);
     expect(requests.some(({ url }) => url.endsWith('/activate'))).toBe(false);
   });
-  it('explains the source dependency blocker and preserves a stopped PLC boot configuration', () => {
+  it('explains mandatory PLC disablement and reports unsupported Docker dependencies', () => {
     activeSession.platformReport = JSON.stringify({
       version: '1',
       platform: 'supported',
@@ -90,7 +90,7 @@ describe('FW31 software support boundary', () => {
     mount();
     expect(screen.queryByRole('button', { name: 'Start installed Docker runtime' })).toBeNull();
     expect(screen.getByText(/CODESYS is configured to start at boot/)).toBeTruthy();
-    expect(screen.getByText(/stopping Docker runs networking event scripts/)).toBeTruthy();
+    expect(screen.getByText(/Installation must validate a supported activation path/)).toBeTruthy();
   });
   it('does not offer activation for an unsupported firmware report even when an installed runtime is stopped', () => {
     activeSession.platformReport = JSON.stringify({
@@ -111,6 +111,28 @@ describe('FW31 software support boundary', () => {
 });
 
 describe('explicit recovery approval', () => {
+  beforeEach(() => {
+    activeSession.runtimeRecoveryAvailable = true;
+  });
+
+  it.each([false, undefined])('offers preparation cleanup alone without runtime recovery ownership (%s)', (available) => {
+    activeSession.state = 'delivery_failed';
+    activeSession.dockerProvisionState = 'recovery_required';
+    activeSession.runtimeRecoveryAvailable = available;
+    mount();
+    expect(screen.queryByRole('button', { name: 'Clean up failed installation' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Clean up controller preparation' })).toBeTruthy();
+  });
+
+  it('routes cleanup through the runtime when both installation and preparation records exist', () => {
+    activeSession.state = 'delivery_failed';
+    activeSession.dockerProvisionState = 'started';
+    activeSession.runtimeRecoveryAvailable = true;
+    mount();
+    expect(screen.getByRole('button', { name: 'Clean up failed installation' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Clean up controller preparation' })).toBeNull();
+  });
+
   it('exposes guarded record deletion for revoked commissioning history', async () => {
     activeSession.state = 'revoked';
     const { onOpenChange } = mount();
@@ -131,7 +153,7 @@ describe('explicit recovery approval', () => {
   it.each(['delivery_failed', 'awaiting_discovery', 'awaiting_verification'] as const)('offers manual recovery in %s without starting it', (state) => {
     activeSession.state = state;
     mount();
-    expect(screen.getByRole('button', { name: 'Recover saved runtime' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Clean up failed installation' }).hasAttribute('disabled')).toBe(true);
     expect(screen.getByText(/cannot undo broker credential revocation/)).toBeTruthy();
     expect(requests.filter(({ url }) => url.endsWith('/recover'))).toHaveLength(0);
   });
@@ -140,9 +162,9 @@ describe('explicit recovery approval', () => {
     activeSession.state = 'delivery_failed';
     failRecovery = failure;
     mount();
-    const recover = screen.getByRole('button', { name: 'Recover saved runtime' });
+    const recover = screen.getByRole('button', { name: 'Clean up failed installation' });
     fillCredentials();
-    fireEvent.click(screen.getByRole('checkbox', { name: /I approve interruption/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /I approve this destructive installation/ }));
     expect((screen.getByLabelText('Recovery SSH password') as HTMLInputElement).value).toBe('');
     fillRecoveryCredentials();
     expect(recover.hasAttribute('disabled')).toBe(true);
@@ -178,7 +200,7 @@ describe('explicit recovery approval', () => {
     expect((screen.getByLabelText('Recovery SSH password') as HTMLInputElement).value).toBe('');
     expect((screen.getByLabelText('Recovery SSH username') as HTMLInputElement).value).toBe('');
     fillRecoveryCredentials();
-    expect(screen.getByRole('button', { name: 'Recover saved runtime' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Clean up failed installation' }).hasAttribute('disabled')).toBe(true);
     expect(requests.filter(({ url }) => url.endsWith('/recover'))).toHaveLength(0);
   });
 
@@ -187,19 +209,39 @@ describe('explicit recovery approval', () => {
     const { rerender, view } = mount();
     fillRecoveryCredentials();
     fireEvent.click(screen.getByRole('checkbox', { name: /I approve interrupting/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Recover saved runtime' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clean up failed installation' }));
     await waitFor(() => expect(requests.filter(({ url }) => url.endsWith('/7/recover'))).toHaveLength(1));
     await waitFor(() => expect(client.isMutating()).toBe(0));
     activeSession = { ...activeSession, id: 8 };
     rerender(view(true));
     fillRecoveryCredentials();
     fireEvent.click(screen.getByRole('checkbox', { name: /I approve interrupting/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Recover saved runtime' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clean up failed installation' }));
     await waitFor(() => expect(requests.filter(({ url }) => url.endsWith('/8/recover'))).toHaveLength(1));
   });
 });
 
 describe('explicit install approval', () => {
+  it.each(['codesys-active', 'codesys-boot-enabled'])('uses one consequence confirmation for %s without preservation or WBM gates', (exclusivity) => {
+    activeSession.platformReport = JSON.stringify({
+      version: '1', platform: 'supported', hardware: 'uid10001-access-denied', exclusivity,
+      docker: 'installed-stopped', configDocker: 'present', provision: 'prepare-controller',
+      qualification: 'software-supported',
+    });
+    mount();
+    expect(screen.getByText('Destructive installation')).toBeTruthy();
+    expect(screen.getByText(/Existing applications and workloads may stop working or be erased/)).toBeTruthy();
+    expect(screen.getByText(/Installation does not certify management hardening or physical readiness/)).toBeTruthy();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Recover saved runtime' })).toBeNull();
+    fillCredentials();
+    const install = screen.getByRole('button', { name: 'Install runtime' });
+    expect(install.hasAttribute('disabled')).toBe(true);
+    fireEvent.click(screen.getByRole('checkbox', { name: /permanent CODESYS disablement and possible loss/ }));
+    expect(install.hasAttribute('disabled')).toBe(false);
+    expect(requests.filter(({ body }) => body)).toHaveLength(0);
+  });
+
   it.each([false, true])('requires fresh consent and clears secrets after submission (failure=%s)', async (failure) => {
     failInstall = failure;
     if (failure) activeSession.state = 'delivery_failed';
@@ -210,7 +252,7 @@ describe('explicit install approval', () => {
     expect(install.hasAttribute('disabled')).toBe(true);
     fillCredentials();
     expect(install.hasAttribute('disabled')).toBe(true);
-    fireEvent.click(screen.getByRole('checkbox', { name: /I approve interruption/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /I approve this destructive installation/ }));
     fireEvent.click(install);
     expect((screen.getByLabelText('Temporary SSH password') as HTMLInputElement).value).toBe('');
     await waitFor(() => expect(requests.filter(({ url }) => url.endsWith('/deliver'))).toHaveLength(1));

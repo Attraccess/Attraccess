@@ -251,7 +251,7 @@ export function commissioningLabel(state: WagoCommissioningState): string {
     awaiting_delivery: 'Preparing automatic delivery',
     delivering: 'Delivering commissioning runtime',
     awaiting_identity_confirmation: 'Ready to verify the physical controller',
-    awaiting_codesys_confirmation: 'Waiting for CODESYS approval',
+    awaiting_codesys_confirmation: 'Waiting for destructive installation approval',
     delivery_failed: 'Delivery needs attention',
     awaiting_discovery: 'Waiting for the controller to connect',
     awaiting_claim: 'Claiming automatically',

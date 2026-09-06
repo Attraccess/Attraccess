@@ -4,7 +4,13 @@
 
 ## Deployment Paths Must Not Be Mixed
 
-The first usable beta targets CC100 `751-9301` firmware **31**. Broader firmware references below are hardware background, not additional supported baselines. Guided commissioning uses a locally verified signed offline bundle, not a controller-side registry pull or mandatory WBM setup. It currently names its container `attraccess-wago` and bind-mounts the controller directory `/var/lib/attraccess-wago` there. The legacy manual example below names its container `attraccess-wago-cc100` and uses a named Docker volume instead. Those storage locations are **not interchangeable**; identify the actual installation before any recovery. Do not run the manual install over a commissioned controller.
+The first usable beta targets CC100 `751-9301` firmware **31**. Broader firmware references below are hardware background, not additional supported baselines. Guided commissioning uses a locally verified signed offline bundle, not a controller-side registry pull or mandatory WBM setup. It names its container `attraccess-wago` and bind-mounts the controller directory `/var/lib/attraccess-wago` there. As of **2026-09-06**, commissioning is destructive: existing applications/data may stop working or be erased, with no preservation, backup or restoration of preexisting CODESYS or other workloads by Attraccess. It always stops and permanently disables CODESYS and verifies this before I/O. Supported Docker setup and persistent narrow I/O permissions belong to the installer. See the current [platform contract](wago-commissioning-platform.md).
+
+The legacy manual example below names its container `attraccess-wago-cc100` and uses a named Docker volume instead. Those storage locations and its restart policy are **not interchangeable** with guided commissioning. Guided commissioning uses Docker restart policy `no` and a host supervisor that verifies CODESYS disablement, exclusive ownership and narrow register access before every start, including at most five crash restarts per supervisor run. It periodically checks the running writer and attempts containment on failed checks. The historical manual `unless-stopped` example does not provide that gate. Identify the actual installation before cleanup; do not run the manual install over a commissioned controller.
+
+For guided installations, Docker itself never restarts `attraccess-wago`. After an ordinary daemon-only restart, while runtime enablement remains present, the supervisor or `/etc/rc.d/S99_zz_attraccess_wago start` can resume the runtime through the full gate and within its limits. A daemon outage that causes a failed check can instead trigger latched containment.
+
+After failed checks or retry exhaustion, containment removes runtime enablement. The hook and a controller reboot do **not** re-enable it: hook `start` currently exits `0` without starting a disabled runtime, so that exit code is not startup evidence. Resolve the cause and use the [wizard cleanup/recommissioning route](wago-cc100-commissioning.md#recover-after-latched-containment); only installation recreates enablement. Do not recreate the marker manually or use `docker start`. An unavailable daemon cannot prove containment, and failed stop verification retains recovery ownership. This corrects the earlier hook-only recovery instruction and supersedes the [intermediate restart design](wago-fw31-support.md#security-follow-up-on-2026-09-06); physical restart/reboot acceptance remains separate.
 
 Both paths use `/etc/attraccess-wago/runtime.env` on the **controller host**. Docker reads it through `--env-file`; it is not mounted into the container. Runtime state is `/var/lib/attraccess-wago/state.json` **inside the container**, backed by the host directory for guided commissioning or by the named volume for the manual example. Both the host environment file and runtime state can contain credentials. A local Attraccess backup is not proof that either device-side file or SSH recovery access has been backed up. Verify recoverability before credential changes and keep secrets out of support evidence.
 
@@ -28,13 +34,17 @@ Before deployment, confirm all of the following:
 
 ## Enable Docker
 
-Fresh FW31 Docker activation is not implemented. Actual FW30 SDK source documents
-`config_docker install` / `activate`, including startup, routing and firewall changes.
-Its deactivation is not a complete inverse and FW31 dependency compatibility has
-not been established. The former installed-daemon action is also disabled because
-its assumed status contract and daemon-only recovery do not match vendor source.
-See [FW31 support boundaries](wago-fw31-support.md) for the exact missing contracts
-and read-only evidence needed. WBM is not a required commissioning step.
+Guided commissioning prepares the existing firmware-installed Docker facility
+within the single destructive-install approval. It uses the vendor activation
+path when needed and verifies daemon availability and boot enablement before I/O.
+The captured FW31 `config_docker install` only checks activation state; it does
+not download or extract Docker. Missing client/daemon binaries remain unsupported.
+Vendor activation can change saved startup, routing and firewall state; neither
+deactivation nor removal restores preexisting applications. The captured init
+script has no usable `status` action, so commissioning checks daemon observations
+and getter results instead. See [current support boundaries](wago-fw31-support.md)
+for exact-source provenance, remaining checks and the superseded preservation
+decision. WBM is not a required commissioning step.
 
 ## Obtain and verify the image
 
@@ -117,7 +127,7 @@ docker run -d \
   "$IMAGE"
 ```
 
-`--restart unless-stopped` starts the runtime after Docker and controller restarts unless an operator explicitly stopped it. It does not make the runtime safe after a failure. Record the command, image digest, environment-file checksum (not its contents), container ID, firmware version, and I/O map review in the deployment record.
+In this historical manual example, `--restart unless-stopped` starts the runtime after Docker and controller restarts unless an operator explicitly stopped it. It does not make the runtime safe after a failure and is not the current guided commissioning policy. Record the command, image digest, environment-file checksum (not its contents), container ID, firmware version, and I/O map review in the deployment record.
 
 Check startup and retain the output:
 
@@ -205,7 +215,7 @@ If it repeats, stop it and preserve logs before changing the image or configurat
 
 ### Controller reboot
 
-After the CC100 returns, confirm Docker is active, the container has restarted, and the runtime publishes a new heartbeat. Verify retained state and Reported Configuration before testing I/O. The persistent volume should restore the accepted snapshot and bounded command history; it does not replay acknowledged commands or pulses.
+After the CC100 returns, confirm Docker is active and the runtime publishes a new heartbeat. For guided commissioning, verify that the boot hook kept CODESYS disabled and verified narrow register access before starting Attraccess; failed checks must leave it stopped. Verify retained state and Reported Configuration before testing I/O. The persistent volume retains the accepted snapshot and bounded command history; it is not a preexisting-workload backup and does not replay acknowledged commands or pulses.
 
 ### Roll back an image or configuration
 

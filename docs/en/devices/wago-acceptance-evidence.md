@@ -6,7 +6,7 @@
 
 Use a CC100 `751-9301`, firmware `31`, safe low-voltage fixtures and qualified wiring where required. Keep emergency-stop and personnel-protection circuits independent. Operational guards, disconnect policies and acknowledgements are not safety-rated functions.
 
-Record the starting controller state and confirm a recoverable backup before changing credentials or installation. A backup of the Attraccess server alone does **not** include device-side permanent MQTT credentials, SSH access or runtime state. If the controller is unavailable or its credentials remain unbacked, record that blocker and do not proceed with destructive recovery or call acceptance complete. Never attach credential files, raw broker payloads, full configuration dumps or unreviewed logs to tickets.
+Record the starting controller state and the explicit destructive-install approval. As of 2026-09-06, commissioning may stop or erase existing applications and data; Attraccess does not preserve, back up, or restore preexisting CODESYS or other workloads. A prior-workload backup is not a commissioning gate. Verify that CODESYS is stopped and permanently disabled before I/O, and repeat that verification after reboot. For changes to existing Attraccess credentials, retain the supported management-access recovery path: a server backup alone does **not** include device-side MQTT credentials, SSH access or runtime state. Unavailable hardware or unresolved credential recovery remains an acceptance blocker. Never attach credential files, raw broker payloads, full configuration dumps or unreviewed logs to tickets.
 
 ## Observe the Actual Journey
 
@@ -19,6 +19,14 @@ For each required check, record the observed behavior and link a timestamped rec
 ## Required Evidence
 
 The offline completeness checker exports the authoritative list as `requiredChecks` in `scripts/check-wago-acceptance.mjs`. It includes commissioning/hardening, permanent enrollment/revocation, visual digital I/O and Modbus, configuration readiness, first flow with acknowledgement, packed-bit independence and concurrent outputs, restart/reboot, rejection/rollback, expired/duplicate commands, operational policies/guards, interrupted commissioning and credential recovery, re-enrollment, Modbus failure and stale waits, desktop/mobile, shared conformance, and audit redaction.
+
+For the current guided deployment, restart/reboot and interrupted-installation
+evidence must exercise the host gate with Docker restart policy `no`: CODESYS
+disablement, narrow permissions, identity/output-writer conflicts, bounded crash
+retries and failed-observation containment. Failed container-stop verification
+must retain the error and recovery ownership. Record the exact tested build;
+earlier browser/software results do not verify later security changes or physical
+behavior. These details supplement the existing checks, not a new evidence schema.
 
 Retain one JSON evidence record outside the source tree with these fields:
 
