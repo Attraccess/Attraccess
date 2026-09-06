@@ -41,6 +41,13 @@ function expectTheme(theme: 'light' | 'dark') {
 
 describe('Application appearance', () => {
   beforeEach(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    vi.spyOn(window, 'matchMedia').mockReturnValue({
+      ...media,
+      matches: false,
+      addEventListener: media.addEventListener.bind(media),
+      removeEventListener: media.removeEventListener.bind(media),
+    });
     localStorage.clear();
     document.documentElement.className = 'light unrelated-class';
   });
@@ -56,11 +63,11 @@ describe('Application appearance', () => {
     document.documentElement.style.colorScheme = '';
   });
 
-  it('defaults to light even on a dark operating system', () => {
+  it('defaults to the operating system appearance', () => {
     const media = window.matchMedia('');
     vi.spyOn(window, 'matchMedia').mockReturnValue({ ...media, matches: true });
     renderTheme();
-    expectTheme('light');
+    expectTheme('dark');
   });
 
   it('honors saved dark mode through StrictMode and remounts', () => {

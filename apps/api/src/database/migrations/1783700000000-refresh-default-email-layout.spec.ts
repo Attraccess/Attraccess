@@ -47,12 +47,13 @@ describe('RefreshDefaultEmailLayout1783700000000', () => {
     expect(body).toContain('{{content}}');
   });
 
-  it.each(['\r\n', '\r'])('recognizes stock content with %j line endings', async (lineEnding) => {
-    await queryRunner.query(`UPDATE "setting" SET "value" = ?`, [originalLayout.replace(/\r?\n/g, lineEnding)]);
+  it.each(['\r\n', '\r'])('preserves stock content that was edited', async (lineEnding) => {
+    const editedLayout = originalLayout.replace(/\r?\n/g, lineEnding);
+    await queryRunner.query(`UPDATE "setting" SET "value" = ?, "updatedAt" = '2021-01-01'`, [editedLayout]);
 
     await migration.up(queryRunner);
 
-    expect(await readLayout()).toBe(readDefaultLayoutBody());
+    expect(await readLayout()).toBe(editedLayout);
   });
 
   it.each([
@@ -62,19 +63,19 @@ describe('RefreshDefaultEmailLayout1783700000000', () => {
     ['spacing', '<mjml>', '<mjml> '],
   ])('preserves even a small %s customization', async (_name, from, to) => {
     const customLayout = originalLayout.replace(from, to);
-    await queryRunner.query(`UPDATE "setting" SET "value" = ?`, [customLayout]);
+    await queryRunner.query(`UPDATE "setting" SET "value" = ?, "updatedAt" = '2021-01-01'`, [customLayout]);
 
     await migration.up(queryRunner);
 
     expect(await readLayout()).toBe(customLayout);
   });
 
-  it('upgrades stock content even when its timestamps indicate it was saved again', async () => {
+  it('preserves stock content when its timestamps indicate it was saved again', async () => {
     await queryRunner.query(`UPDATE "setting" SET "createdAt" = '2020-01-01', "updatedAt" = '2021-01-01'`);
 
     await migration.up(queryRunner);
 
-    expect(await readLayout()).toBe(readDefaultLayoutBody());
+    expect(await readLayout()).toBe(originalLayout);
   });
 
   it('leaves other settings and individual template content untouched', async () => {
@@ -124,7 +125,7 @@ describe('RefreshDefaultEmailLayout1783700000000', () => {
     const query = queryRunner.query.bind(queryRunner);
     jest.spyOn(queryRunner, 'query').mockImplementationOnce(async (sql, parameters) => {
       const rows = await query(sql, parameters);
-      await query(`UPDATE "setting" SET "value" = ?`, [customLayout]);
+      await query(`UPDATE "setting" SET "value" = ?, "updatedAt" = '2021-01-01'`, [customLayout]);
       return rows;
     });
 

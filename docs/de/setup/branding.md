@@ -16,9 +16,9 @@ Das Attraccess-Logo und der Name werden in der Seitenleiste und auf der Anmeldes
 
 Im hellen Modus verwendet Attraccess weiße Hauptflächen mit Akzenten in RAL 5021 Wasserblau (`#256D7B`). Im dunklen Modus sorgen dunkle Oberflächen und hellere petrolfarbene Akzente für gute Lesbarkeit. Flache Oberflächen, klare Rahmen und dezente Eckenradien von 4–6 px halten den Fokus auf der Aufgabe. Farben für Erfolg, Warnungen und Fehler behalten in beiden Modi ihre Bedeutung.
 
-Die Standarddarstellung ist hell, unabhängig vom Farbmodus Ihres Betriebssystems. Über den Farbmodus-Schalter auf der Anmeldeseite, in der Seitenleiste oder in der mobilen Kopfzeile können Sie optional zum dunklen Modus wechseln. Ihre Auswahl wird in diesem Browser für diese Attraccess-Installation gespeichert, sofern lokaler Speicher verfügbar ist.
+Die Standarddarstellung folgt dem Farbmodus Ihres Betriebssystems. Über den Farbmodus-Schalter auf der Anmeldeseite, in der Seitenleiste oder in der mobilen Kopfzeile können Sie optional zwischen hellem und dunklem Modus wechseln. Ihre Auswahl wird in diesem Browser für diese Attraccess-Installation gespeichert, sofern lokaler Speicher verfügbar ist.
 
-Attraccess Companion startet ebenfalls standardmäßig im hellen Modus. Im Einrichtungsassistenten finden Sie den Farbmodus-Schalter bei jedem Schritt oben rechts; der Assistent speichert seine eigene Auswahl lokal. Diese Einstellung ist von der Web-App getrennt und wird nicht zwischen Apps oder Geräten synchronisiert. Jedes neu erstellte Companion-Kioskfenster startet mit einer neuen Sitzung im hellen Modus und übernimmt nicht die Auswahl des Assistenten.
+Attraccess Companion folgt ebenfalls standardmäßig dem Farbmodus des Betriebssystems. Im Einrichtungsassistenten finden Sie den Farbmodus-Schalter bei jedem Schritt oben rechts; der Assistent speichert seine eigene Auswahl lokal. Diese Einstellung ist von der Web-App getrennt und wird nicht zwischen Apps oder Geräten synchronisiert. Jedes neu erstellte Companion-Kioskfenster startet mit einer neuen Sitzung, die dem Farbmodus des Betriebssystems folgt, und übernimmt nicht die Auswahl des Assistenten.
 
 Diese Dokumentation bietet einen eigenen optionalen Schalter für den dunklen Modus und speichert Ihre Auswahl separat.
 

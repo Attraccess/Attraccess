@@ -41,7 +41,7 @@ interface ProvidersProps extends PropsWithChildren {
   defaultTheme?: Theme;
 }
 
-export function Providers({ children, defaultTheme = 'light' }: ProvidersProps) {
+export function Providers({ children, defaultTheme = 'system' }: ProvidersProps) {
   const [theme, setThemeState] = useState(() => readTheme(defaultTheme));
   const systemDark = useSyncExternalStore(subscribeToSystemTheme, isSystemDark, () => false);
   const resolvedTheme = theme === 'system' ? (systemDark ? 'dark' : 'light') : theme;

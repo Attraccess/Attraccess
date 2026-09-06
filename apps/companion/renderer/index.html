@@ -10,7 +10,7 @@
     <title>Attraccess Companion Setup</title>
     <script id="theme-init">
       (() => {
-        let theme = 'light';
+        let theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         try {
           const savedTheme = localStorage.getItem('heroui-theme');
           if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system') {
@@ -22,7 +22,7 @@
                 : savedTheme;
           }
         } catch {
-          // Keep the light default when storage is unavailable.
+          // Keep the system default when storage is unavailable.
         }
         const root = document.documentElement;
         root.classList.remove('light', 'dark');

@@ -46,25 +46,25 @@ describe('Attraccess brand theme', () => {
     }
   });
 
-  it('shares tokens across both applications with white as the default canvas', () => {
+  it('shares tokens across both applications while following the system appearance by default', () => {
     expect(read('apps/frontend/src/styles.css')).toContain('libs/ui/src/tokens.css');
     expect(read('apps/companion/renderer/src/styles.css')).toContain('libs/ui/src/tokens.css');
-    expect(read('apps/frontend/index.html')).toContain('<html class="light" data-theme="light">');
-    expect(read('libs/ui/src/Providers.tsx')).toContain("defaultTheme = 'light'");
+    expect(read('apps/frontend/index.html')).toContain('<html>');
+    expect(read('libs/ui/src/Providers.tsx')).toContain("defaultTheme = 'system'");
     expect(read('apps/frontend/src/main.tsx')).toContain('<Providers>');
-    expect(read('apps/companion/renderer/src/main.tsx')).toContain('defaultTheme="light"');
+    expect(read('apps/companion/renderer/src/main.tsx')).toContain('<Providers>');
     expect(tokens).toContain('--background: #ffffff;');
   });
 
   describe.each(['apps/frontend/index.html', 'apps/companion/renderer/index.html'])('%s first paint', (file) => {
     it.each([
-      [null, true, 'light'],
+      [null, true, 'dark'],
       ['dark', false, 'dark'],
       ['light', true, 'light'],
       ['system', true, 'dark'],
       ['system', false, 'light'],
-      ['invalid', true, 'light'],
-      ['blocked', true, 'light'],
+      ['invalid', true, 'dark'],
+      ['blocked', true, 'dark'],
     ])('resolves saved %s with OS dark=%s before React loads', (saved, osDark, expected) => {
       const script = read(file).match(/<script id="theme-init">([\s\S]*?)<\/script>/)?.[1];
       expect(script).toBeDefined();
