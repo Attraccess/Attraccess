@@ -24,6 +24,7 @@ export type DiscoveryClaim = { username: string; password: string; prefix?: stri
 
 export const CAPABILITIES = [
   'claim',
+  'claim-expiry-v1',
   'heartbeat',
   'configuration-v1',
   'commands',
@@ -31,6 +32,7 @@ export const CAPABILITIES = [
   'measurement',
   'fault',
   'acknowledgement',
+  'credential-rotation-v1',
 ];
 
 export class WagoRuntime {
@@ -52,6 +54,7 @@ export class WagoRuntime {
   private lastPublishedState?: string;
   private polling = false;
   private publishingHeartbeat = false;
+  private credentialUpdates = Promise.resolve();
   private sequence = 0;
   private reservedSequence = 0;
   private initialSequence = 0;
@@ -67,6 +70,7 @@ export class WagoRuntime {
       store: StateStore;
       transport: Transport;
       device: DeviceAdapter;
+      reconnectCredentials?: (credentials: DiscoveryClaim) => Promise<void>;
     },
   ) {
     this.outputs = new OutputController({
@@ -94,6 +98,10 @@ export class WagoRuntime {
     await this.outputs.applyDisconnectPolicies(this.connected);
     await this.options.transport.subscribe(this.desiredTopic(), (payload) => this.receiveDesired(payload));
     await this.options.transport.subscribe(this.commandTopic(), (payload) => this.receiveCommand(payload));
+    if (this.options.reconnectCredentials)
+      await this.options.transport.subscribe(this.credentialRotationTopic(), (payload) =>
+        this.receiveCredentialRotation(payload),
+      );
     await activateConnectionHandling?.();
     await this.publishHeartbeat(true);
   }
@@ -101,6 +109,68 @@ export class WagoRuntime {
   async receiveClaim(credentials: DiscoveryClaim): Promise<void> {
     this.state.credentials = credentials;
     await this.saveState();
+  }
+
+  /** Persist before disconnecting; the acknowledgement is emitted only by the authenticated new connection. */
+  receiveCredentialRotation(payload: Buffer): Promise<void> {
+    const update = this.credentialUpdates.then(async () => {
+      if (!this.loaded || !this.options.reconnectCredentials || !this.state.credentials || payload.length > 8192)
+        return;
+      let input: Record<string, unknown>;
+      try {
+        input = JSON.parse(payload.toString('utf8'));
+      } catch {
+        return;
+      }
+      if (
+        !input ||
+        typeof input !== 'object' ||
+        !Number.isSafeInteger(input.revision) ||
+        (input.revision as number) < 1 ||
+        typeof input.token !== 'string' ||
+        !/^[A-Za-z0-9_-]{43}$/.test(input.token) ||
+        input.username !== this.state.credentials.username ||
+        typeof input.password !== 'string' ||
+        !input.password ||
+        input.password.length > 4096
+      )
+        return;
+      const previous = this.state.credentialRotation;
+      if (
+        previous &&
+        ((input.revision as number) < previous.revision ||
+          (input.revision === previous.revision &&
+            (input.token !== previous.token || input.password !== this.state.credentials.password)))
+      )
+        return;
+      this.state.credentials = { ...this.state.credentials, password: input.password };
+      this.state.credentialRotation = { revision: input.revision as number, token: input.token };
+      await this.saveState();
+      await this.options.reconnectCredentials(this.state.credentials);
+    });
+    this.credentialUpdates = update.catch(() => undefined);
+    return update;
+  }
+
+  /** Call only after MQTT CONNECT succeeds with these credentials, including process restart. */
+  async acknowledgeCredentialRotation(authenticated: DiscoveryClaim): Promise<void> {
+    const rotation = this.state.credentialRotation;
+    if (
+      !this.loaded ||
+      !rotation ||
+      authenticated.username !== this.state.credentials?.username ||
+      authenticated.password !== this.state.credentials.password
+    )
+      return;
+    await this.options.transport.publish(
+      `${this.credentialRotationTopic()}/ack`,
+      { ...rotation, status: 'reconnected' },
+      { retain: true },
+    );
+  }
+
+  private credentialRotationTopic(): string {
+    return this.topic('credentials/rotate');
   }
 
   async receiveDiscoveryClaim(payload: Buffer): Promise<DiscoveryClaim | undefined> {
@@ -111,8 +181,17 @@ export class WagoRuntime {
       return undefined;
     }
     if (!claim || typeof claim !== 'object') return undefined;
-    const { username, password, configuration, acknowledgementToken } = claim as Record<string, unknown>;
+    const { username, password, configuration, acknowledgementToken, expiresAt } = claim as Record<string, unknown>;
     if (typeof username !== 'string' || !username || typeof password !== 'string' || !password) return undefined;
+    const expiry = expiresAt === undefined ? undefined : typeof expiresAt === 'string' ? Date.parse(expiresAt) : NaN;
+    if (
+      expiry !== undefined &&
+      (!Number.isFinite(expiry) ||
+        new Date(expiry).toISOString() !== expiresAt ||
+        expiry <= Date.now() ||
+        expiry - Date.now() > 60_000)
+    )
+      return undefined;
     const namespace =
       configuration && typeof configuration === 'object'
         ? (configuration as Record<string, unknown>).namespace
@@ -124,7 +203,14 @@ export class WagoRuntime {
       ...(typeof namespace === 'string' ? { prefix: namespace } : {}),
     };
     this.state = await this.options.store.load();
-    await this.receiveClaim(credentials);
+    let saved = false;
+    await this.queueStateUpdate(async () => {
+      if (expiry !== undefined && expiry <= Date.now()) return;
+      this.state.credentials = credentials;
+      await this.options.store.save(this.state);
+      saved = true;
+    });
+    if (!saved) return undefined;
     if (typeof acknowledgementToken === 'string' && acknowledgementToken)
       await this.options.transport.publish(`${this.discoveryClaimTopic()}/ack`, { acknowledgementToken });
     return credentials;
@@ -139,7 +225,9 @@ export class WagoRuntime {
         enrollmentSecret: this.options.enrollmentSecret,
         protocolVersion: '1.0.0',
         runtimeVersion: '0.1.0',
-        capabilities: CAPABILITIES,
+        capabilities: this.options.reconnectCredentials
+          ? CAPABILITIES
+          : CAPABILITIES.filter((value) => value !== 'credential-rotation-v1'),
         sequence,
       },
       { retain: true },
@@ -385,7 +473,9 @@ export class WagoRuntime {
           pairingCode: this.options.pairingCode,
           protocolVersion: '1.0.0',
           runtimeVersion: '0.1.0',
-          capabilities: CAPABILITIES,
+          capabilities: this.options.reconnectCredentials
+            ? CAPABILITIES
+            : CAPABILITIES.filter((value) => value !== 'credential-rotation-v1'),
         });
       } catch (error) {
         if (!ignoreStatePublicationFailure) throw error;
