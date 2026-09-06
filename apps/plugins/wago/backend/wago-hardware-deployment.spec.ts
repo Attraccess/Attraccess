@@ -1,6 +1,7 @@
 import { chmodSync, existsSync, lstatSync, mkdirSync, renameSync, rmSync, statSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fw31ShellFixture } from './fixtures/fw31-shell-fixture';
+import { fw31Model, fw31Revisions } from './fixtures/fw31-identity';
 import {
   WAGO_DIN,
   WAGO_DOUT,
@@ -57,15 +58,21 @@ describe('FW31 destructive commissioning shell (isolated vendor command fixtures
     expect(fixture.run(script).status).toBe(0);
   });
 
-  it.each(['VERSION_ID="32"', 'VERSION_ID="31"\nVERSION="30"', 'VERSION_ID="2024.12.0"'])(
-    'rejects ambiguous firmware before changing the controller: %s',
-    (version) => {
-      fixture.file('etc/os-release', 'PTXDIST_PLATFORM_NAME="cc100"\n' + version + '\n');
-      expect(prepare().stderr).toContain('unsupported-firmware');
-      expect(existsSync(join(fixture.root, journal))).toBe(false);
-      expect(existsSync(join(fixture.root, 'vendor.log'))).toBe(false);
-    },
-  );
+  it.each([
+    ['missing REVISIONS', 'etc/REVISIONS', null],
+    ['wrong REVISIONS', 'etc/REVISIONS', fw31Revisions.replace('(31)', '(32)')],
+    ['duplicate REVISIONS firmware', 'etc/REVISIONS', fw31Revisions.repeat(2)],
+    ['model mismatch', 'sys/firmware/devicetree/base/model', fw31Model.replace('751-9301', '751-9302')],
+  ] as const)('rejects invalid identity before changing the controller: %s', (_scenario, path, content) => {
+    if (content === null) rmSync(join(fixture.root, path));
+    else fixture.file(path, content);
+    expect(report().stdout).toContain('platform=unsupported-firmware');
+    const result = prepare();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('unsupported-firmware');
+    expect(existsSync(join(fixture.root, journal))).toBe(false);
+    expect(existsSync(join(fixture.root, 'vendor.log'))).toBe(false);
+  });
 
   it('always stops and permanently disables active CODESYS before granting exact UID permissions', () => {
     activePlc();

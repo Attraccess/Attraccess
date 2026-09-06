@@ -18,6 +18,7 @@ import { WagoRuntimeArtifactCatalog, WagoRuntimeArtifactsService } from '../back
 import { WagoArtifactsController } from '../backend/wago-artifacts.controller';
 import { WagoControllerApi } from '../backend/wago.controller';
 import { WagoCommissioningService } from '../backend/wago-commissioning.service';
+import { fw31IdentityOutput } from '../backend/fixtures/fw31-identity';
 import { WagoCommissioningSession } from '../backend/wago-commissioning-session.entity';
 import { WagoController } from '../backend/wago-controller.entity';
 import { WagoService } from '../backend/wago.service';
@@ -129,7 +130,7 @@ export async function commissioningFixture() {
       failManagementRecovery: true,
     };
     service['inspect'] = async () => ({
-      firmware: 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="31"',
+      firmware: fw31IdentityOutput(),
       codesys: 'inactive',
     });
     service['sudoRunScript'] = async (_host, _fingerprint, _credential, script) => {
