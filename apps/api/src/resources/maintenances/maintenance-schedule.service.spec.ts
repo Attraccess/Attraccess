@@ -4,6 +4,7 @@ import {
   Resource,
   ResourceMaintenance,
   ResourceMaintenanceSchedule,
+  ResourceMaintenanceScheduleTriggerType,
   ResourceMaintenanceScheduleTimeIntervalConfig,
   ResourceMaintenanceScheduleUsageCountConfig,
   ResourceMaintenanceScheduleUsageHoursConfig,
@@ -16,7 +17,7 @@ describe('MaintenanceScheduleService', () => {
   const schedule = {
     id: 10,
     resourceId: 1,
-    triggerType: 'usage_count',
+    triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_COUNT,
     enabled: true,
     usageCountConfig: { thresholdSessions: 12 },
   } as ResourceMaintenanceSchedule;
@@ -132,8 +133,13 @@ describe('MaintenanceScheduleService', () => {
     usageCountConfigRepository.create = jest.fn().mockReturnValue({ scheduleId: 11, thresholdSessions: 12 });
     usageCountConfigRepository.save = jest.fn().mockResolvedValue(undefined);
 
-    await service.create(1, { triggerType: 'usage_count', usageCountConfig: { thresholdSessions: 12 } }, 7);
+    await service.create(
+      1,
+      { triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_COUNT, usageCountConfig: { thresholdSessions: 12 } },
+      7,
+    );
 
+    expect(usageCountConfigRepository.save).toHaveBeenCalledWith({ scheduleId: 11, thresholdSessions: 12 });
     expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
       action: 'maintenance_schedule.created',
       actorId: 7,
