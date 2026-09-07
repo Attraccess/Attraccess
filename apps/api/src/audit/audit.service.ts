@@ -5,8 +5,9 @@ import { AuditLog } from '@attraccess/database-entities';
 import { PluginAuditEvent, PluginAuditHostProvider, PluginAuditReceipt } from '@attraccess/plugins-backend-sdk';
 import { readAuditSettings } from './audit.config';
 import { SettingsStoreService } from '../settings/settings-store.service';
-import { projectAuditEvent } from './audit-policy';
+import { projectAuditEvent, ResourceAuditEvent, projectResourceAuditEvent } from './audit-policy';
 import { AuditQueryDto } from './audit-query.dto';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class AuditService implements PluginAuditHostProvider, OnModuleInit, OnModuleDestroy {
@@ -37,7 +38,8 @@ export class AuditService implements PluginAuditHostProvider, OnModuleInit, OnMo
     });
     try {
       await storage.initialize();
-      await storage.query('PRAGMA busy_timeout = 100');
+      // Audit writes are best-effort and must yield quickly while domain transactions hold SQLite locks.
+      await storage.query('PRAGMA busy_timeout = 25');
       await storage.query('PRAGMA synchronous = FULL');
       this.storage = storage;
       await this.cleanup();
@@ -92,6 +94,36 @@ export class AuditService implements PluginAuditHostProvider, OnModuleInit, OnMo
     } catch {
       // Never log the event, SQLite parameters, or exception (may contain secrets).
       return { status: 'unavailable' };
+    }
+  }
+
+  async recordResource(event: Omit<ResourceAuditEvent, 'operationId'>): Promise<void> {
+    try {
+      const snapshot = projectResourceAuditEvent({ ...event, operationId: randomUUID() });
+      if (!snapshot || this.stopping || !this.storage?.isInitialized || this.pending >= 8) return;
+      this.pending++;
+      try {
+        const config = await readAuditSettings(this.settings);
+        if (!config.enabled || !config.domains.includes('resource') || this.stopping) return;
+        await this.storage.getRepository(AuditLog).insert({
+          at: new Date(),
+          domain: 'resource',
+          pluginId: 'core',
+          action: snapshot.action,
+          operationId: snapshot.operationId,
+          actorId: snapshot.actorId,
+          authenticationMethod: snapshot.authenticationMethod ?? 'session',
+          apiTokenId: snapshot.apiTokenId ?? null,
+          outcome: 'succeeded',
+          subjectType: 'resource',
+          subjectId: snapshot.subjectId,
+          details: snapshot.details,
+        });
+      } finally {
+        this.pending--;
+      }
+    } catch {
+      // Audit persistence must not change the outcome of resource operations.
     }
   }
 

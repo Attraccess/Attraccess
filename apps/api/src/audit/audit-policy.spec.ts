@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { PluginAuditEvent } from '@attraccess/plugins-backend-sdk';
-import { projectAuditEvent } from './audit-policy';
+import { projectAuditEvent, projectResourceAuditEvent } from './audit-policy';
 
 function event(): PluginAuditEvent & { pluginId: string } {
   return {
@@ -87,5 +87,18 @@ describe('audit storage safe snapshot', () => {
         }),
       ),
     ).toBeNull();
+  });
+
+  it('allows only the reviewed resource maintenance and supervision fields', () => {
+    const resourceEvent = {
+      action: 'maintenance_schedule.created' as const,
+      operationId: randomUUID(),
+      actorId: 42,
+      subjectId: 7,
+      details: { scheduleId: 3, enabled: 1, triggerType: 'usage_count', usageThreshold: 12 },
+    };
+    expect(projectResourceAuditEvent(resourceEvent)).toEqual(resourceEvent);
+    expect(projectResourceAuditEvent({ ...resourceEvent, details: { password: 'raw-secret' } })).toBeNull();
+    expect(projectResourceAuditEvent({ ...resourceEvent, action: 'resource.deleted' as never })).toBeNull();
   });
 });

@@ -55,7 +55,7 @@ const event = (): PluginAuditEvent & { pluginId: string } => ({
   subject: { type: 'wago.controller', id: 7 },
   details: { revision: 2 },
 });
-const config = { enabled: true, domains: ['wago'], retention_days: 90 };
+const config = { enabled: true, domains: ['resource', 'wago'], retention_days: 90 };
 
 describe('durable audit SQLite', () => {
   let directory: string;

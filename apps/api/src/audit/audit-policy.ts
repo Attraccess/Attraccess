@@ -1,5 +1,20 @@
 import { PluginAuditEvent } from '@attraccess/plugins-backend-sdk';
 
+export interface ResourceAuditEvent {
+  action:
+    | 'maintenance_schedule.created'
+    | 'maintenance_schedule.updated'
+    | 'maintenance_schedule.deleted'
+    | 'supervision.approved'
+    | 'supervision.rejected';
+  operationId: string;
+  actorId: number;
+  authenticationMethod?: 'session' | 'api-token';
+  apiTokenId?: number;
+  subjectId: number;
+  details: Record<string, string | number>;
+}
+
 const positive = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) > 0;
 const uuid = (v: unknown): v is string =>
   typeof v === 'string' && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);
@@ -134,3 +149,44 @@ export function projectAuditEvent(input: unknown): (PluginAuditEvent & { pluginI
 }
 
 export const AUDIT_ACTIONS = Object.keys(policies).map((action) => `wago.${action}`);
+
+const resourceActions = new Set<ResourceAuditEvent['action']>([
+  'maintenance_schedule.created',
+  'maintenance_schedule.updated',
+  'maintenance_schedule.deleted',
+  'supervision.approved',
+  'supervision.rejected',
+]);
+const resourceDetailFields = new Set([
+  'scheduleId',
+  'enabled',
+  'triggerType',
+  'name',
+  'usageDuration',
+  'usageUnit',
+  'usageThreshold',
+  'requesterUserId',
+  'supervisorUserId',
+  'requestId',
+]);
+
+export function projectResourceAuditEvent(input: ResourceAuditEvent): ResourceAuditEvent | null {
+  if (!resourceActions.has(input.action) || !uuid(input.operationId) || !positive(input.actorId) || !positive(input.subjectId)) {
+    return null;
+  }
+  const details = dataFields(input.details, [...resourceDetailFields]);
+  if (!details) return null;
+  for (const [key, value] of Object.entries(details)) {
+    if (!resourceDetailFields.has(key) || (typeof value !== 'string' && typeof value !== 'number')) return null;
+  }
+  if (Buffer.byteLength(JSON.stringify(details), 'utf8') > 4096) return null;
+  if (
+    (input.authenticationMethod !== undefined &&
+      input.authenticationMethod !== 'session' &&
+      input.authenticationMethod !== 'api-token') ||
+    (input.apiTokenId !== undefined && !positive(input.apiTokenId))
+  ) {
+    return null;
+  }
+  return { ...input, details: details as Record<string, string | number> };
+}

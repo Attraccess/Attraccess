@@ -13,6 +13,7 @@ import { ResourceUsageService } from '../usage/resourceUsage.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto';
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
+import { AuditService } from '../../audit/audit.service';
 // Lets pending request promises settle/flush without depending on real timers.
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
@@ -25,6 +26,7 @@ describe('SupervisionService', () => {
   };
   let introducers: { getMany: jest.Mock };
   let live: { emitToSupervisor: jest.Mock; getSupervisorSubject: jest.Mock };
+  let audit: { recordResource: jest.Mock };
   const requester: User = { id: 1, username: 'requester' } as User;
   const supervisor: User = { id: 2, username: 'supervisor' } as User;
   const dto: RequestSupervisedSessionDto = { supervisorUserId: 2, notes: 'please supervise' };
@@ -43,6 +45,7 @@ describe('SupervisionService', () => {
       emitToSupervisor: jest.fn(),
       getSupervisorSubject: jest.fn(),
     };
+    audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -50,6 +53,7 @@ describe('SupervisionService', () => {
         { provide: ResourceUsageService, useValue: resourceUsageService },
         { provide: ResourceIntroducersService, useValue: introducers },
         { provide: SupervisionLiveService, useValue: live },
+        { provide: AuditService, useValue: audit },
       ],
     }).compile();
 
@@ -107,6 +111,12 @@ describe('SupervisionService', () => {
     expect(
       live.emitToSupervisor.mock.calls.some((c) => c[1].type === SupervisionLiveEventType.RESOLVED),
     ).toBe(true);
+    expect(audit.recordResource).toHaveBeenCalledWith({
+      action: 'supervision.approved',
+      actorId: 2,
+      subjectId: 5,
+      details: expect.objectContaining({ requesterUserId: 1, supervisorUserId: 2 }),
+    });
   });
 
   it('rejects the requester when the supervisor rejects the request', async () => {
@@ -120,6 +130,12 @@ describe('SupervisionService', () => {
     expect(
       live.emitToSupervisor.mock.calls.some((c) => c[1].type === SupervisionLiveEventType.REJECTED),
     ).toBe(true);
+    expect(audit.recordResource).toHaveBeenCalledWith({
+      action: 'supervision.rejected',
+      actorId: 2,
+      subjectId: 5,
+      details: expect.objectContaining({ requesterUserId: 1, supervisorUserId: 2 }),
+    });
   });
 
   it('expires the request after 30s and times out the requester', async () => {
