@@ -54,4 +54,4 @@ target_compile_definitions(${COMPONENT_LIB} PUBLIC
 # -Wdeprecated-enum-enum-conversion in C++ only (LVGL core is C, so it is
 # unaffected). Suppress for the app like IDF does for the sibling warning
 # (-Wno-enum-conversion in tools/cmake/build.cmake:193).
-target_compile_options(${COMPONENT_LIB} PRIVATE "-Wno-deprecated-enum-enum-conversion")
+target_compile_options(${COMPONENT_LIB} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-enum-enum-conversion>")

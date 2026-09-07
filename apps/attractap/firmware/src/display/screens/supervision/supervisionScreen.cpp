@@ -1,4 +1,5 @@
 #include "supervisionScreen.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 
@@ -67,7 +68,7 @@ void SupervisionScreen::init()
    lv_label_set_text(this->requesterNameLabel, initialName);
    lv_obj_set_style_text_align(this->requesterNameLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->requesterNameLabel, lv_color_hex(SUPERVISION_COLOR_TEXT), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->requesterNameLabel, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->requesterNameLabel, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Status line — colour + text reflect the current supervision phase.
    this->statusLabel = lv_label_create(this->screen);

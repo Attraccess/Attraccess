@@ -65,6 +65,19 @@ run (it downloads Mozilla's CA bundle, cached for 7 days). Run it once before
 - **OTA:** upload `firmware_output` via the Attraccess server; updates stream to
   the readers over the websocket.
 
+## Latin-1 Font Smoke Test
+
+The generated Montserrat assets in `src/display/fonts/` cover ASCII and Latin-1
+for dynamic-text sizes 10, 14, 18, 24, and 36. Regenerate them after changing
+the font source or coverage with `tools/generate_latin1_fonts.sh`.
+
+On a touch device, verify `ÄÖÜ äöü ß | München, Größe, für` in a resource name
+and description, a form label and description, a select option, and the
+resource details screen. Also verify a signed-in username at 10px and an
+enrollment, reset, or supervision username at 36px. Confirm every character
+renders without a missing-glyph box and that the existing text hierarchy remains
+unchanged.
+
 ## Serial provisioning console
 
 The firmware speaks a line protocol on the USB console (115200 8N1):

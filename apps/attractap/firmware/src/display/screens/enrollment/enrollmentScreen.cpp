@@ -1,4 +1,5 @@
 #include "enrollmentScreen.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 
@@ -70,7 +71,7 @@ void EnrollmentScreen::init()
    lv_label_set_text(this->userNameLabel, initialName);
    lv_obj_set_style_text_align(this->userNameLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->userNameLabel, lv_color_hex(ENROLL_COLOR_TEXT), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->userNameLabel, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->userNameLabel, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Status line — colour + text reflect the current enrollment phase.
    this->statusLabel = lv_label_create(this->screen);

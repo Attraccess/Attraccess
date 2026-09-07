@@ -1,4 +1,5 @@
 #include "resourceDetailsScreen.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 #include <lvgl.h>
@@ -71,7 +72,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_height(this->loginUserLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->loginUserLabel, LV_ALIGN_CENTER);
    lv_label_set_text(this->loginUserLabel, this->loginUsernameCache.c_str());
-   lv_obj_set_style_text_font(this->loginUserLabel, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->loginUserLabel, &attractap_font_montserrat_latin1_10, LV_PART_MAIN | LV_STATE_DEFAULT);
    // Ensure the username is visible on the background image
    lv_obj_set_style_text_color(this->loginUserLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(this->loginUserLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -118,7 +119,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_height(this->resourceName, LV_SIZE_CONTENT);
    lv_obj_set_align(this->resourceName, LV_ALIGN_CENTER);
    lv_obj_remove_flag(this->resourceName, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_text_font(this->resourceName, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->resourceName, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->resourceName, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->resourceDescription = lv_label_create(resouceDetails);
@@ -128,6 +129,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(this->resourceDescription, LV_ALIGN_CENTER);
    lv_obj_remove_flag(this->resourceDescription, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_style_text_color(this->resourceDescription, lv_color_hex(0xE5E5E5), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->resourceDescription, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->sessionDetailsContainer = lv_obj_create(this->screen);
    lv_obj_remove_style_all(this->sessionDetailsContainer);
@@ -194,7 +196,7 @@ void ResourceDetailsScreen::init()
    lv_label_set_long_mode(this->currentUser, LV_LABEL_LONG_SCROLL_CIRCULAR);
    lv_obj_set_style_text_align(this->currentUser, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_label_set_text(this->currentUser, "JappyJan");
-   lv_obj_set_style_text_font(this->currentUser, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->currentUser, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->currentUser, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *elapsedTimeContainer = lv_obj_create(this->sessionDetailsContainer);
@@ -256,10 +258,11 @@ void ResourceDetailsScreen::init()
    lv_obj_set_style_bg_opa(this->projectsButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_event_cb(this->projectsButton, &ResourceDetailsScreen::onProjectsButtonClick, LV_EVENT_CLICKED, this);
 
-   this->projectsButtonLabel = lv_label_create(this->projectsButton);
-   lv_label_set_text(this->projectsButtonLabel, "Projekt waehlen");
-   lv_obj_set_align(this->projectsButtonLabel, LV_ALIGN_CENTER);
-   lv_obj_set_style_text_align(this->projectsButtonLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    this->projectsButtonLabel = lv_label_create(this->projectsButton);
+    lv_label_set_text(this->projectsButtonLabel, "Projekt waehlen");
+    lv_obj_set_align(this->projectsButtonLabel, LV_ALIGN_CENTER);
+    lv_obj_set_style_text_align(this->projectsButtonLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->projectsButtonLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->clearProjectButton = lv_button_create(this->projectSelectionRow);
    lv_obj_set_height(this->clearProjectButton, 50);
@@ -410,8 +413,9 @@ void ResourceDetailsScreen::init()
    this->introducersListLabel = lv_label_create(this->noIntroductionPanel);
    lv_obj_set_width(this->introducersListLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(this->introducersListLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->introducersListLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->introducersListLabel, "???");
+    lv_obj_set_align(this->introducersListLabel, LV_ALIGN_CENTER);
+    lv_label_set_text(this->introducersListLabel, "???");
+    lv_obj_set_style_text_font(this->introducersListLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->maintenancePanel = lv_obj_create(this->screen);
    lv_obj_set_width(this->maintenancePanel, lv_pct(100));
@@ -435,8 +439,9 @@ void ResourceDetailsScreen::init()
    this->maintenanceIntroducersLabel = lv_label_create(this->maintenancePanel);
    lv_obj_set_width(this->maintenanceIntroducersLabel, LV_SIZE_CONTENT);
    lv_obj_set_height(this->maintenanceIntroducersLabel, LV_SIZE_CONTENT);
-   lv_obj_set_align(this->maintenanceIntroducersLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->maintenanceIntroducersLabel, "???");
+    lv_obj_set_align(this->maintenanceIntroducersLabel, LV_ALIGN_CENTER);
+    lv_label_set_text(this->maintenanceIntroducersLabel, "???");
+    lv_obj_set_style_text_font(this->maintenanceIntroducersLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->healthPanel = lv_obj_create(this->screen);
    lv_obj_set_width(this->healthPanel, lv_pct(100));
@@ -463,8 +468,9 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(this->healthReasonLabel, LV_ALIGN_CENTER);
    lv_label_set_long_mode(this->healthReasonLabel, LV_LABEL_LONG_WRAP);
    lv_label_set_text(this->healthReasonLabel, "");
-   lv_obj_set_style_text_color(this->healthReasonLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_opa(this->healthReasonLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->healthReasonLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(this->healthReasonLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->healthReasonLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->applyCachedState();
 }
@@ -561,8 +567,9 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
       lv_obj_t *labelForFlowButton = lv_label_create(flowButton);
       lv_obj_set_width(labelForFlowButton, LV_SIZE_CONTENT);
       lv_obj_set_height(labelForFlowButton, LV_SIZE_CONTENT);
-      lv_obj_set_align(labelForFlowButton, LV_ALIGN_CENTER);
-      lv_label_set_text(labelForFlowButton, fb.label);
+       lv_obj_set_align(labelForFlowButton, LV_ALIGN_CENTER);
+       lv_label_set_text(labelForFlowButton, fb.label);
+       lv_obj_set_style_text_font(labelForFlowButton, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 
    this->updateElapsedTimeDisplay();

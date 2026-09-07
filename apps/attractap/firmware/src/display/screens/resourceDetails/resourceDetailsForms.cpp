@@ -1,4 +1,5 @@
 #include "resourceDetailsScreen.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 #include <lvgl.h>
@@ -257,14 +258,14 @@ void ResourceDetailsScreen::ensureFormsModal()
    this->formsBreadcrumbLabel = lv_label_create(content);
    lv_label_set_text(this->formsBreadcrumbLabel, "");
    lv_obj_set_style_text_color(this->formsBreadcrumbLabel, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->formsBreadcrumbLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->formsBreadcrumbLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_width(this->formsBreadcrumbLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_label_set_long_mode(this->formsBreadcrumbLabel, LV_LABEL_LONG_WRAP);
 
    this->formsModalErrorLabel = lv_label_create(content);
    lv_label_set_text(this->formsModalErrorLabel, "");
    lv_obj_set_style_text_color(this->formsModalErrorLabel, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->formsModalErrorLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->formsModalErrorLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *list = lv_obj_create(content);
    this->formsModalList = list;
@@ -357,7 +358,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_flex_grow(this->formsEditorTitleLabel, 1);
    lv_label_set_long_mode(this->formsEditorTitleLabel, LV_LABEL_LONG_DOT);
    lv_obj_set_style_text_color(this->formsEditorTitleLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->formsEditorTitleLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->formsEditorTitleLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *editorCancelBtn = lv_button_create(editorHeader);
    lv_obj_remove_style_all(editorCancelBtn);
@@ -378,6 +379,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_flex_grow(editorTa, 1);
    lv_obj_set_style_bg_color(editorTa, lv_color_hex(0x374151), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(editorTa, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(editorTa, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Spacer keeps the keyboard pinned to the bottom when the textarea is
    // one-line (multiline textareas grow instead, see openFormsEditor).
@@ -552,7 +554,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
          }
          lv_obj_t *fieldLabel = lv_label_create(fieldContainer);
          lv_label_set_text(fieldLabel, fieldTitle.c_str());
-         lv_obj_set_style_text_font(fieldLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
+         lv_obj_set_style_text_font(fieldLabel, &attractap_font_montserrat_latin1_24, LV_PART_MAIN | LV_STATE_DEFAULT);
          lv_obj_set_style_text_color(fieldLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
          lv_obj_set_style_width(fieldLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
          lv_label_set_long_mode(fieldLabel, LV_LABEL_LONG_WRAP);
@@ -562,7 +564,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
             lv_obj_t *desc = lv_label_create(fieldContainer);
             lv_label_set_text(desc, field.description.c_str());
             lv_obj_set_style_text_color(desc, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_text_font(desc, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_font(desc, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_width(desc, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_label_set_long_mode(desc, LV_LABEL_LONG_WRAP);
          }
@@ -614,7 +616,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
                lv_obj_t *info = lv_label_create(selectContainer);
                lv_label_set_text(info, SELECT_FIELD_NO_OPTIONS);
                lv_obj_set_style_text_color(info, lv_color_hex(0xF5A524), LV_PART_MAIN | LV_STATE_DEFAULT);
-               lv_obj_set_style_text_font(info, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+               lv_obj_set_style_text_font(info, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
                lv_obj_set_style_width(info, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
                lv_label_set_long_mode(info, LV_LABEL_LONG_WRAP);
             }
@@ -636,6 +638,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
                   lv_label_set_text(optLabel, field.options.select.values[optIndex].c_str());
                   lv_label_set_long_mode(optLabel, LV_LABEL_LONG_WRAP);
                   lv_obj_set_style_text_color(optLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+                  lv_obj_set_style_text_font(optLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
                   if (widget.selectOptionEventCount >= API::MAX_SELECT_OPTIONS)
                   {
@@ -692,6 +695,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
             lv_obj_t *valueLabel = lv_label_create(preview);
             widget.previewLabel = valueLabel;
             lv_obj_set_flex_grow(valueLabel, 1);
+            lv_obj_set_style_text_font(valueLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
             // Multiline: wrap and clip at the fixed preview height. Single line: ellipsis.
             lv_label_set_long_mode(valueLabel, multiline ? LV_LABEL_LONG_WRAP : LV_LABEL_LONG_DOT);
 
@@ -706,7 +710,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
          widget.errorLabel = lv_label_create(fieldContainer);
          lv_label_set_text(widget.errorLabel, "");
          lv_obj_set_style_text_color(widget.errorLabel, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
-         lv_obj_set_style_text_font(widget.errorLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+         lv_obj_set_style_text_font(widget.errorLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
       }
    }
 

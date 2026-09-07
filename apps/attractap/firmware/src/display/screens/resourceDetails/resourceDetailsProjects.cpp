@@ -1,4 +1,5 @@
 #include "resourceDetailsScreen.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 #include <lvgl.h>
@@ -171,6 +172,7 @@ void ResourceDetailsScreen::refreshProjectsButtonLabel()
    }
 
    lv_label_set_text(this->projectsButtonLabel, label.c_str());
+   lv_obj_set_style_text_font(this->projectsButtonLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 void ResourceDetailsScreen::updateClearProjectButtonState()
 {
@@ -248,7 +250,7 @@ void ResourceDetailsScreen::ensureProjectsModal()
 
    lv_obj_t *title = lv_label_create(header);
    lv_label_set_text(title, "Projekt auswaehlen");
-   lv_obj_set_style_text_font(title, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(title, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(title, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *closeButton = lv_button_create(header);
@@ -401,6 +403,7 @@ void ResourceDetailsScreen::rebuildProjectsList()
          lv_label_set_text(label, "Unbenanntes Projekt");
       }
       lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_set_style_text_font(label, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 
    this->updateProjectsPaginationControls();
