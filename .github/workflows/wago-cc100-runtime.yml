@@ -43,6 +43,11 @@ jobs:
             if [[ "$logs" == *"WAGO CC100 simulator enrollment connected"* ]]; then
               break
             fi
+            if [[ -n "$(docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml ps --status exited --quiet)" ]]; then
+              docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml logs cc100-simulator
+              echo "Simulator exited before becoming ready"
+              exit 1
+            fi
             if [[ "$attempt" -eq 30 ]]; then
               docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml logs cc100-simulator
               echo "Simulator did not become ready within 150 seconds"
