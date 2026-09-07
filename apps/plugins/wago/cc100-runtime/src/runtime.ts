@@ -390,7 +390,12 @@ export class WagoRuntime {
     return ++this.sequence;
   }
   private saveState(state: RuntimeState = this.state): Promise<void> {
-    return this.queueStateSave(() => this.options.store.save(state));
+    return this.queueStateSave(() => {
+      const persistedState = { ...state };
+      if (this.reservedSequence > 0 || persistedState.sequence !== undefined)
+        persistedState.sequence = this.reservedSequence;
+      return this.options.store.save(persistedState);
+    });
   }
   private queueStateSave(save: () => Promise<void>): Promise<void> {
     const queued = this.statePersistence.then(save);
