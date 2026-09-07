@@ -1252,7 +1252,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     fingerprint: string,
     credential: TemporarySshCredential,
   ): Promise<{ firmware: string; codesys: string }> {
-    const output = await this.run(
+    const output = await this.sudoRunScript(
       host,
       fingerprint,
       credential,
