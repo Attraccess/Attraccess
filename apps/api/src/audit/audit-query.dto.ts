@@ -19,7 +19,7 @@ export class AuditQueryDto {
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  @Matches(/^(?:resource|wago)(?:\.[a-z_]+)*\.?$/)
+  @Matches(/^(?:maintenance_schedule|supervision|wago)(?:\.[a-z_]+)*\.?$/)
   eventPrefix?: string;
 
   @ApiPropertyOptional({ description: 'Inclusive event timestamp lower bound' })

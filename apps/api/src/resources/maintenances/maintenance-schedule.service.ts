@@ -141,6 +141,7 @@ export class MaintenanceScheduleService {
     apiTokenId?: number,
   ): Promise<void> {
     const schedule = await this.getOne(resourceId, scheduleId);
+    const details = this.scheduleDetails(schedule);
     await this.scheduleRepository.manager.transaction(async (manager) => {
       await manager.getRepository(ResourceMaintenance).update(
         { maintenanceSchedule: { id: scheduleId } },
@@ -157,7 +158,7 @@ export class MaintenanceScheduleService {
       authenticationMethod,
       apiTokenId,
       subjectId: resourceId,
-      details: this.scheduleDetails(schedule),
+      details,
     });
   }
 

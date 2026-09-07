@@ -82,8 +82,13 @@ describe('MaintenanceScheduleService', () => {
   });
 
   it('detaches generated maintenances before deleting a schedule', async () => {
-    const transactionalScheduleRepository = { remove: jest.fn() };
-    scheduleRepository.findOne.mockResolvedValue(schedule);
+    const scheduleToDelete = { ...schedule } as ResourceMaintenanceSchedule;
+    const transactionalScheduleRepository = {
+      remove: jest.fn().mockImplementation((entity: ResourceMaintenanceSchedule) => {
+        delete entity.id;
+      }),
+    };
+    scheduleRepository.findOne.mockResolvedValue(scheduleToDelete);
     scheduleRepository.manager.transaction.mockImplementation(
       async (callback: (manager: { getRepository: (entity: unknown) => unknown }) => Promise<void>) =>
         callback({
@@ -100,16 +105,16 @@ describe('MaintenanceScheduleService', () => {
         }),
     );
 
-    await service.delete(schedule.resourceId, schedule.id, 7);
+    await service.delete(scheduleToDelete.resourceId, 10, 7);
 
     expect(maintenanceRepository.update).toHaveBeenCalledWith(
-      { maintenanceSchedule: { id: schedule.id } },
+      { maintenanceSchedule: { id: 10 } },
       { maintenanceSchedule: null },
     );
-    expect(usageHoursConfigRepository.delete).toHaveBeenCalledWith({ scheduleId: schedule.id });
-    expect(usageCountConfigRepository.delete).toHaveBeenCalledWith({ scheduleId: schedule.id });
-    expect(timeIntervalConfigRepository.delete).toHaveBeenCalledWith({ scheduleId: schedule.id });
-    expect(transactionalScheduleRepository.remove).toHaveBeenCalledWith(schedule);
+    expect(usageHoursConfigRepository.delete).toHaveBeenCalledWith({ scheduleId: 10 });
+    expect(usageCountConfigRepository.delete).toHaveBeenCalledWith({ scheduleId: 10 });
+    expect(timeIntervalConfigRepository.delete).toHaveBeenCalledWith({ scheduleId: 10 });
+    expect(transactionalScheduleRepository.remove).toHaveBeenCalledWith(scheduleToDelete);
     expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
       action: 'maintenance_schedule.deleted',
       actorId: 7,

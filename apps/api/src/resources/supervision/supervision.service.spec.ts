@@ -102,7 +102,7 @@ describe('SupervisionService', () => {
   it('starts the session on approval and resolves the requester', async () => {
     const { pending, requestId } = await createRequest();
 
-    const approved = await service.approve(requestId, supervisor);
+    const approved = await service.approve(requestId, supervisor, 'api-token', 9);
 
     expect(resourceUsageService.startSession).toHaveBeenCalledWith(5, requester, dto, { supervisorUserId: 2 });
     expect(approved).toBe(startedSession);
@@ -114,6 +114,8 @@ describe('SupervisionService', () => {
     expect(audit.recordResource).toHaveBeenCalledWith({
       action: 'supervision.approved',
       actorId: 2,
+      authenticationMethod: 'api-token',
+      apiTokenId: 9,
       subjectId: 5,
       details: expect.objectContaining({ requesterUserId: 1, supervisorUserId: 2 }),
     });
@@ -122,7 +124,7 @@ describe('SupervisionService', () => {
   it('rejects the requester when the supervisor rejects the request', async () => {
     const { pending, requestId } = await createRequest();
 
-    const result = service.reject(requestId, supervisor);
+    const result = service.reject(requestId, supervisor, 'api-token', 9);
 
     expect(result).toEqual({ status: 'rejected', requestId });
     await expect(pending).rejects.toBeInstanceOf(ForbiddenException);
@@ -133,6 +135,8 @@ describe('SupervisionService', () => {
     expect(audit.recordResource).toHaveBeenCalledWith({
       action: 'supervision.rejected',
       actorId: 2,
+      authenticationMethod: 'api-token',
+      apiTokenId: 9,
       subjectId: 5,
       details: expect.objectContaining({ requesterUserId: 1, supervisorUserId: 2 }),
     });
