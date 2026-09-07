@@ -415,17 +415,26 @@ export class WagoRuntime {
     this.measurementsPending = true;
     try {
       for await (const reading of acquireMeasurements(accepted.snapshot, this.options.device)) {
+        let counterPersistenceError: unknown;
         if (reading.ok) {
           const counters = this.options.device.cumulativeCounters?.();
           if (counters && JSON.stringify(counters) !== JSON.stringify(this.state.cumulativeCounters ?? {})) {
+            const previousCounters = this.state.cumulativeCounters;
             this.state.cumulativeCounters = counters;
-            await this.saveState();
+            try {
+              await this.saveState();
+            } catch (error) {
+              // Keep the last durable counters so a later reading can retry this checkpoint.
+              this.state.cumulativeCounters = previousCounters;
+              counterPersistenceError = error;
+            }
           }
         }
         for (const channel of reading.channels) {
           if (accepted !== this.state.accepted || this.configurationPending) return;
           try {
             if (reading.ok === false) throw reading.error;
+            if (counterPersistenceError !== undefined) throw counterPersistenceError;
             const { raw, timestamp } = reading;
             const transform = channel.measurement ?? { unit: 'percent', scale: 1, offset: 0 };
             const measurement = encodeMeasurement(channel.id, raw, transform);

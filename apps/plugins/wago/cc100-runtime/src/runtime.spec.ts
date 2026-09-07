@@ -1418,6 +1418,46 @@ describe('WagoRuntime', () => {
     expect(save).toHaveBeenCalledTimes(1);
   });
 
+  it('reports counter persistence failures and continues later measurement readings', async () => {
+    const metered: Snapshot = {
+      version: 1,
+      physicalPoints: [
+        { id: 'first-meter', hardwareProfile: '751-9301', channel: 0 },
+        { id: 'second-meter', hardwareProfile: '751-9301', channel: 1 },
+      ],
+      logicalChannels: [
+        { id: 'first', physicalPointId: 'first-meter', profile: 'meter', capabilities: ['measurement'] },
+        { id: 'second', physicalPointId: 'second-meter', profile: 'meter', capabilities: ['measurement'] },
+      ].map((channel) => ({
+        ...channel,
+        disconnectPolicy: { mode: 'hold' as const },
+        measurement: { unit: 'watt', scale: 1, offset: 0 },
+      })),
+    };
+    Object.assign(device, { cumulativeCounters: () => ({ meter: { previous: 1, total: 1 } }) });
+    device.values.set('751-9301:0', 1);
+    device.values.set('751-9301:1', 2);
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(metered), snapshot: metered });
+    jest
+      .spyOn(runtime as unknown as { saveState: () => Promise<void> }, 'saveState')
+      .mockRejectedValueOnce(new Error('disk full'));
+
+    await expect(runtime.publishMeasurements()).resolves.toBeUndefined();
+
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+        payload: expect.objectContaining({ channelId: 'first', code: 'measurement_read_failed', message: 'disk full' }),
+      }),
+    );
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        topic: 'attraccess/wago/v1/controllers/cc100-1/measurements',
+        payload: expect.objectContaining({ channelId: 'second', value: 2000 }),
+      }),
+    );
+  });
+
   it('rejects large fractional measurements', async () => {
     const metered: Snapshot = {
       version: 1,
