@@ -104,7 +104,7 @@ describe('WagoCommissioningService', () => {
     await expect(service.deliver(1, { confirmInstall: true })).rejects.toThrow('explicit valid SSH');
   });
 
-  it('rolls back an interrupted claim before making its session retryable', async () => {
+  it('does not complete an interrupted claim from the pre-delivery claimed marker', async () => {
     const { service, session, repository, wago, inspect } = securityHarness({
       state: 'awaiting_claim',
       enrollmentId: 7,
@@ -116,6 +116,7 @@ describe('WagoCommissioningService', () => {
     expect(session).toMatchObject({
       state: 'delivery_failed',
       enrollmentId: null,
+      pairingCode: 'encrypted:v1:opaque-ciphertext',
       failureReason: 'Commissioning was interrupted.',
       progressStep: 'Delivery interrupted',
     });
@@ -125,6 +126,7 @@ describe('WagoCommissioningService', () => {
     expect(wago.rollbackInterruptedClaim.mock.invocationCallOrder[0]).toBeLessThan(
       wago.revokeEnrollmentById.mock.invocationCallOrder[0],
     );
+    expect(session.auditLog).not.toContain('interrupted_claim_reconciled');
     expect(inspect).not.toHaveBeenCalled();
   });
 
