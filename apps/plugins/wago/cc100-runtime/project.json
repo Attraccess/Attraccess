@@ -20,6 +20,21 @@
         "esbuildOptions": { "target": "node24" }
       }
     },
+    "build-simulator": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-simulator"],
+      "options": {
+        "main": "apps/plugins/wago/cc100-runtime/src/simulator.ts",
+        "tsConfig": "apps/plugins/wago/cc100-runtime/tsconfig.json",
+        "outputPath": "dist/apps/wago-cc100-simulator",
+        "platform": "node",
+        "format": ["cjs"],
+        "bundle": true,
+        "thirdParty": true,
+        "generatePackageJson": true,
+        "esbuildOptions": { "target": "node24" }
+      }
+    },
     "test": {
       "executor": "@nx/jest:jest",
       "options": { "jestConfig": "apps/plugins/wago/cc100-runtime/jest.config.ts" }

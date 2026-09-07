@@ -51,6 +51,8 @@ export class WagoRuntime {
       store: StateStore;
       transport: Transport;
       device: DeviceAdapter;
+      capabilities?: string[];
+      configurationError?: () => ValidationError | undefined;
     },
   ) {
     this.outputs = new OutputController({
@@ -114,7 +116,7 @@ export class WagoRuntime {
         enrollmentSecret: this.options.enrollmentSecret,
         protocolVersion: '1.0.0',
         runtimeVersion: '0.1.0',
-        capabilities: CAPABILITIES,
+        capabilities: this.options.capabilities ?? CAPABILITIES,
         sequence,
       },
       { retain: true },
@@ -135,6 +137,8 @@ export class WagoRuntime {
     }
     await this.runConfigurationUpdate(async () => {
       const errors = validateDesired(desired);
+      const configurationError = this.options.configurationError?.();
+      if (configurationError) errors.push(configurationError);
       if (!errors.length && desired.contentHash !== hash(desired.snapshot))
         errors.push({ path: 'contentHash', code: 'hash_mismatch', message: 'content hash does not match snapshot' });
       if (errors.length) return this.reportRejected(desired.revision, desired.contentHash, errors);
@@ -281,7 +285,7 @@ export class WagoRuntime {
       pairingCode: this.options.pairingCode,
       protocolVersion: '1.0.0',
       runtimeVersion: '0.1.0',
-      capabilities: CAPABILITIES,
+      capabilities: this.options.capabilities ?? CAPABILITIES,
       sequence: Date.now(),
     });
   }
@@ -368,7 +372,7 @@ export class WagoRuntime {
     return `${this.options.prefix.replace(/^\/+|\/+$/g, '')}/v1/controllers/${this.options.hardwareId}/${suffix}`;
   }
   private discoveryTopic(): string {
-    return `${this.options.prefix.replace(/^\/+|\/+$/g, '')}/discovery/${this.options.hardwareId}`;
+    return `attraccess/wago/discovery/${this.options.hardwareId}`;
   }
   private desiredTopic(): string {
     return this.topic('configuration/desired');
