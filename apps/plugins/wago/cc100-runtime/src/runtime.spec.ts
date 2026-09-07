@@ -334,6 +334,48 @@ describe('WagoRuntime', () => {
     );
   });
 
+  it('rejects configuration when instructed by a simulator scenario', async () => {
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+      transport,
+      device,
+      configurationError: () => ({ path: '$', code: 'simulated_rejection', message: 'configuration rejected by simulator scenario' }),
+    });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/configuration/reported',
+      payload: expect.objectContaining({ errors: [{ path: '$', code: 'simulated_rejection', message: 'configuration rejected by simulator scenario' }] }),
+    }));
+  });
+
+  it('publishes configured runtime capabilities', async () => {
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+      transport,
+      device,
+      capabilities: ['claim'],
+    });
+    await runtime.start();
+    await runtime.publishDiscoveryAnnouncement();
+
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/v1/controllers/cc100-1/heartbeat',
+      payload: expect.objectContaining({ capabilities: ['claim'] }),
+    }));
+    expect(transport.published).toContainEqual(expect.objectContaining({
+      topic: 'attraccess/wago/discovery/cc100-1',
+      payload: expect.objectContaining({ capabilities: ['claim'] }),
+    }));
+  });
+
   it('reports malformed snapshot capabilities instead of throwing', async () => {
     const malformed = {
       ...snapshot,

@@ -9,6 +9,7 @@ const mqttUrl = required('WAGO_MQTT_URL');
 const prefix = process.env.WAGO_MQTT_PREFIX ?? 'attraccess/wago';
 const statePath = process.env.WAGO_STATE_PATH ?? '/var/lib/attraccess-wago/state.json';
 const scenario = process.env.WAGO_SCENARIO ?? 'normal';
+const capabilities = parseCapabilities(process.env.WAGO_CAPABILITIES);
 const store = new JsonStateStore(statePath);
 const measurementStep = Number(process.env.WAGO_MEASUREMENT_STEP ?? '0');
 if (!Number.isFinite(measurementStep)) throw new Error('WAGO_MEASUREMENT_STEP must be a finite number');
@@ -59,11 +60,14 @@ function connectOperational(state: RuntimeState): void {
   operationalClient.on('error', logConnectionError);
   device.restore(state.accepted?.snapshot, state.outputs);
   const operationalRuntime = runtime(operationalClient, state.credentials.prefix);
+  let initialized = false;
   operationalClient.once(
     'connect',
     () =>
       void handleAsync(async () => {
         await operationalRuntime.start();
+        initialized = true;
+        await operationalRuntime.setConnected(true);
         process.stdout.write(`WAGO CC100 simulator connected as ${hardwareId}\n`);
         if (scenario !== 'stale-heartbeat' && scenario !== 'offline')
           timers = [
@@ -73,8 +77,12 @@ function connectOperational(state: RuntimeState): void {
         if (scenario === 'offline') operationalClient.end();
       }),
   );
-  operationalClient.on('close', () => void handleAsync(() => operationalRuntime.setConnected(false)));
-  operationalClient.on('connect', () => void handleAsync(() => operationalRuntime.setConnected(true)));
+  operationalClient.on('close', () => {
+    if (initialized) void handleAsync(() => operationalRuntime.setConnected(false));
+  });
+  operationalClient.on('connect', () => {
+    if (initialized) void handleAsync(() => operationalRuntime.setConnected(true));
+  });
 }
 
 function runtime(mqtt: MqttClient, operationalPrefix?: string): WagoRuntime {
@@ -86,6 +94,11 @@ function runtime(mqtt: MqttClient, operationalPrefix?: string): WagoRuntime {
     store,
     transport: transport(mqtt),
     device,
+    capabilities,
+    configurationError: () =>
+      scenario === 'reject-configuration'
+        ? { path: '$', code: 'simulated_rejection', message: 'configuration rejected by simulator scenario' }
+        : undefined,
   });
 }
 
@@ -109,6 +122,13 @@ function parseValues(value: string | undefined): Record<string, boolean | number
   )
     throw new Error('WAGO_INITIAL_VALUES must be a JSON object with boolean or numeric values');
   return parsed as Record<string, boolean | number>;
+}
+function parseCapabilities(value: string | undefined): string[] {
+  if (!value) return ['claim', 'heartbeat', 'configuration-v1', 'commands', 'state', 'measurement', 'fault', 'acknowledgement'];
+  const parsed = JSON.parse(value);
+  if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== 'string' || !item.trim()))
+    throw new Error('WAGO_CAPABILITIES must be a JSON array of non-empty strings');
+  return parsed;
 }
 function required(name: string): string {
   const value = process.env[name];

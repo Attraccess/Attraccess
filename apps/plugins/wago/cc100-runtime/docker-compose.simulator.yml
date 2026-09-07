@@ -6,8 +6,8 @@ services:
       RABBITMQ_DEFAULT_USER: attraccess
       RABBITMQ_DEFAULT_PASS: password
     ports:
-      - '1883:1883'
-      - '15672:15672'
+      - '127.0.0.1:1883:1883'
+      - '127.0.0.1:15672:15672'
     healthcheck:
       test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
       interval: 5s
