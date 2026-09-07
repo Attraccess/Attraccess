@@ -46,11 +46,6 @@ describe('destructive runtime shell transaction and signed offline stream fixtur
   };
   beforeEach(() => {
     fixture = fw31ShellFixture();
-    fixture.file(
-      'bin/df',
-      '#!/bin/sh\nprintf "Filesystem 1024-blocks Used Available Capacity Mounted on\\nfixture 999999 0 999999 0%% /\\n"\n',
-      0o700,
-    );
     fixture.file(config + '/runtime.env.next', 'NEW=enrollment');
     fixture.file('bundle/image-reference', image + '\n');
     fixture.file('bundle/image.tar', 'fixture image bytes');
@@ -332,13 +327,10 @@ process.exit(result.status ?? 1);
     });
     const completion = new Promise<number | null>((resolve) => child.on('close', resolve));
     try {
-      // Wait for the actual receiving boundary, not a six-second assumption
-      // about the full metadata preflight on a contended test runner.
-      const receivingDeadline = Date.now() + 60_000;
-      while (
-        Date.now() < receivingDeadline &&
-        !existsSync(join(fixture.root, config, 'delivery/token')) &&
-        child.exitCode === null
+      for (
+        let attempt = 0;
+        attempt < 1500 && !existsSync(join(fixture.root, config, 'delivery/token')) && child.exitCode === null;
+        attempt++
       )
         await new Promise((resolve) => setTimeout(resolve, 20));
       if (!existsSync(join(fixture.root, config, 'delivery/token')))
@@ -351,7 +343,7 @@ process.exit(result.status ?? 1);
       if (child.exitCode === null) child.kill('SIGKILL');
       await completion;
     }
-  }, 90000);
+  }, 35000);
 
   it('receiver rejects invalid script encoding and cleans its private directory', () => {
     const r = fixture.run(runtimeBundleStreamReceiver, '', Buffer.from('not-base64!\n'));

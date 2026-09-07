@@ -28,6 +28,7 @@ import { RefundTransactionDto } from './dto/refund-transaction.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceBillingConfigurationChangedEvent } from './events/resource-billing-configuration-changed.event';
 import { MetricsService } from '../metrics/metrics.service';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class BillingService {
@@ -48,6 +49,7 @@ export class BillingService {
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
     private readonly metricsService: MetricsService,
+    private readonly auditService: AuditService,
   ) {}
 
   async setConfiguration(nextConfigurationData: SetBillingConfigurationDto): Promise<BillingConfigurationDto> {
@@ -175,6 +177,14 @@ export class BillingService {
     });
 
     this.liveNotificationsService.notifyTransactionUpdate(transaction);
+    void this.auditService.recordBillingTransaction({
+      transactionId: transaction.id,
+      userId,
+      initiatorId,
+      amount,
+      status: BillingTransactionStatus.Completed,
+      source: 'manual',
+    });
     this.metricsService.billingTransactionsTotal.inc({ status: transaction.status });
     if (amount) {
       this.metricsService.billingTransactionAmount.observe(Math.abs(amount));
@@ -293,6 +303,7 @@ export class BillingService {
       totalCredits = totalCredits - billingFactorDiscountAmount;
 
       if (transaction) {
+        const previousStatus = transaction.status;
         await manager.update(BillingTransaction, transaction.id, {
           amount: -totalCredits,
           status: BillingTransactionStatus.Completed,
@@ -300,6 +311,14 @@ export class BillingService {
 
         transaction.amount = -totalCredits;
         transaction.status = BillingTransactionStatus.Completed;
+        void this.auditService.recordBillingTransaction({
+          transactionId: transaction.id,
+          userId: transaction.userId,
+          amount: transaction.amount,
+          status: transaction.status,
+          previousStatus,
+          source: 'resource-usage',
+        });
       } else {
         transaction = await manager.save(BillingTransaction, {
           userId: usage.userId,
@@ -307,6 +326,13 @@ export class BillingService {
           amount: -totalCredits,
           status: BillingTransactionStatus.Completed,
         } as Partial<BillingTransaction>);
+        void this.auditService.recordBillingTransaction({
+          transactionId: transaction.id,
+          userId: transaction.userId,
+          amount: transaction.amount,
+          status: transaction.status,
+          source: 'resource-usage',
+        });
       }
 
       await manager.save(BillingTransactionItem, {
@@ -393,11 +419,18 @@ export class BillingService {
       ? transactionalEntityManager.getRepository(BillingTransaction)
       : this.billingTransactionRepository;
 
-    await transactionRepository.save({
+    const transaction = await transactionRepository.save({
       userId: user.id,
       resourceUsageId: usage.id,
       amount: 0,
       status: BillingTransactionStatus.Pending,
+    });
+    void this.auditService.recordBillingTransaction({
+      transactionId: transaction.id,
+      userId: transaction.userId,
+      amount: transaction.amount,
+      status: transaction.status,
+      source: 'resource-usage',
     });
   }
 
@@ -444,6 +477,14 @@ export class BillingService {
     } as Partial<BillingTransaction>);
 
     this.liveNotificationsService.notifyTransactionUpdate(transaction);
+    void this.auditService.recordBillingTransaction({
+      transactionId: refundTransaction.id,
+      userId: refundTransaction.userId,
+      initiatorId: executingUserId,
+      amount: refundTransaction.amount,
+      status: refundTransaction.status,
+      source: 'refund',
+    });
 
     return await this.getTransaction(refundTransaction.id);
   }

@@ -24,6 +24,7 @@ import { ResourceFlowsService } from '../resources/flows/resource-flows.service'
 import { EmailService } from '../email/email.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MetricsService } from '../metrics/metrics.service';
+import { AuditService } from '../audit/audit.service';
 
 const mockMetricsService = {
   billingTransactionsTotal: { inc: jest.fn() },
@@ -39,6 +40,7 @@ describe('BillingService', () => {
   let liveNotificationsService: { notifyTransactionUpdate: jest.Mock };
   let emailService: jest.Mocked<EmailService>;
   let billingTransactionItemRepository: jest.Mocked<Repository<BillingTransactionItem>>;
+  let auditService: { recordBillingTransaction: jest.Mock };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -107,6 +109,7 @@ describe('BillingService', () => {
           provide: MetricsService,
           useValue: mockMetricsService,
         },
+        { provide: AuditService, useValue: { recordBillingTransaction: jest.fn() } },
       ],
     }).compile();
 
@@ -124,6 +127,7 @@ describe('BillingService', () => {
     billingTransactionItemRepository = module.get(getRepositoryToken(BillingTransactionItem)) as jest.Mocked<
       Repository<BillingTransactionItem>
     >;
+    auditService = module.get(AuditService);
   });
 
   it('should be defined', () => {
@@ -184,6 +188,14 @@ describe('BillingService', () => {
       );
       expect(result).toEqual({ id: 123 });
       expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith({ id: 123 });
+      expect(auditService.recordBillingTransaction).toHaveBeenCalledWith({
+        transactionId: 123,
+        userId: 1,
+        initiatorId: 2,
+        amount: 100,
+        status: BillingTransactionStatus.Completed,
+        source: 'manual',
+      });
     });
 
     it('throws InsufficientBalanceError when resulting balance would be negative', async () => {
@@ -580,6 +592,8 @@ describe('BillingService', () => {
       // Existing pending transaction with additional items worth 14 (7 * 2)
       const existingTransaction = {
         id: 77,
+        userId: 24,
+        status: BillingTransactionStatus.Pending,
         items: [
           {
             unitPrice: 7,
@@ -610,6 +624,14 @@ describe('BillingService', () => {
       expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ id: 77, amount: -24 }),
       );
+      expect(auditService.recordBillingTransaction).toHaveBeenCalledWith({
+        transactionId: 77,
+        userId: 24,
+        amount: -24,
+        status: BillingTransactionStatus.Completed,
+        previousStatus: BillingTransactionStatus.Pending,
+        source: 'resource-usage',
+      });
 
       // No BILLING_FACTOR item because billingFactor is 100%
       const saves = (manager.save as jest.Mock).mock.calls
