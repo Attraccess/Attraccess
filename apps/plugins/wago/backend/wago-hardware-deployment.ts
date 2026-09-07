@@ -72,7 +72,7 @@ function rootValue(testRoot: string): string {
   return quote(testRoot.replace(/\/$/, ''));
 }
 
-function checks(testRoot: string, boundedDocker = true): string {
+function checks(testRoot: string, boundedDocker = true, inspectHostWriters = true): string {
   return `set -eu
 ${wagoShellStat()}
 root=${rootValue(testRoot)}
@@ -139,10 +139,14 @@ EOF_MOUNTS
         [ "$conflict" = 0 ] || exclusivity=output-container-conflict
       done
     fi
-    if [ "$exclusivity" = clear ]; then
+    ${
+      inspectHostWriters
+        ? `if [ "$exclusivity" = clear ]; then
       ${wagoHostIoGuardShell()}
       if ! wago_host_io_guard allow-owned; then exclusivity=unknown; fi
-    fi
+    fi`
+        : ''
+    }
   elif [ "$platform" = supported ] && [ -x "$root/etc/init.d/dockerd" ]; then
     if ! printf '%s\\n' "$processes" | grep -iq dockerd &&
       test ! -e "$root/var/run/docker.pid" && test ! -L "$root/var/run/docker.pid"; then
@@ -383,7 +387,10 @@ until docker info >/dev/null 2>&1; do
   attempt=$((attempt + 1)); test "$attempt" -lt 15 || fail 'docker-start-timeout'
   sleep 2
 done
-${checks(testRoot, true)}
+# hardwareOwnership below checks host writers immediately before granting IO;
+# the complete post-grant preflight checks them again before starting a writer.
+# Do not add a third identical scan before those two required boundaries.
+${checks(testRoot, true, false)}
 [ "$exclusivity" = clear ] || fail "$exclusivity"
 ${hardwareOwnership()}
 ${wagoHardwareDeploymentPreflightScript(testRoot, true)}

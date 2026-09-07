@@ -332,10 +332,13 @@ process.exit(result.status ?? 1);
     });
     const completion = new Promise<number | null>((resolve) => child.on('close', resolve));
     try {
-      for (
-        let attempt = 0;
-        attempt < 300 && !existsSync(join(fixture.root, config, 'delivery/token')) && child.exitCode === null;
-        attempt++
+      // Wait for the actual receiving boundary, not a six-second assumption
+      // about the full metadata preflight on a contended test runner.
+      const receivingDeadline = Date.now() + 60_000;
+      while (
+        Date.now() < receivingDeadline &&
+        !existsSync(join(fixture.root, config, 'delivery/token')) &&
+        child.exitCode === null
       )
         await new Promise((resolve) => setTimeout(resolve, 20));
       if (!existsSync(join(fixture.root, config, 'delivery/token')))
@@ -348,7 +351,7 @@ process.exit(result.status ?? 1);
       if (child.exitCode === null) child.kill('SIGKILL');
       await completion;
     }
-  }, 15000);
+  }, 90000);
 
   it('receiver rejects invalid script encoding and cleans its private directory', () => {
     const r = fixture.run(runtimeBundleStreamReceiver, '', Buffer.from('not-base64!\n'));

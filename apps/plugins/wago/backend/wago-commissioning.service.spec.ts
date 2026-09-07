@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
 import { readFile } from 'node:fs/promises';
 import { rootCertificates } from 'node:tls';
 import { createHash, X509Certificate } from 'node:crypto';
@@ -10,6 +11,7 @@ import {
   resolveRuntimeSigningPublicKeyPath,
   runtimeBundleInstallScript,
   WagoCommissioningService,
+  WagoRuntimeUploadError,
 } from './wago-commissioning.service';
 import { WagoService, WagoCredentialOperationUncertainError } from './wago.service';
 import { WagoController } from './wago-controller.entity';
@@ -39,6 +41,61 @@ const secrets = {
 };
 
 describe('WagoCommissioningService', () => {
+  it('retains only fixed upload diagnostics and SSH exit status, never remote secrets', async () => {
+    const service = new WagoCommissioningService({} as PluginContext, {} as WagoService);
+    jest.mocked(spawn).mockImplementation(((command: string) => {
+      const child = Object.assign(new EventEmitter(), {
+        stdout: new EventEmitter(),
+        stderr: new EventEmitter(),
+        stdin: new PassThrough(),
+        kill: jest.fn(),
+      });
+      child.stdin.resume();
+      child.stdin.on('finish', () => {
+        if (command === 'ssh-keyscan') {
+          child.stdout.emit('data', '192.0.2.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey\n');
+        } else if (command === 'ssh-keygen') {
+          child.stdout.emit('data', '256 SHA256:test fixture (ED25519)\n');
+        } else {
+          child.stderr.emit(
+            'data',
+            Buffer.from('private-credential'.repeat(1000) + '\nRuntime supervisor launch unverified: read'),
+          );
+          child.stderr.emit('data', Buffer.from('iness\nprivate-credential\n'));
+        }
+        child.emit('close', command === 'ssh' ? 1 : 0);
+      });
+      return child;
+    }) as never);
+    const result = service['copyTo'](
+      '192.0.2.1',
+      'SHA256:test',
+      { username: 'root', password: 'fixture-secret' },
+      __filename,
+      'true',
+      jest.fn(),
+    );
+    await expect(result).rejects.toThrow(
+      /remote-exit, SSH exit 1, \d+s elapsed\. Runtime supervisor launch unverified: readiness/,
+    );
+    await expect(result).rejects.not.toThrow('private-credential');
+  });
+
+  it.each(['local-timeout', 'operation-aborted'] as const)(
+    'distinguishes %s without treating remote text as trusted diagnostics',
+    (termination) => {
+      const error = new WagoRuntimeUploadError(
+        null,
+        123456,
+        'secret: Runtime supervisor launch unverified: readiness\n',
+        termination,
+      );
+      expect(error.message).toContain(`${termination}, SSH exit unknown, 123s elapsed`);
+      expect(error.message).toContain('No recognized remote diagnostic');
+      expect(error.message).not.toContain('secret');
+    },
+  );
+
   it.each([null, 7])('checks ownership immediately before session deletion (enrollment %p)', async (enrollmentId) => {
     const { service, repository, wago } = securityHarness({ deliveryToken: null, enrollmentId });
     const remove = jest.fn();

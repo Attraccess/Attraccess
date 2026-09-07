@@ -112,9 +112,13 @@ wago_host_io_guard() {
         return 1
       }
     wago_owned=0
-    if test -n "$wago_owned_id" && wago_host_owned_process "$wago_proc"; then wago_owned=1; fi
-    if test "$wago_identity" = collision && test "$wago_owned" != 1; then
-      wago_host_io_error runtime-identity-conflict; return 1
+    # Ownership is evidence for an exemption, not a prerequisite for unrelated
+    # processes. Avoid three extra /proc parsers unless an exemption is needed.
+    if test "$wago_identity" = collision; then
+      wago_host_owned_process "$wago_proc" || {
+        wago_host_io_error runtime-identity-conflict; return 1;
+      }
+      wago_owned=1
     fi
     test -d "$wago_proc/fd" && test -r "$wago_proc/fd" && test -x "$wago_proc/fd" || {
       test ! -d "$wago_proc" && continue
@@ -139,7 +143,10 @@ wago_host_io_guard() {
           return 1
         }
       if test "$wago_mode" != 0 && test "$wago_owned" != 1; then
-        wago_host_io_error output-host-process-conflict; return 1
+        wago_host_owned_process "$wago_proc" || {
+          wago_host_io_error output-host-process-conflict; return 1;
+        }
+        wago_owned=1
       fi
     done
     wago_end=$(wago_host_process_start "$wago_proc") || {

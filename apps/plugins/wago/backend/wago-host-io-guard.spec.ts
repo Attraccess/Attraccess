@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { linkSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { wagoHostIoGuardShell } from './wago-host-io-guard';
@@ -44,6 +44,7 @@ function fixture() {
   executable(
     'bin/awk',
     `const fs=require('node:fs'),cp=require('node:child_process'),args=process.argv.slice(2),p=args.at(-1),root=process.env.FIXTURE_ROOT;
+if(p&&p.startsWith(root+'/proc/'))fs.appendFileSync(root+'/observations',p.slice(root.length)+'\\n');
 if(process.env.FAULT==='process-disappears'&&p===root+'/proc/22/stat'){fs.rmSync(root+'/proc/22',{recursive:true,force:true});process.exit(1);}
 if(process.env.FAULT==='status-unreadable'&&p===root+'/proc/22/status')process.exit(1);
 const r=cp.spawnSync('/usr/bin/awk',args,{stdio:'inherit'});process.exit(r.status ?? 1);`,
@@ -229,6 +230,25 @@ describe('host digital output and identity guard', () => {
     owned();
     expect(host.run(true).status).toBe(0);
     rejected('runtime-identity-conflict');
+  });
+
+  it('checks ownership only when granting an exemption, while still observing every process and descriptor', () => {
+    owned();
+    host.processRecord(23);
+    host.fd(23, '0100000');
+    host.processRecord(24);
+    host.file('unrelated-file', '');
+    host.fd(24, '0100002', 'unrelated-file');
+    expect(host.run(true).status).toBe(0);
+    const observations = readFileSync(join(host.root, 'observations'), 'utf8').trim().split('\n');
+    for (const pid of [1, 23, 24]) {
+      expect(observations.filter((path) => path === `/proc/${pid}/stat`)).toHaveLength(2);
+      expect(observations).toContain(`/proc/${pid}/status`);
+      expect(observations).not.toContain(`/proc/${pid}/uid_map`);
+      expect(observations).not.toContain(`/proc/${pid}/cgroup`);
+    }
+    expect(observations).toContain('/proc/23/fdinfo/5');
+    expect(observations.filter((path) => path === '/proc/22/cgroup')).toHaveLength(2);
   });
 
   it('permits verified container descendants and cgroup-v1 Docker membership', () => {
