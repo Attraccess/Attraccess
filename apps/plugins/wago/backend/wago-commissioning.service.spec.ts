@@ -44,7 +44,7 @@ describe('WagoCommissioningService', () => {
       deleteEnrollmentById: jest.fn().mockResolvedValue(undefined),
       createEnrollment: jest.fn(),
       claim: jest.fn(),
-      isEnrollmentClaimed: jest.fn().mockResolvedValue(false),
+      rollbackInterruptedClaim: jest.fn().mockResolvedValue(undefined),
     };
     const context = {
       getRepository: jest.fn().mockReturnValue(repository),
@@ -104,7 +104,7 @@ describe('WagoCommissioningService', () => {
     await expect(service.deliver(1, { confirmInstall: true })).rejects.toThrow('explicit valid SSH');
   });
 
-  it('fails closed when a claim is interrupted after the controller is marked claimed', async () => {
+  it('rolls back an interrupted claim before making its session retryable', async () => {
     const { service, session, repository, wago, inspect } = securityHarness({
       state: 'awaiting_claim',
       enrollmentId: 7,
@@ -121,29 +121,23 @@ describe('WagoCommissioningService', () => {
     });
     expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(7);
     expect(wago.deleteEnrollmentById).toHaveBeenCalledWith(7);
+    expect(wago.rollbackInterruptedClaim).toHaveBeenCalledWith(session.hardwareId, session.mqttServerId, 7);
+    expect(wago.rollbackInterruptedClaim.mock.invocationCallOrder[0]).toBeLessThan(
+      wago.revokeEnrollmentById.mock.invocationCallOrder[0],
+    );
     expect(inspect).not.toHaveBeenCalled();
   });
 
-  it('completes an interrupted claim that already reached the claimed controller state', async () => {
-    const { service, session, repository, wago, inspect } = securityHarness({
-      state: 'awaiting_claim',
-      enrollmentId: 7,
-    });
+  it('leaves an interrupted claim blocked when controller rollback fails', async () => {
+    const { service, session, repository, wago } = securityHarness({ state: 'awaiting_claim', enrollmentId: 7 });
     repository.find.mockResolvedValue([session]);
-    wago.isEnrollmentClaimed.mockResolvedValue(true);
+    wago.rollbackInterruptedClaim.mockRejectedValue(new Error('broker unavailable'));
 
     await service.onApplicationBootstrap();
 
-    expect(wago.isEnrollmentClaimed).toHaveBeenCalledWith(session.hardwareId, session.mqttServerId, 7);
-    expect(session).toMatchObject({
-      state: 'completed',
-      pairingCode: null,
-      failureReason: null,
-      progressPercent: 100,
-      progressStep: 'Commissioning complete',
-    });
+    expect(session).toMatchObject({ state: 'awaiting_claim', enrollmentId: 7 });
     expect(wago.revokeEnrollmentById).not.toHaveBeenCalled();
-    expect(inspect).not.toHaveBeenCalled();
+    expect(wago.registerCommissioningDiscoveryHandler).not.toHaveBeenCalled();
   });
 
   it('revokes and clears legacy plaintext before registering discovery, using bounded pages', async () => {

@@ -146,6 +146,24 @@ describe('WagoService', () => {
     expect(controllerRepository.delete).toHaveBeenCalledWith(claimed.id);
   });
 
+  it('rolls back an interrupted claim so the controller can be claimed again', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const, name: 'Interrupted claim' };
+    const { service, context, controllerRepository } = createService([claimed]);
+    const revoke = jest.fn().mockResolvedValue(undefined);
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({ revoke });
+
+    await service.rollbackInterruptedClaim(claimed.hardwareId, claimed.mqttServerId, claimed.enrollmentId);
+
+    expect(revoke).toHaveBeenCalledWith({
+      mqttServerId: claimed.mqttServerId,
+      identity: `wago-controller-${claimed.hardwareId}`,
+      username: `wago-controller-${claimed.hardwareId}`,
+      vhost: '/',
+    });
+    expect(claimed).toMatchObject({ trustState: 'untrusted', name: null, enrollmentId: null });
+    expect(controllerRepository.save).toHaveBeenCalledWith(claimed);
+  });
+
   it('does not expose physical-verification secrets in controller listings', async () => {
     const { service } = createService();
 
