@@ -1,6 +1,7 @@
 import {
   Alert,
   Button,
+  Checkbox,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
@@ -47,8 +48,9 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
   const [controllerIp, setControllerIp] = useState('');
   const [mqttServerId, setMqttServerId] = useState<Key | null>(null);
   const [hostKeyFingerprint, setHostKeyFingerprint] = useState('');
-  const [sshUsername, setSshUsername] = useState('root');
-  const [sshPassword, setSshPassword] = useState('wago');
+  const [sshUsername, setSshUsername] = useState('');
+  const [sshPassword, setSshPassword] = useState('');
+  const [confirmInstall, setConfirmInstall] = useState(false);
   const [isCancelConfirmationOpen, setCancelConfirmationOpen] = useState(false);
 
   const mutationSession = deliverSessionMutation.data ?? resumedSession ?? createdSession;
@@ -62,12 +64,21 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
     deliverSessionMutation.isPending ||
     removeSessionMutation.isPending;
   const loadingStatus = createSessionMutation.isPending
-    ? ['Preparing commissioning', 'Scanning and pinning the controller SSH identity.']
+    ? [
+        'Preparing commissioning',
+        'Scanning the SSH key for your review. A scan alone does not authenticate the controller.',
+      ]
     : removeSessionMutation.isPending
       ? ['Canceling enrollment', 'Revoking access and removing the enrollment records.']
       : confirmHostKeyMutation.isPending
         ? ['Confirming controller identity', 'Saving the administrator-confirmed SSH host key.']
         : null;
+
+  useEffect(() => {
+    setSshPassword('');
+    setConfirmInstall(false);
+    setHostKeyFingerprint('');
+  }, [isOpen, resumedSession?.id]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -86,10 +97,12 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
     setControllerIp('');
     setMqttServerId(null);
     setHostKeyFingerprint('');
-    setSshUsername('root');
-    setSshPassword('wago');
+    setSshUsername('');
+    setSshPassword('');
+    setConfirmInstall(false);
     setCancelConfirmationOpen(false);
     createSessionMutation.reset();
+    confirmHostKeyMutation.reset();
     deliverSessionMutation.reset();
     removeSessionMutation.reset();
     onOpenChange(false);
@@ -109,8 +122,14 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
   }
 
   function deliverSession() {
-    if (!session) return;
-    deliverSessionMutation.mutate({ id: session.id, temporarySsh: { username: sshUsername, password: sshPassword } });
+    if (!session || isLoading || !confirmInstall || !sshUsername.trim() || !sshPassword || !canInstall(session)) return;
+    deliverSessionMutation.mutate({
+      id: session.id,
+      confirmInstall: true,
+      temporarySsh: { username: sshUsername.trim(), password: sshPassword },
+    });
+    setSshPassword('');
+    setConfirmInstall(false);
   }
 
   function confirmHostKey() {
@@ -157,6 +176,8 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
                 sshPassword={sshPassword}
                 onSshUsernameChange={setSshUsername}
                 onSshPasswordChange={setSshPassword}
+                confirmInstall={confirmInstall}
+                onConfirmInstallChange={setConfirmInstall}
               />
             )}
             {session && activeStep === 3 && <ProgressStep name={title} session={session} />}
@@ -196,25 +217,29 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
             }
             onPress={createSession}
           >
-            {isLoading ? 'Preparing commissioning' : 'Start automatic commissioning'}
+            {isLoading ? 'Preparing commissioning' : 'Scan controller for review'}
           </Button>
         )}
         {session?.state === 'awaiting_identity_confirmation' && (
           <Button
             isPending={isLoading}
-            isDisabled={hostKeyFingerprint !== session.hostKeyFingerprint}
+            isDisabled={!hostKeyFingerprint || hostKeyFingerprint !== session.hostKeyFingerprint}
             onPress={confirmHostKey}
           >
             {isLoading ? 'Confirming identity' : 'Confirm host key'}
           </Button>
         )}
-        {session && ['awaiting_delivery', 'delivery_failed'].includes(session.state) && (
-          <Button isPending={isLoading} isDisabled={!sshUsername.trim() || !sshPassword} onPress={deliverSession}>
+        {session && canInstall(session) && (
+          <Button
+            isPending={isLoading}
+            isDisabled={isLoading || !confirmInstall || !sshUsername.trim() || !sshPassword}
+            onPress={deliverSession}
+          >
             {isLoading
-              ? 'Starting delivery'
+              ? 'Starting installation'
               : session.state === 'delivery_failed'
-                ? 'Retry delivery'
-                : 'Start secure delivery'}
+                ? 'Retry installation'
+                : 'Install runtime'}
           </Button>
         )}
         {session &&
@@ -222,7 +247,7 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
           session.state !== 'revoked' &&
           (isCancelConfirmationOpen ? (
             <Button
-              color="danger"
+              variant="danger"
               isPending={isLoading}
               onPress={() => removeSessionMutation.mutate(session.id, { onSuccess: close })}
             >
@@ -241,21 +266,21 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
 function DevicePassport({ className, name, step }: { className?: string; name: string; step: number }) {
   return (
     <aside className={`wg:min-w-0 wg:rounded-large wg:bg-default-100 wg:p-5 ${className ?? ''}`}>
-      <CpuIcon className="wg:h-10 wg:w-10 wg:text-accent-soft-foreground" />
+      <CpuIcon className="wg:h-10 wg:w-10 wg:text-primary" />
       <p className="wg:mt-4 wg:text-xs wg:font-semibold wg:uppercase wg:tracking-wider wg:text-muted">
         CC100 device passport
       </p>
       <p className="wg:mt-1 wg:truncate wg:text-lg wg:font-semibold">{name}</p>
       <div className="wg:mt-5 wg:space-y-3">
-        <PassportRow label="Identity" value={step >= 2 ? 'Verified automatically' : 'Not scanned'} />
-        <PassportRow label="Runtime" value={step >= 3 ? 'Provisioning' : 'Not delivered'} />
-        <PassportRow label="Claim" value={step >= 3 ? 'Automatic' : 'Queued'} />
+        <PassportRow label="Identity" value={step >= 2 ? 'Review required' : 'Not scanned'} />
+        <PassportRow label="Runtime" value={step >= 2 ? 'See session status' : 'Not installed'} />
+        <PassportRow label="Claim" value={step >= 3 ? 'See session status' : 'Pending'} />
       </div>
       <div className="wg:mt-6 wg:flex wg:gap-1">
         {[0, 1, 2, 3].map((index) => (
           <span
             key={index}
-            className={`wg:h-1.5 wg:flex-1 wg:rounded-full ${index <= step ? 'wg:bg-accent' : 'wg:bg-default-300'}`}
+            className={`wg:h-1.5 wg:flex-1 wg:rounded-full ${index <= step ? 'wg:bg-primary' : 'wg:bg-default-300'}`}
           />
         ))}
       </div>
@@ -279,14 +304,17 @@ function StepHeading({ step }: { step: number }) {
       'This name is reserved now and applied automatically when the controller comes online.',
     ],
     [
-      'Connect it securely',
-      'Enter the private address and MQTT server. The controller identity is verified automatically.',
+      'Connect the controller',
+      'Enter its private address and choose an MQTT server. Review the scanned identity before installation.',
     ],
     [
-      'Verifying and provisioning',
-      'The server pins the SSH fingerprint automatically and installs the runtime without an operator confirmation.',
+      'Review and approve installation',
+      'Confirm the controller identity, enter temporary SSH credentials, and approve the changes for this attempt.',
     ],
-    ['Commissioning continues automatically', 'You can close this window and start another controller at any time.'],
+    [
+      'Commissioning status',
+      'A saved session does not authorize a new installation. After an interruption, review the status before retrying.',
+    ],
   ][step];
   return (
     <div>
@@ -299,14 +327,14 @@ function StepHeading({ step }: { step: number }) {
 
 function OperationStatus({ title, description }: { title: string; description: string }) {
   return (
-    <div aria-live="polite" className="wg:rounded-large wg:border wg:border-accent/30 wg:bg-accent/5 wg:p-3">
+    <div aria-live="polite" className="wg:rounded-large wg:border wg:border-primary/30 wg:bg-primary/5 wg:p-3">
       <div className="wg:flex wg:items-center wg:gap-2">
         <Spinner color="accent" size="sm" />
         <p className="wg:text-sm wg:font-medium">{title}</p>
       </div>
       <p className="wg:mt-1 wg:text-xs wg:text-muted">{description}</p>
       <div className="wg:mt-3 wg:h-1 wg:overflow-hidden wg:rounded-full wg:bg-default-200">
-        <div className="wg:h-full wg:w-2/5 wg:animate-pulse wg:rounded-full wg:bg-accent" />
+        <div className="wg:h-full wg:w-2/5 wg:animate-pulse wg:rounded-full wg:bg-primary" />
       </div>
     </div>
   );
@@ -341,6 +369,19 @@ function ConnectionStep({
 }) {
   return (
     <div className="wg:space-y-4">
+      <Alert status="accent">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>Prepare the CC100 (751-9301), firmware 31</Alert.Title>
+          <Alert.Description>
+            Have the controller powered using its specified supply and wait for it to finish starting. Connect its
+            Ethernet cable to the intended local network. Ask your network administrator for its assigned IP address and
+            ensure the Attraccess server can reach it. Keep power and networking connected during installation. If the
+            model or firmware is uncertain, check the device label and your maintenance records with the responsible
+            administrator before proceeding.
+          </Alert.Description>
+        </Alert.Content>
+      </Alert>
       <TextField isRequired name="controller-ip">
         <Label>Controller IP address</Label>
         <Input
@@ -402,23 +443,27 @@ function HostKeyConfirmationStep({
       <Alert status="warning">
         <Alert.Indicator />
         <Alert.Content>
-          <Alert.Title>Verify the controller SSH key</Alert.Title>
+          <Alert.Title>Review the controller SSH key</Alert.Title>
           <Alert.Description>
-            Compare this fingerprint with the value shown on the physical controller or from a trusted inventory record.
-            Enter it exactly to authorize delivery.
+            Compare the scanned fingerprint with a trusted inventory record or a fingerprint obtained independently
+            through a trusted administrator. Copying the scan back here is not independent authentication. If no trusted
+            fingerprint is available, confirm the physical controller and its cabling on an isolated network you
+            control; this reduces exposure but does not independently authenticate the SSH key. Stop if the device or
+            network is uncertain. Confirming the key does not start installation.
           </Alert.Description>
         </Alert.Content>
       </Alert>
+      <p className="wg:break-all wg:text-sm">Scanned fingerprint: {expectedFingerprint}</p>
       <TextField isRequired name="host-key-fingerprint">
-        <Label>Scanned SSH host-key fingerprint</Label>
-        <Input
-          value={fingerprint}
-          placeholder={expectedFingerprint}
-          onChange={(event) => onFingerprintChange(event.target.value)}
-        />
+        <Label>Reviewed SSH host-key fingerprint</Label>
+        <Input value={fingerprint} onChange={(event) => onFingerprintChange(event.target.value)} />
       </TextField>
     </div>
   );
+}
+
+function canInstall(session: CommissioningSession) {
+  return ['awaiting_delivery', 'delivery_failed', 'awaiting_codesys_confirmation'].includes(session.state);
 }
 
 function DeliveryStep({
@@ -428,6 +473,8 @@ function DeliveryStep({
   sshPassword,
   onSshUsernameChange,
   onSshPasswordChange,
+  confirmInstall,
+  onConfirmInstallChange,
 }: {
   isDelivering: boolean;
   session: CommissioningSession;
@@ -435,28 +482,72 @@ function DeliveryStep({
   sshPassword: string;
   onSshUsernameChange: (value: string) => void;
   onSshPasswordChange: (value: string) => void;
+  confirmInstall: boolean;
+  onConfirmInstallChange: (value: boolean) => void;
 }) {
   return (
     <div className="wg:space-y-4">
       <CommissioningStatusPanel isActive={isDelivering || session.state === 'delivering'} session={session} />
-      {['awaiting_delivery', 'delivery_failed'].includes(session.state) && (
-        <div className="wg:grid wg:gap-4 wg:sm:grid-cols-2">
-          <TextField isRequired name="ssh-username">
-            <Label>Temporary SSH username</Label>
-            <Input value={sshUsername} onChange={(event) => onSshUsernameChange(event.target.value)} />
-          </TextField>
-          <TextField isRequired name="ssh-password">
-            <Label>Temporary SSH password</Label>
-            <Input type="password" value={sshPassword} onChange={(event) => onSshPasswordChange(event.target.value)} />
-          </TextField>
-        </div>
+      {canInstall(session) && (
+        <>
+          <Alert status="warning">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>Review this installation attempt</Alert.Title>
+              <Alert.Description>
+                Installing on {session.targetHost} can interrupt CODESYS and replaces an existing Attraccess runtime
+                container. Make sure connected equipment can safely tolerate the interruption and replacement.
+                Installation does not certify the controller as hardened or the connected equipment as ready for use.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+          <div className="wg:grid wg:gap-4 wg:sm:grid-cols-2">
+            <TextField isRequired isDisabled={isDelivering} name="ssh-username">
+              <Label>Temporary SSH username</Label>
+              <Input
+                autoComplete="off"
+                value={sshUsername}
+                onChange={(event) => onSshUsernameChange(event.target.value)}
+              />
+            </TextField>
+            <TextField isRequired isDisabled={isDelivering} name="ssh-password">
+              <Label>Temporary SSH password</Label>
+              <Input
+                autoComplete="off"
+                type="password"
+                value={sshPassword}
+                onChange={(event) => onSshPasswordChange(event.target.value)}
+              />
+            </TextField>
+          </div>
+          <Checkbox
+            isRequired
+            isDisabled={isDelivering}
+            isSelected={confirmInstall}
+            onChange={onConfirmInstallChange}
+            name="confirm-install"
+          >
+            <Checkbox.Content>
+              <Checkbox.Control>
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              I approve CODESYS interruption and replacement of the existing Attraccess runtime container for this
+              installation attempt.
+            </Checkbox.Content>
+          </Checkbox>
+          <p className="wg:text-sm wg:text-muted">
+            Enter the controller credentials explicitly; no default credentials are used. The password and approval are
+            cleared after submitting or closing. Every retry needs a new approval and password. Restarting the server
+            does not start or resume an installation.
+          </p>
+        </>
       )}
     </div>
   );
 }
 
 function ProgressStep({ name, session }: { name: string; session: CommissioningSession }) {
-  const complete = session.state === 'completed';
+  const complete = session.state === 'completed' || session.state === 'revoked';
   return (
     <div className="wg:space-y-4">
       <DevicePassport className="wg:md:hidden" name={name} step={3} />
@@ -464,8 +555,9 @@ function ProgressStep({ name, session }: { name: string; session: CommissioningS
       <div className="wg:rounded-large wg:border wg:border-default-200 wg:p-4 wg:text-sm">
         <p className="wg:font-medium">Safe to close</p>
         <p className="wg:mt-1 wg:text-muted">
-          This session is saved in the CC100 devices table. Start another commissioning session while this one continues
-          in the background.
+          This session is saved in the CC100 devices table. Closing this window does not cancel an installation already
+          submitted. If installation is interrupted, reopening the session or restarting the server does not authorize
+          another attempt.
         </p>
       </div>
       {session.failureReason && (
@@ -485,13 +577,13 @@ function CommissioningStatusPanel({ isActive, session }: { isActive: boolean; se
   const isQueued = session.state === 'awaiting_delivery';
   const hasFailure = !isActive && Boolean(session.failureReason);
   const title = isQueued
-    ? 'Delivery queued'
+    ? 'Installation approval required'
     : (session.progressStep ?? (isActive ? 'Preparing commissioning' : commissioningLabel(session.state)));
   const detail = isQueued
-    ? 'The server will begin or resume this saved delivery automatically.'
+    ? 'Review the installation, enter temporary SSH credentials, and approve this attempt. Saved sessions do not start or resume installation automatically.'
     : (session.progressDetail ?? 'Waiting for the next commissioning operation.');
   return (
-    <div aria-live="polite" className="wg:rounded-large wg:border wg:border-accent/30 wg:bg-accent/5 wg:p-4">
+    <div aria-live="polite" className="wg:rounded-large wg:border wg:border-primary/30 wg:bg-primary/5 wg:p-4">
       <div className="wg:flex wg:items-start wg:gap-3">
         {isActive ? (
           <Spinner color="accent" size="sm" />
@@ -510,7 +602,7 @@ function CommissioningStatusPanel({ isActive, session }: { isActive: boolean; se
           <p className="wg:mt-1 wg:text-sm wg:text-muted">{detail}</p>
           <div className="wg:mt-3 wg:h-1.5 wg:overflow-hidden wg:rounded-full wg:bg-default-200">
             <div
-              className={`wg:h-full wg:rounded-full wg:transition-[width] wg:duration-500 ${hasFailure ? 'wg:bg-danger' : 'wg:bg-accent'}`}
+              className={`wg:h-full wg:rounded-full wg:transition-[width] wg:duration-500 ${hasFailure ? 'wg:bg-danger' : 'wg:bg-primary'}`}
               style={{ width: `${percent}%` }}
             />
           </div>

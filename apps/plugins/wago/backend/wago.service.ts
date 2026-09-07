@@ -422,7 +422,8 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
   /** Server-side commissioning revokes the enrollment it created without exposing credentials to a browser. */
   async revokeEnrollmentById(id: number): Promise<void> {
     const enrollment = await this.enrollments.findOneBy({ id });
-    if (enrollment && this.isActiveEnrollment(enrollment)) await this.revokeEnrollment(enrollment);
+    // Expiry limits enrollment use but does not revoke the provisioned broker credential.
+    if (enrollment && !enrollment.consumedAt) await this.revokeEnrollment(enrollment);
   }
 
   async deleteEnrollmentById(id: number): Promise<void> {
@@ -497,6 +498,45 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
         });
       }
     });
+  }
+
+  /** Reverses the durable claim marker left behind when delivery is interrupted before completion is recorded. */
+  async rollbackInterruptedClaim(hardwareId: string, mqttServerId: number, enrollmentId: number | null): Promise<void> {
+    const controller = await this.controllers.findOneBy({ hardwareId });
+    if (
+      !controller ||
+      controller.trustState !== 'claimed' ||
+      controller.mqttServerId !== mqttServerId ||
+      controller.enrollmentId !== enrollmentId
+    )
+      return;
+
+    await this.withClaimLock(controller.id, () =>
+      this.withClaimConfigurationLock(async () => {
+        const current = await this.controllers.findOneBy({ id: controller.id });
+        if (
+          !current ||
+          current.trustState !== 'claimed' ||
+          current.mqttServerId !== mqttServerId ||
+          current.enrollmentId !== enrollmentId
+        )
+          return;
+        const identity = `wago-controller-${current.hardwareId}`;
+        const manual = await this.context.getMqttCredentialProvisioning().revoke({
+          mqttServerId,
+          identity,
+          username: identity,
+          vhost: '/',
+        });
+        if (manual)
+          throw new ConflictException(`Manual credential revocation is required: ${manual.instructions.join(' ')}`);
+        current.trustState = 'untrusted';
+        current.name = null;
+        current.enrollmentId = null;
+        current.updatedAt = new Date().toISOString();
+        await this.controllers.save(current);
+      }),
+    );
   }
 
   private async prepareClaim(

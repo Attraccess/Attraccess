@@ -146,6 +146,24 @@ describe('WagoService', () => {
     expect(controllerRepository.delete).toHaveBeenCalledWith(claimed.id);
   });
 
+  it('rolls back an interrupted claim so the controller can be claimed again', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const, name: 'Interrupted claim' };
+    const { service, context, controllerRepository } = createService([claimed]);
+    const revoke = jest.fn().mockResolvedValue(undefined);
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({ revoke });
+
+    await service.rollbackInterruptedClaim(claimed.hardwareId, claimed.mqttServerId, claimed.enrollmentId);
+
+    expect(revoke).toHaveBeenCalledWith({
+      mqttServerId: claimed.mqttServerId,
+      identity: `wago-controller-${claimed.hardwareId}`,
+      username: `wago-controller-${claimed.hardwareId}`,
+      vhost: '/',
+    });
+    expect(claimed).toMatchObject({ trustState: 'untrusted', name: null, enrollmentId: null });
+    expect(controllerRepository.save).toHaveBeenCalledWith(claimed);
+  });
+
   it('does not expose physical-verification secrets in controller listings', async () => {
     const { service } = createService();
 
@@ -916,6 +934,32 @@ describe('WagoService', () => {
 
     expect(enrollment.consumedAt).toBeNull();
     expect(enrollmentRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('revokes an expired enrollment credential before commissioning deletes its record', async () => {
+    const enrollment = {
+      id: 3,
+      mqttServerId: 2,
+      hardwareId: 'cc100-01',
+      identity: 'wago-enrollment-expired',
+      expiresAt: '2020-01-01T00:00:00.000Z',
+      revokedAt: null,
+      consumedAt: null,
+    } as WagoEnrollment;
+    const { service, enrollmentRepository, context } = createService([], [enrollment]);
+    const revoke = jest.fn().mockResolvedValue(undefined);
+    enrollmentRepository.findOneBy.mockResolvedValue(enrollment);
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({ revoke });
+
+    await service.revokeEnrollmentById(enrollment.id);
+
+    expect(revoke).toHaveBeenCalledWith({
+      mqttServerId: enrollment.mqttServerId,
+      identity: enrollment.identity,
+      username: enrollment.identity,
+      vhost: '/',
+    });
+    expect(enrollment).toMatchObject({ revokedAt: expect.any(String), consumedAt: expect.any(String) });
   });
 
   it('returns administrator supplied manual credentials when automatic provisioning is unavailable', async () => {
