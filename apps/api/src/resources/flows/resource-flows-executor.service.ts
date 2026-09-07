@@ -123,6 +123,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
 
   private readonly resourceActivity: Map<Resource['id'], Date> = new Map();
   private readonly heartbeatLastSeen: Map<string, Date> = new Map();
+  private pluginTriggerEvaluation = Promise.resolve();
 
   private readonly templateVariables = new WeakMap<object, TemplateVariables>();
 
@@ -485,7 +486,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
   public async triggerPluginFlows(
     pluginName: string,
     nodeType: string,
-    matches: (config: Record<string, unknown>) => boolean,
+    matches: (config: Record<string, unknown>, nodeId: string) => boolean,
     payload: object,
   ): Promise<void> {
     const definition = getPluginFlowNode(nodeType);
@@ -497,9 +498,19 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       throw new Error(`Plugin flow node type "${nodeType}" is not a registered trigger node.`);
     }
 
+    const matchingNodes = this.queuePluginTriggerEvaluation(() =>
+      this.findMatchingPluginTriggerNodes(nodeType, matches),
+    );
+    await this.startMatchingPluginFlows(await matchingNodes, payload);
+  }
+
+  private async findMatchingPluginTriggerNodes(
+    nodeType: string,
+    matches: (config: Record<string, unknown>, nodeId: string) => boolean,
+  ): Promise<ResourceFlowNode[]> {
     const pageSize = 100;
-    const concurrency = 10;
     let lastId: string | undefined;
+    const matchingNodes: ResourceFlowNode[] = [];
     for (;;) {
       const nodes = await this.flowNodeRepository.find({
         where: {
@@ -510,30 +521,39 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
         take: pageSize,
       });
 
-      if (nodes.length === 0) return;
+      if (nodes.length === 0) return matchingNodes;
       lastId = nodes[nodes.length - 1].id;
 
-      for (let offset = 0; offset < nodes.length; offset += concurrency) {
-        await Promise.allSettled(nodes.slice(offset, offset + concurrency).map(async (node) => {
-          let isMatch: boolean;
-          try {
-            isMatch = matches(node.data as Record<string, unknown>);
-          } catch (error) {
-            this.logger.error(
-              `Failed to match plugin flow trigger node ID: ${node.id} (Type: ${nodeType})`,
-              error instanceof Error ? error.stack : undefined,
-            );
-            return;
-          }
-
-          if (isMatch) {
-            await this.startFlow(node, { payload });
-          }
-        }));
+      for (const node of nodes) {
+        try {
+          if (matches(node.data as Record<string, unknown>, node.id)) matchingNodes.push(node);
+        } catch (error) {
+          this.logger.error(
+            `Failed to match plugin flow trigger node ID: ${node.id} (Type: ${nodeType})`,
+            error instanceof Error ? error.stack : undefined,
+          );
+        }
       }
 
-      if (nodes.length < pageSize) return;
+      if (nodes.length < pageSize) return matchingNodes;
     }
+  }
+
+  private queuePluginTriggerEvaluation<T>(evaluate: () => Promise<T>): Promise<T> {
+    const queued = this.pluginTriggerEvaluation.then(evaluate, evaluate);
+    this.pluginTriggerEvaluation = queued.then(
+      () => undefined,
+      () => undefined,
+    );
+    return queued;
+  }
+
+  private async startMatchingPluginFlows(nodes: ResourceFlowNode[], payload: object): Promise<void> {
+    const concurrency = 10;
+    for (let offset = 0; offset < nodes.length; offset += concurrency)
+      await Promise.allSettled(
+        nodes.slice(offset, offset + concurrency).map((node) => this.startFlow(node, { payload })),
+      );
   }
 
   public async startFlow(

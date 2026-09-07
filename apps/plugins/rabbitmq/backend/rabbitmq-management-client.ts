@@ -39,7 +39,7 @@ export class RabbitmqManagementClient {
     config: MqttServerConnectionConfig,
     method: 'GET' | 'PUT' | 'DELETE',
     path: string,
-    body?: unknown
+    body?: unknown,
   ): Promise<T> {
     const base = this.managementApiBase(config);
     const controller = new AbortController();
@@ -60,7 +60,7 @@ export class RabbitmqManagementClient {
     } catch (error) {
       throw new HttpException(
         `Cannot reach the RabbitMQ management API at ${base}: ${this.describeNetworkError(error)}`,
-        HttpStatus.BAD_GATEWAY
+        HttpStatus.BAD_GATEWAY,
       );
     } finally {
       clearTimeout(timeout);
@@ -93,7 +93,7 @@ export class RabbitmqManagementClient {
       return new HttpException(
         'The RabbitMQ management API rejected the configured MQTT server credentials (401). ' +
           'Check the username/password configured for this MQTT server.',
-        HttpStatus.BAD_GATEWAY
+        HttpStatus.BAD_GATEWAY,
       );
     }
 
@@ -102,27 +102,21 @@ export class RabbitmqManagementClient {
         'The configured MQTT server user lacks management privileges on RabbitMQ' +
           (reason ? ` (${reason})` : '') +
           '. User management requires a user with the "administrator" tag.',
-        HttpStatus.BAD_GATEWAY
+        HttpStatus.BAD_GATEWAY,
       );
     }
 
     if (response.status === 404) {
-      return new HttpException(
-        `Not found on the RabbitMQ side${reason ? `: ${reason}` : '.'}`,
-        HttpStatus.NOT_FOUND
-      );
+      return new HttpException(`Not found on the RabbitMQ side${reason ? `: ${reason}` : '.'}`, HttpStatus.NOT_FOUND);
     }
 
     if (response.status === 400) {
-      return new HttpException(
-        `RabbitMQ rejected the request${reason ? `: ${reason}` : '.'}`,
-        HttpStatus.BAD_REQUEST
-      );
+      return new HttpException(`RabbitMQ rejected the request${reason ? `: ${reason}` : '.'}`, HttpStatus.BAD_REQUEST);
     }
 
     return new HttpException(
       `RabbitMQ management API request failed (HTTP ${response.status})${reason ? `: ${reason}` : '.'}`,
-      HttpStatus.BAD_GATEWAY
+      HttpStatus.BAD_GATEWAY,
     );
   }
 
@@ -136,7 +130,7 @@ export class RabbitmqManagementClient {
     } catch {
       throw new HttpException(
         'The RabbitMQ management API returned a response that is not valid JSON.',
-        HttpStatus.BAD_GATEWAY
+        HttpStatus.BAD_GATEWAY,
       );
     }
   }

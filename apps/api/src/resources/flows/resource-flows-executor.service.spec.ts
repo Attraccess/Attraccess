@@ -262,6 +262,63 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     expect(service.startFlow).toHaveBeenCalledTimes(101);
   });
 
+  it('evaluates concurrent plugin triggers in order without waiting for earlier flow runs', async () => {
+    registerPluginFlowNodes('ordering-test', [
+      {
+        type: 'plugin.ordering-test.trigger',
+        label: 'Ordering test trigger',
+        configSchema: {},
+        inputs: [],
+        outputs: ['output'],
+        isInput: true,
+      },
+    ]);
+    const node = createNode({ id: 'trigger', type: 'plugin.ordering-test.trigger' as ResourceFlowNodeType });
+    let resolveFirstLookup!: (nodes: ResourceFlowNode[]) => void;
+    const firstLookup = new Promise<ResourceFlowNode[]>((resolve) => {
+      resolveFirstLookup = resolve;
+    });
+    (flowNodeRepository.find as jest.Mock).mockImplementationOnce(() => firstLookup).mockResolvedValue([node]);
+    let releaseFirstFlow!: () => void;
+    const firstFlow = new Promise<NodeProcessingResult[]>((resolve) => {
+      releaseFirstFlow = () => resolve([]);
+    });
+    jest
+      .spyOn(service, 'startFlow')
+      .mockImplementationOnce(() => firstFlow)
+      .mockResolvedValueOnce([]);
+    const matched: string[] = [];
+
+    const first = service.triggerPluginFlows(
+      'ordering-test',
+      'plugin.ordering-test.trigger',
+      () => {
+        matched.push('first');
+        return true;
+      },
+      {},
+    );
+    const second = service.triggerPluginFlows(
+      'ordering-test',
+      'plugin.ordering-test.trigger',
+      () => {
+        matched.push('second');
+        return true;
+      },
+      {},
+    );
+
+    await Promise.resolve();
+    expect(flowNodeRepository.find).toHaveBeenCalledTimes(1);
+    resolveFirstLookup([node]);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(matched).toEqual(['first', 'second']);
+    expect(service.startFlow).toHaveBeenCalledTimes(2);
+    releaseFirstFlow();
+    await Promise.all([first, second]);
+  });
+
   it('rejects a plugin attempting to trigger a node owned by another plugin', async () => {
     registerPluginFlowNodes('owner-plugin', [
       {

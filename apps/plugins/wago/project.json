@@ -7,7 +7,10 @@
   "targets": {
     "lint": {
       "executor": "nx:run-commands",
-      "options": { "cwd": "apps/plugins/wago", "command": "eslint backend frontend/src" }
+      "options": {
+        "cwd": "apps/plugins/wago",
+        "command": "eslint backend frontend/src --max-warnings=0 && prettier --check backend frontend/src"
+      }
     },
     "test": {
       "executor": "@nx/jest:jest",

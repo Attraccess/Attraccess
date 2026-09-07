@@ -44,19 +44,16 @@ describe('WAGO protocol', () => {
     expect(acknowledgementTopic('customer/wago', 'cc100-01')).toBe(
       'customer/wago/v1/controllers/cc100-01/acknowledgements',
     );
-    expect(acknowledgementWildcardTopic('customer/wago')).toBe(
-      'customer/wago/v1/controllers/+/acknowledgements',
-    );
+    expect(acknowledgementWildcardTopic('customer/wago')).toBe('customer/wago/v1/controllers/+/acknowledgements');
     expect(acknowledgementHardwareId('customer/wago', 'customer/wago/v1/controllers/cc100-01/acknowledgements')).toBe(
       'cc100-01',
     );
     expect(
-      configurationReportedHardwareId(
-        'customer/wago',
-        'customer/wago/v1/controllers/cc100-01/configuration/reported',
-      ),
+      configurationReportedHardwareId('customer/wago', 'customer/wago/v1/controllers/cc100-01/configuration/reported'),
     ).toBe('cc100-01');
-    expect(configurationReportedHardwareId('customer/wago', 'customer/wago/v1/controllers/+/configuration/reported')).toBeNull();
+    expect(
+      configurationReportedHardwareId('customer/wago', 'customer/wago/v1/controllers/+/configuration/reported'),
+    ).toBeNull();
   });
 
   it.each(['', '/', 'customer//wago', 'customer/+/wago', 'customer/#/wago'])(

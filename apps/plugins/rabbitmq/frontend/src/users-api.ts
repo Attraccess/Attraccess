@@ -55,11 +55,7 @@ export function deleteUser(mqttServerId: number, username: string): Promise<void
   return api.request<void>(`/${mqttServerId}/${encodeURIComponent(username)}`, { method: 'DELETE' });
 }
 
-export function setPermissions(
-  mqttServerId: number,
-  username: string,
-  permission: RabbitmqPermission
-): Promise<void> {
+export function setPermissions(mqttServerId: number, username: string, permission: RabbitmqPermission): Promise<void> {
   return api.request<void>(`/${mqttServerId}/${encodeURIComponent(username)}/permissions`, {
     method: 'PUT',
     body: permission,

@@ -66,7 +66,7 @@ export function expandCidr(cidr: string): string[] {
   }
   if (prefix < MIN_PREFIX_LENGTH) {
     throw new InvalidCidrError(
-      `subnet ${cidr} is too large to scan — use a prefix of /${MIN_PREFIX_LENGTH} or longer (e.g. /24)`
+      `subnet ${cidr} is too large to scan — use a prefix of /${MIN_PREFIX_LENGTH} or longer (e.g. /24)`,
     );
   }
 
@@ -77,7 +77,7 @@ export function expandCidr(cidr: string): string[] {
 
   if (!isPrivateIpv4(toIp(network))) {
     throw new InvalidCidrError(
-      `refusing to scan ${cidr}: only private networks (10/8, 172.16/12, 192.168/16, 169.254/16) may be scanned`
+      `refusing to scan ${cidr}: only private networks (10/8, 172.16/12, 192.168/16, 169.254/16) may be scanned`,
     );
   }
 

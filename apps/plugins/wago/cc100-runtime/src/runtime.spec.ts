@@ -460,7 +460,7 @@ describe('WagoRuntime', () => {
     expect(transport.published).toContainEqual(
       expect.objectContaining({
         topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: { id: 'command-1', status: 'accepted', error: undefined },
+        payload: expect.objectContaining({ id: 'command-1', status: 'accepted', error: undefined }),
       }),
     );
   });
@@ -999,7 +999,7 @@ describe('WagoRuntime', () => {
     expect(transport.published).toContainEqual(
       expect.objectContaining({
         topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: { id: 'command-1', status: 'duplicate', error: undefined },
+        payload: expect.objectContaining({ id: 'command-1', status: 'duplicate', error: undefined }),
       }),
     );
   });
@@ -1064,6 +1064,94 @@ describe('WagoRuntime', () => {
       expect.objectContaining({
         payload: expect.objectContaining({ connected: false, outputs: { load: false } }),
         retain: true,
+      }),
+    );
+  });
+
+  it('reserves operational message sequences without saving for every measurement', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport, device });
+    await runtime.start();
+    const save = jest.spyOn(store, 'save');
+
+    await runtime['publishOperational']('measurements', {
+      timestamp: '2026-09-01T00:00:00.000Z',
+      channelId: 'meter',
+      unit: 'percent',
+      value: 42,
+    });
+    await runtime['publishOperational']('measurements', {
+      timestamp: '2026-09-01T00:00:05.000Z',
+      channelId: 'meter',
+      unit: 'percent',
+      value: 43,
+    });
+
+    expect(save).not.toHaveBeenCalled();
+    expect(transport.published.filter((message) => message.topic.endsWith('/measurements'))).toContainEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({ sequence: 2, value: 42 }),
+      }),
+    );
+  });
+
+  it('does not publish from a sequence range whose reservation failed to save', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport, device });
+    await runtime.start();
+    runtime['sequence'] = 100;
+    runtime['reservedSequence'] = 100;
+    runtime['state'].sequence = 100;
+    const persist = store.save.bind(store);
+    const save = jest.spyOn(store, 'save').mockRejectedValueOnce(new Error('disk full')).mockImplementation(persist);
+
+    await expect(
+      runtime['publishOperational']('measurements', {
+        timestamp: '2026-09-01T00:00:00.000Z',
+        channelId: 'meter',
+        unit: 'percent',
+        value: 42,
+      }),
+    ).rejects.toThrow('disk full');
+    expect(runtime['reservedSequence']).toBe(100);
+    expect(runtime['state'].sequence).toBe(100);
+
+    await runtime['publishOperational']('measurements', {
+      timestamp: '2026-09-01T00:00:05.000Z',
+      channelId: 'meter',
+      unit: 'percent',
+      value: 43,
+    });
+
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(transport.published.filter((message) => message.topic.endsWith('/measurements'))).toContainEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({ sequence: 101, value: 43 }),
+      }),
+    );
+  });
+
+  it('does not let a concurrent state save overwrite a sequence reservation', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport, device });
+    await runtime.start();
+    runtime['sequence'] = 100;
+    runtime['reservedSequence'] = 100;
+    runtime['state'].sequence = 100;
+
+    const publish = runtime['publishOperational']('measurements', {
+      timestamp: '2026-09-01T00:00:00.000Z',
+      channelId: 'meter',
+      unit: 'percent',
+      value: 42,
+    });
+    const saveClaim = runtime.receiveClaim({ username: 'controller', password: 'secret' });
+    await Promise.all([publish, saveClaim]);
+
+    await expect(store.load()).resolves.toEqual(
+      expect.objectContaining({
+        credentials: { username: 'controller', password: 'secret' },
+        sequence: 200,
       }),
     );
   });

@@ -120,7 +120,10 @@ export const createCommissioningSession = (input: CreateCommissioningSessionInpu
   api.request<CommissioningSession>('/commissioning/sessions', { method: 'POST', body: input });
 
 export const confirmCommissioningHostKey = (id: number, hostKeyFingerprint: string) =>
-  api.request<CommissioningSession>(`/commissioning/sessions/${id}/confirm-host-key`, { method: 'POST', body: { hostKeyFingerprint } });
+  api.request<CommissioningSession>(`/commissioning/sessions/${id}/confirm-host-key`, {
+    method: 'POST',
+    body: { hostKeyFingerprint },
+  });
 
 export const listCommissioningSessions = (limit = 100, offset = 0) =>
   api.request<CommissioningSession[]>(`/commissioning/sessions?limit=${limit}&offset=${offset}`);

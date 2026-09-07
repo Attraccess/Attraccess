@@ -37,7 +37,7 @@ export class ShellyDeviceApiService {
         : [
             this.http.getJson(`http://${target.ipAddress}/rpc/Shelly.GetStatus`, target),
             this.http.getJson(`http://${target.ipAddress}/rpc/Shelly.GetConfig`, target),
-          ]
+          ],
     );
 
     return { generation: target.generation, status, config, fetchedAt: new Date().toISOString() };
@@ -67,7 +67,7 @@ export class ShellyDeviceApiService {
         realm,
         ha1: md5(`${username}:${realm}:${input.password}`),
       },
-      input
+      input,
     );
   }
 }

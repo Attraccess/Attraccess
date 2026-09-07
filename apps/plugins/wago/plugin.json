@@ -7,5 +7,5 @@
     "frontend": { "directory": "frontend", "entryPoint": "remoteEntry.js", "styles": "style.css" }
   },
   "attraccessVersion": { "min": "1.0.0" },
-  "permissions": ["DATABASE_ACCESS", "ACCESS_MQTT_SERVERS", "MANAGE_SECRETS"]
+  "permissions": ["DATABASE_ACCESS", "ACCESS_MQTT_SERVERS", "MANAGE_SECRETS", "TRIGGER_FLOWS"]
 }

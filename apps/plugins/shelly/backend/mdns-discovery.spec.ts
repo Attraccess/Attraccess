@@ -1,7 +1,9 @@
 import { buildQuery, discoverViaMdns, parseShellyAddresses } from './mdns-discovery';
 
 function encodeName(name: string): Buffer {
-  const parts = name.split('.').map((label) => Buffer.concat([Buffer.from([label.length]), Buffer.from(label, 'ascii')]));
+  const parts = name
+    .split('.')
+    .map((label) => Buffer.concat([Buffer.from([label.length]), Buffer.from(label, 'ascii')]));
   return Buffer.concat([...parts, Buffer.from([0])]);
 }
 
