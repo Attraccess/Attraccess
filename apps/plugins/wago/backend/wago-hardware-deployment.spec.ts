@@ -1,6 +1,7 @@
 import { chmodSync, existsSync, lstatSync, mkdirSync, renameSync, rmSync, statSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fw31ShellFixture } from './fixtures/fw31-shell-fixture';
+import { wagoCodesysClassificationShell } from './wago-codesys-classification';
 import { fw31Model, fw31Revisions } from './fixtures/fw31-identity';
 import {
   WAGO_DIN,
@@ -355,13 +356,19 @@ describe('FW31 destructive commissioning shell (isolated vendor command fixtures
   });
 
   it('blocks an unowned open writable DOUT descriptor before changing IO permissions', () => {
+    fixture.file('proc/99/comm', 'writer\n');
     fixture.file('proc/99/status', 'Uid: 20000 20000 20000 20000\nGid: 20000 20000 20000 20000\nGroups: 20000\n');
     fixture.file('proc/99/stat', '99 (writer) S ' + '0 '.repeat(18) + '999\n');
     fixture.file('proc/99/fdinfo/7', 'flags: 0100001\n');
     mkdirSync(join(fixture.root, 'proc/99/fd'));
     symlinkSync(join(fixture.root, WAGO_DOUT), join(fixture.root, 'proc/99/fd/7'));
     const owners = fixture.read('owners.json');
-    expect(prepare().status).not.toBe(0);
+    expect(
+      fixture.run(`root='${fixture.root}'\n${wagoCodesysClassificationShell()}\nwago_codesys_classify`).stdout,
+    ).toBe('inactive\n');
+    const result = prepare();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('unknown');
     expect(fixture.read('owners.json')).toBe(owners);
     expect(existsSync(join(fixture.root, journal, 'started'))).toBe(false);
   });
@@ -393,6 +400,9 @@ const fs=require('node:fs'),root=process.env.FIXTURE_ROOT;
 const state=JSON.parse(fs.readFileSync(root+'/containers.json','utf8'));
 state[0].running=false;fs.writeFileSync(root+'/containers.json',JSON.stringify(state));
 fs.rmSync(root+'/proc/42',{recursive:true,force:true});fs.writeFileSync(root+'/plc','running');
+fs.mkdirSync(root+'/proc/77',{recursive:true});fs.writeFileSync(root+'/proc/77/comm','codesys3\\n');
+fs.writeFileSync(root+'/proc/77/stat','77 (codesys3) S '+'0 '.repeat(18)+'77'+' 0'.repeat(30)+'\\n');
+fs.writeFileSync(root+'/proc/77/exe','synthetic runtime executable');
 `,
       0o700,
     );

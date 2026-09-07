@@ -25,6 +25,15 @@ export function fw31ShellFixture(statStyle: 'native' | 'terse' = 'native') {
   const file = (path: string, content: string, mode = 0o600) => {
     mkdirSync(dirname(join(root, path)), { recursive: true, mode: 0o700 });
     writeFileSync(join(root, path), content, { mode });
+    if (path === 'plc') {
+      const plc = join(root, 'proc/77');
+      if (content === 'running') {
+        mkdirSync(join(plc, 'fd'), { recursive: true });
+        writeFileSync(join(plc, 'comm'), 'codesys3\n');
+        writeFileSync(join(plc, 'stat'), '77 (codesys3) S ' + '0 '.repeat(18) + '77' + ' 0'.repeat(30) + '\n');
+        writeFileSync(join(plc, 'exe'), 'synthetic runtime executable');
+      } else rmSync(plc, { recursive: true, force: true });
+    }
   };
   const read = (path: string) => readFileSync(join(root, path), 'utf8');
   const executable = (path: string, source: string) => file(path, `#!${process.execPath}\n${source}`, 0o700);
@@ -46,6 +55,7 @@ export function fw31ShellFixture(statStyle: 'native' | 'terse' = 'native') {
     wc: '/usr/bin/wc',
     tr: '/usr/bin/tr',
     sed: '/usr/bin/sed',
+    sort: '/usr/bin/sort',
     base64: '/usr/bin/base64',
   }))
     symlinkSync(path, join(root, 'bin', name));
@@ -58,6 +68,7 @@ export function fw31ShellFixture(statStyle: 'native' | 'terse' = 'native') {
   file('proc/self/uid_map', '0 0 4294967295\n');
   file('proc/self/gid_map', '0 0 4294967295\n');
   file('proc/1/status', 'Uid:\t0\t0\t0\t0\nGid:\t0\t0\t0\t0\nGroups:\t0\n');
+  file('proc/1/comm', 'init\n');
   file('proc/1/stat', '1 (init) S 0 ' + '0 '.repeat(17) + '1\n');
   file('proc/1/cgroup', '0::/\n');
   mkdirSync(join(root, 'proc/1/fd'));
@@ -157,6 +168,16 @@ process.exit(r.status ?? 124);`,
     `
 const fs=require('node:fs'),root=process.env.FIXTURE_ROOT,f=process.env.FAULT;
 if(f==='ps-failed')process.exit(1);
+if(process.argv.slice(2).join(' ')==='-eo pid=,comm='){
+ const counter=root+'/ps-scans',n=fs.existsSync(counter)?Number(fs.readFileSync(counter))+1:1;
+ fs.writeFileSync(counter,String(n));
+ if(f==='ps-partial-failed'){console.log('1 init');process.exit(1);}
+ if(fs.existsSync(root+'/ps-output')){process.stdout.write(fs.readFileSync(root+'/ps-output'));process.exit(0);}
+ for(const pid of fs.readdirSync(root+'/proc').filter(p=>/^[1-9][0-9]*$/.test(p)).sort((a,b)=>Number(a)-Number(b))){
+  console.log(pid+' '+fs.readFileSync(root+'/proc/'+pid+'/comm','utf8').replace(/\\n$/,''));
+ }
+ process.exit(0);
+}
 if(fs.readFileSync(root+'/plc','utf8')==='running')console.log(f==='codesys2'?'plclinux_rt':'codesys3');
 if(f==='docker-info-failed')console.log('dockerd');`,
   );
@@ -243,7 +264,7 @@ if(a[0]==='status')process.exit(0);
 if(a[0]!=='stop'||!['1','2'].includes(a[1]))process.exit(99);
 fs.appendFileSync(root+'/vendor.log','runtime '+a.join(' ')+'\\n');
 if(f==='codesys-stop-failed')process.exit(1);
-if(f!=='codesys-stop-stuck')fs.writeFileSync(root+'/plc','stopped');`,
+if(f!=='codesys-stop-stuck'){fs.writeFileSync(root+'/plc','stopped');fs.rmSync(root+'/proc/77',{recursive:true,force:true});}`,
   );
   executable(
     'etc/config-tools/config_runtime',
@@ -310,6 +331,7 @@ const syncProcess=c=>{
  const p=root+'/proc/'+(c.pid||42);
  if(!c.running){fs.rmSync(p,{recursive:true,force:true});return;}
  fs.mkdirSync(p+'/fd',{recursive:true});
+ fs.writeFileSync(p+'/comm','runtime\\n');
  fs.writeFileSync(p+'/status','Uid: 10001 10001 10001 10001\\nGid: 10001 10001 10001 10001\\nGroups: 10001\\n');
  fs.writeFileSync(p+'/stat',(c.pid||42)+' (runtime) S '+'0 '.repeat(18)+'1234\\n');
  fs.writeFileSync(p+'/cgroup','0::/docker/'+fullId(c)+'\\n');
@@ -361,6 +383,7 @@ if(args[0]==='container'&&args[1]==='ls'){
       for (const container of containers) {
         if (container.name !== 'attraccess-wago' || !container.running) continue;
         const path = `proc/${container.pid || 42}`;
+        file(path + '/comm', 'runtime\n');
         file(path + '/status', 'Uid: 10001 10001 10001 10001\nGid: 10001 10001 10001 10001\nGroups: 10001\n');
         file(path + '/stat', `${container.pid || 42} (runtime) S ` + '0 '.repeat(18) + '1234\n');
         file(
@@ -372,13 +395,15 @@ if(args[0]==='container'&&args[1]==='ls'){
         mkdirSync(join(root, path, 'fd'), { recursive: true });
       }
     },
-    run: (script: string, fault = '', input?: Buffer, timeout = 60000) =>
-      spawnSync('/bin/sh', ['-c', `${script}\nstatus=$?\nexit "$status"`], {
+    run: (script: string, fault = '', input?: Buffer, timeout = 60000) => {
+      if (fault === 'codesys2' && read('plc') === 'running') file('proc/77/comm', 'plclinux_rt\n');
+      return spawnSync('/bin/sh', ['-c', `${script}\nstatus=$?\nexit "$status"`], {
         input,
         encoding: 'utf8',
         timeout,
         env: { PATH: join(root, 'bin'), FIXTURE_ROOT: root, TMPDIR: join(root, 'tmp'), FAULT: fault },
-      }),
+      });
+    },
     dispose: () => rmSync(root, { recursive: true, force: true }),
   };
 }

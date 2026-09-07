@@ -232,7 +232,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
         // Sample at invocation time so the real clock gate verifies fresh, aligned UTC.
         return `epoch=${Math.floor(Date.now() / 1000)}\nuptime=120.00\nboot=11111111-1111-4111-8111-111111111111\ntool=supported\n`;
       }
-      return `${fw31IdentityOutput()}\nCODESYS=\n`;
+      return `${fw31IdentityOutput()}\nCODESYS=inactive\n`;
     });
     commissioning['copyTo'] = jest.fn(async () => undefined);
     await commissioning.onApplicationBootstrap();
