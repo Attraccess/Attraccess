@@ -168,7 +168,13 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
 
   afterTransactionCommit({ queryRunner }: TransactionCommitEvent): void {
     // Nested transaction commits release a savepoint; wait for the owning transaction.
-    if (queryRunner.isTransactionActive) return;
+    if (queryRunner.isTransactionActive) {
+      const transactionDepth = this.transactionDepth(queryRunner);
+      for (const event of this.billingEvents.get(queryRunner) ?? []) {
+        event.transactionDepth = Math.min(event.transactionDepth, transactionDepth);
+      }
+      return;
+    }
     const events = this.billingEvents.get(queryRunner);
     if (!events) return;
     this.billingEvents.delete(queryRunner);

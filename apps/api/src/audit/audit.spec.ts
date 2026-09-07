@@ -227,6 +227,38 @@ describe('durable audit SQLite', () => {
     expect((await service.list({ limit: 10 })).items.map((item) => item.subjectId)).toEqual([8]);
   });
 
+  it('retains billing events from a committed savepoint when a sibling savepoint rolls back', async () => {
+    await store.setPlainSetting('audit', 'domains', '["billing"]');
+    let committedReceipt: Promise<{ status: string }> | undefined;
+    let rolledBackReceipt: Promise<{ status: string }> | undefined;
+    await source.transaction(async (manager) => {
+      await manager.transaction(async (nestedManager) => {
+        committedReceipt = service.recordBillingTransactionAfterCommit({
+          transactionId: 8,
+          userId: 42,
+          amount: 0,
+          status: 'pending',
+          source: 'resource-usage',
+        }, nestedManager);
+      });
+      await expect(
+        manager.transaction(async (nestedManager) => {
+          rolledBackReceipt = service.recordBillingTransactionAfterCommit({
+            transactionId: 9,
+            userId: 42,
+            amount: 0,
+            status: 'pending',
+            source: 'resource-usage',
+          }, nestedManager);
+          throw new Error('nested rollback');
+        }),
+      ).rejects.toThrow('nested rollback');
+    });
+    await expect(committedReceipt).resolves.toEqual({ status: 'recorded' });
+    await expect(rolledBackReceipt).resolves.toEqual({ status: 'unavailable' });
+    expect((await service.list({ limit: 10 })).items.map((item) => item.subjectId)).toEqual([8]);
+  });
+
   it('persists every registered action lifecycle and preserves manual command and profile references', async () => {
     for (const action of AUDIT_ACTIONS) {
       for (const terminal of ['succeeded', 'failed'] as const) {
