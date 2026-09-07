@@ -315,14 +315,28 @@ describe('FW31 destructive commissioning shell (isolated vendor command fixtures
     expect(fixture.containers()[0].running).toBe(false);
   });
 
-  it.each(['start', 'supervise'])('contains an overall %s observation timeout', (action) => {
-    fixture.file('etc/attraccess-wago/runtime-enabled', '');
-    fixture.setContainers([{ id: 'new', name: 'attraccess-wago', running: true, restart: 'no' }]);
-    const result = fixture.run(`set -- ${action}\n` + wagoRuntimeBootScript(fixture.root), 'gate-timeout');
-    expect(result.status).not.toBe(0);
-    expect(fixture.containers()[0].running).toBe(false);
-    expect(existsSync(join(fixture.root, 'etc/attraccess-wago/runtime-enabled'))).toBe(false);
+  it('bounds both complete gate entry points to 300 seconds with a five-second kill grace', () => {
+    const script = wagoRuntimeBootScript();
+    expect(script).toContain('observation=$(timeout -k 5 300 "$hook" "$cycle" 8>&-)');
+    expect(script).toContain('if timeout -k 5 300 "$hook" "$action-checked"; then');
+    expect(script.match(/timeout -k 5 300 "\$hook"/g)).toHaveLength(2);
   });
+
+  it.each(['start', 'supervise'])(
+    'contains an overall %s observation timeout without acknowledging readiness',
+    (action) => {
+      fixture.file('etc/attraccess-wago/runtime-enabled', '');
+      const request = `etc/attraccess-wago/supervisor-start.${token}`;
+      fixture.file(request + '/pending', '');
+      fixture.setContainers([{ id: 'new', name: 'attraccess-wago', running: true, restart: 'no' }]);
+      const result = fixture.run(`set -- ${action}\n` + wagoRuntimeBootScript(fixture.root), 'gate-timeout');
+      expect(result.status).toBe(124);
+      expect(fixture.containers()[0].running).toBe(false);
+      expect(existsSync(join(fixture.root, 'etc/attraccess-wago/runtime-enabled'))).toBe(false);
+      expect(existsSync(join(fixture.root, request, 'ready'))).toBe(false);
+      expect(fixture.read('docker.log')).not.toContain('start attraccess-wago');
+    },
+  );
 
   it.each(['ps-failed', 'docker-list-failed', 'docker-inspect-failed', 'readlink-failed'])(
     'contains an already running runtime when boot observation fails: %s',
@@ -416,6 +430,23 @@ fs.writeFileSync(root+'/proc/77/exe','synthetic runtime executable');
   it('caps host-supervised crash starts at five without delegating a retry to Docker', () => {
     fixture.file('etc/attraccess-wago/runtime-enabled', '');
     fixture.setContainers([{ id: 'new', name: 'attraccess-wago', running: false, restart: 'no' }]);
+    // Exercise the supervisor's counter without repeating six full hardware
+    // gates. The real watch gate's refusal to start is checked separately below.
+    fixture.file(
+      'etc/rc.d/S99_zz_attraccess_wago',
+      `#!/bin/sh
+set -eu
+printf '%s\\n' "$1" >> "$FIXTURE_ROOT/gate-actions"
+case "$1" in
+  cycle)
+    docker --host unix:///var/run/docker.sock start attraccess-wago >/dev/null
+    echo started ;;
+  watch) echo 'Fixture watch refused restart' >&2; exit 1 ;;
+  *) exit 99 ;;
+esac
+`,
+      0o700,
+    );
     fixture.file(
       'bin/sleep',
       `#!${process.execPath}
@@ -426,9 +457,12 @@ fs.rmSync(root+'/proc/42',{recursive:true,force:true});
 `,
       0o700,
     );
-    const result = fixture.run('set -- supervise\n' + wagoRuntimeBootScript(fixture.root), '', undefined, 60000);
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain('Runtime crash retry limit reached');
+    const result = fixture.run('set -- supervise\n' + wagoRuntimeBootScript(fixture.root));
+    expect(result.error).toBeUndefined();
+    expect(result.signal).toBeNull();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toBe('Fixture watch refused restart\n');
+    expect(fixture.read('gate-actions').trim().split('\n')).toEqual(['cycle', 'cycle', 'cycle', 'cycle', 'cycle', 'watch']);
     expect(
       fixture
         .read('docker.log')
@@ -438,6 +472,19 @@ fs.rmSync(root+'/proc/42',{recursive:true,force:true});
     expect(fixture.containers()[0]).toMatchObject({ running: false, restart: 'no' });
     expect(existsSync(join(fixture.root, 'etc/attraccess-wago/runtime-enabled'))).toBe(false);
   }, 65000);
+
+  it('refuses a crash restart through the real watch gate and contains the runtime', () => {
+    fixture.file('etc/attraccess-wago/runtime-enabled', '');
+    fixture.setContainers([{ id: 'new', name: 'attraccess-wago', running: false, restart: 'no' }]);
+    const result = fixture.run('set -- watch\n' + wagoRuntimeBootScript(fixture.root));
+    expect(result.error).toBeUndefined();
+    expect(result.signal).toBeNull();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Runtime crash retry limit reached');
+    expect(fixture.read('docker.log')).not.toContain('start attraccess-wago');
+    expect(fixture.containers()[0]).toMatchObject({ running: false, restart: 'no' });
+    expect(existsSync(join(fixture.root, 'etc/attraccess-wago/runtime-enabled'))).toBe(false);
+  });
 
   it('reapplies narrow permissions on reboot and starts only after the gate succeeds', () => {
     expect(prepare().status).toBe(0);

@@ -153,7 +153,7 @@ console.log(args[1].replace(/%[ugahdi]/g,v=>values[v]));`,
     'bin/timeout',
     `
 const args=process.argv.slice(2);
-if(args[0]!=='-k'||args[1]!=='5'||!['10','30','45'].includes(args[2]))process.exit(99);
+if(args[0]!=='-k'||args[1]!=='5'||!['10','30','45','300'].includes(args[2]))process.exit(99);
 if(process.env.FAULT==='gate-timeout'&&args[3].endsWith('/S99_zz_attraccess_wago'))process.exit(124);
 const root=process.env.FIXTURE_ROOT;
 const privilegeLifecycle=['privilege-deadline','privilege-delayed'].includes(process.env.FAULT)&&['setpriv','capsh'].some(tool=>args[3]===root+'/bin/'+tool)&&args[4]!=='--help';

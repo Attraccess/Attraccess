@@ -20,12 +20,25 @@ launch_runtime_supervisor() {
   # Defer a catchable interruption until rollback can again own install.lock.
   trap 'supervisor_interrupted=1' HUP INT TERM
   exec 9>&-
-  supervisor_attempt=0
+  # FW31's complete gate has measured 173s. Allow 300s of polling for each
+  # handoff phase, without changing the supervisor's lease/recovery policy.
+  supervisor_wait_remaining=300
+  supervisor_candidate=
   supervisor_acknowledged=0
-  while test "$supervisor_attempt" -lt 15; do
+  while test "$supervisor_wait_remaining" -gt 0 && test "$supervisor_interrupted" = 0; do
     # Existing owners acknowledge only after completing a gate under install.lock.
-    nohup "$hook" supervise </dev/null >/dev/null 2>&1 9>&- &
+    # Do not pile up workers while a candidate is starting or an owner is gating.
+    if { test -n "$supervisor_candidate" && kill -0 "$supervisor_candidate" 2>/dev/null; } ||
+      { test -f "$config/supervisor.lock" && test ! -L "$config/supervisor.lock" &&
+        test "$(stat -c '%u:%g:%a:%h' "$config/supervisor.lock")" = 0:0:600:1 &&
+        (exec 8<>"$config/supervisor.lock"; ! flock -n 8); }; then
+      :
+    else
+      nohup "$hook" supervise </dev/null >/dev/null 2>&1 9>&- &
+      supervisor_candidate=$!
+    fi
     sleep 2 || break
+    supervisor_wait_remaining=$((supervisor_wait_remaining - 2))
     if test -e "$supervisor_launch/ready" || test -L "$supervisor_launch/ready"; then
       if test -f "$supervisor_launch/ready" && test ! -L "$supervisor_launch/ready" &&
         test "$(stat -c '%u:%g:%a:%h' "$supervisor_launch/ready")" = 0:0:600:1; then
@@ -33,9 +46,8 @@ launch_runtime_supervisor() {
       fi
       break
     fi
-    supervisor_attempt=$((supervisor_attempt + 1))
   done
-  supervisor_attempt=0
+  supervisor_wait_remaining=300
   if ! { test -f "$config/install.lock" && test ! -L "$config/install.lock" &&
     test "$(stat -c '%u:%g:%a:%h' "$config/install.lock")" = 0:0:600:1; }; then
     rm -rf "$supervisor_launch"
@@ -44,8 +56,7 @@ launch_runtime_supervisor() {
   fi
   exec 9<>"$config/install.lock"
   until flock -n 9; do
-    supervisor_attempt=$((supervisor_attempt + 1))
-    if test "$supervisor_attempt" -ge 15 || ! sleep 2; then
+    if test "$supervisor_wait_remaining" -le 0 || ! sleep 2; then
       rm -rf "$supervisor_launch"
       # Leave recovery ownership intact. Neither the caller nor its outer boot
       # wrapper may roll back a different transaction while this lock is held.
@@ -53,6 +64,7 @@ launch_runtime_supervisor() {
       echo 'Runtime supervisor handoff lock unverified; recovery required' >&2
       exit 75
     fi
+    supervisor_wait_remaining=$((supervisor_wait_remaining - 2))
   done
   trap - EXIT HUP INT TERM
   . "$supervisor_launch/traps"
