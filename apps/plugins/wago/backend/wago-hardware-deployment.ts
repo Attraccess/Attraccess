@@ -258,6 +258,9 @@ test "$(stat -c '%u:%g:%a' "$root${WAGO_DIN}")" = 10001:10001:400 &&
 /** Docker cannot restart this writer. Every boot, explicit start and bounded
  * crash retry passes the host gate. The supervisor also withdraws a running
  * writer when its periodic observation detects a conflict or cannot complete.
+ * The 300s gate budget accommodates the observed FW31 172543ms hardware check
+ * (161064ms host IO, 8995ms CODESYS), within the 30-minute operation limit.
+ * This timing allowance is not safety certification or physical qualification.
  */
 export function wagoRuntimeBootScript(testRoot = ''): string {
   return `#!/bin/sh
@@ -312,7 +315,7 @@ case "$action" in
       set -- "$config"/supervisor-start.*
       cycle=cycle
       test "$retries" -lt 5 || cycle=watch
-      if observation=$(timeout -k 5 45 "$hook" "$cycle" 8>&-); then
+      if observation=$(timeout -k 5 300 "$hook" "$cycle" 8>&-); then
         busy=0
         case "$observation" in
           started) retries=$((retries + 1)) ;;
@@ -339,7 +342,7 @@ case "$action" in
     supervisor_owner=1
     # Bound the complete gate, including host /proc and filesystem observations.
     # The outer owner contains a timeout even if the child cannot run its trap.
-    if timeout -k 5 45 "$hook" "$action-checked"; then
+    if timeout -k 5 300 "$hook" "$action-checked"; then
       exit 0
     else
       status=$?

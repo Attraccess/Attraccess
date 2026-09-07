@@ -1,8 +1,13 @@
 /** GNU metadata formats used by our guards, with the FW31 BusyBox terse ABI only. */
 export function wagoShellStat(): string {
   return String.raw`
+# Private shell state: probe -> native|terse, or invalid on any probe failure.
+# Reset at every emission: inherited environment values are never evidence.
+wago_stat_mode=probe
 stat() (
   export LC_ALL=C
+  case "$wago_stat_mode" in probe|native|terse) ;; *) exit 1 ;; esac
+  export WAGO_STAT_MODE="$wago_stat_mode"
   test "$#" = 3 || exit 1
   case "$1" in -c) terse=-t ;; -Lc) terse=-Lt ;; *) exit 1 ;; esac
   case "$2" in '%u'|'%u:%a'|'%u:%a:%h'|'%u:%g'|'%u:%g:%a'|'%u:%g:%a:%h'|'%d:%i') ;; *) exit 1 ;; esac
@@ -12,8 +17,11 @@ stat() (
   test "${'$'}{#WAGO_STAT_PATH}" -le 4096 || exit 1
   wago_stat_invalid=$(printf '\001')
   # Bound captured bytes and retain the producer status even without pipefail.
+  # Mark failures too; the outer dot preserves newlines at the byte limit so
+  # truncated output cannot impersonate a complete successful capture.
   wago_stat_capture() {
-    wago_stat_output=$( (command stat "$@" 2>/dev/null && printf '\nWAGO_STAT_OK') | dd bs=1 count=8193 2>/dev/null | tr '\000' '\001') || return 1
+    wago_stat_output=$( (if command stat "$@" 2>/dev/null; then printf '\nWAGO_STAT_OK'; else printf '\nWAGO_STAT_FAILED'; fi) | dd bs=1 count=8193 2>/dev/null | tr '\000' '\001' && printf '.') || return 1
+    wago_stat_output=${'$'}{wago_stat_output%.}
     test "${'$'}{#wago_stat_output}" -le 8192 || return 1
     case "$wago_stat_output" in *"$wago_stat_invalid"*) return 1 ;; esac
     case "$wago_stat_output" in *'
@@ -24,7 +32,7 @@ WAGO_STAT_OK'} ;; *) return 1 ;; esac
   }
   # Prefer the native observation. Only the positively identified no-format
   # BusyBox build below may fall back; native tool file errors remain failures.
-  if wago_stat_capture "$1" "$2" "$WAGO_STAT_PATH"; then
+  if test "$wago_stat_mode" != terse && wago_stat_capture "$1" "$2" "$WAGO_STAT_PATH"; then
     printf '%s' "$wago_stat_output" | awk '
       BEGIN { n=split(ENVIRON["WAGO_STAT_FORMAT"], f, ":") }
       NR != 1 || NF != 1 { bad=1 }
@@ -35,17 +43,25 @@ WAGO_STAT_OK'} ;; *) return 1 ;; esac
           if (f[i]=="%a" && (a[i] !~ /^[0-7]+$/ || length(a[i])>4)) bad=1
         }
         result=$0 }
-      END { if (bad || NR!=1) exit 1; print result }'
+      END { if (bad || NR!=1) exit 1; print (ENVIRON["WAGO_STAT_MODE"]=="probe" ? "native" : result) }'
     exit $?
   fi
-  # Do not infer compatibility from a failed -c invocation alone.
-  wago_stat_help=$(command stat --help 2>&1 | dd bs=1 count=8193 2>/dev/null | tr '\000' '\001') || exit 1
-  test "${'$'}{#wago_stat_help}" -le 8192 || exit 1
-  case "$wago_stat_help" in *"$wago_stat_invalid"*) exit 1 ;; esac
-  printf '%s\n' "$wago_stat_help" | awk '
-    /^BusyBox v1[.]37[.]0 \(.*\) multi-call binary[.]$/ { version++ }
-    /^Usage: stat \[-ltf\] FILE[.][.][.]$/ { usage++ }
-    END { exit (version!=1 || usage!=1) }' || exit 1
+  if test "$wago_stat_mode" != terse; then
+    # A verified native tool's file errors must never trigger fallback.
+    test "$wago_stat_mode" = probe || exit 1
+    # Do not infer compatibility from a failed -c invocation alone.
+    wago_stat_help=$( (if command stat --help 2>&1; then printf '\nWAGO_STAT_OK'; else printf '\nWAGO_STAT_FAILED'; fi) | dd bs=1 count=8193 2>/dev/null | tr '\000' '\001' && printf '.') || exit 1
+    wago_stat_help=${'$'}{wago_stat_help%.}
+    test "${'$'}{#wago_stat_help}" -le 8192 || exit 1
+    case "$wago_stat_help" in *"$wago_stat_invalid"*) exit 1 ;; esac
+    case "$wago_stat_help" in *'
+WAGO_STAT_OK') wago_stat_help=${'$'}{wago_stat_help%'
+WAGO_STAT_OK'} ;; *) exit 1 ;; esac
+    printf '%s\n' "$wago_stat_help" | awk '
+      /^BusyBox v1[.]37[.]0 \(.*\) multi-call binary[.]$/ { version++ }
+      /^Usage: stat \[-ltf\] FILE[.][.][.]$/ { usage++ }
+      END { exit (version!=1 || usage!=1) }' || exit 1
+  fi
   wago_stat_capture "$terse" "$WAGO_STAT_PATH" || exit 1
   printf '%s' "$wago_stat_output" | awk '
     function decimal(s) {
@@ -98,7 +114,10 @@ WAGO_STAT_OK'} ;; *) return 1 ;; esac
       else if (fmt=="%d:%i") result=hexdecimal(a[6]) ":" a[7]
       else bad=1
     }
-    END { if (bad || NR!=1) exit 1; print result }'
+    END { if (bad || NR!=1) exit 1; print (ENVIRON["WAGO_STAT_MODE"]=="probe" ? "terse" : result) }'
 )
+# Probe an existing root, not a requested file whose native error could be
+# mistaken for an unsupported option. Function arguments leave caller "$@" intact.
+wago_stat_mode=$(stat -c '%u:%g:%a' "${'$'}{root:-/}") || wago_stat_mode=invalid
 `;
 }

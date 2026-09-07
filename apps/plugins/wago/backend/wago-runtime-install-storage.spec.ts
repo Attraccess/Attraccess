@@ -28,6 +28,11 @@ describe('read-only runtime capacity preflight (isolated commands only)', () => 
 const fs=require('node:fs'), root=process.env.FIXTURE_ROOT, args=process.argv.slice(2);
 const statPath=args.at(-1);
 if(args[0]==='--help'){console.log('BusyBox v1.37.0 () multi-call binary.\\nUsage: stat [-ltf] FILE...');process.exit(0);}
+// The capability probe observes only the isolated root, not a capacity path.
+if(args[0]==='-t'&&(statPath==='/'||statPath===root)){
+ const s=fs.lstatSync(root,{bigint:true});
+ console.log(statPath+' '+[s.size,s.blocks,s.mode.toString(16),s.uid,s.gid,s.dev.toString(16),s.ino,s.nlink,0,0,1,1,1,s.blksize].join(' '));process.exit(0);
+}
 const paths=['/etc/attraccess-wago','/tmp','/var/lib',fs.existsSync(root+'/docker-root')?fs.readFileSync(root+'/docker-root','utf8').slice(root.length):'/home'];
 if(args.at(-1)===root+'/etc')args[args.length-1]=root+'/etc/attraccess-wago';
 const i=paths.indexOf(args.at(-1).slice(root.length));
@@ -279,7 +284,7 @@ console.log(fs.existsSync(root+'/docker-root')?fs.readFileSync(root+'/docker-roo
   it.each([run, runStaging])('uses validated native device/inode pairs when available', (check) => {
     fixture.file(
       'bin/stat',
-      '#!/bin/sh\ntest "$1" = -Lc && test "$2" = "%d:%i" || exit 99\nprintf "1:123\\n"\n',
+      '#!/bin/sh\nif test "$1" = -c && test "$2" = "%u:%g:%a" && test "$3" = /; then printf "0:0:700\\n"; exit 0; fi\ntest "$1" = -Lc && test "$2" = "%d:%i" || exit 99\nprintf "1:123\\n"\n',
       0o700,
     );
     layout([1, 1, 1, 1], Array(4).fill(5 * b + reserve));
@@ -289,7 +294,11 @@ console.log(fs.existsSync(root+'/docker-root')?fs.readFileSync(root+'/docker-roo
   it.each(['1', '1:bad', '1:2:3', '01:2', '1:18446744073709551616', '1:2\n1:2'])(
     'rejects malformed native identity %j in both standalone checks',
     (identity) => {
-      fixture.file('bin/stat', `#!${process.execPath}\nconsole.log(${JSON.stringify(identity)});`, 0o700);
+      fixture.file(
+        'bin/stat',
+        `#!${process.execPath}\nconst args=process.argv.slice(2);console.log(args[0]==='-c'&&args[1]==='%u:%g:%a'&&args[2]==='/'?'0:0:700':${JSON.stringify(identity)});`,
+        0o700,
+      );
       expect(run().stderr).toContain('Cannot identify storage filesystem');
       expect(runStaging().stderr).toContain('Cannot identify storage filesystem');
     },
