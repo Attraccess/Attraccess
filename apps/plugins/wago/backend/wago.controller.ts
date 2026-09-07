@@ -108,7 +108,10 @@ export class WagoControllerApi {
       this.wago.claim(id, body?.name ?? '', body?.verifier ?? '', body?.mqttServerId),
     );
   }
-  @Delete('controllers/:id') async removeController(@Param('id', ParseIntPipe) id: number, @Req() request: AuthenticatedRequest) {
+  @Delete('controllers/:id') async removeController(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: AuthenticatedRequest,
+  ) {
     const hardwareId = await this.audit.run(wagoAuditPrincipal(request), id, 'unclaim', {}, () => this.wago.remove(id));
     await this.commissioning.removeByHardwareId(hardwareId);
   }
@@ -151,17 +154,32 @@ export class WagoControllerApi {
   ) {
     return this.wago.revisionsFor(id, Number(offset), Number(limit));
   }
-  @Post('controllers/:id/configuration/publish') publishDraft(@Param('id', ParseIntPipe) id: number, @Req() request: AuthenticatedRequest) {
-    return this.audit.run(wagoAuditPrincipal(request), id, 'publication', {}, () => this.wago.publishDraft(id),
-      (published) => ({ revision: published.revision }));
+  @Post('controllers/:id/configuration/publish') publishDraft(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.audit.run(
+      wagoAuditPrincipal(request),
+      id,
+      'publication',
+      {},
+      () => this.wago.publishDraft(id),
+      (published) => ({ revision: published.revision }),
+    );
   }
   @Post('controllers/:id/configuration/rollback/:revision') rollback(
     @Param('id', ParseIntPipe) id: number,
     @Param('revision', ParseIntPipe) revision: number,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.audit.run(wagoAuditPrincipal(request), id, 'rollback', { sourceRevision: revision }, () => this.wago.rollback(id, revision),
-      (published) => ({ revision: published.revision }));
+    return this.audit.run(
+      wagoAuditPrincipal(request),
+      id,
+      'rollback',
+      { sourceRevision: revision },
+      () => this.wago.rollback(id, revision),
+      (published) => ({ revision: published.revision }),
+    );
   }
   @Get('controllers/:id/configuration/revisions/:revision/preview') previewRevision(
     @Param('id', ParseIntPipe) id: number,

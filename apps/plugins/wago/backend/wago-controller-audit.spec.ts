@@ -21,10 +21,34 @@ describe('WAGO HTTP administration audit hooks', () => {
   });
 
   const routes = [
-    { action: 'claim', call: () => controller.claim(12, { name: 'SECRET', verifier: 'SECRET' }, request), service: service.claim, value: { id: 12, password: 'SECRET' }, details: {} },
-    { action: 'unclaim', call: () => controller.removeController(12, request), service: service.remove, value: 'SECRET-hardware-id', details: {} },
-    { action: 'publication', call: () => controller.publishDraft(12, request), service: service.publishDraft, value: { revision: 8, snapshot: 'SECRET' }, details: { revision: 8 } },
-    { action: 'rollback', call: () => controller.rollback(12, 3, request), service: service.rollback, value: { revision: 9, snapshot: 'SECRET' }, details: { revision: 9, sourceRevision: 3 } },
+    {
+      action: 'claim',
+      call: () => controller.claim(12, { name: 'SECRET', verifier: 'SECRET' }, request),
+      service: service.claim,
+      value: { id: 12, password: 'SECRET' },
+      details: {},
+    },
+    {
+      action: 'unclaim',
+      call: () => controller.removeController(12, request),
+      service: service.remove,
+      value: 'SECRET-hardware-id',
+      details: {},
+    },
+    {
+      action: 'publication',
+      call: () => controller.publishDraft(12, request),
+      service: service.publishDraft,
+      value: { revision: 8, snapshot: 'SECRET' },
+      details: { revision: 8 },
+    },
+    {
+      action: 'rollback',
+      call: () => controller.rollback(12, 3, request),
+      service: service.rollback,
+      value: { revision: 9, snapshot: 'SECRET' },
+      details: { revision: 9, sourceRevision: 3 },
+    },
   ];
 
   it.each(routes)('audits successful $action after the service resolves', async (route) => {
@@ -34,10 +58,15 @@ describe('WAGO HTTP administration audit hooks', () => {
     });
     await route.call();
     expect(record).toHaveBeenCalledTimes(2);
-    expect(record).toHaveBeenLastCalledWith(expect.objectContaining({
-      action: `wago.${route.action}`, outcome: 'succeeded', details: route.details,
-      principal: { userId: 7, authenticationMethod: 'session' }, subject: { type: 'wago.controller', id: 12 },
-    }));
+    expect(record).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        action: `wago.${route.action}`,
+        outcome: 'succeeded',
+        details: route.details,
+        principal: { userId: 7, authenticationMethod: 'session' },
+        subject: { type: 'wago.controller', id: 12 },
+      }),
+    );
     expect(JSON.stringify(record.mock.calls)).not.toContain('SECRET');
     expect(warn).not.toHaveBeenCalled();
   });
@@ -46,7 +75,9 @@ describe('WAGO HTTP administration audit hooks', () => {
     const error = new Error('SECRET');
     route.service.mockRejectedValue(error);
     await expect(route.call()).rejects.toBe(error);
-    expect(record).toHaveBeenLastCalledWith(expect.objectContaining({ action: `wago.${route.action}`, outcome: 'failed' }));
+    expect(record).toHaveBeenLastCalledWith(
+      expect.objectContaining({ action: `wago.${route.action}`, outcome: 'failed' }),
+    );
     expect(JSON.stringify(record.mock.calls)).not.toContain('SECRET');
   });
 
