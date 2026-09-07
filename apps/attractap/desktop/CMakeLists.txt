@@ -33,6 +33,7 @@ find_package(SDL3 REQUIRED CONFIG)
 add_library(attractap-desktop-runtime
     src/host_runtime.cpp
     src/profile_store.cpp
+    src/virtual_nfc.cpp
     src/sdl_display.cpp)
 target_include_directories(attractap-desktop-runtime PUBLIC
     src
@@ -49,7 +50,8 @@ set_target_properties(attractap-desktop PROPERTIES
 add_executable(attractap-desktop-tests
     tests/main.cpp
     src/host_runtime.cpp
-    src/profile_store.cpp)
+    src/profile_store.cpp
+    src/virtual_nfc.cpp)
 target_include_directories(attractap-desktop-tests PRIVATE src)
 target_compile_options(attractap-desktop-tests PRIVATE -Wall -Wextra -Wpedantic)
 

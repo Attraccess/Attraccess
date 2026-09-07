@@ -1,5 +1,6 @@
 #include "host_runtime.hpp"
 #include "profile_store.hpp"
+#include "virtual_nfc.hpp"
 
 #include <cassert>
 #include <chrono>
@@ -30,6 +31,50 @@ int main()
     assert(caseDistinctPath.path() != differentCasePath.path());
     assert(sameProfile.remove("api.key"));
     assert(!sameProfile.remove("api.key"));
+
+    VirtualNfc nfc(first);
+    const VirtualNfc::Key enrolledKey{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+    uint8_t availableKey = 0;
+    int detected = 0;
+    int removed = 0;
+    nfc.setCardDetectedCallback([&](const uint8_t *, uint8_t) { ++detected; });
+    nfc.setCardRemovedCallback([&] { ++removed; });
+    assert(!nfc.getAvailableKeyNo(availableKey));
+    nfc.setPresent(true);
+    assert(detected == 1);
+    auto replacement = nfc.card();
+    replacement.uid[6] = 2;
+    nfc.setCard(replacement);
+    assert(removed == 1);
+    assert(detected == 2);
+    assert(nfc.getAvailableKeyNo(availableKey));
+    assert(availableKey == 1);
+    assert(!nfc.authenticate(availableKey, enrolledKey));
+    assert(nfc.changeKey(availableKey, VirtualNfc::factoryKey(), VirtualNfc::factoryKey(), enrolledKey));
+    assert(nfc.authenticate(availableKey, enrolledKey));
+    assert(nfc.card().keyVersions[availableKey] == 1);
+    nfc.setFaults(true, false);
+    assert(!nfc.authenticate(availableKey, enrolledKey));
+    nfc.setFaults(false, true);
+    assert(!nfc.changeKey(availableKey, VirtualNfc::factoryKey(), enrolledKey, VirtualNfc::factoryKey()));
+    nfc.setFaults(false, false);
+    nfc.setPresent(false);
+    assert(!nfc.authenticate(availableKey, enrolledKey));
+
+    VirtualNfc persisted(first);
+    assert(!persisted.card().present);
+    assert(persisted.card().keys[availableKey] == enrolledKey);
+    persisted.setPresent(true);
+    persisted.resetKeySlot(availableKey);
+    assert(persisted.authenticate(availableKey, VirtualNfc::factoryKey()));
+    assert(persisted.card().keyVersions[availableKey] == 0);
+    persisted.setKeyVersion(availableKey, 7);
+    assert(persisted.card().keyVersions[availableKey] == 7);
+    auto unknown = persisted.card();
+    unknown.type = VirtualNfc::CardType::Unknown;
+    persisted.setCard(unknown);
+    assert(!persisted.authenticate(availableKey, VirtualNfc::factoryKey()));
+    assert(!persisted.getAvailableKeyNo(availableKey));
 
     HostRuntime runtime;
     int value = 0;
