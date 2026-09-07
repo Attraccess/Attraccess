@@ -197,6 +197,36 @@ describe('durable audit SQLite', () => {
     expect((await service.list({ limit: 1 })).items).toHaveLength(0);
   });
 
+  it('retains outer billing events when a nested transaction rolls back', async () => {
+    await store.setPlainSetting('audit', 'domains', '["billing"]');
+    let outerReceipt: Promise<{ status: string }> | undefined;
+    let nestedReceipt: Promise<{ status: string }> | undefined;
+    await source.transaction(async (manager) => {
+      outerReceipt = service.recordBillingTransactionAfterCommit({
+        transactionId: 8,
+        userId: 42,
+        amount: 0,
+        status: 'pending',
+        source: 'resource-usage',
+      }, manager);
+      await expect(
+        manager.transaction(async (nestedManager) => {
+          nestedReceipt = service.recordBillingTransactionAfterCommit({
+            transactionId: 9,
+            userId: 42,
+            amount: 0,
+            status: 'pending',
+            source: 'resource-usage',
+          }, nestedManager);
+          throw new Error('nested rollback');
+        }),
+      ).rejects.toThrow('nested rollback');
+    });
+    await expect(outerReceipt).resolves.toEqual({ status: 'recorded' });
+    await expect(nestedReceipt).resolves.toEqual({ status: 'unavailable' });
+    expect((await service.list({ limit: 10 })).items.map((item) => item.subjectId)).toEqual([8]);
+  });
+
   it('persists every registered action lifecycle and preserves manual command and profile references', async () => {
     for (const action of AUDIT_ACTIONS) {
       for (const terminal of ['succeeded', 'failed'] as const) {

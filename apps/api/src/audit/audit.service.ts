@@ -43,7 +43,11 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
   private subscribed = false;
   private readonly billingEvents = new WeakMap<
     QueryRunner,
-    Array<{ event: BillingTransactionAuditEvent; resolve: (receipt: PluginAuditReceipt) => void }>
+    Array<{
+      event: BillingTransactionAuditEvent;
+      transactionDepth: number;
+      resolve: (receipt: PluginAuditReceipt) => void;
+    }>
   >();
 
   constructor(
@@ -157,7 +161,7 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     if (!queryRunner?.isTransactionActive) return this.recordBillingTransaction(event);
     return new Promise((resolve) => {
       const events = this.billingEvents.get(queryRunner) ?? [];
-      events.push({ event, resolve });
+      events.push({ event, transactionDepth: this.transactionDepth(queryRunner), resolve });
       this.billingEvents.set(queryRunner, events);
     });
   }
@@ -174,8 +178,17 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
   afterTransactionRollback({ queryRunner }: TransactionRollbackEvent): void {
     const events = this.billingEvents.get(queryRunner);
     if (!events) return;
-    this.billingEvents.delete(queryRunner);
-    for (const { resolve } of events) resolve({ status: 'unavailable' });
+    const transactionDepth = this.transactionDepth(queryRunner);
+    const retainedEvents = events.filter((event) => event.transactionDepth <= transactionDepth);
+    for (const event of events) {
+      if (event.transactionDepth > transactionDepth) event.resolve({ status: 'unavailable' });
+    }
+    if (retainedEvents.length) this.billingEvents.set(queryRunner, retainedEvents);
+    else this.billingEvents.delete(queryRunner);
+  }
+
+  private transactionDepth(queryRunner: QueryRunner): number {
+    return (queryRunner as QueryRunner & { transactionDepth: number }).transactionDepth;
   }
 
   private async recordSnapshot(event: Omit<AuditLog, 'id' | 'at'>): Promise<PluginAuditReceipt> {
