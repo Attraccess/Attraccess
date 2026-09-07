@@ -44,7 +44,6 @@ describe('WagoCommissioningService', () => {
       deleteEnrollmentById: jest.fn().mockResolvedValue(undefined),
       createEnrollment: jest.fn(),
       claim: jest.fn(),
-      isEnrollmentClaimed: jest.fn().mockResolvedValue(false),
     };
     const context = {
       getRepository: jest.fn().mockReturnValue(repository),
@@ -104,25 +103,23 @@ describe('WagoCommissioningService', () => {
     await expect(service.deliver(1, { confirmInstall: true })).rejects.toThrow('explicit valid SSH');
   });
 
-  it('reconciles an interrupted claim that already reached the claimed controller state', async () => {
+  it('fails closed when a claim is interrupted after the controller is marked claimed', async () => {
     const { service, session, repository, wago, inspect } = securityHarness({
       state: 'awaiting_claim',
       enrollmentId: 7,
     });
     repository.find.mockResolvedValue([session]);
-    wago.isEnrollmentClaimed.mockResolvedValue(true);
 
     await service.onApplicationBootstrap();
 
-    expect(wago.isEnrollmentClaimed).toHaveBeenCalledWith(session.hardwareId, session.mqttServerId, 7);
     expect(session).toMatchObject({
-      state: 'completed',
-      pairingCode: null,
-      failureReason: null,
-      progressPercent: 100,
-      progressStep: 'Commissioning complete',
+      state: 'delivery_failed',
+      enrollmentId: null,
+      failureReason: 'Commissioning was interrupted.',
+      progressStep: 'Delivery interrupted',
     });
-    expect(wago.revokeEnrollmentById).not.toHaveBeenCalled();
+    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(7);
+    expect(wago.deleteEnrollmentById).toHaveBeenCalledWith(7);
     expect(inspect).not.toHaveBeenCalled();
   });
 
