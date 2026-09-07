@@ -107,7 +107,12 @@ export function useDeliverCommissioningSessionMutation() {
     gcTime: 0,
     retry: false,
     networkMode: 'always',
-    mutationFn: (variables: Omit<Parameters<typeof deliverCommissioningSession>[1], 'confirmInstall'> & { id: number; confirmInstall: boolean }) => {
+    mutationFn: (
+      variables: Omit<Parameters<typeof deliverCommissioningSession>[1], 'confirmInstall'> & {
+        id: number;
+        confirmInstall: boolean;
+      },
+    ) => {
       const temporarySsh = { ...variables.temporarySsh };
       const confirmInstall = variables.confirmInstall;
       // React Query retains mutation variables, including after reset/unmount.

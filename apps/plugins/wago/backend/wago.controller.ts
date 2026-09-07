@@ -69,8 +69,12 @@ export class WagoControllerApi {
     @Body() body: { confirmInstall?: boolean; temporarySsh?: { username?: string; password?: string } },
   ) {
     if (body?.confirmInstall !== true) throw new BadRequestException('Explicit installation consent is required');
-    if (typeof body.temporarySsh?.username !== 'string' || !body.temporarySsh.username.trim() ||
-        typeof body.temporarySsh.password !== 'string' || !body.temporarySsh.password) {
+    if (
+      typeof body.temporarySsh?.username !== 'string' ||
+      !body.temporarySsh.username.trim() ||
+      typeof body.temporarySsh.password !== 'string' ||
+      !body.temporarySsh.password
+    ) {
       throw new BadRequestException('Temporary SSH username and password are required');
     }
     return this.commissioning.deliver(id, {

@@ -39,6 +39,7 @@ describe('WagoCommissioningService', () => {
     };
     const wago = {
       registerCommissioningDiscoveryHandler: jest.fn(),
+      list: jest.fn().mockResolvedValue([]),
       revokeEnrollmentById: jest.fn().mockResolvedValue(undefined),
       deleteEnrollmentById: jest.fn().mockResolvedValue(undefined),
       createEnrollment: jest.fn(),
@@ -323,14 +324,21 @@ describe('WagoCommissioningService', () => {
       auditLog: '[]',
     } as WagoCommissioningSession;
     const repository = {
-      find: jest.fn().mockImplementation(async ({ where, skip }: { where: { state?: string; hardwareId?: string }; skip: number }) => {
-        if (where.state === 'completed') return skip === 0 ? [firstCompleted, secondCompleted] : [];
-        if (where.hardwareId === firstCompleted.hardwareId) return skip === 0 ? [firstCompleted, firstSuperseded] : [];
-        return skip === 0 ? [secondCompleted, secondSuperseded] : [];
-      }),
-      findOneBy: jest.fn().mockImplementation(async ({ id }) =>
-        [firstSuperseded, secondSuperseded].find((session) => session.id === id) ?? null,
-      ),
+      find: jest
+        .fn()
+        .mockImplementation(
+          async ({ where, skip }: { where: { state?: string; hardwareId?: string }; skip: number }) => {
+            if (where.state === 'completed') return skip === 0 ? [firstCompleted, secondCompleted] : [];
+            if (where.hardwareId === firstCompleted.hardwareId)
+              return skip === 0 ? [firstCompleted, firstSuperseded] : [];
+            return skip === 0 ? [secondCompleted, secondSuperseded] : [];
+          },
+        ),
+      findOneBy: jest
+        .fn()
+        .mockImplementation(
+          async ({ id }) => [firstSuperseded, secondSuperseded].find((session) => session.id === id) ?? null,
+        ),
       save: jest.fn(async (value) => value),
     };
     const wago = {

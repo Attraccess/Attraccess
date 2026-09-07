@@ -43,6 +43,10 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       await this.recoverSessions();
       await this.reconcileCompletedSessions();
       this.wago.registerCommissioningDiscoveryHandler((controller) => this.claimDiscovered(controller));
+      // WagoService may already have stored a retained discovery announcement
+      // while recovery was running. Reconcile those records after the handler is
+      // installed instead of requiring a controller restart to announce again.
+      for (const controller of await this.wago.list()) await this.claimDiscovered(controller);
     } catch {
       this.context.logger?.warn('WAGO commissioning recovery failed; automatic discovery claim is disabled.');
     }
@@ -695,7 +699,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       }
       if (page.length < 100) break;
     }
-    if (reconciliationFailed) throw new ConflictException('Superseded commissioning credential cleanup requires attention.');
+    if (reconciliationFailed)
+      throw new ConflictException('Superseded commissioning credential cleanup requires attention.');
   }
 
   private async retireSupersededSessions(hardwareId: string, completedSessionId: number): Promise<void> {
@@ -725,7 +730,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       if (results.some((result) => result.status === 'rejected')) retirementFailed = true;
       if (sessions.length < 100) break;
     }
-    if (retirementFailed) throw new ConflictException('Superseded commissioning credential cleanup requires attention.');
+    if (retirementFailed)
+      throw new ConflictException('Superseded commissioning credential cleanup requires attention.');
   }
 
   private toResponse(session: WagoCommissioningSession): CommissioningSessionResponse {
