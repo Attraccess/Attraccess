@@ -8,6 +8,7 @@ import { wagoShellStat } from './wago-shell-stat';
 export function wagoRuntimeSupervisorLaunchShell(): string {
   return `${wagoShellStat()}
 launch_runtime_supervisor() {
+  supervisor_failure_stage=prerequisites
   command -v nohup >/dev/null && command -v sleep >/dev/null || return 1
   test -f "$hook" && test ! -L "$hook" &&
     test "$(stat -c '%u:%g:%a:%h' "$hook")" = 0:0:700:1 || return 1
@@ -20,11 +21,12 @@ launch_runtime_supervisor() {
   # Defer a catchable interruption until rollback can again own install.lock.
   trap 'supervisor_interrupted=1' HUP INT TERM
   exec 9>&-
-  # FW31's complete gate has measured 173s. Allow 300s of polling for each
-  # handoff phase, without changing the supervisor's lease/recovery policy.
-  supervisor_wait_remaining=300
+  # The complete gate remains bounded to 300s. Allow 30s for launch, its kill
+  # grace and acknowledgement scheduling; lock reacquisition stays at 300s.
+  supervisor_wait_remaining=330
   supervisor_candidate=
   supervisor_acknowledged=0
+  supervisor_failure_stage=readiness
   while test "$supervisor_wait_remaining" -gt 0 && test "$supervisor_interrupted" = 0; do
     # Existing owners acknowledge only after completing a gate under install.lock.
     # Do not pile up workers while a candidate is starting or an owner is gating.
@@ -52,6 +54,7 @@ launch_runtime_supervisor() {
     test "$(stat -c '%u:%g:%a:%h' "$config/install.lock")" = 0:0:600:1; }; then
     rm -rf "$supervisor_launch"
     trap - EXIT HUP INT TERM
+    echo 'Runtime supervisor handoff lock unverified; recovery required' >&2
     exit 75
   fi
   exec 9<>"$config/install.lock"
@@ -69,6 +72,7 @@ launch_runtime_supervisor() {
   trap - EXIT HUP INT TERM
   . "$supervisor_launch/traps"
   supervisor_live=0
+  if test "$supervisor_acknowledged" = 1; then supervisor_failure_stage=owner-verification; fi
   if test "$supervisor_interrupted" = 0 && test "$supervisor_acknowledged" = 1 &&
     test -f "$config/install.lock" && test ! -L "$config/install.lock" &&
     test "$(stat -c '%u:%g:%a:%h' "$config/install.lock")" = 0:0:600:1 &&
@@ -87,7 +91,7 @@ launch_runtime_supervisor() {
   rm -rf "$supervisor_launch" || return 1
   test "$supervisor_live" = 1
 }
-launch_runtime_supervisor || fail 'Runtime supervisor launch unverified'`;
+launch_runtime_supervisor || fail "Runtime supervisor launch unverified: $supervisor_failure_stage"`;
 }
 
 /** Acknowledge the request paths captured in "$@" before the successful gate. */

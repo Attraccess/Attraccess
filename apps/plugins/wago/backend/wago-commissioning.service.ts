@@ -863,7 +863,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       session.progressDetail =
         'Runtime delivered. Waiting for the controller to connect and complete its automatic claim.';
       return this.toResponse(await this.save(session, 'bootstrap_delivered'));
-    } catch {
+    } catch (error) {
+      if (error instanceof WagoRuntimeUploadError) safeFailure = error.message;
       if (credentialsTouched && session.enrollmentId !== null) {
         try {
           await this.revokeSessionEnrollment(session);
@@ -1758,6 +1759,30 @@ function runProcess(
   });
 }
 
+/** Only fixed shell diagnostics cross the credential-bearing SSH boundary. */
+export class WagoRuntimeUploadError extends Error {
+  constructor(
+    code: number | null,
+    elapsedMs: number,
+    stderr: string,
+    termination: 'remote-exit' | 'local-timeout' | 'operation-aborted' = 'remote-exit',
+  ) {
+    const known = [
+      'Runtime supervisor launch unverified: prerequisites',
+      'Runtime supervisor launch unverified: readiness',
+      'Runtime supervisor launch unverified: owner-verification',
+      'Runtime supervisor handoff lock unverified; recovery required',
+      'Runtime supervisor launch unverified',
+      'Cleanup incomplete; recovery journal retained',
+    ];
+    const lines = stderr.slice(-4096).split('\n');
+    const reason = known.find((line) => lines.includes(line)) ?? 'No recognized remote diagnostic';
+    super(
+      `Runtime delivery failed: ${termination}, SSH exit ${code ?? 'unknown'}, ${Math.round(elapsedMs / 1000)}s elapsed. ${reason}. Use reviewed recovery before retrying.`,
+    );
+  }
+}
+
 async function uploadFile(
   source: string,
   args: string[],
@@ -1773,24 +1798,40 @@ async function uploadFile(
     let transferred = 0;
     let lastPercent = -1;
     let settled = false;
-    const timer = setTimeout(() => child.kill(), SSH_TIMEOUT_MS);
+    const started = Date.now();
+    let stderr = '';
+    let termination: 'remote-exit' | 'local-timeout' | 'operation-aborted' = 'remote-exit';
+    const timer = setTimeout(() => {
+      termination = 'local-timeout';
+      child.kill();
+    }, SSH_TIMEOUT_MS);
     const finish = (error?: Error) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       signal?.removeEventListener('abort', abort);
       stream.destroy();
-      if (error) reject(new Error('Commissioning upload failed.'));
+      if (error)
+        reject(
+          error instanceof WagoRuntimeUploadError
+            ? error
+            : new WagoRuntimeUploadError(null, Date.now() - started, stderr, termination),
+        );
       else resolve();
     };
     const abort = () => {
+      termination = 'operation-aborted';
       child.kill();
       finish(new Error('Commissioning upload interrupted.'));
     };
     child.stdin.on('error', () => undefined);
-    child.stderr.on('data', () => undefined);
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr = (stderr + chunk.toString()).slice(-4096);
+    });
     child.on('error', finish);
-    child.on('close', (code) => finish(code === 0 ? undefined : new Error('Commissioning upload failed.')));
+    child.on('close', (code) =>
+      finish(code === 0 ? undefined : new WagoRuntimeUploadError(code, Date.now() - started, stderr, termination)),
+    );
     stream.on('error', (error) => {
       child.kill();
       finish(error);

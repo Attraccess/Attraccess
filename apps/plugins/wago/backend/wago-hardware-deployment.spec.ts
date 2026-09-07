@@ -322,6 +322,21 @@ describe('FW31 destructive commissioning shell (isolated vendor command fixtures
     expect(script.match(/timeout -k 5 300 "\$hook"/g)).toHaveLength(2);
   });
 
+  it('runs exactly the pre-grant and pre-start IO scans in a complete supervisor cycle', () => {
+    fixture.file('etc/attraccess-wago/runtime-enabled', '');
+    fixture.setContainers([{ id: 'new', name: 'attraccess-wago', running: true, restart: 'no' }]);
+    const script = wagoRuntimeBootScript(fixture.root)
+      .replaceAll('wago_host_io_guard() {', 'wago_host_io_guard() {\nprintf "scan\\n" >> "$FIXTURE_ROOT/gate-order"')
+      .replaceAll('chown 10001:10001', 'printf "grant\\n" >> "$FIXTURE_ROOT/gate-order"\nchown 10001:10001');
+    const result = fixture.run('set -- cycle\n' + script);
+    expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toEqual({
+      status: 0,
+      stdout: 'running\n',
+      stderr: '',
+    });
+    expect(fixture.read('gate-order').trim().split('\n')).toEqual(['scan', 'grant', 'scan']);
+  });
+
   it.each(['start', 'supervise'])(
     'contains an overall %s observation timeout without acknowledging readiness',
     (action) => {
@@ -462,7 +477,14 @@ fs.rmSync(root+'/proc/42',{recursive:true,force:true});
     expect(result.signal).toBeNull();
     expect(result.status).toBe(1);
     expect(result.stderr).toBe('Fixture watch refused restart\n');
-    expect(fixture.read('gate-actions').trim().split('\n')).toEqual(['cycle', 'cycle', 'cycle', 'cycle', 'cycle', 'watch']);
+    expect(fixture.read('gate-actions').trim().split('\n')).toEqual([
+      'cycle',
+      'cycle',
+      'cycle',
+      'cycle',
+      'cycle',
+      'watch',
+    ]);
     expect(
       fixture
         .read('docker.log')
