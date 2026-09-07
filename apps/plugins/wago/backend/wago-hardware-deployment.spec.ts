@@ -58,6 +58,30 @@ describe('FW31 destructive commissioning shell (isolated vendor command fixtures
     expect(fixture.run(script).status).toBe(0);
   });
 
+  it('falls back from BusyBox setpriv to capsh for report and preparation', () => {
+    expect(fixture.run(wagoHardwareDeploymentReportScript(fixture.root), 'busybox-setpriv').stdout).toContain(
+      'hardware=accessible',
+    );
+    expect(prepare('busybox-setpriv').status).toBe(0);
+    expect(fixture.read('privilege.log')).toContain('capsh');
+  });
+
+  it('prepares with capsh even when setpriv is absent', () => {
+    rmSync(join(fixture.root, 'bin/setpriv'));
+    expect(prepare().status).toBe(0);
+  });
+
+  it('rejects unverified privileges before preparation mutations', () => {
+    fixture.file(
+      'privilege-status',
+      fixture.read('privilege-status').replace('CapBnd: 0000000000000000', 'CapBnd: 0000000000000001'),
+    );
+    expect(prepare().stderr).toContain('permission-tool-unavailable');
+    expect(existsSync(join(fixture.root, journal))).toBe(false);
+    expect(existsSync(join(fixture.root, 'vendor.log'))).toBe(false);
+    expect(existsSync(join(fixture.root, 'permission-tests.log'))).toBe(false);
+  });
+
   it.each([
     ['missing REVISIONS', 'etc/REVISIONS', null],
     ['wrong REVISIONS', 'etc/REVISIONS', fw31Revisions.replace('(31)', '(32)')],
@@ -131,7 +155,7 @@ describe('FW31 destructive commissioning shell (isolated vendor command fixtures
     expect(existsSync(join(fixture.root, journal, 'started'))).toBe(false);
   });
 
-  it.each(['chown-failed', 'setpriv-unsupported', 'io-permissions'])('fails closed for %s', (fault) => {
+  it.each(['chown-failed', 'privilege-tools-unavailable', 'io-permissions'])('fails closed for %s', (fault) => {
     expect(prepare(fault).status).not.toBe(0);
     expect(existsSync(join(fixture.root, journal, 'started'))).toBe(false);
   });
