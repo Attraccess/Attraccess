@@ -12,12 +12,41 @@ const metadata: Record<string, string> = {
   PTXDIST_BSP_NAME: 'CTL',
 };
 
+// FW31's minimal od has only -b/-v: validate offsets and the final byte count
+// before accepting its octal bytes. No strtonum extension is needed by POSIX awk.
+const octalAwk = `
+function octal(value, result, i) {
+  result = 0
+  for (i = 1; i <= length(value); i++) result = result * 8 + substr(value, i, 1)
+  return result
+}
+{
+  if (terminal || $1 !~ /^[0-7]+$/ || length($1) != 7 || octal($1) != bytes) { invalid = 1; exit 1 }
+  if (NF == 1) { terminal = 1; next }
+  if (short || NF < 2 || NF > 17) { invalid = 1; exit 1 }
+  short = NF < 17
+  for (i = 2; i <= NF; i++) {
+    if ($i !~ /^[0-3][0-7][0-7]$/ || ++bytes > 8193) { invalid = 1; exit 1 }
+    printf "%d ", octal($i)
+  }
+  printf "\\n"
+}
+END { exit (invalid || !terminal) }
+`;
+
 /** Fixed, bounded, source-framed decimal bytes preserve NUL and read failures.
  * Source contents are never shell code or framing delimiters.
  */
 export function wagoFw31IdentityRead(withRoot = false): string {
+  // pipefail is explicit, not a property of the caller's POSIX shell. In
+  // particular a dd error after valid bytes must never publish "complete".
+  const read = `LC_ALL=C; export LC_ALL; dd if="$1" bs=1 count=8193 2>/dev/null | od -b -v | awk '${octalAwk}'`;
+  const quotedRead = `'${read.replaceAll("'", "'\\''")}'`;
   return `{ ${sources
-    .map((path, i) => `printf 'source${i}\\n' && LC_ALL=C od -An -v -tu1 -N 8193 "${withRoot ? '$root' : ''}/${path}"`)
+    .map(
+      (path, i) =>
+        `printf 'source${i}\\n' && /bin/bash -o pipefail -c ${quotedRead} bash "${withRoot ? '$root' : ''}/${path}"`,
+    )
     .join(' && ')} && printf 'complete\\n'; }`;
 }
 

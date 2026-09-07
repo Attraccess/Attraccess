@@ -3,6 +3,7 @@ import { wagoFw31IdentityCheck } from './wago-firmware-identity';
 import { wagoShellFilesystemGuard } from './wago-shell-filesystem';
 import { wagoShellStat } from './wago-shell-stat';
 import { wagoHostIoGuardShell } from './wago-host-io-guard';
+import { wagoPrivilegeProbeShell } from './wago-privilege-probe';
 import { wagoRuntimeSupervisorAcknowledgeShell, wagoRuntimeSupervisorLaunchShell } from './wago-runtime-supervisor';
 
 export const WAGO_HARDWARE_PROFILE = 'cc100-751-9301-fw31-digital-v1';
@@ -90,12 +91,8 @@ dout="$root${WAGO_DOUT}"
 hardware=accessible
 if ! test -f "$din" || ! test -f "$dout" || test -L "$din" || test -L "$dout"; then
   hardware=missing-register
-elif ! command -v setpriv >/dev/null 2>&1; then
-  hardware=permission-tool-unavailable
-elif ! setpriv --reuid=10001 --regid=10001 --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs sh -c 'test "$(id -u)" = 10001 && test "$(id -g)" = 10001' >/dev/null 2>&1; then
-  hardware=permission-tool-unavailable
-elif ! setpriv --reuid=10001 --regid=10001 --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs sh -c 'test -r "$1" && test -r "$2" && test -w "$2"' sh "$din" "$dout"; then
-  hardware=uid10001-access-denied
+else
+  ${wagoPrivilegeProbeShell()}
 fi
 exclusivity=unknown
 processes=$(ps -eo comm=) || exit 1
@@ -429,7 +426,7 @@ ${checks(testRoot)}
 [ "$platform" = supported ] || fail "$platform"
 case "$provision" in prepare-controller|install-vendor-runtime) ;; *) fail "$provision" ;; esac
 command -v timeout >/dev/null || fail 'bounded-vendor-command-unavailable'
-command -v setpriv >/dev/null || fail 'permission-tool-unavailable'
+case "$hardware" in accessible|uid10001-access-denied) ;; *) fail "$hardware" ;; esac
 test -f "$root/etc/specific/rtsversion" && test ! -L "$root/etc/specific/rtsversion" || fail 'Invalid runtime selection'
 if test -e "$journal" || test -L "$journal"; then
   test -d "$journal" && test ! -L "$journal" || fail 'Invalid Docker provisioning journal'
