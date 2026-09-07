@@ -15,6 +15,7 @@ import { WagoService, WagoCredentialOperationUncertainError } from './wago.servi
 import { WagoController } from './wago-controller.entity';
 import type { CommissioningOperationGuard } from './wago-commissioning-lease';
 import { fw31IdentityOutput, fw31OsRelease } from './fixtures/fw31-identity';
+import { runtimeBundleStagingCapacityPreflightScript } from './wago-runtime-install';
 
 jest.mock('node:child_process', () => ({ spawn: jest.fn() }));
 jest.mock('./wago-commissioning-lease', () => ({
@@ -572,15 +573,19 @@ describe('WagoCommissioningService', () => {
           expect(wago.createEnrollment).not.toHaveBeenCalled();
           expect(sudo).not.toHaveBeenCalled();
           expect(result.failureReason).toContain('permanently disabled');
-          expect(result.dockerProvisionState).toBe('recovery_required');
+          expect(result.dockerProvisionState).toBeUndefined();
+          expect(session.dockerProvisionToken).toBeFalsy();
+          expect(install).toHaveBeenCalledTimes(1);
+          expect(install.mock.calls[0][3]).toBe(runtimeBundleStagingCapacityPreflightScript(bundle.length));
           return;
         }
         expect(result.state).toBe('awaiting_discovery');
         expect(sudo).not.toHaveBeenCalled();
         expect(copy).toHaveBeenCalledTimes(1);
-        expect(install).toHaveBeenCalledTimes(4);
+        expect(install).toHaveBeenCalledTimes(5);
         expect(session.codesysState).toBe('disabled');
-        expect(install.mock.calls[0][3]).toContain('runtime-version=0');
+        expect(install.mock.calls[0][3]).toBe(runtimeBundleStagingCapacityPreflightScript(bundle.length));
+        expect(install.mock.calls[1][3]).toContain('runtime-version=0');
         expect(copy.mock.calls[0][4]).toContain('flock -n 9');
         expect(copy.mock.calls[0][4]).toContain(
           Buffer.from(

@@ -1,5 +1,5 @@
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Description, FieldError, Form, Input, Label, Spinner, TextField } from '@heroui/react';
+import { Checkbox, Description, FieldError, Form, Input, Label, Spinner, TextField } from '@heroui/react';
 import { MqttManagementPort, parseManagementPort } from './managementPort';
 import { TlsSection } from './TlsSection';
 import { Button } from '../../../components/button';
@@ -29,6 +29,7 @@ export function EditMqttServerPage() {
   const { success, error: showError } = useToastMessage();
   const queryClient = useQueryClient();
   const [managementPortInput, setManagementPortInput] = useState('');
+  const [clearPassword, setClearPassword] = useState(false);
   const managementPort = parseManagementPort(managementPortInput);
 
   const [formValues, setFormValues] = useState<CreateMqttServerDto>({
@@ -55,6 +56,7 @@ export function EditMqttServerPage() {
 
   useEffect(() => {
     if (server) {
+      setClearPassword(false);
       setManagementPortInput(String((server as typeof server & MqttManagementPort).managementPort ?? ''));
       setFormValues({
         name: server.name,
@@ -62,7 +64,7 @@ export function EditMqttServerPage() {
         port: server.port,
         clientId: server.clientId ?? '',
         username: server.username ?? '',
-        password: server.password ?? '',
+        password: '',
         useTls: server.useTls,
         caCert: server.caCert ?? '',
         tlsInsecure: server.tlsInsecure ?? false,
@@ -99,7 +101,11 @@ export function EditMqttServerPage() {
     e.preventDefault();
     if (!serverId || managementPort === undefined) return;
 
-    const requestBody: CreateMqttServerDto & MqttManagementPort = { ...formValues, managementPort };
+    const { password, ...otherValues } = formValues;
+    const requestBody: CreateMqttServerDto & MqttManagementPort = { ...otherValues, managementPort };
+    // Omission keeps the saved secret; an explicit empty string clears it.
+    if (clearPassword) requestBody.password = '';
+    else if (password) requestBody.password = password;
     updateMqttServer.mutate({
       id: Number(serverId),
       requestBody,
@@ -231,6 +237,8 @@ export function EditMqttServerPage() {
 
             <PasswordInput
               label={t('passwordLabel')}
+              description={t('passwordDescription')}
+              isDisabled={clearPassword}
               id="password"
               name="password"
               placeholder={t('passwordPlaceholder')}
@@ -240,7 +248,22 @@ export function EditMqttServerPage() {
               autoComplete="off"
             />
           </div>
-
+          <Checkbox
+            isSelected={clearPassword}
+            onChange={(selected) => {
+              setClearPassword(selected);
+              if (selected) setFormValues((prev) => ({ ...prev, password: '' }));
+            }}
+            data-cy="edit-mqtt-server-form-clear-password-checkbox"
+          >
+            <Checkbox.Content>
+              <Checkbox.Control>
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              <Label>{t('clearPasswordLabel')}</Label>
+            </Checkbox.Content>
+            <Description>{t('clearPasswordDescription')}</Description>
+          </Checkbox>
         </section>
 
         <TlsSection

@@ -26,6 +26,8 @@ describe('read-only runtime capacity preflight (isolated commands only)', () => 
     layout([1, 1, 1, 2], [181 * 1024, 181 * 1024, 181 * 1024, 848 * 1024]);
     const prelude = `#!${process.execPath}
 const fs=require('node:fs'), root=process.env.FIXTURE_ROOT, args=process.argv.slice(2);
+const statPath=args.at(-1);
+if(args[0]==='--help'){console.log('BusyBox v1.37.0 () multi-call binary.\\nUsage: stat [-ltf] FILE...');process.exit(0);}
 const paths=['/etc/attraccess-wago','/tmp','/var/lib',fs.existsSync(root+'/docker-root')?fs.readFileSync(root+'/docker-root','utf8').slice(root.length):'/home'];
 if(args.at(-1)===root+'/etc')args[args.length-1]=root+'/etc/attraccess-wago';
 const i=paths.indexOf(args.at(-1).slice(root.length));
@@ -34,7 +36,8 @@ const storage=JSON.parse(fs.readFileSync(root+'/storage.json','utf8'));
 `;
     fixture.file(
       'bin/stat',
-      prelude + `if(args[0]!=='-Lc'||args[1]!=='%d')process.exit(99);console.log(storage.devices[i]);`,
+      prelude +
+        `if(args[0]!=='-Lt')process.exit(1);console.log(statPath+' 4096 8 41c0 0 0 '+storage.devices[i].toString(16)+' 123 2 0 0 1 1 1 4096');`,
       0o700,
     );
     fixture.file(
@@ -259,7 +262,7 @@ console.log(fs.existsSync(root+'/docker-root')?fs.readFileSync(root+'/docker-roo
 
   it('fails closed on unknown filesystem identity, missing tools and unavailable Docker', () => {
     fixture.file('bin/stat', '#!/bin/sh\nprintf "unknown\\n"\n', 0o700);
-    expect(run().stderr).toContain('Invalid storage filesystem identity');
+    expect(run().stderr).toContain('Cannot identify storage filesystem');
     fixture.file('bin/docker', '#!/bin/sh\nexit 1\n', 0o700);
     expect(run().status).not.toBe(0);
     rmSync(join(fixture.root, 'bin/flock'));
@@ -271,6 +274,31 @@ console.log(fs.existsSync(root+'/docker-root')?fs.readFileSync(root+'/docker-roo
     expect(script).toContain(runtimeBundleCapacityPreflightScript(bytes, fixture.root));
     expect(script).toContain('codesys-active');
     expect(script).toContain('uid10001-access-denied');
+  });
+
+  it.each([run, runStaging])('uses validated native device/inode pairs when available', (check) => {
+    fixture.file(
+      'bin/stat',
+      '#!/bin/sh\ntest "$1" = -Lc && test "$2" = "%d:%i" || exit 99\nprintf "1:123\\n"\n',
+      0o700,
+    );
+    layout([1, 1, 1, 1], Array(4).fill(5 * b + reserve));
+    expect(check().status).toBe(0);
+  });
+
+  it.each(['1', '1:bad', '1:2:3', '01:2', '1:18446744073709551616', '1:2\n1:2'])(
+    'rejects malformed native identity %j in both standalone checks',
+    (identity) => {
+      fixture.file('bin/stat', `#!${process.execPath}\nconsole.log(${JSON.stringify(identity)});`, 0o700);
+      expect(run().stderr).toContain('Cannot identify storage filesystem');
+      expect(runStaging().stderr).toContain('Cannot identify storage filesystem');
+    },
+  );
+
+  it('requires the stat capture tool before checking capacity', () => {
+    rmSync(join(fixture.root, 'bin/dd'));
+    expect(runStaging().stderr).toContain('Runtime tool unavailable: dd');
+    expect(run().stderr).toContain('Runtime tool unavailable: dd');
   });
 
   it.each([0, -1, NaN, Infinity, 1.5, 512 * mib + 1, Number.MAX_SAFE_INTEGER])(

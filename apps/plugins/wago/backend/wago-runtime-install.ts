@@ -1,5 +1,6 @@
 import { wagoHardwareDeploymentDockerArgs, wagoHardwareDeploymentPreflightScript } from './wago-hardware-deployment';
 import { wagoShellFilesystemGuard } from './wago-shell-filesystem';
+import { wagoShellStat } from './wago-shell-stat';
 import { wagoRuntimeSupervisorLaunchShell } from './wago-runtime-supervisor';
 
 /**
@@ -390,10 +391,11 @@ function bundleCapacityPreflightScript(bytes: number, testRoot: string, includeD
 export LC_ALL=C
 unset DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH
 fail() { echo "$*" >&2; exit 1; }
-for tool in flock ${includeDocker ? 'docker ' : ''}timeout sha256sum base64 tar grep awk stat df nohup mktemp cat cp mv chmod chown rm mkdir touch wc tr sed; do
+for tool in flock ${includeDocker ? 'docker ' : ''}timeout sha256sum base64 tar grep awk stat dd df nohup mktemp cat cp mv chmod chown rm mkdir touch wc tr sed; do
   command -v "$tool" >/dev/null || fail "Runtime tool unavailable: $tool"
 done
 tar --version | grep -q 'GNU tar'
+${wagoShellStat()}
 ${
   includeDocker
     ? `${boundedDocker()}
@@ -406,7 +408,8 @@ storage_config=${quote(testRoot + '/etc/attraccess-wago')}
 if test ! -e "$storage_config"; then storage_config=${quote(testRoot + '/etc')}; fi
 for storage_path in "$storage_config" ${['/tmp', '/var/lib'].map((path) => quote(testRoot + path)).join(' ')}${includeDocker ? ' "$docker_root"' : ''}; do
   test -d "$storage_path" || fail "Missing storage directory: $storage_path"
-  storage_device=$(stat -Lc '%d' "$storage_path") || fail 'Cannot identify storage filesystem'
+  storage_identity=$(stat -Lc '%d:%i' "$storage_path") || fail 'Cannot identify storage filesystem'
+  storage_device=\${storage_identity%%:*}
   case "$storage_device" in ''|*[!0-9]*) fail 'Invalid storage filesystem identity' ;; esac
   # Capture df separately: a pipeline must not hide a failed df exit status.
   storage_df=$(df -Pk "$storage_path") || fail "Cannot read storage capacity: $storage_path"
