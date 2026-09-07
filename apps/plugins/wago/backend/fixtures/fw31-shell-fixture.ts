@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { WAGO_DIN, WAGO_DOUT, wagoRuntimeBootScript } from '../wago-hardware-deployment';
 import { fw31Model, fw31OsRelease, fw31Revisions } from './fw31-identity';
+import { fw31MinimalOd } from './fw31-minimal-od';
 
 export interface FixtureContainer {
   id: string;
@@ -21,7 +21,7 @@ export interface FixtureContainer {
  * No host Docker, PLC process, privilege transition, or network can be reached.
  */
 export function fw31ShellFixture(statStyle: 'native' | 'terse' = 'native') {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'wago-fw31-shell-')));
+  const root = realpathSync(mkdtempSync(join(process.cwd(), '.wago-fw31-shell-')));
   const file = (path: string, content: string, mode = 0o600) => {
     mkdirSync(dirname(join(root, path)), { recursive: true, mode: 0o700 });
     writeFileSync(join(root, path), content, { mode });
@@ -36,7 +36,6 @@ export function fw31ShellFixture(statStyle: 'native' | 'terse' = 'native') {
     cmp: '/usr/bin/cmp',
     awk: '/usr/bin/awk',
     dd: '/bin/dd',
-    od: '/usr/bin/od',
     mkdir: '/bin/mkdir',
     mktemp: '/usr/bin/mktemp',
     mv: '/bin/mv',
@@ -50,6 +49,7 @@ export function fw31ShellFixture(statStyle: 'native' | 'terse' = 'native') {
     base64: '/usr/bin/base64',
   }))
     symlinkSync(path, join(root, 'bin', name));
+  file('bin/od', fw31MinimalOd, 0o700);
   for (const path of ['tmp', 'var/lib', 'home', 'etc/attraccess-wago', 'etc/rc.d/disabled'])
     mkdirSync(join(root, path), { recursive: true, mode: 0o700 });
   file('etc/passwd', 'root:x:0:0:root:/root:/bin/sh\n');
@@ -144,9 +144,12 @@ console.log(args[1].replace(/%[ugahdi]/g,v=>values[v]));`,
 const args=process.argv.slice(2);
 if(args[0]!=='-k'||args[1]!=='5'||!['10','30','45'].includes(args[2]))process.exit(99);
 if(process.env.FAULT==='gate-timeout'&&args[3].endsWith('/S99_zz_attraccess_wago'))process.exit(124);
+const root=process.env.FIXTURE_ROOT;
+const privilegeLifecycle=['privilege-deadline','privilege-delayed'].includes(process.env.FAULT)&&['setpriv','capsh'].some(tool=>args[3]===root+'/bin/'+tool)&&args[4]!=='--help';
 // Match the generated command's deadline. Shorter wall-clock caps measure host
-// process scheduling under parallel Jest workers, not the modeled timeout.
-const r=require('node:child_process').spawnSync(args[3],args.slice(4),{env:{...process.env,FIXTURE_CALLER_PID:String(process.ppid)},stdio:'inherit',timeout:Number(args[2])*1000});
+// process scheduling, except for the explicit isolated privilege lifecycle test.
+const r=require('node:child_process').spawnSync(args[3],args.slice(4),{env:{...process.env,FIXTURE_CALLER_PID:String(process.ppid)},stdio:'inherit',timeout:privilegeLifecycle?1000:Number(args[2])*1000});
+if(privilegeLifecycle)require('node:fs').appendFileSync(root+'/privilege-lifecycle.log',JSON.stringify({event:'reaped',tool:args[3].split('/').at(-1),pid:r.pid,status:r.status,error:r.error?.code})+'\\n');
 process.exit(r.status ?? 124);`,
   );
   executable(
@@ -157,21 +160,51 @@ if(f==='ps-failed')process.exit(1);
 if(fs.readFileSync(root+'/plc','utf8')==='running')console.log(f==='codesys2'?'plclinux_rt':'codesys3');
 if(f==='docker-info-failed')console.log('dockerd');`,
   );
-  executable(
-    'bin/setpriv',
-    `
+  file(
+    'privilege-status',
+    'Uid: 10001 10001 10001 10001\nGid: 10001 10001 10001 10001\nGroups:\nCapInh: 0000000000000000\nCapPrm: 0000000000000000\nCapEff: 0000000000000000\nCapBnd: 0000000000000000\nCapAmb: 0000000000000000\nNoNewPrivs: 1\n',
+  );
+  for (const tool of ['setpriv', 'capsh'])
+    executable(
+      'bin/' + tool,
+      `
 const fs=require('node:fs'),root=process.env.FIXTURE_ROOT,args=process.argv.slice(2);
-if(!['--reuid=10001','--regid=10001','--clear-groups','--bounding-set=-all','--inh-caps=-all','--ambient-caps=-all','--no-new-privs'].every((v,i)=>args[i]===v))process.exit(99);
-if(process.env.FAULT==='setpriv-unsupported')process.exit(127);
-if(args.at(-1).includes('id -u'))process.exit(0);
+const tool=${JSON.stringify(tool)},fault=process.env.FAULT;
+const expected=tool==='setpriv'?['--reuid=10001','--regid=10001','--clear-groups','--bounding-set=-all','--inh-caps=-all','--ambient-caps=-all','--no-new-privs','/bin/sh','-c']:['--drop=all','--groups=','--gid=10001','--uid=10001','--caps=','--noamb','--no-new-privs','--shell=/bin/sh','--','-c'];
+if(process.env.FAULT==='privilege-tools-unavailable')process.exit(127);
+if(args[0]==='--help'){
+ console.log(tool==='setpriv'&&fault==='busybox-setpriv'?'--no-new-privs --inh-caps --ambient-caps':expected.join(' '));process.exit(0);
+}
+if(tool==='setpriv'&&fault==='busybox-setpriv')process.exit(99);
+if(args.length!==expected.length+1||!expected.every((v,i)=>args[i]===v))process.exit(99);
+fs.appendFileSync(root+'/privilege.log',JSON.stringify([tool,...args.slice(0,-1)])+'\\n');
+if(fault==='privilege-timeout')process.exit(124);
+if(fault==='privilege-transitions-failed'||(tool==='setpriv'&&fault==='setpriv-transition-failed'))process.exit(1);
+if(['privilege-deadline','privilege-delayed'].includes(fault)){
+ const marker=root+'/privilege-live-'+tool;
+ const record=(event,status)=>fs.appendFileSync(root+'/privilege-lifecycle.log',JSON.stringify({event,tool,pid:process.pid,status})+'\\n');
+ process.on('exit',status=>{fs.rmSync(marker,{force:true});record('exit',status);});
+ process.on('SIGTERM',()=>process.exit(124));
+ fs.writeFileSync(marker,String(process.pid));record('started');
+ // Deliberately no child processes: this branch models only transition lifetime.
+ setTimeout(()=>{if(fault==='privilege-delayed'){process.stdout.write('accessible');process.exit(0);}process.exit(99);},fault==='privilege-delayed'?150:5000);
+ return;
+}
 const owners=JSON.parse(fs.readFileSync(root+'/owners.json','utf8'));
-for(const [i,path] of args.slice(-2).entries()){
+let permitted=fault!=='io-permissions';
+for(const [i,path] of [process.env.din,process.env.dout].entries()){
  if(!path.startsWith(root+'/'))process.exit(99);
  const s=fs.statSync(path),needed=i===0?0o400:0o600;
- if(!s.isFile()||owners[path.slice(root.length)]!=='10001:10001'||(s.mode&needed)!==needed)process.exit(1);
+ if(!s.isFile()||owners[path.slice(root.length)]!=='10001:10001'||(s.mode&needed)!==needed)permitted=false;
 }
-process.exit(process.env.FAULT==='io-permissions'?1:0);`,
-  );
+// Execute the production verifier, substituting ONLY mock proc state and access
+// predicates. Never invoke a host privilege tool or read the host process state.
+const statusPath=fs.existsSync(root+'/privilege-status-'+tool)?root+'/privilege-status-'+tool:root+'/privilege-status';
+const script=args.at(-1).replace('/proc/$$/status',JSON.stringify(statusPath));
+const mock='test() { case "$1" in -r|-w) printf "%s\\\\n" "$*" >> "$FIXTURE_ROOT/permission-tests.log"; if command test "$1" = -w && command test "\${FAULT:-}" = io-write-denied; then return 1; fi; return '+(permitted?'0':'1')+' ;; *) command test "$@" ;; esac; }\\n';
+const r=require('node:child_process').spawnSync('/bin/sh',['-c',mock+script],{env:process.env,stdio:'inherit',timeout:5000});
+process.exit(r.status ?? 124);`,
+    );
   executable(
     'bin/chown',
     `

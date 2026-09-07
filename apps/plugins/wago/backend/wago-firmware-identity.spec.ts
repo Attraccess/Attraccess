@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fw31IdentityOutput, fw31Model, fw31OsRelease, fw31Revisions } from './fixtures/fw31-identity';
+import { fw31MinimalOd } from './fixtures/fw31-minimal-od';
 import { wagoFw31IdentityCheck, wagoFw31IdentityRead, isCc100Fw31Identity } from './wago-firmware-identity';
 
 const shellIdentity = (input: string) =>
@@ -84,16 +85,44 @@ describe('source-backed CC100 FW31 identity, not live qualification', () => {
     const root = mkdtempSync(join(process.cwd(), '.wago-identity-'));
     try {
       mkdirSync(join(root, 'etc'));
+      mkdirSync(join(root, 'bin'));
+      writeFileSync(join(root, 'bin/od'), fw31MinimalOd, { mode: 0o700 });
       mkdirSync(join(root, 'sys/firmware/devicetree/base'), { recursive: true });
       writeFileSync(join(root, 'etc/os-release'), fw31OsRelease);
       writeFileSync(join(root, 'etc/REVISIONS'), fw31Revisions);
       writeFileSync(join(root, 'sys/firmware/devicetree/base/model'), fw31Model);
       const run = (script: string) =>
-        spawnSync('/bin/sh', ['-c', script], { env: { ...process.env, root }, encoding: 'utf8' });
+        spawnSync('/bin/sh', ['-c', script], {
+          env: { ...process.env, root, PATH: `${root}/bin:/usr/bin:/bin` },
+          encoding: 'utf8',
+          timeout: 5000,
+        });
       const read = run(wagoFw31IdentityRead(true));
       expect(read.status).toBe(0);
       agree(read.stdout, true);
       expect(run(wagoFw31IdentityCheck(true)).status).toBe(0);
+      for (const fault of [
+        'truncated',
+        'bad-offset',
+        'bad-byte',
+        'bad-octal',
+        'short-row',
+        'extra-terminal',
+        'wrong-terminal',
+        'repeat-marker',
+        'failed',
+      ]) {
+        const failed = run(`export OD_FAULT=${fault}; ${wagoFw31IdentityRead(true)}`);
+        expect(failed.status).not.toBe(0);
+        agree(failed.stdout, false);
+        expect(run(`export OD_FAULT=${fault}; ${wagoFw31IdentityCheck(true)}`).status).toBe(1);
+      }
+      writeFileSync(join(root, 'bin/dd'), '#!/bin/sh\n/bin/dd "$@"\nexit 1\n', { mode: 0o700 });
+      const failedProducer = run(wagoFw31IdentityRead(true));
+      expect(failedProducer.status).not.toBe(0);
+      agree(failedProducer.stdout, false);
+      expect(run(wagoFw31IdentityCheck(true)).status).toBe(1);
+      rmSync(join(root, 'bin/dd'));
       const padding = 8192 - Buffer.byteLength(fw31OsRelease + '#' + fw31Revisions + fw31Model);
       writeFileSync(join(root, 'etc/os-release'), fw31OsRelease + '#' + 'x'.repeat(padding));
       const boundary = run(wagoFw31IdentityRead(true));
