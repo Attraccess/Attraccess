@@ -87,6 +87,7 @@ struct SimulatorControls
     lv_obj_t *keyVersion = nullptr;
     lv_obj_t *authenticationFault = nullptr;
     lv_obj_t *writeFault = nullptr;
+    lv_obj_t *keyboard = nullptr;
     lv_obj_t *status = nullptr;
     lv_obj_t *slotStatus = nullptr;
 
@@ -100,8 +101,8 @@ struct SimulatorControls
         const auto &card = nfc.card();
         lv_textarea_set_text(uid, uidText(card).c_str());
         lv_dropdown_set_selected(type, static_cast<uint32_t>(card.type));
-        lv_obj_set_state(authenticationFault, card.failAuthentication ? LV_STATE_CHECKED : LV_STATE_DEFAULT, true);
-        lv_obj_set_state(writeFault, card.failWrite ? LV_STATE_CHECKED : LV_STATE_DEFAULT, true);
+        lv_obj_set_state(authenticationFault, LV_STATE_CHECKED, card.failAuthentication);
+        lv_obj_set_state(writeFault, LV_STATE_CHECKED, card.failWrite);
         const uint32_t selectedSlot = lv_dropdown_get_selected(slot);
         lv_dropdown_set_selected(keyVersion, card.keyVersions[selectedSlot]);
         lv_label_set_text_fmt(status, "Card is %s", card.present ? "present" : "removed");
@@ -168,6 +169,18 @@ struct SimulatorControls
     {
         from(event)->refresh();
     }
+
+    static void showUidKeyboard(lv_event_t *event)
+    {
+        auto *controls = from(event);
+        lv_obj_clear_flag(controls->keyboard, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    static void hideUidKeyboard(lv_event_t *event)
+    {
+        auto *controls = from(event);
+        lv_obj_add_flag(controls->keyboard, LV_OBJ_FLAG_HIDDEN);
+    }
 };
 
 lv_obj_t *button(lv_obj_t *parent, const char *text, int x, int y, int width, lv_event_cb_t callback, SimulatorControls *controls)
@@ -221,8 +234,10 @@ int main(int argc, char **argv)
     lv_obj_set_pos(uidLabel, 12, 43);
     controls.uid = lv_textarea_create(screen);
     lv_textarea_set_one_line(controls.uid, true);
+    lv_textarea_set_accepted_chars(controls.uid, "0123456789abcdefABCDEF:- ");
     lv_obj_set_pos(controls.uid, 52, 36);
     lv_obj_set_size(controls.uid, 250, 34);
+    lv_obj_add_event_cb(controls.uid, SimulatorControls::showUidKeyboard, LV_EVENT_FOCUSED, &controls);
 
     auto *typeLabel = lv_label_create(screen);
     lv_label_set_text(typeLabel, "Type");
@@ -267,6 +282,15 @@ int main(int argc, char **argv)
     lv_checkbox_set_text(controls.writeFault, "Fail key writes");
     lv_obj_set_pos(controls.writeFault, 12, 350);
     lv_obj_add_event_cb(controls.writeFault, SimulatorControls::setFaults, LV_EVENT_VALUE_CHANGED, &controls);
+
+    controls.keyboard = lv_keyboard_create(screen);
+    lv_keyboard_set_mode(controls.keyboard, LV_KEYBOARD_MODE_TEXT_UPPER);
+    lv_keyboard_set_textarea(controls.keyboard, controls.uid);
+    lv_obj_set_width(controls.keyboard, lv_pct(100));
+    lv_obj_set_align(controls.keyboard, LV_ALIGN_BOTTOM_MID);
+    lv_obj_add_flag(controls.keyboard, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_event_cb(controls.keyboard, SimulatorControls::hideUidKeyboard, LV_EVENT_READY, &controls);
+    lv_obj_add_event_cb(controls.keyboard, SimulatorControls::hideUidKeyboard, LV_EVENT_CANCEL, &controls);
 
     auto *help = lv_label_create(screen);
     lv_label_set_text(help, "Keys are never entered here. Enrollment writes the server-issued key\nthrough the adapter; resetting a slot restores its factory key and version 0.");
