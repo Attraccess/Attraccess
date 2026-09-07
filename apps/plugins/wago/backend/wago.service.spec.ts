@@ -1159,7 +1159,7 @@ describe('WagoService', () => {
     expect(context.logger.warn).toHaveBeenCalledWith('Dropping excess WAGO configuration report for controller 1');
   });
 
-  it('returns bounded revision metadata pages without snapshots', async () => {
+  it('returns bounded revision metadata pages with rejection rendering context', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
     const { service, revisionRepository } = createService([claimed]);
 
@@ -1168,7 +1168,7 @@ describe('WagoService', () => {
       expect.objectContaining({
         skip: 5,
         take: 100,
-        select: expect.not.arrayContaining(['snapshot']),
+        select: expect.arrayContaining(['snapshot']),
       }),
     );
   });

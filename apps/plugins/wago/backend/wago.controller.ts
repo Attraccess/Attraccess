@@ -165,10 +165,10 @@ export class WagoControllerApi {
   }
   @Post('controllers/:id/configuration/draft') saveDraft(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { snapshot?: unknown; metadata?: ConfigurationEditorMetadata },
+    @Body() body: { snapshot?: unknown; metadata?: ConfigurationEditorMetadata; expectedVersion?: number | null },
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.wago.saveDraft(id, body?.snapshot, body?.metadata, wagoAuditPrincipal(request));
+    return this.wago.saveDraft(id, body?.snapshot, body?.metadata, body?.expectedVersion, wagoAuditPrincipal(request));
   }
   @Post('controllers/:id/configuration/validate') validateDraft(
     @Param('id', ParseIntPipe) id: number,

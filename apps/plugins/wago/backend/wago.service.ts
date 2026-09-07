@@ -238,15 +238,24 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     controllerId: number,
     snapshot: unknown,
     metadata?: ConfigurationEditorMetadata,
+    expectedVersion?: number | null | PluginAuditPrincipal,
     principal?: PluginAuditPrincipal,
   ): Promise<WagoConfigurationDraft> {
+    // Service callers predating optimistic draft versions passed the principal fourth.
+    if (expectedVersion && typeof expectedVersion === 'object') {
+      principal = expectedVersion;
+      expectedVersion = undefined;
+    }
+    let draftVersion: number | null | undefined;
+    if (typeof expectedVersion === 'number') draftVersion = expectedVersion;
+    else if (expectedVersion === null) draftVersion = null;
     return this.withConfigurationLock(controllerId, async () => {
       const previous = await this.getDraft(controllerId);
       const validatedMetadata = metadata === undefined ? undefined : editorMetadata(metadata);
       const previousMetadata = this.metadataFromProvenance(previous?.presetProvenance);
       const before = previous ? JSON.parse(previous.snapshot) : null;
       const candidate = snapshot as WagoConfigurationSnapshot;
-      let persist = () => this.saveDraftWhileLocked(controllerId, snapshot, validatedMetadata);
+      let persist = () => this.saveDraftWhileLocked(controllerId, snapshot, validatedMetadata, draftVersion);
       if (principal && validateEditorSnapshot(snapshot).length === 0) {
         // The editor appends provenance only for an explicit Apply action. Consume
         // persisted occurrences so ordinary edits and retried saves are not reapplications.
@@ -432,7 +441,15 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     controllerId: number,
     offset = 0,
     limit = 20,
-  ): Promise<{ revisions: Array<Omit<WagoConfigurationRevision, 'snapshot'>>; offset: number; limit: number }> {
+  ): Promise<{
+    revisions: Array<
+      Omit<WagoConfigurationRevision, 'snapshot'> & {
+        rejectionDetails?: Pick<WagoConfigurationRevision, 'snapshot' | 'presetProvenance'>;
+      }
+    >;
+    offset: number;
+    limit: number;
+  }> {
     await this.claimedController(controllerId);
     const pageOffset = Number.isSafeInteger(offset) && offset > 0 ? offset : 0;
     const pageLimit = Number.isSafeInteger(limit) && limit > 0 ? Math.min(limit, 100) : 20;
@@ -451,11 +468,20 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
         'publishedAt',
         'reportedAt',
         'presetProvenance',
+        'snapshot',
       ],
       skip: pageOffset,
       take: pageLimit,
     });
-    return { revisions, offset: pageOffset, limit: pageLimit };
+    return {
+      revisions: revisions.map(({ snapshot, ...revision }) =>
+        revision.state === 'rejected'
+          ? { ...revision, rejectionDetails: { snapshot, presetProvenance: revision.presetProvenance } }
+          : revision,
+      ),
+      offset: pageOffset,
+      limit: pageLimit,
+    };
   }
 
   async reviewDraft(controllerId: number): Promise<{
@@ -695,6 +721,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     controllerId: number,
     snapshot: unknown,
     metadata?: ConfigurationEditorMetadata,
+    expectedVersion?: number | null,
   ): Promise<WagoConfigurationDraft> {
     await this.claimedController(controllerId);
     let provenance: string | undefined;
@@ -707,6 +734,10 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     }
     const serialized = canonicalSnapshot(snapshot);
     const existing = await this.drafts.findOneBy({ controllerId });
+    if (existing && expectedVersion !== undefined && expectedVersion !== existing.version)
+      throw new ConflictException('configuration draft changed; reload it before saving');
+    if (!existing && expectedVersion !== null && expectedVersion !== undefined)
+      throw new ConflictException('configuration draft changed; reload it before saving');
     const draft =
       existing ??
       this.drafts.create({
@@ -715,11 +746,28 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
         reviewedHash: null,
         presetProvenance: null,
         updatedAt: '',
+        version: 1,
       });
     draft.snapshot = serialized;
     if (provenance !== undefined) draft.presetProvenance = provenance;
     draft.reviewedHash = null;
     draft.updatedAt = new Date().toISOString();
+    if (existing && expectedVersion !== undefined) {
+      const result = await this.drafts
+        .createQueryBuilder()
+        .update(WagoConfigurationDraft)
+        .set({
+          snapshot: draft.snapshot,
+          presetProvenance: draft.presetProvenance,
+          reviewedHash: null,
+          updatedAt: draft.updatedAt,
+          version: draft.version + 1,
+        })
+        .where('controller_id = :controllerId AND version = :version', { controllerId, version: draft.version })
+        .execute();
+      if (result.affected !== 1) throw new ConflictException('configuration draft changed; reload it before saving');
+      return (await this.drafts.findOneBy({ controllerId }))!;
+    }
     return this.drafts.save(draft);
   }
 

@@ -194,9 +194,9 @@ describe('WAGO producer-to-consumer measurement contract', () => {
       });
       const read = jest.spyOn(device, 'read');
       messages.length = 0;
-      await expect(createRuntime().start()).rejects.toThrow('persisted configuration is invalid');
+      await expect(createRuntime().start()).resolves.toBeUndefined();
       expect(read).not.toHaveBeenCalled();
-      expect(messages).toEqual([]);
+      expect(messages).toEqual(expect.arrayContaining([expect.objectContaining({ category: 'state', revision: null })]));
       expect(() => encodeMeasurement('current', 1, transform)).toThrow(expect.objectContaining({ code }));
     },
   );

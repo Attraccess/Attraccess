@@ -14,8 +14,12 @@ export function safeValidationSummaries(value: unknown): Array<{ path: string; c
   return value.slice(0, 50).map((item) => {
     const error = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
     const path = typeof error.path === 'string' && error.path.length <= 256 ? error.path : '$';
-    const tokens = path.replace(/\[(\d{1,5})\]/g, '.$1').split('.');
-    const safe = tokens[0] === '$' && tokens.slice(1).every((token) => fields.has(token) || /^\d{1,5}$/.test(token));
+    const tokens = path
+      .replace(/^\$\.?/, '')
+      .replace(/\[(\d{1,5})\]/g, '.$1')
+      .split('.');
+    // Validators historically return both $.rooted and bare allowlisted paths.
+    const safe = tokens.every((token) => fields.has(token) || /^\d{1,5}$/.test(token));
     return {
       path: safe ? path : '$',
       code: codes.has(error.code as string) ? (error.code as string) : 'validation_error',

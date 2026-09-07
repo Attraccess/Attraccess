@@ -91,6 +91,7 @@ set --
 if [ -f "$config/runtime-ca.pem" ]; then
   set -- -v "$config/runtime-ca.pem:/var/lib/attraccess-wago/mqtt-ca.pem:ro"
 fi
+set -- "$@" -v "$root/sys/devices/platform/soc/44009000.spi/spi_master/spi0/spi0.0/din:/run/attraccess-wago/io/din:ro" -v "$root/sys/kernel/dout_drv/DOUT_DATA:/run/attraccess-wago/io/dout"
 docker run -d --pull=never --name attraccess-wago --restart unless-stopped --env-file "$config/runtime.env" -v "$data:/var/lib/attraccess-wago" "$@" "$runtime_image"
 touch "$tx/started"
 trap - EXIT HUP INT TERM

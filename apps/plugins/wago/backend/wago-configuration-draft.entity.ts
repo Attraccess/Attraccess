@@ -8,4 +8,5 @@ export class WagoConfigurationDraft {
   @Column({ type: 'varchar', name: 'reviewed_hash', nullable: true }) reviewedHash!: string | null;
   @Column({ type: 'text', name: 'preset_provenance', nullable: true }) presetProvenance!: string | null;
   @Column({ type: 'varchar', name: 'updated_at' }) updatedAt!: string;
+  @Column({ type: 'integer', default: 1 }) version!: number;
 }

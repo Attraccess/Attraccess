@@ -119,14 +119,22 @@ export function useRecoverCommissioningSessionMutation() {
   return useCommissioningAttemptMutation(recoverCommissioningSession, 'recovery');
 }
 
-function useCommissioningAttemptMutation(attempt: typeof deliverCommissioningSession, intent: 'installation' | 'recovery') {
+function useCommissioningAttemptMutation(
+  attempt: typeof deliverCommissioningSession,
+  intent: 'installation' | 'recovery',
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
     gcTime: 0,
     retry: false,
     networkMode: 'always',
-    mutationFn: (variables: Omit<Parameters<typeof deliverCommissioningSession>[1], 'confirmInstall'> & { id: number; confirmInstall: boolean }) => {
+    mutationFn: (
+      variables: Omit<Parameters<typeof deliverCommissioningSession>[1], 'confirmInstall'> & {
+        id: number;
+        confirmInstall: boolean;
+      },
+    ) => {
       const temporarySsh = { ...variables.temporarySsh };
       const confirmInstall = variables.confirmInstall;
       // React Query retains mutation variables, including after reset/unmount.
@@ -192,10 +200,12 @@ export function useSaveDraftMutation(controllerId: number) {
     mutationFn: ({
       snapshot,
       metadata,
+      expectedVersion,
     }: {
       snapshot: WagoConfigurationSnapshot;
       metadata: ConfigurationEditorMetadata;
-    }) => saveDraft(controllerId, snapshot, metadata),
+      expectedVersion: number | null;
+    }) => saveDraft(controllerId, snapshot, metadata, expectedVersion),
     onSuccess: (draft) => queryClient.setQueryData(queryKeys.draft(controllerId), draft),
   });
 }

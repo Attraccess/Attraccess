@@ -10,6 +10,8 @@ import {
 } from '../../../modbus/model';
 import type { DeviceAdapter, Snapshot } from '../runtime';
 import { type WriteAdmission, WriteAdmissionError } from '../runtime-types';
+// eslint-disable-next-line @nx/enforce-module-boundaries
+import { normalizeMeasurementReading } from '../../../measurement-contract';
 import { decodeRaw, readPdu, writePdu } from './protocol';
 import { type ModbusTransport, ModbusTransportError, QueuedModbusTransport } from './transports';
 
@@ -31,6 +33,15 @@ export class CumulativeCounter {
     if (!Number.isFinite(this.total) || Math.abs(this.total) > Number.MAX_SAFE_INTEGER)
       throw new Error('cumulative counter overflow');
     return this.total;
+  }
+  restore(value: { previous: number; total: number }): void {
+    if (!Number.isFinite(value.previous) || value.previous < 0 || !Number.isFinite(value.total))
+      throw new Error('invalid persisted cumulative counter');
+    this.previous = value.previous;
+    this.total = value.total;
+  }
+  state(): { previous: number; total: number } | undefined {
+    return this.previous === undefined ? undefined : { previous: this.previous, total: this.total };
   }
 }
 
@@ -129,6 +140,21 @@ export class ModbusDeviceRouter implements DeviceAdapter {
     if (!measurement) throw new Error('point has no named measurement');
     return sourceIdentity(connection, device.unitId, measurement);
   }
+  restoreCumulativeCounters(counters: Record<string, { previous: number; total: number }>): void {
+    for (const [key, value] of Object.entries(counters)) {
+      const counter = new CumulativeCounter();
+      counter.restore(value);
+      this.counters.set(key, counter);
+    }
+  }
+  cumulativeCounters(): Record<string, { previous: number; total: number }> {
+    return Object.fromEntries(
+      [...this.counters].flatMap(([key, counter]) => {
+        const value = counter.state();
+        return value ? [[key, value]] : [];
+      }),
+    );
+  }
   private async acquire(key: string, m: ModbusMeasurement, transport: ModbusTransport, unit: number): Promise<number> {
     if (this.active.has(key)) throw new Error('Modbus acquisition already in progress');
     this.active.add(key);
@@ -148,7 +174,7 @@ export class ModbusDeviceRouter implements DeviceAdapter {
         }
         value = counter.update(raw, m.rollover);
       }
-      const scaled = value * m.scale + m.offset;
+      const scaled = normalizeMeasurementReading(value * m.scale + m.offset);
       if (!Number.isFinite(scaled)) throw new Error('Modbus scaling overflow');
       return scaled;
     } finally {

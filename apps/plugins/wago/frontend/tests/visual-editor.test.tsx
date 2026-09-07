@@ -372,6 +372,7 @@ describe('visual configuration workflow', () => {
       presetProvenance: JSON.stringify({ editor: { names: { output: 'Clean refresh', point: 'DO1' }, presets: [] } }),
       reviewedHash: null,
       updatedAt: '2026-09-06',
+      version: 1,
     };
     await act(async () => {
       client.setQueryData(['wago', 'configuration-draft', 1], cleanRefresh);
@@ -385,6 +386,7 @@ describe('visual configuration workflow', () => {
       presetProvenance: JSON.stringify({ editor: { names: { output: 'Saved elsewhere', point: 'DO1' }, presets: [] } }),
       reviewedHash: null,
       updatedAt: '2026-09-07',
+      version: 2,
     };
     state.getDraft.mockResolvedValue(refreshed);
 
@@ -510,7 +512,7 @@ describe('visual configuration workflow', () => {
       revision: 2,
       state: 'rejected',
       contentHash: 'rejected',
-      snapshot: JSON.stringify(state.snapshot),
+      rejectionDetails: { snapshot: JSON.stringify(state.snapshot), presetProvenance: null },
       publishedAt: '2026-09-05',
       reportedAt: '2026-09-05',
       rejectionErrors: JSON.stringify([
@@ -522,11 +524,11 @@ describe('visual configuration workflow', () => {
       ]),
     };
     state.history.mockResolvedValue({ revisions: [revision], offset: 0, limit: 20 });
-    state.revisionPreview.mockResolvedValue({ revision, current: revision, diff: [], impacts: [] });
     mount();
     expect(await screen.findByText('Door lock · Physical terminal: Select a compatible terminal')).toBeInTheDocument();
     expect(screen.getByText(/Rejected by controller/)).toBeInTheDocument();
     expect(screen.queryByText(/logicalChannels\[0\]/)).not.toBeInTheDocument();
+    expect(state.revisionPreview).not.toHaveBeenCalled();
     state.acknowledge.mockImplementation(async () => {
       const saved = { ...revision, rejectionAcknowledgedAt: '2026-09-06', rejectionAcknowledgedBy: 7 };
       state.history.mockResolvedValue({ revisions: [saved], offset: 0, limit: 20 });

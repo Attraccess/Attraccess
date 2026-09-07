@@ -266,6 +266,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       enrollmentExpiresAt = enrollment.expiresAt;
       const environment = [
         `WAGO_HARDWARE_ID=${session.hardwareId}`,
+        'WAGO_HARDWARE_PROFILE=cc100-751-9301-fw31-digital-v1',
         `WAGO_MQTT_URL=mqtts://${broker.host}:${broker.port}`,
         `WAGO_MQTT_USERNAME=${enrollment.username}`,
         `WAGO_MQTT_PASSWORD=${enrollment.password}`,

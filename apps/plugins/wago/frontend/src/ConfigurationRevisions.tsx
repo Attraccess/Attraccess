@@ -1,11 +1,7 @@
 import { Alert, Button, Checkbox, Label, Link } from '@heroui/react';
 import { useEffect, useState } from 'react';
 import type { ConfigurationEditorMetadata, ConfigurationImpact, ConfigurationValidationError } from './api';
-import {
-  useConfigurationActions,
-  useConfigurationRevisionsQuery,
-  useConfigurationRevisionPreviewQuery,
-} from './queries';
+import { useConfigurationActions, useConfigurationRevisionsQuery } from './queries';
 import { ConfigurationChanges, ConfigurationErrors, ConfigurationMetadataChanges } from './ConfigurationChanges';
 import { readMetadata } from './configuration-model';
 
@@ -61,27 +57,24 @@ function ImpactWarning({
 
 function RejectionErrors({
   value,
-  controllerId,
-  revision,
+  snapshot,
+  provenance,
   names,
 }: {
   value: string | null;
-  controllerId: number;
-  revision: number;
+  snapshot?: string;
+  provenance?: string | null;
   names: Record<string, string>;
 }) {
-  const preview = useConfigurationRevisionPreviewQuery(controllerId, revision, !!value);
-  if (!value) return null;
-  if (preview.isPending) return <p>Loading rejected field details…</p>;
-  if (preview.isError) return <p>Could not load rejected field details: {preview.error.message}</p>;
+  if (!value || !snapshot) return null;
   try {
     const errors = JSON.parse(value) as ConfigurationValidationError[];
     if (!Array.isArray(errors)) throw new Error('invalid errors');
     return (
       <ConfigurationErrors
         errors={errors}
-        snapshot={JSON.parse(preview.data.revision.snapshot)}
-        names={{ ...names, ...readMetadata(preview.data.revision.presetProvenance ?? null).names }}
+        snapshot={JSON.parse(snapshot)}
+        names={{ ...names, ...readMetadata(provenance ?? null).names }}
       />
     );
   } catch {
@@ -219,8 +212,8 @@ export function ConfigurationRevisions({
           </p>
           <RejectionErrors
             value={revision.rejectionErrors}
-            controllerId={controllerId}
-            revision={revision.revision}
+            snapshot={revision.rejectionDetails?.snapshot}
+            provenance={revision.rejectionDetails?.presetProvenance}
             names={metadata.names}
           />
           {revision.state === 'rejected' &&

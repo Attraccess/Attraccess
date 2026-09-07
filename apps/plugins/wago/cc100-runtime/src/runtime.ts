@@ -86,8 +86,14 @@ export class WagoRuntime {
     this.initialSequence = this.sequence;
     if (this.state.accepted) {
       const errors = validateDesired({ protocolVersion: 1, ...this.state.accepted });
-      if (errors.length) throw new Error('persisted configuration is invalid');
-      this.options.device.configure?.(this.state.accepted.snapshot);
+      if (errors.length) {
+        // Keep transport recovery available when an old local snapshot no longer validates.
+        delete this.state.accepted;
+        await this.saveState();
+      } else {
+        this.options.device.configure?.(this.state.accepted.snapshot);
+        this.options.device.restoreCumulativeCounters?.(this.state.cumulativeCounters ?? {});
+      }
     }
     this.outputs.recoverPulses();
     this.loaded = true;
@@ -414,6 +420,11 @@ export class WagoRuntime {
           try {
             if (reading.ok === false) throw reading.error;
             const { raw, timestamp } = reading;
+            const counters = this.options.device.cumulativeCounters?.();
+            if (counters) {
+              this.state.cumulativeCounters = counters;
+              await this.saveState();
+            }
             const transform = channel.measurement ?? { unit: 'percent', scale: 1, offset: 0 };
             const measurement = encodeMeasurement(channel.id, raw, transform);
             await this.publishOperational(

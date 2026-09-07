@@ -38,6 +38,8 @@ export type RuntimeState = {
   commandExpiries?: Record<string, string>;
   /** Highest reserved operational sequence; skipped unused values are intentional. */
   sequence?: number;
+  /** Cumulative Modbus source state survives process restarts and rollovers. */
+  cumulativeCounters?: Record<string, { previous: number; total: number }>;
 };
 
 export interface Transport {
@@ -54,6 +56,8 @@ export interface DeviceAdapter {
   prepareConfiguration?(snapshot: Snapshot): () => void;
   suspend?(): () => void;
   measurementSource?(point: Snapshot['physicalPoints'][number]): string;
+  restoreCumulativeCounters?(counters: Record<string, { previous: number; total: number }>): void;
+  cumulativeCounters?(): Record<string, { previous: number; total: number }>;
   shouldPoll?(point: Snapshot['physicalPoints'][number], now: number): boolean;
   /** True when a failed write may already have reached the physical device. */
   writeMayHaveBeenTransmitted?(error: unknown): boolean;

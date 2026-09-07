@@ -80,6 +80,7 @@ export interface WagoConfigurationDraft {
   reviewedHash: string | null;
   presetProvenance: string | null;
   updatedAt: string;
+  version: number;
 }
 export interface WagoPreset {
   id:
@@ -120,6 +121,7 @@ export interface ConfigurationRevision {
   rejectionAcknowledgedBy?: number | null;
   publishedAt: string;
   reportedAt: string | null;
+  rejectionDetails?: { snapshot: string; presetProvenance: string | null };
 }
 export interface ConfigurationImpact {
   channelId: string;
@@ -186,10 +188,8 @@ export const deliverCommissioningSession = (
   id: number,
   input: { confirmInstall: true; temporarySsh: { username: string; password: string } },
 ) => api.request<CommissioningSession>(`/commissioning/sessions/${id}/deliver`, { method: 'POST', body: input });
-export const recoverCommissioningSession = (
-  id: number,
-  input: Parameters<typeof deliverCommissioningSession>[1],
-) => api.request<CommissioningSession>(`/commissioning/sessions/${id}/recover`, { method: 'POST', body: input });
+export const recoverCommissioningSession = (id: number, input: Parameters<typeof deliverCommissioningSession>[1]) =>
+  api.request<CommissioningSession>(`/commissioning/sessions/${id}/recover`, { method: 'POST', body: input });
 export const revokeCommissioningSession = (id: number) =>
   api.request<CommissioningSession>(`/commissioning/sessions/${id}/revoke`, { method: 'POST' });
 export const removeCommissioningSession = (id: number) =>
@@ -198,10 +198,15 @@ export const removeController = (id: number) => api.request<void>(`/controllers/
 
 export const getDraft = (id: number) =>
   api.request<WagoConfigurationDraft | null>(`/controllers/${id}/configuration/draft`);
-export const saveDraft = (id: number, snapshot: unknown, metadata?: ConfigurationEditorMetadata) =>
+export const saveDraft = (
+  id: number,
+  snapshot: unknown,
+  metadata: ConfigurationEditorMetadata,
+  expectedVersion: number | null,
+) =>
   api.request<WagoConfigurationDraft>(`/controllers/${id}/configuration/draft`, {
     method: 'POST',
-    body: { snapshot, metadata },
+    body: { snapshot, metadata, expectedVersion },
   });
 export const listPresets = () => api.request<WagoPreset[]>('/configuration/presets');
 export const previewPreset = (id: number, application: WagoPresetApplication, snapshot?: WagoConfigurationSnapshot) =>

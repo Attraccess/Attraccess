@@ -468,6 +468,7 @@ describe('WagoCommissioningService', () => {
           Buffer.from(
             [
               'WAGO_HARDWARE_ID=cc100-test',
+              'WAGO_HARDWARE_PROFILE=cc100-751-9301-fw31-digital-v1',
               'WAGO_MQTT_URL=mqtts://mock.invalid:8883',
               'WAGO_MQTT_USERNAME=enrollment',
               'WAGO_MQTT_PASSWORD=mqtt-password',

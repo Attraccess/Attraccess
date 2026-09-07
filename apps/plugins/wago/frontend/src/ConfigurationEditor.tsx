@@ -64,6 +64,7 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
   const [presetBusy, setPresetBusy] = useState(false);
   const editVersion = useRef(0);
   const loadedDraft = useRef<string | null>(null);
+  const loadedDraftVersion = useRef<number | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -91,6 +92,7 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
       setDirty(false);
       setDraftConflict(false);
       loadedDraft.current = incoming;
+      loadedDraftVersion.current = draft.data?.version ?? null;
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Could not read draft.');
     }
@@ -140,10 +142,15 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
       const result = await validate.mutateAsync(snapshot);
       if (!mounted.current || savingVersion !== editVersion.current || !result.valid) return;
       const savedMetadata = metadataForSnapshot(snapshot, metadata);
-      await save.mutateAsync({ snapshot, metadata: savedMetadata });
+      const saved = await save.mutateAsync({
+        snapshot,
+        metadata: savedMetadata,
+        expectedVersion: loadedDraftVersion.current,
+      });
       if (!mounted.current || savingVersion !== editVersion.current) return;
       setDirty(false);
       setMetadata(savedMetadata);
+      loadedDraftVersion.current = saved.version;
       setNotice('Draft saved. Review and publish separately to send it to the controller.');
       setGeneration((value) => value + 1);
     } catch (error) {
@@ -153,6 +160,7 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
   const busy = save.isPending || validate.isPending || revisionBusy || presetBusy;
   function reloadSavedDraft() {
     loadedDraft.current = null;
+    loadedDraftVersion.current = null;
     setDirty(false);
     setDraftConflict(false);
     void draft.refetch();

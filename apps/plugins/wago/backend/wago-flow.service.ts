@@ -35,9 +35,9 @@ type Waiter = (state?: CachedState, cancel?: boolean) => void;
 
 @Injectable()
 export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
-  private readonly controllers: Repository<WagoController>;
-  private readonly revisions: Repository<WagoConfigurationRevision>;
-  private readonly settings: Repository<WagoSettings>;
+  private controllers!: Repository<WagoController>;
+  private revisions!: Repository<WagoConfigurationRevision>;
+  private settings!: Repository<WagoSettings>;
   private readonly cache = new Map<string, CachedState>();
   private controllerByHardwareId = new Map<string, { controller: WagoController; serverId: number }>();
   private readonly streams = new Map<
@@ -66,13 +66,10 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   private readonly controllerMessages = new Map<string, Promise<void>>();
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {
-    this.controllers = context.getRepository(WagoController);
-    this.revisions = context.getRepository(WagoConfigurationRevision);
-    this.settings = context.getRepository(WagoSettings);
-  }
+  constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
 
   async onModuleInit(): Promise<void> {
+    this.ensureRepositories();
     await this.refresh();
     // Claims and settings are managed by another service; periodically reconcile this shared subscription.
     this.refreshTimer = setInterval(
@@ -83,6 +80,12 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       60_000,
     );
   }
+  private ensureRepositories(): void {
+    if (this.controllers) return;
+    this.controllers = this.context.getRepository(WagoController);
+    this.revisions = this.context.getRepository(WagoConfigurationRevision);
+    this.settings = this.context.getRepository(WagoSettings);
+  }
   onModuleDestroy(): void {
     if (this.refreshTimer) clearInterval(this.refreshTimer);
     this.subscriptions.splice(0).forEach((subscription) => subscription.unsubscribe());
@@ -92,6 +95,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   }
 
   async refresh(): Promise<void> {
+    this.ensureRepositories();
     const settings = await this.settings.findOneBy({ id: 1 });
     if (!settings) return;
     const controllers = await this.controllers.find({ where: { trustState: 'claimed' } });
@@ -150,6 +154,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   }
 
   async resolveConfigSchema(config: Record<string, unknown>, kind: NodeKind): Promise<Record<string, unknown>> {
+    this.ensureRepositories();
     const controllers = await this.controllers.find({ where: { trustState: 'claimed' }, order: { name: 'ASC' } });
     const selected =
       typeof config.controllerId === 'number'

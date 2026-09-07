@@ -66,6 +66,11 @@ export function encodeMeasurement(
   };
 }
 
+/** Remove IEEE-754 acquisition noise without accepting a meaningful fractional milli-unit. */
+export function normalizeMeasurementReading(value: number): number {
+  return Number(value.toPrecision(15));
+}
+
 function powerOfTen(exponent: number): bigint {
   // String construction also works with the repository's ES2015 test transpilation.
   return BigInt('1' + '0'.repeat(exponent));
