@@ -124,7 +124,8 @@ function parseValues(value: string | undefined): Record<string, boolean | number
   return parsed as Record<string, boolean | number>;
 }
 function parseCapabilities(value: string | undefined): string[] {
-  if (!value) return ['claim', 'heartbeat', 'configuration-v1', 'commands', 'state', 'measurement', 'fault', 'acknowledgement'];
+  if (!value)
+    return ['claim', 'heartbeat', 'configuration-v1', 'commands', 'state', 'measurement', 'fault', 'acknowledgement'];
   const parsed = JSON.parse(value);
   if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== 'string' || !item.trim()))
     throw new Error('WAGO_CAPABILITIES must be a JSON array of non-empty strings');
