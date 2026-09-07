@@ -13,7 +13,7 @@ export type Snapshot = {
     pulse?: { durationMs: number };
     guard?: { channelId: string; when: 'on' | 'off' };
     feedback?: { channelId: string; expected: 'match' | 'inverse'; timeoutMs: number };
-    measurement?: { unit: string; scale: number; offset: number };
+    measurement?: { unit: string; scale: number; offset: number; kind?: 'live' | 'cumulative' };
   }>;
 };
 

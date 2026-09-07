@@ -1,3 +1,7 @@
+import { randomUUID } from 'node:crypto';
+// The standalone runtime bundles the same plugin-owned wire schema as its consumer.
+// eslint-disable-next-line @nx/enforce-module-boundaries
+import { encodeMeasurement, MeasurementContractError } from '../../measurement-contract';
 import { hash, validateDesired } from './configuration';
 import { OutputController } from './output-controller';
 import {
@@ -30,6 +34,7 @@ export class WagoRuntime {
   private state: RuntimeState = { outputs: {}, commandIds: [], commandExpiries: {} };
   private connected = true;
   private readonly inFlightCommandIds = new Set<string>();
+  private readonly streamId = randomUUID();
   private readonly outputs: OutputController;
   private configurationUpdates = Promise.resolve();
   private sequence = 0;
@@ -291,19 +296,17 @@ export class WagoRuntime {
       if (!point) continue;
       try {
         const raw = await this.options.device.read(point);
-        if (typeof raw !== 'number') continue;
+        const timestamp = new Date().toISOString();
         const transform = channel.measurement ?? { unit: 'percent', scale: 1, offset: 0 };
         await this.publishOperational('measurements', {
-          timestamp: new Date().toISOString(),
-          channelId: channel.id,
-          unit: transform.unit,
-          value: raw * transform.scale + transform.offset,
+          timestamp,
+          ...encodeMeasurement(channel.id, raw, transform),
         });
       } catch (error) {
         await this.publishOperational('faults', {
           timestamp: new Date().toISOString(),
           channelId: channel.id,
-          code: 'measurement_read_failed',
+          code: error instanceof MeasurementContractError ? error.code : 'measurement_read_failed',
           message: error instanceof Error ? error.message : String(error),
         });
       }
@@ -408,7 +411,11 @@ export class WagoRuntime {
     options?: { retain?: boolean },
   ): Promise<void> {
     const sequence = await this.nextSequence();
-    await this.options.transport.publish(this.topic(suffix), { sequence, ...payload }, options);
+    await this.options.transport.publish(
+      this.topic(suffix),
+      { streamId: this.streamId, sequence, ...payload },
+      options,
+    );
   }
   private async rejectFailedWrite(id: string): Promise<void> {
     await this.releaseCommand(id);
