@@ -32,6 +32,10 @@ export class WagoRuntime {
   private readonly inFlightCommandIds = new Set<string>();
   private readonly outputs: OutputController;
   private configurationUpdates = Promise.resolve();
+  private sequence = 0;
+  private reservedSequence = 0;
+  private sequenceReservation: Promise<void> | null = null;
+  private statePersistence: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly options: {
@@ -48,7 +52,7 @@ export class WagoRuntime {
       device: options.device,
       getSnapshot: () => this.state.accepted?.snapshot,
       getState: () => this.state,
-      saveState: () => this.options.store.save(this.state),
+      saveState: () => this.saveState(),
       publishState: () => this.publishState(),
       publishFault: (channelId, error) => this.publishFault(channelId, error),
     });
@@ -56,6 +60,8 @@ export class WagoRuntime {
 
   async start(): Promise<void> {
     this.state = await this.options.store.load();
+    this.sequence = this.state.sequence ?? 0;
+    this.reservedSequence = this.sequence;
     await this.options.transport.subscribe(this.desiredTopic(), (payload) => this.receiveDesired(payload));
     await this.options.transport.subscribe(this.commandTopic(), (payload) => this.receiveCommand(payload));
     await this.publishHeartbeat();
@@ -64,7 +70,7 @@ export class WagoRuntime {
 
   async receiveClaim(credentials: DiscoveryClaim): Promise<void> {
     this.state.credentials = credentials;
-    await this.options.store.save(this.state);
+    await this.saveState();
   }
 
   async receiveDiscoveryClaim(payload: Buffer): Promise<DiscoveryClaim | undefined> {
@@ -146,7 +152,7 @@ export class WagoRuntime {
             contentHash: desired.contentHash,
             snapshot: desired.snapshot,
           };
-          await this.options.store.save({ ...this.state, accepted });
+          await this.saveState({ ...this.state, accepted });
           this.state.accepted = accepted;
         });
       } catch {
@@ -173,7 +179,12 @@ export class WagoRuntime {
     } catch {
       return;
     }
-    if (typeof command?.id !== 'string' || !command.id || !command.channelId || !['set', 'pulse'].includes(command.action))
+    if (
+      typeof command?.id !== 'string' ||
+      !command.id ||
+      !command.channelId ||
+      !['set', 'pulse'].includes(command.action)
+    )
       return;
     if (command.action === 'set' && typeof command.value !== 'boolean')
       return this.acknowledge(command.id, 'rejected', 'set commands require a boolean value', 'invalid_command');
@@ -210,7 +221,7 @@ export class WagoRuntime {
       // Keep the reservation through an unexpected exit after the physical write.
       this.state.commandIds = [...this.state.commandIds, command.id].slice(-100);
       this.state.commandExpiries = { ...this.state.commandExpiries, [command.id]: expiresAt };
-      await this.options.store.save(this.state);
+      await this.saveState();
       await this.outputs.runForCommand(channel.id, async () => {
         const currentChannel = this.state.accepted?.snapshot.logicalChannels.find(
           (item) => item.id === command.channelId,
@@ -282,13 +293,15 @@ export class WagoRuntime {
         const raw = await this.options.device.read(point);
         if (typeof raw !== 'number') continue;
         const transform = channel.measurement ?? { unit: 'percent', scale: 1, offset: 0 };
-        await this.options.transport.publish(this.topic('measurements'), {
+        await this.publishOperational('measurements', {
+          timestamp: new Date().toISOString(),
           channelId: channel.id,
           unit: transform.unit,
           value: raw * transform.scale + transform.offset,
         });
       } catch (error) {
-        await this.options.transport.publish(this.topic('faults'), {
+        await this.publishOperational('faults', {
+          timestamp: new Date().toISOString(),
           channelId: channel.id,
           code: 'measurement_read_failed',
           message: error instanceof Error ? error.message : String(error),
@@ -298,9 +311,10 @@ export class WagoRuntime {
   }
 
   private async publishState(): Promise<void> {
-    await this.options.transport.publish(
-      this.topic('state'),
+    await this.publishOperational(
+      'state',
       {
+        timestamp: new Date().toISOString(),
         connected: this.connected,
         revision: this.state.accepted?.revision ?? null,
         contentHash: this.state.accepted?.contentHash ?? null,
@@ -327,7 +341,8 @@ export class WagoRuntime {
             code: 'device_write_failed',
             message: error instanceof Error ? error.message : String(error),
           };
-    return this.options.transport.publish(this.topic('faults'), {
+    return this.publishOperational('faults', {
+      timestamp: new Date().toISOString(),
       channelId,
       ...fault,
     });
@@ -338,7 +353,13 @@ export class WagoRuntime {
     error?: string,
     code?: string,
   ): Promise<void> {
-    return this.options.transport.publish(this.topic('acknowledgements'), { id, status, error, code });
+    return this.publishOperational('acknowledgements', {
+      timestamp: new Date().toISOString(),
+      id,
+      status,
+      error,
+      code,
+    });
   }
   private topic(suffix: string): string {
     return `${this.options.prefix.replace(/^\/+|\/+$/g, '')}/v1/controllers/${this.options.hardwareId}/${suffix}`;
@@ -352,6 +373,38 @@ export class WagoRuntime {
   private commandTopic(): string {
     return this.topic('commands');
   }
+  private async nextSequence(): Promise<number> {
+    while (this.sequence === this.reservedSequence) {
+      if (!this.sequenceReservation) {
+        this.sequenceReservation = this.queueStateSave(async () => {
+          const reservedSequence = this.reservedSequence + 100;
+          await this.options.store.save({ ...this.state, sequence: reservedSequence });
+          this.reservedSequence = reservedSequence;
+          this.state.sequence = reservedSequence;
+        }).finally(() => {
+          this.sequenceReservation = null;
+        });
+      }
+      await this.sequenceReservation;
+    }
+    return ++this.sequence;
+  }
+  private saveState(state: RuntimeState = this.state): Promise<void> {
+    return this.queueStateSave(() => this.options.store.save(state));
+  }
+  private queueStateSave(save: () => Promise<void>): Promise<void> {
+    const queued = this.statePersistence.then(save);
+    this.statePersistence = queued.catch(() => undefined);
+    return queued;
+  }
+  private async publishOperational(
+    suffix: 'state' | 'measurements' | 'faults' | 'acknowledgements',
+    payload: Record<string, unknown>,
+    options?: { retain?: boolean },
+  ): Promise<void> {
+    const sequence = await this.nextSequence();
+    await this.options.transport.publish(this.topic(suffix), { sequence, ...payload }, options);
+  }
   private async rejectFailedWrite(id: string): Promise<void> {
     await this.releaseCommand(id);
     await this.acknowledge(id, 'rejected', 'device write failed', 'device_write_failed');
@@ -359,7 +412,7 @@ export class WagoRuntime {
   private async releaseCommand(id: string): Promise<void> {
     this.state.commandIds = this.state.commandIds.filter((commandId) => commandId !== id);
     if (this.state.commandExpiries) delete this.state.commandExpiries[id];
-    await this.options.store.save(this.state);
+    await this.saveState();
   }
   private pruneCommandExpiries(): void {
     const now = Date.now();

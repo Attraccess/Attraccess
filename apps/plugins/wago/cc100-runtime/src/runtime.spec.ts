@@ -997,7 +997,7 @@ describe('WagoRuntime', () => {
     expect(transport.published).toContainEqual(
       expect.objectContaining({
         topic: 'attraccess/wago/v1/controllers/cc100-1/acknowledgements',
-        payload: { id: 'command-1', status: 'duplicate', error: undefined },
+        payload: expect.objectContaining({ id: 'command-1', status: 'duplicate', error: undefined }),
       }),
     );
   });

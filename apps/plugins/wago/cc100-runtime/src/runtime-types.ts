@@ -25,6 +25,8 @@ export type RuntimeState = {
   outputs: Record<string, boolean>;
   commandIds: string[];
   commandExpiries?: Record<string, string>;
+  /** Highest sequence number durably reserved for operational messages. */
+  sequence?: number;
 };
 
 export interface Transport {
