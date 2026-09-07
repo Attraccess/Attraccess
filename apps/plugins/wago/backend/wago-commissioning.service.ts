@@ -1,4 +1,5 @@
 import { isCc100Fw31Identity, wagoFw31IdentityRead } from './wago-firmware-identity';
+import { parseWagoCodesysClassification, wagoCodesysClassificationShell } from './wago-codesys-classification';
 import { commissionClock } from './wago-commissioning-clock';
 import type { WagoCommissioningPreflightReport } from '../shared/commissioning';
 import { MANAGEMENT_INSPECTION_COMMAND } from './wago-management-inspection';
@@ -1255,7 +1256,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       host,
       fingerprint,
       credential,
-      `${wagoFw31IdentityRead()}; printf '\\nCODESYS='; ps -eo comm=`,
+      `${wagoFw31IdentityRead()}; root=''; ${wagoCodesysClassificationShell()}\nprintf '\\nCODESYS='; wago_codesys_classify`,
     );
     const marker = '\nCODESYS=';
     const markerIndex = output.indexOf(marker);
@@ -1263,7 +1264,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     const processes = markerIndex >= 0 ? output.slice(markerIndex + marker.length) : '';
     return {
       firmware,
-      codesys: markerIndex < 0 ? 'unknown' : /codesys|plclinux_rt/i.test(processes) ? 'active' : 'inactive',
+      codesys: markerIndex < 0 ? 'unknown' : parseWagoCodesysClassification(processes),
     };
   }
 

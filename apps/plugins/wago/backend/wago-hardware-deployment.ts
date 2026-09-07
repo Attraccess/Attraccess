@@ -1,5 +1,6 @@
 /** FW31 vendor lifecycle and narrow digital I/O deployment. Physical qualification is separate. */
 import { wagoFw31IdentityCheck } from './wago-firmware-identity';
+import { wagoCodesysClassificationShell } from './wago-codesys-classification';
 import { wagoShellFilesystemGuard } from './wago-shell-filesystem';
 import { wagoShellStat } from './wago-shell-stat';
 import { wagoHostIoGuardShell } from './wago-host-io-guard';
@@ -96,7 +97,9 @@ else
 fi
 exclusivity=unknown
 processes=$(ps -eo comm=) || exit 1
-if printf '%s\\n' "$processes" | grep -Eiq 'codesys|plclinux_rt|rtswrapper'; then exclusivity=codesys-active; fi
+${wagoCodesysClassificationShell()}
+codesys_state=$(wago_codesys_classify) || exit 1
+if [ "$codesys_state" = active ]; then exclusivity=codesys-active; fi
 # WAGO config_runtime/init runtime use S98_runtime. A stopped PLC can return
 # at reboot; process absence is not permission to replace its output ownership.
 if [ "$exclusivity" = unknown ] && { test -e "$root/etc/rc.d/S98_runtime" || test -L "$root/etc/rc.d/S98_runtime" || test "$(cat "$root/etc/specific/rtsversion" 2>/dev/null || :)" != 0; }; then
@@ -112,7 +115,7 @@ if [ -n "$docker_cli" ] && [ -n "$daemon_cli" ]; then
   if docker info >/dev/null 2>&1; then
     docker_state=running
     provision=none
-    if [ "$exclusivity" = unknown ] && [ "$hardware" != missing-register ]; then
+    if [ "$exclusivity" = unknown ] && [ "$codesys_state" = inactive ] && [ "$hardware" != missing-register ]; then
       exclusivity=clear
       output_canonical=$(readlink -f "$dout") || exit 1
       containers=$(docker container ls -a --no-trunc --format '{{.ID}}') || exit 1
@@ -217,8 +220,9 @@ done
 /** Narrow ownership is reapplied to volatile sysfs files on every controller boot. */
 function codesysStopped(): string {
   return `
-processes=$(ps -eo comm=) || fail 'Cannot verify CODESYS stopped'
-if printf '%s\\n' "$processes" | grep -Eiq 'codesys|plclinux_rt|rtswrapper'; then fail 'codesys-active'; fi
+${wagoCodesysClassificationShell()}
+codesys_state=$(wago_codesys_classify) || fail 'Cannot verify CODESYS stopped'
+case "$codesys_state" in inactive) ;; active) fail 'codesys-active' ;; *) fail 'Cannot verify CODESYS stopped' ;; esac
 `;
 }
 
