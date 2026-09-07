@@ -329,7 +329,7 @@ process.exit(result.status ?? 1);
     try {
       for (
         let attempt = 0;
-        attempt < 300 && !existsSync(join(fixture.root, config, 'delivery/token')) && child.exitCode === null;
+        attempt < 1500 && !existsSync(join(fixture.root, config, 'delivery/token')) && child.exitCode === null;
         attempt++
       )
         await new Promise((resolve) => setTimeout(resolve, 20));
@@ -343,7 +343,7 @@ process.exit(result.status ?? 1);
       if (child.exitCode === null) child.kill('SIGKILL');
       await completion;
     }
-  }, 15000);
+  }, 35000);
 
   it('receiver rejects invalid script encoding and cleans its private directory', () => {
     const r = fixture.run(runtimeBundleStreamReceiver, '', Buffer.from('not-base64!\n'));

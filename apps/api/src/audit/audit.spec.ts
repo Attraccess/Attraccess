@@ -128,6 +128,55 @@ describe('durable audit SQLite', () => {
     expect(await service.record(event())).toEqual({ status: 'recorded' });
   });
 
+  it('records billing transaction lifecycle events with only allowlisted metadata', async () => {
+    await store.setPlainSetting('audit', 'domains', '["billing"]');
+    expect(
+      await service.recordBillingTransaction({
+        transactionId: 7,
+        userId: 42,
+        initiatorId: 9,
+        amount: 500,
+        status: 'pending',
+        source: 'sumup-topup',
+        // Runtime callers cannot expand the audited projection with provider data.
+        clientSecret: 'not persisted',
+      } as never),
+    ).toEqual({ status: 'recorded' });
+    expect((await service.list({ limit: 1 })).items[0]).toMatchObject({
+      domain: 'billing',
+      action: 'billing.transaction.created',
+      subjectType: 'billing.transaction',
+      subjectId: 7,
+      actorId: 9,
+      details: { amount: 500, status: 'pending', source: 'sumup-topup' },
+    });
+    expect(
+      await service.recordBillingTransaction({
+        transactionId: 7,
+        userId: 42,
+        amount: 500,
+        status: 'not-a-status',
+        source: 'sumup-topup',
+      }),
+    ).toEqual({ status: 'unavailable' });
+  });
+
+  it('records a billing event after its originating transaction commits', async () => {
+    await store.setPlainSetting('audit', 'domains', '["billing"]');
+    let receipt: Promise<{ status: string }> | undefined;
+    await source.transaction(async () => {
+      receipt = service.recordBillingTransaction({
+        transactionId: 8,
+        userId: 42,
+        amount: 0,
+        status: 'pending',
+        source: 'resource-usage',
+      });
+    });
+    await expect(receipt).resolves.toEqual({ status: 'recorded' });
+    expect((await service.list({ limit: 1 })).items[0]).toMatchObject({ subjectId: 8, domain: 'billing' });
+  });
+
   it('persists every registered action lifecycle and preserves manual command and profile references', async () => {
     for (const action of AUDIT_ACTIONS) {
       for (const terminal of ['succeeded', 'failed'] as const) {
