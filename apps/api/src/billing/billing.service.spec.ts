@@ -40,7 +40,7 @@ describe('BillingService', () => {
   let liveNotificationsService: { notifyTransactionUpdate: jest.Mock };
   let emailService: jest.Mocked<EmailService>;
   let billingTransactionItemRepository: jest.Mocked<Repository<BillingTransactionItem>>;
-  let auditService: { recordBillingTransaction: jest.Mock };
+  let auditService: { recordBillingTransaction: jest.Mock; recordBillingTransactionAfterCommit: jest.Mock };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -109,7 +109,7 @@ describe('BillingService', () => {
           provide: MetricsService,
           useValue: mockMetricsService,
         },
-        { provide: AuditService, useValue: { recordBillingTransaction: jest.fn() } },
+        { provide: AuditService, useValue: { recordBillingTransaction: jest.fn(), recordBillingTransactionAfterCommit: jest.fn() } },
       ],
     }).compile();
 
@@ -624,14 +624,14 @@ describe('BillingService', () => {
       expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ id: 77, amount: -24 }),
       );
-      expect(auditService.recordBillingTransaction).toHaveBeenCalledWith({
+      expect(auditService.recordBillingTransactionAfterCommit).toHaveBeenCalledWith({
         transactionId: 77,
         userId: 24,
         amount: -24,
         status: BillingTransactionStatus.Completed,
         previousStatus: BillingTransactionStatus.Pending,
         source: 'resource-usage',
-      });
+      }, manager);
 
       // No BILLING_FACTOR item because billingFactor is 100%
       const saves = (manager.save as jest.Mock).mock.calls

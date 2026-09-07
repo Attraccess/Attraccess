@@ -1,6 +1,13 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
-import { DataSource } from 'typeorm';
+import {
+  DataSource,
+  EntityManager,
+  EntitySubscriberInterface,
+  QueryRunner,
+  TransactionCommitEvent,
+  TransactionRollbackEvent,
+} from 'typeorm';
 import { AuditLog } from '@attraccess/database-entities';
 import { PluginAuditEvent, PluginAuditHostProvider, PluginAuditReceipt } from '@attraccess/plugins-backend-sdk';
 import { readAuditSettings } from './audit.config';
@@ -24,7 +31,7 @@ export interface BillingTransactionAuditEvent {
 }
 
 @Injectable()
-export class AuditService implements PluginAuditHostProvider, OnModuleInit, OnModuleDestroy {
+export class AuditService implements PluginAuditHostProvider, EntitySubscriberInterface, OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AuditService.name);
   private stopping = false;
   private activeReads = 0;
@@ -33,6 +40,11 @@ export class AuditService implements PluginAuditHostProvider, OnModuleInit, OnMo
   private cleaning = false;
   private writeTail: Promise<void> = Promise.resolve();
   private contended = false;
+  private subscribed = false;
+  private readonly billingEvents = new WeakMap<
+    QueryRunner,
+    Array<{ event: BillingTransactionAuditEvent; resolve: (receipt: PluginAuditReceipt) => void }>
+  >();
 
   constructor(
     private readonly source: DataSource,
@@ -41,6 +53,8 @@ export class AuditService implements PluginAuditHostProvider, OnModuleInit, OnMo
 
   async onModuleInit(): Promise<void> {
     if (this.storage?.isInitialized || this.stopping) return;
+    this.source.subscribers.push(this);
+    this.subscribed = true;
     // A separate connection guarantees that a receipt follows autocommit, never a
     // savepoint in the application's shared SQLite transaction. No schema sync.
     if (this.source.options.type !== 'sqlite' || this.source.options.database === ':memory:') return;
@@ -65,6 +79,7 @@ export class AuditService implements PluginAuditHostProvider, OnModuleInit, OnMo
 
   async onModuleDestroy(): Promise<void> {
     this.stopping = true;
+    if (this.subscribed) this.source.subscribers.splice(this.source.subscribers.indexOf(this), 1);
     while (this.pending || this.cleaning || this.activeReads) await new Promise((resolve) => setTimeout(resolve, 5));
     const storage = this.storage;
     this.storage = undefined;
@@ -110,9 +125,6 @@ export class AuditService implements PluginAuditHostProvider, OnModuleInit, OnMo
         return { status: 'unavailable' };
       const actorId = event.initiatorId ?? event.userId;
       if (!Number.isSafeInteger(actorId) || actorId <= 0) return { status: 'unavailable' };
-      // Billing callers can be inside a TypeORM transaction. Give SQLite's asynchronous
-      // commit a chance to release its write lock before this separate connection writes.
-      await new Promise<void>((resolve) => setTimeout(resolve, 25));
       return await this.recordSnapshot({
         domain: 'billing',
         pluginId: 'billing',
@@ -134,6 +146,36 @@ export class AuditService implements PluginAuditHostProvider, OnModuleInit, OnMo
     } catch {
       return { status: 'unavailable' };
     }
+  }
+
+  /** Defers billing audit writes until the supplied transaction has committed. */
+  recordBillingTransactionAfterCommit(
+    event: BillingTransactionAuditEvent,
+    transactionManager?: EntityManager,
+  ): Promise<PluginAuditReceipt> {
+    const queryRunner = transactionManager?.queryRunner;
+    if (!queryRunner?.isTransactionActive) return this.recordBillingTransaction(event);
+    return new Promise((resolve) => {
+      const events = this.billingEvents.get(queryRunner) ?? [];
+      events.push({ event, resolve });
+      this.billingEvents.set(queryRunner, events);
+    });
+  }
+
+  afterTransactionCommit({ queryRunner }: TransactionCommitEvent): void {
+    // Nested transaction commits release a savepoint; wait for the owning transaction.
+    if (queryRunner.isTransactionActive) return;
+    const events = this.billingEvents.get(queryRunner);
+    if (!events) return;
+    this.billingEvents.delete(queryRunner);
+    for (const { event, resolve } of events) void this.recordBillingTransaction(event).then(resolve);
+  }
+
+  afterTransactionRollback({ queryRunner }: TransactionRollbackEvent): void {
+    const events = this.billingEvents.get(queryRunner);
+    if (!events) return;
+    this.billingEvents.delete(queryRunner);
+    for (const { resolve } of events) resolve({ status: 'unavailable' });
   }
 
   private async recordSnapshot(event: Omit<AuditLog, 'id' | 'at'>): Promise<PluginAuditReceipt> {

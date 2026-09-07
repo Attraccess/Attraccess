@@ -311,14 +311,14 @@ export class BillingService {
 
         transaction.amount = -totalCredits;
         transaction.status = BillingTransactionStatus.Completed;
-        void this.auditService.recordBillingTransaction({
+        void this.auditService.recordBillingTransactionAfterCommit({
           transactionId: transaction.id,
           userId: transaction.userId,
           amount: transaction.amount,
           status: transaction.status,
           previousStatus,
           source: 'resource-usage',
-        });
+        }, manager);
       } else {
         transaction = await manager.save(BillingTransaction, {
           userId: usage.userId,
@@ -326,13 +326,13 @@ export class BillingService {
           amount: -totalCredits,
           status: BillingTransactionStatus.Completed,
         } as Partial<BillingTransaction>);
-        void this.auditService.recordBillingTransaction({
+        void this.auditService.recordBillingTransactionAfterCommit({
           transactionId: transaction.id,
           userId: transaction.userId,
           amount: transaction.amount,
           status: transaction.status,
           source: 'resource-usage',
-        });
+        }, manager);
       }
 
       await manager.save(BillingTransactionItem, {
@@ -425,13 +425,13 @@ export class BillingService {
       amount: 0,
       status: BillingTransactionStatus.Pending,
     });
-    void this.auditService.recordBillingTransaction({
+    void this.auditService.recordBillingTransactionAfterCommit({
       transactionId: transaction.id,
       userId: transaction.userId,
       amount: transaction.amount,
       status: transaction.status,
       source: 'resource-usage',
-    });
+    }, transactionalEntityManager);
   }
 
   public async isBillingEnabled(resourceId: number, transactionalEntityManager?: EntityManager) {

@@ -161,20 +161,40 @@ describe('durable audit SQLite', () => {
     ).toEqual({ status: 'unavailable' });
   });
 
-  it('records a billing event after its originating transaction commits', async () => {
+  it('records a billing event only after its originating transaction commits', async () => {
     await store.setPlainSetting('audit', 'domains', '["billing"]');
     let receipt: Promise<{ status: string }> | undefined;
-    await source.transaction(async () => {
-      receipt = service.recordBillingTransaction({
+    await source.transaction(async (manager) => {
+      receipt = service.recordBillingTransactionAfterCommit({
         transactionId: 8,
         userId: 42,
         amount: 0,
         status: 'pending',
         source: 'resource-usage',
-      });
+      }, manager);
+      expect((await service.list({ limit: 1 })).items).toHaveLength(0);
     });
     await expect(receipt).resolves.toEqual({ status: 'recorded' });
     expect((await service.list({ limit: 1 })).items[0]).toMatchObject({ subjectId: 8, domain: 'billing' });
+  });
+
+  it('discards a billing event when its originating transaction rolls back', async () => {
+    await store.setPlainSetting('audit', 'domains', '["billing"]');
+    let receipt: Promise<{ status: string }> | undefined;
+    await expect(
+      source.transaction(async (manager) => {
+        receipt = service.recordBillingTransactionAfterCommit({
+          transactionId: 8,
+          userId: 42,
+          amount: 0,
+          status: 'pending',
+          source: 'resource-usage',
+        }, manager);
+        throw new Error('rollback');
+      }),
+    ).rejects.toThrow('rollback');
+    await expect(receipt).resolves.toEqual({ status: 'unavailable' });
+    expect((await service.list({ limit: 1 })).items).toHaveLength(0);
   });
 
   it('persists every registered action lifecycle and preserves manual command and profile references', async () => {
