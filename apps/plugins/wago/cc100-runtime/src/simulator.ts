@@ -61,13 +61,31 @@ function connectOperational(state: RuntimeState): void {
   device.restore(state.accepted?.snapshot, state.outputs);
   const operationalRuntime = runtime(operationalClient, state.credentials.prefix);
   let initialized = false;
+  let connected = false;
+  const pendingConnectionStates: boolean[] = [];
+
+  const applyConnectionState = (connectionState: boolean): void => {
+    connected = connectionState;
+    if (operationalClient !== client) return;
+    if (!initialized) {
+      pendingConnectionStates.push(connectionState);
+      return;
+    }
+    void handleAsync(() => operationalRuntime.setConnected(connectionState));
+  };
+
   operationalClient.once(
     'connect',
     () =>
       void handleAsync(async () => {
         await operationalRuntime.start();
+        const hadPendingConnectionState = pendingConnectionStates.length > 0;
+        while (pendingConnectionStates.length > 0) {
+          const connectionState = pendingConnectionStates.shift();
+          if (connectionState !== undefined) await operationalRuntime.setConnected(connectionState);
+        }
         initialized = true;
-        await operationalRuntime.setConnected(true);
+        if (!hadPendingConnectionState && !connected) await operationalRuntime.setConnected(false);
         process.stdout.write(`WAGO CC100 simulator connected as ${hardwareId}\n`);
         if (scenario !== 'stale-heartbeat' && scenario !== 'offline')
           timers = [
@@ -77,12 +95,8 @@ function connectOperational(state: RuntimeState): void {
         if (scenario === 'offline') operationalClient.end();
       }),
   );
-  operationalClient.on('close', () => {
-    if (initialized) void handleAsync(() => operationalRuntime.setConnected(false));
-  });
-  operationalClient.on('connect', () => {
-    if (initialized) void handleAsync(() => operationalRuntime.setConnected(true));
-  });
+  operationalClient.on('close', () => applyConnectionState(false));
+  operationalClient.on('connect', () => applyConnectionState(true));
 }
 
 function runtime(mqtt: MqttClient, operationalPrefix?: string): WagoRuntime {
@@ -124,7 +138,8 @@ function parseValues(value: string | undefined): Record<string, boolean | number
   return parsed as Record<string, boolean | number>;
 }
 function parseCapabilities(value: string | undefined): string[] {
-  if (!value) return ['claim', 'heartbeat', 'configuration-v1', 'commands', 'state', 'measurement', 'fault', 'acknowledgement'];
+  if (!value)
+    return ['claim', 'heartbeat', 'configuration-v1', 'commands', 'state', 'measurement', 'fault', 'acknowledgement'];
   const parsed = JSON.parse(value);
   if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== 'string' || !item.trim()))
     throw new Error('WAGO_CAPABILITIES must be a JSON array of non-empty strings');
