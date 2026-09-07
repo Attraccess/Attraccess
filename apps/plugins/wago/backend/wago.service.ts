@@ -161,14 +161,32 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     }));
   }
 
-  async isEnrollmentClaimed(hardwareId: string, mqttServerId: number, enrollmentId: number | null): Promise<boolean> {
-    const controller = await this.controllers.findOneBy({ hardwareId });
-    return Boolean(
-      controller &&
-      controller.trustState === 'claimed' &&
-      controller.mqttServerId === mqttServerId &&
-      controller.enrollmentId === enrollmentId,
-    );
+  async rollbackInterruptedClaim(hardwareId: string, mqttServerId: number, enrollmentId: number | null): Promise<void> {
+    await this.withClaimConfigurationLock(async () => {
+      const controller = await this.controllers.findOneBy({ hardwareId });
+      if (
+        !controller ||
+        controller.trustState !== 'claimed' ||
+        controller.mqttServerId !== mqttServerId ||
+        controller.enrollmentId !== enrollmentId
+      )
+        return;
+
+      const identity = `wago-controller-${controller.hardwareId}`;
+      const manual = await this.context.getMqttCredentialProvisioning().revoke({
+        mqttServerId,
+        identity,
+        username: identity,
+        vhost: '/',
+      });
+      if (manual)
+        throw new ConflictException(`Manual credential revocation is required: ${manual.instructions.join(' ')}`);
+
+      controller.trustState = 'untrusted';
+      controller.name = null;
+      controller.updatedAt = new Date().toISOString();
+      await this.controllers.save(controller);
+    });
   }
 
   registerCommissioningDiscoveryHandler(handler: (controller: WagoController) => Promise<void>): void {
