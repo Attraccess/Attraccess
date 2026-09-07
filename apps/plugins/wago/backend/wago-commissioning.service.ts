@@ -661,6 +661,19 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             await this.revokeSessionEnrollment(session);
             continue;
           }
+          if (
+            session.state === 'awaiting_claim' &&
+            (await this.wago.isEnrollmentClaimed(session.hardwareId, session.mqttServerId, session.enrollmentId))
+          ) {
+            session.state = 'completed';
+            session.pairingCode = null;
+            session.failureReason = null;
+            session.progressPercent = 100;
+            session.progressStep = 'Commissioning complete';
+            session.progressDetail = 'The controller is claimed and ready to configure.';
+            await this.save(session, 'interrupted_claim_reconciled');
+            continue;
+          }
           try {
             this.decryptVerifier(session);
           } catch {

@@ -161,6 +161,16 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     }));
   }
 
+  async isEnrollmentClaimed(hardwareId: string, mqttServerId: number, enrollmentId: number | null): Promise<boolean> {
+    const controller = await this.controllers.findOneBy({ hardwareId });
+    return Boolean(
+      controller &&
+        controller.trustState === 'claimed' &&
+        controller.mqttServerId === mqttServerId &&
+        controller.enrollmentId === enrollmentId,
+    );
+  }
+
   registerCommissioningDiscoveryHandler(handler: (controller: WagoController) => Promise<void>): void {
     this.commissioningDiscoveryHandler = handler;
   }

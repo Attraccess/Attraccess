@@ -44,6 +44,7 @@ describe('WagoCommissioningService', () => {
       deleteEnrollmentById: jest.fn().mockResolvedValue(undefined),
       createEnrollment: jest.fn(),
       claim: jest.fn(),
+      isEnrollmentClaimed: jest.fn().mockResolvedValue(false),
     };
     const context = {
       getRepository: jest.fn().mockReturnValue(repository),
@@ -101,6 +102,28 @@ describe('WagoCommissioningService', () => {
     expect(inspect).not.toHaveBeenCalled();
     expect(wago.registerCommissioningDiscoveryHandler).toHaveBeenCalledTimes(1);
     await expect(service.deliver(1, { confirmInstall: true })).rejects.toThrow('explicit valid SSH');
+  });
+
+  it('reconciles an interrupted claim that already reached the claimed controller state', async () => {
+    const { service, session, repository, wago, inspect } = securityHarness({
+      state: 'awaiting_claim',
+      enrollmentId: 7,
+    });
+    repository.find.mockResolvedValue([session]);
+    wago.isEnrollmentClaimed.mockResolvedValue(true);
+
+    await service.onApplicationBootstrap();
+
+    expect(wago.isEnrollmentClaimed).toHaveBeenCalledWith(session.hardwareId, session.mqttServerId, 7);
+    expect(session).toMatchObject({
+      state: 'completed',
+      pairingCode: null,
+      failureReason: null,
+      progressPercent: 100,
+      progressStep: 'Commissioning complete',
+    });
+    expect(wago.revokeEnrollmentById).not.toHaveBeenCalled();
+    expect(inspect).not.toHaveBeenCalled();
   });
 
   it('revokes and clears legacy plaintext before registering discovery, using bounded pages', async () => {
