@@ -44,7 +44,9 @@ beforeEach(async () => {
 import os,sys,stat,fcntl,time,subprocess,signal
 name=os.path.basename(sys.argv[0])
 if name=='stat':
- s=os.stat(sys.argv[-1]); fmt=sys.argv[2]; print(fmt.replace('%u',str(s.st_uid)).replace('%a',format(stat.S_IMODE(s.st_mode),'o')).replace('%h',str(s.st_nlink)))
+ # Map the initialization probe to the isolated fixture root, never the host root.
+ p=os.path.dirname(os.environ['HOME']) if sys.argv[-1]=='/' else sys.argv[-1]
+ s=(os.stat if sys.argv[1]=='-Lc' else os.lstat)(p); fmt=sys.argv[2]; print(fmt.replace('%u',str(s.st_uid)).replace('%g',str(s.st_gid)).replace('%a',format(stat.S_IMODE(s.st_mode),'o')).replace('%h',str(s.st_nlink)))
 elif name=='flock':
  end=time.monotonic()+float(sys.argv[2])
  while True:

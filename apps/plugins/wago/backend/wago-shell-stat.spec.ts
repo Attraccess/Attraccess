@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, linkSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { wagoShellStat } from './wago-shell-stat';
@@ -29,13 +29,19 @@ describe('FW31 source-backed stat metadata adapter', () => {
       join(root, 'stat'),
       `#!${process.execPath}
 const fs=require('node:fs'), args=process.argv.slice(2), env=process.env;
+if(env.CALLS) fs.appendFileSync(env.CALLS,JSON.stringify(args)+'\\n');
 if (args[0]==='--help') {
-  console.log(env.HELP || 'BusyBox v1.37.0 () multi-call binary.\\n\\nUsage: stat [-ltf] FILE...'); process.exit(0);
+  process.stdout.write((env.HELP || 'BusyBox v1.37.0 () multi-call binary.\\n\\nUsage: stat [-ltf] FILE...\\n')+(env.HELP_NULL?String.fromCharCode(0):'')); process.exit(Number(env.HELP_STATUS || 0));
 }
 if (args[0].includes('c')) {
   if (!env.NATIVE) process.exit(1);
   if (args.at(-1)===env.ROOT) { console.log('0:0:700'); process.exit(0); }
-  process.stdout.write(env.NATIVE); process.exit(Number(env.STATUS || 0));
+  if(env.NATIVE_REAL) {
+    const s=(args[0]==='-Lc'?fs.statSync:fs.lstatSync)(args[2],{bigint:true});
+    const values={'%u':s.uid,'%g':s.gid,'%a':(s.mode&4095n).toString(8),'%h':s.nlink,'%d':s.dev,'%i':s.ino};
+    console.log(args[1].replace(/%[ugahdi]/g,v=>values[v]));process.exit(0);
+  }
+  process.stdout.write(env.NATIVE+(env.NATIVE_NULL?String.fromCharCode(0):'')); process.exit(Number(env.STATUS || 0));
 }
 if (!['-t','-Lt'].includes(args[0]) || args.length!==2) process.exit(99);
 let fields=env.FIELDS;
@@ -51,19 +57,153 @@ process.exit(Number(env.STATUS || 0));
     );
   });
   afterEach(() => rmSync(root, { recursive: true, force: true }));
+  const runScript = (script: string, env: Record<string, string> = {}) =>
+    spawnSync('/bin/sh', ['-c', `set -eu\nroot=${quote(root)}\n${script}`], {
+      env: { ...process.env, PATH: `${root}:${process.env.PATH}`, ROOT: root, FIELDS: fields, ...env },
+      encoding: 'utf8',
+      timeout: 15000,
+    });
   const run = (format = '%u:%g:%a:%h', env: Record<string, string> = {}, path = '/etc', follow = false) =>
-    spawnSync(
-      '/bin/sh',
-      [
-        '-c',
-        `set -eu\nroot=${quote(root)}\n${wagoShellStat()}\nstat ${follow ? '-Lc' : '-c'} ${quote(format)} ${quote(path)}`,
-      ],
-      {
-        env: { ...process.env, PATH: `${root}:${process.env.PATH}`, ROOT: root, FIELDS: fields, ...env },
-        encoding: 'utf8',
-        timeout: 5000,
-      },
+    runScript(`${wagoShellStat()}\nstat ${follow ? '-Lc' : '-c'} ${quote(format)} ${quote(path)}`, env);
+
+  it.each(['native', 'terse'])('caches %s mode across observations, preserving caller and nested arguments', (mode) => {
+    const helper = wagoShellStat();
+    const calls = join(root, 'calls');
+    const target = join(root, 'target');
+    writeFileSync(target, 'real unprivileged fixture');
+    linkSync(target, join(root, 'hardlink'));
+    symlinkSync(target, join(root, 'alias'));
+    const formats = ['%u', '%u:%a', '%u:%a:%h', '%u:%g', '%u:%g:%a', '%u:%g:%a:%h', '%d:%i'];
+    const observations = formats
+      .flatMap((format) =>
+        ['-c', '-Lc'].map(
+          (flag) =>
+            `value=$(stat ${flag} ${quote(format)} ${quote(flag === '-Lc' ? join(root, 'alias') : target)}) || exit 1\nprintf '%s\\n' "$value"`,
+        ),
+      )
+      .join('\n');
+    const started = performance.now();
+    const result = runScript(
+      `
+set -- 'Docker CA with spaces' '' '*;literal'
+${helper}
+${observations}
+check_nested() (
+  test "$#" = 2 && test "$1" = nested && test "$2" = 'CA argument'
+  ${helper}
+  ${observations}
+  test "$#" = 2 && test "$1" = nested && test "$2" = 'CA argument'
+)
+check_nested nested 'CA argument'
+${helper}
+${observations}
+test "$#" = 3 && test "$1" = 'Docker CA with spaces' && test "$2" = '' && test "$3" = '*;literal'
+`,
+      { CALLS: calls, REAL: '1', ...(mode === 'native' ? { NATIVE: '1', NATIVE_REAL: '1' } : {}) },
     );
+    const elapsedMs = Math.round(performance.now() - started);
+    expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
+    const lines = result.stdout.trim().split('\n');
+    expect(lines).toHaveLength(42);
+    const s = statSync(target, { bigint: true });
+    const values: Record<string, string> = {
+      '%u': String(s.uid),
+      '%g': String(s.gid),
+      '%a': (s.mode & BigInt(0o7777)).toString(8),
+      '%h': String(s.nlink),
+      '%d': String(s.dev),
+      '%i': String(s.ino),
+    };
+    expect(lines.slice(0, 14)).toEqual(
+      formats.flatMap((format) => Array(2).fill(format.replace(/%[ugahdi]/g, (field) => values[field]))),
+    );
+    expect(lines.slice(14, 28)).toEqual(lines.slice(0, 14));
+    expect(lines.slice(28)).toEqual(lines.slice(0, 14));
+    expect(lines[4]).toMatch(/:2$/);
+    const invoked: string[][] = readFileSync(calls, 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    const help = invoked.filter(([flag]) => flag === '--help').length;
+    const native = invoked.filter(([flag]) => flag.includes('c')).length;
+    const terse = invoked.filter(([flag]) => ['-t', '-Lt'].includes(flag)).length;
+    process.stdout.write(
+      `source-only stat fixture: ${JSON.stringify({ mode, observations: 42, emissions: 3, elapsedMs, help, native, terse })}\n`,
+    );
+    expect({ help, native, terse }).toEqual(
+      mode === 'native' ? { help: 0, native: 45, terse: 0 } : { help: 3, native: 3, terse: 45 },
+    );
+  });
+
+  it.each(['native', 'terse', 'probe', 'invalid'])('ignores inherited cache injection %s', (mode) => {
+    const result = run('%u', {
+      wago_stat_mode: mode,
+      WAGO_STAT_MODE: mode,
+      HELP: 'unknown stat tool',
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stdout).toBe('');
+  });
+
+  it('never detects capabilities again after a native file error', () => {
+    const calls = join(root, 'calls');
+    const result = run('%u', { CALLS: calls, NATIVE: '0\n', STATUS: '1' });
+    expect(result.status).not.toBe(0);
+    expect(result.stdout).toBe('');
+    expect(readFileSync(calls, 'utf8')).not.toContain('--help');
+    expect(readFileSync(calls, 'utf8')).not.toContain('"-t"');
+  });
+
+  it.each(['native', 'terse'])('fails closed on a missing real file in cached %s mode', (mode) => {
+    const result = run(
+      '%u',
+      {
+        REAL: '1',
+        ...(mode === 'native' ? { NATIVE: '1', NATIVE_REAL: '1' } : {}),
+      },
+      join(root, 'missing'),
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe('');
+  });
+
+  it.each([8192, 8193])('enforces the exact help capture byte boundary at %i', (bytes) => {
+    const header = 'BusyBox v1.37.0 () multi-call binary.\nUsage: stat [-ltf] FILE...\n';
+    const markerBytes = '\nWAGO_STAT_OK'.length;
+    const result = run('%u', { HELP: header + 'x'.repeat(bytes - markerBytes - header.length) });
+    expect(result.status === 0).toBe(bytes === 8192);
+    expect(result.stdout).toBe(bytes === 8192 ? '0\n' : '');
+  });
+
+  it.each([
+    { STATUS: '1' },
+    { FIELDS: fields.replace('7779', '18446744073709551616'), NATIVE: '0:0:888:1\n' },
+    { SUFFIX: '', NATIVE: '0:0:700:1' },
+    { NULL_BYTE: '1', NATIVE_NULL: '1' },
+    { SUFFIX: '\n\nWAGO_STAT_OK', NATIVE: '0:0:700:1\n\nWAGO_STAT_OK', STATUS: '1' },
+    { SUFFIX: '\n\nWAGO_STAT_OK' + '\n'.repeat(9000), NATIVE: '0:0:700:1\n\nWAGO_STAT_OK' + '\n'.repeat(9000) },
+  ])('still validates each observation after caching: case %#', (fault) => {
+    for (const mode of ['native', 'terse']) {
+      const calls = join(root, 'calls-' + mode);
+      const assignments = Object.entries(fault)
+        .filter(([key]) => mode === 'native' || !key.startsWith('NATIVE'))
+        .map(([key, value]) => `export ${key}=${quote(value)}`)
+        .join('\n');
+      const result = runScript(`${wagoShellStat()}\n${assignments}\nstat -c '%u:%g:%a:%h' /etc`, {
+        CALLS: calls,
+        ...(mode === 'native' ? { NATIVE: '0:0:700:1\n' } : {}),
+      });
+      expect(result.status).not.toBe(0);
+      expect(result.stdout).toBe('');
+      const invoked: string[][] = readFileSync(calls, 'utf8')
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line));
+      expect(invoked.filter(([flag]) => flag === '--help')).toHaveLength(mode === 'native' ? 0 : 1);
+      expect(invoked).toHaveLength(mode === 'native' ? 2 : 4);
+    }
+  });
 
   it.each([
     ['%u', '0'],
@@ -130,6 +270,16 @@ process.exit(Number(env.STATUS || 0));
     { SUFFIX: '\n\n' },
     { SUFFIX: '' },
     { NULL_BYTE: '1' },
+    { HELP_STATUS: '1' },
+    { HELP: 'BusyBox v1.37.0 () multi-call binary.\nUsage: stat [-ltf] FILE...\n\nWAGO_STAT_OK', HELP_STATUS: '1' },
+    { HELP: 'BusyBox v1.37.0 () multi-call binary.\nUsage: stat [-ltf] FILE...\n\nWAGO_STAT_OK' + '\n'.repeat(9000) },
+    { HELP_NULL: '1' },
+    { SUFFIX: '\n\nWAGO_STAT_OK', STATUS: '1' },
+    { SUFFIX: '\n\nWAGO_STAT_OK' + '\n'.repeat(9000) },
+    { NATIVE: '0:0:700:1\n\nWAGO_STAT_OK', STATUS: '1' },
+    { NATIVE: '0:0:700:1\n\nWAGO_STAT_OK' + '\n'.repeat(9000) },
+    { NATIVE: '0:0:700:1\n', NATIVE_NULL: '1' },
+    { NATIVE: '0:0:700:1' },
   ])('fails closed on failed observations and unexpected variants: %j', (env) => {
     const result = run(undefined, env);
     expect(result.status).not.toBe(0);
@@ -171,6 +321,25 @@ process.exit(Number(env.STATUS || 0));
     }
   });
 });
+
+it.each(['native', 'terse'] as const)(
+  'initializes %s metadata in standalone and nested fixture shells without root context',
+  (mode) => {
+    const fixture = fw31ShellFixture(mode);
+    const helper = wagoShellStat();
+    const script = `unset root\n${helper}\ntest "$wago_stat_mode" = ${mode}\nstat -c '%u:%g:%a' "$FIXTURE_ROOT"`;
+    try {
+      const result = fixture.run(`${script}\n/bin/sh -c ${quote(script)}\n${script}`);
+      expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toEqual({
+        status: 0,
+        stdout: '0:0:700\n0:0:700\n0:0:700\n',
+        stderr: '',
+      });
+    } finally {
+      fixture.dispose();
+    }
+  },
+);
 
 it('carries terse-only metadata through inspection, preparation, install, persisted boot and recovery', () => {
   const fixture = fw31ShellFixture('terse');

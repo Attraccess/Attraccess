@@ -52,12 +52,12 @@ const r=cp.spawnSync('/usr/bin/awk',args,{stdio:'inherit'});process.exit(r.statu
     'bin/stat',
     `const fs=require('node:fs'),args=process.argv.slice(2),root=process.env.FIXTURE_ROOT,p=args.at(-1);
 if(args[0]==='--help'){console.log('BusyBox v1.37.0 () multi-call binary.\\nUsage: stat [-ltf] FILE...');process.exit(0);}
-if(args[0]!=='-Lt'||!p.startsWith(root+'/'))process.exit(99);
+if(!['-t','-Lt'].includes(args[0])||(p!==root&&!p.startsWith(root+'/')))process.exit(99);
 if(p===root+'/proc/22/fd/5'){
  if(process.env.FAULT==='fd-disappears'){fs.rmSync(p);process.exit(1);}
  if(process.env.FAULT==='fd-unreadable')process.exit(1);
 }
-try{const s=fs.statSync(p,{bigint:true});console.log(p+' '+[s.size,s.blocks,s.mode.toString(16),s.uid,s.gid,s.dev.toString(16),s.ino,s.nlink,0,0,1,1,1,s.blksize].join(' '));}catch{process.exit(1);}`,
+try{const s=(args[0]==='-Lt'?fs.statSync:fs.lstatSync)(p,{bigint:true});console.log(p+' '+[s.size,s.blocks,s.mode.toString(16),s.uid,s.gid,s.dev.toString(16),s.ino,s.nlink,0,0,1,1,1,s.blksize].join(' '));}catch{process.exit(1);}`,
   );
   executable(
     'bin/docker',

@@ -135,12 +135,14 @@ done
     'bin/stat',
     `
 const fs=require('node:fs'),root=process.env.FIXTURE_ROOT,args=process.argv.slice(2),p=args.at(-1);
+// Standalone/nested helpers probe /. Observe the fixture root, never the host root.
+const observedPath=p==='/'?root:p;
 const terse=${JSON.stringify(statStyle)}==='terse';
 if(terse&&args[0]==='--help'){console.log('BusyBox v1.37.0 () multi-call binary.\\nUsage: stat [-ltf] FILE...');process.exit(0);}
 if(terse&&!['-t','-Lt'].includes(args[0]))process.exit(1);
-if(p!==root&&!p.startsWith(root+'/'))process.exit(99);
-const s=args[0].includes('L')?fs.statSync(p):fs.lstatSync(p),owners=JSON.parse(fs.readFileSync(root+'/owners.json','utf8'));
-const owner=(owners[p.slice(root.length)]||'0:0').split(':'),mode=(s.mode&0o7777).toString(8);
+if(observedPath!==root&&!observedPath.startsWith(root+'/'))process.exit(99);
+const s=args[0].includes('L')?fs.statSync(observedPath):fs.lstatSync(observedPath),owners=JSON.parse(fs.readFileSync(root+'/owners.json','utf8'));
+const owner=(owners[observedPath.slice(root.length)]||'0:0').split(':'),mode=(s.mode&0o7777).toString(8);
 const values={'%u':owner[0],'%g':owner[1],'%a':mode,'%h':s.nlink,'%d':s.dev,'%i':s.ino};
 if(terse){console.log(p+' '+[s.size,s.blocks,s.mode.toString(16),...owner,s.dev.toString(16),s.ino,s.nlink,0,0,1,1,1,s.blksize].join(' '));process.exit(0);}
 console.log(args[1].replace(/%[ugahdi]/g,v=>values[v]));`,
@@ -153,7 +155,7 @@ console.log(args[1].replace(/%[ugahdi]/g,v=>values[v]));`,
     'bin/timeout',
     `
 const args=process.argv.slice(2);
-if(args[0]!=='-k'||args[1]!=='5'||!['10','30','45'].includes(args[2]))process.exit(99);
+if(args[0]!=='-k'||args[1]!=='5'||!['10','30','45','300'].includes(args[2]))process.exit(99);
 if(process.env.FAULT==='gate-timeout'&&args[3].endsWith('/S99_zz_attraccess_wago'))process.exit(124);
 const root=process.env.FIXTURE_ROOT;
 const privilegeLifecycle=['privilege-deadline','privilege-delayed'].includes(process.env.FAULT)&&['setpriv','capsh'].some(tool=>args[3]===root+'/bin/'+tool)&&args[4]!=='--help';
