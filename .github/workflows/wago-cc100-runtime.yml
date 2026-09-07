@@ -38,12 +38,21 @@ jobs:
           WAGO_ENROLLMENT_PASSWORD: password
         run: |
           docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml up --build --detach
-          sleep 15
-          logs="$(docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml logs cc100-simulator)"
-          [[ "$logs" == *"WAGO CC100 simulator enrollment connected"* ]]
+          for attempt in {1..30}; do
+            logs="$(docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml logs cc100-simulator)"
+            if [[ "$logs" == *"WAGO CC100 simulator enrollment connected"* ]]; then
+              break
+            fi
+            if [[ "$attempt" -eq 30 ]]; then
+              docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml logs cc100-simulator
+              echo "Simulator did not become ready within 150 seconds"
+              exit 1
+            fi
+            sleep 5
+          done
       - name: Stop simulator integration stack
         if: always()
-        run: docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml down --volumes
+        run: WAGO_ENROLLMENT_SECRET=cleanup docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml down --volumes
       - uses: actions/upload-artifact@v4
         with:
           name: wago-cc100-runtime-manifest
