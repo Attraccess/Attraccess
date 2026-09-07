@@ -3,6 +3,7 @@
 #include "sdl_display.hpp"
 
 #include <chrono>
+#include <array>
 #include <limits>
 #include <stdexcept>
 #include <thread>
@@ -53,8 +54,8 @@ int main(int argc, char **argv)
     lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
     lv_display_set_user_data(display, &driver);
     lv_display_set_flush_cb(display, flush);
-    static lv_color_t buffer[SdlDisplay::Width * 80];
-    lv_display_set_buffers(display, buffer, nullptr, sizeof(buffer), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    static std::array<uint16_t, SdlDisplay::Width * 80> buffer;
+    lv_display_set_buffers(display, buffer.data(), nullptr, buffer.size() * sizeof(buffer.front()), LV_DISPLAY_RENDER_MODE_PARTIAL);
     auto *input = lv_indev_create();
     lv_indev_set_type(input, LV_INDEV_TYPE_POINTER);
     lv_indev_set_user_data(input, &driver);

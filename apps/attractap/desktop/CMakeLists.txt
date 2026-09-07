@@ -40,8 +40,11 @@ target_include_directories(attractap-desktop-runtime PUBLIC
 target_link_libraries(attractap-desktop-runtime PUBLIC SDL3::SDL3 lvgl::lvgl)
 target_compile_options(attractap-desktop-runtime PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Wpedantic>")
 
-add_executable(attractap-desktop src/main.cpp)
+add_executable(attractap-desktop MACOSX_BUNDLE src/main.cpp)
 target_link_libraries(attractap-desktop PRIVATE attractap-desktop-runtime)
+set_target_properties(attractap-desktop PROPERTIES
+    MACOSX_BUNDLE_BUNDLE_NAME "Attractap Desktop"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "org.attraccess.attractap-desktop")
 
 add_executable(attractap-desktop-tests
     tests/main.cpp

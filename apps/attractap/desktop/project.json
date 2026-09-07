@@ -20,7 +20,7 @@
     "serve": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "cmake --build dist/apps/attractap-desktop --target attractap-desktop && dist/apps/attractap-desktop/attractap-desktop",
+        "command": "cmake --build dist/apps/attractap-desktop --target attractap-desktop && open -W dist/apps/attractap-desktop/attractap-desktop.app",
         "cwd": "."
       },
       "dependsOn": ["build"],
