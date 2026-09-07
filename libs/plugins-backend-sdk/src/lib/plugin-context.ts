@@ -6,6 +6,7 @@ import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscri
 import type { PluginEntityClass } from './entity';
 import type { MqttCredentialProvisioningProviderFactory } from './mqtt-credential-provisioning';
 import type { MqttCredentialProvisioningHostProvider } from './mqtt-credential-provisioning';
+import type { PluginAuditContext } from './plugin-audit';
 
 /**
  * DI token under which a plugin's own services can inject the PluginContext.
@@ -114,6 +115,8 @@ export interface PluginSecretsContext {
  * a minor SDK bump; removing/changing one is a major bump.
  */
 export interface PluginContext {
+  /** Optional for compatibility with hosts predating generic plugin audit support. */
+  readonly audit?: PluginAuditContext;
   /** This plugin's own manifest (name, version, directory, id). */
   readonly manifest: PluginManifestInfo;
 
