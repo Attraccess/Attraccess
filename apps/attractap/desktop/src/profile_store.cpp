@@ -157,8 +157,13 @@ void ProfileStore::save() const
             throw std::runtime_error("Could not write desktop profile");
         for (const auto &[key, value] : values)
             output << key << '\0' << value << '\0';
+        output.close();
         if (!output)
+        {
+            std::error_code cleanupError;
+            std::filesystem::remove(temporaryPath.data(), cleanupError);
             throw std::runtime_error("Could not write desktop profile");
+        }
     }
     std::filesystem::rename(temporaryPath.data(), profilePath, error);
     if (error)

@@ -32,7 +32,7 @@ void SdlDisplay::flush(const lv_area_t *area, uint8_t *pxMap)
     if (!SDL_LockTexture(texture, &target, &pixels, &pitch))
         return;
 
-    const int rowBytes = target.w * static_cast<int>(sizeof(lv_color_t));
+    const int rowBytes = target.w * LV_COLOR_FORMAT_GET_SIZE(LV_COLOR_FORMAT_RGB565);
     for (int row = 0; row < target.h; ++row)
         std::memcpy(static_cast<uint8_t *>(pixels) + row * pitch, pxMap + row * rowBytes, rowBytes);
     SDL_UnlockTexture(texture);

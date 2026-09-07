@@ -50,6 +50,7 @@ int main(int argc, char **argv)
     lv_init();
     lv_tick_set_cb(+[] { static HostRuntime clock; return clock.millis(); });
     auto *display = lv_display_create(SdlDisplay::Width, SdlDisplay::Height);
+    lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
     lv_display_set_user_data(display, &driver);
     lv_display_set_flush_cb(display, flush);
     static lv_color_t buffer[SdlDisplay::Width * 80];
