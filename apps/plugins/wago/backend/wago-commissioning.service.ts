@@ -46,6 +46,7 @@ import {
 import {
   runtimeBundleDeliveryScript,
   runtimeBundlePreflightScript,
+  runtimeBundleStagingCapacityPreflightScript,
   runtimeBundleRecoveryAcknowledgementScript,
   runtimeBundleRecoveryScript,
   runtimeBundleStreamReceiver,
@@ -331,7 +332,12 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
                 );
                 session.platformReport = JSON.stringify(report);
               } else if (action === 'activate') {
-                await this.prepareController(session, credential);
+                const bundle = await this.acquireRuntimeBundle(session);
+                try {
+                  await this.prepareController(session, credential, bundle.bytes);
+                } finally {
+                  await rm(bundle.directory, { recursive: true, force: true });
+                }
               } else {
                 if (!session.dockerProvisionToken)
                   throw new ConflictException('No Docker provisioning attempt to recover.');
@@ -341,12 +347,13 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
               return this.toResponse(await this.save(session, `platform_${action}_succeeded`));
             } catch (error) {
               if (error instanceof ConflictException) throw error;
-              if (action !== 'inspect') session.dockerProvisionState = 'recovery_required';
+              if (action !== 'inspect' && session.dockerProvisionToken)
+                session.dockerProvisionState = 'recovery_required';
               session.failureReason =
                 action === 'inspect'
                   ? 'Controller preflight could not be read. Check the explicit SSH credential and supported firmware tools.'
                   : action === 'activate'
-                    ? 'Controller preparation failed. CODESYS must be stopped and permanently disabled before IO or runtime startup. Clean up the retained preparation attempt before retrying.'
+                    ? 'Controller preparation failed. Check the signed runtime release, staging storage and required tools. CODESYS must be stopped and permanently disabled before IO or runtime startup. Clean up any retained preparation attempt before retrying.'
                     : 'Controller preparation cleanup remains unverified. Clean up any runtime transaction first, then retry preparation cleanup. The recovery token is retained; previous workloads are not restored.';
               return this.toResponse(await this.save(session, `platform_${action}_failed`));
             }
@@ -388,11 +395,18 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
   private async prepareController(
     session: WagoCommissioningSession,
     credential: TemporarySshCredential,
+    verifiedBundleBytes: number,
   ): Promise<void> {
     if (session.deliveryToken)
       throw new ConflictException('Clean up the retained runtime installation before preparing the controller.');
     if (session.dockerProvisionToken && session.dockerProvisionState !== 'started')
       throw new ConflictException('Clean up the retained controller preparation before retrying.');
+    await this.sudoRunScript(
+      session.targetHost,
+      session.hostKeyFingerprint,
+      credential,
+      runtimeBundleStagingCapacityPreflightScript(verifiedBundleBytes),
+    );
     session.dockerProvisionToken ??= randomBytes(16).toString('hex');
     session.dockerProvisionState = 'starting';
     await this.save(session, 'controller_preparation_started');
@@ -712,14 +726,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
           'Automatic MQTT credential provisioning is unavailable. Check management HTTPS access, the issuing CA, certificate DNS name and validity, and the broker/server clocks in MQTT settings.';
         throw new Error(safeFailure);
       }
-      bundle =
-        this.artifacts && (session.runtimeArtifactDigest || (await this.artifacts.has()))
-          ? await this.artifacts.acquire(session.runtimeArtifactDigest ?? undefined)
-          : await verifyRuntimeBundle();
-      if (bundle.image && !session.runtimeArtifactDigest) {
-        session.runtimeArtifactDigest = bundle.digest;
-        await this.save(session, 'runtime_release_selected');
-      }
+      bundle = await this.acquireRuntimeBundle(session);
       session.state = 'delivering';
       session.failureReason = null;
       await this.updateProgress(
@@ -741,8 +748,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         'Permanently disabling CODESYS, activating vendor Docker and preparing exclusive onboard IO.',
       );
       safeFailure =
-        'Controller preparation failed. CODESYS must be stopped and permanently disabled before IO or runtime startup. Clean up the retained preparation attempt before retrying.';
-      await this.prepareController(session, credential);
+        'Controller preparation failed. Check staging storage and required tools. CODESYS must be stopped and permanently disabled before IO or runtime startup. Clean up any retained preparation attempt before retrying.';
+      await this.prepareController(session, credential, bundle.bytes);
       safeFailure =
         'Runtime prerequisites failed. Check vendor Docker, exclusive onboard IO, available storage and required firmware tools.';
       await this.sudoRunScript(
@@ -877,6 +884,27 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       return this.toResponse(await this.save(session, 'delivery_failed'));
     } finally {
       if (bundle) await rm(bundle.directory, { recursive: true, force: true });
+    }
+  }
+
+  private async acquireRuntimeBundle(
+    session: WagoCommissioningSession,
+  ): Promise<Awaited<ReturnType<typeof verifyRuntimeBundle>> & { image?: string }> {
+    const bundle =
+      this.artifacts && (session.runtimeArtifactDigest || (await this.artifacts.has()))
+        ? await this.artifacts.acquire(session.runtimeArtifactDigest ?? undefined)
+        : await verifyRuntimeBundle();
+    try {
+      if (session.runtimeArtifactDigest && session.runtimeArtifactDigest !== bundle.digest)
+        throw new ConflictException('Verified runtime release does not match the session-pinned artifact.');
+      if ('image' in bundle && bundle.image && !session.runtimeArtifactDigest) {
+        session.runtimeArtifactDigest = bundle.digest;
+        await this.save(session, 'runtime_release_selected');
+      }
+      return bundle;
+    } catch (error) {
+      await rm(bundle.directory, { recursive: true, force: true });
+      throw error;
     }
   }
 

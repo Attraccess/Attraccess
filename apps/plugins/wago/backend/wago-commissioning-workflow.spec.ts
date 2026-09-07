@@ -2,6 +2,7 @@ import { DataSource } from 'typeorm';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import plugin from './plugin';
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
@@ -12,6 +13,7 @@ import { WagoService } from './wago.service';
 import { WagoController } from './wago-controller.entity';
 import { AddWagoCommissioningPrincipal1780000000009 } from './migrations/1780000000009-add-wago-commissioning-principal';
 import { fw31IdentityOutput } from './fixtures/fw31-identity';
+import { runtimeBundlePreflightScript, runtimeBundleStagingCapacityPreflightScript } from './wago-runtime-install';
 
 describe('commissioning workflows with a real isolated database and mocked device transport', () => {
   let db: DataSource;
@@ -200,8 +202,19 @@ describe('commissioning workflows with a real isolated database and mocked devic
 
   it('activates under durable ownership and records CODESYS disabled only after preparation succeeds', async () => {
     const repository = db.getRepository(WagoCommissioningSession);
-    const remote = jest.spyOn(service as never, 'sudoRunScript').mockImplementation((async () => {
+    const remote = jest.spyOn(service as never, 'sudoRunScript').mockImplementation((async (
+      _host,
+      _pin,
+      _credential,
+      script: string,
+    ) => {
       const saved = await repository.findOneByOrFail({ id: session.id });
+      expect(artifacts.acquire).toHaveBeenCalledWith(digest);
+      if (script === runtimeBundleStagingCapacityPreflightScript(512)) {
+        expect(saved.dockerProvisionToken).toBeNull();
+        expect(saved.dockerProvisionState).toBeNull();
+        return '';
+      }
       expect(saved.dockerProvisionToken).toMatch(/^[a-f0-9]{32}$/);
       expect(saved.dockerProvisionState).toBe('starting');
       expect(saved.codesysState).not.toBe('disabled');
@@ -218,7 +231,133 @@ describe('commissioning workflows with a real isolated database and mocked devic
     );
     expect(result).toMatchObject({ dockerProvisionState: 'started', codesysState: 'disabled', failureReason: null });
     expect(result).not.toHaveProperty('dockerProvisionToken');
-    expect(remote).toHaveBeenCalledTimes(1);
+    expect(remote).toHaveBeenCalledTimes(2);
+    expect(remote.mock.calls[0][3]).toBe(runtimeBundleStagingCapacityPreflightScript(512));
+    expect(existsSync(directory)).toBe(false);
+  });
+
+  it.each(['deliver', 'activate'] as const)(
+    'blocks %s before tokens, PLC preparation, clock changes or enrollment when staging is insufficient',
+    async (action) => {
+      wago.createEnrollment.mockClear();
+      const remote = jest.spyOn(service as never, 'sudoRunScript').mockImplementation((async (
+        _host,
+        _pin,
+        _credential,
+        script: string,
+      ) => {
+        expect(artifacts.acquire).toHaveBeenCalledWith(digest);
+        expect(script).toBe(runtimeBundleStagingCapacityPreflightScript(512));
+        const saved = await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id });
+        expect(saved.dockerProvisionToken).toBeNull();
+        expect(saved.deliveryToken).toBeNull();
+        throw new Error('Insufficient runtime storage');
+      }) as never);
+      const copy = jest.spyOn(service as never, 'copyTo');
+      const result =
+        action === 'deliver'
+          ? await service.deliver(session.id, { confirmInstall: true, temporarySsh: credential }, principal)
+          : await service.platform(
+              session.id,
+              'activate',
+              { reviewedDockerActivation: true, temporarySsh: credential },
+              principal,
+            );
+      expect(result.failureReason).toBeTruthy();
+      expect(remote).toHaveBeenCalledTimes(1);
+      expect(wago.createEnrollment).not.toHaveBeenCalled();
+      expect(copy).not.toHaveBeenCalled();
+      expect(await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id })).toMatchObject({
+        dockerProvisionToken: null,
+        dockerProvisionState: null,
+        deliveryToken: null,
+        enrollmentId: null,
+      });
+      expect(existsSync(directory)).toBe(false);
+    },
+  );
+
+  it.each(['deliver', 'activate'] as const)(
+    'never bypasses staging in %s when verified bytes are unavailable',
+    async (action) => {
+      artifacts.acquire.mockResolvedValue({ digest, directory, path: join(directory, 'runtime.tar') });
+      const remote = jest.spyOn(service as never, 'sudoRunScript');
+      wago.createEnrollment.mockClear();
+      if (action === 'deliver')
+        await service.deliver(session.id, { confirmInstall: true, temporarySsh: credential }, principal);
+      else
+        await service.platform(
+          session.id,
+          'activate',
+          { reviewedDockerActivation: true, temporarySsh: credential },
+          principal,
+        );
+      expect(remote).not.toHaveBeenCalled();
+      expect(wago.createEnrollment).not.toHaveBeenCalled();
+      expect(
+        (await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id })).dockerProvisionToken,
+      ).toBeNull();
+      expect(existsSync(directory)).toBe(false);
+    },
+  );
+
+  it.each(['deliver', 'activate'] as const)(
+    'rejects a different verified artifact in %s before any remote calls',
+    async (action) => {
+      artifacts.acquire.mockResolvedValue({ digest: 'b'.repeat(64), bytes: 512, directory });
+      const remote = jest.spyOn(service as never, 'sudoRunScript');
+      wago.createEnrollment.mockClear();
+      if (action === 'deliver')
+        await service.deliver(session.id, { confirmInstall: true, temporarySsh: credential }, principal);
+      else
+        await expect(
+          service.platform(
+            session.id,
+            'activate',
+            { reviewedDockerActivation: true, temporarySsh: credential },
+            principal,
+          ),
+        ).rejects.toThrow('session-pinned');
+      expect(remote).not.toHaveBeenCalled();
+      expect(wago.createEnrollment).not.toHaveBeenCalled();
+      expect(existsSync(directory)).toBe(false);
+    },
+  );
+
+  it('allows inactive Docker through staging, then activates before full hardware and capacity checks', async () => {
+    let active = false;
+    const order: string[] = [];
+    wago.createEnrollment.mockClear();
+    jest.spyOn(service as never, 'sudoRunScript').mockImplementation((async (
+      _host,
+      _pin,
+      _credential,
+      script: string,
+    ) => {
+      if (script === runtimeBundleStagingCapacityPreflightScript(512)) {
+        expect(active).toBe(false);
+        expect(script).not.toContain('docker info');
+        order.push('staging');
+      } else if (script.includes('runtime-version=0')) {
+        expect(order).toEqual(['staging']);
+        active = true;
+        order.push('prepare');
+      } else if (script === runtimeBundlePreflightScript(512)) {
+        expect(active).toBe(true);
+        expect(script).toContain('codesys-active');
+        order.push('full');
+      } else if (script.includes("printf 'epoch=")) {
+        expect(order).toEqual(['staging', 'prepare', 'full']);
+        return clockOutput();
+      }
+      return '';
+    }) as never);
+    jest.spyOn(service as never, 'copyTo').mockResolvedValue(undefined as never);
+    const result = await service.deliver(session.id, { confirmInstall: true, temporarySsh: credential }, principal);
+    expect(result.state).toBe('awaiting_discovery');
+    expect(order).toEqual(['staging', 'prepare', 'full']);
+    expect(artifacts.acquire).toHaveBeenCalledTimes(1);
+    expect(wago.createEnrollment).toHaveBeenCalledTimes(1);
   });
 
   it('requires explicit destructive preparation approval', async () => {
@@ -249,7 +388,10 @@ describe('commissioning workflows with a real isolated database and mocked devic
       firmware: fw31IdentityOutput(),
       codesys: 'active',
     } as never);
-    jest.spyOn(service as never, 'sudoRunScript').mockRejectedValue(new Error('private remote output') as never);
+    jest
+      .spyOn(service as never, 'sudoRunScript')
+      .mockResolvedValueOnce('' as never)
+      .mockRejectedValue(new Error('private remote output') as never);
     const copy = jest.spyOn(service as never, 'copyTo');
     wago.createEnrollment.mockClear();
     const result = await service.deliver(session.id, { temporarySsh: credential, confirmInstall: true }, principal);

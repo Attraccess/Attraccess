@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
     host: 'broker.example',
     port: 1883,
     managementPort: 18083 as number | null | undefined,
+    username: 'test-user',
+    useTls: false,
   },
 }));
 
@@ -32,7 +34,6 @@ vi.mock('../../../components/toastProvider', () => ({
 vi.mock('../../../components/pageHeader', () => ({ PageHeader: () => null }));
 vi.mock('../../../components/select', () => ({ Select: () => null }));
 vi.mock('../../../components/labeledSwitch', () => ({ LabeledSwitch: () => null }));
-vi.mock('../../../components/PasswordInput', () => ({ PasswordInput: () => null }));
 vi.mock('./TlsSection', () => ({ TlsSection: () => null }));
 vi.mock('../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
 
@@ -106,4 +107,65 @@ it.each([null, undefined])('renders an unset saved management port (%s) as empty
   mocks.server.managementPort = managementPort;
   render(<EditMqttServerPage />);
   expect(screen.getByRole('spinbutton', { name: 'Management Port (Optional)' })).toHaveValue(null);
+});
+
+describe('MQTT edit password intent', () => {
+  function setup() {
+    const { container } = render(<EditMqttServerPage />);
+    const password = screen.getByLabelText('New password (Optional)');
+    const clear = screen.getByRole('checkbox', { name: 'Clear saved password' });
+    const form = container.querySelector('form');
+    if (!form) throw new Error('MQTT form missing');
+    return { password, clear, form };
+  }
+
+  it('omits password when only the management port changes with a password-free read response', () => {
+    expect(mocks.server).not.toHaveProperty('password');
+    const { password, form } = setup();
+    expect(password).toHaveValue('');
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Management Port (Optional)' }), {
+      target: { value: '18084' },
+    });
+    fireEvent.submit(form);
+    expect(mocks.update).toHaveBeenCalledOnce();
+    const { requestBody } = mocks.update.mock.calls[0][0];
+    expect(requestBody).toMatchObject({ managementPort: 18084, port: 1883, username: 'test-user' });
+    expect(requestBody).not.toHaveProperty('password');
+  });
+
+  it('includes the exact replacement string when supplied', () => {
+    const { password, form } = setup();
+    fireEvent.change(password, { target: { value: ' test-only replacement ' } });
+    fireEvent.submit(form);
+    expect(mocks.update.mock.calls[0][0].requestBody).toHaveProperty('password', ' test-only replacement ');
+  });
+
+  it('omits password after a replacement is typed and erased', () => {
+    const { password, form } = setup();
+    fireEvent.change(password, { target: { value: 'test-only replacement' } });
+    fireEvent.change(password, { target: { value: '' } });
+    fireEvent.submit(form);
+    expect(mocks.update.mock.calls[0][0].requestBody).not.toHaveProperty('password');
+  });
+
+  it('sends an explicit empty string for deliberate clearing and prevents conflicting replacement', () => {
+    const { password, clear, form } = setup();
+    fireEvent.change(password, { target: { value: 'test-only replacement' } });
+    fireEvent.click(clear);
+    expect(clear).toBeChecked();
+    expect(password).toHaveValue('');
+    expect(password).toBeDisabled();
+    fireEvent.submit(form);
+    expect(mocks.update.mock.calls[0][0].requestBody).toHaveProperty('password', '');
+  });
+
+  it('returns to keeping the saved password when clearing is cancelled', () => {
+    const { password, clear, form } = setup();
+    fireEvent.click(clear);
+    fireEvent.click(clear);
+    expect(clear).not.toBeChecked();
+    expect(password).toBeEnabled();
+    fireEvent.submit(form);
+    expect(mocks.update.mock.calls[0][0].requestBody).not.toHaveProperty('password');
+  });
 });
