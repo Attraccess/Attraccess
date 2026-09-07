@@ -11,4 +11,4 @@ COPY --from=build /workspace/dist/apps/wago-cc100-simulator ./
 RUN chown -R runtime:runtime /app /var/lib/attraccess-wago
 USER runtime
 VOLUME ["/var/lib/attraccess-wago"]
-CMD ["node", "simulator.js"]
+CMD ["node", "simulator.cjs"]

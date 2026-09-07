@@ -52,7 +52,7 @@ jobs:
           done
       - name: Stop simulator integration stack
         if: always()
-        run: WAGO_ENROLLMENT_SECRET=cleanup docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml down --volumes
+        run: WAGO_ENROLLMENT_SECRET=cleanup WAGO_ENROLLMENT_USERNAME=cleanup WAGO_ENROLLMENT_PASSWORD=cleanup docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml down --volumes
       - uses: actions/upload-artifact@v4
         with:
           name: wago-cc100-runtime-manifest
