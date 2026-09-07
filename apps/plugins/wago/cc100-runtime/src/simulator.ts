@@ -17,7 +17,9 @@ let client: MqttClient | undefined;
 let timers: NodeJS.Timeout[] = [];
 
 void start().catch((error: unknown) => {
-  process.stderr.write(`WAGO simulator startup failed: ${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
+  process.stderr.write(
+    `WAGO simulator startup failed: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+  );
   process.exit(1);
 });
 
@@ -31,35 +33,46 @@ function connectEnrollment(): void {
   const enrollmentClient = connect(mqttUrl, credentials('WAGO_ENROLLMENT'));
   client = enrollmentClient;
   enrollmentClient.on('error', logConnectionError);
-  enrollmentClient.once('connect', () => void handleAsync(async () => {
-    const enrollmentRuntime = runtime(enrollmentClient);
-    await subscribe(enrollmentClient, enrollmentRuntime.discoveryClaimTopic(), async (payload) => {
-      const claim = await enrollmentRuntime.receiveDiscoveryClaim(payload);
-      if (!claim) return;
-      enrollmentClient.end(true, () => void handleAsync(async () => connectOperational(await store.load())));
-    });
-    await enrollmentRuntime.publishDiscoveryAnnouncement();
-    process.stdout.write(`WAGO CC100 simulator enrollment connected as ${hardwareId}\n`);
-  }));
+  enrollmentClient.once(
+    'connect',
+    () =>
+      void handleAsync(async () => {
+        const enrollmentRuntime = runtime(enrollmentClient);
+        await subscribe(enrollmentClient, enrollmentRuntime.discoveryClaimTopic(), async (payload) => {
+          const claim = await enrollmentRuntime.receiveDiscoveryClaim(payload);
+          if (!claim) return;
+          enrollmentClient.end(true, () => void handleAsync(async () => connectOperational(await store.load())));
+        });
+        await enrollmentRuntime.publishDiscoveryAnnouncement();
+        process.stdout.write(`WAGO CC100 simulator enrollment connected as ${hardwareId}\n`);
+      }),
+  );
 }
 
 function connectOperational(state: RuntimeState): void {
   if (!state.credentials) throw new Error('permanent MQTT credentials are required');
-  const operationalClient = connect(mqttUrl, { username: state.credentials.username, password: state.credentials.password });
+  const operationalClient = connect(mqttUrl, {
+    username: state.credentials.username,
+    password: state.credentials.password,
+  });
   client = operationalClient;
   operationalClient.on('error', logConnectionError);
   device.restore(state.accepted?.snapshot, state.outputs);
   const operationalRuntime = runtime(operationalClient, state.credentials.prefix);
-  operationalClient.once('connect', () => void handleAsync(async () => {
-    await operationalRuntime.start();
-    process.stdout.write(`WAGO CC100 simulator connected as ${hardwareId}\n`);
-    if (scenario !== 'stale-heartbeat' && scenario !== 'offline')
-      timers = [
-        setInterval(() => void handleAsync(() => operationalRuntime.publishHeartbeat()), 30_000),
-        setInterval(() => void handleAsync(() => operationalRuntime.publishMeasurements()), 5_000),
-      ];
-    if (scenario === 'offline') operationalClient.end();
-  }));
+  operationalClient.once(
+    'connect',
+    () =>
+      void handleAsync(async () => {
+        await operationalRuntime.start();
+        process.stdout.write(`WAGO CC100 simulator connected as ${hardwareId}\n`);
+        if (scenario !== 'stale-heartbeat' && scenario !== 'offline')
+          timers = [
+            setInterval(() => void handleAsync(() => operationalRuntime.publishHeartbeat()), 30_000),
+            setInterval(() => void handleAsync(() => operationalRuntime.publishMeasurements()), 5_000),
+          ];
+        if (scenario === 'offline') operationalClient.end();
+      }),
+  );
   operationalClient.on('close', () => void handleAsync(() => operationalRuntime.setConnected(false)));
   operationalClient.on('connect', () => void handleAsync(() => operationalRuntime.setConnected(true)));
 }
@@ -89,7 +102,11 @@ function credentials(prefix: string): { username?: string; password?: string } {
 function parseValues(value: string | undefined): Record<string, boolean | number> {
   if (!value) return {};
   const parsed = JSON.parse(value) as Record<string, unknown>;
-  if (!parsed || Array.isArray(parsed) || Object.values(parsed).some((item) => typeof item !== 'boolean' && typeof item !== 'number'))
+  if (
+    !parsed ||
+    Array.isArray(parsed) ||
+    Object.values(parsed).some((item) => typeof item !== 'boolean' && typeof item !== 'number')
+  )
     throw new Error('WAGO_INITIAL_VALUES must be a JSON object with boolean or numeric values');
   return parsed as Record<string, boolean | number>;
 }
@@ -99,19 +116,33 @@ function required(name: string): string {
   return value;
 }
 function publish(mqtt: MqttClient, topic: string, payload: unknown, retain = false): Promise<void> {
-  return new Promise((resolve, reject) => mqtt.publish(topic, JSON.stringify(payload), { qos: 1, retain }, (error) => error ? reject(error) : resolve()));
+  return new Promise((resolve, reject) =>
+    mqtt.publish(topic, JSON.stringify(payload), { qos: 1, retain }, (error) => (error ? reject(error) : resolve())),
+  );
 }
-function subscribe(mqtt: MqttClient, topic: string, listener: (payload: Buffer) => void | Promise<void>): Promise<void> {
-  return new Promise((resolve, reject) => mqtt.subscribe(topic, { qos: 1 }, (error) => {
-    if (error) return reject(error);
-    mqtt.on('message', (receivedTopic, payload) => { if (receivedTopic === topic) void handleAsync(() => listener(payload)); });
-    resolve();
-  }));
+function subscribe(
+  mqtt: MqttClient,
+  topic: string,
+  listener: (payload: Buffer) => void | Promise<void>,
+): Promise<void> {
+  return new Promise((resolve, reject) =>
+    mqtt.subscribe(topic, { qos: 1 }, (error) => {
+      if (error) return reject(error);
+      mqtt.on('message', (receivedTopic, payload) => {
+        if (receivedTopic === topic) void handleAsync(() => listener(payload));
+      });
+      resolve();
+    }),
+  );
 }
 function handleAsync(callback: () => void | Promise<void>): Promise<void> {
-  return Promise.resolve().then(callback).catch((error: unknown) => {
-    process.stderr.write(`WAGO simulator callback failed: ${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
-  });
+  return Promise.resolve()
+    .then(callback)
+    .catch((error: unknown) => {
+      process.stderr.write(
+        `WAGO simulator callback failed: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+      );
+    });
 }
 function logConnectionError(error: Error): void {
   process.stderr.write(`WAGO simulator MQTT connection error: ${error.message}\n`);
