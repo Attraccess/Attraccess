@@ -35,7 +35,12 @@ export function validateSnapshot(value: unknown): ValidationError[] {
   }
   const snapshot = value as Partial<Snapshot>;
   const errors: ValidationError[] = [];
-  validateKeys(snapshot as Record<string, unknown>, 'snapshot', ['version', 'physicalPoints', 'logicalChannels'], errors);
+  validateKeys(
+    snapshot as Record<string, unknown>,
+    'snapshot',
+    ['version', 'physicalPoints', 'logicalChannels'],
+    errors,
+  );
   if (snapshot.version !== 1) {
     errors.push({ path: 'snapshot.version', code: 'unsupported_version', message: 'snapshot version must be 1' });
   }
@@ -55,7 +60,12 @@ export function validateSnapshot(value: unknown): ValidationError[] {
       });
       return;
     }
-    validateKeys(point as Record<string, unknown>, `snapshot.physicalPoints[${index}]`, ['id', 'hardwareProfile', 'channel'], errors);
+    validateKeys(
+      point as Record<string, unknown>,
+      `snapshot.physicalPoints[${index}]`,
+      ['id', 'hardwareProfile', 'channel'],
+      errors,
+    );
     if (!point?.id || pointIds.has(point.id)) {
       errors.push({
         path: `snapshot.physicalPoints[${index}].id`,
@@ -202,7 +212,12 @@ export function validateSnapshot(value: unknown): ValidationError[] {
       });
     }
     if (channel.feedback) {
-      validateKeys(channel.feedback as Record<string, unknown>, `${path}.feedback`, ['channelId', 'expected', 'timeoutMs'], errors);
+      validateKeys(
+        channel.feedback as Record<string, unknown>,
+        `${path}.feedback`,
+        ['channelId', 'expected', 'timeoutMs'],
+        errors,
+      );
     }
     if (
       channel.range &&
@@ -234,13 +249,23 @@ export function validateSnapshot(value: unknown): ValidationError[] {
       });
     }
     if (channel.measurement) {
-      validateKeys(channel.measurement as Record<string, unknown>, `${path}.measurement`, ['unit', 'scale', 'offset'], errors);
+      validateKeys(
+        channel.measurement as Record<string, unknown>,
+        `${path}.measurement`,
+        ['unit', 'scale', 'offset'],
+        errors,
+      );
     }
   });
   return errors;
 }
 
-function validateKeys(value: Record<string, unknown>, path: string, allowed: string[], errors: ValidationError[]): void {
+function validateKeys(
+  value: Record<string, unknown>,
+  path: string,
+  allowed: string[],
+  errors: ValidationError[],
+): void {
   Object.keys(value)
     .filter((key) => !allowed.includes(key))
     .forEach((key) =>
