@@ -41,6 +41,10 @@
       "label": "Überwachung",
       "description": "Metrik-Endpunkt und Instrumentierung"
     },
+    "auditLog": {
+      "label": "Auditprotokoll",
+      "description": "Administrative Aktivitäten und Aufbewahrung"
+    },
     "plugins": {
       "label": "Plugins",
       "description": "Installierte Plugins"

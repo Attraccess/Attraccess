@@ -50,6 +50,7 @@ import { SsoSection } from '../settings/sections/sso';
 import { EmailSection } from '../settings/sections/email';
 import { MessagingSection } from '../settings/sections/messaging';
 import { PluginsSection } from '../settings/sections/plugins';
+import { AuditLogSection } from '../settings/sections/audit-log';
 // Not lazy: the strength preview is evaluated server-side, so this section pulls in nothing the
 // main bundle does not already carry — and a Suspense boundary here only buys a spinner.
 import { SecuritySection } from '../settings/sections/security';
@@ -412,6 +413,15 @@ const coreRoutes: RouteConfig[] = [
       </SettingsLayout>
     ),
     authRequired: 'system.plugins.manage',
+  },
+  {
+    path: '/settings/audit-log',
+    element: (
+      <SettingsLayout>
+        <AuditLogSection />
+      </SettingsLayout>
+    ),
+    authRequired: 'system.audit.read',
   },
   {
     path: '/devices/companion',
