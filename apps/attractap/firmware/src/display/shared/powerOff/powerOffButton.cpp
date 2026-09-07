@@ -1,28 +1,22 @@
 #ifdef HAS_POWER_BUTTON
 
 #include "powerOffButton.hpp"
-
-#define POWER_TEXT   0xE0E0E0
-#define POWER_RED    0xC62828
-#define POWER_BLUE   0x1565C0
+#include "display/theme.hpp"
 
 namespace
 {
     std::function<void()> g_onConfirm;
     lv_obj_t *g_confirm = nullptr;
 
-    lv_obj_t *makeButton(lv_obj_t *parent, uint32_t color, const char *text, lv_event_cb_t cb)
+    lv_obj_t *makeButton(lv_obj_t *parent, lv_color_t color, const char *text, lv_event_cb_t cb)
     {
         lv_obj_t *btn = lv_button_create(parent);
-        lv_obj_set_style_bg_color(btn, lv_color_hex(color), LV_PART_MAIN);
-        lv_obj_set_style_bg_opa(btn, 255, LV_PART_MAIN);
-        lv_obj_set_style_radius(btn, 10, LV_PART_MAIN);
+        DisplayTheme::button(btn, color);
         lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, nullptr);
 
         lv_obj_t *lbl = lv_label_create(btn);
         lv_label_set_text(lbl, text);
         lv_obj_set_align(lbl, LV_ALIGN_CENTER);
-        lv_obj_set_style_text_color(lbl, lv_color_hex(POWER_TEXT), LV_PART_MAIN);
         lv_obj_set_style_text_font(lbl, &lv_font_montserrat_20, LV_PART_MAIN);
         return btn;
     }
@@ -67,13 +61,25 @@ namespace
         lv_obj_set_flex_align(g_confirm, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
         lv_obj_set_style_pad_row(g_confirm, 24, LV_PART_MAIN);
 
-        lv_obj_t *lbl = lv_label_create(g_confirm);
+        // Keep the full-screen click guard; only wrap the existing content in a light card.
+        lv_obj_t *dialog = lv_obj_create(g_confirm);
+        lv_obj_remove_style_all(dialog);
+        DisplayTheme::applySurface(dialog);
+        lv_obj_remove_flag(dialog, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_size(dialog, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+        lv_obj_set_style_border_width(dialog, 0, LV_PART_MAIN);
+        lv_obj_set_style_pad_all(dialog, 16, LV_PART_MAIN);
+        lv_obj_set_style_pad_row(dialog, 24, LV_PART_MAIN);
+        lv_obj_set_flex_flow(dialog, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_flex_align(dialog, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+        lv_obj_t *lbl = lv_label_create(dialog);
         lv_label_set_text(lbl, "Geraet ausschalten?");
-        lv_obj_set_style_text_color(lbl, lv_color_hex(POWER_TEXT), LV_PART_MAIN);
+        lv_obj_set_style_text_color(lbl, DisplayTheme::text(), LV_PART_MAIN);
         lv_obj_set_style_text_font(lbl, &lv_font_montserrat_24, LV_PART_MAIN);
         lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
 
-        lv_obj_t *row = lv_obj_create(g_confirm);
+        lv_obj_t *row = lv_obj_create(dialog);
         lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_set_size(row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
         lv_obj_set_style_bg_opa(row, 0, LV_PART_MAIN);
@@ -82,15 +88,17 @@ namespace
         lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
         lv_obj_set_style_pad_column(row, 16, LV_PART_MAIN);
 
-        lv_obj_set_size(makeButton(row, POWER_BLUE, "Abbrechen", &onCancel), 180, 52);
-        lv_obj_set_size(makeButton(row, POWER_RED, LV_SYMBOL_POWER "  Ausschalten", &onConfirm), 180, 52);
+        lv_obj_t *cancelBtn = makeButton(row, DisplayTheme::primary(), "Abbrechen", &onCancel);
+        DisplayTheme::secondaryButton(cancelBtn);
+        lv_obj_set_size(cancelBtn, 180, 52);
+        lv_obj_set_size(makeButton(row, DisplayTheme::danger(), LV_SYMBOL_POWER "  Ausschalten", &onConfirm), 180, 52);
     }
 }
 
 lv_obj_t *PowerOffButton::create(lv_obj_t *parent, std::function<void()> cb)
 {
     g_onConfirm = cb;
-    lv_obj_t *btn = makeButton(parent, POWER_RED, LV_SYMBOL_POWER, &onPowerBtn);
+    lv_obj_t *btn = makeButton(parent, DisplayTheme::danger(), LV_SYMBOL_POWER, &onPowerBtn);
     lv_obj_set_size(btn, 56, 40);
     return btn;
 }

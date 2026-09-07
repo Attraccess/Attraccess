@@ -2,7 +2,6 @@
 
 #include <string>
 #include <lvgl.h>
-#include "../../images/lockscreen_background_image.hpp"
 #include "../../images/logo_40h.hpp"
 #include "../IScreen.hpp"
 #include "../../../api/api.hpp"

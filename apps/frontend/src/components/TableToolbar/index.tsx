@@ -17,10 +17,7 @@ export function TableToolbar(props: Props) {
 
   return (
     <div
-      className={cn(
-        'mb-2 flex flex-wrap items-center gap-3 rounded-large bg-content1 px-3 py-2 shadow-small',
-        className,
-      )}
+      className={cn('mb-4 flex flex-wrap items-center gap-3 border-b border-separator pb-4', className)}
       data-cy="table-toolbar"
     >
       {search && <div className="min-w-0 flex-1">{search}</div>}

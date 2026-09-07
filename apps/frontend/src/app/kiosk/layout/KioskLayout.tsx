@@ -7,6 +7,7 @@ import { AttraccessLogo } from '@attraccess/ui';
 import { useAutoLogoff } from '../hooks/useAutoLogoff';
 import { KioskScreensaver } from '../KioskScreensaver';
 import { useAuth } from '../../../hooks/useAuth';
+import { ThemeToggle } from '../../../components/themeToggle';
 
 const en = { signOut: 'Sign out' };
 const de = { signOut: 'Abmelden' };
@@ -56,10 +57,15 @@ export function KioskLayout({ children }: PropsWithChildren) {
       <div className="min-h-screen flex flex-col items-center justify-center gap-10 p-4">
         {autoLogoffSeconds && remaining !== null && <AutoLogoffBar fraction={remaining / autoLogoffSeconds} />}
         {isAuthenticated && (
-          <Button variant="ghost" size="sm" onPress={logout} className="fixed top-3 left-3 z-50">
-            <LogOutIcon className="w-4 h-4" />
-            {t('signOut')}
-          </Button>
+          <>
+            <Button variant="ghost" size="sm" onPress={logout} className="fixed top-3 left-3 z-50">
+              <LogOutIcon className="w-4 h-4" />
+              {t('signOut')}
+            </Button>
+            <div className="fixed top-3 right-3 z-50">
+              <ThemeToggle />
+            </div>
+          </>
         )}
         <div className="flex items-center">
           <AttraccessLogo className="h-16 w-auto" />

@@ -1,4 +1,8 @@
 {
+  "title": "Resources",
+  "subtitle": "Your workshop, ready for your next idea.",
+  "filter": "Filter resources",
+  "scan": "Scan resource QR code",
   "searchPlaceholder": "Search resources...",
   "addResource": "Add Resource"
 }

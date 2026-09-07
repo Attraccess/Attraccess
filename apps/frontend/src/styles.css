@@ -1,4 +1,5 @@
-@import "@heroui/styles";
+@import '@heroui/styles';
+@import '../../../libs/ui/src/tokens.css';
 @plugin "@tailwindcss/typography";
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -37,20 +38,11 @@ body,
 }
 
 /* Expressive form validation errors: larger, bolder, with leading warning glyph */
-.field-error[data-visible="true"] {
+.field-error[data-visible='true'] {
   @apply text-sm font-medium flex items-start gap-1;
 }
 
-.field-error[data-visible="true"]::before {
-  content: "⚠";
+.field-error[data-visible='true']::before {
+  content: '⚠';
   @apply text-base leading-none;
 }
-
-/* Dark mode: raise overlay lightness so popovers/modals/menus are visually
-   distinct from the page background (bg ≈ 12% L vs default overlay ≈ 21% L). */
-.dark {
-  --overlay: oklch(0.32 0.006 285.89);
-  --overlay-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
-}
-
-/* You can add global styles to this file, and also import other style files */

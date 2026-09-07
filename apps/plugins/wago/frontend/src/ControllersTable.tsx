@@ -72,7 +72,7 @@ export function ControllersTable({ controllers, sessions, onClaim, onConfigure, 
 function ControllerRow({ row, onClaim, onConfigure, onRemove, onResume }: { row: Extract<TableRowData, { kind: 'controller' }>; onClaim: (controllerId: number) => void; onConfigure: (controllerId: number) => void; onRemove: (controller: WagoController) => void; onResume: (session: CommissioningSession) => void }) {
   const { controller, session } = row;
   return (
-    <TableRow key={row.key} id={row.key} className={session ? 'wg:bg-primary/5' : undefined}>
+    <TableRow key={row.key} id={row.key} className={session ? 'wg:bg-accent/5' : undefined}>
       <TableCell>
         <div className="wg:flex wg:min-w-0 wg:flex-col">
           <span className="wg:truncate wg:font-medium">{controller.name ?? controller.hardwareId}</span>
@@ -102,7 +102,7 @@ function ControllerRow({ row, onClaim, onConfigure, onRemove, onResume }: { row:
 function CommissioningRow({ row, onResume }: { row: Extract<TableRowData, { kind: 'session' }>; onResume: (session: CommissioningSession) => void }) {
   const { session } = row;
   return (
-    <TableRow key={row.key} id={row.key} className="wg:bg-primary/5">
+    <TableRow key={row.key} id={row.key} className="wg:bg-accent/5">
       <TableCell>
         <div className="wg:flex wg:min-w-0 wg:flex-col">
           <span className="wg:truncate wg:font-medium">{session.controllerName ?? 'CC100 enrollment'}</span>
@@ -120,7 +120,7 @@ function CommissioningRow({ row, onResume }: { row: Extract<TableRowData, { kind
 }
 
 function CommissioningStatus({ session }: { session: CommissioningSession }) {
-  return <span className="wg:mt-1 wg:text-xs wg:text-primary">{commissioningLabel(session.state)}{session.failureReason ? `: ${session.failureReason}` : ''}</span>;
+  return <span className="wg:mt-1 wg:text-xs wg:text-accent-soft-foreground">{commissioningLabel(session.state)}{session.failureReason ? `: ${session.failureReason}` : ''}</span>;
 }
 
 function EmptyControllers() {

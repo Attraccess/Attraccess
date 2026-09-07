@@ -1,0 +1,24 @@
+/* Handwritten wrapper: keep RGB565 pixels word-aligned in read-only storage. */
+#if defined(__APPLE__)
+.section __TEXT,__const
+#else
+.section .rodata.attraccess_logos,"a"
+#endif
+
+.balign 4
+.global _binary_logo_133x40_rgb565a8_start
+_binary_logo_133x40_rgb565a8_start:
+.incbin "@ATTRACTAP_IMAGE_DIR@/logo_133x40.rgb565a8"
+.global _binary_logo_133x40_rgb565a8_end
+_binary_logo_133x40_rgb565a8_end:
+
+.balign 4
+.global _binary_logo_400x120_rgb565a8_start
+_binary_logo_400x120_rgb565a8_start:
+.incbin "@ATTRACTAP_IMAGE_DIR@/logo_400x120.rgb565a8"
+.global _binary_logo_400x120_rgb565a8_end
+_binary_logo_400x120_rgb565a8_end:
+
+#if defined(__linux__)
+.section .note.GNU-stack,"",@progbits
+#endif

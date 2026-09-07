@@ -1,4 +1,5 @@
 #include "display.hpp"
+#include "theme.hpp"
 #include <vector>
 #include <string>
 #include <functional>
@@ -253,29 +254,7 @@ void Display::setup()
         .name = "reboot",
         .skip_unhandled_events = false};
 
-    lv_theme_t *base_theme = lv_theme_default_init(
-        disp,
-        lv_palette_main(LV_PALETTE_BLUE),       /* Primary color */
-        lv_palette_lighten(LV_PALETTE_BLUE, 2), /* Secondary color */
-        false,                                  /* Dark mode */
-        &lv_font_montserrat_18                  /* Normal font */
-    );
-
-    static lv_style_t global_bg_style;
-    lv_style_init(&global_bg_style);
-
-    /* Background gradient */
-    lv_style_set_bg_color(&global_bg_style, lv_color_hex(0x1F2C47));
-    lv_style_set_bg_grad_color(&global_bg_style, lv_color_hex(0x364C7C));
-    lv_style_set_bg_grad_dir(&global_bg_style, LV_GRAD_DIR_VER);
-    lv_style_set_bg_opa(&global_bg_style, LV_OPA_COVER);
-
-    /* Default text color */
-    lv_style_set_text_color(&global_bg_style, lv_color_white());
-
-    lv_obj_t *scr = lv_disp_get_scr_act(disp);
-    lv_obj_add_style(scr, &global_bg_style, 0);
-    lv_display_set_theme(disp, base_theme);
+    DisplayTheme::init(disp);
 
     Display::initDeviceOverlay();
     Display::initDrawer();

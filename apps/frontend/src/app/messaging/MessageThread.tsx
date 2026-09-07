@@ -115,7 +115,7 @@ export function MessageThread(props: Props) {
         )}
 
         {!isLoading && messages.length === 0 && (
-          <p className="py-6 text-center text-small text-zinc-500">{t('thread.empty')}</p>
+          <p className="py-6 text-center text-small text-muted">{t('thread.empty')}</p>
         )}
 
         {hasOlder && (
@@ -139,10 +139,8 @@ export function MessageThread(props: Props) {
                   className={cn(
                     'max-w-[75%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-small',
                     isOwn
-                      ? 'bg-blue-600 text-white'
-                      // zinc-200, not zinc-100: the thread sits on the page background now that
-                      // the Card is gone, and zinc-100 is the same colour as it in light mode.
-                      : 'bg-zinc-200 text-zinc-900 dark:bg-zinc-700 dark:text-zinc-50',
+                      ? 'bg-accent text-accent-foreground'
+                      : 'bg-surface-secondary text-surface-secondary-foreground',
                   )}
                 >
                   {message.content}
@@ -152,8 +150,7 @@ export function MessageThread(props: Props) {
                     to={message.referenceUrl ?? '#'}
                     className={cn(
                       'mt-1 inline-flex max-w-[75%] items-center gap-1 rounded-lg border px-2 py-1 text-tiny',
-                      'border-zinc-200 bg-zinc-50 text-zinc-600 hover:bg-zinc-100',
-                      'dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700',
+                      'border-border bg-surface-secondary text-surface-secondary-foreground hover:bg-surface-tertiary',
                     )}
                     data-cy={`message-reference-${message.id}`}
                   >
@@ -161,7 +158,7 @@ export function MessageThread(props: Props) {
                     <span className="truncate">{message.referenceLabel}</span>
                   </Link>
                 )}
-                <span className="mt-0.5 text-tiny text-zinc-400">
+                <span className="mt-0.5 text-tiny text-muted">
                   {new Date(message.createdAt).toLocaleString()}
                 </span>
               </div>
@@ -172,9 +169,9 @@ export function MessageThread(props: Props) {
       </div>
 
       {attachedResourceId && (
-        <div className="flex items-center gap-2 border-t border-zinc-200 px-3 pt-2 dark:border-zinc-700">
+        <div className="flex items-center gap-2 border-t border-border px-3 pt-2">
           <span
-            className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1 text-tiny text-zinc-600 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+            className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface-secondary px-2 py-1 text-tiny text-surface-secondary-foreground"
             data-cy="composer-resource-reference"
           >
             <BoxIcon size={12} className="shrink-0" />
@@ -184,7 +181,7 @@ export function MessageThread(props: Props) {
               onClick={() => setAttachedResourceId(undefined)}
               aria-label={t('composer.removeReference')}
               data-cy="composer-remove-reference"
-              className="ml-0.5 rounded p-0.5 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+              className="ml-0.5 rounded p-0.5 hover:bg-surface-tertiary"
             >
               <XIcon size={12} />
             </button>
@@ -196,7 +193,7 @@ export function MessageThread(props: Props) {
         onSubmit={handleSubmit}
         className={cn(
           'flex items-end gap-2 p-3',
-          attachedResourceId ? '' : 'border-t border-zinc-200 dark:border-zinc-700',
+          attachedResourceId ? '' : 'border-t border-border',
         )}
       >
         <TextArea
