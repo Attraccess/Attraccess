@@ -415,16 +415,18 @@ export class WagoRuntime {
     this.measurementsPending = true;
     try {
       for await (const reading of acquireMeasurements(accepted.snapshot, this.options.device)) {
+        if (reading.ok) {
+          const counters = this.options.device.cumulativeCounters?.();
+          if (counters && JSON.stringify(counters) !== JSON.stringify(this.state.cumulativeCounters ?? {})) {
+            this.state.cumulativeCounters = counters;
+            await this.saveState();
+          }
+        }
         for (const channel of reading.channels) {
           if (accepted !== this.state.accepted || this.configurationPending) return;
           try {
             if (reading.ok === false) throw reading.error;
             const { raw, timestamp } = reading;
-            const counters = this.options.device.cumulativeCounters?.();
-            if (counters) {
-              this.state.cumulativeCounters = counters;
-              await this.saveState();
-            }
             const transform = channel.measurement ?? { unit: 'percent', scale: 1, offset: 0 };
             const measurement = encodeMeasurement(channel.id, raw, transform);
             await this.publishOperational(

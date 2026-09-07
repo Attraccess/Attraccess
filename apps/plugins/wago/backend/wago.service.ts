@@ -242,10 +242,12 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     principal?: PluginAuditPrincipal,
   ): Promise<WagoConfigurationDraft> {
     // Service callers predating optimistic draft versions passed the principal fourth.
-    if (expectedVersion && typeof expectedVersion === 'object') {
+    if (principal === undefined && expectedVersion && typeof expectedVersion === 'object') {
       principal = expectedVersion;
       expectedVersion = undefined;
     }
+    if (expectedVersion !== undefined && expectedVersion !== null && typeof expectedVersion !== 'number')
+      throw new BadRequestException('expected draft version must be a number or null');
     let draftVersion: number | null | undefined;
     if (typeof expectedVersion === 'number') draftVersion = expectedVersion;
     else if (expectedVersion === null) draftVersion = null;
@@ -421,6 +423,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
               },
             ]);
         draft.updatedAt = new Date().toISOString();
+        draft.version++;
         return this.drafts.save(draft);
       };
       // Classification and before/after evidence belong to this same configuration lock.
@@ -570,6 +573,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
           }),
           reviewedHash: null,
           updatedAt: new Date().toISOString(),
+          version: (draft?.version ?? 0) + 1,
         });
         const approvedHash = this.reviewIdentity(replacement, current, approvedImpacts);
         replacement.reviewedHash = approvedHash;
@@ -752,22 +756,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     if (provenance !== undefined) draft.presetProvenance = provenance;
     draft.reviewedHash = null;
     draft.updatedAt = new Date().toISOString();
-    if (existing && expectedVersion !== undefined) {
-      const result = await this.drafts
-        .createQueryBuilder()
-        .update(WagoConfigurationDraft)
-        .set({
-          snapshot: draft.snapshot,
-          presetProvenance: draft.presetProvenance,
-          reviewedHash: null,
-          updatedAt: draft.updatedAt,
-          version: draft.version + 1,
-        })
-        .where('controller_id = :controllerId AND version = :version', { controllerId, version: draft.version })
-        .execute();
-      if (result.affected !== 1) throw new ConflictException('configuration draft changed; reload it before saving');
-      return (await this.drafts.findOneBy({ controllerId }))!;
-    }
+    if (existing) draft.version = existing.version + 1;
     return this.drafts.save(draft);
   }
 

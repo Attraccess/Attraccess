@@ -168,6 +168,12 @@ export class WagoControllerApi {
     @Body() body: { snapshot?: unknown; metadata?: ConfigurationEditorMetadata; expectedVersion?: number | null },
     @Req() request: AuthenticatedRequest,
   ) {
+    if (
+      body?.expectedVersion !== undefined &&
+      body.expectedVersion !== null &&
+      (!Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1)
+    )
+      throw new BadRequestException('expectedVersion must be a positive integer or null');
     return this.wago.saveDraft(id, body?.snapshot, body?.metadata, body?.expectedVersion, wagoAuditPrincipal(request));
   }
   @Post('controllers/:id/configuration/validate') validateDraft(

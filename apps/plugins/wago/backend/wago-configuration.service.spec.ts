@@ -120,6 +120,35 @@ describe('configuration editor service boundaries', () => {
     expect(mqtt.publish.mock.calls[0][2]).not.toContain('Machine enable');
   });
 
+  it('advances draft versions for unversioned saves and preset applications', async () => {
+    const { service } = fixture();
+    const first = await service.saveDraft(1, snapshot);
+    const second = await service.saveDraft(1, snapshot, { names: { output: 'Output' }, presets: [] });
+    const application = { presetId: 'pulsed-lock-bank' as const, channelId: 'output', physicalPointId: 'point' };
+    const preview = await service.previewPreset(1, application);
+    await service.applyPreset(
+      1,
+      application,
+      preview.diff.map((change) => change.path),
+      preview.draftHash,
+    );
+
+    expect(first.version).toBe(1);
+    expect(second.version).toBe(2);
+    await expect(service.saveDraft(1, snapshot, undefined, 2)).rejects.toThrow('configuration draft changed');
+    expect((await service.getDraft(1))?.version).toBe(3);
+  });
+
+  it('does not accept a supplied version object when an authenticated principal is provided', async () => {
+    const { service, audit } = fixture();
+    const principal = { userId: 7, authenticationMethod: 'session' as const };
+
+    await expect(service.saveDraft(1, snapshot, undefined, { userId: 99 } as never, principal)).rejects.toThrow(
+      'expected draft version must be a number or null',
+    );
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
   it('includes editor metadata changes in reviews and rollback previews', async () => {
     const { service } = fixture();
     await service.saveDraft(1, snapshot, { names: { output: 'Original' }, presets: [] });

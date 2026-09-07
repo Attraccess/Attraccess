@@ -5,7 +5,7 @@ import type { WagoService } from './wago.service';
 import type { AuthenticatedRequest, PluginContext } from '@attraccess/plugins-backend-sdk';
 
 describe('WagoControllerApi', () => {
-  const service = { previewPreset: jest.fn(), applyPreset: jest.fn() } as unknown as WagoService;
+  const service = { previewPreset: jest.fn(), applyPreset: jest.fn(), saveDraft: jest.fn() } as unknown as WagoService;
   const commissioning = {
     list: jest.fn(),
     create: jest.fn(),
@@ -68,5 +68,24 @@ describe('WagoControllerApi', () => {
     expect(() => controller.createCommissioningSession({ mqttServerId: 1, targetHost: '192.168.1.10' })).toThrow(
       new BadRequestException('controller name is required'),
     );
+  });
+
+  it('rejects nonnumeric draft versions before they reach the audited service boundary', () => {
+    const request = { user: { id: 7, authenticationMethod: 'session' } } as AuthenticatedRequest;
+
+    expect(() => controller.saveDraft(1, { snapshot: {}, expectedVersion: { userId: 99 } } as never, request)).toThrow(
+      'expectedVersion must be a positive integer or null',
+    );
+    expect(service.saveDraft).not.toHaveBeenCalled();
+  });
+
+  it('forwards only a valid draft version alongside the authenticated principal', () => {
+    const request = { user: { id: 7, authenticationMethod: 'session' } } as AuthenticatedRequest;
+    controller.saveDraft(1, { snapshot: {}, expectedVersion: 2 }, request);
+
+    expect(service.saveDraft).toHaveBeenCalledWith(1, {}, undefined, 2, {
+      userId: 7,
+      authenticationMethod: 'session',
+    });
   });
 });

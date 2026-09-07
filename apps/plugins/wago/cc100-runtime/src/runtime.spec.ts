@@ -1393,6 +1393,31 @@ describe('WagoRuntime', () => {
     );
   });
 
+  it('persists changed cumulative counters once per acquired reading', async () => {
+    const metered: Snapshot = {
+      version: 1,
+      physicalPoints: [{ id: 'meter', hardwareProfile: '751-9301', channel: 0 }],
+      logicalChannels: ['first', 'second'].map((id) => ({
+        id,
+        physicalPointId: 'meter',
+        profile: 'meter',
+        capabilities: ['measurement'],
+        disconnectPolicy: { mode: 'hold' as const },
+        measurement: { unit: 'watt', scale: 1, offset: 0 },
+      })),
+    };
+    const counters = jest.fn(() => ({ meter: { previous: 1, total: 1 } }));
+    Object.assign(device, { cumulativeCounters: counters });
+    device.values.set('751-9301:0', 1);
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(metered), snapshot: metered });
+    const save = jest.spyOn(runtime as unknown as { saveState: () => Promise<void> }, 'saveState');
+
+    await runtime.publishMeasurements();
+
+    expect(counters).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects large fractional measurements', async () => {
     const metered: Snapshot = {
       version: 1,
