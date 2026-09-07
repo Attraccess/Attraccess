@@ -18,6 +18,7 @@ import { SupervisionRequestDto } from './dtos/supervisionRequest.dto';
 import { SupervisionDecisionResponseDto } from './dtos/supervisionDecision.response.dto';
 import { SupervisionLiveService } from './supervision-live.service';
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
+import { AuditService } from '../../audit/audit.service';
 
 interface PendingSupervisionRequest {
   id: string;
@@ -99,6 +100,7 @@ export class SupervisionService {
     private readonly resourceUsageService: ResourceUsageService,
     private readonly resourceIntroducersService: ResourceIntroducersService,
     private readonly supervisionLive: SupervisionLiveService,
+    private readonly audit: AuditService,
   ) {}
 
   /** Registered by the Attractap module at startup; see {@link ReaderSupervisionArmer}. */
@@ -406,6 +408,16 @@ export class SupervisionService {
         supervisorUserId: supervisor.id,
       });
       this.fulfil(request, session);
+      void this.audit.recordResource({
+        action: 'supervision.approved',
+        actorId: supervisor.id,
+        subjectId: request.resourceId,
+        details: {
+          requestId: request.id,
+          requesterUserId: request.requester.id,
+          supervisorUserId: supervisor.id,
+        },
+      });
       // Reader-originated requests surface the result to the reader websocket; the session was just
       // started here (the web popup won the race against an on-reader card tap).
       request.readerCallbacks?.onResolved(session, { id: supervisor.id, username: supervisor.username });
@@ -427,6 +439,16 @@ export class SupervisionService {
     this.clear(request);
     const error = new ForbiddenException('The supervision request was rejected by the supervisor');
     this.fail(request, error);
+    void this.audit.recordResource({
+      action: 'supervision.rejected',
+      actorId: supervisor.id,
+      subjectId: request.resourceId,
+      details: {
+        requestId: request.id,
+        requesterUserId: request.requester.id,
+        supervisorUserId: supervisor.id,
+      },
+    });
     request.readerCallbacks?.onFailed(error);
     this.emitToEligible(request, SupervisionLiveEventType.REJECTED);
     return { status: 'rejected', requestId };

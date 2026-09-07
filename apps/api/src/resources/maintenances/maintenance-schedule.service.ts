@@ -13,6 +13,7 @@ import {
 } from '@attraccess/database-entities';
 import { CreateMaintenanceScheduleDto } from './dtos/create-maintenance-schedule.dto';
 import { UpdateMaintenanceScheduleDto } from './dtos/update-maintenance-schedule.dto';
+import { AuditService } from '../../audit/audit.service';
 
 @Injectable()
 export class MaintenanceScheduleService {
@@ -27,6 +28,7 @@ export class MaintenanceScheduleService {
     private readonly timeIntervalConfigRepository: Repository<ResourceMaintenanceScheduleTimeIntervalConfig>,
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
+    private readonly audit: AuditService,
   ) { }
 
   async findAllByResourceId(resourceId: number): Promise<ResourceMaintenanceSchedule[]> {
@@ -49,7 +51,13 @@ export class MaintenanceScheduleService {
     return schedule;
   }
 
-  async create(resourceId: number, dto: CreateMaintenanceScheduleDto): Promise<ResourceMaintenanceSchedule> {
+  async create(
+    resourceId: number,
+    dto: CreateMaintenanceScheduleDto,
+    actorId: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<ResourceMaintenanceSchedule> {
     await this.ensureResourceExists(resourceId);
 
     const schedule = this.scheduleRepository.create({
@@ -66,13 +74,25 @@ export class MaintenanceScheduleService {
       timeIntervalConfig: dto.timeIntervalConfig,
     });
 
-    return this.getOne(resourceId, saved.id);
+    const result = await this.getOne(resourceId, saved.id);
+    await this.audit.recordResource({
+      action: 'maintenance_schedule.created',
+      actorId,
+      authenticationMethod,
+      apiTokenId,
+      subjectId: resourceId,
+      details: this.scheduleDetails(result),
+    });
+    return result;
   }
 
   async update(
     resourceId: number,
     scheduleId: number,
     dto: UpdateMaintenanceScheduleDto,
+    actorId: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
   ): Promise<ResourceMaintenanceSchedule> {
     const schedule = await this.getOne(resourceId, scheduleId);
 
@@ -101,16 +121,26 @@ export class MaintenanceScheduleService {
       });
     }
 
-    return this.getOne(resourceId, scheduleId);
+    const result = await this.getOne(resourceId, scheduleId);
+    await this.audit.recordResource({
+      action: 'maintenance_schedule.updated',
+      actorId,
+      authenticationMethod,
+      apiTokenId,
+      subjectId: resourceId,
+      details: this.scheduleDetails(result),
+    });
+    return result;
   }
 
-  async delete(resourceId: number, scheduleId: number): Promise<void> {
-    const schedule = await this.scheduleRepository.findOne({
-      where: { id: scheduleId, resourceId },
-    });
-    if (!schedule) {
-      throw new NotFoundException('Maintenance schedule not found');
-    }
+  async delete(
+    resourceId: number,
+    scheduleId: number,
+    actorId: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<void> {
+    const schedule = await this.getOne(resourceId, scheduleId);
     await this.scheduleRepository.manager.transaction(async (manager) => {
       await manager.getRepository(ResourceMaintenance).update(
         { maintenanceSchedule: { id: scheduleId } },
@@ -121,6 +151,14 @@ export class MaintenanceScheduleService {
       await manager.getRepository(ResourceMaintenanceScheduleTimeIntervalConfig).delete({ scheduleId });
       await manager.getRepository(ResourceMaintenanceSchedule).remove(schedule);
     });
+    await this.audit.recordResource({
+      action: 'maintenance_schedule.deleted',
+      actorId,
+      authenticationMethod,
+      apiTokenId,
+      subjectId: resourceId,
+      details: this.scheduleDetails(schedule),
+    });
   }
 
   private async ensureResourceExists(resourceId: number): Promise<void> {
@@ -128,6 +166,25 @@ export class MaintenanceScheduleService {
     if (!exists) {
       throw new NotFoundException(`Resource with ID ${resourceId} not found`);
     }
+  }
+
+  private scheduleDetails(schedule: ResourceMaintenanceSchedule): Record<string, string | number> {
+    const details: Record<string, string | number> = {
+      scheduleId: schedule.id,
+      enabled: schedule.enabled ? 1 : 0,
+      triggerType: schedule.triggerType,
+    };
+    if (schedule.name) details.name = schedule.name.slice(0, 512);
+    if (schedule.usageHoursConfig) {
+      details.usageDuration = schedule.usageHoursConfig.duration;
+      details.usageUnit = schedule.usageHoursConfig.unit;
+    }
+    if (schedule.usageCountConfig) details.usageThreshold = schedule.usageCountConfig.thresholdSessions;
+    if (schedule.timeIntervalConfig) {
+      details.usageDuration = schedule.timeIntervalConfig.duration;
+      details.usageUnit = schedule.timeIntervalConfig.unit;
+    }
+    return details;
   }
 
   private async removeConfigsForSchedule(scheduleId: number): Promise<void> {
