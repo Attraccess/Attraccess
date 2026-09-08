@@ -460,4 +460,64 @@ describe('management transition orchestration (no device or broker connections)'
     });
     expect(h.calls).toEqual([]);
   });
+
+  it.each([
+    {
+      name: 'expired review',
+      operation: async (service: WagoManagementService, h: ReturnType<typeof harness>) => {
+        const review = await h.review();
+        h.advance(300001);
+        await service.apply(7, { reviewToken: review.reviewToken!, confirm: true, temporarySsh: credential });
+      },
+      code: 'review_required',
+    },
+    {
+      name: 'unsupported qualification',
+      operation: async (service: WagoManagementService, h: ReturnType<typeof harness>) => {
+        const review = await h.review();
+        h.adapter.qualify.mockReturnValue({
+          support: 'UNSUPPORTED',
+          evidence: 'missing-fw31-command-evidence',
+          minimumPrivileges: false,
+          rebootSafeWatchdog: false,
+        });
+        await service.apply(7, { reviewToken: review.reviewToken!, confirm: true, temporarySsh: credential });
+      },
+      code: 'UNSUPPORTED',
+    },
+    {
+      name: 'wrong recovery username',
+      operation: async (service: WagoManagementService, h: ReturnType<typeof harness>) => {
+        const review = await h.review();
+        await h.apply(review.reviewToken!);
+        await service.recover(7, { confirm: true, temporarySsh: { ...credential, username: 'other' } });
+      },
+      code: 'credentials_required',
+    },
+  ])('releases the shared commissioning lease after a $name', async ({ operation, code }) => {
+    const h = harness();
+    let held = false;
+    const lease: CommissioningLeaseRunner = {
+      run: async (_fingerprint, callback) => {
+        if (held) throw new CommissioningLeaseError('lease_busy');
+        held = true;
+        const result = await callback({
+          assertOwned: async () => undefined,
+          signal: new AbortController().signal,
+          deadline: Number.MAX_SAFE_INTEGER,
+        });
+        held = false;
+        return result;
+      },
+    };
+    const service = new WagoManagementService(h.store, h.secrets, h.adapter, lease, h.now);
+
+    await expect(operation(service, h)).rejects.toMatchObject({ code });
+    await expect(lease.run(target.hostKeyFingerprint, async () => undefined)).resolves.toBeUndefined();
+    expect(h.calls).toEqual(
+      code === 'credentials_required'
+        ? ['prepare', 'arm', 'install', 'verify', 'restrict', 'verify', 'baseline', 'commit']
+        : [],
+    );
+  });
 });
