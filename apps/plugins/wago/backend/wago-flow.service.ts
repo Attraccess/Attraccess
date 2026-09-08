@@ -57,6 +57,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   private readonly unavailableHardware = new Set<number>();
   private readonly unavailableConfiguration = new Set<number>();
   private readonly appliedConfigurations = new Map<number, { revision: number; contentHash: string }>();
+  private readonly processingByController = new Map<number, Promise<void>>();
   private readonly channelCache = new Map<number, WagoConfigurationSnapshot['logicalChannels']>();
   private readonly waiters = new Set<Waiter>();
   private readonly waitersByKey = new Map<string, Set<Waiter>>();
@@ -273,6 +274,22 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       this.context.logger.warn(`Ignoring future-dated WAGO event for ${controller.hardwareId}`);
       return;
     }
+    const previous = this.processingByController.get(controller.id) ?? Promise.resolve();
+    const processing = previous.catch(() => undefined).then(() => this.processMessage(controller, event, eventTime));
+    this.processingByController.set(controller.id, processing);
+    try {
+      await processing;
+    } finally {
+      if (this.processingByController.get(controller.id) === processing)
+        this.processingByController.delete(controller.id);
+    }
+  }
+
+  private async processMessage(
+    controller: WagoController,
+    event: WagoOperationalMessage,
+    eventTime: number,
+  ): Promise<void> {
     // Resolve configuration before mutating stream/cache state, then process the entire snapshot atomically.
     const channels = await this.channels(controller.id);
     let stream = this.streams.get(controller.id);
