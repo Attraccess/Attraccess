@@ -11,6 +11,7 @@ import {
   discoveryTopic,
   heartbeatTopic,
   parseAnnouncement,
+  parseHeartbeat,
 } from './protocol';
 
 describe('WAGO protocol', () => {
@@ -29,6 +30,16 @@ describe('WAGO protocol', () => {
     expect(heartbeatTopic('attraccess/wago', valid.hardwareId)).toBe(
       'attraccess/wago/v1/controllers/cc100-01/heartbeat',
     );
+  });
+
+  it('accepts runtime heartbeats without weakening physical discovery verification', () => {
+    const heartbeat = { ...valid };
+    delete heartbeat.pairingCode;
+    const payload = Buffer.from(JSON.stringify(heartbeat));
+    expect(parseHeartbeat(payload)).toEqual(heartbeat);
+    expect(() => parseAnnouncement(payload)).toThrow('pairingCode is required');
+    expect(() => parseHeartbeat(Buffer.from(JSON.stringify({ ...heartbeat, sequence: -1 })))).toThrow();
+    expect(() => parseHeartbeat(Buffer.from(JSON.stringify({ ...heartbeat, hardwareId: '' })))).toThrow();
   });
 
   it('uses a versioned configuration protocol below the configurable operational prefix', () => {
