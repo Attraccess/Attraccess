@@ -277,8 +277,9 @@ export function ConfigurationRevisions({
                     revision: preview.revision.revision,
                     force: rollbackForce,
                     sourceHash: preview.revision.contentHash,
-                    currentHash: preview.current?.contentHash ?? null,
+                    currentHash: preview.current ? `${preview.current.revision}:${preview.current.contentHash}` : null,
                     draftHash: preview.draftHash,
+                    impactHash: preview.impactHash,
                   });
                 } catch (error) {
                   failure = error;

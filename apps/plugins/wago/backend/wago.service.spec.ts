@@ -587,7 +587,10 @@ describe('WagoService', () => {
     const snapshot = { version: 1, physicalPoints: [], logicalChannels: [] };
     draftRepository.findOneBy.mockResolvedValue({
       controllerId: claimed.id,
-      reviewedHash: configurationHash({ snapshot: JSON.stringify(snapshot), metadata: null }),
+      reviewedHash: configurationHash({
+        draft: configurationHash({ snapshot: JSON.stringify(snapshot), metadata: null }),
+        impacts: [],
+      }),
       snapshot: JSON.stringify(snapshot),
     });
 

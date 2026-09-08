@@ -140,6 +140,7 @@ export interface ConfigurationReview {
 }
 export interface RevisionPreview {
   draftHash: string;
+  impactHash: string;
   revision: ConfigurationRevision & { snapshot: string };
   current: (ConfigurationRevision & { snapshot: string }) | null;
   diff: ConfigurationDiff[];
@@ -259,8 +260,9 @@ export const rollbackConfiguration = (
   sourceHash: string,
   currentHash: string | null,
   draftHash: string,
+  impactHash: string,
 ) =>
   api.request<ConfigurationRevision>(`/controllers/${id}/configuration/rollback/${revision}`, {
     method: 'POST',
-    body: { force, sourceHash, currentHash, draftHash },
+    body: { force, sourceHash, currentHash, draftHash, impactHash },
   });

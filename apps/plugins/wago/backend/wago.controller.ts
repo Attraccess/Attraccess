@@ -217,7 +217,14 @@ export class WagoControllerApi {
     @Param('id', ParseIntPipe) id: number,
     @Param('revision', ParseIntPipe) revision: number,
     @Req() request: AuthenticatedRequest,
-    @Body() body?: { force?: boolean; sourceHash?: string; currentHash?: string | null; draftHash?: string },
+    @Body()
+    body?: {
+      force?: boolean;
+      sourceHash?: string;
+      currentHash?: string | null;
+      draftHash?: string;
+      impactHash?: string;
+    },
   ) {
     return this.audit.run(
       wagoAuditPrincipal(request),
@@ -225,7 +232,15 @@ export class WagoControllerApi {
       'rollback',
       body?.force === true ? { sourceRevision: revision, force: true } : { sourceRevision: revision },
       () =>
-        this.wago.rollback(id, revision, body?.force === true, body?.sourceHash, body?.currentHash, body?.draftHash),
+        this.wago.rollback(
+          id,
+          revision,
+          body?.force === true,
+          body?.sourceHash,
+          body?.currentHash,
+          body?.draftHash,
+          body?.impactHash,
+        ),
       (published) => ({ revision: published.revision }),
     );
   }

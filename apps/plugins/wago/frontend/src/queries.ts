@@ -287,13 +287,15 @@ export function useConfigurationActions(controllerId: number) {
       sourceHash,
       currentHash,
       draftHash,
+      impactHash,
     }: {
       revision: number;
       force: boolean;
       sourceHash: string;
       currentHash: string | null;
       draftHash: string;
-    }) => rollbackConfiguration(controllerId, revision, force, sourceHash, currentHash, draftHash),
+      impactHash: string;
+    }) => rollbackConfiguration(controllerId, revision, force, sourceHash, currentHash, draftHash, impactHash),
     onSettled: refresh,
   });
   return { validate, review, publish, preview, rollback };

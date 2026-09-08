@@ -336,6 +336,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     sourceHash?: string,
     currentHash?: string | null,
     draftHash?: string,
+    impactHash?: string,
   ): Promise<WagoConfigurationRevision> {
     return this.withConfigurationLock(controllerId, async () => {
       await this.claimedController(controllerId);
@@ -346,13 +347,13 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       if (
         draftHash !== this.draftIdentity(draft) ||
         sourceHash !== source.contentHash ||
-        currentHash !== (current?.contentHash ?? null)
+        currentHash !== this.revisionIdentity(current)
       )
         throw new ConflictException('configuration changed since rollback preview; preview and confirm again');
       const snapshot = JSON.parse(source.snapshot);
       const errors = validateEditorSnapshot(snapshot);
       if (errors.length) throw new ConflictException({ message: 'rollback configuration is invalid', errors });
-      await this.requireImpactAcknowledgement(controllerId, current, snapshot, force);
+      await this.requireImpactAcknowledgement(controllerId, current, snapshot, force, impactHash);
       await this.saveDraftWhileLocked(
         controllerId,
         snapshot,
@@ -373,6 +374,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     current: WagoConfigurationRevision | null;
     diff: ReturnType<typeof configurationDiff>;
     metadataDiff: ReturnType<typeof configurationDiff>;
+    impactHash: string;
   }> {
     return this.withConfigurationLock(controllerId, async () => {
       await this.claimedController(controllerId);
@@ -380,14 +382,15 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       if (!selected) throw new NotFoundException(`WAGO configuration revision ${revision} not found`);
       const [current] = await this.revisions.find({ where: { controllerId }, order: { revision: 'DESC' }, take: 1 });
       const draft = await this.drafts.findOneBy({ controllerId });
+      const impacts = await configurationFlowImpacts(
+        this.context,
+        controllerId,
+        current ? JSON.parse(current.snapshot) : null,
+        JSON.parse(selected.snapshot),
+      );
       return {
         draftHash: this.draftIdentity(draft),
-        impacts: await configurationFlowImpacts(
-          this.context,
-          controllerId,
-          current ? JSON.parse(current.snapshot) : null,
-          JSON.parse(selected.snapshot),
-        ),
+        impacts,
         revision: selected,
         current: current ?? null,
         diff: configurationDiff(current ? JSON.parse(current.snapshot) : null, JSON.parse(selected.snapshot)),
@@ -395,12 +398,24 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
           this.metadataFromProvenance(current?.presetProvenance),
           this.metadataFromProvenance(selected.presetProvenance),
         ),
+        impactHash: configurationHash(impacts),
       };
     });
   }
 
   private draftIdentity(draft: WagoConfigurationDraft | null): string {
     return configurationHash(draft ? { snapshot: draft.snapshot, metadata: draft.presetProvenance ?? null } : null);
+  }
+
+  private revisionIdentity(revision: WagoConfigurationRevision | null): string | null {
+    return revision ? `${revision.revision}:${revision.contentHash}` : null;
+  }
+
+  private reviewIdentity(
+    draft: WagoConfigurationDraft,
+    impacts: Awaited<ReturnType<typeof configurationFlowImpacts>>,
+  ): string {
+    return configurationHash({ draft: this.draftIdentity(draft), impacts });
   }
 
   private metadataFromProvenance(provenance: string | null | undefined): ConfigurationEditorMetadata {
@@ -455,7 +470,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
       previous ? JSON.parse(previous.snapshot) : null,
       JSON.parse(draft.snapshot),
     );
-    draft.reviewedHash = this.draftIdentity(draft);
+    draft.reviewedHash = this.reviewIdentity(draft, impacts);
     await this.drafts.save(draft);
     const diff = configurationDiff(previous ? JSON.parse(previous.snapshot) : null, JSON.parse(draft.snapshot));
     const metadataDiff = configurationDiff(
@@ -477,6 +492,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     previous: WagoConfigurationRevision | null,
     snapshot: WagoConfigurationSnapshot,
     force: boolean,
+    expectedImpactHash?: string,
   ) {
     const impacts = await configurationFlowImpacts(
       this.context,
@@ -486,6 +502,12 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     );
     if (impacts.length && !force)
       throw new ConflictException({ message: 'acknowledge potential flow impacts before publishing', impacts });
+    if (force && expectedImpactHash !== undefined && expectedImpactHash !== configurationHash(impacts))
+      throw new ConflictException({
+        message: 'flow impacts changed since preview; preview and confirm again',
+        impacts,
+      });
+    return impacts;
   }
 
   private async publishDraftWhileLocked(
@@ -500,13 +522,13 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     if (validation.length)
       throw new ConflictException({ message: 'configuration draft is invalid', errors: validation });
     const contentHash = configurationHash(JSON.parse(draft.snapshot));
-    const reviewIdentity = this.draftIdentity(draft);
+    const previous = await this.latestRevision(controllerId);
+    const impacts = await this.requireImpactAcknowledgement(controllerId, previous, JSON.parse(draft.snapshot), force);
+    const reviewIdentity = this.reviewIdentity(draft, impacts);
     if (reviewedHash !== undefined && reviewedHash !== reviewIdentity)
       throw new ConflictException('draft changed since your review; review it again');
     if (draft.reviewedHash !== reviewIdentity)
       throw new ConflictException('review the current configuration draft before publishing it');
-    const previous = await this.latestRevision(controllerId);
-    await this.requireImpactAcknowledgement(controllerId, previous, JSON.parse(draft.snapshot), force);
     if (
       previous?.state === 'pending' &&
       previous.contentHash === contentHash &&
