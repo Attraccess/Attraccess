@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(attractap_desktop LANGUAGES C CXX)
+project(attractap_desktop LANGUAGES C CXX ASM)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -32,6 +32,51 @@ find_package(SDL3 REQUIRED CONFIG)
 find_package(CURL 8.7 REQUIRED)
 find_package(Threads REQUIRED)
 
+include(FetchContent)
+FetchContent_Declare(ArduinoJson
+    URL https://codeload.github.com/bblanchon/ArduinoJson/tar.gz/refs/tags/v7.4.2
+    URL_HASH SHA256=681f703dd237f5b7f1dc1d7009a9cf246e88676b349572e73eae9154e8994a55)
+FetchContent_MakeAvailable(ArduinoJson)
+
+file(GLOB_RECURSE ATTRACTAP_FIRMWARE_SOURCES "${FIRMWARE_DIR}/src/*.cpp")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/main\\.cpp$")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/nfc/")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/websocket/")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/api/demo_websocket\\.cpp$")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/api/ota/")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/display/driver/")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/network/(wifi|ethernet)/")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/ioexpander/")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/led/")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/beeper/beeper\\.cpp$")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/serial/serialCommandHandler\\.cpp$")
+list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/utils\\.cpp$")
+
+set(ATTRACTAP_IMAGE_DIR "${FIRMWARE_DIR}/src/display/images")
+configure_file("${ATTRACTAP_IMAGE_DIR}/logos.S.in" "${CMAKE_CURRENT_BINARY_DIR}/logos.S" @ONLY)
+set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/logos.S" PROPERTIES
+    OBJECT_DEPENDS "${ATTRACTAP_IMAGE_DIR}/logo_133x40.rgb565a8;${ATTRACTAP_IMAGE_DIR}/logo_400x120.rgb565a8")
+
+add_library(attractap-production-host
+    ${ATTRACTAP_FIRMWARE_SOURCES}
+    src/host_utils.cpp
+    "${CMAKE_CURRENT_BINARY_DIR}/logos.S")
+target_include_directories(attractap-production-host PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/shims"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${FIRMWARE_DIR}/src")
+target_compile_definitions(attractap-production-host PUBLIC
+    ATTRACTAP_HOST
+    HAS_LVGL_DISPLAY
+    FIRMWARE_NAME="attractap-desktop"
+    FIRMWARE_VARIANT="desktop"
+    PIN_ETH_SPI_CS=-1
+    LOG_LEVEL_NUM=3
+    FIRMWARE_VERSION="desktop"
+    FIRMWARE_FRIENDLY_NAME="Attractap"
+    FIRMWARE_VARIANT_FRIENDLY_NAME="Desktop")
+target_link_libraries(attractap-production-host PUBLIC lvgl::lvgl ArduinoJson Threads::Threads)
+
 add_library(attractap-desktop-runtime
     src/host_runtime.cpp
     src/host_websocket.cpp
@@ -39,13 +84,14 @@ add_library(attractap-desktop-runtime
     src/virtual_nfc.cpp
     src/sdl_display.cpp)
 target_include_directories(attractap-desktop-runtime PUBLIC
+    src/shims
     src
     "${FIRMWARE_DIR}/src")
-target_link_libraries(attractap-desktop-runtime PUBLIC SDL3::SDL3 lvgl::lvgl CURL::libcurl Threads::Threads)
+target_link_libraries(attractap-desktop-runtime PUBLIC SDL3::SDL3 lvgl::lvgl CURL::libcurl Threads::Threads attractap-production-host)
 target_compile_options(attractap-desktop-runtime PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Wpedantic>")
 
 add_executable(attractap-desktop MACOSX_BUNDLE src/main.cpp)
-target_link_libraries(attractap-desktop PRIVATE attractap-desktop-runtime)
+target_link_libraries(attractap-desktop PRIVATE attractap-desktop-runtime attractap-production-host)
 set_target_properties(attractap-desktop PROPERTIES
     MACOSX_BUNDLE_BUNDLE_NAME "Attractap Desktop"
     MACOSX_BUNDLE_GUI_IDENTIFIER "org.attraccess.attractap-desktop")

@@ -222,6 +222,12 @@ void API::processIncomingMessage(const char *buf, size_t len)
     }
     else if (strcmp(eventType, "READER_FIRMWARE_UPDATE_REQUIRED") == 0)
     {
+#ifdef ATTRACTAP_HOST
+        // The simulator deliberately cannot alter firmware, flash, or boot state.
+        logger.error("Firmware updates are unsupported by the desktop simulator");
+        if (this->errorCallback)
+            this->errorCallback("Firmware update", "Firmware updates are not available in the desktop simulator.");
+#else
         // Initialize OTA from metadata and request first chunk
         JsonObject fw = inboundDoc["data"]["payload"]["available"].as<JsonObject>();
         if (fw.isNull())
@@ -230,6 +236,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
             return;
         }
         this->firmware.begin(fw);
+#endif
     }
     else if (strcmp(eventType, "PROJECTS_OF_USER") == 0)
     {
@@ -307,7 +314,7 @@ bool API::sendMessage(const char *type, JsonObject payload)
             this->logger.error("Failed to serialize event to buffer (small)");
             return false;
         }
-        this->logger.info((std::string("sending message to websocket: ") + json).c_str());
+        this->logger.info((std::string("Sending reader event: ") + type).c_str());
         return this->transport.sendMessage(json, n);
     }
 
@@ -323,7 +330,7 @@ bool API::sendMessage(const char *type, JsonObject payload)
         this->logger.error("Failed to serialize event to dynamically allocated buffer");
         return false;
     }
-    this->logger.info((std::string("sending message to websocket: ") + json.get()).c_str());
+    this->logger.info((std::string("Sending reader event: ") + type).c_str());
     return this->transport.sendMessage(json.get(), n);
 }
 
@@ -350,7 +357,7 @@ void API::sendHeartbeat()
         this->logger.error("Failed to serialize heartbeat");
         return;
     }
-    this->logger.info((std::string("pushing heartbeat to websocket queue: ") + json).c_str());
+    this->logger.info("Sending reader heartbeat");
     this->transport.sendHeartbeat(json, n);
 
     this->heartbeat_sent_at = millis();

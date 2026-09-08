@@ -19,7 +19,7 @@ void API::onRegistrationData(JsonObject data)
 
             Settings::saveAttraccessAuthConfig(apiKey, readerId);
 
-            this->logger.infof("Reader registered with ID: %d and token: %s", readerId, apiKey.c_str());
+            this->logger.infof("Reader registered with ID: %d", readerId);
 
             this->sendAuthenticationRequest();
         }
@@ -71,7 +71,7 @@ void API::sendAuthenticationRequest()
         this->logger.error("Failed to serialize authenticate event to buffer");
         return;
     }
-    this->logger.info((std::string("sending authentication request to websocket: ") + json).c_str());
+    this->logger.info("Sending reader authentication request");
     this->transport.sendMessage(json, n);
 }
 

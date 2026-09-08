@@ -1,5 +1,7 @@
 #include "beeper.hpp"
 
+#ifndef ATTRACTAP_HOST
+
 #include "../platform.hpp"
 #if defined(BEEPER_PIN) && !defined(HAS_IO_EXPANDER)
 #include "driver/gpio.h"
@@ -162,3 +164,4 @@ void Beeper::beeperOff()
     gpio_set_level((gpio_num_t)BEEPER_PIN, 0);
 #endif
 }
+#endif

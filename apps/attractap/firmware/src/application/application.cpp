@@ -22,7 +22,9 @@ void Application::networkTask(void *parameter) {
     esp_task_wdt_reset();
 #endif
     Network::loop();
+#ifdef ESP_PLATFORM
     vTaskDelay(100 / portTICK_PERIOD_MS);
+#endif
   }
 }
 
@@ -37,6 +39,7 @@ void Application::ledTask(void *parameter) {
 #endif
 
 void Application::setup() {
+#ifdef ESP_PLATFORM
   // Confirm OTA image on first boot after update to avoid rollback
   const esp_partition_t *running = esp_ota_get_running_partition();
   esp_ota_img_states_t ota_state;
@@ -46,6 +49,7 @@ void Application::setup() {
       esp_ota_mark_app_valid_cancel_rollback();
     }
   }
+#endif
 
   Settings::setup();
   this->setupBootDiagnostics();
@@ -69,7 +73,9 @@ void Application::setup() {
 #else
   this->beeper.setup();
 #ifdef HAS_LVGL_DISPLAY
+#ifndef ATTRACTAP_HOST
   Display::setup();
+#endif
 #endif
 #endif
 
@@ -596,7 +602,7 @@ void Application::setup() {
   });
 #endif
 
-#ifndef DEMO_MODE
+#if !defined(DEMO_MODE) && defined(ESP_PLATFORM)
   xTaskCreate(Application::networkTask, "NetworkTask", 4096, nullptr,
               tskIDLE_PRIORITY, nullptr);
 #endif

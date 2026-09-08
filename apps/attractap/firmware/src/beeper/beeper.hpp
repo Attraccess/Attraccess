@@ -1,8 +1,10 @@
 #pragma once
 
+#ifndef ATTRACTAP_HOST
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
+#endif
 #include "../settings/settings.hpp"
 #include "../logger/logger.hpp"
 
@@ -15,7 +17,9 @@ class Beeper
 public:
     Beeper() : logger("Beeper") {}
 
-#ifdef HAS_IO_EXPANDER
+#if defined(ATTRACTAP_HOST)
+    void setup() {}
+#elif defined(HAS_IO_EXPANDER)
     void setup(IOExpander *expander = nullptr);
 #else
     void setup();
@@ -25,12 +29,16 @@ public:
     // dedicated beeper worker and return immediately. The blocking delay()-based
     // implementation froze the UI for 100-700 ms because processState() runs
     // under lv_lock (PERFORMANCE_ANALYSIS.md M1/M6).
-    void errorBeep();
-    void successBeep();
-    void singleBeep();
-    void indicateBeep();
+    void errorBeep() { log("error"); }
+    void successBeep() { log("success"); }
+    void singleBeep() { log("single"); }
+    void indicateBeep() { log("indicate"); }
 
 private:
+#ifdef ATTRACTAP_HOST
+    void log(const char *pattern) { logger.debugf("Host beep: %s", pattern); }
+    Logger logger;
+#else
     struct PatternRequest
     {
         const uint16_t *pattern;
@@ -47,5 +55,6 @@ private:
 
 #ifdef HAS_IO_EXPANDER
     IOExpander *ioExpander = nullptr;
+#endif
 #endif
 };

@@ -10,7 +10,18 @@
 #include "../logger/logger.hpp"
 #include "reader_transport.hpp"
 #include "../utils.hpp"
+#ifdef ATTRACTAP_HOST
+class HostOtaUpdater
+{
+public:
+    template <typename... Args>
+    explicit HostOtaUpdater(Args &&...) {}
+    void tick() {}
+    bool inProgress() const { return false; }
+};
+#else
 #include "ota/ota_updater.hpp"
+#endif
 
 class API
 {
@@ -429,5 +440,9 @@ private:
     std::function<void(int)> firmwareUpdateProgressCallback;
     std::function<void(std::string availableVersion)> firmwareUpdateMetaCallback;
 
+#ifdef ATTRACTAP_HOST
+    HostOtaUpdater firmware;
+#else
     OtaUpdater firmware;
+#endif
 };

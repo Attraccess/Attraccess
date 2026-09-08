@@ -1,4 +1,18 @@
 #include "network.hpp"
+#ifdef ATTRACTAP_HOST
+
+Logger Network::logger("Network");
+bool Network::_sharedComponentsInitialized = false;
+
+void Network::setup()
+{
+    logger.info("Host network adapter active");
+}
+
+void Network::loop() {}
+void Network::initSharedComponents() {}
+
+#else
 #include "platform.hpp"
 #include "esp_err.h"
 #include "esp_log.h"
@@ -73,3 +87,4 @@ void Network::loop()
     Wifi::loop();
     Ethernet::loop();
 }
+#endif

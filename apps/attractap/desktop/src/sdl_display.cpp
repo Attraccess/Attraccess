@@ -53,6 +53,8 @@ bool SdlDisplay::pollEvents()
     {
         if (event.type == SDL_EVENT_QUIT)
             return false;
+        if (event.type == SDL_EVENT_KEY_DOWN && keyCallback)
+            keyCallback(event.key.key);
         if (event.type == SDL_EVENT_MOUSE_MOTION || event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP)
         {
             const float x = event.type == SDL_EVENT_MOUSE_MOTION ? event.motion.x : event.button.x;
