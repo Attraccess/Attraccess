@@ -77,3 +77,16 @@ export interface WagoDiagnostics {
   events: Array<{ kind: string; receivedAt: string }>;
   limitations: string[];
 }
+
+export interface WagoResourceDiagnostics {
+  resourceId: number;
+  controllers: Array<{
+    controllerId: number;
+    name: string;
+    unavailable: boolean;
+    references: WagoDiagnostics['references'];
+    referencesTruncated: boolean;
+  }>;
+  invalidControllerReferences: number;
+  truncated: boolean;
+}

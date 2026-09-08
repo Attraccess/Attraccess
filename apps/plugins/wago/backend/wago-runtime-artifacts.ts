@@ -129,14 +129,15 @@ function storedMetadata(value: unknown, maxBytes: number): RuntimeArtifactMetada
     typeof data.digest !== 'string' ||
     !digestPattern.test(data.digest) ||
     !Number.isSafeInteger(data.bytes) ||
-    data.bytes < 1 ||
-    data.bytes > maxBytes ||
     typeof data.image !== 'string'
   )
     throw new Error('Invalid catalog metadata');
+  if (typeof data.bytes !== 'number' || !Number.isSafeInteger(data.bytes) || data.bytes < 1 || data.bytes > maxBytes)
+    throw new Error('Invalid catalog metadata');
+  const bytes = data.bytes;
   const manifest = validateRuntimeManifest(data.manifest);
   if (data.image !== manifest.image) throw new Error('Invalid catalog metadata');
-  return Object.freeze({ digest: data.digest, bytes: data.bytes, image: data.image, manifest });
+  return Object.freeze({ digest: data.digest, bytes, image: data.image, manifest });
 }
 
 /** Internal catalog. The host-selected trust key is pinned for its lifetime; HTTP never supplies it. */
@@ -369,6 +370,10 @@ export class WagoRuntimeArtifactCatalog {
     }
     if (!digestPattern.test(digest)) throw new Error('Invalid current runtime artifact');
     return this.metadata(root, digest);
+  }
+  async get(digest: string): Promise<RuntimeArtifactMetadata> {
+    if (!digestPattern.test(digest)) throw new ConflictException('Select a verified runtime release.');
+    return this.verifiedMetadata(await this.root(), digest);
   }
   async list(): Promise<RuntimeArtifactMetadata[]> {
     const root = await this.root();

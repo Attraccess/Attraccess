@@ -45,9 +45,9 @@ export class WagoControllerApi {
   constructor(
     @Inject(WagoService) private readonly wago: WagoService,
     @Inject(WagoCommissioningService) private readonly commissioning: WagoCommissioningService,
-    @Inject(Symbol.for('attraccess.plugin.context')) context: PluginContext,
+    @Inject(Symbol.for('attraccess.plugin.context')) context?: PluginContext,
   ) {
-    this.audit = new WagoAudit(context);
+    this.audit = new WagoAudit(context as PluginContext);
   }
   @Get('controllers') list() {
     return this.wago.list();
@@ -76,7 +76,7 @@ export class WagoControllerApi {
   @Post('commissioning/sessions')
   createCommissioningSession(
     @Body() body: { mqttServerId?: number; targetHost?: string; name?: string; runtimeArtifactDigest?: string },
-    @Req() request: AuthenticatedRequest,
+    @Req() request?: AuthenticatedRequest,
   ) {
     if (!body?.mqttServerId) throw new BadRequestException('MQTT server is required');
     if (!body.name?.trim()) throw new BadRequestException('controller name is required');
@@ -114,7 +114,7 @@ export class WagoControllerApi {
   deliverCommissioningSession(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: CommissioningAttemptInput,
-    @Req() request: AuthenticatedRequest,
+    @Req() request?: AuthenticatedRequest,
   ) {
     return this.commissioning.deliver(
       id,
@@ -276,7 +276,7 @@ export class WagoControllerApi {
       previewedDraftHash?: string;
       snapshot?: WagoConfigurationSnapshot;
     },
-    @Req() request: AuthenticatedRequest,
+    @Req() request?: AuthenticatedRequest,
   ) {
     if (!body?.application) throw new BadRequestException('application is required');
     return this.wago.applyPreset(
@@ -285,7 +285,7 @@ export class WagoControllerApi {
       body.selectedPaths ?? [],
       body.previewedDraftHash ?? '',
       body.snapshot,
-      wagoAuditPrincipal(request),
+      wagoAuditPrincipal(request as AuthenticatedRequest),
     );
   }
   @Post('controllers/:id/configuration/draft') saveDraft(

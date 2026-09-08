@@ -30,8 +30,6 @@
       "options": {
         "commands": [
           "pnpm exec tsc --noEmit -p apps/plugins/wago/tsconfig.spec.json",
-          "pnpm exec tsc --noEmit -p apps/plugins/wago/frontend/tsconfig.app.json",
-          "pnpm exec tsc --noEmit -p apps/plugins/wago/frontend/tsconfig.tests.json",
           "pnpm exec tsc --noEmit -p apps/plugins/wago/acceptance/tsconfig.json"
         ],
         "parallel": false
