@@ -311,15 +311,17 @@ export class WagoRuntime {
         capabilities: this.options.capabilities ?? CAPABILITIES,
         sequence: Date.now(),
       });
-      try {
-        await this.publishState();
-      } catch (error) {
-        // State telemetry reserves a durable sequence. A read-only state volume
-        // must not prevent startup or disconnect safety policies from running.
-        if (!ignoreStatePublicationFailure) throw error;
-      }
     } finally {
       this.publishingHeartbeat = false;
+    }
+    // State telemetry is coalesced independently so a stalled read or MQTT
+    // acknowledgement cannot suppress later heartbeat messages.
+    try {
+      await this.publishState();
+    } catch (error) {
+      // State telemetry reserves a durable sequence. A read-only state volume
+      // must not prevent startup or disconnect safety policies from running.
+      if (!ignoreStatePublicationFailure) throw error;
     }
   }
 
@@ -553,7 +555,7 @@ export class WagoRuntime {
     return `${this.options.prefix.replace(/^\/+|\/+$/g, '')}/v1/controllers/${this.options.hardwareId}/${suffix}`;
   }
   private discoveryTopic(): string {
-    return `${this.options.prefix.replace(/^\/+|\/+$/g, '')}/discovery/${this.options.hardwareId}`;
+    return `attraccess/wago/discovery/${this.options.hardwareId}`;
   }
   private desiredTopic(): string {
     return this.topic('configuration/desired');

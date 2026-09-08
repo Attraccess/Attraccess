@@ -102,6 +102,25 @@ describe('WagoRuntime', () => {
     await expect(runtime.receiveDiscoveryClaim(Buffer.from('{"username":"controller"}'))).resolves.toBeUndefined();
   });
 
+  it('keeps discovery on the backend namespace after enrollment selects an operational prefix', async () => {
+    const enrolledRuntime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'customer/wago',
+      pairingCode: '482931',
+      enrollmentSecret: 'enrollment-secret',
+      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+      transport,
+      device,
+    });
+
+    await enrolledRuntime.publishDiscoveryAnnouncement(1);
+
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({ topic: 'attraccess/wago/discovery/cc100-1' }),
+    );
+    expect(enrolledRuntime.discoveryClaimTopic()).toBe('attraccess/wago/discovery/cc100-1/claim');
+  });
+
   it('preserves persisted runtime state when receiving a discovery claim before startup', async () => {
     const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
     await store.save({
@@ -143,6 +162,56 @@ describe('WagoRuntime', () => {
         }),
       }),
     );
+  });
+
+  it('continues publishing heartbeats while state telemetry is stalled', async () => {
+    let stallStatePublication = false;
+    let releaseStatePublication!: () => void;
+    let statePublicationStarted!: () => void;
+    const statePublication = new Promise<void>((resolve) => {
+      releaseStatePublication = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      statePublicationStarted = resolve;
+    });
+    const stalledTransport: Transport = {
+      publish: async (topic, payload, options) => {
+        if (stallStatePublication && topic.endsWith('/state')) {
+          statePublicationStarted();
+          await statePublication;
+        }
+        await transport.publish(topic, payload, options);
+      },
+      subscribe: async (topic, listener) => transport.subscribe(topic, listener),
+    };
+    runtime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+      transport: stalledTransport,
+      device,
+    });
+    await runtime.start();
+    const initialHeartbeatCount = transport.published.filter(
+      (message) => message.topic === 'attraccess/wago/v1/controllers/cc100-1/heartbeat',
+    ).length;
+    stallStatePublication = true;
+    let blockedHeartbeat!: Promise<void>;
+    let nextHeartbeat!: Promise<void>;
+    try {
+      blockedHeartbeat = runtime.publishHeartbeat();
+      await started;
+      nextHeartbeat = runtime.publishHeartbeat();
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      expect(
+        transport.published.filter((message) => message.topic === 'attraccess/wago/v1/controllers/cc100-1/heartbeat'),
+      ).toHaveLength(initialHeartbeatCount + 2);
+    } finally {
+      releaseStatePublication();
+      await Promise.all([blockedHeartbeat, nextHeartbeat]);
+    }
   });
 
   it('publishes typed integer-base-unit measurements with stream identity', async () => {
