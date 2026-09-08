@@ -8,6 +8,10 @@ import { WagoConfigurationRevision } from './wago-configuration-revision.entity'
 import { configurationHash } from './configuration';
 
 describe('WagoService', () => {
+  const services: WagoService[] = [];
+  afterEach(() => {
+    services.splice(0).forEach((service) => service.onModuleDestroy());
+  });
   const controller = (): WagoController => ({
     id: 1,
     hardwareId: 'cc100-01',
@@ -85,7 +89,14 @@ describe('WagoService', () => {
     };
     settingsRepository.createQueryBuilder.mockReturnValue(settingsQuery);
     const subscriptions: Array<{ unsubscribe: jest.Mock }> = [];
+    const flowQuery = {
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    };
     const context = {
+      dataSource: { getRepository: () => ({ createQueryBuilder: () => flowQuery }) },
       getRepository: jest.fn((entity) => {
         if (entity === WagoController) return controllerRepository;
         if (entity === WagoEnrollment) return enrollmentRepository;
@@ -106,6 +117,7 @@ describe('WagoService', () => {
       getMqttCredentialProvisioning: jest.fn(),
     } as unknown as PluginContext;
     const service = new WagoService(context);
+    services.push(service);
     // Unit tests invoke service methods directly, outside Nest's module lifecycle.
     Object.assign(service, {
       controllers: controllerRepository,
@@ -457,6 +469,78 @@ describe('WagoService', () => {
     expect(controllerRepository.save).toHaveBeenCalledWith(expect.objectContaining({ lastSequence: 4 }));
   });
 
+  it('persists a valid canonical heartbeat when the bounded diagnostics cache is full', async () => {
+    const claimed = { ...controller(), id: 257, trustState: 'claimed' as const };
+    const { service, controllerRepository } = createService([claimed]);
+    const timestamp = new Date().toISOString();
+    const streamId = '00000000-0000-4000-8000-000000000001';
+    for (let id = 1; id <= 256; id++) {
+      service.diagnostics.ingest(id, 'heartbeat', Buffer.from(JSON.stringify({ timestamp, streamId, sequence: 1 })));
+    }
+    const onHeartbeat = (
+      Reflect.get(service, 'onHeartbeat') as (hardwareId: string, payload: Buffer) => Promise<void>
+    ).bind(service);
+
+    await onHeartbeat(
+      claimed.hardwareId,
+      Buffer.from(
+        JSON.stringify({
+          hardwareId: claimed.hardwareId,
+          pairingCode: '482931',
+          protocolVersion: '1.0.0',
+          runtimeVersion: '1.0.0',
+          capabilities: ['claim', 'heartbeat', 'configuration-v1'],
+          timestamp,
+          streamId,
+          sequence: 1,
+        }),
+      ),
+    );
+
+    expect(service.diagnostics.read(claimed.id).heartbeatAt).toBeUndefined();
+    expect(controllerRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ lastHeartbeatAt: timestamp, lastSeenAt: expect.any(String) }),
+    );
+  });
+
+  it('does not regress a persisted heartbeat with an older canonical heartbeat when the diagnostics cache is full', async () => {
+    const timestamp = new Date(Date.now() - 60_000).toISOString();
+    const claimed = {
+      ...controller(),
+      id: 257,
+      trustState: 'claimed' as const,
+      lastHeartbeatAt: new Date(Date.now()).toISOString(),
+      lastSeenAt: new Date(Date.now() - 31_000).toISOString(),
+    };
+    const { service, controllerRepository } = createService([claimed]);
+    const streamId = '00000000-0000-4000-8000-000000000001';
+    for (let id = 1; id <= 256; id++) {
+      service.diagnostics.ingest(id, 'heartbeat', Buffer.from(JSON.stringify({ timestamp, streamId, sequence: 1 })));
+    }
+    const onHeartbeat = (
+      Reflect.get(service, 'onHeartbeat') as (hardwareId: string, payload: Buffer) => Promise<void>
+    ).bind(service);
+
+    await onHeartbeat(
+      claimed.hardwareId,
+      Buffer.from(
+        JSON.stringify({
+          hardwareId: claimed.hardwareId,
+          pairingCode: '482931',
+          protocolVersion: '1.0.0',
+          runtimeVersion: '1.0.0',
+          capabilities: ['claim', 'heartbeat', 'configuration-v1'],
+          timestamp,
+          streamId,
+          sequence: 1,
+        }),
+      ),
+    );
+
+    expect(controllerRepository.save).not.toHaveBeenCalled();
+    expect(claimed.lastHeartbeatAt).not.toBe(timestamp);
+  });
+
   it('publishes a retained, content-addressed revision only after validation', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
     const { service, draftRepository, revisionRepository, context } = createService([claimed]);
@@ -503,7 +587,10 @@ describe('WagoService', () => {
     const snapshot = { version: 1, physicalPoints: [], logicalChannels: [] };
     draftRepository.findOneBy.mockResolvedValue({
       controllerId: claimed.id,
-      reviewedHash: configurationHash(snapshot),
+      reviewedHash: configurationHash({
+        draft: configurationHash({ snapshot: JSON.stringify(snapshot), metadata: null }),
+        impacts: [],
+      }),
       snapshot: JSON.stringify(snapshot),
     });
 
@@ -705,7 +792,10 @@ describe('WagoService', () => {
     const { service, context } = createService([first, second]);
     let releaseFirst!: () => void;
     const onConfigurationReported = jest
-      .spyOn(service as never, 'onConfigurationReported')
+      .spyOn(
+        service as unknown as { onConfigurationReported: WagoService['onConfigurationReported'] },
+        'onConfigurationReported',
+      )
       .mockImplementation((controllerId) =>
         controllerId === first.id ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve(),
       );
@@ -739,10 +829,15 @@ describe('WagoService', () => {
     const { service, context } = createService([claimed]);
     let releaseFirst!: () => void;
     const processed: Buffer[] = [];
-    jest.spyOn(service as never, 'onConfigurationReported').mockImplementation((_controllerId, payload) => {
-      processed.push(payload);
-      return processed.length === 1 ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve();
-    });
+    jest
+      .spyOn(
+        service as unknown as { onConfigurationReported: WagoService['onConfigurationReported'] },
+        'onConfigurationReported',
+      )
+      .mockImplementation((_controllerId, payload) => {
+        processed.push(payload);
+        return processed.length === 1 ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve();
+      });
 
     await service.onApplicationBootstrap();
 
@@ -769,10 +864,15 @@ describe('WagoService', () => {
     const { service, context } = createService([claimed]);
     let releaseFirst!: () => void;
     const processed: Buffer[] = [];
-    jest.spyOn(service as never, 'onConfigurationReported').mockImplementation((_controllerId, payload) => {
-      processed.push(payload);
-      return processed.length === 1 ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve();
-    });
+    jest
+      .spyOn(
+        service as unknown as { onConfigurationReported: WagoService['onConfigurationReported'] },
+        'onConfigurationReported',
+      )
+      .mockImplementation((_controllerId, payload) => {
+        processed.push(payload);
+        return processed.length === 1 ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve();
+      });
 
     await service.onApplicationBootstrap();
 
@@ -1166,7 +1266,9 @@ describe('WagoService', () => {
     await new Promise<void>((resolve) => setImmediate(resolve));
     const message = { topic: 'attraccess/wago/discovery/cc100-01', payload: Buffer.from('{}') };
 
-    const onDiscovery = jest.spyOn(service as never, 'onDiscovery').mockResolvedValue(undefined);
+    const onDiscovery = jest
+      .spyOn(service as unknown as { onDiscovery: WagoService['onDiscovery'] }, 'onDiscovery')
+      .mockResolvedValue(undefined);
     await secondCallback(message);
     expect(onDiscovery).not.toHaveBeenCalled();
 
@@ -1176,6 +1278,34 @@ describe('WagoService', () => {
     await secondCallback(message);
     expect(onDiscovery).toHaveBeenCalledTimes(1);
     expect(subscriptions[0].unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves retained state delivered before replacement subscriptions activate', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, context } = createService([claimed], [], 2);
+    const subscribeConfiguredServers = (Reflect.get(service, 'subscribeConfiguredServers') as () => Promise<void>).bind(
+      service,
+    );
+    await subscribeConfiguredServers();
+    const retained = Buffer.from(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        streamId: '00000000-0000-4000-8000-000000000001',
+        sequence: 1,
+        connected: true,
+        revision: 1,
+        contentHash: 'a'.repeat(64),
+        outputs: { relay: true },
+      }),
+    );
+    (context.mqtt.subscribe as jest.Mock).mockImplementation(async (_serverId, topic, callback) => {
+      if (topic.endsWith('/state')) await callback({ topic, payload: retained });
+      return { unsubscribe: jest.fn() };
+    });
+
+    await subscribeConfiguredServers();
+
+    expect(service.diagnostics.read(claimed.id).outputs.relay.value).toBe(true);
   });
 
   it('unsubscribes an in-flight replacement when the module is destroyed', async () => {

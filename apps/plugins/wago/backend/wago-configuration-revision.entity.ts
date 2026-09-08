@@ -8,6 +8,7 @@ export class WagoConfigurationRevision {
   @Column({ type: 'integer', name: 'controller_id' }) controllerId!: number;
   @Column({ type: 'integer' }) revision!: number;
   @Column({ type: 'text' }) snapshot!: string;
+  @Column({ type: 'text', name: 'preset_provenance', nullable: true }) presetProvenance?: string | null;
   @Column({ type: 'varchar', name: 'content_hash' }) contentHash!: string;
   @Column({ type: 'varchar' }) state!: WagoConfigurationRevisionState;
   @Column({ type: 'text', name: 'rejection_errors', nullable: true }) rejectionErrors!: string | null;
