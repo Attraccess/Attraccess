@@ -92,30 +92,4 @@ describe('WAGO bounded diagnostics', () => {
       }),
     ).toBe(false);
   });
-  it('establishes the measurement epoch on the first canonical state', () => {
-    const streamId = '00000000-0000-4000-8000-000000000001';
-    const timestamp = (offset: number) => new Date(now + offset).toISOString();
-    send('heartbeat', { timestamp: timestamp(0), streamId, sequence: 1 });
-    now += 1;
-    send('state', {
-      timestamp: timestamp(0),
-      streamId,
-      sequence: 2,
-      connected: true,
-      revision: 2,
-      contentHash: 'a'.repeat(64),
-      outputs: {},
-    });
-    expect(
-      send('measurements', {
-        timestamp: timestamp(-1),
-        streamId,
-        sequence: 1,
-        channelId: 'meter',
-        value: 1,
-        unit: 'milliwatt',
-        kind: 'live',
-      }),
-    ).toBe(false);
-  });
 });

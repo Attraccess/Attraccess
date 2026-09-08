@@ -398,7 +398,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
           this.metadataFromProvenance(current?.presetProvenance),
           this.metadataFromProvenance(selected.presetProvenance),
         ),
-        impactHash: configurationHash(impacts),
+        impactHash: configurationHash({ impacts }),
       };
     });
   }
@@ -502,7 +502,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     );
     if (impacts.length && !force)
       throw new ConflictException({ message: 'acknowledge potential flow impacts before publishing', impacts });
-    if (force && expectedImpactHash !== undefined && expectedImpactHash !== configurationHash(impacts))
+    if (force && expectedImpactHash !== undefined && expectedImpactHash !== configurationHash({ impacts }))
       throw new ConflictException({
         message: 'flow impacts changed since preview; preview and confirm again',
         impacts,

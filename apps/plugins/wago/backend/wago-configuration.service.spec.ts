@@ -82,7 +82,7 @@ describe('configuration editor service boundaries', () => {
       revision,
       force,
       preview.revision.contentHash,
-      preview.current?.contentHash ?? null,
+      preview.current ? `${preview.current.revision}:${preview.current.contentHash}` : null,
       preview.draftHash,
     );
   }
@@ -206,7 +206,10 @@ describe('configuration editor service boundaries', () => {
     await service.saveDraft(1, { ...snapshot, logicalChannels: [] });
     await service.reviewDraft(1);
     expect(review.draft.reviewedHash).toBe(
-      configurationHash({ snapshot: canonicalSnapshot(snapshot), metadata: null }),
+      configurationHash({
+        draft: configurationHash({ snapshot: canonicalSnapshot(snapshot), metadata: null }),
+        impacts: [],
+      }),
     );
     await expect(service.publishDraft(1, true, review.draft.reviewedHash ?? '')).rejects.toThrow('draft changed');
     expect(mqtt.publish).not.toHaveBeenCalled();
@@ -228,7 +231,7 @@ describe('configuration editor service boundaries', () => {
         1,
         true,
         preview.revision.contentHash,
-        preview.current?.contentHash ?? null,
+        preview.current ? `${preview.current.revision}:${preview.current.contentHash}` : null,
         preview.draftHash,
       ),
     ).rejects.toThrow('configuration changed');
@@ -433,14 +436,20 @@ describe('configuration editor service boundaries', () => {
           1,
           true,
           preview.revision.contentHash,
-          preview.current?.contentHash ?? null,
+          preview.current ? `${preview.current.revision}:${preview.current.contentHash}` : null,
           preview.draftHash,
         ),
       ).rejects.toThrow('configuration changed');
       expect(draft()).toEqual(before);
       expect(mqtt.publish).toHaveBeenCalledTimes(1);
       await expect(
-        service.rollback(1, 1, true, preview.revision.contentHash, preview.current?.contentHash ?? null),
+        service.rollback(
+          1,
+          1,
+          true,
+          preview.revision.contentHash,
+          preview.current ? `${preview.current.revision}:${preview.current.contentHash}` : null,
+        ),
       ).rejects.toThrow('configuration changed');
     },
   );
