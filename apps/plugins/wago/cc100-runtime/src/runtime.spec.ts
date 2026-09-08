@@ -1,5 +1,6 @@
 import { MemoryDeviceAdapter } from './adapters';
 import { JsonStateStore, WagoRuntime, hash, validateSnapshot, type Snapshot, type Transport } from './runtime';
+import { SimulatorDeviceAdapter } from './simulator-device';
 
 class TestTransport implements Transport {
   readonly published: Array<{ topic: string; payload: unknown; retain?: boolean }> = [];
@@ -70,6 +71,35 @@ describe('WagoRuntime', () => {
         retain: true,
       }),
     );
+  });
+
+  it('retains the simulator channel map when rejecting a stale configuration', async () => {
+    const simulator = new SimulatorDeviceAdapter({}, 'normal', 0);
+    const inspectionRuntime = new WagoRuntime({
+      hardwareId: 'cc100-1',
+      prefix: 'attraccess/wago',
+      pairingCode: '482931',
+      store: new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`),
+      transport,
+      device: simulator,
+    });
+    const staleSnapshot: Snapshot = {
+      ...snapshot,
+      physicalPoints: [{ ...snapshot.physicalPoints[0], id: 'replacement', channel: 1 }],
+      logicalChannels: [{ ...snapshot.logicalChannels[0], physicalPointId: 'replacement' }],
+    };
+
+    await inspectionRuntime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 2, contentHash: hash(snapshot), snapshot });
+    await simulator.write(snapshot.physicalPoints[0], true);
+    await transport.send(desired, {
+      protocolVersion: 1,
+      revision: 1,
+      contentHash: hash(staleSnapshot),
+      snapshot: staleSnapshot,
+    });
+
+    await expect(simulator.readChannel('load')).resolves.toBe(true);
   });
 
   it('publishes the required retained discovery announcement and persists a valid claim', async () => {
