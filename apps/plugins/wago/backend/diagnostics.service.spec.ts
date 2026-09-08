@@ -75,7 +75,13 @@ describe('controller diagnostics', () => {
     const context = {
       getRepository: (entity: unknown) => {
         if (entity === WagoController)
-          return { createQueryBuilder: () => query([{ id: 1, hardwareId: 'broken' }, { id: 2, hardwareId: 'healthy' }]) };
+          return {
+            createQueryBuilder: () =>
+              query([
+                { id: 1, hardwareId: 'broken' },
+                { id: 2, hardwareId: 'healthy' },
+              ]),
+          };
         if (entity === WagoConfigurationRevision)
           return {
             createQueryBuilder: () =>
@@ -84,7 +90,11 @@ describe('controller diagnostics', () => {
                 {
                   controllerId: 2,
                   revision: 1,
-                  snapshot: JSON.stringify({ version: 1, physicalPoints: [], logicalChannels: [{ id: 'io', capabilities: [] }] }),
+                  snapshot: JSON.stringify({
+                    version: 1,
+                    physicalPoints: [],
+                    logicalChannels: [{ id: 'io', capabilities: [] }],
+                  }),
                 },
               ]),
           };

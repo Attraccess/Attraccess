@@ -152,7 +152,9 @@ export class WagoDiagnosticsService {
           [...controllerNodes, ...(conflictNodesByControllerId.get(controllerId) ?? [])],
           appliedSnapshot?.logicalChannels.map((channel) => channel.id) ?? [],
           applied?.revision ?? null,
-          Object.fromEntries(appliedSnapshot?.logicalChannels.map((channel) => [channel.id, channel.capabilities]) ?? []),
+          Object.fromEntries(
+            appliedSnapshot?.logicalChannels.map((channel) => [channel.id, channel.capabilities]) ?? [],
+          ),
         ).filter((reference) => reference.resourceId === resourceId);
         return {
           controllerId,
