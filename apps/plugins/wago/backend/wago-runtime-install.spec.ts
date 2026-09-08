@@ -208,6 +208,19 @@ else if (args[0] === 'container' && args[1] === 'ls') {
     expect(existsSync(join(root, 'tmp/attraccess-wago-runtime.tar'))).toBe(false);
   });
 
+  it('retains an ownership receipt when recovering an interrupted upload', () => {
+    mkdirSync(join(config, 'delivery'));
+    write(join(config, 'delivery/token'), 'a'.repeat(32));
+    write(join(config, 'delivery/phase'), 'receiving');
+
+    expect(run(runtimeBundleRecoveryScript(root, 'a'.repeat(32))).status).toBe(0);
+    expect(existsSync(tx)).toBe(false);
+    expect(existsSync(join(config, 'delivery'))).toBe(false);
+    expect(readFileSync(`${tx}.restored/token`, 'utf8')).toBe('a'.repeat(32));
+    expect(existsSync(join(config, 'runtime.env.next'))).toBe(false);
+    expect(existsSync(join(root, 'tmp/attraccess-wago-runtime.tar'))).toBe(false);
+  });
+
   it('delivers one stream under flock and rolls the old CA back with prior data', () => {
     prior();
     write(join(data, 'mqtt-ca.pem'), 'old CA');

@@ -791,19 +791,25 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
   }
 
   private async reconcileCompletedSessions(): Promise<void> {
+    let reconciliationFailed = false;
     for (let skip = 0; ; skip += 100) {
       const page = await this.sessions.find({ where: { state: 'completed' }, order: { id: 'ASC' }, take: 100, skip });
-      for (const session of page) {
-        if (session.state === 'completed') await this.retireSupersededSessions(session.hardwareId, session.id);
-      }
+      const results = await Promise.allSettled(
+        page
+          .filter((session) => session.state === 'completed')
+          .map((session) => this.retireSupersededSessions(session.hardwareId, session.id)),
+      );
+      if (results.some((result) => result.status === 'rejected')) reconciliationFailed = true;
       if (page.length < 100) break;
     }
+    if (reconciliationFailed) throw new ConflictException('Commissioning cleanup requires credential revocation.');
   }
 
   private async retireSupersededSessions(hardwareId: string, completedSessionId: number): Promise<void> {
+    let revocationFailed = false;
     for (let skip = 0; ; skip += 100) {
       const sessions = await this.sessions.find({ where: { hardwareId }, order: { id: 'ASC' }, take: 100, skip });
-      await Promise.all(
+      const results = await Promise.allSettled(
         sessions
           .filter(
             (session) =>
@@ -823,8 +829,10 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             }),
           ),
       );
+      if (results.some((result) => result.status === 'rejected')) revocationFailed = true;
       if (sessions.length < 100) break;
     }
+    if (revocationFailed) throw new ConflictException('Commissioning credential revocation requires attention.');
   }
 
   private toResponse(session: WagoCommissioningSession): CommissioningSessionResponse {

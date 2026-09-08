@@ -118,8 +118,10 @@ if [ -d "$cleanup" ]; then
 fi
 if [ ! -d "$tx" ]; then
   test -d "$config/delivery" || fail 'No runtime transaction to recover'
+  # Preserve ownership before removing interrupted-upload artifacts. A lost SSH
+  # acknowledgement must leave an idempotent receipt for the coordinator retry.
+  mv "$config/delivery" "$receipt"
   rm -f "$config/runtime.env.next" "$config/runtime-ca.pem.next" "$root/tmp/attraccess-wago-runtime.tar"
-  rm -rf "$config/delivery"
   exit 0
 fi
 test ! -e "$tx/accepting" || fail 'Acceptance already began; finish acceptance instead of recovery'

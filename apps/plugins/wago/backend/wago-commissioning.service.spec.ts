@@ -170,6 +170,61 @@ describe('WagoCommissioningService', () => {
     expect(wago.registerCommissioningDiscoveryHandler).not.toHaveBeenCalled();
   });
 
+  it('continues superseded credential cleanup after individual revocation failures', async () => {
+    const completedA = { id: 1, hardwareId: 'controller-a', state: 'completed' } as WagoCommissioningSession;
+    const completedB = { id: 2, hardwareId: 'controller-b', state: 'completed' } as WagoCommissioningSession;
+    const failed = {
+      id: 3,
+      hardwareId: 'controller-a',
+      enrollmentId: 3,
+      state: 'awaiting_discovery',
+      auditLog: '[]',
+    } as WagoCommissioningSession;
+    const later = {
+      id: 4,
+      hardwareId: 'controller-a',
+      enrollmentId: 4,
+      state: 'awaiting_discovery',
+      auditLog: '[]',
+    } as WagoCommissioningSession;
+    const otherGroup = {
+      id: 5,
+      hardwareId: 'controller-b',
+      enrollmentId: 5,
+      state: 'awaiting_discovery',
+      auditLog: '[]',
+    } as WagoCommissioningSession;
+    const sessions = new Map([
+      [3, failed],
+      [4, later],
+      [5, otherGroup],
+    ]);
+    const repository = {
+      find: jest.fn(({ where }: { where: { state?: string; hardwareId?: string } }) => {
+        if (where.state === 'completed') return [completedA, completedB];
+        return where.hardwareId === 'controller-a' ? [failed, later] : [otherGroup];
+      }),
+      findOneBy: jest.fn(({ id }) => sessions.get(id)),
+      save: jest.fn(async (session) => session),
+    };
+    const wago = {
+      revokeEnrollmentById: jest.fn((id) =>
+        id === 3 ? Promise.reject(new Error('broker unavailable')) : Promise.resolve(),
+      ),
+    } as unknown as WagoService;
+    const context = { getRepository: jest.fn().mockReturnValue(repository) } as unknown as PluginContext;
+    const service = new WagoCommissioningService(context, wago);
+    service['sessions'] = repository as never;
+
+    await expect(service['reconcileCompletedSessions']()).rejects.toThrow('credential revocation');
+
+    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(3);
+    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(4);
+    expect(wago.revokeEnrollmentById).toHaveBeenCalledWith(5);
+    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ id: 4, state: 'revoked' }));
+    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ id: 5, state: 'revoked' }));
+  });
+
   it('rejects a legacy verifier on direct discovery without passing it to claim', async () => {
     const { service, session, wago } = securityHarness({
       state: 'awaiting_discovery',
