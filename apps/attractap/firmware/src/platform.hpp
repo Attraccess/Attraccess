@@ -15,7 +15,7 @@
 #include "freertos/task.h"
 #endif
 
-static inline uint32_t millis()
+inline uint32_t millis()
 {
 #ifdef ATTRACTAP_HOST
     static const auto startedAt = std::chrono::steady_clock::now();

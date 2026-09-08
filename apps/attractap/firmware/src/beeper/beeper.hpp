@@ -29,10 +29,17 @@ public:
     // dedicated beeper worker and return immediately. The blocking delay()-based
     // implementation froze the UI for 100-700 ms because processState() runs
     // under lv_lock (PERFORMANCE_ANALYSIS.md M1/M6).
+#ifdef ATTRACTAP_HOST
     void errorBeep() { log("error"); }
     void successBeep() { log("success"); }
     void singleBeep() { log("single"); }
     void indicateBeep() { log("indicate"); }
+#else
+    void errorBeep();
+    void successBeep();
+    void singleBeep();
+    void indicateBeep();
+#endif
 
 private:
 #ifdef ATTRACTAP_HOST

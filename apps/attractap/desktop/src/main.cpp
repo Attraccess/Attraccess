@@ -6,6 +6,7 @@
 #include "profile_store.hpp"
 #include "sdl_display.hpp"
 #include "settings/settings.hpp"
+#include "state/state.hpp"
 #include "virtual_nfc.hpp"
 
 #include <chrono>
@@ -39,10 +40,20 @@ int main(int argc, char **argv)
     Settings::setup();
     Settings::saveAttraccessApiConfig(profile.get("api.host"), 443, true);
     if (readerId != 0 || Settings::getAttraccessAuthConfig().readerId == 0)
-        Settings::saveAttraccessAuthConfig(profile.get("api.key"), readerId);
+        Settings::saveAttraccessAuthConfig(Settings::getAttraccessAuthConfig().apiKey, readerId);
 
     HostRuntime runtime;
     HostWebsocket websocket(runtime, profile.get("api.host"));
+    const auto apiConfig = Settings::getAttraccessApiConfig();
+    State::setWifiState(true, {}, "Desktop");
+    State::setWebsocketState(false, apiConfig.hostname, apiConfig.port, apiConfig.useSSL);
+    websocket.setStateCallback([apiConfig](HostWebsocket::State state) {
+        const bool connected = state == HostWebsocket::State::Connected;
+        State::setWebsocketState(connected, apiConfig.hostname, apiConfig.port, apiConfig.useSSL);
+        State::setWebsocketPhase(state == HostWebsocket::State::Connected ? State::WS_CONNECTED
+                                 : state == HostWebsocket::State::Connecting ? State::WS_CONNECTING
+                                                                               : State::WS_INIT);
+    });
     VirtualNfc nfc(profile);
     API api(websocket);
     Application application(nfc, api);

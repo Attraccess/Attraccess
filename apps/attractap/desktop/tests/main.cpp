@@ -2,6 +2,7 @@
 #include "host_websocket.hpp"
 #include "profile_store.hpp"
 #include "virtual_nfc.hpp"
+#include "utils.hpp"
 
 #include <cassert>
 #include <chrono>
@@ -121,6 +122,10 @@ int main()
     HostWebsocket websocket(runtime, "http://localhost:3001");
     assert(websocket.send("outbound"));
     assert(!websocket.send(nullptr, 0));
+
+    assert(parseIso8601ToTimeT("2026-01-02T03:04:05Z") != static_cast<time_t>(-1));
+    assert(parseIso8601ToTimeT("2026-01-02T03:04:05+02:00") != static_cast<time_t>(-1));
+    assert(parseIso8601ToTimeT("not a timestamp") == static_cast<time_t>(-1));
 
     std::filesystem::remove_all(root);
 }
