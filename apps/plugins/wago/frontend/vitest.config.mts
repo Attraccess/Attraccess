@@ -15,6 +15,10 @@ export default defineConfig({
       'apps/plugins/wago/frontend/tests/*.test.tsx',
       'apps/plugins/wago/frontend/src/ModbusConfigurationForm.spec.tsx',
     ],
+    // The visual editor and Modbus form tests both render into jsdom's global document.
+    // Running files concurrently allows user-event interactions in one file to target
+    // another file's DOM, producing intermittent input corruption and timeouts.
+    fileParallelism: false,
     testTimeout: 15_000,
   },
   esbuild: { jsx: 'automatic' },
