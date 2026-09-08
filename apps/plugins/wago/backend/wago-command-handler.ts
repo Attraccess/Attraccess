@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import { ResourceFlowNode } from '@attraccess/plugins-backend-sdk';
 import type { PluginContext, Repository } from '@attraccess/plugins-backend-sdk';
 import { commandTopic } from './protocol';
-import { configurationHash } from './configuration';
 import { WagoController } from './wago-controller.entity';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
@@ -66,11 +65,7 @@ export class WagoCommandHandler {
     if (controllerId) {
       const draft = await this.dependencies.context.getRepository(WagoConfigurationDraft).findOneBy({ controllerId });
       try {
-        const draftMatchesAppliedRevision =
-          typeof draft?.snapshot === 'string' &&
-          configurationHash(JSON.parse(draft.snapshot)) === revision?.contentHash;
-        const provenance = revision?.presetProvenance ?? (draftMatchesAppliedRevision ? draft?.presetProvenance : null);
-        const storedNames = JSON.parse(provenance ?? 'null')?.editor?.names;
+        const storedNames = JSON.parse(revision?.presetProvenance ?? draft?.presetProvenance ?? 'null')?.editor?.names;
         if (storedNames && typeof storedNames === 'object' && !Array.isArray(storedNames)) names = storedNames;
       } catch {
         /* Drafts created before the visual editor have no channel labels. */
@@ -203,7 +198,7 @@ export class WagoCommandHandler {
     return [];
   }
 
-  async execute(config: Record<string, unknown>): Promise<void> {
+  async execute(config: Record<string, unknown>, commandId = randomUUID()): Promise<void> {
     const errors = await this.validate(config);
     if (errors.length)
       throw new WagoCommandError(errors.map((error) => error.message).join(' '), 'controller-rejection');
@@ -223,7 +218,7 @@ export class WagoCommandHandler {
     if (!controller.mqttServerId)
       throw new WagoCommandError(`WAGO controller ${controllerId} has no MQTT server`, 'transport-dispatch');
     const settings = await this.dependencies.getSettings();
-    const id = randomUUID();
+    const id = commandId;
     this.dependencies.onCommand?.(controllerId, channelId, id);
     const command = JSON.stringify({
       id,
@@ -237,22 +232,42 @@ export class WagoCommandHandler {
       completionBehavior === 'acknowledged'
         ? this.waitForAcknowledgement(id, controllerId, acknowledgementTimeoutSeconds)
         : undefined;
+    // Observe rejection immediately: publication can stall after the controller rejects or times out.
+    const acknowledgementFailure = acknowledgement
+      ? new Promise<never>((_resolve, reject) =>
+          acknowledgement.then(
+            () => undefined,
+            (error) => reject({ acknowledgementError: error }),
+          ),
+        )
+      : undefined;
+    let dispatchTimer: ReturnType<typeof setTimeout> | undefined;
+    const dispatchDeadline = new Promise<never>((_resolve, reject) => {
+      dispatchTimer = setTimeout(
+        () => reject(new WagoCommandError('WAGO command dispatch timed out', 'acknowledgement-timeout')),
+        acknowledgementTimeoutSeconds * 1000,
+      );
+    });
     try {
-      await this.dependencies.context.mqtt.publish(
+      const publication = this.dependencies.context.mqtt.publish(
         controller.mqttServerId,
         commandTopic(settings.operationalPrefix, controller.hardwareId),
         command,
         { qos: 1, retain: false },
       );
+      await Promise.race([publication, dispatchDeadline, ...(acknowledgementFailure ? [acknowledgementFailure] : [])]);
     } catch (error) {
+      if (isAcknowledgementFailure(error)) throw error.acknowledgementError;
       this.dependencies.onCommandFailure?.(id, 'dispatch-failed');
-      const dispatchError = new WagoCommandError(
-        `Failed to publish WAGO command: ${String(error)}`,
-        'transport-dispatch',
-      );
+      const dispatchError =
+        error instanceof WagoCommandError
+          ? error
+          : new WagoCommandError(`Failed to publish WAGO command: ${String(error)}`, 'transport-dispatch');
       this.reject(id, dispatchError);
       if (acknowledgement) await acknowledgement.catch(() => undefined);
       throw dispatchError;
+    } finally {
+      clearTimeout(dispatchTimer);
     }
     await acknowledgement;
   }
@@ -265,6 +280,8 @@ export class WagoCommandHandler {
       return;
     }
     if (
+      !acknowledgement ||
+      typeof acknowledgement !== 'object' ||
       typeof acknowledgement.id !== 'string' ||
       !['accepted', 'duplicate', 'rejected'].includes(acknowledgement.status as string)
     )
@@ -422,6 +439,15 @@ export class WagoCommandHandler {
     context.set(key, value);
     return value;
   }
+}
+
+function isAcknowledgementFailure(error: unknown): error is { acknowledgementError: Error } {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'acknowledgementError' in error &&
+    (error as { acknowledgementError: unknown }).acknowledgementError instanceof Error
+  );
 }
 
 function positiveInteger(value: unknown): number | undefined {

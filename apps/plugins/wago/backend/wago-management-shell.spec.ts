@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { chmod, chown, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -11,12 +11,9 @@ import { WagoManagementProvider } from './wago-management-provider';
 const exec = promisify(execFile);
 const token = '1234567890abcdef1234567890abcdef';
 const key = generateManagementKey();
+const keyEntry = `no-agent-forwarding,no-port-forwarding,no-pty,no-X11-forwarding ${key.publicKey}`;
 let root: string, home: string, bin: string;
 let watchdogPid: number | undefined;
-const fixtureUser = process.getuid?.() === 0 ? { uid: 65534, gid: 65534 } : undefined;
-const chownFixture = async (file: string) => {
-  if (fixtureUser !== undefined) await chown(file, fixtureUser.uid, fixtureUser.gid);
-};
 const path = (...parts: string[]) => join(home, '.ssh', ...parts);
 const env = () => ({ ...process.env, HOME: home, PATH: `${bin}:${process.env.PATH}` });
 const command = (action: ManagementShellAction, seconds = 180, selectedToken = token) =>
@@ -26,7 +23,6 @@ const command = (action: ManagementShellAction, seconds = 180, selectedToken = t
 const run = (action: ManagementShellAction, seconds = 180, selectedToken = token) =>
   exec('/bin/sh', ['-c', command(action, seconds, selectedToken)], {
     env: env(),
-    ...(fixtureUser === undefined ? {} : fixtureUser),
     timeout: 10000,
     maxBuffer: 16384,
   });
@@ -39,14 +35,6 @@ beforeEach(async () => {
   await mkdir(home, { mode: 0o700 });
   await mkdir(bin, { mode: 0o700 });
   await mkdir(path(), { mode: 0o700 });
-  if (fixtureUser !== undefined) {
-    // The generated production command refuses root. Give the isolated fixture
-    // tree to the standard unprivileged account when tests run in a root container.
-    await chmod(root, 0o755);
-    await chown(home, fixtureUser.uid, fixtureUser.gid);
-    await chown(bin, fixtureUser.uid, fixtureUser.gid);
-    await chown(path(), fixtureUser.uid, fixtureUser.gid);
-  }
   await writeFile(join(root, 'uptime'), '1000.00 0.00\n');
   await writeFile(join(root, 'boot-id'), 'fixture-boot\n');
   // Isolated Linux utility fixtures for macOS. No device/network/system service commands.
@@ -74,7 +62,7 @@ elif name=='timeout':
  try: sys.exit(child.wait(timeout=float(sys.argv[3])))
  except subprocess.TimeoutExpired: os.killpg(os.getpid(),signal.SIGKILL)
 `;
-  for (const tool of ['stat', 'flock', 'timeout']) await writeFile(join(bin, tool), shim, { mode: 0o755 });
+  for (const tool of ['stat', 'flock', 'timeout']) await writeFile(join(bin, tool), shim, { mode: 0o700 });
 });
 afterEach(async () => {
   if (watchdogPid) {
@@ -89,7 +77,6 @@ afterEach(async () => {
 
 async function prepared() {
   await writeFile(path('authorized_keys'), '# existing key\n', { mode: 0o600 });
-  await chownFixture(path('authorized_keys'));
   await run('prepare');
   // Most tests inject the independent-watchdog acknowledgement; one below launches the real child.
   await writeFile(path('.attraccess-management-transaction', 'armed'), '');
@@ -99,7 +86,7 @@ describe('executable isolated management shell fixtures', () => {
   it('adds only the generated public key, preserves the snapshot, and restores exactly on explicit recovery', async () => {
     await prepared();
     await run('install');
-    expect(await readFile(path('authorized_keys'), 'utf8')).toBe(`# existing key\n\n${key.publicKey}\n`);
+    expect(await readFile(path('authorized_keys'), 'utf8')).toBe(`# existing key\n\n${keyEntry}\n`);
     await run('commit');
     await run('watchdog'); // committed watchdog must leave the key in place
     expect(await readFile(path('authorized_keys'), 'utf8')).toContain(key.publicKey);
@@ -174,7 +161,7 @@ describe('executable isolated management shell fixtures', () => {
     const holder = exec(
       '/bin/sh',
       ['-c', 'exec 9>>"$HOME/.ssh/.attraccess-management.lock"; flock -w 5 9; touch "$HOME/locked"; sleep 7'],
-      { env: env(), timeout: 10000, ...(fixtureUser === undefined ? {} : fixtureUser) },
+      { env: env(), timeout: 10000 },
     );
     await waitFor(async () => (await readdir(home)).includes('locked'));
     const watchdog = run('watchdog');
@@ -187,9 +174,8 @@ describe('executable isolated management shell fixtures', () => {
   }, 15000);
 
   it('reserves append space and rolls back an installed image of exactly 65536 bytes', async () => {
-    const previous = '#'.repeat(65536 - Buffer.byteLength(key.publicKey) - 2);
+    const previous = '#'.repeat(65536 - Buffer.byteLength(keyEntry) - 2);
     await writeFile(path('authorized_keys'), previous, { mode: 0o600 });
-    await chownFixture(path('authorized_keys'));
     await run('prepare');
     await writeFile(path('.attraccess-management-transaction', 'armed'), '');
     await run('install');
@@ -199,12 +185,11 @@ describe('executable isolated management shell fixtures', () => {
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe(previous);
   });
 
-  it.each([65536 - Buffer.byteLength(key.publicKey) - 1, 65536])(
+  it.each([65536 - Buffer.byteLength(keyEntry) - 1, 65536])(
     'refuses an append that would overflow (%i existing bytes)',
     async (size) => {
       const previous = '#'.repeat(size);
       await writeFile(path('authorized_keys'), previous, { mode: 0o600 });
-      await chownFixture(path('authorized_keys'));
       await run('prepare');
       await writeFile(path('.attraccess-management-transaction', 'armed'), '');
       await expect(run('install')).rejects.toBeDefined();
@@ -216,7 +201,6 @@ describe('executable isolated management shell fixtures', () => {
   it('a crash before token publication leaves no active journal and permits a fresh prepare', async () => {
     // Kill the shell immediately after allocating staging, before it can write a token.
     await writeFile(join(bin, 'mktemp'), '#!/bin/sh\n/usr/bin/mktemp "$@"\nkill -KILL "$PPID"\n', { mode: 0o700 });
-    await chownFixture(join(bin, 'mktemp'));
     await expect(run('prepare')).rejects.toBeDefined();
     const entries = await readdir(path());
     expect(entries).not.toContain('.attraccess-management-transaction');
@@ -261,14 +245,11 @@ describe('executable isolated management shell fixtures', () => {
     const flock = await readFile(join(bin, 'flock'));
     await writeFile(join(bin, 'flock'), '#!/bin/sh\necho attempt >> "$HOME/attempts"\nexit 1\n');
     await writeFile(join(bin, 'sleep'), '#!/bin/sh\necho pause >> "$HOME/pauses"\n', { mode: 0o700 });
-    await chownFixture(join(bin, 'flock'));
-    await chownFixture(join(bin, 'sleep'));
     await expect(run('watchdog')).rejects.toBeDefined();
     expect((await readFile(join(home, 'attempts'), 'utf8')).trim().split('\n')).toHaveLength(12);
     expect((await readFile(join(home, 'pauses'), 'utf8')).trim().split('\n')).toHaveLength(11);
     expect(await readFile(path('authorized_keys'), 'utf8')).toContain(key.publicKey);
     await writeFile(join(bin, 'flock'), flock);
-    await chownFixture(join(bin, 'flock'));
     await rm(join(bin, 'sleep'));
     await writeFile(join(root, 'uptime'), '1180.00 0.00\n');
     await expect(run('commit')).rejects.toBeDefined();
@@ -280,7 +261,6 @@ describe('executable isolated management shell fixtures', () => {
     await prepared();
     await writeFile(path('.attraccess-management-transaction', 'deadline'), '100100\n');
     await writeFile(join(bin, 'mv'), '#!/bin/sh\nsleep 2\nexec /bin/mv "$@"\n', { mode: 0o700 });
-    await chownFixture(join(bin, 'mv'));
     await expect(run('install')).rejects.toBeDefined();
     await new Promise((resolve) => setTimeout(resolve, 1500));
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe('# existing key\n');
@@ -313,7 +293,7 @@ describe('executable isolated management shell fixtures', () => {
     await mkdir(join(proc, '2'));
     await mkdir(join(proc, 'net'));
     await mkdir(join(etc, 'init.d'), { recursive: true });
-    await writeFile(join(etc, 'os-release'), 'NAME="WAGO CC100"\nVERSION_ID="4.9.1(31)"\n');
+    await writeFile(join(etc, 'os-release'), 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="4.9.1(31)"\n');
     await writeFile(join(proc, '1', 'comm'), 'init\n');
     await writeFile(join(proc, '2', 'comm'), 'dropbear\n');
     for (const family of ['tcp', 'tcp6', 'udp', 'udp6'])
@@ -334,8 +314,8 @@ describe('executable isolated management shell fixtures', () => {
     });
     expect(output.stdout).not.toContain('00000000');
     const provider = new WagoManagementProvider({ execute: jest.fn(), verifyNewKeyConnection: jest.fn() });
-    expect(provider.qualify(inspection, 'baseline').support).toBe('qualification_required');
-    expect(provider.qualify(inspection, 'key_only').support).toBe('qualification_required');
+    expect(provider.qualify(inspection, 'baseline').support).toBe('UNSUPPORTED');
+    expect(provider.qualify(inspection, 'key_only').support).toBe('UNSUPPORTED');
   });
 
   it('reports mixed/unknown daemons and BSP-only firmware conservatively; rejects oversized/raw output', () => {
@@ -343,6 +323,46 @@ describe('executable isolated management shell fixtures', () => {
     expect(inspection).toMatchObject({ firmware: 'unknown', ssh: 'mixed', wbm: 'unknown', serviceControl: 'unknown' });
     expect(() => parseManagementInspection(`BEGIN=1\n${'secret'.repeat(5000)}\nEND=1\n`)).toThrow('inspection_failed');
     expect(() => parseManagementInspection('BEGIN=1\nPASSWORD=secret\nEND=1\n')).toThrow('inspection_failed');
+  });
+
+  it.each([
+    ['31', '2025.88', 'dropbear', 1004, 'supported'],
+    ['31', 'unknown', 'dropbear', 1004, 'UNSUPPORTED'],
+    ['31', '', 'dropbear', 1004, 'UNSUPPORTED'],
+    ['unrecognized', '2025.88', 'dropbear', 1004, 'UNSUPPORTED'],
+    ['31', '2025.88', 'dropbear', 0, 'UNSUPPORTED'],
+    ['31', '2025.88', 'dropbear\nSSH=openssh', 1004, 'UNSUPPORTED'],
+    ['31', '2025.88\nDROPBEAR=unknown', 'dropbear', 1004, 'UNSUPPORTED'],
+  ])(
+    'gates Dropbear enrollment by live version, firmware and non-root identity (%s/%s/%s/%s)',
+    (firmware, version, daemon, uid, support) => {
+      const inspection = parseManagementInspection(
+        `BEGIN=1\nMODEL=cc100\nFW=${firmware}\nUID=${uid}\nSSH=${daemon}\n${version ? `DROPBEAR=${version}\n` : ''}END=1\n`,
+      );
+      const provider = new WagoManagementProvider({ execute: jest.fn(), verifyNewKeyConnection: jest.fn() });
+      expect(provider.qualify(inspection, 'key_only').support).toBe(support);
+      expect(provider.qualify(inspection, 'baseline').support).toBe('UNSUPPORTED');
+    },
+  );
+
+  it('does not attempt root process executable reads or execute an installed daemon to infer its version', async () => {
+    const proc = join(root, 'proc'),
+      etc = join(root, 'etc');
+    await mkdir(etc);
+    await writeFile(join(etc, 'os-release'), 'PTXDIST_PLATFORM_NAME=cc100\nVERSION_ID=31\n');
+    for (const pid of ['2', '3']) {
+      await mkdir(join(proc, pid), { recursive: true });
+      await writeFile(join(proc, pid, 'comm'), 'dropbear\n');
+      // Permission-realistic model: no readable executable for a root daemon.
+      await symlink('/unreadable-root-daemon-executable', join(proc, pid, 'exe'));
+    }
+    const script = MANAGEMENT_INSPECTION_COMMAND.replaceAll('/proc/', `${proc}/`).replaceAll('/etc/', `${etc}/`);
+    expect(script).not.toMatch(/\/exe| -V/);
+    const result = await exec('/bin/sh', ['-c', script], { env: env(), timeout: 5000 });
+    expect(parseManagementInspection(result.stdout)).toMatchObject({ ssh: 'dropbear', dropbearVersion: 'unknown' });
+    // Only the authenticated transport can supply the version of its selected peer.
+    const provider = new WagoManagementProvider({ execute: jest.fn(), verifyNewKeyConnection: jest.fn() });
+    expect(provider.qualify(parseManagementInspection(result.stdout), 'key_only').support).toBe('UNSUPPORTED');
   });
 });
 

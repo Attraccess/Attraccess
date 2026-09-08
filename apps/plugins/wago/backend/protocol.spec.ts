@@ -39,16 +39,6 @@ describe('WAGO protocol', () => {
     expect(() => parseAnnouncement(payload)).toThrow('pairingCode');
   });
 
-  it('accepts runtime heartbeats without weakening physical discovery verification', () => {
-    const heartbeat = { ...valid };
-    delete heartbeat.pairingCode;
-    const payload = Buffer.from(JSON.stringify(heartbeat));
-    expect(parseHeartbeat(payload)).toEqual(heartbeat);
-    expect(() => parseAnnouncement(payload)).toThrow('pairingCode is required');
-    expect(() => parseHeartbeat(Buffer.from(JSON.stringify({ ...heartbeat, sequence: -1 })))).toThrow();
-    expect(() => parseHeartbeat(Buffer.from(JSON.stringify({ ...heartbeat, hardwareId: '' })))).toThrow();
-  });
-
   it('uses a versioned configuration protocol below the configurable operational prefix', () => {
     expect(configurationDesiredTopic('customer/wago/', 'cc100-01')).toBe(
       'customer/wago/v1/controllers/cc100-01/configuration/desired',

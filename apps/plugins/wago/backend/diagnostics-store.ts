@@ -175,7 +175,8 @@ export class WagoDiagnosticsStore {
       canonical &&
       kind === 'state' &&
       data.readiness !== undefined &&
-      (!isObject(data.readiness) || typeof data.readiness.hardwareAvailable !== 'boolean')
+      (!isObject(data.readiness) ||
+        (data.readiness.hardwareAvailable !== undefined && typeof data.readiness.hardwareAvailable !== 'boolean'))
     )
       return false;
     if (
@@ -296,7 +297,7 @@ export class WagoDiagnosticsStore {
         state.contentHash !== contentHash ||
         state.hardwareAvailable !== hardwareAvailable
       ) {
-        if (canonical || state.stateSourceAt)
+        if (state.stateSourceAt || (canonical && state.connected === false))
           state.measurementAfter = canonical ? (sourceTime(data.timestamp) as number) : this.now();
         state.measurements = Object.create(null);
         state.cumulativeMeasurements = Object.create(null);

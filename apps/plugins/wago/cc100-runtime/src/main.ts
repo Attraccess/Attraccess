@@ -1,6 +1,5 @@
 import { connect, type MqttClient } from 'mqtt';
 import { Cc100OnboardIoAdapter } from './adapters';
-import { ModbusDeviceRouter } from './modbus/adapter';
 import { CC100_DIGITAL_PROFILE } from './onboard-profile';
 import { JsonStateStore, WagoRuntime, type DiscoveryClaim, type Transport } from './runtime';
 
@@ -14,7 +13,7 @@ if (process.env.WAGO_IO_PATHS)
   throw new Error('WAGO_IO_PATHS is no longer supported; redeploy with the firmware-31 digital hardware profile');
 if (required('WAGO_HARDWARE_PROFILE') !== CC100_DIGITAL_PROFILE.id)
   throw new Error(`unsupported WAGO_HARDWARE_PROFILE; expected ${CC100_DIGITAL_PROFILE.id}`);
-const adapter = new ModbusDeviceRouter(new Cc100OnboardIoAdapter());
+const adapter = new Cc100OnboardIoAdapter();
 const mqttUrl = required('WAGO_MQTT_URL');
 let client: MqttClient | undefined;
 let heartbeatTimer: NodeJS.Timeout | undefined;
@@ -58,6 +57,14 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
     store,
     transport,
     device: adapter,
+    reconnectCredentials: async (next) => {
+      if (activeClient !== client) throw new Error('Credential handoff connection is no longer active');
+      await runtime.setConnected(false);
+      credentials = next;
+      activeClient.options.username = next.username;
+      activeClient.options.password = next.password;
+      activeClient.reconnect();
+    },
   });
   let initialized = false;
   let connected = false;
@@ -70,7 +77,21 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
       pendingConnectionStates.push(state);
       return;
     }
-    void handleAsync(() => runtime.setConnected(state));
+    void handleAsync(async () => {
+      if (state) await runtime.retryCredentialRotationSubscription();
+      await runtime.setConnected(state);
+      if (state && credentials) await runtime.acknowledgeCredentialRotation(credentials);
+    });
+  };
+
+  const activateConnectionHandling = async (): Promise<void> => {
+    if (initialized) return;
+    if (!pendingConnectionStates.length && !connected) pendingConnectionStates.push(false);
+    while (pendingConnectionStates.length > 0) {
+      const state = pendingConnectionStates.shift();
+      if (state !== undefined) await handleAsync(() => runtime.setConnected(state));
+    }
+    initialized = true;
   };
 
   activeClient.once(
@@ -87,19 +108,12 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
           return;
         }
         try {
-          await runtime.start();
+          await runtime.start(activateConnectionHandling);
         } finally {
-          // start() subscribes before its first publications. Keep connection
-          // policies live even if a publication fails after those subscriptions.
-          if (!pendingConnectionStates.length && !connected) pendingConnectionStates.push(false);
-          while (pendingConnectionStates.length > 0) {
-            const state = pendingConnectionStates.shift();
-            if (state !== undefined) await handleAsync(() => runtime.setConnected(state));
-          }
-          // Keep events received during replay in this queue so their order is
-          // preserved before live connection events can apply policies.
-          initialized = true;
+          // Also activate if subscriptions fail after commands become reachable.
+          await activateConnectionHandling();
         }
+        if (connected && credentials) await runtime.acknowledgeCredentialRotation(credentials);
         heartbeatTimer = setInterval(() => void handleAsync(() => runtime.publishHeartbeat()), 30_000).unref();
         measurementTimer = setInterval(() => void handleAsync(() => runtime.publishMeasurements()), 5_000).unref();
         inputTimer = setInterval(() => void handleAsync(() => runtime.pollInputs()), 250).unref();

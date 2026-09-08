@@ -3,7 +3,6 @@ import { WagoManagementEntity } from './wago-management.entity';
 import type { ManagementRecord, ManagementStore, PinnedManagementSsh } from './wago-management.types';
 import { WagoManagementProvider } from './wago-management-provider';
 import { WagoManagementService } from './wago-management';
-import { createWagoCommissioningLeaseService } from './wago-commissioning-lease';
 
 export class RepositoryManagementStore implements ManagementStore {
   constructor(private readonly repository: Repository<WagoManagementEntity>) {}
@@ -64,6 +63,5 @@ export function createWagoManagementService(
     new RepositoryManagementStore(context.getRepository(WagoManagementEntity)),
     context.secrets,
     new WagoManagementProvider(ssh),
-    createWagoCommissioningLeaseService(context),
   );
 }

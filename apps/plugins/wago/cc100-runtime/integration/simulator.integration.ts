@@ -206,7 +206,7 @@ describe('isolated broker / executable simulator', () => {
       logger: { warn: () => undefined },
     } as unknown as PluginContext;
     service = new WagoService(context);
-    await service.onApplicationBootstrap();
+    await service.onModuleInit();
   });
 
   async function stop() {
@@ -442,7 +442,7 @@ describe('isolated broker / executable simulator', () => {
       'physical output feedback',
     );
     const beforeReconnect = connections.filter((name) => name === `wago-controller-${hardwareId}`).length;
-    const lastHeartbeat = controller.lastHeartbeatAt;
+    const lastHeartbeat = (await service.list()).find((item) => item.id === controller.id)!.lastHeartbeatAt;
     Object.values(broker.clients).forEach((client: any) => {
       if (client.identity === `wago-controller-${hardwareId}`) client.conn.destroy();
     });
@@ -453,7 +453,11 @@ describe('isolated broker / executable simulator', () => {
         ),
       'TCP reconnect',
     );
-    await eventually(() => expect(controller.lastHeartbeatAt).not.toBe(lastHeartbeat), 'heartbeat after reconnect');
+    await eventually(async () => {
+      const current = (await service.list()).find((item) => item.id === controller.id)!;
+      expect(current.lastHeartbeatAt).not.toBe(lastHeartbeat);
+      expect(current.connectivity).toBe('online');
+    }, 'heartbeat after reconnect');
     await mqtt.publishAsync(`${base}/commands`, JSON.stringify(outputCommand('after-reconnect')), { qos: 1 });
     await eventually(
       () =>
@@ -684,7 +688,7 @@ describe('isolated broker / executable simulator', () => {
         expect(firstMeasurement.streamId).toMatch(
           /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
         );
-        expect(firstMeasurement.sequence).toBeGreaterThan(0);
+        expect(firstMeasurement.sequence).toBe(1);
         expect(parseOperationalMessage(prefix, measurement.topic, measurement.payload)).toMatchObject({
           hardwareId,
           message: { category: 'measurement', channelId: 'level', value: 42000, unit: 'millipercent', kind: 'live' },
@@ -718,7 +722,7 @@ describe('isolated broker / executable simulator', () => {
         );
         for (const event of [firstState, firstAck]) {
           expect(event.streamId).toBe(firstMeasurement.streamId);
-          expect(event.sequence).toBeGreaterThan(0);
+          expect(event.sequence).toBe(1); // counters are independent across categories
           expect(event.timestamp).toBe(new Date(event.timestamp).toISOString());
         }
         await stop();
@@ -736,7 +740,7 @@ describe('isolated broker / executable simulator', () => {
             .payload.toString(),
         );
         expect(restarted.streamId).not.toBe(firstMeasurement.streamId);
-        expect(restarted.sequence).toBeGreaterThan(0);
+        expect(restarted.sequence).toBe(1);
         expect(restarted).toMatchObject({ kind: 'live', unit: 'millipercent', value: 42000 });
         await eventually(
           () => expect(triggers.length).toBeGreaterThan(previousTriggers),

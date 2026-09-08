@@ -1,8 +1,6 @@
 import { createHash } from 'node:crypto';
 
 import { type Snapshot, type ValidationError } from './runtime-types';
-// eslint-disable-next-line @nx/enforce-module-boundaries
-import { validateModbus, validateModbusBindings } from '../../modbus/model';
 
 export const PROTOCOL_VERSION = 1;
 
@@ -40,13 +38,9 @@ export function validateSnapshot(value: unknown): ValidationError[] {
   validateKeys(
     snapshot as Record<string, unknown>,
     'snapshot',
-    ['version', 'physicalPoints', 'logicalChannels', 'modbus'],
+    ['version', 'physicalPoints', 'logicalChannels'],
     errors,
   );
-  if (snapshot.modbus !== undefined) {
-    errors.push(...validateModbus(snapshot.modbus));
-  }
-  errors.push(...validateModbusBindings(snapshot));
   if (snapshot.version !== 1) {
     errors.push({ path: 'snapshot.version', code: 'unsupported_version', message: 'snapshot version must be 1' });
   }
@@ -69,7 +63,7 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     validateKeys(
       point as Record<string, unknown>,
       `snapshot.physicalPoints[${index}]`,
-      ['id', 'hardwareProfile', 'channel', 'modbus'],
+      ['id', 'hardwareProfile', 'channel'],
       errors,
     );
     if (!point?.id || pointIds.has(point.id)) {
@@ -80,7 +74,7 @@ export function validateSnapshot(value: unknown): ValidationError[] {
       });
     }
     pointIds.add(point?.id);
-    if (!['751-9301', '879-3000', '879-1300', 'modbus'].includes(point?.hardwareProfile ?? '')) {
+    if (!['751-9301', '879-3000', '879-1300'].includes(point?.hardwareProfile ?? '')) {
       errors.push({
         path: `snapshot.physicalPoints[${index}].hardwareProfile`,
         code: 'unsupported_profile',
@@ -251,10 +245,9 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     if (
       channel.measurement &&
       (!capabilities.includes('measurement') ||
-        !['ampere', 'volt', 'watt', 'watt-hour', 'percent'].includes(channel.measurement.unit) ||
+        !['ampere', 'volt', 'watt', 'percent'].includes(channel.measurement.unit) ||
         !Number.isFinite(channel.measurement.scale) ||
-        !Number.isFinite(channel.measurement.offset) ||
-        (channel.measurement.kind !== undefined && !['live', 'cumulative'].includes(channel.measurement.kind)))
+        !Number.isFinite(channel.measurement.offset))
     ) {
       errors.push({
         path: `${path}.measurement`,
@@ -266,7 +259,7 @@ export function validateSnapshot(value: unknown): ValidationError[] {
       validateKeys(
         channel.measurement as Record<string, unknown>,
         `${path}.measurement`,
-        ['unit', 'scale', 'offset', 'kind'],
+        ['unit', 'scale', 'offset'],
         errors,
       );
     }

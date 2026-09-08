@@ -5,22 +5,12 @@ import { WagoController } from './wago-controller.entity';
 import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { configurationHash, validateSnapshot, type WagoConfigurationSnapshot } from './configuration';
-import { editorMetadata, type ConfigurationEditorMetadata } from './configuration-editor';
 import { freshness } from './diagnostics-store';
 import { safeValidationSummaries } from './diagnostics-validation';
 import type { WagoDiagnostics, WagoResourceDiagnostics } from '../diagnostics-types';
 
 function own<T>(values: Record<string, T>, key: string): T | undefined {
   return Object.prototype.hasOwnProperty.call(values, key) ? values[key] : undefined;
-}
-
-function metadataFromProvenance(provenance: string | null | undefined): ConfigurationEditorMetadata {
-  if (!provenance) return { names: {}, presets: [] };
-  try {
-    return editorMetadata(JSON.parse(provenance).editor);
-  } catch {
-    return { names: {}, presets: [] };
-  }
 }
 
 export function diagnosticReferences(
@@ -94,7 +84,7 @@ export class WagoDiagnosticsService {
           .filter((channelId): channelId is string => typeof channelId === 'string'),
       ),
     ];
-    const controllerIdsForQuery = selectedControllerIds.map(String);
+    const controllerIdsForQuery = selectedControllerIds;
     const [controllers, appliedRevisions, conflictNodes] = await Promise.all([
       this.context
         .getRepository(WagoController)
@@ -106,9 +96,11 @@ export class WagoDiagnosticsService {
         .getRepository(WagoConfigurationRevision)
         .createQueryBuilder('revision')
         .select(['revision.controllerId', 'revision.revision', 'revision.snapshot'])
-        .distinctOn(['revision.controllerId'])
         .where('revision.controllerId IN (:...controllerIds)', { controllerIds: selectedControllerIds })
         .andWhere('revision.state = :state', { state: 'applied' })
+        .andWhere(
+          'revision.revision = (SELECT MAX(applied.revision) FROM plugin_wago_configuration_revisions applied WHERE applied.controller_id = revision.controller_id AND applied.state = :state)',
+        )
         .orderBy('revision.controllerId', 'ASC')
         .addOrderBy('revision.revision', 'DESC')
         .getMany(),
@@ -254,8 +246,8 @@ export class WagoDiagnosticsService {
           !!draft &&
           (!latest ||
             configurationHash(JSON.parse(draft.snapshot)) !== latest.contentHash ||
-            configurationHash(metadataFromProvenance(draft.presetProvenance)) !==
-              configurationHash(metadataFromProvenance(latest.presetProvenance))),
+            configurationHash({ metadata: draft.presetProvenance ? JSON.parse(draft.presetProvenance) : null }) !==
+              configurationHash({ metadata: latest.presetProvenance ? JSON.parse(latest.presetProvenance) : null })),
         validationErrorCount: validationErrors.length,
         // Codes originate in our validator. Omit messages and dynamic paths, which can include arbitrary draft values.
         validationCodes: [...new Set(validationErrors.map((error) => error.code))].slice(0, 50),
@@ -277,7 +269,7 @@ export class WagoDiagnosticsService {
       hardwareReadiness: 'unknown' as const,
       hardwareReadinessReason:
         'Reported hardware availability is shown when supplied; it does not prove physical I/O readiness. Applied configuration and cached output state are not physical proof.',
-      channels: (snapshot?.logicalChannels ?? []).slice(0, 256).map((channel) => {
+      channels: ((appliedSnapshot ?? snapshot)?.logicalChannels ?? []).slice(0, 256).map((channel) => {
         const values = [
           channel.capabilities.includes('input') ? own(runtime.inputs, channel.id) : undefined,
           channel.capabilities.includes('output') ? own(runtime.outputs, channel.id) : undefined,

@@ -89,33 +89,188 @@ describe('commissioning workflows with a real isolated database and mocked devic
     jest.restoreAllMocks();
   });
 
-  it('pins the artifact and carries the reviewed Docker token into the runtime transaction', async () => {
-    const remote = jest.spyOn(service as never, 'sudoRunScript').mockResolvedValue(stoppedReport as never);
-    await service.platform(session.id, 'inspect', { temporarySsh: credential }, principal);
-    const activated = await service.platform(
+  it('blocks an unfinished preparation before any further host mutation', async () => {
+    const token = 'c'.repeat(32);
+    const repository = db.getRepository(WagoCommissioningSession);
+    await repository.update(session.id, {
+      platformReport: JSON.stringify({ platform: 'supported', provision: 'review-start-installed-runtime' }),
+      dockerProvisionToken: token,
+      dockerProvisionState: token ? 'starting' : null,
+    });
+    const before = await repository.findOneByOrFail({ id: session.id });
+    const remote = jest.spyOn(service as never, 'sudoRunScript');
+    await expect(
+      service.platform(
+        session.id,
+        'activate',
+        {
+          temporarySsh: credential,
+          reviewedDockerActivation: true,
+        },
+        principal,
+      ),
+    ).rejects.toThrow('retained controller preparation');
+    expect(await repository.findOneByOrFail({ id: session.id })).toEqual(before);
+    expect(remote).not.toHaveBeenCalled();
+  });
+
+  it('activates under durable ownership and records CODESYS disabled only after preparation succeeds', async () => {
+    const repository = db.getRepository(WagoCommissioningSession);
+    const remote = jest.spyOn(service as never, 'sudoRunScript').mockImplementation((async () => {
+      const saved = await repository.findOneByOrFail({ id: session.id });
+      expect(saved.dockerProvisionToken).toMatch(/^[a-f0-9]{32}$/);
+      expect(saved.dockerProvisionState).toBe('starting');
+      expect(saved.codesysState).not.toBe('disabled');
+      return '';
+    }) as never);
+    const result = await service.platform(
       session.id,
       'activate',
-      { temporarySsh: credential, reviewedDockerActivation: true },
+      {
+        temporarySsh: credential,
+        reviewedDockerActivation: true,
+      },
       principal,
     );
-    expect(activated.dockerProvisionState).toBe('started');
-    expect(activated).not.toHaveProperty('dockerProvisionToken');
+    expect(result).toMatchObject({ dockerProvisionState: 'started', codesysState: 'disabled', failureReason: null });
+    expect(result).not.toHaveProperty('dockerProvisionToken');
+    expect(remote).toHaveBeenCalledTimes(1);
+  });
+
+  it('requires explicit destructive preparation approval', async () => {
+    const remote = jest.spyOn(service as never, 'sudoRunScript');
+    await expect(service.platform(session.id, 'activate', { temporarySsh: credential }, principal)).rejects.toThrow(
+      'Explicit Docker',
+    );
+    expect(remote).not.toHaveBeenCalled();
+  });
+
+  it.each(['starting', 'recovering'])(
+    'retains interrupted %s preparation for explicit cleanup after restart',
+    async (state) => {
+      const repository = db.getRepository(WagoCommissioningSession);
+      await repository.update(session.id, { dockerProvisionToken: 'c'.repeat(32), dockerProvisionState: state });
+      const remote = jest.spyOn(service as never, 'sudoRunScript');
+      await service.onApplicationBootstrap();
+      expect(await repository.findOneByOrFail({ id: session.id })).toMatchObject({
+        dockerProvisionToken: 'c'.repeat(32),
+        dockerProvisionState: 'recovery_required',
+      });
+      expect(remote).not.toHaveBeenCalled();
+    },
+  );
+
+  it('fails closed before enrollment or delivery when active CODESYS cannot be disabled', async () => {
+    jest.spyOn(service as never, 'inspect').mockResolvedValue({
+      firmware: 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="31"',
+      codesys: 'active',
+    } as never);
+    jest.spyOn(service as never, 'sudoRunScript').mockRejectedValue(new Error('private remote output') as never);
+    const copy = jest.spyOn(service as never, 'copyTo');
+    wago.createEnrollment.mockClear();
+    const result = await service.deliver(session.id, { temporarySsh: credential, confirmInstall: true }, principal);
+    expect(result).toMatchObject({
+      state: 'delivery_failed',
+      codesysState: 'active',
+      dockerProvisionState: 'recovery_required',
+    });
+    expect(result.failureReason).toContain('permanently disabled');
+    expect(result.failureReason).not.toContain('private remote output');
+    expect(wago.createEnrollment).not.toHaveBeenCalled();
+    expect(copy).not.toHaveBeenCalled();
+  });
+
+  it('retains an old restored token when final lifecycle reconciliation fails', async () => {
+    const token = 'c'.repeat(32);
+    await db.getRepository(WagoCommissioningSession).update(session.id, {
+      dockerProvisionToken: token,
+      dockerProvisionState: 'restored',
+    });
+    jest.spyOn(service as never, 'sudoRunScript').mockRejectedValue(new Error('unresolved-lifecycle-effects') as never);
+    const result = await service.platform(
+      session.id,
+      'recover',
+      {
+        temporarySsh: credential,
+        reviewedDockerActivation: true,
+      },
+      principal,
+    );
+    expect(result.dockerProvisionState).toBe('recovery_required');
+    expect(result.failureReason).toContain('cleanup remains unverified');
+    expect(
+      (await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id })).dockerProvisionToken,
+    ).toBe(token);
+  });
+
+  it('pins the artifact and carries an existing Docker token into the runtime transaction', async () => {
+    const remote = jest.spyOn(service as never, 'sudoRunScript').mockResolvedValue(stoppedReport as never);
+    await service.platform(session.id, 'inspect', { temporarySsh: credential }, principal);
+    await db.getRepository(WagoCommissioningSession).update(session.id, {
+      dockerProvisionToken: 'c'.repeat(32),
+      dockerProvisionState: 'started',
+    });
     const saved = await db.getRepository(WagoCommissioningSession).findOneByOrFail({ id: session.id });
-    const dockerProvisionToken = saved.dockerProvisionToken;
-    expect(dockerProvisionToken).toMatch(/^[a-f0-9]{32}$/);
-    if (!dockerProvisionToken) throw new Error('expected Docker provisioning token');
+    expect(saved.dockerProvisionToken).toMatch(/^[a-f0-9]{32}$/);
     remote.mockResolvedValue('' as never);
     const copy = jest.spyOn(service as never, 'copyTo').mockResolvedValue(undefined as never);
     const delivered = await service.deliver(session.id, { confirmInstall: true, temporarySsh: credential }, principal);
     expect(delivered.state).toBe('awaiting_discovery');
     expect(artifacts.acquire).toHaveBeenCalledWith(digest);
     const script = copy.mock.calls[0][4] as string;
-    expect(script).toContain(dockerProvisionToken);
+    expect(script).toContain(saved.dockerProvisionToken);
     expect(script).toContain('WAGO_HARDWARE_PROFILE=cc100-751-9301-fw31-digital-v1');
     expect(script).toContain('--user 10001:10001 --cap-drop ALL');
     expect(JSON.stringify(delivered)).not.toContain('bootstrap-fixture');
     expect((await service.list())[0]).not.toHaveProperty('deliveryToken');
     expect((await service.list())[0]).not.toHaveProperty('initiatingPrincipal');
+  });
+
+  it('retries only preparation acknowledgement after runtime cleanup and preparation containment succeeded', async () => {
+    const token = 'd'.repeat(32);
+    const repository = db.getRepository(WagoCommissioningSession);
+    await repository.update(session.id, {
+      state: 'delivery_failed',
+      deliveryToken: token,
+      dockerProvisionToken: token,
+      dockerProvisionState: 'started',
+    });
+    const remote = jest
+      .spyOn(service as never, 'sudoRunScript')
+      .mockResolvedValueOnce('' as never) // runtime cleanup
+      .mockResolvedValueOnce('' as never) // runtime acknowledgement
+      .mockResolvedValueOnce('' as never) // preparation containment
+      .mockRejectedValueOnce(new Error('lost preparation acknowledgement') as never);
+    const input = { confirmInstall: true, temporarySsh: credential };
+    const failed = await service.recover(session.id, input, principal);
+    expect(failed).toMatchObject({ state: 'recovery_revocation_pending', dockerProvisionState: 'restored' });
+    expect((await repository.findOneByOrFail({ id: session.id })).dockerProvisionToken).toBe(token);
+    remote.mockClear().mockResolvedValue('' as never);
+    const result = await service.recover(session.id, input, principal);
+    expect(remote).toHaveBeenCalledTimes(2); // runtime receipt acknowledgement + preparation finish only
+    expect(result).toMatchObject({ state: 'delivery_failed', dockerProvisionState: null, failureReason: null });
+    expect(result.runtimeRecoveryAvailable).toBeUndefined();
+    expect((await repository.findOneByOrFail({ id: session.id })).dockerProvisionToken).toBeNull();
+  });
+
+  it('retains matching preparation ownership for cleanup when upload fails before a remote runtime journal exists', async () => {
+    const repository = db.getRepository(WagoCommissioningSession);
+    const remote = jest.spyOn(service as never, 'sudoRunScript').mockResolvedValue('' as never);
+    jest.spyOn(service as never, 'copyTo').mockRejectedValue(new Error('connection failed before stdin') as never);
+    const input = { confirmInstall: true, temporarySsh: credential };
+    expect(await service.deliver(session.id, input, principal)).toMatchObject({
+      state: 'delivery_failed',
+      runtimeRecoveryAvailable: true,
+    });
+    const failed = await repository.findOneByOrFail({ id: session.id });
+    expect(failed.deliveryToken).toBe(failed.dockerProvisionToken);
+    expect(failed.deliveryToken).toMatch(/^[a-f0-9]{32}$/);
+    remote.mockClear();
+    const recovered = await service.recover(session.id, input, principal);
+    expect(remote.mock.calls[0][3]).toContain('No preparation recovery ownership');
+    expect(remote.mock.calls[0][3]).toContain(failed.deliveryToken);
+    expect(recovered).toMatchObject({ state: 'delivery_failed', dockerProvisionState: null, failureReason: null });
+    expect(recovered.runtimeRecoveryAvailable).toBeUndefined();
   });
 
   it('serializes separate service instances before either can touch the same controller', async () => {
@@ -185,7 +340,7 @@ describe('commissioning workflows with a real isolated database and mocked devic
     expect(retained).not.toHaveProperty('deliveryToken');
     jest.spyOn(service as never, 'sudoRunScript').mockResolvedValue('' as never);
     const restored = await service.recover(session.id, { confirmInstall: true, temporarySsh: credential });
-    expect(restored.progressStep).toBe('Runtime snapshot restored');
+    expect(restored.progressStep).toBe('Runtime installation cleaned up');
     expect(restored.runtimeRecoveryAvailable).toBeUndefined();
   });
 

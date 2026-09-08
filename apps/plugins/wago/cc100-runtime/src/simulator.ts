@@ -18,17 +18,18 @@ const capabilities = parseCapabilities(process.env.WAGO_CAPABILITIES);
 const heartbeatInterval = interval('WAGO_HEARTBEAT_INTERVAL_MS', 30_000);
 const measurementInterval = interval('WAGO_MEASUREMENT_INTERVAL_MS', 5_000);
 const store = new JsonStateStore(statePath);
-const measurementStep = Number(process.env.WAGO_MEASUREMENT_STEP ?? '0');
-if (!Number.isFinite(measurementStep)) throw new Error('WAGO_MEASUREMENT_STEP must be a finite number');
-const device = new SimulatorDeviceAdapter(parseValues(process.env.WAGO_INITIAL_VALUES), scenario, measurementStep);
+const device = new SimulatorDeviceAdapter(
+  parseValues(process.env.WAGO_INITIAL_VALUES),
+  scenario,
+  Number(process.env.WAGO_MEASUREMENT_STEP ?? '0'),
+);
 let client: MqttClient | undefined;
 let timers: NodeJS.Timeout[] = [];
 
 void start().catch((error: unknown) => {
-  process.stderr.write(
-    `WAGO simulator startup failed: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
-  );
-  process.exit(1);
+  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  process.exitCode = 1;
+  if (process.connected) process.disconnect();
 });
 
 async function start(): Promise<void> {
@@ -89,6 +90,8 @@ function connectEnrollment(): void {
                 operationalPrefix,
               };
               await store.save(claimedState);
+              // Never acknowledge delivery until permanent credentials are durable.
+              // Wait for MQTT PUBACK before ending the enrollment connection.
               if (claim.acknowledgementToken)
                 await publish(enrollmentClient, `${discovery}/claim/ack`, {
                   acknowledgementToken: claim.acknowledgementToken,
@@ -130,11 +133,12 @@ function connectOperational(state: SimulatorState): void {
   client = operationalClient;
   operationalClient.on('error', logConnectionError);
   device.restore(state.accepted?.snapshot, state.outputs);
-  if (state.accepted) device.activate(state.accepted.snapshot);
+  // Current main requires pairingCode; keeping it on the options object also
+  // permits the older runtime base whose structural interface omits that field.
   const runtimeOptions: ConstructorParameters<typeof WagoRuntime>[0] & { pairingCode: string } = {
     hardwareId,
     pairingCode,
-    prefix: state.operationalPrefix ?? state.credentials.prefix ?? prefix,
+    prefix: state.operationalPrefix ?? prefix,
     store,
     transport: transport(operationalClient),
     device,
@@ -149,7 +153,7 @@ function connectOperational(state: SimulatorState): void {
       handleAsync(async () => {
         if (generation !== connectionGeneration) return;
         if (!started) {
-          await operationalRuntime.start();
+          await operationalRuntime.start(() => operationalRuntime.setConnected(operationalClient.connected));
           started = true;
         } else {
           await operationalRuntime.setConnected(true);
@@ -194,8 +198,10 @@ function transport(mqtt: MqttClient): Transport {
   };
 }
 
+// Rejection is a simulator protocol scenario, not an optional production-runtime
+// constructor hook. Normal configuration always reaches the shared runtime.
 async function rejectDesired(mqtt: MqttClient, topic: string, payload: Buffer): Promise<void> {
-  let desired: unknown;
+  let desired;
   try {
     desired = JSON.parse(payload.toString('utf8'));
   } catch {
@@ -215,8 +221,8 @@ async function rejectDesired(mqtt: MqttClient, topic: string, payload: Buffer): 
     mqtt,
     topic.replace(/desired$/, 'reported'),
     {
-      revision: (desired as { revision?: number })?.revision ?? 0,
-      contentHash: (desired as { contentHash?: string })?.contentHash ?? '',
+      revision: desired?.revision ?? 0,
+      contentHash: desired?.contentHash ?? '',
       errors: [
         ...validateDesired(desired),
         { path: '$', code: 'simulated_rejection', message: 'configuration rejected by simulator scenario' },
@@ -235,8 +241,11 @@ function parseValues(value: string | undefined): Record<string, boolean | number
   const parsed = JSON.parse(value) as Record<string, unknown>;
   if (
     !parsed ||
+    typeof parsed !== 'object' ||
     Array.isArray(parsed) ||
-    Object.values(parsed).some((item) => typeof item !== 'boolean' && typeof item !== 'number')
+    Object.values(parsed).some(
+      (item) => typeof item !== 'boolean' && (typeof item !== 'number' || !Number.isFinite(item)),
+    )
   )
     throw new Error('WAGO_INITIAL_VALUES must be a JSON object with boolean or numeric values');
   return parsed as Record<string, boolean | number>;
@@ -300,20 +309,25 @@ function logConnectionError(error: Error): void {
 }
 process.on('SIGTERM', () => {
   timers.forEach(clearInterval);
-  client?.end(true, () => process.exit(0));
+  if (client) client.end(true, () => process.exit(0));
+  else process.exit(0);
 });
 
-// IPC is used only by the integration harness to inspect the in-memory device.
-process.on('message', (message: { type?: string; id?: string; channelId?: string }) => {
-  if (message.type !== 'simulator-read' || !message.id || !message.channelId || !process.send) return;
-  void device
-    .readChannel(message.channelId)
-    .then((value) => process.send?.({ type: 'simulator-read-result', id: message.id, value }))
-    .catch((error: unknown) =>
-      process.send?.({
-        type: 'simulator-read-result',
-        id: message.id,
-        error: error instanceof Error ? error.message : String(error),
-      }),
-    );
+// An IPC parent can inspect the actual in-memory device independently of MQTT
+// reported state. There is no listener or control port in ordinary CLI/Docker use.
+process.on('message', (message: unknown) => {
+  if (!process.send || !message || typeof message !== 'object') return;
+  const request = message as { type?: string; id?: string; channelId?: string };
+  if (request.type !== 'simulator-read' || typeof request.id !== 'string' || typeof request.channelId !== 'string')
+    return;
+  void handleAsync(async () => {
+    const snapshot = (await store.load()).accepted?.snapshot;
+    const channel = snapshot?.logicalChannels.find((item) => item.id === request.channelId);
+    const point = snapshot?.physicalPoints.find((item) => item.id === channel?.physicalPointId);
+    if (!point) {
+      process.send?.({ type: 'simulator-read-result', id: request.id, error: 'unknown channel' });
+      return;
+    }
+    process.send?.({ type: 'simulator-read-result', id: request.id, value: await device.read(point) });
+  });
 });

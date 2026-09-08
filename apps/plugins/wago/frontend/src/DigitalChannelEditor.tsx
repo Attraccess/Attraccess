@@ -1,7 +1,10 @@
 import { Button, Checkbox, Input, Label, ListBox, Select, TextField } from '@heroui/react';
+import type { ReactNode } from 'react';
 import type { Channel } from './configuration-model';
 import { pointLabel } from './configuration-model';
 import type { ConfigurationEditorMetadata, WagoConfigurationSnapshot } from './api';
+import { ModbusPointForm } from './ModbusConfigurationForm';
+import { bindModbusPoint, emptyModbus } from './modbus-editor';
 import { availableDigitalTerminals } from '../../backend/configuration-digital';
 
 export function Choice({
@@ -79,6 +82,7 @@ export function DigitalChannelEditor({
   onRename,
   onRemove,
   onAssign,
+  assignment,
 }: {
   channel: Channel;
   snapshot: WagoConfigurationSnapshot;
@@ -87,6 +91,7 @@ export function DigitalChannelEditor({
   onRename: (id: string, name: string) => void;
   onRemove: () => void;
   onAssign: (terminal: number) => void;
+  assignment?: ReactNode;
 }) {
   const inputs = snapshot.logicalChannels
     .filter((item) => item.id !== channel.id && item.capabilities.includes('input'))
@@ -120,15 +125,17 @@ export function DigitalChannelEditor({
           onChange={(event) => onRename(channel.id, event.target.value)}
         />
       </TextField>
-      <Choice
-        label="Physical terminal"
-        value={String(point.channel)}
-        options={availableDigitalTerminals(snapshot, output ? 'output' : 'input', point.id).map((terminal) => ({
-          id: String(terminal.channel),
-          label: `CC100 ${terminal.label}`,
-        }))}
-        onChange={(value) => onAssign(Number(value))}
-      />
+      {assignment ?? (
+        <Choice
+          label="Physical terminal"
+          value={String(point.channel)}
+          options={availableDigitalTerminals(snapshot, output ? 'output' : 'input', point.id).map((terminal) => ({
+            id: String(terminal.channel),
+            label: `CC100 ${terminal.label}`,
+          }))}
+          onChange={(value) => onAssign(Number(value))}
+        />
+      )}
       <TextField isRequired>
         <Label>Physical point label</Label>
         <Input
@@ -248,7 +255,7 @@ export function DigitalChannelEditor({
           {!inputs.length && <p>Add a digital input to configure guards or feedback.</p>}
         </>
       )}
-      {channel.capabilities.includes('input') && (
+      {(channel.capabilities.includes('input') || channel.capabilities.includes('measurement')) && (
         <>
           <Checkbox
             isSelected={!!channel.range}
@@ -306,17 +313,27 @@ export function PhysicalAssignments({
 }) {
   const unused = snapshot.physicalPoints.filter(
     (point) =>
-      point.hardwareProfile === '751-9301' &&
+      (point.hardwareProfile === '751-9301' || point.hardwareProfile === 'modbus') &&
       !snapshot.logicalChannels.some((channel) => channel.physicalPointId === point.id),
   );
   if (!unused.length) return null;
   return (
-    <section aria-label="Unused physical assignments">
+    <section aria-label="Unused physical assignments" className="wg:min-w-0">
       <h3>Unused physical assignments</h3>
       {unused.map((point) => (
-        <div key={point.id}>
-          <p>{pointLabel(point, metadata.names)}</p>
+        <fieldset key={point.id} className="wg:flex wg:min-w-0 wg:flex-col wg:gap-3">
+          <legend className="wg:max-w-full wg:whitespace-normal wg:break-words">
+            {pointLabel(point, metadata.names)}
+          </legend>
+          {point.hardwareProfile === 'modbus' && (
+            <ModbusPointForm
+              configuration={snapshot.modbus ?? emptyModbus}
+              value={point.modbus ?? { deviceId: '' }}
+              onChange={(binding) => onChange(bindModbusPoint(snapshot, point.id, binding))}
+            />
+          )}
           <Button
+            className="wg:h-auto wg:min-h-10 wg:whitespace-normal wg:py-2"
             variant="secondary"
             onPress={() =>
               onChange({ ...snapshot, physicalPoints: snapshot.physicalPoints.filter((item) => item.id !== point.id) })
@@ -324,7 +341,7 @@ export function PhysicalAssignments({
           >
             Release {pointLabel(point, metadata.names)}
           </Button>
-        </div>
+        </fieldset>
       ))}
     </section>
   );

@@ -11,8 +11,9 @@ import {
   runtimeBundleInstallScript,
   WagoCommissioningService,
 } from './wago-commissioning.service';
-import { WagoService } from './wago.service';
+import { WagoService, WagoCredentialOperationUncertainError } from './wago.service';
 import { WagoController } from './wago-controller.entity';
+import type { CommissioningOperationGuard } from './wago-commissioning-lease';
 
 jest.mock('node:child_process', () => ({ spawn: jest.fn() }));
 jest.mock('./wago-commissioning-lease', () => ({
@@ -34,6 +35,98 @@ const secrets = {
 };
 
 describe('WagoCommissioningService', () => {
+  it.each([null, 7])('checks ownership immediately before session deletion (enrollment %p)', async (enrollmentId) => {
+    const { service, repository, wago } = securityHarness({ deliveryToken: null, enrollmentId });
+    const remove = jest.fn();
+    Object.assign(repository, { delete: remove });
+    let owned = true;
+    Object.assign(wago, {
+      deleteEnrollmentById: jest.fn(async () => {
+        owned = false;
+      }),
+    });
+    const guard: CommissioningOperationGuard = {
+      assertOwned: async () => {
+        if (!owned) throw new Error('lease_lost');
+      },
+      signal: new AbortController().signal,
+      deadline: Date.now() + 60_000,
+    };
+    // Isolate the final local guard from the lease runner's eventual final check.
+    jest.spyOn(service['leases'], 'run').mockImplementation(async (_fingerprint, operation) => {
+      if (enrollmentId === null) owned = false;
+      return operation(guard);
+    });
+    await expect(service.remove(1)).rejects.toThrow('lease_lost');
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it('releases a settled local rejection so a corrected request can retry', async () => {
+    const { service } = securityHarness();
+    const release = jest.fn();
+    jest.spyOn(service['leases'], 'run').mockImplementation(async (_fingerprint, operation) => {
+      const value = await operation({
+        assertOwned: async () => undefined,
+        signal: new AbortController().signal,
+        deadline: Date.now() + 60_000,
+      });
+      release();
+      return value;
+    });
+    await expect(
+      service['withControllerLock'](1, async () => {
+        throw new Error('qualification_required');
+      }),
+    ).rejects.toThrow('qualification_required');
+    expect(release).toHaveBeenCalledTimes(1);
+    await expect(service['withControllerLock'](1, async () => 'retry')).resolves.toBe('retry');
+    expect(release).toHaveBeenCalledTimes(2);
+  });
+
+  it('retains the controller lease for an uncertain manual MQTT handoff', async () => {
+    const { service } = securityHarness();
+    const release = jest.fn();
+    jest.spyOn(service['leases'], 'run').mockImplementation(async (_fingerprint, operation) => {
+      const value = await operation({
+        assertOwned: async () => undefined,
+        signal: new AbortController().signal,
+        deadline: Date.now() + 60_000,
+      });
+      release();
+      return value;
+    });
+    await expect(
+      service['withControllerLock'](1, async () => {
+        throw new WagoCredentialOperationUncertainError('fixture timeout');
+      }),
+    ).rejects.toThrow('fixture timeout');
+    expect(release).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])('does not resolve the lease callback after a remote failure (caught %p)', async (caught) => {
+    const { service } = securityHarness();
+    const release = jest.fn();
+    jest.spyOn(service['leases'], 'run').mockImplementation(async (_fingerprint, operation) => {
+      const value = await operation({
+        assertOwned: async () => undefined,
+        signal: new AbortController().signal,
+        deadline: Date.now() + 60_000,
+      });
+      release();
+      return value;
+    });
+    await expect(
+      service['withControllerLock'](1, async () => {
+        const remote = service['remoteOperation'](async () => {
+          throw new Error('transport disconnected');
+        });
+        if (caught) return remote.catch(() => ({ state: 'delivery_failed' }));
+        return remote;
+      }),
+    ).rejects.toThrow(caught ? 'Remote completion is uncertain' : 'transport disconnected');
+    expect(release).not.toHaveBeenCalled();
+  });
+
   function securityHarness(overrides: Partial<WagoCommissioningSession> = {}, Service = WagoCommissioningService) {
     const session = {
       id: 1,
@@ -401,7 +494,7 @@ describe('WagoCommissioningService', () => {
   });
 
   it.each(['success', 'codesys', 'prerequisites', 'ca'])(
-    'delivery %s preserves secrets and cleans verified artifacts',
+    'delivery %s protects secrets and cleans verified artifacts',
     async (scenario) => {
       const fs = require('node:fs/promises') as typeof import('node:fs/promises');
       const bundle = Buffer.from('mock signed bundle');
@@ -418,11 +511,11 @@ describe('WagoCommissioningService', () => {
       }) as never);
       try {
         const { service, session, repository, wago, inspect, sudo, context } = securityHarness(
-          { firmwareBaseline: '31' },
+          { firmwareBaseline: '31', deliveryToken: null },
           configuredService(),
         );
         inspect.mockResolvedValue({
-          firmware: 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"',
+          firmware: 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"\nVERSION="4.9.1(31)"',
           codesys: scenario === 'codesys' ? 'active' : 'inactive',
         });
         const copy = jest.fn().mockResolvedValue(undefined);
@@ -466,21 +559,21 @@ describe('WagoCommissioningService', () => {
           temporarySsh: { username: 'root', password: 'explicit-ssh' },
         });
         expect(fs.rm).toHaveBeenCalledWith('/mock/staging', { recursive: true, force: true });
-        if (scenario === 'codesys' || scenario === 'prerequisites') {
+        if (scenario === 'prerequisites') {
           expect(result.state).toBe('delivery_failed');
           expect(copy).not.toHaveBeenCalled();
           expect(wago.createEnrollment).not.toHaveBeenCalled();
           expect(sudo).not.toHaveBeenCalled();
-          if (scenario === 'codesys') {
-            expect(result.failureReason).toContain('workload configuration cannot be safely preserved');
-            expect(install).not.toHaveBeenCalled();
-          }
+          expect(result.failureReason).toContain('permanently disabled');
+          expect(result.dockerProvisionState).toBe('recovery_required');
           return;
         }
         expect(result.state).toBe('awaiting_discovery');
         expect(sudo).not.toHaveBeenCalled();
         expect(copy).toHaveBeenCalledTimes(1);
-        expect(install).toHaveBeenCalledTimes(2);
+        expect(install).toHaveBeenCalledTimes(3);
+        expect(session.codesysState).toBe('disabled');
+        expect(install.mock.calls[0][3]).toContain('runtime-version=0');
         expect(copy.mock.calls[0][4]).toContain('flock -n 9');
         expect(copy.mock.calls[0][4]).toContain(
           Buffer.from(
@@ -523,7 +616,7 @@ describe('WagoCommissioningService', () => {
       confirmInstall: true,
       temporarySsh: { username: 'root', password: 'secret' },
     });
-    expect(result.progressStep).toBe('Runtime snapshot restored');
+    expect(result.progressStep).toBe('Runtime installation cleaned up');
     expect(result.state).toBe('revoked');
     expect(result.progressDetail).toContain('new commissioning session');
     expect(script.mock.calls[0][3]).toContain('flock -n 9');
@@ -608,8 +701,11 @@ describe('WagoCommissioningService', () => {
     );
   });
 
-  it('recognizes WAGO firmware revision 31 by its PTXdist BSP version', () => {
-    expect(isSupportedController('PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"', '31')).toBe(true);
+  it('requires a release identity as well as the PTXdist BSP version', () => {
+    expect(isSupportedController('PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"', '31')).toBe(false);
+    expect(
+      isSupportedController('PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"\nVERSION="4.9.1(31)"', '31'),
+    ).toBe(true);
     expect(isSupportedController('PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"', '32')).toBe(false);
   });
 

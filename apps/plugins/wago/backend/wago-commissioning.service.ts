@@ -1,3 +1,6 @@
+import { isCc100Fw31Identity } from './wago-firmware-identity';
+import { MANAGEMENT_INSPECTION_COMMAND } from './wago-management-inspection';
+import { ManagementPeerVersion } from './wago-management-peer-version';
 import {
   ConflictException,
   Inject,
@@ -15,7 +18,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PLUGIN_CONTEXT, PluginContext, Repository } from '@attraccess/plugins-backend-sdk';
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
-import { WagoService } from './wago.service';
+import { WagoService, WagoCredentialOperationUncertainError } from './wago.service';
 import { commissioningVerification } from './wago-commissioning-verification';
 import { WagoController } from './wago-controller.entity';
 import { assertCommissioningBroker } from './wago-commissioning-preflight';
@@ -34,9 +37,9 @@ import { restoreManagementKey } from './wago-management-key';
 import {
   wagoHardwareDeploymentReportScript,
   parseWagoHardwareDeploymentReport,
-  wagoDockerProvisionScript,
   wagoDockerProvisionRecoveryScript,
   wagoDockerProvisionFinishScript,
+  wagoCommissioningPreparationScript,
 } from './wago-hardware-deployment';
 import {
   runtimeBundleDeliveryScript,
@@ -89,6 +92,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
   private management!: WagoManagementService;
   private readonly leases = createWagoCommissioningLeaseService(this.context);
   private readonly operationContext = new AsyncLocalStorage<CommissioningOperationGuard>();
+  private readonly uncertainRemoteOperations = new WeakSet<CommissioningOperationGuard>();
   private readonly controllerLocks = new Map<string, Promise<void>>();
   private readonly deliveryLocks = new Map<number, Promise<void>>();
   private readonly transferWrites = new Map<number, Promise<void>>();
@@ -318,67 +322,86 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
                 );
                 session.platformReport = JSON.stringify(report);
               } else if (action === 'activate') {
-                if (session.dockerProvisionToken)
-                  throw new ConflictException('Recover the previous Docker provisioning attempt first.');
-                if (session.deliveryToken)
-                  throw new ConflictException('Recover the runtime delivery before changing Docker.');
-                const report = session.platformReport ? JSON.parse(session.platformReport) : null;
-                if (report?.provision !== 'review-start-installed-runtime')
-                  throw new ConflictException('Inspect the controller and review its supported Docker action first.');
-                session.dockerProvisionToken = randomBytes(16).toString('hex');
-                session.dockerProvisionState = 'starting';
-                await this.save(session, 'docker_start_requested');
-                await this.sudoRunScript(
-                  session.targetHost,
-                  session.hostKeyFingerprint,
-                  credential,
-                  wagoDockerProvisionScript({
-                    reviewedDockerActivation: true,
-                    action: 'start-installed-runtime',
-                    token: session.dockerProvisionToken,
-                  }),
-                );
-                session.dockerProvisionState = 'started';
+                await this.prepareController(session, credential);
               } else {
                 if (!session.dockerProvisionToken)
                   throw new ConflictException('No Docker provisioning attempt to recover.');
-                if (session.dockerProvisionState !== 'restored') {
-                  session.dockerProvisionState = 'recovering';
-                  await this.save(session, 'docker_recovery_requested');
-                  await this.sudoRunScript(
-                    session.targetHost,
-                    session.hostKeyFingerprint,
-                    credential,
-                    wagoDockerProvisionRecoveryScript(session.dockerProvisionToken),
-                  );
-                  session.dockerProvisionState = 'restored';
-                  await this.save(session, 'docker_restored');
-                }
-                await this.sudoRunScript(
-                  session.targetHost,
-                  session.hostKeyFingerprint,
-                  credential,
-                  wagoDockerProvisionFinishScript(session.dockerProvisionToken, 'restored'),
-                );
-                session.dockerProvisionToken = null;
-                session.dockerProvisionState = null;
+                await this.cleanupControllerPreparation(session, credential);
               }
               session.failureReason = null;
               return this.toResponse(await this.save(session, `platform_${action}_succeeded`));
             } catch (error) {
               if (error instanceof ConflictException) throw error;
-              if (action !== 'inspect' && session.dockerProvisionState !== 'restored')
-                session.dockerProvisionState = 'recovery_required';
+              if (action !== 'inspect') session.dockerProvisionState = 'recovery_required';
               session.failureReason =
                 action === 'inspect'
                   ? 'Controller preflight could not be read. Check the explicit SSH credential and supported firmware tools.'
-                  : 'Docker provisioning needs recovery. Restore any runtime transaction first, then retry Docker recovery.';
+                  : action === 'activate'
+                    ? 'Controller preparation failed. CODESYS must be stopped and permanently disabled before IO or runtime startup. Clean up the retained preparation attempt before retrying.'
+                    : 'Controller preparation cleanup remains unverified. Clean up any runtime transaction first, then retry preparation cleanup. The recovery token is retained; previous workloads are not restored.';
               return this.toResponse(await this.save(session, `platform_${action}_failed`));
             }
           }),
         ),
       (result) => !result.failureReason,
     );
+  }
+
+  private async cleanupControllerPreparation(
+    session: WagoCommissioningSession,
+    credential: TemporarySshCredential,
+  ): Promise<void> {
+    if (!session.dockerProvisionToken) return;
+    if (session.dockerProvisionState !== 'restored') {
+      session.dockerProvisionState = 'recovering';
+      await this.save(session, 'controller_preparation_cleanup_started');
+      await this.sudoRunScript(
+        session.targetHost,
+        session.hostKeyFingerprint,
+        credential,
+        wagoDockerProvisionRecoveryScript(session.dockerProvisionToken),
+      );
+      session.dockerProvisionState = 'restored';
+      await this.save(session, 'controller_preparation_cleanup_verified');
+    }
+    await this.sudoRunScript(
+      session.targetHost,
+      session.hostKeyFingerprint,
+      credential,
+      wagoDockerProvisionFinishScript(session.dockerProvisionToken, 'restored'),
+    );
+    session.dockerProvisionToken = null;
+    session.dockerProvisionState = null;
+    await this.save(session, 'controller_preparation_cleaned_up');
+  }
+
+  /** Persist ownership before destructive host changes so interruption is recoverable. */
+  private async prepareController(
+    session: WagoCommissioningSession,
+    credential: TemporarySshCredential,
+  ): Promise<void> {
+    if (session.deliveryToken)
+      throw new ConflictException('Clean up the retained runtime installation before preparing the controller.');
+    if (session.dockerProvisionToken && session.dockerProvisionState !== 'started')
+      throw new ConflictException('Clean up the retained controller preparation before retrying.');
+    session.dockerProvisionToken ??= randomBytes(16).toString('hex');
+    session.dockerProvisionState = 'starting';
+    await this.save(session, 'controller_preparation_started');
+    try {
+      await this.sudoRunScript(
+        session.targetHost,
+        session.hostKeyFingerprint,
+        credential,
+        wagoCommissioningPreparationScript(session.dockerProvisionToken),
+      );
+      session.dockerProvisionState = 'started';
+      session.codesysState = 'disabled';
+      await this.save(session, 'controller_prepared');
+    } catch (error) {
+      session.dockerProvisionState = 'recovery_required';
+      await this.save(session, 'controller_preparation_failed');
+      throw error;
+    }
   }
 
   async managementStatus(id: number) {
@@ -494,19 +517,32 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             return await this.management.inspect(
               { controllerId: subject, host: session.targetHost, hostKeyFingerprint: session.hostKeyFingerprint },
               input.temporarySsh,
+              this.operationContext.getStore()?.assertOwned,
             );
           if (action === 'review')
-            return await this.management.review(subject, { mode: input.mode, exceptions: input.exceptions });
+            return await this.management.review(
+              subject,
+              { mode: input.mode, exceptions: input.exceptions },
+              this.operationContext.getStore()?.assertOwned,
+            );
           if (action === 'apply')
-            return await this.management.apply(subject, {
-              reviewToken: input.reviewToken,
+            return await this.management.apply(
+              subject,
+              {
+                reviewToken: input.reviewToken,
+                confirm: input.confirm as true,
+                temporarySsh: input.temporarySsh,
+              },
+              this.operationContext.getStore()?.assertOwned,
+            );
+          return await this.management.recover(
+            subject,
+            {
               confirm: input.confirm as true,
               temporarySsh: input.temporarySsh,
-            });
-          return await this.management.recover(subject, {
-            confirm: input.confirm as true,
-            temporarySsh: input.temporarySsh,
-          });
+            },
+            this.operationContext.getStore()?.assertOwned,
+          );
         } catch (error) {
           throw new ConflictException(
             error instanceof ManagementError
@@ -573,20 +609,22 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       // A dedicated short-lived agent holds only this generated identity. The key
       // enters via stdin, never argv or a disk file; the agent exits with SSH and
       // its 30-second key TTL also bounds credentials after a client crash.
-      const output = await runProcess(
-        'ssh-agent',
-        [
-          '-t',
-          '30',
-          '-a',
-          socket,
-          'sh',
-          '-c',
-          `ssh-add -t 30 - >/dev/null 2>&1 && exec ssh ${sshArguments.map(shellQuote).join(' ')}`,
-        ],
-        privateKey,
-        {},
-        { ...limits, signal: guard?.signal },
+      const output = await this.remoteOperation(() =>
+        runProcess(
+          'ssh-agent',
+          [
+            '-t',
+            '30',
+            '-a',
+            socket,
+            'sh',
+            '-c',
+            `ssh-add -t 30 - >/dev/null 2>&1 && exec ssh ${sshArguments.map(shellQuote).join(' ')}`,
+          ],
+          privateKey,
+          {},
+          { ...limits, signal: guard?.signal },
+        ),
       );
       const match = output.match(new RegExp(`^${nonce}\\n([0-9]+)\\n$`));
       if (!match) throw new Error('Management key proof failed');
@@ -687,11 +725,17 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         safeFailure = 'Unsupported CC100 model or firmware baseline.';
         throw new Error(safeFailure);
       }
-      if (inspection.codesys !== 'inactive') {
-        safeFailure =
-          'CODESYS is active or unknown. Delivery blocked because workload configuration cannot be safely preserved and restored.';
-        throw new Error(safeFailure);
-      }
+      await this.updateProgress(
+        session,
+        20,
+        'Preparing controller',
+        'Permanently disabling CODESYS, activating vendor Docker and preparing exclusive onboard IO.',
+      );
+      safeFailure =
+        'Controller preparation failed. CODESYS must be stopped and permanently disabled before IO or runtime startup. Clean up the retained preparation attempt before retrying.';
+      await this.prepareController(session, credential);
+      safeFailure =
+        'Runtime prerequisites failed. Check vendor Docker, exclusive onboard IO, available storage and required firmware tools.';
       await this.sudoRunScript(
         session.targetHost,
         session.hostKeyFingerprint,
@@ -705,6 +749,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         'set -eu; if test -f /etc/attraccess-wago/install.lock; then (exec 8</etc/attraccess-wago/install.lock; flock -n 8); fi; for path in /etc/attraccess-wago/delivery /var/lib/attraccess-wago-install-transaction /var/lib/attraccess-wago-install-transaction.restored /var/lib/attraccess-wago-install-transaction.cleanup /var/lib/attraccess-wago-install-transaction.accepted-cleanup; do test ! -e "$path"; done',
       );
       credentialsTouched = true;
+      safeFailure =
+        'Secure enrollment or runtime delivery failed. Clean up the retained installation before retrying; previous workloads will not be restored.';
       await this.revokeSessionEnrollment(session);
       await this.operationContext.getStore()?.assertOwned();
       const enrollment = await this.wago.createEnrollment(
@@ -786,7 +832,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       session.enrollmentExpiresAt = null;
       session.progressStep = 'Delivery failed';
       session.progressDetail =
-        'Review the blocker. If delivery was interrupted, explicitly recover the controller snapshot before retrying.';
+        'Review the blocker. Clean up any interrupted preparation or runtime installation before retrying. Cleanup will not restore CODESYS or previous workloads.';
       session.failureReason = safeFailure;
       return this.toResponse(await this.save(session, 'delivery_failed'));
     } finally {
@@ -834,8 +880,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
           throw new ConflictException('commissioning session has no runtime recovery ownership token');
         let restored = session.state === 'recovery_revocation_pending';
         try {
-          // Recovery restores the old environment verbatim. Broker availability must
-          // not prevent restoring a controller; no new credentials are provisioned.
+          // Cleanup must remain available even when the broker is unavailable.
+          // Destructive commissioning never promises restoration of old workloads.
           if (!restored)
             await this.sudoRunScript(
               session.targetHost,
@@ -846,9 +892,9 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
           restored = true;
           if (requiresNewSession) session.pairingCode = null;
           session.state = 'recovery_revocation_pending';
-          session.progressStep = 'Runtime snapshot restored';
+          session.progressStep = 'Runtime installation cleaned up';
           session.progressDetail =
-            'Previous container, environment and data restored. Readiness is unverified; restored broker credentials may have been revoked.';
+            'Failed runtime installation cleaned up. CODESYS remains disabled; previous workloads are not restored.';
           if (!session.pairingCode)
             session.progressDetail +=
               ' Remove the existing controller registration before creating a new commissioning session.';
@@ -860,6 +906,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             credential,
             runtimeBundleRecoveryAcknowledgementScript('', session.deliveryToken),
           );
+          await this.cleanupControllerPreparation(session, credential);
           await this.revokeSessionEnrollment(session);
           session.state = session.pairingCode ? 'delivery_failed' : 'revoked';
           session.deliveryToken = null;
@@ -872,10 +919,10 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
               : 'delivery_failed';
           session.progressStep = 'Recovery requires attention';
           session.progressDetail = restored
-            ? 'Runtime restored. Retry recovery to finish broker credential revocation; the controller will not be restored again.'
+            ? 'Runtime cleanup completed. Retry recovery to finish preparation cleanup and broker credential revocation.'
             : 'Recovery could not be confirmed. An active lock is never removed; retry explicit recovery after the active operation ends.';
           session.failureReason =
-            'Runtime recovery or credential revocation failed; inspect the retained snapshot before retrying delivery.';
+            'Installation cleanup or credential revocation failed; finish the retained recovery before retrying delivery.';
           return this.toResponse(await this.save(session, 'runtime_recovery_failed'));
         }
       }),
@@ -895,13 +942,22 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     try {
       const outcome = await this.leases.run(session.hostKeyFingerprint, (guard) =>
         this.operationContext.run(guard, async () => {
-          // Domain failures have settled locally and retain their remote recovery journals.
-          // A lost lease/crashed worker instead leaves the durable lease for explicit recovery.
+          let outcome: { value: T } | { error: unknown };
           try {
-            return { value: await operation() };
+            outcome = { value: await operation() };
           } catch (error) {
-            return { error };
+            if (error instanceof WagoCredentialOperationUncertainError) this.uncertainRemoteOperations.add(guard);
+            outcome = { error };
           }
+          if (this.uncertainRemoteOperations.has(guard)) {
+            if ('error' in outcome) throw outcome.error;
+            throw new ConflictException(
+              'Remote completion is uncertain. Explicit controller operation recovery is required.',
+            );
+          }
+          // The lease runner validates ownership before release. Settled local
+          // failures may release, while uncertain transport failures above may not.
+          return outcome;
         }),
       );
       if ('error' in outcome) throw outcome.error;
@@ -935,9 +991,9 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         const session = await this.sessions.findOneBy({ id });
         if (!session) throw new NotFoundException('commissioning session not found');
         if (session.deliveryToken)
-          throw new ConflictException('Recover the retained runtime snapshot before deleting this session.');
+          throw new ConflictException('Clean up the retained runtime installation before deleting this session.');
         if (session.dockerProvisionToken)
-          throw new ConflictException('Recover the saved Docker provisioning state before deleting this session.');
+          throw new ConflictException('Clean up the retained controller preparation before deleting this session.');
         if (session.managementControllerId) {
           const security = await this.management.status(session.managementControllerId);
           if (security && (security.recoveryRequired || ['key_enrolled', 'hardened'].includes(security.state)))
@@ -951,6 +1007,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             throw new ConflictException('Commissioning enrollment removal failed.');
           }
         }
+        await this.operationContext.getStore()?.assertOwned();
         await this.sessions.delete(id);
       }),
     );
@@ -959,6 +1016,36 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
   async removeByHardwareId(hardwareId: string): Promise<void> {
     const sessions = await this.sessions.find({ where: { hardwareId } });
     await Promise.all(sessions.map((session) => this.remove(session.id)));
+  }
+
+  async operateControllerSafely<T>(
+    id: number,
+    operation: (assertOwned: () => Promise<void>, guard: CommissioningOperationGuard) => Promise<T>,
+  ): Promise<T> {
+    const controller = await this.context.getRepository(WagoController).findOneBy({ id });
+    if (!controller) throw new NotFoundException('controller not found');
+    const sessions = await this.sessions.find({ where: { hardwareId: controller.hardwareId }, order: { id: 'DESC' } });
+    if (!sessions.length) {
+      const controller = new AbortController();
+      const guard = {
+        assertOwned: async () => {
+          if (controller.signal.aborted) throw new ConflictException('Controller operation ended');
+        },
+        signal: controller.signal,
+        deadline: Date.now() + 60_000,
+      };
+      try {
+        return await operation(guard.assertOwned, guard);
+      } finally {
+        controller.abort();
+      }
+    }
+    return this.withControllerLock(sessions[0].id, async () => {
+      const guard = this.operationContext.getStore();
+      if (!guard) throw new ConflictException('Controller operation ownership is unavailable.');
+      await guard.assertOwned();
+      return operation(guard.assertOwned, guard);
+    });
   }
 
   /** The HTTP audit wrapper belongs inside remove(), so removal is audited once by ATT-983. */
@@ -1106,7 +1193,10 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     const markerIndex = output.indexOf(marker);
     const firmware = markerIndex >= 0 ? output.slice(0, markerIndex) : output;
     const processes = markerIndex >= 0 ? output.slice(markerIndex + marker.length) : '';
-    return { firmware, codesys: markerIndex < 0 ? 'unknown' : /codesys/i.test(processes) ? 'active' : 'inactive' };
+    return {
+      firmware,
+      codesys: markerIndex < 0 ? 'unknown' : /codesys|plclinux_rt/i.test(processes) ? 'active' : 'inactive',
+    };
   }
 
   private sudoRun(
@@ -1135,6 +1225,19 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     return this.sudoRun(host, fingerprint, credential, 'base64 -d | sh', Buffer.from(script).toString('base64'));
   }
 
+  private async remoteOperation<T>(operation: () => Promise<T>): Promise<T> {
+    const guard = this.operationContext.getStore();
+    await guard?.assertOwned();
+    try {
+      return await operation();
+    } catch (error) {
+      // A local transport rejection cannot establish remote termination, even
+      // when a domain handler saves a failure response or attempts recovery.
+      if (guard) this.uncertainRemoteOperations.add(guard);
+      throw error;
+    }
+  }
+
   private async run(
     host: string,
     fingerprint: string,
@@ -1148,41 +1251,49 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     const dir = await mkdtemp(join(tmpdir(), 'attraccess-cc100-'));
     const knownHosts = join(dir, 'known_hosts');
     const askPass = join(dir, 'askpass');
+    const peer = command === MANAGEMENT_INSPECTION_COMMAND ? new ManagementPeerVersion() : undefined;
     try {
       await writeFile(knownHosts, await pinnedHostKey(host, fingerprint), { mode: 0o600 });
       await writeFile(askPass, '#!/bin/sh\nprintf \'%s\\n\' "$ATTRACCESS_SSH_PASSWORD"\n', { mode: 0o700 });
-      return await runProcess(
-        'ssh',
-        [
-          ...BOOTSTRAP_SSH_OPTIONS,
-          '-o',
-          'BatchMode=no',
-          '-o',
-          'NumberOfPasswordPrompts=1',
-          '-o',
-          'HostKeyAlgorithms=ssh-ed25519',
-          '-o',
-          'StrictHostKeyChecking=yes',
-          '-o',
-          `UserKnownHostsFile=${knownHosts}`,
-          '-o',
-          'ConnectTimeout=15',
-          `${credential.username}@${host}`,
-          `sh -c ${shellQuote(command)}`,
-        ],
-        input,
-        {
-          SSH_ASKPASS: askPass,
-          SSH_ASKPASS_REQUIRE: 'force',
-          DISPLAY: 'attraccess',
-          ATTRACCESS_SSH_PASSWORD: credential.password,
-        },
-        {
-          timeoutMs: limits?.timeoutMs ?? SSH_TIMEOUT_MS,
-          maxOutputBytes: limits?.maxOutputBytes ?? 65_536,
-          signal: guard?.signal,
-        },
+      const output = await this.remoteOperation(() =>
+        runProcess(
+          'ssh',
+          [
+            ...BOOTSTRAP_SSH_OPTIONS,
+            ...(peer ? ['-v'] : []),
+            '-o',
+            'BatchMode=no',
+            '-o',
+            'NumberOfPasswordPrompts=1',
+            '-o',
+            'HostKeyAlgorithms=ssh-ed25519',
+            '-o',
+            'StrictHostKeyChecking=yes',
+            '-o',
+            `UserKnownHostsFile=${knownHosts}`,
+            '-o',
+            'ConnectTimeout=15',
+            `${credential.username}@${host}`,
+            `sh -c ${shellQuote(command)}`,
+          ],
+          input,
+          {
+            SSH_ASKPASS: askPass,
+            SSH_ASKPASS_REQUIRE: 'force',
+            DISPLAY: 'attraccess',
+            ATTRACCESS_SSH_PASSWORD: credential.password,
+          },
+          {
+            timeoutMs: limits?.timeoutMs ?? SSH_TIMEOUT_MS,
+            maxOutputBytes: limits?.maxOutputBytes ?? 65_536,
+            signal: guard?.signal,
+            peerVersion: peer,
+          },
+        ),
       );
+      // -v's identification belongs to this authenticated, pinned SSH session.
+      // Root /proc executable access is unnecessary for a non-root account.
+      return peer ? output.replace(/\nEND=1\n$/, `\nDROPBEAR=${peer.result()}\nEND=1\n`) : output;
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -1207,34 +1318,36 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       // Keep the credential-bearing script off the API host's process arguments.
       // read consumes one line; the installer receives the remaining binary stream.
       const receiver = runtimeBundleStreamReceiver;
-      await uploadFile(
-        source,
-        [
-          ...BOOTSTRAP_SSH_OPTIONS,
-          '-o',
-          'BatchMode=no',
-          '-o',
-          'NumberOfPasswordPrompts=1',
-          '-o',
-          'HostKeyAlgorithms=ssh-ed25519',
-          '-o',
-          'StrictHostKeyChecking=yes',
-          '-o',
-          `UserKnownHostsFile=${knownHosts}`,
-          '-o',
-          'ConnectTimeout=15',
-          `${credential.username}@${host}`,
-          credential.username === 'root' ? `sh -c ${shellQuote(receiver)}` : `sudo -S sh -c ${shellQuote(receiver)}`,
-        ],
-        {
-          SSH_ASKPASS: askPass,
-          SSH_ASKPASS_REQUIRE: 'force',
-          DISPLAY: 'attraccess',
-          ATTRACCESS_SSH_PASSWORD: credential.password,
-        },
-        onProgress,
-        `${credential.username === 'root' ? '' : `${credential.password}\n`}${Buffer.from(script).toString('base64')}\n`,
-        guard?.signal,
+      await this.remoteOperation(() =>
+        uploadFile(
+          source,
+          [
+            ...BOOTSTRAP_SSH_OPTIONS,
+            '-o',
+            'BatchMode=no',
+            '-o',
+            'NumberOfPasswordPrompts=1',
+            '-o',
+            'HostKeyAlgorithms=ssh-ed25519',
+            '-o',
+            'StrictHostKeyChecking=yes',
+            '-o',
+            `UserKnownHostsFile=${knownHosts}`,
+            '-o',
+            'ConnectTimeout=15',
+            `${credential.username}@${host}`,
+            credential.username === 'root' ? `sh -c ${shellQuote(receiver)}` : `sudo -S sh -c ${shellQuote(receiver)}`,
+          ],
+          {
+            SSH_ASKPASS: askPass,
+            SSH_ASKPASS_REQUIRE: 'force',
+            DISPLAY: 'attraccess',
+            ATTRACCESS_SSH_PASSWORD: credential.password,
+          },
+          onProgress,
+          `${credential.username === 'root' ? '' : `${credential.password}\n`}${Buffer.from(script).toString('base64')}\n`,
+          guard?.signal,
+        ),
       );
     } finally {
       await rm(dir, { recursive: true, force: true });
@@ -1346,6 +1459,15 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             const session = await this.sessions.findOneBy({ id: candidate.id });
             if (!session || session.state === 'recovery_revocation_pending') return;
             if (
+              session.dockerProvisionToken &&
+              ['starting', 'recovering'].includes(session.dockerProvisionState ?? '')
+            ) {
+              session.dockerProvisionState = 'recovery_required';
+              session.failureReason =
+                'Controller preparation was interrupted. Clean up the retained attempt before retrying.';
+              await this.save(session, 'controller_preparation_interrupted');
+            }
+            if (
               ['completed', 'awaiting_verification', 'claim_interrupted'].includes(session.state) &&
               !session.pairingCode
             )
@@ -1380,7 +1502,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
             if (session.state === 'delivering') {
               session.state = 'delivery_failed';
               session.progressStep = 'Delivery interrupted';
-              session.progressDetail = 'Retry with explicit SSH credentials and installation confirmation.';
+              session.progressDetail =
+                'Clean up the retained preparation or runtime installation before retrying with explicit SSH credentials.';
               session.failureReason = 'Commissioning was interrupted.';
               await this.save(session, 'delivery_interrupted');
               await this.revokeSessionEnrollment(session);
@@ -1510,7 +1633,7 @@ function runProcess(
   args: string[],
   input?: string | Buffer,
   environment?: Record<string, string>,
-  limits: { timeoutMs: number; maxOutputBytes: number; signal?: AbortSignal } = {
+  limits: { timeoutMs: number; maxOutputBytes: number; signal?: AbortSignal; peerVersion?: ManagementPeerVersion } = {
     timeoutMs: SSH_TIMEOUT_MS,
     maxOutputBytes: 65_536,
   },
@@ -1540,7 +1663,7 @@ function runProcess(
         stop();
       } else stdout += chunk;
     });
-    child.stderr.on('data', () => undefined);
+    child.stderr.on('data', (chunk: Buffer) => limits.peerVersion?.write(chunk));
     child.on('error', () => {
       clearTimeout(timer);
       limits.signal?.removeEventListener('abort', stop);
@@ -1696,12 +1819,7 @@ function escapeRegExp(value: string): string {
 }
 
 export function isSupportedController(inspection: string, firmwareBaseline: string): boolean {
-  if (!inspection.includes('PTXDIST_PLATFORM_NAME="cc100"')) return false;
-  const reportedFirmware = inspection.match(/^VERSION_ID=["']?([^"'\r\n]+)["']?$/m)?.[1]?.trim();
-  if (reportedFirmware === firmwareBaseline.trim()) return true;
-
-  // WAGO CC100 firmware revision 31 is built on the 2024.12.0 PTXdist BSP.
-  return firmwareBaseline.trim() === '31' && reportedFirmware === '2024.12.0';
+  return firmwareBaseline.trim() === '31' && isCc100Fw31Identity(inspection);
 }
 
 export function resolveRuntimeSigningPublicKeyPath(

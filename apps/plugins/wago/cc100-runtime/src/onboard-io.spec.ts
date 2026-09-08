@@ -1,10 +1,13 @@
+import * as files from 'node:fs/promises';
+import { WriteAdmissionError } from './runtime-types';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Cc100OnboardIoAdapter } from './adapters';
-import { ModbusDeviceRouter } from './modbus/adapter';
 import { CC100_DIGITAL_PROFILE } from './onboard-profile';
 import { hash, JsonStateStore, WagoRuntime, type Snapshot, type Transport } from './runtime';
+
+jest.mock('node:fs/promises', () => ({ __esModule: true, ...jest.requireActual('node:fs/promises') }));
 
 const point = (channel: number): Snapshot['physicalPoints'][number] => ({
   id: `point-${channel}`,
@@ -168,15 +171,6 @@ describe('CC100 packed digital I/O', () => {
       expect.arrayContaining([expect.objectContaining({ code: 'invalid_direction' })]),
     );
     expect((await store.load()).accepted).toBeUndefined();
-  });
-
-  it('retains onboard validation when installed through the Modbus router', () => {
-    const invalid = structuredClone(snapshot);
-    invalid.logicalChannels.push({ ...snapshot.logicalChannels[0], id: 'DO1-alias' });
-    const router = new ModbusDeviceRouter(adapter);
-    expect(router.validate(invalid)).toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: 'duplicate_output' })]),
-    );
   });
 
   it('reports malformed referenced guard capabilities instead of throwing', async () => {
@@ -517,14 +511,17 @@ describe('CC100 packed digital I/O', () => {
     await command('DO1', true, 'allowed');
     expect(await readFile(paths.output, 'utf8')).toBe('1');
     await writeFile(paths.input, '1');
+    const publish = transport.publish;
+    const feedback = new Promise<void>((resolve) => {
+      jest.spyOn(transport, 'publish').mockImplementation(async (...args) => {
+        await publish(...args);
+        if ((args[1] as { code?: string }).code === 'feedback_mismatch') resolve();
+      });
+    });
     await jest.advanceTimersByTimeAsync(10);
-    // Timer callbacks perform real file I/O; flush until the feedback read finishes.
-    for (
-      let attempt = 0;
-      attempt < 100 && !messages.some(({ payload }) => payload.code === 'feedback_mismatch');
-      attempt++
-    )
-      await new Promise<void>((resolve) => setImmediate(resolve));
+    // Wait for the actual file-I/O completion event. A fixed number of event-loop
+    // spins can finish before the filesystem callback on a busy CI runner.
+    await feedback;
     expect(messages.some(({ payload }) => payload.code === 'feedback_mismatch')).toBe(true);
   });
 
@@ -566,5 +563,41 @@ describe('CC100 packed digital I/O', () => {
     await command('DO1', true);
     expect(messages.at(-1)?.payload.code).toBe('unsupported_point');
     expect(await readFile(paths.output, 'utf8')).toBe('0');
+  });
+});
+
+describe('packed output admission', () => {
+  it('checks expiry after the physical register read and before changing any bits', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'cc100-admission-'));
+    const output = join(directory, 'dout');
+    const release = deferred();
+    const entered = deferred();
+    const originalRead = files.readFile;
+    let expired = false;
+    try {
+      await writeFile(output, '8');
+      jest.spyOn(files, 'readFile').mockImplementation(async (...args: Parameters<typeof files.readFile>) => {
+        const value = await originalRead(...args);
+        if (args[0] === output) {
+          entered.resolve();
+          await release.promise;
+        }
+        return value;
+      });
+      const adapter = new Cc100OnboardIoAdapter({ input: join(directory, 'din'), output });
+      const writing = adapter.write(point(0), true, () => {
+        if (expired) throw new WriteAdmissionError('expired');
+      });
+      const rejected = expect(writing).rejects.toMatchObject({ code: 'expired' });
+      await entered.promise;
+      expired = true;
+      release.resolve();
+      await rejected;
+      expect(await originalRead(output, 'utf8')).toBe('8');
+    } finally {
+      release.resolve();
+      jest.restoreAllMocks();
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });

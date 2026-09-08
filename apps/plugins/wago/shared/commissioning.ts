@@ -7,10 +7,16 @@ export interface WagoHardwareDeploymentReport {
   version: '1';
   platform: 'supported' | 'unsupported-firmware';
   hardware: 'accessible' | 'missing-register' | 'uid10001-access-denied' | 'permission-tool-unavailable';
-  exclusivity: 'clear' | 'codesys-active' | 'output-container-conflict' | 'unknown';
+  exclusivity: 'clear' | 'codesys-active' | 'codesys-boot-enabled' | 'output-container-conflict' | 'unknown';
   docker: 'running' | 'installed-stopped' | 'vendor-package-missing' | 'unsupported-tool-state';
   configDocker: 'present' | 'missing';
   provision:
-    'none' | 'review-start-installed-runtime' | 'unsupported-fw31-package-activation' | 'unsupported-tool-state';
-  qualification: 'required';
+    | 'none'
+    | 'prepare-controller'
+    | 'install-vendor-runtime'
+    | 'review-start-installed-runtime'
+    | 'unsupported-fw31-package-activation'
+    | 'unsupported-tool-state'
+    | 'unsupported-lifecycle-dependencies';
+  qualification: 'software-supported' | 'required';
 }

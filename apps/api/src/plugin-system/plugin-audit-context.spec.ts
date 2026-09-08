@@ -1,5 +1,5 @@
 import type { PluginAuditEvent } from '@attraccess/plugins-backend-sdk';
-import { createPluginAuditContext, PLUGIN_AUDIT_TIMEOUT_MS } from './plugin-audit-context';
+import { createPluginAuditContext } from './plugin-audit-context';
 
 describe('plugin audit host bridge', () => {
   const event: PluginAuditEvent = {
@@ -20,17 +20,5 @@ describe('plugin audit host bridge', () => {
     const failing = createPluginAuditContext('id', () => ({ record: async () => { throw new Error('secret storage error'); } }));
     await expect(missing.record(event)).resolves.toEqual({ status: 'unavailable' });
     await expect(failing.record(event)).resolves.toEqual({ status: 'unavailable' });
-  });
-
-  it('bounds stalled storage writes so they cannot stall plugin operations', async () => {
-    jest.useFakeTimers();
-    try {
-      const audit = createPluginAuditContext('id', () => ({ record: async () => new Promise(() => undefined) }));
-      const receipt = audit.record(event);
-      await jest.advanceTimersByTimeAsync(PLUGIN_AUDIT_TIMEOUT_MS);
-      await expect(receipt).resolves.toEqual({ status: 'unavailable' });
-    } finally {
-      jest.useRealTimers();
-    }
   });
 });

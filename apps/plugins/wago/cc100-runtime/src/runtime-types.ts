@@ -1,3 +1,5 @@
+// eslint-disable-next-line @nx/enforce-module-boundaries
+import type { ModbusConfiguration, ModbusPoint } from '../../modbus/model';
 export type DisconnectPolicy = { mode: 'hold' | 'immediate' | 'watchdog'; timeoutMs?: number };
 
 export type Snapshot = {
@@ -26,12 +28,16 @@ export type Snapshot = {
 export type ValidationError = { path: string; code: string; message: string };
 
 export type RuntimeState = {
-  credentials?: { username: string; password: string; prefix?: string };
+  credentials?: { username: string; password: string; prefix?: string; credentialEpoch?: string };
+  credentialRotation?: { revision: number; token: string };
   accepted?: { revision: number; contentHash: string; snapshot: Snapshot };
   outputs: Record<string, boolean>;
+  uncertainOutputChannelIds?: string[];
+  /** Shutdown obligations use the accepted snapshot, whose routing remains locked until OFF is durable. */
+  pendingPulseChannelIds?: string[];
   commandIds: string[];
   commandExpiries?: Record<string, string>;
-  /** Highest sequence number durably reserved for operational messages. */
+  /** Highest reserved operational sequence; skipped unused values are intentional. */
   sequence?: number;
 };
 
@@ -40,16 +46,22 @@ export interface Transport {
   subscribe(topic: string, listener: (payload: Buffer) => void | Promise<void>): Promise<void>;
 }
 
+/** Optional absolute expiry also travels to a subprocess's final pre-send check. */
+export type WriteAdmission = (() => void) & { expiresAt?: number };
+
 export interface DeviceAdapter {
-  validate?(snapshot: Snapshot): ValidationError[];
-  activate?(snapshot: Snapshot): void;
   configure?(snapshot: Snapshot): void;
+  /** Prepare may throw; the returned synchronous installation must not throw. */
   prepareConfiguration?(snapshot: Snapshot): () => void;
   suspend?(): () => void;
   measurementSource?(point: Snapshot['physicalPoints'][number]): string;
   shouldPoll?(point: Snapshot['physicalPoints'][number], now: number): boolean;
+  /** True when a failed write may already have reached the physical device. */
+  writeMayHaveBeenTransmitted?(error: unknown): boolean;
+
+  validate?(snapshot: Snapshot): ValidationError[];
   checkAvailability?(): Promise<void>;
-  write(point: Snapshot['physicalPoints'][number], value: boolean): Promise<void>;
+  write(point: Snapshot['physicalPoints'][number], value: boolean, admit?: WriteAdmission): Promise<void>;
   read(point: Snapshot['physicalPoints'][number]): Promise<boolean | number>;
 }
 
@@ -57,5 +69,10 @@ export interface StateStore {
   load(): Promise<RuntimeState>;
   save(state: RuntimeState): Promise<void>;
 }
-// eslint-disable-next-line @nx/enforce-module-boundaries
-import type { ModbusConfiguration, ModbusPoint } from '../../modbus/model';
+
+/** A write was refused before physical transmission. */
+export class WriteAdmissionError extends Error {
+  constructor(readonly code: 'expired' | 'outage_ended') {
+    super(code === 'expired' ? 'command has expired' : 'disconnect outage has ended');
+  }
+}

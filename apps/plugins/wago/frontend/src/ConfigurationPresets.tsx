@@ -9,6 +9,7 @@ import type {
 import { useApplyPresetMutation, usePresetsQuery, usePreviewPresetMutation } from './queries';
 import { Choice } from './DigitalChannelEditor';
 import { ConfigurationChanges, ConfigurationErrors } from './ConfigurationChanges';
+import { boundMeasurement, emptyModbus } from './modbus-editor';
 import { isEditableDigitalChannel } from '../../backend/configuration-digital';
 
 export function ConfigurationPresets({
@@ -50,11 +51,17 @@ export function ConfigurationPresets({
     },
     [],
   );
-  const compatibleChannels = snapshot.logicalChannels.filter(
-    (item) =>
-      isEditableDigitalChannel(snapshot, item) &&
-      item.capabilities.includes(presetId === 'generic-monitored-input' ? 'input' : 'output'),
-  );
+  const compatibleChannels = snapshot.logicalChannels.filter((item) => {
+    const point = snapshot.physicalPoints.find((point) => point.id === item.physicalPointId);
+    if (presetId === 'metered-switched-load') {
+      const measurement = boundMeasurement(snapshot.modbus ?? emptyModbus, point?.modbus);
+      return !!point?.modbus?.actionId && measurement?.unit === 'watt' && measurement.kind === 'live';
+    }
+    return (
+      (isEditableDigitalChannel(snapshot, item) || (point?.hardwareProfile === 'modbus' && !!point.modbus?.actionId)) &&
+      item.capabilities.includes(presetId === 'generic-monitored-input' ? 'input' : 'output')
+    );
+  });
   const target = compatibleChannels.find((item) => item.id === channelId);
   const inputs = snapshot.logicalChannels
     .filter((item) => item.id !== channelId && item.capabilities.includes('input'))
@@ -66,6 +73,7 @@ export function ConfigurationPresets({
     ...(guardChannelId ? { guardChannelId } : {}),
     ...(feedbackChannelId ? { feedbackChannelId } : {}),
   };
+  const canCopy = !!result && !result.errors.length && (!result.diff.length || !!paths.length) && !busy;
   async function showPreview() {
     const current = generation.current;
     setError(null);
@@ -80,7 +88,7 @@ export function ConfigurationPresets({
     }
   }
   async function copyChanges() {
-    if (!result) return;
+    if (!result || !canCopy) return;
     const current = generation.current;
     setError(null);
     try {
@@ -106,9 +114,7 @@ export function ConfigurationPresets({
       <Choice
         label="Preset"
         value={presetId}
-        options={(presets.data ?? [])
-          .filter((item) => item.id !== 'metered-switched-load')
-          .map((item) => ({ id: item.id, label: item.name }))}
+        options={(presets.data ?? []).map((item) => ({ id: item.id, label: item.name }))}
         onChange={(id) => {
           setPresetId(id as typeof presetId);
           setChannelId('');
@@ -122,12 +128,12 @@ export function ConfigurationPresets({
         onChange={setChannelId}
       />
       {!compatibleChannels.length && (
-        <p>Add a digital {presetId === 'generic-monitored-input' ? 'input' : 'output'} to use this preset.</p>
+        <p>
+          {presetId === 'metered-switched-load'
+            ? 'Bind a live power measurement and a named output action to the same Modbus point to use this preset.'
+            : `Add a digital ${presetId === 'generic-monitored-input' ? 'input' : 'output'} or a compatible Modbus output to use this preset.`}
+        </p>
       )}
-      <p>
-        Metered switched loads remain available in existing configurations. New metered loads require the Modbus editor
-        integration.
-      </p>
       {presetId === 'guarded-enable-request' && (
         <Choice label="Guard input" value={guardChannelId} options={inputs} onChange={setGuardChannelId} />
       )}
@@ -161,11 +167,11 @@ export function ConfigurationPresets({
           />
           <ConfigurationErrors errors={result.errors} snapshot={result.snapshot} names={metadata.names} />
           <Button
-            isDisabled={!paths.length || preview.isPending}
+            isDisabled={!canCopy}
             isPending={apply.isPending}
             onPress={() => void copyChanges()}
           >
-            Copy selected changes to local edits
+            {result.diff.length ? 'Copy selected changes to local edits' : 'Reapply preset to local edits'}
           </Button>
         </>
       )}

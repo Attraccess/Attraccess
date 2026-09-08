@@ -16,7 +16,7 @@ import type { Key } from '@heroui/react';
 import { AlertCircleIcon, CheckCircle2Icon, CpuIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { CommissioningSession } from './api';
-import { getCommissioningVerification } from './api';
+import { getCommissioningSupport, getCommissioningVerification } from './api';
 import { RuntimeArtifactImport } from './RuntimeArtifactImport';
 import type { RuntimeArtifactInfo } from './RuntimeArtifactImport';
 import { CommissioningSecurityPanel } from './CommissioningSecurityPanel';
@@ -60,6 +60,12 @@ export function CommissioningModal({
   const [createdSession, setCreatedSession] = useState<CommissioningSession | null>(null);
   const [artifactBusy, setArtifactBusy] = useState(false);
   const [selectedArtifact, setSelectedArtifact] = useState<RuntimeArtifactInfo | null>(null);
+  const supportQuery = useQuery({
+    queryKey: ['wago', 'commissioning-support'],
+    queryFn: getCommissioningSupport,
+    enabled: isOpen && !resumedSession,
+  });
+  const artifactAvailable = selectedArtifact !== null || supportQuery.data?.ready === true;
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [controllerIp, setControllerIp] = useState('');
@@ -98,8 +104,8 @@ export function CommissioningModal({
     removeSessionMutation.isPending;
   const loadingStatus = recoverSessionMutation.isPending
     ? [
-        'Recovering saved runtime',
-        'Restoring the saved container, data, and environment. Broker credential revocation cannot be undone.',
+        'Cleaning up failed installation',
+        'Cleaning up the runtime installation and credentials. CODESYS and preexisting workloads are not restored.',
       ]
     : createSessionMutation.isPending
       ? [
@@ -156,7 +162,7 @@ export function CommissioningModal({
   }
 
   function createSession() {
-    if (artifactBusy || !selectedArtifact) return;
+    if (artifactBusy || !artifactAvailable) return;
     if (selectedMqttServerId === null) return;
     createSessionMutation.mutate(
       {
@@ -307,12 +313,13 @@ export function CommissioningModal({
                 <Alert status="warning">
                   <Alert.Indicator />
                   <Alert.Content>
-                    <Alert.Title>Recover the saved runtime</Alert.Title>
+                    <Alert.Title>Clean up failed installation</Alert.Title>
                     <Alert.Description>
-                      Recovery interrupts the current runtime and restores the saved container, data, and environment,
-                      if a snapshot exists. It cannot undo broker credential revocation; the restored runtime may be
-                      unable to connect. A missing snapshot will produce an error. Recovery does not certify readiness.
-                      Nothing is restored automatically, and this action does not discard the backup.
+                      Cleanup interrupts the Attraccess runtime and reconciles this installation and its credentials.
+                      It cannot undo broker credential revocation or restore CODESYS, other applications, Docker host
+                      settings, or data erased during commissioning. It does not re-enable CODESYS. An incomplete cleanup
+                      keeps its recovery record for another attempt. Cleanup does not certify readiness and is never
+                      automatic.
                     </Alert.Description>
                   </Alert.Content>
                 </Alert>
@@ -331,12 +338,12 @@ export function CommissioningModal({
                   onChange={setConfirmRecovery}
                   name="confirm-recovery"
                 >
+                  <Checkbox.Control>
+                    <Checkbox.Indicator />
+                  </Checkbox.Control>
                   <Checkbox.Content>
-                    <Checkbox.Control>
-                      <Checkbox.Indicator />
-                    </Checkbox.Control>
-                    I approve interrupting the current runtime and restoring the saved container, data, and environment
-                    for this recovery attempt.
+                    I approve interrupting the Attraccess runtime and cleaning up this failed installation. This does
+                    not restore preexisting applications or data.
                   </Checkbox.Content>
                 </Checkbox>
                 <p className="wg:text-sm wg:text-muted">
@@ -371,7 +378,7 @@ export function CommissioningModal({
             isDisabled={isLoading || !confirmRecovery || !recoveryUsername.trim() || !recoveryPassword}
             onPress={recoverSession}
           >
-            Recover saved runtime
+            Clean up failed installation
           </Button>
         )}
         <Button variant="secondary" onPress={isCancelConfirmationOpen ? () => setCancelConfirmationOpen(false) : close}>
@@ -393,7 +400,7 @@ export function CommissioningModal({
             isPending={isLoading}
             isDisabled={
               artifactBusy ||
-              !selectedArtifact ||
+              !artifactAvailable ||
               !controllerIp.trim() ||
               selectedMqttServerId === null ||
               mqttServersQuery.isPending ||
@@ -415,6 +422,7 @@ export function CommissioningModal({
         )}
         {session && canInstall(session) && (
           <Button
+            variant="danger"
             isPending={isLoading}
             isDisabled={isLoading || !confirmInstall || !sshUsername.trim() || !sshPassword}
             onPress={deliverSession}
@@ -650,16 +658,7 @@ function canInstall(session: CommissioningSession) {
 }
 
 function canRecover(session: CommissioningSession) {
-  return (
-    !!session.runtimeRecoveryAvailable ||
-    [
-      'delivery_failed',
-      'awaiting_discovery',
-      'awaiting_verification',
-      'claim_interrupted',
-      'recovery_revocation_pending',
-    ].includes(session.state)
-  );
+  return session.runtimeRecoveryAvailable === true;
 }
 
 function CredentialFields({
@@ -724,12 +723,13 @@ function DeliveryStep({
           <Alert status="warning">
             <Alert.Indicator />
             <Alert.Content>
-              <Alert.Title>Review this installation attempt</Alert.Title>
+              <Alert.Title>Destructive installation</Alert.Title>
               <Alert.Description>
-                Installing on {session.targetHost} replaces an existing Attraccess runtime container. Make sure
-                connected equipment can safely tolerate the interruption. An active CODESYS workload blocks this release
-                until its backup and restoration procedure is qualified; it will not be stopped automatically.
-                Installation does not certify management hardening or physical readiness.
+                Installing Attraccess on {session.targetHost} takes over this controller. Existing applications and
+                workloads may stop working or be erased. CODESYS will be stopped and permanently disabled before
+                digital I/O is enabled; installation fails if this cannot be verified. Attraccess does not preserve,
+                back up, or restore preexisting CODESYS applications or other workloads. Make connected equipment safe
+                for the interruption. Installation does not certify management hardening or physical readiness.
               </Alert.Description>
             </Alert.Content>
           </Alert>
@@ -747,12 +747,12 @@ function DeliveryStep({
             onChange={onConfirmInstallChange}
             name="confirm-install"
           >
+            <Checkbox.Control>
+              <Checkbox.Indicator />
+            </Checkbox.Control>
             <Checkbox.Content>
-              <Checkbox.Control>
-                <Checkbox.Indicator />
-              </Checkbox.Control>
-              I approve interruption and replacement of the existing Attraccess runtime container for this installation
-              attempt.
+              I approve this destructive installation, including permanent CODESYS disablement and possible loss of
+              existing applications and data, without preservation, backup, or restoration by Attraccess.
             </Checkbox.Content>
           </Checkbox>
           <p className="wg:text-sm wg:text-muted">
@@ -804,7 +804,6 @@ function VerificationStatus({
     queryFn: () => getCommissioningVerification(session.id),
     refetchInterval: 5000,
   });
-  const controllerId = verification.data?.controllerId ?? session.managementControllerId;
   return (
     <div className="wg:space-y-3">
       <Alert status="warning">
@@ -831,12 +830,16 @@ function VerificationStatus({
           </Alert.Description>
         </Alert.Content>
       </Alert>
-      {controllerId && (
+      {(verification.data?.controllerId || session.managementControllerId) && (
         <>
           {onConfigure && verification.data?.controllerId && (
-            <Button onPress={() => onConfigure(verification.data.controllerId)}>Configure inputs and outputs</Button>
+            <Button onPress={() => onConfigure(verification.data!.controllerId!)}>Configure inputs and outputs</Button>
           )}
-          <CommissioningSecurityPanel key={session.id} sessionId={session.id} controllerId={controllerId} />
+          <CommissioningSecurityPanel
+            key={session.id}
+            sessionId={session.id}
+            controllerId={verification.data?.controllerId ?? session.managementControllerId!}
+          />
         </>
       )}
     </div>

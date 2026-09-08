@@ -28,9 +28,10 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
   } catch {
     /* Unknown status is not approval. */
   }
-  const recovery = !!current.dockerProvisionState;
+  const recovery = !!current.dockerProvisionState && current.runtimeRecoveryAvailable !== true;
+  const codesysDisabled = current.codesysState === 'disabled';
 
-  async function run(action: 'inspect' | 'activate' | 'recover') {
+  async function run(action: 'inspect' | 'recover') {
     if (busy || !form.current?.reportValidity() || (action !== 'inspect' && !approved)) return;
     const values = new FormData(form.current);
     const temporarySsh = {
@@ -66,11 +67,19 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
     <section className="wg:space-y-3" aria-label="Controller installation preflight">
       <h3>Controller installation preflight</h3>
       <p>
-        Inspect firmware, exact digital registers, UID 10001 permissions, exclusive output access and Docker before
-        installation. This does not change the controller.
+        Optionally inspect firmware, digital I/O access, CODESYS and Docker before installation. Inspection does not
+        change the controller. Installation checks these again under your destructive-install approval.
       </p>
+      {codesysDisabled && (
+        <p role="status">
+          Controller preparation verified CODESYS stopped and permanently disabled. This is a saved result, not a
+          live controller status check.
+        </p>
+      )}
       {report && (
         <dl>
+          <dt>Report source</dt>
+          <dd>Saved inspection snapshot; these values are not live controller status.</dd>
           <dt>Platform</dt>
           <dd>{report.platform}</dd>
           <dt>Hardware access</dt>
@@ -83,16 +92,29 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
           <dd>{report.provision}</dd>
         </dl>
       )}
+      {report?.platform === 'unsupported-firmware' && (
+        <p>
+          The controller has not reported an unambiguous CC100 FW31 release identity. A BSP version alone is
+          insufficient.
+        </p>
+      )}
+      {report && (
+        <p>
+          Installation prepares supported Docker and persistent, limited digital I/O access. It must verify CODESYS is
+          stopped and disabled before enabling I/O. An inspection report does not prove installation, management
+          hardening or physical qualification is complete.
+        </p>
+      )}
       {report?.hardware === 'uid10001-access-denied' && (
         <p>
-          The runtime account cannot access the digital registers with minimum permissions. A firmware-qualified
-          permission setup is required; installation will not switch to root or privileged mode.
+          The runtime account cannot currently access the digital registers. Installation must establish and verify
+          persistent access limited to the required input and output registers, or fail without enabling I/O.
         </p>
       )}
       {report?.hardware === 'permission-tool-unavailable' && (
         <p>
-          This firmware cannot yet verify runtime-account permissions with the available tools. Qualification is
-          required before installation.
+          The available tools cannot verify runtime-account permissions. A supported permission probe is needed before
+          installation can proceed.
         </p>
       )}
       {report?.hardware === 'missing-register' && (
@@ -101,10 +123,18 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
           will not create substitute directories.
         </p>
       )}
-      {report?.exclusivity === 'codesys-active' && (
+      {!codesysDisabled && report?.exclusivity === 'codesys-active' && (
         <p>
-          A PLC workload is active. Attraccess will not stop it until a recoverable firmware-specific transition is
-          qualified. This is not a WBM setup step.
+          CODESYS is active. Destructive installation will stop and permanently disable it. Existing PLC applications
+          and data may be lost; Attraccess will not preserve, back up, or restore them. Installation fails if CODESYS
+          cannot be verified stopped and disabled before I/O.
+        </p>
+      )}
+      {!codesysDisabled && report?.exclusivity === 'codesys-boot-enabled' && (
+        <p>
+          CODESYS is configured to start at boot. Destructive installation must disable that startup and verify
+          CODESYS is stopped before I/O. A stopped process alone is insufficient. No separate PLC preservation or
+          restoration approval is required.
         </p>
       )}
       {report?.exclusivity === 'output-container-conflict' && (
@@ -117,16 +147,25 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
           <Alert.Indicator />
           <Alert.Content>
             <Alert.Description>
-              The vendor Docker package is unavailable. Firmware-31 package activation and restoration must be qualified
-              before automatic activation. This is not a WBM setup requirement.
+              This report could not establish a supported Docker package installation path. Retry installation only
+              after the reported package or compatibility issue is resolved. An old inspection does not authorize
+              activation by itself.
             </Alert.Description>
           </Alert.Content>
         </Alert>
       )}
+      {report?.provision === 'unsupported-lifecycle-dependencies' && (
+        <p>
+          This report could not verify the Docker lifecycle dependencies. Installation must validate a supported
+          activation path before changing Docker. Vendor activation can change startup, routing and firewall settings;
+          preexisting settings are not restored by commissioning.
+        </p>
+      )}
       {current.dockerProvisionState && (
         <p role="status">
-          Saved Docker operation: {current.dockerProvisionState}. Restore any installed runtime snapshot before
-          restoring the Docker stopped state.
+          Saved controller preparation: {current.dockerProvisionState}. If runtime installation began, use Clean up
+          failed installation first. Preparation cleanup reconciles its operation record; it does not restore previous
+          workloads or host settings, re-enable CODESYS, or qualify physical I/O.
         </p>
       )}
       {current.failureReason && <p role="alert">{current.failureReason}</p>}
@@ -142,24 +181,23 @@ export function CommissioningPlatformPreflight({ session }: { session: Commissio
         <Button type="button" variant="secondary" isDisabled={busy} onPress={() => void run('inspect')}>
           Inspect installation prerequisites
         </Button>
-        {(report?.provision === 'review-start-installed-runtime' || recovery) && (
+        {recovery && (
           <>
             <Checkbox isSelected={approved} onChange={setApproved} isDisabled={busy}>
               <Checkbox.Control>
                 <Checkbox.Indicator />
               </Checkbox.Control>
               <Checkbox.Content>
-                {recovery
-                  ? 'I approve restoring the saved Docker stopped state after runtime recovery.'
-                  : 'I approve starting the already-installed Docker runtime. No vendor package will be installed or removed.'}
+                I approve cleaning up this controller preparation. Preexisting workloads and host settings will not
+                be restored.
               </Checkbox.Content>
             </Checkbox>
             <Button
               type="button"
               isDisabled={busy || !approved}
-              onPress={() => void run(recovery ? 'recover' : 'activate')}
+              onPress={() => void run('recover')}
             >
-              {recovery ? 'Recover Docker provisioning' : 'Start installed Docker runtime'}
+              Clean up controller preparation
             </Button>
           </>
         )}

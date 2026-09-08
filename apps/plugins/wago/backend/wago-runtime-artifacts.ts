@@ -263,10 +263,7 @@ export class WagoRuntimeArtifactCatalog {
     const info = await lstat(directory);
     if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('Invalid catalog object');
     try {
-      const metadata = storedMetadata(
-        JSON.parse(await smallFile(join(directory, 'metadata.json'), 4096)),
-        this.maxBytes,
-      );
+      const metadata = storedMetadata(JSON.parse(await smallFile(join(directory, 'metadata.json'), 4096)), this.maxBytes);
       if (metadata.digest !== digest) throw new Error('Invalid catalog digest');
       return metadata;
     } catch (error) {
@@ -321,7 +318,8 @@ export class WagoRuntimeArtifactCatalog {
         const existing = await lstat(destination);
         if (!existing.isDirectory() || existing.isSymbolicLink()) throw new Error('Invalid catalog object');
         const existingMetadata = await this.verify(destination);
-        if (existingMetadata.digest !== metadata.digest) throw new Error('Invalid catalog object');
+        if (existingMetadata.digest !== metadata.digest)
+          throw new Error('Invalid catalog object');
         await this.backfillMetadata(destination, existingMetadata);
       }
       const objectsHandle = await open(join(root, 'objects'), constants.O_RDONLY | constants.O_NOFOLLOW);

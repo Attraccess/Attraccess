@@ -57,7 +57,7 @@
       "outputs": ["{workspaceRoot}/coverage/apps/frontend"]
     },
     "typecheck": {
-      "dependsOn": ["react-query-client:generate"],
+      "dependsOn": ["react-query-client:generate", "typecheck-tests"],
       "cache": true,
       "inputs": [
         "production",
@@ -69,6 +69,13 @@
     },
     "serve": {
       "dependsOn": ["react-query-client:generate"]
+    },
+    "typecheck-tests": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["react-query-client:generate"],
+      "options": {
+        "command": "pnpm exec tsc --noEmit -p apps/frontend/tsconfig.spec.json"
+      }
     }
   },
   "targetDefaults": {

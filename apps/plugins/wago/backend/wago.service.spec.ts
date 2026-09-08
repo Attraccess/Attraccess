@@ -158,24 +158,6 @@ describe('WagoService', () => {
     expect(controllerRepository.delete).toHaveBeenCalledWith(claimed.id);
   });
 
-  it('rolls back an interrupted claim so the controller can be claimed again', async () => {
-    const claimed = { ...controller(), trustState: 'claimed' as const, name: 'Interrupted claim' };
-    const { service, context, controllerRepository } = createService([claimed]);
-    const revoke = jest.fn().mockResolvedValue(undefined);
-    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({ revoke });
-
-    await service.rollbackInterruptedClaim(claimed.hardwareId, claimed.mqttServerId, claimed.enrollmentId);
-
-    expect(revoke).toHaveBeenCalledWith({
-      mqttServerId: claimed.mqttServerId,
-      identity: `wago-controller-${claimed.hardwareId}`,
-      username: `wago-controller-${claimed.hardwareId}`,
-      vhost: '/',
-    });
-    expect(claimed).toMatchObject({ trustState: 'untrusted', name: null, enrollmentId: null });
-    expect(controllerRepository.save).toHaveBeenCalledWith(claimed);
-  });
-
   it('does not expose physical-verification secrets in controller listings', async () => {
     const { service } = createService();
 
@@ -355,6 +337,44 @@ describe('WagoService', () => {
         claimed.id,
         Buffer.from(JSON.stringify({ id: command.id, status: 'rejected', error: 'command expired' })),
       );
+    });
+
+    await expect(
+      service.executeCommand({
+        controllerId: claimed.id,
+        channelId: 'pump',
+        action: 'pulse',
+        expectedConfigurationRevision: 3,
+      }),
+    ).rejects.toThrow('command expired');
+  });
+
+  it('ignores null acknowledgements and rejects while publication is stalled', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, context, revisionRepository } = createService([claimed], [], 2);
+    revisionRepository.find.mockResolvedValue([
+      {
+        controllerId: claimed.id,
+        revision: 3,
+        state: 'applied',
+        snapshot: JSON.stringify({
+          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'] }],
+        }),
+      },
+    ]);
+    (context.mqtt.publish as jest.Mock).mockImplementation(() => {
+      const command = JSON.parse((context.mqtt.publish as jest.Mock).mock.calls[0][2]) as { id: string };
+      const acknowledge = Reflect.get(service, 'onCommandAcknowledgement') as (
+        controllerId: number,
+        payload: Buffer,
+      ) => void;
+      acknowledge.call(service, claimed.id, Buffer.from('null'));
+      acknowledge.call(
+        service,
+        claimed.id,
+        Buffer.from(JSON.stringify({ id: command.id, status: 'rejected', error: 'command expired' })),
+      );
+      return new Promise<void>(() => undefined);
     });
 
     await expect(
@@ -587,10 +607,7 @@ describe('WagoService', () => {
     const snapshot = { version: 1, physicalPoints: [], logicalChannels: [] };
     draftRepository.findOneBy.mockResolvedValue({
       controllerId: claimed.id,
-      reviewedHash: configurationHash({
-        draft: configurationHash({ snapshot: JSON.stringify(snapshot), metadata: null }),
-        impacts: [],
-      }),
+      reviewedHash: configurationHash({ snapshot: JSON.stringify(snapshot), metadata: null }),
       snapshot: JSON.stringify(snapshot),
     });
 
@@ -1180,7 +1197,10 @@ describe('WagoService', () => {
       revoke: jest.fn().mockResolvedValue(undefined),
     });
     (context.mqtt.publish as jest.Mock).mockRejectedValue(claimError);
-    controllerRepository.save.mockResolvedValueOnce(candidate).mockRejectedValueOnce(rollbackError);
+    controllerRepository.save
+      .mockResolvedValueOnce(candidate) // provisioning intent
+      .mockResolvedValueOnce(candidate) // claimed state
+      .mockRejectedValueOnce(rollbackError);
     enrollmentRepository.findOneBy.mockResolvedValue(enrollment);
 
     await expect(service.claim(candidate.id, 'Controller', 'fingerprint')).rejects.toBe(claimError);

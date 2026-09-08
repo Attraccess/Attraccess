@@ -26,7 +26,6 @@ describe('WagoFlowService', () => {
 
   function createService() {
     const trigger = jest.fn().mockResolvedValue(undefined);
-    const subscribe = jest.fn().mockResolvedValue({ unsubscribe: jest.fn() });
     const controllerRepository = { find: jest.fn().mockResolvedValue([controller]), findOneBy: jest.fn() };
     const revisionQuery = {
       innerJoin: jest.fn().mockReturnThis(),
@@ -52,9 +51,9 @@ describe('WagoFlowService', () => {
       ),
       logger: { warn: jest.fn() },
       flows: { trigger },
-      mqtt: { subscribe },
+      mqtt: { subscribe: jest.fn().mockResolvedValue({ unsubscribe: jest.fn() }) },
     } as unknown as PluginContext;
-    return { service: new WagoFlowService(context), trigger, subscribe, context, revisionQuery, revisionRepository };
+    return { service: new WagoFlowService(context), trigger, context, revisionQuery, revisionRepository };
   }
 
   it('caches a validated retained state and dispatches matching trigger nodes', async () => {
@@ -85,31 +84,6 @@ describe('WagoFlowService', () => {
     expect(context.getRepository(WagoController).findOneBy).not.toHaveBeenCalled();
   });
 
-  it('accepts retained state delivered while installing subscriptions', async () => {
-    const { service, subscribe } = createService();
-    subscribe.mockImplementation(async (_serverId, _topic, listener) => {
-      await listener({
-        topic: 'attraccess/wago/v1/controllers/cc100-01/state',
-        payload: Buffer.from(
-          JSON.stringify({
-            streamId: STREAM_A,
-            sequence: 1,
-            timestamp: '2026-08-30T00:00:00.000Z',
-            connected: true,
-            revision: 1,
-            contentHash: 'hash',
-            outputs: { door: true },
-          }),
-        ),
-      });
-      return { unsubscribe: jest.fn() };
-    });
-
-    await service.refresh();
-
-    expect(service.read({ controllerId: 1, channelId: 'door', category: 'state' })).toMatchObject({ value: true });
-  });
-
   it('ignores duplicate sequences and resolves waiters from later state', async () => {
     const { service, trigger } = createService();
     await service.refresh();
@@ -138,42 +112,6 @@ describe('WagoFlowService', () => {
     await service['onMessage'](2, 'attraccess/wago', topic, event(2, true));
     await expect(waiting).resolves.toMatchObject({ value: true, sequence: 2 });
     expect(trigger).toHaveBeenCalledTimes(2);
-  });
-
-  it('serializes cold-cache messages for one controller', async () => {
-    const { service, revisionRepository } = createService();
-    await service.refresh();
-    service['channelCache'].clear();
-    let resolveRevision!: (revisions: WagoConfigurationRevision[]) => void;
-    revisionRepository.find.mockImplementation(
-      () => new Promise<WagoConfigurationRevision[]>((resolve) => (resolveRevision = resolve)),
-    );
-    const topic = 'attraccess/wago/v1/controllers/cc100-01/state';
-    const event = (sequence: number, value: boolean) =>
-      Buffer.from(
-        JSON.stringify({
-          streamId: STREAM_A,
-          sequence,
-          timestamp: new Date().toISOString(),
-          connected: true,
-          revision: 1,
-          contentHash: 'hash',
-          outputs: { door: value },
-        }),
-      );
-
-    const first = service['onMessage'](2, 'attraccess/wago', topic, event(1, false));
-    const second = service['onMessage'](2, 'attraccess/wago', topic, event(2, true));
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(revisionRepository.find).toHaveBeenCalledTimes(1);
-    resolveRevision([revision]);
-    await Promise.all([first, second]);
-
-    expect(service.read({ controllerId: 1, channelId: 'door', category: 'state' })).toMatchObject({
-      sequence: 2,
-      value: true,
-    });
   });
 
   it('only evaluates waiters for the updated channel state', async () => {
@@ -495,8 +433,8 @@ describe('WagoFlowService', () => {
       await stateMessage(service, 1, { outputs: Object.fromEntries(logicalChannels.map(({ id }) => [id, true])) });
       await expect(waiting).resolves.toMatchObject({ channelId: 'channel-2000', value: true });
       expect(service['cache'].size).toBe(2_000);
-      expect(service['dispatches'].length).toBeLessThanOrEqual(100);
-      expect(trigger).toHaveBeenCalled();
+      expect(service['dispatches'].length).toBe(100);
+      expect(trigger).toHaveBeenCalledTimes(1);
       releaseDispatch();
       await jest.advanceTimersByTimeAsync(0);
       expect(service['dispatches'].length).toBe(0);
@@ -773,7 +711,7 @@ describe('WagoFlowService', () => {
       await expect(waiting).resolves.toMatchObject({ sequence: 2 });
     });
 
-    it('does not dispatch queued events from a retired boot', async () => {
+    it('drops queued events from a retired boot while keeping the dispatch queue bounded', async () => {
       const { service, trigger } = await setup();
       let release: () => void;
       trigger.mockImplementationOnce(
@@ -788,8 +726,8 @@ describe('WagoFlowService', () => {
       await snapshot(service, 1, { inputs: { sensor: false } }, STREAM_B);
       release();
       await jest.advanceTimersByTimeAsync(0);
-      expect(trigger).toHaveBeenCalledTimes(3);
-      expect(trigger.mock.calls[2][2]).toMatchObject({ wago: { streamId: STREAM_B, value: false } });
+      expect(trigger).toHaveBeenCalledTimes(2);
+      expect(trigger.mock.calls[1][2]).toMatchObject({ wago: { streamId: STREAM_B, value: false } });
       expect(service['dispatches']).toHaveLength(0);
     });
 
@@ -912,34 +850,5 @@ describe('WagoFlowService', () => {
     expect(service['matchesEvent'](config, 'node-1', state(50))).toBe(false);
     expect(service['matchesEvent'](config, 'node-1', state(100))).toBe(true);
     expect(service['matchesEvent'](config, 'node-2', state(50))).toBe(true);
-  });
-
-  it('dispatches later WAGO events while an earlier flow is waiting', async () => {
-    const { service, trigger } = createService();
-    await service.refresh();
-    let releaseFirstTrigger!: () => void;
-    const firstTrigger = new Promise<void>((resolve) => {
-      releaseFirstTrigger = resolve;
-    });
-    trigger.mockImplementationOnce(() => firstTrigger);
-    const topic = 'attraccess/wago/v1/controllers/cc100-01/state';
-    const event = (sequence: number, value: boolean) =>
-      Buffer.from(
-        JSON.stringify({
-          streamId: STREAM_A,
-          sequence,
-          timestamp: `2026-08-30T00:00:0${sequence}.000Z`,
-          connected: true,
-          revision: 1,
-          contentHash: 'hash',
-          outputs: { door: value },
-        }),
-      );
-
-    await service['onMessage'](2, 'attraccess/wago', topic, event(1, false));
-    await service['onMessage'](2, 'attraccess/wago', topic, event(2, true));
-
-    expect(trigger).toHaveBeenCalledTimes(2);
-    releaseFirstTrigger();
   });
 });

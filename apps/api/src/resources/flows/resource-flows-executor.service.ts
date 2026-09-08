@@ -123,7 +123,6 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
 
   private readonly resourceActivity: Map<Resource['id'], Date> = new Map();
   private readonly heartbeatLastSeen: Map<string, Date> = new Map();
-  private pluginTriggerEvaluation = Promise.resolve();
 
   private readonly templateVariables = new WeakMap<object, TemplateVariables>();
 
@@ -191,11 +190,11 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       [ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE]: new MqttSendMessageExecutor(this.mqttClientService),
       [ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION]: new EndUsageSessionExecutor(this.resourceUsageService),
       [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY]: new ActivityTrackExecutor(this.resourceActivity),
-      [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_OPERATING]: new OperatingTransitionExecutor(
+      [ResourceFlowNodeType.OUTPUT_RESOURCE_OPERATING]: new OperatingTransitionExecutor(
         this.operatingIntervals,
         'operating',
       ),
-      [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE]: new OperatingTransitionExecutor(this.operatingIntervals, 'idle'),
+      [ResourceFlowNodeType.OUTPUT_RESOURCE_IDLE]: new OperatingTransitionExecutor(this.operatingIntervals, 'idle'),
 
       [ResourceFlowNodeType.PROCESSING_WAIT]: new WaitExecutor(),
       [ResourceFlowNodeType.PROCESSING_IF]: new IfExecutor(),
@@ -498,19 +497,9 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       throw new Error(`Plugin flow node type "${nodeType}" is not a registered trigger node.`);
     }
 
-    const matchingNodes = this.queuePluginTriggerEvaluation(() =>
-      this.findMatchingPluginTriggerNodes(nodeType, matches),
-    );
-    await this.startMatchingPluginFlows(await matchingNodes, payload);
-  }
-
-  private async findMatchingPluginTriggerNodes(
-    nodeType: string,
-    matches: (config: Record<string, unknown>, nodeId: string) => boolean,
-  ): Promise<ResourceFlowNode[]> {
     const pageSize = 100;
+    const concurrency = 10;
     let lastId: string | undefined;
-    const matchingNodes: ResourceFlowNode[] = [];
     for (;;) {
       const nodes = await this.flowNodeRepository.find({
         where: {
@@ -521,39 +510,30 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
         take: pageSize,
       });
 
-      if (nodes.length === 0) return matchingNodes;
+      if (nodes.length === 0) return;
       lastId = nodes[nodes.length - 1].id;
 
-      for (const node of nodes) {
-        try {
-          if (matches(node.data as Record<string, unknown>, node.id)) matchingNodes.push(node);
-        } catch (error) {
-          this.logger.error(
-            `Failed to match plugin flow trigger node ID: ${node.id} (Type: ${nodeType})`,
-            error instanceof Error ? error.stack : undefined,
-          );
-        }
+      for (let offset = 0; offset < nodes.length; offset += concurrency) {
+        await Promise.allSettled(nodes.slice(offset, offset + concurrency).map(async (node) => {
+          let isMatch: boolean;
+          try {
+            isMatch = matches(node.data as Record<string, unknown>, node.id);
+          } catch (error) {
+            this.logger.error(
+              `Failed to match plugin flow trigger node ID: ${node.id} (Type: ${nodeType})`,
+              error instanceof Error ? error.stack : undefined,
+            );
+            return;
+          }
+
+          if (isMatch) {
+            await this.startFlow(node, { payload });
+          }
+        }));
       }
 
-      if (nodes.length < pageSize) return matchingNodes;
+      if (nodes.length < pageSize) return;
     }
-  }
-
-  private queuePluginTriggerEvaluation<T>(evaluate: () => Promise<T>): Promise<T> {
-    const queued = this.pluginTriggerEvaluation.then(evaluate, evaluate);
-    this.pluginTriggerEvaluation = queued.then(
-      () => undefined,
-      () => undefined,
-    );
-    return queued;
-  }
-
-  private async startMatchingPluginFlows(nodes: ResourceFlowNode[], payload: object): Promise<void> {
-    const concurrency = 10;
-    for (let offset = 0; offset < nodes.length; offset += concurrency)
-      await Promise.allSettled(
-        nodes.slice(offset, offset + concurrency).map((node) => this.startFlow(node, { payload })),
-      );
   }
 
   public async startFlow(
@@ -699,15 +679,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     } catch (error) {
       const processingTime = Date.now() - startTime;
       const failureBehavior = dispatchStarted ? getExternalEffectFailureBehavior(node.type, node.data) : undefined;
-      const pluginNode = getPluginFlowNode(node.type);
-      const pluginFailureBehavior =
-        dispatchStarted && pluginNode && !pluginNode.isInput
-          ? pluginNode.getFailureBehavior?.(node.data as Record<string, unknown>)
-          : undefined;
       const failureKind = dispatchStarted
-        ? (this.nodeExecutors[node.type]?.getFailureKind?.(error) ??
-          (pluginNode && !pluginNode.isInput ? pluginNode.getFailureKind?.(error) : undefined) ??
-          'node-failure')
+        ? (this.nodeExecutors[node.type]?.getFailureKind?.(error) ?? 'node-failure')
         : 'node-failure';
       const errorMessage = this.errorReason(error);
       this.logger.error(
@@ -720,21 +693,20 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
         nodeId: node.id,
         resourceId: node.resourceId,
         type: ResourceFlowLogType.NODE_PROCESSING_FAILED,
-        payload: () => ({ error: errorMessage, failureKind, failureBehavior: pluginFailureBehavior ?? failureBehavior ?? 'fail-flow' }),
+        payload: () => ({ error: errorMessage, failureKind, failureBehavior: failureBehavior ?? 'fail-flow' }),
       });
 
-      const effectiveFailureBehavior = pluginFailureBehavior ?? failureBehavior;
-      if (!effectiveFailureBehavior || effectiveFailureBehavior === 'fail-flow') {
-        throw effectiveFailureBehavior === 'fail-flow' ? new ExternalEffectFailureError(errorMessage, error, failureKind) : error;
+      if (!failureBehavior || failureBehavior === 'fail-flow') {
+        throw failureBehavior === 'fail-flow' ? new ExternalEffectFailureError(errorMessage, error, failureKind) : error;
       }
 
       const payload =
-        effectiveFailureBehavior === 'failure-output'
+        failureBehavior === 'failure-output'
           ? { ...resultOfPreviousNode.payload, flowError: { kind: failureKind, message: errorMessage } }
           : resultOfPreviousNode.payload;
       responseOfNode = {
         payload,
-        outputHandle: effectiveFailureBehavior === 'failure-output' ? 'failure' : 'output',
+        outputHandle: failureBehavior === 'failure-output' ? 'failure' : 'output',
       };
     }
 
