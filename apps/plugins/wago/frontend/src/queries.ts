@@ -28,6 +28,7 @@ import {
   publishConfiguration,
   listConfigurationRevisions,
   previewConfigurationRevision,
+  acknowledgeConfigurationRejection,
   rollbackConfiguration,
 } from './api';
 
@@ -198,20 +199,20 @@ export function usePreviewPresetMutation(controllerId: number) {
 }
 
 export function useApplyPresetMutation() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
       controllerId,
       application,
       selectedPaths,
       previewedDraftHash,
+      snapshot,
     }: {
       controllerId: number;
       application: WagoPresetApplication;
       selectedPaths: string[];
       previewedDraftHash: string;
-    }) => applyPreset(controllerId, application, selectedPaths, previewedDraftHash),
-    onSuccess: (draft, { controllerId }) => queryClient.setQueryData(queryKeys.draft(controllerId), draft),
+      snapshot: WagoConfigurationSnapshot;
+    }) => applyPreset(controllerId, application, selectedPaths, previewedDraftHash, snapshot),
   });
 }
 
@@ -249,6 +250,11 @@ export function useConfigurationActions(controllerId: number) {
     onSuccess: refresh,
   });
   const preview = useMutation({ mutationFn: (revision: number) => previewConfigurationRevision(controllerId, revision) });
+  const acknowledgeRejection = useMutation({
+    mutationFn: ({ revision, contentHash, reportedAt }: { revision: number; contentHash: string; reportedAt: string }) =>
+      acknowledgeConfigurationRejection(controllerId, revision, contentHash, reportedAt),
+    onSuccess: refresh,
+  });
   const rollback = useMutation({
     mutationFn: ({ revision, force, sourceHash, currentHash, draftHash }: {
       revision: number;
@@ -259,5 +265,5 @@ export function useConfigurationActions(controllerId: number) {
     }) => rollbackConfiguration(controllerId, revision, force, sourceHash, currentHash, draftHash),
     onSettled: refresh,
   });
-  return { validate, review, publish, preview, rollback };
+  return { validate, review, publish, preview, acknowledgeRejection, rollback };
 }

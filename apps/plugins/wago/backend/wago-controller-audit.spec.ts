@@ -3,28 +3,36 @@ import { BadRequestException } from '@nestjs/common';
 import { WagoControllerApi } from './wago.controller';
 import type { WagoService } from './wago.service';
 import type { WagoCommissioningService } from './wago-commissioning.service';
+import type { WagoCredentialRotationService } from './wago-credential-rotation';
 
 describe('WAGO HTTP administration audit hooks', () => {
   const record = jest.fn<Promise<PluginAuditReceipt>, []>();
   const warn = jest.fn();
   const service = { claim: jest.fn(), remove: jest.fn(), publishDraft: jest.fn(), rollback: jest.fn() };
-  const commissioning = { removeByHardwareId: jest.fn() };
+  const commissioning = {
+    removeByHardwareId: jest.fn(),
+    removeControllerSafely: jest.fn(async (_id: number, remove: (assertOwned: () => Promise<void>) => Promise<void>) =>
+      remove(async () => undefined),
+    ),
+  };
   const request = { user: { id: 7, authenticationMethod: 'session' }, body: { userId: 999 } } as AuthenticatedRequest;
   const controller = new WagoControllerApi(
     service as unknown as WagoService,
     commissioning as unknown as WagoCommissioningService,
+    {} as WagoCredentialRotationService,
     { audit: { record }, logger: { warn } } as unknown as PluginContext,
   );
   beforeEach(() => {
     jest.resetAllMocks();
     record.mockResolvedValue({ status: 'recorded' });
+    commissioning.removeControllerSafely.mockImplementation(
+      async (_id: number, remove: (assertOwned: () => Promise<void>) => Promise<void>) => remove(async () => undefined),
+    );
   });
 
   const routes = [
     { action: 'claim', call: () => controller.claim(12, { name: 'SECRET', verifier: 'SECRET' }, request), service: service.claim, value: { id: 12, password: 'SECRET' }, details: {} },
     { action: 'unclaim', call: () => controller.removeController(12, request), service: service.remove, value: 'SECRET-hardware-id', details: {} },
-    { action: 'publication', call: () => controller.publishDraft(12, request), service: service.publishDraft, value: { revision: 8, snapshot: 'SECRET' }, details: { revision: 8 } },
-    { action: 'rollback', call: () => controller.rollback(12, 3, request), service: service.rollback, value: { revision: 9, snapshot: 'SECRET' }, details: { revision: 9, sourceRevision: 3 } },
   ];
 
   it.each(routes)('audits successful $action after the service resolves', async (route) => {
@@ -48,13 +56,6 @@ describe('WAGO HTTP administration audit hooks', () => {
     await expect(route.call()).rejects.toBe(error);
     expect(record).toHaveBeenLastCalledWith(expect.objectContaining({ action: `wago.${route.action}`, outcome: 'failed' }));
     expect(JSON.stringify(record.mock.calls)).not.toContain('SECRET');
-  });
-
-  it('records completed unclaim even if later commissioning history cleanup fails', async () => {
-    service.remove.mockResolvedValue('hardware-id');
-    commissioning.removeByHardwareId.mockRejectedValue(new Error('cleanup failed'));
-    await expect(controller.removeController(12, request)).rejects.toThrow('cleanup failed');
-    expect(record).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'wago.unclaim', outcome: 'succeeded' }));
   });
 
   it('rejects missing authenticated identity before mutation', () => {

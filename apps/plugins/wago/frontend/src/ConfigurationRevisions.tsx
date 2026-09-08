@@ -116,6 +116,7 @@ export function ConfigurationRevisions({
     actions.review.isPending ||
     actions.publish.isPending ||
     actions.preview.isPending ||
+    actions.acknowledgeRejection.isPending ||
     actions.rollback.isPending;
   useEffect(() => {
     onBusyChange(busy);
@@ -222,6 +223,26 @@ export function ConfigurationRevisions({
             revision={revision.revision}
             names={metadata.names}
           />
+          {revision.state === 'rejected' && !revision.rejectionAcknowledgedAt && revision.reportedAt && (
+            <Button
+              variant="secondary"
+              isDisabled={disabled || busy}
+              onPress={() =>
+                void run(() =>
+                  actions.acknowledgeRejection.mutateAsync({
+                    revision: revision.revision,
+                    contentHash: revision.contentHash,
+                    reportedAt: revision.reportedAt!,
+                  }),
+                )
+              }
+            >
+              Acknowledge rejection of revision {revision.revision}
+            </Button>
+          )}
+          {revision.rejectionAcknowledgedAt && (
+            <p>Rejection acknowledged by user {revision.rejectionAcknowledgedBy ?? 'unknown'}.</p>
+          )}
           <Button
             variant="secondary"
             isDisabled={disabled || busy}

@@ -22,6 +22,7 @@ import { join } from 'node:path';
 import { PLUGIN_CONTEXT, PluginContext, Repository } from '@attraccess/plugins-backend-sdk';
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
 import { WagoService, WagoCredentialOperationUncertainError } from './wago.service';
+import { WagoCredentialRotationUncertainError } from './wago-credential-rotation';
 import { commissioningVerification } from './wago-commissioning-verification';
 import { WagoController } from './wago-controller.entity';
 import { assertCommissioningBroker } from './wago-commissioning-preflight';
@@ -1016,7 +1017,11 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
           try {
             outcome = { value: await operation() };
           } catch (error) {
-            if (error instanceof WagoCredentialOperationUncertainError) this.uncertainRemoteOperations.add(guard);
+            if (
+              error instanceof WagoCredentialOperationUncertainError ||
+              error instanceof WagoCredentialRotationUncertainError
+            )
+              this.uncertainRemoteOperations.add(guard);
             outcome = { error };
           }
           if (this.uncertainRemoteOperations.has(guard)) {
@@ -1091,11 +1096,14 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
   async operateControllerSafely<T>(
     id: number,
     operation: (assertOwned: () => Promise<void>, guard: CommissioningOperationGuard) => Promise<T>,
+    requireCommissioningSession = false,
   ): Promise<T> {
     const controller = await this.context.getRepository(WagoController).findOneBy({ id });
     if (!controller) throw new NotFoundException('controller not found');
     const sessions = await this.sessions.find({ where: { hardwareId: controller.hardwareId }, order: { id: 'DESC' } });
     if (!sessions.length) {
+      if (requireCommissioningSession)
+        throw new ConflictException('A commissioning session must remain pinned while rotating credentials.');
       const controller = new AbortController();
       const guard = {
         assertOwned: async () => {

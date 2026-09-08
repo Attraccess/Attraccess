@@ -89,7 +89,7 @@ export class WagoRuntime {
     this.state = await this.options.store.load();
     this.sequence = this.state.sequence ?? 0;
     this.reservedSequence = this.sequence;
-    this.initialSequence = this.sequence;
+    this.initialSequence = 0;
     if (this.state.accepted) {
       const errors = validateDesired({ protocolVersion: 1, ...this.state.accepted });
       if (errors.length) throw new Error('persisted configuration is invalid');

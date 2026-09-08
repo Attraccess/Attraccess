@@ -57,7 +57,8 @@ describe('resource diagnostics', () => {
     expect(controllersQuery.where).toHaveBeenCalledWith('controller.id IN (:...controllerIds)', {
       controllerIds: [1, 2],
     });
-    expect(revisionsQuery.distinctOn).toHaveBeenCalledWith(['revision.controllerId']);
+    expect(revisionsQuery.andWhere).toHaveBeenCalledWith('revision.state = :state', { state: 'applied' });
+    expect(revisionsQuery.orderBy).toHaveBeenCalledWith('revision.controllerId', 'ASC');
     expect(result.controllers.map((controller) => controller.name)).toEqual(['Controller 1', 'Controller 2']);
     expect(result.truncated).toBe(false);
   });

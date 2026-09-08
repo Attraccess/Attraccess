@@ -245,9 +245,7 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     if (
       channel.measurement &&
       (!capabilities.includes('measurement') ||
-        !['ampere', 'volt', 'watt', 'percent'].includes(channel.measurement.unit) ||
-        !Number.isFinite(channel.measurement.scale) ||
-        !Number.isFinite(channel.measurement.offset))
+        !['live', 'cumulative'].includes(channel.measurement.kind ?? 'live'))
     ) {
       errors.push({
         path: `${path}.measurement`,
@@ -259,7 +257,7 @@ export function validateSnapshot(value: unknown): ValidationError[] {
       validateKeys(
         channel.measurement as Record<string, unknown>,
         `${path}.measurement`,
-        ['unit', 'scale', 'offset'],
+        ['unit', 'scale', 'offset', 'kind'],
         errors,
       );
     }

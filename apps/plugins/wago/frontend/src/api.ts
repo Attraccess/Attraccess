@@ -223,10 +223,11 @@ export const applyPreset = (
   application: WagoPresetApplication,
   selectedPaths: string[],
   previewedDraftHash: string,
+  snapshot: WagoConfigurationSnapshot,
 ) =>
   api.request<WagoConfigurationDraft>(`/controllers/${id}/configuration/presets/apply`, {
     method: 'POST',
-    body: { application, selectedPaths, previewedDraftHash },
+    body: { application, selectedPaths, previewedDraftHash, snapshot },
   });
 
 export const validateConfiguration = (id: number, snapshot: WagoConfigurationSnapshot) =>
@@ -247,6 +248,11 @@ export const listConfigurationRevisions = (id: number, offset: number) =>
   );
 export const previewConfigurationRevision = (id: number, revision: number) =>
   api.request<RevisionPreview>(`/controllers/${id}/configuration/revisions/${revision}/preview`);
+export const acknowledgeConfigurationRejection = (id: number, revision: number, contentHash: string, reportedAt: string) =>
+  api.request<ConfigurationRevision>(`/controllers/${id}/configuration/revisions/${revision}/acknowledge-rejection`, {
+    method: 'POST',
+    body: { contentHash, reportedAt },
+  });
 export const rollbackConfiguration = (
   id: number,
   revision: number,

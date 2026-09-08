@@ -70,6 +70,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   private readonly dispatches: Array<{ state: CachedState; previous?: CachedState }> = [];
   private readonly lastDispatchAtByNode = new Map<string, number>();
   private dispatching = false;
+  private messageQueue: Promise<void> = Promise.resolve();
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
@@ -253,7 +254,12 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async onMessage(serverId: number, prefix: string, topic: string, payload: Buffer): Promise<void> {
+  private onMessage(serverId: number, prefix: string, topic: string, payload: Buffer): Promise<void> {
+    const queued = this.messageQueue.catch(() => undefined).then(() => this.processMessage(serverId, prefix, topic, payload));
+    this.messageQueue = queued;
+    return queued;
+  }
+  private async processMessage(serverId: number, prefix: string, topic: string, payload: Buffer): Promise<void> {
     let parsed: ReturnType<typeof parseOperationalMessage>;
     try {
       parsed = parseOperationalMessage(prefix, topic, payload);

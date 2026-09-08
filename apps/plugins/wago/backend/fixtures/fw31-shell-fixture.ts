@@ -119,7 +119,7 @@ done
   );
   file(
     'bin/df',
-    '#!/bin/sh\nif [ "$FAULT" = storage ]; then echo "disk 100 99 1"; else echo "disk 999999 0 999999"; fi\n',
+    '#!/bin/sh\necho "Filesystem 1024-blocks Used Available Capacity Mounted on"\nif [ "$FAULT" = storage ]; then echo "disk 100 99 1 99% /fixture"; else echo "disk 999999 0 999999 0% /fixture"; fi\n',
     0o700,
   );
   file(

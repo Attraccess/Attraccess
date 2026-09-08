@@ -129,7 +129,7 @@ describe('UploadPluginModal', () => {
     render(<UploadPluginModal isOpen onClose={vi.fn()} />);
 
     const file = new File(['content'], 'bad.txt', { type: 'text/plain' });
-    await user.upload(fileInput(), file, { applyAccept: false });
+    fireEvent.change(fileInput(), { target: { files: [file] } });
     await user.click(uploadButton());
 
     expect(hoisted.uploadMutateMock).not.toHaveBeenCalled();

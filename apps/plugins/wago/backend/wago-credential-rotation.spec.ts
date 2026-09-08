@@ -69,7 +69,9 @@ describe('credential rotation with isolated SQLite and fixture broker transport'
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
-    await db.query('ALTER TABLE plugin_wago_controllers ADD COLUMN credential_epoch varchar');
+    const columns = await db.query('PRAGMA table_info(plugin_wago_controllers)');
+    if (!columns.some((column: { name: string }) => column.name === 'credential_epoch'))
+      await db.query('ALTER TABLE plugin_wago_controllers ADD COLUMN credential_epoch varchar');
     await db.query('UPDATE plugin_wago_controllers SET credential_epoch = ? WHERE id = 1', [credentialEpoch]);
     const key = randomBytes(32);
     context = {

@@ -1115,9 +1115,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     },
   ): Promise<WagoController> {
     return this.withClaimLock(id, async () => {
-      const prepared = await this.withClaimConfigurationLock(() =>
-        this.prepareClaim(id, name, verifier, mqttServerId, assertOwned, manual?.credentials),
-      );
+      const prepared = await this.prepareClaim(id, name, verifier, mqttServerId, assertOwned, manual?.credentials);
       try {
         const acknowledgementToken = randomBytes(24).toString('base64url');
         await assertOwned();
@@ -1224,6 +1222,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     // mqttServerId; removal must still revoke this identity on its original broker.
     await assertOwned();
     controller.credentialMqttServerId = selectedServerId;
+    controller.credentialEpoch = randomUUID();
     await this.controllers.save(controller);
     await assertOwned();
     const provisioned =
@@ -1335,6 +1334,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     if (manual) throw new ConflictException('Manual permanent credential revocation is required.');
     await assertOwned();
     controller.credentialMqttServerId = null;
+    controller.credentialEpoch = null;
     Object.assign(controller, previousController);
     await assertOwned();
     await this.controllers.save(controller).catch((rollbackError) => {

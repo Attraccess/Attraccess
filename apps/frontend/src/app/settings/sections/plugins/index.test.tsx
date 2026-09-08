@@ -295,7 +295,7 @@ describe('PluginsSection', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((input: { url?: string } | string, init?: { method?: string }) => {
-        const request = typeof input === 'string' ? { url: input, method: init?.method } : input;
+        const request: { url?: string; method?: string } = typeof input === 'string' ? { url: input, method: init?.method } : input;
         if (request.url?.endsWith('/api/plugins/registries')) {
           if (request.method === 'POST') return Promise.resolve({ ok: true });
           registryLoads += 1;
@@ -332,7 +332,7 @@ describe('PluginsSection', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((input: { url?: string } | string, init?: { method?: string }) => {
-        const request = typeof input === 'string' ? { url: input, method: init?.method } : input;
+        const request: { url?: string; method?: string } = typeof input === 'string' ? { url: input, method: init?.method } : input;
         if (request.url?.endsWith('/api/plugins/registries')) {
           if (request.method === 'POST') return Promise.resolve({ ok: true });
           registryLoads += 1;

@@ -123,6 +123,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
 
   private readonly resourceActivity: Map<Resource['id'], Date> = new Map();
   private readonly heartbeatLastSeen: Map<string, Date> = new Map();
+  /** Preserve event lookup order without serializing the flow runs they launch. */
+  private pluginFlowLookupQueue: Promise<void> = Promise.resolve();
 
   private readonly templateVariables = new WeakMap<object, TemplateVariables>();
 
@@ -501,14 +503,16 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     const concurrency = 10;
     let lastId: string | undefined;
     for (;;) {
-      const nodes = await this.flowNodeRepository.find({
-        where: {
-          type: nodeType as ResourceFlowNodeType,
-          ...(lastId ? { id: MoreThan(lastId) } : {}),
-        },
-        order: { id: 'ASC' },
-        take: pageSize,
-      });
+      const nodes = await this.queuedPluginFlowLookup(() =>
+        this.flowNodeRepository.find({
+          where: {
+            type: nodeType as ResourceFlowNodeType,
+            ...(lastId ? { id: MoreThan(lastId) } : {}),
+          },
+          order: { id: 'ASC' },
+          take: pageSize,
+        }),
+      );
 
       if (nodes.length === 0) return;
       lastId = nodes[nodes.length - 1].id;
@@ -534,6 +538,15 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
 
       if (nodes.length < pageSize) return;
     }
+  }
+
+  private queuedPluginFlowLookup(lookup: () => Promise<ResourceFlowNode[]>): Promise<ResourceFlowNode[]> {
+    const queued = this.pluginFlowLookupQueue.then(lookup, lookup);
+    this.pluginFlowLookupQueue = queued.then(
+      () => undefined,
+      () => undefined,
+    );
+    return queued;
   }
 
   public async startFlow(

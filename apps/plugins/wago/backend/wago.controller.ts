@@ -19,6 +19,7 @@ import { WagoCommissioningService } from './wago-commissioning.service';
 import type { WagoPresetApplication, WagoConfigurationSnapshot } from './configuration';
 import type { ConfigurationEditorMetadata } from './configuration-editor';
 import { WagoAudit, wagoAuditPrincipal } from './wago-audit';
+import { WagoCredentialRotationService } from './wago-credential-rotation';
 
 type CommissioningAttemptInput = { confirmInstall?: boolean; temporarySsh?: { username?: string; password?: string } };
 
@@ -45,6 +46,7 @@ export class WagoControllerApi {
   constructor(
     @Inject(WagoService) private readonly wago: WagoService,
     @Inject(WagoCommissioningService) private readonly commissioning: WagoCommissioningService,
+    @Inject(WagoCredentialRotationService) private readonly credentialRotation: WagoCredentialRotationService,
     @Inject(Symbol.for('attraccess.plugin.context')) context?: PluginContext,
   ) {
     this.audit = new WagoAudit(context as PluginContext);
@@ -235,6 +237,27 @@ export class WagoControllerApi {
     const input = { name: body.name, verifier: body.verifier, username: body.username, password: body.password };
     return this.commissioning.operateControllerSafely(id, (assertOwned) =>
       this.wago.completeManualCredentials(id, input, principal, assertOwned),
+    );
+  }
+  @Auth('system.settings.manage')
+  @Get('controllers/:id/credentials/rotation')
+  credentialRotationStatus(@Param('id', ParseIntPipe) id: number) {
+    return this.credentialRotation.status(id);
+  }
+  @Auth('system.settings.manage')
+  @Post('controllers/:id/credentials/rotate')
+  async rotateCredentials(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { confirm?: boolean; retry?: boolean },
+    @Req() request: AuthenticatedRequest,
+  ) {
+    if (!body || Object.keys(body).some((key) => key !== 'confirm' && key !== 'retry') || body.confirm !== true)
+      throw new BadRequestException('Explicit credential rotation consent is required');
+    if (body.retry !== undefined && typeof body.retry !== 'boolean') throw new BadRequestException('Invalid rotation retry flag');
+    const settings = await this.wago.getSettings();
+    return this.commissioning.operateControllerSafely(id, (_assertOwned, guard) =>
+      this.credentialRotation.rotate(id, settings.operationalPrefix, wagoAuditPrincipal(request), guard, body.retry === true),
+      true,
     );
   }
   @Auth('resources.update')

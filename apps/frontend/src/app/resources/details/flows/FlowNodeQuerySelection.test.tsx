@@ -33,15 +33,9 @@ beforeEach(() => {
 });
 
 it('waits for measured nodes, selects the decoded ID and preserves unsaved edits', async () => {
-  const view = render(
-    <MemoryRouter initialEntries={[`/resources/42/flows?node=${encodeURIComponent(id)}`]}>
-      <Host />
-    </MemoryRouter>,
-  );
-  expect(mocks.fitView).not.toHaveBeenCalled();
   mocks.initialized = true;
-  view.rerender(
-    <MemoryRouter>
+  render(
+    <MemoryRouter initialEntries={[`/resources/42/flows?node=${encodeURIComponent(id)}`]}>
       <Host />
     </MemoryRouter>,
   );

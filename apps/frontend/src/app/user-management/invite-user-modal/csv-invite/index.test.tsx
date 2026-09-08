@@ -64,6 +64,6 @@ describe('CsvInvite', () => {
     expect(anchor).toBeInTheDocument();
     expect(badge).not.toBeNull();
     expect(badge).toHaveTextContent('2');
-    expect(anchor).toContainElement(badge);
+    expect(anchor).toContainElement(badge as HTMLElement);
   });
 });
