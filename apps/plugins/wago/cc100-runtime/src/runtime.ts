@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import { encodeMeasurement, MeasurementContractError } from '../../measurement-contract';
 import { hash, validateDesired } from './configuration';
+import { acquireMeasurements, measurementErrorCode } from './modbus/acquisition';
 import { OutputController } from './output-controller';
 import {
   type DeviceAdapter,
@@ -77,6 +78,7 @@ export class WagoRuntime {
     this.state = await this.options.store.load();
     this.sequence = this.state.sequence ?? 0;
     this.reservedSequence = this.sequence;
+    if (this.state.accepted) this.options.device.configure?.(this.state.accepted.snapshot);
     await this.options.transport.subscribe(this.desiredTopic(), (payload) => this.receiveDesired(payload));
     await this.options.transport.subscribe(this.commandTopic(), (payload) => this.receiveCommand(payload));
     await this.publishHeartbeat(true);
@@ -169,11 +171,20 @@ export class WagoRuntime {
             contentHash: desired.contentHash,
             snapshot: desired.snapshot,
           };
-          await this.queueStateUpdate(async () => {
-            await this.options.store.save({ ...this.state, accepted });
-            this.state.accepted = accepted;
-            this.options.device.activate?.(accepted.snapshot);
-          });
+          const installRouting =
+            this.options.device.prepareConfiguration?.(accepted.snapshot) ??
+            (() => this.options.device.configure?.(accepted.snapshot));
+          const resume = this.options.device.suspend?.();
+          try {
+            await this.queueStateUpdate(async () => {
+              await this.options.store.save({ ...this.state, accepted });
+              this.state.accepted = accepted;
+              installRouting();
+              this.options.device.activate?.(accepted.snapshot);
+            });
+          } finally {
+            resume?.();
+          }
         });
       } catch {
         return this.reportRejected(desired.revision, desired.contentHash, [
@@ -327,29 +338,33 @@ export class WagoRuntime {
   async publishMeasurements(): Promise<void> {
     const accepted = this.state.accepted;
     if (!accepted) return;
-    for (const channel of accepted.snapshot.logicalChannels.filter((item) =>
-      item.capabilities.includes('measurement'),
-    )) {
-      const point = accepted.snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
-      if (!point) continue;
-      try {
-        const raw = await this.options.device.read(point);
-        // Capture the completion instant before a transform or publication can
-        // block or otherwise advance the clock.
-        const readCompletedAt = Date.now();
-        const timestamp = new Date(readCompletedAt).toISOString();
+    for await (const reading of acquireMeasurements(accepted.snapshot, this.options.device)) {
+      if (accepted !== this.state.accepted) return;
+      for (const channel of reading.channels) {
+        if (reading.ok === false) {
+          await this.publishOperational('faults', {
+            timestamp: new Date().toISOString(),
+            channelId: channel.id,
+            code: measurementErrorCode(reading.error),
+            message: reading.error instanceof Error ? reading.error.message : String(reading.error),
+          });
+          continue;
+        }
         const transform = channel.measurement ?? { unit: 'percent', scale: 1, offset: 0 };
-        await this.publishOperational('measurements', {
-          timestamp,
-          ...encodeMeasurement(channel.id, raw, transform),
-        });
-      } catch (error) {
-        await this.publishOperational('faults', {
-          timestamp: new Date().toISOString(),
-          channelId: channel.id,
-          code: error instanceof MeasurementContractError ? error.code : 'measurement_read_failed',
-          message: error instanceof Error ? error.message : String(error),
-        });
+        try {
+          if (accepted !== this.state.accepted) return;
+          await this.publishOperational('measurements', {
+            timestamp: reading.timestamp,
+            ...encodeMeasurement(channel.id, reading.raw, transform),
+          });
+        } catch (error) {
+          await this.publishOperational('faults', {
+            timestamp: new Date().toISOString(),
+            channelId: channel.id,
+            code: error instanceof MeasurementContractError ? error.code : measurementErrorCode(error),
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
     }
   }

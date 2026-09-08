@@ -1,5 +1,6 @@
 import { connect, type MqttClient } from 'mqtt';
 import { Cc100OnboardIoAdapter } from './adapters';
+import { ModbusDeviceRouter } from './modbus/adapter';
 import { CC100_DIGITAL_PROFILE } from './onboard-profile';
 import { JsonStateStore, WagoRuntime, type DiscoveryClaim, type Transport } from './runtime';
 
@@ -13,7 +14,7 @@ if (process.env.WAGO_IO_PATHS)
   throw new Error('WAGO_IO_PATHS is no longer supported; redeploy with the firmware-31 digital hardware profile');
 if (required('WAGO_HARDWARE_PROFILE') !== CC100_DIGITAL_PROFILE.id)
   throw new Error(`unsupported WAGO_HARDWARE_PROFILE; expected ${CC100_DIGITAL_PROFILE.id}`);
-const adapter = new Cc100OnboardIoAdapter();
+const adapter = new ModbusDeviceRouter(new Cc100OnboardIoAdapter());
 const mqttUrl = required('WAGO_MQTT_URL');
 let client: MqttClient | undefined;
 let heartbeatTimer: NodeJS.Timeout | undefined;
