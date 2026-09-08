@@ -175,9 +175,7 @@ function DiagnosticsContent({ controllerId, onConfigure }: { controllerId: numbe
                   <div key={`${sample.kind}:${sample.measurementKind ?? ''}`}>
                     <p>
                       Latest {sample.kind}: {String(sample.value)} {sample.unit ?? ''} {sample.measurementKind ?? ''} ·{' '}
-                      {sample.current
-                        ? 'current source sample'
-                        : `not current: ${sample.availabilityReason}`}
+                      {sample.current ? 'current source sample' : `not current: ${sample.availabilityReason}`}
                     </p>
                     <p>
                       Source time: {sample.sourceAt ?? 'unavailable'} ({sample.sourceFreshness}). Received:{' '}

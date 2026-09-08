@@ -231,6 +231,7 @@ describe('visual configuration workflow', () => {
         .find({ queryKey: ['wago', 'diagnostics', 2] })
         ?.getObserversCount(),
     ).toBe(0);
+  });
 
   it('renders literal editor names in metadata changes', () => {
     render(

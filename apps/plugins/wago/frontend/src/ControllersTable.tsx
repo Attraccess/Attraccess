@@ -81,6 +81,7 @@ export function ControllersTable({
                   onResume={onResume}
                 />
               )
+            }
           </TableBody>
         </TableContent>
       </TableScrollContainer>

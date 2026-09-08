@@ -50,7 +50,10 @@ describe('canonical diagnostic consumer', () => {
     expect(store.read(1).cumulativeMeasurements.meter.measurementKind).toBe('cumulative');
     expect(store.read(1).measurements.meter).toMatchObject({ value: 500, measurementKind: 'live' });
     expect(measurement(3, { unit: 'watt-hour', kind: 'cumulative', value: Number.MAX_SAFE_INTEGER })).toBe(true);
-    expect(store.read(1).cumulativeMeasurements.meter).toMatchObject({ unit: 'watt-hour', value: Number.MAX_SAFE_INTEGER });
+    expect(store.read(1).cumulativeMeasurements.meter).toMatchObject({
+      unit: 'watt-hour',
+      value: Number.MAX_SAFE_INTEGER,
+    });
   });
   it('rejects malformed/future timestamps and invalid category values before watermarks', () => {
     state();

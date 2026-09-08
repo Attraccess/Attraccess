@@ -201,14 +201,14 @@ export class WagoControllerApi {
   }
   @Post('controllers/:id/configuration/publish') publishDraft(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { force?: boolean; reviewedHash?: string },
     @Req() request: AuthenticatedRequest,
+    @Body() body?: { force?: boolean; reviewedHash?: string },
   ) {
     return this.audit.run(
       wagoAuditPrincipal(request),
       id,
       'publication',
-      { force: body?.force === true },
+      body?.force === true ? { force: true } : {},
       () => this.wago.publishDraft(id, body?.force === true, body?.reviewedHash),
       (published) => ({ revision: published.revision }),
     );
@@ -216,15 +216,16 @@ export class WagoControllerApi {
   @Post('controllers/:id/configuration/rollback/:revision') rollback(
     @Param('id', ParseIntPipe) id: number,
     @Param('revision', ParseIntPipe) revision: number,
-    @Body() body: { force?: boolean; sourceHash?: string; currentHash?: string | null; draftHash?: string },
     @Req() request: AuthenticatedRequest,
+    @Body() body?: { force?: boolean; sourceHash?: string; currentHash?: string | null; draftHash?: string },
   ) {
     return this.audit.run(
       wagoAuditPrincipal(request),
       id,
       'rollback',
-      { sourceRevision: revision, force: body?.force === true },
-      () => this.wago.rollback(id, revision, body?.force === true, body?.sourceHash, body?.currentHash, body?.draftHash),
+      body?.force === true ? { sourceRevision: revision, force: true } : { sourceRevision: revision },
+      () =>
+        this.wago.rollback(id, revision, body?.force === true, body?.sourceHash, body?.currentHash, body?.draftHash),
       (published) => ({ revision: published.revision }),
     );
   }

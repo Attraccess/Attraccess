@@ -66,7 +66,11 @@ export class WagoCommandHandler {
     if (controllerId) {
       const draft = await this.dependencies.context.getRepository(WagoConfigurationDraft).findOneBy({ controllerId });
       try {
-        const storedNames = JSON.parse(revision?.presetProvenance ?? draft?.presetProvenance ?? 'null')?.editor?.names;
+        const draftMatchesAppliedRevision =
+          typeof draft?.snapshot === 'string' &&
+          configurationHash(JSON.parse(draft.snapshot)) === revision?.contentHash;
+        const provenance = revision?.presetProvenance ?? (draftMatchesAppliedRevision ? draft?.presetProvenance : null);
+        const storedNames = JSON.parse(provenance ?? 'null')?.editor?.names;
         if (storedNames && typeof storedNames === 'object' && !Array.isArray(storedNames)) names = storedNames;
       } catch {
         /* Drafts created before the visual editor have no channel labels. */

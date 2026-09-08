@@ -193,8 +193,8 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
                     <Alert.Content>
                       <Alert.Title>Saved draft changed</Alert.Title>
                       <Alert.Description>
-                        Another editor saved a newer draft. Reload it before editing, reviewing, or saving so your
-                        local changes do not overwrite it.
+                        Another editor saved a newer draft. Reload it before editing, reviewing, or saving so your local
+                        changes do not overwrite it.
                       </Alert.Description>
                       <Button variant="secondary" onPress={reloadSavedDraft}>
                         Reload saved draft
@@ -208,7 +208,11 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
                       {dirty ? 'Unsaved local edits' : draft.data ? 'Draft is saved' : 'No saved draft yet'} ·{' '}
                       {snapshot.logicalChannels.length} channels
                     </p>
-                    <fieldset disabled={busy || draftConflict} inert={busy || draftConflict} className="wg:flex wg:flex-col wg:gap-4">
+                    <fieldset
+                      disabled={busy || draftConflict}
+                      inert={busy || draftConflict}
+                      className="wg:flex wg:flex-col wg:gap-4"
+                    >
                       <legend className="wg:sr-only">Digital configuration</legend>
                       <div className="wg:flex wg:gap-2">
                         <Button
@@ -308,7 +312,9 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
                       generation={generation}
                       controllerId={controllerId}
                       metadata={metadata}
-                      disabled={dirty || draftConflict || save.isPending || validate.isPending || presetBusy || !draft.data}
+                      disabled={
+                        dirty || draftConflict || save.isPending || validate.isPending || presetBusy || !draft.data
+                      }
                       onBusyChange={setRevisionBusy}
                       onRollback={async (failure) => {
                         try {

@@ -84,10 +84,17 @@ export function ControllersPage() {
         />
       )}
 
-      {diagnosticsControllerId !== null && <>
-        <Button variant="secondary" onPress={() => setDiagnosticsControllerId(null)}>Close diagnostics</Button>
-        <ControllerDiagnostics controllerId={diagnosticsControllerId} onConfigure={() => setConfigurationControllerId(diagnosticsControllerId)} />
-      </>}
+      {diagnosticsControllerId !== null && (
+        <>
+          <Button variant="secondary" onPress={() => setDiagnosticsControllerId(null)}>
+            Close diagnostics
+          </Button>
+          <ControllerDiagnostics
+            controllerId={diagnosticsControllerId}
+            onConfigure={() => setConfigurationControllerId(diagnosticsControllerId)}
+          />
+        </>
+      )}
       <ClaimControllerModal
         controllerId={claimControllerId}
         onOpenChange={(isOpen) => {

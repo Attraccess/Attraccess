@@ -60,7 +60,8 @@ export function admitEnvelope(
   if (restart) {
     if (
       !(category === 'heartbeat' || (category === 'state' && data.connected === true)) ||
-      now - timestamp > 90_000 || timestamp < state.lastSourceTime
+      now - timestamp > 90_000 ||
+      timestamp < state.lastSourceTime
     )
       return 'rejected';
     if (state.retiredStreams.length >= 16) {
