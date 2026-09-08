@@ -2080,6 +2080,7 @@ describe('WagoRuntime', () => {
       contentHash: hash(monitored),
       snapshot: monitored,
     });
+    await Promise.resolve();
     releaseWrite();
     await command;
     await replacement;
