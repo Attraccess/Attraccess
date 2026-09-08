@@ -128,10 +128,10 @@ describe('WagoCommissioningService', () => {
       pairingCode: 'legacy-secret',
     });
     const firstPage = Array.from({ length: 100 }, (_, i) => ({ ...session, id: i + 1 }));
-    repository.findOneBy.mockImplementation(async ({ id }) => id === session.id ? session : firstPage.find((entry) => entry.id === id));
-    repository.find
-      .mockResolvedValueOnce(firstPage)
-      .mockResolvedValueOnce([session]);
+    repository.findOneBy.mockImplementation(async ({ id }) =>
+      id === session.id ? session : firstPage.find((entry) => entry.id === id),
+    );
+    repository.find.mockResolvedValueOnce(firstPage).mockResolvedValueOnce([session]);
     wago.revokeEnrollmentById.mockImplementation(async () => {
       expect(wago.registerCommissioningDiscoveryHandler).not.toHaveBeenCalled();
     });

@@ -95,7 +95,11 @@ export class WagoControllerApi {
     @Body() body: CommissioningAttemptInput,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.commissioning.deliver(id, validateCommissioningAttempt(body, 'installation'), commissioningPrincipal(request));
+    return this.commissioning.deliver(
+      id,
+      validateCommissioningAttempt(body, 'installation'),
+      commissioningPrincipal(request),
+    );
   }
   @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/recover')
@@ -104,7 +108,11 @@ export class WagoControllerApi {
     @Body() body: CommissioningAttemptInput,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.commissioning.recover(id, validateCommissioningAttempt(body, 'recovery'), commissioningPrincipal(request));
+    return this.commissioning.recover(
+      id,
+      validateCommissioningAttempt(body, 'recovery'),
+      commissioningPrincipal(request),
+    );
   }
   @Auth('system.settings.manage')
   @Get('commissioning/sessions/:id/verification')

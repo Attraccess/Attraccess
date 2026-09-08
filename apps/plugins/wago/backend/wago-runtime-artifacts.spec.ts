@@ -540,7 +540,10 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
 
   it('does not let the manifest-copy task cache and restore stale runtime/frontend bundles', async () => {
     const project = JSON.parse(await readFile(join(__dirname, '../project.json'), 'utf8'));
-    expect(project.targets.build.outputs).toEqual(['{projectRoot}/package/package.json', '{projectRoot}/package/plugin.json']);
+    expect(project.targets.build.outputs).toEqual([
+      '{projectRoot}/package/package.json',
+      '{projectRoot}/package/plugin.json',
+    ]);
   });
 
   it('always packages and verifies the fresh generated outputs instead of restoring cached archives', async () => {

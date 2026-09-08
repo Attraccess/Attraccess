@@ -95,7 +95,15 @@ export function useCreateCommissioningSessionMutation() {
 export function useConfirmCommissioningHostKeyMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, hostKeyFingerprint, physicalIdentityConfirmed }: { id: number; hostKeyFingerprint: string; physicalIdentityConfirmed?: boolean }) => confirmCommissioningHostKey(id, hostKeyFingerprint, physicalIdentityConfirmed),
+    mutationFn: ({
+      id,
+      hostKeyFingerprint,
+      physicalIdentityConfirmed,
+    }: {
+      id: number;
+      hostKeyFingerprint: string;
+      physicalIdentityConfirmed?: boolean;
+    }) => confirmCommissioningHostKey(id, hostKeyFingerprint, physicalIdentityConfirmed),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.commissioningSessions }),
   });
 }
@@ -108,14 +116,22 @@ export function useRecoverCommissioningSessionMutation() {
   return useCommissioningAttemptMutation(recoverCommissioningSession, 'recovery');
 }
 
-function useCommissioningAttemptMutation(attempt: typeof deliverCommissioningSession, intent: 'installation' | 'recovery') {
+function useCommissioningAttemptMutation(
+  attempt: typeof deliverCommissioningSession,
+  intent: 'installation' | 'recovery',
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
     gcTime: 0,
     retry: false,
     networkMode: 'always',
-    mutationFn: (variables: Omit<Parameters<typeof deliverCommissioningSession>[1], 'confirmInstall'> & { id: number; confirmInstall: boolean }) => {
+    mutationFn: (
+      variables: Omit<Parameters<typeof deliverCommissioningSession>[1], 'confirmInstall'> & {
+        id: number;
+        confirmInstall: boolean;
+      },
+    ) => {
       const temporarySsh = { ...variables.temporarySsh };
       const confirmInstall = variables.confirmInstall;
       // React Query retains mutation variables, including after reset/unmount.
