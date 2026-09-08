@@ -29,16 +29,19 @@ else()
 endif()
 
 find_package(SDL3 REQUIRED CONFIG)
+find_package(CURL 8.7 REQUIRED)
+find_package(Threads REQUIRED)
 
 add_library(attractap-desktop-runtime
     src/host_runtime.cpp
+    src/host_websocket.cpp
     src/profile_store.cpp
     src/virtual_nfc.cpp
     src/sdl_display.cpp)
 target_include_directories(attractap-desktop-runtime PUBLIC
     src
     "${FIRMWARE_DIR}/src")
-target_link_libraries(attractap-desktop-runtime PUBLIC SDL3::SDL3 lvgl::lvgl)
+target_link_libraries(attractap-desktop-runtime PUBLIC SDL3::SDL3 lvgl::lvgl CURL::libcurl Threads::Threads)
 target_compile_options(attractap-desktop-runtime PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Wpedantic>")
 
 add_executable(attractap-desktop MACOSX_BUNDLE src/main.cpp)
@@ -50,9 +53,11 @@ set_target_properties(attractap-desktop PROPERTIES
 add_executable(attractap-desktop-tests
     tests/main.cpp
     src/host_runtime.cpp
+    src/host_websocket.cpp
     src/profile_store.cpp
     src/virtual_nfc.cpp)
 target_include_directories(attractap-desktop-tests PRIVATE src)
+target_link_libraries(attractap-desktop-tests PRIVATE CURL::libcurl Threads::Threads)
 target_compile_options(attractap-desktop-tests PRIVATE -Wall -Wextra -Wpedantic)
 
 enable_testing()
