@@ -2,6 +2,7 @@ import type { PluginContext, Repository } from '@attraccess/plugins-backend-sdk'
 import { WagoCommandHandler } from './wago-command-handler';
 import { WagoController } from './wago-controller.entity';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
+import { configurationHash } from './configuration';
 
 describe('WAGO command form', () => {
   const revision = Object.assign(new WagoConfigurationRevision(), {
@@ -14,7 +15,9 @@ describe('WAGO command form', () => {
       ],
     }),
   });
+  revision.contentHash = configurationHash(JSON.parse(revision.snapshot));
   const appliedRevision = jest.fn();
+  const drafts = { findOneBy: jest.fn() };
   const query = {
     select: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
@@ -24,7 +27,7 @@ describe('WAGO command form', () => {
   const handler = new WagoCommandHandler({
     context: {
       dataSource: { getRepository: () => ({ createQueryBuilder: () => query }) },
-      getRepository: () => ({ findOneBy: async () => ({ presetProvenance: JSON.stringify({ editor: { names: { 'door-lock': 'Workshop door lock' } } }) }) }),
+      getRepository: () => drafts,
     } as unknown as PluginContext,
     controllers: () => ({ find: async () => [{ id: 1, name: 'Workshop' }] }) as unknown as Repository<WagoController>,
     claimedController: jest.fn(),
@@ -32,7 +35,13 @@ describe('WAGO command form', () => {
     appliedRevision,
   });
 
-  beforeEach(() => appliedRevision.mockResolvedValue(revision));
+  beforeEach(() => {
+    appliedRevision.mockResolvedValue(revision);
+    drafts.findOneBy.mockResolvedValue({
+      snapshot: revision.snapshot,
+      presetProvenance: JSON.stringify({ editor: { names: { 'door-lock': 'Workshop door lock' } } }),
+    });
+  });
 
   it('lists only output channels and shows cross-resource conflict help', async () => {
     const schema = await handler.schema({ controllerId: 1, channelId: 'door-lock', action: 'set' }, 2);
@@ -56,6 +65,19 @@ describe('WAGO command form', () => {
     expect(schema.required).toEqual(expect.arrayContaining(['channelId', 'action', 'expectedConfigurationRevision']));
   });
 
+  it('does not use labels from a draft that differs from the applied revision', async () => {
+    drafts.findOneBy.mockResolvedValue({
+      snapshot: JSON.stringify({ logicalChannels: [{ id: 'door-lock', capabilities: ['output'] }] }),
+      presetProvenance: JSON.stringify({ editor: { names: { 'door-lock': 'Renamed draft channel' } } }),
+    });
+
+    const schema = await handler.schema({ controllerId: 1 }, 2);
+
+    expect(schema.properties).toMatchObject({
+      channelId: { oneOf: expect.arrayContaining([{ const: 'door-lock', title: 'door-lock (pulsed-lock-bank)' }]) },
+    });
+  });
+
   it('does not offer pulses for non-pulsed outputs', async () => {
     const schema = await handler.schema({ controllerId: 1, channelId: 'lamp' }, 2);
     expect(schema.properties).toMatchObject({ action: { oneOf: [{ const: 'set', title: 'Set state' }] } });
@@ -64,7 +86,9 @@ describe('WAGO command form', () => {
   it('keeps an unapplied controller incomplete with actionable help', async () => {
     appliedRevision.mockResolvedValue(null);
     const schema = await handler.schema({ controllerId: 1 }, 2);
-    expect(schema.properties).toMatchObject({ controllerId: { description: expect.stringContaining('wait for the controller') } });
+    expect(schema.properties).toMatchObject({
+      controllerId: { description: expect.stringContaining('wait for the controller') },
+    });
     expect(schema.required).toEqual(expect.arrayContaining(['channelId', 'action', 'expectedConfigurationRevision']));
   });
 });
