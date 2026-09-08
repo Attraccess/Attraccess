@@ -37,6 +37,7 @@ export class WagoRuntime {
   private readonly streamId = randomUUID();
   private readonly outputs: OutputController;
   private configurationUpdates = Promise.resolve();
+  private connectionPolicyTransitions = Promise.resolve();
   private statePublication?: Promise<void>;
   private stateRefreshRequested = false;
   private forceStateRefresh = false;
@@ -288,7 +289,11 @@ export class WagoRuntime {
 
   async setConnected(connected: boolean): Promise<void> {
     this.connected = connected;
-    await this.outputs.applyDisconnectPolicies(connected);
+    // Keep hardware transitions ordered. A reconnect that follows a disconnect
+    // must clear watchdogs only after the pending shutdown has finished.
+    const transition = this.connectionPolicyTransitions.then(() => this.outputs.applyDisconnectPolicies(connected));
+    this.connectionPolicyTransitions = transition.catch(() => undefined);
+    await transition;
     // Connection callbacks must complete after the hardware policy. Otherwise a
     // stalled MQTT state publish can delay a following disconnect shutdown.
     this.requestStatePublication();
@@ -303,7 +308,7 @@ export class WagoRuntime {
         pairingCode: this.options.pairingCode,
         protocolVersion: '1.0.0',
         runtimeVersion: '0.1.0',
-        capabilities: CAPABILITIES,
+        capabilities: this.options.capabilities ?? CAPABILITIES,
         sequence: Date.now(),
       });
       try {
@@ -471,9 +476,11 @@ export class WagoRuntime {
     // publications. Retained readiness still carries every current read error.
     if (this.pendingFaults.has(key) || this.pendingFaults.size >= 100) return Promise.resolve();
     this.pendingFaults.add(key);
-    return this.publishOperational('faults', { timestamp: new Date().toISOString(), channelId, ...fault }).finally(() => {
-      this.pendingFaults.delete(key);
-    });
+    return this.publishOperational('faults', { timestamp: new Date().toISOString(), channelId, ...fault }).finally(
+      () => {
+        this.pendingFaults.delete(key);
+      },
+    );
   }
   private acknowledge(
     id: string,
@@ -481,7 +488,13 @@ export class WagoRuntime {
     error?: string,
     code?: string,
   ): Promise<void> {
-    return this.publishOperational('acknowledgements', { timestamp: new Date().toISOString(), id, status, error, code });
+    return this.publishOperational('acknowledgements', {
+      timestamp: new Date().toISOString(),
+      id,
+      status,
+      error,
+      code,
+    });
   }
 
   private publishOperational(

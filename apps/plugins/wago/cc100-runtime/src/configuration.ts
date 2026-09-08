@@ -245,9 +245,10 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     if (
       channel.measurement &&
       (!capabilities.includes('measurement') ||
-        !['ampere', 'volt', 'watt', 'percent'].includes(channel.measurement.unit) ||
+        !['ampere', 'volt', 'watt', 'watt-hour', 'percent'].includes(channel.measurement.unit) ||
         !Number.isFinite(channel.measurement.scale) ||
-        !Number.isFinite(channel.measurement.offset))
+        !Number.isFinite(channel.measurement.offset) ||
+        (channel.measurement.kind !== undefined && !['live', 'cumulative'].includes(channel.measurement.kind)))
     ) {
       errors.push({
         path: `${path}.measurement`,
