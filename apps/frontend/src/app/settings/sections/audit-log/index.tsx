@@ -225,7 +225,7 @@ export function AuditLogSection() {
             onPress={() => {
               const previous = history.at(-1);
               setHistory((items) => items.slice(0, -1));
-              setBeforeId(previous);
+              setBeforeId(previous === 0 ? undefined : previous);
             }}
           >
             Previous
