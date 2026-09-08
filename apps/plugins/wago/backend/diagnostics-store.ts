@@ -297,7 +297,7 @@ export class WagoDiagnosticsStore {
         state.contentHash !== contentHash ||
         state.hardwareAvailable !== hardwareAvailable
       ) {
-        if (state.stateSourceAt || (canonical && state.connected === false))
+        if (canonical || state.stateSourceAt)
           state.measurementAfter = canonical ? (sourceTime(data.timestamp) as number) : this.now();
         state.measurements = Object.create(null);
         state.cumulativeMeasurements = Object.create(null);

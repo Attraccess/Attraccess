@@ -22,8 +22,9 @@ describe('canonical diagnostic consumer', () => {
       ...envelope(sequence, index),
       ...extra,
     });
-  const measurement = (sequence = 1, extra: Record<string, unknown> = {}) =>
-    send('measurements', {
+  const measurement = (sequence = 1, extra: Record<string, unknown> = {}) => {
+    if (extra.timestamp === undefined) now++;
+    return send('measurements', {
       channelId: 'meter',
       kind: 'live',
       unit: 'milliwatt',
@@ -31,6 +32,7 @@ describe('canonical diagnostic consumer', () => {
       ...envelope(sequence),
       ...extra,
     });
+  };
   beforeEach(() => {
     now = Date.parse('2026-09-05T12:00:00Z');
     store = new WagoDiagnosticsStore(() => now);
@@ -172,7 +174,7 @@ describe('canonical diagnostic consumer', () => {
     now += 100;
     state(3, 1, { inputs: {}, outputs: {} });
     expect(measurement(50, { timestamp: new Date(oldSource).toISOString() })).toBe(false);
-    expect(measurement(50)).toBe(false); // Same millisecond as reconnect is ambiguous: fail closed.
+    expect(measurement(50, { timestamp: new Date(now).toISOString() })).toBe(false); // Same millisecond as reconnect is ambiguous: fail closed.
     now++;
     expect(measurement(2)).toBe(true);
     now++;
