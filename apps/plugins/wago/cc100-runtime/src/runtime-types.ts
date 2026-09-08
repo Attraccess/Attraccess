@@ -2,7 +2,13 @@ export type DisconnectPolicy = { mode: 'hold' | 'immediate' | 'watchdog'; timeou
 
 export type Snapshot = {
   version: number;
-  physicalPoints: Array<{ id: string; hardwareProfile: '751-9301' | '879-3000' | '879-1300'; channel: number }>;
+  modbus?: ModbusConfiguration;
+  physicalPoints: Array<{
+    id: string;
+    hardwareProfile: '751-9301' | '879-3000' | '879-1300' | 'modbus';
+    channel: number;
+    modbus?: ModbusPoint;
+  }>;
   logicalChannels: Array<{
     id: string;
     physicalPointId: string;
@@ -37,6 +43,11 @@ export interface Transport {
 export interface DeviceAdapter {
   validate?(snapshot: Snapshot): ValidationError[];
   activate?(snapshot: Snapshot): void;
+  configure?(snapshot: Snapshot): void;
+  prepareConfiguration?(snapshot: Snapshot): () => void;
+  suspend?(): () => void;
+  measurementSource?(point: Snapshot['physicalPoints'][number]): string;
+  shouldPoll?(point: Snapshot['physicalPoints'][number], now: number): boolean;
   checkAvailability?(): Promise<void>;
   write(point: Snapshot['physicalPoints'][number], value: boolean): Promise<void>;
   read(point: Snapshot['physicalPoints'][number]): Promise<boolean | number>;
@@ -46,3 +57,5 @@ export interface StateStore {
   load(): Promise<RuntimeState>;
   save(state: RuntimeState): Promise<void>;
 }
+// eslint-disable-next-line @nx/enforce-module-boundaries
+import type { ModbusConfiguration, ModbusPoint } from '../../modbus/model';

@@ -627,7 +627,7 @@ export function ModbusConfigurationForm({ value, onChange, isDisabled = false }:
       >
         Add device
       </Button>
-      {profiles.map((p) => (
+      {profiles.map((p, profileIndex) => (
         <div key={p.id}>
           <ModbusProfileForm
             value={p}
