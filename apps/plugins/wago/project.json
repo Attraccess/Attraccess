@@ -20,8 +20,7 @@
     "test-frontend": {
       "executor": "nx:run-commands",
       "options": {
-        "cwd": "apps/plugins/wago",
-        "command": "pnpm exec vitest run --config frontend/vitest.config.ts"
+        "command": "pnpm exec vitest run --config apps/plugins/wago/frontend/vitest.config.ts"
       }
     },
     "build-backend": {

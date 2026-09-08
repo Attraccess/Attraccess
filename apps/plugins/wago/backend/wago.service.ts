@@ -446,7 +446,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   /** Revokes the controller's access before removing all of its local state. */
-  async remove(id: number): Promise<string> {
+  async remove(id: number, assertOwned: () => Promise<void> = async () => undefined): Promise<string> {
     return this.withClaimLock(id, () =>
       this.withClaimConfigurationLock(async () => {
         const controller = await this.controllers.findOneBy({ id });
@@ -464,7 +464,9 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
             throw new ConflictException(`Manual credential revocation is required: ${manual.instructions.join(' ')}`);
         }
 
-        if (controller.enrollmentId) await this.revokeEnrollmentById(controller.enrollmentId);
+        await assertOwned();
+        if (controller.enrollmentId) await this.revokeEnrollmentById(controller.enrollmentId, assertOwned);
+        await assertOwned();
         await Promise.all([this.drafts.delete({ controllerId: id }), this.revisions.delete({ controllerId: id })]);
         await this.controllers.delete(id);
         this.configurationReportQueues.delete(id);
@@ -479,11 +481,20 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     );
   }
 
-  async claim(id: number, name: string, verifier: string, mqttServerId?: number): Promise<WagoController> {
+  async claim(
+    id: number,
+    name: string,
+    verifier: string,
+    mqttServerId?: number,
+    assertOwned: () => Promise<void> = async () => undefined,
+  ): Promise<WagoController> {
     return this.withClaimLock(id, async () => {
-      const prepared = await this.withClaimConfigurationLock(() => this.prepareClaim(id, name, verifier, mqttServerId));
+      const prepared = await this.withClaimConfigurationLock(() =>
+        this.prepareClaim(id, name, verifier, mqttServerId, assertOwned),
+      );
       try {
         const acknowledgementToken = randomBytes(24).toString('base64url');
+        await assertOwned();
         await this.watchClaimAcknowledgement(prepared, acknowledgementToken);
         await this.context.mqtt.publish(
           prepared.mqttServerId,
@@ -559,6 +570,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     name: string,
     verifier: string,
     mqttServerId?: number,
+    assertOwned: () => Promise<void> = async () => undefined,
   ): Promise<{
     controller: WagoController;
     enrollment: WagoEnrollment;
@@ -591,6 +603,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     const identity = `wago-controller-${controller.hardwareId}`;
     const settings = await this.getSettings();
     const namespace = normalizeOperationalPrefix(settings.operationalPrefix);
+    await assertOwned();
     const credential = await this.context.getMqttCredentialProvisioning().provision({
       mqttServerId: selectedServerId,
       identity,
@@ -604,6 +617,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
         ],
       },
     });
+    await assertOwned();
     if (!('password' in credential)) {
       throw new ConflictException(`Manual credential provisioning is required: ${credential.instructions.join(' ')}`);
     }
