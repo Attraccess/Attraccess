@@ -333,7 +333,10 @@ export class WagoRuntime {
       if (!point) continue;
       try {
         const raw = await this.options.device.read(point);
-        const timestamp = new Date().toISOString();
+        // Capture the completion instant before a transform or publication can
+        // block or otherwise advance the clock.
+        const readCompletedAt = Date.now();
+        const timestamp = new Date(readCompletedAt).toISOString();
         const transform = channel.measurement ?? { unit: 'percent', scale: 1, offset: 0 };
         await this.publishOperational('measurements', {
           timestamp,
@@ -527,9 +530,9 @@ export class WagoRuntime {
         ? this.options.transport.publish(
             this.topic(suffix),
             {
+              ...metadata,
               streamId: this.streamId,
               ...payload,
-              ...metadata,
             },
             options,
           )
