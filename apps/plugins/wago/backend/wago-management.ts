@@ -151,7 +151,7 @@ export class WagoManagementService {
       throw new ManagementError('invalid_request');
     validateCredential(input.temporarySsh);
     const existing = await this.required(controllerId);
-    return this.locked(controllerId, existing.target.hostKeyFingerprint, async (owner, guard) => {
+    return this.locked(controllerId, existing.target.hostKeyFingerprint, async (owner, guard, markMutating) => {
       const record = await this.required(controllerId);
       if (record.transaction) throw new ManagementError('recovery_required');
       if (
@@ -190,6 +190,7 @@ export class WagoManagementService {
         record.failure = null;
         await this.save(record, owner, guard); // durable intent and encrypted key BEFORE preparing remote state
         const tx = record.transaction;
+        markMutating();
         await this.remote(guard, () => this.adapter.prepare(tx, input.temporarySsh));
         const watchdog = await this.remote(guard, () => this.adapter.armWatchdog(tx, input.temporarySsh));
         if (!watchdog.armed || (record.mode === 'baseline' && !watchdog.rebootSafe)) throw new Error();
@@ -222,7 +223,7 @@ export class WagoManagementService {
       } catch {
         // No raw transport/crypto/database errors, stdout or credentials are persisted or returned.
         if (!record.transaction) throw new ManagementError('operation_failed');
-        return this.rollback(record, owner, guard, input.temporarySsh, 'transition_failed');
+        return this.rollback(record, owner, guard, input.temporarySsh, 'transition_failed', markMutating);
       } finally {
         if (key) key.privateKey = '';
       }
@@ -237,13 +238,13 @@ export class WagoManagementService {
     if (input.confirm !== true) throw new ManagementError('invalid_request');
     validateCredential(input.temporarySsh);
     const existing = await this.required(controllerId);
-    return this.locked(controllerId, existing.target.hostKeyFingerprint, async (owner, guard) => {
+    return this.locked(controllerId, existing.target.hostKeyFingerprint, async (owner, guard, markMutating) => {
       const record = await this.required(controllerId);
       if (record.state === 'recovered') return publicStatus(record);
       if (!record.transaction) throw new ManagementError('invalid_request');
       if (input.temporarySsh.username !== record.transaction.username)
         throw new ManagementError('credentials_required');
-      return this.rollback(record, owner, guard, input.temporarySsh, null);
+      return this.rollback(record, owner, guard, input.temporarySsh, null, markMutating);
     });
   }
 
@@ -274,6 +275,7 @@ export class WagoManagementService {
     guard: CommissioningOperationGuard,
     credential: SessionCredential,
     failure: ManagementRecord['failure'],
+    markMutating: () => void,
   ): Promise<ManagementPublicStatus> {
     record.state = 'recovering';
     record.failure = failure;
@@ -293,6 +295,7 @@ export class WagoManagementService {
           retainedKey = undefined;
         }
       }
+      markMutating();
       await this.remote(guard, () => this.adapter.rollback(this.transaction(record), credential, retainedKey));
       const recovered: ManagementRecord = {
         ...record,
@@ -348,17 +351,27 @@ export class WagoManagementService {
   private async locked<T>(
     controllerId: number,
     fingerprint: string,
-    action: (owner: string, guard: CommissioningOperationGuard) => Promise<T>,
+    action: (owner: string, guard: CommissioningOperationGuard, markMutating: () => void) => Promise<T>,
   ): Promise<T> {
     validId(controllerId);
     const owner = identifier();
     let acquired = false;
+    let mutationStarted = false;
     try {
-      return await this.commissioningLease.run(fingerprint, async (guard) => {
+      const outcome = await this.commissioningLease.run(fingerprint, async (guard) => {
         acquired = await this.store.acquire(controllerId, owner, this.now(), this.now() + LEASE_MS);
         if (!acquired) throw new ManagementError('busy');
-        return action(owner, guard);
+        try {
+          return { result: await action(owner, guard, () => (mutationStarted = true)) } as const;
+        } catch (error) {
+          // A rejected preflight has no remote outcome to protect. Let the shared lease
+          // release normally, while retaining it for any failure after mutation begins.
+          if (error instanceof ManagementError && !mutationStarted) return { error } as const;
+          throw error;
+        }
       });
+      if ('error' in outcome) throw outcome.error;
+      return outcome.result;
     } catch (error) {
       if (error instanceof ManagementError) throw error;
       if (error instanceof CommissioningLeaseError)
