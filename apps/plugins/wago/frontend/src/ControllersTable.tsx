@@ -33,14 +33,7 @@ export function ControllersTable({
   onRemove,
   onResume,
 }: ControllersTableProps) {
-  const activeSessions = sessions.filter(
-    (session) =>
-      session.state !== 'completed' &&
-      session.state !== 'revoked' &&
-      !controllers.some(
-        (controller) => controller.hardwareId === session.hardwareId && controller.trustState === 'claimed',
-      ),
-  );
+  const activeSessions = sessions.filter((session) => session.state !== 'completed' && session.state !== 'revoked');
   const rows: TableRowData[] = [
     ...controllers.map((controller) => ({
       key: `controller-${controller.id}`,
@@ -101,7 +94,7 @@ function ControllerRow({
 }) {
   const { controller, session } = row;
   return (
-    <TableRow key={row.key} id={row.key} className={session ? 'wg:bg-accent/5' : undefined}>
+    <TableRow key={row.key} id={row.key} className={session ? 'wg:bg-primary/5' : undefined}>
       <TableCell>
         <div className="wg:flex wg:min-w-0 wg:flex-col">
           <span className="wg:truncate wg:font-medium">{controller.name ?? controller.hardwareId}</span>
@@ -126,14 +119,17 @@ function ControllerRow({
       <TableCell className="wg:hidden wg:lg:table-cell">{formatHeartbeat(controller.lastHeartbeatAt)}</TableCell>
       <TableCell>
         <div className="wg:flex wg:justify-end wg:gap-2">
-          {session ? (
+          {session && (
             <Button size="sm" variant="secondary" onPress={() => onResume(session)}>
               View progress
             </Button>
-          ) : controller.trustState === 'untrusted' ? (
-            <Button size="sm" onPress={() => onClaim(controller.id)}>
-              Claim
-            </Button>
+          )}
+          {controller.trustState === 'untrusted' ? (
+            !session && (
+              <Button size="sm" onPress={() => onClaim(controller.id)}>
+                Claim
+              </Button>
+            )
           ) : (
             <Button size="sm" variant="secondary" onPress={() => onConfigure(controller.id)}>
               Configure
@@ -157,7 +153,7 @@ function CommissioningRow({
 }) {
   const { session } = row;
   return (
-    <TableRow key={row.key} id={row.key} className="wg:bg-accent/5">
+    <TableRow key={row.key} id={row.key} className="wg:bg-primary/5">
       <TableCell>
         <div className="wg:flex wg:min-w-0 wg:flex-col">
           <span className="wg:truncate wg:font-medium">{session.controllerName ?? 'CC100 enrollment'}</span>
@@ -196,7 +192,7 @@ function CommissioningRow({
 
 function CommissioningStatus({ session }: { session: CommissioningSession }) {
   return (
-    <span className="wg:mt-1 wg:text-xs wg:text-accent-soft-foreground">
+    <span className="wg:mt-1 wg:text-xs wg:text-primary">
       {commissioningLabel(session.state)}
       {session.failureReason ? `: ${session.failureReason}` : ''}
     </span>
@@ -248,6 +244,9 @@ export function commissioningLabel(state: WagoCommissioningState): string {
     awaiting_discovery: 'Waiting for the controller to connect',
     awaiting_claim: 'Claiming automatically',
     completed: 'Claimed',
+    awaiting_verification: 'Verification required',
+    claim_interrupted: 'Claim recovery required',
+    recovery_revocation_pending: 'Restored; revocation pending',
     revoked: 'Revoked',
   }[state];
 }

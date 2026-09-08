@@ -16,6 +16,8 @@ import type { Key } from '@heroui/react';
 import { AlertCircleIcon, CheckCircle2Icon, CpuIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { CommissioningSession } from './api';
+import { getCommissioningVerification } from './api';
+import { useQuery } from '@tanstack/react-query';
 import { commissioningLabel } from './ControllersTable';
 import { StandardDrawer } from './drawer';
 import {
@@ -23,6 +25,7 @@ import {
   useConfirmCommissioningHostKeyMutation,
   useCreateCommissioningSessionMutation,
   useDeliverCommissioningSessionMutation,
+  useRecoverCommissioningSessionMutation,
   useMqttServersQuery,
   useRemoveCommissioningSessionMutation,
   useSettingsQuery,
@@ -38,6 +41,7 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
   const createSessionMutation = useCreateCommissioningSessionMutation();
   const confirmHostKeyMutation = useConfirmCommissioningHostKeyMutation();
   const deliverSessionMutation = useDeliverCommissioningSessionMutation();
+  const recoverSessionMutation = useRecoverCommissioningSessionMutation();
   const removeSessionMutation = useRemoveCommissioningSessionMutation();
   const settingsQuery = useSettingsQuery();
   const mqttServersQuery = useMqttServersQuery();
@@ -51,9 +55,19 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
   const [sshUsername, setSshUsername] = useState('');
   const [sshPassword, setSshPassword] = useState('');
   const [confirmInstall, setConfirmInstall] = useState(false);
+  const [recoveryUsername, setRecoveryUsername] = useState('');
+  const [recoveryPassword, setRecoveryPassword] = useState('');
+  const [confirmRecovery, setConfirmRecovery] = useState(false);
   const [isCancelConfirmationOpen, setCancelConfirmationOpen] = useState(false);
 
-  const mutationSession = deliverSessionMutation.data ?? resumedSession ?? createdSession;
+  const attemptSession =
+    recoverSessionMutation.submittedAt > deliverSessionMutation.submittedAt
+      ? recoverSessionMutation.data
+      : deliverSessionMutation.data;
+  const mutationSession =
+    (attemptSession && (!resumedSession || attemptSession.id === resumedSession.id) ? attemptSession : null) ??
+    resumedSession ??
+    createdSession;
   const session = mutationSession
     ? (commissioningSessionsQuery.data?.find((candidate) => candidate.id === mutationSession.id) ?? mutationSession)
     : null;
@@ -62,21 +76,30 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
     createSessionMutation.isPending ||
     confirmHostKeyMutation.isPending ||
     deliverSessionMutation.isPending ||
+    recoverSessionMutation.isPending ||
     removeSessionMutation.isPending;
-  const loadingStatus = createSessionMutation.isPending
+  const loadingStatus = recoverSessionMutation.isPending
     ? [
-        'Preparing commissioning',
-        'Scanning the SSH key for your review. A scan alone does not authenticate the controller.',
+        'Recovering saved runtime',
+        'Restoring the saved container, data, and environment. Broker credential revocation cannot be undone.',
       ]
-    : removeSessionMutation.isPending
-      ? ['Canceling enrollment', 'Revoking access and removing the enrollment records.']
-      : confirmHostKeyMutation.isPending
-        ? ['Confirming controller identity', 'Saving the administrator-confirmed SSH host key.']
-        : null;
+    : createSessionMutation.isPending
+      ? [
+          'Preparing commissioning',
+          'Scanning the SSH key for your review. A scan alone does not authenticate the controller.',
+        ]
+      : removeSessionMutation.isPending
+        ? ['Canceling enrollment', 'Revoking access and removing the enrollment records.']
+        : confirmHostKeyMutation.isPending
+          ? ['Confirming controller identity', 'Saving the administrator-confirmed SSH host key.']
+          : null;
 
   useEffect(() => {
     setSshPassword('');
     setConfirmInstall(false);
+    setRecoveryUsername('');
+    setRecoveryPassword('');
+    setConfirmRecovery(false);
     setHostKeyFingerprint('');
   }, [isOpen, resumedSession?.id]);
 
@@ -101,9 +124,13 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
     setSshPassword('');
     setConfirmInstall(false);
     setCancelConfirmationOpen(false);
+    setRecoveryUsername('');
+    setRecoveryPassword('');
+    setConfirmRecovery(false);
     createSessionMutation.reset();
     confirmHostKeyMutation.reset();
     deliverSessionMutation.reset();
+    recoverSessionMutation.reset();
     removeSessionMutation.reset();
     onOpenChange(false);
   }
@@ -128,6 +155,31 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
       confirmInstall: true,
       temporarySsh: { username: sshUsername.trim(), password: sshPassword },
     });
+    setSshPassword('');
+    setConfirmInstall(false);
+    setRecoveryUsername('');
+    setRecoveryPassword('');
+    setConfirmRecovery(false);
+  }
+
+  function recoverSession() {
+    if (
+      !session ||
+      isLoading ||
+      !canRecover(session) ||
+      !confirmRecovery ||
+      !recoveryUsername.trim() ||
+      !recoveryPassword
+    )
+      return;
+    recoverSessionMutation.mutate({
+      id: session.id,
+      confirmInstall: true,
+      temporarySsh: { username: recoveryUsername.trim(), password: recoveryPassword },
+    });
+    setRecoveryUsername('');
+    setRecoveryPassword('');
+    setConfirmRecovery(false);
     setSshPassword('');
     setConfirmInstall(false);
   }
@@ -181,9 +233,56 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
               />
             )}
             {session && activeStep === 3 && <ProgressStep name={title} session={session} />}
+            {session && ['awaiting_verification', 'completed'].includes(session.state) && (
+              <VerificationStatus session={session} />
+            )}
+            {session && canRecover(session) && (
+              <div className="wg:space-y-4">
+                <Alert status="warning">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Title>Recover the saved runtime</Alert.Title>
+                    <Alert.Description>
+                      Recovery interrupts the current runtime and restores the saved container, data, and environment,
+                      if a snapshot exists. It cannot undo broker credential revocation; the restored runtime may be
+                      unable to connect. A missing snapshot will produce an error. Recovery does not certify readiness.
+                      Nothing is restored automatically, and this action does not discard the backup.
+                    </Alert.Description>
+                  </Alert.Content>
+                </Alert>
+                <CredentialFields
+                  intent="recovery"
+                  isDisabled={isLoading}
+                  username={recoveryUsername}
+                  password={recoveryPassword}
+                  onUsernameChange={setRecoveryUsername}
+                  onPasswordChange={setRecoveryPassword}
+                />
+                <Checkbox
+                  isRequired
+                  isDisabled={isLoading}
+                  isSelected={confirmRecovery}
+                  onChange={setConfirmRecovery}
+                  name="confirm-recovery"
+                >
+                  <Checkbox.Content>
+                    <Checkbox.Control>
+                      <Checkbox.Indicator />
+                    </Checkbox.Control>
+                    I approve interrupting the current runtime and restoring the saved container, data, and environment
+                    for this recovery attempt.
+                  </Checkbox.Content>
+                </Checkbox>
+                <p className="wg:text-sm wg:text-muted">
+                  Enter fresh SSH credentials and approve each recovery attempt separately. Credentials and recovery
+                  consent are cleared after submission or closing.
+                </p>
+              </div>
+            )}
             {createSessionMutation.isError && <ErrorAlert error={createSessionMutation.error} />}
             {confirmHostKeyMutation.isError && <ErrorAlert error={confirmHostKeyMutation.error} />}
             {deliverSessionMutation.isError && <ErrorAlert error={deliverSessionMutation.error} />}
+            {recoverSessionMutation.isError && <ErrorAlert error={recoverSessionMutation.error} />}
             {isCancelConfirmationOpen && (
               <Alert status="warning">
                 <Alert.Indicator />
@@ -198,6 +297,16 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
         </div>
       </DrawerBody>
       <DrawerFooter>
+        {session && canRecover(session) && (
+          <Button
+            variant="danger"
+            isPending={recoverSessionMutation.isPending}
+            isDisabled={isLoading || !confirmRecovery || !recoveryUsername.trim() || !recoveryPassword}
+            onPress={recoverSession}
+          >
+            Recover saved runtime
+          </Button>
+        )}
         <Button variant="secondary" onPress={isCancelConfirmationOpen ? () => setCancelConfirmationOpen(false) : close}>
           {isCancelConfirmationOpen ? 'Keep enrollment' : 'Close'}
         </Button>
@@ -466,6 +575,51 @@ function canInstall(session: CommissioningSession) {
   return ['awaiting_delivery', 'delivery_failed', 'awaiting_codesys_confirmation'].includes(session.state);
 }
 
+function canRecover(session: CommissioningSession) {
+  return [
+    'delivery_failed',
+    'awaiting_discovery',
+    'awaiting_verification',
+    'claim_interrupted',
+    'recovery_revocation_pending',
+  ].includes(session.state);
+}
+
+function CredentialFields({
+  intent = 'installation',
+  isDisabled,
+  username,
+  password,
+  onUsernameChange,
+  onPasswordChange,
+}: {
+  intent?: 'installation' | 'recovery';
+  isDisabled: boolean;
+  username: string;
+  password: string;
+  onUsernameChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
+}) {
+  const prefix = intent === 'recovery' ? 'Recovery SSH' : 'Temporary SSH';
+  return (
+    <div className="wg:grid wg:gap-4 wg:sm:grid-cols-2">
+      <TextField isRequired isDisabled={isDisabled} name={`${intent}-ssh-username`}>
+        <Label>{prefix} username</Label>
+        <Input autoComplete="off" value={username} onChange={(event) => onUsernameChange(event.target.value)} />
+      </TextField>
+      <TextField isRequired isDisabled={isDisabled} name={`${intent}-ssh-password`}>
+        <Label>{prefix} password</Label>
+        <Input
+          autoComplete="off"
+          type="password"
+          value={password}
+          onChange={(event) => onPasswordChange(event.target.value)}
+        />
+      </TextField>
+    </div>
+  );
+}
+
 function DeliveryStep({
   isDelivering,
   session,
@@ -501,25 +655,13 @@ function DeliveryStep({
               </Alert.Description>
             </Alert.Content>
           </Alert>
-          <div className="wg:grid wg:gap-4 wg:sm:grid-cols-2">
-            <TextField isRequired isDisabled={isDelivering} name="ssh-username">
-              <Label>Temporary SSH username</Label>
-              <Input
-                autoComplete="off"
-                value={sshUsername}
-                onChange={(event) => onSshUsernameChange(event.target.value)}
-              />
-            </TextField>
-            <TextField isRequired isDisabled={isDelivering} name="ssh-password">
-              <Label>Temporary SSH password</Label>
-              <Input
-                autoComplete="off"
-                type="password"
-                value={sshPassword}
-                onChange={(event) => onSshPasswordChange(event.target.value)}
-              />
-            </TextField>
-          </div>
+          <CredentialFields
+            isDisabled={isDelivering}
+            username={sshUsername}
+            password={sshPassword}
+            onUsernameChange={onSshUsernameChange}
+            onPasswordChange={onSshPasswordChange}
+          />
           <Checkbox
             isRequired
             isDisabled={isDelivering}
@@ -547,7 +689,7 @@ function DeliveryStep({
 }
 
 function ProgressStep({ name, session }: { name: string; session: CommissioningSession }) {
-  const complete = session.state === 'completed' || session.state === 'revoked';
+  const complete = ['completed', 'revoked', 'claim_interrupted', 'recovery_revocation_pending'].includes(session.state);
   return (
     <div className="wg:space-y-4">
       <DevicePassport className="wg:md:hidden" name={name} step={3} />
@@ -569,6 +711,36 @@ function ProgressStep({ name, session }: { name: string; session: CommissioningS
         </Alert>
       )}
     </div>
+  );
+}
+
+function VerificationStatus({ session }: { session: CommissioningSession }) {
+  const verification = useQuery({
+    queryKey: ['wago', 'commissioning-verification', session.id],
+    queryFn: () => getCommissioningVerification(session.id),
+    refetchInterval: 5000,
+  });
+  return (
+    <Alert status="warning">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>Commissioning is not yet verified</Alert.Title>
+        <Alert.Description>
+          {verification.isError ? (
+            'Verification could not be loaded. No readiness claim is made.'
+          ) : verification.data ? (
+            <ul>
+              <li>Permanent heartbeat: {verification.data.permanentConnection ? 'received' : 'pending'}</li>
+              <li>Enrollment credential revoked: {verification.data.enrollmentRevoked ? 'verified' : 'pending'}</li>
+              <li>Desired/reported configuration: {verification.data.configurationApplied ? 'applied' : 'pending'}</li>
+              <li>Management hardening and physical hardware readiness: unverified</li>
+            </ul>
+          ) : (
+            'Checking commissioning evidence...'
+          )}
+        </Alert.Description>
+      </Alert.Content>
+    </Alert>
   );
 }
 
