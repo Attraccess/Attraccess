@@ -8,24 +8,21 @@
 #include "../settings/settings.hpp"
 #include "state/state.hpp"
 #include "../logger/logger.hpp"
-#ifdef DEMO_MODE
-#include "demo_websocket.hpp"
-#else
-#include "../websocket/websocket.hpp"
-#endif
+#include "reader_transport.hpp"
 #include "../utils.hpp"
 #include "ota/ota_updater.hpp"
 
 class API
 {
 public:
-    API() : logger("API"),
+    explicit API(IReaderTransport &transport) : logger("API"),
+             transport(transport),
             firmware(
                 logger,
                 [this](const char *type, JsonObject payload)
                 { return this->sendMessage(type, payload); },
                 [this](const char *reason)
-                { this->websocket.forceReconnect(reason); },
+                { this->transport.forceReconnect(reason); },
                 firmwareUpdateProgressCallback,
                 firmwareUpdateMetaCallback,
                 errorCallback) {}
@@ -331,11 +328,7 @@ public:
 
 private:
     Logger logger;
-#ifdef DEMO_MODE
-    DemoWebsocket websocket;
-#else
-    Websocket websocket;
-#endif
+    IReaderTransport &transport;
 
     void updateSateInfo();
 

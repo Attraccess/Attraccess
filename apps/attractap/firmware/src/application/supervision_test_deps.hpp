@@ -67,15 +67,26 @@ public:
     void cancelSupervision() { ++cancels; }
 };
 
-class NFC {
+class NFC : public INfc {
 public:
     bool authenticateResult = true;
     uint32_t enabled = 0;
     uint32_t disabled = 0;
-    void resetCardPresence() {}
-    void enableCardDetection() { ++enabled; }
-    void disableCardDetection() { ++disabled; }
-    bool authenticate(uint8_t, uint8_t *) { return authenticateResult; }
+    void setup() override {}
+    void loop() override {}
+    bool changeKey(uint8_t, uint8_t *, uint8_t *, uint8_t *, uint8_t) override { return false; }
+    void resetCardPresence() override {}
+    void enableCardDetection() override { ++enabled; }
+    void disableCardDetection() override { ++disabled; }
+    void setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)>) override {}
+    void setCardRemovalCallback(std::function<void(uint32_t)>) override {}
+    bool getAvailableKeyNo(uint8_t *, uint8_t *, uint8_t *) override { return false; }
+    bool isCardPresent() override { return false; }
+    uint8_t *getFactoryKey() override { return factoryKey; }
+    bool authenticate(uint8_t, uint8_t *) override { return authenticateResult; }
+
+private:
+    uint8_t factoryKey[16] = {};
 };
 
 class Beeper {
