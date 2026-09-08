@@ -109,7 +109,10 @@ export function useRecoverCommissioningSessionMutation() {
   return useCommissioningAttemptMutation(recoverCommissioningSession, 'recovery');
 }
 
-function useCommissioningAttemptMutation(attempt: typeof deliverCommissioningSession, intent: 'installation' | 'recovery') {
+function useCommissioningAttemptMutation(
+  attempt: typeof deliverCommissioningSession,
+  intent: 'installation' | 'recovery',
+) {
   const queryClient = useQueryClient();
 
   return useMutation({

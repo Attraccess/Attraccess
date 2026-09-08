@@ -6,16 +6,29 @@ import type { CommissioningSession } from './api';
 import { CommissioningModal } from './CommissioningModal';
 
 vi.mock('./drawer', () => ({
-  StandardDrawer: ({ isOpen, children }: { isOpen: boolean; children: ReactNode }) => isOpen ? <div>{children}</div> : null,
+  StandardDrawer: ({ isOpen, children }: { isOpen: boolean; children: ReactNode }) =>
+    isOpen ? <div>{children}</div> : null,
 }));
 vi.mock('./ControllersTable', () => ({ commissioningLabel: (state: string) => state }));
 
 const session: CommissioningSession = {
-  id: 7, hardwareId: 'test-controller', mqttServerId: 1, targetHost: '192.0.2.7',
-  controllerName: 'Test controller', hostKeyFingerprint: 'SHA256:test', firmwareBaseline: '31',
-  state: 'awaiting_delivery', enrollmentExpiresAt: null, codesysState: null,
-  progressPercent: 0, progressStep: null, progressDetail: null, auditLog: '[]',
-  failureReason: null, createdAt: '', updatedAt: '',
+  id: 7,
+  hardwareId: 'test-controller',
+  mqttServerId: 1,
+  targetHost: '192.0.2.7',
+  controllerName: 'Test controller',
+  hostKeyFingerprint: 'SHA256:test',
+  firmwareBaseline: '31',
+  state: 'awaiting_delivery',
+  enrollmentExpiresAt: null,
+  codesysState: null,
+  progressPercent: 0,
+  progressStep: null,
+  progressDetail: null,
+  auditLog: '[]',
+  failureReason: null,
+  createdAt: '',
+  updatedAt: '',
 };
 
 let client: QueryClient;
@@ -30,13 +43,30 @@ beforeEach(() => {
   failInstall = false;
   failRecovery = false;
   activeSession = { ...session };
-  vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
-    requests.push({ url, body: options?.body as string | undefined });
-    const isInstall = url.endsWith('/deliver');
-    const isRecovery = url.endsWith('/recover');
-    const data = isInstall || isRecovery ? activeSession : url.endsWith('/verification') ? { permanentConnection: false, enrollmentRevoked: false, configurationApplied: false } : url.includes('/commissioning/sessions') ? [activeSession] : url.endsWith('/settings') ? { defaultMqttServerId: 1 } : [];
-    return { ok: !(isInstall && failInstall) && !(isRecovery && failRecovery), status: 400, json: async () => ({ message: isRecovery ? 'Runtime snapshot unavailable' : 'Installation failed' }), text: async () => JSON.stringify(data) };
-  }));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string, options?: RequestInit) => {
+      requests.push({ url, body: options?.body as string | undefined });
+      const isInstall = url.endsWith('/deliver');
+      const isRecovery = url.endsWith('/recover');
+      const data =
+        isInstall || isRecovery
+          ? activeSession
+          : url.endsWith('/verification')
+            ? { permanentConnection: false, enrollmentRevoked: false, configurationApplied: false }
+            : url.includes('/commissioning/sessions')
+              ? [activeSession]
+              : url.endsWith('/settings')
+                ? { defaultMqttServerId: 1 }
+                : [];
+      return {
+        ok: !(isInstall && failInstall) && !(isRecovery && failRecovery),
+        status: 400,
+        json: async () => ({ message: isRecovery ? 'Runtime snapshot unavailable' : 'Installation failed' }),
+        text: async () => JSON.stringify(data),
+      };
+    }),
+  );
 });
 
 afterEach(() => {
@@ -47,7 +77,11 @@ afterEach(() => {
 
 function mount() {
   const onOpenChange = vi.fn();
-  const view = (isOpen: boolean) => <QueryClientProvider client={client}><CommissioningModal isOpen={isOpen} session={activeSession} onOpenChange={onOpenChange} /></QueryClientProvider>;
+  const view = (isOpen: boolean) => (
+    <QueryClientProvider client={client}>
+      <CommissioningModal isOpen={isOpen} session={activeSession} onOpenChange={onOpenChange} />
+    </QueryClientProvider>
+  );
   return { ...render(view(true)), view, onOpenChange };
 }
 
@@ -62,43 +96,52 @@ function fillRecoveryCredentials() {
 }
 
 describe('explicit recovery approval', () => {
-  it.each(['delivery_failed', 'awaiting_discovery', 'awaiting_verification'] as const)('offers manual recovery in %s without starting it', (state) => {
-    activeSession.state = state;
-    mount();
-    expect(screen.getByRole('button', { name: 'Recover saved runtime' }).hasAttribute('disabled')).toBe(true);
-    expect(screen.getByText(/cannot undo broker credential revocation/)).toBeTruthy();
-    expect(requests.filter(({ url }) => url.endsWith('/recover'))).toHaveLength(0);
-  });
+  it.each(['delivery_failed', 'awaiting_discovery', 'awaiting_verification'] as const)(
+    'offers manual recovery in %s without starting it',
+    (state) => {
+      activeSession.state = state;
+      mount();
+      expect(screen.getByRole('button', { name: 'Recover saved runtime' }).hasAttribute('disabled')).toBe(true);
+      expect(screen.getByText(/cannot undo broker credential revocation/)).toBeTruthy();
+      expect(requests.filter(({ url }) => url.endsWith('/recover'))).toHaveLength(0);
+    },
+  );
 
-  it.each([false, true])('requires separate consent, scrubs credentials, and never retries (failure=%s)', async (failure) => {
-    activeSession.state = 'delivery_failed';
-    failRecovery = failure;
-    mount();
-    const recover = screen.getByRole('button', { name: 'Recover saved runtime' });
-    fillCredentials();
-    fireEvent.click(screen.getByRole('checkbox', { name: /I approve CODESYS/ }));
-    expect((screen.getByLabelText('Recovery SSH password') as HTMLInputElement).value).toBe('');
-    fillRecoveryCredentials();
-    expect(recover.hasAttribute('disabled')).toBe(true);
-    fireEvent.click(screen.getByRole('checkbox', { name: /I approve interrupting/ }));
-    fireEvent.click(recover);
-    expect((screen.getByLabelText('Recovery SSH password') as HTMLInputElement).value).toBe('');
-    expect((screen.getByLabelText('Recovery SSH username') as HTMLInputElement).value).toBe('');
-    await waitFor(() => expect(requests.filter(({ url }) => url.endsWith('/recover'))).toHaveLength(1));
-    expect(JSON.parse(requests.find(({ url }) => url.endsWith('/recover'))?.body ?? '{}')).toEqual({ confirmInstall: true, temporarySsh: { username: 'recovery-operator', password: 'recovery-secret' } });
-    await waitFor(() => expect(client.isMutating()).toBe(0));
-    const mutations = client.getMutationCache().getAll();
-    expect(mutations.every((mutation) => mutation.options.retry === false)).toBe(true);
-    const variables = JSON.stringify(mutations.map((mutation) => mutation.state.variables));
-    expect(variables).not.toContain('recovery-secret');
-    expect(variables).not.toContain('recovery-operator');
-    expect(variables).not.toContain('"confirmInstall":true');
-    if (failure) expect(screen.getByText('Runtime snapshot unavailable')).toBeTruthy();
-    fillRecoveryCredentials();
-    expect(recover.hasAttribute('disabled')).toBe(true);
-    expect(screen.getByRole('button', { name: 'Retry installation' }).hasAttribute('disabled')).toBe(true);
-    expect(requests.filter(({ url }) => url.endsWith('/deliver'))).toHaveLength(0);
-  });
+  it.each([false, true])(
+    'requires separate consent, scrubs credentials, and never retries (failure=%s)',
+    async (failure) => {
+      activeSession.state = 'delivery_failed';
+      failRecovery = failure;
+      mount();
+      const recover = screen.getByRole('button', { name: 'Recover saved runtime' });
+      fillCredentials();
+      fireEvent.click(screen.getByRole('checkbox', { name: /I approve CODESYS/ }));
+      expect((screen.getByLabelText('Recovery SSH password') as HTMLInputElement).value).toBe('');
+      fillRecoveryCredentials();
+      expect(recover.hasAttribute('disabled')).toBe(true);
+      fireEvent.click(screen.getByRole('checkbox', { name: /I approve interrupting/ }));
+      fireEvent.click(recover);
+      expect((screen.getByLabelText('Recovery SSH password') as HTMLInputElement).value).toBe('');
+      expect((screen.getByLabelText('Recovery SSH username') as HTMLInputElement).value).toBe('');
+      await waitFor(() => expect(requests.filter(({ url }) => url.endsWith('/recover'))).toHaveLength(1));
+      expect(JSON.parse(requests.find(({ url }) => url.endsWith('/recover'))?.body ?? '{}')).toEqual({
+        confirmInstall: true,
+        temporarySsh: { username: 'recovery-operator', password: 'recovery-secret' },
+      });
+      await waitFor(() => expect(client.isMutating()).toBe(0));
+      const mutations = client.getMutationCache().getAll();
+      expect(mutations.every((mutation) => mutation.options.retry === false)).toBe(true);
+      const variables = JSON.stringify(mutations.map((mutation) => mutation.state.variables));
+      expect(variables).not.toContain('recovery-secret');
+      expect(variables).not.toContain('recovery-operator');
+      expect(variables).not.toContain('"confirmInstall":true');
+      if (failure) expect(screen.getByText('Runtime snapshot unavailable')).toBeTruthy();
+      fillRecoveryCredentials();
+      expect(recover.hasAttribute('disabled')).toBe(true);
+      expect(screen.getByRole('button', { name: 'Retry installation' }).hasAttribute('disabled')).toBe(true);
+      expect(requests.filter(({ url }) => url.endsWith('/deliver'))).toHaveLength(0);
+    },
+  );
 
   it.each(['external', 'button', 'session'])('clears recovery credentials and consent on %s close/change', (mode) => {
     activeSession.state = 'awaiting_discovery';
@@ -149,10 +192,27 @@ describe('explicit install approval', () => {
     expect((screen.getByLabelText('Temporary SSH password') as HTMLInputElement).value).toBe('');
     await waitFor(() => expect(requests.filter(({ url }) => url.endsWith('/deliver'))).toHaveLength(1));
     const request = requests.find(({ url }) => url.endsWith('/deliver'));
-    expect(JSON.parse(request?.body ?? '{}')).toEqual({ confirmInstall: true, temporarySsh: { username: 'operator', password: 'test-only-password' } });
+    expect(JSON.parse(request?.body ?? '{}')).toEqual({
+      confirmInstall: true,
+      temporarySsh: { username: 'operator', password: 'test-only-password' },
+    });
     await waitFor(() => expect(client.isMutating()).toBe(0));
-    expect(JSON.stringify(client.getMutationCache().getAll().map((mutation) => mutation.state.variables))).not.toContain('test-only-password');
-    expect(JSON.stringify(client.getMutationCache().getAll().map((mutation) => mutation.state.variables))).not.toContain('"confirmInstall":true');
+    expect(
+      JSON.stringify(
+        client
+          .getMutationCache()
+          .getAll()
+          .map((mutation) => mutation.state.variables),
+      ),
+    ).not.toContain('test-only-password');
+    expect(
+      JSON.stringify(
+        client
+          .getMutationCache()
+          .getAll()
+          .map((mutation) => mutation.state.variables),
+      ),
+    ).not.toContain('"confirmInstall":true');
     expect(install.hasAttribute('disabled')).toBe(true);
     // A new password alone cannot reuse the previous approval.
     fillCredentials();
