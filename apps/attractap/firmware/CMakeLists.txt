@@ -27,5 +27,12 @@ file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/version.txt" ATTRACTAP_VERSION LIMIT_COU
 # Directory-scoped so it propagates to every component added below this scope.
 add_compile_definitions(LV_CONF_PATH="${CMAKE_CURRENT_LIST_DIR}/include/lv_conf.h")
 
+# Perf-monitor build: LVGL itself must compile with LV_USE_SYSMON, so the
+# define must reach every component (main's PUBLIC defs don't propagate to
+# LVGL, which main requires). Variants that opt in set ATTRACTAP_LV_PERF_MONITOR.
+if(DEFINED ATTRACTAP_LV_PERF_MONITOR_GL)
+    add_compile_definitions(ATTRACTAP_LV_PERF_MONITOR=1)
+endif()
+
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(attractap)

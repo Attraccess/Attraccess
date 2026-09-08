@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <freertos/portable.h>
 
 #include "../settings/settings.hpp"
 #include "../network/wifi/wifi.hpp"
@@ -210,6 +211,51 @@ void SerialCommandHandler::handleCommand(const std::string &topic, const std::st
         logger.error("debug.crash received - forcing panic for crash-report e2e test (ATT-474)");
         fflush(stdout);
         abort();
+        return;
+    }
+
+    if (topic == "debug.stats")
+    {
+        // Per-task CPU / run-time stats dump (requires the run-stats config in
+        // sdkconfig.debug). Diagnoses idle CPU burn (PERFORMANCE_ANALYSIS.md Q10).
+#if CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS
+        // Snapshot status records instead of passing storage to FreeRTOS's
+        // unbounded formatter. A task created during the snapshot simply does
+        // not appear in this report; it cannot overrun the status array.
+        const UBaseType_t taskCount = uxTaskGetNumberOfTasks();
+        TaskStatus_t *taskStatus = static_cast<TaskStatus_t *>(pvPortMalloc(taskCount * sizeof(TaskStatus_t)));
+        if (!taskStatus)
+        {
+            logger.error("debug.stats unavailable: unable to allocate task snapshot");
+            return;
+        }
+
+        configRUN_TIME_COUNTER_TYPE totalRunTime = 0;
+        const UBaseType_t reportedTaskCount = uxTaskGetSystemState(taskStatus, taskCount, &totalRunTime);
+        logger.info("--- FreeRTOS run-time stats ---");
+        logger.info("Task                 Runtime        CPU");
+        for (UBaseType_t i = 0; i < reportedTaskCount; i++)
+        {
+            const unsigned long percent = totalRunTime > 100
+                                              ? static_cast<unsigned long>(taskStatus[i].ulRunTimeCounter / (totalRunTime / 100))
+                                              : 0;
+            char row[80];
+            const int written = snprintf(row, sizeof(row), "%-20.20s %10lu %3lu%%",
+                                         taskStatus[i].pcTaskName,
+                                         static_cast<unsigned long>(taskStatus[i].ulRunTimeCounter),
+                                         percent);
+            if (written < 0 || static_cast<size_t>(written) >= sizeof(row))
+            {
+                logger.warn("debug.stats row truncated");
+                continue;
+            }
+            logger.info(row);
+        }
+        logger.info("--- end stats ---");
+        vPortFree(taskStatus);
+#else
+        logger.warn("debug.stats unavailable: CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS not enabled (sdkconfig.debug)");
+#endif
         return;
     }
 
