@@ -175,8 +175,7 @@ export class WagoDiagnosticsStore {
       canonical &&
       kind === 'state' &&
       data.readiness !== undefined &&
-      (!isObject(data.readiness) ||
-        (data.readiness.hardwareAvailable !== undefined && typeof data.readiness.hardwareAvailable !== 'boolean'))
+      (!isObject(data.readiness) || typeof data.readiness.hardwareAvailable !== 'boolean')
     )
       return false;
     if (

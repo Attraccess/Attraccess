@@ -47,6 +47,7 @@ import { EdgeWithDeleteButton } from './edgeWithDeleteButton';
 import JSConfetti from 'js-confetti';
 import { LogViewer } from './logViewer';
 import { VariablesModal } from './variablesModal';
+import { FlowNodeQuerySelection } from './FlowNodeQuerySelection';
 import de from './de.json';
 import en from './en.json';
 import nodesDeTranslations from './node/de.json';
@@ -460,6 +461,7 @@ function FlowsPageInner() {
             edgeTypes={edgeTypes}
           >
             <Controls />
+            <FlowNodeQuerySelection key={resourceId} nodes={nodes} setNodes={setNodes} />
             <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
 
             <Panel position="top-right" className="flex flex-row flex-wrap gap-2">
