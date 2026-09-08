@@ -7,10 +7,14 @@ import { WagoSettings } from './wago-settings.entity';
 import { WagoEnrollment } from './wago-enrollment.entity';
 import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
+import { WagoCredentialRotationEntity } from './wago-credential-rotation.entity';
 import { WagoCommissioningSession } from './wago-commissioning-session.entity';
 import { WagoCommissioningService } from './wago-commissioning.service';
+import { WagoCredentialRotationService } from './wago-credential-rotation';
 import { WagoRuntimeArtifactsService } from './wago-runtime-artifacts';
 import { WagoArtifactsController, WagoArtifactUploadInterceptor } from './wago-artifacts.controller';
+import { WagoDiagnosticsController } from './diagnostics.controller';
+import { WagoDiagnosticsService } from './diagnostics.service';
 import { WagoCommissioningReadiness } from './wago-commissioning-readiness';
 import { WagoManagementEntity } from './wago-management.entity';
 import { WagoCommissioningLeaseEntity } from './wago-commissioning-lease.entity';
@@ -26,6 +30,7 @@ const plugin: PluginBackendModule = {
     WagoEnrollment,
     WagoConfigurationDraft,
     WagoConfigurationRevision,
+    WagoCredentialRotationEntity,
     WagoCommissioningSession,
     WagoManagementEntity,
     WagoCommissioningLeaseEntity,
@@ -34,14 +39,16 @@ const plugin: PluginBackendModule = {
   register(context: PluginContext): DynamicModule {
     return {
       module: WagoPluginModule,
-      controllers: [WagoControllerApi, WagoArtifactsController],
+      controllers: [WagoControllerApi, WagoArtifactsController, WagoDiagnosticsController],
       providers: [
         { provide: PLUGIN_CONTEXT, useValue: context },
         WagoService,
         WagoRuntimeArtifactsService,
         WagoArtifactUploadInterceptor,
         WagoCommissioningReadiness,
+        WagoDiagnosticsService,
         WagoCommissioningService,
+        WagoCredentialRotationService,
       ],
     };
   },

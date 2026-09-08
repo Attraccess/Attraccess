@@ -42,4 +42,6 @@ export class SimulatorDeviceAdapter implements DeviceAdapter {
   }
 }
 
-function key(point: Point): string { return `${point.hardwareProfile}:${point.channel}`; }
+function key(point: Point): string {
+  return `${point.hardwareProfile}:${point.channel}`;
+}

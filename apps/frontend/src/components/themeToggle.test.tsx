@@ -32,7 +32,7 @@ function expectTheme(theme: 'light' | 'dark') {
   expect(document.documentElement).not.toHaveClass(theme === 'light' ? 'dark' : 'light');
   expect(document.documentElement.dataset.theme).toBe(theme);
   expect(document.documentElement.style.colorScheme).toBe(theme);
-  expect(screen.getByRole('button', { name: 'Dark mode', exact: true })).toHaveAttribute(
+  expect(screen.getByRole('button', { name: 'Dark mode' })).toHaveAttribute(
     'aria-pressed',
     String(theme === 'dark'),
   );
@@ -85,7 +85,7 @@ describe('Application appearance', () => {
     const user = userEvent.setup();
     renderTheme();
     await user.type(screen.getByLabelText('Unsaved draft'), ' plus unsaved edits');
-    await user.click(screen.getByRole('button', { name: 'Dark mode', exact: true }));
+    await user.click(screen.getByRole('button', { name: 'Dark mode' }));
     expectTheme('dark');
     expect(screen.getByRole('button', { name: 'Second dark mode control' })).toHaveAttribute('aria-pressed', 'true');
     expect(localStorage.getItem('heroui-theme')).toBe('dark');
@@ -112,7 +112,7 @@ describe('Application appearance', () => {
     });
     renderTheme();
     expectTheme('light');
-    await userEvent.click(screen.getByRole('button', { name: 'Dark mode', exact: true }));
+    await userEvent.click(screen.getByRole('button', { name: 'Dark mode' }));
     expectTheme('dark');
   });
 
@@ -121,7 +121,7 @@ describe('Application appearance', () => {
     act(() => toast.info('Appearance updated', { description: 'Your draft is unchanged.', duration: Infinity }));
     await screen.findByText('Appearance updated');
     expect(document.querySelector('[data-sonner-toaster]')).toHaveAttribute('data-sonner-theme', 'light');
-    await userEvent.click(screen.getByRole('button', { name: 'Dark mode', exact: true }));
+    await userEvent.click(screen.getByRole('button', { name: 'Dark mode' }));
     expect(document.querySelector('[data-sonner-toaster]')).toHaveAttribute('data-sonner-theme', 'dark');
     expect(screen.getByText('Your draft is unchanged.')).toBeInTheDocument();
   });

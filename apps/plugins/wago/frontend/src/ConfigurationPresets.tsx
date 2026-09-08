@@ -35,8 +35,9 @@ export function ConfigurationPresets({
   const [result, setResult] = useState<PresetPreview | null>(null);
   const [paths, setPaths] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
   const generation = useRef(0);
-  const busy = preview.isPending || apply.isPending;
+  const busy = processing;
   useEffect(() => {
     onBusyChange(busy);
   }, [busy, onBusyChange]);
@@ -77,6 +78,7 @@ export function ConfigurationPresets({
   async function showPreview() {
     const current = generation.current;
     setError(null);
+    setProcessing(true);
     try {
       const next = await preview.mutateAsync({ application, snapshot });
       if (current !== generation.current) return;
@@ -85,12 +87,15 @@ export function ConfigurationPresets({
     } catch (error) {
       if (current === generation.current)
         setError(error instanceof Error ? error.message : 'Could not preview preset.');
+    } finally {
+      setProcessing(false);
     }
   }
   async function copyChanges() {
     if (!result || !canCopy) return;
     const current = generation.current;
     setError(null);
+    setProcessing(true);
     try {
       const next = await apply.mutateAsync({
         controllerId,
@@ -104,6 +109,8 @@ export function ConfigurationPresets({
       setResult(null);
     } catch (error) {
       if (current === generation.current) setError(error instanceof Error ? error.message : 'Could not copy preset.');
+    } finally {
+      setProcessing(false);
     }
   }
   return (

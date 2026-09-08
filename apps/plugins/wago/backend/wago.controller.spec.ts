@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { WagoControllerApi } from './wago.controller';
 import type { WagoCommissioningService } from './wago-commissioning.service';
 import type { WagoService } from './wago.service';
+import type { WagoCredentialRotationService } from './wago-credential-rotation';
 import type { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
 describe('WagoControllerApi', () => {
@@ -12,7 +13,7 @@ describe('WagoControllerApi', () => {
     deliver: jest.fn(),
     recover: jest.fn(),
   } as unknown as WagoCommissioningService;
-  const controller = new WagoControllerApi(service, commissioning);
+  const controller = new WagoControllerApi(service, commissioning, {} as WagoCredentialRotationService);
   const request = { user: { id: 42, authenticationMethod: 'session' } } as AuthenticatedRequest;
 
   beforeEach(() => jest.clearAllMocks());

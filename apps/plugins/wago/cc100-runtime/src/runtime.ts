@@ -89,9 +89,15 @@ export class WagoRuntime {
     this.state = await this.options.store.load();
     this.sequence = this.state.sequence ?? 0;
     this.reservedSequence = this.sequence;
-    this.initialSequence = this.sequence;
+    this.initialSequence = 0;
     if (this.state.accepted) {
-      const errors = validateDesired({ protocolVersion: 1, ...this.state.accepted });
+      // Keep operating configurations written by older runtime versions alive. New
+      // desired configurations reject invalid measurement metadata, but a persisted
+      // legacy transform is handled by the measurement fault path instead of making
+      // the controller unavailable after a restart.
+      const errors = validateDesired({ protocolVersion: 1, ...this.state.accepted }).filter(
+        ({ code }) => code !== 'invalid_measurement',
+      );
       if (errors.length) throw new Error('persisted configuration is invalid');
       this.options.device.configure?.(this.state.accepted.snapshot);
     }

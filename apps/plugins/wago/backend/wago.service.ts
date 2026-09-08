@@ -1224,6 +1224,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     // mqttServerId; removal must still revoke this identity on its original broker.
     await assertOwned();
     controller.credentialMqttServerId = selectedServerId;
+    controller.credentialEpoch = randomUUID();
     await this.controllers.save(controller);
     await assertOwned();
     const provisioned =
@@ -1238,6 +1239,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
           subscribe: [
             configurationDesiredTopic(namespace, controller.hardwareId),
             commandTopic(namespace, controller.hardwareId),
+            `${namespace}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${controller.hardwareId}/credentials/rotate`,
           ],
         },
       }));
@@ -1335,6 +1337,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     if (manual) throw new ConflictException('Manual permanent credential revocation is required.');
     await assertOwned();
     controller.credentialMqttServerId = null;
+    controller.credentialEpoch = null;
     Object.assign(controller, previousController);
     await assertOwned();
     await this.controllers.save(controller).catch((rollbackError) => {

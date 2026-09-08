@@ -19,6 +19,7 @@ import { WagoCommissioningService } from './wago-commissioning.service';
 import type { WagoPresetApplication, WagoConfigurationSnapshot } from './configuration';
 import type { ConfigurationEditorMetadata } from './configuration-editor';
 import { WagoAudit, wagoAuditPrincipal } from './wago-audit';
+import { WagoCredentialRotationService } from './wago-credential-rotation';
 
 type CommissioningAttemptInput = { confirmInstall?: boolean; temporarySsh?: { username?: string; password?: string } };
 
@@ -45,9 +46,10 @@ export class WagoControllerApi {
   constructor(
     @Inject(WagoService) private readonly wago: WagoService,
     @Inject(WagoCommissioningService) private readonly commissioning: WagoCommissioningService,
-    @Inject(Symbol.for('attraccess.plugin.context')) context: PluginContext,
+    @Inject(WagoCredentialRotationService) private readonly credentialRotation: WagoCredentialRotationService,
+    @Inject(Symbol.for('attraccess.plugin.context')) context?: PluginContext,
   ) {
-    this.audit = new WagoAudit(context);
+    this.audit = new WagoAudit(context as PluginContext);
   }
   @Get('controllers') list() {
     return this.wago.list();
@@ -76,7 +78,7 @@ export class WagoControllerApi {
   @Post('commissioning/sessions')
   createCommissioningSession(
     @Body() body: { mqttServerId?: number; targetHost?: string; name?: string; runtimeArtifactDigest?: string },
-    @Req() request: AuthenticatedRequest,
+    @Req() request?: AuthenticatedRequest,
   ) {
     if (!body?.mqttServerId) throw new BadRequestException('MQTT server is required');
     if (!body.name?.trim()) throw new BadRequestException('controller name is required');
@@ -114,7 +116,7 @@ export class WagoControllerApi {
   deliverCommissioningSession(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: CommissioningAttemptInput,
-    @Req() request: AuthenticatedRequest,
+    @Req() request?: AuthenticatedRequest,
   ) {
     return this.commissioning.deliver(
       id,
@@ -237,6 +239,27 @@ export class WagoControllerApi {
       this.wago.completeManualCredentials(id, input, principal, assertOwned),
     );
   }
+  @Auth('system.settings.manage')
+  @Get('controllers/:id/credentials/rotation')
+  credentialRotationStatus(@Param('id', ParseIntPipe) id: number) {
+    return this.credentialRotation.status(id);
+  }
+  @Auth('system.settings.manage')
+  @Post('controllers/:id/credentials/rotate')
+  async rotateCredentials(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { confirm?: boolean; retry?: boolean },
+    @Req() request: AuthenticatedRequest,
+  ) {
+    if (!body || Object.keys(body).some((key) => key !== 'confirm' && key !== 'retry') || body.confirm !== true)
+      throw new BadRequestException('Explicit credential rotation consent is required');
+    if (body.retry !== undefined && typeof body.retry !== 'boolean') throw new BadRequestException('Invalid rotation retry flag');
+    const settings = await this.wago.getSettings();
+    return this.commissioning.operateControllerSafely(id, (_assertOwned, guard) =>
+      this.credentialRotation.rotate(id, settings.operationalPrefix, wagoAuditPrincipal(request), guard, body.retry === true),
+      true,
+    );
+  }
   @Auth('resources.update')
   @Post('controllers/:id/commands')
   manualCommand(
@@ -276,7 +299,7 @@ export class WagoControllerApi {
       previewedDraftHash?: string;
       snapshot?: WagoConfigurationSnapshot;
     },
-    @Req() request: AuthenticatedRequest,
+    @Req() request?: AuthenticatedRequest,
   ) {
     if (!body?.application) throw new BadRequestException('application is required');
     return this.wago.applyPreset(
@@ -285,7 +308,7 @@ export class WagoControllerApi {
       body.selectedPaths ?? [],
       body.previewedDraftHash ?? '',
       body.snapshot,
-      wagoAuditPrincipal(request),
+      wagoAuditPrincipal(request as AuthenticatedRequest),
     );
   }
   @Post('controllers/:id/configuration/draft') saveDraft(

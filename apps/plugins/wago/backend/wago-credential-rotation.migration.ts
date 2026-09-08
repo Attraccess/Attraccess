@@ -3,8 +3,14 @@ import type { MigrationInterface, QueryRunner } from '@attraccess/plugins-backen
 export class WagoCredentialRotation1780010610000 implements MigrationInterface {
   name = 'WagoCredentialRotation1780010610000';
   async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query('ALTER TABLE "plugin_wago_controllers" ADD COLUMN "credential_epoch" varchar');
-    await queryRunner.query(`CREATE TABLE "plugin_wago_credential_rotations" (
+    const controllerColumns = await queryRunner.query('PRAGMA table_info("plugin_wago_controllers")');
+    if (!controllerColumns.some((column: { name: string }) => column.name === 'credential_epoch'))
+      await queryRunner.query('ALTER TABLE "plugin_wago_controllers" ADD COLUMN "credential_epoch" varchar');
+    const tables = await queryRunner.query(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'plugin_wago_credential_rotations'",
+    );
+    if (!tables.length)
+      await queryRunner.query(`CREATE TABLE "plugin_wago_credential_rotations" (
       "controller_id" integer PRIMARY KEY NOT NULL REFERENCES "plugin_wago_controllers"("id") ON DELETE CASCADE,
       "revision" integer NOT NULL,
       "credential_epoch" varchar NOT NULL,

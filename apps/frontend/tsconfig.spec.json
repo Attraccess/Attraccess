@@ -2,11 +2,14 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "../../dist/out-tsc",
-    "module": "commonjs",
-    "moduleResolution": "node16",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "target": "es2022",
     "jsx": "react-jsx",
+    "strict": false,
     "types": [
       "jest",
+      "vitest/globals",
       "node",
       "@nx/react/typings/cssmodule.d.ts",
       "@nx/react/typings/image.d.ts"

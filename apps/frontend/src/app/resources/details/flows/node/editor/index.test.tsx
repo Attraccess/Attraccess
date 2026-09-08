@@ -19,13 +19,17 @@ vi.mock('../../../../../../components/standardDrawer', () => ({
     isOpen ? <div>{children}</div> : null,
 }));
 
+const baseProperties = {
+  command: { type: 'string', title: 'Command', refreshesSchema: true, default: 'first' },
+};
+
 const base: ResourceFlowNodeSchemaDto = {
   type: 'test',
   configSchema: {
     dynamic: true,
-    properties: { command: { type: 'string', title: 'Command', refreshesSchema: true, default: 'first' } },
+    properties: baseProperties,
   },
-} as ResourceFlowNodeSchemaDto;
+} as unknown as ResourceFlowNodeSchemaDto;
 
 function editor(schema = base) {
   return (
@@ -77,7 +81,7 @@ describe('dynamic node editor', () => {
         dynamic: true,
         required: ['controllerId', 'channel', 'operation', 'revision', ...(argument ? [argument] : [])],
         properties: {
-          ...base.configSchema.properties,
+          ...baseProperties,
           controllerId: {
             type: 'integer',
             title: 'Controller',
@@ -184,7 +188,7 @@ describe('dynamic node editor', () => {
       configSchema: {
         ...base.configSchema,
         dynamic: false,
-        properties: { ...base.configSchema.properties, timeout: { type: 'number', title: 'Optional timeout', default: 15 } },
+        properties: { ...baseProperties, timeout: { type: 'number', title: 'Optional timeout', default: 15 } },
       },
     }));
     fireEvent.click(screen.getByText('Open'));
@@ -218,7 +222,7 @@ describe('dynamic node editor', () => {
       ...base,
       configSchema: {
         properties: {
-          ...base.configSchema.properties,
+          ...baseProperties,
           nested: { type: 'object', properties: { saved: { type: 'string' } } },
         },
       },
@@ -337,7 +341,7 @@ describe('dynamic node editor', () => {
         ...base.configSchema,
         dynamic: false,
         properties: {
-          ...base.configSchema.properties,
+          ...baseProperties,
           choice: { type: 'string', title: 'Choice', enum: ['available'] },
         },
       },

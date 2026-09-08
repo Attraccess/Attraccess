@@ -6,7 +6,7 @@ export class AuditSettingsDto {
   @IsBoolean()
   enabled!: boolean;
 
-  @ApiProperty({ enum: ['billing', 'resource', 'wago'], isArray: true, default: ['wago'] })
+  @ApiProperty({ enum: ['billing', 'resource', 'wago'], isArray: true, default: ['resource', 'wago'] })
   @IsArray()
   @ArrayMaxSize(3)
   @ArrayUnique()

@@ -35,6 +35,7 @@ import { WagoCommissioningSession } from '../../../plugins/wago/backend/wago-com
 import { commissioningFingerprintHash } from '../../../plugins/wago/backend/wago-commissioning-lease';
 import { WagoCommissioningLeaseEntity } from '../../../plugins/wago/backend/wago-commissioning-lease.entity';
 import { WagoRuntimeArtifactsService } from '../../../plugins/wago/backend/wago-runtime-artifacts';
+import { WagoCredentialRotationService } from '../../../plugins/wago/backend/wago-credential-rotation';
 import { WagoCredentialRotationEntity } from '../../../plugins/wago/backend/wago-credential-rotation.entity';
 import { WagoConfigurationRevision } from '../../../plugins/wago/backend/wago-configuration-revision.entity';
 import { discoveryTopic, heartbeatTopic } from '../../../plugins/wago/backend/protocol';
@@ -269,6 +270,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
         SessionStrategy,
         { provide: WagoService, useValue: wago },
         { provide: WagoCommissioningService, useValue: commissioning },
+        { provide: WagoCredentialRotationService, useFactory: () => new WagoCredentialRotationService(context) },
         { provide: Symbol.for('attraccess.plugin.context'), useValue: context },
         { provide: SessionService, useValue: { validateSession: async () => null } },
         { provide: TwoFactorService, useValue: { getStatus: async () => ({ required: false }) } },
@@ -386,7 +388,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
       runtimeVersion: '0.1.0',
       capabilities: ['claim', 'claim-expiry-v1', 'heartbeat', 'configuration-v1', 'credential-rotation-v1'],
       timestamp,
-      streamId: 'fixture-operational-boot',
+      streamId: '11111111-1111-4111-8111-111111111111',
       sequence: 1,
     });
     const updated = await db.getRepository(WagoController).findOneByOrFail({ id: controller.id });

@@ -119,7 +119,7 @@ done
   );
   file(
     'bin/df',
-    '#!/bin/sh\nif [ "$FAULT" = storage ]; then echo "disk 100 99 1"; else echo "disk 999999 0 999999"; fi\n',
+    '#!/bin/sh\necho "Filesystem 1024-blocks Used Available Capacity Mounted on"\nif [ "$FAULT" = storage ]; then echo "disk 100 99 1 99% /fixture"; else echo "disk 999999 0 999999 0% /fixture"; fi\n',
     0o700,
   );
   file(
@@ -399,12 +399,18 @@ if(args[0]==='container'&&args[1]==='ls'){
     },
     run: (script: string, fault = '', input?: Buffer, timeout = 60000) => {
       if (fault === 'codesys2' && read('plc') === 'running') file('proc/77/comm', 'plclinux_rt\n');
-      return spawnSync('/bin/sh', ['-c', `${script}\nstatus=$?\nexit "$status"`], {
-        input,
-        encoding: 'utf8',
-        timeout,
-        env: { PATH: join(root, 'bin'), FIXTURE_ROOT: root, TMPDIR: join(root, 'tmp'), FAULT: fault },
-      });
+      const path = join(root, 'tmp', `run-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.sh`);
+      writeFileSync(path, `${script}\nstatus=$?\nexit "$status"`, { mode: 0o700 });
+      try {
+        return spawnSync('/bin/sh', [path], {
+          input,
+          encoding: 'utf8',
+          timeout,
+          env: { PATH: join(root, 'bin'), FIXTURE_ROOT: root, TMPDIR: join(root, 'tmp'), FAULT: fault },
+        });
+      } finally {
+        rmSync(path, { force: true });
+      }
     },
     dispose: () => rmSync(root, { recursive: true, force: true }),
   };

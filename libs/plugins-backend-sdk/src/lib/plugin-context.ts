@@ -45,6 +45,11 @@ export interface MqttServerConnectionConfig {
   /** Management API port on the same host (1-65535). Null/omitted uses the provider default. */
   readonly managementPort?: number | null;
   readonly useTls: boolean;
+  /** PEM trust anchors for private PKI. Omitted by older hosts. */
+  readonly caCert?: string | null;
+  /** Integrations requiring authenticated TLS must reject this setting. */
+  readonly tlsInsecure?: boolean;
+  readonly tlsServername?: string | null;
   readonly username: string | null;
   /** Resolved (decrypted) password. Only ever provided to permitted plugins. */
   readonly password: string | null;
@@ -103,6 +108,12 @@ export interface PluginFlowsContext {
    * configuration matches the supplied external event.
    */
   trigger(nodeType: string, matches: (config: Record<string, unknown>, nodeId: string) => boolean, payload: object): Promise<void>;
+}
+
+/** Host-managed encryption for secret material owned by this plugin. */
+export interface PluginSecretsContext {
+  encrypt(plaintext: string): string;
+  decrypt(ciphertext: string): string;
 }
 
 /**
@@ -164,6 +175,9 @@ export interface PluginContext {
 
   /** Start matching flows from a plugin-declared trigger node. Requires TRIGGER_FLOWS. */
   readonly flows: PluginFlowsContext;
+
+  /** Encrypt and decrypt this plugin's secret material. Requires MANAGE_SECRETS. */
+  readonly secrets: PluginSecretsContext;
 }
 
 /**
@@ -190,7 +204,7 @@ export interface PluginBackendModule {
    *
    * Type naming convention: "plugin.<pluginName>.<nodeName>".
    */
-  flowNodes?: PluginFlowNodeDefinition[];
+  flowNodes?: PluginFlowNodeDefinition[] | ((context: PluginContext) => PluginFlowNodeDefinition[]);
 
   /** Optional broker credential provider offered to other integrations by this plugin. */
   credentialProvisioningProvider?: MqttCredentialProvisioningProviderFactory;

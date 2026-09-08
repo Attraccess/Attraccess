@@ -11,7 +11,7 @@ export const auditSettingsUpdateSchema = z.object(fields).partial().strict();
 export const auditSettingsSchema = z
   .object({
     enabled: fields.enabled.default(true),
-    domains: fields.domains.default(['wago']),
+    domains: fields.domains.default(['resource', 'wago']),
     retention_days: fields.retention_days.default(90),
   })
   .strict();

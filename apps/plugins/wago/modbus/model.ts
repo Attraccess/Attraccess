@@ -184,6 +184,7 @@ export function validateModbus(value: unknown): Array<{ path: string; code: stri
       endpoint = `tcp:${modbusHostIdentity(c.host)}:${c.port}`;
     } else if (c.transport === 'rtu') {
       if (
+        typeof c.path !== 'string' ||
         !/^\/dev\/[a-zA-Z0-9_./-]+$/.test(c.path) ||
         c.path.includes('..') ||
         c.path
@@ -377,7 +378,11 @@ export function validateModbusBindings(snapshot: {
           }
         }
         if (capabilities.includes('input') && !capabilities.includes('measurement'))
-          fail('Modbus register inputs require measurement capability and its named measurement transform');
+          fail(
+            measurement
+              ? 'Modbus register inputs require measurement capability and its named measurement transform'
+              : 'input requires named measurement',
+          );
         if (capabilities.includes('output') && !action) fail('output requires named action');
         if (
           capabilities.includes('measurement') &&

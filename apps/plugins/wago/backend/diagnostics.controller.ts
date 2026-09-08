@@ -10,4 +10,8 @@ export class WagoDiagnosticsController {
   get(@Param('id', ParseIntPipe) id: number) {
     return this.diagnostics.get(id);
   }
+  @Get('resources/:id/diagnostics')
+  getResource(@Param('id', ParseIntPipe) id: number) {
+    return this.diagnostics.getResource(id);
+  }
 }

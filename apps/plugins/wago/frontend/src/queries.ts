@@ -21,6 +21,15 @@ import {
   type ClaimControllerInput,
   type CreateCommissioningSessionInput,
   type WagoPresetApplication,
+  type WagoConfigurationSnapshot,
+  type ConfigurationEditorMetadata,
+  validateConfiguration,
+  reviewConfiguration,
+  publishConfiguration,
+  listConfigurationRevisions,
+  previewConfigurationRevision,
+  acknowledgeConfigurationRejection,
+  rollbackConfiguration,
 } from './api';
 
 const queryKeys = {
@@ -29,6 +38,7 @@ const queryKeys = {
   mqttServers: ['mqtt', 'servers'] as const,
   draft: (controllerId: number) => ['wago', 'configuration-draft', controllerId] as const,
   presets: ['wago', 'configuration-presets'] as const,
+  revisions: (controllerId: number) => ['wago', 'configuration-revisions', controllerId] as const,
   commissioningSessions: ['wago', 'commissioning-sessions'] as const,
 };
 
@@ -178,7 +188,8 @@ export function usePresetsQuery() {
 export function useSaveDraftMutation(controllerId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (snapshot: unknown) => saveDraft(controllerId, snapshot),
+    mutationFn: ({ snapshot, metadata }: { snapshot: WagoConfigurationSnapshot; metadata?: ConfigurationEditorMetadata }) =>
+      saveDraft(controllerId, snapshot, metadata),
     onSuccess: (draft) => queryClient.setQueryData(queryKeys.draft(controllerId), draft),
   });
 }
@@ -188,19 +199,71 @@ export function usePreviewPresetMutation(controllerId: number) {
 }
 
 export function useApplyPresetMutation() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
       controllerId,
       application,
       selectedPaths,
       previewedDraftHash,
+      snapshot,
     }: {
       controllerId: number;
       application: WagoPresetApplication;
       selectedPaths: string[];
       previewedDraftHash: string;
-    }) => applyPreset(controllerId, application, selectedPaths, previewedDraftHash),
-    onSuccess: (draft, { controllerId }) => queryClient.setQueryData(queryKeys.draft(controllerId), draft),
+      snapshot: WagoConfigurationSnapshot;
+    }) => applyPreset(controllerId, application, selectedPaths, previewedDraftHash, snapshot),
   });
+}
+
+export function useConfigurationRevisionsQuery(controllerId: number, offset: number) {
+  return useQuery({
+    queryKey: [...queryKeys.revisions(controllerId), offset],
+    queryFn: () => listConfigurationRevisions(controllerId, offset),
+    refetchInterval: 2_000,
+  });
+}
+
+export function useConfigurationRevisionPreviewQuery(controllerId: number, revision: number, enabled: boolean) {
+  return useQuery({
+    queryKey: [...queryKeys.revisions(controllerId), 'preview', revision],
+    queryFn: () => previewConfigurationRevision(controllerId, revision),
+    enabled,
+  });
+}
+
+export function useConfigurationActions(controllerId: number) {
+  const client = useQueryClient();
+  const refresh = async () => {
+    await Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.revisions(controllerId) }),
+      client.invalidateQueries({ queryKey: queryKeys.draft(controllerId) }),
+    ]);
+  };
+  const validate = useMutation({
+    mutationFn: (snapshot: WagoConfigurationSnapshot) => validateConfiguration(controllerId, snapshot),
+  });
+  const review = useMutation({ mutationFn: () => reviewConfiguration(controllerId) });
+  const publish = useMutation({
+    mutationFn: ({ force, reviewedHash }: { force: boolean; reviewedHash: string }) =>
+      publishConfiguration(controllerId, force, reviewedHash),
+    onSuccess: refresh,
+  });
+  const preview = useMutation({ mutationFn: (revision: number) => previewConfigurationRevision(controllerId, revision) });
+  const acknowledgeRejection = useMutation({
+    mutationFn: ({ revision, contentHash, reportedAt }: { revision: number; contentHash: string; reportedAt: string }) =>
+      acknowledgeConfigurationRejection(controllerId, revision, contentHash, reportedAt),
+    onSuccess: refresh,
+  });
+  const rollback = useMutation({
+    mutationFn: ({ revision, force, sourceHash, currentHash, draftHash }: {
+      revision: number;
+      force: boolean;
+      sourceHash: string;
+      currentHash: string | null;
+      draftHash: string;
+    }) => rollbackConfiguration(controllerId, revision, force, sourceHash, currentHash, draftHash),
+    onSettled: refresh,
+  });
+  return { validate, review, publish, preview, acknowledgeRejection, rollback };
 }

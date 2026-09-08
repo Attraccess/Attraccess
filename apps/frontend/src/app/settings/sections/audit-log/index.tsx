@@ -48,7 +48,7 @@ export function AuditLogSection() {
   };
   const { data, isLoading } = useQuery({ queryKey: ['audit-log', request], queryFn: () => AuditService.auditControllerList(request) });
   const settings = useQuery({ queryKey: ['audit-settings'], queryFn: () => SettingsService.settingsControllerGetAuditSettings(), enabled: canManage });
-  const [draft, setDraft] = useState<{ enabled: boolean; domains: 'wago'[]; retention_days: number } | undefined>();
+  const [draft, setDraft] = useState<{ enabled: boolean; domains: Array<'billing' | 'resource' | 'wago'>; retention_days: number } | undefined>();
   const currentSettings = draft ?? settings.data;
   const saveSettings = useMutation({
     mutationFn: () => SettingsService.settingsControllerUpdateAuditSettings({ requestBody: draft }),

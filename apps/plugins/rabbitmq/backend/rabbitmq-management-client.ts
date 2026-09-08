@@ -8,9 +8,7 @@
 // (unreachable broker, rejected credentials, missing management privileges, …).
 import type { MqttServerConnectionConfig } from '@attraccess/plugins-backend-sdk';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-
-const MGMT_PORT_HTTP = 15672;
-const MGMT_PORT_HTTPS = 15671;
+import { describeManagementError, managementApiBase, managementRequest } from './rabbitmq-management-transport';
 
 // Management operations are quick; a broker that takes longer than this is
 // treated as unreachable instead of stalling the request.
@@ -27,9 +25,7 @@ export class RabbitmqManagementClient {
   // Builds the management API base URL from the generic MQTT config (same
   // convention as RabbitmqDetectionService).
   managementApiBase(config: MqttServerConnectionConfig): string {
-    const scheme = config.useTls ? 'https' : 'http';
-    const port = config.useTls ? MGMT_PORT_HTTPS : MGMT_PORT_HTTP;
-    return `${scheme}://${config.host}:${port}`;
+    return managementApiBase(config);
   }
 
   // Performs one management API request. `path` is relative to `/api`, with
@@ -42,28 +38,14 @@ export class RabbitmqManagementClient {
     body?: unknown,
   ): Promise<T> {
     const base = this.managementApiBase(config);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
     let response: Response;
     try {
-      response = await fetch(`${base}/api${path}`, {
-        method,
-        headers: {
-          accept: 'application/json',
-          ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
-          ...this.authHeader(config),
-        },
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-        signal: controller.signal,
-      });
+      response = await managementRequest(config, `${base}/api${path}`, method, body, REQUEST_TIMEOUT_MS);
     } catch (error) {
       throw new HttpException(
-        `Cannot reach the RabbitMQ management API at ${base}: ${this.describeNetworkError(error)}`,
+        `Cannot reach the RabbitMQ management API at ${base}: ${describeManagementError(error, REQUEST_TIMEOUT_MS)}`,
         HttpStatus.BAD_GATEWAY,
       );
-    } finally {
-      clearTimeout(timeout);
     }
 
     if (!response.ok) {
@@ -71,15 +53,6 @@ export class RabbitmqManagementClient {
     }
 
     return this.parseBody<T>(response);
-  }
-
-  private authHeader(config: MqttServerConnectionConfig): Record<string, string> {
-    if (config.username === null) {
-      return {};
-    }
-    const credentials = `${config.username}:${config.password ?? ''}`;
-    const encoded = Buffer.from(credentials, 'utf8').toString('base64');
-    return { authorization: `Basic ${encoded}` };
   }
 
   // Maps an upstream error response to an exception with an actionable
@@ -99,23 +72,21 @@ export class RabbitmqManagementClient {
 
     if (response.status === 403 || /not.?authori[sz]ed/i.test(reason)) {
       return new HttpException(
-        'The configured MQTT server user lacks management privileges on RabbitMQ' +
-          (reason ? ` (${reason})` : '') +
-          '. User management requires a user with the "administrator" tag.',
+        'The configured MQTT server user lacks management privileges on RabbitMQ. User management requires a user with the "administrator" tag.',
         HttpStatus.BAD_GATEWAY,
       );
     }
 
     if (response.status === 404) {
-      return new HttpException(`Not found on the RabbitMQ side${reason ? `: ${reason}` : '.'}`, HttpStatus.NOT_FOUND);
+      return new HttpException('Not found on the RabbitMQ side.', HttpStatus.NOT_FOUND);
     }
 
     if (response.status === 400) {
-      return new HttpException(`RabbitMQ rejected the request${reason ? `: ${reason}` : '.'}`, HttpStatus.BAD_REQUEST);
+      return new HttpException('RabbitMQ rejected the request.', HttpStatus.BAD_REQUEST);
     }
 
     return new HttpException(
-      `RabbitMQ management API request failed (HTTP ${response.status})${reason ? `: ${reason}` : '.'}`,
+      `RabbitMQ management API request failed (HTTP ${response.status}).`,
       HttpStatus.BAD_GATEWAY,
     );
   }

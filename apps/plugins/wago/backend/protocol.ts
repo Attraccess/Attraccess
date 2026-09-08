@@ -242,6 +242,23 @@ export function configurationReportedHardwareId(prefix: string, topic: string): 
   return hardwareId && !/[+/]/.test(hardwareId) ? hardwareId : null;
 }
 
+export function acknowledgementWildcardTopic(prefix: string): string {
+  return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/+/acknowledgements`;
+}
+
+export function acknowledgementTopic(prefix: string, hardwareId: string): string {
+  if (!hardwareId || /[+/]/.test(hardwareId)) throw new Error('hardware ID must not be empty or contain MQTT wildcards');
+  return `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${hardwareId}/acknowledgements`;
+}
+
+export function acknowledgementHardwareId(prefix: string, topic: string): string | null {
+  const topicPrefix = `${normalizeOperationalPrefix(prefix)}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/`;
+  const topicSuffix = '/acknowledgements';
+  if (!topic.startsWith(topicPrefix) || !topic.endsWith(topicSuffix)) return null;
+  const hardwareId = topic.slice(topicPrefix.length, -topicSuffix.length);
+  return hardwareId && !/[+/]/.test(hardwareId) ? hardwareId : null;
+}
+
 export function normalizeOperationalPrefix(prefix: string): string {
   const trimmed = prefix.trim();
   let start = 0;

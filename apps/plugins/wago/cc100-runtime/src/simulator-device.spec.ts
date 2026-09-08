@@ -23,17 +23,22 @@ describe('SimulatorDeviceAdapter', () => {
 
   it('restores persisted output values to their physical points', async () => {
     const device = new SimulatorDeviceAdapter({}, 'normal', 0);
-    device.restore({
-      version: 1,
-      physicalPoints: [output],
-      logicalChannels: [{
-        id: 'load',
-        physicalPointId: 'output',
-        profile: 'generic-digital-output',
-        capabilities: ['output'],
-        disconnectPolicy: { mode: 'hold' },
-      }],
-    }, { load: true });
+    device.restore(
+      {
+        version: 1,
+        physicalPoints: [output],
+        logicalChannels: [
+          {
+            id: 'load',
+            physicalPointId: 'output',
+            profile: 'generic-digital-output',
+            capabilities: ['output'],
+            disconnectPolicy: { mode: 'hold' },
+          },
+        ],
+      },
+      { load: true },
+    );
 
     await expect(device.read(output)).resolves.toBe(true);
   });
