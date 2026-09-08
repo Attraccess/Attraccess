@@ -120,6 +120,7 @@ export class WagoControllerApi {
   commissioningVerification(@Param('id', ParseIntPipe) id: number) {
     return this.commissioning.verification(id);
   }
+  @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/revoke')
   revokeCommissioningSession(@Param('id', ParseIntPipe) id: number) {
     return this.commissioning.revoke(id);

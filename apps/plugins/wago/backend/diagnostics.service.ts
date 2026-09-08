@@ -5,12 +5,22 @@ import { WagoController } from './wago-controller.entity';
 import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { configurationHash, validateSnapshot, type WagoConfigurationSnapshot } from './configuration';
+import { editorMetadata, type ConfigurationEditorMetadata } from './configuration-editor';
 import { freshness } from './diagnostics-store';
 import { safeValidationSummaries } from './diagnostics-validation';
 import type { WagoDiagnostics } from '../diagnostics-types';
 
 function own<T>(values: Record<string, T>, key: string): T | undefined {
   return Object.prototype.hasOwnProperty.call(values, key) ? values[key] : undefined;
+}
+
+function metadataFromProvenance(provenance: string | null | undefined): ConfigurationEditorMetadata {
+  if (!provenance) return { names: {}, presets: [] };
+  try {
+    return editorMetadata(JSON.parse(provenance).editor);
+  } catch {
+    return { names: {}, presets: [] };
+  }
 }
 
 export function diagnosticReferences(
@@ -122,7 +132,12 @@ export class WagoDiagnosticsService {
         : 'Legacy payloads have no source envelope; sequence gaps and source freshness are unavailable.',
       configuration: {
         draftUpdatedAt: draft?.updatedAt ?? null,
-        draftChanged: !!draft && (!latest || configurationHash(JSON.parse(draft.snapshot)) !== latest.contentHash),
+        draftChanged:
+          !!draft &&
+          (!latest ||
+            configurationHash(JSON.parse(draft.snapshot)) !== latest.contentHash ||
+            configurationHash(metadataFromProvenance(draft.presetProvenance)) !==
+              configurationHash(metadataFromProvenance(latest.presetProvenance))),
         validationErrorCount: validationErrors.length,
         // Codes originate in our validator. Omit messages and dynamic paths, which can include arbitrary draft values.
         validationCodes: [...new Set(validationErrors.map((error) => error.code))].slice(0, 50),

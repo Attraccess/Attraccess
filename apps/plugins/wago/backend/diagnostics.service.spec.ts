@@ -4,6 +4,7 @@ import { WagoController } from './wago-controller.entity';
 import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
 import { WagoDiagnosticsStore } from './diagnostics-store';
 import { WagoService } from './wago.service';
+import { configurationHash } from './configuration';
 
 describe('diagnostic references', () => {
   const node = (id: string, resourceId: number, type = 'command', channelId = 'relay') => ({
@@ -218,6 +219,7 @@ describe('controller diagnostics', () => {
       ],
     };
     const revision = { revision: 2, state: 'applied', snapshot: JSON.stringify(snapshot), contentHash: 'a'.repeat(64) };
+    const draft: { current: WagoConfigurationDraft | null } = { current: null };
     const query = {
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
@@ -242,7 +244,7 @@ describe('controller diagnostics', () => {
                     },
             }
           : entity === WagoConfigurationDraft
-            ? { findOneBy: async () => null }
+            ? { findOneBy: async () => draft.current }
             : { findOne: async ({ where }: { where: { state?: string } }) => (where.state ? revision : latest) },
       dataSource: { getRepository: () => ({ createQueryBuilder: () => query }) },
     } as unknown as PluginContext;
@@ -251,6 +253,7 @@ describe('controller diagnostics', () => {
     return {
       service: new WagoDiagnosticsService(context, { diagnostics } as WagoService),
       diagnostics,
+      draft,
       latest,
       revision,
       query,
@@ -273,6 +276,19 @@ describe('controller diagnostics', () => {
     const result = await service.get(1);
     expect(result.references[0].invalid).toBe(false);
     expect(result.configuration.revisionMismatch).toBe(true);
+  });
+  it('reports unpublished editor metadata changes', async () => {
+    const { service, draft, latest, snapshot } = setup();
+    latest.contentHash = configurationHash(snapshot);
+    draft.current = {
+      snapshot: JSON.stringify(snapshot),
+      presetProvenance: JSON.stringify({ editor: { names: {}, presets: [] } }),
+      updatedAt: '2026-09-05T12:00:00.000Z',
+    } as WagoConfigurationDraft;
+    expect((await service.get(1)).configuration.draftChanged).toBe(false);
+
+    draft.current.presetProvenance = JSON.stringify({ editor: { names: { io: 'Pump' }, presets: [] } });
+    expect((await service.get(1)).configuration.draftChanged).toBe(true);
   });
   it('only projects rejection summaries matching both latest revision and hash', async () => {
     const { service, diagnostics } = setup();
@@ -372,6 +388,7 @@ describe('controller diagnostics', () => {
         ...extra,
       });
     state(1);
+    jest.advanceTimersByTime(1);
     send('measurements', 1, { channelId: 'io', unit: 'millipercent', value: 42000, kind: 'live' });
     let result = await service.get(1);
     expect(result.channels[0].samples.map((value) => value.kind)).toEqual(['input', 'output', 'measurement']);
