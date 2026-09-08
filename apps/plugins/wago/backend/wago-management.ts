@@ -1,6 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import type { PluginSecretsContext } from '@attraccess/plugins-backend-sdk';
 import { assertManagementKey, generateManagementKey, restoreManagementKey } from './wago-management-key';
+import type { CommissioningLeaseRunner, CommissioningOperationGuard } from './wago-commissioning-lease';
+import { CommissioningLeaseError } from './wago-commissioning-lease';
 import type {
   ManagementAdapter,
   ManagementException,
@@ -28,7 +30,8 @@ const transitionStates: ManagementState[] = [
 ];
 const exceptionNames: ManagementException[] = ['wbm_exposed', 'other_services_exposed', 'unqualified_privileges'];
 const identifier = () => randomBytes(16).toString('hex');
-const LEASE_MS = 300000;
+const REVIEW_MS = 300000;
+const LEASE_MS = 30 * 60_000;
 
 export class ManagementError extends Error {
   constructor(
@@ -60,6 +63,7 @@ export class WagoManagementService {
     private readonly store: ManagementStore,
     private readonly secrets: PluginSecretsContext,
     private readonly adapter: ManagementAdapter,
+    private readonly commissioningLease: CommissioningLeaseRunner,
     private readonly now = Date.now,
     private readonly createKey: () => ManagementKey = generateManagementKey,
   ) {}
@@ -77,7 +81,7 @@ export class WagoManagementService {
   async inspect(target: ManagementTarget, credential: SessionCredential): Promise<ManagementPublicStatus> {
     validateTarget(target);
     validateCredential(credential);
-    return this.locked(target.controllerId, async (owner) => {
+    return this.locked(target.controllerId, target.hostKeyFingerprint, async (owner, guard) => {
       const previous = await this.store.load(target.controllerId);
       if (previous?.transaction) throw new ManagementError('recovery_required');
       const inspection = cleanInspection(await this.adapter.inspect(target, credential));
@@ -95,7 +99,7 @@ export class WagoManagementService {
         encryptedPrivateKey: null,
         failure: null,
       };
-      await this.save(record, owner);
+      await this.save(record, owner, guard);
       return publicStatus(record);
     });
   }
@@ -112,7 +116,8 @@ export class WagoManagementService {
       input.exceptions.some((value) => !exceptionNames.includes(value))
     )
       throw new ManagementError('invalid_request');
-    return this.locked(controllerId, async (owner) => {
+    const record = await this.required(controllerId);
+    return this.locked(controllerId, record.target.hostKeyFingerprint, async (owner, guard) => {
       const record = await this.required(controllerId);
       if (record.transaction) throw new ManagementError('recovery_required');
       if (!record.inspection || !['inspected', 'reviewed'].includes(record.state))
@@ -132,7 +137,7 @@ export class WagoManagementService {
       record.reviewToken = identifier();
       record.reviewedAt = this.now();
       record.state = 'reviewed';
-      await this.save(record, owner);
+      await this.save(record, owner, guard);
       return publicStatus(record);
     });
   }
@@ -145,14 +150,15 @@ export class WagoManagementService {
     if (input.confirm !== true || typeof input.reviewToken !== 'string' || !/^[a-f0-9]{32}$/.test(input.reviewToken))
       throw new ManagementError('invalid_request');
     validateCredential(input.temporarySsh);
-    return this.locked(controllerId, async (owner) => {
+    const existing = await this.required(controllerId);
+    return this.locked(controllerId, existing.target.hostKeyFingerprint, async (owner, guard) => {
       const record = await this.required(controllerId);
       if (record.transaction) throw new ManagementError('recovery_required');
       if (
         record.state !== 'reviewed' ||
         record.reviewToken !== input.reviewToken ||
         record.reviewedAt === null ||
-        this.now() - record.reviewedAt > LEASE_MS ||
+        this.now() - record.reviewedAt > REVIEW_MS ||
         this.now() < record.reviewedAt ||
         !record.mode ||
         !record.inspection
@@ -182,22 +188,22 @@ export class WagoManagementService {
         record.reviewToken = null;
         record.state = 'preparing';
         record.failure = null;
-        await this.save(record, owner); // durable intent and encrypted key BEFORE preparing remote state
+        await this.save(record, owner, guard); // durable intent and encrypted key BEFORE preparing remote state
         const tx = record.transaction;
-        await this.adapter.prepare(tx, input.temporarySsh);
-        const watchdog = await this.adapter.armWatchdog(tx, input.temporarySsh);
+        await this.remote(guard, () => this.adapter.prepare(tx, input.temporarySsh));
+        const watchdog = await this.remote(guard, () => this.adapter.armWatchdog(tx, input.temporarySsh));
         if (!watchdog.armed || (record.mode === 'baseline' && !watchdog.rebootSafe)) throw new Error();
-        await this.step(record, owner, 'installing_key');
-        await this.adapter.installKey(tx, input.temporarySsh, key.publicKey);
-        await this.step(record, owner, 'verifying_key');
-        await this.verify(record, key.privateKey);
+        await this.step(record, owner, guard, 'installing_key');
+        await this.remote(guard, () => this.adapter.installKey(tx, input.temporarySsh, key.publicKey));
+        await this.step(record, owner, guard, 'verifying_key');
+        await this.verify(record, key.privateKey, guard);
         if (record.mode === 'baseline') {
-          await this.step(record, owner, 'restricting_access');
-          await this.adapter.restrictAccess(tx, input.temporarySsh, key.privateKey);
-          await this.step(record, owner, 'verifying_baseline');
+          await this.step(record, owner, guard, 'restricting_access');
+          await this.remote(guard, () => this.adapter.restrictAccess(tx, input.temporarySsh, key.privateKey));
+          await this.step(record, owner, guard, 'verifying_baseline');
           // Verify a THIRD fresh key connection after changing policy/reloading the service.
-          await this.verify(record, key.privateKey);
-          const result = await this.adapter.verifyBaseline(tx, key.privateKey);
+          await this.verify(record, key.privateKey, guard);
+          const result = await this.remote(guard, () => this.adapter.verifyBaseline(tx, key.privateKey));
           if (
             !result.passwordDisabled ||
             !result.defaultAccessDisabled ||
@@ -207,16 +213,16 @@ export class WagoManagementService {
           )
             throw new Error();
         }
-        await this.step(record, owner, 'committing');
-        await this.adapter.commit(tx, input.temporarySsh, key.privateKey);
+        await this.step(record, owner, guard, 'committing');
+        await this.remote(guard, () => this.adapter.commit(tx, input.temporarySsh, key.privateKey));
         record.state = record.mode === 'baseline' && record.exceptions.length === 0 ? 'hardened' : 'key_enrolled';
         if (record.state !== 'hardened') record.support = 'qualification_required';
-        await this.save(record, owner);
+        await this.save(record, owner, guard);
         return publicStatus(record);
       } catch {
         // No raw transport/crypto/database errors, stdout or credentials are persisted or returned.
         if (!record.transaction) throw new ManagementError('operation_failed');
-        return this.rollback(record, owner, input.temporarySsh, 'transition_failed');
+        return this.rollback(record, owner, guard, input.temporarySsh, 'transition_failed');
       } finally {
         if (key) key.privateKey = '';
       }
@@ -230,20 +236,25 @@ export class WagoManagementService {
     exactKeys(input, ['confirm', 'temporarySsh']);
     if (input.confirm !== true) throw new ManagementError('invalid_request');
     validateCredential(input.temporarySsh);
-    return this.locked(controllerId, async (owner) => {
+    const existing = await this.required(controllerId);
+    return this.locked(controllerId, existing.target.hostKeyFingerprint, async (owner, guard) => {
       const record = await this.required(controllerId);
       if (record.state === 'recovered') return publicStatus(record);
       if (!record.transaction) throw new ManagementError('invalid_request');
       if (input.temporarySsh.username !== record.transaction.username)
         throw new ManagementError('credentials_required');
-      return this.rollback(record, owner, input.temporarySsh, null);
+      return this.rollback(record, owner, guard, input.temporarySsh, null);
     });
   }
 
-  private async verify(record: ManagementRecord, privateKey: string): Promise<void> {
+  private async verify(
+    record: ManagementRecord,
+    privateKey: string,
+    guard: CommissioningOperationGuard,
+  ): Promise<void> {
     const nonce = identifier();
     const tx = this.transaction(record);
-    const proof = await this.adapter.verifyKey(tx, privateKey, nonce);
+    const proof = await this.remote(guard, () => this.adapter.verifyKey(tx, privateKey, nonce));
     if (
       proof.nonce !== nonce ||
       !proof.keyOnly ||
@@ -260,6 +271,7 @@ export class WagoManagementService {
   private async rollback(
     record: ManagementRecord,
     owner: string,
+    guard: CommissioningOperationGuard,
     credential: SessionCredential,
     failure: ManagementRecord['failure'],
   ): Promise<ManagementPublicStatus> {
@@ -267,7 +279,7 @@ export class WagoManagementService {
     record.failure = failure;
     let retainedKey: string | undefined;
     try {
-      await this.save(record, owner);
+      await this.save(record, owner, guard);
       if (record.encryptedPrivateKey) {
         // A committed baseline may no longer accept passwords. The trusted adapter can restore
         // access with the retained generated key after restart; it never leaves this server seam.
@@ -281,7 +293,7 @@ export class WagoManagementService {
           retainedKey = undefined;
         }
       }
-      await this.adapter.rollback(this.transaction(record), credential, retainedKey);
+      await this.remote(guard, () => this.adapter.rollback(this.transaction(record), credential, retainedKey));
       const recovered: ManagementRecord = {
         ...record,
         state: 'recovered',
@@ -291,24 +303,34 @@ export class WagoManagementService {
         reviewToken: null,
         support: 'qualification_required',
       };
-      await this.save(recovered, owner);
+      await this.save(recovered, owner, guard);
       return publicStatus(recovered);
     } catch {
       record.state = 'recovery_required';
       record.failure = 'rollback_failed';
-      await this.save(record, owner);
+      await this.save(record, owner, guard);
     } finally {
       retainedKey = undefined;
     }
     return publicStatus(record);
   }
-  private async step(record: ManagementRecord, owner: string, state: ManagementState): Promise<void> {
+  private async step(
+    record: ManagementRecord,
+    owner: string,
+    guard: CommissioningOperationGuard,
+    state: ManagementState,
+  ): Promise<void> {
     if (this.now() + 15000 >= this.transaction(record).deadline) throw new Error('deadline');
     record.state = state;
-    await this.save(record, owner);
+    await this.save(record, owner, guard);
   }
-  private save(record: ManagementRecord, owner: string) {
+  private async save(record: ManagementRecord, owner: string, guard: CommissioningOperationGuard) {
+    await guard.assertOwned();
     return this.store.save(record.target.controllerId, owner, record, this.now());
+  }
+  private async remote<T>(guard: CommissioningOperationGuard, operation: () => Promise<T>): Promise<T> {
+    await guard.assertOwned();
+    return operation();
   }
   private async required(controllerId: number): Promise<ManagementRecord> {
     const record = await this.store.load(controllerId);
@@ -323,16 +345,24 @@ export class WagoManagementService {
     if (!record.inspection) throw new Error('inspection_missing');
     return record.inspection;
   }
-  private async locked<T>(controllerId: number, action: (owner: string) => Promise<T>): Promise<T> {
+  private async locked<T>(
+    controllerId: number,
+    fingerprint: string,
+    action: (owner: string, guard: CommissioningOperationGuard) => Promise<T>,
+  ): Promise<T> {
     validId(controllerId);
     const owner = identifier();
     let acquired = false;
     try {
-      acquired = await this.store.acquire(controllerId, owner, this.now(), this.now() + LEASE_MS);
-      if (!acquired) throw new ManagementError('busy');
-      return await action(owner);
+      return await this.commissioningLease.run(fingerprint, async (guard) => {
+        acquired = await this.store.acquire(controllerId, owner, this.now(), this.now() + LEASE_MS);
+        if (!acquired) throw new ManagementError('busy');
+        return action(owner, guard);
+      });
     } catch (error) {
       if (error instanceof ManagementError) throw error;
+      if (error instanceof CommissioningLeaseError)
+        throw new ManagementError(error.code === 'lease_recovery_required' ? 'recovery_required' : 'busy');
       throw new ManagementError('operation_failed');
     } finally {
       if (acquired) await this.store.release(controllerId, owner).catch(() => undefined);
