@@ -128,6 +128,137 @@ describe('durable audit SQLite', () => {
     expect(await service.record(event())).toEqual({ status: 'recorded' });
   });
 
+  it('records billing transaction lifecycle events with only allowlisted metadata', async () => {
+    await store.setPlainSetting('audit', 'domains', '["billing"]');
+    expect(
+      await service.recordBillingTransaction({
+        transactionId: 7,
+        userId: 42,
+        initiatorId: 9,
+        amount: 500,
+        status: 'pending',
+        source: 'sumup-topup',
+        // Runtime callers cannot expand the audited projection with provider data.
+        clientSecret: 'not persisted',
+      } as never),
+    ).toEqual({ status: 'recorded' });
+    expect((await service.list({ limit: 1 })).items[0]).toMatchObject({
+      domain: 'billing',
+      action: 'billing.transaction.created',
+      subjectType: 'billing.transaction',
+      subjectId: 7,
+      actorId: 9,
+      details: { amount: 500, status: 'pending', source: 'sumup-topup' },
+    });
+    expect(
+      await service.recordBillingTransaction({
+        transactionId: 7,
+        userId: 42,
+        amount: 500,
+        status: 'not-a-status',
+        source: 'sumup-topup',
+      }),
+    ).toEqual({ status: 'unavailable' });
+  });
+
+  it('records a billing event only after its originating transaction commits', async () => {
+    await store.setPlainSetting('audit', 'domains', '["billing"]');
+    let receipt: Promise<{ status: string }> | undefined;
+    await source.transaction(async (manager) => {
+      receipt = service.recordBillingTransactionAfterCommit({
+        transactionId: 8,
+        userId: 42,
+        amount: 0,
+        status: 'pending',
+        source: 'resource-usage',
+      }, manager);
+      expect((await service.list({ limit: 1 })).items).toHaveLength(0);
+    });
+    await expect(receipt).resolves.toEqual({ status: 'recorded' });
+    expect((await service.list({ limit: 1 })).items[0]).toMatchObject({ subjectId: 8, domain: 'billing' });
+  });
+
+  it('discards a billing event when its originating transaction rolls back', async () => {
+    await store.setPlainSetting('audit', 'domains', '["billing"]');
+    let receipt: Promise<{ status: string }> | undefined;
+    await expect(
+      source.transaction(async (manager) => {
+        receipt = service.recordBillingTransactionAfterCommit({
+          transactionId: 8,
+          userId: 42,
+          amount: 0,
+          status: 'pending',
+          source: 'resource-usage',
+        }, manager);
+        throw new Error('rollback');
+      }),
+    ).rejects.toThrow('rollback');
+    await expect(receipt).resolves.toEqual({ status: 'unavailable' });
+    expect((await service.list({ limit: 1 })).items).toHaveLength(0);
+  });
+
+  it('retains outer billing events when a nested transaction rolls back', async () => {
+    await store.setPlainSetting('audit', 'domains', '["billing"]');
+    let outerReceipt: Promise<{ status: string }> | undefined;
+    let nestedReceipt: Promise<{ status: string }> | undefined;
+    await source.transaction(async (manager) => {
+      outerReceipt = service.recordBillingTransactionAfterCommit({
+        transactionId: 8,
+        userId: 42,
+        amount: 0,
+        status: 'pending',
+        source: 'resource-usage',
+      }, manager);
+      await expect(
+        manager.transaction(async (nestedManager) => {
+          nestedReceipt = service.recordBillingTransactionAfterCommit({
+            transactionId: 9,
+            userId: 42,
+            amount: 0,
+            status: 'pending',
+            source: 'resource-usage',
+          }, nestedManager);
+          throw new Error('nested rollback');
+        }),
+      ).rejects.toThrow('nested rollback');
+    });
+    await expect(outerReceipt).resolves.toEqual({ status: 'recorded' });
+    await expect(nestedReceipt).resolves.toEqual({ status: 'unavailable' });
+    expect((await service.list({ limit: 10 })).items.map((item) => item.subjectId)).toEqual([8]);
+  });
+
+  it('retains billing events from a committed savepoint when a sibling savepoint rolls back', async () => {
+    await store.setPlainSetting('audit', 'domains', '["billing"]');
+    let committedReceipt: Promise<{ status: string }> | undefined;
+    let rolledBackReceipt: Promise<{ status: string }> | undefined;
+    await source.transaction(async (manager) => {
+      await manager.transaction(async (nestedManager) => {
+        committedReceipt = service.recordBillingTransactionAfterCommit({
+          transactionId: 8,
+          userId: 42,
+          amount: 0,
+          status: 'pending',
+          source: 'resource-usage',
+        }, nestedManager);
+      });
+      await expect(
+        manager.transaction(async (nestedManager) => {
+          rolledBackReceipt = service.recordBillingTransactionAfterCommit({
+            transactionId: 9,
+            userId: 42,
+            amount: 0,
+            status: 'pending',
+            source: 'resource-usage',
+          }, nestedManager);
+          throw new Error('nested rollback');
+        }),
+      ).rejects.toThrow('nested rollback');
+    });
+    await expect(committedReceipt).resolves.toEqual({ status: 'recorded' });
+    await expect(rolledBackReceipt).resolves.toEqual({ status: 'unavailable' });
+    expect((await service.list({ limit: 10 })).items.map((item) => item.subjectId)).toEqual([8]);
+  });
+
   it('persists every registered action lifecycle and preserves manual command and profile references', async () => {
     for (const action of AUDIT_ACTIONS) {
       for (const terminal of ['succeeded', 'failed'] as const) {

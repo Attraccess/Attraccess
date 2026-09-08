@@ -1,6 +1,13 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
-import { DataSource } from 'typeorm';
+import {
+  DataSource,
+  EntityManager,
+  EntitySubscriberInterface,
+  QueryRunner,
+  TransactionCommitEvent,
+  TransactionRollbackEvent,
+} from 'typeorm';
 import { AuditLog } from '@attraccess/database-entities';
 import { PluginAuditEvent, PluginAuditHostProvider, PluginAuditReceipt } from '@attraccess/plugins-backend-sdk';
 import { readAuditSettings } from './audit.config';
@@ -8,14 +15,40 @@ import { SettingsStoreService } from '../settings/settings-store.service';
 import { projectAuditEvent } from './audit-policy';
 import { AuditQueryDto } from './audit-query.dto';
 
+const billingStatuses = new Set(['pending', 'completed', 'failed']);
+const billingSources = new Set(['manual', 'resource-usage', 'refund', 'sumup-topup']);
+const SQLITE_BUSY_TIMEOUT_MS = 100;
+const SQLITE_CONTENTION_RECOVERY_DELAY_MS = 500;
+
+export interface BillingTransactionAuditEvent {
+  transactionId: number;
+  userId: number;
+  initiatorId?: number | null;
+  amount: number;
+  status: string;
+  previousStatus?: string;
+  source: string;
+}
+
 @Injectable()
-export class AuditService implements PluginAuditHostProvider, OnModuleInit, OnModuleDestroy {
+export class AuditService implements PluginAuditHostProvider, EntitySubscriberInterface, OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AuditService.name);
   private stopping = false;
   private activeReads = 0;
   private storage?: DataSource;
   private pending = 0;
   private cleaning = false;
+  private writeTail: Promise<void> = Promise.resolve();
+  private contended = false;
+  private subscribed = false;
+  private readonly billingEvents = new WeakMap<
+    QueryRunner,
+    Array<{
+      event: BillingTransactionAuditEvent;
+      transactionDepth: number;
+      resolve: (receipt: PluginAuditReceipt) => void;
+    }>
+  >();
 
   constructor(
     private readonly source: DataSource,
@@ -24,6 +57,8 @@ export class AuditService implements PluginAuditHostProvider, OnModuleInit, OnMo
 
   async onModuleInit(): Promise<void> {
     if (this.storage?.isInitialized || this.stopping) return;
+    this.source.subscribers.push(this);
+    this.subscribed = true;
     // A separate connection guarantees that a receipt follows autocommit, never a
     // savepoint in the application's shared SQLite transaction. No schema sync.
     if (this.source.options.type !== 'sqlite' || this.source.options.database === ':memory:') return;
@@ -37,7 +72,7 @@ export class AuditService implements PluginAuditHostProvider, OnModuleInit, OnMo
     });
     try {
       await storage.initialize();
-      await storage.query('PRAGMA busy_timeout = 100');
+      await storage.query(`PRAGMA busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`);
       await storage.query('PRAGMA synchronous = FULL');
       this.storage = storage;
       await this.cleanup();
@@ -48,6 +83,7 @@ export class AuditService implements PluginAuditHostProvider, OnModuleInit, OnMo
 
   async onModuleDestroy(): Promise<void> {
     this.stopping = true;
+    if (this.subscribed) this.source.subscribers.splice(this.source.subscribers.indexOf(this), 1);
     while (this.pending || this.cleaning || this.activeReads) await new Promise((resolve) => setTimeout(resolve, 5));
     const storage = this.storage;
     this.storage = undefined;
@@ -57,41 +93,146 @@ export class AuditService implements PluginAuditHostProvider, OnModuleInit, OnMo
   async record(event: PluginAuditEvent & { pluginId: string }): Promise<PluginAuditReceipt> {
     try {
       const snapshot = projectAuditEvent(event);
-      if (!snapshot || this.stopping || !this.storage?.isInitialized || this.pending >= 8)
-        return { status: 'unavailable' };
-      // Refuse an originating transaction even if it ends while settings are read.
-      if (this.source.createQueryRunner().isTransactionActive) return { status: 'unavailable' };
-      this.pending++;
-      try {
-        const config = await readAuditSettings(this.settings);
-        if (
-          !config.enabled ||
-          !config.domains.includes('wago') ||
-          this.stopping ||
-          this.source.createQueryRunner().isTransactionActive
-        )
-          return { status: 'unavailable' };
-        await this.storage.getRepository(AuditLog).insert({
-          at: new Date(),
-          domain: 'wago',
-          pluginId: snapshot.pluginId,
-          action: snapshot.action,
-          operationId: snapshot.operationId,
-          actorId: snapshot.principal.userId,
-          authenticationMethod: snapshot.principal.authenticationMethod,
-          apiTokenId: snapshot.principal.apiTokenId ?? null,
-          outcome: snapshot.outcome,
-          subjectType: snapshot.subject.type,
-          subjectId: snapshot.subject.id,
-          details: { ...snapshot.details } as Record<string, string | number>,
-        });
-        return { status: 'recorded' };
-      } finally {
-        this.pending--;
-      }
+      if (!snapshot) return { status: 'unavailable' };
+      return await this.recordSnapshot({
+        domain: 'wago',
+        pluginId: snapshot.pluginId,
+        action: snapshot.action,
+        operationId: snapshot.operationId,
+        actorId: snapshot.principal.userId,
+        authenticationMethod: snapshot.principal.authenticationMethod,
+        apiTokenId: snapshot.principal.apiTokenId ?? null,
+        outcome: snapshot.outcome,
+        subjectType: snapshot.subject.type,
+        subjectId: snapshot.subject.id,
+        details: snapshot.details as Record<string, string | number>,
+      });
     } catch {
       // Never log the event, SQLite parameters, or exception (may contain secrets).
       return { status: 'unavailable' };
+    }
+  }
+
+  /** Billing events are projected from scalar transaction fields only, never provider payloads. */
+  async recordBillingTransaction(event: BillingTransactionAuditEvent): Promise<PluginAuditReceipt> {
+    try {
+      if (
+        !Number.isSafeInteger(event.transactionId) ||
+        event.transactionId <= 0 ||
+        !Number.isSafeInteger(event.userId) ||
+        event.userId <= 0 ||
+        !Number.isSafeInteger(event.amount) ||
+        !billingStatuses.has(event.status) ||
+        (event.previousStatus !== undefined && !billingStatuses.has(event.previousStatus)) ||
+        !billingSources.has(event.source)
+      )
+        return { status: 'unavailable' };
+      const actorId = event.initiatorId ?? event.userId;
+      if (!Number.isSafeInteger(actorId) || actorId <= 0) return { status: 'unavailable' };
+      return await this.recordSnapshot({
+        domain: 'billing',
+        pluginId: 'billing',
+        action: event.previousStatus === undefined ? 'billing.transaction.created' : 'billing.transaction.updated',
+        operationId: `billing-transaction-${event.transactionId}`,
+        actorId,
+        authenticationMethod: 'session',
+        apiTokenId: null,
+        outcome: 'succeeded',
+        subjectType: 'billing.transaction',
+        subjectId: event.transactionId,
+        details: {
+          amount: event.amount,
+          status: event.status,
+          ...(event.previousStatus === undefined ? {} : { previousStatus: event.previousStatus }),
+          source: event.source,
+        },
+      });
+    } catch {
+      return { status: 'unavailable' };
+    }
+  }
+
+  /** Defers billing audit writes until the supplied transaction has committed. */
+  recordBillingTransactionAfterCommit(
+    event: BillingTransactionAuditEvent,
+    transactionManager?: EntityManager,
+  ): Promise<PluginAuditReceipt> {
+    const queryRunner = transactionManager?.queryRunner;
+    if (!queryRunner?.isTransactionActive) return this.recordBillingTransaction(event);
+    return new Promise((resolve) => {
+      const events = this.billingEvents.get(queryRunner) ?? [];
+      events.push({ event, transactionDepth: this.transactionDepth(queryRunner), resolve });
+      this.billingEvents.set(queryRunner, events);
+    });
+  }
+
+  afterTransactionCommit({ queryRunner }: TransactionCommitEvent): void {
+    // Nested transaction commits release a savepoint; wait for the owning transaction.
+    if (queryRunner.isTransactionActive) {
+      const transactionDepth = this.transactionDepth(queryRunner);
+      for (const event of this.billingEvents.get(queryRunner) ?? []) {
+        event.transactionDepth = Math.min(event.transactionDepth, transactionDepth);
+      }
+      return;
+    }
+    const events = this.billingEvents.get(queryRunner);
+    if (!events) return;
+    this.billingEvents.delete(queryRunner);
+    for (const { event, resolve } of events) void this.recordBillingTransaction(event).then(resolve);
+  }
+
+  afterTransactionRollback({ queryRunner }: TransactionRollbackEvent): void {
+    const events = this.billingEvents.get(queryRunner);
+    if (!events) return;
+    const transactionDepth = this.transactionDepth(queryRunner);
+    const retainedEvents = events.filter((event) => event.transactionDepth <= transactionDepth);
+    for (const event of events) {
+      if (event.transactionDepth > transactionDepth) event.resolve({ status: 'unavailable' });
+    }
+    if (retainedEvents.length) this.billingEvents.set(queryRunner, retainedEvents);
+    else this.billingEvents.delete(queryRunner);
+  }
+
+  private transactionDepth(queryRunner: QueryRunner): number {
+    return (queryRunner as QueryRunner & { transactionDepth: number }).transactionDepth;
+  }
+
+  private async recordSnapshot(event: Omit<AuditLog, 'id' | 'at'>): Promise<PluginAuditReceipt> {
+    if (this.stopping || !this.storage?.isInitialized || this.pending >= 8) return { status: 'unavailable' };
+    if (this.source.createQueryRunner().isTransactionActive) return { status: 'unavailable' };
+    this.pending++;
+    try {
+      const config = await readAuditSettings(this.settings);
+      if (!config.enabled || !config.domains.includes(event.domain as 'billing' | 'wago') || this.stopping)
+        return { status: 'unavailable' };
+      // sqlite3 queues concurrent statements after a busy timeout. Keep those writes in our
+      // bounded admission queue instead, so a released lock cannot revive stale audit writes.
+      const precedingWrite = this.writeTail;
+      let releaseWrite: () => void;
+      this.writeTail = new Promise<void>((resolve) => {
+        releaseWrite = resolve;
+      });
+      try {
+        await precedingWrite;
+        if (this.contended) {
+          // Drop the already-admitted burst, then give the first later write a short chance
+          // to observe a released SQLite lock without reviving the whole stale burst.
+          if (this.pending > 1) return { status: 'unavailable' };
+          await new Promise<void>((resolve) => setTimeout(resolve, SQLITE_CONTENTION_RECOVERY_DELAY_MS));
+          this.contended = false;
+        }
+        try {
+          await this.storage.getRepository(AuditLog).insert({ at: new Date(), ...event });
+        } catch {
+          this.contended = true;
+          return { status: 'unavailable' };
+        }
+      } finally {
+        releaseWrite();
+      }
+      return { status: 'recorded' };
+    } finally {
+      this.pending--;
     }
   }
 
