@@ -2,7 +2,7 @@ module.exports = {
   displayName: 'wago-simulator-broker',
   rootDir: '../../../../..',
   testEnvironment: 'node',
-  modulePathIgnorePatterns: ['<rootDir>/dist/', '<rootDir>/apps/plugins/[^/]+/package/'],
+  modulePathIgnorePatterns: ['<rootDir>/dist/', '<rootDir>/.nx/cache/', '<rootDir>/apps/plugins/[^/]+/package/'],
   moduleDirectories: ['node_modules', '<rootDir>/node_modules'],
   testMatch: ['<rootDir>/apps/plugins/wago/cc100-runtime/integration/*.integration.ts'],
   transform: {
