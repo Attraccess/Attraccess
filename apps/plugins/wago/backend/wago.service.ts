@@ -1115,7 +1115,9 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     },
   ): Promise<WagoController> {
     return this.withClaimLock(id, async () => {
-      const prepared = await this.prepareClaim(id, name, verifier, mqttServerId, assertOwned, manual?.credentials);
+      const prepared = await this.withClaimConfigurationLock(() =>
+        this.prepareClaim(id, name, verifier, mqttServerId, assertOwned, manual?.credentials),
+      );
       try {
         const acknowledgementToken = randomBytes(24).toString('base64url');
         await assertOwned();

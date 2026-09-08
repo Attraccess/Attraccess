@@ -245,7 +245,7 @@ describe('CC100 packed digital I/O', () => {
   it('does not overwrite a configuration commit with a simultaneous sequence reservation', async () => {
     await runtime.start();
     await apply();
-    for (let index = 0; index < 98; index++) await command('missing', true, `unknown-${index}`);
+    for (let index = 0; index < 100; index++) await command('missing', true, `unknown-${index}`);
     expect(Number(messages.at(-1)?.payload.sequence)).toBe(100);
     const started = deferred();
     const release = deferred();
@@ -541,10 +541,10 @@ describe('CC100 packed digital I/O', () => {
     expect(await readFile(paths.output, 'utf8')).toBe('0');
   });
 
-  it('reserves monotonic sequences across restart and blocks commands using unsupported persisted mappings', async () => {
+  it('starts a new sequence stream across restart and blocks commands using unsupported persisted mappings', async () => {
     await runtime.start();
     await apply();
-    const previous = Number(state()?.sequence);
+    const previousStream = state()?.streamId;
     const persisted = await store.load();
     if (!persisted.accepted) throw new Error('test configuration was not accepted');
     persisted.accepted.snapshot.logicalChannels[0].capabilities = ['input', 'output'];
@@ -558,7 +558,8 @@ describe('CC100 packed digital I/O', () => {
       device: adapter,
     });
     await runtime.start();
-    expect(Number(state()?.sequence)).toBeGreaterThan(previous);
+    expect(Number(state()?.sequence)).toBe(1);
+    expect(state()?.streamId).not.toBe(previousStream);
     expect(state()?.readiness).toEqual(expect.objectContaining({ ready: false }));
     await command('DO1', true);
     expect(messages.at(-1)?.payload.code).toBe('unsupported_point');

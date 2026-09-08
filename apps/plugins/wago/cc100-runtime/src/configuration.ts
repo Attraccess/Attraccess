@@ -249,8 +249,7 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     }
     if (
       channel.measurement &&
-      (!capabilities.includes('measurement') ||
-        !['live', 'cumulative'].includes(channel.measurement.kind ?? 'live'))
+      (!capabilities.includes('measurement') || !['live', 'cumulative'].includes(channel.measurement.kind ?? 'live'))
     ) {
       errors.push({
         path: `${path}.measurement`,
