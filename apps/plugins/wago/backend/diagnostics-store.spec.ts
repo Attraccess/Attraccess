@@ -96,7 +96,7 @@ describe('WAGO bounded diagnostics', () => {
     const streamId = '00000000-0000-4000-8000-000000000001';
     const timestamp = (offset: number) => new Date(now + offset).toISOString();
     send('heartbeat', { timestamp: timestamp(0), streamId, sequence: 1 });
-    now += 1;
+    now += 10;
     send('state', {
       timestamp: timestamp(0),
       streamId,
@@ -108,7 +108,7 @@ describe('WAGO bounded diagnostics', () => {
     });
     expect(
       send('measurements', {
-        timestamp: timestamp(-1),
+        timestamp: timestamp(-5),
         streamId,
         sequence: 1,
         channelId: 'meter',
