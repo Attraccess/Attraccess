@@ -585,7 +585,7 @@ void Application::processEnrollment() {
     bool ok = this->nfc.changeKey(
         this->apiEnrollNewCardData.keyNo, this->nfc.getFactoryKey(),
         this->nfc.getFactoryKey(), this->apiEnrollNewCardData.keyBytes,
-        NFC::CARD_KEY_VERSION_ENROLLED);
+        INfc::CARD_KEY_VERSION_ENROLLED);
     this->api.sendEnrollNewCard(ok);
     if (ok) {
       this->beeper.successBeep();
@@ -704,7 +704,7 @@ void Application::processReset() {
                                   this->nfc.getFactoryKey(),
                                   this->apiResetNfcCardData.keyBytes,
                                   this->nfc.getFactoryKey(),
-                                  NFC::CARD_KEY_VERSION_FREE);
+                                  INfc::CARD_KEY_VERSION_FREE);
     this->api.sendResetNfcCard(ok);
     if (ok) {
       this->beeper.successBeep();

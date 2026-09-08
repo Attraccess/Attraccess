@@ -64,8 +64,18 @@ int main()
     nfc.setPresent(false);
     assert(!nfc.authenticate(availableKey, const_cast<uint8_t *>(enrolledKey.data())));
 
+    nfcContract.disableCardDetection();
+    nfc.setPresent(true);
+    assert(detected == 2);
+    nfcContract.enableCardDetection();
+    nfcContract.loop();
+    assert(detected == 3);
+    nfcContract.resetCardPresence();
+    nfcContract.loop();
+    assert(detected == 4);
+
     VirtualNfc persisted(first);
-    assert(!persisted.card().present);
+    assert(persisted.card().present);
     assert(persisted.card().keys[availableKey] == enrolledKey);
     persisted.setPresent(true);
     persisted.resetKeySlot(availableKey);

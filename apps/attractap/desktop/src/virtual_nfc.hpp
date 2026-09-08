@@ -37,7 +37,7 @@ public:
     explicit VirtualNfc(ProfileStore &profile);
 
     void setup() override {}
-    void loop() override {}
+    void loop() override;
 
     const Card &card() const { return currentCard; }
     void setCard(const Card &card);
@@ -55,7 +55,7 @@ public:
 
     void enableCardDetection() override { cardDetectionEnabled = true; }
     void disableCardDetection() override { cardDetectionEnabled = false; }
-    void resetCardPresence() override {}
+    void resetCardPresence() override { cardPresenceReported = false; }
 
     void setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)> callback) override;
     void setCardRemovalCallback(std::function<void(uint32_t)> callback) override;
@@ -68,10 +68,12 @@ private:
     static std::string encode(const Card &card);
     static bool decode(const std::string &value, Card &card);
     void save();
+    void reconcileCardPresence();
 
     ProfileStore &profile;
     Card currentCard;
     bool cardDetectionEnabled = false;
+    bool cardPresenceReported = false;
     std::function<void(uint8_t *, uint8_t)> cardDetectedCallback;
     std::function<void(uint32_t)> cardRemovedCallback;
 };
