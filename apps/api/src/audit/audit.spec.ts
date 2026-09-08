@@ -55,7 +55,7 @@ const event = (): PluginAuditEvent & { pluginId: string } => ({
   subject: { type: 'wago.controller', id: 7 },
   details: { revision: 2 },
 });
-const config = { enabled: true, domains: ['wago'], retention_days: 90 };
+const config = { enabled: true, domains: ['resource', 'wago'], retention_days: 90 };
 
 describe('durable audit SQLite', () => {
   let directory: string;
@@ -755,12 +755,18 @@ describe('audit policy and authorization', () => {
     }
   });
 
-  it('validates paging bounds and rejects unrecognized query fields', async () => {
+  it('validates audit query bounds, resource action prefixes, and recognized fields', async () => {
     const pipe = new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true });
     for (const query of [{ limit: '101' }, { beforeId: '-1' }, { raw: 'secret' }]) {
       await expect(pipe.transform(query, { type: 'query', metatype: AuditQueryDto })).rejects.toThrow();
     }
     expect(await pipe.transform({ limit: '5' }, { type: 'query', metatype: AuditQueryDto })).toEqual({ limit: 5 });
+    await expect(
+      pipe.transform({ eventPrefix: 'maintenance_schedule.' }, { type: 'query', metatype: AuditQueryDto }),
+    ).resolves.toMatchObject({ eventPrefix: 'maintenance_schedule.' });
+    await expect(
+      pipe.transform({ eventPrefix: 'supervision.' }, { type: 'query', metatype: AuditQueryDto }),
+    ).resolves.toMatchObject({ eventPrefix: 'supervision.' });
   });
 });
 

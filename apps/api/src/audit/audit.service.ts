@@ -12,8 +12,9 @@ import { AuditLog } from '@attraccess/database-entities';
 import { PluginAuditEvent, PluginAuditHostProvider, PluginAuditReceipt } from '@attraccess/plugins-backend-sdk';
 import { readAuditSettings } from './audit.config';
 import { SettingsStoreService } from '../settings/settings-store.service';
-import { projectAuditEvent } from './audit-policy';
+import { projectAuditEvent, projectResourceAuditEvent, ResourceAuditEvent } from './audit-policy';
 import { AuditQueryDto } from './audit-query.dto';
+import { randomUUID } from 'crypto';
 
 const billingStatuses = new Set(['pending', 'completed', 'failed']);
 const billingSources = new Set(['manual', 'resource-usage', 'refund', 'sumup-topup']);
@@ -164,6 +165,24 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
       events.push({ event, transactionDepth: this.transactionDepth(queryRunner), resolve });
       this.billingEvents.set(queryRunner, events);
     });
+  }
+
+  async recordResource(event: Omit<ResourceAuditEvent, 'operationId'>): Promise<void> {
+    try {
+      const snapshot = projectResourceAuditEvent({ ...event, operationId: randomUUID() });
+      if (!snapshot || this.stopping || !this.storage?.isInitialized || this.pending >= 8) return;
+      this.pending++;
+      try {
+        const config = await readAuditSettings(this.settings);
+        if (!config.enabled || !config.domains.includes('resource') || this.stopping) return;
+        await this.storage.getRepository(AuditLog).insert({
+          at: new Date(), domain: 'resource', pluginId: 'core', action: snapshot.action,
+          operationId: snapshot.operationId, actorId: snapshot.actorId,
+          authenticationMethod: snapshot.authenticationMethod ?? 'session', apiTokenId: snapshot.apiTokenId ?? null,
+          outcome: 'succeeded', subjectType: 'resource', subjectId: snapshot.subjectId, details: snapshot.details,
+        });
+      } finally { this.pending--; }
+    } catch { /* Audit persistence must not affect resource operations. */ }
   }
 
   afterTransactionCommit({ queryRunner }: TransactionCommitEvent): void {

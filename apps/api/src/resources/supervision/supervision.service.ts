@@ -18,6 +18,7 @@ import { SupervisionRequestDto } from './dtos/supervisionRequest.dto';
 import { SupervisionDecisionResponseDto } from './dtos/supervisionDecision.response.dto';
 import { SupervisionLiveService } from './supervision-live.service';
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
+import { AuditService } from '../../audit/audit.service';
 
 interface PendingSupervisionRequest {
   id: string;
@@ -99,6 +100,7 @@ export class SupervisionService {
     private readonly resourceUsageService: ResourceUsageService,
     private readonly resourceIntroducersService: ResourceIntroducersService,
     private readonly supervisionLive: SupervisionLiveService,
+    private readonly audit: AuditService,
   ) {}
 
   /** Registered by the Attractap module at startup; see {@link ReaderSupervisionArmer}. */
@@ -388,7 +390,12 @@ export class SupervisionService {
    * Approves a pending request: starts the supervised session via the normal start path with the
    * supervisor attached, then resolves the waiting requester.
    */
-  public async approve(requestId: string, supervisor: User): Promise<ResourceUsage> {
+  public async approve(
+    requestId: string,
+    supervisor: User,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<ResourceUsage> {
     const request = this.getPendingForSupervisorOrThrow(requestId, supervisor, { allowAnyAuthorized: true });
     await this.assertMayApprove(request, supervisor);
 
@@ -406,6 +413,18 @@ export class SupervisionService {
         supervisorUserId: supervisor.id,
       });
       this.fulfil(request, session);
+      void this.audit.recordResource({
+        action: 'supervision.approved',
+        actorId: supervisor.id,
+        authenticationMethod,
+        apiTokenId,
+        subjectId: request.resourceId,
+        details: {
+          requestId: request.id,
+          requesterUserId: request.requester.id,
+          supervisorUserId: supervisor.id,
+        },
+      });
       // Reader-originated requests surface the result to the reader websocket; the session was just
       // started here (the web popup won the race against an on-reader card tap).
       request.readerCallbacks?.onResolved(session, { id: supervisor.id, username: supervisor.username });
@@ -422,11 +441,28 @@ export class SupervisionService {
   /**
    * Rejects a pending request: the waiting requester is failed with a Forbidden error.
    */
-  public reject(requestId: string, supervisor: User): SupervisionDecisionResponseDto {
+  public reject(
+    requestId: string,
+    supervisor: User,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): SupervisionDecisionResponseDto {
     const request = this.getPendingForSupervisorOrThrow(requestId, supervisor);
     this.clear(request);
     const error = new ForbiddenException('The supervision request was rejected by the supervisor');
     this.fail(request, error);
+    void this.audit.recordResource({
+      action: 'supervision.rejected',
+      actorId: supervisor.id,
+      authenticationMethod,
+      apiTokenId,
+      subjectId: request.resourceId,
+      details: {
+        requestId: request.id,
+        requesterUserId: request.requester.id,
+        supervisorUserId: supervisor.id,
+      },
+    });
     request.readerCallbacks?.onFailed(error);
     this.emitToEligible(request, SupervisionLiveEventType.REJECTED);
     return { status: 'rejected', requestId };
