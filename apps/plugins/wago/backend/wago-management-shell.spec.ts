@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { chmod, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, chown, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -13,6 +13,7 @@ const token = '1234567890abcdef1234567890abcdef';
 const key = generateManagementKey();
 let root: string, home: string, bin: string;
 let watchdogPid: number | undefined;
+const fixtureUser = process.getuid?.() === 0 ? { uid: 65534, gid: 65534 } : undefined;
 const path = (...parts: string[]) => join(home, '.ssh', ...parts);
 const env = () => ({ ...process.env, HOME: home, PATH: `${bin}:${process.env.PATH}` });
 const command = (action: ManagementShellAction, seconds = 180, selectedToken = token) =>
@@ -22,6 +23,7 @@ const command = (action: ManagementShellAction, seconds = 180, selectedToken = t
 const run = (action: ManagementShellAction, seconds = 180, selectedToken = token) =>
   exec('/bin/sh', ['-c', command(action, seconds, selectedToken)], {
     env: env(),
+    ...(fixtureUser === undefined ? {} : fixtureUser),
     timeout: 10000,
     maxBuffer: 16384,
   });
@@ -34,6 +36,14 @@ beforeEach(async () => {
   await mkdir(home, { mode: 0o700 });
   await mkdir(bin, { mode: 0o700 });
   await mkdir(path(), { mode: 0o700 });
+  if (fixtureUser !== undefined) {
+    // The generated production command refuses root. Give the isolated fixture
+    // tree to the standard unprivileged account when tests run in a root container.
+    await chmod(root, 0o755);
+    await chown(home, fixtureUser.uid, fixtureUser.gid);
+    await chown(bin, fixtureUser.uid, fixtureUser.gid);
+    await chown(path(), fixtureUser.uid, fixtureUser.gid);
+  }
   await writeFile(join(root, 'uptime'), '1000.00 0.00\n');
   await writeFile(join(root, 'boot-id'), 'fixture-boot\n');
   // Isolated Linux utility fixtures for macOS. No device/network/system service commands.
@@ -61,7 +71,7 @@ elif name=='timeout':
  try: sys.exit(child.wait(timeout=float(sys.argv[3])))
  except subprocess.TimeoutExpired: os.killpg(os.getpid(),signal.SIGKILL)
 `;
-  for (const tool of ['stat', 'flock', 'timeout']) await writeFile(join(bin, tool), shim, { mode: 0o700 });
+  for (const tool of ['stat', 'flock', 'timeout']) await writeFile(join(bin, tool), shim, { mode: 0o755 });
 });
 afterEach(async () => {
   if (watchdogPid) {
@@ -76,6 +86,7 @@ afterEach(async () => {
 
 async function prepared() {
   await writeFile(path('authorized_keys'), '# existing key\n', { mode: 0o600 });
+  if (fixtureUser !== undefined) await chown(path('authorized_keys'), fixtureUser.uid, fixtureUser.gid);
   await run('prepare');
   // Most tests inject the independent-watchdog acknowledgement; one below launches the real child.
   await writeFile(path('.attraccess-management-transaction', 'armed'), '');
