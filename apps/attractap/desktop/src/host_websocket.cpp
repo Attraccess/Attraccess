@@ -47,7 +47,7 @@ std::string HostWebsocket::readerUrl(const std::string &endpoint)
 
     const auto authorityStart = schemeEnd + 3;
     const auto authorityEnd = endpoint.find_first_of("/?#", authorityStart);
-    if (authorityStart == authorityEnd || endpoint.find('@', authorityStart) < authorityEnd)
+    if (authorityStart == endpoint.size() || authorityStart == authorityEnd || endpoint.find('@', authorityStart) < authorityEnd)
         throw std::invalid_argument("Reader endpoint must contain a host and no credentials");
 
     return websocketScheme + "://" + endpoint.substr(authorityStart, authorityEnd - authorityStart) + "/api/attractap/websocket";
@@ -278,6 +278,12 @@ void HostWebsocket::run(std::stop_token stopToken)
                 continue;
             }
 
+            if (received > MaxInboundMessageBytes - inbound.size())
+            {
+                publishError("Host WebSocket message exceeds the maximum size");
+                open = false;
+                continue;
+            }
             inbound.append(buffer.data(), received);
             if (frame->bytesleft == 0 && (frame->flags & CURLWS_CONT) == 0)
             {

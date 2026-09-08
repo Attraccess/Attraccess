@@ -91,16 +91,20 @@ int main()
     assert(HostWebsocket::readerUrl("http://localhost:3001") == "ws://localhost:3001/api/attractap/websocket");
     assert(HostWebsocket::readerUrl("https://reader.example.test/") == "wss://reader.example.test/api/attractap/websocket");
     assert(HostWebsocket::readerUrl("wss://reader.example.test/ignored") == "wss://reader.example.test/api/attractap/websocket");
-    bool invalidEndpointRejected = false;
-    try
+    const auto rejectsInvalidEndpoint = [](const std::string &endpoint)
     {
-        static_cast<void>(HostWebsocket::readerUrl("reader.example.test"));
-    }
-    catch (const std::invalid_argument &)
-    {
-        invalidEndpointRejected = true;
-    }
-    assert(invalidEndpointRejected);
+        try
+        {
+            static_cast<void>(HostWebsocket::readerUrl(endpoint));
+            return false;
+        }
+        catch (const std::invalid_argument &)
+        {
+            return true;
+        }
+    };
+    assert(rejectsInvalidEndpoint("reader.example.test"));
+    assert(rejectsInvalidEndpoint("http://"));
 
     HostWebsocket websocket(runtime, "http://localhost:3001");
     assert(websocket.send("outbound"));

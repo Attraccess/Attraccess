@@ -47,6 +47,7 @@ public:
 
 private:
     static constexpr size_t MaxQueuedMessages = 64;
+    static constexpr size_t MaxInboundMessageBytes = 1024 * 1024;
 
     void run(std::stop_token stopToken);
     void publishState(State state);
