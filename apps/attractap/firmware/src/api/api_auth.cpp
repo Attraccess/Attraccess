@@ -72,7 +72,7 @@ void API::sendAuthenticationRequest()
         return;
     }
     this->logger.info((std::string("sending authentication request to websocket: ") + json).c_str());
-    this->websocket.sendMessage(json, n);
+    this->transport.sendMessage(json, n);
 }
 
 void API::sendFirmwareInfo()
@@ -111,7 +111,7 @@ void API::sendFirmwareInfo()
         this->logger.error("Failed to serialize firmware info");
         return;
     }
-    this->websocket.sendMessage(json, n);
+    this->transport.sendMessage(json, n);
 }
 
 void API::onReaderAuthenticated(JsonObject data)

@@ -1,6 +1,7 @@
 #include "virtual_nfc.hpp"
 
 #include <charconv>
+#include <algorithm>
 #include <iomanip>
 #include <sstream>
 #include <string_view>
@@ -54,9 +55,9 @@ void VirtualNfc::setCard(const Card &card)
     const bool wasPresent = currentCard.present;
     currentCard = card;
     save();
-    if (wasPresent && cardRemovedCallback)
-        cardRemovedCallback();
-    if (currentCard.present && cardDetectedCallback)
+    if (wasPresent && cardDetectionEnabled && cardRemovedCallback)
+        cardRemovedCallback(0);
+    if (currentCard.present && cardDetectionEnabled && cardDetectedCallback)
         cardDetectedCallback(currentCard.uid.data(), currentCard.uidLength);
 }
 
@@ -67,10 +68,10 @@ void VirtualNfc::setPresent(bool present)
 
     currentCard.present = present;
     save();
-    if (present && cardDetectedCallback)
+    if (present && cardDetectionEnabled && cardDetectedCallback)
         cardDetectedCallback(currentCard.uid.data(), currentCard.uidLength);
-    if (!present && cardRemovedCallback)
-        cardRemovedCallback();
+    if (!present && cardDetectionEnabled && cardRemovedCallback)
+        cardRemovedCallback(0);
 }
 
 void VirtualNfc::setFaults(bool failAuthentication, bool failWrite)
@@ -97,53 +98,58 @@ void VirtualNfc::setKeyVersion(uint8_t keyNumber, uint8_t keyVersion)
     save();
 }
 
-bool VirtualNfc::authenticate(uint8_t keyNumber, const Key &key) const
+bool VirtualNfc::authenticate(uint8_t keyNumber, uint8_t *key)
 {
     return currentCard.present && currentCard.type != CardType::Unknown && !currentCard.failAuthentication && keyNumber < KeySlotCount &&
-           currentCard.keys[keyNumber] == key;
+           std::equal(currentCard.keys[keyNumber].begin(), currentCard.keys[keyNumber].end(), key);
 }
 
-bool VirtualNfc::changeKey(uint8_t keyNumber, const Key &masterKey, const Key &oldKey,
-                           const Key &newKey, uint8_t keyVersion)
+bool VirtualNfc::changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey,
+                            uint8_t *newKey, uint8_t keyVersion)
 {
     if (keyNumber >= KeySlotCount || currentCard.failWrite || !authenticate(0, masterKey) ||
         !authenticate(keyNumber, oldKey))
         return false;
 
-    currentCard.keys[keyNumber] = newKey;
+    std::copy_n(newKey, KeySize, currentCard.keys[keyNumber].begin());
     currentCard.keyVersions[keyNumber] = keyVersion;
     save();
     return authenticate(keyNumber, newKey);
 }
 
-bool VirtualNfc::getAvailableKeyNo(uint8_t &keyNumber) const
+bool VirtualNfc::getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNumber)
 {
     if (!currentCard.present || currentCard.type == CardType::Unknown || currentCard.failAuthentication)
         return false;
 
-    if (currentCard.type == CardType::Desfire && !authenticate(0, factoryKey()))
+    if (currentCard.type == CardType::Desfire && !authenticate(0, getFactoryKey()))
         return false;
 
     for (uint8_t index = 1; index < KeySlotCount; ++index)
     {
         const bool isFree = currentCard.type == CardType::Desfire
                                 ? currentCard.keyVersions[index] == 0
-                                : authenticate(index, factoryKey());
+                                : authenticate(index, getFactoryKey());
         if (isFree)
         {
-            keyNumber = index;
+            *keyNumber = index;
+            if (uid && uidLength)
+            {
+                std::copy_n(currentCard.uid.begin(), currentCard.uidLength, uid);
+                *uidLength = currentCard.uidLength;
+            }
             return true;
         }
     }
     return false;
 }
 
-void VirtualNfc::setCardDetectedCallback(std::function<void(const uint8_t *, uint8_t)> callback)
+void VirtualNfc::setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)> callback)
 {
     cardDetectedCallback = std::move(callback);
 }
 
-void VirtualNfc::setCardRemovedCallback(std::function<void()> callback)
+void VirtualNfc::setCardRemovalCallback(std::function<void(uint32_t)> callback)
 {
     cardRemovedCallback = std::move(callback);
 }
