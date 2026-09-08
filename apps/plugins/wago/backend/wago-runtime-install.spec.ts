@@ -317,7 +317,9 @@ process.exit(result.status ?? 1);
       0o700,
     );
     const { bundle, script } = delivery();
-    const child = spawn('/bin/sh', ['-c', script], {
+    const deliveryScript = 'tmp/delivery.sh';
+    fixture.file(deliveryScript, script, 0o700);
+    const child = spawn('/bin/sh', [join(fixture.root, deliveryScript)], {
       env: { PATH: join(fixture.root, 'bin'), FIXTURE_ROOT: fixture.root, TMPDIR: join(fixture.root, 'tmp') },
     });
     child.stdout.resume();
