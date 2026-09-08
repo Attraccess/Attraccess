@@ -1,4 +1,5 @@
 #include "host_runtime.hpp"
+#include "host_websocket.hpp"
 #include "profile_store.hpp"
 #include "virtual_nfc.hpp"
 
@@ -86,6 +87,28 @@ int main()
     const auto before = runtime.millis();
     std::this_thread::sleep_for(std::chrono::milliseconds(2));
     assert(runtime.millis() >= before);
+
+    assert(HostWebsocket::readerUrl("http://localhost:3001") == "ws://localhost:3001/api/attractap/websocket");
+    assert(HostWebsocket::readerUrl("https://reader.example.test/") == "wss://reader.example.test/api/attractap/websocket");
+    assert(HostWebsocket::readerUrl("wss://reader.example.test/ignored") == "wss://reader.example.test/api/attractap/websocket");
+    const auto rejectsInvalidEndpoint = [](const std::string &endpoint)
+    {
+        try
+        {
+            static_cast<void>(HostWebsocket::readerUrl(endpoint));
+            return false;
+        }
+        catch (const std::invalid_argument &)
+        {
+            return true;
+        }
+    };
+    assert(rejectsInvalidEndpoint("reader.example.test"));
+    assert(rejectsInvalidEndpoint("http://"));
+
+    HostWebsocket websocket(runtime, "http://localhost:3001");
+    assert(websocket.send("outbound"));
+    assert(!websocket.send(nullptr, 0));
 
     std::filesystem::remove_all(root);
 }
