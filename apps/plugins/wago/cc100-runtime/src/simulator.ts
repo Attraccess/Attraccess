@@ -1,10 +1,11 @@
 import { connect, type MqttClient } from 'mqtt';
-import { JsonStateStore, WagoRuntime, type RuntimeState, type Transport } from './runtime';
+import { JsonStateStore, WagoRuntime, validateDesired, type RuntimeState, type Transport } from './runtime';
 import { SimulatorDeviceAdapter } from './simulator-device';
 
 type SimulatorState = RuntimeState & {
   simulatorHardwareId?: string;
   simulatorPairingCode?: string;
+  operationalPrefix?: string;
 };
 
 let hardwareId: string;
@@ -14,26 +15,14 @@ const prefix = process.env.WAGO_MQTT_PREFIX ?? 'attraccess/wago';
 const statePath = process.env.WAGO_STATE_PATH ?? '/var/lib/attraccess-wago/state.json';
 const scenario = process.env.WAGO_SCENARIO ?? 'normal';
 const capabilities = parseCapabilities(process.env.WAGO_CAPABILITIES);
+const heartbeatInterval = interval('WAGO_HEARTBEAT_INTERVAL_MS', 30_000);
+const measurementInterval = interval('WAGO_MEASUREMENT_INTERVAL_MS', 5_000);
 const store = new JsonStateStore(statePath);
 const measurementStep = Number(process.env.WAGO_MEASUREMENT_STEP ?? '0');
 if (!Number.isFinite(measurementStep)) throw new Error('WAGO_MEASUREMENT_STEP must be a finite number');
 const device = new SimulatorDeviceAdapter(parseValues(process.env.WAGO_INITIAL_VALUES), scenario, measurementStep);
 let client: MqttClient | undefined;
 let timers: NodeJS.Timeout[] = [];
-
-process.on('message', (message: { type?: string; id?: string; channelId?: string }) => {
-  if (message.type !== 'simulator-read' || !message.id || !message.channelId || !process.send) return;
-  void device
-    .readChannel(message.channelId)
-    .then((value) => process.send?.({ type: 'simulator-read-result', id: message.id, value }))
-    .catch((error: unknown) =>
-      process.send?.({
-        type: 'simulator-read-result',
-        id: message.id,
-        error: error instanceof Error ? error.message : String(error),
-      }),
-    );
-});
 
 void start().catch((error: unknown) => {
   process.stderr.write(
@@ -52,12 +41,7 @@ async function start(): Promise<void> {
     throw new Error('WAGO_HARDWARE_ID does not match the persisted simulator identity');
   if (!hardwareId.trim() || /[/+#]/.test(hardwareId) || hardwareId.includes(String.fromCharCode(0)))
     throw new Error('invalid WAGO_HARDWARE_ID');
-  const persistedState: SimulatorState = {
-    ...state,
-    simulatorHardwareId: hardwareId,
-    simulatorPairingCode: pairingCode,
-  };
-  await store.save(persistedState);
+  await store.save(Object.assign(state, { simulatorHardwareId: hardwareId, simulatorPairingCode: pairingCode }));
   if (state.credentials) return connectOperational(state);
   return connectEnrollment();
 }
@@ -67,17 +51,70 @@ function connectEnrollment(): void {
   const enrollmentClient = connect(mqttUrl, credentials('WAGO_ENROLLMENT'));
   client = enrollmentClient;
   enrollmentClient.on('error', logConnectionError);
-  enrollmentClient.once(
+  let subscribed = false;
+  let claiming = false;
+  enrollmentClient.on(
     'connect',
     () =>
       void handleAsync(async () => {
-        const enrollmentRuntime = runtime(enrollmentClient, undefined, enrollmentSecret);
-        await subscribe(enrollmentClient, enrollmentRuntime.discoveryClaimTopic(), async (payload) => {
-          const claim = await enrollmentRuntime.receiveDiscoveryClaim(payload);
-          if (!claim) return;
-          enrollmentClient.end(true, () => void handleAsync(async () => connectOperational(await store.load())));
-        });
-        await enrollmentRuntime.publishDiscoveryAnnouncement();
+        const discovery = `attraccess/wago/discovery/${hardwareId}`;
+        if (!subscribed) {
+          await subscribe(enrollmentClient, `${discovery}/claim`, async (payload) => {
+            if (claiming) return;
+            const claim = JSON.parse(payload.toString('utf8')) as {
+              username: string;
+              password: string;
+              configuration?: { namespace?: string };
+              acknowledgementToken?: string;
+            };
+            if (
+              typeof claim?.username !== 'string' ||
+              !claim.username ||
+              typeof claim.password !== 'string' ||
+              !claim.password ||
+              typeof claim.configuration?.namespace !== 'string'
+            )
+              throw new Error('claim does not include permanent MQTT credentials and configuration namespace');
+            const operationalPrefix = normalizeOperationalPrefix(claim.configuration.namespace);
+            if (
+              claim.acknowledgementToken !== undefined &&
+              (typeof claim.acknowledgementToken !== 'string' || !claim.acknowledgementToken)
+            )
+              throw new Error('claim acknowledgementToken must be a non-empty string');
+            claiming = true;
+            try {
+              const claimedState: SimulatorState = {
+                ...(await store.load()),
+                credentials: { username: claim.username, password: claim.password },
+                operationalPrefix,
+              };
+              await store.save(claimedState);
+              if (claim.acknowledgementToken)
+                await publish(enrollmentClient, `${discovery}/claim/ack`, {
+                  acknowledgementToken: claim.acknowledgementToken,
+                });
+            } catch (error) {
+              claiming = false;
+              throw error;
+            }
+            enrollmentClient.end(true, () => void handleAsync(async () => connectOperational(await store.load())));
+          });
+          subscribed = true;
+        }
+        await publish(
+          enrollmentClient,
+          discovery,
+          {
+            hardwareId,
+            pairingCode,
+            enrollmentSecret,
+            protocolVersion: '1.0.0',
+            runtimeVersion: '0.1.0-simulator',
+            capabilities,
+            sequence: Date.now(),
+          },
+          true,
+        );
         process.stdout.write(`WAGO CC100 simulator enrollment connected as ${hardwareId}\n`);
       }),
   );
@@ -86,6 +123,7 @@ function connectEnrollment(): void {
 function connectOperational(state: SimulatorState): void {
   if (!state.credentials) throw new Error('permanent MQTT credentials are required');
   const operationalClient = connect(mqttUrl, {
+    clientId: state.credentials.username,
     username: state.credentials.username,
     password: state.credentials.password,
   });
@@ -93,81 +131,104 @@ function connectOperational(state: SimulatorState): void {
   operationalClient.on('error', logConnectionError);
   device.restore(state.accepted?.snapshot, state.outputs);
   if (state.accepted) device.activate(state.accepted.snapshot);
-  const operationalRuntime = runtime(operationalClient, state.credentials.prefix);
-  let initialized = false;
-  let starting = false;
-  let connectionGeneration = 0;
-  const startTelemetry = () => {
-    timers.forEach(clearInterval);
-    timers = [];
-    if (scenario !== 'stale-heartbeat' && scenario !== 'offline')
-      timers = [
-        setInterval(() => void handleAsync(() => operationalRuntime.publishHeartbeat()), 30_000),
-        setInterval(() => void handleAsync(() => operationalRuntime.publishMeasurements()), 5_000),
-      ];
+  const runtimeOptions: ConstructorParameters<typeof WagoRuntime>[0] & { pairingCode: string } = {
+    hardwareId,
+    pairingCode,
+    prefix: state.operationalPrefix ?? state.credentials.prefix ?? prefix,
+    store,
+    transport: transport(operationalClient),
+    device,
   };
-  operationalClient.on(
-    'connect',
-    () =>
-      void handleAsync(async () => {
-        if (starting) return;
-        if (initialized) {
+  const operationalRuntime = new WagoRuntime(runtimeOptions);
+  let started = false;
+  let lifecycle = Promise.resolve();
+  let connectionGeneration = 0;
+  operationalClient.on('connect', () => {
+    const generation = ++connectionGeneration;
+    lifecycle = lifecycle.then(() =>
+      handleAsync(async () => {
+        if (generation !== connectionGeneration) return;
+        if (!started) {
+          await operationalRuntime.start();
+          started = true;
+        } else {
           await operationalRuntime.setConnected(true);
-          startTelemetry();
+          await operationalRuntime.publishHeartbeat();
+        }
+        // A disconnect can occur while startup awaits subscriptions or publishes.
+        // Do not let that stale completion restore an operational state or timers.
+        if (generation !== connectionGeneration) {
+          await operationalRuntime.setConnected(false);
           return;
         }
-        starting = true;
-        const generation = ++connectionGeneration;
-        try {
-          await operationalRuntime.start();
-          if (generation !== connectionGeneration) {
-            await operationalRuntime.setConnected(false);
-            return;
-          }
-          initialized = true;
-          await operationalRuntime.setConnected(true);
-          process.stdout.write(`WAGO CC100 simulator connected as ${hardwareId}\n`);
-          startTelemetry();
-          if (scenario === 'offline') operationalClient.end();
-        } finally {
-          starting = false;
-        }
+        process.stdout.write(`WAGO CC100 simulator connected as ${hardwareId}\n`);
+        timers.forEach(clearInterval);
+        if (scenario !== 'stale-heartbeat' && scenario !== 'offline')
+          timers = [
+            setInterval(() => void handleAsync(() => operationalRuntime.publishHeartbeat()), heartbeatInterval),
+            setInterval(() => void handleAsync(() => operationalRuntime.publishMeasurements()), measurementInterval),
+          ];
+        if (scenario === 'offline') operationalClient.end();
       }),
-  );
+    );
+  });
   operationalClient.on('close', () => {
     connectionGeneration++;
     timers.forEach(clearInterval);
     timers = [];
-    if (initialized) void handleAsync(() => operationalRuntime.setConnected(false));
-  });
-}
-
-function runtime(mqtt: MqttClient, operationalPrefix?: string, enrollmentSecret?: string): WagoRuntime {
-  return new WagoRuntime({
-    hardwareId,
-    prefix: operationalPrefix ?? prefix,
-    pairingCode,
-    enrollmentSecret,
-    store,
-    transport: transport(mqtt),
-    device,
-    capabilities,
-    configurationError: () =>
-      scenario === 'reject-configuration'
-        ? { path: '$', code: 'simulated_rejection', message: 'configuration rejected by simulator scenario' }
-        : undefined,
+    // Safety shutdown must not wait for pending MQTT subscriptions or PUBACKs.
+    void handleAsync(() => operationalRuntime.setConnected(false));
   });
 }
 
 function transport(mqtt: MqttClient): Transport {
   return {
-    publish: (topic, payload, options) => publish(mqtt, topic, payload, options?.retain),
-    subscribe: (topic, listener) => subscribe(mqtt, topic, listener),
+    publish: (topic, payload, options) =>
+      mqtt.connected ? publish(mqtt, topic, payload, options?.retain) : Promise.resolve(),
+    subscribe: (topic, listener) =>
+      subscribe(mqtt, topic, (payload) =>
+        scenario === 'reject-configuration' && topic.endsWith('/configuration/desired')
+          ? rejectDesired(mqtt, topic, payload)
+          : listener(payload),
+      ),
   };
 }
 
-function credentials(prefix: string): { username?: string; password?: string } {
-  return { username: process.env[`${prefix}_USERNAME`], password: process.env[`${prefix}_PASSWORD`] };
+async function rejectDesired(mqtt: MqttClient, topic: string, payload: Buffer): Promise<void> {
+  let desired: unknown;
+  try {
+    desired = JSON.parse(payload.toString('utf8'));
+  } catch {
+    await publish(
+      mqtt,
+      topic.replace(/desired$/, 'reported'),
+      {
+        revision: 0,
+        contentHash: '',
+        errors: [{ path: '$', code: 'invalid_json', message: 'desired configuration is not valid JSON' }],
+      },
+      true,
+    );
+    return;
+  }
+  await publish(
+    mqtt,
+    topic.replace(/desired$/, 'reported'),
+    {
+      revision: (desired as { revision?: number })?.revision ?? 0,
+      contentHash: (desired as { contentHash?: string })?.contentHash ?? '',
+      errors: [
+        ...validateDesired(desired),
+        { path: '$', code: 'simulated_rejection', message: 'configuration rejected by simulator scenario' },
+      ],
+    },
+    true,
+  );
+}
+
+function credentials(prefix: string): { clientId: string; username: string; password: string } {
+  const username = required(`${prefix}_USERNAME`);
+  return { clientId: username, username, password: required(`${prefix}_PASSWORD`) };
 }
 function parseValues(value: string | undefined): Record<string, boolean | number> {
   if (!value) return {};
@@ -192,6 +253,18 @@ function required(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`${name} is required`);
   return value;
+}
+function interval(name: string, fallback: number): number {
+  const value = Number(process.env[name] ?? fallback);
+  if (!Number.isSafeInteger(value) || value < 1 || value > 2_147_483_647)
+    throw new Error(`${name} must be a positive timer interval`);
+  return value;
+}
+function normalizeOperationalPrefix(value: string): string {
+  const normalized = value.trim().replace(/^\/+|\/+$/g, '');
+  if (!normalized || normalized.split('/').some((segment) => !segment || /[+#]/.test(segment)))
+    throw new Error('claim namespace must contain non-empty segments without wildcards');
+  return normalized;
 }
 function publish(mqtt: MqttClient, topic: string, payload: unknown, retain = false): Promise<void> {
   return new Promise((resolve, reject) =>
@@ -228,4 +301,19 @@ function logConnectionError(error: Error): void {
 process.on('SIGTERM', () => {
   timers.forEach(clearInterval);
   client?.end(true, () => process.exit(0));
+});
+
+// IPC is used only by the integration harness to inspect the in-memory device.
+process.on('message', (message: { type?: string; id?: string; channelId?: string }) => {
+  if (message.type !== 'simulator-read' || !message.id || !message.channelId || !process.send) return;
+  void device
+    .readChannel(message.channelId)
+    .then((value) => process.send?.({ type: 'simulator-read-result', id: message.id, value }))
+    .catch((error: unknown) =>
+      process.send?.({
+        type: 'simulator-read-result',
+        id: message.id,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
 });
