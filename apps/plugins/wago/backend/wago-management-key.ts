@@ -36,10 +36,11 @@ export function generateManagementKey(): ManagementKey {
     field(inner),
   ]);
   seed.fill(0);
-  const encoded = bytes
-    .toString('base64')
-    .match(/.{1,70}/g)
-    ?.join('\n') ?? '';
+  const encoded =
+    bytes
+      .toString('base64')
+      .match(/.{1,70}/g)
+      ?.join('\n') ?? '';
   return {
     privateKey: `-----BEGIN OPENSSH PRIVATE KEY-----\n${encoded}\n-----END OPENSSH PRIVATE KEY-----\n`,
     publicKey: `${algorithm} ${publicBlob(pub).toString('base64')}`,

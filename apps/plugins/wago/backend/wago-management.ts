@@ -12,6 +12,7 @@ import type {
   ManagementState,
   ManagementStore,
   ManagementTarget,
+  ManagementTransaction,
   SessionCredential,
 } from './wago-management.types';
 
@@ -240,8 +241,8 @@ export class WagoManagementService {
   }
 
   private async verify(record: ManagementRecord, privateKey: string): Promise<void> {
-    const nonce = identifier(),
-      tx = record.transaction!;
+    const nonce = identifier();
+    const tx = this.transaction(record);
     const proof = await this.adapter.verifyKey(tx, privateKey, nonce);
     if (
       proof.nonce !== nonce ||
@@ -250,7 +251,7 @@ export class WagoManagementService {
       proof.keyFingerprint !== record.keyFingerprint ||
       !Number.isSafeInteger(proof.uid) ||
       proof.uid <= 0 ||
-      proof.uid !== record.inspection!.uid ||
+      proof.uid !== this.inspection(record).uid ||
       !proof.managementOperationSucceeded
     )
       throw new Error('verification_failed');
@@ -280,7 +281,7 @@ export class WagoManagementService {
           retainedKey = undefined;
         }
       }
-      await this.adapter.rollback(record.transaction!, credential, retainedKey);
+      await this.adapter.rollback(this.transaction(record), credential, retainedKey);
       const recovered: ManagementRecord = {
         ...record,
         state: 'recovered',
@@ -302,7 +303,7 @@ export class WagoManagementService {
     return publicStatus(record);
   }
   private async step(record: ManagementRecord, owner: string, state: ManagementState): Promise<void> {
-    if (this.now() + 15000 >= record.transaction!.deadline) throw new Error('deadline');
+    if (this.now() + 15000 >= this.transaction(record).deadline) throw new Error('deadline');
     record.state = state;
     await this.save(record, owner);
   }
@@ -313,6 +314,14 @@ export class WagoManagementService {
     const record = await this.store.load(controllerId);
     if (!record) throw new ManagementError('inspect_required');
     return record;
+  }
+  private transaction(record: ManagementRecord): ManagementTransaction {
+    if (!record.transaction) throw new Error('transaction_missing');
+    return record.transaction;
+  }
+  private inspection(record: ManagementRecord): ManagementInspection {
+    if (!record.inspection) throw new Error('inspection_missing');
+    return record.inspection;
   }
   private async locked<T>(controllerId: number, action: (owner: string) => Promise<T>): Promise<T> {
     validId(controllerId);

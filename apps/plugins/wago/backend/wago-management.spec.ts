@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import { ManagementError, WagoManagementService } from './wago-management';
 import { generateManagementKey } from './wago-management-key';
