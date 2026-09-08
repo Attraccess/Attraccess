@@ -307,6 +307,25 @@ describe('WagoRuntime', () => {
     );
   });
 
+  it.each([
+    { unit: 'unknown', scale: 1, offset: 0 },
+    { unit: 'watt', scale: Number.NaN, offset: 0 },
+    { unit: 'watt', scale: 1, offset: Number.POSITIVE_INFINITY },
+  ])('rejects invalid measurement metadata: %j', (measurement) => {
+    const errors = validateSnapshot({
+      ...snapshot,
+      logicalChannels: [
+        {
+          ...snapshot.logicalChannels[0],
+          capabilities: ['output', 'measurement'],
+          measurement,
+        },
+      ],
+    });
+
+    expect(errors).toContainEqual(expect.objectContaining({ code: 'invalid_measurement' }));
+  });
+
   it('rejects duplicate logical channel IDs', async () => {
     const duplicated = {
       ...snapshot,

@@ -1239,6 +1239,7 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
           subscribe: [
             configurationDesiredTopic(namespace, controller.hardwareId),
             commandTopic(namespace, controller.hardwareId),
+            `${namespace}/v${CONFIGURATION_PROTOCOL_VERSION}/controllers/${controller.hardwareId}/credentials/rotate`,
           ],
         },
       }));

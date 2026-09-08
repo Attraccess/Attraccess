@@ -249,7 +249,11 @@ export function validateSnapshot(value: unknown): ValidationError[] {
     }
     if (
       channel.measurement &&
-      (!capabilities.includes('measurement') || !['live', 'cumulative'].includes(channel.measurement.kind ?? 'live'))
+      (!capabilities.includes('measurement') ||
+        !['ampere', 'volt', 'watt', 'watt-hour', 'percent'].includes(channel.measurement.unit) ||
+        !Number.isFinite(channel.measurement.scale) ||
+        !Number.isFinite(channel.measurement.offset) ||
+        !['live', 'cumulative'].includes(channel.measurement.kind ?? 'live'))
     ) {
       errors.push({
         path: `${path}.measurement`,

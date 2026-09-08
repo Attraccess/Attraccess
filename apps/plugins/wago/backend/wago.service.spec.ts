@@ -628,9 +628,10 @@ describe('WagoService', () => {
     };
     const candidate = { ...controller(), fingerprint: 'fingerprint' };
     const { service, context, enrollmentRepository } = createService([candidate], [enrollment]);
+    const provision = jest.fn().mockResolvedValue({ username: 'wago-controller-cc100-01', password: 'secret' });
     (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = jest.fn().mockResolvedValue({});
     (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({
-      provision: jest.fn().mockResolvedValue({ username: 'wago-controller-cc100-01', password: 'secret' }),
+      provision,
       revoke: jest.fn().mockResolvedValue(undefined),
     });
     enrollmentRepository.findOneBy.mockResolvedValue(enrollment);
@@ -642,6 +643,13 @@ describe('WagoService', () => {
       'attraccess/wago/discovery/cc100-01/claim',
       expect.stringContaining('"desiredTopic":"attraccess/wago/v1/controllers/cc100-01/configuration/desired"'),
       { qos: 1 },
+    );
+    expect(provision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        topicPolicy: expect.objectContaining({
+          subscribe: expect.arrayContaining(['attraccess/wago/v1/controllers/cc100-01/credentials/rotate']),
+        }),
+      }),
     );
   });
 
