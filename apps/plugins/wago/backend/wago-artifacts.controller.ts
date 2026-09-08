@@ -161,6 +161,13 @@ export class WagoArtifactUploadInterceptor implements NestInterceptor {
         }),
         cancelled,
       ]);
+      // The deadline limits receiving multipart bytes. Once Multer has accepted all
+      // parts, importing can safely finish even when verification takes longer than
+      // the upload window; otherwise a late timer could report cancellation while
+      // still allowing the catalog to activate the verified release.
+      clearTimeout(timer);
+      request.off('aborted', abort);
+      request.off('error', abort);
       return response.pipe(
         takeUntil(from(cancelled)),
         concatMap(async (result) => {

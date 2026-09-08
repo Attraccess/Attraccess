@@ -413,6 +413,23 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
         remove.mockRestore();
       }
     });
+
+    it('ends the upload deadline once Multer has accepted the request body', async () => {
+      const timers = jest.spyOn(global, 'setTimeout');
+      const source = new PassThrough();
+      sources.push(source);
+      Object.assign(source, { headers: {} });
+      const response = await interceptor.intercept(uploadContext(source), {
+        handle: () => defer(async () => ({ success: true })),
+      });
+
+      const index = timers.mock.calls.findIndex(([, delay]) => delay === 10 * 60 * 1000);
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(source.listenerCount('aborted')).toBe(0);
+      source.emit('aborted');
+
+      await expect(lastValueFrom(response)).resolves.toEqual({ success: true });
+    });
   });
   it('uses exactly cwd/storage when the existing application setting is absent', async () => {
     const previous = process.env.STORAGE_ROOT;
