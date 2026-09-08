@@ -67,7 +67,7 @@ describe('RuntimeArtifactImport', () => {
     expect(onBusyChange).toHaveBeenLastCalledWith(true);
     expect((await screen.findByRole('alert')).textContent).toContain('Check your connection and retry');
     expect(screen.getByRole('alert').textContent).not.toContain('/private/source');
-    expect(onBusyChange).toHaveBeenLastCalledWith(false);
+    await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false));
     expect(screen.getByRole('group').hasAttribute('disabled')).toBe(true);
     fetch.mockImplementation(normalFetch);
     await userEvent.click(screen.getByRole('button', { name: 'Retry loading releases' }));
