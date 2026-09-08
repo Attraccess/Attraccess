@@ -125,7 +125,7 @@ time_t parseIso8601ToTimeT(const std::string &iso8601)
     utc.tm_hour = hour;
     utc.tm_min = minute;
     utc.tm_sec = second;
-    const time_t timestamp = std::mktime(&utc);
+    const time_t timestamp = ::timegm(&utc);
     if (timestamp == static_cast<time_t>(-1)) return static_cast<time_t>(-1);
     return timestamp - (timezoneHour * 3600L + timezoneMinute * 60L) * timezoneSign;
 }

@@ -123,8 +123,10 @@ int main()
     assert(websocket.send("outbound"));
     assert(!websocket.send(nullptr, 0));
 
-    assert(parseIso8601ToTimeT("2026-01-02T03:04:05Z") != static_cast<time_t>(-1));
-    assert(parseIso8601ToTimeT("2026-01-02T03:04:05+02:00") != static_cast<time_t>(-1));
+    constexpr time_t timestamp = 1767323045;
+    assert(parseIso8601ToTimeT("2026-01-02T03:04:05Z") == timestamp);
+    assert(parseIso8601ToTimeT("2026-01-02T05:04:05+02:00") == timestamp);
+    assert(parseIso8601ToTimeT("2026-01-01T22:04:05-05:00") == timestamp);
     assert(parseIso8601ToTimeT("not a timestamp") == static_cast<time_t>(-1));
 
     std::filesystem::remove_all(root);
