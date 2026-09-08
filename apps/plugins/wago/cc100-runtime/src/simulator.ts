@@ -31,12 +31,19 @@ void start().catch((error: unknown) => {
 async function start(): Promise<void> {
   const state = (await store.load()) as SimulatorState;
   hardwareId = state.simulatorHardwareId ?? required('WAGO_HARDWARE_ID');
-  pairingCode = state.credentials ? state.simulatorPairingCode || process.env.WAGO_PAIRING_CODE || '' : required('WAGO_PAIRING_CODE');
+  pairingCode = state.credentials
+    ? state.simulatorPairingCode || process.env.WAGO_PAIRING_CODE || ''
+    : required('WAGO_PAIRING_CODE');
   if (process.env.WAGO_HARDWARE_ID && process.env.WAGO_HARDWARE_ID !== hardwareId)
     throw new Error('WAGO_HARDWARE_ID does not match the persisted simulator identity');
   if (!hardwareId.trim() || /[/+#]/.test(hardwareId) || hardwareId.includes(String.fromCharCode(0)))
     throw new Error('invalid WAGO_HARDWARE_ID');
-  await store.save({ ...state, simulatorHardwareId: hardwareId, simulatorPairingCode: pairingCode });
+  const persistedState: SimulatorState = {
+    ...state,
+    simulatorHardwareId: hardwareId,
+    simulatorPairingCode: pairingCode,
+  };
+  await store.save(persistedState);
   if (state.credentials) return connectOperational(state);
   return connectEnrollment();
 }
