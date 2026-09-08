@@ -7,7 +7,7 @@ import {
   type ModbusMeasurement,
   validateModbus,
 } from '../../../modbus/model';
-import type { DeviceAdapter, Snapshot } from '../runtime';
+import type { DeviceAdapter, Snapshot, ValidationError } from '../runtime';
 import { decodeRaw, readPdu, writePdu } from './protocol';
 import { type ModbusTransport, ModbusTransportError, QueuedModbusTransport } from './transports';
 
@@ -47,6 +47,15 @@ export class ModbusDeviceRouter implements DeviceAdapter {
   ) {}
   configure(snapshot: Snapshot): void {
     this.prepareConfiguration(snapshot)();
+  }
+  validate(snapshot: Snapshot): ValidationError[] {
+    const onboardPointIds = new Set(snapshot.physicalPoints.filter((point) => !point.modbus).map((point) => point.id));
+    if (!onboardPointIds.size || !this.onboard.validate) return [];
+    return this.onboard.validate({
+      ...snapshot,
+      physicalPoints: snapshot.physicalPoints.filter((point) => onboardPointIds.has(point.id)),
+      logicalChannels: snapshot.logicalChannels.filter((channel) => onboardPointIds.has(channel.physicalPointId)),
+    });
   }
   /** Build the next immutable routing table without changing active I/O or history. */
   prepareConfiguration(snapshot: Snapshot): () => void {

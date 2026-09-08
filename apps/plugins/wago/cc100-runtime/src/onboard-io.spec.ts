@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Cc100OnboardIoAdapter } from './adapters';
+import { ModbusDeviceRouter } from './modbus/adapter';
 import { CC100_DIGITAL_PROFILE } from './onboard-profile';
 import { hash, JsonStateStore, WagoRuntime, type Snapshot, type Transport } from './runtime';
 
@@ -167,6 +168,15 @@ describe('CC100 packed digital I/O', () => {
       expect.arrayContaining([expect.objectContaining({ code: 'invalid_direction' })]),
     );
     expect((await store.load()).accepted).toBeUndefined();
+  });
+
+  it('retains onboard validation when installed through the Modbus router', () => {
+    const invalid = structuredClone(snapshot);
+    invalid.logicalChannels.push({ ...snapshot.logicalChannels[0], id: 'DO1-alias' });
+    const router = new ModbusDeviceRouter(adapter);
+    expect(router.validate(invalid)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'duplicate_output' })]),
+    );
   });
 
   it('reports malformed referenced guard capabilities instead of throwing', async () => {
