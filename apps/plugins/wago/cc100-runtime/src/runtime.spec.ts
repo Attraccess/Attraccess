@@ -1209,6 +1209,35 @@ describe('WagoRuntime', () => {
     );
   });
 
+  it('does not postpone a watchdog shutdown after repeated disconnect notifications', async () => {
+    jest.useFakeTimers();
+    try {
+      const watchdogSnapshot: Snapshot = {
+        ...snapshot,
+        logicalChannels: [
+          { ...snapshot.logicalChannels[0], disconnectPolicy: { mode: 'watchdog', timeoutMs: 100 }, pulse: undefined },
+        ],
+      };
+      await transport.send(desired, {
+        protocolVersion: 1,
+        revision: 1,
+        contentHash: hash(watchdogSnapshot),
+        snapshot: watchdogSnapshot,
+      });
+      await transport.send(commands, validCommand());
+      expect(device.values.get('751-9301:0')).toBe(true);
+
+      await runtime.setConnected(false);
+      await jest.advanceTimersByTimeAsync(90);
+      await runtime.setConnected(false);
+      await jest.advanceTimersByTimeAsync(10);
+
+      expect(device.values.get('751-9301:0')).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('retries the aggregate immediate shutdown state after a state-store failure', async () => {
     const twoOutputs: Snapshot = {
       ...snapshot,

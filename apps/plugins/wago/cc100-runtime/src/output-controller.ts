@@ -16,6 +16,7 @@ export class OutputController {
   private readonly commandOperations = new Set<Promise<void>>();
   private feedbackGenerationSequence = 0;
   private configurationGeneration = 0;
+  private disconnected = false;
   private replacement?: Promise<void>;
 
   constructor(
@@ -198,10 +199,16 @@ export class OutputController {
 
   async applyDisconnectPolicies(connected: boolean): Promise<void> {
     if (connected) {
+      this.disconnected = false;
       this.watchdogs.forEach(clearTimeout);
       this.watchdogs.clear();
       return;
     }
+    // MQTT clients can report the same disconnect more than once. The first
+    // report establishes the watchdog deadline; later notifications must not
+    // defer it, including after a watchdog has already fired.
+    if (this.disconnected) return;
+    this.disconnected = true;
     let stateSaveFailed = false;
     for (const channel of this.options.getSnapshot()?.logicalChannels ?? []) {
       if (!channel.capabilities.includes('output')) continue;
