@@ -25,8 +25,8 @@ import {
   normalizeOperationalPrefix,
   parseAnnouncement,
   parseHeartbeat,
-  type WagoHeartbeat,
   type WagoAnnouncement,
+  type WagoHeartbeat,
 } from './protocol';
 import { WagoController } from './wago-controller.entity';
 import { WagoSettings } from './wago-settings.entity';

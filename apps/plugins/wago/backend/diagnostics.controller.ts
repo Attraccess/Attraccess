@@ -6,6 +6,10 @@ import { WagoDiagnosticsService } from './diagnostics.service';
 @Controller('wago')
 export class WagoDiagnosticsController {
   constructor(@Inject(WagoDiagnosticsService) private readonly diagnostics: WagoDiagnosticsService) {}
+  @Get('resources/:id/diagnostics')
+  getResource(@Param('id', ParseIntPipe) id: number) {
+    return this.diagnostics.getResource(id);
+  }
   @Get('controllers/:id/diagnostics')
   get(@Param('id', ParseIntPipe) id: number) {
     return this.diagnostics.get(id);

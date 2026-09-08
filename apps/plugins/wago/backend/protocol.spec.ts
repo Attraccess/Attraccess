@@ -31,6 +31,13 @@ describe('WAGO protocol', () => {
       'attraccess/wago/v1/controllers/cc100-01/heartbeat',
     );
   });
+  it('accepts permanent heartbeats without discovery pairing credentials', () => {
+    const heartbeat = { ...valid, pairingCode: undefined };
+    const payload = Buffer.from(JSON.stringify(heartbeat));
+    expect(parseHeartbeat(payload)).toMatchObject({ hardwareId: valid.hardwareId, sequence: 3 });
+    expect(parseHeartbeat(payload)).not.toHaveProperty('pairingCode');
+    expect(() => parseAnnouncement(payload)).toThrow('pairingCode');
+  });
 
   it('accepts runtime heartbeats without weakening physical discovery verification', () => {
     const heartbeat = { ...valid };

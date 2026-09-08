@@ -1,4 +1,16 @@
 export type Freshness = 'missing' | 'invalid' | 'future' | 'stale' | 'fresh';
+export interface WagoResourceDiagnostics {
+  resourceId: number;
+  truncated: boolean;
+  invalidControllerReferences: number;
+  controllers: Array<{
+    controllerId: number;
+    name: string;
+    unavailable: boolean;
+    references: WagoDiagnostics['references'];
+    referencesTruncated: boolean;
+  }>;
+}
 export interface DiagnosticValue {
   kind: 'input' | 'output' | 'measurement';
   value: boolean | number;
