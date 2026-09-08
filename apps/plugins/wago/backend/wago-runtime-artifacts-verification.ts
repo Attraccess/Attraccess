@@ -1,4 +1,5 @@
 import { createHash, createPublicKey, verify } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import type { FileHandle } from 'node:fs/promises';
 import { WAGO_HARDWARE_PROFILE } from './wago-hardware-deployment';
 
@@ -44,6 +45,31 @@ function reader(data: Buffer) {
       if (offset !== data.length) invalid();
     },
   };
+}
+
+/** Resolve host configuration once; uploads never supply trust anchors. */
+export function loadRuntimeArtifactSigningKey(
+  environment: string | undefined,
+  configuredPath: string | undefined,
+): string {
+  const path = configuredPath?.trim();
+  if (!path) return WAGO_RUNTIME_RELEASE_KEY;
+  if (environment !== 'development')
+    throw new Error('local CC100 runtime signing keys are only allowed in development');
+  try {
+    const match = readFileSync(path, 'utf8')
+      .trim()
+      .match(/^ssh-ed25519[ \t]+([A-Za-z0-9+/]+={0,2})(?:[ \t]+[^\r\n]*)?$/);
+    if (!match) invalid();
+    const bytes = Buffer.from(match[1], 'base64');
+    if (bytes.toString('base64') !== match[1]) invalid();
+    const fields = reader(bytes);
+    if (fields.string().toString() !== 'ssh-ed25519' || fields.string().length !== 32) invalid();
+    fields.end();
+    return match[1];
+  } catch {
+    throw new Error('Invalid development CC100 runtime signing public key');
+  }
 }
 
 /** OpenSSH SSHSIG v1/Ed25519 verification. Only the small signed digest is buffered. */

@@ -156,5 +156,6 @@ export * from './1783400000000-api-token-management-permission';
 export * from './1783500000000-resource-operating-interval';
 export * from './1783600000000-activity-flow-node-types';
 export * from './1783700000000-durable-audit';
+export * from './1783800000000-mqtt-server-management-port';
 export * from './1765442000000-form-field-position';
 export * from './1783700000000-refresh-default-email-layout';

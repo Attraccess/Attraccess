@@ -1,64 +1,141 @@
 import { spawnSync } from 'node:child_process';
-import { wagoFw31IdentityCheck, isCc100Fw31Identity } from './wago-firmware-identity';
+import { createHash } from 'node:crypto';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fw31IdentityOutput, fw31Model, fw31OsRelease, fw31Revisions } from './fixtures/fw31-identity';
+import { fw31MinimalOd } from './fixtures/fw31-minimal-od';
+import { wagoFw31IdentityCheck, wagoFw31IdentityRead, isCc100Fw31Identity } from './wago-firmware-identity';
 
 const shellIdentity = (input: string) =>
-  spawnSync('/bin/sh', ['-c', wagoFw31IdentityCheck().replace(' "/etc/os-release"', '')], { input, encoding: 'utf8' });
-
-describe('CC100 FW31 identity, never a BSP-only or operator-supplied qualification', () => {
-  it.each([
-    ['VERSION_ID="31"', true],
-    ['VERSION_ID="4.9.1(31)"', true],
-    ['VERSION_ID="04.09.01(31)"', true],
-    ['VERSION_ID="2024.12.0"\nVERSION="4.9.1(31)"', true],
-    ['VERSION_ID=31', true],
-    ['VERSION_ID="2024.12.0"', false],
-    ['VERSION_ID="30"', false],
-    ['VERSION_ID="32"\nVERSION="31"', false],
-    ['VERSION_ID="31"\nVERSION="30"', false],
-    ['VERSION_ID="31"\nVERSION_ID="31"', false],
-    ['VERSION_ID="31"\nVERSION_ID', false],
-    ['VERSION_ID="31"\nPTXDIST_PLATFORM_NAME="other"', false],
-    ['VERSION_ID="31"\r', false],
-    ['VERSION_ID="31" # guessed release', false],
-    ['VERSION_ID="$(printf 31)"', false],
-    ['', false],
-  ])('host and executable shell agree for %s', (versions, supported) => {
-    const input = `PTXDIST_PLATFORM_NAME="cc100"\n${versions}\n`;
-    expect(isCc100Fw31Identity(input)).toBe(supported);
-    const result = shellIdentity(input);
-    expect(result.error).toBeUndefined();
-    expect(result.stderr).toBe('');
-    expect(result.status).toBe(supported ? 0 : 1);
+  spawnSync('/bin/sh', ['-c', wagoFw31IdentityCheck().replace(wagoFw31IdentityRead(), 'cat')], {
+    input,
+    encoding: 'utf8',
   });
+const agree = (input: string, supported: boolean) => {
+  expect(isCc100Fw31Identity(input)).toBe(supported);
+  const result = shellIdentity(input);
+  expect(result.error).toBeUndefined();
+  expect(result.stderr).toBe('');
+  expect(result.status).toBe(supported ? 0 : 1);
+};
 
-  it('requires the platform field, not a matching substring in a description', () => {
-    const input = 'NAME="PTXDIST_PLATFORM_NAME="cc100""\nVERSION_ID="31"\n';
-    expect(isCc100Fw31Identity(input)).toBe(false);
-    expect(shellIdentity(input).status).toBe(1);
-  });
-
-  it.each([0, 1, 9, 11, 13, 31, 127, 128, 255])('rejects control/non-ASCII byte %s even in comments', (byte) => {
-    for (const input of [
-      `PTXDIST_PLATFORM_NAME=cc100\nVERSION_ID=31${String.fromCharCode(byte)}\n`,
-      `PTXDIST_PLATFORM_NAME=cc100\nVERSION_ID=31\n# ${String.fromCharCode(byte)}\n`,
-    ]) {
-      expect(isCc100Fw31Identity(input)).toBe(false);
-      expect(shellIdentity(input).status).toBe(1);
-    }
-  });
-
-  it.each([16384, 16385, 17000])('enforces the identical total byte bound at %s', (bytes) => {
-    const prefix = 'PTXDIST_PLATFORM_NAME=cc100\nVERSION_ID=31\n#';
-    const input = prefix + 'x'.repeat(bytes - Buffer.byteLength(prefix));
-    expect(isCc100Fw31Identity(input)).toBe(bytes <= 16384);
-    expect(shellIdentity(input).status).toBe(bytes <= 16384 ? 0 : 1);
-  });
-
-  it('does not accept a partial od read even after valid identity bytes', () => {
-    const script = wagoFw31IdentityCheck().replace(
-      'LC_ALL=C od -An -v -tu1 "/etc/os-release"',
-      `printf '80 84 88 68 73 83 84 95 80 76 65 84 70 79 82 77 95 78 65 77 69 61 99 99 49 48 48 10 86 69 82 83 73 79 78 95 73 68 61 51 49 10\\n'; false`,
+describe('source-backed CC100 FW31 identity, not live qualification', () => {
+  it('matches the owner capture model hash including the terminal NUL', () => {
+    expect(createHash('sha256').update(fw31Model).digest('hex')).toBe(
+      '728889ca9b67dac65330484dfa962d63dbdb709897d69f17bc6e0243497d80fa',
     );
-    expect(spawnSync('/bin/sh', ['-c', script]).status).toBe(1);
+  });
+  it('accepts the real capture in host and POSIX shell', () => agree(fw31IdentityOutput(), true));
+  it.each(['31', '4.9.1(31)', '04.09.01(30)', '04.09.01(32)', '$(printf 04.09.01(31))', ''])(
+    'rejects unproven or wrong firmware %s',
+    (version) => agree(fw31IdentityOutput(fw31OsRelease, `FIRMWARE=${version}\n`), false),
+  );
+  it.each([
+    '',
+    'FIRMWARE',
+    fw31Revisions + fw31Revisions,
+    fw31Revisions + 'FIRMWARE=04.09.01(30)\n',
+    'FIRMWARE="04.09.01(31)\n',
+    'FIRMWARE=04.09.01(31) # guessed\n',
+    fw31Revisions + 'VERSION=31\n',
+    fw31Revisions + 'malformed\n',
+  ])('rejects absent, malformed, duplicate or misplaced revision metadata %s', (revisions) =>
+    agree(fw31IdentityOutput(fw31OsRelease, revisions), false),
+  );
+  it.each([
+    '',
+    'CC100',
+    '751-9301',
+    'CC100-751-9302\0',
+    'CC100-751-9301\n',
+    'CC100-751-9301',
+    fw31Model + '\0',
+    fw31Model + 'other',
+  ])('requires exact model %s', (model) => agree(fw31IdentityOutput(fw31OsRelease, fw31Revisions, model), false));
+  it.each([
+    '',
+    fw31OsRelease + 'VERSION=2024.12.0\n',
+    fw31OsRelease + 'FIRMWARE=04.09.01(31)\n',
+    fw31OsRelease.replace('cc100', 'other'),
+    fw31OsRelease.replace('VERSION="2024.12.0"', 'VERSION="31"'),
+    fw31OsRelease + 'BROKEN\n',
+    fw31OsRelease + 'NAME=duplicate\n',
+  ])('rejects absent or conflicting os-release metadata %s', (osRelease) =>
+    agree(fw31IdentityOutput(osRelease), false),
+  );
+  it('supports quoted assignment syntax, not release aliases', () =>
+    agree(fw31IdentityOutput(fw31OsRelease, 'FIRMWARE="04.09.01(31)"'), true));
+  it.each([0, 1, 9, 11, 13, 31, 127, 128, 255])('rejects control/non-ASCII byte %s', (byte) => {
+    agree(fw31IdentityOutput(fw31OsRelease + '# ' + String.fromCharCode(byte)), false);
+    agree(fw31IdentityOutput(fw31OsRelease, fw31Revisions + '# ' + String.fromCharCode(byte)), false);
+  });
+  it.each([8192, 8193, 17000])('bounds total source bytes at %s', (bytes) => {
+    const prefix = fw31OsRelease + '#';
+    const osRelease = prefix + 'x'.repeat(bytes - Buffer.byteLength(prefix + fw31Revisions + fw31Model));
+    agree(fw31IdentityOutput(osRelease), bytes <= 8192);
+  });
+  it.each([
+    (s: string) => s.replace('complete\n', ''),
+    (s: string) => s + 'complete\n',
+    (s: string) => s.replace('source1', 'source0'),
+    (s: string) => s.replace('source1', 'source3'),
+    (s: string) => s.replace('source0\n', 'source0\n' + ' '.repeat(50001) + '\n'),
+  ])('rejects incomplete or corrupt framing', (change) => agree(change(fw31IdentityOutput()), false));
+  it('executes bounded reads against isolated files and fails on a missing source', () => {
+    const root = mkdtempSync(join(process.cwd(), '.wago-identity-'));
+    try {
+      mkdirSync(join(root, 'etc'));
+      mkdirSync(join(root, 'bin'));
+      writeFileSync(join(root, 'bin/od'), fw31MinimalOd, { mode: 0o700 });
+      mkdirSync(join(root, 'sys/firmware/devicetree/base'), { recursive: true });
+      writeFileSync(join(root, 'etc/os-release'), fw31OsRelease);
+      writeFileSync(join(root, 'etc/REVISIONS'), fw31Revisions);
+      writeFileSync(join(root, 'sys/firmware/devicetree/base/model'), fw31Model);
+      const run = (script: string) =>
+        spawnSync('/bin/sh', ['-c', script], {
+          env: { ...process.env, root, PATH: `${root}/bin:/usr/bin:/bin` },
+          encoding: 'utf8',
+          timeout: 5000,
+        });
+      const read = run(wagoFw31IdentityRead(true));
+      expect(read.status).toBe(0);
+      agree(read.stdout, true);
+      expect(run(wagoFw31IdentityCheck(true)).status).toBe(0);
+      for (const fault of [
+        'truncated',
+        'bad-offset',
+        'bad-byte',
+        'bad-octal',
+        'short-row',
+        'extra-terminal',
+        'wrong-terminal',
+        'repeat-marker',
+        'failed',
+      ]) {
+        const failed = run(`export OD_FAULT=${fault}; ${wagoFw31IdentityRead(true)}`);
+        expect(failed.status).not.toBe(0);
+        agree(failed.stdout, false);
+        expect(run(`export OD_FAULT=${fault}; ${wagoFw31IdentityCheck(true)}`).status).toBe(1);
+      }
+      writeFileSync(join(root, 'bin/dd'), '#!/bin/sh\n/bin/dd "$@"\nexit 1\n', { mode: 0o700 });
+      const failedProducer = run(wagoFw31IdentityRead(true));
+      expect(failedProducer.status).not.toBe(0);
+      agree(failedProducer.stdout, false);
+      expect(run(wagoFw31IdentityCheck(true)).status).toBe(1);
+      rmSync(join(root, 'bin/dd'));
+      const padding = 8192 - Buffer.byteLength(fw31OsRelease + '#' + fw31Revisions + fw31Model);
+      writeFileSync(join(root, 'etc/os-release'), fw31OsRelease + '#' + 'x'.repeat(padding));
+      const boundary = run(wagoFw31IdentityRead(true));
+      expect(Buffer.byteLength(boundary.stdout)).toBeLessThan(50000);
+      agree(boundary.stdout, true);
+      expect(run(wagoFw31IdentityCheck(true)).status).toBe(0);
+      writeFileSync(join(root, 'etc/os-release'), fw31OsRelease + '#' + 'x'.repeat(20000));
+      expect(run(wagoFw31IdentityCheck(true)).status).toBe(1);
+      rmSync(join(root, 'etc/REVISIONS'));
+      expect(isCc100Fw31Identity(run(wagoFw31IdentityRead(true)).stdout)).toBe(false);
+      expect(run(wagoFw31IdentityCheck(true)).status).toBe(1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

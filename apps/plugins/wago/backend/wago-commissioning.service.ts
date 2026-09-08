@@ -1,4 +1,7 @@
-import { isCc100Fw31Identity } from './wago-firmware-identity';
+import { isCc100Fw31Identity, wagoFw31IdentityRead } from './wago-firmware-identity';
+import { parseWagoCodesysClassification, wagoCodesysClassificationShell } from './wago-codesys-classification';
+import { commissionClock } from './wago-commissioning-clock';
+import type { WagoCommissioningPreflightReport } from '../shared/commissioning';
 import { MANAGEMENT_INSPECTION_COMMAND } from './wago-management-inspection';
 import { ManagementPeerVersion } from './wago-management-peer-version';
 import {
@@ -44,6 +47,7 @@ import {
 import {
   runtimeBundleDeliveryScript,
   runtimeBundlePreflightScript,
+  runtimeBundleStagingCapacityPreflightScript,
   runtimeBundleRecoveryAcknowledgementScript,
   runtimeBundleRecoveryScript,
   runtimeBundleStreamReceiver,
@@ -312,7 +316,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
               throw new ConflictException('Finish identity confirmation and any active delivery first.');
             try {
               if (action === 'inspect') {
-                const report = parseWagoHardwareDeploymentReport(
+                session.platformReport = null;
+                const report: WagoCommissioningPreflightReport = parseWagoHardwareDeploymentReport(
                   await this.sudoRunScript(
                     session.targetHost,
                     session.hostKeyFingerprint,
@@ -320,9 +325,20 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
                     wagoHardwareDeploymentReportScript(),
                   ),
                 );
+                report.clock = await commissionClock(
+                  (script, limits) =>
+                    this.sudoRunScript(session.targetHost, session.hostKeyFingerprint, credential, script, limits),
+                  false,
+                  async () => undefined,
+                );
                 session.platformReport = JSON.stringify(report);
               } else if (action === 'activate') {
-                await this.prepareController(session, credential);
+                const bundle = await this.acquireRuntimeBundle(session);
+                try {
+                  await this.prepareController(session, credential, bundle.bytes);
+                } finally {
+                  await rm(bundle.directory, { recursive: true, force: true });
+                }
               } else {
                 if (!session.dockerProvisionToken)
                   throw new ConflictException('No Docker provisioning attempt to recover.');
@@ -332,12 +348,13 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
               return this.toResponse(await this.save(session, `platform_${action}_succeeded`));
             } catch (error) {
               if (error instanceof ConflictException) throw error;
-              if (action !== 'inspect') session.dockerProvisionState = 'recovery_required';
+              if (action !== 'inspect' && session.dockerProvisionToken)
+                session.dockerProvisionState = 'recovery_required';
               session.failureReason =
                 action === 'inspect'
                   ? 'Controller preflight could not be read. Check the explicit SSH credential and supported firmware tools.'
                   : action === 'activate'
-                    ? 'Controller preparation failed. CODESYS must be stopped and permanently disabled before IO or runtime startup. Clean up the retained preparation attempt before retrying.'
+                    ? 'Controller preparation failed. Check the signed runtime release, staging storage and required tools. CODESYS must be stopped and permanently disabled before IO or runtime startup. Clean up any retained preparation attempt before retrying.'
                     : 'Controller preparation cleanup remains unverified. Clean up any runtime transaction first, then retry preparation cleanup. The recovery token is retained; previous workloads are not restored.';
               return this.toResponse(await this.save(session, `platform_${action}_failed`));
             }
@@ -379,11 +396,18 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
   private async prepareController(
     session: WagoCommissioningSession,
     credential: TemporarySshCredential,
+    verifiedBundleBytes: number,
   ): Promise<void> {
     if (session.deliveryToken)
       throw new ConflictException('Clean up the retained runtime installation before preparing the controller.');
     if (session.dockerProvisionToken && session.dockerProvisionState !== 'started')
       throw new ConflictException('Clean up the retained controller preparation before retrying.');
+    await this.sudoRunScript(
+      session.targetHost,
+      session.hostKeyFingerprint,
+      credential,
+      runtimeBundleStagingCapacityPreflightScript(verifiedBundleBytes),
+    );
     session.dockerProvisionToken ??= randomBytes(16).toString('hex');
     session.dockerProvisionState = 'starting';
     await this.save(session, 'controller_preparation_started');
@@ -703,14 +727,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
           'Automatic MQTT credential provisioning is unavailable. Check management HTTPS access, the issuing CA, certificate DNS name and validity, and the broker/server clocks in MQTT settings.';
         throw new Error(safeFailure);
       }
-      bundle =
-        this.artifacts && (session.runtimeArtifactDigest || (await this.artifacts.has()))
-          ? await this.artifacts.acquire(session.runtimeArtifactDigest ?? undefined)
-          : await verifyRuntimeBundle();
-      if (bundle.image && !session.runtimeArtifactDigest) {
-        session.runtimeArtifactDigest = bundle.digest;
-        await this.save(session, 'runtime_release_selected');
-      }
+      bundle = await this.acquireRuntimeBundle(session);
       session.state = 'delivering';
       session.failureReason = null;
       await this.updateProgress(
@@ -732,8 +749,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         'Permanently disabling CODESYS, activating vendor Docker and preparing exclusive onboard IO.',
       );
       safeFailure =
-        'Controller preparation failed. CODESYS must be stopped and permanently disabled before IO or runtime startup. Clean up the retained preparation attempt before retrying.';
-      await this.prepareController(session, credential);
+        'Controller preparation failed. Check staging storage and required tools. CODESYS must be stopped and permanently disabled before IO or runtime startup. Clean up any retained preparation attempt before retrying.';
+      await this.prepareController(session, credential, bundle.bytes);
       safeFailure =
         'Runtime prerequisites failed. Check vendor Docker, exclusive onboard IO, available storage and required firmware tools.';
       await this.sudoRunScript(
@@ -748,11 +765,42 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
         credential,
         'set -eu; if test -f /etc/attraccess-wago/install.lock; then (exec 8</etc/attraccess-wago/install.lock; flock -n 8); fi; for path in /etc/attraccess-wago/delivery /var/lib/attraccess-wago-install-transaction /var/lib/attraccess-wago-install-transaction.restored /var/lib/attraccess-wago-install-transaction.cleanup /var/lib/attraccess-wago-install-transaction.accepted-cleanup; do test ! -e "$path"; done',
       );
+      safeFailure =
+        'Controller UTC inspection or synchronization failed. Enrollment is blocked; retry with fresh install consent and SSH credentials. Check the application UTC clock and supported FW31 clock tool. Clock changes are not rolled back by cleanup.';
+      const previousReport: WagoCommissioningPreflightReport = JSON.parse(session.platformReport ?? '{}');
+      delete previousReport.clock;
+      session.platformReport = JSON.stringify(previousReport);
+      await this.updateProgress(
+        session,
+        45,
+        'Checking controller UTC',
+        'Comparing controller UTC with authoritative application UTC before enrollment.',
+      );
+      const clock = await commissionClock(
+        (script, limits) =>
+          this.sudoRunScript(session.targetHost, session.hostKeyFingerprint, credential, script, limits),
+        input.confirmInstall === true,
+        async (clock) => {
+          session.platformReport = JSON.stringify({ ...JSON.parse(session.platformReport ?? '{}'), clock });
+          await this.updateProgress(
+            session,
+            45,
+            'Controller UTC',
+            `${clock.result}; controller ${clock.controllerUtc}; application ${clock.hostUtc}; skew ${clock.skewSeconds}s; action ${clock.action}.`,
+          );
+        },
+      );
+      if (!['within-tolerance', 'synchronized'].includes(clock.result)) throw new Error(safeFailure);
       credentialsTouched = true;
       safeFailure =
         'Secure enrollment or runtime delivery failed. Clean up the retained installation before retrying; previous workloads will not be restored.';
       await this.revokeSessionEnrollment(session);
       await this.operationContext.getStore()?.assertOwned();
+      safeFailure =
+        'Application UTC changed or controller clock verification expired before enrollment. No new enrollment credential was issued; retry with fresh install consent.';
+      clock.assertFresh();
+      safeFailure =
+        'Secure enrollment or runtime delivery failed. Clean up the retained installation before retrying; previous workloads will not be restored.';
       const enrollment = await this.wago.createEnrollment(
         session.hardwareId,
         session.mqttServerId,
@@ -815,7 +863,8 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       session.progressDetail =
         'Runtime delivered. Waiting for the controller to connect and complete its automatic claim.';
       return this.toResponse(await this.save(session, 'bootstrap_delivered'));
-    } catch {
+    } catch (error) {
+      if (error instanceof WagoRuntimeUploadError) safeFailure = error.message;
       if (credentialsTouched && session.enrollmentId !== null) {
         try {
           await this.revokeSessionEnrollment(session);
@@ -837,6 +886,27 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
       return this.toResponse(await this.save(session, 'delivery_failed'));
     } finally {
       if (bundle) await rm(bundle.directory, { recursive: true, force: true });
+    }
+  }
+
+  private async acquireRuntimeBundle(
+    session: WagoCommissioningSession,
+  ): Promise<Awaited<ReturnType<typeof verifyRuntimeBundle>> & { image?: string }> {
+    const bundle =
+      this.artifacts && (session.runtimeArtifactDigest || (await this.artifacts.has()))
+        ? await this.artifacts.acquire(session.runtimeArtifactDigest ?? undefined)
+        : await verifyRuntimeBundle();
+    try {
+      if (session.runtimeArtifactDigest && session.runtimeArtifactDigest !== bundle.digest)
+        throw new ConflictException('Verified runtime release does not match the session-pinned artifact.');
+      if ('image' in bundle && bundle.image && !session.runtimeArtifactDigest) {
+        session.runtimeArtifactDigest = bundle.digest;
+        await this.save(session, 'runtime_release_selected');
+      }
+      return bundle;
+    } catch (error) {
+      await rm(bundle.directory, { recursive: true, force: true });
+      throw error;
     }
   }
 
@@ -1183,11 +1253,11 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     fingerprint: string,
     credential: TemporarySshCredential,
   ): Promise<{ firmware: string; codesys: string }> {
-    const output = await this.run(
+    const output = await this.sudoRunScript(
       host,
       fingerprint,
       credential,
-      "cat /etc/os-release; printf '\\nCODESYS='; ps -eo comm=",
+      `${wagoFw31IdentityRead()}; root=''; ${wagoCodesysClassificationShell()}\nprintf '\\nCODESYS='; wago_codesys_classify`,
     );
     const marker = '\nCODESYS=';
     const markerIndex = output.indexOf(marker);
@@ -1195,7 +1265,7 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     const processes = markerIndex >= 0 ? output.slice(markerIndex + marker.length) : '';
     return {
       firmware,
-      codesys: markerIndex < 0 ? 'unknown' : /codesys|plclinux_rt/i.test(processes) ? 'active' : 'inactive',
+      codesys: markerIndex < 0 ? 'unknown' : parseWagoCodesysClassification(processes),
     };
   }
 
@@ -1205,14 +1275,16 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     credential: TemporarySshCredential,
     command: string,
     input?: string,
+    limits?: { timeoutMs: number; maxOutputBytes: number },
   ): Promise<string> {
-    if (credential.username === 'root') return this.run(host, fingerprint, credential, command, input);
+    if (credential.username === 'root') return this.run(host, fingerprint, credential, command, input, limits);
     return this.run(
       host,
       fingerprint,
       credential,
       `sudo -S sh -c ${shellQuote(command)}`,
       `${credential.password}\n${input ?? ''}`,
+      limits,
     );
   }
 
@@ -1221,8 +1293,16 @@ export class WagoCommissioningService implements OnApplicationBootstrap {
     fingerprint: string,
     credential: TemporarySshCredential,
     script: string,
+    limits?: { timeoutMs: number; maxOutputBytes: number },
   ): Promise<string> {
-    return this.sudoRun(host, fingerprint, credential, 'base64 -d | sh', Buffer.from(script).toString('base64'));
+    return this.sudoRun(
+      host,
+      fingerprint,
+      credential,
+      'base64 -d | sh',
+      Buffer.from(script).toString('base64'),
+      limits,
+    );
   }
 
   private async remoteOperation<T>(operation: () => Promise<T>): Promise<T> {
@@ -1679,6 +1759,30 @@ function runProcess(
   });
 }
 
+/** Only fixed shell diagnostics cross the credential-bearing SSH boundary. */
+export class WagoRuntimeUploadError extends Error {
+  constructor(
+    code: number | null,
+    elapsedMs: number,
+    stderr: string,
+    termination: 'remote-exit' | 'local-timeout' | 'operation-aborted' = 'remote-exit',
+  ) {
+    const known = [
+      'Runtime supervisor launch unverified: prerequisites',
+      'Runtime supervisor launch unverified: readiness',
+      'Runtime supervisor launch unverified: owner-verification',
+      'Runtime supervisor handoff lock unverified; recovery required',
+      'Runtime supervisor launch unverified',
+      'Cleanup incomplete; recovery journal retained',
+    ];
+    const lines = stderr.slice(-4096).split('\n');
+    const reason = known.find((line) => lines.includes(line)) ?? 'No recognized remote diagnostic';
+    super(
+      `Runtime delivery failed: ${termination}, SSH exit ${code ?? 'unknown'}, ${Math.round(elapsedMs / 1000)}s elapsed. ${reason}. Use reviewed recovery before retrying.`,
+    );
+  }
+}
+
 async function uploadFile(
   source: string,
   args: string[],
@@ -1694,24 +1798,40 @@ async function uploadFile(
     let transferred = 0;
     let lastPercent = -1;
     let settled = false;
-    const timer = setTimeout(() => child.kill(), SSH_TIMEOUT_MS);
+    const started = Date.now();
+    let stderr = '';
+    let termination: 'remote-exit' | 'local-timeout' | 'operation-aborted' = 'remote-exit';
+    const timer = setTimeout(() => {
+      termination = 'local-timeout';
+      child.kill();
+    }, SSH_TIMEOUT_MS);
     const finish = (error?: Error) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       signal?.removeEventListener('abort', abort);
       stream.destroy();
-      if (error) reject(new Error('Commissioning upload failed.'));
+      if (error)
+        reject(
+          error instanceof WagoRuntimeUploadError
+            ? error
+            : new WagoRuntimeUploadError(null, Date.now() - started, stderr, termination),
+        );
       else resolve();
     };
     const abort = () => {
+      termination = 'operation-aborted';
       child.kill();
       finish(new Error('Commissioning upload interrupted.'));
     };
     child.stdin.on('error', () => undefined);
-    child.stderr.on('data', () => undefined);
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr = (stderr + chunk.toString()).slice(-4096);
+    });
     child.on('error', finish);
-    child.on('close', (code) => finish(code === 0 ? undefined : new Error('Commissioning upload failed.')));
+    child.on('close', (code) =>
+      finish(code === 0 ? undefined : new WagoRuntimeUploadError(code, Date.now() - started, stderr, termination)),
+    );
     stream.on('error', (error) => {
       child.kill();
       finish(error);

@@ -1,7 +1,10 @@
 /** FW31 vendor lifecycle and narrow digital I/O deployment. Physical qualification is separate. */
 import { wagoFw31IdentityCheck } from './wago-firmware-identity';
+import { wagoCodesysClassificationShell } from './wago-codesys-classification';
 import { wagoShellFilesystemGuard } from './wago-shell-filesystem';
+import { wagoShellStat } from './wago-shell-stat';
 import { wagoHostIoGuardShell } from './wago-host-io-guard';
+import { wagoPrivilegeProbeShell } from './wago-privilege-probe';
 import { wagoRuntimeSupervisorAcknowledgeShell, wagoRuntimeSupervisorLaunchShell } from './wago-runtime-supervisor';
 
 export const WAGO_HARDWARE_PROFILE = 'cc100-751-9301-fw31-digital-v1';
@@ -69,8 +72,9 @@ function rootValue(testRoot: string): string {
   return quote(testRoot.replace(/\/$/, ''));
 }
 
-function checks(testRoot: string, boundedDocker = true): string {
+function checks(testRoot: string, boundedDocker = true, inspectHostWriters = true): string {
   return `set -eu
+${wagoShellStat()}
 root=${rootValue(testRoot)}
 # Never inherit a remote Docker context or TCP endpoint from the login shell.
 unset DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH
@@ -88,16 +92,14 @@ dout="$root${WAGO_DOUT}"
 hardware=accessible
 if ! test -f "$din" || ! test -f "$dout" || test -L "$din" || test -L "$dout"; then
   hardware=missing-register
-elif ! command -v setpriv >/dev/null 2>&1; then
-  hardware=permission-tool-unavailable
-elif ! setpriv --reuid=10001 --regid=10001 --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs sh -c 'test "$(id -u)" = 10001 && test "$(id -g)" = 10001' >/dev/null 2>&1; then
-  hardware=permission-tool-unavailable
-elif ! setpriv --reuid=10001 --regid=10001 --clear-groups --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs sh -c 'test -r "$1" && test -r "$2" && test -w "$2"' sh "$din" "$dout"; then
-  hardware=uid10001-access-denied
+else
+  ${wagoPrivilegeProbeShell()}
 fi
 exclusivity=unknown
 processes=$(ps -eo comm=) || exit 1
-if printf '%s\\n' "$processes" | grep -Eiq 'codesys|plclinux_rt|rtswrapper'; then exclusivity=codesys-active; fi
+${wagoCodesysClassificationShell()}
+codesys_state=$(wago_codesys_classify) || exit 1
+if [ "$codesys_state" = active ]; then exclusivity=codesys-active; fi
 # WAGO config_runtime/init runtime use S98_runtime. A stopped PLC can return
 # at reboot; process absence is not permission to replace its output ownership.
 if [ "$exclusivity" = unknown ] && { test -e "$root/etc/rc.d/S98_runtime" || test -L "$root/etc/rc.d/S98_runtime" || test "$(cat "$root/etc/specific/rtsversion" 2>/dev/null || :)" != 0; }; then
@@ -113,7 +115,7 @@ if [ -n "$docker_cli" ] && [ -n "$daemon_cli" ]; then
   if docker info >/dev/null 2>&1; then
     docker_state=running
     provision=none
-    if [ "$exclusivity" = unknown ] && [ "$hardware" != missing-register ]; then
+    if [ "$exclusivity" = unknown ] && [ "$codesys_state" = inactive ] && [ "$hardware" != missing-register ]; then
       exclusivity=clear
       output_canonical=$(readlink -f "$dout") || exit 1
       containers=$(docker container ls -a --no-trunc --format '{{.ID}}') || exit 1
@@ -137,10 +139,14 @@ EOF_MOUNTS
         [ "$conflict" = 0 ] || exclusivity=output-container-conflict
       done
     fi
-    if [ "$exclusivity" = clear ]; then
+    ${
+      inspectHostWriters
+        ? `if [ "$exclusivity" = clear ]; then
       ${wagoHostIoGuardShell()}
       if ! wago_host_io_guard allow-owned; then exclusivity=unknown; fi
-    fi
+    fi`
+        : ''
+    }
   elif [ "$platform" = supported ] && [ -x "$root/etc/init.d/dockerd" ]; then
     if ! printf '%s\\n' "$processes" | grep -iq dockerd &&
       test ! -e "$root/var/run/docker.pid" && test ! -L "$root/var/run/docker.pid"; then
@@ -218,8 +224,9 @@ done
 /** Narrow ownership is reapplied to volatile sysfs files on every controller boot. */
 function codesysStopped(): string {
   return `
-processes=$(ps -eo comm=) || fail 'Cannot verify CODESYS stopped'
-if printf '%s\\n' "$processes" | grep -Eiq 'codesys|plclinux_rt|rtswrapper'; then fail 'codesys-active'; fi
+${wagoCodesysClassificationShell()}
+codesys_state=$(wago_codesys_classify) || fail 'Cannot verify CODESYS stopped'
+case "$codesys_state" in inactive) ;; active) fail 'codesys-active' ;; *) fail 'Cannot verify CODESYS stopped' ;; esac
 `;
 }
 
@@ -255,6 +262,9 @@ test "$(stat -c '%u:%g:%a' "$root${WAGO_DIN}")" = 10001:10001:400 &&
 /** Docker cannot restart this writer. Every boot, explicit start and bounded
  * crash retry passes the host gate. The supervisor also withdraws a running
  * writer when its periodic observation detects a conflict or cannot complete.
+ * The 300s gate budget accommodates the observed FW31 172543ms hardware check
+ * (161064ms host IO, 8995ms CODESYS), within the 30-minute operation limit.
+ * This timing allowance is not safety certification or physical qualification.
  */
 export function wagoRuntimeBootScript(testRoot = ''): string {
   return `#!/bin/sh
@@ -309,7 +319,7 @@ case "$action" in
       set -- "$config"/supervisor-start.*
       cycle=cycle
       test "$retries" -lt 5 || cycle=watch
-      if observation=$(timeout -k 5 45 "$hook" "$cycle" 8>&-); then
+      if observation=$(timeout -k 5 300 "$hook" "$cycle" 8>&-); then
         busy=0
         case "$observation" in
           started) retries=$((retries + 1)) ;;
@@ -336,7 +346,7 @@ case "$action" in
     supervisor_owner=1
     # Bound the complete gate, including host /proc and filesystem observations.
     # The outer owner contains a timeout even if the child cannot run its trap.
-    if timeout -k 5 45 "$hook" "$action-checked"; then
+    if timeout -k 5 300 "$hook" "$action-checked"; then
       exit 0
     else
       status=$?
@@ -377,7 +387,10 @@ until docker info >/dev/null 2>&1; do
   attempt=$((attempt + 1)); test "$attempt" -lt 15 || fail 'docker-start-timeout'
   sleep 2
 done
-${checks(testRoot, true)}
+# hardwareOwnership below checks host writers immediately before granting IO;
+# the complete post-grant preflight checks them again before starting a writer.
+# Do not add a third identical scan before those two required boundaries.
+${checks(testRoot, true, false)}
 [ "$exclusivity" = clear ] || fail "$exclusivity"
 ${hardwareOwnership()}
 ${wagoHardwareDeploymentPreflightScript(testRoot, true)}
@@ -427,7 +440,7 @@ ${checks(testRoot)}
 [ "$platform" = supported ] || fail "$platform"
 case "$provision" in prepare-controller|install-vendor-runtime) ;; *) fail "$provision" ;; esac
 command -v timeout >/dev/null || fail 'bounded-vendor-command-unavailable'
-command -v setpriv >/dev/null || fail 'permission-tool-unavailable'
+case "$hardware" in accessible|uid10001-access-denied) ;; *) fail "$hardware" ;; esac
 test -f "$root/etc/specific/rtsversion" && test ! -L "$root/etc/specific/rtsversion" || fail 'Invalid runtime selection'
 if test -e "$journal" || test -L "$journal"; then
   test -d "$journal" && test ! -L "$journal" || fail 'Invalid Docker provisioning journal'

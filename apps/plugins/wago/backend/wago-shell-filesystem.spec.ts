@@ -3,7 +3,8 @@ import { join } from 'node:path';
 import { fw31ShellFixture } from './fixtures/fw31-shell-fixture';
 import { wagoShellFilesystemGuard } from './wago-shell-filesystem';
 
-describe('root-owned commissioning filesystem and lock boundary', () => {
+const describeStat = describe.each(['native', 'terse'] as const);
+describeStat('root-owned commissioning filesystem and lock boundary (%s)', (statStyle) => {
   let fixture: ReturnType<typeof fw31ShellFixture>;
   const config = 'etc/attraccess-wago';
   const lock = config + '/install.lock';
@@ -18,7 +19,7 @@ echo guarded`;
   const owner = (path: string, value: string) =>
     fixture.file('owners.json', JSON.stringify({ ...JSON.parse(fixture.read('owners.json')), ['/' + path]: value }));
 
-  beforeEach(() => (fixture = fw31ShellFixture()));
+  beforeEach(() => (fixture = fw31ShellFixture(statStyle)));
   afterEach(() => fixture.dispose());
 
   it('creates a private regular lock without modifying an existing valid lock', () => {

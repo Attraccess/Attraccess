@@ -7,6 +7,7 @@ import { assertManagementKey, generateManagementKey } from './wago-management-ke
 import { MANAGEMENT_INSPECTION_COMMAND, parseManagementInspection } from './wago-management-inspection';
 import { managementKeyCommand, ManagementShellAction } from './wago-management-shell';
 import { WagoManagementProvider } from './wago-management-provider';
+import { fw31Model, fw31OsRelease, fw31Revisions } from './fixtures/fw31-identity';
 
 const exec = promisify(execFile);
 const token = '1234567890abcdef1234567890abcdef';
@@ -43,7 +44,9 @@ beforeEach(async () => {
 import os,sys,stat,fcntl,time,subprocess,signal
 name=os.path.basename(sys.argv[0])
 if name=='stat':
- s=os.stat(sys.argv[-1]); fmt=sys.argv[2]; print(fmt.replace('%u',str(s.st_uid)).replace('%a',format(stat.S_IMODE(s.st_mode),'o')).replace('%h',str(s.st_nlink)))
+ # Map the initialization probe to the isolated fixture root, never the host root.
+ p=os.path.dirname(os.environ['HOME']) if sys.argv[-1]=='/' else sys.argv[-1]
+ s=(os.stat if sys.argv[1]=='-Lc' else os.lstat)(p); fmt=sys.argv[2]; print(fmt.replace('%u',str(s.st_uid)).replace('%g',str(s.st_gid)).replace('%a',format(stat.S_IMODE(s.st_mode),'o')).replace('%h',str(s.st_nlink)))
 elif name=='flock':
  end=time.monotonic()+float(sys.argv[2])
  while True:
@@ -293,7 +296,10 @@ describe('executable isolated management shell fixtures', () => {
     await mkdir(join(proc, '2'));
     await mkdir(join(proc, 'net'));
     await mkdir(join(etc, 'init.d'), { recursive: true });
-    await writeFile(join(etc, 'os-release'), 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="4.9.1(31)"\n');
+    await writeFile(join(etc, 'os-release'), fw31OsRelease);
+    await writeFile(join(etc, 'REVISIONS'), fw31Revisions);
+    await mkdir(join(root, 'sys/firmware/devicetree/base'), { recursive: true });
+    await writeFile(join(root, 'sys/firmware/devicetree/base/model'), fw31Model);
     await writeFile(join(proc, '1', 'comm'), 'init\n');
     await writeFile(join(proc, '2', 'comm'), 'dropbear\n');
     for (const family of ['tcp', 'tcp6', 'udp', 'udp6'])
@@ -301,7 +307,9 @@ describe('executable isolated management shell fixtures', () => {
         join(proc, 'net', family),
         `header\n${family === 'tcp' ? '0: 00000000:01BB 00000000:0000 0A\n' : ''}`,
       );
-    const command = MANAGEMENT_INSPECTION_COMMAND.replaceAll('/proc/', `${proc}/`).replaceAll('/etc/', `${etc}/`);
+    const command = MANAGEMENT_INSPECTION_COMMAND.replaceAll('/proc/', `${proc}/`)
+      .replaceAll('/etc/', `${etc}/`)
+      .replaceAll('/sys/', `${join(root, 'sys')}/`);
     const output = await exec('/bin/sh', ['-c', command], { env: env(), timeout: 5000 });
     const inspection = parseManagementInspection(output.stdout);
     expect(inspection).toMatchObject({
@@ -349,14 +357,19 @@ describe('executable isolated management shell fixtures', () => {
     const proc = join(root, 'proc'),
       etc = join(root, 'etc');
     await mkdir(etc);
-    await writeFile(join(etc, 'os-release'), 'PTXDIST_PLATFORM_NAME=cc100\nVERSION_ID=31\n');
+    await writeFile(join(etc, 'os-release'), fw31OsRelease);
+    await writeFile(join(etc, 'REVISIONS'), fw31Revisions);
+    await mkdir(join(root, 'sys/firmware/devicetree/base'), { recursive: true });
+    await writeFile(join(root, 'sys/firmware/devicetree/base/model'), fw31Model);
     for (const pid of ['2', '3']) {
       await mkdir(join(proc, pid), { recursive: true });
       await writeFile(join(proc, pid, 'comm'), 'dropbear\n');
       // Permission-realistic model: no readable executable for a root daemon.
       await symlink('/unreadable-root-daemon-executable', join(proc, pid, 'exe'));
     }
-    const script = MANAGEMENT_INSPECTION_COMMAND.replaceAll('/proc/', `${proc}/`).replaceAll('/etc/', `${etc}/`);
+    const script = MANAGEMENT_INSPECTION_COMMAND.replaceAll('/proc/', `${proc}/`)
+      .replaceAll('/etc/', `${etc}/`)
+      .replaceAll('/sys/', `${join(root, 'sys')}/`);
     expect(script).not.toMatch(/\/exe| -V/);
     const result = await exec('/bin/sh', ['-c', script], { env: env(), timeout: 5000 });
     expect(parseManagementInspection(result.stdout)).toMatchObject({ ssh: 'dropbear', dropbearVersion: 'unknown' });

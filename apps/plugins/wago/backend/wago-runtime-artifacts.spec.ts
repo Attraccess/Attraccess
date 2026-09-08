@@ -9,7 +9,7 @@ import { once } from 'node:events';
 import { ClientRequest, IncomingMessage, request as httpRequest, Server } from 'node:http';
 import { promisify } from 'node:util';
 import { WagoRuntimeArtifactCatalog, WagoRuntimeArtifactsService } from './wago-runtime-artifacts';
-import { WAGO_RUNTIME_RELEASE_KEY } from './wago-runtime-artifacts-verification';
+import { loadRuntimeArtifactSigningKey, WAGO_RUNTIME_RELEASE_KEY } from './wago-runtime-artifacts-verification';
 import { CallHandler, ExecutionContext, INestApplication } from '@nestjs/common';
 import * as fileFields from '@nestjs/platform-express/multer/interceptors/file-fields.interceptor';
 import { Reflector } from '@nestjs/core';
@@ -127,12 +127,121 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
   let root: string;
   let catalog: WagoRuntimeArtifactCatalog;
   beforeEach(async () => {
+    jest.replaceProperty(process, 'env', { ...process.env });
+    delete process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH;
     root = await mkdtemp(join(tmpdir(), 'wago-artifact-test-'));
     catalog = new WagoRuntimeArtifactCatalog(root, publicKey.toString('base64'));
   });
   afterEach(async () => {
     await catalog.onModuleDestroy();
     await rm(root, { recursive: true, force: true });
+    jest.restoreAllMocks();
+  });
+  describe('visual importer development signing', () => {
+    let service: WagoRuntimeArtifactsService | undefined;
+    let keyPath: string;
+    beforeEach(async () => {
+      service = undefined;
+      keyPath = join(root, 'development.pub');
+      await writeFile(keyPath, `ssh-ed25519 ${publicKey.toString('base64')} fixture\n`);
+      process.env.STORAGE_ROOT = root;
+      process.env.NODE_ENV = 'development';
+      process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH = ` ${keyPath} `;
+    });
+    afterEach(async () => {
+      await service?.onModuleDestroy();
+    });
+    it('imports an explicitly trusted development signature and pins it through validation and delivery', async () => {
+      service = new WagoRuntimeArtifactsService();
+      // Selection must capture bytes at construction, not read a mutable file during verification.
+      await writeFile(keyPath, `ssh-ed25519 ${WAGO_RUNTIME_RELEASE_KEY}\n`);
+      delete process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH;
+      const imported = await service.import(upload());
+      expect(await service.get(imported.digest)).toEqual(imported);
+      expect(await service.has()).toBe(true);
+      const snapshot = await service.acquire(imported.digest);
+      try {
+        expect(await readFile(snapshot.path)).toEqual(bundle());
+        expect(snapshot.digest).toBe(imported.digest);
+      } finally {
+        await snapshot.cleanup();
+      }
+    });
+    it.each(['production', 'test', 'staging', '', undefined])(
+      'rejects an override in %s before reading it',
+      async (environment) => {
+        if (environment === undefined) delete process.env.NODE_ENV;
+        else process.env.NODE_ENV = environment;
+        await rm(keyPath);
+        expect(() => new WagoRuntimeArtifactsService()).toThrow(
+          'local CC100 runtime signing keys are only allowed in development',
+        );
+        expect(await readdir(root)).toEqual([]);
+      },
+    );
+    it.each(['development', 'production', 'test', undefined])(
+      'keeps the release default without an override in %s',
+      async (environment) => {
+        if (environment === undefined) delete process.env.NODE_ENV;
+        else process.env.NODE_ENV = environment;
+        delete process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH;
+        expect(loadRuntimeArtifactSigningKey(environment, undefined)).toBe(WAGO_RUNTIME_RELEASE_KEY);
+        service = new WagoRuntimeArtifactsService();
+        process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH = keyPath;
+        await expect(service.import(upload())).rejects.toThrow('Runtime import failed');
+        expect(await service.current()).toBeNull();
+      },
+    );
+    it('treats a blank override as the release default', async () => {
+      process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH = '  ';
+      service = new WagoRuntimeArtifactsService();
+      await expect(service.import(upload())).rejects.toThrow('Runtime import failed');
+    });
+    it('rejects retained development artifacts after restarting with production release trust', async () => {
+      service = new WagoRuntimeArtifactsService();
+      const imported = await service.import(upload());
+      await service.onModuleDestroy();
+      process.env.NODE_ENV = 'production';
+      delete process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH;
+      service = new WagoRuntimeArtifactsService();
+      expect(await service.has()).toBe(false);
+      await expect(service.get(imported.digest)).rejects.toThrow('Invalid signed runtime artifact');
+      await expect(service.acquire(imported.digest)).rejects.toThrow('Invalid signed runtime artifact');
+    });
+    it('rejects a signature from a different key without trusting the uploaded signature key', async () => {
+      await writeFile(keyPath, `ssh-ed25519 ${WAGO_RUNTIME_RELEASE_KEY}\n`);
+      service = new WagoRuntimeArtifactsService();
+      await expect(service.import(upload())).rejects.toThrow('Runtime import failed');
+    });
+    it.each([
+      ['checksum', () => upload(bundle(), '0'.repeat(64))],
+      [
+        'tampered bytes with updated checksum',
+        () => upload(bundle({ ...manifest, runtimeVersion: '0.2.0' }), undefined, signature(bundle())),
+      ],
+      ['wrong namespace', () => upload(bundle(), undefined, signature(bundle(), 'wrong'))],
+      ['mutable image', () => upload(bundle({ ...manifest, image: 'latest' }, 'latest'))],
+      ['image mismatch', () => upload(bundle(manifest, image.replace('aaaa', 'bbbb')))],
+    ])('still rejects %s with development signing', async (_name, fixture) => {
+      service = new WagoRuntimeArtifactsService();
+      const imported = await service.import(upload());
+      await expect(service.import(fixture())).rejects.toThrow('Runtime import failed');
+      expect(await service.current()).toEqual(imported);
+      expect(await readdir(join(await service.root(), 'staging'))).toEqual([]);
+    });
+    it.each([
+      '',
+      'ssh-rsa AAAA',
+      'ssh-ed25519 AAAA',
+      `ssh-ed25519 ${publicKey.toString('base64')}\nssh-ed25519 ${WAGO_RUNTIME_RELEASE_KEY}`,
+    ])('fails closed for malformed key file %j', async (text) => {
+      await writeFile(keyPath, text);
+      expect(() => new WagoRuntimeArtifactsService()).toThrow('Invalid development CC100 runtime signing public key');
+    });
+    it('fails closed without exposing an unreadable configured path', async () => {
+      await rm(keyPath);
+      expect(() => new WagoRuntimeArtifactsService()).toThrow('Invalid development CC100 runtime signing public key');
+    });
   });
   describe('loopback multipart lifecycle', () => {
     let app: INestApplication;

@@ -7,7 +7,8 @@ class TrustConfigurationError extends Error {}
 
 export function managementApiBase(config: MqttServerConnectionConfig): string {
   const host = isIP(config.host) === 6 ? `[${config.host}]` : config.host;
-  return `${config.useTls ? 'https' : 'http'}://${host}:${config.useTls ? 15671 : 15672}`;
+  const port = config.managementPort ?? (config.useTls ? 15671 : 15672);
+  return `${config.useTls ? 'https' : 'http'}://${host}:${port}`;
 }
 
 function trustOptions(config: MqttServerConnectionConfig): RequestOptions {

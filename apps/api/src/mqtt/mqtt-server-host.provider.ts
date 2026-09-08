@@ -30,6 +30,7 @@ export class MqttServerHostProviderService implements MqttServerHostProvider {
       name: server.name,
       host: server.host,
       port: server.port,
+      managementPort: server.managementPort,
       useTls: server.useTls,
       caCert: server.caCert,
       tlsInsecure: server.tlsInsecure,

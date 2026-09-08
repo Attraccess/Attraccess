@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
 import { readFile } from 'node:fs/promises';
 import { rootCertificates } from 'node:tls';
 import { createHash, X509Certificate } from 'node:crypto';
@@ -10,10 +11,15 @@ import {
   resolveRuntimeSigningPublicKeyPath,
   runtimeBundleInstallScript,
   WagoCommissioningService,
+  WagoRuntimeUploadError,
 } from './wago-commissioning.service';
 import { WagoService, WagoCredentialOperationUncertainError } from './wago.service';
 import { WagoController } from './wago-controller.entity';
 import type { CommissioningOperationGuard } from './wago-commissioning-lease';
+import { fw31IdentityOutput, fw31OsRelease } from './fixtures/fw31-identity';
+import { runtimeBundleStagingCapacityPreflightScript } from './wago-runtime-install';
+import { wagoFw31IdentityRead } from './wago-firmware-identity';
+import { wagoCodesysClassificationShell } from './wago-codesys-classification';
 
 jest.mock('node:child_process', () => ({ spawn: jest.fn() }));
 jest.mock('./wago-commissioning-lease', () => ({
@@ -35,6 +41,61 @@ const secrets = {
 };
 
 describe('WagoCommissioningService', () => {
+  it('retains only fixed upload diagnostics and SSH exit status, never remote secrets', async () => {
+    const service = new WagoCommissioningService({} as PluginContext, {} as WagoService);
+    jest.mocked(spawn).mockImplementation(((command: string) => {
+      const child = Object.assign(new EventEmitter(), {
+        stdout: new EventEmitter(),
+        stderr: new EventEmitter(),
+        stdin: new PassThrough(),
+        kill: jest.fn(),
+      });
+      child.stdin.resume();
+      child.stdin.on('finish', () => {
+        if (command === 'ssh-keyscan') {
+          child.stdout.emit('data', '192.0.2.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey\n');
+        } else if (command === 'ssh-keygen') {
+          child.stdout.emit('data', '256 SHA256:test fixture (ED25519)\n');
+        } else {
+          child.stderr.emit(
+            'data',
+            Buffer.from('private-credential'.repeat(1000) + '\nRuntime supervisor launch unverified: read'),
+          );
+          child.stderr.emit('data', Buffer.from('iness\nprivate-credential\n'));
+        }
+        child.emit('close', command === 'ssh' ? 1 : 0);
+      });
+      return child;
+    }) as never);
+    const result = service['copyTo'](
+      '192.0.2.1',
+      'SHA256:test',
+      { username: 'root', password: 'fixture-secret' },
+      __filename,
+      'true',
+      jest.fn(),
+    );
+    await expect(result).rejects.toThrow(
+      /remote-exit, SSH exit 1, \d+s elapsed\. Runtime supervisor launch unverified: readiness/,
+    );
+    await expect(result).rejects.not.toThrow('private-credential');
+  });
+
+  it.each(['local-timeout', 'operation-aborted'] as const)(
+    'distinguishes %s without treating remote text as trusted diagnostics',
+    (termination) => {
+      const error = new WagoRuntimeUploadError(
+        null,
+        123456,
+        'secret: Runtime supervisor launch unverified: readiness\n',
+        termination,
+      );
+      expect(error.message).toContain(`${termination}, SSH exit unknown, 123s elapsed`);
+      expect(error.message).toContain('No recognized remote diagnostic');
+      expect(error.message).not.toContain('secret');
+    },
+  );
+
   it.each([null, 7])('checks ownership immediately before session deletion (enrollment %p)', async (enrollmentId) => {
     const { service, repository, wago } = securityHarness({ deliveryToken: null, enrollmentId });
     const remove = jest.fn();
@@ -515,11 +576,17 @@ describe('WagoCommissioningService', () => {
           configuredService(),
         );
         inspect.mockResolvedValue({
-          firmware: 'PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"\nVERSION="4.9.1(31)"',
+          firmware: fw31IdentityOutput(),
           codesys: scenario === 'codesys' ? 'active' : 'inactive',
         });
         const copy = jest.fn().mockResolvedValue(undefined);
-        const install = jest.fn().mockResolvedValue('');
+        const install = jest
+          .fn()
+          .mockImplementation(async (_host, _pin, _credential, script: string) =>
+            script.includes("printf 'epoch=")
+              ? `epoch=${Math.floor(Date.now() / 1000)}\nuptime=100.00\nboot=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\ntool=supported\n`
+              : '',
+          );
         service['copyTo'] = copy;
         service['sudoRunScript'] = install;
         if (scenario === 'prerequisites') install.mockRejectedValue(new Error('private output'));
@@ -565,15 +632,19 @@ describe('WagoCommissioningService', () => {
           expect(wago.createEnrollment).not.toHaveBeenCalled();
           expect(sudo).not.toHaveBeenCalled();
           expect(result.failureReason).toContain('permanently disabled');
-          expect(result.dockerProvisionState).toBe('recovery_required');
+          expect(result.dockerProvisionState).toBeUndefined();
+          expect(session.dockerProvisionToken).toBeFalsy();
+          expect(install).toHaveBeenCalledTimes(1);
+          expect(install.mock.calls[0][3]).toBe(runtimeBundleStagingCapacityPreflightScript(bundle.length));
           return;
         }
         expect(result.state).toBe('awaiting_discovery');
         expect(sudo).not.toHaveBeenCalled();
         expect(copy).toHaveBeenCalledTimes(1);
-        expect(install).toHaveBeenCalledTimes(3);
+        expect(install).toHaveBeenCalledTimes(5);
         expect(session.codesysState).toBe('disabled');
-        expect(install.mock.calls[0][3]).toContain('runtime-version=0');
+        expect(install.mock.calls[0][3]).toBe(runtimeBundleStagingCapacityPreflightScript(bundle.length));
+        expect(install.mock.calls[1][3]).toContain('runtime-version=0');
         expect(copy.mock.calls[0][4]).toContain('flock -n 9');
         expect(copy.mock.calls[0][4]).toContain(
           Buffer.from(
@@ -701,12 +772,10 @@ describe('WagoCommissioningService', () => {
     );
   });
 
-  it('requires a release identity as well as the PTXdist BSP version', () => {
-    expect(isSupportedController('PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"', '31')).toBe(false);
-    expect(
-      isSupportedController('PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"\nVERSION="4.9.1(31)"', '31'),
-    ).toBe(true);
-    expect(isSupportedController('PTXDIST_PLATFORM_NAME="cc100"\nVERSION_ID="2024.12.0"', '32')).toBe(false);
+  it('requires framed FW31 identity including REVISIONS and the supported baseline', () => {
+    expect(isSupportedController(fw31IdentityOutput(fw31OsRelease, ''), '31')).toBe(false);
+    expect(isSupportedController(fw31IdentityOutput(), '31')).toBe(true);
+    expect(isSupportedController(fw31IdentityOutput(), '32')).toBe(false);
   });
 
   it('defers repository access until plugin module initialization', async () => {
@@ -724,6 +793,59 @@ describe('WagoCommissioningService', () => {
     await service.onApplicationBootstrap();
 
     expect(context.getRepository).toHaveBeenCalledWith(WagoCommissioningSession);
+  });
+
+  it.each(['root', 'operator'])('streams the full privileged inspection over stdin for %s', async (username) => {
+    const service = new WagoCommissioningService({} as PluginContext, {} as WagoService);
+    const credential = { username, password: 'fixture-only' };
+    const firmware = fw31IdentityOutput();
+    const script = `${wagoFw31IdentityRead()}; root=''; ${wagoCodesysClassificationShell()}\nprintf '\\nCODESYS='; wago_codesys_classify`;
+    const ssh = jest.fn();
+    let output = '';
+    jest.mocked(spawn).mockImplementation(((command: string, args: string[]) => {
+      const child = Object.assign(new EventEmitter(), {
+        stdout: new EventEmitter(),
+        stderr: new EventEmitter(),
+        kill: jest.fn(),
+        stdin: Object.assign(new EventEmitter(), {
+          end: (input?: string) => {
+            if (command === 'ssh-keyscan') {
+              child.stdout.emit('data', '192.0.2.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKey\n');
+            } else if (command === 'ssh-keygen') {
+              child.stdout.emit('data', '256 SHA256:test fixture (ED25519)\n');
+            } else if (command === 'ssh') {
+              ssh(args, input);
+              child.stdout.emit('data', output);
+            } else throw new Error('Unexpected fixture process');
+            child.emit('close', 0);
+          },
+        }),
+      });
+      return child;
+    }) as never);
+
+    for (const classification of ['active', 'inactive', 'unknown', 'invalid', '']) {
+      output = firmware + (classification ? `\nCODESYS=${classification}\n` : '');
+      await expect(service['inspect']('192.0.2.1', 'SHA256:test', credential)).resolves.toEqual({
+        firmware,
+        codesys: ['active', 'inactive'].includes(classification) ? classification : 'unknown',
+      });
+    }
+
+    expect(Buffer.byteLength(script)).toBeGreaterThan(16_000);
+    expect(ssh).toHaveBeenCalledTimes(5);
+    for (const [args, input] of ssh.mock.calls) {
+      expect(args).toContain('StrictHostKeyChecking=yes');
+      expect(args).toContain(`${username}@192.0.2.1`);
+      expect(args.at(-1)).toBe(
+        username === 'root' ? "sh -c 'base64 -d | sh'" : String.raw`sh -c 'sudo -S sh -c '\''base64 -d | sh'\'''`,
+      );
+      const encoded = username === 'root' ? input : input.slice(`${credential.password}\n`.length);
+      expect(input).toBe(
+        `${username === 'root' ? '' : `${credential.password}\n`}${Buffer.from(script).toString('base64')}`,
+      );
+      expect(Buffer.from(encoded, 'base64').toString()).toBe(script);
+    }
   });
 
   it('does not add a sudo password to root command input', async () => {
@@ -745,6 +867,7 @@ describe('WagoCommissioningService', () => {
       { username: 'root', password: 'wago' },
       'base64 -d | sh',
       'script',
+      undefined,
     );
   });
 
@@ -767,6 +890,7 @@ describe('WagoCommissioningService', () => {
       { username: 'operator', password: 'secret' },
       "sudo -S sh -c 'base64 -d | sh'",
       'secret\nscript',
+      undefined,
     );
   });
 

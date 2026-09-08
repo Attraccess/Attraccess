@@ -1,6 +1,8 @@
 import { chmodSync, existsSync, lstatSync, mkdirSync, renameSync, rmSync, statSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { fw31ShellFixture } from './fixtures/fw31-shell-fixture';
+import { wagoCodesysClassificationShell } from './wago-codesys-classification';
+import { fw31Model, fw31Revisions } from './fixtures/fw31-identity';
 import {
   WAGO_DIN,
   WAGO_DOUT,
@@ -57,15 +59,45 @@ describe('FW31 destructive commissioning shell (isolated vendor command fixtures
     expect(fixture.run(script).status).toBe(0);
   });
 
-  it.each(['VERSION_ID="32"', 'VERSION_ID="31"\nVERSION="30"', 'VERSION_ID="2024.12.0"'])(
-    'rejects ambiguous firmware before changing the controller: %s',
-    (version) => {
-      fixture.file('etc/os-release', 'PTXDIST_PLATFORM_NAME="cc100"\n' + version + '\n');
-      expect(prepare().stderr).toContain('unsupported-firmware');
-      expect(existsSync(join(fixture.root, journal))).toBe(false);
-      expect(existsSync(join(fixture.root, 'vendor.log'))).toBe(false);
-    },
-  );
+  it('falls back from BusyBox setpriv to capsh for report and preparation', () => {
+    expect(fixture.run(wagoHardwareDeploymentReportScript(fixture.root), 'busybox-setpriv').stdout).toContain(
+      'hardware=accessible',
+    );
+    expect(prepare('busybox-setpriv').status).toBe(0);
+    expect(fixture.read('privilege.log')).toContain('capsh');
+  });
+
+  it('prepares with capsh even when setpriv is absent', () => {
+    rmSync(join(fixture.root, 'bin/setpriv'));
+    expect(prepare().status).toBe(0);
+  });
+
+  it('rejects unverified privileges before preparation mutations', () => {
+    fixture.file(
+      'privilege-status',
+      fixture.read('privilege-status').replace('CapBnd: 0000000000000000', 'CapBnd: 0000000000000001'),
+    );
+    expect(prepare().stderr).toContain('permission-tool-unavailable');
+    expect(existsSync(join(fixture.root, journal))).toBe(false);
+    expect(existsSync(join(fixture.root, 'vendor.log'))).toBe(false);
+    expect(existsSync(join(fixture.root, 'permission-tests.log'))).toBe(false);
+  });
+
+  it.each([
+    ['missing REVISIONS', 'etc/REVISIONS', null],
+    ['wrong REVISIONS', 'etc/REVISIONS', fw31Revisions.replace('(31)', '(32)')],
+    ['duplicate REVISIONS firmware', 'etc/REVISIONS', fw31Revisions.repeat(2)],
+    ['model mismatch', 'sys/firmware/devicetree/base/model', fw31Model.replace('751-9301', '751-9302')],
+  ] as const)('rejects invalid identity before changing the controller: %s', (_scenario, path, content) => {
+    if (content === null) rmSync(join(fixture.root, path));
+    else fixture.file(path, content);
+    expect(report().stdout).toContain('platform=unsupported-firmware');
+    const result = prepare();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('unsupported-firmware');
+    expect(existsSync(join(fixture.root, journal))).toBe(false);
+    expect(existsSync(join(fixture.root, 'vendor.log'))).toBe(false);
+  });
 
   it('always stops and permanently disables active CODESYS before granting exact UID permissions', () => {
     activePlc();
@@ -124,7 +156,7 @@ describe('FW31 destructive commissioning shell (isolated vendor command fixtures
     expect(existsSync(join(fixture.root, journal, 'started'))).toBe(false);
   });
 
-  it.each(['chown-failed', 'setpriv-unsupported', 'io-permissions'])('fails closed for %s', (fault) => {
+  it.each(['chown-failed', 'privilege-tools-unavailable', 'io-permissions'])('fails closed for %s', (fault) => {
     expect(prepare(fault).status).not.toBe(0);
     expect(existsSync(join(fixture.root, journal, 'started'))).toBe(false);
   });
@@ -283,14 +315,43 @@ describe('FW31 destructive commissioning shell (isolated vendor command fixtures
     expect(fixture.containers()[0].running).toBe(false);
   });
 
-  it.each(['start', 'supervise'])('contains an overall %s observation timeout', (action) => {
+  it('bounds both complete gate entry points to 300 seconds with a five-second kill grace', () => {
+    const script = wagoRuntimeBootScript();
+    expect(script).toContain('observation=$(timeout -k 5 300 "$hook" "$cycle" 8>&-)');
+    expect(script).toContain('if timeout -k 5 300 "$hook" "$action-checked"; then');
+    expect(script.match(/timeout -k 5 300 "\$hook"/g)).toHaveLength(2);
+  });
+
+  it('runs exactly the pre-grant and pre-start IO scans in a complete supervisor cycle', () => {
     fixture.file('etc/attraccess-wago/runtime-enabled', '');
     fixture.setContainers([{ id: 'new', name: 'attraccess-wago', running: true, restart: 'no' }]);
-    const result = fixture.run(`set -- ${action}\n` + wagoRuntimeBootScript(fixture.root), 'gate-timeout');
-    expect(result.status).not.toBe(0);
-    expect(fixture.containers()[0].running).toBe(false);
-    expect(existsSync(join(fixture.root, 'etc/attraccess-wago/runtime-enabled'))).toBe(false);
+    const script = wagoRuntimeBootScript(fixture.root)
+      .replaceAll('wago_host_io_guard() {', 'wago_host_io_guard() {\nprintf "scan\\n" >> "$FIXTURE_ROOT/gate-order"')
+      .replaceAll('chown 10001:10001', 'printf "grant\\n" >> "$FIXTURE_ROOT/gate-order"\nchown 10001:10001');
+    const result = fixture.run('set -- cycle\n' + script);
+    expect({ status: result.status, stdout: result.stdout, stderr: result.stderr }).toEqual({
+      status: 0,
+      stdout: 'running\n',
+      stderr: '',
+    });
+    expect(fixture.read('gate-order').trim().split('\n')).toEqual(['scan', 'grant', 'scan']);
   });
+
+  it.each(['start', 'supervise'])(
+    'contains an overall %s observation timeout without acknowledging readiness',
+    (action) => {
+      fixture.file('etc/attraccess-wago/runtime-enabled', '');
+      const request = `etc/attraccess-wago/supervisor-start.${token}`;
+      fixture.file(request + '/pending', '');
+      fixture.setContainers([{ id: 'new', name: 'attraccess-wago', running: true, restart: 'no' }]);
+      const result = fixture.run(`set -- ${action}\n` + wagoRuntimeBootScript(fixture.root), 'gate-timeout');
+      expect(result.status).toBe(124);
+      expect(fixture.containers()[0].running).toBe(false);
+      expect(existsSync(join(fixture.root, 'etc/attraccess-wago/runtime-enabled'))).toBe(false);
+      expect(existsSync(join(fixture.root, request, 'ready'))).toBe(false);
+      expect(fixture.read('docker.log')).not.toContain('start attraccess-wago');
+    },
+  );
 
   it.each(['ps-failed', 'docker-list-failed', 'docker-inspect-failed', 'readlink-failed'])(
     'contains an already running runtime when boot observation fails: %s',
@@ -324,13 +385,19 @@ describe('FW31 destructive commissioning shell (isolated vendor command fixtures
   });
 
   it('blocks an unowned open writable DOUT descriptor before changing IO permissions', () => {
+    fixture.file('proc/99/comm', 'writer\n');
     fixture.file('proc/99/status', 'Uid: 20000 20000 20000 20000\nGid: 20000 20000 20000 20000\nGroups: 20000\n');
     fixture.file('proc/99/stat', '99 (writer) S ' + '0 '.repeat(18) + '999\n');
     fixture.file('proc/99/fdinfo/7', 'flags: 0100001\n');
     mkdirSync(join(fixture.root, 'proc/99/fd'));
     symlinkSync(join(fixture.root, WAGO_DOUT), join(fixture.root, 'proc/99/fd/7'));
     const owners = fixture.read('owners.json');
-    expect(prepare().status).not.toBe(0);
+    expect(
+      fixture.run(`root='${fixture.root}'\n${wagoCodesysClassificationShell()}\nwago_codesys_classify`).stdout,
+    ).toBe('inactive\n');
+    const result = prepare();
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('unknown');
     expect(fixture.read('owners.json')).toBe(owners);
     expect(existsSync(join(fixture.root, journal, 'started'))).toBe(false);
   });
@@ -362,6 +429,9 @@ const fs=require('node:fs'),root=process.env.FIXTURE_ROOT;
 const state=JSON.parse(fs.readFileSync(root+'/containers.json','utf8'));
 state[0].running=false;fs.writeFileSync(root+'/containers.json',JSON.stringify(state));
 fs.rmSync(root+'/proc/42',{recursive:true,force:true});fs.writeFileSync(root+'/plc','running');
+fs.mkdirSync(root+'/proc/77',{recursive:true});fs.writeFileSync(root+'/proc/77/comm','codesys3\\n');
+fs.writeFileSync(root+'/proc/77/stat','77 (codesys3) S '+'0 '.repeat(18)+'77'+' 0'.repeat(30)+'\\n');
+fs.writeFileSync(root+'/proc/77/exe','synthetic runtime executable');
 `,
       0o700,
     );
@@ -375,6 +445,23 @@ fs.rmSync(root+'/proc/42',{recursive:true,force:true});fs.writeFileSync(root+'/p
   it('caps host-supervised crash starts at five without delegating a retry to Docker', () => {
     fixture.file('etc/attraccess-wago/runtime-enabled', '');
     fixture.setContainers([{ id: 'new', name: 'attraccess-wago', running: false, restart: 'no' }]);
+    // Exercise the supervisor's counter without repeating six full hardware
+    // gates. The real watch gate's refusal to start is checked separately below.
+    fixture.file(
+      'etc/rc.d/S99_zz_attraccess_wago',
+      `#!/bin/sh
+set -eu
+printf '%s\\n' "$1" >> "$FIXTURE_ROOT/gate-actions"
+case "$1" in
+  cycle)
+    docker --host unix:///var/run/docker.sock start attraccess-wago >/dev/null
+    echo started ;;
+  watch) echo 'Fixture watch refused restart' >&2; exit 1 ;;
+  *) exit 99 ;;
+esac
+`,
+      0o700,
+    );
     fixture.file(
       'bin/sleep',
       `#!${process.execPath}
@@ -385,9 +472,19 @@ fs.rmSync(root+'/proc/42',{recursive:true,force:true});
 `,
       0o700,
     );
-    const result = fixture.run('set -- supervise\n' + wagoRuntimeBootScript(fixture.root), '', undefined, 60000);
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain('Runtime crash retry limit reached');
+    const result = fixture.run('set -- supervise\n' + wagoRuntimeBootScript(fixture.root));
+    expect(result.error).toBeUndefined();
+    expect(result.signal).toBeNull();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toBe('Fixture watch refused restart\n');
+    expect(fixture.read('gate-actions').trim().split('\n')).toEqual([
+      'cycle',
+      'cycle',
+      'cycle',
+      'cycle',
+      'cycle',
+      'watch',
+    ]);
     expect(
       fixture
         .read('docker.log')
@@ -397,6 +494,19 @@ fs.rmSync(root+'/proc/42',{recursive:true,force:true});
     expect(fixture.containers()[0]).toMatchObject({ running: false, restart: 'no' });
     expect(existsSync(join(fixture.root, 'etc/attraccess-wago/runtime-enabled'))).toBe(false);
   }, 65000);
+
+  it('refuses a crash restart through the real watch gate and contains the runtime', () => {
+    fixture.file('etc/attraccess-wago/runtime-enabled', '');
+    fixture.setContainers([{ id: 'new', name: 'attraccess-wago', running: false, restart: 'no' }]);
+    const result = fixture.run('set -- watch\n' + wagoRuntimeBootScript(fixture.root));
+    expect(result.error).toBeUndefined();
+    expect(result.signal).toBeNull();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Runtime crash retry limit reached');
+    expect(fixture.read('docker.log')).not.toContain('start attraccess-wago');
+    expect(fixture.containers()[0]).toMatchObject({ running: false, restart: 'no' });
+    expect(existsSync(join(fixture.root, 'etc/attraccess-wago/runtime-enabled'))).toBe(false);
+  });
 
   it('reapplies narrow permissions on reboot and starts only after the gate succeeds', () => {
     expect(prepare().status).toBe(0);

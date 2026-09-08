@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { linkSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { wagoHostIoGuardShell } from './wago-host-io-guard';
@@ -39,9 +39,12 @@ function fixture() {
   };
   processRecord(1);
   mkdirSync(join(root, 'bin'));
+  symlinkSync('/bin/dd', join(root, 'bin/dd'));
+  symlinkSync('/usr/bin/tr', join(root, 'bin/tr'));
   executable(
     'bin/awk',
     `const fs=require('node:fs'),cp=require('node:child_process'),args=process.argv.slice(2),p=args.at(-1),root=process.env.FIXTURE_ROOT;
+if(p&&p.startsWith(root+'/proc/'))fs.appendFileSync(root+'/observations',p.slice(root.length)+'\\n');
 if(process.env.FAULT==='process-disappears'&&p===root+'/proc/22/stat'){fs.rmSync(root+'/proc/22',{recursive:true,force:true});process.exit(1);}
 if(process.env.FAULT==='status-unreadable'&&p===root+'/proc/22/status')process.exit(1);
 const r=cp.spawnSync('/usr/bin/awk',args,{stdio:'inherit'});process.exit(r.status ?? 1);`,
@@ -49,12 +52,13 @@ const r=cp.spawnSync('/usr/bin/awk',args,{stdio:'inherit'});process.exit(r.statu
   executable(
     'bin/stat',
     `const fs=require('node:fs'),args=process.argv.slice(2),root=process.env.FIXTURE_ROOT,p=args.at(-1);
-if(args[0]!=='-Lc'||args[1]!=='%d:%i'||!p.startsWith(root+'/'))process.exit(99);
+if(args[0]==='--help'){console.log('BusyBox v1.37.0 () multi-call binary.\\nUsage: stat [-ltf] FILE...');process.exit(0);}
+if(!['-t','-Lt'].includes(args[0])||(p!==root&&!p.startsWith(root+'/')))process.exit(99);
 if(p===root+'/proc/22/fd/5'){
  if(process.env.FAULT==='fd-disappears'){fs.rmSync(p);process.exit(1);}
  if(process.env.FAULT==='fd-unreadable')process.exit(1);
 }
-try{const s=fs.statSync(p,{bigint:true});console.log(s.dev+':'+s.ino);}catch{process.exit(1);}`,
+try{const s=(args[0]==='-Lt'?fs.statSync:fs.lstatSync)(p,{bigint:true});console.log(p+' '+[s.size,s.blocks,s.mode.toString(16),s.uid,s.gid,s.dev.toString(16),s.ino,s.nlink,0,0,1,1,1,s.blksize].join(' '));}catch{process.exit(1);}`,
   );
   executable(
     'bin/docker',
@@ -82,7 +86,8 @@ else process.exit(99);`,
         ],
         {
           encoding: 'utf8',
-          timeout: 10000,
+          // Terse metadata uses additional fixture processes, not device latency.
+          timeout: 30000,
           env: { FIXTURE_ROOT: root, PATH: join(root, 'bin'), FAULT: fault },
         },
       ),
@@ -225,6 +230,25 @@ describe('host digital output and identity guard', () => {
     owned();
     expect(host.run(true).status).toBe(0);
     rejected('runtime-identity-conflict');
+  });
+
+  it('checks ownership only when granting an exemption, while still observing every process and descriptor', () => {
+    owned();
+    host.processRecord(23);
+    host.fd(23, '0100000');
+    host.processRecord(24);
+    host.file('unrelated-file', '');
+    host.fd(24, '0100002', 'unrelated-file');
+    expect(host.run(true).status).toBe(0);
+    const observations = readFileSync(join(host.root, 'observations'), 'utf8').trim().split('\n');
+    for (const pid of [1, 23, 24]) {
+      expect(observations.filter((path) => path === `/proc/${pid}/stat`)).toHaveLength(2);
+      expect(observations).toContain(`/proc/${pid}/status`);
+      expect(observations).not.toContain(`/proc/${pid}/uid_map`);
+      expect(observations).not.toContain(`/proc/${pid}/cgroup`);
+    }
+    expect(observations).toContain('/proc/23/fdinfo/5');
+    expect(observations.filter((path) => path === '/proc/22/cgroup')).toHaveLength(2);
   });
 
   it('permits verified container descendants and cgroup-v1 Docker membership', () => {
