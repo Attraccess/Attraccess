@@ -169,6 +169,7 @@ export function validateModbus(value: unknown): Array<{ path: string; code: stri
       endpoint = `tcp:${c.host.toLowerCase()}:${c.port}`;
     } else if (c.transport === 'rtu') {
       if (
+        typeof c.path !== 'string' ||
         !/^\/dev\/[a-zA-Z0-9_./-]+$/.test(c.path) ||
         c.path.includes('..') ||
         c.path
