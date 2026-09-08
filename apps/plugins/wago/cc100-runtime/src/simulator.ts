@@ -21,6 +21,20 @@ const device = new SimulatorDeviceAdapter(parseValues(process.env.WAGO_INITIAL_V
 let client: MqttClient | undefined;
 let timers: NodeJS.Timeout[] = [];
 
+process.on('message', (message: { type?: string; id?: string; channelId?: string }) => {
+  if (message.type !== 'simulator-read' || !message.id || !message.channelId || !process.send) return;
+  void device
+    .readChannel(message.channelId)
+    .then((value) => process.send?.({ type: 'simulator-read-result', id: message.id, value }))
+    .catch((error: unknown) =>
+      process.send?.({
+        type: 'simulator-read-result',
+        id: message.id,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+});
+
 void start().catch((error: unknown) => {
   process.stderr.write(
     `WAGO simulator startup failed: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
@@ -80,26 +94,43 @@ function connectOperational(state: SimulatorState): void {
   device.restore(state.accepted?.snapshot, state.outputs);
   const operationalRuntime = runtime(operationalClient, state.credentials.prefix);
   let initialized = false;
+  let starting = false;
   let connectionGeneration = 0;
-  operationalClient.once(
+  const startTelemetry = () => {
+    timers.forEach(clearInterval);
+    timers = [];
+    if (scenario !== 'stale-heartbeat' && scenario !== 'offline')
+      timers = [
+        setInterval(() => void handleAsync(() => operationalRuntime.publishHeartbeat()), 30_000),
+        setInterval(() => void handleAsync(() => operationalRuntime.publishMeasurements()), 5_000),
+      ];
+  };
+  operationalClient.on(
     'connect',
     () =>
       void handleAsync(async () => {
-        const generation = ++connectionGeneration;
-        await operationalRuntime.start();
-        if (generation !== connectionGeneration) {
-          await operationalRuntime.setConnected(false);
+        if (starting) return;
+        if (initialized) {
+          await operationalRuntime.setConnected(true);
+          startTelemetry();
           return;
         }
-        initialized = true;
-        await operationalRuntime.setConnected(true);
-        process.stdout.write(`WAGO CC100 simulator connected as ${hardwareId}\n`);
-        if (scenario !== 'stale-heartbeat' && scenario !== 'offline')
-          timers = [
-            setInterval(() => void handleAsync(() => operationalRuntime.publishHeartbeat()), 30_000),
-            setInterval(() => void handleAsync(() => operationalRuntime.publishMeasurements()), 5_000),
-          ];
-        if (scenario === 'offline') operationalClient.end();
+        starting = true;
+        const generation = ++connectionGeneration;
+        try {
+          await operationalRuntime.start();
+          if (generation !== connectionGeneration) {
+            await operationalRuntime.setConnected(false);
+            return;
+          }
+          initialized = true;
+          await operationalRuntime.setConnected(true);
+          process.stdout.write(`WAGO CC100 simulator connected as ${hardwareId}\n`);
+          startTelemetry();
+          if (scenario === 'offline') operationalClient.end();
+        } finally {
+          starting = false;
+        }
       }),
   );
   operationalClient.on('close', () => {
@@ -107,12 +138,6 @@ function connectOperational(state: SimulatorState): void {
     timers.forEach(clearInterval);
     timers = [];
     if (initialized) void handleAsync(() => operationalRuntime.setConnected(false));
-  });
-  operationalClient.on('connect', () => {
-    if (initialized) {
-      connectionGeneration++;
-      void handleAsync(() => operationalRuntime.setConnected(true));
-    }
   });
 }
 

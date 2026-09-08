@@ -4,29 +4,19 @@ on:
   pull_request:
     paths:
       - 'apps/plugins/wago/cc100-runtime/**'
-<<<<<<< HEAD
       - 'apps/plugins/wago/backend/**'
       - 'apps/plugins/wago/measurement-contract.ts'
       - 'libs/plugins-backend-sdk/**'
       - 'apps/plugins/wago/scripts/package-runtime-artifact.mjs'
-=======
-      - 'apps/plugins/wago/backend/**'
-      - 'libs/plugins-backend-sdk/**'
->>>>>>> 96040193 (fix(ATT-1048): verify simulator lifecycle on isolated broker)
       - '.github/workflows/wago-cc100-runtime.yml'
   push:
     branches: [main]
     paths:
       - 'apps/plugins/wago/cc100-runtime/**'
-<<<<<<< HEAD
       - 'apps/plugins/wago/backend/**'
       - 'apps/plugins/wago/measurement-contract.ts'
       - 'libs/plugins-backend-sdk/**'
       - 'apps/plugins/wago/scripts/package-runtime-artifact.mjs'
-=======
-      - 'apps/plugins/wago/backend/**'
-      - 'libs/plugins-backend-sdk/**'
->>>>>>> 96040193 (fix(ATT-1048): verify simulator lifecycle on isolated broker)
       - '.github/workflows/wago-cc100-runtime.yml'
 
 permissions:
@@ -47,44 +37,10 @@ jobs:
       - run: pnpm nx run wago-cc100-runtime:test
       - run: pnpm nx run wago-cc100-runtime:build
       - run: pnpm nx run wago-cc100-runtime:build-simulator
-<<<<<<< HEAD
-      - name: Start simulator against RabbitMQ
-        env:
-          WAGO_ENROLLMENT_SECRET: ci-enrollment-secret
-          WAGO_ENROLLMENT_USERNAME: attraccess
-          WAGO_ENROLLMENT_PASSWORD: password
-        run: |
-          docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml up --build --detach
-          for attempt in {1..30}; do
-            logs="$(docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml logs cc100-simulator)"
-            if [[ "$logs" == *"WAGO CC100 simulator enrollment connected"* ]]; then
-              break
-            fi
-            if [[ -n "$(docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml ps --status exited --quiet)" ]]; then
-              docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml logs cc100-simulator
-              echo "Simulator exited before becoming ready"
-              exit 1
-            fi
-            if [[ "$attempt" -eq 30 ]]; then
-              docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml logs cc100-simulator
-              echo "Simulator did not become ready within 150 seconds"
-              exit 1
-            fi
-            sleep 5
-          done
-      - name: Stop simulator integration stack
-        if: always()
-        run: WAGO_ENROLLMENT_SECRET=cleanup WAGO_ENROLLMENT_USERNAME=cleanup WAGO_ENROLLMENT_PASSWORD=cleanup docker compose -f apps/plugins/wago/cc100-runtime/docker-compose.simulator.yml down --volumes
       - name: Typecheck simulator integration harness
         run: pnpm exec tsc --noEmit -p apps/plugins/wago/cc100-runtime/integration/tsconfig.json
       - name: Verify simulator lifecycle and measurement flow on an isolated broker
         run: pnpm nx run wago-cc100-runtime:test-simulator-integration
-=======
-      - name: Typecheck simulator integration harness
-        run: pnpm exec tsc --noEmit -p apps/plugins/wago/cc100-runtime/integration/tsconfig.json
-      - name: Verify simulator lifecycle and measurement flow on an isolated broker
-        run: pnpm nx run wago-cc100-runtime:test-simulator-integration
->>>>>>> 96040193 (fix(ATT-1048): verify simulator lifecycle on isolated broker)
       - uses: actions/upload-artifact@v4
         with:
           name: wago-cc100-runtime-manifest
