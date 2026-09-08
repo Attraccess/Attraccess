@@ -29,11 +29,11 @@ void API::updateSateInfo()
 
 void API::setup()
 {
-    this->websocket.setup();
-    this->websocket.setMessageCallbackRaw([this](const char *buf, size_t len)
+    this->transport.setup();
+    this->transport.setMessageCallbackRaw([this](const char *buf, size_t len)
                                           { this->processIncomingMessage(buf, len); });
-#ifndef DEMO_MODE
-    this->websocket.setBinaryDataCallback([this](esp_websocket_event_data_t data)
+#ifdef ESP_PLATFORM
+    this->transport.setBinaryDataCallback([this](esp_websocket_event_data_t data)
                                           { this->firmware.onChunk(data); });
 #endif
 }
@@ -49,7 +49,7 @@ void API::setFirmwareUpdateMetaCallback(std::function<void(std::string available
 
 void API::loop()
 {
-    this->websocket.loop();
+    this->transport.loop();
     this->updateSateInfo();
 
     // Only send heartbeat when connection is usable
@@ -308,7 +308,7 @@ bool API::sendMessage(const char *type, JsonObject payload)
             return false;
         }
         this->logger.info((std::string("sending message to websocket: ") + json).c_str());
-        return this->websocket.sendMessage(json, n);
+        return this->transport.sendMessage(json, n);
     }
 
     std::unique_ptr<char[]> json(new (std::nothrow) char[requiredBytes]);
@@ -324,7 +324,7 @@ bool API::sendMessage(const char *type, JsonObject payload)
         return false;
     }
     this->logger.info((std::string("sending message to websocket: ") + json.get()).c_str());
-    return this->websocket.sendMessage(json.get(), n);
+    return this->transport.sendMessage(json.get(), n);
 }
 
 void API::sendHeartbeat()
@@ -351,23 +351,23 @@ void API::sendHeartbeat()
         return;
     }
     this->logger.info((std::string("pushing heartbeat to websocket queue: ") + json).c_str());
-    this->websocket.sendHeartbeat(json, n);
+    this->transport.sendHeartbeat(json, n);
 
     this->heartbeat_sent_at = millis();
 }
 
 void API::disableConnectionAttempts()
 {
-    this->websocket.disableConnectionAttempts();
+    this->transport.disableConnectionAttempts();
     this->loopIsEnabled = false;
 }
 
 void API::enableConnectionAttempts()
 {
-    this->websocket.enableConnectionAttempts();
+    this->transport.enableConnectionAttempts();
 }
 
 void API::resetCertificateTrust()
 {
-    this->websocket.resetCertificateTrust();
+    this->transport.resetCertificateTrust();
 }

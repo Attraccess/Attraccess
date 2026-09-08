@@ -56,7 +56,7 @@ add_executable(attractap-desktop-tests
     src/host_websocket.cpp
     src/profile_store.cpp
     src/virtual_nfc.cpp)
-target_include_directories(attractap-desktop-tests PRIVATE src)
+target_include_directories(attractap-desktop-tests PRIVATE src "${FIRMWARE_DIR}/src")
 target_link_libraries(attractap-desktop-tests PRIVATE CURL::libcurl Threads::Threads)
 target_compile_options(attractap-desktop-tests PRIVATE -Wall -Wextra -Wpedantic)
 

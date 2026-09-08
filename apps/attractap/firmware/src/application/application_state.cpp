@@ -583,8 +583,8 @@ void Application::processEnrollment() {
 
   case ENROLL_PHASE_WRITING: {
     bool ok = this->nfc.changeKey(
-        this->apiEnrollNewCardData.keyNo, this->nfc.FACTORY_KEY,
-        this->nfc.FACTORY_KEY, this->apiEnrollNewCardData.keyBytes,
+        this->apiEnrollNewCardData.keyNo, this->nfc.getFactoryKey(),
+        this->nfc.getFactoryKey(), this->apiEnrollNewCardData.keyBytes,
         NFC::CARD_KEY_VERSION_ENROLLED);
     this->api.sendEnrollNewCard(ok);
     if (ok) {
@@ -701,9 +701,9 @@ void Application::processReset() {
     // Authenticate as the (still factory) application master key, then change
     // the stored slot from the card's current key back to the factory key.
     bool ok = this->nfc.changeKey(this->apiResetNfcCardData.keyNo,
-                                  this->nfc.FACTORY_KEY,
+                                  this->nfc.getFactoryKey(),
                                   this->apiResetNfcCardData.keyBytes,
-                                  this->nfc.FACTORY_KEY,
+                                  this->nfc.getFactoryKey(),
                                   NFC::CARD_KEY_VERSION_FREE);
     this->api.sendResetNfcCard(ok);
     if (ok) {
