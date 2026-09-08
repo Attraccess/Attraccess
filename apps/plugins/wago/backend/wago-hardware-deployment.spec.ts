@@ -117,7 +117,7 @@ if (args[0] === 'container' && args[1] === 'ls') {
 } else if (args[0] === 'inspect') {
   const c = containers.find(c => c.id === args.at(-1));
   if (!c || process.env.FAULT === 'docker-inspect-failed') process.exit(1);
-  console.log(args[2] === '{{.Name}}' ? '/' + c.name : c.mounts.join('\\n'));
+  console.log(args[2] === '{{.Name}}' ? '/' + c.name : args[2] === '{{.HostConfig.Privileged}}' ? String(Boolean(c.privileged)) : c.mounts.join('\\n'));
 } else process.exit(99);
 `,
       0o700,
@@ -206,6 +206,11 @@ if (action === 'start') {
     expect(report().stdout).toContain('exclusivity=clear');
   });
 
+  it('rejects privileged containers even without an output bind mount', () => {
+    file('containers.json', JSON.stringify([{ id: 'other', name: 'other', mounts: [], privileged: true }]));
+    expect(report().stdout).toContain('exclusivity=output-container-conflict');
+  });
+
   it('distinguishes missing package, installed stopped runtime and unknown service status', () => {
     file('daemon', 'stopped');
     expect(report().stdout).toContain(
@@ -237,7 +242,7 @@ if (action === 'start') {
     expect(() => wagoDockerProvisionScript({ ...review, token: 'invalid' })).toThrow('token');
   });
 
-  it('starts only a reviewed stopped runtime, and preserves an idempotent restoration receipt', () => {
+  it('starts only a reviewed stopped runtime, and retains a token-bound restoration receipt for acknowledgement retries', () => {
     file('daemon', 'stopped');
     expect(provision().status).toBe(0);
     expect(readFileSync(join(root, 'daemon'), 'utf8')).toBe('running');
@@ -247,6 +252,9 @@ if (action === 'start') {
     expect(readFileSync(join(root, 'mutations'), 'utf8')).toBe('start\nstop\n');
     expect(run(wagoDockerProvisionFinishScript(token, 'restored', root)).status).toBe(0);
     expect(existsSync(join(root, 'etc/attraccess-wago/docker-provision'))).toBe(false);
+    expect(existsSync(join(root, `etc/attraccess-wago/docker-provision.restored-${token}/token`))).toBe(true);
+    expect(run(wagoDockerProvisionFinishScript(token, 'restored', root)).status).toBe(0);
+    expect(run(wagoDockerProvisionFinishScript('b'.repeat(32), 'restored', root)).status).not.toBe(0);
   });
 
   it.each(['start-failed', 'start-killed'])('recovers a partial activation: %s', (fault) => {

@@ -65,9 +65,23 @@ export class WagoCommissioningReadiness implements OnModuleDestroy {
             // Validate the additional commissioning fields from the already decoded payload.
             const value = JSON.parse(message.payload.toString('utf8')) as Record<string, unknown>;
             const readiness = value.readiness;
+            if (timestamp > now || (event.contentHash !== null && !/^[a-f0-9]{64}$/i.test(event.contentHash))) {
+              current.state = undefined;
+              return;
+            }
             if (
-              timestamp > now ||
-              (event.contentHash !== null && !/^[a-f0-9]{64}$/i.test(event.contentHash)) ||
+              current.stream.activeStream &&
+              current.stream.activeStream !== event.streamId &&
+              timestamp <= current.stream.lastSourceTime
+            )
+              return;
+            // Advance the watermark before rejecting an otherwise canonical state
+            // whose commissioning-only readiness fields are malformed.
+            if (admitEnvelope(current.stream, event, 'state', now) === 'rejected') {
+              if (current.stream.trackingExhausted) current.state = undefined;
+              return;
+            }
+            if (
               !readiness ||
               typeof readiness !== 'object' ||
               !('configurationAccepted' in readiness) ||
@@ -78,18 +92,6 @@ export class WagoCommissioningReadiness implements OnModuleDestroy {
               typeof readiness.ready !== 'boolean'
             ) {
               current.state = undefined;
-              return;
-            }
-            if (
-              current.stream.activeStream &&
-              current.stream.activeStream !== event.streamId &&
-              timestamp <= current.stream.lastSourceTime
-            )
-              return;
-            // Keep admission history when usable readiness is invalidated. A malformed
-            // publication must never allow an older ready sample or retired boot back in.
-            if (admitEnvelope(current.stream, event, 'state', now) === 'rejected') {
-              if (current.stream.trackingExhausted) current.state = undefined;
               return;
             }
             current.state = {

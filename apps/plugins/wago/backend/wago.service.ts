@@ -329,10 +329,9 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
               (saved) => ({ ...details, after: wagoAuditSummary(JSON.parse(saved.snapshot)) }),
             );
         }
+        const previousProfiles = (before as WagoConfigurationSnapshot | null)?.modbus?.profiles;
         for (const profile of candidate.modbus?.profiles ?? []) {
-          const old = (before as WagoConfigurationSnapshot | null)?.modbus?.profiles.find(
-            (entry) => entry.id === profile.id,
-          );
+          const old = Array.isArray(previousProfiles) ? previousProfiles.find((entry) => entry.id === profile.id) : undefined;
           if (old && configurationHash(old) === configurationHash(profile)) continue;
           const operation = persist;
           const details = { profileId: profile.id, profileVersion: profile.version, before: wagoAuditSummary(before) };
