@@ -49,6 +49,7 @@ export class SimulatorDeviceAdapter implements DeviceAdapter {
 
   restore(snapshot: Snapshot | undefined, outputs: Record<string, boolean>): void {
     if (!snapshot) return;
+    this.snapshot = snapshot;
     for (const channel of snapshot.logicalChannels) {
       if (!channel.capabilities.includes('output') || outputs[channel.id] === undefined) continue;
       const point = snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
