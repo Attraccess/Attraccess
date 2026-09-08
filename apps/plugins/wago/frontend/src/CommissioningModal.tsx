@@ -17,6 +17,11 @@ import { AlertCircleIcon, CheckCircle2Icon, CpuIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { CommissioningSession } from './api';
 import { getCommissioningVerification } from './api';
+import { RuntimeArtifactImport } from './RuntimeArtifactImport';
+import type { RuntimeArtifactInfo } from './RuntimeArtifactImport';
+import { CommissioningSecurityPanel } from './CommissioningSecurityPanel';
+import { CommissioningPlatformPreflight } from './CommissioningPlatformPreflight';
+import { CommissioningOperationStatus } from './CommissioningOperationStatus';
 import { useQuery } from '@tanstack/react-query';
 import { commissioningLabel } from './ControllersTable';
 import { StandardDrawer } from './drawer';
@@ -35,9 +40,15 @@ interface CommissioningModalProps {
   isOpen: boolean;
   session: CommissioningSession | null;
   onOpenChange: (isOpen: boolean) => void;
+  onConfigure?: (controllerId: number) => void;
 }
 
-export function CommissioningModal({ isOpen, session: resumedSession, onOpenChange }: CommissioningModalProps) {
+export function CommissioningModal({
+  isOpen,
+  session: resumedSession,
+  onOpenChange,
+  onConfigure,
+}: CommissioningModalProps) {
   const createSessionMutation = useCreateCommissioningSessionMutation();
   const confirmHostKeyMutation = useConfirmCommissioningHostKeyMutation();
   const deliverSessionMutation = useDeliverCommissioningSessionMutation();
@@ -47,11 +58,18 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
   const mqttServersQuery = useMqttServersQuery();
   const commissioningSessionsQuery = useCommissioningSessionsQuery();
   const [createdSession, setCreatedSession] = useState<CommissioningSession | null>(null);
+  const [artifactBusy, setArtifactBusy] = useState(false);
+  const [selectedArtifact, setSelectedArtifact] = useState<RuntimeArtifactInfo | null>(null);
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [controllerIp, setControllerIp] = useState('');
   const [mqttServerId, setMqttServerId] = useState<Key | null>(null);
   const [hostKeyFingerprint, setHostKeyFingerprint] = useState('');
+  const [isolatedIdentity, setIsolatedIdentity] = useState(false);
+  useEffect(() => {
+    setIsolatedIdentity(false);
+    setHostKeyFingerprint('');
+  }, [resumedSession?.id, isOpen]);
   const [sshUsername, setSshUsername] = useState('');
   const [sshPassword, setSshPassword] = useState('');
   const [confirmInstall, setConfirmInstall] = useState(false);
@@ -101,6 +119,7 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
     setRecoveryPassword('');
     setConfirmRecovery(false);
     setHostKeyFingerprint('');
+    setIsolatedIdentity(false);
   }, [isOpen, resumedSession?.id]);
 
   useEffect(() => {
@@ -129,6 +148,7 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
     setConfirmRecovery(false);
     createSessionMutation.reset();
     confirmHostKeyMutation.reset();
+    confirmHostKeyMutation.reset();
     deliverSessionMutation.reset();
     recoverSessionMutation.reset();
     removeSessionMutation.reset();
@@ -136,9 +156,15 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
   }
 
   function createSession() {
+    if (artifactBusy || !selectedArtifact) return;
     if (selectedMqttServerId === null) return;
     createSessionMutation.mutate(
-      { name, targetHost: controllerIp, mqttServerId: selectedMqttServerId },
+      {
+        name,
+        targetHost: controllerIp,
+        mqttServerId: selectedMqttServerId,
+        runtimeArtifactDigest: selectedArtifact?.digest,
+      },
       {
         onSuccess: (created) => {
           setCreatedSession(created);
@@ -186,14 +212,23 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
 
   function confirmHostKey() {
     if (!session) return;
-    confirmHostKeyMutation.mutate({ id: session.id, hostKeyFingerprint });
+    confirmHostKeyMutation.mutate({
+      id: session.id,
+      hostKeyFingerprint: isolatedIdentity ? session.hostKeyFingerprint : hostKeyFingerprint,
+      physicalIdentityConfirmed: isolatedIdentity,
+    });
+  }
+
+  function configureController(controllerId: number) {
+    close();
+    onConfigure?.(controllerId);
   }
 
   const activeStep = session ? sessionStep(session) : step;
   const title = session?.controllerName || name || 'New CC100 controller';
 
   return (
-    <StandardDrawer isOpen={isOpen} onOpenChange={(open) => !open && close()}>
+    <StandardDrawer ariaLabel="Commission a controller" isOpen={isOpen} onOpenChange={(open) => !open && close()}>
       <DrawerHeader>
         <h2 className="wg:text-xl wg:font-semibold">Commission a controller</h2>
       </DrawerHeader>
@@ -203,6 +238,7 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
           <div className="wg:min-w-0 wg:space-y-5">
             <StepHeading step={activeStep} />
             {loadingStatus && <OperationStatus title={loadingStatus[0]} description={loadingStatus[1]} />}
+            {session && <CommissioningOperationStatus key={`operation-${session.id}`} sessionId={session.id} />}
             {!session && activeStep === 0 && <NameStep name={name} onNameChange={setName} />}
             {!session && activeStep === 1 && (
               <ConnectionStep
@@ -213,12 +249,36 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
                 onMqttServerIdChange={setMqttServerId}
               />
             )}
+            {!session && activeStep === 1 && (
+              <RuntimeArtifactImport
+                disabled={isLoading}
+                onBusyChange={setArtifactBusy}
+                onSelectionChange={setSelectedArtifact}
+              />
+            )}
+            {session?.runtimeArtifactDigest && (
+              <p className="wg:break-all wg:text-sm">
+                Pinned signed release: <code>{session.runtimeArtifactDigest}</code>. Retries keep this release.
+              </p>
+            )}
             {session?.state === 'awaiting_identity_confirmation' && (
               <HostKeyConfirmationStep
                 fingerprint={hostKeyFingerprint}
                 expectedFingerprint={session.hostKeyFingerprint}
                 onFingerprintChange={setHostKeyFingerprint}
               />
+            )}
+            {session?.state === 'awaiting_identity_confirmation' && (
+              <Checkbox isSelected={isolatedIdentity} onChange={setIsolatedIdentity}>
+                <Checkbox.Control>
+                  <Checkbox.Indicator />
+                </Checkbox.Control>
+                <Checkbox.Content>
+                  Alternatively, I verified the physical 751-9301 label and connected this controller as the only device
+                  on an isolated service network. I accept first-key pinning on that connection, not independent
+                  cryptographic identity verification. Do not select this on a shared LAN.
+                </Checkbox.Content>
+              </Checkbox>
             )}
             {session && activeStep === 2 && session.state !== 'awaiting_identity_confirmation' && (
               <DeliveryStep
@@ -233,9 +293,15 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
               />
             )}
             {session && activeStep === 3 && <ProgressStep name={title} session={session} />}
-            {session && ['awaiting_verification', 'completed'].includes(session.state) && (
-              <VerificationStatus session={session} />
-            )}
+            {session &&
+              session.state !== 'awaiting_identity_confirmation' &&
+              (canInstall(session) || session.dockerProvisionState) && (
+                <CommissioningPlatformPreflight key={`preflight-${session.id}`} session={session} />
+              )}
+            {session &&
+              (['awaiting_verification', 'completed'].includes(session.state) || session.managementControllerId) && (
+                <VerificationStatus session={session} onConfigure={onConfigure ? configureController : undefined} />
+              )}
             {session && canRecover(session) && (
               <div className="wg:space-y-4">
                 <Alert status="warning">
@@ -282,6 +348,7 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
             {createSessionMutation.isError && <ErrorAlert error={createSessionMutation.error} />}
             {confirmHostKeyMutation.isError && <ErrorAlert error={confirmHostKeyMutation.error} />}
             {deliverSessionMutation.isError && <ErrorAlert error={deliverSessionMutation.error} />}
+            {removeSessionMutation.isError && <ErrorAlert error={removeSessionMutation.error} />}
             {recoverSessionMutation.isError && <ErrorAlert error={recoverSessionMutation.error} />}
             {isCancelConfirmationOpen && (
               <Alert status="warning">
@@ -296,7 +363,7 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
           </div>
         </div>
       </DrawerBody>
-      <DrawerFooter>
+      <DrawerFooter className="wg:flex-wrap">
         {session && canRecover(session) && (
           <Button
             variant="danger"
@@ -311,7 +378,13 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
           {isCancelConfirmationOpen ? 'Keep enrollment' : 'Close'}
         </Button>
         {!session && activeStep === 0 && (
-          <Button isDisabled={!name.trim()} onPress={() => setStep(1)}>
+          <Button
+            isDisabled={!name.trim()}
+            onPress={() => {
+              setArtifactBusy(true);
+              setStep(1);
+            }}
+          >
             Continue
           </Button>
         )}
@@ -319,6 +392,8 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
           <Button
             isPending={isLoading}
             isDisabled={
+              artifactBusy ||
+              !selectedArtifact ||
               !controllerIp.trim() ||
               selectedMqttServerId === null ||
               mqttServersQuery.isPending ||
@@ -332,7 +407,7 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
         {session?.state === 'awaiting_identity_confirmation' && (
           <Button
             isPending={isLoading}
-            isDisabled={!hostKeyFingerprint || hostKeyFingerprint !== session.hostKeyFingerprint}
+            isDisabled={!isolatedIdentity && (!hostKeyFingerprint || hostKeyFingerprint !== session.hostKeyFingerprint)}
             onPress={confirmHostKey}
           >
             {isLoading ? 'Confirming identity' : 'Confirm host key'}
@@ -353,18 +428,17 @@ export function CommissioningModal({ isOpen, session: resumedSession, onOpenChan
         )}
         {session &&
           session.state !== 'completed' &&
-          session.state !== 'revoked' &&
           (isCancelConfirmationOpen ? (
             <Button
               variant="danger"
               isPending={isLoading}
               onPress={() => removeSessionMutation.mutate(session.id, { onSuccess: close })}
             >
-              {isLoading ? 'Canceling enrollment' : 'Confirm cancellation'}
+              {isLoading ? 'Removing record' : 'Confirm cancellation'}
             </Button>
           ) : (
             <Button variant="secondary" isDisabled={isLoading} onPress={() => setCancelConfirmationOpen(true)}>
-              Cancel enrollment
+              {session.state === 'revoked' ? 'Delete commissioning record' : 'Cancel enrollment'}
             </Button>
           ))}
       </DrawerFooter>
@@ -576,13 +650,16 @@ function canInstall(session: CommissioningSession) {
 }
 
 function canRecover(session: CommissioningSession) {
-  return [
-    'delivery_failed',
-    'awaiting_discovery',
-    'awaiting_verification',
-    'claim_interrupted',
-    'recovery_revocation_pending',
-  ].includes(session.state);
+  return (
+    !!session.runtimeRecoveryAvailable ||
+    [
+      'delivery_failed',
+      'awaiting_discovery',
+      'awaiting_verification',
+      'claim_interrupted',
+      'recovery_revocation_pending',
+    ].includes(session.state)
+  );
 }
 
 function CredentialFields({
@@ -649,9 +726,10 @@ function DeliveryStep({
             <Alert.Content>
               <Alert.Title>Review this installation attempt</Alert.Title>
               <Alert.Description>
-                Installing on {session.targetHost} can interrupt CODESYS and replaces an existing Attraccess runtime
-                container. Make sure connected equipment can safely tolerate the interruption and replacement.
-                Installation does not certify the controller as hardened or the connected equipment as ready for use.
+                Installing on {session.targetHost} replaces an existing Attraccess runtime container. Make sure
+                connected equipment can safely tolerate the interruption. An active CODESYS workload blocks this release
+                until its backup and restoration procedure is qualified; it will not be stopped automatically.
+                Installation does not certify management hardening or physical readiness.
               </Alert.Description>
             </Alert.Content>
           </Alert>
@@ -673,8 +751,8 @@ function DeliveryStep({
               <Checkbox.Control>
                 <Checkbox.Indicator />
               </Checkbox.Control>
-              I approve CODESYS interruption and replacement of the existing Attraccess runtime container for this
-              installation attempt.
+              I approve interruption and replacement of the existing Attraccess runtime container for this installation
+              attempt.
             </Checkbox.Content>
           </Checkbox>
           <p className="wg:text-sm wg:text-muted">
@@ -714,33 +792,54 @@ function ProgressStep({ name, session }: { name: string; session: CommissioningS
   );
 }
 
-function VerificationStatus({ session }: { session: CommissioningSession }) {
+function VerificationStatus({
+  session,
+  onConfigure,
+}: {
+  session: CommissioningSession;
+  onConfigure?: (controllerId: number) => void;
+}) {
   const verification = useQuery({
     queryKey: ['wago', 'commissioning-verification', session.id],
     queryFn: () => getCommissioningVerification(session.id),
     refetchInterval: 5000,
   });
+  const controllerId = verification.data?.controllerId ?? session.managementControllerId;
   return (
-    <Alert status="warning">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title>Commissioning is not yet verified</Alert.Title>
-        <Alert.Description>
-          {verification.isError ? (
-            'Verification could not be loaded. No readiness claim is made.'
-          ) : verification.data ? (
-            <ul>
-              <li>Permanent heartbeat: {verification.data.permanentConnection ? 'received' : 'pending'}</li>
-              <li>Enrollment credential revoked: {verification.data.enrollmentRevoked ? 'verified' : 'pending'}</li>
-              <li>Desired/reported configuration: {verification.data.configurationApplied ? 'applied' : 'pending'}</li>
-              <li>Management hardening and physical hardware readiness: unverified</li>
-            </ul>
-          ) : (
-            'Checking commissioning evidence...'
+    <div className="wg:space-y-3">
+      <Alert status="warning">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>Commissioning is not yet verified</Alert.Title>
+          <Alert.Description>
+            {verification.isError ? (
+              'Verification could not be loaded. No readiness claim is made.'
+            ) : verification.data ? (
+              <ul>
+                <li>Permanent heartbeat: {verification.data.permanentConnection ? 'received' : 'pending'}</li>
+                <li>Enrollment credential revoked: {verification.data.enrollmentRevoked ? 'verified' : 'pending'}</li>
+                <li>
+                  Desired/reported configuration: {verification.data.configurationApplied ? 'applied' : 'pending'}
+                </li>
+                <li>Runtime hardware probe: {verification.data.hardwareReadiness ?? 'unverified'}</li>
+                <li>Management hardening: {verification.data.managementHardening}</li>
+                <li>Physical qualification: required before production use</li>
+              </ul>
+            ) : (
+              'Checking commissioning evidence...'
+            )}
+          </Alert.Description>
+        </Alert.Content>
+      </Alert>
+      {controllerId && (
+        <>
+          {onConfigure && verification.data?.controllerId && (
+            <Button onPress={() => onConfigure(verification.data.controllerId)}>Configure inputs and outputs</Button>
           )}
-        </Alert.Description>
-      </Alert.Content>
-    </Alert>
+          <CommissioningSecurityPanel key={session.id} sessionId={session.id} controllerId={controllerId} />
+        </>
+      )}
+    </div>
   );
 }
 

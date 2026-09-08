@@ -7,3 +7,6 @@ export * from './migrations/1780000000005-add-wago-commissioning-enrollment';
 export * from './migrations/1780000000006-add-wago-commissioning-claim-details';
 export * from './migrations/1780000000007-add-wago-commissioning-progress';
 export * from './migrations/1780000000008-add-wago-commissioning-delivery-token';
+export * from './migrations/1780000000009-add-wago-commissioning-principal';
+export * from './wago-management.migration';
+export * from './wago-commissioning-lease.migration';

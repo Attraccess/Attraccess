@@ -17,6 +17,7 @@ import { WagoService } from './wago.service';
 import { WagoCommissioningService } from './wago-commissioning.service';
 import type { WagoPresetApplication } from './configuration';
 import { WagoAudit, wagoAuditPrincipal } from './wago-audit';
+import { commissioningPrincipal } from './wago-commissioning-audit';
 
 type CommissioningAttemptInput = { confirmInstall?: boolean; temporarySsh?: { username?: string; password?: string } };
 
@@ -89,13 +90,29 @@ export class WagoControllerApi {
   }
   @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/deliver')
-  deliverCommissioningSession(@Param('id', ParseIntPipe) id: number, @Body() body: CommissioningAttemptInput) {
-    return this.commissioning.deliver(id, validateCommissioningAttempt(body, 'installation'));
+  deliverCommissioningSession(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: CommissioningAttemptInput,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.commissioning.deliver(
+      id,
+      validateCommissioningAttempt(body, 'installation'),
+      commissioningPrincipal(request),
+    );
   }
   @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/recover')
-  recoverCommissioningSession(@Param('id', ParseIntPipe) id: number, @Body() body: CommissioningAttemptInput) {
-    return this.commissioning.recover(id, validateCommissioningAttempt(body, 'recovery'));
+  recoverCommissioningSession(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: CommissioningAttemptInput,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.commissioning.recover(
+      id,
+      validateCommissioningAttempt(body, 'recovery'),
+      commissioningPrincipal(request),
+    );
   }
   @Auth('system.settings.manage')
   @Get('commissioning/sessions/:id/verification')

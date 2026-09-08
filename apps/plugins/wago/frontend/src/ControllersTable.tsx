@@ -33,7 +33,14 @@ export function ControllersTable({
   onRemove,
   onResume,
 }: ControllersTableProps) {
-  const activeSessions = sessions.filter((session) => session.state !== 'completed' && session.state !== 'revoked');
+  const activeSessions = sessions.filter(
+    (session) =>
+      session.state !== 'completed' &&
+      (session.state !== 'revoked' ||
+        !!session.runtimeRecoveryAvailable ||
+        !!session.dockerProvisionState ||
+        !!session.managementControllerId),
+  );
   const rows: TableRowData[] = [
     ...controllers.map((controller) => ({
       key: `controller-${controller.id}`,
@@ -135,7 +142,7 @@ function ControllerRow({
               Configure
             </Button>
           )}
-          <Button color="danger" size="sm" variant="ghost" onPress={() => onRemove(controller)}>
+          <Button size="sm" variant="danger" onPress={() => onRemove(controller)}>
             Remove
           </Button>
         </div>

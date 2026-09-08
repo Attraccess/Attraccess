@@ -51,6 +51,7 @@ describe('hardware deployment shell fixtures (isolated files and fake management
       mkdir: '/bin/mkdir',
       mktemp: '/usr/bin/mktemp',
       mv: '/bin/mv',
+      ls: '/bin/ls',
       chmod: '/bin/chmod',
       rm: '/bin/rm',
       touch: '/usr/bin/touch',
@@ -131,6 +132,7 @@ const state = fs.readFileSync(root + '/daemon', 'utf8');
 if (action === 'status') process.exit(process.env.FAULT === 'unknown-status' ? 4 : state === 'running' ? 0 : 3);
 fs.appendFileSync(root + '/mutations', action + '\\n');
 if (action === 'start') {
+  fs.mkdirSync(root + '/var/lib/docker/containers', { recursive: true });
   fs.writeFileSync(root + '/daemon', 'running');
   if (process.env.FAULT === 'start-failed') process.exit(1);
   if (process.env.FAULT === 'start-killed') process.kill(process.ppid, 'SIGKILL');
@@ -253,6 +255,22 @@ if (action === 'start') {
     expect(recover('stop-failed').status).not.toBe(0);
     expect(recover().status).toBe(0);
     expect(readFileSync(join(root, 'daemon'), 'utf8')).toBe('stopped');
+  });
+
+  it('can activate again after recovery leaves initialized but empty Docker storage', () => {
+    file('daemon', 'stopped');
+    expect(provision().status).toBe(0);
+    expect(recover().status).toBe(0);
+    expect(run(wagoDockerProvisionFinishScript(token, 'restored', root)).status).toBe(0);
+    expect(existsSync(join(root, 'var/lib/docker/containers'))).toBe(true);
+    expect(provision().status).toBe(0);
+  });
+
+  it('refuses initialized storage containing container metadata', () => {
+    file('daemon', 'stopped');
+    file('var/lib/docker/containers/existing/config.v2.json', '{}');
+    expect(provision().status).not.toBe(0);
+    expect(existsSync(join(root, 'mutations'))).toBe(false);
   });
 
   it('keeps an already-running daemon unchanged and refuses concurrent delivery/lock conflicts', () => {
