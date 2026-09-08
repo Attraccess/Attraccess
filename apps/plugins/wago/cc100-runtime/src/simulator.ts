@@ -92,6 +92,7 @@ function connectOperational(state: SimulatorState): void {
   client = operationalClient;
   operationalClient.on('error', logConnectionError);
   device.restore(state.accepted?.snapshot, state.outputs);
+  if (state.accepted) device.activate(state.accepted.snapshot);
   const operationalRuntime = runtime(operationalClient, state.credentials.prefix);
   let initialized = false;
   let starting = false;

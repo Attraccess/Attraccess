@@ -172,6 +172,7 @@ export class WagoRuntime {
           await this.queueStateUpdate(async () => {
             await this.options.store.save({ ...this.state, accepted });
             this.state.accepted = accepted;
+            this.options.device.activate?.(accepted.snapshot);
           });
         });
       } catch {

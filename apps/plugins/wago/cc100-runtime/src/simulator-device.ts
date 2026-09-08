@@ -32,9 +32,12 @@ export class SimulatorDeviceAdapter implements DeviceAdapter {
     return value;
   }
 
-  validate(snapshot: Snapshot): [] {
-    this.snapshot = snapshot;
+  validate(_snapshot: Snapshot): [] {
     return [];
+  }
+
+  activate(snapshot: Snapshot): void {
+    this.snapshot = snapshot;
   }
 
   async readChannel(channelId: string): Promise<boolean | number> {
