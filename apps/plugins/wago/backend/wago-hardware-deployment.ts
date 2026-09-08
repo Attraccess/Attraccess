@@ -114,6 +114,8 @@ if [ -n "$docker_cli" ] && [ -n "$daemon_cli" ]; then
         name=$(docker inspect --format '{{.Name}}' "$container") || exit 1
         # The installer stops this exact predecessor under the shared lock.
         [ "$name" != /attraccess-wago ] || continue
+        privileged=$(docker inspect --format '{{.HostConfig.Privileged}}' "$container") || exit 1
+        [ "$privileged" != true ] || exclusivity=output-container-conflict
         mounts=$(docker inspect --format '{{range .Mounts}}{{if eq .Type "bind"}}{{.Source}}{{"\\n"}}{{end}}{{end}}' "$container") || exit 1
         conflict=0
         while IFS= read -r source; do
@@ -263,13 +265,22 @@ export function wagoDockerProvisionFinishScript(
   if (outcome !== 'accepted' && outcome !== 'restored') throw new Error('Invalid provisioning outcome');
   return `${provisionLock(token, testRoot)}
 cleanup="$journal.${outcome}-$token"
-if test -d "$cleanup" && test ! -e "$journal"; then rm -rf "$cleanup"; exit 0; fi
+if test -d "$cleanup" && test ! -L "$cleanup" && test ! -e "$journal"; then
+  test "$(cat "$cleanup/token")" = "$token" || fail 'Docker provisioning token mismatch'
+  test -f "$cleanup/${outcome === 'accepted' ? 'started' : 'restored'}" || fail 'Provisioning outcome not verified'
+  ${outcome === 'accepted' ? `test ! -e "$cleanup/restored" || fail 'Docker provisioning was restored'` : ''}
+  exit 0
+fi
+if test ! -e "$journal"; then
+  for receipt in "$config"/docker-provision.${outcome}-*; do
+    test ! -e "$receipt" || fail 'Docker provisioning token mismatch'
+  done
+fi
 ${outcome === 'restored' ? 'if test ! -e "$journal"; then exit 0; fi' : ''}
 test -d "$journal" && test ! -L "$journal" || fail 'No Docker provisioning journal'
 test "$(cat "$journal/token")" = "$token" || fail 'Docker provisioning token mismatch'
 test -f "$journal/${outcome === 'accepted' ? 'started' : 'restored'}" || fail 'Provisioning outcome not verified'
 ${outcome === 'accepted' ? `test ! -e "$journal/restored" || fail 'Docker provisioning was restored'` : ''}
 mv "$journal" "$cleanup"
-rm -rf "$cleanup"
 `;
 }

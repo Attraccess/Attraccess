@@ -63,6 +63,14 @@ describe('bounded commissioning runtime readiness', () => {
     expect(service.observe(1, 'fixture', 'attraccess/wago')).toBeUndefined();
   });
 
+  it('advances the state watermark before rejecting malformed readiness fields', () => {
+    send(payload);
+    send({ ...payload, sequence: 2, readiness: { ...payload.readiness, configurationAccepted: 'true' } });
+    expect(service.observe(1, 'fixture', 'attraccess/wago')).toBeUndefined();
+    send(payload);
+    expect(service.observe(1, 'fixture', 'attraccess/wago')).toBeUndefined();
+  });
+
   it('rejects duplicate sequences even when their timestamp is later', () => {
     send({
       ...payload,

@@ -60,8 +60,9 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   private readonly waiters = new Set<Waiter>();
   private readonly waitersByKey = new Map<string, Set<Waiter>>();
   private readonly subscriptions: PluginMqttSubscription[] = [];
-  private readonly dispatches: Array<{ state: CachedState; previous?: CachedState }> = [];
+  private readonly dispatches: Array<{ state: CachedState }> = [];
   private readonly lastDispatchAtByNode = new Map<string, number>();
+  private readonly lastEmittedMeasurementByNode = new Map<string, CachedState>();
   private dispatching = false;
   private readonly controllerMessages = new Map<string, Promise<void>>();
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
@@ -396,7 +397,6 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
         Date.parse(event.timestamp) < (this.streams.get(controller.id)?.sampleNotBefore ?? 0),
     };
     const cacheKey = this.cacheKey(controller.id, channelId, event.category);
-    const previous = this.cache.get(cacheKey);
     this.cache.set(cacheKey, state);
     if (this.cache.size > MAX_CACHE_ENTRIES) {
       const oldest = this.cache.keys().next().value;
@@ -407,7 +407,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       this.context.logger.warn(`Dropping excess WAGO flow dispatch for ${controller.hardwareId}`);
       return;
     }
-    this.dispatches.push({ state, previous });
+    this.dispatches.push({ state });
     if (!this.dispatching) void this.dispatch();
   }
   private async channels(controllerId: number): Promise<WagoConfigurationSnapshot['logicalChannels']> {
@@ -488,7 +488,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     config: Record<string, unknown>,
     nodeId: string,
     state: CachedState,
-    previous?: CachedState,
+    _previous?: CachedState,
   ): boolean {
     if (
       config.controllerId !== state.controllerId ||
@@ -496,14 +496,15 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       config.category !== state.category
     )
       return false;
+    const emitted = this.lastEmittedMeasurementByNode.get(nodeId);
     if (
       typeof config.minimumChange === 'number' &&
       typeof state.value === 'number' &&
-      typeof previous?.value === 'number' &&
-      previous.streamId === state.streamId &&
-      previous.unit === state.unit &&
-      previous.kind === state.kind &&
-      Math.abs(state.value - previous.value) < config.minimumChange
+      typeof emitted?.value === 'number' &&
+      emitted.streamId === state.streamId &&
+      emitted.unit === state.unit &&
+      emitted.kind === state.kind &&
+      Math.abs(state.value - emitted.value) < config.minimumChange
     )
       return false;
     if (typeof config.minimumIntervalMs === 'number') {
@@ -511,6 +512,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       if (lastDispatchAt !== undefined && state.receivedAt - lastDispatchAt < config.minimumIntervalMs) return false;
       this.lastDispatchAtByNode.set(nodeId, state.receivedAt);
     }
+    if (state.category === 'measurement') this.lastEmittedMeasurementByNode.set(nodeId, state);
     return true;
   }
   private matchesCondition(state: CachedState, config: Record<string, unknown>): boolean {
@@ -554,13 +556,13 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     while (this.dispatches.length) {
       const dispatch = this.dispatches.shift();
       if (!dispatch) continue;
-      const { state, previous } = dispatch;
+      const { state } = dispatch;
       const stream = this.streams.get(state.controllerId);
       if (stream?.active !== state.streamId || stream.exhausted) continue;
       try {
         await this.context.flows.trigger(
           'plugin.wago.event-received',
-          (config, nodeId) => this.matchesEvent(config, nodeId, state, previous),
+          (config, nodeId) => this.matchesEvent(config, nodeId, state),
           { wago: this.payload(state) },
         );
       } catch (error) {
