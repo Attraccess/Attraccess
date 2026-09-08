@@ -52,13 +52,17 @@ VirtualNfc::VirtualNfc(ProfileStore &profile) : profile(profile)
 
 void VirtualNfc::setCard(const Card &card)
 {
-    const bool wasPresent = currentCard.present;
     currentCard = card;
     save();
-    if (wasPresent && cardDetectionEnabled && cardRemovedCallback)
-        cardRemovedCallback(0);
-    if (currentCard.present && cardDetectionEnabled && cardDetectedCallback)
-        cardDetectedCallback(currentCard.uid.data(), currentCard.uidLength);
+
+    // A replacement is a removal followed by a new presentation.
+    if (cardPresenceReported)
+    {
+        cardPresenceReported = false;
+        if (cardDetectionEnabled && cardRemovedCallback)
+            cardRemovedCallback(0);
+    }
+    reconcileCardPresence();
 }
 
 void VirtualNfc::setPresent(bool present)
@@ -68,10 +72,12 @@ void VirtualNfc::setPresent(bool present)
 
     currentCard.present = present;
     save();
-    if (present && cardDetectionEnabled && cardDetectedCallback)
-        cardDetectedCallback(currentCard.uid.data(), currentCard.uidLength);
-    if (!present && cardDetectionEnabled && cardRemovedCallback)
-        cardRemovedCallback(0);
+    reconcileCardPresence();
+}
+
+void VirtualNfc::loop()
+{
+    reconcileCardPresence();
 }
 
 void VirtualNfc::setFaults(bool failAuthentication, bool failWrite)
@@ -228,4 +234,16 @@ bool VirtualNfc::decode(const std::string &value, Card &card)
 void VirtualNfc::save()
 {
     profile.put(StorageKey, encode(currentCard));
+}
+
+void VirtualNfc::reconcileCardPresence()
+{
+    if (!cardDetectionEnabled || currentCard.present == cardPresenceReported)
+        return;
+
+    cardPresenceReported = currentCard.present;
+    if (cardPresenceReported && cardDetectedCallback)
+        cardDetectedCallback(currentCard.uid.data(), currentCard.uidLength);
+    if (!cardPresenceReported && cardRemovedCallback)
+        cardRemovedCallback(0);
 }

@@ -14,6 +14,9 @@ public:
         CARD_TYPE_DESFIRE,
     };
 
+    static constexpr uint8_t CARD_KEY_VERSION_FREE = 0x00;
+    static constexpr uint8_t CARD_KEY_VERSION_ENROLLED = 0x01;
+
     virtual ~INfc() = default;
     virtual void setup() = 0;
     virtual void loop() = 0;
