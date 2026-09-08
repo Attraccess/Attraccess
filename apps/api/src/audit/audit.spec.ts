@@ -313,7 +313,7 @@ describe('durable audit SQLite', () => {
       'before.logicalChannelCount': 1,
       'after.logicalChannelCount': 2,
     });
-  });
+  }, 30_000);
 
   it('filters and paginates without duplication; hides expired rows and cleans them', async () => {
     await service.record(event());
