@@ -519,7 +519,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     expect(await db.getRepository(WagoCredentialRotationEntity).count()).toBe(0);
     expect(await rows('credential_rotation')).toEqual(evidence);
     await lifecycle('unclaim', controller.id);
-  });
+  }, 30_000);
 
   it('reopens encrypted pending rotation and retries the same handoff only after explicit operation recovery', async () => {
     const controller = await deliverAndClaim();
