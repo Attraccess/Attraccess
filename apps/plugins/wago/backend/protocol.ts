@@ -299,4 +299,3 @@ function isBooleanRecord(value: unknown): boolean {
     Object.values(value).every((item) => typeof item === 'boolean')
   );
 }
-import { type Measurement, parseMeasurement } from '../measurement-contract';
