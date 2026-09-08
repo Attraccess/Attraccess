@@ -14,6 +14,9 @@ const key = generateManagementKey();
 let root: string, home: string, bin: string;
 let watchdogPid: number | undefined;
 const fixtureUser = process.getuid?.() === 0 ? { uid: 65534, gid: 65534 } : undefined;
+const chownFixture = async (file: string) => {
+  if (fixtureUser !== undefined) await chown(file, fixtureUser.uid, fixtureUser.gid);
+};
 const path = (...parts: string[]) => join(home, '.ssh', ...parts);
 const env = () => ({ ...process.env, HOME: home, PATH: `${bin}:${process.env.PATH}` });
 const command = (action: ManagementShellAction, seconds = 180, selectedToken = token) =>
@@ -86,7 +89,7 @@ afterEach(async () => {
 
 async function prepared() {
   await writeFile(path('authorized_keys'), '# existing key\n', { mode: 0o600 });
-  if (fixtureUser !== undefined) await chown(path('authorized_keys'), fixtureUser.uid, fixtureUser.gid);
+  await chownFixture(path('authorized_keys'));
   await run('prepare');
   // Most tests inject the independent-watchdog acknowledgement; one below launches the real child.
   await writeFile(path('.attraccess-management-transaction', 'armed'), '');
@@ -171,7 +174,7 @@ describe('executable isolated management shell fixtures', () => {
     const holder = exec(
       '/bin/sh',
       ['-c', 'exec 9>>"$HOME/.ssh/.attraccess-management.lock"; flock -w 5 9; touch "$HOME/locked"; sleep 7'],
-      { env: env(), timeout: 10000 },
+      { env: env(), timeout: 10000, ...(fixtureUser === undefined ? {} : fixtureUser) },
     );
     await waitFor(async () => (await readdir(home)).includes('locked'));
     const watchdog = run('watchdog');
@@ -186,6 +189,7 @@ describe('executable isolated management shell fixtures', () => {
   it('reserves append space and rolls back an installed image of exactly 65536 bytes', async () => {
     const previous = '#'.repeat(65536 - Buffer.byteLength(key.publicKey) - 2);
     await writeFile(path('authorized_keys'), previous, { mode: 0o600 });
+    await chownFixture(path('authorized_keys'));
     await run('prepare');
     await writeFile(path('.attraccess-management-transaction', 'armed'), '');
     await run('install');
@@ -200,6 +204,7 @@ describe('executable isolated management shell fixtures', () => {
     async (size) => {
       const previous = '#'.repeat(size);
       await writeFile(path('authorized_keys'), previous, { mode: 0o600 });
+      await chownFixture(path('authorized_keys'));
       await run('prepare');
       await writeFile(path('.attraccess-management-transaction', 'armed'), '');
       await expect(run('install')).rejects.toBeDefined();
@@ -211,6 +216,7 @@ describe('executable isolated management shell fixtures', () => {
   it('a crash before token publication leaves no active journal and permits a fresh prepare', async () => {
     // Kill the shell immediately after allocating staging, before it can write a token.
     await writeFile(join(bin, 'mktemp'), '#!/bin/sh\n/usr/bin/mktemp "$@"\nkill -KILL "$PPID"\n', { mode: 0o700 });
+    await chownFixture(join(bin, 'mktemp'));
     await expect(run('prepare')).rejects.toBeDefined();
     const entries = await readdir(path());
     expect(entries).not.toContain('.attraccess-management-transaction');
@@ -255,11 +261,14 @@ describe('executable isolated management shell fixtures', () => {
     const flock = await readFile(join(bin, 'flock'));
     await writeFile(join(bin, 'flock'), '#!/bin/sh\necho attempt >> "$HOME/attempts"\nexit 1\n');
     await writeFile(join(bin, 'sleep'), '#!/bin/sh\necho pause >> "$HOME/pauses"\n', { mode: 0o700 });
+    await chownFixture(join(bin, 'flock'));
+    await chownFixture(join(bin, 'sleep'));
     await expect(run('watchdog')).rejects.toBeDefined();
     expect((await readFile(join(home, 'attempts'), 'utf8')).trim().split('\n')).toHaveLength(12);
     expect((await readFile(join(home, 'pauses'), 'utf8')).trim().split('\n')).toHaveLength(11);
     expect(await readFile(path('authorized_keys'), 'utf8')).toContain(key.publicKey);
     await writeFile(join(bin, 'flock'), flock);
+    await chownFixture(join(bin, 'flock'));
     await rm(join(bin, 'sleep'));
     await writeFile(join(root, 'uptime'), '1180.00 0.00\n');
     await expect(run('commit')).rejects.toBeDefined();
@@ -271,6 +280,7 @@ describe('executable isolated management shell fixtures', () => {
     await prepared();
     await writeFile(path('.attraccess-management-transaction', 'deadline'), '100100\n');
     await writeFile(join(bin, 'mv'), '#!/bin/sh\nsleep 2\nexec /bin/mv "$@"\n', { mode: 0o700 });
+    await chownFixture(join(bin, 'mv'));
     await expect(run('install')).rejects.toBeDefined();
     await new Promise((resolve) => setTimeout(resolve, 1500));
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe('# existing key\n');
