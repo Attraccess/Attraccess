@@ -8,7 +8,9 @@ Produces firmware_output/ with, per variant:
 plus firmwares.json — the manifest consumed by the API/frontend. The manifest
 field set must stay stable; the flasher and OTA pipeline depend on it.
 """
+import argparse
 import glob
+import hashlib
 import json
 import os
 import re
@@ -164,7 +166,105 @@ def run_idf(args):
     return subprocess.run(["bash", "-c", command]).returncode
 
 
+def resolve_toolchain_identity():
+    """Return the ESP-IDF checkout and revision used to configure CMake."""
+    export_script = find_idf_export()
+    if export_script:
+        idf_path = os.path.dirname(export_script)
+    else:
+        idf_py = shutil.which("idf.py")
+        if not idf_py:
+            return None
+        # idf.py lives at <IDF_PATH>/tools/idf.py.
+        idf_path = os.path.dirname(os.path.dirname(os.path.realpath(idf_py)))
+
+    try:
+        revision = subprocess.run(
+            ["git", "-C", idf_path, "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        revision = None
+    if revision and revision.returncode == 0:
+        return f"{idf_path}@{revision.stdout.strip()}"
+
+    version_path = os.path.join(idf_path, "version.txt")
+    try:
+        with open(version_path) as f:
+            return f"{idf_path}@{f.read().strip()}"
+    except FileNotFoundError:
+        # Without a revision-bearing identity, restored CMake state is unsafe.
+        return None
+
+
+def file_digest(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def prepare_build_dir(
+    build_dir,
+    clean,
+    toolchain_identity,
+    sdkconfig_defaults_digest,
+    firmware_version_digest,
+):
+    """Discard build state only when requested or configured elsewhere."""
+    if not os.path.exists(build_dir):
+        return
+    if clean or toolchain_identity is None:
+        print(f"Cleaning CMake build directory: {os.path.abspath(build_dir)}")
+        shutil.rmtree(build_dir)
+        return
+
+    state_path = os.path.join(build_dir, ".attractap-build-state.json")
+    try:
+        with open(state_path) as f:
+            state = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        state = None
+    expected_state = {
+        "firmwareDir": FIRMWARE_DIR,
+        "toolchain": toolchain_identity,
+        "sdkconfigDefaults": sdkconfig_defaults_digest,
+        "firmwareVersion": firmware_version_digest,
+    }
+    if state != expected_state:
+        print(f"Cleaning stale CMake build directory: {os.path.abspath(build_dir)}")
+        shutil.rmtree(build_dir)
+
+
+def write_build_state(
+    build_dir,
+    toolchain_identity,
+    sdkconfig_defaults_digest,
+    firmware_version_digest,
+):
+    with open(os.path.join(build_dir, ".attractap-build-state.json"), "w") as f:
+        json.dump(
+            {
+                "firmwareDir": FIRMWARE_DIR,
+                "toolchain": toolchain_identity,
+                "sdkconfigDefaults": sdkconfig_defaults_digest,
+                "firmwareVersion": firmware_version_digest,
+            },
+            f,
+            sort_keys=True,
+        )
+
+
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="discard cached CMake/Ninja state before building",
+    )
+    args = parser.parse_args()
     os.chdir(FIRMWARE_DIR)
 
     if not shutil.which("idf.py") and not find_idf_export():
@@ -176,6 +276,9 @@ def main():
 
     python_cmd = resolve_python_command()
     esptool_cmd = resolve_esptool_command()
+    toolchain_identity = resolve_toolchain_identity()
+    sdkconfig_defaults_digest = file_digest("sdkconfig.defaults")
+    firmware_version_digest = file_digest("version.txt")
 
     with open("version.txt") as f:
         firmware_version = f.read().strip().splitlines()[0]
@@ -228,12 +331,13 @@ def main():
             sys.exit(1)
 
         build_dir = os.path.join("build", variant)
-        # CMake caches absolute paths to the source tree and ESP-IDF checkout.
-        # Reusing a build directory from another worktree can therefore make
-        # the compiler read a different checkout, or fail with a stale cache.
-        if os.path.exists(build_dir):
-            print(f"Cleaning CMake build directory: {os.path.abspath(build_dir)}")
-            shutil.rmtree(build_dir)
+        prepare_build_dir(
+            build_dir,
+            args.clean,
+            toolchain_identity,
+            sdkconfig_defaults_digest,
+            firmware_version_digest,
+        )
         sdkconfig_path = os.path.abspath(os.path.join(build_dir, "sdkconfig"))
         build_args = [
             "-B", build_dir,
@@ -246,6 +350,12 @@ def main():
         if run_idf(build_args) != 0:
             print(f"Error: Build failed for variant '{variant}'")
             sys.exit(1)
+        write_build_state(
+            build_dir,
+            toolchain_identity,
+            sdkconfig_defaults_digest,
+            firmware_version_digest,
+        )
 
         # Flash layout from flasher_args.json (bootloader, partition table,
         # otadata initial image, app). The otadata image MUST be part of the
