@@ -662,6 +662,36 @@ describe('PluginsSection', () => {
     expect(screen.getByText('Loaded')).toBeInTheDocument();
   });
 
+  it('retries a failed plugin and reports that the app is restarting', async () => {
+    const setTimeoutMock = vi.spyOn(global, 'setTimeout');
+    const fetchMock = vi.fn((input: { url?: string } | string) => {
+      const url = typeof input === 'string' ? input : (input.url ?? '');
+      if (url.endsWith('/api/plugins/plugin-1/retry')) return Promise.resolve({ ok: true });
+      if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+      if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    hoisted.plugins = [makePlugin({ status: 'error', error: 'Plugin startup failed' })];
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+
+    await user.click(screen.getByRole('button', { name: 'View load error for Cool Plugin' }));
+    await user.click(screen.getByRole('button', { name: 'Retry and restart' }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/api/plugins/plugin-1/retry'),
+        expect.objectContaining({ method: 'POST', credentials: 'include' }),
+      ),
+    );
+    expect(hoisted.successToast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'The plugin will be retried when the app restarts.' }),
+    );
+    expect(setTimeoutMock).toHaveBeenCalledWith(expect.any(Function), 5000);
+    clearTimeout(setTimeoutMock.mock.results.at(-1)?.value as ReturnType<typeof setTimeout>);
+  });
+
   it('shows the empty state when no plugins are installed', () => {
     render(<PluginsSection />);
 

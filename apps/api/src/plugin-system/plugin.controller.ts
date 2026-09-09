@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -205,6 +206,23 @@ export class PluginController {
   @ApiOperation({ summary: 'Get plugin system status', operationId: 'getPluginSystemStatus' })
   getPluginSystemStatus() {
     return { disabled: PluginModule.arePluginsDisabled() };
+  }
+
+  @Post(':pluginId/retry')
+  @Auth('system.plugins.manage')
+  @ApiOperation({ summary: 'Retry a failed plugin on restart', operationId: 'retryPlugin' })
+  retryPlugin(@Param('pluginId') pluginId: string) {
+    const plugin = PluginService.getManifestById(pluginId);
+    if (!plugin) {
+      throw new NotFoundException('Plugin not found');
+    }
+    if (!PluginService.isPluginQuarantined(plugin)) {
+      throw new BadRequestException('Plugin is not disabled');
+    }
+
+    PluginService.clearPluginQuarantine(plugin.pluginDirectory);
+    this.pluginService.requestRestart();
+    return { ok: true };
   }
 
   // Also add support for loading the index.js file

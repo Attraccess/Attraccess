@@ -139,7 +139,8 @@ export function PluginsSection() {
 
   const { data: plugins } = usePluginsServiceGetPlugins();
   const [pluginsDisabled, setPluginsDisabled] = useState(false);
-  const [failedPlugin, setFailedPlugin] = useState<{ name: string; error: string } | null>(null);
+  const [failedPlugin, setFailedPlugin] = useState<{ id: string; name: string; error: string } | null>(null);
+  const [isRetryingPlugin, setIsRetryingPlugin] = useState(false);
   const [pluginToDelete, setPluginToDelete] = useState<string | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [versionPlugin, setVersionPlugin] = useState<VersionPlugin | null>(null);
@@ -175,6 +176,26 @@ export function PluginsSection() {
   const registryRequest = useRef(0);
   const latestRegistryTest = useRef<symbol | null>(null);
   const isLoadingMarketplace = isLoadingMarketplaceSearch || isLoadingMarketplaceDetail;
+
+  const retryPlugin = async () => {
+    if (!failedPlugin) return;
+
+    setIsRetryingPlugin(true);
+    try {
+      const response = await fetch(`${getBaseUrl()}/api/plugins/${encodeURIComponent(failedPlugin.id)}/retry`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error();
+      toast.success({ title: t('status.retrySuccess') });
+      setTimeout(() => window.location.reload(), 5000);
+      setFailedPlugin(null);
+    } catch {
+      toast.error({ title: t('status.retryError') });
+    } finally {
+      setIsRetryingPlugin(false);
+    }
+  };
 
   useEffect(() => {
     if (!globalThis.fetch) return;
@@ -574,7 +595,7 @@ export function PluginsSection() {
                         <button
                           type="button"
                           className="rounded-medium outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                          onClick={() => setFailedPlugin({ name: plugin.name, error: plugin.error ?? '' })}
+                          onClick={() => setFailedPlugin({ id: plugin.id, name: plugin.name, error: plugin.error ?? '' })}
                           aria-label={t('status.viewError', { pluginName: plugin.name })}
                           data-cy={`plugins-list-status-${plugin.id}`}
                         >
@@ -690,6 +711,14 @@ export function PluginsSection() {
               <ModalFooter>
                 <Button variant="secondary" onPress={close}>
                   {t('status.close')}
+                </Button>
+                <Button
+                  variant="primary"
+                  onPress={() => void retryPlugin()}
+                  isPending={isRetryingPlugin}
+                  data-cy="plugins-list-retry-load-button"
+                >
+                  {t('status.retry')}
                 </Button>
               </ModalFooter>
             </>
