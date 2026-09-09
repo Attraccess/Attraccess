@@ -129,6 +129,16 @@ describe('PluginsSection', () => {
     expect(screen.getByText('Version: 1.0.0')).toBeInTheDocument();
   });
 
+  it('closes the marketplace with its Cancel button', async () => {
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+    await openMarketplace(user);
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('heading', { name: 'Plugin marketplace' })).not.toBeInTheDocument();
+  });
+
   it('uses exact package lookup when a selected registry cannot be searched', async () => {
     const user = userEvent.setup();
     vi.stubGlobal(

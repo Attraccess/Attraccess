@@ -708,7 +708,7 @@ export function PluginsSection() {
           }}
           size="cover"
         >
-          {() => (
+          {({ close }) => (
             <>
               <ModalHeader>
                 {marketplacePlugin ? (
@@ -887,6 +887,11 @@ export function PluginsSection() {
                   </div>
                 )}
               </ModalBody>
+              <ModalFooter>
+                <Button variant="secondary" onPress={close}>
+                  {t('marketplace.cancel')}
+                </Button>
+              </ModalFooter>
             </>
           )}
         </StandardModal>
