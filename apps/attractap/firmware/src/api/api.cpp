@@ -29,11 +29,11 @@ void API::updateSateInfo()
 
 void API::setup()
 {
-    this->websocket.setup();
-    this->websocket.setMessageCallbackRaw([this](const char *buf, size_t len)
+    this->transport.setup();
+    this->transport.setMessageCallbackRaw([this](const char *buf, size_t len)
                                           { this->processIncomingMessage(buf, len); });
-#ifndef DEMO_MODE
-    this->websocket.setBinaryDataCallback([this](esp_websocket_event_data_t data)
+#ifdef ESP_PLATFORM
+    this->transport.setBinaryDataCallback([this](esp_websocket_event_data_t data)
                                           { this->firmware.onChunk(data); });
 #endif
 }
@@ -49,7 +49,7 @@ void API::setFirmwareUpdateMetaCallback(std::function<void(std::string available
 
 void API::loop()
 {
-    this->websocket.loop();
+    this->transport.loop();
     this->updateSateInfo();
 
     // Only send heartbeat when connection is usable
@@ -222,6 +222,12 @@ void API::processIncomingMessage(const char *buf, size_t len)
     }
     else if (strcmp(eventType, "READER_FIRMWARE_UPDATE_REQUIRED") == 0)
     {
+#ifdef ATTRACTAP_HOST
+        // The simulator deliberately cannot alter firmware, flash, or boot state.
+        logger.error("Firmware updates are unsupported by the desktop simulator");
+        if (this->errorCallback)
+            this->errorCallback("Firmware update", "Firmware updates are not available in the desktop simulator.");
+#else
         // Initialize OTA from metadata and request first chunk
         JsonObject fw = inboundDoc["data"]["payload"]["available"].as<JsonObject>();
         if (fw.isNull())
@@ -230,6 +236,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
             return;
         }
         this->firmware.begin(fw);
+#endif
     }
     else if (strcmp(eventType, "PROJECTS_OF_USER") == 0)
     {
@@ -307,8 +314,8 @@ bool API::sendMessage(const char *type, JsonObject payload)
             this->logger.error("Failed to serialize event to buffer (small)");
             return false;
         }
-        this->logger.info((std::string("sending message to websocket: ") + json).c_str());
-        return this->websocket.sendMessage(json, n);
+        this->logger.info((std::string("Sending reader event: ") + type).c_str());
+        return this->transport.sendMessage(json, n);
     }
 
     std::unique_ptr<char[]> json(new (std::nothrow) char[requiredBytes]);
@@ -323,8 +330,8 @@ bool API::sendMessage(const char *type, JsonObject payload)
         this->logger.error("Failed to serialize event to dynamically allocated buffer");
         return false;
     }
-    this->logger.info((std::string("sending message to websocket: ") + json.get()).c_str());
-    return this->websocket.sendMessage(json.get(), n);
+    this->logger.info((std::string("Sending reader event: ") + type).c_str());
+    return this->transport.sendMessage(json.get(), n);
 }
 
 void API::sendHeartbeat()
@@ -350,24 +357,24 @@ void API::sendHeartbeat()
         this->logger.error("Failed to serialize heartbeat");
         return;
     }
-    this->logger.info((std::string("pushing heartbeat to websocket queue: ") + json).c_str());
-    this->websocket.sendHeartbeat(json, n);
+    this->logger.info("Sending reader heartbeat");
+    this->transport.sendHeartbeat(json, n);
 
     this->heartbeat_sent_at = millis();
 }
 
 void API::disableConnectionAttempts()
 {
-    this->websocket.disableConnectionAttempts();
+    this->transport.disableConnectionAttempts();
     this->loopIsEnabled = false;
 }
 
 void API::enableConnectionAttempts()
 {
-    this->websocket.enableConnectionAttempts();
+    this->transport.enableConnectionAttempts();
 }
 
 void API::resetCertificateTrust()
 {
-    this->websocket.resetCertificateTrust();
+    this->transport.resetCertificateTrust();
 }

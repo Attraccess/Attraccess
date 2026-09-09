@@ -4,7 +4,12 @@
 #include <ctime>
 #include <string>
 
+#ifndef ATTRACTAP_HOST
 #include "driver/i2c_master.h"
+#else
+using i2c_master_bus_handle_t = void *;
+using i2c_master_dev_handle_t = void *;
+#endif
 
 /**
  * Shared I2C bus clock (Hz). GT911 touch, PN532 NFC and the PCA9555 IO expander

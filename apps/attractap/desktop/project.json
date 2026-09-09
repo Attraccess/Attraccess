@@ -1,0 +1,43 @@
+{
+  "name": "attractap-desktop",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/attractap/desktop",
+  "projectType": "application",
+  "tags": ["scope:hardware"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "cmake -S apps/attractap/desktop -B dist/apps/attractap-desktop",
+          "cmake --build dist/apps/attractap-desktop"
+        ],
+        "parallel": false,
+        "cwd": "."
+      },
+      "outputs": ["{workspaceRoot}/dist/apps/attractap-desktop"]
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "cmake --build dist/apps/attractap-desktop --target attractap-desktop && open -W dist/apps/attractap-desktop/attractap-desktop.app",
+        "cwd": "."
+      },
+      "dependsOn": ["build"],
+      "cache": false
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "cmake -S apps/attractap/desktop -B dist/apps/attractap-desktop",
+          "cmake --build dist/apps/attractap-desktop --target attractap-desktop-tests",
+          "ctest --test-dir dist/apps/attractap-desktop --output-on-failure"
+        ],
+        "parallel": false,
+        "cwd": "."
+      },
+      "cache": false
+    }
+  }
+}

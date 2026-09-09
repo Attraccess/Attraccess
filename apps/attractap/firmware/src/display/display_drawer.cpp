@@ -232,7 +232,10 @@ void Display::showRebootConfirm()
         if (lv_event_get_code(e) != LV_EVENT_CLICKED)
             return;
         Display::logger.info("Drawer: reboot confirmed, restarting");
-        esp_restart(); }, LV_EVENT_CLICKED, NULL);
+#ifndef ATTRACTAP_HOST
+        esp_restart();
+#endif
+    }, LV_EVENT_CLICKED, NULL);
 }
 
 void Display::handleGestureSample(int16_t x, int16_t y, bool pressed)

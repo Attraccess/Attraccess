@@ -11,8 +11,9 @@
 #include "../state/state.hpp"
 #include "../logger/logger.hpp"
 #include "certManager/AdaptiveCertManager.hpp"
+#include "../api/reader_transport.hpp"
 
-class Websocket
+class Websocket : public IReaderTransport
 {
 public:
     Websocket() : logger("Websocket") {}
@@ -23,24 +24,24 @@ public:
         CONNECTING,
         CONNECTED,
     };
-    void setup();
-    void loop();
+    void setup() override;
+    void loop() override;
     bool sendMessage(const std::string &message);
-    bool sendMessage(const char *message, size_t length);
-    bool sendHeartbeat(const char *message, size_t length);
-    void setMessageCallbackRaw(std::function<void(const char *, size_t)> callback);
-    void setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback);
+    bool sendMessage(const char *message, size_t length) override;
+    bool sendHeartbeat(const char *message, size_t length) override;
+    void setMessageCallbackRaw(std::function<void(const char *, size_t)> callback) override;
+    void setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)> callback) override;
 
-    void enableConnectionAttempts();
-    void disableConnectionAttempts();
+    void enableConnectionAttempts() override;
+    void disableConnectionAttempts() override;
 
     // Tear down the current connection and reconnect (same mechanism as the
     // inbound-liveness watchdog). Must be called from the main-loop task.
-    void forceReconnect(const char *reason);
+    void forceReconnect(const char *reason) override;
 
     // Clear the locked TLS certificate decision so the next connect sweeps the
     // full CA list again (device settings "reset certificate" button).
-    void resetCertificateTrust();
+    void resetCertificateTrust() override;
 
 private:
     std::function<void(const char *, size_t)> messageCallbackRaw;
