@@ -11,10 +11,13 @@ interface DeleteOptions {
 
 const hoisted = vi.hoisted(() => ({
   deleteMutateMock: vi.fn(),
+  retryMutateAsyncMock: vi.fn(),
+  statusRefetchMock: vi.fn(),
   successToast: vi.fn(),
   errorToast: vi.fn(),
   showToast: vi.fn(),
   plugins: [] as unknown[],
+  pluginSystemStatus: { disabled: false, instanceId: 'original-instance' },
   deleteOptions: undefined as DeleteOptions | undefined,
 }));
 
@@ -28,6 +31,11 @@ function deferred<T>() {
 
 vi.mock('@attraccess/react-query-client', () => ({
   usePluginsServiceGetPlugins: () => ({ data: hoisted.plugins }),
+  usePluginsServiceGetPluginSystemStatus: () => ({
+    data: hoisted.pluginSystemStatus,
+    refetch: hoisted.statusRefetchMock,
+  }),
+  usePluginsServiceRetryPlugin: () => ({ mutateAsync: hoisted.retryMutateAsyncMock, isPending: false }),
   usePluginsServiceDeletePlugin: (options: DeleteOptions) => {
     hoisted.deleteOptions = options;
     return { mutate: hoisted.deleteMutateMock, isPending: false };
@@ -56,10 +64,15 @@ function makePlugin(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   hoisted.deleteMutateMock.mockReset();
+  hoisted.retryMutateAsyncMock.mockReset();
+  hoisted.statusRefetchMock.mockReset();
   hoisted.successToast.mockReset();
   hoisted.errorToast.mockReset();
   hoisted.plugins = [];
+  hoisted.pluginSystemStatus = { disabled: false, instanceId: 'original-instance' };
   hoisted.deleteOptions = undefined;
+  hoisted.statusRefetchMock.mockResolvedValue({ data: hoisted.pluginSystemStatus });
+  hoisted.retryMutateAsyncMock.mockResolvedValue({ ok: true });
   vi.stubGlobal(
     'fetch',
     vi.fn((input: { url?: string } | string) => {
@@ -296,7 +309,8 @@ describe('PluginsSection', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((input: { url?: string } | string, init?: { method?: string }) => {
-        const request: { url?: string; method?: string } = typeof input === 'string' ? { url: input, method: init?.method } : input;
+        const request: { url?: string; method?: string } =
+          typeof input === 'string' ? { url: input, method: init?.method } : input;
         if (request.url?.endsWith('/api/plugins/registries')) {
           if (request.method === 'POST') return Promise.resolve({ ok: true });
           registryLoads += 1;
@@ -333,7 +347,8 @@ describe('PluginsSection', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((input: { url?: string } | string, init?: { method?: string }) => {
-        const request: { url?: string; method?: string } = typeof input === 'string' ? { url: input, method: init?.method } : input;
+        const request: { url?: string; method?: string } =
+          typeof input === 'string' ? { url: input, method: init?.method } : input;
         if (request.url?.endsWith('/api/plugins/registries')) {
           if (request.method === 'POST') return Promise.resolve({ ok: true });
           registryLoads += 1;
@@ -641,16 +656,7 @@ describe('PluginsSection', () => {
   });
 
   it('warns when plugins are globally disabled', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((input: { url?: string } | string) => {
-        const url = typeof input === 'string' ? input : (input.url ?? '');
-        if (url.endsWith('/api/plugins/status')) return Promise.resolve({ ok: true, json: async () => ({ disabled: true }) });
-        if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
-        if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
-        return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
-      }),
-    );
+    hoisted.pluginSystemStatus = { disabled: true, instanceId: 'original-instance' };
     render(<PluginsSection />);
 
     expect(await screen.findByText('Plugins are disabled')).toBeInTheDocument();
@@ -664,25 +670,9 @@ describe('PluginsSection', () => {
   });
 
   it('retries a failed plugin when the restarted server becomes available without observing downtime', async () => {
-    let isRestarting = false;
-    let restartStatusCalls = 0;
-    const fetchMock = vi.fn((input: { url?: string } | string, _init?: RequestInit) => {
-      const url = typeof input === 'string' ? input : (input.url ?? '');
-      if (url.endsWith('/api/plugins/plugin-1/retry')) {
-        isRestarting = true;
-        return Promise.resolve({ ok: true });
-      }
-      if (url.endsWith('/api/plugins/status') && isRestarting) {
-        restartStatusCalls += 1;
-        isRestarting = false;
-        return Promise.resolve({ ok: true, json: async () => ({ instanceId: 'restarted-instance' }) });
-      }
-      if (url.endsWith('/api/plugins/status')) return Promise.resolve({ ok: true, json: async () => ({ instanceId: 'original-instance' }) });
-      if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
-      if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
-      return Promise.resolve({ ok: true, json: async () => ({}) });
-    });
-    vi.stubGlobal('fetch', fetchMock);
+    hoisted.statusRefetchMock
+      .mockResolvedValueOnce({ data: { disabled: false, instanceId: 'original-instance' } })
+      .mockResolvedValueOnce({ data: { disabled: false, instanceId: 'restarted-instance' } });
     hoisted.plugins = [makePlugin({ status: 'error', error: 'Plugin startup failed' })];
     const user = userEvent.setup();
     render(<PluginsSection />);
@@ -690,27 +680,14 @@ describe('PluginsSection', () => {
     await user.click(screen.getByRole('button', { name: 'View load error for Cool Plugin' }));
     await user.click(screen.getByRole('button', { name: 'Retry and restart' }));
 
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('/api/plugins/plugin-1/retry'),
-        expect.objectContaining({ method: 'POST', credentials: 'include' }),
-      ),
-    );
+    await waitFor(() => expect(hoisted.retryMutateAsyncMock).toHaveBeenCalledWith({ pluginId: 'plugin-1' }));
     expect(hoisted.successToast).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'The plugin will be retried when the app restarts.' }),
     );
-    await waitFor(() => expect(restartStatusCalls).toBe(1));
-
-    const statusRequestWithTimeout = fetchMock.mock.calls.findIndex(
-      ([input, init]) =>
-        (typeof input === 'string' ? input : (input.url ?? '')).endsWith('/api/plugins/status') &&
-        init?.signal instanceof AbortSignal,
+    await waitFor(() => expect(hoisted.statusRefetchMock).toHaveBeenCalledTimes(2));
+    expect(hoisted.statusRefetchMock.mock.invocationCallOrder[0]).toBeLessThan(
+      hoisted.retryMutateAsyncMock.mock.invocationCallOrder[0],
     );
-    const retryRequest = fetchMock.mock.calls.findIndex(([input]) =>
-      (typeof input === 'string' ? input : (input.url ?? '')).endsWith('/api/plugins/plugin-1/retry'),
-    );
-    expect(statusRequestWithTimeout).toBeGreaterThanOrEqual(0);
-    expect(statusRequestWithTimeout).toBeLessThan(retryRequest);
   });
 
   it('shows the empty state when no plugins are installed', () => {

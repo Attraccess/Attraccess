@@ -26,6 +26,8 @@ import { Auth } from '@attraccess/plugins-backend-sdk';
 import { UploadPluginDto } from './dto/uploadPlugin.dto';
 import { NpmPluginService } from './npm-plugin.service';
 import { randomUUID } from 'crypto';
+import { PluginSystemStatusDto } from './dto/plugin-system-status.dto';
+import { RetryPluginResponseDto } from './dto/retry-plugin-response.dto';
 
 const PLUGIN_SYSTEM_INSTANCE_ID = randomUUID();
 
@@ -207,14 +209,16 @@ export class PluginController {
   @Get('status')
   @Auth('system.plugins.manage')
   @ApiOperation({ summary: 'Get plugin system status', operationId: 'getPluginSystemStatus' })
-  getPluginSystemStatus() {
+  @ApiResponse({ status: 200, type: PluginSystemStatusDto })
+  getPluginSystemStatus(): PluginSystemStatusDto {
     return { disabled: PluginModule.arePluginsDisabled(), instanceId: PLUGIN_SYSTEM_INSTANCE_ID };
   }
 
   @Post(':pluginId/retry')
   @Auth('system.plugins.manage')
   @ApiOperation({ summary: 'Retry a failed plugin on restart', operationId: 'retryPlugin' })
-  retryPlugin(@Param('pluginId') pluginId: string) {
+  @ApiResponse({ status: 201, type: RetryPluginResponseDto })
+  retryPlugin(@Param('pluginId') pluginId: string): RetryPluginResponseDto {
     const plugin = PluginService.getManifestById(pluginId);
     if (!plugin) {
       throw new NotFoundException('Plugin not found');
