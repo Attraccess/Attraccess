@@ -46,19 +46,24 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
    const char *ssidText = lv_textarea_get_text(self->wifiSSID);
    const char *passwordText = lv_textarea_get_text(self->wifiPassword);
    const char *hostText = lv_textarea_get_text(self->serverHostname);
-   const char *devicePinText = self->devicePin ? lv_textarea_get_text(self->devicePin) : "";
+    const char *devicePinText = self->devicePin ? lv_textarea_get_text(self->devicePin) : "";
 
-   std::string hostValue = hostText ? hostText : "";
-   if (hostValue.rfind("https://", 0) == 0)
-   {
-      hostValue.erase(0, 8);
-      lv_textarea_set_text(self->serverHostname, hostValue.c_str());
-   }
+    std::string hostValue = hostText ? hostText : "";
+    bool useSSL = lv_obj_has_state(self->useSSLSwitch, LV_STATE_CHECKED);
+    if (hostValue.rfind("https://", 0) == 0)
+    {
+       hostValue.erase(0, 8);
+       lv_textarea_set_text(self->serverHostname, hostValue.c_str());
+       useSSL = true;
+       lv_obj_add_state(self->useSSLSwitch, LV_STATE_CHECKED);
+    }
 
-   if (hostValue.rfind("http://", 0) == 0)
-   {
-      hostValue.erase(0, 7);
-      lv_textarea_set_text(self->serverHostname, hostValue.c_str());
+    if (hostValue.rfind("http://", 0) == 0)
+    {
+       hostValue.erase(0, 7);
+       lv_textarea_set_text(self->serverHostname, hostValue.c_str());
+       useSSL = false;
+       lv_obj_remove_state(self->useSSLSwitch, LV_STATE_CHECKED);
    }
 
    bool hostValid = !hostValue.empty() && hostnameLooksValid(hostValue.c_str());
@@ -103,10 +108,10 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
    if (self->onSaveCallback)
    {
       ConnectionConfigurationScreen::ConnectionConfig cfg;
-      cfg.ssid = std::string(ssidText);
-      cfg.password = std::string(passwordText);
-      cfg.host = hostValue;
-      cfg.useSSL = lv_obj_has_state(self->useSSLSwitch, LV_STATE_CHECKED);
+       cfg.ssid = std::string(ssidText);
+       cfg.password = std::string(passwordText);
+       cfg.host = hostValue;
+       cfg.useSSL = useSSL;
       cfg.devicePin = std::string(devicePinText);
       cfg.beeperEnabled = lv_obj_has_state(self->beeperEnabled, LV_STATE_CHECKED);
       self->onSaveCallback(cfg);

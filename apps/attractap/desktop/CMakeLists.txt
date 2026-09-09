@@ -29,6 +29,18 @@ else()
 endif()
 
 find_package(SDL3 REQUIRED CONFIG)
+# The macOS SDK libcurl omits WebSocket support. Prefer Homebrew's curl when
+# available so the host transport can use CURLOPT_CONNECT_ONLY with ws:// URLs.
+if(APPLE)
+    foreach(CURL_PREFIX /opt/homebrew/opt/curl /usr/local/opt/curl)
+        if(EXISTS "${CURL_PREFIX}/include/curl/curl.h" AND EXISTS "${CURL_PREFIX}/lib/libcurl.dylib")
+            set(CURL_INCLUDE_DIR "${CURL_PREFIX}/include" CACHE PATH "" FORCE)
+            set(CURL_LIBRARY_RELEASE "${CURL_PREFIX}/lib/libcurl.dylib" CACHE FILEPATH "" FORCE)
+            set(CURL_LIBRARY_DEBUG "${CURL_PREFIX}/lib/libcurl.dylib" CACHE FILEPATH "" FORCE)
+            break()
+        endif()
+    endforeach()
+endif()
 find_package(CURL 8.7 REQUIRED)
 find_package(Threads REQUIRED)
 

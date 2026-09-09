@@ -1,4 +1,5 @@
 #include "host_websocket.hpp"
+#include "logger/logger.hpp"
 #include "settings/settings.hpp"
 
 #include <curl/curl.h>
@@ -10,6 +11,8 @@
 
 namespace
 {
+Logger logger("HostWebsocket");
+
 void initializeCurl()
 {
     static std::once_flag initialized;
@@ -162,6 +165,7 @@ void HostWebsocket::publishState(State state)
 
 void HostWebsocket::publishError(const std::string &message)
 {
+    logger.error(message.c_str());
     ErrorCallback callback;
     std::shared_ptr<std::atomic_bool> lifetime;
     {
