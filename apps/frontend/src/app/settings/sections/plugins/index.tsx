@@ -186,9 +186,10 @@ export function PluginsSection() {
 
   const { data: plugins } = usePluginsServiceGetPlugins();
   const { data: pluginSystemStatus, refetch: refetchPluginSystemStatus } = usePluginsServiceGetPluginSystemStatus();
-  const { mutateAsync: retryFailedPlugin, isPending: isRetryingPlugin } = usePluginsServiceRetryPlugin();
+  const { mutateAsync: retryFailedPlugin } = usePluginsServiceRetryPlugin();
   const pluginsDisabled = pluginSystemStatus?.disabled === true;
   const [failedPlugin, setFailedPlugin] = useState<{ id: string; name: string; error: string } | null>(null);
+  const [isRetryingPlugin, setIsRetryingPlugin] = useState(false);
   const [pluginToDelete, setPluginToDelete] = useState<string | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [versionPlugin, setVersionPlugin] = useState<VersionPlugin | null>(null);
@@ -228,6 +229,7 @@ export function PluginsSection() {
   const retryPlugin = async () => {
     if (!failedPlugin) return;
 
+    setIsRetryingPlugin(true);
     try {
       const getPluginSystemStatus = async () => (await refetchPluginSystemStatus()).data;
       const previousInstanceId = await getServerInstanceId(getPluginSystemStatus);
@@ -238,6 +240,8 @@ export function PluginsSection() {
       setFailedPlugin(null);
     } catch {
       toast.error({ title: t('status.retryError') });
+    } finally {
+      setIsRetryingPlugin(false);
     }
   };
 

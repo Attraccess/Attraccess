@@ -690,6 +690,28 @@ describe('PluginsSection', () => {
     );
   });
 
+  it('keeps the retry action pending while it waits for the restarted server', async () => {
+    const restartStatus = deferred<{ data: { disabled: boolean; instanceId: string } }>();
+    hoisted.statusRefetchMock
+      .mockResolvedValueOnce({ data: { disabled: false, instanceId: 'original-instance' } })
+      .mockReturnValueOnce(restartStatus.promise);
+    hoisted.plugins = [makePlugin({ status: 'error', error: 'Plugin startup failed' })];
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+
+    await user.click(screen.getByRole('button', { name: 'View load error for Cool Plugin' }));
+    await user.click(screen.getByRole('button', { name: 'Retry and restart' }));
+
+    await waitFor(() => expect(hoisted.statusRefetchMock).toHaveBeenCalledTimes(2));
+    expect(document.querySelector('[data-cy="plugins-list-retry-load-button"]')).toHaveAttribute(
+      'data-pending',
+      'true',
+    );
+
+    restartStatus.resolve({ data: { disabled: false, instanceId: 'restarted-instance' } });
+    await waitFor(() => expect(hoisted.successToast).toHaveBeenCalled());
+  });
+
   it('shows the empty state when no plugins are installed', () => {
     render(<PluginsSection />);
 
