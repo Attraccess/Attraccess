@@ -90,6 +90,7 @@ target_compile_definitions(attractap-production-host PUBLIC
 target_link_libraries(attractap-production-host PUBLIC lvgl::lvgl ArduinoJson Threads::Threads)
 
 add_library(attractap-desktop-runtime
+    src/api_endpoint.cpp
     src/host_runtime.cpp
     src/host_websocket.cpp
     src/profile_store.cpp
@@ -110,6 +111,7 @@ set_target_properties(attractap-desktop PROPERTIES
 
 add_executable(attractap-desktop-tests
     tests/main.cpp
+    src/api_endpoint.cpp
     src/host_runtime.cpp
     src/host_websocket.cpp
     src/profile_store.cpp

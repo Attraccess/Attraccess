@@ -1,4 +1,5 @@
 #include "application/application.hpp"
+#include "api_endpoint.hpp"
 #include "api/api.hpp"
 #include "display/display.hpp"
 #include "host_runtime.hpp"
@@ -25,39 +26,6 @@ uint32_t parseReaderId(const char *value)
     return static_cast<uint32_t>(readerId);
 }
 
-struct ApiEndpoint
-{
-    std::string hostname;
-    uint16_t port;
-    bool useSSL;
-};
-
-ApiEndpoint parseApiEndpoint(std::string endpoint)
-{
-    bool useSSL = true;
-    if (endpoint.rfind("http://", 0) == 0)
-    {
-        endpoint.erase(0, 7);
-        useSSL = false;
-    }
-    else if (endpoint.rfind("https://", 0) == 0)
-    {
-        endpoint.erase(0, 8);
-    }
-
-    const auto path = endpoint.find_first_of("/?#");
-    if (path != std::string::npos)
-        endpoint.erase(path);
-
-    uint16_t port = useSSL ? 443 : 80;
-    const auto separator = endpoint.find(':');
-    if (separator != std::string::npos)
-    {
-        port = static_cast<uint16_t>(std::stoul(endpoint.substr(separator + 1)));
-        endpoint.erase(separator);
-    }
-    return {std::move(endpoint), port, useSSL};
-}
 }
 
 int main(int argc, char **argv)

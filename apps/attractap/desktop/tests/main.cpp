@@ -1,3 +1,4 @@
+#include "api_endpoint.hpp"
 #include "host_runtime.hpp"
 #include "host_websocket.hpp"
 #include "profile_store.hpp"
@@ -118,6 +119,30 @@ int main()
     };
     assert(rejectsInvalidEndpoint("reader.example.test"));
     assert(rejectsInvalidEndpoint("http://"));
+
+    const auto websocketEndpoint = parseApiEndpoint("wss://localhost");
+    assert(websocketEndpoint.hostname == "localhost");
+    assert(websocketEndpoint.port == 443);
+    assert(websocketEndpoint.useSSL);
+    const auto ipv6Endpoint = parseApiEndpoint("https://[::1]:8443/path");
+    assert(ipv6Endpoint.hostname == "[::1]");
+    assert(ipv6Endpoint.port == 8443);
+    assert(ipv6Endpoint.useSSL);
+    const auto rejectsInvalidApiEndpoint = [](const std::string &endpoint)
+    {
+        try
+        {
+            static_cast<void>(parseApiEndpoint(endpoint));
+            return false;
+        }
+        catch (const std::invalid_argument &)
+        {
+            return true;
+        }
+    };
+    assert(rejectsInvalidApiEndpoint("https://[::1]:0"));
+    assert(rejectsInvalidApiEndpoint("https://localhost:"));
+    assert(rejectsInvalidApiEndpoint("https://::1"));
 
     HostWebsocket websocket(runtime, "http://localhost:3001");
     assert(websocket.send("outbound"));
