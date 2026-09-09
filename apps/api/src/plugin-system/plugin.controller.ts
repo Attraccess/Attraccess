@@ -25,6 +25,9 @@ import { FileUpload } from '../common/types/file-upload.types';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { UploadPluginDto } from './dto/uploadPlugin.dto';
 import { NpmPluginService } from './npm-plugin.service';
+import { randomUUID } from 'crypto';
+
+const PLUGIN_SYSTEM_INSTANCE_ID = randomUUID();
 
 @ApiTags('Plugins')
 @Controller('plugins')
@@ -205,7 +208,7 @@ export class PluginController {
   @Auth('system.plugins.manage')
   @ApiOperation({ summary: 'Get plugin system status', operationId: 'getPluginSystemStatus' })
   getPluginSystemStatus() {
-    return { disabled: PluginModule.arePluginsDisabled() };
+    return { disabled: PluginModule.arePluginsDisabled(), instanceId: PLUGIN_SYSTEM_INSTANCE_ID };
   }
 
   @Post(':pluginId/retry')

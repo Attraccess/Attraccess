@@ -61,28 +61,43 @@ import { Select } from '../../../../components/select';
 
 const DOCS_URL = 'https://docs.attraccess.org/#/plugins/developing-plugins';
 const SERVER_READY_POLL_INTERVAL_MS = 250;
+const SERVER_RESTART_TIMEOUT_MS = 30_000;
+const SERVER_STATUS_REQUEST_TIMEOUT_MS = 2_000;
 
-function waitForServerRestart() {
-  return new Promise<void>((resolve) => {
-    let serverStopped = false;
+async function getServerInstanceId(signal?: AbortSignal) {
+  const response = await fetch(`${getBaseUrl()}/api/plugins/status`, { credentials: 'include', signal });
+  if (!response.ok) throw new Error('Plugin system status request failed');
 
-    const poll = async () => {
-      try {
-        const response = await fetch(`${getBaseUrl()}/api/plugins/status`, { credentials: 'include' });
-        if (serverStopped && response.ok) {
-          resolve();
-          return;
-        }
-        if (!response.ok) serverStopped = true;
-      } catch {
-        serverStopped = true;
-      }
+  const status = (await response.json()) as { instanceId?: unknown };
+  if (typeof status.instanceId !== 'string') throw new Error('Plugin system instance ID is missing');
+  return status.instanceId;
+}
 
-      setTimeout(() => void poll(), SERVER_READY_POLL_INTERVAL_MS);
-    };
+function wait(delay: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, delay));
+}
 
-    void poll();
-  });
+async function waitForServerRestart(previousInstanceId: string) {
+  const deadline = Date.now() + SERVER_RESTART_TIMEOUT_MS;
+
+  while (Date.now() < deadline) {
+    const abortController = new AbortController();
+    const requestTimeout = setTimeout(
+      () => abortController.abort(),
+      Math.min(SERVER_STATUS_REQUEST_TIMEOUT_MS, deadline - Date.now()),
+    );
+    try {
+      if ((await getServerInstanceId(abortController.signal)) !== previousInstanceId) return;
+    } catch {
+      // A restart may temporarily make the status endpoint unavailable.
+    } finally {
+      clearTimeout(requestTimeout);
+    }
+
+    await wait(Math.min(SERVER_READY_POLL_INTERVAL_MS, deadline - Date.now()));
+  }
+
+  throw new Error('Plugin system restart timed out');
 }
 
 type VersionCandidate = {
@@ -206,13 +221,14 @@ export function PluginsSection() {
 
     setIsRetryingPlugin(true);
     try {
+      const previousInstanceId = await getServerInstanceId();
       const response = await fetch(`${getBaseUrl()}/api/plugins/${encodeURIComponent(failedPlugin.id)}/retry`, {
         method: 'POST',
         credentials: 'include',
       });
       if (!response.ok) throw new Error();
       toast.success({ title: t('status.retrySuccess') });
-      await waitForServerRestart();
+      await waitForServerRestart(previousInstanceId);
       window.location.reload();
       setFailedPlugin(null);
     } catch {

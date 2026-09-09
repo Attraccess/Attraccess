@@ -63,7 +63,7 @@ describe('PluginController', () => {
   it('reports when plugins are globally disabled', () => {
     PluginModule.configure({ DISABLE_PLUGINS: true });
 
-    expect(controller.getPluginSystemStatus()).toEqual({ disabled: true });
+    expect(controller.getPluginSystemStatus()).toEqual({ disabled: true, instanceId: expect.any(String) });
   });
 
   describe('retryPlugin', () => {
