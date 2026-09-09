@@ -490,7 +490,7 @@ function FlowsPageInner() {
                 isPending={isSaving}
                 onPress={save}
                 isDisabled={!flowHasChanged}
-                variant={saveFailed ? 'danger-soft' : flowHasChanged ? 'primary' : 'outline'}
+                variant={saveFailed ? 'danger-soft' : flowHasChanged ? 'primary' : 'secondary'}
               >
                 <SaveIcon />
               </Button>
