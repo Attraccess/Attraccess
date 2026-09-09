@@ -49,8 +49,9 @@ std::string millisToTimeString(double milliseconds)
     return value;
 }
 
-std::string timeToTimeString(time_t value, int)
+std::string timeToTimeString(time_t value, int utcOffsetMinutes)
 {
+    value += static_cast<time_t>(utcOffsetMinutes) * 60;
     char result[17];
     const auto *time = std::gmtime(&value);
     return time && std::strftime(result, sizeof(result), "%d.%m. %H:%M", time) ? result : "";

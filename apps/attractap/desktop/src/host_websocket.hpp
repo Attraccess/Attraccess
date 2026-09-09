@@ -51,9 +51,9 @@ public:
     bool sendMessage(const char *message, size_t length) override { return send(message, length); }
     bool sendHeartbeat(const char *message, size_t length) override { return send(message, length); }
     void setMessageCallbackRaw(std::function<void(const char *, size_t)> callback) override { setMessageCallback(std::move(callback)); }
-    void enableConnectionAttempts() override { start(); }
+    void enableConnectionAttempts() override;
     void disableConnectionAttempts() override { stop(); }
-    void forceReconnect(const char *) override { stop(); start(); }
+    void forceReconnect(const char *) override { enableConnectionAttempts(); }
     void resetCertificateTrust() override {}
 
 private:
@@ -61,6 +61,7 @@ private:
     static constexpr size_t MaxInboundMessageBytes = 1024 * 1024;
 
     void run(std::stop_token stopToken);
+    void updateUrlFromSettings();
     void publishState(State state);
     void publishError(const std::string &message);
     void publishMessage(std::string message);

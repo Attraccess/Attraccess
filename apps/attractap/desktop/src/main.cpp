@@ -47,7 +47,8 @@ int main(int argc, char **argv)
     const auto apiConfig = Settings::getAttraccessApiConfig();
     State::setWifiState(true, {}, "Desktop");
     State::setWebsocketState(false, apiConfig.hostname, apiConfig.port, apiConfig.useSSL);
-    websocket.setStateCallback([apiConfig](HostWebsocket::State state) {
+    websocket.setStateCallback([](HostWebsocket::State state) {
+        const auto apiConfig = Settings::getAttraccessApiConfig();
         const bool connected = state == HostWebsocket::State::Connected;
         State::setWebsocketState(connected, apiConfig.hostname, apiConfig.port, apiConfig.useSSL);
         State::setWebsocketPhase(state == HostWebsocket::State::Connected ? State::WS_CONNECTED

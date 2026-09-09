@@ -122,8 +122,17 @@ int main()
     HostWebsocket websocket(runtime, "http://localhost:3001");
     assert(websocket.send("outbound"));
     assert(!websocket.send(nullptr, 0));
+    bool disconnected = false;
+    websocket.setStateCallback([&disconnected](HostWebsocket::State state) {
+        disconnected = state == HostWebsocket::State::Disconnected;
+    });
+    websocket.start();
+    websocket.stop();
+    runtime.dispatch();
+    assert(disconnected);
 
     constexpr time_t timestamp = 1767323045;
+    assert(timeToTimeString(timestamp, 120) == "02.01. 05:04");
     assert(parseIso8601ToTimeT("2026-01-02T03:04:05Z") == timestamp);
     assert(parseIso8601ToTimeT("2026-01-02T05:04:05+02:00") == timestamp);
     assert(parseIso8601ToTimeT("2026-01-01T22:04:05-05:00") == timestamp);

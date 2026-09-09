@@ -1,4 +1,5 @@
 #include "host_websocket.hpp"
+#include "settings/settings.hpp"
 
 #include <curl/curl.h>
 
@@ -103,6 +104,31 @@ void HostWebsocket::stop()
     }
     worker.request_stop();
     worker.join();
+
+    StateCallback callback;
+    {
+        std::lock_guard lock(mutex);
+        callback = stateCallback;
+    }
+    if (callback)
+        runtime.post([callback = std::move(callback)] { callback(State::Disconnected); });
+}
+
+void HostWebsocket::enableConnectionAttempts()
+{
+    stop();
+    updateUrlFromSettings();
+    start();
+}
+
+void HostWebsocket::updateUrlFromSettings()
+{
+    const auto config = Settings::getAttraccessApiConfig();
+    const std::string endpoint = config.hostname.find("://") == std::string::npos
+                                     ? std::string(config.useSSL ? "https://" : "http://") + config.hostname + ":" + std::to_string(config.port)
+                                     : config.hostname;
+    std::lock_guard lock(mutex);
+    url = readerUrl(endpoint);
 }
 
 bool HostWebsocket::send(const char *message, size_t length)
