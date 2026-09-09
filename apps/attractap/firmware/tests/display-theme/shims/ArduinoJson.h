@@ -1,2 +1,7 @@
 #pragma once
-// state.hpp includes this header but its public interface uses no JSON types.
+// Only declarations for API's header; no JSON operations are used by screens.
+#include <cstddef>
+struct JsonObject {};
+struct JsonObjectConst;
+struct JsonVariantConst;
+template <size_t Capacity> struct StaticJsonDocument {};

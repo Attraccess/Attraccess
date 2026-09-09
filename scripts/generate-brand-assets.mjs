@@ -80,11 +80,15 @@ assets.set('apps/companion/src/assets/logo.svg', Buffer.from(lockup));
 
 // LVGL 9 RGB565A8: little-endian RGB565 plane followed by an A8 plane.
 // ESP-IDF embeds these binary assets; no generated C++ arrays are committed.
+// The reader uses a fixed dark theme. Change only the vector lettering, keeping
+// the approved full-color mascot and its embedded raster identical.
+const firmwareLockup = lockup.replace(wordmark[0], wordmark[0].replace('fill="currentcolor"', 'fill="#F4F8F8"'));
+assert.notEqual(firmwareLockup, lockup, 'Firmware wordmark must use light ink');
 for (const [width, height] of [
   [133, 40],
   [400, 120],
 ]) {
-  const rgba = await sharp(await render(lockup, width, height))
+  const rgba = await sharp(await render(firmwareLockup, width, height))
     .ensureAlpha()
     .raw()
     .toBuffer();

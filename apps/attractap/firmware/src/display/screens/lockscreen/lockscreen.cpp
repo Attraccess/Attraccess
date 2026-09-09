@@ -1,5 +1,6 @@
 #include "lockscreen.hpp"
 #include "display/theme.hpp"
+#include "display/images/lockscreen_background_image.hpp"
 #include <string>
 
 #include <cstring>
@@ -13,6 +14,7 @@ void Lockscreen::init()
     this->screen = lv_obj_create(NULL);
     lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
     DisplayTheme::applyScreen(this->screen);
+    lv_obj_set_style_bg_image_src(this->screen, &lockscreen_background_image, LV_PART_MAIN);
 
     lv_obj_t *label = lv_label_create(this->screen);
     lv_obj_set_width(label, LV_SIZE_CONTENT);

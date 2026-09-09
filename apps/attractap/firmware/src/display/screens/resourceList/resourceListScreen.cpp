@@ -1,5 +1,6 @@
 #include "resourceListScreen.hpp"
 #include "display/theme.hpp"
+#include "display/images/lockscreen_background_image.hpp"
 #include <string>
 #include <functional>
 
@@ -14,6 +15,7 @@ void ResourceListScreen::init()
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(this->screen, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
    DisplayTheme::applyScreen(this->screen);
+   lv_obj_set_style_bg_image_src(this->screen, &lockscreen_background_image, LV_PART_MAIN);
    lv_obj_set_style_pad_left(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_right(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_top(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);

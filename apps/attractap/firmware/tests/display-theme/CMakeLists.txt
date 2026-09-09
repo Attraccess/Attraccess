@@ -34,7 +34,7 @@ message(STATUS "Host renderer LVGL source: ${LVGL_SOURCE_DIR}")
 set(ATTRACTAP_IMAGE_DIR "${FIRMWARE_DIR}/src/display/images")
 configure_file("${ATTRACTAP_IMAGE_DIR}/logos.S.in" "${CMAKE_CURRENT_BINARY_DIR}/logos.S" @ONLY)
 set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/logos.S" PROPERTIES
-    OBJECT_DEPENDS "${FIRMWARE_DIR}/src/display/images/logo_133x40.rgb565a8;${FIRMWARE_DIR}/src/display/images/logo_400x120.rgb565a8")
+    OBJECT_DEPENDS "${ATTRACTAP_IMAGE_DIR}/logo_133x40.rgb565a8;${ATTRACTAP_IMAGE_DIR}/logo_400x120.rgb565a8;${ATTRACTAP_IMAGE_DIR}/lockscreen.rgb565")
 
 add_executable(display-theme-host
     main.cpp
@@ -43,6 +43,9 @@ add_executable(display-theme-host
     "${FIRMWARE_DIR}/src/display/theme.cpp"
     "${FIRMWARE_DIR}/src/display/screens/boot/bootscreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/init/initscreen.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/lockscreen/lockscreen.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/noResources/noResourcesScreen.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceList/resourceListScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/enrollment/enrollmentScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/reset/resetScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/supervision/supervisionScreen.cpp"
@@ -52,6 +55,7 @@ target_compile_definitions(display-theme-host PRIVATE
     FIRMWARE_FRIENDLY_NAME="Attractap Host"
     FIRMWARE_VERSION="test"
     PIN_ETH_SPI_CS=1
+    DEMO_MODE=1
     LOGGER_LEVEL_NUM=0)
 target_compile_options(display-theme-host PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra>")

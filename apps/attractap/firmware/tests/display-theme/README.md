@@ -54,11 +54,12 @@ warnings may also appear in a host build.
 
 | Area | Verified |
 | --- | --- |
-| Theme | Already-created and new screens, surfaces, inherited 18px font/text, white background, radius, no gradients/shadows |
+| Theme | Already-created and new screens, distinct dark surfaces, frontend dark palette, inherited 18px font/text, radius, no gradients/shadows |
 | Buttons | Automatic theme and primary/secondary/danger helpers; default, pressed, disabled, disabled + pressed, keyboard focus; inherited label text, border, color-filter removal, visible focus outline; framebuffer fill samples |
 | Fields | Textarea and dropdown focus/disabled styles; helper field, placeholder, cursor, selection background/text |
 | Keyboard | Real LVGL keyboard and button matrix, automatic and helper styles, pressed/checked/disabled item styles; real per-key controls and framebuffer fill samples |
 | Logos | Both production descriptors and embedded RGB565+A8 files, word alignment, byte counts, no recolor, every fully opaque/transparent pixel against the rendered framebuffer |
+| Restored backgrounds | Original RGB565 artwork on production lockscreen (available/in-use/maintenance), resource list and no-resources screens; alignment, byte count, unrecolored framebuffer samples and resource selection callback |
 | Boot | Production title and deterministic firmware info |
 | Init | Pending network, connected WLAN/certificate search warning, authenticated API state, settings event callback |
 | NFC Enrollment / Reset | Waiting, writing, success, error; cached username; phase colors; cancel visibility/callback; deterministic countdown and expiry |
@@ -66,7 +67,7 @@ warnings may also appear in a host build.
 | PIN | Production field/numeric keyboard, real keyboard value-change callbacks entering `1234`, valid/rejected/short PIN and cancel behavior, per-key state rendering |
 
 Production `IScreen::init()` idempotence and normal screen teardown are exercised.
-There are **11 test groups and 25 rendered fixtures**. The reported check count
+There are **12 test groups and 30 rendered fixtures**. The reported check count
 includes individual logo pixels, not just behavioral assertions. Widget gallery
 frames are labeled `widgets-*`; they exercise the production theme but are not
 claimed to be firmware screens. All other screen fixtures use production layouts.
@@ -105,7 +106,9 @@ Montserrat 18. LVGL error logs fail the run.
 The shims provide only SDK header declarations, a deterministic
 `esp_timer_get_time()`, the logger constructor, and the three `State` getters
 consumed by init. The actual production `platform.hpp`, `state.hpp`, `utils.hpp`
-and `logger.hpp` are used. Non-error logging levels are compiled out. Other
+and `logger.hpp` are used. The resource screens include the production API header
+using its `DEMO_MODE` branch, with declaration-only JSON/NVS/OTA shims; no API or
+demo transport is instantiated. Non-error logging levels are compiled out. Other
 logger/SDK operations fail to link instead of silently pretending that hardware
 works.
 
@@ -131,7 +134,8 @@ Files: `widgets-surfaces`, `widgets-buttons`, `widgets-button-helpers`,
 `init-connected`, `enrollment-{waiting,writing,success,error}`,
 `reset-{waiting,writing,success,error}`,
 `supervision-{waiting,verifying,success,error}`,
-`pin-{empty,valid,key-states,rejected}` (all with `.rgba` suffix).
+`pin-{empty,valid,key-states,rejected}`, `lockscreen-{available,in-use,maintenance}`,
+`resource-list`, `no-resources` (all with `.rgba` suffix).
 
 Sharp can convert one using these input options (run where Sharp is installed):
 
