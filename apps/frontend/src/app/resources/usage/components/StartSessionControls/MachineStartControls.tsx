@@ -36,7 +36,7 @@ export function MachineStartControls({
           {t('machine.startSession')}
         </Button>
         <Dropdown>
-          <DropdownTrigger className={buttonVariants({ isIconOnly: true })}>
+          <DropdownTrigger className={`${buttonVariants({ isIconOnly: true })} inline-flex items-center justify-center`}>
             <ChevronDownIcon />
           </DropdownTrigger>
           <DropdownPopover>

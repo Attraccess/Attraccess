@@ -46,3 +46,13 @@ body,
   content: '⚠';
   @apply text-base leading-none;
 }
+
+/* Keep labels, helper copy, and prefixed input text clear of field boundaries. */
+.textfield,
+.select {
+  @apply gap-2;
+}
+
+.input-group:has([data-slot='input-group-prefix']) .input-group__input {
+  @apply ps-3;
+}

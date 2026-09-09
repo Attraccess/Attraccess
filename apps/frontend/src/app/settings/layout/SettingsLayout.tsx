@@ -28,9 +28,9 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
         {t('backToSettings')}
       </Link>
 
-      <nav aria-label={t('navLabel')} className="hidden w-56 shrink-0 flex-col gap-6 sm:flex">
+      <nav aria-label={t('navLabel')} className="hidden w-56 shrink-0 flex-col gap-8 sm:flex">
         {groups.map((group) => (
-          <div key={group.key} className="flex flex-col gap-1">
+          <div key={group.key} className="flex flex-col gap-2 border-t border-separator pt-4 first:border-t-0 first:pt-0">
             <div className="px-3 text-xs font-semibold uppercase tracking-wide text-muted">
               {t(`groups.${group.key}`)}
             </div>

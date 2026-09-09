@@ -43,8 +43,8 @@
     --field-border-focus: var(--accent);
     --field-shadow: 0 0 0 0 transparent;
 
-    --radius: 0.125rem;
-    --field-radius: 0.25rem;
+    --radius: 0.5rem;
+    --field-radius: 0.5rem;
     --surface-shadow: 0 0 0 1px var(--border);
     --overlay-shadow: 0 8px 32px rgb(32 39 41 / 12%), 0 0 0 1px var(--border);
   }
