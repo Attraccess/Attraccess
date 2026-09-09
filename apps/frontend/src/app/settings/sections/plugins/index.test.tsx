@@ -97,6 +97,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe('PluginsSection', () => {
@@ -662,11 +663,20 @@ describe('PluginsSection', () => {
     expect(screen.getByText('Loaded')).toBeInTheDocument();
   });
 
-  it('retries a failed plugin and reports that the app is restarting', async () => {
-    const setTimeoutMock = vi.spyOn(global, 'setTimeout');
+  it('retries a failed plugin and waits for the restarted server before reloading', async () => {
+    let isRestarting = false;
+    let restartStatusCalls = 0;
     const fetchMock = vi.fn((input: { url?: string } | string) => {
       const url = typeof input === 'string' ? input : (input.url ?? '');
-      if (url.endsWith('/api/plugins/plugin-1/retry')) return Promise.resolve({ ok: true });
+      if (url.endsWith('/api/plugins/plugin-1/retry')) {
+        isRestarting = true;
+        return Promise.resolve({ ok: true });
+      }
+      if (url.endsWith('/api/plugins/status') && isRestarting) {
+        restartStatusCalls += 1;
+        if (restartStatusCalls === 1) return Promise.reject(new Error('Server restarting'));
+        isRestarting = false;
+      }
       if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
       if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
       return Promise.resolve({ ok: true, json: async () => ({}) });
@@ -688,8 +698,7 @@ describe('PluginsSection', () => {
     expect(hoisted.successToast).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'The plugin will be retried when the app restarts.' }),
     );
-    expect(setTimeoutMock).toHaveBeenCalledWith(expect.any(Function), 5000);
-    clearTimeout(setTimeoutMock.mock.results.at(-1)?.value as ReturnType<typeof setTimeout>);
+    await waitFor(() => expect(restartStatusCalls).toBe(2));
   });
 
   it('shows the empty state when no plugins are installed', () => {

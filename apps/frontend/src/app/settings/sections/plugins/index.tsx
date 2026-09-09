@@ -60,6 +60,30 @@ import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { Select } from '../../../../components/select';
 
 const DOCS_URL = 'https://docs.attraccess.org/#/plugins/developing-plugins';
+const SERVER_READY_POLL_INTERVAL_MS = 250;
+
+function waitForServerRestart() {
+  return new Promise<void>((resolve) => {
+    let serverStopped = false;
+
+    const poll = async () => {
+      try {
+        const response = await fetch(`${getBaseUrl()}/api/plugins/status`, { credentials: 'include' });
+        if (serverStopped && response.ok) {
+          resolve();
+          return;
+        }
+        if (!response.ok) serverStopped = true;
+      } catch {
+        serverStopped = true;
+      }
+
+      setTimeout(() => void poll(), SERVER_READY_POLL_INTERVAL_MS);
+    };
+
+    void poll();
+  });
+}
 
 type VersionCandidate = {
   version: string;
@@ -188,7 +212,8 @@ export function PluginsSection() {
       });
       if (!response.ok) throw new Error();
       toast.success({ title: t('status.retrySuccess') });
-      setTimeout(() => window.location.reload(), 5000);
+      await waitForServerRestart();
+      window.location.reload();
       setFailedPlugin(null);
     } catch {
       toast.error({ title: t('status.retryError') });
