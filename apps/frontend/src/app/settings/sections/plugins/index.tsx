@@ -221,7 +221,7 @@ export function PluginsSection() {
 
     setIsRetryingPlugin(true);
     try {
-      const previousInstanceId = await getServerInstanceId();
+      const previousInstanceId = await getServerInstanceId(AbortSignal.timeout(SERVER_STATUS_REQUEST_TIMEOUT_MS));
       const response = await fetch(`${getBaseUrl()}/api/plugins/${encodeURIComponent(failedPlugin.id)}/retry`, {
         method: 'POST',
         credentials: 'include',

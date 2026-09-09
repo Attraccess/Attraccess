@@ -666,7 +666,7 @@ describe('PluginsSection', () => {
   it('retries a failed plugin when the restarted server becomes available without observing downtime', async () => {
     let isRestarting = false;
     let restartStatusCalls = 0;
-    const fetchMock = vi.fn((input: { url?: string } | string) => {
+    const fetchMock = vi.fn((input: { url?: string } | string, _init?: RequestInit) => {
       const url = typeof input === 'string' ? input : (input.url ?? '');
       if (url.endsWith('/api/plugins/plugin-1/retry')) {
         isRestarting = true;
@@ -700,6 +700,17 @@ describe('PluginsSection', () => {
       expect.objectContaining({ title: 'The plugin will be retried when the app restarts.' }),
     );
     await waitFor(() => expect(restartStatusCalls).toBe(1));
+
+    const statusRequestWithTimeout = fetchMock.mock.calls.findIndex(
+      ([input, init]) =>
+        (typeof input === 'string' ? input : (input.url ?? '')).endsWith('/api/plugins/status') &&
+        init?.signal instanceof AbortSignal,
+    );
+    const retryRequest = fetchMock.mock.calls.findIndex(([input]) =>
+      (typeof input === 'string' ? input : (input.url ?? '')).endsWith('/api/plugins/plugin-1/retry'),
+    );
+    expect(statusRequestWithTimeout).toBeGreaterThanOrEqual(0);
+    expect(statusRequestWithTimeout).toBeLessThan(retryRequest);
   });
 
   it('shows the empty state when no plugins are installed', () => {
