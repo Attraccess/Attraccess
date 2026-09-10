@@ -195,7 +195,7 @@ describe('WagoService', () => {
         revision: 3,
         state: 'applied',
         snapshot: JSON.stringify({
-          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'] }],
+          logicalChannels: [{ id: 'pump', capabilities: ['output'] }],
         }),
       },
     ]);
@@ -297,7 +297,7 @@ describe('WagoService', () => {
         revision: 3,
         state: 'applied',
         snapshot: JSON.stringify({
-          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'] }],
+          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'], pulse: { durationMs: 500 } }],
         }),
       },
     ]);
@@ -322,7 +322,7 @@ describe('WagoService', () => {
         revision: 3,
         state: 'applied',
         snapshot: JSON.stringify({
-          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'] }],
+          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'], pulse: { durationMs: 500 } }],
         }),
       },
     ]);
@@ -358,7 +358,7 @@ describe('WagoService', () => {
         revision: 3,
         state: 'applied',
         snapshot: JSON.stringify({
-          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'] }],
+          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'], pulse: { durationMs: 500 } }],
         }),
       },
     ]);

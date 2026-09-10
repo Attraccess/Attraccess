@@ -5,6 +5,7 @@ import { pointLabel } from './configuration-model';
 import type { ConfigurationEditorMetadata, WagoConfigurationSnapshot } from './api';
 import { ModbusPointForm } from './ModbusConfigurationForm';
 import { bindModbusPoint, emptyModbus } from './modbus-editor';
+import { outputBehavior } from '../../channel-behavior';
 import { availableDigitalTerminals } from '../../backend/configuration-digital';
 
 export function Choice({
@@ -115,7 +116,7 @@ export function DigitalChannelEditor({
     <fieldset className="wg:flex wg:flex-col wg:gap-3">
       <legend className="wg:sr-only">{metadata.names[channel.id] ?? channel.id}</legend>
       <p className="wg:text-sm wg:text-muted">
-        {channel.profile.replaceAll('-', ' ')} · {channel.capabilities.join(', ')}
+        Setup preset: {channel.profile.replaceAll('-', ' ')}. Customize the behavior below.
       </p>
       <TextField isRequired>
         <Label>Channel name</Label>
@@ -148,7 +149,11 @@ export function DigitalChannelEditor({
         </TextField>
       </details>
       <h3 className="wg:mt-3 wg:font-semibold">Behavior</h3>
-      <p className="wg:text-sm wg:text-muted">Choose what happens when the controller loses its connection.</p>
+      <p className="wg:text-sm wg:text-muted">
+        {output
+          ? 'Define how flows control this output and what happens when its connection is lost.'
+          : 'Choose what happens when the controller loses its connection.'}
+      </p>
       <Choice
         label="On disconnect"
         value={channel.disconnectPolicy.mode}
@@ -174,18 +179,20 @@ export function DigitalChannelEditor({
       )}
       {output && (
         <>
-          <Checkbox
-            isSelected={channel.capabilities.includes('pulse')}
-            isDisabled={channel.profile === 'pulsed-lock-bank'}
-            onChange={(enabled) => capability('pulse', enabled)}
-          >
-            <Checkbox.Control>
-              <Checkbox.Indicator />
-            </Checkbox.Control>
-            <Checkbox.Content>
-              <Label>Pulse output</Label>
-            </Checkbox.Content>
-          </Checkbox>
+          <Choice
+            label="Output behavior"
+            value={outputBehavior(channel) ?? 'switched'}
+            options={[
+              { id: 'switched', label: 'Switched — turn on / turn off' },
+              { id: 'pulsed', label: 'Pulsed — trigger for a duration' },
+            ]}
+            onChange={(behavior) => capability('pulse', behavior === 'pulsed')}
+          />
+          <p className="wg:text-sm wg:text-muted">
+            {outputBehavior(channel) === 'pulsed'
+              ? 'Flows can trigger a pulse for the duration below. The controller turns the output off automatically.'
+              : 'Flows can turn this output on or off. It keeps that state until another command or the disconnect policy changes it.'}
+          </p>
           {channel.pulse && (
             <NumericField
               label="Pulse duration (ms)"
@@ -203,7 +210,6 @@ export function DigitalChannelEditor({
               </p>
               <Checkbox
                 isSelected={channel.capabilities.includes('guard')}
-                isDisabled={channel.profile === 'guarded-enable-request'}
                 onChange={(enabled) => capability('guard', enabled)}
               >
                 <Checkbox.Control>

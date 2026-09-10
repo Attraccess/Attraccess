@@ -29,7 +29,7 @@ function fixture(claimed = true) {
   const revision = Object.assign(new WagoConfigurationRevision(), {
     revision: 1,
     state: 'applied',
-    snapshot: JSON.stringify({ logicalChannels: [{ id: 'output', capabilities: ['output', 'pulse'] }] }),
+    snapshot: JSON.stringify({ logicalChannels: [{ id: 'output', capabilities: ['output'] }] }),
   });
   const record = jest.fn().mockResolvedValue({ status: 'recorded' });
   const publish = jest.fn().mockResolvedValue(undefined);
@@ -73,7 +73,7 @@ function fixture(claimed = true) {
   jest.spyOn(service as never, 'subscribeConfiguredServers').mockResolvedValue(undefined as never);
   const acknowledge = async (topic: string, payload: object) =>
     callbacks.get(topic)?.(createMock<PluginMqttMessage>({ payload: Buffer.from(JSON.stringify(payload)) }));
-  return { service, record, publish, provider, acknowledge, controller };
+  return { service, record, publish, provider, acknowledge, controller, revision };
 }
 const command = {
   channelId: 'output',
@@ -85,6 +85,22 @@ const command = {
 
 describe('real manual administration lifecycle boundaries', () => {
   afterEach(() => jest.useRealTimers());
+  it('rejects a manual set command on a pulsed channel without publishing it', async () => {
+    const h = fixture();
+    h.revision.snapshot = JSON.stringify({
+      logicalChannels: [
+        {
+          id: 'output',
+          capabilities: ['output', 'pulse'],
+          pulse: { durationMs: 500 },
+        },
+      ],
+    });
+    await expect(h.service.manualCommand(7, command, principal)).rejects.toThrow(
+      'Manual command does not match the applied configuration',
+    );
+    expect(h.publish).not.toHaveBeenCalled();
+  });
   it.each(['accepted', 'rejected'])(
     'correlates actual manual command %s with bounded redacted result',
     async (status) => {

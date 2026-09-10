@@ -166,7 +166,7 @@ function DiagnosticsContent({ controllerId, onConfigure }: { controllerId: numbe
               <Card.Header>
                 <Card.Title>{channel.id}</Card.Title>
                 <Card.Description>
-                  {channel.profile} · {channel.capabilities.join(', ')}
+                  Setup preset: {channel.profile} · Capabilities: {channel.capabilities.join(', ')}
                 </Card.Description>
               </Card.Header>
               <Card.Content>
@@ -175,9 +175,7 @@ function DiagnosticsContent({ controllerId, onConfigure }: { controllerId: numbe
                   <div key={`${sample.kind}:${sample.measurementKind ?? ''}`}>
                     <p>
                       Latest {sample.kind}: {String(sample.value)} {sample.unit ?? ''} {sample.measurementKind ?? ''} ·{' '}
-                      {sample.current
-                        ? 'current source sample'
-                        : `not current: ${sample.availabilityReason}`}
+                      {sample.current ? 'current source sample' : `not current: ${sample.availabilityReason}`}
                     </p>
                     <p>
                       Source time: {sample.sourceAt ?? 'unavailable'} ({sample.sourceFreshness}). Received:{' '}

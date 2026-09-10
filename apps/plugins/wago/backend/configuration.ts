@@ -1,3 +1,4 @@
+import { pulseBehaviorError } from '../channel-behavior';
 import { createHash } from 'node:crypto';
 import { CONFIGURATION_PROTOCOL_VERSION } from './protocol';
 import { type ModbusConfiguration, type ModbusPoint, validateModbus, validateModbusBindings } from '../modbus/model';
@@ -216,7 +217,6 @@ export function validateSnapshot(snapshot: unknown): ConfigurationValidationErro
     validateGuard(channel.guard, `${path}.guard`, capabilities, channelIds, errors);
     validateFeedback(channel.feedback, `${path}.feedback`, capabilities, channel.id, channelsById, errors);
     validateMeasurement(channel.measurement, `${path}.measurement`, capabilities, errors);
-    validateProfile(channel.profile, capabilities, path, errors);
   });
   return errors;
 }
@@ -391,17 +391,11 @@ function validatePulse(
   capabilities: Set<string>,
   errors: ConfigurationValidationError[],
 ): void {
+  const message = pulseBehaviorError([...capabilities], value);
+  if (message) errors.push({ path, code: 'invalid_pulse', message });
   if (value === undefined) return;
   if (!record(value, path, errors)) return;
   exactKeys(value, path, ['durationMs'], errors);
-  if (!Number.isSafeInteger(value.durationMs) || (value.durationMs as number) <= 0)
-    errors.push({
-      path: `${path}.durationMs`,
-      code: 'invalid_duration',
-      message: 'durationMs must be a positive integer',
-    });
-  if (!capabilities.has('pulse'))
-    errors.push({ path, code: 'unsupported_field', message: 'pulse requires pulse capability' });
 }
 
 function validateGuard(
@@ -473,30 +467,6 @@ function validateFeedback(
     });
   if (!capabilities.has('feedback'))
     errors.push({ path, code: 'unsupported_field', message: 'feedback requires feedback capability' });
-}
-
-function validateProfile(
-  value: unknown,
-  capabilities: Set<string>,
-  path: string,
-  errors: ConfigurationValidationError[],
-): void {
-  const required: Record<string, string[]> = {
-    'metered-switched-load': ['output', 'measurement'],
-    'pulsed-lock-bank': ['output', 'pulse'],
-    'guarded-enable-request': ['output', 'guard'],
-    'generic-digital-output': ['output'],
-    'generic-monitored-input': ['input'],
-  };
-  required[value as string]
-    ?.filter((capability) => !capabilities.has(capability))
-    .forEach((capability) =>
-      errors.push({
-        path: `${path}.capabilities`,
-        code: 'missing_capability',
-        message: `${value} requires ${capability} capability`,
-      }),
-    );
 }
 
 function presetChannel(application: WagoPresetApplication): WagoConfigurationSnapshot['logicalChannels'][number] {

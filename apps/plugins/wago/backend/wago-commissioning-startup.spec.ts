@@ -31,6 +31,13 @@ it('boots the commissioning plugin and empty artifact catalog without privileged
   } as unknown as PluginContext;
   let module: TestingModule | undefined;
   try {
+    const nodes = typeof plugin.flowNodes === 'function' ? plugin.flowNodes(context) : plugin.flowNodes;
+    expect(nodes?.map((node) => node.type)).toEqual([
+      'plugin.wago.command',
+      'plugin.wago.event-received',
+      'plugin.wago.read-state',
+      'plugin.wago.wait-for-state',
+    ]);
     await dataSource.initialize();
     module = await Test.createTestingModule({ imports: [plugin.register(context)] }).compile();
     await module.init();
@@ -39,6 +46,17 @@ it('boots the commissioning plugin and empty artifact catalog without privileged
       firmwareBaseline: '31',
       ready: false,
     });
+    const command = nodes?.find((node) => node.type === 'plugin.wago.command');
+    await expect(command?.resolveConfigSchema?.({}, { resourceId: 1 })).resolves.toMatchObject({
+      dynamic: true,
+      properties: { controllerId: { oneOf: [] } },
+    });
+    for (const node of nodes?.filter((node) => node !== command) ?? []) {
+      await expect(node.resolveConfigSchema?.({}, { resourceId: 1 })).resolves.toMatchObject({ dynamic: true });
+      await expect(node.validateConfig?.({}, new Map())).resolves.toEqual(
+        expect.arrayContaining([expect.objectContaining({ field: 'controllerId' })]),
+      );
+    }
     expect(get).not.toHaveBeenCalled();
     expect(context.mqtt.subscribe).not.toHaveBeenCalled();
   } finally {

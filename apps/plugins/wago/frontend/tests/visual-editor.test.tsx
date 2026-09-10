@@ -729,7 +729,8 @@ describe('Modbus output and serial composition', () => {
     await section(user, 'Channels');
     await user.click(screen.getByRole('button', { name: /Named measurement/ }));
     await user.click(await screen.findByRole('option', { name: /Active power/ }));
-    await user.click(screen.getByRole('checkbox', { name: 'Pulse output' }));
+    await user.click(screen.getByRole('button', { name: /Output behavior/ }));
+    await user.click(await screen.findByRole('option', { name: /Pulsed —/ }));
     await user.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
     const [, saved] = state.save.mock.calls[0];
@@ -975,6 +976,38 @@ describe('configuration workspace', () => {
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Add channel' })).not.toBeInTheDocument();
     expect(state.save).not.toHaveBeenCalled();
+  });
+
+  it('lets a pulse preset become switched and persist only its chosen behavior', async () => {
+    state.getDraft.mockResolvedValue({
+      snapshot: JSON.stringify({
+        ...state.snapshot,
+        logicalChannels: [
+          {
+            ...state.snapshot.logicalChannels[0],
+            profile: 'pulsed-lock-bank',
+            capabilities: ['output', 'pulse'],
+            pulse: { durationMs: 750 },
+          },
+        ],
+      }),
+      presetProvenance: null,
+      reviewedHash: null,
+      updatedAt: 'initial',
+    });
+    mount();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /Output behavior/ }));
+    await user.click(await screen.findByRole('option', { name: /Switched —/ }));
+    expect(screen.queryByRole('spinbutton', { name: 'Pulse duration (ms)' })).not.toBeInTheDocument();
+    expect(screen.getByText(/Flows can turn this output on or off/)).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(state.save).toHaveBeenCalledTimes(1));
+    const saved = state.save.mock.calls[0][1];
+    expect(validateEditorSnapshot(saved)).toEqual([]);
+    expect(saved.logicalChannels[0]).toMatchObject({ profile: 'pulsed-lock-bank', capabilities: ['output'] });
+    expect(saved.logicalChannels[0]).not.toHaveProperty('pulse');
+    expect(state.publish).not.toHaveBeenCalled();
   });
 
   it('guides creation from a free terminal and keeps the list, map and saved payload consistent', async () => {

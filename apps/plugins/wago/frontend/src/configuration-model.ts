@@ -121,7 +121,7 @@ function words(value: string) {
 const fieldLabels: Record<string, string> = {
   physicalPointId: 'Physical terminal',
   channel: 'Physical terminal',
-  profile: 'Preset profile',
+  profile: 'Setup preset',
   capabilities: 'Capabilities',
   disconnectPolicy: 'On disconnect',
   mode: 'Mode',

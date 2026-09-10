@@ -29,11 +29,7 @@ export function isEditableDigitalChannel(
   channel: WagoConfigurationSnapshot['logicalChannels'][number],
 ) {
   const point = snapshot.physicalPoints.find((item) => item.id === channel.physicalPointId);
-  return (
-    point?.hardwareProfile === '751-9301' &&
-    channel.profile !== 'metered-switched-load' &&
-    !channel.capabilities.includes('measurement')
-  );
+  return point?.hardwareProfile === '751-9301' && !channel.capabilities.includes('measurement');
 }
 
 export function digitalTerminalLabel(channel: number) {
