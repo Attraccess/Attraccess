@@ -8,24 +8,32 @@
 #include "../settings/settings.hpp"
 #include "state/state.hpp"
 #include "../logger/logger.hpp"
-#ifdef DEMO_MODE
-#include "demo_websocket.hpp"
-#else
-#include "../websocket/websocket.hpp"
-#endif
+#include "reader_transport.hpp"
 #include "../utils.hpp"
+#ifdef ATTRACTAP_HOST
+class HostOtaUpdater
+{
+public:
+    template <typename... Args>
+    explicit HostOtaUpdater(Args &&...) {}
+    void tick() {}
+    bool inProgress() const { return false; }
+};
+#else
 #include "ota/ota_updater.hpp"
+#endif
 
 class API
 {
 public:
-    API() : logger("API"),
+    explicit API(IReaderTransport &transport) : logger("API"),
+             transport(transport),
             firmware(
                 logger,
                 [this](const char *type, JsonObject payload)
                 { return this->sendMessage(type, payload); },
                 [this](const char *reason)
-                { this->websocket.forceReconnect(reason); },
+                { this->transport.forceReconnect(reason); },
                 firmwareUpdateProgressCallback,
                 firmwareUpdateMetaCallback,
                 errorCallback) {}
@@ -331,11 +339,7 @@ public:
 
 private:
     Logger logger;
-#ifdef DEMO_MODE
-    DemoWebsocket websocket;
-#else
-    Websocket websocket;
-#endif
+    IReaderTransport &transport;
 
     void updateSateInfo();
 
@@ -436,5 +440,9 @@ private:
     std::function<void(int)> firmwareUpdateProgressCallback;
     std::function<void(std::string availableVersion)> firmwareUpdateMetaCallback;
 
+#ifdef ATTRACTAP_HOST
+    HostOtaUpdater firmware;
+#else
     OtaUpdater firmware;
+#endif
 };
