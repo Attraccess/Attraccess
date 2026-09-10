@@ -37,17 +37,29 @@ const updateSW = registerSW({
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 
-root.render(
-  <Providers>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <PluginProvider>
-          <StrictMode>
-            <PWAInstall />
-            <App />
-          </StrictMode>
-        </PluginProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
-  </Providers>,
-);
+// Throwaway WAGO design review. This branch is removed by production builds.
+if (import.meta.env.DEV && new URLSearchParams(location.search).get('prototype') === 'wago-configuration') {
+  void import('../../plugins/wago/frontend/src/configuration-prototype/ConfigurationPrototype').then(
+    ({ ConfigurationPrototype }) => {
+      root.render(
+        <BrowserRouter>
+          <ConfigurationPrototype />
+        </BrowserRouter>,
+      );
+    },
+  );
+} else
+  root.render(
+    <Providers>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <PluginProvider>
+            <StrictMode>
+              <PWAInstall />
+              <App />
+            </StrictMode>
+          </PluginProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </Providers>,
+  );
