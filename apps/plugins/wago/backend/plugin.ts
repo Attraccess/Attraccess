@@ -12,7 +12,6 @@ import { WagoCommissioningSession } from './wago-commissioning-session.entity';
 import { WagoCommissioningService } from './wago-commissioning.service';
 import { WagoCredentialRotationService } from './wago-credential-rotation';
 import { WagoRuntimeArtifactsService } from './wago-runtime-artifacts';
-import { WagoArtifactsController, WagoArtifactUploadInterceptor } from './wago-artifacts.controller';
 import { WagoDiagnosticsController } from './diagnostics.controller';
 import { WagoDiagnosticsService } from './diagnostics.service';
 import { WagoCommissioningReadiness } from './wago-commissioning-readiness';
@@ -39,12 +38,11 @@ const plugin: PluginBackendModule = {
   register(context: PluginContext): DynamicModule {
     return {
       module: WagoPluginModule,
-      controllers: [WagoControllerApi, WagoArtifactsController, WagoDiagnosticsController],
+      controllers: [WagoControllerApi, WagoDiagnosticsController],
       providers: [
         { provide: PLUGIN_CONTEXT, useValue: context },
         WagoService,
         WagoRuntimeArtifactsService,
-        WagoArtifactUploadInterceptor,
         WagoCommissioningReadiness,
         WagoDiagnosticsService,
         WagoCommissioningService,

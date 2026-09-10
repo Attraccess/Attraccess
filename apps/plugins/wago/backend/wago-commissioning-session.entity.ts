@@ -27,6 +27,10 @@ export class WagoCommissioningSession {
   @Column({ type: 'varchar', name: 'enrollment_expires_at', nullable: true }) enrollmentExpiresAt!: string | null;
   @Column({ type: 'integer', name: 'enrollment_id', nullable: true }) enrollmentId!: number | null;
   @Column({ type: 'varchar', name: 'pairing_code', nullable: true }) pairingCode!: string | null;
+  @Column({ type: 'text', name: 'encrypted_ssh_credential', nullable: true, select: false }) encryptedSshCredential!:
+    | string
+    | null;
+  @Column({ type: 'varchar', name: 'ssh_credential_rotated_at', nullable: true }) sshCredentialRotatedAt!: string | null;
   @Column({ type: 'varchar', name: 'delivery_token', nullable: true }) deliveryToken!: string | null;
   @Column({ type: 'text', name: 'initiating_principal', nullable: true }) initiatingPrincipal!: string | null;
   @Column({ type: 'varchar', name: 'runtime_artifact_digest', nullable: true }) runtimeArtifactDigest!: string | null;

@@ -11,6 +11,10 @@ export const WAGO_HARDWARE_PROFILE = 'cc100-751-9301-fw31-digital-v1';
 export const WAGO_DIN = '/sys/devices/platform/soc/44009000.spi/spi_master/spi0/spi0.0/din';
 export const WAGO_DOUT = '/sys/kernel/dout_drv/DOUT_DATA';
 export const WAGO_DOCKER_PROVISION_REVIEW_FLAG = 'reviewedDockerActivation' as const;
+// FW31 may need longer than its init script's own ten-second wait while its
+// CODESYS wrapper and children unwind. The previous 30-second outer bound was
+// observed to cut off a real CC100 shutdown just before it completed.
+const WAGO_RUNTIME_STOP_TIMEOUT_SECONDS = 120;
 
 export interface WagoDockerProvisionReview {
   reviewedDockerActivation: boolean;
@@ -192,7 +196,7 @@ export function wagoHardwareDeploymentDockerArgs(testRoot = ''): string {
   return `--user 10001:10001 --cap-drop ALL --security-opt no-new-privileges --network host --env WAGO_HARDWARE_PROFILE=${WAGO_HARDWARE_PROFILE} --mount ${quote(`type=bind,src=${testRoot}${WAGO_DIN},dst=/run/attraccess-wago/io/din,readonly`)} --mount ${quote(`type=bind,src=${testRoot}${WAGO_DOUT},dst=/run/attraccess-wago/io/dout`)}`;
 }
 
-function provisionLock(token: string, testRoot: string): string {
+function provisionLock(token: string, testRoot: string, waitSeconds = 0): string {
   if (!/^[a-f0-9]{32}$/.test(token)) throw new Error('Invalid provisioning token');
   return `set -eu
 umask 077
@@ -200,7 +204,7 @@ root=${rootValue(testRoot)}
 config="$root/etc/attraccess-wago"
 journal="$config/docker-provision"
 fail() { echo "$*" >&2; exit 1; }
-${wagoShellFilesystemGuard()}
+${wagoShellFilesystemGuard({ waitSeconds })}
 for path in "$root/var/lib/attraccess-wago-install-transaction" "$root/var/lib/attraccess-wago-install-transaction.cleanup" "$root/var/lib/attraccess-wago-install-transaction.restored" "$root/var/lib/attraccess-wago-install-transaction.accepted-cleanup" "$config/delivery"; do
   test ! -e "$path" || fail 'Finish runtime delivery/recovery before Docker provisioning'
 done
@@ -467,8 +471,8 @@ if docker info >/dev/null 2>&1; then
 fi
 # The FW31 init has no status command. Explicit stop covers an active process
 # even when runtime selection is already 0; the selection override is vendor API.
-timeout -k 5 30 "$root/etc/init.d/runtime" stop 1 >/dev/null 2>&1 || fail 'codesys-stop-failed'
-timeout -k 5 30 "$root/etc/init.d/runtime" stop 2 >/dev/null 2>&1 || fail 'codesys-stop-failed'
+timeout -k 5 ${WAGO_RUNTIME_STOP_TIMEOUT_SECONDS} "$root/etc/init.d/runtime" stop 1 >/dev/null 2>&1 || fail 'codesys-stop-failed'
+timeout -k 5 ${WAGO_RUNTIME_STOP_TIMEOUT_SECONDS} "$root/etc/init.d/runtime" stop 2 >/dev/null 2>&1 || fail 'codesys-stop-failed'
 ${codesysStopped()}
 timeout -k 5 45 "$root/etc/config-tools/config_runtime" --wait runtime-version=0 force-new-version=yes restart-server=NO >/dev/null 2>&1 || fail 'codesys-disable-failed'
 ${codesysDisabled()}
@@ -589,6 +593,43 @@ echo 'docker-provision=contained'
 `;
 }
 
+/** Reconcile a verified controller journal without exporting its durable token. */
+export function wagoDockerProvisionReconciliationScript(testRoot = ''): string {
+  return `set -eu
+umask 077
+root=${rootValue(testRoot)}
+config="$root/etc/attraccess-wago"
+journal="$config/docker-provision"
+fail() { echo "$*" >&2; exit 1; }
+${wagoShellFilesystemGuard()}
+for path in "$root/var/lib/attraccess-wago-install-transaction" "$root/var/lib/attraccess-wago-install-transaction.cleanup" "$root/var/lib/attraccess-wago-install-transaction.restored" "$root/var/lib/attraccess-wago-install-transaction.accepted-cleanup" "$config/delivery"; do
+  test ! -e "$path" || fail 'Finish runtime delivery/recovery before Docker provisioning'
+done
+if test ! -e "$journal" && test ! -L "$journal"; then echo 'docker-provision=absent'; exit 0; fi
+test -d "$journal" && test ! -L "$journal" && test "$(stat -c '%u:%g:%a' "$journal")" = 0:0:700 || fail 'Unsafe preparation journal ownership or permissions'
+for field in token mode prior started restored start-intent accepted os-release dockerd; do
+  path="$journal/$field"
+  if test -e "$path" || test -L "$path"; then
+    test -f "$path" && test ! -L "$path" || fail 'Unsafe preparation journal field'
+    metadata=$(stat -c '%u:%g:%a:%h' "$path") || fail 'Cannot inspect preparation journal field'
+    case "$metadata" in 0:0:[0-7][0145][0145]:1) ;; *) fail 'Unsafe preparation journal field ownership or permissions' ;; esac
+  fi
+done
+test -f "$journal/token" && test ! -L "$journal/token" || fail 'Invalid Docker provisioning journal'
+token=$(cat "$journal/token")
+printf '%s\n' "$token" | grep -Eq '^[a-f0-9]{32}$' || fail 'Invalid Docker provisioning journal'
+test -f "$journal/mode" && test ! -L "$journal/mode" && test "$(cat "$journal/mode")" = destructive || fail 'Invalid preparation journal mode'
+${dockerRecoveryHelpers()}
+printf '%s\n' destructive > "$journal/mode"
+rm -f "$config/runtime-enabled"
+contain_runtime || fail 'Cannot verify runtime containment; Docker recovery required'
+touch "$journal/restored"
+test ! -e "$completed" && test ! -L "$completed" || fail 'Conflicting preparation completion receipt'
+mv "$journal" "$completed"
+echo 'docker-provision=reconciled'
+`;
+}
+
 /** A durable tokened receipt makes lost SSH responses / coordinator saves retryable. */
 export function wagoDockerProvisionFinishScript(
   token: string,
@@ -596,7 +637,7 @@ export function wagoDockerProvisionFinishScript(
   testRoot = '',
 ): string {
   if (outcome !== 'accepted' && outcome !== 'restored') throw new Error('Invalid provisioning outcome');
-  return `${provisionLock(token, testRoot)}
+  return `${provisionLock(token, testRoot, 330)}
 ${dockerRecoveryHelpers()}
 if test ! -e "$journal" && test ! -L "$journal"; then
   ${outcome === 'restored' ? `completed_recovery || fail 'No preparation recovery receipt'` : `test -d "$completed" && test ! -L "$completed" && test -f "$completed/token" && test ! -L "$completed/token" && test "$(cat "$completed/token")" = "$token" && test -f "$completed/accepted" || fail 'No preparation acceptance receipt'`}

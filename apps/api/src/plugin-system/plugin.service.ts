@@ -144,22 +144,26 @@ export class PluginService {
    * Records the error that prevented the guarded startup from completing so the
    * next process can show the actionable cause rather than a generic warning.
    */
-  public static recordBootFailure(error: unknown): void {
+  public static recordBootFailure(error: unknown): boolean {
     const active = PluginService.readBootGuard();
-    if (active.length === 0) return;
+    if (active.length === 0) return false;
 
     const message = error instanceof Error ? error.message : String(error);
     const stack = error instanceof Error ? error.stack ?? '' : '';
     const affected = active.filter((pluginDirectory) => stack.includes(join(PluginService.PLUGIN_PATH, pluginDirectory)));
     if (affected.length === 0) {
       PluginService.logger.error('Could not attribute the startup failure to a plugin; no plugins were quarantined.');
-      return;
+      return false;
     }
 
     for (const pluginDirectory of affected) {
       PluginService.pluginFailures.set(pluginDirectory, { pluginDirectory, message });
     }
     PluginService.writeFailures([...PluginService.pluginFailures.values()]);
+    // The replacement process should retain unaffected plugins. The persisted
+    // quarantine now identifies the failed plugin precisely.
+    PluginService.clearBootGuard();
+    return true;
   }
 
   public static clearBootGuard(): void {

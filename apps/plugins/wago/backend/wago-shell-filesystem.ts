@@ -9,11 +9,15 @@ export function wagoShellFilesystemGuard({
   acquireLock = true,
   lockName = 'install.lock',
   descriptor = 9,
+  waitSeconds = 0,
 }: {
   acquireLock?: boolean;
   lockName?: 'install.lock' | 'supervisor.lock';
   descriptor?: 8 | 9;
+  waitSeconds?: number;
 } = {}): string {
+  if (!Number.isSafeInteger(waitSeconds) || waitSeconds < 0 || waitSeconds > 330)
+    throw new Error('Invalid controller lock wait');
   return `
 ${wagoShellRootDirectoryCheck()}
 wago_require_root_directory "$root/etc" || fail 'Unsafe configuration parent ownership or permissions'
@@ -37,7 +41,7 @@ validate_controller_lock || fail 'Unsafe controller lock ownership, permissions 
 ${
   acquireLock
     ? `exec ${descriptor}<>"$config/${lockName}"
-flock -n ${descriptor} || fail 'Another runtime transaction holds the controller lock'
+${waitSeconds ? `timeout -k 5 ${waitSeconds} flock ${descriptor}` : `flock -n ${descriptor}`} || fail 'Another runtime transaction holds the controller lock'
 validate_controller_lock || fail 'Controller lock changed during acquisition'`
     : ''
 }

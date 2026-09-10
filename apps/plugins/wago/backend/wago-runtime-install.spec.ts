@@ -31,6 +31,7 @@ describe('destructive runtime shell transaction and signed offline stream fixtur
   };
   const delivery = () => {
     const bundle = readFileSync(join(fixture.root, 'tmp/attraccess-wago-runtime.tar'));
+    rmSync(join(fixture.root, 'tmp/attraccess-wago-runtime.tar'));
     return {
       bundle,
       script: runtimeBundleDeliveryScript(
@@ -88,7 +89,13 @@ describe('destructive runtime shell transaction and signed offline stream fixtur
     expect(fixture.read('docker.log')).not.toMatch(/^start old-id/m);
   });
 
-  it.each(['load', 'inspect-image', 'start', 'supervisor-launch-failed'])(
+  it('loads the image without materializing a second archive on the root filesystem', () => {
+    expect(install().status).toBe(0);
+    expect(existsSync(join(fixture.root, tx, 'bundle/image.tar'))).toBe(false);
+    expect(fixture.read('docker-loaded-sha256')).toBe(createHash('sha256').update('fixture image bytes').digest('hex'));
+  });
+
+  it.each(['load', 'tar-image-stream-failed', 'inspect-image', 'start', 'supervisor-launch-failed'])(
     'contains %s failures without restoring old workloads',
     (fault) => {
       prior();
@@ -206,6 +213,9 @@ describe('destructive runtime shell transaction and signed offline stream fixtur
     fixture.file(config + '/docker-provision/started', '');
     const { bundle, script } = delivery();
     expect(fixture.run(script, '', bundle).status).toBe(0);
+    expect(existsSync(join(fixture.root, config, 'delivery/bundle'))).toBe(false);
+    expect(existsSync(join(fixture.root, `tmp/attraccess-wago-upload-${token}`))).toBe(false);
+    expect(fixture.read('docker-loaded-sha256')).toBe(createHash('sha256').update('fixture image bytes').digest('hex'));
     expect(fixture.read(tx + '/token')).toBe(token + '\n');
     expect(fixture.read(config + '/runtime-ca.pem')).toBe('public CA');
     expect(fixture.run(runtimeBundleRecoveryScript(fixture.root, 'b'.repeat(32))).status).not.toBe(0);
@@ -221,7 +231,34 @@ describe('destructive runtime shell transaction and signed offline stream fixtur
     if (fault === 'corrupt') bytes[bytes.length - 1] ^= 1;
     expect(fixture.run(script, '', bytes).status).not.toBe(0);
     expect(fixture.containers()).toEqual([]);
+    const upload = join(fixture.root, `tmp/attraccess-wago-upload-${token}`);
+    expect(statSync(upload).mode & 0o777).toBe(0o700);
+    expect(statSync(join(upload, 'bundle')).mode & 0o777).toBe(0o600);
+    expect(existsSync(join(fixture.root, config, 'delivery/bundle'))).toBe(false);
+    expect(fixture.run(runtimeBundleRecoveryScript(fixture.root, 'b'.repeat(32))).status).not.toBe(0);
+    expect(existsSync(upload)).toBe(true);
     expect(fixture.run(runtimeBundleRecoveryScript(fixture.root, token)).status).toBe(0);
+    expect(existsSync(upload)).toBe(false);
+  });
+
+  it('rejects an upload directory owned by another user during recovery', () => {
+    fixture.file(config + '/delivery/token', token);
+    const upload = `/tmp/attraccess-wago-upload-${token}`;
+    fixture.file(upload + '/bundle', 'unowned bytes');
+    fixture.file('owners.json', JSON.stringify({ ...JSON.parse(fixture.read('owners.json')), [upload]: '10001:10001' }));
+    const result = fixture.run(runtimeBundleRecoveryScript(fixture.root, token));
+    expect(result.stderr).toContain('Unsafe runtime upload directory');
+    expect(fixture.read(upload + '/bundle')).toBe('unowned bytes');
+    expect(existsSync(join(fixture.root, config, 'delivery'))).toBe(true);
+  });
+
+  it('propagates tar stream failure even when Docker consumes the whole image and exits successfully', () => {
+    const result = install('tar-image-stream-failed');
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('Runtime image stream or Docker load failed');
+    expect(fixture.read('docker-loaded-sha256')).toBe(createHash('sha256').update('fixture image bytes').digest('hex'));
+    expect(fixture.containers()).toEqual([]);
+    expect(fixture.read('docker.log')).not.toMatch(/^run /m);
   });
 
   it('rejects a wrong embedded image reference before discarding existing state', () => {
@@ -313,7 +350,7 @@ process.exit(result.status ?? 1);
     rmSync(join(fixture.root, config, 'runtime.env.next'));
     fixture.file(
       'bin/flock',
-      '#!/usr/bin/python3\nimport fcntl,sys\ntry: fcntl.flock(int(sys.argv[2]),fcntl.LOCK_EX|fcntl.LOCK_NB)\nexcept OSError: sys.exit(1)\n',
+      '#!/usr/bin/python3\nimport fcntl,sys\ntry: fcntl.flock(int(sys.argv[-1]),fcntl.LOCK_EX | (fcntl.LOCK_NB if "-n" in sys.argv else 0))\nexcept OSError: sys.exit(1)\n',
       0o700,
     );
     const { bundle, script } = delivery();
@@ -339,7 +376,8 @@ process.exit(result.status ?? 1);
         throw new Error(`Delivery did not reach the locked receiving phase: ${stderr}`);
       expect(fixture.run(runtimeBundleRecoveryScript(fixture.root, token)).stderr).toContain('lock');
       child.stdin.end(bundle);
-      expect(await completion).toBe(0);
+      const code = await completion;
+      expect({ code, failure: code === 0 ? '' : stderr }).toEqual({ code: 0, failure: '' });
     } finally {
       child.stdin.destroy();
       if (child.exitCode === null) child.kill('SIGKILL');

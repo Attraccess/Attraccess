@@ -24,6 +24,7 @@ export function runtimeBundleInstallScript(image: string, testRoot = ''): string
 
 function installScript(image: string, testRoot: string, locked = false): string {
   if (!/^\S+@sha256:[a-f0-9]{64}$/i.test(image)) throw new Error('Runtime image must be digest-pinned');
+  const archive = locked ? '"$upload/bundle"' : '"$root/tmp/attraccess-wago-runtime.tar"';
   return `${preamble(testRoot, locked)}
 test ! -e "$tx" && test ! -e "$cleanup" && test ! -e "$receipt" && test ! -e "$acceptedCleanup" || fail 'Runtime transaction exists; recover or accept it before retrying'
 test -s "$config/runtime.env.next" && test ! -L "$config/runtime.env.next" || fail 'Missing staged runtime.env.next'
@@ -53,12 +54,12 @@ trap - EXIT HUP INT TERM
 trap 'code=$?; trap - EXIT; if [ "$code" -ne 0 ]; then if ! rollback; then echo "Cleanup incomplete; recovery journal retained" >&2; fi; fi; exit "$code"' EXIT
 trap 'trap - EXIT; echo "Interrupted; recovery journal retained" >&2; exit 130' HUP INT TERM
 mkdir "$tx/bundle"
-# Stream only the two expected members into regular files; never unpack archive
-# paths, links, permissions or device nodes into the controller filesystem.
-tar --warning=no-timestamp --warning=no-unknown-keyword -xOf "$root/tmp/attraccess-wago-runtime.tar" image-reference > "$tx/bundle/image-reference"
+# Read only the expected members; never unpack archive paths, links, permissions
+# or device nodes. The signed image archive remains in tmpfs until Docker loads it.
+tar --warning=no-timestamp --warning=no-unknown-keyword -xOf ${archive} image-reference > "$tx/bundle/image-reference"
 test "$(cat "$tx/bundle/image-reference")" = ${quote(image)} || fail 'Runtime image reference mismatch'
-tar --warning=no-timestamp --warning=no-unknown-keyword -xOf "$root/tmp/attraccess-wago-runtime.tar" image.tar > "$tx/bundle/image.tar"
-test -s "$tx/bundle/image.tar" || fail 'Empty runtime image archive'
+tar --warning=no-timestamp --warning=no-unknown-keyword -tf ${archive} image.tar > "$tx/bundle/image-members" || fail 'Runtime image archive is missing'
+test "$(cat "$tx/bundle/image-members")" = image.tar || fail 'Invalid runtime image archive members'
 awk '$2 == "attraccess-wago" || $2 == "attraccess-wago.previous" { print $1 }' "$config/containers.next" > "$tx/old-id"
 touch "$tx/prepared"
 rm -f "$tx/preparing"
@@ -83,8 +84,11 @@ touch "$tx/env-changing"
 rm -f "$config/runtime.env.previous"
 mv "$config/runtime.env.next" "$config/runtime.env"
 chmod 0600 "$config/runtime.env"
-# Do not pipe docker load into sed: POSIX sh would hide a failing load exit code.
-docker load -i "$tx/bundle/image.tar" > "$tx/load-output"
+# Check both ends of the stream: neither truncated tar output nor a failed Docker
+# load may be hidden by a successful consumer. Bash is already required by FW31
+# identity inspection. No second image archive is written to the root filesystem.
+${locked ? "printf 'WAGO_DELIVERY_PHASE=loading\\n' >&2" : ''}
+/bin/bash -o pipefail -c ${quote('tar --warning=no-timestamp --warning=no-unknown-keyword -xOf "$1" image.tar | timeout -k 5 45 docker --host unix:///var/run/docker.sock load')} sh ${archive} > "$tx/load-output" || fail 'Runtime image stream or Docker load failed'
 sed -n -e 's/^Loaded image: //p' -e 's/^Loaded image ID: //p' "$tx/load-output" > "$tx/loaded-image"
 test "$(wc -l < "$tx/loaded-image" | tr -d ' ')" = 1 || fail 'Expected exactly one loaded image'
 runtime_image=$(cat "$tx/loaded-image")
@@ -102,9 +106,11 @@ ${wagoHardwareDeploymentPreflightScript(testRoot)}
 ${boundedDocker()}
 # Every subsequent start must pass the host gate again. Docker's own restart
 # manager cannot run that gate and must never restart a physical I/O writer.
+${locked ? "printf 'WAGO_DELIVERY_PHASE=starting\\n' >&2" : ''}
 docker run -d --pull=never --name attraccess-wago --restart no --env-file "$config/runtime.env" ${wagoHardwareDeploymentDockerArgs(testRoot)} -v "$data:/var/lib/attraccess-wago" "$@" "$runtime_image"
 touch "$tx/started"
 touch "$config/runtime-enabled"
+${locked ? "printf 'WAGO_DELIVERY_PHASE=supervising\\n' >&2" : ''}
 ${wagoRuntimeSupervisorLaunchShell()}
 trap - EXIT HUP INT TERM
 echo 'Runtime container started; readiness unverified; recovery journal retained'
@@ -112,9 +118,9 @@ echo 'Runtime container started; readiness unverified; recovery journal retained
 }
 
 /** Stop and remove the failed owned runtime without restoring previous workloads. */
-export function runtimeBundleRecoveryScript(testRoot = '', token?: string): string {
+export function runtimeBundleRecoveryScript(testRoot = '', token?: string, waitSeconds = 0): string {
   if (token && !/^[a-f0-9]{32}$/.test(token)) throw new Error('Invalid delivery token');
-  return `${preamble(testRoot)}
+  return `${preamble(testRoot, false, waitSeconds)}
 test ! -e "$acceptedCleanup" || fail 'Acceptance cleanup is pending; recovery is unavailable'
 ${
   token
@@ -140,18 +146,21 @@ fi`
 ${token ? `require_owner ${quote(token)}` : ''}
 if [ -d "$receipt" ]; then
   rm -rf "$receipt/bundle"
+  clear_delivery_upload
   rm -f "$root/tmp/attraccess-wago-runtime.tar"
   rm -rf "$config/delivery"
   exit 0
 fi
 if [ -d "$cleanup" ]; then
   rm -rf "$cleanup"
+  clear_delivery_upload
   rm -f "$root/tmp/attraccess-wago-runtime.tar"
   rm -rf "$config/delivery"
   exit 0
 fi
 if [ ! -d "$tx" ]; then
   test -d "$config/delivery" || fail 'No runtime transaction to recover'
+  clear_delivery_upload
   rm -f "$config/runtime.env.next" "$config/runtime-ca.pem.next" "$root/tmp/attraccess-wago-runtime.tar"
   mv "$config/delivery" "$receipt"
   rm -rf "$receipt/bundle"
@@ -159,6 +168,7 @@ if [ ! -d "$tx" ]; then
 fi
 test ! -e "$tx/accepting" || fail 'Acceptance already began; finish acceptance instead of recovery'
 rollback retained || fail 'Recovery incomplete; journal retained for another recovery attempt'
+clear_delivery_upload
 rm -f "$root/tmp/attraccess-wago-runtime.tar"
 rm -rf "$config/delivery"
 `;
@@ -186,19 +196,20 @@ fi
 
 /** Call only after the coordinator accepts the new runtime; discards recovery metadata. */
 export function runtimeBundleAcceptScript(testRoot = ''): string {
-  return `${preamble(testRoot)}
+  return `${preamble(testRoot, false, 330)}
 test ! -e "$cleanup" || fail 'Recovery cleanup is pending; acceptance is unavailable'
 if [ -d "$acceptedCleanup" ]; then rm -rf "$acceptedCleanup"; exit 0; fi
 test -f "$tx/started" || fail 'No started runtime transaction to accept'
 test ! -e "$tx/recovering" || fail 'Recovery already began; finish recovery instead of acceptance'
 validate_snapshot || fail 'Incomplete runtime transaction metadata'
+test "$(docker inspect --format '{{.State.Running}} {{.HostConfig.RestartPolicy.Name}}' attraccess-wago 2>/dev/null)" = 'true no' || fail 'Runtime container is not running'
 touch "$tx/accepting"
 mv "$tx" "$acceptedCleanup"
 rm -rf "$acceptedCleanup"
 `;
 }
 
-function preamble(testRoot: string, locked = false): string {
+function preamble(testRoot: string, locked = false, waitSeconds = 0): string {
   if (testRoot && (!testRoot.startsWith('/') || testRoot === '/' || testRoot.includes('\n')))
     throw new Error('Test root must be an absolute isolated directory');
   return `set -eu
@@ -214,7 +225,7 @@ cleanup="$tx.cleanup"
 acceptedCleanup="$tx.accepted-cleanup"
 receipt="$tx.restored"
 fail() { echo "$*" >&2; exit 1; }
-${wagoShellFilesystemGuard({ acquireLock: !locked })}
+${wagoShellFilesystemGuard({ acquireLock: !locked, waitSeconds })}
 wago_require_root_directory_or_alias "$root/var" && wago_require_root_directory_or_alias "$root/var/lib" || fail 'Unsafe runtime journal parent'
 for journal in "$tx" "$cleanup" "$acceptedCleanup" "$receipt" "$config/delivery" "$config/docker-provision" "$config"/docker-provision.completed-*; do
   if test -e "$journal" || test -L "$journal"; then
@@ -223,6 +234,26 @@ for journal in "$tx" "$cleanup" "$acceptedCleanup" "$receipt" "$config/delivery"
   fi
 done
 test ! -e "$tx" || { test ! -e "$cleanup" && test ! -e "$receipt" && test ! -e "$acceptedCleanup"; } || fail 'Conflicting runtime journals require manual inspection'
+require_upload_parent() {
+  test -d "$root/tmp" && test ! -L "$root/tmp" || fail 'Unsafe runtime upload parent'
+  case "$(stat -c '%u:%g:%a' "$root/tmp")" in
+    0:0:700|0:0:755|0:0:1777) ;; *) fail 'Unsafe runtime upload parent' ;;
+  esac
+}
+clear_delivery_upload() {
+  test -d "$config/delivery" || return 0
+  test -f "$config/delivery/token" && test ! -L "$config/delivery/token" || fail 'Invalid delivery ownership token'
+  upload_token=$(cat "$config/delivery/token")
+  test "\${#upload_token}" = 32 || fail 'Invalid delivery ownership token'
+  case "$upload_token" in *[!a-f0-9]*) fail 'Invalid delivery ownership token' ;; esac
+  require_upload_parent
+  delivery_upload="$root/tmp/attraccess-wago-upload-$upload_token"
+  if test -e "$delivery_upload" || test -L "$delivery_upload"; then
+    test -d "$delivery_upload" && test ! -L "$delivery_upload" &&
+      test "$(stat -c '%u:%g:%a' "$delivery_upload")" = 0:0:700 || fail 'Unsafe runtime upload directory'
+    rm -rf "$delivery_upload"
+  fi
+}
 require_owner() {
   expected=$1
   for journal in "$tx" "$receipt" "$cleanup" "$config/delivery"; do
@@ -341,6 +372,9 @@ if [ -e "$config/docker-provision" ]; then
   test "$(cat "$config/docker-provision/token")" = ${quote(token)} || fail 'Docker provisioning belongs to another delivery'
 fi
 test ! -e "$config/delivery" && test ! -L "$config/delivery" || fail 'Delivery journal exists; explicit recovery required'
+require_upload_parent
+upload="$root/tmp/attraccess-wago-upload-${token}"
+test ! -e "$upload" && test ! -L "$upload" || fail 'Runtime upload staging already exists; cleanup required'
 stage=$(mktemp -d "$config/delivery-stage.XXXXXX")
 trap 'rm -rf "$stage"' EXIT
 trap 'exit 130' HUP INT TERM
@@ -348,10 +382,11 @@ printf '%s\\n' ${quote(token)} > "$stage/token"
 printf '%s\\n' receiving > "$stage/phase"
 mv "$stage" "$config/delivery"
 trap - EXIT HUP INT TERM
-cat > "$config/delivery/bundle"
-test "$(wc -c < "$config/delivery/bundle" | tr -d ' ')" = ${bytes} || fail 'Incomplete runtime upload'
-printf '%s  %s\\n' ${quote(digest)} "$config/delivery/bundle" | sha256sum -c - >/dev/null
-mv "$config/delivery/bundle" "$root/tmp/attraccess-wago-runtime.tar"
+mkdir -m 0700 "$upload"
+(set -C; cat > "$upload/bundle")
+test "$(wc -c < "$upload/bundle" | tr -d ' ')" = ${bytes} || fail 'Incomplete runtime upload'
+printf 'WAGO_DELIVERY_PHASE=validating\\n' >&2
+printf '%s  %s\\n' ${quote(digest)} "$upload/bundle" | sha256sum -c - >/dev/null || fail 'Runtime upload checksum mismatch'
 printf '%s' ${quote(Buffer.from(environment).toString('base64'))} | base64 -d > "$config/delivery/env"
 chmod 0600 "$config/delivery/env"
 mv "$config/delivery/env" "$config/runtime.env.next"
@@ -363,8 +398,9 @@ mv "$config/delivery/ca" "$config/runtime-ca.pem.next"`
     : ''
 }
 printf '%s\\n' installing > "$config/delivery/phase"
+printf 'WAGO_DELIVERY_PHASE=installing\\n' >&2
 ${installScript(image, testRoot, true)}
-rm -f "$root/tmp/attraccess-wago-runtime.tar"
+clear_delivery_upload
 rm -rf "$config/delivery"
 `;
 }
@@ -373,10 +409,10 @@ rm -rf "$config/delivery"
  * Read-only capacity/tool checks. Staging is checked before preparation; the full
  * check requires activated Docker on its local socket and never guesses its root.
  *
- * B is the authenticated, plain outer tar size (bounds the extracted image.tar).
- * Peak phases: upload E=B; move E=B,T=B (even equal st_dev can be bind mounts);
- * extraction/load T=B,V=B,D=3B. Sum by st_dev, then take the phase maximum,
- * adding 16 MiB once per filesystem for configuration/journals and headroom.
+ * B is the authenticated, plain outer tar size. The only archive is uploaded to
+ * a private directory on /tmp (T=B); its image member streams straight to Docker
+ * (D=3B admission reserve). /etc and /var/lib hold only small configuration and
+ * journal files. Sum T and D by st_dev, adding 16 MiB once per filesystem.
  * No credit is taken for deleting old state, cached layers, or existing uploads.
  *
  * The retained Docker 3B reserve is an admission policy, NOT an expansion bound:
@@ -391,15 +427,15 @@ function bundleCapacityPreflightScript(bytes: number, testRoot: string, includeD
 export LC_ALL=C
 unset DOCKER_HOST DOCKER_CONTEXT DOCKER_TLS_VERIFY DOCKER_CERT_PATH
 fail() { echo "$*" >&2; exit 1; }
-for tool in flock ${includeDocker ? 'docker ' : ''}timeout sha256sum base64 tar grep awk stat dd df nohup mktemp cat cp mv chmod chown rm mkdir touch wc tr sed; do
+for tool in bash flock ${includeDocker ? 'docker ' : ''}timeout sha256sum base64 tar grep awk stat dd df nohup mktemp cat cp mv chmod chown rm mkdir touch wc tr sed; do
   command -v "$tool" >/dev/null || fail "Runtime tool unavailable: $tool"
 done
-tar --version | grep -q 'GNU tar'
+tar --version | grep -q 'GNU tar' || fail 'Runtime requires GNU tar'
 ${wagoShellStat()}
 ${
   includeDocker
     ? `${boundedDocker()}
-docker_root=$(docker info --format '{{.DockerRootDir}}')
+docker_root=$(docker info --format '{{.DockerRootDir}}') || fail 'Docker storage inspection failed'
 case "$docker_root" in /*) ;; *) fail 'Invalid Docker storage root' ;; esac`
     : ''
 }
@@ -426,10 +462,7 @@ printf '%s' "$storage_rows" | awk -v b=${Math.ceil(bytes / 1024)} '
   { dev[NR]=$1; available[NR]=$2; path[NR]=$3 }
   END {
     for (i=1; i<=NR; i++) {
-      # Equal st_dev does not rule out EXDEV between distinct bind mounts.
-      move=(dev[i]==dev[1] ? b : 0)+(dev[i]==dev[2] ? b : 0)
-      load=(dev[i]==dev[2] ? b : 0)+(dev[i]==dev[3] ? b : 0)+(NR==4 && dev[i]==dev[4] ? 3*b : 0)
-      required=(move>load ? move : load)+16384
+      required=(dev[i]==dev[2] ? b : 0)+(NR==4 && dev[i]==dev[4] ? 3*b : 0)+16384
       if (available[i]<required) {
         printf "Insufficient runtime storage: %s requires %.0f KiB, available %.0f KiB\\n", path[i], required, available[i]
         bad=1
@@ -478,7 +511,7 @@ printf '%s' "$payload" | base64 -d > "$directory/script"
 chmod 0600 "$directory/script"
 unset payload
 exec 3<&0
-sh "$directory/script" <&3 &
+sh "$directory/script" <&3 3<&- &
 child=$!
 wait "$child"
 `;

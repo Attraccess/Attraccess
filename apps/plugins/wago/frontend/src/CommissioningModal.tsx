@@ -16,12 +16,8 @@ import type { Key } from '@heroui/react';
 import { AlertCircleIcon, CheckCircle2Icon, CpuIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { CommissioningSession } from './api';
-import { getCommissioningSupport, getCommissioningVerification } from './api';
-import { RuntimeArtifactImport } from './RuntimeArtifactImport';
-import type { RuntimeArtifactInfo } from './RuntimeArtifactImport';
+import { getCommissioningVerification } from './api';
 import { CommissioningSecurityPanel } from './CommissioningSecurityPanel';
-import { CommissioningPlatformPreflight } from './CommissioningPlatformPreflight';
-import { CommissioningOperationStatus } from './CommissioningOperationStatus';
 import { useQuery } from '@tanstack/react-query';
 import { commissioningLabel } from './ControllersTable';
 import { StandardDrawer } from './drawer';
@@ -30,7 +26,6 @@ import {
   useConfirmCommissioningHostKeyMutation,
   useCreateCommissioningSessionMutation,
   useDeliverCommissioningSessionMutation,
-  useRecoverCommissioningSessionMutation,
   useMqttServersQuery,
   useRemoveCommissioningSessionMutation,
   useSettingsQuery,
@@ -52,20 +47,11 @@ export function CommissioningModal({
   const createSessionMutation = useCreateCommissioningSessionMutation();
   const confirmHostKeyMutation = useConfirmCommissioningHostKeyMutation();
   const deliverSessionMutation = useDeliverCommissioningSessionMutation();
-  const recoverSessionMutation = useRecoverCommissioningSessionMutation();
   const removeSessionMutation = useRemoveCommissioningSessionMutation();
   const settingsQuery = useSettingsQuery();
   const mqttServersQuery = useMqttServersQuery();
   const commissioningSessionsQuery = useCommissioningSessionsQuery();
   const [createdSession, setCreatedSession] = useState<CommissioningSession | null>(null);
-  const [artifactBusy, setArtifactBusy] = useState(false);
-  const [selectedArtifact, setSelectedArtifact] = useState<RuntimeArtifactInfo | null>(null);
-  const supportQuery = useQuery({
-    queryKey: ['wago', 'commissioning-support'],
-    queryFn: getCommissioningSupport,
-    enabled: isOpen && !resumedSession,
-  });
-  const artifactAvailable = selectedArtifact !== null || supportQuery.data?.ready === true;
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [controllerIp, setControllerIp] = useState('');
@@ -78,16 +64,11 @@ export function CommissioningModal({
   }, [resumedSession?.id, isOpen]);
   const [sshUsername, setSshUsername] = useState('');
   const [sshPassword, setSshPassword] = useState('');
+  const [useCustomSshCredentials, setUseCustomSshCredentials] = useState(false);
   const [confirmInstall, setConfirmInstall] = useState(false);
-  const [recoveryUsername, setRecoveryUsername] = useState('');
-  const [recoveryPassword, setRecoveryPassword] = useState('');
-  const [confirmRecovery, setConfirmRecovery] = useState(false);
   const [isCancelConfirmationOpen, setCancelConfirmationOpen] = useState(false);
 
-  const attemptSession =
-    recoverSessionMutation.submittedAt > deliverSessionMutation.submittedAt
-      ? recoverSessionMutation.data
-      : deliverSessionMutation.data;
+  const attemptSession = deliverSessionMutation.data;
   const mutationSession =
     (attemptSession && (!resumedSession || attemptSession.id === resumedSession.id) ? attemptSession : null) ??
     resumedSession ??
@@ -100,30 +81,23 @@ export function CommissioningModal({
     createSessionMutation.isPending ||
     confirmHostKeyMutation.isPending ||
     deliverSessionMutation.isPending ||
-    recoverSessionMutation.isPending ||
     removeSessionMutation.isPending;
-  const loadingStatus = recoverSessionMutation.isPending
+  const loadingStatus = createSessionMutation.isPending
     ? [
-        'Cleaning up failed installation',
-        'Cleaning up the runtime installation and credentials. CODESYS and preexisting workloads are not restored.',
+        'Preparing commissioning',
+        'Scanning the SSH key for your review. A scan alone does not authenticate the controller.',
       ]
-    : createSessionMutation.isPending
-      ? [
-          'Preparing commissioning',
-          'Scanning the SSH key for your review. A scan alone does not authenticate the controller.',
-        ]
-      : removeSessionMutation.isPending
-        ? ['Canceling enrollment', 'Revoking access and removing the enrollment records.']
-        : confirmHostKeyMutation.isPending
-          ? ['Confirming controller identity', 'Saving the administrator-confirmed SSH host key.']
-          : null;
+    : removeSessionMutation.isPending
+      ? ['Canceling enrollment', 'Revoking access and removing the enrollment records.']
+      : confirmHostKeyMutation.isPending
+        ? ['Confirming controller identity', 'Saving the administrator-confirmed SSH host key.']
+        : null;
 
   useEffect(() => {
     setSshPassword('');
+    setSshUsername('');
+    setUseCustomSshCredentials(false);
     setConfirmInstall(false);
-    setRecoveryUsername('');
-    setRecoveryPassword('');
-    setConfirmRecovery(false);
     setHostKeyFingerprint('');
     setIsolatedIdentity(false);
   }, [isOpen, resumedSession?.id]);
@@ -147,29 +121,24 @@ export function CommissioningModal({
     setHostKeyFingerprint('');
     setSshUsername('');
     setSshPassword('');
+    setUseCustomSshCredentials(false);
     setConfirmInstall(false);
     setCancelConfirmationOpen(false);
-    setRecoveryUsername('');
-    setRecoveryPassword('');
-    setConfirmRecovery(false);
     createSessionMutation.reset();
     confirmHostKeyMutation.reset();
     confirmHostKeyMutation.reset();
     deliverSessionMutation.reset();
-    recoverSessionMutation.reset();
     removeSessionMutation.reset();
     onOpenChange(false);
   }
 
   function createSession() {
-    if (artifactBusy || !artifactAvailable) return;
     if (selectedMqttServerId === null) return;
     createSessionMutation.mutate(
       {
         name,
         targetHost: controllerIp,
         mqttServerId: selectedMqttServerId,
-        runtimeArtifactDigest: selectedArtifact?.digest,
       },
       {
         onSuccess: (created) => {
@@ -181,37 +150,22 @@ export function CommissioningModal({
   }
 
   function deliverSession() {
-    if (!session || isLoading || !confirmInstall || !sshUsername.trim() || !sshPassword || !canInstall(session)) return;
-    deliverSessionMutation.mutate({
-      id: session.id,
-      confirmInstall: true,
-      temporarySsh: { username: sshUsername.trim(), password: sshPassword },
-    });
-    setSshPassword('');
-    setConfirmInstall(false);
-    setRecoveryUsername('');
-    setRecoveryPassword('');
-    setConfirmRecovery(false);
-  }
-
-  function recoverSession() {
     if (
       !session ||
       isLoading ||
-      !canRecover(session) ||
-      !confirmRecovery ||
-      !recoveryUsername.trim() ||
-      !recoveryPassword
+      (session.state !== 'delivery_failed' && !confirmInstall) ||
+      (session.state !== 'delivery_failed' && useCustomSshCredentials && (!sshUsername.trim() || !sshPassword)) ||
+      !canInstall(session)
     )
       return;
-    recoverSessionMutation.mutate({
+    deliverSessionMutation.mutate({
       id: session.id,
       confirmInstall: true,
-      temporarySsh: { username: recoveryUsername.trim(), password: recoveryPassword },
+      ...(session.state !== 'delivery_failed' && useCustomSshCredentials
+        ? { temporarySsh: { username: sshUsername.trim(), password: sshPassword } }
+        : {}),
     });
-    setRecoveryUsername('');
-    setRecoveryPassword('');
-    setConfirmRecovery(false);
+    setSshUsername('');
     setSshPassword('');
     setConfirmInstall(false);
   }
@@ -244,7 +198,6 @@ export function CommissioningModal({
           <div className="wg:min-w-0 wg:space-y-5">
             <StepHeading step={activeStep} />
             {loadingStatus && <OperationStatus title={loadingStatus[0]} description={loadingStatus[1]} />}
-            {session && <CommissioningOperationStatus key={`operation-${session.id}`} sessionId={session.id} />}
             {!session && activeStep === 0 && <NameStep name={name} onNameChange={setName} />}
             {!session && activeStep === 1 && (
               <ConnectionStep
@@ -254,18 +207,6 @@ export function CommissioningModal({
                 onControllerIpChange={setControllerIp}
                 onMqttServerIdChange={setMqttServerId}
               />
-            )}
-            {!session && activeStep === 1 && (
-              <RuntimeArtifactImport
-                disabled={isLoading}
-                onBusyChange={setArtifactBusy}
-                onSelectionChange={setSelectedArtifact}
-              />
-            )}
-            {session?.runtimeArtifactDigest && (
-              <p className="wg:break-all wg:text-sm">
-                Pinned signed release: <code>{session.runtimeArtifactDigest}</code>. Retries keep this release.
-              </p>
             )}
             {session?.state === 'awaiting_identity_confirmation' && (
               <HostKeyConfirmationStep
@@ -292,6 +233,8 @@ export function CommissioningModal({
                 session={session}
                 sshUsername={sshUsername}
                 sshPassword={sshPassword}
+                useCustomSshCredentials={useCustomSshCredentials}
+                onUseCustomSshCredentialsChange={setUseCustomSshCredentials}
                 onSshUsernameChange={setSshUsername}
                 onSshPasswordChange={setSshPassword}
                 confirmInstall={confirmInstall}
@@ -300,63 +243,13 @@ export function CommissioningModal({
             )}
             {session && activeStep === 3 && <ProgressStep name={title} session={session} />}
             {session &&
-              session.state !== 'awaiting_identity_confirmation' &&
-              (canInstall(session) || session.dockerProvisionState) && (
-                <CommissioningPlatformPreflight key={`preflight-${session.id}`} session={session} />
-              )}
-            {session &&
               (['awaiting_verification', 'completed'].includes(session.state) || session.managementControllerId) && (
                 <VerificationStatus session={session} onConfigure={onConfigure ? configureController : undefined} />
               )}
-            {session && canRecover(session) && (
-              <div className="wg:space-y-4">
-                <Alert status="warning">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Title>Clean up failed installation</Alert.Title>
-                    <Alert.Description>
-                      Cleanup interrupts the Attraccess runtime and reconciles this installation and its credentials.
-                      It cannot undo broker credential revocation or restore CODESYS, other applications, Docker host
-                      settings, or data erased during commissioning. It does not re-enable CODESYS. An incomplete cleanup
-                      keeps its recovery record for another attempt. Cleanup does not certify readiness and is never
-                      automatic.
-                    </Alert.Description>
-                  </Alert.Content>
-                </Alert>
-                <CredentialFields
-                  intent="recovery"
-                  isDisabled={isLoading}
-                  username={recoveryUsername}
-                  password={recoveryPassword}
-                  onUsernameChange={setRecoveryUsername}
-                  onPasswordChange={setRecoveryPassword}
-                />
-                <Checkbox
-                  isRequired
-                  isDisabled={isLoading}
-                  isSelected={confirmRecovery}
-                  onChange={setConfirmRecovery}
-                  name="confirm-recovery"
-                >
-                  <Checkbox.Control>
-                    <Checkbox.Indicator />
-                  </Checkbox.Control>
-                  <Checkbox.Content>
-                    I approve interrupting the Attraccess runtime and cleaning up this failed installation. This does
-                    not restore preexisting applications or data.
-                  </Checkbox.Content>
-                </Checkbox>
-                <p className="wg:text-sm wg:text-muted">
-                  Enter fresh SSH credentials and approve each recovery attempt separately. Credentials and recovery
-                  consent are cleared after submission or closing.
-                </p>
-              </div>
-            )}
             {createSessionMutation.isError && <ErrorAlert error={createSessionMutation.error} />}
             {confirmHostKeyMutation.isError && <ErrorAlert error={confirmHostKeyMutation.error} />}
             {deliverSessionMutation.isError && <ErrorAlert error={deliverSessionMutation.error} />}
             {removeSessionMutation.isError && <ErrorAlert error={removeSessionMutation.error} />}
-            {recoverSessionMutation.isError && <ErrorAlert error={recoverSessionMutation.error} />}
             {isCancelConfirmationOpen && (
               <Alert status="warning">
                 <Alert.Indicator />
@@ -371,16 +264,6 @@ export function CommissioningModal({
         </div>
       </DrawerBody>
       <DrawerFooter className="wg:flex-wrap">
-        {session && canRecover(session) && (
-          <Button
-            variant="danger"
-            isPending={recoverSessionMutation.isPending}
-            isDisabled={isLoading || !confirmRecovery || !recoveryUsername.trim() || !recoveryPassword}
-            onPress={recoverSession}
-          >
-            Clean up failed installation
-          </Button>
-        )}
         <Button variant="secondary" onPress={isCancelConfirmationOpen ? () => setCancelConfirmationOpen(false) : close}>
           {isCancelConfirmationOpen ? 'Keep enrollment' : 'Close'}
         </Button>
@@ -388,7 +271,6 @@ export function CommissioningModal({
           <Button
             isDisabled={!name.trim()}
             onPress={() => {
-              setArtifactBusy(true);
               setStep(1);
             }}
           >
@@ -399,8 +281,6 @@ export function CommissioningModal({
           <Button
             isPending={isLoading}
             isDisabled={
-              artifactBusy ||
-              !artifactAvailable ||
               !controllerIp.trim() ||
               selectedMqttServerId === null ||
               mqttServersQuery.isPending ||
@@ -424,7 +304,11 @@ export function CommissioningModal({
           <Button
             variant="danger"
             isPending={isLoading}
-            isDisabled={isLoading || !confirmInstall || !sshUsername.trim() || !sshPassword}
+            isDisabled={
+              isLoading ||
+              (session.state !== 'delivery_failed' && !confirmInstall) ||
+              (session.state !== 'delivery_failed' && useCustomSshCredentials && (!sshUsername.trim() || !sshPassword))
+            }
             onPress={deliverSession}
           >
             {isLoading
@@ -500,7 +384,7 @@ function StepHeading({ step }: { step: number }) {
     ],
     [
       'Review and approve installation',
-      'Confirm the controller identity, enter temporary SSH credentials, and approve the changes for this attempt.',
+      'Attraccess verifies the controller automatically before it makes any changes.',
     ],
     [
       'Commissioning status',
@@ -657,10 +541,6 @@ function canInstall(session: CommissioningSession) {
   return ['awaiting_delivery', 'delivery_failed', 'awaiting_codesys_confirmation'].includes(session.state);
 }
 
-function canRecover(session: CommissioningSession) {
-  return session.runtimeRecoveryAvailable === true;
-}
-
 function CredentialFields({
   intent = 'installation',
   isDisabled,
@@ -701,6 +581,8 @@ function DeliveryStep({
   session,
   sshUsername,
   sshPassword,
+  useCustomSshCredentials,
+  onUseCustomSshCredentialsChange,
   onSshUsernameChange,
   onSshPasswordChange,
   confirmInstall,
@@ -710,6 +592,8 @@ function DeliveryStep({
   session: CommissioningSession;
   sshUsername: string;
   sshPassword: string;
+  useCustomSshCredentials: boolean;
+  onUseCustomSshCredentialsChange: (value: boolean) => void;
   onSshUsernameChange: (value: string) => void;
   onSshPasswordChange: (value: string) => void;
   confirmInstall: boolean;
@@ -718,28 +602,40 @@ function DeliveryStep({
   return (
     <div className="wg:space-y-4">
       <CommissioningStatusPanel isActive={isDelivering || session.state === 'delivering'} session={session} />
-      {canInstall(session) && (
+      {canInstall(session) && session.state === 'delivery_failed' && (
+        <p>Retry automatically reconciles the previous attempt and uses the saved SSH credentials.</p>
+      )}
+      {canInstall(session) && session.state !== 'delivery_failed' && (
         <>
           <Alert status="warning">
             <Alert.Indicator />
             <Alert.Content>
               <Alert.Title>Destructive installation</Alert.Title>
               <Alert.Description>
-                Installing Attraccess on {session.targetHost} takes over this controller. Existing applications and
-                workloads may stop working or be erased. CODESYS will be stopped and permanently disabled before
-                digital I/O is enabled; installation fails if this cannot be verified. Attraccess does not preserve,
-                back up, or restore preexisting CODESYS applications or other workloads. Make connected equipment safe
-                for the interruption. Installation does not certify management hardening or physical readiness.
+                Installing Attraccess on {session.targetHost} takes over this controller. Existing workloads may stop or
+                be erased. CODESYS is permanently disabled. Make connected equipment safe before continuing.
               </Alert.Description>
             </Alert.Content>
           </Alert>
-          <CredentialFields
+          <Checkbox
             isDisabled={isDelivering}
-            username={sshUsername}
-            password={sshPassword}
-            onUsernameChange={onSshUsernameChange}
-            onPasswordChange={onSshPasswordChange}
-          />
+            isSelected={useCustomSshCredentials}
+            onChange={onUseCustomSshCredentialsChange}
+          >
+            <Checkbox.Control>
+              <Checkbox.Indicator />
+            </Checkbox.Control>
+            <Checkbox.Content>Use different SSH credentials</Checkbox.Content>
+          </Checkbox>
+          {useCustomSshCredentials && (
+            <CredentialFields
+              isDisabled={isDelivering}
+              username={sshUsername}
+              password={sshPassword}
+              onUsernameChange={onSshUsernameChange}
+              onPasswordChange={onSshPasswordChange}
+            />
+          )}
           <Checkbox
             isRequired
             isDisabled={isDelivering}
@@ -751,15 +647,13 @@ function DeliveryStep({
               <Checkbox.Indicator />
             </Checkbox.Control>
             <Checkbox.Content>
-              I approve this destructive installation, including synchronization of controller system and hardware
-              clocks to application UTC, permanent CODESYS disablement and possible loss of existing applications and
-              data, without preservation, backup, or restoration by Attraccess.
+              I approve this destructive installation and understand that existing applications and data may be lost.
             </Checkbox.Content>
           </Checkbox>
           <p className="wg:text-sm wg:text-muted">
-            Enter the controller credentials explicitly; no default credentials are used. The password and approval are
-            cleared after submitting or closing. Every retry needs a new approval and password. Restarting the server
-            does not start or resume an installation.
+            Attraccess uses the factory root / wago SSH credentials until an enrolled credential is available. A custom
+            account must have root or sudo access. Installation automatically checks access and controller
+            prerequisites. Custom credentials and approval are cleared after submission or closing.
           </p>
         </>
       )}
@@ -805,12 +699,16 @@ function VerificationStatus({
     queryFn: () => getCommissioningVerification(session.id),
     refetchInterval: 5000,
   });
+  const verifiedControllerId = verification.data?.controllerId;
+  const securityControllerId = verifiedControllerId ?? session.managementControllerId;
   return (
     <div className="wg:space-y-3">
-      <Alert status="warning">
+      <Alert status={session.state === 'completed' ? 'success' : 'warning'}>
         <Alert.Indicator />
         <Alert.Content>
-          <Alert.Title>Commissioning is not yet verified</Alert.Title>
+          <Alert.Title>
+            {session.state === 'completed' ? 'Enrollment verified' : 'Verifying enrollment automatically'}
+          </Alert.Title>
           <Alert.Description>
             {verification.isError ? (
               'Verification could not be loaded. No readiness claim is made.'
@@ -831,15 +729,15 @@ function VerificationStatus({
           </Alert.Description>
         </Alert.Content>
       </Alert>
-      {(verification.data?.controllerId || session.managementControllerId) && (
+      {session.state === 'completed' && securityControllerId && (
         <>
-          {onConfigure && verification.data?.controllerId && (
-            <Button onPress={() => onConfigure(verification.data!.controllerId!)}>Configure inputs and outputs</Button>
+          {onConfigure && verifiedControllerId && (
+            <Button onPress={() => onConfigure(verifiedControllerId)}>Configure inputs and outputs</Button>
           )}
           <CommissioningSecurityPanel
             key={session.id}
             sessionId={session.id}
-            controllerId={verification.data?.controllerId ?? session.managementControllerId!}
+            controllerId={securityControllerId}
           />
         </>
       )}

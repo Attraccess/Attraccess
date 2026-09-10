@@ -49,7 +49,6 @@ launch_runtime_supervisor() {
       break
     fi
   done
-  supervisor_wait_remaining=300
   if ! { test -f "$config/install.lock" && test ! -L "$config/install.lock" &&
     test "$(stat -c '%u:%g:%a:%h' "$config/install.lock")" = 0:0:600:1; }; then
     rm -rf "$supervisor_launch"
@@ -58,17 +57,15 @@ launch_runtime_supervisor() {
     exit 75
   fi
   exec 9<>"$config/install.lock"
-  until flock -n 9; do
-    if test "$supervisor_wait_remaining" -le 0 || ! sleep 2; then
-      rm -rf "$supervisor_launch"
-      # Leave recovery ownership intact. Neither the caller nor its outer boot
-      # wrapper may roll back a different transaction while this lock is held.
-      trap - EXIT HUP INT TERM
-      echo 'Runtime supervisor handoff lock unverified; recovery required' >&2
-      exit 75
-    fi
-    supervisor_wait_remaining=$((supervisor_wait_remaining - 2))
-  done
+  # Queue at the kernel lock; polling every two seconds can repeatedly miss
+  # the supervisor's equally short idle window after an acknowledged gate.
+  if ! timeout -k 5 300 flock 9; then
+    rm -rf "$supervisor_launch"
+    # Never roll back a different transaction while it owns install.lock.
+    trap - EXIT HUP INT TERM
+    echo 'Runtime supervisor handoff lock unverified; recovery required' >&2
+    exit 75
+  fi
   trap - EXIT HUP INT TERM
   . "$supervisor_launch/traps"
   supervisor_live=0

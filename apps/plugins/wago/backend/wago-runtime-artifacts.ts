@@ -1,7 +1,6 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { constants, Dir } from 'node:fs';
-import { lstat, mkdir, open, opendir, readdir, realpath, rm, chmod } from 'node:fs/promises';
-import filesystem from 'node:fs/promises';
+import { access, lstat, mkdir, open, opendir, readdir, realpath, rename, rm, chmod } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
@@ -241,7 +240,7 @@ export class WagoRuntimeArtifactCatalog {
     try {
       await writeArtifactStream(temporary, Readable.from([JSON.stringify(metadata)]), 4096);
       await chmod(temporary, 0o400);
-      await filesystem.rename(temporary, path);
+      await rename(temporary, path);
       const handle = await open(directory, constants.O_RDONLY | constants.O_NOFOLLOW);
       try {
         await handle.sync();
@@ -265,7 +264,10 @@ export class WagoRuntimeArtifactCatalog {
     const info = await lstat(directory);
     if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('Invalid catalog object');
     try {
-      const metadata = storedMetadata(JSON.parse(await smallFile(join(directory, 'metadata.json'), 4096)), this.maxBytes);
+      const metadata = storedMetadata(
+        JSON.parse(await smallFile(join(directory, 'metadata.json'), 4096)),
+        this.maxBytes,
+      );
       if (metadata.digest !== digest) throw new Error('Invalid catalog digest');
       return metadata;
     } catch (error) {
@@ -314,14 +316,13 @@ export class WagoRuntimeArtifactCatalog {
       }
       const destination = join(root, 'objects', metadata.digest);
       try {
-        await filesystem.rename(directory, destination);
+        await rename(directory, destination);
       } catch (error) {
         if (!['EEXIST', 'ENOTEMPTY'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error;
         const existing = await lstat(destination);
         if (!existing.isDirectory() || existing.isSymbolicLink()) throw new Error('Invalid catalog object');
         const existingMetadata = await this.verify(destination);
-        if (existingMetadata.digest !== metadata.digest)
-          throw new Error('Invalid catalog object');
+        if (existingMetadata.digest !== metadata.digest) throw new Error('Invalid catalog object');
         await this.backfillMetadata(destination, existingMetadata);
       }
       const objectsHandle = await open(join(root, 'objects'), constants.O_RDONLY | constants.O_NOFOLLOW);
@@ -334,7 +335,7 @@ export class WagoRuntimeArtifactCatalog {
       const pointer = join(root, temporaryName('current'));
       try {
         await writeArtifactStream(pointer, Readable.from([metadata.digest]), 64);
-        await filesystem.rename(pointer, join(root, 'current'));
+        await rename(pointer, join(root, 'current'));
         const handle = await open(root, constants.O_RDONLY);
         try {
           await handle.sync();
@@ -436,4 +437,37 @@ export class WagoRuntimeArtifactsService extends WagoRuntimeArtifactCatalog {
       loadRuntimeArtifactSigningKey(process.env.NODE_ENV, process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH),
     );
   }
+  override async onModuleInit() {
+    await super.onModuleInit();
+    const directory = await bundledRuntimeArtifactDirectory();
+    if (!directory) return;
+    const files = await Promise.all(
+      ['runtime.tar', 'runtime.tar.sha256', 'runtime.tar.sig'].map((name) => openArtifactFile(join(directory, name))),
+    );
+    try {
+      await this.import({
+        bundle: files[0].createReadStream({ autoClose: false }),
+        checksum: files[1].createReadStream({ autoClose: false }),
+        signature: files[2].createReadStream({ autoClose: false }),
+      });
+    } finally {
+      await Promise.allSettled(files.map((file) => file.close()));
+    }
+  }
+}
+
+/** Installed plugins carry the signed release next to their bundled backend. */
+async function bundledRuntimeArtifactDirectory(): Promise<string | null> {
+  const candidates = [join(__dirname, 'wago-cc100-runtime')];
+  for (const directory of candidates) {
+    try {
+      await Promise.all(
+        ['runtime.tar', 'runtime.tar.sha256', 'runtime.tar.sig'].map((name) => access(join(directory, name))),
+      );
+      return directory;
+    } catch {
+      // Source checkouts have no plugin package until it has been built.
+    }
+  }
+  return null;
 }

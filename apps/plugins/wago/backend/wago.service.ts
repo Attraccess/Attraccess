@@ -276,6 +276,36 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     return this.drafts.findOneBy({ controllerId });
   }
 
+  /** A new enrollment starts with no logical outputs. Never publish an unreviewed
+   * user draft or overwrite an existing commissioned configuration. */
+  async ensureCommissioningConfiguration(controllerId: number): Promise<void> {
+    await this.withConfigurationLock(controllerId, async () => {
+      const controller = await this.claimedController(controllerId);
+      this.requireConfigurationCompatibility(controller);
+      const previous = await this.latestRevision(controllerId);
+      if (previous) {
+        // A failed publish can leave a durable pending revision. Other states
+        // already have retained desired configuration and must not be reset.
+        if (previous.state === 'pending') await this.publishRevision(controller, previous);
+        return;
+      }
+      const snapshot = { version: CONFIGURATION_PROTOCOL_VERSION, physicalPoints: [], logicalChannels: [] };
+      const revision = await this.revisions.save(
+        this.revisions.create({
+          controllerId,
+          revision: 1,
+          snapshot: JSON.stringify(snapshot),
+          contentHash: configurationHash(snapshot),
+          state: 'pending',
+          publishedAt: new Date().toISOString(),
+          reportedAt: null,
+          rejectionErrors: null,
+        }),
+      );
+      await this.publishRevision(controller, revision);
+    });
+  }
+
   async saveDraft(
     controllerId: number,
     snapshot: unknown,

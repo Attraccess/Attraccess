@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Button, Checkbox, Input, Label, TextField } from '@heroui/react';
-import { useRef, useState } from 'react';
+import { Alert, Button, Checkbox } from '@heroui/react';
+import { useState } from 'react';
 import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
 import type { CommissioningLeaseStatus } from '../../shared/commissioning';
 
@@ -14,29 +14,21 @@ export function CommissioningOperationStatus({ sessionId }: { sessionId: number 
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
-  const form = useRef<HTMLFormElement>(null);
   const status = query.data;
   async function recover() {
-    if (!form.current?.reportValidity() || busy || !confirmed || status?.state !== 'stale') return;
-    const fields = new FormData(form.current);
-    const temporarySsh = {
-      username: String(fields.get('leaseUsername') ?? ''),
-      password: String(fields.get('leasePassword') ?? ''),
-    };
-    form.current.reset();
+    if (busy || !confirmed || status?.state !== 'stale') return;
     setConfirmed(false);
     setBusy(true);
     setError(false);
     try {
       await api.request(`/${sessionId}/operation/recover`, {
         method: 'POST',
-        body: { temporarySsh, owner: status.owner, previousWorkerStopped: true },
+        body: { owner: status.owner, previousWorkerStopped: true },
       });
       await query.refetch();
     } catch {
       setError(true);
     } finally {
-      temporarySsh.password = '';
       setBusy(false);
     }
   }
@@ -56,26 +48,12 @@ export function CommissioningOperationStatus({ sessionId }: { sessionId: number 
           silently takes over an interrupted operation.
         </Alert.Description>
         {status.state === 'stale' && (
-          <form
-            ref={form}
-            onSubmit={(event) => {
-              event.preventDefault();
-              void recover();
-            }}
-          >
+          <div>
             <p>
               Recovery is available after {new Date(status.recoveryAfter).toLocaleString()}. Stop the previous
               Attraccess commissioning instance first. The server then checks that both controller locks are idle.
               Runtime and management snapshots are not removed.
             </p>
-            <TextField name="leaseUsername" isRequired isDisabled={busy}>
-              <Label>Coordinator recovery SSH username</Label>
-              <Input autoComplete="off" />
-            </TextField>
-            <TextField name="leasePassword" isRequired isDisabled={busy}>
-              <Label>Coordinator recovery SSH password</Label>
-              <Input type="password" autoComplete="off" />
-            </TextField>
             <Checkbox isSelected={confirmed} onChange={setConfirmed} isDisabled={busy}>
               <Checkbox.Control>
                 <Checkbox.Indicator />
@@ -85,10 +63,10 @@ export function CommissioningOperationStatus({ sessionId }: { sessionId: number 
                 expired operation.
               </Checkbox.Content>
             </Checkbox>
-            <Button type="submit" isDisabled={busy || !confirmed}>
+            <Button onPress={recover} isDisabled={busy || !confirmed}>
               Recover interrupted coordinator
             </Button>
-          </form>
+          </div>
         )}
         {error && (
           <p role="alert">

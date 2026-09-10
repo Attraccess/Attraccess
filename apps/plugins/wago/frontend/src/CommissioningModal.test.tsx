@@ -53,7 +53,13 @@ function mount() {
   return { ...render(view(true)), view, onOpenChange };
 }
 
+function enableCustomCredentials() {
+  if (!screen.queryByLabelText('Temporary SSH username'))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Use different SSH credentials' }));
+}
+
 function fillCredentials() {
+  enableCustomCredentials();
   fireEvent.change(screen.getByLabelText('Temporary SSH username'), { target: { value: 'operator' } });
   fireEvent.change(screen.getByLabelText('Temporary SSH password'), { target: { value: 'test-only-password' } });
 }
@@ -64,7 +70,7 @@ function fillRecoveryCredentials() {
 }
 
 describe('FW31 software support boundary', () => {
-  it('shows saved UTC skew, action and result without claiming live synchronization', () => {
+  it('keeps runtime checks automatic instead of presenting a saved inspection', () => {
     activeSession.platformReport = JSON.stringify({
       clock: {
         hostUtc: '2026-09-06T18:00:00.000Z',
@@ -79,18 +85,12 @@ describe('FW31 software support boundary', () => {
       },
     });
     mount();
-    expect(screen.getByText('Saved clock result (not live)')).toBeTruthy();
-    expect(screen.getByText('synchronized')).toBeTruthy();
-    expect(screen.getByText('-134972158 seconds')).toBeTruthy();
-    expect(screen.getByText('supported / synchronize')).toBeTruthy();
-    expect(
-      screen.getByRole('checkbox', {
-        name: /synchronization of controller system and hardware clocks to application UTC/,
-      }),
-    ).toBeTruthy();
-    expect(requests.some(({ url }) => url.endsWith('/deliver') || url.endsWith('/inspect'))).toBe(false);
+    expect(screen.getByText(/Attraccess verifies the controller automatically/)).toBeTruthy();
+    expect(screen.queryByText('Saved clock result (not live)')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Inspect installation prerequisites/ })).toBeNull();
+    expect(requests.some(({ url }) => url.endsWith('/inspect'))).toBe(false);
   });
-  it.each([null, 'starting'] as const)('suppresses stale saved activation while retaining pending recovery (%s)', (state) => {
+  it.each([null, 'starting'] as const)('does not expose a separate preparation cleanup action (%s)', (state) => {
     activeSession.platformReport = JSON.stringify({
       version: '1', platform: 'supported', hardware: 'accessible', exclusivity: 'clear',
       docker: 'installed-stopped', configDocker: 'present',
@@ -98,11 +98,9 @@ describe('FW31 software support boundary', () => {
     });
     activeSession.dockerProvisionState = state;
     mount();
-    expect(screen.queryByRole('button', { name: 'Start installed Docker runtime' })).toBeNull();
-    expect(!!screen.queryByRole('button', { name: 'Clean up controller preparation' })).toBe(!!state);
-    expect(requests.some(({ url }) => url.endsWith('/activate'))).toBe(false);
+    expect(screen.queryByRole('button', { name: 'Clean up controller preparation' })).toBeNull();
   });
-  it('explains mandatory PLC disablement and reports unsupported Docker dependencies', () => {
+  it('does not expose saved prerequisite details', () => {
     activeSession.platformReport = JSON.stringify({
       version: '1',
       platform: 'supported',
@@ -114,9 +112,8 @@ describe('FW31 software support boundary', () => {
       qualification: 'required',
     });
     mount();
-    expect(screen.queryByRole('button', { name: 'Start installed Docker runtime' })).toBeNull();
-    expect(screen.getByText(/CODESYS is configured to start at boot/)).toBeTruthy();
-    expect(screen.getByText(/Installation must validate a supported activation path/)).toBeTruthy();
+    expect(screen.queryByText(/CODESYS is configured to start at boot/)).toBeNull();
+    expect(screen.queryByText(/Installation must validate a supported activation path/)).toBeNull();
   });
   it('does not offer activation for an unsupported firmware report even when an installed runtime is stopped', () => {
     activeSession.platformReport = JSON.stringify({
@@ -130,11 +127,10 @@ describe('FW31 software support boundary', () => {
       qualification: 'required',
     });
     mount();
-    expect(screen.queryByRole('button', { name: 'Start installed Docker runtime' })).toBeNull();
-    expect(screen.getByText(/BSP version alone is insufficient/)).toBeTruthy();
-    expect(requests.some(({ url }) => url.endsWith('/activate'))).toBe(false);
+    expect(screen.queryByText(/BSP version alone is insufficient/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Inspect installation prerequisites/ })).toBeNull();
   });
-  it.each(['codesys-active', 'codesys-boot-enabled'])('distinguishes saved %s inspection from verified preparation after a later failure', (exclusivity) => {
+  it.each(['codesys-active', 'codesys-boot-enabled'])('does not display saved %s inspection details after a later failure', (exclusivity) => {
     activeSession.state = 'delivery_failed';
     activeSession.dockerProvisionState = 'started';
     activeSession.codesysState = 'disabled';
@@ -144,13 +140,10 @@ describe('FW31 software support boundary', () => {
       qualification: 'software-supported',
     });
     mount();
-    expect(screen.getByText(/Controller preparation verified CODESYS stopped and permanently disabled/)).toBeTruthy();
-    expect(screen.getByText(/Saved inspection snapshot; these values are not live controller status/)).toBeTruthy();
-    expect(screen.getByText(exclusivity, { exact: true })).toBeTruthy();
-    expect(screen.queryByText(/CODESYS is active/)).toBeNull();
-    expect(screen.queryByText(/CODESYS is configured to start at boot/)).toBeNull();
+    expect(screen.queryByText(/Controller preparation verified CODESYS stopped and permanently disabled/)).toBeNull();
+    expect(screen.queryByText(exclusivity, { exact: true })).toBeNull();
   });
-  it('retains the active CODESYS warning when disabling failed', () => {
+  it('does not repeat a saved CODESYS warning when disabling failed', () => {
     activeSession.state = 'delivery_failed';
     activeSession.dockerProvisionState = 'recovery_required';
     activeSession.codesysState = 'active';
@@ -160,8 +153,7 @@ describe('FW31 software support boundary', () => {
       qualification: 'software-supported',
     });
     mount();
-    expect(screen.getByText(/CODESYS is active/)).toBeTruthy();
-    expect(screen.queryByText(/Controller preparation verified CODESYS stopped and permanently disabled/)).toBeNull();
+    expect(screen.queryByText(/CODESYS is active/)).toBeNull();
   });
 });
 
@@ -170,13 +162,13 @@ describe('explicit recovery approval', () => {
     activeSession.runtimeRecoveryAvailable = true;
   });
 
-  it.each([false, undefined])('offers preparation cleanup alone without runtime recovery ownership (%s)', (available) => {
+  it.each([false, undefined])('does not offer preparation cleanup without runtime recovery ownership (%s)', (available) => {
     activeSession.state = 'delivery_failed';
     activeSession.dockerProvisionState = 'recovery_required';
     activeSession.runtimeRecoveryAvailable = available;
     mount();
     expect(screen.queryByRole('button', { name: 'Clean up failed installation' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Clean up controller preparation' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Clean up controller preparation' })).toBeNull();
   });
 
   it('routes cleanup through the runtime when both installation and preparation records exist', () => {
@@ -277,6 +269,15 @@ describe('explicit recovery approval', () => {
 });
 
 describe('explicit install approval', () => {
+  it('shows the saved API root cause and the privileged factory account', () => {
+    activeSession.state = 'delivery_failed';
+    activeSession.failureReason = 'Checking controller identity and SSH access (admin@192.0.2.7): SSH login succeeded, but this account is not permitted to run commissioning commands with sudo.';
+    mount();
+    expect(screen.getByText(activeSession.failureReason)).toBeTruthy();
+    expect(screen.getByText(/factory root \/ wago SSH credentials/)).toBeTruthy();
+    expect(screen.queryByLabelText('Temporary SSH username')).toBeNull();
+  });
+
   it.each(['codesys-active', 'codesys-boot-enabled'])('uses one consequence confirmation for %s without preservation or WBM gates', (exclusivity) => {
     activeSession.platformReport = JSON.stringify({
       version: '1', platform: 'supported', hardware: 'uid10001-access-denied', exclusivity,
@@ -285,14 +286,13 @@ describe('explicit install approval', () => {
     });
     mount();
     expect(screen.getByText('Destructive installation')).toBeTruthy();
-    expect(screen.getByText(/Existing applications and workloads may stop working or be erased/)).toBeTruthy();
-    expect(screen.getByText(/Installation does not certify management hardening or physical readiness/)).toBeTruthy();
-    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+    expect(screen.getByText(/Existing workloads may stop or be erased/)).toBeTruthy();
+    expect(screen.getAllByRole('checkbox', { name: /I approve this destructive installation/ })).toHaveLength(1);
     expect(screen.queryByRole('button', { name: 'Recover saved runtime' })).toBeNull();
     fillCredentials();
     const install = screen.getByRole('button', { name: 'Install runtime' });
     expect(install.hasAttribute('disabled')).toBe(true);
-    fireEvent.click(screen.getByRole('checkbox', { name: /permanent CODESYS disablement and possible loss/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /existing applications and data may be lost/ }));
     expect(install.hasAttribute('disabled')).toBe(false);
     expect(requests.filter(({ body }) => body)).toHaveLength(0);
   });
@@ -302,6 +302,7 @@ describe('explicit install approval', () => {
     if (failure) activeSession.state = 'delivery_failed';
     mount();
     const install = screen.getByRole('button', { name: failure ? 'Retry installation' : 'Install runtime' });
+    enableCustomCredentials();
     expect((screen.getByLabelText('Temporary SSH username') as HTMLInputElement).value).toBe('');
     expect((screen.getByLabelText('Temporary SSH password') as HTMLInputElement).value).toBe('');
     expect(install.hasAttribute('disabled')).toBe(true);
@@ -326,9 +327,10 @@ describe('explicit install approval', () => {
   it('clears the password and consent when closed externally and reopened', () => {
     const { rerender, view } = mount();
     fillCredentials();
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /I approve this destructive installation/ }));
     rerender(view(false));
     rerender(view(true));
+    enableCustomCredentials();
     expect((screen.getByLabelText('Temporary SSH password') as HTMLInputElement).value).toBe('');
     fillCredentials();
     expect(screen.getByRole('button', { name: 'Install runtime' }).hasAttribute('disabled')).toBe(true);
@@ -338,11 +340,12 @@ describe('explicit install approval', () => {
   it('clears the password and consent on the Close button', () => {
     const { rerender, view, onOpenChange } = mount();
     fillCredentials();
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /I approve this destructive installation/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
     rerender(view(false));
     rerender(view(true));
+    enableCustomCredentials();
     expect((screen.getByLabelText('Temporary SSH password') as HTMLInputElement).value).toBe('');
     fillCredentials();
     expect(screen.getByRole('button', { name: 'Install runtime' }).hasAttribute('disabled')).toBe(true);

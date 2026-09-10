@@ -698,12 +698,19 @@ describe('signed runtime artifact catalog (isolated disk and ephemeral keys only
     expect(project.targets.build.outputs).toEqual([
       '{projectRoot}/package/package.json',
       '{projectRoot}/package/plugin.json',
+      '{projectRoot}/package/dist/wago-cc100-runtime',
     ]);
   });
 
   it('always packages and verifies the fresh generated outputs instead of restoring cached archives', async () => {
     const project = JSON.parse(await readFile(join(__dirname, '../project.json'), 'utf8'));
     for (const target of ['pack', 'pack-test', 'zip']) expect(project.targets[target].cache).toBe(false);
+  });
+  it('ships the signed runtime with the packed plugin', async () => {
+    const project = JSON.parse(await readFile(join(__dirname, '../project.json'), 'utf8'));
+    expect(project.targets['pack-test'].options.command).toContain('dist/wago-cc100-runtime/runtime.tar');
+    expect(project.targets['pack-test'].options.command).toContain('dist/wago-cc100-runtime/runtime.tar.sha256');
+    expect(project.targets['pack-test'].options.command).toContain('dist/wago-cc100-runtime/runtime.tar.sig');
   });
   it('uses existing STORAGE_ROOT without accessing the plugin context or host ModuleRef', async () => {
     const previous = process.env.STORAGE_ROOT;

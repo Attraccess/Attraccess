@@ -139,6 +139,22 @@ describe('WagoService', () => {
     };
   }
 
+  it('automatically publishes an inert enrollment configuration without changing a user draft', async () => {
+    const { service, context, draftRepository, revisionRepository } = createService([
+      { ...controller(), trustState: 'claimed' },
+    ]);
+    await service.ensureCommissioningConfiguration(1);
+    expect(draftRepository.save).not.toHaveBeenCalled();
+    const publish = (context.mqtt.publish as jest.Mock).mock.calls[0];
+    expect(JSON.parse(publish[2]).snapshot).toEqual({ version: 1, physicalPoints: [], logicalChannels: [] });
+    const savedRevision = revisionRepository.save.mock.calls.at(-1);
+    if (!savedRevision) throw new Error('Expected the enrollment configuration to be saved');
+    const revision = savedRevision[0];
+    revisionRepository.find.mockResolvedValue([{ ...revision, state: 'applied' }]);
+    await service.ensureCommissioningConfiguration(1);
+    expect(context.mqtt.publish).toHaveBeenCalledTimes(1);
+  });
+
   it('revokes a claimed controller before deleting its local records', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const, enrollmentId: null };
     const { service, context, controllerRepository, draftRepository, revisionRepository } = createService([claimed]);

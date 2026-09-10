@@ -48,6 +48,7 @@ describe('published runtime boot hook and interrupted journal disposal (isolated
       ]).status,
     ).toBe(0);
     const bundle = readFileSync(join(fixture.root, 'tmp/attraccess-wago-runtime.tar'));
+    rmSync(join(fixture.root, 'tmp/attraccess-wago-runtime.tar'));
     const delivery = runtimeBundleDeliveryScript(
       image,
       'NEW=enrollment',
@@ -141,7 +142,7 @@ process.exit(result.status ?? 1);
     expect(fixture.run(recover(), 'journal-disposal').signal).toBe('SIGKILL');
     expect(exists(tx)).toBe(false);
     expect(exists(receipt + '/bundle/image-reference')).toBe(false);
-    expect(exists(receipt + '/bundle/image.tar')).toBe(true);
+    expect(exists(receipt + '/bundle/image-members')).toBe(true);
     expect(fixture.read(receipt + '/token')).toBe(token + '\n');
     expect(fixture.containers()).toEqual([]);
     expect(exists(data)).toBe(false);

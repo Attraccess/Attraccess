@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { wagoHostIoGuardShell } from './wago-host-io-guard';
@@ -52,6 +52,7 @@ const r=cp.spawnSync('/usr/bin/awk',args,{stdio:'inherit'});process.exit(r.statu
   executable(
     'bin/stat',
     `const fs=require('node:fs'),args=process.argv.slice(2),root=process.env.FIXTURE_ROOT,p=args.at(-1);
+if(p&&p.startsWith(root+'/proc/'))fs.appendFileSync(root+'/stat-observations',p.slice(root.length)+'\\n');
 if(args[0]==='--help'){console.log('BusyBox v1.37.0 () multi-call binary.\\nUsage: stat [-ltf] FILE...');process.exit(0);}
 if(!['-t','-Lt'].includes(args[0])||(p!==root&&!p.startsWith(root+'/')))process.exit(99);
 if(p===root+'/proc/22/fd/5'){
@@ -111,6 +112,15 @@ describe('host digital output and identity guard', () => {
 
   it('admits an unused numeric identity with no direct output writers', () => {
     expect(host.run().status).toBe(0);
+  });
+
+  it('uses kernel fdinfo inode evidence to avoid a stat subprocess pipeline for unrelated descriptors', () => {
+    host.processRecord(22);
+    host.file('unrelated', '');
+    host.fd(22, '0100002', 'unrelated');
+    host.file('proc/22/fdinfo/5', `flags: 0100002\nino: ${statSync(join(host.root, 'unrelated')).ino}\n`);
+    expect(host.run().status).toBe(0);
+    expect(() => readFileSync(join(host.root, 'stat-observations'), 'utf8')).toThrow();
   });
 
   it.each([

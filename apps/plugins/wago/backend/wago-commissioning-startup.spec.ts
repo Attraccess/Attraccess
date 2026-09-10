@@ -11,7 +11,9 @@ import { WagoCommissioningService } from './wago-commissioning.service';
 it('boots the commissioning plugin and empty artifact catalog without privileged host-provider resolution', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'wago-startup-fixture-'));
   const storage = process.env.STORAGE_ROOT;
+  const signingKey = process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH;
   process.env.STORAGE_ROOT = directory;
+  delete process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH;
   const dataSource = new DataSource({
     type: 'sqlite',
     database: ':memory:',
@@ -46,6 +48,8 @@ it('boots the commissioning plugin and empty artifact catalog without privileged
     if (dataSource.isInitialized) await dataSource.destroy();
     if (storage === undefined) delete process.env.STORAGE_ROOT;
     else process.env.STORAGE_ROOT = storage;
+    if (signingKey === undefined) delete process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH;
+    else process.env.WAGO_CC100_RUNTIME_SIGNING_PUBLIC_KEY_PATH = signingKey;
     await rm(directory, { recursive: true, force: true });
   }
 });

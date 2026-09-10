@@ -22,13 +22,20 @@ describe('WagoControllerApi', () => {
     it.each([
       {},
       { confirmInstall: false, temporarySsh: { username: 'operator', password: 'secret' } },
-      { confirmInstall: true },
       { confirmInstall: true, temporarySsh: { username: ' ', password: 'secret' } },
       { confirmInstall: true, temporarySsh: { username: 'operator', password: '' } },
-    ])('rejects missing consent or credentials: %j', (body) => {
+    ])('rejects missing consent or incomplete custom credentials: %j', (body) => {
       expect(() => controller[method](7, body, request)).toThrow(BadRequestException);
       expect(commissioning.deliver).not.toHaveBeenCalled();
       expect(commissioning.recover).not.toHaveBeenCalled();
+    });
+  });
+
+  it('allows an approved attempt without custom credentials', async () => {
+    await controller.deliverCommissioningSession(7, { confirmInstall: true }, request);
+    expect(commissioning.deliver).toHaveBeenCalledWith(7, { confirmInstall: true }, {
+      userId: 42,
+      authenticationMethod: 'session',
     });
   });
 

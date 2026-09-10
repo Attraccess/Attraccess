@@ -18,6 +18,7 @@ import { WagoRuntimeArtifactCatalog, WagoRuntimeArtifactsService } from '../back
 import { WagoArtifactsController } from '../backend/wago-artifacts.controller';
 import { WagoControllerApi } from '../backend/wago.controller';
 import { WagoCommissioningService } from '../backend/wago-commissioning.service';
+import { WagoCredentialRotationService } from '../backend/wago-credential-rotation';
 import { fw31IdentityOutput } from '../backend/fixtures/fw31-identity';
 import { WagoCommissioningSession } from '../backend/wago-commissioning-session.entity';
 import { WagoController } from '../backend/wago-controller.entity';
@@ -134,6 +135,8 @@ export async function commissioningFixture() {
       codesys: 'inactive',
     });
     service['sudoRunScript'] = async (_host, _fingerprint, _credential, script) => {
+      if (script.includes("printf 'epoch="))
+        return `epoch=${Math.floor(Date.now() / 1000)}\nuptime=100.00\nboot=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\ntool=supported\n`;
       if (script.includes('version=1') && script.includes('platform=')) {
         transport.platformCalls++;
         return 'version=1\nplatform=supported\nhardware=accessible\nexclusivity=clear\ndocker=running\nconfigDocker=present\nprovision=prepare-controller\nqualification=software-supported\n';
@@ -175,6 +178,15 @@ export async function commissioningFixture() {
         { provide: WagoRuntimeArtifactsService, useValue: catalog },
         { provide: WagoCommissioningService, useValue: service },
         { provide: WagoService, useValue: wago },
+        {
+          provide: WagoCredentialRotationService,
+          useValue: {
+            status: async () => ({ state: 'none' }),
+            rotate: async () => {
+              throw new Error('Credential rotation is unavailable in the commissioning fixture');
+            },
+          },
+        },
         { provide: Symbol.for('attraccess.plugin.context'), useValue: context },
       ],
     })

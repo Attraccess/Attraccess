@@ -10,6 +10,7 @@ import {
   wagoCommissioningPreparationScript,
   wagoDockerProvisionScript,
   wagoDockerProvisionRecoveryScript,
+  wagoDockerProvisionReconciliationScript,
   wagoDockerProvisionFinishScript,
   wagoHardwareDeploymentDockerArgs,
   wagoHardwareDeploymentReportScript,
@@ -23,6 +24,7 @@ describe('FW31 destructive commissioning shell (isolated vendor command fixtures
   const prepare = (fault = '') => fixture.run(wagoCommissioningPreparationScript(token, fixture.root), fault);
   const report = () => fixture.run(wagoHardwareDeploymentReportScript(fixture.root));
   const recover = (fault = '') => fixture.run(wagoDockerProvisionRecoveryScript(token, fixture.root), fault);
+  const reconcile = (fault = '') => fixture.run(wagoDockerProvisionReconciliationScript(fixture.root), fault);
   const finish = () => fixture.run(wagoDockerProvisionFinishScript(token, 'restored', fixture.root));
   const activePlc = () => {
     fixture.file('plc', 'running');
@@ -33,6 +35,16 @@ describe('FW31 destructive commissioning shell (isolated vendor command fixtures
     fixture = fw31ShellFixture();
   });
   afterEach(() => fixture.dispose());
+
+  it('reconciles a durable root-owned preparation journal after coordinator token loss', () => {
+    expect(prepare().status).toBe(0);
+    expect(fixture.run(wagoDockerProvisionRecoveryScript('b'.repeat(32), fixture.root)).stderr).toContain(
+      'Docker provisioning token mismatch',
+    );
+    expect(reconcile().stdout).toContain('docker-provision=reconciled');
+    expect(existsSync(join(fixture.root, journal))).toBe(false);
+    expect(existsSync(join(fixture.root, `etc/attraccess-wago/docker-provision.completed-${token}`))).toBe(true);
+  });
 
   it('reports software support read-only and strictly parses the enum-only contract', () => {
     const r = report();
@@ -106,6 +118,12 @@ describe('FW31 destructive commissioning shell (isolated vendor command fixtures
     fixture.file('owners.json', '{}');
     expect(report().stdout).toContain('exclusivity=codesys-active');
     expect(prepare().status).toBe(0);
+    expect(wagoCommissioningPreparationScript(token, fixture.root)).toContain(
+      'timeout -k 5 120 "$root/etc/init.d/runtime" stop 1',
+    );
+    expect(wagoCommissioningPreparationScript(token, fixture.root)).toContain(
+      'timeout -k 5 120 "$root/etc/init.d/runtime" stop 2',
+    );
     expect(fixture.read('vendor.log')).toContain(
       'runtime stop 1\nruntime stop 2\nconfig_runtime --wait runtime-version=0 force-new-version=yes restart-server=NO',
     );

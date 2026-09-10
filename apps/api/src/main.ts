@@ -14,7 +14,11 @@ async function main() {
     await startListening(app, port, globalPrefix, nodeEnv);
   } catch (error) {
     logger.error('Failed to bootstrap application', error.stack);
-    PluginService.recordBootFailure(error);
+    if (PluginService.recordBootFailure(error)) {
+      logger.error('A plugin prevented startup and was quarantined. Restarting without it.');
+      new PluginService().requestRestart();
+      return;
+    }
     process.exit(1);
   }
 }

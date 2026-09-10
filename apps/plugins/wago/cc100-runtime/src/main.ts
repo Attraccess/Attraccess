@@ -42,6 +42,8 @@ function connectRuntime(credentials?: DiscoveryClaim): void {
     clientId: username,
     username,
     password: credentials?.password ?? required('WAGO_MQTT_PASSWORD'),
+    rejectUnauthorized: process.env.WAGO_MQTT_TLS_INSECURE !== 'true',
+    ...(process.env.WAGO_MQTT_TLS_SERVERNAME ? { servername: process.env.WAGO_MQTT_TLS_SERVERNAME } : {}),
   });
   const activeClient = client;
   const transport: Transport = {

@@ -12,6 +12,7 @@
     },
     "build": {
       "executor": "@nx/esbuild:esbuild",
+      "dependsOn": [],
       "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-runtime"],
       "options": {
         "main": "apps/plugins/wago/cc100-runtime/src/main.ts",
@@ -23,6 +24,19 @@
         "thirdParty": true,
         "generatePackageJson": true,
         "esbuildOptions": { "target": "node24" }
+      }
+    },
+    "stage-plugin-release": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build"],
+      "inputs": [
+        "{workspaceRoot}/runtime-release/**/*",
+        "{workspaceRoot}/apps/plugins/wago/scripts/stage-runtime-release-for-plugin.mjs"
+      ],
+      "outputs": ["{workspaceRoot}/apps/plugins/wago/runtime-release"],
+      "options": {
+        "command": "node apps/plugins/wago/scripts/stage-runtime-release-for-plugin.mjs"
       }
     },
     "build-simulator": {

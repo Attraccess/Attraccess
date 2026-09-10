@@ -100,6 +100,16 @@ describe('PluginMigrationService', () => {
     expect(await tableExists(dbFile, 'plugin_widget')).toBe(true);
   });
 
+  it('adopts matching history when a plugin is renamed without replaying its migrations', async () => {
+    await PluginMigrationService.runUpMigrations(manifest);
+    writeMigrationPlugin(root, 'renamed-widgets', 'renamed-widgets');
+    PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+    const renamed = PluginService.getPlugins().find((plugin) => plugin.name === 'renamed-widgets') as LoadedPluginManifest;
+
+    await expect(PluginMigrationService.runUpMigrations(renamed)).resolves.toBe(0);
+    expect(await tableExists(dbFile, 'plugin_migrations_renamed_widgets')).toBe(true);
+  });
+
   it('reverts migrations and drops the tracking table on down', async () => {
     await PluginMigrationService.runUpMigrations(manifest);
 

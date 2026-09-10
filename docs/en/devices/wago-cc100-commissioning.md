@@ -17,7 +17,7 @@ Attraccess uses an SSH-only commissioning flow. WAGO Web-Based Management (WBM) 
 - Before authorizing delivery, compare the selected controller's physical label and service-network location with the target controller, then obtain its SSH fingerprint from a trusted inventory or an authorized technician over an independent channel. Copying the scanned fingerprint back into the form is not independent identity authentication. Do not assume the CC100 displays its SSH fingerprint.
 - USB-C service access and WBM are break-glass recovery paths only. Use WAGO's firmware-specific recovery instructions locally when SSH is unavailable; do not use WBM to work around an Attraccess commissioning error.
 
-The server verifies the pinned host key and an imported signed runtime release, prepares the supported platform, transfers the release over SSH and starts enrollment. Preparation uses the firmware-installed vendor Docker tools and establishes persistent access to only the required digital registers. The captured FW31 vendor `install` action downloads or extracts no engine; missing Docker binaries remain unsupported. The controller never needs an image registry or Internet connection for installation.
+The installed WAGO plugin verifies the pinned host key and its signed runtime release, prepares the supported platform, transfers the release over SSH and starts enrollment. Preparation uses the firmware-installed vendor Docker tools and establishes persistent access to only the required digital registers. The captured FW31 vendor `install` action downloads or extracts no engine; missing Docker binaries remain unsupported. The controller never needs an image registry or Internet connection for installation.
 
 **Destructive commissioning (2026-09-06):** existing applications and workloads may stop working or be erased. Attraccess does not preserve, back up, or restore preexisting CODESYS applications, retained PLC data, other workloads or their host settings. It always stops and permanently disables CODESYS, verifying both process and boot state before granting I/O. If this cannot be verified, installation fails before enrollment/runtime launch. The [earlier preservation decision](wago-fw31-support.md) is retained as superseded history.
 
@@ -25,23 +25,31 @@ The server verifies the pinned host key and an imported signed runtime release, 
 
 - Confirm the controller order number is `751-9301` and it is on a private IPv4 network: `10.0.0.0/8`, `172.16.0.0/12`, or `192.168.0.0/16`.
 - Confirm the supported firmware baseline in **WAGO controllers**. The current default baseline is WAGO CC100 firmware `31`; BSP version `2024.12.0` alone does not identify that firmware. See [FW31 support boundaries](wago-fw31-support.md) for source compatibility and qualification limits.
-- Configure the target local MQTT server with TLS and certificate verification enabled. Use the certificate DNS name as the broker hostname. Import the issuing CA PEM bundle in MQTT settings for a private CA; expired/not-yet-valid certificates require checking clocks and certificate renewal, not disabling verification.
-- Obtain a temporary SSH username and password from the customer. These are entered for the delivery attempt and are not stored in the commissioning session, UI, or audit log.
-- Ensure the temporary SSH identity can run the required commands. Non-root identities require `sudo` access. Credentials are never prefilled or guessed, and must be entered again for each install or recovery attempt.
-- Obtain the signed runtime bundle from the official WAGO runtime build artifacts or your software distributor. Extract the download and select its `.tar`, `.sha256` and `.sig` files in **CC100 runtime release**. No server file path, environment variable, signing key, JSON or command line is needed. Only the built-in release signing key is trusted.
+- Configure the target local MQTT server with the transport and TLS settings required by the deployment. Attraccess uses those settings for the commissioned runtime.
+- Initial installation uses the factory **root** SSH account unless **Use different SSH credentials** is selected. The FW31 **admin** account can log in over SSH but is not permitted to run commissioning commands with `sudo`.
+- Custom SSH identities need root or non-interactive `sudo` access. The API verifies access and inspects controller prerequisites automatically before preparation. Credentials are cleared from the UI after submission or closing and retained encrypted by the server for an explicit retry. Enrollment does not change the root password or establish management hardening.
+- Install the WAGO plugin release that includes the CC100 runtime. The plugin verifies its packaged `.tar`, checksum and signature before it becomes available; no runtime download, upload, selection, server path, environment variable, signing key, JSON or command line is needed from the operator.
 - Ensure the controller can reach the selected local MQTT broker. No external registry, DNS, or Internet access is required or used.
 
 ## Commission a controller
 
 1. Open **WAGO controllers** and select **Commission controller**.
 2. Enter a **Controller name**, then select **Continue**.
-3. Enter the **Controller IP address**, select the local **MQTT server** and import/select the signed runtime release. Scanning is disabled while import is in progress. Verify the physical controller label and its network location, then select **Scan controller for review**. The session pins the selected digest; another administrator importing a release cannot change this job or its retries.
+3. Enter the **Controller IP address** and select the local **MQTT server**. Verify the physical controller label and its network location, then select **Scan controller for review**. The session pins the signed runtime bundled with the installed WAGO plugin; later server upgrades do not change this job or its retries.
 4. Compare the scanned Ed25519 fingerprint with an independent trusted record and select **Confirm host key**. Alternatively, explicitly attest the physical label and a service network with only that controller attached. This alternative is first-key pinning on an isolated connection, not independent cryptographic authentication; do not use it on a shared LAN.
-5. Optionally use **Inspect installation prerequisites** to see firmware, register access, output ownership and Docker status without changing the controller. Active or boot-enabled CODESYS and missing runtime permissions are conditions the supported destructive preparation must resolve. Unsupported firmware/components, missing registers and independent output writers still block installation. There is no separate Docker, workload-preservation or WBM approval gate.
-6. Enter the customer-supplied **Temporary SSH username** and **Temporary SSH password**. Make connected equipment safe for interruption, review the pinned release and **Destructive installation** warning, then select the single consequence confirmation and **Install runtime**. This approves permanent CODESYS disablement and possible loss of existing applications/data without backup or restoration by Attraccess. Delivery performs and verifies supported controller preparation before enrollment/runtime launch. Closing or submitting clears the password and consent; no system SSH-agent or factory-password fallback is used.
-7. Watch the saved session in the controllers table or select **View progress**. Once claimed, **Configure inputs and outputs** opens the existing visual configuration editor and resets the commissioning drawer for the next controller.
+5. Review the pinned release and **Destructive installation** warning. Installation automatically inspects firmware, register access, output ownership and Docker status before changing the controller. Active or boot-enabled CODESYS and missing runtime permissions are conditions preparation must resolve. Unsupported firmware/components, missing registers and independent output writers still block installation.
+6. For a controller with changed factory access, select **Use different SSH credentials** and enter its **Temporary SSH username** and **Temporary SSH password**. Otherwise initial installation uses factory root access. Make connected equipment safe for interruption, select the consequence confirmation and **Install runtime**. This approves permanent CODESYS disablement and possible loss of existing applications/data without backup or restoration by Attraccess. Closing or submitting clears credentials and consent from the form.
+7. Enrollment proceeds automatically through delivery, supervisor verification, permanent MQTT credentials, bootstrap revocation, initial configuration and runtime readiness. **Enrollment complete** is 100%. The server continues reconciliation even if the browser closes. **Configure inputs and outputs** is an optional subsequent workflow, not a requirement to finish enrollment.
 
-The saved progress describes identity, package and controller preflight, transfer, enrollment, configuration and runtime installation. Restarting Attraccess never retries SSH with remembered or factory credentials.
+The saved progress describes each installation stage. Uploading all bytes is not completion: the controller reports checksum verification, image loading, startup and supervisor checks separately. Finalization waits on the controller lock with a bounded timeout rather than repeatedly racing the supervisor over SSH. Restarting Attraccess does not automatically start another destructive installation; **Retry installation** reconciles retained installation/preparation receipts and uses the saved encrypted SSH credential without separate cleanup controls.
+
+### Delivery diagnostics
+
+Failures identify the operation and observed cause: SSH authentication rejection, a denied `sudo` operation, a refused connection, a missing controller command, a failed CODESYS/Docker operation, or insufficient storage with required and available KiB. The API saves firmware, Docker and I/O prerequisite observations automatically during installation. Read-only inspection failures do not require controller-operation recovery. Failures after remote mutations retain the operation lease when completion is uncertain, while preserving the original failure in the HTTP response and saved session.
+
+Delivery uploads the verified bundle once into a private, session-owned directory on `/tmp` and streams its image member directly into Docker. `/etc` and `/var/lib` hold only small configuration and journal files. Preflight budgets the bundle on `/tmp`, Docker's loading reserve on its discovered storage filesystem, and 16 MiB of headroom per filesystem. Both archive-extraction and Docker-load failures stop installation; successful delivery or explicit recovery removes the owned temporary upload. Existing signed bundles and session pins remain usable with this delivery path.
+
+The release packager also gzip-compresses the Docker image payload before signing new releases, reducing transfer size further. Docker loads either compressed or uncompressed image members directly.
 
 During delivery, Attraccess rechecks the pinned SSH key with strict host-key checking and verifies the runtime bundle checksum and signature on the local server. Installation journals protect operation integrity and cleanup; they are not a backup service for preexisting workloads. A new enrollment receives fresh runtime storage rather than silently reusing revoked credentials. Environment files are staged with mode `0600`; private CA trust uses a separate read-only bind mount from a protected host directory.
 
@@ -51,7 +59,7 @@ CODESYS disablement is configured to persist across reboot. Host supervision rec
 
 After runtime delivery, the controller uses a restricted enrollment credential to announce through the selected local MQTT broker. Attraccess sends permanent controller-scoped credentials. Publication of that claim is not proof that the runtime has reconnected or that the enrollment credential has been revoked.
 
-The session remains **Verification required**. The UI separately checks a fresh permanent heartbeat, enrollment revocation, applied Desired/Reported Configuration and a fresh matching runtime `state.readiness` probe. A stale or mismatched probe is not ready. Management status is read from its saved security transaction. Physical qualification remains required; no successful install, key enrollment or MQTT claim is hardware acceptance evidence.
+The server revisits discovery received during delivery, so an early announcement cannot be lost at the state transition. A new controller receives an inert configuration with no logical outputs; existing published configuration and unreviewed user drafts are not overwritten. The session becomes **Enrollment complete** only after a fresh permanent heartbeat, enrollment revocation, applied Desired/Reported Configuration and a matching fresh runtime `state.readiness` probe. A stale or mismatched probe is not ready. Management hardening and physical qualification remain separate: completed enrollment is not a hardened-device or physical acceptance claim.
 
 ### Management security
 
@@ -77,19 +85,19 @@ Also confirm a current heartbeat and the expected runtime version. An applied co
 | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | IP is rejected                              | Use a valid private IPv4 address and confirm it belongs to the physically selected CC100.                                                                                                                                              |
 | SSH key cannot be scanned or does not match | Stop. Recheck the controller label, address, and trusted fingerprint. A changed key must not be accepted blindly. Use local USB-C/WBM recovery only to restore the controller's supported SSH access.                                  |
-| SSH authentication or `sudo` fails          | Correct the customer-supplied temporary credential or its privilege. Select **Retry installation** only after the controller is reachable.                                                                                                 |
+| SSH authentication or `sudo` fails          | Correct the customer-supplied temporary credential or its privilege. Select **Retry installation** only after the controller is reachable.                                                                                             |
 | Model or firmware is unsupported            | Do not proceed. Restore the supported firmware through the customer-operated WAGO recovery process, then start a new session.                                                                                                          |
 | Docker activation fails                     | Collect the session error and controller logs. Repair Docker using the WAGO-supported local procedure; do not install an alternative container engine.                                                                                 |
-| Bundle checksum or signature fails          | Stop. Replace the local artifact with the approved signed release. Do not bypass verification or copy an image from a registry.                                                                                                        |
-| Delivery fails                              | Open **View progress**, record the displayed failure reason, restore reachability or prerequisites, then select **Retry installation**. If credential revocation needs attention, resolve that condition before retrying.                  |
+| Bundled runtime is unavailable              | Stop. Install a complete WAGO plugin release that includes the approved signed runtime. Do not bypass verification or copy an image from a registry.                                                                                   |
+| Delivery fails                              | Open **View progress**, record the displayed failure reason, restore reachability or prerequisites, then select **Retry installation**. If credential revocation needs attention, resolve that condition before retrying.              |
 | Controller does not connect or claim        | Verify local MQTT reachability and broker selection, then inspect the controller runtime logs through the secured SSH path. The enrollment credential expires after 15 minutes; cancel the session and create a new one if it expires. |
 | Initial configuration is rejected           | Correct the complete Desired Configuration, then validate, review, and publish a new revision through the configuration API. Do not edit the controller state file by hand.                                                            |
 
 Select **Cancel enrollment** only to abandon the session. It revokes the enrollment credential and deletes the Attraccess commissioning session. Removing a controller from Attraccess also revokes its MQTT access, but does not uninstall the runtime from the CC100.
 
-**Clean up failed installation** is a separate, optional recovery operation requiring fresh SSH credentials and explicit cleanup approval. It interrupts the Attraccess runtime and reconciles the installation, preparation journal and credentials. It cannot reverse broker-side credential revocation, restore preexisting applications/data or host settings, or re-enable CODESYS. Incomplete or interrupted cleanup retains its integrity record for another explicit attempt. Cleanup is not a prerequisite to granting initial destructive-install consent or a promise of workload restoration.
+**Retry installation** automatically reconciles a retained installation, preparation journal and bootstrap credentials before continuing. No separate cleanup approval or repeated credential entry is needed. Cleanup cannot reverse broker-side credential revocation, restore preexisting applications/data or host settings, or re-enable CODESYS. An incomplete cleanup retains its ownership record for the next retry.
 
-Cleanup remains failed if Attraccess cannot verify that the owned runtime stopped or was removed. An unreachable Docker daemon does not prove the container stopped. Restore the supported local service's observability and retry the explicit cleanup; retain the failure record until verification succeeds.
+Cleanup remains failed if Attraccess cannot verify that the owned runtime stopped or was removed. An unreachable Docker daemon does not prove the container stopped. Once the supported local service is observable, **Retry installation** repeats the automatic cleanup; the failure record remains until verification succeeds. If a server restart revoked the bootstrap identity, retry reinstalls with fresh credentials rather than accepting a running container that can no longer enroll.
 
 ### Recover after latched containment
 
@@ -101,13 +109,10 @@ identify which case occurred. Rebooting does not clear the latch.
 After resolving the cause, use the existing wizard controls for a current guided
 installation with retained recovery ownership:
 
-1. Open the controller's **View progress** and select **Clean up failed installation**
-   with fresh **Recovery SSH** credentials and explicit cleanup approval. Wait for
-   **Runtime installation cleaned up** and completion of credential/preparation
-   cleanup. **Recovery requires attention** means cleanup still needs resolution.
-2. If the session is unclaimed and offers **Retry installation**, enter fresh
-   temporary SSH credentials, approve the destructive consequences and retry.
-3. If the controller was claimed, follow the progress instruction to **Remove
+1. For an unclaimed failed session, open **View progress** and select **Retry
+   installation**. Attraccess reconciles retained runtime/preparation ownership,
+   cleans up the interrupted attempt and installs using fresh bootstrap credentials.
+2. If the controller was already claimed, **Remove
    controller**, then select **Commission controller** and complete a new session.
    Registration removal also removes its configuration; configure and verify the
    new installation before use.
@@ -115,7 +120,7 @@ installation with retained recovery ownership:
 Installation recreates enablement only through the verified preparation/delivery
 flow. This route needs no shell or re-enable control. Cleanup cannot succeed without
 valid retained ownership and observable container stop/removal; if the cleanup
-control is unavailable or recovery remains unverified, keep the installation
+ownership is unavailable or recovery remains unverified, keep the installation
 blocked and obtain support rather than bypassing the latch. A successful hook exit
 is not proof of a running runtime; fresh readiness and physical qualification
 remain separate requirements.
@@ -130,7 +135,7 @@ An interrupted coordinator has a durable operation lease. It is never silently s
 
 ### Integration contract
 
-- Installation and recovery endpoints require `{ confirmInstall: true, temporarySsh: { username, password } }` for that explicit request only. The recovery endpoint is `POST /api/wago/commissioning/sessions/:id/recover`.
+- Installation and recovery endpoints require `{ confirmInstall: true }`; an optional `temporarySsh: { username, password }` overrides the factory/enrolled credential for that request. The recovery endpoint is `POST /api/wago/commissioning/sessions/:id/recover`.
 - `GET /api/wago/commissioning/sessions/:id/verification` returns non-secret `controllerId`, `permanentConnection`, `enrollmentRevoked`, `configurationApplied`, `managementHardening`, `hardwareReadiness`, `softwareReady`, `physicalQualification` and `ready` fields. Configuration application alone is not hardware readiness. `ready` stays false while physical qualification is required.
 - Runtime uses a fresh `/var/lib/attraccess-wago` per enrollment. Private CA trust uses `NODE_EXTRA_CA_CERTS=/var/lib/attraccess-wago/mqtt-ca.pem` with an additional read-only bind mount; runtime code must not replace or bypass that trust. Cleanup journals do not promise preservation of previous workloads.
 - ATT-1056 must supply qualified device permissions/mounts and runtime health evidence before commissioning can advertise physical readiness. The installer does not invent GPIO mappings or add privileged hardware access.
@@ -140,7 +145,7 @@ An interrupted coordinator has a durable operation lease. It is never silently s
 Current software behavior and remaining release limits:
 
 - Additive, verified key enrollment for an existing non-root OpenSSH or detected Dropbear 2025.88 account is implemented. Firmware-specific account creation, password/default credential removal and root-login restrictions are not implemented; complete dependency gates and lockout-safe restoration are still required.
-- The signed packager and visual importer are implemented. Existing server-configured two-member bundles retain their legacy delivery path, but new visual imports use the signed manifest format and hardware profile contract. The publishing workflow requires ATT-1056's profile-aware runtime to be integrated before producing these releases.
+- The signed runtime is packaged with every WAGO plugin release. Release engineering verifies its checksum, SSHSIG, manifest compatibility and immutable image reference before the plugin registers it. The publishing workflow requires ATT-1056's profile-aware runtime to be integrated before producing these releases.
 - Preexisting CODESYS/workload preservation and restoration are outside product scope. Unique minimum-privilege SSH management access and the remaining management-service baseline still require implementation and firmware-31 qualification; their status must not be presented as a blanket Docker/I/O blocker.
 - Container start is not success evidence. Fresh permanent heartbeat and matching runtime readiness/configuration probes are required, followed by physical qualification.
 - The current runtime deployment remains subject to the image digest, least-privilege model, and hardware verification evidence documented in [WAGO CC100 Docker Runtime](wago-cc100-runtime.md).

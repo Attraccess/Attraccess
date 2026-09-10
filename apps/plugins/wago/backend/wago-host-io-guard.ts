@@ -126,6 +126,28 @@ wago_host_io_guard() {
     }
     for wago_fd in "$wago_proc"/fd/[0-9]*; do
       test -e "$wago_fd" || test -L "$wago_fd" || continue
+      # FW31 exposes the inode in fdinfo. Read it with shell builtins before
+      # invoking the portable stat parser: statting every socket/pipe starts
+      # thousands of processes and can exhaust the supervisor's gate timeout.
+      # Inode equality alone never grants an exemption; matching candidates
+      # still require the full device:inode and writable-descriptor checks.
+      wago_fd_inode=
+      wago_fd_inode_seen=0
+      wago_fd_inode_bad=0
+      if ! { while read -r wago_fd_key wago_fd_value wago_fd_extra; do
+        if test "$wago_fd_key" = ino:; then
+          wago_fd_inode_seen=$((wago_fd_inode_seen + 1))
+          case "$wago_fd_value" in ''|*[!0-9]*) wago_fd_inode_bad=1 ;; esac
+          test -z "$wago_fd_extra" || wago_fd_inode_bad=1
+          wago_fd_inode=$wago_fd_value
+        fi
+      done < "$wago_proc/fdinfo/\${wago_fd##*/}"; } 2>/dev/null; then
+        test ! -e "$wago_fd" && test ! -L "$wago_fd" && continue
+        return 1
+      fi
+      test "$wago_fd_inode_bad" = 0 && test "$wago_fd_inode_seen" -le 1 || return 1
+      if test "$wago_fd_inode_seen" = 1 && test "$wago_fd_inode" != "\${wago_dout_inode#*:}"; then continue; fi
+      # Older proc fixtures/kernels without ino retain the conservative stat path.
       wago_inode=$(stat -Lc '%d:%i' "$wago_fd" 2>/dev/null) || {
         # Closing a descriptor or exiting during observation is normal. A live
         # but unobservable descriptor must not be interpreted as no writer.

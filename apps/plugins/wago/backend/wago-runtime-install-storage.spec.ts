@@ -66,6 +66,16 @@ console.log(fs.existsSync(root+'/docker-root')?fs.readFileSync(root+'/docker-roo
   });
   afterEach(() => fixture.dispose());
 
+  it('admits the existing signed bundle on the measured CC100 root, tmpfs and Docker partitions', () => {
+    layout([1, 2, 1, 3], [181188, 250124, 181188, 807148]);
+    const staging = fixture.run(runtimeBundleStagingCapacityPreflightScript(236668416, fixture.root));
+    expect(staging.stderr).toBe('');
+    expect(staging.status).toBe(0);
+    const full = fixture.run(runtimeBundleCapacityPreflightScript(236668416, fixture.root));
+    expect(full.stderr).toBe('');
+    expect(full.status).toBe(0);
+  });
+
   it('checks unprepared staging with inactive Docker without querying or activating it', () => {
     fixture.file('daemon', 'stopped');
     fixture.file('plc', 'running');
@@ -81,7 +91,7 @@ console.log(fs.existsSync(root+'/docker-root')?fs.readFileSync(root+'/docker-roo
 
   it.each([0, 1, 2])('rejects insufficient early staging at path index %s with inactive Docker', (index) => {
     fixture.file('daemon', 'stopped');
-    const free = [b + reserve, b + reserve, b + reserve, 999999];
+    const free = [reserve, b + reserve, reserve, 999999];
     free[index]--;
     layout([1, 2, 3, 4], free);
     expect(runStaging().stderr).toContain('Insufficient runtime storage');
@@ -96,7 +106,7 @@ console.log(fs.existsSync(root+'/docker-root')?fs.readFileSync(root+'/docker-roo
     fixture.file('daemon', 'running');
     expect(run().stderr).toContain('Insufficient runtime storage');
     expect(run().status).not.toBe(0);
-    layout([1, 1, 1, 1], Array(4).fill(5 * b + reserve));
+    layout([1, 1, 1, 1], Array(4).fill(4 * b + reserve));
     expect(run().status).toBe(0);
   });
 
@@ -121,10 +131,10 @@ console.log(fs.existsSync(root+'/docker-root')?fs.readFileSync(root+'/docker-roo
     expect(run().status).not.toBe(0);
   });
 
-  it.each([run, runStaging])('budgets two move copies on equal-device bind mounts', (check) => {
-    layout([1, 1, 2, 3], [2 * b + reserve, 2 * b + reserve, b + reserve, 3 * b + reserve]);
+  it.each([run, runStaging])('budgets a single upload on equal-device bind mounts', (check) => {
+    layout([1, 1, 2, 3], [b + reserve, b + reserve, reserve, 3 * b + reserve]);
     expect(check().status).toBe(0);
-    layout([1, 1, 2, 3], [2 * b + reserve - 1, 2 * b + reserve - 1, b + reserve, 3 * b + reserve]);
+    layout([1, 1, 2, 3], [b + reserve - 1, b + reserve - 1, reserve, 3 * b + reserve]);
     expect(check().stderr).toContain('Insufficient runtime storage');
     expect(check().status).not.toBe(0);
   });
@@ -140,10 +150,10 @@ console.log(fs.existsSync(root+'/docker-root')?fs.readFileSync(root+'/docker-roo
   });
 
   it.each([
-    ['root', [1, 1, 1, 2], [2 * b + reserve - 1, 2 * b + reserve - 1, 2 * b + reserve - 1, 999999]],
+    ['root', [1, 1, 1, 2], [b + reserve - 1, b + reserve - 1, b + reserve - 1, 999999]],
     ['tmp', [1, 2, 3, 4], [999999, b + reserve - 1, 999999, 999999]],
-    ['varlib', [1, 2, 3, 4], [999999, 999999, b + reserve - 1, 999999]],
-    ['upload', [1, 2, 3, 4], [b + reserve - 1, 999999, 999999, 999999]],
+    ['varlib journals', [1, 2, 3, 4], [999999, 999999, reserve - 1, 999999]],
+    ['configuration', [1, 2, 3, 4], [reserve - 1, 999999, 999999, 999999]],
     ['docker', [1, 2, 3, 4], [999999, 999999, 999999, 3 * b + reserve - 1]],
   ])('rejects insufficient %s capacity', (_name, devices, free) => {
     layout(devices as number[], free as number[]);
@@ -156,78 +166,78 @@ console.log(fs.existsSync(root+'/docker-root')?fs.readFileSync(root+'/docker-roo
   it.each([
     [
       [1, 2, 3, 4],
-      [1, 1, 1, 3],
+      [0, 1, 0, 3],
     ],
     [
       [1, 1, 2, 3],
-      [2, 1, 3],
+      [1, 0, 3],
     ],
     [
       [1, 2, 1, 3],
-      [1, 1, 3],
+      [0, 1, 3],
     ],
     [
       [1, 2, 3, 1],
-      [3, 1, 1],
+      [3, 1, 0],
     ],
     [
       [1, 2, 2, 3],
-      [1, 2, 3],
+      [0, 1, 3],
     ],
     [
       [1, 2, 3, 2],
-      [1, 4, 1],
+      [0, 4, 0],
     ],
     [
       [1, 2, 3, 3],
-      [1, 1, 4],
+      [0, 1, 3],
     ],
     [
       [1, 1, 2, 2],
-      [2, 4],
+      [1, 3],
     ],
     [
       [1, 2, 1, 2],
-      [1, 4],
+      [0, 4],
     ],
     [
       [1, 2, 2, 1],
-      [3, 2],
+      [3, 1],
     ],
     [
       [1, 1, 1, 2],
-      [2, 3],
+      [1, 3],
     ],
     [
       [1, 1, 2, 1],
-      [4, 1],
+      [4, 0],
     ],
     [
       [1, 2, 1, 1],
-      [4, 1],
+      [3, 1],
     ],
     [
       [1, 2, 2, 2],
-      [1, 5],
+      [0, 4],
     ],
-    [[1, 1, 1, 1], [5]],
+    [[1, 1, 1, 1], [4]],
     [
       [1, 2, 3],
-      [1, 1, 1],
+      [0, 1, 0],
     ],
     [
       [1, 1, 2],
-      [2, 1],
+      [1, 0],
     ],
     [
       [1, 2, 1],
-      [1, 1],
+      [0, 1],
     ],
     [
       [1, 2, 2],
-      [1, 2],
+      [0, 1],
     ],
-    [[1, 1, 1], [2]],
+    [[1, 1, 1], [1]],
   ])('enforces each filesystem peak for devices %j', (devices, coefficients) => {
     const check = devices.length === 4 ? run : runStaging;
     const free = devices.map((device) => coefficients[device - 1] * b + reserve);

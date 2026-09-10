@@ -40,6 +40,7 @@ export function fw31ShellFixture(statStyle: 'native' | 'terse' = 'native') {
   mkdirSync(join(root, 'bin'));
   for (const [name, path] of Object.entries({
     sh: '/bin/sh',
+    bash: '/bin/bash',
     cat: '/bin/cat',
     cp: '/bin/cp',
     cmp: '/usr/bin/cmp',
@@ -124,7 +125,7 @@ done
   );
   file(
     'bin/tar',
-    '#!/bin/sh\nif [ "$1" = --version ]; then echo "GNU tar fixture"; exit 0; fi\nshift 2\nexec /usr/bin/tar "$@"\n',
+    '#!/bin/sh\nif [ "$1" = --version ]; then echo "GNU tar fixture"; exit 0; fi\nshift 2\nif [ "$FAULT" = tar-image-stream-failed ] && [ "$1" = -xOf ] && [ "$3" = image.tar ]; then /usr/bin/tar "$@"; exit 2; fi\nexec /usr/bin/tar "$@"\n',
     0o700,
   );
   executable(
@@ -155,13 +156,14 @@ console.log(args[1].replace(/%[ugahdi]/g,v=>values[v]));`,
     'bin/timeout',
     `
 const args=process.argv.slice(2);
-if(args[0]!=='-k'||args[1]!=='5'||!['10','30','45','300'].includes(args[2]))process.exit(99);
+if(args[0]!=='-k'||args[1]!=='5'||!['10','30','45','120','300','330'].includes(args[2]))process.exit(99);
 if(process.env.FAULT==='gate-timeout'&&args[3].endsWith('/S99_zz_attraccess_wago'))process.exit(124);
 const root=process.env.FIXTURE_ROOT;
 const privilegeLifecycle=['privilege-deadline','privilege-delayed'].includes(process.env.FAULT)&&['setpriv','capsh'].some(tool=>args[3]===root+'/bin/'+tool)&&args[4]!=='--help';
 // Match the generated command's deadline. Shorter wall-clock caps measure host
 // process scheduling, except for the explicit isolated privilege lifecycle test.
-const r=require('node:child_process').spawnSync(args[3],args.slice(4),{env:{...process.env,FIXTURE_CALLER_PID:String(process.ppid)},stdio:'inherit',timeout:privilegeLifecycle?1000:Number(args[2])*1000});
+const stdio=args[3]==='flock'?Array.from({length:Number(args[4])+1},(_,fd)=>fd<3||fd===Number(args[4])?fd:'ignore'):'inherit';
+const r=require('node:child_process').spawnSync(args[3],args.slice(4),{env:{...process.env,FIXTURE_CALLER_PID:String(process.ppid)},stdio,timeout:privilegeLifecycle?1000:Number(args[2])*1000});
 if(privilegeLifecycle)require('node:fs').appendFileSync(root+'/privilege-lifecycle.log',JSON.stringify({event:'reaped',tool:args[3].split('/').at(-1),pid:r.pid,status:r.status,error:r.error?.code})+'\\n');
 process.exit(r.status ?? 124);`,
   );
@@ -358,6 +360,8 @@ if(args[0]==='container'&&args[1]==='ls'){
  if(fault==='remove')process.exit(1);
  const c=find(args.at(-1));if(!c)process.exit(1);if(fault!=='remove-stuck')state=state.filter(v=>v!==c);save();
 }else if(args[0]==='load'){
+ const input=fs.readFileSync(args.includes('-i')?args[args.indexOf('-i')+1]:0);
+ fs.writeFileSync(root+'/docker-loaded-sha256',require('node:crypto').createHash('sha256').update(input).digest('hex'));
  console.log('Loaded image ID: sha256:fixture');if(fault==='load')process.exit(1);
 }else if(args[0]==='image'&&args[1]==='inspect'){
  if(fault==='inspect-image')process.exit(1);

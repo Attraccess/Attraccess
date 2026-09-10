@@ -211,17 +211,43 @@ describe('PluginService', () => {
         main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
         attraccessVersion: { min: '1.0.0' },
       });
+      writePlugin(root, 'unaffected-plugin', {
+        name: 'unaffected-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
 
       PluginService.beginBootGuard();
       const error = new Error('Plugin onModuleInit failed');
       error.stack = `${error.stack}\n    at ${join(root, 'previously-active', 'dist', 'index.js')}:1:1`;
-      PluginService.recordBootFailure(error);
+      expect(PluginService.recordBootFailure(error)).toBe(true);
       PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
       PluginService.beginBootGuard();
 
-      const [plugin] = PluginService.getPlugins();
-      expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
-      expect(PluginService.getPluginsWithLoadStatus()[0].error).toBe('Plugin onModuleInit failed');
+      const plugins = PluginService.getPlugins();
+      const failed = plugins.find((plugin) => plugin.name === 'previously-active');
+      const unaffected = plugins.find((plugin) => plugin.name === 'unaffected-plugin');
+      if (!failed || !unaffected) throw new Error('Expected both fixture plugins to be loaded');
+      expect(PluginService.isPluginQuarantined(failed)).toBe(true);
+      expect(PluginService.isPluginQuarantined(unaffected)).toBe(false);
+      expect(PluginService.getPluginsWithLoadStatus().find((plugin) => plugin.name === 'previously-active')).toMatchObject({
+        error: 'Plugin onModuleInit failed',
+      });
+    });
+
+    it('does not request a restart when a startup error cannot be attributed to a plugin', () => {
+      writePlugin(root, 'active-plugin', {
+        name: 'active-plugin',
+        version: '1.0.0',
+        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+        attraccessVersion: { min: '1.0.0' },
+      });
+      PluginService.beginBootGuard();
+
+      expect(PluginService.recordBootFailure(new Error('host database unavailable'))).toBe(false);
+
+      expect(PluginService.isPluginQuarantined(PluginService.getPlugins()[0])).toBe(false);
     });
 
     it('quarantines guarded plugins after an abrupt startup failure', () => {

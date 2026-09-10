@@ -1,4 +1,5 @@
 import { chmodSync, existsSync, linkSync, statSync, symlinkSync } from 'node:fs';
+import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { fw31ShellFixture } from './fixtures/fw31-shell-fixture';
 import { wagoShellFilesystemGuard } from './wago-shell-filesystem';
@@ -29,6 +30,58 @@ echo guarded`;
     expect(fixture.run(guard()).status).toBe(0);
     expect(fixture.read(lock)).toBe('existing lock contents');
   });
+
+  it('queues a finalizer behind a live gate on the controller lock instead of racing SSH reconnects', async () => {
+    fixture.file(
+      'bin/flock',
+      '#!/usr/bin/python3\nimport fcntl,sys\nprint("waiting",flush=True)\ntry: fcntl.flock(int(sys.argv[-1]),fcntl.LOCK_EX | (fcntl.LOCK_NB if "-n" in sys.argv else 0))\nexcept OSError: sys.exit(1)\n',
+      0o700,
+    );
+    // Real firmware timeout preserves inherited descriptors; the generic Node
+    // fixture models child stdio only, so use a descriptor-preserving launcher.
+    fixture.file('bin/timeout', '#!/bin/sh\nshift 3\nexec "$@"\n', 0o700);
+    fixture.file(lock, '');
+    const start = (script: string) => {
+      const child = spawn('/bin/sh', ['-c', script], {
+        env: { PATH: join(fixture.root, 'bin'), FIXTURE_ROOT: fixture.root },
+      });
+      let output = '',
+        errors = '';
+      child.stdout.on('data', (chunk) => {
+        output += String(chunk);
+      });
+      child.stderr.on('data', (chunk) => {
+        errors += String(chunk);
+      });
+      const done = new Promise<number | null>((resolve) => child.on('close', resolve));
+      const reached = async (marker: string) => {
+        for (let i = 0; i < 500 && !output.includes(marker) && child.exitCode === null; i++)
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        expect({ output, errors }).toEqual({ output: expect.stringContaining(marker), errors: '' });
+      };
+      return { child, done, reached };
+    };
+    const owner = start(`exec 9<> '${join(fixture.root, lock)}'; flock 9; echo held; read release`);
+    let waiter: ReturnType<typeof start> | undefined;
+    try {
+      await owner.reached('held');
+      waiter = start(guard({ waitSeconds: 330 }));
+      await waiter.reached('waiting');
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(waiter.child.exitCode).toBeNull();
+      owner.child.stdin.end('release\n');
+      expect(await owner.done).toBe(0);
+      expect(await waiter.done).toBe(0);
+      await waiter.reached('guarded');
+    } finally {
+      for (const process of [owner, waiter])
+        if (process) {
+          process.child.stdin.end();
+          if (process.child.exitCode === null) process.child.kill('SIGKILL');
+          await process.done;
+        }
+    }
+  }, 15_000);
 
   it.each(['configuration', 'parent'])('rejects a non-root-owned %s directory without changing ownership', (path) => {
     const target = path === 'configuration' ? config : 'etc';

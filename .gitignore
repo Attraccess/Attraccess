@@ -35,6 +35,8 @@ libs/react-query-client/src/lib/
 
 apps/api/src/assets/attractap-firmwares/
 apps/api/src/assets/companion-app/
+apps/plugins/wago/runtime-release/
+runtime-release/
 apps/attractap-touch-firmware/.pio/
 apps/api/src/assets/attractap-firmwares/
 secrets/

@@ -1,7 +1,19 @@
 import type { MqttServerConnectionConfig } from '@attraccess/plugins-backend-sdk';
-import { assertCommissioningBroker } from './wago-commissioning-preflight';
-import { rootCertificates } from 'node:tls';
-import { X509Certificate } from 'node:crypto';
+import { assertCommissioningBroker, controllerPreparationBlockers } from './wago-commissioning-preflight';
+import type { WagoCommissioningPreflightReport } from '../shared/commissioning';
+
+describe('automatic controller prerequisite admission', () => {
+  const supported: WagoCommissioningPreflightReport = {
+    platform: 'supported', hardware: 'accessible', exclusivity: 'clear', docker: 'running',
+    configDocker: 'present', provision: 'prepare-controller',
+  };
+  it.each(['codesys-active', 'codesys-boot-enabled'] as const)('allows preparation to resolve %s and register permissions', (exclusivity) => {
+    expect(controllerPreparationBlockers({ ...supported, exclusivity, hardware: 'uid10001-access-denied' })).toEqual([]);
+  });
+  it('allows the firmware-installed Docker service to be activated automatically', () => {
+    expect(controllerPreparationBlockers({ ...supported, docker: 'installed-stopped', provision: 'install-vendor-runtime' })).toEqual([]);
+  });
+});
 
 describe('commissioning broker preflight', () => {
   const config: MqttServerConnectionConfig = {
@@ -15,36 +27,17 @@ describe('commissioning broker preflight', () => {
     clientId: null,
   };
 
-  it('accepts system trust without connecting to a broker', () => {
+  it('accepts the MQTT TLS settings selected by the user without connecting to a broker', () => {
     expect(() => assertCommissioningBroker(config)).not.toThrow();
-  });
-
-  it.each([{ useTls: false }, { tlsInsecure: true }])('rejects unauthenticated transport %j', (override) => {
-    expect(() => assertCommissioningBroker({ ...config, ...override })).toThrow('certificate verification');
-  });
-
-  it('does not silently discard a certificate hostname override', () => {
-    expect(() => assertCommissioningBroker({ ...config, tlsServername: 'other.example.test' })).toThrow('DNS name');
-  });
-
-  it.each(['bad pem', '-----BEGIN CERTIFICATE-----\nbad\n-----END CERTIFICATE-----'])(
-    'rejects invalid CA input',
-    (caCert) => {
-      expect(() => assertCommissioningBroker({ ...config, caCert })).toThrow('CA');
-    },
-  );
-
-  it('validates a PEM trust anchor and reports certificate clock errors', () => {
-    const caCert = rootCertificates[0];
-    const certificate = new X509Certificate(caCert);
-    const validFrom = Date.parse(certificate.validFrom);
-    const validTo = Date.parse(certificate.validTo);
-    expect(() => assertCommissioningBroker({ ...config, caCert }, (validFrom + validTo) / 2)).not.toThrow();
-    expect(() => assertCommissioningBroker({ ...config, caCert }, validFrom - 1)).toThrow('clock');
-    expect(() => assertCommissioningBroker({ ...config, caCert }, validTo + 1)).toThrow('expired');
     expect(() =>
-      assertCommissioningBroker({ ...config, caCert: `${caCert}\nprivate-key-material` }, validFrom),
-    ).toThrow('PEM');
+      assertCommissioningBroker({
+        ...config,
+        useTls: false,
+        tlsInsecure: true,
+        tlsServername: 'other.example.test',
+        caCert: 'user-managed-certificate-data',
+      }),
+    ).not.toThrow();
   });
 
   it.each(['broker.example.test/path', 'broker.example.test\nWAGO_MQTT_PASSWORD=bad', 'user@broker.example.test'])(

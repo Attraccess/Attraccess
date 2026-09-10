@@ -129,6 +129,7 @@ export class PluginMigrationService {
 
     try {
       await PluginMigrationService.relaxBusyTimeout(dataSource);
+      await PluginMigrationService.adoptExistingMigrationHistory(dataSource, manifest, classes);
       const applied = await dataSource.runMigrations({ transaction: 'all' });
       if (applied.length > 0) {
         PluginMigrationService.logger.log(
@@ -141,6 +142,49 @@ export class PluginMigrationService {
     } finally {
       await dataSource.destroy();
     }
+  }
+
+  /**
+   * A plugin package can be renamed while retaining its schema and migration
+   * classes. Its migration ledger is named after the package, so adopt matching
+   * history from an earlier ledger before TypeORM attempts to replay it.
+   */
+  private static async adoptExistingMigrationHistory(
+    dataSource: DataSource,
+    manifest: LoadedPluginManifest,
+    migrations: PluginMigrationClass[],
+  ): Promise<void> {
+    if (dataSource.options.type !== 'sqlite') return;
+
+    const target = PluginMigrationService.migrationsTableName(manifest);
+    await dataSource.query(
+      `CREATE TABLE IF NOT EXISTS "${target}" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "timestamp" bigint NOT NULL, "name" varchar NOT NULL)`,
+    );
+    const executed = await dataSource.query(`SELECT "name" FROM "${target}"`);
+    if (executed.length > 0) return;
+
+    const migrationNames = migrations.map((migration) => new migration().name);
+    if (migrationNames.length === 0) return;
+    const tables = await dataSource.query(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'plugin_migrations_%'",
+    );
+    const placeholders = migrationNames.map(() => '?').join(', ');
+    const adopted = new Map<number, string>();
+    for (const { name } of tables as Array<{ name: string }>) {
+      if (name === target || !/^plugin_migrations_[a-zA-Z0-9_]+$/.test(name)) continue;
+      const rows = await dataSource.query(
+        `SELECT "timestamp", "name" FROM "${name}" WHERE "name" IN (${placeholders})`,
+        migrationNames,
+      );
+      for (const row of rows as Array<{ timestamp: number; name: string }>) adopted.set(row.timestamp, row.name);
+    }
+    for (const [timestamp, name] of adopted) {
+      await dataSource.query(`INSERT INTO "${target}" ("timestamp", "name") VALUES (?, ?)`, [timestamp, name]);
+    }
+    if (adopted.size > 0)
+      PluginMigrationService.logger.log(
+        `Adopted ${adopted.size} migration(s) for renamed plugin "${manifest.name}".`,
+      );
   }
 
   /**
