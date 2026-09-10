@@ -276,14 +276,36 @@ export class WagoService implements OnApplicationBootstrap, OnModuleDestroy {
     return this.drafts.findOneBy({ controllerId });
   }
 
+  async getConfigurationBaseline(controllerId: number): Promise<WagoConfigurationRevision | null> {
+    await this.claimedController(controllerId);
+    const [revision] = await this.revisions.find({
+      where: { controllerId, state: 'applied' },
+      order: { revision: 'DESC' },
+      take: 1,
+    });
+    return revision ?? null;
+  }
+
   async saveDraft(
     controllerId: number,
     snapshot: unknown,
     metadata?: ConfigurationEditorMetadata,
     principal?: PluginAuditPrincipal,
+    expectedDraft?: Pick<WagoConfigurationDraft, 'snapshot' | 'presetProvenance' | 'updatedAt'> | null,
   ): Promise<WagoConfigurationDraft> {
     return this.withConfigurationLock(controllerId, async () => {
       const previous = await this.getDraft(controllerId);
+      if (
+        expectedDraft !== undefined &&
+        (expectedDraft === null
+          ? previous !== null
+          : !previous ||
+            expectedDraft.snapshot !== previous.snapshot ||
+            expectedDraft.updatedAt !== previous.updatedAt ||
+            expectedDraft.presetProvenance !== previous.presetProvenance)
+      ) {
+        throw new ConflictException('Saved draft changed. Reload it before saving your edits.');
+      }
       const validatedMetadata = metadata === undefined ? undefined : editorMetadata(metadata);
       const previousMetadata = this.metadataFromProvenance(previous?.presetProvenance);
       const before = previous ? JSON.parse(previous.snapshot) : null;

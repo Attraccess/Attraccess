@@ -280,6 +280,9 @@ export class WagoControllerApi {
   @Get('controllers/:id/configuration/draft') draft(@Param('id', ParseIntPipe) id: number) {
     return this.wago.getDraft(id);
   }
+  @Get('controllers/:id/configuration/baseline') baseline(@Param('id', ParseIntPipe) id: number) {
+    return this.wago.getConfigurationBaseline(id);
+  }
   @Get('configuration/presets') presets() {
     return this.wago.presets();
   }
@@ -313,10 +316,15 @@ export class WagoControllerApi {
   }
   @Post('controllers/:id/configuration/draft') saveDraft(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { snapshot?: unknown; metadata?: ConfigurationEditorMetadata },
+    @Body()
+    body: {
+      snapshot?: unknown;
+      metadata?: ConfigurationEditorMetadata;
+      expectedDraft?: { snapshot: string; presetProvenance: string | null; updatedAt: string } | null;
+    },
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.wago.saveDraft(id, body?.snapshot, body?.metadata, wagoAuditPrincipal(request));
+    return this.wago.saveDraft(id, body?.snapshot, body?.metadata, wagoAuditPrincipal(request), body?.expectedDraft);
   }
   @Post('controllers/:id/configuration/validate') validateDraft(
     @Param('id', ParseIntPipe) id: number,

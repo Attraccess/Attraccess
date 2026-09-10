@@ -86,6 +86,7 @@ export interface WagoConfigurationDraft {
   presetProvenance: string | null;
   updatedAt: string;
 }
+export type DraftIdentity = Pick<WagoConfigurationDraft, 'snapshot' | 'presetProvenance' | 'updatedAt'>;
 export interface WagoPreset {
   id:
     | 'metered-switched-load'
@@ -121,6 +122,8 @@ export interface ConfigurationRevision {
   contentHash: string;
   state: 'pending' | 'published' | 'applied' | 'rejected';
   rejectionErrors: string | null;
+  rejectionAcknowledgedAt?: string | null;
+  rejectionAcknowledgedBy?: number | null;
   publishedAt: string;
   reportedAt: string | null;
 }
@@ -164,8 +167,19 @@ export const claimController = (id: number, input: ClaimControllerInput) =>
 export const createCommissioningSession = (input: CreateCommissioningSessionInput) =>
   api.request<CommissioningSession>('/commissioning/sessions', { method: 'POST', body: input });
 
-export const confirmCommissioningHostKey = (id: number, hostKeyFingerprint: string, physicalIdentityConfirmed = false) =>
-  api.request<CommissioningSession>(`/commissioning/sessions/${id}/confirm-host-key`, { method: 'POST', body: { hostKeyFingerprint, physicalIdentityConfirmed, trustMethod: physicalIdentityConfirmed ? 'isolated_service_connection' : 'trusted_inventory' } });
+export const confirmCommissioningHostKey = (
+  id: number,
+  hostKeyFingerprint: string,
+  physicalIdentityConfirmed = false,
+) =>
+  api.request<CommissioningSession>(`/commissioning/sessions/${id}/confirm-host-key`, {
+    method: 'POST',
+    body: {
+      hostKeyFingerprint,
+      physicalIdentityConfirmed,
+      trustMethod: physicalIdentityConfirmed ? 'isolated_service_connection' : 'trusted_inventory',
+    },
+  });
 
 export const listCommissioningSessions = (limit = 100, offset = 0) =>
   api.request<CommissioningSession[]>(`/commissioning/sessions?limit=${limit}&offset=${offset}`);
@@ -195,10 +209,8 @@ export const deliverCommissioningSession = (
   id: number,
   input: { confirmInstall: true; temporarySsh: { username: string; password: string } },
 ) => api.request<CommissioningSession>(`/commissioning/sessions/${id}/deliver`, { method: 'POST', body: input });
-export const recoverCommissioningSession = (
-  id: number,
-  input: Parameters<typeof deliverCommissioningSession>[1],
-) => api.request<CommissioningSession>(`/commissioning/sessions/${id}/recover`, { method: 'POST', body: input });
+export const recoverCommissioningSession = (id: number, input: Parameters<typeof deliverCommissioningSession>[1]) =>
+  api.request<CommissioningSession>(`/commissioning/sessions/${id}/recover`, { method: 'POST', body: input });
 export const revokeCommissioningSession = (id: number) =>
   api.request<CommissioningSession>(`/commissioning/sessions/${id}/revoke`, { method: 'POST' });
 export const removeCommissioningSession = (id: number) =>
@@ -207,16 +219,23 @@ export const removeController = (id: number) => api.request<void>(`/controllers/
 
 export const getDraft = (id: number) =>
   api.request<WagoConfigurationDraft | null>(`/controllers/${id}/configuration/draft`);
-export const saveDraft = (id: number, snapshot: unknown, metadata?: ConfigurationEditorMetadata) =>
+export const getConfigurationBaseline = (id: number) =>
+  api.request<(ConfigurationRevision & { snapshot: string }) | null>(`/controllers/${id}/configuration/baseline`);
+export const saveDraft = (
+  id: number,
+  snapshot: unknown,
+  metadata?: ConfigurationEditorMetadata,
+  expectedDraft?: DraftIdentity | null,
+) =>
   api.request<WagoConfigurationDraft>(`/controllers/${id}/configuration/draft`, {
     method: 'POST',
-    body: { snapshot, metadata },
+    body: { snapshot, metadata, expectedDraft },
   });
 export const listPresets = () => api.request<WagoPreset[]>('/configuration/presets');
-export const previewPreset = (id: number, application: WagoPresetApplication) =>
+export const previewPreset = (id: number, application: WagoPresetApplication, snapshot?: WagoConfigurationSnapshot) =>
   api.request<PresetPreview>(`/controllers/${id}/configuration/presets/preview`, {
     method: 'POST',
-    body: { application },
+    body: { application, snapshot },
   });
 export const applyPreset = (
   id: number,
@@ -248,7 +267,12 @@ export const listConfigurationRevisions = (id: number, offset: number) =>
   );
 export const previewConfigurationRevision = (id: number, revision: number) =>
   api.request<RevisionPreview>(`/controllers/${id}/configuration/revisions/${revision}/preview`);
-export const acknowledgeConfigurationRejection = (id: number, revision: number, contentHash: string, reportedAt: string) =>
+export const acknowledgeConfigurationRejection = (
+  id: number,
+  revision: number,
+  contentHash: string,
+  reportedAt: string,
+) =>
   api.request<ConfigurationRevision>(`/controllers/${id}/configuration/revisions/${revision}/acknowledge-rejection`, {
     method: 'POST',
     body: { contentHash, reportedAt },

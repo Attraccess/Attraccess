@@ -1,3 +1,4 @@
+import { randomUUID } from './configuration-id';
 import { BUILTIN_MODBUS_PROFILES } from '../../modbus/model';
 import type { ConfigurationDiff, ConfigurationEditorMetadata, WagoConfigurationSnapshot } from './api';
 import { availableDigitalTerminals, digitalTerminalLabel } from '../../backend/configuration-digital';
@@ -44,7 +45,7 @@ export function readMetadata(provenance: string | null): ConfigurationEditorMeta
 export function addDigitalChannel(
   snapshot: WagoConfigurationSnapshot,
   direction: 'input' | 'output',
-  newId: () => string = () => crypto.randomUUID(),
+  newId: () => string = () => randomUUID(),
 ): { snapshot: WagoConfigurationSnapshot; channel: Channel; point: PhysicalPoint } {
   const terminal = availableDigitalTerminals(snapshot, direction)[0];
   if (!terminal) throw new Error(`All digital ${direction} terminals are assigned.`);
@@ -122,6 +123,25 @@ const fieldLabels: Record<string, string> = {
   channel: 'Physical terminal',
   profile: 'Preset profile',
   capabilities: 'Capabilities',
+  disconnectPolicy: 'On disconnect',
+  mode: 'Mode',
+  timeoutMs: 'Timeout (ms)',
+  durationMs: 'Duration (ms)',
+  channelId: 'Channel',
+  presetId: 'Preset',
+  pulse: 'Pulse',
+  guard: 'Guard',
+  feedback: 'Feedback',
+  measurement: 'Measurement',
+  range: 'Expected range',
+  minimum: 'Minimum',
+  maximum: 'Maximum',
+  when: 'When',
+  expected: 'Expected state',
+  unit: 'Unit',
+  scale: 'Scale',
+  offset: 'Offset',
+  kind: 'Measurement kind',
   'disconnectPolicy.mode': 'On disconnect',
   'disconnectPolicy.timeoutMs': 'Watchdog timeout',
   'pulse.durationMs': 'Pulse duration',
