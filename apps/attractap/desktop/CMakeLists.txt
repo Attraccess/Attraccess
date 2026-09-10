@@ -67,7 +67,7 @@ list(FILTER ATTRACTAP_FIRMWARE_SOURCES EXCLUDE REGEX "/utils\\.cpp$")
 set(ATTRACTAP_IMAGE_DIR "${FIRMWARE_DIR}/src/display/images")
 configure_file("${ATTRACTAP_IMAGE_DIR}/logos.S.in" "${CMAKE_CURRENT_BINARY_DIR}/logos.S" @ONLY)
 set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/logos.S" PROPERTIES
-    OBJECT_DEPENDS "${ATTRACTAP_IMAGE_DIR}/logo_133x40.rgb565a8;${ATTRACTAP_IMAGE_DIR}/logo_400x120.rgb565a8")
+    OBJECT_DEPENDS "${ATTRACTAP_IMAGE_DIR}/logo_133x40.rgb565a8;${ATTRACTAP_IMAGE_DIR}/logo_400x120.rgb565a8;${ATTRACTAP_IMAGE_DIR}/lockscreen.rgb565")
 
 add_library(attractap-production-host
     ${ATTRACTAP_FIRMWARE_SOURCES}

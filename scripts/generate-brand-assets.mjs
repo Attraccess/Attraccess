@@ -108,6 +108,27 @@ for (const [width, height] of [
   assets.set(`apps/attractap/firmware/src/display/images/logo_${width}x${height}.rgb565a8`, image);
 }
 
+// Bottom-left square keeps the raccoon reaching toward the rings together.
+// Keep a PNG preview alongside the source; LVGL consumes the opaque RGB565 bytes.
+const wallpaper = await read('apps/frontend/public/login-wallpaper-RAL5020.png');
+const wallpaperMetadata = await sharp(wallpaper).metadata();
+const cropSize = Math.min(wallpaperMetadata.width, wallpaperMetadata.height);
+const squareWallpaper = await sharp(wallpaper)
+  .extract({ left: 0, top: wallpaperMetadata.height - cropSize, width: cropSize, height: cropSize })
+  .resize(480, 480)
+  .png(pngOptions)
+  .toBuffer();
+assets.set('apps/frontend/public/login-wallpaper-RAL5020-480.png', squareWallpaper);
+const wallpaperRgb = await sharp(squareWallpaper).removeAlpha().raw().toBuffer();
+const wallpaper565 = Buffer.alloc(480 * 480 * 2);
+for (let pixel = 0; pixel < 480 * 480; pixel++) {
+  const offset = pixel * 3;
+  const value =
+    ((wallpaperRgb[offset] >> 3) << 11) | ((wallpaperRgb[offset + 1] >> 2) << 5) | (wallpaperRgb[offset + 2] >> 3);
+  wallpaper565.writeUInt16LE(value, pixel * 2);
+}
+assets.set('apps/attractap/firmware/src/display/images/lockscreen.rgb565', wallpaper565);
+
 for (const [input, output, width, height] of [
   [original, logo, 150, 300],
   [embed(original), apiLogo, 400, 120],

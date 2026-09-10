@@ -1,7 +1,7 @@
 #pragma once
 #include <lvgl.h>
 
-// Original pre-brand-refresh artwork, embedded once as word-aligned RGB565.
+// Bottom-left crop of the RAL5020 login wallpaper, embedded once as aligned RGB565.
 extern const uint8_t lockscreen_map[] asm("_binary_lockscreen_rgb565_start");
 
 inline const lv_image_dsc_t lockscreen_background_image = {

@@ -75,9 +75,11 @@ run `node scripts/generate-brand-assets.mjs` to regenerate the 133 x 40 and
 verify them without writing files. They contain a little-endian RGB565 color
 plane followed by an A8 alpha plane. ESP-IDF embeds these binary assets only
 for display variants; the small image-descriptor headers are handwritten.
-The lockscreen, resource list and no-resources screens also use the original
-480 x 480 background artwork, restored byte-for-byte from the parent of branding
-commit `0f9e8987`. `lockscreen.rgb565` is a 460,800-byte little-endian RGB565
+The lockscreen, resource list and no-resources screens use a bottom-left square
+crop of `apps/frontend/public/login-wallpaper-RAL5020.png`, preserving the raccoon
+and the rings. The same brand generator produces a 480 x 480 PNG preview at
+`apps/frontend/public/login-wallpaper-RAL5020-480.png` and the firmware asset.
+`lockscreen.rgb565` is a 460,800-byte little-endian RGB565
 asset shared by those screens, embedded once with four-byte alignment through
 `logos.S.in`. No generated C++ pixel arrays are needed.
 
