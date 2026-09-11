@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   X,
   Settings,
@@ -10,6 +10,9 @@ import {
   PuzzleIcon,
   PanelLeftClose,
   PanelLeftOpen,
+  Moon,
+  Sun,
+  Monitor,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -41,7 +44,7 @@ import { SidebarItem, SidebarItemGroup, useSidebarItems, useSidebarEndItems } fr
 import { NavLink as RouterNavLink, useNavigate } from 'react-router-dom';
 import usePluginState from '../plugins/plugin.state';
 import type { PluginSidebarItem } from '@attraccess/plugins-frontend-sdk';
-import { ThemeToggle } from '../../components/themeToggle';
+import { useAppTheme } from '@attraccess/ui';
 
 interface NavLinkProps {
   href: string;
@@ -162,6 +165,22 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
     de,
   });
   const navigate = useNavigate();
+  const { theme, setTheme } = useAppTheme();
+  const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+  const keepSettingsMenuOpen = useRef(false);
+
+  const cycleTheme = () => {
+    keepSettingsMenuOpen.current = true;
+    setTheme(theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light');
+    window.requestAnimationFrame(() => {
+      keepSettingsMenuOpen.current = false;
+    });
+  };
+
+  const handleSettingsMenuOpenChange = (isOpen: boolean) => {
+    if (!isOpen && keepSettingsMenuOpen.current) return;
+    setIsSettingsMenuOpen(isOpen);
+  };
 
   const routes = useAllRoutes();
   const sidebarItems = useSidebarItems();
@@ -462,7 +481,6 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
 
         {/* User section at bottom */}
         <div className={isCollapsed ? 'p-2' : 'p-4'}>
-          <ThemeToggle showLabel={!isCollapsed} className={cn('mb-2', !isCollapsed && 'w-full justify-start')} />
           {user && (
             <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
               {!isCollapsed && (
@@ -471,7 +489,11 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
                   <span>{user.username}</span>
                 </div>
               )}
-              <Dropdown data-cy="sidebar-settings-dropdown">
+              <Dropdown
+                data-cy="sidebar-settings-dropdown"
+                isOpen={isSettingsMenuOpen}
+                onOpenChange={handleSettingsMenuOpenChange}
+              >
                 <DropdownTrigger
                   // Not "Settings": that name now belongs to the nav entry two rows up. This menu
                   // is language, account and logout.
@@ -513,6 +535,21 @@ export function Sidebar({ isOpen, toggleSidebar, isCollapsed, toggleCollapsed }:
                     >
                       <User className="h-4 w-4" />
                       {t('account')}
+                    </DropdownItem>
+                    <DropdownItem
+                      key="theme"
+                      id="theme"
+                      onPress={cycleTheme}
+                      data-cy="sidebar-theme-toggle"
+                    >
+                      {theme === 'light' ? (
+                        <Sun className="h-4 w-4" />
+                      ) : theme === 'dark' ? (
+                        <Moon className="h-4 w-4" />
+                      ) : (
+                        <Monitor className="h-4 w-4" />
+                      )}
+                      {t('design', { variant: t(`designVariants.${theme}`) })}
                     </DropdownItem>
                     <DropdownItem key="logout" id="logout" onPress={() => logout()} data-cy="sidebar-logout-button">
                       <LogOut />

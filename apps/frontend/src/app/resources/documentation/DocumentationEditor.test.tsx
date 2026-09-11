@@ -38,7 +38,10 @@ describe('DocumentationEditor', () => {
 
     // regression: HeroUI v3 only wires up a radio when Radio.Control sits inside Radio.Content —
     // without Control there is no input at all, and with Control as a sibling the circle is dead
-    await userEvent.click(urlRadio.closest('[data-slot="radio"]')!.querySelector('[data-slot="radio-control"]')!);
+    const radio = urlRadio.closest('[data-slot="radio"]');
+    const radioControl = radio?.querySelector('[data-slot="radio-control"]');
+    if (!radioControl) throw new Error('Expected URL radio control');
+    await userEvent.click(radioControl);
 
     expect(urlRadio).toBeChecked();
     expect(screen.getByLabelText('urlContent.label')).toBeInTheDocument();

@@ -28,7 +28,6 @@ import { AttraccessUserActionsBridge } from '../components/attraccessUserActions
 import { SupervisorApprovalListener } from '../components/supervisorApproval/SupervisorApprovalListener';
 import { KioskGuard } from './kiosk/KioskGuard';
 import { useLocaleSync } from '../hooks/useLocaleSync';
-import usePluginState from './plugins/plugin.state';
 import { NotFound } from './not-found';
 import { ThemeToggle } from '../components/themeToggle';
 
