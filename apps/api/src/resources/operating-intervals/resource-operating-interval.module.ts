@@ -4,9 +4,10 @@ import { ResourceOperatingInterval, ResourceUsage } from '@attraccess/database-e
 import { ResourceOperatingAttributionController } from './resource-operating-attribution.controller';
 import { ResourceOperatingAttributionService } from './resource-operating-attribution.service';
 import { ResourceOperatingIntervalService } from './resource-operating-interval.service';
+import { ResourceMaintenanceModule } from '../maintenances/maintenance.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ResourceOperatingInterval, ResourceUsage])],
+  imports: [TypeOrmModule.forFeature([ResourceOperatingInterval, ResourceUsage]), ResourceMaintenanceModule],
   controllers: [ResourceOperatingAttributionController],
   providers: [ResourceOperatingIntervalService, ResourceOperatingAttributionService],
   exports: [ResourceOperatingIntervalService, ResourceOperatingAttributionService],

@@ -1,0 +1,10 @@
+{
+  "title": "Operating duration",
+  "session": "Total session time",
+  "operating": "Machine running time",
+  "unattributedOperating": "Running outside a session",
+  "running": "Machine is currently running",
+  "idle": "Machine is currently idle",
+  "provisional": "Live values are provisional.",
+  "unavailable": "No operating interval source is available for this resource."
+}

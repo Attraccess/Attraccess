@@ -8,92 +8,120 @@ interface Props<TPacket> {
   enabled?: boolean;
 }
 
+type Subscriber = (data: unknown) => void;
+
+interface SseConnection {
+  abortController: AbortController;
+}
+
+const connections = new Map<string, SseConnection>();
+const subscribers = new Map<string, Set<Subscriber>>();
+
+async function consume(url: string, connection: SseConnection) {
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+      signal: connection.abortController.signal,
+    });
+
+    if (!res.ok) {
+      // A 401 is expected while a previously authenticated app is logging out.
+      if (res.status === 401) {
+        return;
+      }
+      throw new Error(`Failed to connect to SSE: ${res.status} ${res.statusText}`);
+    }
+
+    for await (const event of events(res, connection.abortController.signal)) {
+      try {
+        const nextPacket = JSON.parse(event.data as string);
+
+        if (nextPacket.keepalive) {
+          continue;
+        }
+
+        subscribers.get(url)?.forEach((subscriber) => {
+          try {
+            subscriber(nextPacket);
+          } catch (subscriberError) {
+            console.error('[SSE] Subscriber error:', subscriberError);
+          }
+        });
+      } catch (parseError) {
+        console.error('[FlowContext] Error parsing event data:', parseError, event);
+      }
+    }
+  } catch (error) {
+    // Abort errors are expected when the last subscriber unmounts.
+    if (error instanceof Error && error.name !== 'AbortError' && !error.message.includes('401')) {
+      console.error('[SSE] Connection error:', error);
+    }
+  } finally {
+    if (connections.get(url) === connection) {
+      connections.delete(url);
+    }
+  }
+}
+
+function subscribe(url: string, subscriber: Subscriber): () => void {
+  let subscriberSet = subscribers.get(url);
+
+  if (!subscriberSet) {
+    subscriberSet = new Set();
+    subscribers.set(url, subscriberSet);
+  }
+
+  let connection = connections.get(url);
+
+  if (!connection) {
+    connection = {
+      abortController: new AbortController(),
+    };
+    connections.set(url, connection);
+    void consume(url, connection);
+  }
+
+  subscriberSet.add(subscriber);
+
+  return () => {
+    subscriberSet.delete(subscriber);
+
+    if (subscriberSet.size === 0 && subscribers.get(url) === subscriberSet) {
+      const activeConnection = connections.get(url);
+      subscribers.delete(url);
+      connections.delete(url);
+      activeConnection?.abortController.abort();
+    }
+  };
+}
+
 export function useSSE<TPacket>(props: Props<TPacket>) {
   const { path, onUpdate, enabled = true } = props;
 
-  const abortController = useRef<AbortController | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   // Use a ref so onUpdate changes don't force reconnects
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
 
-  const connect = useCallback(async () => {
-    if (!enabled) {
-      return;
-    }
-
-    const url = `${getBaseUrl()}${path}`;
-
-    if (abortController.current) {
-      abortController.current.abort();
-    }
-    abortController.current = new AbortController();
-
-    try {
-      const res = await fetch(url, {
-        method: 'GET',
-        credentials: 'include', // Include cookies for authentication
-        signal: abortController.current.signal,
-      });
-
-      if (!res.ok) {
-        // Silently handle 401 errors - user is not authenticated, which is expected on some pages
-        if (res.status === 401) {
-          return;
-        }
-        throw new Error(`Failed to connect to SSE: ${res.status} ${res.statusText}`);
-      }
-
-      const stream = events(res, abortController.current.signal);
-
-      for await (const event of stream) {
-        try {
-          const nextPacket = JSON.parse(event.data as string);
-
-          if (nextPacket.keepalive) {
-            continue;
-          }
-
-          onUpdateRef.current(nextPacket);
-        } catch (parseError) {
-          console.error('[FlowContext] Error parsing event data:', parseError, event);
-        }
-      }
-    } catch (error) {
-      // Only log non-401 errors and abort errors (which are expected when component unmounts)
-      if (error instanceof Error && error.name !== 'AbortError' && !error.message.includes('401')) {
-        console.error('[SSE] Connection error:', error);
-      }
-    }
-  }, [path, enabled]); // onUpdate removed: always reads latest via ref
-
   useEffect(() => {
     if (!enabled) {
-      if (abortController.current) {
-        abortController.current.abort();
-        abortController.current = null;
-      }
       return;
     }
 
-    if (!abortController.current) {
-      connect();
-    }
+    const unsubscribe = subscribe(`${getBaseUrl()}${path}`, (data) => onUpdateRef.current(data as TPacket));
+    unsubscribeRef.current = unsubscribe;
 
     return () => {
-      if (abortController.current) {
-        abortController.current.abort();
-        abortController.current = null;
+      unsubscribe();
+      if (unsubscribeRef.current === unsubscribe) {
+        unsubscribeRef.current = null;
       }
     };
-  }, [connect, enabled]);
+  }, [path, enabled]);
 
   return {
-    abort: () => {
-      if (abortController.current) {
-        abortController.current.abort();
-        abortController.current = null;
-      }
-    },
+    abort: useCallback(() => unsubscribeRef.current?.(), []),
   };
 }

@@ -260,7 +260,7 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/csv-export',
     element: <CsvExport />,
-    authRequired: 'billing.manage',
+    authRequired: ['billing.manage', 'resources.reports.export'],
   },
   {
     path: '/billing/administration/sumup',

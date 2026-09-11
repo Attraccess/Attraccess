@@ -13,9 +13,16 @@
     "endTime": "Endzeit",
     "usageInMinutes": "Nutzung in Minuten",
     "usageInHours": "Nutzung in Stunden",
+    "sessionDurationMs": "Exakte Sitzungsdauer (ms)",
+    "operatingDurationMs": "Betriebsdauer (ms, Sitzung)",
+    "durationStatus": "Status der Betriebsdaten",
     "startNotes": "Start-Notizen",
     "endNotes": "End-Notizen",
     "supervisorId": "Aufsicht-ID",
     "supervisorUsername": "Aufsicht-Name"
+  },
+  "status": {
+    "provisional": "Vorläufig",
+    "unavailable": "Nicht verfügbar"
   }
 }

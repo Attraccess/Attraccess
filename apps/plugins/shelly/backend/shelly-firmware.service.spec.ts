@@ -1,7 +1,5 @@
-// eslint-disable-next-line @nx/enforce-module-boundaries -- test covers host behavior against plugin firmware integration.
-import { ShellyFirmwareService } from '../../../plugins/shelly/backend/shelly-firmware.service';
-// eslint-disable-next-line @nx/enforce-module-boundaries -- test covers host behavior against plugin firmware integration.
-import { ShellyHttpClient } from '../../../plugins/shelly/backend/shelly-http.client';
+import { ShellyFirmwareService } from './shelly-firmware.service';
+import { ShellyHttpClient } from './shelly-http.client';
 
 describe('ShellyFirmwareService (ATT-501)', () => {
   const fetchMock = jest.fn();

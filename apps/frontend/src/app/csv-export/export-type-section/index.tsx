@@ -5,6 +5,7 @@ import { FileSpreadsheetIcon } from 'lucide-react';
 import { useLicenseServiceGetLicenseInformation } from '@attraccess/react-query-client';
 import { ResourceUsageCard } from './resource-usage-card';
 import { BillingTransactionsCard } from './billing-transactions-card';
+import { useAuth } from '../../../hooks/useAuth';
 
 export type ExportTypeKey = 'resourceUsageHours' | 'billingTransactions';
 
@@ -17,6 +18,7 @@ interface Props {
 export function ExportTypeSection(props: Props) {
   const { range, onOpen, t } = props;
   const { data: license } = useLicenseServiceGetLicenseInformation();
+  const { hasPermission } = useAuth();
 
   return (
     <Card>
@@ -32,8 +34,10 @@ export function ExportTypeSection(props: Props) {
       </Card.Header>
       <Card.Content>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ResourceUsageCard range={range} onPress={() => onOpen('resourceUsageHours')} t={t} />
-          {license?.modules.includes('billing') && (
+          {hasPermission('resources.reports.export') && (
+            <ResourceUsageCard range={range} onPress={() => onOpen('resourceUsageHours')} t={t} />
+          )}
+          {license?.modules.includes('billing') && hasPermission('billing.manage') && (
             <BillingTransactionsCard range={range} onPress={() => onOpen('billingTransactions')} t={t} />
           )}
         </div>

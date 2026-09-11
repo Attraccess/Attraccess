@@ -19,6 +19,12 @@
           "label": "Manage Resource Maintenance",
           "description": "Allows managing resource maintenance schedules and requests"
         }
+      },
+      "reports": {
+        "export": {
+          "label": "Export Resource Reports",
+          "description": "Allows exporting resource session and operating duration reports"
+        }
       }
     },
     "users": {

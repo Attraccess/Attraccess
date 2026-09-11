@@ -1,10 +1,29 @@
-import { ResourceUsage, useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite } from '@attraccess/react-query-client';
+import {
+  ResourceUsage,
+  useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite,
+} from '@attraccess/react-query-client';
 import { ExportProps } from '../export-props';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDateTimeFormatter, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './de.json';
 import en from './en.json';
 import { CsvExportDrawerContent, ColumnDefinition } from '../export-drawer';
+import { useQuery } from '@tanstack/react-query';
+import { getBaseUrl } from '../../../api';
+import {
+  attributedDurationByResourceAndUsage,
+  mergeOperatingDurationSummaries,
+  operatingDurationWindows,
+  type OperatingDurationSummary,
+} from './operating-duration';
+
+const RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST = 100;
+
+function durationMsForSession(item: ResourceUsage, asOf: Date): number {
+  const now = new Date();
+  const end = Math.min(new Date(item.endTime ?? now).getTime(), asOf.getTime(), now.getTime());
+  return end - new Date(item.startTime).getTime();
+}
 
 export function ResourceUsageExport(props: ExportProps) {
   const { t } = useTranslations({
@@ -14,17 +33,11 @@ export function ResourceUsageExport(props: ExportProps) {
 
   const [fetchAll, setFetchAll] = useState(false);
 
-  const {
-    data,
-    status,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    refetch,
-  } = useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite({
-    start: props.start.toISOString(),
-    end: props.end.toISOString(),
-  });
+  const { data, status, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } =
+    useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite({
+      start: props.start.toISOString(),
+      end: props.end.toISOString(),
+    });
 
   // ponytail: only fetch remaining pages after user clicks export
   useEffect(() => {
@@ -33,13 +46,48 @@ export function ResourceUsageExport(props: ExportProps) {
     }
   }, [fetchAll, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const resourceUsageExport = useMemo(
-    () => data?.pages.flatMap((page) => page.data) ?? [],
-    [data],
-  );
+  const resourceUsageExport = useMemo(() => data?.pages.flatMap((page) => page.data) ?? [], [data]);
 
   const isFetchingAllPages = fetchAll && (hasNextPage || isFetchingNextPage);
   const fetchStatus = status === 'success' && isFetchingAllPages ? 'pending' : status;
+
+  const resourceIds = useMemo(
+    () => [...new Set(resourceUsageExport.map((usage) => usage.resourceId))],
+    [resourceUsageExport],
+  );
+  const operatingDurationRanges = useMemo(
+    () => operatingDurationWindows(props.start, props.end),
+    [props.start, props.end],
+  );
+  const { data: operatingDurations, status: operatingDurationsStatus } = useQuery({
+    queryKey: ['resource-operating-durations', resourceIds, props.start, props.end],
+    queryFn: async ({ signal }) => {
+      const operatingDurations: Record<number, OperatingDurationSummary> = {};
+      for (let index = 0; index < resourceIds.length; index += RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST) {
+        for (const range of operatingDurationRanges) {
+          const response = await fetch(`${getBaseUrl()}/api/analytics/resource-operating-durations`, {
+            method: 'POST',
+            credentials: 'include',
+            signal,
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              resourceIds: resourceIds.slice(index, index + RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST),
+              start: range.start.toISOString(),
+              end: range.end.toISOString(),
+            }),
+          });
+          if (!response.ok) throw new Error('Failed to load operating durations');
+          mergeOperatingDurationSummaries(operatingDurations, await response.json());
+        }
+      }
+      return operatingDurations;
+    },
+    enabled: resourceIds.length > 0 && !isFetchingAllPages,
+  });
+  const attributedDurations = useMemo(
+    () => attributedDurationByResourceAndUsage(operatingDurations),
+    [operatingDurations],
+  );
 
   const formatDateTimeFull = useDateTimeFormatter({ showDate: true, showTime: true, showSeconds: true });
   const formatUsageDuration = useNumberFormatter();
@@ -123,6 +171,31 @@ export function ResourceUsageExport(props: ExportProps) {
         selectedByDefault: true,
       },
       {
+        label: t('columns.sessionDurationMs'),
+        key: 'sessionDurationMs',
+        getter: (item) => durationMsForSession(item, props.end),
+        selectedByDefault: true,
+      },
+      {
+        label: t('columns.operatingDurationMs'),
+        key: 'operatingDurationMs',
+        getter: (item) =>
+          operatingDurations?.[item.resourceId]?.operatingDataAvailable
+            ? attributedDurations.get(item.resourceId)?.get(item.id) ?? 0
+            : '',
+        selectedByDefault: true,
+      },
+      {
+        label: t('columns.durationStatus'),
+        key: 'durationStatus',
+        getter: (item) => {
+          const duration = operatingDurations?.[item.resourceId];
+          if (!duration?.operatingDataAvailable) return t('status.unavailable');
+          return duration.isProvisional ? t('status.provisional') : '';
+        },
+        selectedByDefault: true,
+      },
+      {
         label: t('columns.startNotes'),
         key: 'startNotes',
         getter: (item) => item.startNotes ?? '',
@@ -143,7 +216,7 @@ export function ResourceUsageExport(props: ExportProps) {
         getter: (item) => item.supervisorUser?.username ?? '',
       },
     ] as ColumnDefinition<ResourceUsage>[];
-  }, [formatUsageDuration, formatDateTimeFull, t]);
+  }, [attributedDurations, formatUsageDuration, formatDateTimeFull, operatingDurations, props.end, t]);
 
   // TODO: handle grouping by user and resource
 
@@ -155,7 +228,9 @@ export function ResourceUsageExport(props: ExportProps) {
       options={options}
       setOption={setOption}
       filename="resource-usage.csv"
-      queryStatus={fetchStatus}
+      queryStatus={
+        fetchStatus !== 'success' ? fetchStatus : resourceIds.length > 0 ? operatingDurationsStatus : fetchStatus
+      }
       onFetchAllPages={() => setFetchAll(true)}
       isFetchingAllPages={isFetchingAllPages}
     />

@@ -8,6 +8,7 @@
       "startTime": "Startzeit",
       "endTime": "Endzeit",
       "duration": "Dauer",
+      "operatingDuration": "Maschinenlaufzeit",
       "project": "Projekt",
       "supervisor": "Aufsicht"
     },
