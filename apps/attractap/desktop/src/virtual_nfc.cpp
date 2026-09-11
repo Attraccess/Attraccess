@@ -81,7 +81,7 @@ void VirtualNfc::setCard(size_t index, const Card &card)
         if (cardDetectionEnabled && cardRemovedCallback)
             cardRemovedCallback(0);
     }
-    if (!cards[index].present)
+    if (wasPresented && !cards[index].present)
         presentedCard = CardCount;
     reconcileCardPresence();
 }
