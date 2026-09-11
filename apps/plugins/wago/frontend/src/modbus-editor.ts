@@ -1,3 +1,4 @@
+import { randomUUID } from './configuration-id';
 import { findProfile, type ModbusConfiguration, type ModbusPoint } from '../../modbus/model';
 import type { Channel, PhysicalPoint } from './configuration-model';
 import type { WagoConfigurationSnapshot } from './api';
@@ -56,13 +57,13 @@ export function bindModbusPoint(snapshot: WagoConfigurationSnapshot, pointId: st
 
 export function addModbusChannel(snapshot: WagoConfigurationSnapshot, binding: ModbusPoint) {
   const point: PhysicalPoint = {
-    id: `point-${crypto.randomUUID()}`,
+    id: `point-${randomUUID()}`,
     hardwareProfile: 'modbus',
     channel: 0,
     modbus: binding,
   };
   const channel: Channel = {
-    id: `channel-${crypto.randomUUID()}`,
+    id: `channel-${randomUUID()}`,
     physicalPointId: point.id,
     profile: 'generic-monitored-input',
     capabilities: ['input'],

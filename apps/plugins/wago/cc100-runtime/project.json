@@ -11,6 +11,7 @@
       "options": { "command": "node apps/plugins/wago/cc100-runtime/integration/run.mjs" }
     },
     "build": {
+      "inputs": ["default", "{projectRoot}/../channel-behavior.ts"],
       "executor": "@nx/esbuild:esbuild",
       "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-runtime"],
       "options": {
@@ -26,6 +27,7 @@
       }
     },
     "build-simulator": {
+      "inputs": ["default", "{projectRoot}/../channel-behavior.ts"],
       "executor": "@nx/esbuild:esbuild",
       "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-simulator"],
       "options": {
@@ -41,6 +43,7 @@
       }
     },
     "test": {
+      "inputs": ["default", "{projectRoot}/../channel-behavior.ts"],
       "executor": "@nx/jest:jest",
       "options": { "jestConfig": "apps/plugins/wago/cc100-runtime/jest.config.ts" }
     },
@@ -52,6 +55,7 @@
       }
     },
     "typecheck": {
+      "inputs": ["default", "{projectRoot}/../channel-behavior.ts"],
       "executor": "nx:run-commands",
       "options": { "cwd": "apps/plugins/wago/cc100-runtime", "command": "tsc --noEmit -p tsconfig.json" }
     }

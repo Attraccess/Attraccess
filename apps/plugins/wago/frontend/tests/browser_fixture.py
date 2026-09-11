@@ -96,6 +96,8 @@ class WagoFixture:
         elif path == "/api/wago/configuration/presets":
             reply([{"id": "generic-digital-output", "name": "Generic digital output", "description": "A conservative output foundation."},
                    {"id": "pulsed-lock-bank", "name": "Pulsed lock bank", "description": "Pulses an output briefly and returns it to off immediately when disconnected."}])
+        elif suffix == "baseline":
+            reply(next((r for r in self.revisions if r["state"] == "applied"), None))
         elif suffix == "draft":
             if request.method == "POST":
                 self.draft = {"controllerId": 91058, "snapshot": json.dumps(body["snapshot"]),

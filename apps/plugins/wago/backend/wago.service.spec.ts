@@ -195,7 +195,7 @@ describe('WagoService', () => {
         revision: 3,
         state: 'applied',
         snapshot: JSON.stringify({
-          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'] }],
+          logicalChannels: [{ id: 'pump', capabilities: ['output'] }],
         }),
       },
     ]);
@@ -297,7 +297,7 @@ describe('WagoService', () => {
         revision: 3,
         state: 'applied',
         snapshot: JSON.stringify({
-          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'] }],
+          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'], pulse: { durationMs: 500 } }],
         }),
       },
     ]);
@@ -322,7 +322,7 @@ describe('WagoService', () => {
         revision: 3,
         state: 'applied',
         snapshot: JSON.stringify({
-          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'] }],
+          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'], pulse: { durationMs: 500 } }],
         }),
       },
     ]);
@@ -358,7 +358,7 @@ describe('WagoService', () => {
         revision: 3,
         state: 'applied',
         snapshot: JSON.stringify({
-          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'] }],
+          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'], pulse: { durationMs: 500 } }],
         }),
       },
     ]);
@@ -1404,5 +1404,44 @@ describe('WagoService', () => {
 
     expect(revoke).not.toHaveBeenCalled();
     expect(enrollmentRepository.save).toHaveBeenCalledWith(expect.objectContaining({ consumedAt: expect.any(String) }));
+  });
+  it('starts the editor from the last applied revision without creating a draft', async () => {
+    const { service, revisionRepository, draftRepository } = createService([
+      { ...controller(), trustState: 'claimed' },
+    ]);
+    const revision = {
+      revision: 4,
+      state: 'applied',
+      snapshot: '{"version":1,"physicalPoints":[],"logicalChannels":[]}',
+    };
+    revisionRepository.find.mockResolvedValue([revision]);
+    expect(await service.getConfigurationBaseline(1)).toBe(revision);
+    expect(revisionRepository.find).toHaveBeenCalledWith({
+      where: { controllerId: 1, state: 'applied' },
+      order: { revision: 'DESC' },
+      take: 1,
+    });
+    expect(draftRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('rejects stale editor saves inside the configuration lock, including metadata-only changes', async () => {
+    const { service, draftRepository } = createService([{ ...controller(), trustState: 'claimed' }]);
+    const snapshot = { version: 1, physicalPoints: [], logicalChannels: [] };
+    const previous = {
+      controllerId: 1,
+      snapshot: JSON.stringify(snapshot),
+      updatedAt: 'same-timestamp',
+      presetProvenance: '{"editor":{"names":{},"presets":[]}}',
+    };
+    draftRepository.findOneBy.mockResolvedValue(previous);
+    await expect(service.saveDraft(1, snapshot, undefined, undefined, null)).rejects.toThrow('Saved draft changed');
+    await expect(
+      service.saveDraft(1, snapshot, undefined, undefined, { ...previous, presetProvenance: null }),
+    ).rejects.toThrow('Saved draft changed');
+    expect(draftRepository.save).not.toHaveBeenCalled();
+    expect(JSON.parse((await service.saveDraft(1, snapshot, undefined, undefined, previous)).snapshot)).toEqual(
+      snapshot,
+    );
+    expect(draftRepository.save).toHaveBeenCalledTimes(1);
   });
 });

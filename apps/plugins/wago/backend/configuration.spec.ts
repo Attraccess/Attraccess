@@ -6,8 +6,56 @@ import {
   parseConfigurationReport,
   validateSnapshot,
 } from './configuration';
+// eslint-disable-next-line @nx/enforce-module-boundaries
+import { validateSnapshot as validateRuntimeSnapshot } from '../cc100-runtime/src/configuration';
 
 describe('WAGO configuration snapshots', () => {
+  it.each([
+    { capabilities: ['output', 'pulse'] },
+    { capabilities: ['output'], pulse: { durationMs: 500 } },
+    { capabilities: ['input', 'pulse'], pulse: { durationMs: 500 } },
+    { capabilities: ['output', 'pulse'], pulse: { durationMs: 0 } },
+    { capabilities: ['output', 'pulse'], pulse: null },
+  ])('rejects inconsistent pulse behavior in API and runtime: %j', (behavior) => {
+    const snapshot = {
+      version: 1,
+      physicalPoints: [{ id: 'point', hardwareProfile: '751-9301', channel: 0 }],
+      logicalChannels: [
+        {
+          id: 'output',
+          physicalPointId: 'point',
+          profile: 'generic-digital-output',
+          disconnectPolicy: { mode: 'immediate' },
+          ...behavior,
+        },
+      ],
+    };
+    for (const validate of [validateSnapshot, validateRuntimeSnapshot]) {
+      expect(validate(snapshot)).toContainEqual(expect.objectContaining({ code: 'invalid_pulse' }));
+    }
+  });
+
+  it.each(['pulsed-lock-bank', 'guarded-enable-request', 'metered-switched-load'])(
+    'treats %s as a setup preset that can be customized to switched behavior',
+    (profile) => {
+      const snapshot = {
+        version: 1,
+        physicalPoints: [{ id: 'point', hardwareProfile: '751-9301', channel: 0 }],
+        logicalChannels: [
+          {
+            id: 'output',
+            physicalPointId: 'point',
+            profile,
+            capabilities: ['output'],
+            disconnectPolicy: { mode: 'immediate' },
+          },
+        ],
+      };
+      expect(validateSnapshot(snapshot)).toEqual([]);
+      expect(validateRuntimeSnapshot(snapshot)).toEqual([]);
+    },
+  );
+
   it('hashes equivalent snapshots identically regardless of object key order', () => {
     expect(configurationHash({ version: 1, physicalPoints: [], logicalChannels: [] })).toBe(
       configurationHash({ logicalChannels: [], physicalPoints: [], version: 1 }),

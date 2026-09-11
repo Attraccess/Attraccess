@@ -5,6 +5,8 @@ import { commandTopic } from './protocol';
 import { WagoController } from './wago-controller.entity';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
 import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
+import { outputBehavior, supportsOutputAction } from '../channel-behavior';
+import type { WagoConfigurationSnapshot } from './configuration';
 
 const DEFAULT_COMMAND_TIMEOUT_SECONDS = 30;
 const MAX_COMMAND_TIMEOUT_SECONDS = 300;
@@ -54,11 +56,7 @@ export class WagoCommandHandler {
       .find({ where: { trustState: 'claimed' }, order: { name: 'ASC' } });
     const controllerId = positiveInteger(config.controllerId);
     const revision = controllerId ? await this.dependencies.appliedRevision(controllerId) : null;
-    const snapshot = revision
-      ? (JSON.parse(revision.snapshot) as {
-          logicalChannels: Array<{ id: string; profile: string; capabilities: string[] }>;
-        })
-      : null;
+    const snapshot = revision ? (JSON.parse(revision.snapshot) as WagoConfigurationSnapshot) : null;
     const channelId = typeof config.channelId === 'string' ? config.channelId : undefined;
     const outputChannels = snapshot?.logicalChannels.filter((item) => item.capabilities.includes('output')) ?? [];
     let names: Record<string, unknown> = {};
@@ -106,14 +104,22 @@ export class WagoCommandHandler {
       };
     }
     if (channel) {
-      const actions = channel.capabilities.includes('output')
-        ? [
-            { const: 'set', title: 'Set state' },
-            ...(channel.capabilities.includes('pulse') ? [{ const: 'pulse', title: 'Pulse' }] : []),
-          ]
-        : [];
-      properties.action = { type: 'string', title: 'Operation', oneOf: actions, refreshesSchema: true };
-      if (config.action === 'set') properties.value = { type: 'boolean', title: 'State', default: false };
+      const pulsed = outputBehavior(channel) === 'pulsed';
+      const action = pulsed ? 'pulse' : 'set';
+      properties.action = {
+        type: 'string',
+        title: 'Operation',
+        oneOf: [{ const: action, title: pulsed ? 'Trigger pulse' : 'Turn on / turn off' }],
+        // Never silently reinterpret an existing incompatible flow action.
+        ...(config.action === undefined ? { default: action } : {}),
+        refreshesSchema: true,
+        description: pulsed
+          ? channel.pulse
+            ? `Turns on for ${channel.pulse.durationMs} ms, then off automatically. Change the duration in the controller configuration.`
+            : 'This pulsed channel is missing its duration. Correct and publish its controller configuration.'
+          : 'Stays on or off until another command or the configured disconnect policy changes it.',
+      };
+      if (!pulsed) properties.value = { type: 'boolean', title: 'Output on', default: false };
       properties.expectedConfigurationRevision = {
         type: 'number',
         title: 'Configuration revision',
@@ -186,15 +192,23 @@ export class WagoCommandHandler {
           message: 'The controller configuration changed. Reopen the node and save the current revision.',
         },
       ];
-    const snapshot = JSON.parse(revision.snapshot) as {
-      logicalChannels: Array<{ id: string; capabilities: string[] }>;
-    };
+    const snapshot = JSON.parse(revision.snapshot) as WagoConfigurationSnapshot;
     const channel = snapshot.logicalChannels.find((item) => item.id === channelId);
     if (!channel) return [{ field: 'channelId', message: 'The selected Logical Channel no longer exists.' }];
     if (!channel.capabilities.includes('output'))
       return [{ field: 'channelId', message: 'The selected Logical Channel no longer supports output commands.' }];
-    if (action === 'pulse' && !channel.capabilities.includes('pulse'))
-      return [{ field: 'action', message: 'The selected Logical Channel no longer supports pulses.' }];
+    if (!supportsOutputAction(channel, action))
+      return [
+        {
+          field: 'action',
+          message:
+            outputBehavior(channel) === 'pulsed'
+              ? action === 'set'
+                ? 'This channel is configured as pulsed. Reopen this node and explicitly select Trigger pulse, or change the channel to switched behavior and publish it.'
+                : 'This pulsed channel has invalid pulse settings. Correct and publish its controller configuration.'
+              : 'This channel is configured as switched. Reopen this node and explicitly select Turn on / turn off, or change the channel to pulsed behavior and publish it.',
+        },
+      ];
     return [];
   }
 

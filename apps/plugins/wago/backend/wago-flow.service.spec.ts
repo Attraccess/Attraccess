@@ -67,6 +67,61 @@ describe('WagoFlowService', () => {
     expect(getRepository).not.toHaveBeenCalled();
   });
 
+  it.each(['event', 'read', 'wait'] as const)('validates applied channels for %s nodes', async (kind) => {
+    const { service } = createService();
+    const config = { controllerId: 1, channelId: 'door', category: 'state', equals: false };
+    await expect(service.validateConfig(config, kind)).resolves.toEqual([]);
+    await expect(service.validateConfig({ ...config, channelId: 'removed' }, kind)).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'channelId' })]),
+    );
+    await expect(service.validateConfig({ ...config, category: 'measurement' }, kind)).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'category' })]),
+    );
+  });
+
+  it('uses current applied channel names in the form even when the runtime cache is populated', async () => {
+    const { service, revisionRepository } = createService();
+    await service.refresh();
+    revisionRepository.find.mockResolvedValue([
+      {
+        ...revision,
+        snapshot: JSON.stringify({ logicalChannels: [{ id: 'new-input', capabilities: ['input'] }] }),
+        presetProvenance: JSON.stringify({ editor: { names: { 'new-input': 'Door contact' } } }),
+      },
+    ]);
+    await expect(
+      service.resolveConfigSchema({ controllerId: 1, channelId: 'new-input' }, 'event'),
+    ).resolves.toMatchObject({
+      properties: { channelId: { oneOf: [{ const: 'new-input', title: 'Door contact' }] } },
+    });
+  });
+
+  it('rejects invalid wait conditions and event filters', async () => {
+    const { service } = createService();
+    const config = { controllerId: 1, channelId: 'door', category: 'state' };
+    await expect(service.validateConfig({ ...config, equals: 'true', timeoutMs: 0 }, 'wait')).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: 'equals' }),
+        expect.objectContaining({ field: 'timeoutMs' }),
+      ]),
+    );
+    await expect(
+      service.validateConfig({ ...config, minimumIntervalMs: -1, minimumChange: NaN }, 'event'),
+    ).resolves.toHaveLength(2);
+  });
+
+  it('shares applied configuration lookups while validating a flow', async () => {
+    const { service, revisionRepository } = createService();
+    const config = { controllerId: 1, channelId: 'door', category: 'state', equals: false };
+    const context = new Map<string, unknown>();
+    await Promise.all([
+      service.validateConfig(config, 'event', context),
+      service.validateConfig(config, 'read', context),
+      service.validateConfig(config, 'wait', context),
+    ]);
+    expect(revisionRepository.find).toHaveBeenCalledTimes(1);
+  });
+
   it('serializes concurrent controller messages before asynchronous channel resolution', async () => {
     const { service } = createService();
     await service.refresh();

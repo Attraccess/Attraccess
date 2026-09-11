@@ -1,11 +1,9 @@
-import type { PluginContext, PluginFlowExecutionNodeDefinition } from '@attraccess/plugins-backend-sdk';
-import { WagoService } from './wago.service';
+import type { PluginFlowExecutionNodeDefinition } from '@attraccess/plugins-backend-sdk';
+import type { WagoService } from './wago.service';
 
 export const WAGO_COMMAND_NODE_TYPE = 'plugin.wago.command';
 
-export function createWagoCommandNode(context: PluginContext): PluginFlowExecutionNodeDefinition {
-  const service = () => context.get(WagoService);
-
+export function createWagoCommandNode(service: () => WagoService): PluginFlowExecutionNodeDefinition {
   return {
     type: WAGO_COMMAND_NODE_TYPE,
     label: 'WAGO command',

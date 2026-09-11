@@ -3,6 +3,9 @@ import { acquireMeasurements, measurementErrorCode } from './modbus/acquisition'
 // The standalone runtime bundles the plugin-owned measurement contract.
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import { encodeMeasurement } from '../../measurement-contract';
+// The API and standalone runtime enforce the same configured output behavior.
+// eslint-disable-next-line @nx/enforce-module-boundaries
+import { supportsOutputAction } from '../../channel-behavior';
 import { hash, validateDesired } from './configuration';
 import { OutputController } from './output-controller';
 import {
@@ -418,12 +421,11 @@ export class WagoRuntime {
       const channel = this.state.accepted?.snapshot.logicalChannels.find((item) => item.id === command.channelId);
       if (!channel || !channel.capabilities.includes('output'))
         return this.acknowledge(command.id, 'rejected', 'unknown output channel', 'unknown_channel');
-      const duration = command.action === 'pulse' ? channel.pulse?.durationMs : undefined;
-      if (command.action === 'pulse' && !duration)
+      if (!supportsOutputAction(channel, command.action))
         return this.acknowledge(
           command.id,
           'rejected',
-          'channel does not define a pulse duration',
+          'command does not match the configured output behavior',
           'unsupported_operation',
         );
 
@@ -446,6 +448,10 @@ export class WagoRuntime {
         if (Date.parse(expiresAt) <= Date.now()) {
           await this.releaseCommand(command.id);
           return { error: 'command has expired', code: 'expired' };
+        }
+        if (!supportsOutputAction(currentChannel, command.action)) {
+          await this.releaseCommand(command.id);
+          return { error: 'command does not match the configured output behavior', code: 'unsupported_operation' };
         }
         if (!(await this.outputs.isGuardSatisfied(currentChannel))) {
           await this.releaseCommand(command.id);

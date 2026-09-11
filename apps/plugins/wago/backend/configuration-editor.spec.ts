@@ -67,9 +67,9 @@ describe('visual configuration editing', () => {
     });
     const application = { presetId: 'pulsed-lock-bank' as const, channelId: 'output', physicalPointId: 'point-out' };
     const preview = previewConfigurationPreset(output, application);
-    expect(() => selectPresetChanges(output, application, ['$.logicalChannels[1].profile'], preview.draftHash)).toThrow(
-      'requires pulse',
-    );
+    expect(() =>
+      selectPresetChanges(output, application, ['$.logicalChannels[1].capabilities[1]'], preview.draftHash),
+    ).toThrow('Pulsed behavior requires');
   });
 
   it('preserves unselected array removals when a preset removes capabilities', () => {
@@ -194,6 +194,11 @@ describe('visual configuration editing', () => {
     expect(
       validateEditorSnapshot({ ...value, physicalPoints: [{ ...value.physicalPoints[0], channel: 12 }] }),
     ).toContainEqual(expect.objectContaining({ code: 'unsupported_terminal' }));
+  });
+
+  it('keeps customized setup presets editable according to their actual capabilities', () => {
+    const channel = { ...base.logicalChannels[0], profile: 'metered-switched-load' as const };
+    expect(isEditableDigitalChannel(base, channel)).toBe(true);
   });
 
   it('preserves external points and does not expose them as digital channels', () => {

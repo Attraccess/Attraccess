@@ -1,5 +1,6 @@
+import { randomUUID } from './configuration-id';
 import { Button, Description, Input, Label, ListBox, Select, TextField } from '@heroui/react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   BUILTIN_MODBUS_PROFILES,
   duplicateProfile,
@@ -18,6 +19,8 @@ export interface ModbusConfigurationFormProps {
   showIdentifiers?: boolean;
   collapseProfiles?: boolean;
   showValidationErrors?: boolean;
+  focused?: boolean;
+  deviceChannels?: (deviceId: string) => ReactNode;
 }
 /** Host editor sets hardwareProfile=modbus and channel=0; binding uses names, not channel offsets. */
 export function ModbusPointForm({
@@ -234,11 +237,13 @@ export function ModbusProfileForm({
   onChange,
   isDisabled = false,
   showIdentifiers = true,
+  collapseSignals = false,
 }: {
   value: ModbusProfile;
   onChange: (value: ModbusProfile) => void;
   isDisabled?: boolean;
   showIdentifiers?: boolean;
+  collapseSignals?: boolean;
 }) {
   const readonly = isDisabled || BUILTIN_MODBUS_PROFILES.includes(value);
   return (
@@ -280,9 +285,9 @@ export function ModbusProfileForm({
               measurements: value.measurements.map((item, i) => (i === index ? { ...item, ...patch } : item)),
             });
           return (
-            <section key={index} className="wg:flex wg:flex-col wg:gap-3">
-              <h4>Measurement: {m.name}</h4>
-              <div className="wg:flex wg:flex-col wg:gap-3">
+            <details key={index} open={!collapseSignals} className="wg:rounded-lg wg:border wg:border-border wg:p-3">
+              <summary className="wg:cursor-pointer wg:font-medium">Measurement: {m.name}</summary>
+              <div className="wg:flex wg:flex-col wg:gap-3 wg:pt-3">
                 {showIdentifiers && (
                   <Field label="Measurement ID" value={m.id} disabled={readonly} onChange={(id) => update({ id })} />
                 )}
@@ -336,7 +341,7 @@ export function ModbusProfileForm({
                   Remove measurement
                 </Button>
               </div>
-            </section>
+            </details>
           );
         })}
         <Button
@@ -349,7 +354,7 @@ export function ModbusProfileForm({
                 ...value.measurements,
                 {
                   ...emptyFormat,
-                  id: crypto.randomUUID(),
+                  id: randomUUID(),
                   name: 'Measurement',
                   functionCode: 3,
                   unit: 'watt',
@@ -369,9 +374,9 @@ export function ModbusProfileForm({
               actions: value.actions.map((item, i) => (i === index ? { ...item, ...patch } : item)),
             });
           return (
-            <section key={index} className="wg:flex wg:flex-col wg:gap-3">
-              <h4>Action: {a.name}</h4>
-              <div className="wg:flex wg:flex-col wg:gap-3">
+            <details key={index} open={!collapseSignals} className="wg:rounded-lg wg:border wg:border-border wg:p-3">
+              <summary className="wg:cursor-pointer wg:font-medium">Action: {a.name}</summary>
+              <div className="wg:flex wg:flex-col wg:gap-3 wg:pt-3">
                 {showIdentifiers && (
                   <Field label="Action ID" value={a.id} disabled={readonly} onChange={(id) => update({ id })} />
                 )}
@@ -406,7 +411,7 @@ export function ModbusProfileForm({
                   Remove action
                 </Button>
               </div>
-            </section>
+            </details>
           );
         })}
         <Button
@@ -417,7 +422,7 @@ export function ModbusProfileForm({
               ...value,
               actions: [
                 ...value.actions,
-                { ...emptyFormat, id: crypto.randomUUID(), name: 'Switch', functionCode: 5, onValue: 1, offValue: 0 },
+                { ...emptyFormat, id: randomUUID(), name: 'Switch', functionCode: 5, onValue: 1, offValue: 0 },
               ],
             })
           }
@@ -436,16 +441,95 @@ export function ModbusConfigurationForm({
   showIdentifiers = true,
   collapseProfiles = false,
   showValidationErrors = true,
+  focused = false,
+  deviceChannels,
 }: ModbusConfigurationFormProps) {
   const [openProfiles, setOpenProfiles] = useState<Set<number>>(new Set());
+  const [section, setSection] = useState<'connections' | 'devices' | 'profiles'>(
+    value.devices.length ? 'devices' : 'connections',
+  );
+  const [selected, setSelected] = useState<Record<string, string>>({});
   const errors = validateModbus(value);
   const profiles = [...BUILTIN_MODBUS_PROFILES, ...value.profiles];
+  const items =
+    section === 'profiles'
+      ? profiles.map((p) => ({ id: `${p.id}@${p.version}`, name: `${p.name} v${p.version}` }))
+      : section === 'devices'
+        ? value.devices
+        : value.connections.map((c, i) => ({
+            id: c.id,
+            name: `Connection ${i + 1}: ${c.transport === 'tcp' ? c.host || 'TCP' : c.path}`,
+          }));
+  const selectedId = items.find((item) => item.id === selected[section])?.id ?? items[0]?.id;
+  function change(next: ModbusConfiguration) {
+    const selectedProfileIndex = profiles.findIndex((profile) => `${profile.id}@${profile.version}` === selected.profiles);
+    if (selectedProfileIndex >= BUILTIN_MODBUS_PROFILES.length) {
+      const profile = next.profiles[selectedProfileIndex - BUILTIN_MODBUS_PROFILES.length];
+      setSelected((current) => ({ ...current, profiles: `${profile.id}@${profile.version}` }));
+    }
+    for (const key of ['connections', 'devices', 'profiles'] as const) {
+      if (next[key].length > value[key].length) {
+        const item = next[key][next[key].length - 1];
+        setSection(key);
+        setSelected((current) => ({
+          ...current,
+          [key]: key === 'profiles' ? `${item.id}@${(item as ModbusProfile).version}` : item.id,
+        }));
+      }
+    }
+    onChange(next);
+  }
   return (
     <section aria-label="Modbus configuration" className="wg:flex wg:min-w-0 wg:flex-col wg:gap-4">
-      <p>No hardware is qualified. Built-in maps are unverified manual-derived candidates; no rollover is assumed.</p>
+      {focused && (
+        <>
+          <header>
+            <h2 className="wg:text-xl wg:font-semibold">External devices</h2>
+            <p className="wg:text-sm wg:text-muted">
+              Connect a Modbus device, choose its register map, then add the signals you need as channels.
+            </p>
+          </header>
+          <nav aria-label="External device settings" className="wg:flex wg:flex-wrap wg:gap-2">
+            {(['connections', 'devices', 'profiles'] as const).map((key) => (
+              <Button
+                key={key}
+                variant={section === key ? 'secondary' : 'ghost'}
+                aria-current={section === key ? 'page' : undefined}
+                onPress={() => setSection(key)}
+              >
+                {key === 'connections' ? 'Connections' : key === 'devices' ? 'Devices' : 'Device profiles'} (
+                {key === 'profiles' ? profiles.length : value[key].length})
+              </Button>
+            ))}
+          </nav>
+          {!!items.length && (
+            <Choice
+              label={
+                section === 'connections' ? 'Edit connection' : section === 'devices' ? 'Edit device' : 'Edit profile'
+              }
+              value={selectedId ?? ''}
+              options={items.map((item) => item.id)}
+              labels={Object.fromEntries(items.map((item) => [item.id, item.name]))}
+              disabled={isDisabled}
+              onChange={(id) => setSelected({ ...selected, [section]: id })}
+            />
+          )}
+          {!items.length && (
+            <p className="wg:py-4 wg:text-muted">
+              {section === 'connections'
+                ? 'Add a TCP network or RTU serial connection to get started.'
+                : 'Add a device and select its connection and profile.'}
+            </p>
+          )}
+        </>
+      )}
+      <p className="wg:text-sm wg:text-muted">
+        Built-in register maps are unverified candidates. Check the device manual and qualify the hardware before use.
+      </p>
       {value.connections.map((c, index) => {
+        if (focused && (section !== 'connections' || c.id !== selectedId)) return null;
         const update = (patch: object) =>
-          onChange({
+          change({
             ...value,
             connections: value.connections.map((item, i) => (i === index ? { ...item, ...patch } : item)),
           });
@@ -464,7 +548,7 @@ export function ModbusConfigurationForm({
                 options={['tcp', 'rtu']}
                 disabled={isDisabled}
                 onChange={(v) =>
-                  onChange({
+                  change({
                     ...value,
                     connections: value.connections.map((item, i) =>
                       i === index
@@ -549,7 +633,7 @@ export function ModbusConfigurationForm({
               <Button
                 isDisabled={isDisabled}
                 variant="danger"
-                onPress={() => onChange({ ...value, connections: value.connections.filter((_, i) => i !== index) })}
+                onPress={() => change({ ...value, connections: value.connections.filter((_, i) => i !== index) })}
               >
                 Remove connection
               </Button>
@@ -557,32 +641,35 @@ export function ModbusConfigurationForm({
           </section>
         );
       })}
-      <Button
-        isDisabled={isDisabled}
-        variant="secondary"
-        onPress={() =>
-          onChange({
-            ...value,
-            connections: [
-              ...value.connections,
-              {
-                id: crypto.randomUUID(),
-                transport: 'tcp',
-                host: '',
-                port: 502,
-                timeoutMs: 1000,
-                reconnectMs: 250,
-                queueLimit: 16,
-              },
-            ],
-          })
-        }
-      >
-        Add connection
-      </Button>
+      {(!focused || section === 'connections') && (
+        <Button
+          isDisabled={isDisabled}
+          variant="secondary"
+          onPress={() =>
+            change({
+              ...value,
+              connections: [
+                ...value.connections,
+                {
+                  id: randomUUID(),
+                  transport: 'tcp',
+                  host: '',
+                  port: 502,
+                  timeoutMs: 1000,
+                  reconnectMs: 250,
+                  queueLimit: 16,
+                },
+              ],
+            })
+          }
+        >
+          Add connection
+        </Button>
+      )}
       {value.devices.map((d, index) => {
+        if (focused && (section !== 'devices' || d.id !== selectedId)) return null;
         const update = (patch: Partial<typeof d>) =>
-          onChange({ ...value, devices: value.devices.map((item, i) => (i === index ? { ...item, ...patch } : item)) });
+          change({ ...value, devices: value.devices.map((item, i) => (i === index ? { ...item, ...patch } : item)) });
         return (
           <section key={index} className="wg:flex wg:flex-col wg:gap-3">
             <h3>Device: {d.name}</h3>
@@ -638,96 +725,103 @@ export function ModbusConfigurationForm({
               <Button
                 isDisabled={isDisabled}
                 variant="danger"
-                onPress={() => onChange({ ...value, devices: value.devices.filter((_, i) => i !== index) })}
+                onPress={() => change({ ...value, devices: value.devices.filter((_, i) => i !== index) })}
               >
                 Remove device
               </Button>
             </div>
+            {deviceChannels?.(d.id)}
           </section>
         );
       })}
-      <Button
-        isDisabled={isDisabled}
-        variant="secondary"
-        onPress={() =>
-          onChange({
-            ...value,
-            devices: [
-              ...value.devices,
-              {
-                id: crypto.randomUUID(),
-                name: 'Modbus device',
-                connectionId: value.connections[0]?.id ?? '',
-                unitId: 1,
-                profileId: profiles[0].id,
-                profileVersion: profiles[0].version,
-              },
-            ],
-          })
-        }
-      >
-        Add device
-      </Button>
-      {profiles.map((p, profileIndex) => (
-        // Profiles are appended and edited in place; the editable ID must not control mount identity.
-        <details
-          key={profileIndex}
-          open={!collapseProfiles || openProfiles.has(profileIndex)}
-          onToggle={(event) => {
-            const open = event.currentTarget.open;
-            setOpenProfiles((current) => {
-              const next = new Set(current);
-              if (open) next.add(profileIndex);
-              else next.delete(profileIndex);
-              return next;
-            });
-          }}
+      {(!focused || section === 'devices') && (
+        <Button
+          isDisabled={isDisabled}
+          variant="secondary"
+          onPress={() =>
+            change({
+              ...value,
+              devices: [
+                ...value.devices,
+                {
+                  id: randomUUID(),
+                  name: 'Modbus device',
+                  connectionId: value.connections[0]?.id ?? '',
+                  unitId: 1,
+                  profileId: profiles[0].id,
+                  profileVersion: profiles[0].version,
+                },
+              ],
+            })
+          }
         >
-          <summary className="wg:whitespace-normal wg:break-words">
-            {p.name} v{p.version}
-          </summary>
-          {(!collapseProfiles || openProfiles.has(profileIndex)) && (
-            <ModbusProfileForm
-              value={p}
-              showIdentifiers={showIdentifiers}
-              isDisabled={isDisabled}
-              onChange={(updated) =>
-                onChange({
-                  ...value,
-                  profiles: value.profiles.map((item, i) =>
-                    i === profileIndex - BUILTIN_MODBUS_PROFILES.length ? updated : item,
-                  ),
-                })
-              }
-            />
-          )}
-          <Button
-            className="wg:h-auto wg:min-h-10 wg:whitespace-normal wg:py-2"
-            isDisabled={isDisabled}
-            variant="secondary"
-            onPress={() =>
-              onChange({ ...value, profiles: [...value.profiles, duplicateProfile(p, crypto.randomUUID())] })
-            }
-          >
-            Duplicate {p.name}
-          </Button>
-        </details>
-      ))}
-      <Button
-        isDisabled={isDisabled}
-        variant="secondary"
-        onPress={() =>
-          onChange({
-            ...value,
-            profiles: [
-              ...value.profiles,
-              { id: crypto.randomUUID(), name: 'Custom profile', version: 1, measurements: [], actions: [] },
-            ],
-          })
-        }
-      >
-        Create custom profile
-      </Button>
+          Add device
+        </Button>
+      )}
+      {profiles.map(
+        (p, profileIndex) =>
+          (!focused || (section === 'profiles' && `${p.id}@${p.version}` === selectedId)) && (
+            // Profiles are appended and edited in place; the editable ID must not control mount identity.
+            <details
+              key={profileIndex}
+              open={focused || !collapseProfiles || openProfiles.has(profileIndex)}
+              onToggle={(event) => {
+                const open = event.currentTarget.open;
+                setOpenProfiles((current) => {
+                  const next = new Set(current);
+                  if (open) next.add(profileIndex);
+                  else next.delete(profileIndex);
+                  return next;
+                });
+              }}
+            >
+              <summary className="wg:whitespace-normal wg:break-words">
+                {p.name} v{p.version}
+              </summary>
+              {(focused || !collapseProfiles || openProfiles.has(profileIndex)) && (
+                <ModbusProfileForm
+                  value={p}
+                  collapseSignals={focused}
+                  showIdentifiers={showIdentifiers}
+                  isDisabled={isDisabled}
+                  onChange={(updated) =>
+                    change({
+                      ...value,
+                      profiles: value.profiles.map((item, i) =>
+                        i === profileIndex - BUILTIN_MODBUS_PROFILES.length ? updated : item,
+                      ),
+                    })
+                  }
+                />
+              )}
+              <Button
+                className="wg:h-auto wg:min-h-10 wg:whitespace-normal wg:py-2"
+                isDisabled={isDisabled}
+                variant="secondary"
+                onPress={() => change({ ...value, profiles: [...value.profiles, duplicateProfile(p, randomUUID())] })}
+              >
+                Duplicate {p.name}
+              </Button>
+            </details>
+          ),
+      )}
+      {(!focused || section === 'profiles') && (
+        <Button
+          isDisabled={isDisabled}
+          variant="secondary"
+          onPress={() =>
+            change({
+              ...value,
+              profiles: [
+                ...value.profiles,
+                { id: randomUUID(), name: 'Custom profile', version: 1, measurements: [], actions: [] },
+              ],
+            })
+          }
+        >
+          Create custom profile
+        </Button>
+      )}
       {showValidationErrors && errors.length > 0 && (
         <ul role="alert">
           {errors.map((error, i) => (

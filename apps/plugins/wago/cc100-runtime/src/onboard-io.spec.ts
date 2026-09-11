@@ -165,6 +165,8 @@ describe('CC100 packed digital I/O', () => {
     expect(adapter.validate(invalid).map(({ code }) => code)).toEqual(
       expect.arrayContaining(['invalid_direction', 'unsupported_point', 'duplicate_output']),
     );
+    // Remove the malformed pulse first so runtime acceptance reaches hardware direction validation.
+    invalid.logicalChannels[4].capabilities = ['input'];
     await runtime.start();
     await apply(invalid);
     expect(messages.filter(({ topic }) => topic.endsWith('/configuration/reported')).at(-1)?.payload.errors).toEqual(
