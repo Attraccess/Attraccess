@@ -1,0 +1,16 @@
+#if defined(__APPLE__)
+.section __TEXT,__const
+#else
+.section .rodata.attractap_device,"a"
+#endif
+
+.balign 4
+.global _binary_attractap_device_start
+_binary_attractap_device_start:
+.incbin "@CMAKE_CURRENT_SOURCE_DIR@/assets/attractap.png"
+.global _binary_attractap_device_end
+_binary_attractap_device_end:
+
+#if defined(__linux__)
+.section .note.GNU-stack,"",@progbits
+#endif
