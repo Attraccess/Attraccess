@@ -13,6 +13,7 @@ class VirtualNfc : public INfc
 public:
     static constexpr size_t KeySize = 16;
     static constexpr size_t KeySlotCount = 6;
+    static constexpr size_t CardCount = 4;
     using Key = std::array<uint8_t, KeySize>;
 
     enum class CardType : uint8_t
@@ -39,9 +40,10 @@ public:
     void setup() override {}
     void loop() override;
 
-    const Card &card() const { return currentCard; }
-    void setCard(const Card &card);
-    void setPresent(bool present);
+    const Card &card(size_t index) const { return cards.at(index); }
+    void setCard(size_t index, const Card &card);
+    void setPresent(size_t index, bool present);
+    void clearCardData(size_t index);
     void setFaults(bool failAuthentication, bool failWrite);
     void resetKeySlot(uint8_t keyNumber);
     void setKeyVersion(uint8_t keyNumber, uint8_t keyVersion);
@@ -50,7 +52,7 @@ public:
     bool changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey,
                    uint8_t *newKey, uint8_t keyVersion = 1) override;
     bool getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNumber) override;
-    bool isCardPresent() override { return currentCard.present; }
+    bool isCardPresent() override { return presentedCard < CardCount; }
     uint8_t *getFactoryKey() override { return const_cast<uint8_t *>(factoryKey().data()); }
 
     void enableCardDetection() override { cardDetectionEnabled = true; }
@@ -63,15 +65,21 @@ public:
     static const Key &factoryKey();
 
 private:
-    static constexpr const char *StorageKey = "nfc.virtual-card.v1";
+    static constexpr const char *LegacyStorageKey = "nfc.virtual-card.v1";
+    static constexpr const char *StorageKeyPrefix = "nfc.virtual-card.v2.";
 
     static std::string encode(const Card &card);
     static bool decode(const std::string &value, Card &card);
-    void save();
+    static Card defaultCard(size_t index);
+    static std::string storageKey(size_t index);
+    Card &currentCard();
+    const Card &currentCard() const;
+    void save(size_t index);
     void reconcileCardPresence();
 
     ProfileStore &profile;
-    Card currentCard;
+    std::array<Card, CardCount> cards;
+    size_t presentedCard = CardCount;
     bool cardDetectionEnabled = false;
     bool cardPresenceReported = false;
     std::function<void(uint8_t *, uint8_t)> cardDetectedCallback;

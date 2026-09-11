@@ -71,6 +71,7 @@ set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/logos.S" PROPERTIES
 
 add_library(attractap-production-host
     ${ATTRACTAP_FIRMWARE_SOURCES}
+    src/host_beeper.cpp
     src/host_utils.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/logos.S")
 target_include_directories(attractap-production-host PUBLIC
@@ -87,7 +88,7 @@ target_compile_definitions(attractap-production-host PUBLIC
     FIRMWARE_VERSION="desktop"
     FIRMWARE_FRIENDLY_NAME="Attractap"
     FIRMWARE_VARIANT_FRIENDLY_NAME="Desktop")
-target_link_libraries(attractap-production-host PUBLIC lvgl::lvgl ArduinoJson Threads::Threads)
+target_link_libraries(attractap-production-host PUBLIC SDL3::SDL3 lvgl::lvgl ArduinoJson Threads::Threads)
 
 add_library(attractap-desktop-runtime
     src/api_endpoint.cpp

@@ -12,6 +12,10 @@
 class IOExpander;
 #endif
 
+#ifdef ATTRACTAP_HOST
+void hostBeeper(const char *pattern);
+#endif
+
 class Beeper
 {
 public:
@@ -43,7 +47,7 @@ public:
 
 private:
 #ifdef ATTRACTAP_HOST
-    void log(const char *pattern) { logger.debugf("Host beep: %s", pattern); }
+    void log(const char *pattern) { logger.debugf("Host beep: %s", pattern); hostBeeper(pattern); }
     Logger logger;
 #else
     struct PatternRequest

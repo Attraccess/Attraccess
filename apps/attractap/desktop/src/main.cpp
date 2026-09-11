@@ -48,9 +48,9 @@ int main(int argc, char **argv)
     if (readerId != 0 || Settings::getAttraccessAuthConfig().readerId == 0)
         Settings::saveAttraccessAuthConfig(Settings::getAttraccessAuthConfig().apiKey, readerId);
 
-    HostRuntime runtime;
-    HostWebsocket websocket(runtime, profile.get("api.host"));
     const auto apiConfig = Settings::getAttraccessApiConfig();
+    HostRuntime runtime;
+    HostWebsocket websocket(runtime);
     State::setWifiState(true, {}, "Desktop");
     State::setWebsocketState(false, apiConfig.hostname, apiConfig.port, apiConfig.useSSL);
     websocket.setStateCallback([](HostWebsocket::State state) {
@@ -65,11 +65,8 @@ int main(int argc, char **argv)
     API api(websocket);
     Application application(nfc, api);
     SdlDisplay display;
-    display.setKeyCallback([&nfc](SDL_Keycode key) {
-        // Keep simulator input outside the application UI; N presents/removes the virtual card.
-        if (key == SDLK_N)
-            nfc.setPresent(!nfc.card().present);
-    });
+    display.setCardPresenceCallback([&nfc](size_t index, bool present) { nfc.setPresent(index, present); });
+    display.setClearCardCallback([&nfc](size_t index) { nfc.clearCardData(index); });
 
     Display::setup(display);
     application.setup();

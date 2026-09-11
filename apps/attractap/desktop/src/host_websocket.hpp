@@ -31,7 +31,7 @@ public:
     // The backend path is fixed so a profile cannot accidentally connect to another API.
     static std::string readerUrl(const std::string &endpoint);
 
-    HostWebsocket(HostRuntime &runtime, std::string endpoint);
+    explicit HostWebsocket(HostRuntime &runtime);
     ~HostWebsocket();
 
     HostWebsocket(const HostWebsocket &) = delete;

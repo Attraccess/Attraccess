@@ -2,6 +2,7 @@
 #include "host_runtime.hpp"
 #include "host_websocket.hpp"
 #include "profile_store.hpp"
+#include "settings/settings.hpp"
 #include "virtual_nfc.hpp"
 #include "utils.hpp"
 
@@ -41,33 +42,34 @@ int main()
     uint8_t availableKey = 0;
     int detected = 0;
     int removed = 0;
-    nfcContract.setCardDetectionCallback([&](uint8_t *, uint8_t) { ++detected; });
+    uint8_t detectedCard = 0;
+    nfcContract.setCardDetectionCallback([&](uint8_t *uid, uint8_t) { ++detected; detectedCard = uid[6]; });
     nfcContract.setCardRemovalCallback([&](uint32_t) { ++removed; });
     nfcContract.enableCardDetection();
     assert(!nfcContract.getAvailableKeyNo(nullptr, nullptr, &availableKey));
-    nfc.setPresent(true);
+    nfc.setPresent(0, true);
     assert(detected == 1);
-    auto replacement = nfc.card();
-    replacement.uid[6] = 2;
-    nfc.setCard(replacement);
+    assert(detectedCard == 1);
+    nfc.setPresent(1, true);
     assert(removed == 1);
     assert(detected == 2);
+    assert(detectedCard == 2);
     assert(nfcContract.getAvailableKeyNo(nullptr, nullptr, &availableKey));
     assert(availableKey == 1);
     assert(!nfcContract.authenticate(availableKey, const_cast<uint8_t *>(enrolledKey.data())));
     assert(nfcContract.changeKey(availableKey, nfcContract.getFactoryKey(), nfcContract.getFactoryKey(), const_cast<uint8_t *>(enrolledKey.data())));
     assert(nfcContract.authenticate(availableKey, const_cast<uint8_t *>(enrolledKey.data())));
-    assert(nfc.card().keyVersions[availableKey] == 1);
+    assert(nfc.card(1).keyVersions[availableKey] == 1);
     nfc.setFaults(true, false);
     assert(!nfc.authenticate(availableKey, const_cast<uint8_t *>(enrolledKey.data())));
     nfc.setFaults(false, true);
     assert(!nfc.changeKey(availableKey, nfc.getFactoryKey(), const_cast<uint8_t *>(enrolledKey.data()), nfc.getFactoryKey()));
     nfc.setFaults(false, false);
-    nfc.setPresent(false);
+    nfc.setPresent(1, false);
     assert(!nfc.authenticate(availableKey, const_cast<uint8_t *>(enrolledKey.data())));
 
     nfcContract.disableCardDetection();
-    nfc.setPresent(true);
+    nfc.setPresent(1, true);
     assert(detected == 2);
     nfcContract.enableCardDetection();
     nfcContract.loop();
@@ -77,19 +79,33 @@ int main()
     assert(detected == 4);
 
     VirtualNfc persisted(first);
-    assert(persisted.card().present);
-    assert(persisted.card().keys[availableKey] == enrolledKey);
-    persisted.setPresent(true);
+    for (size_t index = 0; index < VirtualNfc::CardCount; ++index)
+    {
+        assert(!persisted.card(index).present);
+        assert(persisted.card(index).uid[6] == index + 1);
+    }
+    assert(persisted.card(1).keys[availableKey] == enrolledKey);
+    assert(persisted.card(0).keys[availableKey] == VirtualNfc::factoryKey());
+    persisted.setPresent(1, true);
     persisted.resetKeySlot(availableKey);
     assert(persisted.authenticate(availableKey, persisted.getFactoryKey()));
-    assert(persisted.card().keyVersions[availableKey] == 0);
+    assert(persisted.card(1).keyVersions[availableKey] == 0);
     persisted.setKeyVersion(availableKey, 7);
-    assert(persisted.card().keyVersions[availableKey] == 7);
-    auto unknown = persisted.card();
+    assert(persisted.card(1).keyVersions[availableKey] == 7);
+    auto unknown = persisted.card(1);
     unknown.type = VirtualNfc::CardType::Unknown;
-    persisted.setCard(unknown);
+    persisted.setCard(1, unknown);
     assert(!persisted.authenticate(availableKey, persisted.getFactoryKey()));
     assert(!persisted.getAvailableKeyNo(nullptr, nullptr, &availableKey));
+    persisted.clearCardData(1);
+    assert(!persisted.isCardPresent());
+    assert(persisted.card(1).type == VirtualNfc::CardType::Ntag424);
+    assert(persisted.card(1).keyVersions[availableKey] == 0);
+    assert(persisted.card(1).keys[availableKey] == VirtualNfc::factoryKey());
+
+    VirtualNfc afterRestart(first);
+    assert(!afterRestart.isCardPresent());
+    assert(afterRestart.card(1).keys[availableKey] == VirtualNfc::factoryKey());
 
     HostRuntime runtime;
     int value = 0;
@@ -144,7 +160,10 @@ int main()
     assert(rejectsInvalidApiEndpoint("https://localhost:"));
     assert(rejectsInvalidApiEndpoint("https://::1"));
 
-    HostWebsocket websocket(runtime, "http://localhost:3001");
+    KVStore::setHostProfile(&first);
+    Settings::setup();
+    Settings::saveAttraccessApiConfig("localhost", 3001, false);
+    HostWebsocket websocket(runtime);
     assert(websocket.send("outbound"));
     assert(!websocket.send(nullptr, 0));
     bool disconnected = false;

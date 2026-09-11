@@ -41,38 +41,77 @@ bool readUnsigned(std::string_view value, unsigned &result)
 
 VirtualNfc::VirtualNfc(ProfileStore &profile) : profile(profile)
 {
-    const std::string stored = profile.get(StorageKey);
-    if (!stored.empty() && decode(stored, currentCard))
-        return;
-
-    for (auto &key : currentCard.keys)
-        key = factoryKey();
-    save();
+    for (size_t index = 0; index < CardCount; ++index)
+    {
+        cards[index] = defaultCard(index);
+        std::string stored = profile.get(storageKey(index));
+        if (index == 0 && stored.empty())
+            stored = profile.get(LegacyStorageKey);
+        if (!stored.empty())
+        {
+            Card persisted;
+            if (decode(stored, persisted))
+            {
+                persisted.uid = cards[index].uid;
+                persisted.uidLength = cards[index].uidLength;
+                persisted.present = false;
+                cards[index] = persisted;
+            }
+        }
+        save(index);
+    }
 }
 
-void VirtualNfc::setCard(const Card &card)
+void VirtualNfc::setCard(size_t index, const Card &card)
 {
-    currentCard = card;
-    save();
+    if (index >= CardCount)
+        return;
+    const bool wasPresented = presentedCard == index;
+    cards[index] = card;
+    const Card defaults = defaultCard(index);
+    cards[index].uid = defaults.uid;
+    cards[index].uidLength = defaults.uidLength;
+    cards[index].present = wasPresented && card.present;
+    save(index);
 
     // A replacement is a removal followed by a new presentation.
-    if (cardPresenceReported)
+    if (wasPresented && cardPresenceReported)
     {
         cardPresenceReported = false;
         if (cardDetectionEnabled && cardRemovedCallback)
             cardRemovedCallback(0);
     }
+    if (!cards[index].present)
+        presentedCard = CardCount;
     reconcileCardPresence();
 }
 
-void VirtualNfc::setPresent(bool present)
+void VirtualNfc::setPresent(size_t index, bool present)
 {
-    if (currentCard.present == present)
+    if (index >= CardCount || (present && presentedCard == index) || (!present && presentedCard != index))
         return;
 
-    currentCard.present = present;
-    save();
+    if (presentedCard < CardCount)
+    {
+        cards[presentedCard].present = false;
+        presentedCard = CardCount;
+        reconcileCardPresence();
+    }
+    presentedCard = present ? index : CardCount;
+    if (present)
+        cards[index].present = true;
     reconcileCardPresence();
+}
+
+void VirtualNfc::clearCardData(size_t index)
+{
+    if (index >= CardCount)
+        return;
+    const bool wasPresented = presentedCard == index;
+    if (wasPresented)
+        setPresent(index, false);
+    cards[index] = defaultCard(index);
+    save(index);
 }
 
 void VirtualNfc::loop()
@@ -82,67 +121,75 @@ void VirtualNfc::loop()
 
 void VirtualNfc::setFaults(bool failAuthentication, bool failWrite)
 {
-    currentCard.failAuthentication = failAuthentication;
-    currentCard.failWrite = failWrite;
-    save();
+    if (presentedCard >= CardCount) return;
+    currentCard().failAuthentication = failAuthentication;
+    currentCard().failWrite = failWrite;
+    save(presentedCard);
 }
 
 void VirtualNfc::resetKeySlot(uint8_t keyNumber)
 {
     if (keyNumber >= KeySlotCount)
         return;
-    currentCard.keys[keyNumber] = factoryKey();
-    currentCard.keyVersions[keyNumber] = 0;
-    save();
+    if (presentedCard >= CardCount) return;
+    currentCard().keys[keyNumber] = factoryKey();
+    currentCard().keyVersions[keyNumber] = 0;
+    save(presentedCard);
 }
 
 void VirtualNfc::setKeyVersion(uint8_t keyNumber, uint8_t keyVersion)
 {
     if (keyNumber >= KeySlotCount)
         return;
-    currentCard.keyVersions[keyNumber] = keyVersion;
-    save();
+    if (presentedCard >= CardCount) return;
+    currentCard().keyVersions[keyNumber] = keyVersion;
+    save(presentedCard);
 }
 
 bool VirtualNfc::authenticate(uint8_t keyNumber, uint8_t *key)
 {
-    return currentCard.present && currentCard.type != CardType::Unknown && !currentCard.failAuthentication && keyNumber < KeySlotCount &&
-           std::equal(currentCard.keys[keyNumber].begin(), currentCard.keys[keyNumber].end(), key);
+    if (presentedCard >= CardCount) return false;
+    const Card &card = currentCard();
+    return card.present && card.type != CardType::Unknown && !card.failAuthentication && keyNumber < KeySlotCount &&
+           std::equal(card.keys[keyNumber].begin(), card.keys[keyNumber].end(), key);
 }
 
 bool VirtualNfc::changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey,
                             uint8_t *newKey, uint8_t keyVersion)
 {
-    if (keyNumber >= KeySlotCount || currentCard.failWrite || !authenticate(0, masterKey) ||
+    if (presentedCard >= CardCount || keyNumber >= KeySlotCount || currentCard().failWrite || !authenticate(0, masterKey) ||
         !authenticate(keyNumber, oldKey))
         return false;
 
-    std::copy_n(newKey, KeySize, currentCard.keys[keyNumber].begin());
-    currentCard.keyVersions[keyNumber] = keyVersion;
-    save();
+    std::copy_n(newKey, KeySize, currentCard().keys[keyNumber].begin());
+    currentCard().keyVersions[keyNumber] = keyVersion;
+    save(presentedCard);
     return authenticate(keyNumber, newKey);
 }
 
 bool VirtualNfc::getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNumber)
 {
-    if (!currentCard.present || currentCard.type == CardType::Unknown || currentCard.failAuthentication)
+    if (presentedCard >= CardCount)
+        return false;
+    const Card &card = currentCard();
+    if (!card.present || card.type == CardType::Unknown || card.failAuthentication)
         return false;
 
-    if (currentCard.type == CardType::Desfire && !authenticate(0, getFactoryKey()))
+    if (card.type == CardType::Desfire && !authenticate(0, getFactoryKey()))
         return false;
 
     for (uint8_t index = 1; index < KeySlotCount; ++index)
     {
-        const bool isFree = currentCard.type == CardType::Desfire
-                                ? currentCard.keyVersions[index] == 0
+        const bool isFree = card.type == CardType::Desfire
+                                ? card.keyVersions[index] == 0
                                 : authenticate(index, getFactoryKey());
         if (isFree)
         {
             *keyNumber = index;
             if (uid && uidLength)
             {
-                std::copy_n(currentCard.uid.begin(), currentCard.uidLength, uid);
-                *uidLength = currentCard.uidLength;
+                std::copy_n(card.uid.begin(), card.uidLength, uid);
+                *uidLength = card.uidLength;
             }
             return true;
         }
@@ -164,6 +211,30 @@ const VirtualNfc::Key &VirtualNfc::factoryKey()
 {
     static const Key key{};
     return key;
+}
+
+VirtualNfc::Card VirtualNfc::defaultCard(size_t index)
+{
+    Card card;
+    card.uid[6] = static_cast<uint8_t>(index + 1);
+    for (auto &key : card.keys)
+        key = factoryKey();
+    return card;
+}
+
+std::string VirtualNfc::storageKey(size_t index)
+{
+    return std::string(StorageKeyPrefix) + std::to_string(index);
+}
+
+VirtualNfc::Card &VirtualNfc::currentCard()
+{
+    return cards[presentedCard];
+}
+
+const VirtualNfc::Card &VirtualNfc::currentCard() const
+{
+    return cards[presentedCard];
 }
 
 std::string VirtualNfc::encode(const Card &card)
@@ -231,19 +302,22 @@ bool VirtualNfc::decode(const std::string &value, Card &card)
     return true;
 }
 
-void VirtualNfc::save()
+void VirtualNfc::save(size_t index)
 {
-    profile.put(StorageKey, encode(currentCard));
+    Card persisted = cards[index];
+    persisted.present = false;
+    profile.put(storageKey(index), encode(persisted));
 }
 
 void VirtualNfc::reconcileCardPresence()
 {
-    if (!cardDetectionEnabled || currentCard.present == cardPresenceReported)
+    const bool present = presentedCard < CardCount;
+    if (!cardDetectionEnabled || present == cardPresenceReported)
         return;
 
-    cardPresenceReported = currentCard.present;
+    cardPresenceReported = present;
     if (cardPresenceReported && cardDetectedCallback)
-        cardDetectedCallback(currentCard.uid.data(), currentCard.uidLength);
+        cardDetectedCallback(currentCard().uid.data(), currentCard().uidLength);
     if (!cardPresenceReported && cardRemovedCallback)
         cardRemovedCallback(0);
 }
