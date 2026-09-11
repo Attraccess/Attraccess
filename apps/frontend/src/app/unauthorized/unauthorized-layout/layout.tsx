@@ -18,12 +18,18 @@ export function UnauthorizedLayout({ children }: UnauthorizedLayoutProps) {
   return (
     <div className="h-[var(--vvh,100dvh)] overflow-y-auto bg-background border-t-4 border-accent">
       <div className="flex min-h-full">
-        <div className="hidden lg:flex lg:w-1/2 flex-col justify-between bg-surface-secondary border-r border-separator p-12 xl:p-16">
+        <div className="dark relative isolate hidden lg:flex lg:w-1/2 flex-col justify-between bg-background text-foreground border-r border-separator p-12 xl:p-16">
+          <img
+            src="/login-wallpaper-RAL5020.png"
+            alt=""
+            className="absolute inset-0 -z-20 h-full w-full object-cover object-left-bottom"
+          />
+          <div className="absolute inset-0 -z-10 bg-black/60" aria-hidden />
           <AttraccessLogo className="h-12 w-auto self-start" />
           <div className="py-12 max-w-lg">
             <p className="text-xs font-semibold uppercase tracking-widest text-accent mb-6">{t('eyebrow')}</p>
             <h2 className="text-5xl xl:text-6xl leading-tight font-semibold tracking-tight mb-6">{t('title')}</h2>
-            <p className="text-lg leading-relaxed text-muted">{t('subtitle')}</p>
+            <p className="text-lg leading-relaxed text-foreground">{t('subtitle')}</p>
           </div>
           <div className="flex items-end justify-between gap-8">
             <div className="space-y-4 py-6 border-t border-separator flex-1 text-sm font-medium">

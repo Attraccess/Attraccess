@@ -1,5 +1,9 @@
 #include "display/theme.hpp"
 #include "display/images/logo_40h.hpp"
+#include "display/images/lockscreen_background_image.hpp"
+#include "display/screens/lockscreen/lockscreen.hpp"
+#include "display/screens/resourceList/resourceListScreen.hpp"
+#include "display/screens/noResources/noResourcesScreen.hpp"
 #include "display/screens/boot/bootscreen.hpp"
 #include "display/screens/init/initscreen.hpp"
 #include "display/screens/enrollment/enrollmentScreen.hpp"
@@ -27,6 +31,7 @@ static_assert(LV_USE_STDLIB_MALLOC == LV_STDLIB_CLIB && LV_USE_PERF_MONITOR == 0
 
 extern const uint8_t smallLogoEnd[] asm("_binary_logo_133x40_rgb565a8_end");
 extern const uint8_t largeLogoEnd[] asm("_binary_logo_400x120_rgb565a8_end");
+extern const uint8_t backgroundEnd[] asm("_binary_lockscreen_rgb565_end");
 
 namespace
 {
@@ -210,8 +215,10 @@ void expectFlat(lv_obj_t *obj, int32_t radius)
 
 void testSurfaces(Renderer &renderer)
 {
-    expectColor(DisplayTheme::primary(), lv_color_hex(0x256D7B), "Brand primary token");
-    expectColor(DisplayTheme::background(), lv_color_white(), "White screen token");
+    expectColor(DisplayTheme::primary(), lv_color_hex(0x82C4CE), "Frontend dark primary token");
+    expectColor(DisplayTheme::background(), lv_color_hex(0x162124), "Frontend dark screen token");
+    expectColor(DisplayTheme::surface(), lv_color_hex(0x1E2C2F), "Frontend dark surface token");
+    expectColor(DisplayTheme::text(), lv_color_hex(0xF4F8F8), "Frontend dark foreground token");
     expectColor(lv_obj_get_style_bg_color(lv_screen_active(), LV_PART_MAIN), DisplayTheme::background(),
                 "init themes the already-created active screen");
     ScreenGuard screen(lv_obj_create(nullptr));
@@ -225,16 +232,18 @@ void testSurfaces(Renderer &renderer)
     lv_obj_set_size(surface, 400, 140);
     lv_obj_center(surface);
     expectFlat(surface, DisplayTheme::Radius);
+    expectColor(lv_obj_get_style_bg_color(surface, LV_PART_MAIN), DisplayTheme::surface(), "Automatic surface fill");
     expectColor(lv_obj_get_style_border_color(surface, LV_PART_MAIN), DisplayTheme::border(), "Automatic surface border");
     DisplayTheme::applyScreen(surface);
     expectFlat(surface, 0);
     expect(lv_obj_get_style_border_width(surface, LV_PART_MAIN) == 0, "applyScreen removes border");
     DisplayTheme::applySurface(surface);
+    expectColor(lv_obj_get_style_bg_color(surface, LV_PART_MAIN), DisplayTheme::surface(), "Helper surface fill");
     expectFlat(surface, DisplayTheme::Radius);
     expect(lv_obj_get_style_border_width(surface, LV_PART_MAIN) == 1, "applySurface adds border");
-    lv_obj_center(label(surface, "White surface / dark text"));
+    lv_obj_center(label(surface, "Dark surface / light text"));
     renderer.capture("widgets-surfaces");
-    renderer.expectPixel(2, 2, DisplayTheme::background(), "Rendered white background");
+    renderer.expectPixel(2, 2, DisplayTheme::background(), "Rendered dark background");
 }
 
 void testButtons(Renderer &renderer, bool helpers)
@@ -262,7 +271,7 @@ void testButtons(Renderer &renderer, bool helpers)
             setState(button, states[row]);
             const bool disabled = states[row] & LV_STATE_DISABLED;
             const auto expectedBg = disabled ? DisplayTheme::surfaceSecondary() : states[row] & LV_STATE_PRESSED
-                ? (helpers ? lv_color_darken(bg, LV_OPA_20) : DisplayTheme::primaryPressed()) : bg;
+                ? (column == 0 ? DisplayTheme::primaryPressed() : lv_color_darken(bg, LV_OPA_20)) : bg;
             const auto expectedFg = disabled ? DisplayTheme::muted() : fg;
             samples.emplace_back(button, expectedBg);
             const std::string context = std::string(names[row]) + " column " + std::to_string(column);
@@ -416,7 +425,7 @@ void testLogos(Renderer &renderer)
                 expect(rendered == expected, "Opaque logo pixel preserved by actual renderer");
                 ++opaque;
             } else if (alpha == 0) {
-                expect(rendered == lv_color_to_u16(DisplayTheme::background()), "Transparent logo pixel composites on white");
+                expect(rendered == lv_color_to_u16(DisplayTheme::background()), "Transparent logo pixel composites on dark background");
                 ++transparent;
             }
         }
@@ -598,6 +607,69 @@ void testPin(Renderer &renderer)
 }
 }
 
+namespace
+{
+void expectBackground(Renderer &renderer, lv_obj_t *screen, const char *fixture)
+{
+    expect(lv_obj_get_style_bg_image_src(screen, LV_PART_MAIN) == &lockscreen_background_image,
+           "Production screen retains original background descriptor");
+    expect(lv_obj_get_style_bg_image_recolor_opa(screen, LV_PART_MAIN) == LV_OPA_TRANSP,
+           "Background artwork is not recolored");
+    renderer.capture(fixture);
+    // Bottom strip is unobscured on all three production layouts.
+    for (int x = 0; x < Renderer::width; ++x) {
+        uint16_t original;
+        std::memcpy(&original, lockscreen_map + (470 * Renderer::width + x) * 2, sizeof(original));
+        expect(renderer.pixels[470 * Renderer::width + x] == original, "Original background pixels rendered unchanged");
+    }
+}
+
+void testBackgroundScreens(Renderer &renderer)
+{
+    expect(reinterpret_cast<uintptr_t>(lockscreen_map) % 4 == 0, "Background data aligned");
+    expect(static_cast<size_t>(backgroundEnd - lockscreen_map) == 480 * 480 * 2, "Background byte count");
+    {
+        Lockscreen lock;
+        lock.setResourceName("Lasercutter");
+        lock.init();
+        ScreenGuard guard(lock.getScreen(), &lock);
+        lock.setUsageInfo(false, "", false);
+        expectBackground(renderer, guard.root, "lockscreen-available");
+        lock.setUsageInfo(true, "Alex", false);
+        expectBackground(renderer, guard.root, "lockscreen-in-use");
+        lock.setUsageInfo(false, "", true);
+        expectBackground(renderer, guard.root, "lockscreen-maintenance");
+    }
+    {
+        NoResourcesScreen empty;
+        empty.init();
+        ScreenGuard guard(empty.getScreen(), &empty);
+        expectBackground(renderer, guard.root, "no-resources");
+    }
+    {
+        ResourceListScreen list;
+        API::ResourceList resources{};
+        resources.count = 3;
+        const char *names[] = {"Lasercutter", "CNC Fraese", "3D Drucker"};
+        for (int i = 0; i < 3; ++i) {
+            resources.items[i].id = i + 1;
+            std::strcpy(resources.items[i].name, names[i]);
+            std::strcpy(resources.items[i].description, "Werkstatt");
+        }
+        resources.items[1].hasActiveUsage = true;
+        resources.items[2].isUnderMaintenance = true;
+        list.setResourceList(resources);
+        list.init();
+        ScreenGuard guard(list.getScreen(), &list);
+        expectBackground(renderer, guard.root, "resource-list");
+        uint32_t selected = 0;
+        list.setResourceSelectionCallback([&](const API::ResourceBrief &resource) { selected = resource.id; });
+        lv_obj_send_event(requireObject(guard.root, &lv_button_class), LV_EVENT_CLICKED, nullptr);
+        expect(selected == 1, "Resource selection callback survives background restoration");
+    }
+}
+}
+
 int main(int argc, char **argv)
 {
     std::filesystem::path output;
@@ -634,6 +706,7 @@ int main(int argc, char **argv)
         test("theme/helper-button-states", [&] { testButtons(renderer, true); });
         test("theme/fields-and-keyboard-states", [&] { testInputs(renderer); });
         test("render/production-logo-bytes", [&] { testLogos(renderer); });
+        test("screen/restored-backgrounds", [&] { testBackgroundScreens(renderer); });
         test("screen/boot", [&] { testBoot(renderer); });
         test("screen/init", [&] { testInit(renderer); });
         test("screen/enrollment", [&] { testCard<EnrollmentScreen>(renderer, "enrollment", "Karte wird beschrieben...\nbitte nicht bewegen", "Karte registriert!"); });
@@ -642,7 +715,7 @@ int main(int argc, char **argv)
         test("screen/pin-and-real-keyboard-events", [&] { testPin(renderer); });
         std::cout << "RESULT " << passed << " passed, " << failed << " failed; " << checks << " checks; "
                   << renderer.captures << " real LVGL frames\n";
-        std::cout << "COVERAGE: production theme, boot/init/enrollment/reset/supervision/PIN and both logo assets.\n"
+        std::cout << "COVERAGE: production theme, boot/init/enrollment/reset/supervision/PIN, lockscreen/resource list/no resources and image assets.\n"
                      "NOT COVERED: devices, RTOS, transport, full router/overlays, remaining screens or pixel-golden approval.\n";
         if (!output.empty()) std::cout << "OUTPUT " << std::filesystem::absolute(output) << '\n';
         return failed || lvglErrors ? 1 : 0;

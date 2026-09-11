@@ -321,9 +321,13 @@ export function PluginsSection() {
     }
   };
 
+  const loadMarketplaceForCurrentFilters = useEffectEvent(() => {
+    void loadMarketplace();
+  });
+
   useEffect(() => {
     if (!isMarketplaceOpen || !globalThis.fetch) return;
-    const timeout = window.setTimeout(() => void loadMarketplace(), marketplaceQuery.trim() ? 300 : 0);
+    const timeout = window.setTimeout(loadMarketplaceForCurrentFilters, marketplaceQuery.trim() ? 300 : 0);
     return () => window.clearTimeout(timeout);
   }, [isMarketplaceOpen, marketplaceQuery, selectedRegistryId]);
 

@@ -95,7 +95,7 @@ namespace
 void DisplayTheme::init(lv_display_t *display)
 {
     initStyles();
-    lv_theme_t *base = lv_theme_default_init(display, primary(), primary(), false, &lv_font_montserrat_18);
+    lv_theme_t *base = lv_theme_default_init(display, primary(), primary(), true, &lv_font_montserrat_18);
     theme = *base;
     lv_theme_set_parent(&theme, base);
     lv_theme_set_apply_cb(&theme, applyTheme);
@@ -117,6 +117,7 @@ void DisplayTheme::applyScreen(lv_obj_t *obj)
 void DisplayTheme::applySurface(lv_obj_t *obj)
 {
     applyScreen(obj);
+    lv_obj_set_style_bg_color(obj, surface(), LV_PART_MAIN);
     lv_obj_set_style_border_width(obj, 1, LV_PART_MAIN);
     lv_obj_set_style_border_color(obj, border(), LV_PART_MAIN);
     lv_obj_set_style_radius(obj, Radius, LV_PART_MAIN);
@@ -130,7 +131,7 @@ void DisplayTheme::button(lv_obj_t *obj, lv_color_t bg, lv_color_t fg)
     lv_obj_set_style_radius(obj, Radius, LV_PART_MAIN);
     lv_obj_set_style_border_width(obj, 0, LV_PART_MAIN);
     lv_obj_set_style_shadow_width(obj, 0, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(obj, lv_color_darken(bg, LV_OPA_20), LV_PART_MAIN | LV_STATE_PRESSED);
+    lv_obj_set_style_bg_color(obj, lv_color_eq(bg, primary()) ? primaryPressed() : lv_color_darken(bg, LV_OPA_20), LV_PART_MAIN | LV_STATE_PRESSED);
     lv_obj_set_style_text_color(obj, fg, LV_PART_MAIN | LV_STATE_PRESSED);
     lv_obj_set_style_color_filter_dsc(obj, nullptr, LV_PART_MAIN | LV_STATE_PRESSED);
     lv_obj_set_style_recolor_opa(obj, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_PRESSED);

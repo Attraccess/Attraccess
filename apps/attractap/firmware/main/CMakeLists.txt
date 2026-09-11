@@ -62,6 +62,6 @@ if("HAS_LVGL_DISPLAY=1" IN_LIST ATTRACTAP_DEFINES)
     get_filename_component(ATTRACTAP_IMAGE_DIR "${CMAKE_CURRENT_LIST_DIR}/../src/display/images" ABSOLUTE)
     configure_file("${ATTRACTAP_IMAGE_DIR}/logos.S.in" "${CMAKE_CURRENT_BINARY_DIR}/logos.S" @ONLY)
     set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/logos.S" PROPERTIES
-        OBJECT_DEPENDS "${ATTRACTAP_IMAGE_DIR}/logo_133x40.rgb565a8;${ATTRACTAP_IMAGE_DIR}/logo_400x120.rgb565a8")
+        OBJECT_DEPENDS "${ATTRACTAP_IMAGE_DIR}/logo_133x40.rgb565a8;${ATTRACTAP_IMAGE_DIR}/logo_400x120.rgb565a8;${ATTRACTAP_IMAGE_DIR}/lockscreen.rgb565")
     target_sources(${COMPONENT_LIB} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/logos.S")
 endif()

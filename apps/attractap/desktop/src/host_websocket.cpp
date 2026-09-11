@@ -57,10 +57,11 @@ std::string HostWebsocket::readerUrl(const std::string &endpoint)
     return websocketScheme + "://" + endpoint.substr(authorityStart, authorityEnd - authorityStart) + "/api/attractap/websocket";
 }
 
-HostWebsocket::HostWebsocket(HostRuntime &runtime, std::string endpoint)
-    : runtime(runtime), url(readerUrl(endpoint))
+HostWebsocket::HostWebsocket(HostRuntime &runtime)
+    : runtime(runtime)
 {
     initializeCurl();
+    updateUrlFromSettings();
 }
 
 HostWebsocket::~HostWebsocket()

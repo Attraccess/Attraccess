@@ -238,7 +238,7 @@ void DemoSettingsScreen::showScanOverlay()
 
     lv_obj_t *lbl = lv_label_create(_scanOverlay);
     lv_label_set_text(lbl, "Karte ans Lesegeraet halten...");
-    lv_obj_set_style_text_color(lbl, DisplayTheme::onPrimary(), LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl, DisplayTheme::text(), LV_PART_MAIN);
     lv_obj_set_style_text_font(lbl, &lv_font_montserrat_24, LV_PART_MAIN);
     lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
 

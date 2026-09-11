@@ -80,11 +80,15 @@ assets.set('apps/companion/src/assets/logo.svg', Buffer.from(lockup));
 
 // LVGL 9 RGB565A8: little-endian RGB565 plane followed by an A8 plane.
 // ESP-IDF embeds these binary assets; no generated C++ arrays are committed.
+// The reader uses a fixed dark theme. Change only the vector lettering, keeping
+// the approved full-color mascot and its embedded raster identical.
+const firmwareLockup = lockup.replace(wordmark[0], wordmark[0].replace('fill="currentcolor"', 'fill="#F4F8F8"'));
+assert.notEqual(firmwareLockup, lockup, 'Firmware wordmark must use light ink');
 for (const [width, height] of [
   [133, 40],
   [400, 120],
 ]) {
-  const rgba = await sharp(await render(lockup, width, height))
+  const rgba = await sharp(await render(firmwareLockup, width, height))
     .ensureAlpha()
     .raw()
     .toBuffer();
@@ -103,6 +107,27 @@ for (const [width, height] of [
   }
   assets.set(`apps/attractap/firmware/src/display/images/logo_${width}x${height}.rgb565a8`, image);
 }
+
+// Bottom-left square keeps the raccoon reaching toward the rings together.
+// Keep a PNG preview alongside the source; LVGL consumes the opaque RGB565 bytes.
+const wallpaper = await read('apps/frontend/public/login-wallpaper-RAL5020.png');
+const wallpaperMetadata = await sharp(wallpaper).metadata();
+const cropSize = Math.min(wallpaperMetadata.width, wallpaperMetadata.height);
+const squareWallpaper = await sharp(wallpaper)
+  .extract({ left: 0, top: wallpaperMetadata.height - cropSize, width: cropSize, height: cropSize })
+  .resize(480, 480)
+  .png(pngOptions)
+  .toBuffer();
+assets.set('apps/frontend/public/login-wallpaper-RAL5020-480.png', squareWallpaper);
+const wallpaperRgb = await sharp(squareWallpaper).removeAlpha().raw().toBuffer();
+const wallpaper565 = Buffer.alloc(480 * 480 * 2);
+for (let pixel = 0; pixel < 480 * 480; pixel++) {
+  const offset = pixel * 3;
+  const value =
+    ((wallpaperRgb[offset] >> 3) << 11) | ((wallpaperRgb[offset + 1] >> 2) << 5) | (wallpaperRgb[offset + 2] >> 3);
+  wallpaper565.writeUInt16LE(value, pixel * 2);
+}
+assets.set('apps/attractap/firmware/src/display/images/lockscreen.rgb565', wallpaper565);
 
 for (const [input, output, width, height] of [
   [original, logo, 150, 300],

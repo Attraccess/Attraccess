@@ -31,7 +31,7 @@
       "options": {
         "commands": [
           "cmake -S apps/attractap/desktop -B dist/apps/attractap-desktop",
-          "cmake --build dist/apps/attractap-desktop --target attractap-desktop-tests",
+          "cmake --build dist/apps/attractap-desktop --target attractap-desktop-tests attractap-desktop-display-tests",
           "ctest --test-dir dist/apps/attractap-desktop --output-on-failure"
         ],
         "parallel": false,

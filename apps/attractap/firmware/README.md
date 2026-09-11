@@ -60,20 +60,28 @@ run (it downloads Mozilla's CA bundle, cached for 7 days). Run it once before
 
 ## Display Theme
 
-All display variants use white backgrounds, RAL 5021 water-blue accents
-(`#256D7B`), dark text, small corners and restrained borders. Shared styles live
+All display variants use the web frontend's dark palette: deep blue-green
+backgrounds (`#162124`), raised surfaces (`#1E2C2F`), water-blue accents
+(`#82C4CE`), light text, small corners and restrained borders. Shared styles live
 in `src/display/theme.hpp` and `theme.cpp`, including pressed, disabled, focused
 and keyboard states. Green, amber and red retain their status/safety meanings.
-This is the firmware's light theme; the web application's saved dark-mode
+This is the firmware's fixed dark theme; the web application's saved dark-mode
 preference does not configure a reader. Lite's LED status colors are unchanged.
 
-The logos preserve the approved full-color mascot. From the repository root,
+The logos preserve the approved full-color mascot, with light vector lettering
+for dark backgrounds. From the repository root,
 run `node scripts/generate-brand-assets.mjs` to regenerate the 133 x 40 and
 400 x 120 `*.rgb565a8` assets alongside the web artwork, or add `--check` to
 verify them without writing files. They contain a little-endian RGB565 color
 plane followed by an A8 alpha plane. ESP-IDF embeds these binary assets only
 for display variants; the small image-descriptor headers are handwritten.
-No generated C++ pixel arrays or full-screen white wallpaper are needed.
+The lockscreen, resource list and no-resources screens use a bottom-left square
+crop of `apps/frontend/public/login-wallpaper-RAL5020.png`, preserving the raccoon
+and the rings. The same brand generator produces a 480 x 480 PNG preview at
+`apps/frontend/public/login-wallpaper-RAL5020-480.png` and the firmware asset.
+`lockscreen.rgb565` is a 460,800-byte little-endian RGB565
+asset shared by those screens, embedded once with four-byte alignment through
+`logos.S.in`. No generated C++ pixel arrays are needed.
 
 ## Host Tests
 

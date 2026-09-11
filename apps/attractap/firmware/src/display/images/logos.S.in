@@ -19,6 +19,13 @@ _binary_logo_400x120_rgb565a8_start:
 .global _binary_logo_400x120_rgb565a8_end
 _binary_logo_400x120_rgb565a8_end:
 
+.balign 4
+.global _binary_lockscreen_rgb565_start
+_binary_lockscreen_rgb565_start:
+.incbin "@ATTRACTAP_IMAGE_DIR@/lockscreen.rgb565"
+.global _binary_lockscreen_rgb565_end
+_binary_lockscreen_rgb565_end:
+
 #if defined(__linux__)
 .section .note.GNU-stack,"",@progbits
 #endif
