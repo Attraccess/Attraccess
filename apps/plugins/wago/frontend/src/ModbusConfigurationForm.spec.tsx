@@ -85,6 +85,26 @@ describe('Modbus custom profile editing', () => {
     expect(input).toHaveValue('custom-edited');
     expect(screen.getByDisplayValue('custom-edited')).toBe(input);
   });
+  it('keeps the selected custom profile open when its version changes', async () => {
+    function Editor() {
+      const [value, onChange] = useState<ModbusConfiguration>({
+        connections: [],
+        devices: [],
+        profiles: [{ id: 'custom', name: 'Custom', version: 1, measurements: [], actions: [] }],
+      });
+      return <ModbusConfigurationForm value={value} onChange={onChange} focused />;
+    }
+    render(<Editor />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /device profiles/i }));
+    await user.click(screen.getByRole('button', { name: /edit profile/i }));
+    await user.click(screen.getByRole('option', { name: 'Custom v1' }));
+    const version = screen.getByRole('textbox', { name: 'Version' });
+    await user.clear(version);
+    await user.type(version, '2');
+    expect(screen.getByRole('textbox', { name: 'Version' })).toHaveValue('2');
+    expect(screen.getByDisplayValue('Custom')).toBeInTheDocument();
+  });
 });
 
 it('keeps partial numeric text while typing and replaces it when the authoritative value changes', async () => {

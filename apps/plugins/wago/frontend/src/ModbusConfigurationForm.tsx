@@ -462,6 +462,11 @@ export function ModbusConfigurationForm({
           }));
   const selectedId = items.find((item) => item.id === selected[section])?.id ?? items[0]?.id;
   function change(next: ModbusConfiguration) {
+    const selectedProfileIndex = profiles.findIndex((profile) => `${profile.id}@${profile.version}` === selected.profiles);
+    if (selectedProfileIndex >= BUILTIN_MODBUS_PROFILES.length) {
+      const profile = next.profiles[selectedProfileIndex - BUILTIN_MODBUS_PROFILES.length];
+      setSelected((current) => ({ ...current, profiles: `${profile.id}@${profile.version}` }));
+    }
     for (const key of ['connections', 'devices', 'profiles'] as const) {
       if (next[key].length > value[key].length) {
         const item = next[key][next[key].length - 1];
