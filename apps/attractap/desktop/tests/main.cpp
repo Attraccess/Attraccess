@@ -50,6 +50,10 @@ int main()
     nfc.setPresent(0, true);
     assert(detected == 1);
     assert(detectedCard == 1);
+    auto inactiveReplacement = nfc.card(1);
+    nfc.setCard(1, inactiveReplacement);
+    assert(nfcContract.isCardPresent());
+    assert(nfcContract.getAvailableKeyNo(nullptr, nullptr, &availableKey));
     nfc.setPresent(1, true);
     assert(removed == 1);
     assert(detected == 2);
