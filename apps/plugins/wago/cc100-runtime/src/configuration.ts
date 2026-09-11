@@ -3,6 +3,8 @@ import { createHash } from 'node:crypto';
 // Keep persisted runtime snapshots subject to the same Modbus contract as API acceptance.
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import { validateModbus, validateModbusBindings } from '../../modbus/model';
+// eslint-disable-next-line @nx/enforce-module-boundaries
+import { pulseBehaviorError } from '../../channel-behavior';
 import { type Snapshot, type ValidationError } from './runtime-types';
 
 export const PROTOCOL_VERSION = 1;
@@ -172,18 +174,8 @@ export function validateSnapshot(value: unknown): ValidationError[] {
         message: 'every channel needs hold, immediate, or watchdog disconnect behavior',
       });
     }
-    if (
-      channel?.pulse &&
-      (!capabilities.includes('pulse') ||
-        !Number.isSafeInteger(channel.pulse.durationMs) ||
-        channel.pulse.durationMs <= 0)
-    ) {
-      errors.push({
-        path: `${path}.pulse`,
-        code: 'invalid_pulse',
-        message: 'pulse requires pulse capability and positive duration',
-      });
-    }
+    const pulseError = pulseBehaviorError(capabilities, channel.pulse);
+    if (pulseError) errors.push({ path: `${path}.pulse`, code: 'invalid_pulse', message: pulseError });
     if (channel.pulse) {
       validateKeys(channel.pulse as Record<string, unknown>, `${path}.pulse`, ['durationMs'], errors);
     }

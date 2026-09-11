@@ -5,6 +5,7 @@ import { WagoController } from './wago-controller.entity';
 import type { WagoConfigurationSnapshot } from './configuration';
 import { operationalWildcardTopic, parseOperationalMessage, type WagoOperationalMessage } from './protocol';
 import { WagoSettings } from './wago-settings.entity';
+import { WAGO_EVENT_NODE_TYPE } from './wago-state-nodes';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 const STALE_AFTER_MS = 90_000;
@@ -152,13 +153,37 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
     this.controllerByHardwareId = controllerByHardwareId;
   }
 
-  async resolveConfigSchema(config: Record<string, unknown>, kind: NodeKind): Promise<Record<string, unknown>> {
-    const controllers = await this.controllers.find({ where: { trustState: 'claimed' }, order: { name: 'ASC' } });
+  async resolveConfigSchema(
+    config: Record<string, unknown>,
+    kind: NodeKind,
+    validationContext = new Map<string, unknown>(),
+  ): Promise<Record<string, unknown>> {
+    const controllers = await this.cached(validationContext, 'wago-flow-controllers', () =>
+      this.controllers.find({ where: { trustState: 'claimed' }, order: { name: 'ASC' } }),
+    );
     const selected =
       typeof config.controllerId === 'number'
         ? controllers.find((controller) => controller.id === config.controllerId)
         : undefined;
-    const channels = selected ? await this.channels(selected.id) : [];
+    const revision = selected
+      ? await this.cached(validationContext, `wago-applied-revision:${selected.id}`, async () => {
+          const [latest] = await this.revisions.find({
+            where: { controllerId: selected.id, state: 'applied' },
+            order: { revision: 'DESC' },
+            take: 1,
+          });
+          return latest ?? null;
+        })
+      : null;
+    const channels: WagoConfigurationSnapshot['logicalChannels'] = revision
+      ? JSON.parse(revision.snapshot).logicalChannels
+      : [];
+    let names: Record<string, unknown> = {};
+    try {
+      names = JSON.parse(revision?.presetProvenance ?? 'null')?.editor?.names ?? {};
+    } catch {
+      // Older configurations may not have visual editor labels.
+    }
     const channel = channels.find((item) => item.id === config.channelId);
     const properties: Record<string, unknown> = {
       controllerId: {
@@ -169,12 +194,17 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
           const: controller.id,
           title: controller.name ?? controller.hardwareId,
         })),
+        description:
+          selected && !revision ? 'Publish a configuration and wait for the controller to apply it first.' : undefined,
       },
       channelId: {
         type: 'string',
         title: 'Logical Channel',
         refreshesSchema: true,
-        oneOf: channels.map((channel) => ({ const: channel.id, title: channel.id })),
+        oneOf: channels.map((channel) => ({
+          const: channel.id,
+          title: typeof names[channel.id] === 'string' ? names[channel.id] : channel.id,
+        })),
       },
     };
     if (kind === 'event') {
@@ -183,7 +213,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
         title: 'Event category',
         oneOf: this.categories(channel).map((category) => ({ const: category, title: category })),
       };
-      properties.minimumIntervalMs = { type: 'number', title: 'Minimum interval (ms)', minimum: 0 };
+      properties.minimumIntervalMs = { type: 'number', title: 'Minimum interval (ms)', minimum: 0, default: 0 };
       if (channel?.capabilities.includes('measurement'))
         properties.minimumChange = { type: 'number', title: 'Minimum change (wire units)', minimum: 0 };
     }
@@ -199,9 +229,62 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
         type: config.category === 'measurement' ? 'number' : 'boolean',
         title: config.category === 'measurement' ? 'Equals (wire value)' : 'Equals',
       };
-      properties.timeoutMs = { type: 'number', title: 'Timeout (ms)', minimum: 1, maximum: MAX_TIMEOUT_MS };
+      properties.timeoutMs = {
+        type: 'number',
+        title: 'Timeout (ms)',
+        minimum: 1,
+        maximum: MAX_TIMEOUT_MS,
+        default: 30_000,
+      };
     }
-    return { dynamic: true, type: 'object', properties, required: ['controllerId', 'channelId', 'category'] };
+    return {
+      dynamic: true,
+      type: 'object',
+      properties,
+      required: ['controllerId', 'channelId', 'category', ...(kind === 'wait' ? ['equals', 'timeoutMs'] : [])],
+    };
+  }
+
+  private cached<T>(context: Map<string, unknown>, key: string, load: () => Promise<T>): Promise<T> {
+    if (!context.has(key)) context.set(key, load());
+    return context.get(key) as Promise<T>;
+  }
+
+  async validateConfig(config: Record<string, unknown>, kind: NodeKind, context = new Map<string, unknown>()) {
+    const schema = await this.resolveConfigSchema(config, kind, context);
+    const properties = schema.properties as Record<string, { oneOf?: Array<{ const: unknown }> }>;
+    const errors: Array<{ field: string; message: string }> = [];
+    for (const [field, message] of [
+      ['controllerId', 'Select a claimed WAGO controller.'],
+      ['channelId', 'Select a channel from the applied controller configuration.'],
+      ['category', 'Select a category supported by this channel.'],
+    ]) {
+      if (!properties[field]?.oneOf?.some((choice) => choice.const === config[field])) errors.push({ field, message });
+    }
+    const numericFields =
+      kind === 'event' ? ['minimumIntervalMs', 'minimumChange'] : kind === 'wait' ? ['timeoutMs'] : [];
+    for (const field of numericFields) {
+      const value = config[field];
+      if (
+        value !== undefined &&
+        (typeof value !== 'number' ||
+          !Number.isFinite(value) ||
+          value < (field === 'timeoutMs' ? 1 : 0) ||
+          (field === 'timeoutMs' && value > MAX_TIMEOUT_MS))
+      )
+        errors.push({
+          field,
+          message: field === 'timeoutMs' ? 'Enter a valid positive timeout.' : 'Enter a non-negative number.',
+        });
+    }
+    if (
+      kind === 'wait' &&
+      (config.category === 'measurement'
+        ? typeof config.equals !== 'number' || !Number.isFinite(config.equals)
+        : typeof config.equals !== 'boolean')
+    )
+      errors.push({ field: 'equals', message: 'Enter a matching value for the selected state category.' });
+    return errors;
   }
 
   read(config: Record<string, unknown>): CachedState | null {
@@ -255,7 +338,9 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
   }
 
   private onMessage(serverId: number, prefix: string, topic: string, payload: Buffer): Promise<void> {
-    const queued = this.messageQueue.catch(() => undefined).then(() => this.processMessage(serverId, prefix, topic, payload));
+    const queued = this.messageQueue
+      .catch(() => undefined)
+      .then(() => this.processMessage(serverId, prefix, topic, payload));
     this.messageQueue = queued;
     return queued;
   }
@@ -539,7 +624,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
         !this.unavailableConfiguration.has(state.controllerId),
     };
   }
-  payload(state: CachedState): object {
+  payload(state: CachedState) {
     const payload = { ...state };
     delete payload.invalidated;
     return { ...payload, ...this.freshness(state) };
@@ -554,7 +639,7 @@ export class WagoFlowService implements OnModuleInit, OnModuleDestroy {
       if (stream?.active !== state.streamId || stream.exhausted) continue;
       try {
         await this.context.flows.trigger(
-          'plugin.wago.event-received',
+          WAGO_EVENT_NODE_TYPE,
           (config, nodeId) => this.matchesEvent(config, nodeId, state, previous),
           { wago: this.payload(state) },
         );

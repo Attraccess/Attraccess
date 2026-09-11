@@ -96,7 +96,11 @@ export function ConfigurationRevisions({
   onRollback,
   generation,
   onBusyChange,
+  view = 'review',
+  hasSavedDraft = true,
 }: {
+  view?: 'review' | 'history';
+  hasSavedDraft?: boolean;
   controllerId: number;
   metadata: ConfigurationEditorMetadata;
   disabled: boolean;
@@ -145,183 +149,205 @@ export function ConfigurationRevisions({
     }
   }
   return (
-    <section aria-label="Review and publish" className="wg:flex wg:flex-col wg:gap-3">
-      <h2 className="wg:font-medium">Review and publish</h2>
-      <p>Save local edits first. Publishing sends a new revision to the controller.</p>
-      {offset === 0 && !history.isError && history.data?.revisions[0]?.state === 'applied' && (
-        <p>
-          <Link href="/resources">Choose a resource for your first flow</Link>. Open its Flows tab, add a WAGO command,
-          then select this controller and a named output channel.
-        </p>
-      )}
-      <Button
-        variant="secondary"
-        isDisabled={disabled || busy}
-        onPress={() =>
-          void run(async () => {
-            setForce(false);
-            await actions.review.mutateAsync();
-          })
-        }
-      >
-        Review saved draft
-      </Button>
-      {review && (
-        <>
-          <ConfigurationChanges
-            changes={review.diff}
-            before={review.previous ? JSON.parse(review.previous.snapshot) : null}
-            after={JSON.parse(review.draft.snapshot)}
-            names={reviewNames}
-          />
-          <ConfigurationMetadataChanges changes={review.metadataDiff ?? []} names={reviewNames} />
-          <ImpactWarning impacts={review.impacts} names={reviewNames} acknowledged={force} onChange={setForce} />
-          <Button
-            isDisabled={disabled || busy || !reviewedHash || (!!review.impacts.length && !force)}
-            isPending={actions.publish.isPending}
-            onPress={() =>
-              void run(async () => {
-                if (!reviewedHash) return;
-                await actions.publish.mutateAsync({ force, reviewedHash });
-                actions.review.reset();
-                setOffset(0);
-              })
-            }
-          >
-            Publish reviewed draft
-          </Button>
-        </>
-      )}
-      {actions.publish.data && (
-        <p role="status">
-          Publication submitted for revision {actions.publish.data.revision}. Current controller report is shown in
-          revision history.
-        </p>
-      )}
-      <h3 className="wg:font-medium">Revision history and deployment progress</h3>
-      {history.isPending && <p>Loading history…</p>}
-      {history.isError && <p role="alert">Could not load history: {history.error.message}</p>}
-      {!history.isPending && history.data?.revisions.length === 0 && <p>No published revisions.</p>}
-      {history.data?.revisions.map((revision) => (
-        <section key={revision.revision} aria-label={`Revision ${revision.revision}`}>
-          <p className="wg:font-medium">
-            Revision {revision.revision} ·{' '}
-            {revision.state === 'pending'
-              ? 'Pending delivery'
-              : revision.state === 'published'
-                ? 'Published — awaiting controller report'
-                : revision.state === 'applied'
-                  ? 'Applied by controller'
-                  : 'Rejected by controller'}
-          </p>
-          <p>
-            Published: {revision.publishedAt} · Reported: {revision.reportedAt ?? 'Not yet reported'}
-          </p>
-          <RejectionErrors
-            value={revision.rejectionErrors}
-            controllerId={controllerId}
-            revision={revision.revision}
-            names={metadata.names}
-          />
-          {revision.state === 'rejected' && !revision.rejectionAcknowledgedAt && revision.reportedAt && (
-            <Button
-              variant="secondary"
-              isDisabled={disabled || busy}
-              onPress={() =>
-                void run(() =>
-                  actions.acknowledgeRejection.mutateAsync({
-                    revision: revision.revision,
-                    contentHash: revision.contentHash,
-                    reportedAt: revision.reportedAt!,
-                  }),
-                )
-              }
-            >
-              Acknowledge rejection of revision {revision.revision}
-            </Button>
-          )}
-          {revision.rejectionAcknowledgedAt && (
-            <p>Rejection acknowledged by user {revision.rejectionAcknowledgedBy ?? 'unknown'}.</p>
+    <section
+      aria-label={view === 'review' ? 'Review and publish' : 'Revision history'}
+      className="wg:flex wg:flex-col wg:gap-4"
+    >
+      <div hidden={view !== 'review'}>
+        <div className="wg:flex wg:flex-col wg:gap-4">
+          <h2 className="wg:font-medium">Review and publish</h2>
+          <p>Save local edits first. Publishing sends a new revision to the controller.</p>
+          {offset === 0 && !history.isError && history.data?.revisions[0]?.state === 'applied' && (
+            <p>
+              <Link href="/resources">Choose a resource for your first flow</Link>. Open its Flows tab, add a WAGO
+              command, then select this controller and a named output channel.
+            </p>
           )}
           <Button
             variant="secondary"
-            isDisabled={disabled || busy}
+            isDisabled={disabled || busy || !hasSavedDraft}
             onPress={() =>
               void run(async () => {
-                setRollbackForce(false);
-                await actions.preview.mutateAsync(revision.revision);
+                setForce(false);
+                await actions.review.mutateAsync();
               })
             }
           >
-            Preview rollback to revision {revision.revision}
+            Review saved draft
           </Button>
-        </section>
-      ))}
-      <div className="wg:flex wg:gap-2">
-        <Button variant="secondary" isDisabled={offset === 0} onPress={() => setOffset(Math.max(0, offset - 20))}>
-          Newer revisions
-        </Button>
-        <Button
-          variant="secondary"
-          isDisabled={(history.data?.revisions.length ?? 0) < 20}
-          onPress={() => setOffset(offset + 20)}
-        >
-          Older revisions
-        </Button>
+          {review && (
+            <>
+              <ConfigurationChanges
+                changes={review.diff}
+                before={review.previous ? JSON.parse(review.previous.snapshot) : null}
+                after={JSON.parse(review.draft.snapshot)}
+                names={reviewNames}
+              />
+              <ConfigurationMetadataChanges changes={review.metadataDiff ?? []} names={reviewNames} />
+              <ImpactWarning impacts={review.impacts} names={reviewNames} acknowledged={force} onChange={setForce} />
+              <Button
+                isDisabled={disabled || busy || !hasSavedDraft || !reviewedHash || (!!review.impacts.length && !force)}
+                isPending={actions.publish.isPending}
+                onPress={() =>
+                  void run(async () => {
+                    if (!reviewedHash) return;
+                    await actions.publish.mutateAsync({ force, reviewedHash });
+                    actions.review.reset();
+                    setOffset(0);
+                  })
+                }
+              >
+                Publish reviewed draft
+              </Button>
+            </>
+          )}
+          {actions.publish.data && (
+            <p role="status">
+              Publication submitted for revision {actions.publish.data.revision}. Current controller report is shown in
+              revision history.
+            </p>
+          )}
+        </div>
       </div>
-      {preview && (
-        <>
-          <h3>Restore revision {preview.revision.revision} as a new revision</h3>
-          <p>This replaces the saved draft and publishes a new revision. The historical revision is retained.</p>
-          <ConfigurationChanges
-            changes={preview.diff}
-            before={preview.current ? JSON.parse(preview.current.snapshot) : null}
-            after={JSON.parse(preview.revision.snapshot)}
-            names={rollbackNames}
-          />
-          <ConfigurationMetadataChanges changes={preview.metadataDiff ?? []} names={rollbackNames} />
-          <ImpactWarning
-            impacts={preview.impacts}
-            names={rollbackNames}
-            acknowledged={rollbackForce}
-            onChange={setRollbackForce}
-          />
-          <Button
-            variant="danger"
-            isDisabled={disabled || busy || (!!preview.impacts.length && !rollbackForce)}
-            onPress={() =>
-              void run(async () => {
-                setReconciling(true);
-                let failure: unknown;
-                try {
-                  await actions.rollback.mutateAsync({
-                    revision: preview.revision.revision,
-                    force: rollbackForce,
-                    sourceHash: preview.revision.contentHash,
-                    currentHash: preview.current?.contentHash ?? null,
-                    draftHash: preview.draftHash,
-                  });
-                } catch (error) {
-                  failure = error;
+      <div hidden={view !== 'history'}>
+        <div className="wg:flex wg:flex-col wg:gap-4">
+          <h2 className="wg:text-xl wg:font-semibold">Revision history and deployment progress</h2>
+          <p className="wg:text-sm wg:text-muted">
+            Track controller acknowledgements or restore an earlier configuration as a new revision.
+          </p>
+          {history.isPending && <p>Loading history…</p>}
+          {history.isError && <p role="alert">Could not load history: {history.error.message}</p>}
+          {!history.isPending && history.data?.revisions.length === 0 && <p>No published revisions.</p>}
+          {history.data?.revisions.map((revision) => (
+            <section
+              key={revision.revision}
+              aria-label={`Revision ${revision.revision}`}
+              className="wg:flex wg:flex-col wg:gap-3 wg:rounded-xl wg:border wg:border-border wg:p-4"
+            >
+              <p className="wg:font-medium">
+                Revision {revision.revision} ·{' '}
+                {revision.state === 'pending'
+                  ? 'Pending delivery'
+                  : revision.state === 'published'
+                    ? 'Published — awaiting controller report'
+                    : revision.state === 'applied'
+                      ? 'Applied by controller'
+                      : 'Rejected by controller'}
+              </p>
+              <p>
+                Published: {revision.publishedAt} · Reported: {revision.reportedAt ?? 'Not yet reported'}
+              </p>
+              <RejectionErrors
+                value={revision.rejectionErrors}
+                controllerId={controllerId}
+                revision={revision.revision}
+                names={metadata.names}
+              />
+              {revision.state === 'rejected' && !revision.rejectionAcknowledgedAt && revision.reportedAt && (
+                <Button
+                  variant="secondary"
+                  isDisabled={disabled || busy}
+                  onPress={() =>
+                    void run(() =>
+                      actions.acknowledgeRejection.mutateAsync({
+                        revision: revision.revision,
+                        contentHash: revision.contentHash,
+                        reportedAt: revision.reportedAt!,
+                      }),
+                    )
+                  }
+                >
+                  Acknowledge rejection of revision {revision.revision}
+                </Button>
+              )}
+              {revision.rejectionAcknowledgedAt && (
+                <p>Rejection acknowledged by user {revision.rejectionAcknowledgedBy ?? 'unknown'}.</p>
+              )}
+              <Button
+                variant="secondary"
+                isDisabled={disabled || busy}
+                onPress={() =>
+                  void run(async () => {
+                    setRollbackForce(false);
+                    await actions.preview.mutateAsync(revision.revision);
+                  })
                 }
-                try {
-                  actions.review.reset();
-                  actions.preview.reset();
-                  setOffset(0);
-                  await onRollback(failure);
-                } finally {
-                  setReconciling(false);
+              >
+                Preview rollback to revision {revision.revision}
+              </Button>
+            </section>
+          ))}
+          <div className="wg:flex wg:gap-2">
+            <Button
+              variant="secondary"
+              isDisabled={busy || offset === 0}
+              onPress={() => setOffset(Math.max(0, offset - 20))}
+            >
+              Newer revisions
+            </Button>
+            <Button
+              variant="secondary"
+              isDisabled={busy || (history.data?.revisions.length ?? 0) < 20}
+              onPress={() => setOffset(offset + 20)}
+            >
+              Older revisions
+            </Button>
+          </div>
+          {preview && (
+            <>
+              <h3>Restore revision {preview.revision.revision} as a new revision</h3>
+              <p>This replaces the saved draft and publishes a new revision. The historical revision is retained.</p>
+              <ConfigurationChanges
+                changes={preview.diff}
+                before={preview.current ? JSON.parse(preview.current.snapshot) : null}
+                after={JSON.parse(preview.revision.snapshot)}
+                names={rollbackNames}
+              />
+              <ConfigurationMetadataChanges changes={preview.metadataDiff ?? []} names={rollbackNames} />
+              <ImpactWarning
+                impacts={preview.impacts}
+                names={rollbackNames}
+                acknowledged={rollbackForce}
+                onChange={setRollbackForce}
+              />
+              <Button
+                variant="danger"
+                isDisabled={disabled || busy || (!!preview.impacts.length && !rollbackForce)}
+                onPress={() =>
+                  void run(async () => {
+                    setReconciling(true);
+                    let failure: unknown;
+                    try {
+                      await actions.rollback.mutateAsync({
+                        revision: preview.revision.revision,
+                        force: rollbackForce,
+                        sourceHash: preview.revision.contentHash,
+                        currentHash: preview.current?.contentHash ?? null,
+                        draftHash: preview.draftHash,
+                      });
+                    } catch (error) {
+                      failure = error;
+                    }
+                    try {
+                      actions.review.reset();
+                      actions.preview.reset();
+                      setOffset(0);
+                      await onRollback(failure);
+                    } finally {
+                      setReconciling(false);
+                    }
+                  })
                 }
-              })
-            }
-          >
-            Publish rollback as new revision
-          </Button>
-          <Button variant="secondary" onPress={() => actions.preview.reset()}>
-            Cancel rollback
-          </Button>
-        </>
-      )}
+              >
+                Publish rollback as new revision
+              </Button>
+              <Button variant="secondary" isDisabled={busy} onPress={() => actions.preview.reset()}>
+                Cancel rollback
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
       {error && <p role="alert">{error}</p>}
     </section>
   );

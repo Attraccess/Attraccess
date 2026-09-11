@@ -8,6 +8,8 @@ import {
   applyPreset,
   getSettings,
   getDraft,
+  getConfigurationBaseline,
+  type DraftIdentity,
   listPresets,
   listControllers,
   listCommissioningSessions,
@@ -105,7 +107,15 @@ export function useCreateCommissioningSessionMutation() {
 export function useConfirmCommissioningHostKeyMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, hostKeyFingerprint, physicalIdentityConfirmed }: { id: number; hostKeyFingerprint: string; physicalIdentityConfirmed?: boolean }) => confirmCommissioningHostKey(id, hostKeyFingerprint, physicalIdentityConfirmed),
+    mutationFn: ({
+      id,
+      hostKeyFingerprint,
+      physicalIdentityConfirmed,
+    }: {
+      id: number;
+      hostKeyFingerprint: string;
+      physicalIdentityConfirmed?: boolean;
+    }) => confirmCommissioningHostKey(id, hostKeyFingerprint, physicalIdentityConfirmed),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.commissioningSessions }),
   });
 }
@@ -118,14 +128,22 @@ export function useRecoverCommissioningSessionMutation() {
   return useCommissioningAttemptMutation(recoverCommissioningSession, 'recovery');
 }
 
-function useCommissioningAttemptMutation(attempt: typeof deliverCommissioningSession, intent: 'installation' | 'recovery') {
+function useCommissioningAttemptMutation(
+  attempt: typeof deliverCommissioningSession,
+  intent: 'installation' | 'recovery',
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
     gcTime: 0,
     retry: false,
     networkMode: 'always',
-    mutationFn: (variables: Omit<Parameters<typeof deliverCommissioningSession>[1], 'confirmInstall'> & { id: number; confirmInstall: boolean }) => {
+    mutationFn: (
+      variables: Omit<Parameters<typeof deliverCommissioningSession>[1], 'confirmInstall'> & {
+        id: number;
+        confirmInstall: boolean;
+      },
+    ) => {
       const temporarySsh = { ...variables.temporarySsh };
       const confirmInstall = variables.confirmInstall;
       // React Query retains mutation variables, including after reset/unmount.
@@ -181,6 +199,14 @@ export function useDraftQuery(controllerId: number | null) {
   });
 }
 
+export function useConfigurationBaselineQuery(controllerId: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ['wago', 'configuration-baseline', controllerId],
+    queryFn: () => getConfigurationBaseline(controllerId),
+    enabled,
+  });
+}
+
 export function usePresetsQuery() {
   return useQuery({ queryKey: queryKeys.presets, queryFn: listPresets });
 }
@@ -188,14 +214,29 @@ export function usePresetsQuery() {
 export function useSaveDraftMutation(controllerId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ snapshot, metadata }: { snapshot: WagoConfigurationSnapshot; metadata?: ConfigurationEditorMetadata }) =>
-      saveDraft(controllerId, snapshot, metadata),
+    mutationFn: ({
+      snapshot,
+      metadata,
+      expectedDraft,
+    }: {
+      snapshot: WagoConfigurationSnapshot;
+      metadata?: ConfigurationEditorMetadata;
+      expectedDraft?: DraftIdentity | null;
+    }) => saveDraft(controllerId, snapshot, metadata, expectedDraft),
     onSuccess: (draft) => queryClient.setQueryData(queryKeys.draft(controllerId), draft),
   });
 }
 
 export function usePreviewPresetMutation(controllerId: number) {
-  return useMutation({ mutationFn: (application: WagoPresetApplication) => previewPreset(controllerId, application) });
+  return useMutation({
+    mutationFn: ({
+      application,
+      snapshot,
+    }: {
+      application: WagoPresetApplication;
+      snapshot: WagoConfigurationSnapshot;
+    }) => previewPreset(controllerId, application, snapshot),
+  });
 }
 
 export function useApplyPresetMutation() {
@@ -249,14 +290,29 @@ export function useConfigurationActions(controllerId: number) {
       publishConfiguration(controllerId, force, reviewedHash),
     onSuccess: refresh,
   });
-  const preview = useMutation({ mutationFn: (revision: number) => previewConfigurationRevision(controllerId, revision) });
+  const preview = useMutation({
+    mutationFn: (revision: number) => previewConfigurationRevision(controllerId, revision),
+  });
   const acknowledgeRejection = useMutation({
-    mutationFn: ({ revision, contentHash, reportedAt }: { revision: number; contentHash: string; reportedAt: string }) =>
-      acknowledgeConfigurationRejection(controllerId, revision, contentHash, reportedAt),
+    mutationFn: ({
+      revision,
+      contentHash,
+      reportedAt,
+    }: {
+      revision: number;
+      contentHash: string;
+      reportedAt: string;
+    }) => acknowledgeConfigurationRejection(controllerId, revision, contentHash, reportedAt),
     onSuccess: refresh,
   });
   const rollback = useMutation({
-    mutationFn: ({ revision, force, sourceHash, currentHash, draftHash }: {
+    mutationFn: ({
+      revision,
+      force,
+      sourceHash,
+      currentHash,
+      draftHash,
+    }: {
       revision: number;
       force: boolean;
       sourceHash: string;

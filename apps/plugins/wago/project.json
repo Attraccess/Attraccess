@@ -39,7 +39,7 @@
       "executor": "nx:run-commands",
       "options": {
         "cwd": "apps/plugins/wago",
-        "command": "eslint backend frontend/src frontend/tests acceptance modbus measurement-contract.ts"
+        "command": "eslint backend frontend/src frontend/tests acceptance modbus measurement-contract.ts channel-behavior.ts"
       }
     },
     "test": {
@@ -53,7 +53,7 @@
     "test-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/frontend/**/*", "{projectRoot}/modbus/**/*"],
+      "inputs": ["{projectRoot}/frontend/**/*", "{projectRoot}/modbus/**/*", "{projectRoot}/channel-behavior.ts"],
       "options": {
         "command": "pnpm exec vitest run --config apps/plugins/wago/frontend/vitest.config.mts"
       }
@@ -63,6 +63,7 @@
       "cache": true,
       "inputs": [
         "{projectRoot}/diagnostics-types.ts",
+        "{projectRoot}/channel-behavior.ts",
         "{projectRoot}/backend/**/*",
         "{projectRoot}/modbus/**/*",
         "{projectRoot}/measurement-contract.ts",
@@ -80,6 +81,7 @@
       "cache": true,
       "inputs": [
         "{projectRoot}/diagnostics-types.ts",
+        "{projectRoot}/channel-behavior.ts",
         "{projectRoot}/frontend/**/*",
         "{projectRoot}/modbus/**/*",
         "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"

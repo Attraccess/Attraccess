@@ -31,11 +31,15 @@ const snapshot: Snapshot = {
       id: 'load',
       physicalPointId: 'output-1',
       profile: 'generic-digital-output',
-      capabilities: ['output', 'pulse'],
+      capabilities: ['output'],
       disconnectPolicy: { mode: 'immediate' },
-      pulse: { durationMs: 10 },
     },
   ],
+};
+
+const pulsedSnapshot: Snapshot = {
+  ...snapshot,
+  logicalChannels: [{ ...snapshot.logicalChannels[0], capabilities: ['output', 'pulse'], pulse: { durationMs: 10 } }],
 };
 
 describe('WagoRuntime', () => {
@@ -361,7 +365,7 @@ describe('WagoRuntime', () => {
         },
         {
           ...snapshot.logicalChannels[0],
-          capabilities: ['output', 'guard', 'pulse'],
+          capabilities: ['output', 'guard'],
           guard: { channelId: 'interlock', when: 'on' },
         },
       ],
@@ -438,6 +442,22 @@ describe('WagoRuntime', () => {
     );
   });
 
+  it('rejects pulses on switched outputs before any device write or command reservation', async () => {
+    const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
+    runtime = new WagoRuntime({ hardwareId: 'cc100-1', prefix: 'attraccess/wago', store, transport, device });
+    await runtime.start();
+    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+    const write = jest.spyOn(device, 'write');
+    await transport.send(commands, validCommand({ action: 'pulse' }));
+    expect(write).not.toHaveBeenCalled();
+    expect((await store.load())?.commandIds).not.toContain('command-1');
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({ id: 'command-1', status: 'rejected', code: 'unsupported_operation' }),
+      }),
+    );
+  });
+
   it('rejects stale configuration revisions before writing the device', async () => {
     await transport.send(desired, { protocolVersion: 1, revision: 2, contentHash: hash(snapshot), snapshot });
 
@@ -463,6 +483,7 @@ describe('WagoRuntime', () => {
   });
 
   it('does not repeat an unexpired pulse after a runtime reboot', async () => {
+    const snapshot = pulsedSnapshot;
     const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
     runtime = new WagoRuntime({
       hardwareId: 'cc100-1',
@@ -575,6 +596,7 @@ describe('WagoRuntime', () => {
   });
 
   it('deactivates a pulse when retained state publication fails after it turns on', async () => {
+    const snapshot = pulsedSnapshot;
     let failStatePublication = false;
     const failingTransport: Transport = {
       publish: async (topic, payload, options) => {
@@ -602,6 +624,7 @@ describe('WagoRuntime', () => {
   });
 
   it('retries a failed scheduled pulse shutdown', async () => {
+    const snapshot = pulsedSnapshot;
     const writes: boolean[] = [];
     const flakyDevice = {
       write: async (_point: Snapshot['physicalPoints'][number], value: boolean) => {
@@ -628,6 +651,7 @@ describe('WagoRuntime', () => {
   });
 
   it('de-energizes active pulses before applying a replacement configuration', async () => {
+    const snapshot = pulsedSnapshot;
     const replacement: Snapshot = {
       ...snapshot,
       physicalPoints: [{ id: 'output-2', hardwareProfile: '751-9301', channel: 1 }],
@@ -647,6 +671,7 @@ describe('WagoRuntime', () => {
   });
 
   it('keeps retrying a failed pulse shutdown until a replacement can de-energize it', async () => {
+    const snapshot = pulsedSnapshot;
     jest.useFakeTimers();
     let failShutdown = false;
     let shutdownAttempts = 0;
@@ -704,6 +729,7 @@ describe('WagoRuntime', () => {
   });
 
   it('shuts down a pulse that completes while configuration replacement is waiting', async () => {
+    const snapshot = pulsedSnapshot;
     let releaseWrite!: () => void;
     let writeStarted!: () => void;
     const write = new Promise<void>((resolve) => {
@@ -777,7 +803,12 @@ describe('WagoRuntime', () => {
       device: delayedDevice,
     });
     await runtime.start();
-    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+    await transport.send(desired, {
+      protocolVersion: 1,
+      revision: 1,
+      contentHash: hash(pulsedSnapshot),
+      snapshot: pulsedSnapshot,
+    });
     await transport.send(commands, validCommand({ action: 'pulse' }));
 
     const revisionTwo = transport.send(desired, {
@@ -800,14 +831,20 @@ describe('WagoRuntime', () => {
     expect(device.values.get('751-9301:0')).toBe(true);
   });
 
-  it('keeps a newer set command from being overridden by a pending pulse timer', async () => {
+  it.each([true, false])('rejects set %s without cancelling a pending pulse shutdown', async (value) => {
+    const snapshot = pulsedSnapshot;
     await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
 
     await transport.send(commands, validCommand({ id: 'pulse', action: 'pulse' }));
-    await transport.send(commands, validCommand({ id: 'set', value: true }));
+    await transport.send(commands, validCommand({ id: 'set', value }));
     await new Promise((resolve) => setTimeout(resolve, 20));
 
-    expect(device.values.get('751-9301:0')).toBe(true);
+    expect(transport.published).toContainEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({ id: 'set', status: 'rejected', code: 'unsupported_operation' }),
+      }),
+    );
+    expect(device.values.get('751-9301:0')).toBe(false);
   });
 
   it('serializes commands for one channel in arrival order', async () => {
@@ -1017,6 +1054,7 @@ describe('WagoRuntime', () => {
   });
 
   it('does not acknowledge a pulse when persisting its output state fails', async () => {
+    const snapshot = pulsedSnapshot;
     const store = new JsonStateStore(`/tmp/wago-runtime-${Date.now()}-${Math.random()}.json`);
     runtime = new WagoRuntime({
       hardwareId: 'cc100-1',
@@ -1438,7 +1476,8 @@ describe('WagoRuntime', () => {
     expect(restartedMeasurement.streamId).not.toBe(firstMeasurement.streamId);
   });
 
-  it('shuts off an accepted pulse after a newer command fails', async () => {
+  it('shuts off an accepted pulse after a newer pulse fails', async () => {
+    const snapshot = pulsedSnapshot;
     const pulseSnapshot: Snapshot = {
       ...snapshot,
       logicalChannels: snapshot.logicalChannels.map((channel) => ({
@@ -1451,17 +1490,16 @@ describe('WagoRuntime', () => {
     const pulseWriteStarted = new Promise<void>((resolve) => {
       notifyPulseWriteStarted = resolve;
     });
-    let falseWrites = 0;
     const writes: boolean[] = [];
     const delayedPulseDevice = {
       write: async (_point: Snapshot['physicalPoints'][number], value: boolean) => {
         writes.push(value);
-        if (value) {
+        if (writes.length === 1) {
           notifyPulseWriteStarted?.();
           await new Promise<void>((resolve) => {
             resolvePulseWrite = resolve;
           });
-        } else if (++falseWrites === 1) throw new Error('temporary failure');
+        } else if (value) throw new Error('temporary failure');
       },
       read: async () => false,
     };
@@ -1482,13 +1520,13 @@ describe('WagoRuntime', () => {
 
     const pulse = transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'pulse' }));
     await pulseWriteStarted;
-    const set = transport.send(
+    const repeatedPulse = transport.send(
       commands,
-      validCommand({ id: 'command-2', channelId: 'load', action: 'set', value: false }),
+      validCommand({ id: 'command-2', channelId: 'load', action: 'pulse' }),
     );
     resolvePulseWrite?.();
     await pulse;
-    await set;
+    await repeatedPulse;
     await new Promise((resolve) => setTimeout(resolve, 150));
 
     expect(transport.published).toContainEqual(
@@ -1503,10 +1541,11 @@ describe('WagoRuntime', () => {
         payload: expect.objectContaining({ id: 'command-2', status: 'rejected', error: 'device write failed' }),
       }),
     );
-    expect(writes).toEqual([true, false, false]);
+    expect(writes).toEqual([true, true, false]);
   });
 
-  it('shuts off a delayed pulse after a newer command succeeds', async () => {
+  it('shuts off a delayed pulse after a newer pulse succeeds', async () => {
+    const snapshot = pulsedSnapshot;
     let resolvePulseWrite: (() => void) | undefined;
     let notifyPulseWriteStarted: (() => void) | undefined;
     const pulseWriteStarted = new Promise<void>((resolve) => {
@@ -1537,19 +1576,19 @@ describe('WagoRuntime', () => {
 
     const pulse = transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'pulse' }));
     await pulseWriteStarted;
-    const set = transport.send(
+    const repeatedPulse = transport.send(
       commands,
-      validCommand({ id: 'command-2', channelId: 'load', action: 'set', value: false }),
+      validCommand({ id: 'command-2', channelId: 'load', action: 'pulse' }),
     );
     resolvePulseWrite?.();
     await pulse;
-    await set;
+    await repeatedPulse;
     await new Promise((resolve) => setTimeout(resolve, 20));
 
-    expect(writes).toEqual([true, false]);
+    expect(writes).toEqual([true, true, false]);
   });
 
-  it('does not let a stale pulse shutoff override a newer successful set command', async () => {
+  it('does not let a stale pulse shutoff override a set command after changing to switched behavior', async () => {
     let resolvePulseWrite: (() => void) | undefined;
     let notifyPulseWriteStarted: (() => void) | undefined;
     const pulseWriteStarted = new Promise<void>((resolve) => {
@@ -1576,19 +1615,27 @@ describe('WagoRuntime', () => {
       device: delayedPulseDevice,
     });
     await runtime.start();
-    await transport.send(desired, { protocolVersion: 1, revision: 1, contentHash: hash(snapshot), snapshot });
+    await transport.send(desired, {
+      protocolVersion: 1,
+      revision: 1,
+      contentHash: hash(pulsedSnapshot),
+      snapshot: pulsedSnapshot,
+    });
 
     const pulse = transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'pulse' }));
     await pulseWriteStarted;
-    const set = transport.send(
-      commands,
-      validCommand({ id: 'command-2', channelId: 'load', action: 'set', value: true }),
-    );
+    const replacement = transport.send(desired, {
+      protocolVersion: 1,
+      revision: 2,
+      contentHash: hash(snapshot),
+      snapshot,
+    });
     resolvePulseWrite?.();
-    await Promise.all([pulse, set]);
+    await Promise.all([pulse, replacement]);
+    await transport.send(commands, validCommand({ id: 'command-2', expectedConfigurationRevision: 2 }));
     await new Promise((resolve) => setTimeout(resolve, 20));
 
-    expect(writes).toEqual([true, true]);
+    expect(writes).toEqual([true, false, true]);
   });
 
   it('reports a feedback mismatch after the configured feedback timeout', async () => {

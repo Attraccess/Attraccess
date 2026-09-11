@@ -81,8 +81,8 @@ export function ConfigurationMetadataChanges({
 }) {
   if (!changes.length) return null;
   return (
-    <section aria-label="Editor metadata changes">
-      <h3 className="wg:font-medium">Editor metadata changes</h3>
+    <section aria-label="Names and presets">
+      <h3 className="wg:font-medium">Names and presets</h3>
       <ul className="wg:flex wg:flex-col wg:gap-3">
         {changes.map((change) => (
           <li key={change.path}>
@@ -105,5 +105,5 @@ function metadataChangeLabel(path: string, names: Record<string, string>) {
   const name = path.match(/^\$\.names\.([^.]*)$/);
   if (name) return `Name for ${names[name[1]] ?? name[1]}`;
   if (/^\$\.presets\[\d+\]/.test(path)) return 'Preset application';
-  return 'Editor metadata';
+  return 'Names and presets';
 }

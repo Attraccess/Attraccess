@@ -185,6 +185,39 @@ Desired snapshots are validated before they are persisted. A rejected snapshot p
 
 Use only diagnostics controls present in the exact tested plugin build. This manual baseline does not establish that a controller detail screen exists; verify the integrated UI before documenting its navigation. Broker-level topic inspection is an engineering tool, not normal operator acceptance, and messages can contain secrets as well as topology and operating state.
 
+## Resource flows
+
+Once a controller is claimed and its configuration is applied, the flow catalog offers four WAGO nodes:
+
+| Node                | Use                                                                                 | Outputs                                                          |
+| ------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| WAGO command        | Control an output using its configured switched or pulsed behavior.                 | `output`, `failure` (according to the selected failure behavior) |
+| WAGO event received | Start a flow on a channel state report, measurement, or fault.                      | `output`                                                         |
+| WAGO read state     | Read the latest received state or measurement without sending a controller command. | `output`, `unavailable`                                          |
+| WAGO wait for state | Wait for an available state or measurement to equal a configured value.             | `output`, `timeout`                                              |
+
+Select the controller, the named logical channel, and the operation or event/state category. Command nodes list only output channels and pin the applied configuration revision; reopen and save them after publishing a new revision. Event/read/wait nodes also support input and measurement channels.
+
+The channel's **Output behavior** is authoritative:
+
+| Configured behavior       | Command node operation | Result                                                                      |
+| ------------------------- | ---------------------- | --------------------------------------------------------------------------- |
+| Switched                  | Turn on / turn off     | Set the output to the selected boolean state.                               |
+| Pulsed                    | Trigger pulse          | Turn on for the channel's configured duration, then turn off automatically. |
+| Input or measurement only | No command operation   | Use event, read, or wait nodes.                                             |
+
+Setup presets copy starting settings into the channel. Their names do not constrain later customization: a channel created from a pulse preset can be changed to switched behavior. Pulse duration, operational guards, feedback monitoring, and disconnect behavior belong to the controller configuration. Flow nodes choose when to issue the permitted operation; they cannot override those settings or supply a different duration. Guards are checked and configured feedback is monitored for commands of either output behavior.
+
+The existing version 1 snapshot format is retained. The `pulse` capability and positive `pulse.durationMs` together define pulsed behavior; output channels without either are switched. Inconsistent pulse settings are rejected by both API and runtime configuration validation. The command wire actions remain `set` (with a boolean `value`) and `pulse`.
+
+**Existing flows:** set commands on pulsed channels are now invalid, including set-off. They are not automatically converted. Validation flags the node, and execution rejects it before publication. Explicitly select **Trigger pulse**, or change the channel to switched behavior, publish that configuration, and reopen the node to accept its new revision. Manual commands use the same restrictions. Updated CC100 runtimes also reject incompatible direct MQTT commands with `unsupported_operation`; deploying the plugin alone does not update a controller's installed runtime. Internal pulse shutdown and disconnect handling still turn outputs off.
+
+Event, read, and wait nodes put their result in `wago`, preserving the incoming payload. For example, `wago.value` contains a boolean state or numeric measurement, with freshness and availability information in `wago.available`, `wago.stale`, and `wago.offline` when a sample exists. Missing samples return `wago.available: false`; read nodes route missing or unavailable samples to `unavailable`, and waits only match available samples. Measurement values and comparisons use [wire units](wago-measurement-contract.md).
+
+State events are reports, including periodic snapshots; they are not limited to value changes. Use the event node's minimum interval to limit how frequently it starts a flow, and minimum change to filter measurements. An event can report unavailable data, so check `wago.available` when freshness matters.
+
+For example, connect **WAGO event received → WAGO read state → a condition** to react to a contact while inspecting another channel. Use **WAGO command → WAGO wait for state** when the flow should continue only after an input reports the expected state.
+
 ## Recovery
 
 ### Broker loss

@@ -5,6 +5,7 @@ import { pointLabel } from './configuration-model';
 import type { ConfigurationEditorMetadata, WagoConfigurationSnapshot } from './api';
 import { ModbusPointForm } from './ModbusConfigurationForm';
 import { bindModbusPoint, emptyModbus } from './modbus-editor';
+import { outputBehavior } from '../../channel-behavior';
 import { availableDigitalTerminals } from '../../backend/configuration-digital';
 
 export function Choice({
@@ -113,9 +114,9 @@ export function DigitalChannelEditor({
   }
   return (
     <fieldset className="wg:flex wg:flex-col wg:gap-3">
-      <legend className="wg:font-medium">{metadata.names[channel.id] ?? channel.id}</legend>
-      <p>
-        {channel.profile.replaceAll('-', ' ')} · {channel.capabilities.join(', ')}
+      <legend className="wg:sr-only">{metadata.names[channel.id] ?? channel.id}</legend>
+      <p className="wg:text-sm wg:text-muted">
+        Setup preset: {channel.profile.replaceAll('-', ' ')}. Customize the behavior below.
       </p>
       <TextField isRequired>
         <Label>Channel name</Label>
@@ -136,14 +137,23 @@ export function DigitalChannelEditor({
           onChange={(value) => onAssign(Number(value))}
         />
       )}
-      <TextField isRequired>
-        <Label>Physical point label</Label>
-        <Input
-          maxLength={120}
-          value={metadata.names[point.id] ?? pointLabel(point, metadata.names)}
-          onChange={(event) => onRename(point.id, event.target.value)}
-        />
-      </TextField>
+      <details className="wg:rounded-lg wg:border wg:border-border wg:p-3">
+        <summary className="wg:cursor-pointer wg:font-medium">Wiring label</summary>
+        <TextField isRequired>
+          <Label>Physical point label</Label>
+          <Input
+            maxLength={120}
+            value={metadata.names[point.id] ?? pointLabel(point, metadata.names)}
+            onChange={(event) => onRename(point.id, event.target.value)}
+          />
+        </TextField>
+      </details>
+      <h3 className="wg:mt-3 wg:font-semibold">Behavior</h3>
+      <p className="wg:text-sm wg:text-muted">
+        {output
+          ? 'Define how flows control this output and what happens when its connection is lost.'
+          : 'Choose what happens when the controller loses its connection.'}
+      </p>
       <Choice
         label="On disconnect"
         value={channel.disconnectPolicy.mode}
@@ -169,18 +179,20 @@ export function DigitalChannelEditor({
       )}
       {output && (
         <>
-          <Checkbox
-            isSelected={channel.capabilities.includes('pulse')}
-            isDisabled={channel.profile === 'pulsed-lock-bank'}
-            onChange={(enabled) => capability('pulse', enabled)}
-          >
-            <Checkbox.Control>
-              <Checkbox.Indicator />
-            </Checkbox.Control>
-            <Checkbox.Content>
-              <Label>Pulse output</Label>
-            </Checkbox.Content>
-          </Checkbox>
+          <Choice
+            label="Output behavior"
+            value={outputBehavior(channel) ?? 'switched'}
+            options={[
+              { id: 'switched', label: 'Switched — turn on / turn off' },
+              { id: 'pulsed', label: 'Pulsed — trigger for a duration' },
+            ]}
+            onChange={(behavior) => capability('pulse', behavior === 'pulsed')}
+          />
+          <p className="wg:text-sm wg:text-muted">
+            {outputBehavior(channel) === 'pulsed'
+              ? 'Flows can trigger a pulse for the duration below. The controller turns the output off automatically.'
+              : 'Flows can turn this output on or off. It keeps that state until another command or the disconnect policy changes it.'}
+          </p>
           {channel.pulse && (
             <NumericField
               label="Pulse duration (ms)"
@@ -189,107 +201,118 @@ export function DigitalChannelEditor({
               onChange={(durationMs) => onChange({ ...channel, pulse: { durationMs } })}
             />
           )}
-          <Checkbox
-            isSelected={channel.capabilities.includes('guard')}
-            isDisabled={channel.profile === 'guarded-enable-request'}
-            onChange={(enabled) => capability('guard', enabled)}
-          >
-            <Checkbox.Control>
-              <Checkbox.Indicator />
-            </Checkbox.Control>
-            <Checkbox.Content>
-              <Label>Operational guard</Label>
-            </Checkbox.Content>
-          </Checkbox>
-          {guard && (
-            <>
-              <Choice
-                label="Guard input"
-                value={guard.channelId}
-                options={inputs}
-                onChange={(channelId) => onChange({ ...channel, guard: { ...guard, channelId } })}
-              />
-              <Choice
-                label="Allow output when guard is"
-                value={guard.when}
-                options={options(['on', 'off'])}
-                onChange={(when) => onChange({ ...channel, guard: { ...guard, when: when as 'on' | 'off' } })}
-              />
-            </>
-          )}
-          <Checkbox
-            isSelected={channel.capabilities.includes('feedback')}
-            onChange={(enabled) => capability('feedback', enabled)}
-          >
-            <Checkbox.Control>
-              <Checkbox.Indicator />
-            </Checkbox.Control>
-            <Checkbox.Content>
-              <Label>Monitor feedback</Label>
-            </Checkbox.Content>
-          </Checkbox>
-          {feedback && (
-            <>
-              <Choice
-                label="Feedback input"
-                value={feedback.channelId}
-                options={inputs}
-                onChange={(channelId) => onChange({ ...channel, feedback: { ...feedback, channelId } })}
-              />
-              <Choice
-                label="Expected feedback"
-                value={feedback.expected}
-                options={options(['match', 'inverse'])}
-                onChange={(expected) =>
-                  onChange({ ...channel, feedback: { ...feedback, expected: expected as 'match' | 'inverse' } })
-                }
-              />
-              <NumericField
-                label="Feedback timeout (ms)"
-                min={1}
-                value={feedback.timeoutMs}
-                onChange={(timeoutMs) => onChange({ ...channel, feedback: { ...feedback, timeoutMs } })}
-              />
-            </>
-          )}
-          {!inputs.length && <p>Add a digital input to configure guards or feedback.</p>}
+          <details className="wg:rounded-lg wg:border wg:border-border wg:p-3" open={!!guard || !!feedback}>
+            <summary className="wg:cursor-pointer wg:font-medium">Conditions & feedback</summary>
+            <div className="wg:flex wg:flex-col wg:gap-3 wg:pt-3">
+              <p className="wg:text-sm wg:text-muted">
+                Operational controls only. Guards and enable requests do not replace certified electrical safety
+                functions.
+              </p>
+              <Checkbox
+                isSelected={channel.capabilities.includes('guard')}
+                onChange={(enabled) => capability('guard', enabled)}
+              >
+                <Checkbox.Control>
+                  <Checkbox.Indicator />
+                </Checkbox.Control>
+                <Checkbox.Content>
+                  <Label>Operational guard</Label>
+                </Checkbox.Content>
+              </Checkbox>
+              {guard && (
+                <>
+                  <Choice
+                    label="Guard input"
+                    value={guard.channelId}
+                    options={inputs}
+                    onChange={(channelId) => onChange({ ...channel, guard: { ...guard, channelId } })}
+                  />
+                  <Choice
+                    label="Allow output when guard is"
+                    value={guard.when}
+                    options={options(['on', 'off'])}
+                    onChange={(when) => onChange({ ...channel, guard: { ...guard, when: when as 'on' | 'off' } })}
+                  />
+                </>
+              )}
+              <Checkbox
+                isSelected={channel.capabilities.includes('feedback')}
+                onChange={(enabled) => capability('feedback', enabled)}
+              >
+                <Checkbox.Control>
+                  <Checkbox.Indicator />
+                </Checkbox.Control>
+                <Checkbox.Content>
+                  <Label>Monitor feedback</Label>
+                </Checkbox.Content>
+              </Checkbox>
+              {feedback && (
+                <>
+                  <Choice
+                    label="Feedback input"
+                    value={feedback.channelId}
+                    options={inputs}
+                    onChange={(channelId) => onChange({ ...channel, feedback: { ...feedback, channelId } })}
+                  />
+                  <Choice
+                    label="Expected feedback"
+                    value={feedback.expected}
+                    options={options(['match', 'inverse'])}
+                    onChange={(expected) =>
+                      onChange({ ...channel, feedback: { ...feedback, expected: expected as 'match' | 'inverse' } })
+                    }
+                  />
+                  <NumericField
+                    label="Feedback timeout (ms)"
+                    min={1}
+                    value={feedback.timeoutMs}
+                    onChange={(timeoutMs) => onChange({ ...channel, feedback: { ...feedback, timeoutMs } })}
+                  />
+                </>
+              )}
+              {!inputs.length && <p>Add a digital input to configure guards or feedback.</p>}
+            </div>
+          </details>
         </>
       )}
       {(channel.capabilities.includes('input') || channel.capabilities.includes('measurement')) && (
-        <>
-          <Checkbox
-            isSelected={!!channel.range}
-            onChange={(enabled) => {
-              const next = { ...channel };
-              if (enabled) next.range = { minimum: 0, maximum: 1 };
-              else delete next.range;
-              onChange(next);
-            }}
-          >
-            <Checkbox.Control>
-              <Checkbox.Indicator />
-            </Checkbox.Control>
-            <Checkbox.Content>
-              <Label>Expected value range</Label>
-            </Checkbox.Content>
-          </Checkbox>
-          {range && (
-            <>
-              <NumericField
-                label="Minimum"
-                integer={false}
-                value={range.minimum}
-                onChange={(minimum) => onChange({ ...channel, range: { ...range, minimum } })}
-              />
-              <NumericField
-                label="Maximum"
-                integer={false}
-                value={range.maximum}
-                onChange={(maximum) => onChange({ ...channel, range: { ...range, maximum } })}
-              />
-            </>
-          )}
-        </>
+        <details className="wg:rounded-lg wg:border wg:border-border wg:p-3" open={!!range}>
+          <summary className="wg:cursor-pointer wg:font-medium">Expected range</summary>
+          <div className="wg:flex wg:flex-col wg:gap-3 wg:pt-3">
+            <Checkbox
+              isSelected={!!channel.range}
+              onChange={(enabled) => {
+                const next = { ...channel };
+                if (enabled) next.range = { minimum: 0, maximum: 1 };
+                else delete next.range;
+                onChange(next);
+              }}
+            >
+              <Checkbox.Control>
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              <Checkbox.Content>
+                <Label>Expected value range</Label>
+              </Checkbox.Content>
+            </Checkbox>
+            {range && (
+              <>
+                <NumericField
+                  label="Minimum"
+                  integer={false}
+                  value={range.minimum}
+                  onChange={(minimum) => onChange({ ...channel, range: { ...range, minimum } })}
+                />
+                <NumericField
+                  label="Maximum"
+                  integer={false}
+                  value={range.maximum}
+                  onChange={(maximum) => onChange({ ...channel, range: { ...range, maximum } })}
+                />
+              </>
+            )}
+          </div>
+        </details>
       )}
       <details>
         <summary>Stable internal reference</summary>

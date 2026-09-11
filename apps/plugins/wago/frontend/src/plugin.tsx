@@ -6,8 +6,9 @@ import type {
   PluginSidebarItem,
   RouteConfig,
 } from '@attraccess/plugins-frontend-sdk';
-import type { IPluginStore } from 'react-pluggable';
+import type { PluginStore } from 'react-pluggable';
 import { ControllersPage } from './ControllersPage';
+import { ConfigurationPage } from './ConfigurationPage';
 import {
   RESOURCE_OVERVIEW_SLOT,
   type PluginSlotContribution,
@@ -16,6 +17,7 @@ import {
 import { ResourceDiagnostics } from './ResourceDiagnostics';
 
 export default class WagoPlugin implements AttraccessFrontendPlugin {
+  pluginStore!: PluginStore;
   private diagnosticsAllowed = false;
   private readonly authListeners = new Set<() => void>();
   private readonly diagnosticsAccess = {
@@ -44,8 +46,8 @@ export default class WagoPlugin implements AttraccessFrontendPlugin {
     return [];
   }
 
-  init(store: IPluginStore): void {
-    void store;
+  init(store: PluginStore): void {
+    this.pluginStore = store;
   }
 
   activate(): void {
@@ -67,7 +69,14 @@ export default class WagoPlugin implements AttraccessFrontendPlugin {
   }
 
   getRoutes(): RouteConfig[] {
-    return [{ path: '/wago', authRequired: 'resources.update', element: <ControllersPage /> }];
+    return [
+      { path: '/wago', authRequired: 'resources.update', element: <ControllersPage /> },
+      {
+        path: '/wago/controllers/:controllerId/configuration',
+        authRequired: 'resources.update',
+        element: <ConfigurationPage />,
+      },
+    ];
   }
 
   getSidebarItems(): PluginSidebarItem[] {

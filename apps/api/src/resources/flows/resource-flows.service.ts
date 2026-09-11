@@ -146,7 +146,7 @@ export class ResourceFlowsService {
         });
       }
       const plugin = getPluginFlowNode(nodeData.type);
-      if (plugin && !plugin.isInput && plugin.validateConfig) {
+      if (plugin?.validateConfig) {
         const validationErrors = await plugin.validateConfig(
           nodeData.data as Record<string, unknown>,
           validationContext,

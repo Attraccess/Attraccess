@@ -1,6 +1,6 @@
 # WAGO Fixture-Only Browser Tests
 
-Run the ATT-1058 configuration and command suites from the worktree root:
+Run the ATT-1058 configuration suite from the worktree root:
 
 ```sh
 PYTHON=/opt/homebrew/opt/python@3.14/bin/python3.14 \
@@ -10,7 +10,7 @@ PYTHON=/opt/homebrew/opt/python@3.14/bin/python3.14 \
 Use any Python interpreter with Playwright and its Chromium browser installed.
 The wrapper builds the current production configuration editor into
 `output/playwright/att-1058/harness` and runs `test_configuration_browser.py`
-and `test_isolated_command_browser.py` explicitly.
+explicitly. The command and commissioning suites have separate runners.
 Pass `-k first_digital` to run just that scenario at both viewport sizes.
 No application source, dependency manifests, generated API clients, or database
 files are modified. Build output and browser evidence are not source files to commit.
@@ -34,6 +34,9 @@ Playwright intercepts every request at `https://wago-fixture.invalid`:
 - Every scenario asserts no unexpected requests or JavaScript page errors, and
   that all HTTP requests were handled as local assets or fixture responses.
 
+The configuration browser suite also disables native `crypto.randomUUID` to exercise
+the ID-generation fallback used on plain HTTP LAN addresses.
+
 The isolation contract test passes synthetic route objects for forbidden host
 ports and unknown URLs to the router. It never contacts those addresses.
 Existing `test_command_browser.py` is a **legacy real-host suite**, excluded from
@@ -48,17 +51,16 @@ Fourteen configuration browser scenarios run at 1440x1000 desktop and 390x844 to
 3. Explicit save, review, publish and simulated applied report.
 4. Simulated rejected report with readable channel labels.
 5. Rollback as a new revision, preserving history and requiring impact acknowledgement.
-6. Readable review labels, no JSON editor/internal paths, and dialog viewport bounds.
+6. Readable review labels, no JSON editor/internal paths, and full-page viewport bounds.
 7. Removing the first of two channels shows only the removed stable identity in review.
 8. A metadata-only draft change after rollback preview rejects confirmation without overwriting the draft.
 9. Embedded diagnostics refresh failure hides cached online status, recovers, and preserves unsaved edits without saving or publishing; the panel fits both viewports.
-10. Metadata-only renames appear in review and rollback preview; rollback restores the prior label without changing the hardware snapshot.
+10. Modbus TCP/device/named measurement setup, explicit save/publication, cumulative rebinding with stable IDs, and rollback restoring the complete snapshot.
+11. Locked unqualified built-ins, custom profile duplication and selection, and invalid register address save blocking.
 
-11. Modbus TCP/device/named measurement setup, explicit save/publication, cumulative rebinding with stable IDs, and rollback restoring the complete snapshot.
-12. Locked unqualified built-ins, custom profile duplication and selection, and invalid register address save blocking.
-
-13. Customized input watchdog/range survives measurement rebinding, and conversion to a plain output removes the incompatible range while retaining channel identity.
-14. A saved unused Modbus point can be rebound after device deletion or explicitly released; repairs preserve its physical ID.
+12. Customized input watchdog/range survives measurement rebinding, and conversion to a plain output removes the incompatible range while retaining channel identity.
+13. A saved unused Modbus point can be rebound after device deletion or explicitly released; repairs preserve its physical ID.
+14. A 120-character channel name wraps in the channel list and terminal map without horizontal overflow.
 
 Together with isolation, rollback-identity, and metadata-aware review contract tests,
 the configuration suite executes 31 tests. Rollback requests must carry the previewed draft
@@ -70,7 +72,7 @@ real controller acceptance, physical readiness, or host integration correctness.
 
 ## Isolated Command Forms
 
-Two command scenarios run at both viewport sizes (4 more tests; **35 total**):
+The separate command suite has two scenarios at both viewport sizes (4 tests):
 
 1. Labelled controller/channel/operation choices, absence of input-only choices,
    Pulse invalidation when switching to a set-only output, read-only revision,
