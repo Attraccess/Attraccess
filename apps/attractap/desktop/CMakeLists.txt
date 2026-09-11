@@ -30,7 +30,7 @@ endif()
 
 find_package(SDL3 3.4 REQUIRED CONFIG) # Built-in PNG loading for the CAD device shell.
 # The macOS SDK libcurl omits WebSocket support. Prefer Homebrew's curl when
-# available so the host transport can use CURLOPT_CONNECT_ONLY with ws:// URLs.
+# available so the host transport can use CURLOPT_CONNECT_ONLY with WebSocket URLs.
 if(APPLE)
     foreach(CURL_PREFIX /opt/homebrew/opt/curl /usr/local/opt/curl)
         if(EXISTS "${CURL_PREFIX}/include/curl/curl.h" AND EXISTS "${CURL_PREFIX}/lib/libcurl.dylib")
