@@ -142,6 +142,31 @@ describe('AttractapGateway', () => {
       expect(sanitize('“München” — Größe™')).toBe('"München" - GrößeTM');
       expect(sanitize('Cafe\u0301 ☃')).toBe('Cafe ?');
     });
+
+    it('preserves layout controls', () => {
+      expect(sanitize('First line\nSecond line\r\n\tIndented')).toBe('First line\nSecond line\r\n\tIndented');
+    });
+
+    it('does not rewrite form option or draft values', () => {
+      const message = new AttractapEvent(AttractapEventType.RESOURCE_USAGE_FORM_FIELDS, {
+        fields: [
+          {
+            name: '“Größe”',
+            description: null,
+            options: ['Size™'],
+            value: 'Size™',
+          },
+        ],
+      });
+      const sanitized = (
+        gateway as unknown as { sanitizeForLVGL: <T>(value: T) => T }
+      ).sanitizeForLVGL(message);
+      const field = sanitized.data.payload.fields[0];
+
+      expect(field.name).toBe('"Größe"');
+      expect(field.options).toEqual(['Size™']);
+      expect(field.value).toBe('Size™');
+    });
   });
 
   describe('handleConnection', () => {

@@ -114,7 +114,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     // Normalize only unsupported code points so existing Latin-1 glyphs survive.
     return Array.from(output)
       .map((character) => {
-        if (/^[\x20-\x7E\xA0-\xFF]$/.test(character)) {
+        if (/^[\n\r\t\x20-\x7E\xA0-\xFF]$/.test(character)) {
           return character;
         }
 
@@ -137,7 +137,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         seen.add(obj);
         const out: Record<string, unknown> = {};
         for (const [k, val] of Object.entries(obj)) {
-          out[k] = sanitize(val);
+          // Form options and draft values are protocol values: changing them
+          // prevents the firmware from submitting the value the API validates.
+          out[k] = k === 'options' || k === 'value' || k === 'answers' ? val : sanitize(val);
         }
         return out;
       }
