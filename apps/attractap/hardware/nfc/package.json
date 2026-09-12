@@ -7,7 +7,7 @@
     "@attraccess/attractap-hw-shared": "workspace:*",
     "@tscircuit/cli": "0.1.1399",
     "playwright": "1.62.1",
-    "tscircuit": "0.0.1774",
+    "tscircuit": "0.0.2339",
     "tsx": "^4.20.3"
   }
 }

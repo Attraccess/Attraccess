@@ -13,7 +13,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "tscircuit": "0.0.1774"
+    "tscircuit": "0.0.2339"
   },
   "devDependencies": {
     "tsx": "^4.20.3",
