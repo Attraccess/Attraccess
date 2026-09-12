@@ -1,4 +1,5 @@
 #include "resourceDetailsScreen.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 #include <lvgl.h>
@@ -164,13 +165,14 @@ void ResourceDetailsScreen::refreshProjectsButtonLabel()
       return;
    }
 
-   std::string label = "Projekt waehlen";
+   std::string label = "Projekt wählen";
    if (this->selectedProjectId != 0 && this->selectedProjectName.length() > 0)
    {
       label = "Projekt: " + this->selectedProjectName;
    }
 
    lv_label_set_text(this->projectsButtonLabel, label.c_str());
+   lv_obj_set_style_text_font(this->projectsButtonLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 void ResourceDetailsScreen::updateClearProjectButtonState()
 {
@@ -245,9 +247,9 @@ void ResourceDetailsScreen::ensureProjectsModal()
    lv_obj_set_style_margin_bottom(header, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *title = lv_label_create(header);
-   lv_label_set_text(title, "Projekt auswaehlen");
-   lv_obj_set_style_text_font(title, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(title, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_label_set_text(title, "Projekt auswählen");
+    lv_obj_set_style_text_font(title, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(title, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *closeButton = lv_button_create(header);
    DisplayTheme::secondaryButton(closeButton);
@@ -286,7 +288,8 @@ void ResourceDetailsScreen::ensureProjectsModal()
    lv_obj_set_style_pad_right(this->projectsPrevButton, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_event_cb(this->projectsPrevButton, &ResourceDetailsScreen::onProjectsPrevPage, LV_EVENT_CLICKED, this);
    lv_obj_t *prevLabel = lv_label_create(this->projectsPrevButton);
-   lv_label_set_text(prevLabel, "Zurueck");
+   lv_label_set_text(prevLabel, "Zurück");
+   lv_obj_set_style_text_font(prevLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
 
    this->projectsPaginationLabel = lv_label_create(footer);
    lv_label_set_text(this->projectsPaginationLabel, "Seite 1");
@@ -368,7 +371,8 @@ void ResourceDetailsScreen::rebuildProjectsList()
    if (this->projectsCache.count == 0)
    {
       lv_obj_t *emptyLabel = lv_label_create(this->projectsListContainer);
-      lv_label_set_text(emptyLabel, this->projectsDataInitialized ? "Keine Projekte verfuegbar" : "Lade Projekte ...");
+      lv_label_set_text(emptyLabel, this->projectsDataInitialized ? "Keine Projekte verfügbar" : "Lade Projekte ...");
+      lv_obj_set_style_text_font(emptyLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
       lv_obj_set_style_text_color(emptyLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
       this->updateProjectsPaginationControls();
       return;
@@ -403,6 +407,7 @@ void ResourceDetailsScreen::rebuildProjectsList()
          lv_label_set_text(label, "Unbenanntes Projekt");
       }
       lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_set_style_text_font(label, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 
    this->updateProjectsPaginationControls();

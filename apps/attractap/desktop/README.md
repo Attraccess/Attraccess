@@ -6,9 +6,14 @@ libcurl 8.7+ with WebSocket support. On macOS, the build prefers Homebrew curl.
 
 ```sh
 pnpm nx build attractap-desktop
-open dist/apps/attractap-desktop/attractap-desktop.app
+open -n dist/apps/attractap-desktop/attractap-desktop.app
 pnpm nx test attractap-desktop
 ```
+
+`pnpm nx serve attractap-desktop` builds and launches a fresh app process. Quit
+the previous simulator before restarting it. On macOS, `open` without `-n`
+only activates an already-running instance, even after its executable has been
+rebuilt, so it can keep displaying an older version of the UI.
 
 To choose an API endpoint and reader profile, launch the executable directly:
 
@@ -34,8 +39,9 @@ The CAD image is embedded in the executable, including the macOS app bundle.
 ## Display interaction checks
 
 The display tests use SDL's headless software renderer and the production LVGL
-startup screen. They cover scaled touches, card hold/release, cancellation,
-clearing data, and resized-window hit testing. To also capture preview images,
+screens. They cover resource selection into the lockscreen with an umlaut in
+the resource name, scaled touches, card hold/release, cancellation, clearing
+data, and resized-window hit testing. To also capture preview images,
 pass an existing output directory:
 
 ```sh

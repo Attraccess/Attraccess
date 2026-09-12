@@ -49,6 +49,11 @@ add_executable(display-theme-host
     "${FIRMWARE_DIR}/src/display/screens/enrollment/enrollmentScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/reset/resetScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/supervision/supervisionScreen.cpp"
+    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_10.c"
+    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_14.c"
+    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_18.c"
+    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_24.c"
+    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_36.c"
     "${FIRMWARE_DIR}/src/display/shared/pinInput/pinInputPage.cpp")
 target_include_directories(display-theme-host PRIVATE shims "${FIRMWARE_DIR}/src")
 target_compile_definitions(display-theme-host PRIVATE

@@ -17,8 +17,8 @@ namespace
 {
     // A handful of fake projects to pick from in the project selector.
     const char *const DEMO_PROJECTS[] = {
-        "Moebelbau Eiche",
-        "Prototyp Gehaeuse",
+        "Möbelbau Eiche",
+        "Prototyp Gehäuse",
         "Reparatur Fahrradrahmen",
         "Weihnachtsgeschenke",
         "CNC Schild Gravur",
@@ -40,10 +40,10 @@ namespace
         bool required;
     };
     const CncField CNC_FIELDS[] = {
-        {101, "Material", "Werkstoff des Werkstuecks", "select", true},
+        {101, "Material", "Werkstoff des Werkstücks", "select", true},
         {102, "Auftragsnummer", "Interne Auftrags-ID", "text", true},
-        {103, "Geschaetzte Laufzeit (Min)", "Optional", "number", false},
-        {104, "Absaugung geprueft", "Spaeneabsaugung aktiv?", "boolean", true},
+        {103, "Geschätzte Laufzeit (Min)", "Optional", "number", false},
+        {104, "Absaugung geprüft", "Späneabsaugung aktiv?", "boolean", true},
     };
     constexpr uint32_t CNC_FIELD_COUNT = sizeof(CNC_FIELDS) / sizeof(CNC_FIELDS[0]);
     const char *const CNC_MATERIALS[] = {"Aluminium", "Holz", "Kunststoff", "Messing", "Stahl"};
@@ -214,7 +214,7 @@ void DemoWebsocket::respondAuthenticated()
     StaticJsonDocument<256> doc;
     doc["event"] = "EVENT";
     doc["data"]["type"] = "READER_AUTHENTICATED";
-    doc["data"]["payload"]["name"] = "Demo Geraet";
+    doc["data"]["payload"]["name"] = "Demo Gerät";
 
     char buf[256];
     size_t n = serializeJson(doc, buf, sizeof(buf));
@@ -230,7 +230,7 @@ void DemoWebsocket::respondResourceList()
     doc["event"] = "EVENT";
     doc["data"]["type"] = "RESOURCE_LIST";
     doc["data"]["payload"]["messageId"] = ++_resourceListMsgId;
-    doc["data"]["payload"]["readerName"] = "Demo Geraet";
+    doc["data"]["payload"]["readerName"] = "Demo Gerät";
 
     // Introducers = enrolled admin cards (they can introduce others). Shown in
     // the "not introduced" panel when a no-permission card taps a resource.
@@ -437,7 +437,7 @@ void DemoWebsocket::respondFormRequest(uint32_t resourceId)
     doc["event"] = "EVENT";
     doc["data"]["type"] = "RESOURCE_USAGE_FORM_REQUEST";
     doc["data"]["payload"]["resourceId"] = resourceId;
-    doc["data"]["payload"]["resourceName"] = "CNC Fraese";
+    doc["data"]["payload"]["resourceName"] = "CNC Fräse";
     doc["data"]["payload"]["action"] = "start";
 
     JsonArray forms = doc["data"]["payload"]["forms"].to<JsonArray>();

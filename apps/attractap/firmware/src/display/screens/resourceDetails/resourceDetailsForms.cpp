@@ -1,4 +1,5 @@
 #include "resourceDetailsScreen.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 #include <lvgl.h>
@@ -6,10 +7,90 @@
 #include <stdio.h>
 #include <cstdlib>
 
-static const char *SELECT_FIELD_PLACEHOLDER = "Bitte Option waehlen";
-static const char *SELECT_FIELD_NO_OPTIONS = "Keine Optionen verfuegbar";
-static const char *SELECT_FIELD_INVALID = "Ungueltige Auswahl";
+static const char *SELECT_FIELD_PLACEHOLDER = "Bitte Option wählen";
+static const char *SELECT_FIELD_NO_OPTIONS = "Keine Optionen verfügbar";
+static const char *SELECT_FIELD_INVALID = "Ungültige Auswahl";
 static const lv_coord_t SELECT_FIELD_OPTION_GAP = 6;
+
+// Select values must remain unchanged for submission, so prepare a separate
+// display string for code points not covered by the reader's Latin-1 fonts.
+static std::string makeLVGLDisplayText(const std::string &input)
+{
+   std::string output;
+   for (size_t index = 0; index < input.length();)
+   {
+      const unsigned char byte = static_cast<unsigned char>(input[index]);
+      if (byte < 0x80)
+      {
+         output += input[index++];
+         continue;
+      }
+
+      uint32_t codepoint = 0;
+      size_t length = 0;
+      if ((byte & 0xE0) == 0xC0 && index + 1 < input.length())
+      {
+         codepoint = ((byte & 0x1F) << 6) | (static_cast<unsigned char>(input[index + 1]) & 0x3F);
+         length = 2;
+      }
+      else if ((byte & 0xF0) == 0xE0 && index + 2 < input.length())
+      {
+         codepoint = ((byte & 0x0F) << 12) | ((static_cast<unsigned char>(input[index + 1]) & 0x3F) << 6) |
+                     (static_cast<unsigned char>(input[index + 2]) & 0x3F);
+         length = 3;
+      }
+      else
+      {
+         output += '?';
+         ++index;
+         continue;
+      }
+
+      if (codepoint >= 0xA0 && codepoint <= 0xFF)
+      {
+         output.append(input, index, length);
+      }
+      else if (codepoint >= 0x300 && codepoint <= 0x36F)
+      {
+         // Keep the base character of decomposed accents.
+      }
+      else
+      {
+         switch (codepoint)
+         {
+         case 0x2018:
+         case 0x2019:
+         case 0x201A:
+         case 0x2032:
+            output += '\'';
+            break;
+         case 0x201C:
+         case 0x201D:
+         case 0x201E:
+         case 0x2033:
+            output += '"';
+            break;
+         case 0x2013:
+         case 0x2014:
+         case 0x2015:
+         case 0x2022:
+            output += '-';
+            break;
+         case 0x2026:
+            output += "...";
+            break;
+         case 0x2122:
+            output += "TM";
+            break;
+         default:
+            output += '?';
+            break;
+         }
+      }
+      index += length;
+   }
+   return output;
+}
 
 void ResourceDetailsScreen::disposeFormsModal()
 {
@@ -153,7 +234,7 @@ void ResourceDetailsScreen::showFormPageErrors(const API::ResourceUsageFormPageR
    }
    if (this->formsModalErrorLabel)
    {
-      lv_label_set_text(this->formsModalErrorLabel, shown ? "Bitte Eingabe korrigieren." : "Eingabe ungueltig.");
+      lv_label_set_text(this->formsModalErrorLabel, shown ? "Bitte Eingabe korrigieren." : "Eingabe ungültig.");
    }
 }
 void ResourceDetailsScreen::hideFormsModal()
@@ -251,15 +332,15 @@ void ResourceDetailsScreen::ensureFormsModal()
 
    this->formsBreadcrumbLabel = lv_label_create(content);
    lv_label_set_text(this->formsBreadcrumbLabel, "");
-   lv_obj_set_style_text_color(this->formsBreadcrumbLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->formsBreadcrumbLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->formsBreadcrumbLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->formsBreadcrumbLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_width(this->formsBreadcrumbLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_label_set_long_mode(this->formsBreadcrumbLabel, LV_LABEL_LONG_WRAP);
 
    this->formsModalErrorLabel = lv_label_create(content);
    lv_label_set_text(this->formsModalErrorLabel, "");
-   lv_obj_set_style_text_color(this->formsModalErrorLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->formsModalErrorLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->formsModalErrorLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->formsModalErrorLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *list = lv_obj_create(content);
    this->formsModalList = list;
@@ -291,7 +372,8 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_style_pad_all(backBtn, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
    DisplayTheme::secondaryButton(backBtn);
    lv_obj_t *backLabel = lv_label_create(backBtn);
-   lv_label_set_text(backLabel, "Zurueck");
+   lv_label_set_text(backLabel, "Zurück");
+   lv_obj_set_style_text_font(backLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
    lv_obj_set_align(backLabel, LV_ALIGN_CENTER);
    lv_obj_add_event_cb(backBtn, &ResourceDetailsScreen::onFormsBack, LV_EVENT_CLICKED, this);
 
@@ -350,8 +432,8 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_label_set_text(this->formsEditorTitleLabel, "");
    lv_obj_set_flex_grow(this->formsEditorTitleLabel, 1);
    lv_label_set_long_mode(this->formsEditorTitleLabel, LV_LABEL_LONG_DOT);
-   lv_obj_set_style_text_color(this->formsEditorTitleLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->formsEditorTitleLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->formsEditorTitleLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->formsEditorTitleLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *editorCancelBtn = lv_button_create(editorHeader);
    lv_obj_remove_style_all(editorCancelBtn);
@@ -367,7 +449,8 @@ void ResourceDetailsScreen::ensureFormsModal()
    this->formsEditorTextarea = editorTa;
    lv_obj_set_width(editorTa, lv_pct(100));
    lv_obj_set_flex_grow(editorTa, 1);
-   DisplayTheme::field(editorTa);
+    DisplayTheme::field(editorTa);
+    lv_obj_set_style_text_font(editorTa, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Spacer keeps the keyboard pinned to the bottom when the textarea is
    // one-line (multiline textareas grow instead, see openFormsEditor).
@@ -466,22 +549,22 @@ void ResourceDetailsScreen::buildCurrentFormField()
       return;
    }
 
-   std::string pageTitle = "Bitte Formular ausfuellen";
+   std::string pageTitle = "Bitte Formular ausfüllen";
    std::string resourceName = "";
 
    if (this->formsModalMeta)
    {
       if (this->formsModalMeta->action == API::ResourceUsageFormActionType::START)
       {
-         pageTitle = "Bitte vor dem Start ausfuellen";
+         pageTitle = "Bitte vor dem Start ausfüllen";
       }
       else if (this->formsModalMeta->action == API::ResourceUsageFormActionType::END)
       {
-         pageTitle = "Bitte vor dem Ende ausfuellen";
+         pageTitle = "Bitte vor dem Ende ausfüllen";
       }
       else if (this->formsModalMeta->action == API::ResourceUsageFormActionType::TAKEOVER)
       {
-         pageTitle = "Bitte vor der Uebernahme ausfuellen";
+         pageTitle = "Bitte vor der Übernahme ausfüllen";
       }
 
       if (this->formsModalMeta->resourceName.length() > 0)
@@ -543,8 +626,8 @@ void ResourceDetailsScreen::buildCurrentFormField()
          }
          lv_obj_t *fieldLabel = lv_label_create(fieldContainer);
          lv_label_set_text(fieldLabel, fieldTitle.c_str());
-         lv_obj_set_style_text_font(fieldLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
-         lv_obj_set_style_text_color(fieldLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+          lv_obj_set_style_text_font(fieldLabel, &attractap_font_montserrat_latin1_24, LV_PART_MAIN | LV_STATE_DEFAULT);
+          lv_obj_set_style_text_color(fieldLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
          lv_obj_set_style_width(fieldLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
          lv_label_set_long_mode(fieldLabel, LV_LABEL_LONG_WRAP);
 
@@ -552,8 +635,8 @@ void ResourceDetailsScreen::buildCurrentFormField()
          {
             lv_obj_t *desc = lv_label_create(fieldContainer);
             lv_label_set_text(desc, field.description.c_str());
-            lv_obj_set_style_text_color(desc, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_text_font(desc, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+             lv_obj_set_style_text_color(desc, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
+             lv_obj_set_style_text_font(desc, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_width(desc, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_label_set_long_mode(desc, LV_LABEL_LONG_WRAP);
          }
@@ -606,8 +689,8 @@ void ResourceDetailsScreen::buildCurrentFormField()
             {
                lv_obj_t *info = lv_label_create(selectContainer);
                lv_label_set_text(info, SELECT_FIELD_NO_OPTIONS);
-               lv_obj_set_style_text_color(info, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
-               lv_obj_set_style_text_font(info, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+                lv_obj_set_style_text_color(info, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
+                lv_obj_set_style_text_font(info, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
                lv_obj_set_style_width(info, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
                lv_label_set_long_mode(info, LV_LABEL_LONG_WRAP);
             }
@@ -624,8 +707,10 @@ void ResourceDetailsScreen::buildCurrentFormField()
                   lv_obj_t *optLabel = lv_label_create(optBtn);
                   lv_obj_set_width(optLabel, lv_pct(100));
                   lv_obj_set_align(optLabel, LV_ALIGN_CENTER);
-                  lv_label_set_text(optLabel, field.options.select.values[optIndex].c_str());
+                  const std::string displayValue = makeLVGLDisplayText(field.options.select.values[optIndex]);
+                  lv_label_set_text(optLabel, displayValue.c_str());
                   lv_label_set_long_mode(optLabel, LV_LABEL_LONG_WRAP);
+                  lv_obj_set_style_text_font(optLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
                   if (widget.selectOptionEventCount >= API::MAX_SELECT_OPTIONS)
                   {
@@ -680,6 +765,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
             lv_obj_t *valueLabel = lv_label_create(preview);
             widget.previewLabel = valueLabel;
             lv_obj_set_flex_grow(valueLabel, 1);
+            lv_obj_set_style_text_font(valueLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
             // Multiline: wrap and clip at the fixed preview height. Single line: ellipsis.
             lv_label_set_long_mode(valueLabel, multiline ? LV_LABEL_LONG_WRAP : LV_LABEL_LONG_DOT);
 
@@ -693,8 +779,8 @@ void ResourceDetailsScreen::buildCurrentFormField()
 
          widget.errorLabel = lv_label_create(fieldContainer);
          lv_label_set_text(widget.errorLabel, "");
-         lv_obj_set_style_text_color(widget.errorLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
-         lv_obj_set_style_text_font(widget.errorLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+          lv_obj_set_style_text_color(widget.errorLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
+          lv_obj_set_style_text_font(widget.errorLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
       }
    }
 
@@ -799,7 +885,7 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
    {
       if (this->formsModalErrorLabel)
       {
-         lv_label_set_text(this->formsModalErrorLabel, "Bitte markierte Felder ausfuellen.");
+         lv_label_set_text(this->formsModalErrorLabel, "Bitte markierte Felder ausfüllen.");
       }
       return false;
    }

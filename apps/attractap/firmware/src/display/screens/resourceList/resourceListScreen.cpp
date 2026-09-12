@@ -1,6 +1,7 @@
 #include "resourceListScreen.hpp"
 #include "display/theme.hpp"
 #include "display/images/lockscreen_background_image.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 
@@ -110,7 +111,7 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
    lv_obj_remove_flag(resourceNameLabel, LV_OBJ_FLAG_SCROLL_ELASTIC);
    lv_obj_remove_flag(resourceNameLabel, LV_OBJ_FLAG_SCROLL_MOMENTUM);
    lv_obj_remove_flag(resourceNameLabel, LV_OBJ_FLAG_SCROLL_CHAIN);
-   lv_obj_set_style_text_font(resourceNameLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(resourceNameLabel, &attractap_font_montserrat_latin1_24, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_min_width(resourceNameLabel, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_max_width(resourceNameLabel, 370, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_label_set_long_mode(resourceNameLabel, LV_LABEL_LONG_SCROLL);
@@ -125,7 +126,7 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
    lv_obj_remove_flag(resourceDescriptionContainer, LV_OBJ_FLAG_SCROLL_ELASTIC);
    lv_obj_remove_flag(resourceDescriptionContainer, LV_OBJ_FLAG_SCROLL_MOMENTUM);
    lv_obj_remove_flag(resourceDescriptionContainer, LV_OBJ_FLAG_SCROLL_CHAIN);
-   lv_obj_set_style_text_font(resourceDescriptionContainer, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(resourceDescriptionContainer, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_min_width(resourceDescriptionContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_max_width(resourceDescriptionContainer, 300, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_label_set_long_mode(resourceDescriptionContainer, LV_LABEL_LONG_DOT);
@@ -142,8 +143,8 @@ void ResourceListScreen::setNoResourcesMessage()
    lv_obj_set_width(noResourcesMessage, lv_pct(100));
    lv_obj_set_height(noResourcesMessage, LV_SIZE_CONTENT);
    lv_obj_set_align(noResourcesMessage, LV_ALIGN_CENTER);
-   lv_label_set_text(noResourcesMessage, "Keine Ressourcen mit diesem Reader verknuepft, bitte konfigurieren Sie den Reader in der Attraccess Administration");
-   lv_obj_set_style_text_font(noResourcesMessage, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_label_set_text(noResourcesMessage, "Keine Ressourcen mit diesem Reader verknüpft, bitte konfigurieren Sie den Reader in der Attraccess Administration");
+   lv_obj_set_style_text_font(noResourcesMessage, &attractap_font_montserrat_latin1_24, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(noResourcesMessage, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 

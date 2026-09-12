@@ -1,5 +1,6 @@
 #include "supervisionScreen.hpp"
 #include "display/theme.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 
@@ -53,8 +54,8 @@ void SupervisionScreen::init()
    const char *initialName = this->view.requesterName.length() > 0 ? this->view.requesterName.c_str() : "...";
    lv_label_set_text(this->requesterNameLabel, initialName);
    lv_obj_set_style_text_align(this->requesterNameLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->requesterNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->requesterNameLabel, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->requesterNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->requesterNameLabel, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Status line — colour + text reflect the current supervision phase.
    this->statusLabel = lv_label_create(this->screen);
@@ -62,7 +63,7 @@ void SupervisionScreen::init()
    lv_obj_set_height(this->statusLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->statusLabel, LV_LABEL_LONG_WRAP);
    lv_obj_set_style_text_align(this->statusLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->statusLabel, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->statusLabel, &attractap_font_montserrat_latin1_24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Secondary hint — who may approve + the web fallback note.
    this->hintLabel = lv_label_create(this->screen);
@@ -72,7 +73,7 @@ void SupervisionScreen::init()
    lv_label_set_text(this->hintLabel, this->view.supervisorHint.c_str());
    lv_obj_set_style_text_align(this->hintLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->hintLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->hintLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->hintLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Cancel button — lets the user abort the supervised start.
    this->cancelButton = lv_button_create(this->screen);

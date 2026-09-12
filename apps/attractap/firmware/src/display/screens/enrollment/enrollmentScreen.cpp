@@ -1,5 +1,6 @@
 #include "enrollmentScreen.hpp"
 #include "display/theme.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 
@@ -54,8 +55,8 @@ void EnrollmentScreen::init()
    const char *initialName = this->userNameCache.length() > 0 ? this->userNameCache.c_str() : "...";
    lv_label_set_text(this->userNameLabel, initialName);
    lv_obj_set_style_text_align(this->userNameLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->userNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->userNameLabel, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->userNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->userNameLabel, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Status line — colour + text reflect the current enrollment phase.
    this->statusLabel = lv_label_create(this->screen);
@@ -63,7 +64,7 @@ void EnrollmentScreen::init()
    lv_obj_set_height(this->statusLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->statusLabel, LV_LABEL_LONG_WRAP);
    lv_obj_set_style_text_align(this->statusLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->statusLabel, &lv_font_montserrat_32, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->statusLabel, &attractap_font_montserrat_latin1_24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Cancel button — lets the user actively abort enrollment (ATT-503).
    this->cancelButton = lv_button_create(this->screen);

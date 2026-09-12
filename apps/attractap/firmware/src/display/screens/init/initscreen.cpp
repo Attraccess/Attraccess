@@ -1,4 +1,5 @@
 #include "initscreen.hpp"
+#include "display/fonts/attractap_fonts.hpp"
 #include "display/theme.hpp"
 #include <string>
 #include <functional>
@@ -239,7 +240,7 @@ void InitScreen::init()
    lv_obj_set_width(this->connectionStateLabel, lv_pct(100));
    lv_obj_set_height(this->connectionStateLabel, LV_SIZE_CONTENT);
    lv_label_set_text(this->connectionStateLabel, "");
-   lv_obj_set_style_text_font(this->connectionStateLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->connectionStateLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(this->connectionStateLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *openSettingsButton = lv_btn_create(statesContainer);
@@ -424,7 +425,7 @@ void InitScreen::loop()
    }
    else if (!websocketState.connected && websocketState.secondsUntilNextAttempt > 0)
    {
-      stateLine += "  naechster Versuch in " + std::to_string(websocketState.secondsUntilNextAttempt) + "s";
+      stateLine += "  nächster Versuch in " + std::to_string(websocketState.secondsUntilNextAttempt) + "s";
    }
    setLabelTextIfChanged(this->connectionStateLabel, stateLine.c_str());
 }

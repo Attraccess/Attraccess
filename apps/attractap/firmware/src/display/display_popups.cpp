@@ -1,5 +1,6 @@
 #include "display.hpp"
 #include "display/theme.hpp"
+#include "fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 #include <cstdlib>
@@ -45,13 +46,13 @@ void Display::showErrorPopup(const std::string &title, const std::string &messag
     lv_obj_t *titleLbl = lv_label_create(dialog);
     lv_label_set_text(titleLbl, title.c_str());
     lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(titleLbl, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(titleLbl, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     // Message
     lv_obj_t *msgLbl = lv_label_create(dialog);
     lv_label_set_text(msgLbl, message.c_str());
     lv_obj_set_style_text_color(msgLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(msgLbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(msgLbl, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_width(msgLbl, lv_pct(100));
 
     // Footer with OK button
@@ -117,20 +118,20 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
     lv_obj_t *titleLbl = lv_label_create(dialog);
     lv_label_set_text(titleLbl, "Unzureichendes Guthaben");
     lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(titleLbl, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(titleLbl, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     // Message
     lv_obj_t *msgLbl = lv_label_create(dialog);
     lv_label_set_text(msgLbl, "Ihr Guthaben reicht nicht aus, um die Aktion auszuführen. Bitte laden Sie Ihr Guthaben auf.");
     lv_obj_set_style_text_color(msgLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(msgLbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(msgLbl, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_width(msgLbl, lv_pct(100));
 
     // Amount label
     lv_obj_t *amountLbl = lv_label_create(dialog);
     lv_label_set_text(amountLbl, "Betrag (EUR)");
     lv_obj_set_style_text_color(amountLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(amountLbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(amountLbl, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     // Amount input
     lv_obj_t *amountTa = lv_textarea_create(dialog);
@@ -146,7 +147,7 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
     lv_obj_t *errorLbl = lv_label_create(dialog);
     lv_label_set_text(errorLbl, "");
     lv_obj_set_style_text_color(errorLbl, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(errorLbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(errorLbl, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     // Footer with buttons
     lv_obj_t *footer = lv_obj_create(dialog);
@@ -264,7 +265,7 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
         lv_obj_t *infoLbl = lv_label_create(dialog);
         lv_label_set_text(infoLbl, "Bitte am Zahlungsterminal fortfahren …");
         lv_obj_set_style_text_color(infoLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_text_font(infoLbl, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_font(infoLbl, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
         if (c->onStart) c->onStart(amountCents);
         // Close after short delay

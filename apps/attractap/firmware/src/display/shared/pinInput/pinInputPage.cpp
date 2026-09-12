@@ -1,5 +1,6 @@
 #include "pinInputPage.hpp"
 #include "display/theme.hpp"
+#include "display/fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 
@@ -33,7 +34,7 @@ lv_obj_t *PinInputPage::init(const char *title, lv_obj_t *parent)
     lv_obj_set_align(this->labelForDevicePin, LV_ALIGN_CENTER);
     lv_label_set_text(this->labelForDevicePin, title);
     lv_obj_set_style_text_align(this->labelForDevicePin, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(this->labelForDevicePin, &lv_font_montserrat_32, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->labelForDevicePin, &attractap_font_montserrat_latin1_24, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(this->labelForDevicePin, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
     this->devicePin = lv_textarea_create(containerForDevicePinInputAndLabel);

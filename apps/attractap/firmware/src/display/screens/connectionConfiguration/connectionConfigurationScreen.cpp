@@ -1,5 +1,6 @@
 #include "connectionConfigurationScreen.hpp"
 #include "display/theme.hpp"
+#include "display/fonts/attractap_fonts.hpp"
 #include <string>
 
 // Screen construction (tabs/widgets) and lifecycle. Behaviour-specific logic
@@ -153,7 +154,8 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_width(sslInfoLabel, lv_pct(100));
    lv_obj_set_height(sslInfoLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(sslInfoLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(sslInfoLabel, "Selbst-Signierte Zertifikate werden (aktuell) nicht unterstuetzt. Eine Verbindung ohne SSL ist sehr unsicher und sollte vermieden werden.");
+   lv_label_set_text(sslInfoLabel, "Selbst-Signierte Zertifikate werden (aktuell) nicht unterstützt. Eine Verbindung ohne SSL ist sehr unsicher und sollte vermieden werden.");
+   lv_obj_set_style_text_font(sslInfoLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
    lv_obj_set_style_text_color(sslInfoLabel, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Reset the locked certificate decision (ATT-714): once a cert worked it is
@@ -168,13 +170,15 @@ void ConnectionConfigurationScreen::init()
 
    this->resetCertLabel = lv_label_create(this->resetCertButton);
    lv_obj_set_align(this->resetCertLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(this->resetCertLabel, "Zertifikat zuruecksetzen");
+   lv_label_set_text(this->resetCertLabel, "Zertifikat zurücksetzen");
+   lv_obj_set_style_text_font(this->resetCertLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
 
    lv_obj_t *containerForSaveButton = this->createSaveContainer(apiTab);
    this->createSaveButton(containerForSaveButton);
 
    // Device tab
-   lv_obj_t *deviceTab = lv_tabview_add_tab(this->tabs, "Geraet");
+   lv_obj_t *deviceTab = lv_tabview_add_tab(this->tabs, "Gerät");
+   lv_obj_set_style_text_font(lv_tabview_get_tab_bar(this->tabs), &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
    lv_obj_set_flex_flow(deviceTab, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(deviceTab, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
@@ -182,7 +186,8 @@ void ConnectionConfigurationScreen::init()
    lv_obj_set_width(this->labelForDevicePin, LV_SIZE_CONTENT);
    lv_obj_set_height(this->labelForDevicePin, LV_SIZE_CONTENT);
    lv_obj_set_align(this->labelForDevicePin, LV_ALIGN_CENTER);
-   lv_label_set_text(this->labelForDevicePin, "Geraete PIN*");
+   lv_label_set_text(this->labelForDevicePin, "Geräte PIN*");
+   lv_obj_set_style_text_font(this->labelForDevicePin, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
    lv_obj_set_style_text_color(this->labelForDevicePin, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    this->labelForDevicePinDefaultColor = lv_obj_get_style_text_color(this->labelForDevicePin, LV_PART_MAIN | LV_STATE_DEFAULT);
 

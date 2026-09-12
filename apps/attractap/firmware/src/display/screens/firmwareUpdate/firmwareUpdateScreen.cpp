@@ -1,4 +1,5 @@
 #include "firmwareUpdateScreen.hpp"
+#include "display/fonts/attractap_fonts.hpp"
 #include "display/theme.hpp"
 #include <string>
 
@@ -48,7 +49,7 @@ void FirmwareUpdateScreen::init()
     lv_obj_set_align(this->versionsLabel, LV_ALIGN_CENTER);
     lv_obj_set_style_text_color(this->versionsLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(this->versionsLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(this->versionsLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->versionsLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
     if (this->availableVersionCache.length() > 0)
     {
         this->setAvailableVersion(this->availableVersionCache);

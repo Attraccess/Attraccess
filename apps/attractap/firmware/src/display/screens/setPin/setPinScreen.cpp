@@ -11,7 +11,7 @@ void SetPinScreen::init()
    }
    this->pinInputPage.setOnConfirmCallback([this](std::string pin)
                                            { this->onPinConfirmed(pin); return true; });
-   this->screen = this->pinInputPage.init("Geraete-PIN");
+   this->screen = this->pinInputPage.init("Geräte-PIN");
 }
 
 void SetPinScreen::setOnPinConfirmedCallback(std::function<void(std::string)> onPinConfirmed)

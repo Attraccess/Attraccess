@@ -1,5 +1,6 @@
 #include "resetScreen.hpp"
 #include "display/theme.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 
@@ -41,10 +42,10 @@ void ResetScreen::init()
    lv_obj_t *title = lv_label_create(this->screen);
    lv_obj_set_width(title, lv_pct(100));
    lv_obj_set_height(title, LV_SIZE_CONTENT);
-   lv_label_set_text(title, "Karte zuruecksetzen");
+   lv_label_set_text(title, "Karte zurücksetzen");
    lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(title, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(title, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(title, &attractap_font_montserrat_latin1_24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Username — the person the card belongs to. Most prominent line.
    this->userNameLabel = lv_label_create(this->screen);
@@ -54,8 +55,8 @@ void ResetScreen::init()
    const char *initialName = this->userNameCache.length() > 0 ? this->userNameCache.c_str() : "...";
    lv_label_set_text(this->userNameLabel, initialName);
    lv_obj_set_style_text_align(this->userNameLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->userNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->userNameLabel, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->userNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->userNameLabel, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Status line — colour + text reflect the current reset phase.
    this->statusLabel = lv_label_create(this->screen);
@@ -63,7 +64,7 @@ void ResetScreen::init()
    lv_obj_set_height(this->statusLabel, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->statusLabel, LV_LABEL_LONG_WRAP);
    lv_obj_set_style_text_align(this->statusLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->statusLabel, &lv_font_montserrat_32, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(this->statusLabel, &attractap_font_montserrat_latin1_24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Cancel button — lets the user actively abort the reset.
    this->cancelButton = lv_button_create(this->screen);
@@ -123,11 +124,11 @@ void ResetScreen::applyStatus()
       color = DisplayTheme::text();
       break;
    case STATUS_WRITING:
-      text = "Karte wird zurueckgesetzt...\nbitte nicht bewegen";
+      text = "Karte wird zurückgesetzt...\nbitte nicht bewegen";
       color = DisplayTheme::warning();
       break;
    case STATUS_SUCCESS:
-      text = "Karte zurueckgesetzt!";
+      text = "Karte zurückgesetzt!";
       color = DisplayTheme::success();
       break;
    case STATUS_ERROR:

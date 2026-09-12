@@ -1,4 +1,5 @@
 #include "lockscreen.hpp"
+#include "display/fonts/attractap_fonts.hpp"
 #include "display/theme.hpp"
 #include "display/images/lockscreen_background_image.hpp"
 #include <string>
@@ -69,12 +70,14 @@ void Lockscreen::init()
     lv_obj_set_align(this->resourceNameLabel, LV_ALIGN_CENTER);
     lv_label_set_text(this->resourceNameLabel, "???");
     lv_obj_set_style_text_color(this->resourceNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->resourceNameLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     this->usageInfoLabel = lv_label_create(resourceInfo);
     lv_obj_set_width(this->usageInfoLabel, LV_SIZE_CONTENT);
     lv_obj_set_height(this->usageInfoLabel, LV_SIZE_CONTENT);
     lv_obj_set_align(this->usageInfoLabel, LV_ALIGN_CENTER);
     lv_label_set_text(this->usageInfoLabel, "???");
+    lv_obj_set_style_text_font(this->usageInfoLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     this->updateUsageInfo();
 }
@@ -137,7 +140,7 @@ void Lockscreen::updateUsageInfo()
     }
     else
     {
-        lv_label_set_text(this->usageInfoLabel, "Verfuegbar");
+        lv_label_set_text(this->usageInfoLabel, "Verfügbar");
         lv_obj_set_style_text_color(this->usageInfoLabel, DisplayTheme::success(), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
 }
