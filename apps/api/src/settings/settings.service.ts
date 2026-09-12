@@ -1,4 +1,5 @@
-import { Inject, Injectable, Optional } from '@nestjs/common';
+import { auditSettingsUpdateSchema, readAuditSettings } from '../audit/audit.config';
+import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
@@ -44,6 +45,19 @@ import { METRICS_TOGGLE_INVALIDATOR, MetricsToggleInvalidator } from './metrics-
 
 @Injectable()
 export class SettingsService {
+  getAuditSettings() {
+    return readAuditSettings(this.settingsStore);
+  }
+
+  async updateAuditSettings(update: unknown) {
+    const parsed = auditSettingsUpdateSchema.safeParse(update);
+    if (!parsed.success) throw new BadRequestException('Invalid audit settings');
+    for (const [key, value] of Object.entries(parsed.data)) {
+      if (value !== undefined) await this.settingsStore.setPlainSetting('audit', key, JSON.stringify(value));
+    }
+    return this.getAuditSettings();
+  }
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,

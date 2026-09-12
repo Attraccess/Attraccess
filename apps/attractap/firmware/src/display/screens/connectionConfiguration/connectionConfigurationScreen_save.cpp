@@ -1,4 +1,5 @@
 #include "connectionConfigurationScreen.hpp"
+#include "display/theme.hpp"
 #include <string>
 #include <functional>
 #include <cstring>
@@ -45,19 +46,24 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
    const char *ssidText = lv_textarea_get_text(self->wifiSSID);
    const char *passwordText = lv_textarea_get_text(self->wifiPassword);
    const char *hostText = lv_textarea_get_text(self->serverHostname);
-   const char *devicePinText = self->devicePin ? lv_textarea_get_text(self->devicePin) : "";
+    const char *devicePinText = self->devicePin ? lv_textarea_get_text(self->devicePin) : "";
 
-   std::string hostValue = hostText ? hostText : "";
-   if (hostValue.rfind("https://", 0) == 0)
-   {
-      hostValue.erase(0, 8);
-      lv_textarea_set_text(self->serverHostname, hostValue.c_str());
-   }
+    std::string hostValue = hostText ? hostText : "";
+    bool useSSL = lv_obj_has_state(self->useSSLSwitch, LV_STATE_CHECKED);
+    if (hostValue.rfind("https://", 0) == 0)
+    {
+       hostValue.erase(0, 8);
+       lv_textarea_set_text(self->serverHostname, hostValue.c_str());
+       useSSL = true;
+       lv_obj_add_state(self->useSSLSwitch, LV_STATE_CHECKED);
+    }
 
-   if (hostValue.rfind("http://", 0) == 0)
-   {
-      hostValue.erase(0, 7);
-      lv_textarea_set_text(self->serverHostname, hostValue.c_str());
+    if (hostValue.rfind("http://", 0) == 0)
+    {
+       hostValue.erase(0, 7);
+       lv_textarea_set_text(self->serverHostname, hostValue.c_str());
+       useSSL = false;
+       lv_obj_remove_state(self->useSSLSwitch, LV_STATE_CHECKED);
    }
 
    bool hostValid = !hostValue.empty() && hostnameLooksValid(hostValue.c_str());
@@ -67,13 +73,13 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
    if (self->labelForServerHostname)
    {
       lv_obj_set_style_text_color(self->labelForServerHostname,
-                                  hostValid ? self->labelForServerHostnameDefaultColor : lv_color_hex(0xFF0000),
+                                  hostValid ? self->labelForServerHostnameDefaultColor : DisplayTheme::danger(),
                                   LV_PART_MAIN | LV_STATE_DEFAULT);
    }
    if (self->labelForDevicePin)
    {
       lv_obj_set_style_text_color(self->labelForDevicePin,
-                                  devicePinValid ? self->labelForDevicePinDefaultColor : lv_color_hex(0xFF0000),
+                                  devicePinValid ? self->labelForDevicePinDefaultColor : DisplayTheme::danger(),
                                   LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 
@@ -102,10 +108,10 @@ void ConnectionConfigurationScreen::onSaveButtonEvent(lv_event_t *e)
    if (self->onSaveCallback)
    {
       ConnectionConfigurationScreen::ConnectionConfig cfg;
-      cfg.ssid = std::string(ssidText);
-      cfg.password = std::string(passwordText);
-      cfg.host = hostValue;
-      cfg.useSSL = lv_obj_has_state(self->useSSLSwitch, LV_STATE_CHECKED);
+       cfg.ssid = std::string(ssidText);
+       cfg.password = std::string(passwordText);
+       cfg.host = hostValue;
+       cfg.useSSL = useSSL;
       cfg.devicePin = std::string(devicePinText);
       cfg.beeperEnabled = lv_obj_has_state(self->beeperEnabled, LV_STATE_CHECKED);
       self->onSaveCallback(cfg);
@@ -120,8 +126,7 @@ lv_obj_t *ConnectionConfigurationScreen::createSaveButton(lv_obj_t *parent)
    lv_obj_set_align(save, LV_ALIGN_CENTER);
    lv_obj_add_flag(save, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(save, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_bg_color(save, lv_color_hex(0x00FF00), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(save, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::button(save);
    lv_obj_add_event_cb(save, &ConnectionConfigurationScreen::onSaveButtonEvent, LV_EVENT_CLICKED, this);
 
    lv_obj_t *label = lv_label_create(save);
@@ -129,7 +134,6 @@ lv_obj_t *ConnectionConfigurationScreen::createSaveButton(lv_obj_t *parent)
    lv_obj_set_height(label, LV_SIZE_CONTENT);
    lv_obj_set_align(label, LV_ALIGN_CENTER);
    lv_label_set_text(label, "Speichern");
-   lv_obj_set_style_text_color(label, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(label, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    return save;

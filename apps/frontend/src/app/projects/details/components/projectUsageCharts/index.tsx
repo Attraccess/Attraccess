@@ -38,13 +38,14 @@ type ProjectUsageChartsProps = {
 };
 
 const TOOLTIP_CONTAINER_CLASS =
-  'rounded-lg border border-divider bg-background/95 px-3 py-2 text-foreground shadow-xl backdrop-blur-md';
-const TOOLTIP_LABEL_CLASS = 'text-xs font-medium text-default-500';
+  'rounded-lg border border-border bg-surface/95 px-3 py-2 text-foreground shadow-xl backdrop-blur-md';
+const TOOLTIP_LABEL_CLASS = 'text-xs font-medium text-muted';
 const TOOLTIP_DOT_CLASS = 'h-2 w-2 rounded-full';
 const TOOLTIP_VALUE_CLASS = 'ml-auto font-semibold text-foreground';
-const BAR_COLORS = {
-  sessions: { base: '#0ea5e9', active: '#38bdf8' },
-  minutes: { base: '#10b981', active: '#34d399' },
+const CHART_COLORS = {
+  sessions: { base: 'var(--chart-sessions)', active: 'var(--chart-sessions-active)' },
+  minutes: { base: 'var(--chart-minutes)', active: 'var(--chart-minutes-active)' },
+  spend: 'var(--chart-spend)',
 };
 type ChartTooltipProps = TooltipContentProps;
 type ChartTooltipPayload = TooltipPayload;
@@ -101,8 +102,8 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
 
               return (
                 <div key={String(entry.dataKey ?? index)} className="flex items-center gap-2 text-sm">
-                  <span className={TOOLTIP_DOT_CLASS} style={{ backgroundColor: entry.color ?? '#94a3b8' }} />
-                  <span className="text-default-500">{entry.name}</span>
+                  <span className={TOOLTIP_DOT_CLASS} style={{ backgroundColor: entry.color ?? 'var(--muted)' }} />
+                  <span className="text-muted">{entry.name}</span>
                   <span className={TOOLTIP_VALUE_CLASS}>{formattedValue}</span>
                 </div>
               );
@@ -138,8 +139,8 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
 
               return (
                 <div key={String(entry.dataKey ?? index)} className="flex items-center gap-2 text-sm">
-                  <span className={TOOLTIP_DOT_CLASS} style={{ backgroundColor: entry.color ?? '#94a3b8' }} />
-                  <span className="text-default-500">{entry.name}</span>
+                  <span className={TOOLTIP_DOT_CLASS} style={{ backgroundColor: entry.color ?? 'var(--muted)' }} />
+                  <span className="text-muted">{entry.name}</span>
                   <span className={TOOLTIP_VALUE_CLASS}>{value}</span>
                 </div>
               );
@@ -157,7 +158,7 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
         <Card.Header>
           <div>
             <p className="font-semibold">{t('charts.timeSeries.title')}</p>
-            <p className="text-xs text-default-500">{t('charts.title')}</p>
+            <p className="text-xs text-muted">{t('charts.title')}</p>
           </div>
         </Card.Header>
         <Card.Content className="h-[320px]">
@@ -170,33 +171,41 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis yAxisId="minutes" label={{ value: t('tooltip.minutes'), angle: -90, position: 'insideLeft' }} />
+                <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+                <XAxis dataKey="date" stroke="var(--muted)" />
+                <YAxis
+                  yAxisId="minutes"
+                  stroke="var(--muted)"
+                  label={{ value: t('tooltip.minutes'), angle: -90, position: 'insideLeft', fill: 'var(--muted)' }}
+                />
                 <YAxis
                   yAxisId="spend"
                   orientation="right"
-                  label={{ value: t('tooltip.spend'), angle: 90, position: 'insideRight' }}
+                  stroke="var(--muted)"
+                  label={{ value: t('tooltip.spend'), angle: 90, position: 'insideRight', fill: 'var(--muted)' }}
                 />
-                <Tooltip content={renderTimeSeriesTooltip} />
-                <Legend />
+                <Tooltip content={renderTimeSeriesTooltip} cursor={{ stroke: 'var(--border)' }} />
+                <Legend labelStyle={{ color: 'var(--foreground)' }} inactiveColor="var(--muted)" />
                 <Line
                   type="monotone"
                   dataKey="minutes"
-                  stroke="#10b981"
+                  stroke={CHART_COLORS.minutes.base}
                   yAxisId="minutes"
                   name={t('tooltip.minutes')}
                   strokeWidth={2}
                   dot={false}
+                  activeDot={{ fill: CHART_COLORS.minutes.active, stroke: 'var(--surface)' }}
                 />
                 <Line
                   type="monotone"
                   dataKey="spend"
-                  stroke="#2563eb"
+                  stroke={CHART_COLORS.spend}
                   yAxisId="spend"
                   name={`${t('tooltip.spend')} (${data?.summary.currency ?? ''})`}
                   strokeWidth={2}
+                  strokeDasharray="6 4"
                   dot={false}
+                  activeDot={{ fill: CHART_COLORS.spend, stroke: 'var(--surface)' }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -208,7 +217,7 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
         <Card.Header>
           <div>
             <p className="font-semibold">{t('charts.topResources.title')}</p>
-            <p className="text-xs text-default-500">{t('charts.title')}</p>
+            <p className="text-xs text-muted">{t('charts.title')}</p>
           </div>
         </Card.Header>
         <Card.Content className="flex flex-col gap-4">
@@ -226,31 +235,31 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                 {canRenderCharts ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={topResources}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="resourceName" />
-                      <YAxis />
-                      <Tooltip content={renderTopResourcesTooltip} />
-                      <Legend />
+                      <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+                      <XAxis dataKey="resourceName" stroke="var(--muted)" />
+                      <YAxis stroke="var(--muted)" />
+                      <Tooltip content={renderTopResourcesTooltip} cursor={{ fill: 'var(--surface-secondary)' }} />
+                      <Legend labelStyle={{ color: 'var(--foreground)' }} inactiveColor="var(--muted)" />
                       <Bar
                         dataKey="sessions"
-                        fill={BAR_COLORS.sessions.base}
+                        fill={CHART_COLORS.sessions.base}
                         name={t('tooltip.sessions')}
                         activeBar={
                           <Rectangle
-                            fill={BAR_COLORS.sessions.active}
-                            stroke={BAR_COLORS.sessions.base}
+                            fill={CHART_COLORS.sessions.active}
+                            stroke={CHART_COLORS.sessions.base}
                             strokeWidth={2}
                           />
                         }
                       />
                       <Bar
                         dataKey="minutes"
-                        fill={BAR_COLORS.minutes.base}
+                        fill={CHART_COLORS.minutes.base}
                         name={t('tooltip.minutes')}
                         activeBar={
                           <Rectangle
-                            fill={BAR_COLORS.minutes.active}
-                            stroke={BAR_COLORS.minutes.base}
+                            fill={CHART_COLORS.minutes.active}
+                            stroke={CHART_COLORS.minutes.base}
                             strokeWidth={2}
                           />
                         }

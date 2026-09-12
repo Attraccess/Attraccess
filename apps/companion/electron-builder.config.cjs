@@ -1,7 +1,10 @@
+const path = require('node:path');
+
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
   appId: 'org.attraccess.companion',
   productName: 'Attraccess Companion',
+  icon: path.join(__dirname, '../frontend/public/icon-512.png'),
   // ponytail: resolved at build time so it stays in sync with the installed version
   electronVersion: require('../../node_modules/electron/package.json').version,
   directories: {
@@ -20,6 +23,7 @@ module.exports = {
     target: [{ target: 'dmg', arch: ['universal'] }],
   },
   win: {
+    icon: path.join(__dirname, 'assets/icon.ico'),
     target: [{ target: 'nsis', arch: ['x64'] }],
   },
   linux: {

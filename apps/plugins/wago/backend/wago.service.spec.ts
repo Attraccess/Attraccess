@@ -8,6 +8,10 @@ import { WagoConfigurationRevision } from './wago-configuration-revision.entity'
 import { configurationHash } from './configuration';
 
 describe('WagoService', () => {
+  const services: WagoService[] = [];
+  afterEach(() => {
+    services.splice(0).forEach((service) => service.onModuleDestroy());
+  });
   const controller = (): WagoController => ({
     id: 1,
     hardwareId: 'cc100-01',
@@ -85,7 +89,14 @@ describe('WagoService', () => {
     };
     settingsRepository.createQueryBuilder.mockReturnValue(settingsQuery);
     const subscriptions: Array<{ unsubscribe: jest.Mock }> = [];
+    const flowQuery = {
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    };
     const context = {
+      dataSource: { getRepository: () => ({ createQueryBuilder: () => flowQuery }) },
       getRepository: jest.fn((entity) => {
         if (entity === WagoController) return controllerRepository;
         if (entity === WagoEnrollment) return enrollmentRepository;
@@ -106,6 +117,7 @@ describe('WagoService', () => {
       getMqttCredentialProvisioning: jest.fn(),
     } as unknown as PluginContext;
     const service = new WagoService(context);
+    services.push(service);
     // Unit tests invoke service methods directly, outside Nest's module lifecycle.
     Object.assign(service, {
       controllers: controllerRepository,
@@ -183,7 +195,7 @@ describe('WagoService', () => {
         revision: 3,
         state: 'applied',
         snapshot: JSON.stringify({
-          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'] }],
+          logicalChannels: [{ id: 'pump', capabilities: ['output'] }],
         }),
       },
     ]);
@@ -285,7 +297,7 @@ describe('WagoService', () => {
         revision: 3,
         state: 'applied',
         snapshot: JSON.stringify({
-          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'] }],
+          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'], pulse: { durationMs: 500 } }],
         }),
       },
     ]);
@@ -310,7 +322,7 @@ describe('WagoService', () => {
         revision: 3,
         state: 'applied',
         snapshot: JSON.stringify({
-          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'] }],
+          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'], pulse: { durationMs: 500 } }],
         }),
       },
     ]);
@@ -325,6 +337,44 @@ describe('WagoService', () => {
         claimed.id,
         Buffer.from(JSON.stringify({ id: command.id, status: 'rejected', error: 'command expired' })),
       );
+    });
+
+    await expect(
+      service.executeCommand({
+        controllerId: claimed.id,
+        channelId: 'pump',
+        action: 'pulse',
+        expectedConfigurationRevision: 3,
+      }),
+    ).rejects.toThrow('command expired');
+  });
+
+  it('ignores null acknowledgements and rejects while publication is stalled', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, context, revisionRepository } = createService([claimed], [], 2);
+    revisionRepository.find.mockResolvedValue([
+      {
+        controllerId: claimed.id,
+        revision: 3,
+        state: 'applied',
+        snapshot: JSON.stringify({
+          logicalChannels: [{ id: 'pump', capabilities: ['output', 'pulse'], pulse: { durationMs: 500 } }],
+        }),
+      },
+    ]);
+    (context.mqtt.publish as jest.Mock).mockImplementation(() => {
+      const command = JSON.parse((context.mqtt.publish as jest.Mock).mock.calls[0][2]) as { id: string };
+      const acknowledge = Reflect.get(service, 'onCommandAcknowledgement') as (
+        controllerId: number,
+        payload: Buffer,
+      ) => void;
+      acknowledge.call(service, claimed.id, Buffer.from('null'));
+      acknowledge.call(
+        service,
+        claimed.id,
+        Buffer.from(JSON.stringify({ id: command.id, status: 'rejected', error: 'command expired' })),
+      );
+      return new Promise<void>(() => undefined);
     });
 
     await expect(
@@ -439,6 +489,78 @@ describe('WagoService', () => {
     expect(controllerRepository.save).toHaveBeenCalledWith(expect.objectContaining({ lastSequence: 4 }));
   });
 
+  it('persists a valid canonical heartbeat when the bounded diagnostics cache is full', async () => {
+    const claimed = { ...controller(), id: 257, trustState: 'claimed' as const };
+    const { service, controllerRepository } = createService([claimed]);
+    const timestamp = new Date().toISOString();
+    const streamId = '00000000-0000-4000-8000-000000000001';
+    for (let id = 1; id <= 256; id++) {
+      service.diagnostics.ingest(id, 'heartbeat', Buffer.from(JSON.stringify({ timestamp, streamId, sequence: 1 })));
+    }
+    const onHeartbeat = (
+      Reflect.get(service, 'onHeartbeat') as (hardwareId: string, payload: Buffer) => Promise<void>
+    ).bind(service);
+
+    await onHeartbeat(
+      claimed.hardwareId,
+      Buffer.from(
+        JSON.stringify({
+          hardwareId: claimed.hardwareId,
+          pairingCode: '482931',
+          protocolVersion: '1.0.0',
+          runtimeVersion: '1.0.0',
+          capabilities: ['claim', 'heartbeat', 'configuration-v1'],
+          timestamp,
+          streamId,
+          sequence: 1,
+        }),
+      ),
+    );
+
+    expect(service.diagnostics.read(claimed.id).heartbeatAt).toBeUndefined();
+    expect(controllerRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ lastHeartbeatAt: timestamp, lastSeenAt: expect.any(String) }),
+    );
+  });
+
+  it('does not regress a persisted heartbeat with an older canonical heartbeat when the diagnostics cache is full', async () => {
+    const timestamp = new Date(Date.now() - 60_000).toISOString();
+    const claimed = {
+      ...controller(),
+      id: 257,
+      trustState: 'claimed' as const,
+      lastHeartbeatAt: new Date(Date.now()).toISOString(),
+      lastSeenAt: new Date(Date.now() - 31_000).toISOString(),
+    };
+    const { service, controllerRepository } = createService([claimed]);
+    const streamId = '00000000-0000-4000-8000-000000000001';
+    for (let id = 1; id <= 256; id++) {
+      service.diagnostics.ingest(id, 'heartbeat', Buffer.from(JSON.stringify({ timestamp, streamId, sequence: 1 })));
+    }
+    const onHeartbeat = (
+      Reflect.get(service, 'onHeartbeat') as (hardwareId: string, payload: Buffer) => Promise<void>
+    ).bind(service);
+
+    await onHeartbeat(
+      claimed.hardwareId,
+      Buffer.from(
+        JSON.stringify({
+          hardwareId: claimed.hardwareId,
+          pairingCode: '482931',
+          protocolVersion: '1.0.0',
+          runtimeVersion: '1.0.0',
+          capabilities: ['claim', 'heartbeat', 'configuration-v1'],
+          timestamp,
+          streamId,
+          sequence: 1,
+        }),
+      ),
+    );
+
+    expect(controllerRepository.save).not.toHaveBeenCalled();
+    expect(claimed.lastHeartbeatAt).not.toBe(timestamp);
+  });
+
   it('publishes a retained, content-addressed revision only after validation', async () => {
     const claimed = { ...controller(), trustState: 'claimed' as const };
     const { service, draftRepository, revisionRepository, context } = createService([claimed]);
@@ -485,7 +607,7 @@ describe('WagoService', () => {
     const snapshot = { version: 1, physicalPoints: [], logicalChannels: [] };
     draftRepository.findOneBy.mockResolvedValue({
       controllerId: claimed.id,
-      reviewedHash: configurationHash(snapshot),
+      reviewedHash: configurationHash({ snapshot: JSON.stringify(snapshot), metadata: null }),
       snapshot: JSON.stringify(snapshot),
     });
 
@@ -506,9 +628,10 @@ describe('WagoService', () => {
     };
     const candidate = { ...controller(), fingerprint: 'fingerprint' };
     const { service, context, enrollmentRepository } = createService([candidate], [enrollment]);
+    const provision = jest.fn().mockResolvedValue({ username: 'wago-controller-cc100-01', password: 'secret' });
     (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = jest.fn().mockResolvedValue({});
     (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({
-      provision: jest.fn().mockResolvedValue({ username: 'wago-controller-cc100-01', password: 'secret' }),
+      provision,
       revoke: jest.fn().mockResolvedValue(undefined),
     });
     enrollmentRepository.findOneBy.mockResolvedValue(enrollment);
@@ -520,6 +643,13 @@ describe('WagoService', () => {
       'attraccess/wago/discovery/cc100-01/claim',
       expect.stringContaining('"desiredTopic":"attraccess/wago/v1/controllers/cc100-01/configuration/desired"'),
       { qos: 1 },
+    );
+    expect(provision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        topicPolicy: expect.objectContaining({
+          subscribe: expect.arrayContaining(['attraccess/wago/v1/controllers/cc100-01/credentials/rotate']),
+        }),
+      }),
     );
   });
 
@@ -687,7 +817,10 @@ describe('WagoService', () => {
     const { service, context } = createService([first, second]);
     let releaseFirst!: () => void;
     const onConfigurationReported = jest
-      .spyOn(service as never, 'onConfigurationReported')
+      .spyOn(
+        service as unknown as { onConfigurationReported: WagoService['onConfigurationReported'] },
+        'onConfigurationReported',
+      )
       .mockImplementation((controllerId) =>
         controllerId === first.id ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve(),
       );
@@ -721,10 +854,15 @@ describe('WagoService', () => {
     const { service, context } = createService([claimed]);
     let releaseFirst!: () => void;
     const processed: Buffer[] = [];
-    jest.spyOn(service as never, 'onConfigurationReported').mockImplementation((_controllerId, payload) => {
-      processed.push(payload);
-      return processed.length === 1 ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve();
-    });
+    jest
+      .spyOn(
+        service as unknown as { onConfigurationReported: WagoService['onConfigurationReported'] },
+        'onConfigurationReported',
+      )
+      .mockImplementation((_controllerId, payload) => {
+        processed.push(payload);
+        return processed.length === 1 ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve();
+      });
 
     await service.onApplicationBootstrap();
 
@@ -751,10 +889,15 @@ describe('WagoService', () => {
     const { service, context } = createService([claimed]);
     let releaseFirst!: () => void;
     const processed: Buffer[] = [];
-    jest.spyOn(service as never, 'onConfigurationReported').mockImplementation((_controllerId, payload) => {
-      processed.push(payload);
-      return processed.length === 1 ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve();
-    });
+    jest
+      .spyOn(
+        service as unknown as { onConfigurationReported: WagoService['onConfigurationReported'] },
+        'onConfigurationReported',
+      )
+      .mockImplementation((_controllerId, payload) => {
+        processed.push(payload);
+        return processed.length === 1 ? new Promise<void>((resolve) => (releaseFirst = resolve)) : Promise.resolve();
+      });
 
     await service.onApplicationBootstrap();
 
@@ -918,6 +1061,32 @@ describe('WagoService', () => {
     expect(enrollmentRepository.save).not.toHaveBeenCalled();
   });
 
+  it('revokes an expired enrollment credential before commissioning deletes its record', async () => {
+    const enrollment = {
+      id: 3,
+      mqttServerId: 2,
+      hardwareId: 'cc100-01',
+      identity: 'wago-enrollment-expired',
+      expiresAt: '2020-01-01T00:00:00.000Z',
+      revokedAt: null,
+      consumedAt: null,
+    } as WagoEnrollment;
+    const { service, enrollmentRepository, context } = createService([], [enrollment]);
+    const revoke = jest.fn().mockResolvedValue(undefined);
+    enrollmentRepository.findOneBy.mockResolvedValue(enrollment);
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({ revoke });
+
+    await service.revokeEnrollmentById(enrollment.id);
+
+    expect(revoke).toHaveBeenCalledWith({
+      mqttServerId: enrollment.mqttServerId,
+      identity: enrollment.identity,
+      username: enrollment.identity,
+      vhost: '/',
+    });
+    expect(enrollment).toMatchObject({ revokedAt: expect.any(String), consumedAt: expect.any(String) });
+  });
+
   it('returns administrator supplied manual credentials when automatic provisioning is unavailable', async () => {
     const { service, context } = createService([], [], 2);
     (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = jest
@@ -936,12 +1105,51 @@ describe('WagoService', () => {
 
     expect(enrollment).toMatchObject({ username: 'manual-$&', password: 'secret' });
     expect(enrollment.manualInstructions).toEqual(['Create a scoped broker user named manual-$& manually.']);
+    service.onModuleDestroy();
+  });
+
+  it('discards a manual enrollment recovery record when credentials are not supplied', async () => {
+    const { service, context, enrollmentRepository } = createService([], [], 2);
+    enrollmentRepository.save.mockImplementation(async (value) => ({ ...value, id: 17 }));
+    (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = jest
+      .fn()
+      .mockResolvedValue({ host: 'mqtt.example.test', port: 8883, useTls: true });
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({
+      provision: jest.fn().mockResolvedValue({ instructions: ['Create the scoped broker user manually.'] }),
+    });
+
+    await expect(service.createEnrollment('cc100-01')).rejects.toThrow('Manual discovery credentials are required');
+
+    expect(enrollmentRepository.delete).toHaveBeenCalledWith(17);
+    expect(service['enrollmentExpiryTimers'].size).toBe(0);
   });
 
   it.each(['cc100/+1', 'cc100/#1'])('rejects MQTT wildcard characters in hardware IDs', async (hardwareId) => {
     const { service } = createService();
 
     await expect(service.createEnrollment(hardwareId)).rejects.toThrow('without MQTT separators or wildcards');
+  });
+
+  it('persists an enrollment recovery record before provisioning the broker credential', async () => {
+    const { service, context, enrollmentRepository } = createService([], [], 2);
+    const provision = jest.fn().mockResolvedValue({ username: 'ignored', password: 'secret' });
+    const assertOwned = jest
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('lease lost'));
+    (context as unknown as { getMqttServerConfig: jest.Mock }).getMqttServerConfig = jest
+      .fn()
+      .mockResolvedValue({ host: 'mqtt.example.test', port: 8883, useTls: true });
+    (context.getMqttCredentialProvisioning as jest.Mock).mockReturnValue({ provision });
+
+    await expect(service.createEnrollment('cc100-01', undefined, undefined, assertOwned)).rejects.toThrow('lease lost');
+
+    expect(enrollmentRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ hardwareId: 'cc100-01', identity: expect.stringMatching(/^wago-enrollment-/) }),
+    );
+    expect(enrollmentRepository.save.mock.invocationCallOrder[0]).toBeLessThan(provision.mock.invocationCallOrder[0]);
+    service.onModuleDestroy();
   });
 
   it('leaves bootstrap credentials available until expiry after a post-delivery claim failure', async () => {
@@ -997,7 +1205,10 @@ describe('WagoService', () => {
       revoke: jest.fn().mockResolvedValue(undefined),
     });
     (context.mqtt.publish as jest.Mock).mockRejectedValue(claimError);
-    controllerRepository.save.mockResolvedValueOnce(candidate).mockRejectedValueOnce(rollbackError);
+    controllerRepository.save
+      .mockResolvedValueOnce(candidate) // provisioning intent
+      .mockResolvedValueOnce(candidate) // claimed state
+      .mockRejectedValueOnce(rollbackError);
     enrollmentRepository.findOneBy.mockResolvedValue(enrollment);
 
     await expect(service.claim(candidate.id, 'Controller', 'fingerprint')).rejects.toBe(claimError);
@@ -1083,7 +1294,9 @@ describe('WagoService', () => {
     await new Promise<void>((resolve) => setImmediate(resolve));
     const message = { topic: 'attraccess/wago/discovery/cc100-01', payload: Buffer.from('{}') };
 
-    const onDiscovery = jest.spyOn(service as never, 'onDiscovery').mockResolvedValue(undefined);
+    const onDiscovery = jest
+      .spyOn(service as unknown as { onDiscovery: WagoService['onDiscovery'] }, 'onDiscovery')
+      .mockResolvedValue(undefined);
     await secondCallback(message);
     expect(onDiscovery).not.toHaveBeenCalled();
 
@@ -1093,6 +1306,34 @@ describe('WagoService', () => {
     await secondCallback(message);
     expect(onDiscovery).toHaveBeenCalledTimes(1);
     expect(subscriptions[0].unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves retained state delivered before replacement subscriptions activate', async () => {
+    const claimed = { ...controller(), trustState: 'claimed' as const };
+    const { service, context } = createService([claimed], [], 2);
+    const subscribeConfiguredServers = (Reflect.get(service, 'subscribeConfiguredServers') as () => Promise<void>).bind(
+      service,
+    );
+    await subscribeConfiguredServers();
+    const retained = Buffer.from(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        streamId: '00000000-0000-4000-8000-000000000001',
+        sequence: 1,
+        connected: true,
+        revision: 1,
+        contentHash: 'a'.repeat(64),
+        outputs: { relay: true },
+      }),
+    );
+    (context.mqtt.subscribe as jest.Mock).mockImplementation(async (_serverId, topic, callback) => {
+      if (topic.endsWith('/state')) await callback({ topic, payload: retained });
+      return { unsubscribe: jest.fn() };
+    });
+
+    await subscribeConfiguredServers();
+
+    expect(service.diagnostics.read(claimed.id).outputs.relay.value).toBe(true);
   });
 
   it('unsubscribes an in-flight replacement when the module is destroyed', async () => {
@@ -1163,5 +1404,44 @@ describe('WagoService', () => {
 
     expect(revoke).not.toHaveBeenCalled();
     expect(enrollmentRepository.save).toHaveBeenCalledWith(expect.objectContaining({ consumedAt: expect.any(String) }));
+  });
+  it('starts the editor from the last applied revision without creating a draft', async () => {
+    const { service, revisionRepository, draftRepository } = createService([
+      { ...controller(), trustState: 'claimed' },
+    ]);
+    const revision = {
+      revision: 4,
+      state: 'applied',
+      snapshot: '{"version":1,"physicalPoints":[],"logicalChannels":[]}',
+    };
+    revisionRepository.find.mockResolvedValue([revision]);
+    expect(await service.getConfigurationBaseline(1)).toBe(revision);
+    expect(revisionRepository.find).toHaveBeenCalledWith({
+      where: { controllerId: 1, state: 'applied' },
+      order: { revision: 'DESC' },
+      take: 1,
+    });
+    expect(draftRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('rejects stale editor saves inside the configuration lock, including metadata-only changes', async () => {
+    const { service, draftRepository } = createService([{ ...controller(), trustState: 'claimed' }]);
+    const snapshot = { version: 1, physicalPoints: [], logicalChannels: [] };
+    const previous = {
+      controllerId: 1,
+      snapshot: JSON.stringify(snapshot),
+      updatedAt: 'same-timestamp',
+      presetProvenance: '{"editor":{"names":{},"presets":[]}}',
+    };
+    draftRepository.findOneBy.mockResolvedValue(previous);
+    await expect(service.saveDraft(1, snapshot, undefined, undefined, null)).rejects.toThrow('Saved draft changed');
+    await expect(
+      service.saveDraft(1, snapshot, undefined, undefined, { ...previous, presetProvenance: null }),
+    ).rejects.toThrow('Saved draft changed');
+    expect(draftRepository.save).not.toHaveBeenCalled();
+    expect(JSON.parse((await service.saveDraft(1, snapshot, undefined, undefined, previous)).snapshot)).toEqual(
+      snapshot,
+    );
+    expect(draftRepository.save).toHaveBeenCalledTimes(1);
   });
 });

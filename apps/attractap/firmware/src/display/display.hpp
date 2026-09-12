@@ -34,7 +34,9 @@ class IOExpander;
 class Display
 {
 public:
-#ifdef HAS_IO_EXPANDER
+#ifdef ATTRACTAP_HOST
+    static void setup(IDisplayDriver &driver);
+#elif defined(HAS_IO_EXPANDER)
     static void setup(IOExpander *ioExpander = nullptr);
 #else
     static void setup();

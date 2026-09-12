@@ -2,7 +2,7 @@ import { Alert, Button, Spinner } from '@heroui/react';
 import { PlusIcon, RefreshCwIcon, SettingsIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ClaimControllerModal } from './ClaimControllerModal';
-import { ConfigurationEditor } from './ConfigurationEditor';
+import { useNavigate } from 'react-router-dom';
 import { ControllersTable } from './ControllersTable';
 import { CommissioningModal } from './CommissioningModal';
 import { MqttSettingsModal } from './MqttSettingsModal';
@@ -14,7 +14,8 @@ export function ControllersPage() {
   const controllersQuery = useControllersQuery();
   const sessionsQuery = useCommissioningSessionsQuery();
   const [claimControllerId, setClaimControllerId] = useState<number | null>(null);
-  const [configurationControllerId, setConfigurationControllerId] = useState<number | null>(null);
+  const navigate = useNavigate();
+  const configure = (id: number) => navigate(`/wago/controllers/${id}/configuration`);
   const [isCommissioningOpen, setCommissioningOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [commissioningSession, setCommissioningSession] = useState<CommissioningSession | null>(null);
@@ -22,7 +23,7 @@ export function ControllersPage() {
 
   useEffect(() => {
     setCommissioningSession((session) =>
-      session ? sessionsQuery.data?.find((candidate) => candidate.id === session.id) ?? session : null,
+      session ? (sessionsQuery.data?.find((candidate) => candidate.id === session.id) ?? session) : null,
     );
   }, [sessionsQuery.data]);
 
@@ -32,7 +33,8 @@ export function ControllersPage() {
         <div>
           <h1 className="wg:text-2xl wg:font-semibold">WAGO controllers</h1>
           <p className="wg:mt-1 wg:text-sm wg:text-muted">
-            Commission a controller through a host-key-pinned SSH session; controller credentials are never displayed here.
+            Commission a controller through a host-key-pinned SSH session; controller credentials are never displayed
+            here.
           </p>
         </div>
         <div className="wg:flex wg:flex-wrap wg:gap-2">
@@ -67,16 +69,16 @@ export function ControllersPage() {
           <Spinner color="accent" />
         </div>
       ) : (
-          <ControllersTable
-            controllers={controllersQuery.data ?? []}
-            sessions={sessionsQuery.data ?? []}
-            onClaim={setClaimControllerId}
-            onConfigure={setConfigurationControllerId}
-            onRemove={setRemovingController}
-            onResume={(session) => {
-              setCommissioningSession(session);
-              setCommissioningOpen(true);
-            }}
+        <ControllersTable
+          controllers={controllersQuery.data ?? []}
+          sessions={sessionsQuery.data ?? []}
+          onClaim={setClaimControllerId}
+          onConfigure={configure}
+          onRemove={setRemovingController}
+          onResume={(session) => {
+            setCommissioningSession(session);
+            setCommissioningOpen(true);
+          }}
         />
       )}
 
@@ -86,22 +88,24 @@ export function ControllersPage() {
           if (!isOpen) setClaimControllerId(null);
         }}
       />
-      <ConfigurationEditor
-        controllerId={configurationControllerId}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) setConfigurationControllerId(null);
-        }}
-      />
       <CommissioningModal
         isOpen={isCommissioningOpen}
         session={commissioningSession}
+        onConfigure={(controllerId) => {
+          setCommissioningOpen(false);
+          setCommissioningSession(null);
+          configure(controllerId);
+        }}
         onOpenChange={(open) => {
           setCommissioningOpen(open);
           if (!open) setCommissioningSession(null);
         }}
       />
       <MqttSettingsModal isOpen={isSettingsOpen} onOpenChange={setSettingsOpen} />
-      <RemoveControllerDrawer controller={removingController} onOpenChange={(open) => !open && setRemovingController(null)} />
+      <RemoveControllerDrawer
+        controller={removingController}
+        onOpenChange={(open) => !open && setRemovingController(null)}
+      />
     </main>
   );
 }

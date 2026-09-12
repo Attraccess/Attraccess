@@ -11,23 +11,27 @@
 #include "../logger/logger.hpp"
 #include "../demo/demo_store.hpp"
 #include "../utils.hpp"
+#include "reader_transport.hpp"
 
-class DemoWebsocket
+class DemoWebsocket : public IReaderTransport
 {
 public:
     DemoWebsocket() : _logger("DemoWebsocket") {}
 
-    void setup();
-    void loop();
+    void setup() override;
+    void loop() override;
     bool sendMessage(const std::string &message);
-    bool sendMessage(const char *message, size_t length);
-    bool sendHeartbeat(const char *message, size_t length);
-    void setMessageCallbackRaw(std::function<void(const char *, size_t)> callback);
+    bool sendMessage(const char *message, size_t length) override;
+    bool sendHeartbeat(const char *message, size_t length) override;
+    void setMessageCallbackRaw(std::function<void(const char *, size_t)> callback) override;
 
-    void enableConnectionAttempts() {}
-    void disableConnectionAttempts() {}
-    void forceReconnect(const char *) {}
-    void resetCertificateTrust() {}
+    void enableConnectionAttempts() override {}
+    void disableConnectionAttempts() override {}
+    void forceReconnect(const char *) override {}
+    void resetCertificateTrust() override {}
+#ifdef ESP_PLATFORM
+    void setBinaryDataCallback(std::function<void(esp_websocket_event_data_t)>) override {}
+#endif
 
 private:
     Logger _logger;

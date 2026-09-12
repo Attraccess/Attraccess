@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RenderResponse } from './openscad.worker';
 
 const parseBinaryStl = vi.fn(() => ({ positions: new Float32Array(), triangleCount: 0 }));
-vi.mock('./stl', () => ({ parseBinaryStl: (...args: unknown[]) => parseBinaryStl(...args) }));
+vi.mock('./stl', () => ({ parseBinaryStl }));
 
 /** Stands in for the real Worker so no wasm is loaded; just records what gets posted. */
 class FakeWorker {

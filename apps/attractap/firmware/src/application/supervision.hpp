@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include "../nfc/nfc_contract.hpp"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -11,7 +12,6 @@
 #include "../api/api.hpp"
 #include "../beeper/beeper.hpp"
 #include "../logger/logger.hpp"
-#include "../nfc/nfc.hpp"
 #endif
 
 #ifdef HAS_LVGL_DISPLAY
@@ -25,7 +25,7 @@ class SupervisionFlow {
 public:
     enum class Outcome { None, ReturnToRouting, Unlock, UnlockAndStartSession };
 
-    SupervisionFlow(API &api, NFC &nfc, Beeper &beeper, Logger &logger,
+    SupervisionFlow(API &api, INfc &nfc, Beeper &beeper, Logger &logger,
                     SupervisionScreen &screen);
 
     void setup();
@@ -63,7 +63,7 @@ private:
     };
 
     API &api;
-    NFC &nfc;
+    INfc &nfc;
     Beeper &beeper;
     Logger &logger;
     SupervisionScreen &screen;

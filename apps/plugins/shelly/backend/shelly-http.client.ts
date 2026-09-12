@@ -28,7 +28,7 @@ export class ShellyHttpClient {
 
   private async requestJson(
     url: string,
-    options: { method: 'GET' | 'POST'; body?: unknown; credentials: DeviceCredentials }
+    options: { method: 'GET' | 'POST'; body?: unknown; credentials: DeviceCredentials },
   ): Promise<unknown> {
     const requestOptions = this.buildFetchOptions(options.method, options.body);
     let response = await fetch(url, requestOptions);
@@ -66,7 +66,7 @@ export class ShellyHttpClient {
     response: Response,
     url: string,
     method: string,
-    credentials: DeviceCredentials
+    credentials: DeviceCredentials,
   ): Record<string, string> {
     const username = credentials.username?.trim() || 'admin';
     const password = credentials.currentPassword ?? '';
@@ -90,7 +90,7 @@ function buildDigestAuthorization(
   url: string,
   method: string,
   username: string,
-  password: string
+  password: string,
 ): string {
   const params = parseDigestChallenge(challenge);
   const algorithm = (params.algorithm ?? 'MD5').toUpperCase();
@@ -103,7 +103,12 @@ function buildDigestAuthorization(
 
   const requestUrl = new URL(url);
   const uri = `${requestUrl.pathname}${requestUrl.search}`;
-  const qop = params.qop?.split(',').map((value) => value.trim()).includes('auth') ? 'auth' : undefined;
+  const qop = params.qop
+    ?.split(',')
+    .map((value) => value.trim())
+    .includes('auth')
+    ? 'auth'
+    : undefined;
   const nc = '00000001';
   const cnonce = randomBytes(8).toString('hex');
   const ha1 = hash(`${username}:${realm}:${password}`);

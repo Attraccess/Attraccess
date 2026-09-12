@@ -33,10 +33,7 @@ function makeProbe(reachable: Record<string, { generation: number; model: string
 }
 
 function build(registry: ReturnType<typeof makeRegistry>, probe: ReturnType<typeof makeProbe>) {
-  return new DiscoveryService(
-    registry as unknown as DeviceRegistryService,
-    probe as unknown as ShellyProbeService
-  );
+  return new DiscoveryService(registry as unknown as DeviceRegistryService, probe as unknown as ShellyProbeService);
 }
 
 describe('DiscoveryService', () => {
@@ -71,9 +68,7 @@ describe('DiscoveryService', () => {
 
     expect(registry.create).not.toHaveBeenCalled();
     expect(registry.updateProbe).toHaveBeenCalledWith(7, expect.objectContaining({ model: 'SHSW-25' }));
-    expect(result.devices).toEqual([
-      expect.objectContaining({ deviceId: 7, name: 'Workshop light', isNew: false }),
-    ]);
+    expect(result.devices).toEqual([expect.objectContaining({ deviceId: 7, name: 'Workshop light', isNew: false })]);
   });
 
   it('probes mDNS hits outside the scanned subnet, without probing an address twice', async () => {

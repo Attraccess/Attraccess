@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Chip, Input, InputGroup, Spinner, TextField } from '@heroui/react';
+import { Chip, InputGroup, Spinner, TextField } from '@heroui/react';
 import { CheckIcon, EyeIcon, EyeOffIcon, XIcon } from 'lucide-react';
 import type { PolicyError } from '@attraccess/shared';
 import {
@@ -93,7 +93,7 @@ export function PasswordPreview({ policy, t }: { policy: PasswordPolicyDto; t: T
         data-testid="policy-preview-input"
       >
         <InputGroup>
-          <Input type={reveal ? 'text' : 'password'} autoComplete="new-password" />
+          <InputGroup.Input type={reveal ? 'text' : 'password'} autoComplete="new-password" />
           <InputGroup.Suffix>
             <Button
               isIconOnly
@@ -131,7 +131,11 @@ export function PasswordPreview({ policy, t }: { policy: PasswordPolicyDto; t: T
                 <ul className="list-disc pl-5 text-xs text-foreground">
                   {result.errors.map((err, idx) => {
                     const error = err as unknown as PolicyError;
-                    return <li key={idx}>{t(`preview.errors.${error.code}`, error.params as Record<string, string | number>)}</li>;
+                    return (
+                      <li key={idx}>
+                        {t(`preview.errors.${error.code}`, error.params as Record<string, string | number>)}
+                      </li>
+                    );
                   })}
                 </ul>
               )}

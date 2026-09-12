@@ -1,24 +1,10 @@
 #include "enrollmentScreen.hpp"
+#include "display/theme.hpp"
 #include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 
 #include "platform.hpp"
-
-// Palette — dark, neutral background with explicit high-contrast white text.
-// The previous design left label text colour unset (defaulting to near-black)
-// on a dark purple background, which is the "bad contrast / hard to read"
-// complaint in ATT-503.
-#define ENROLL_COLOR_BG 0x14142A
-#define ENROLL_COLOR_TEXT 0xFFFFFF
-#define ENROLL_COLOR_TITLE 0xB9B9D6
-#define ENROLL_COLOR_ACCENT 0x7C4DFF
-#define ENROLL_COLOR_BAR_BG 0x2A2A40
-#define ENROLL_COLOR_WAITING 0xE6E6F0
-#define ENROLL_COLOR_WRITING 0xFFC107
-#define ENROLL_COLOR_SUCCESS 0x4CD964
-#define ENROLL_COLOR_ERROR 0xFF5252
-#define ENROLL_COLOR_CANCEL_BG 0x3A3A57
 
 void EnrollmentScreen::init()
 {
@@ -31,8 +17,7 @@ void EnrollmentScreen::init()
    lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(this->screen, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-   lv_obj_set_style_bg_color(this->screen, lv_color_hex(ENROLL_COLOR_BG), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(this->screen, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::applyScreen(this->screen);
    lv_obj_set_style_pad_left(this->screen, 24, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_right(this->screen, 24, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_top(this->screen, 18, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -47,9 +32,9 @@ void EnrollmentScreen::init()
    lv_obj_set_height(this->timeoutBar, 12);
    lv_obj_set_width(this->timeoutBar, lv_pct(100));
    lv_obj_set_style_radius(this->timeoutBar, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_color(this->timeoutBar, lv_color_hex(ENROLL_COLOR_BAR_BG), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_color(this->timeoutBar, DisplayTheme::surfaceSecondary(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(this->timeoutBar, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_color(this->timeoutBar, lv_color_hex(ENROLL_COLOR_ACCENT), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_color(this->timeoutBar, DisplayTheme::primary(), LV_PART_INDICATOR | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(this->timeoutBar, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
    lv_obj_set_style_radius(this->timeoutBar, 6, LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
@@ -59,7 +44,7 @@ void EnrollmentScreen::init()
    lv_obj_set_height(title, LV_SIZE_CONTENT);
    lv_label_set_text(title, "Neue Karte registrieren");
    lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(title, lv_color_hex(ENROLL_COLOR_TITLE), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(title, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(title, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Username — the person the card is being enrolled for. Most prominent line.
@@ -70,8 +55,8 @@ void EnrollmentScreen::init()
    const char *initialName = this->userNameCache.length() > 0 ? this->userNameCache.c_str() : "...";
    lv_label_set_text(this->userNameLabel, initialName);
    lv_obj_set_style_text_align(this->userNameLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->userNameLabel, lv_color_hex(ENROLL_COLOR_TEXT), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->userNameLabel, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->userNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->userNameLabel, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Status line — colour + text reflect the current enrollment phase.
    this->statusLabel = lv_label_create(this->screen);
@@ -86,15 +71,13 @@ void EnrollmentScreen::init()
    lv_obj_set_width(this->cancelButton, lv_pct(80));
    lv_obj_set_height(this->cancelButton, 56);
    lv_obj_remove_flag(this->cancelButton, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_bg_color(this->cancelButton, lv_color_hex(ENROLL_COLOR_CANCEL_BG), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(this->cancelButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_radius(this->cancelButton, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::secondaryButton(this->cancelButton);
    lv_obj_add_event_cb(this->cancelButton, &EnrollmentScreen::onCancelButtonEvent, LV_EVENT_CLICKED, this);
 
    lv_obj_t *cancelLabel = lv_label_create(this->cancelButton);
    lv_obj_set_align(cancelLabel, LV_ALIGN_CENTER);
    lv_label_set_text(cancelLabel, "Abbrechen");
-   lv_obj_set_style_text_color(cancelLabel, lv_color_hex(ENROLL_COLOR_TEXT), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(cancelLabel, DisplayTheme::onPrimarySoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(cancelLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->updateTimeoutBar();
@@ -133,29 +116,29 @@ void EnrollmentScreen::applyStatus()
    }
 
    const char *text = "";
-   uint32_t color = ENROLL_COLOR_WAITING;
+   lv_color_t color = DisplayTheme::text();
    switch (this->status)
    {
    case STATUS_WAITING:
       text = "Karte an den Leser halten";
-      color = ENROLL_COLOR_WAITING;
+      color = DisplayTheme::text();
       break;
    case STATUS_WRITING:
       text = "Karte wird beschrieben...\nbitte nicht bewegen";
-      color = ENROLL_COLOR_WRITING;
+      color = DisplayTheme::warning();
       break;
    case STATUS_SUCCESS:
       text = "Karte registriert!";
-      color = ENROLL_COLOR_SUCCESS;
+      color = DisplayTheme::success();
       break;
    case STATUS_ERROR:
       text = this->statusMessageOverride.length() > 0 ? this->statusMessageOverride.c_str() : "Fehler";
-      color = ENROLL_COLOR_ERROR;
+      color = DisplayTheme::danger();
       break;
    }
 
    lv_label_set_text(this->statusLabel, text);
-   lv_obj_set_style_text_color(this->statusLabel, lv_color_hex(color), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->statusLabel, color, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Hide the cancel button once enrollment has succeeded — nothing left to
    // cancel, and it auto-dismisses shortly after.

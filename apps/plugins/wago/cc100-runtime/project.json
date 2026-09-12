@@ -3,9 +3,15 @@
   "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/plugins/wago/cc100-runtime/src",
   "projectType": "application",
-  "tags": ["scope:hardware"],
+  "tags": ["scope:hardware", "type:plugin"],
   "targets": {
+    "test-simulator-integration": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": { "command": "node apps/plugins/wago/cc100-runtime/integration/run.mjs" }
+    },
     "build": {
+      "inputs": ["default", "{projectRoot}/../channel-behavior.ts"],
       "executor": "@nx/esbuild:esbuild",
       "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-runtime"],
       "options": {
@@ -20,15 +26,36 @@
         "esbuildOptions": { "target": "node24" }
       }
     },
+    "build-simulator": {
+      "inputs": ["default", "{projectRoot}/../channel-behavior.ts"],
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-simulator"],
+      "options": {
+        "main": "apps/plugins/wago/cc100-runtime/src/simulator.ts",
+        "tsConfig": "apps/plugins/wago/cc100-runtime/tsconfig.json",
+        "outputPath": "dist/apps/wago-cc100-simulator",
+        "platform": "node",
+        "format": ["cjs"],
+        "bundle": true,
+        "thirdParty": true,
+        "generatePackageJson": true,
+        "esbuildOptions": { "target": "node24" }
+      }
+    },
     "test": {
+      "inputs": ["default", "{projectRoot}/../channel-behavior.ts"],
       "executor": "@nx/jest:jest",
       "options": { "jestConfig": "apps/plugins/wago/cc100-runtime/jest.config.ts" }
     },
     "lint": {
       "executor": "nx:run-commands",
-      "options": { "cwd": "apps/plugins/wago/cc100-runtime", "command": "eslint src" }
+      "options": {
+        "cwd": "apps/plugins/wago/cc100-runtime",
+        "command": "eslint src --max-warnings=0 && prettier --check src"
+      }
     },
     "typecheck": {
+      "inputs": ["default", "{projectRoot}/../channel-behavior.ts"],
       "executor": "nx:run-commands",
       "options": { "cwd": "apps/plugins/wago/cc100-runtime", "command": "tsc --noEmit -p tsconfig.json" }
     }

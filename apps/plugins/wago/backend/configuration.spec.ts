@@ -6,8 +6,56 @@ import {
   parseConfigurationReport,
   validateSnapshot,
 } from './configuration';
+// eslint-disable-next-line @nx/enforce-module-boundaries
+import { validateSnapshot as validateRuntimeSnapshot } from '../cc100-runtime/src/configuration';
 
 describe('WAGO configuration snapshots', () => {
+  it.each([
+    { capabilities: ['output', 'pulse'] },
+    { capabilities: ['output'], pulse: { durationMs: 500 } },
+    { capabilities: ['input', 'pulse'], pulse: { durationMs: 500 } },
+    { capabilities: ['output', 'pulse'], pulse: { durationMs: 0 } },
+    { capabilities: ['output', 'pulse'], pulse: null },
+  ])('rejects inconsistent pulse behavior in API and runtime: %j', (behavior) => {
+    const snapshot = {
+      version: 1,
+      physicalPoints: [{ id: 'point', hardwareProfile: '751-9301', channel: 0 }],
+      logicalChannels: [
+        {
+          id: 'output',
+          physicalPointId: 'point',
+          profile: 'generic-digital-output',
+          disconnectPolicy: { mode: 'immediate' },
+          ...behavior,
+        },
+      ],
+    };
+    for (const validate of [validateSnapshot, validateRuntimeSnapshot]) {
+      expect(validate(snapshot)).toContainEqual(expect.objectContaining({ code: 'invalid_pulse' }));
+    }
+  });
+
+  it.each(['pulsed-lock-bank', 'guarded-enable-request', 'metered-switched-load'])(
+    'treats %s as a setup preset that can be customized to switched behavior',
+    (profile) => {
+      const snapshot = {
+        version: 1,
+        physicalPoints: [{ id: 'point', hardwareProfile: '751-9301', channel: 0 }],
+        logicalChannels: [
+          {
+            id: 'output',
+            physicalPointId: 'point',
+            profile,
+            capabilities: ['output'],
+            disconnectPolicy: { mode: 'immediate' },
+          },
+        ],
+      };
+      expect(validateSnapshot(snapshot)).toEqual([]);
+      expect(validateRuntimeSnapshot(snapshot)).toEqual([]);
+    },
+  );
+
   it('hashes equivalent snapshots identically regardless of object key order', () => {
     expect(configurationHash({ version: 1, physicalPoints: [], logicalChannels: [] })).toBe(
       configurationHash({ logicalChannels: [], physicalPoints: [], version: 1 }),
@@ -77,26 +125,53 @@ describe('WAGO configuration snapshots', () => {
   });
 
   it('builds editable presets with explicit disconnect defaults', () => {
-    const base = { version: 1 as const, physicalPoints: [{ id: 'point-a', hardwareProfile: '751-9301' as const, channel: 0 }], logicalChannels: [] };
+    const base = {
+      version: 1 as const,
+      physicalPoints: [{ id: 'point-a', hardwareProfile: '751-9301' as const, channel: 0 }],
+      logicalChannels: [],
+    };
     const output = applyPreset(base, { presetId: 'pulsed-lock-bank', channelId: 'lock-a', physicalPointId: 'point-a' });
-    const input = applyPreset(base, { presetId: 'generic-monitored-input', channelId: 'input-a', physicalPointId: 'point-a' });
+    const input = applyPreset(base, {
+      presetId: 'generic-monitored-input',
+      channelId: 'input-a',
+      physicalPointId: 'point-a',
+    });
 
-    expect(output.logicalChannels[0]).toMatchObject({ capabilities: ['output', 'pulse'], disconnectPolicy: { mode: 'immediate' }, pulse: { durationMs: 500 } });
+    expect(output.logicalChannels[0]).toMatchObject({
+      capabilities: ['output', 'pulse'],
+      disconnectPolicy: { mode: 'immediate' },
+      pulse: { durationMs: 500 },
+    });
     expect(input.logicalChannels[0]).toMatchObject({ capabilities: ['input'], disconnectPolicy: { mode: 'hold' } });
   });
 
   it('validates feedback mismatch declarations as declarative configuration', () => {
-    expect(validateSnapshot({
-      version: 1,
-      physicalPoints: [
-        { id: 'output', hardwareProfile: '751-9301', channel: 0 },
-        { id: 'input', hardwareProfile: '751-9301', channel: 1 },
-      ],
-      logicalChannels: [
-        { id: 'feedback', physicalPointId: 'input', profile: 'generic-monitored-input', capabilities: ['input'], disconnectPolicy: { mode: 'hold' } },
-        { id: 'output', physicalPointId: 'output', profile: 'generic-digital-output', capabilities: ['output', 'feedback'], disconnectPolicy: { mode: 'immediate' }, feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 100 } },
-      ],
-    })).toEqual([]);
+    expect(
+      validateSnapshot({
+        version: 1,
+        physicalPoints: [
+          { id: 'output', hardwareProfile: '751-9301', channel: 0 },
+          { id: 'input', hardwareProfile: '751-9301', channel: 1 },
+        ],
+        logicalChannels: [
+          {
+            id: 'feedback',
+            physicalPointId: 'input',
+            profile: 'generic-monitored-input',
+            capabilities: ['input'],
+            disconnectPolicy: { mode: 'hold' },
+          },
+          {
+            id: 'output',
+            physicalPointId: 'output',
+            profile: 'generic-digital-output',
+            capabilities: ['output', 'feedback'],
+            disconnectPolicy: { mode: 'immediate' },
+            feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 100 },
+          },
+        ],
+      }),
+    ).toEqual([]);
   });
 
   it('requires feedback to reference a distinct input channel', () => {

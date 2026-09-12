@@ -31,13 +31,13 @@ export function ResourceOverview() {
 
   const [searchValue, setSearchValue] = useState('');
   const [filterByOnlyInUseByMe, setFilterByOnlyInUseByMeState] = useState(
-    getValueFromLocalStorage(PersistedFilterProps.onlyInUseByMe, false)
+    getValueFromLocalStorage(PersistedFilterProps.onlyInUseByMe, false),
   );
   const [filterByOnlyWithPermissions, setFilterByOnlyWithPermissionsState] = useState(
-    getValueFromLocalStorage(PersistedFilterProps.onlyWithPermissions, true)
+    getValueFromLocalStorage(PersistedFilterProps.onlyWithPermissions, true),
   );
   const [filterByHideEmptyResourceGroups, setFilterByHideEmptyResourceGroupsState] = useState(
-    getValueFromLocalStorage(PersistedFilterProps.hideEmptyResourceGroups, true)
+    getValueFromLocalStorage(PersistedFilterProps.hideEmptyResourceGroups, true),
   );
 
   const debouncedSearchValue = useDebounce(searchValue, 250);
@@ -46,7 +46,7 @@ export function ResourceOverview() {
     setFilterByOnlyInUseByMeState(value);
     localStorage.setItem(
       getLocalStorageFilterKey(PersistedFilterProps.onlyInUseByMe),
-      value === true ? 'true' : 'false'
+      value === true ? 'true' : 'false',
     );
   }, []);
 
@@ -54,7 +54,7 @@ export function ResourceOverview() {
     setFilterByOnlyWithPermissionsState(value);
     localStorage.setItem(
       getLocalStorageFilterKey(PersistedFilterProps.onlyWithPermissions),
-      value === true ? 'true' : 'false'
+      value === true ? 'true' : 'false',
     );
   }, []);
 
@@ -62,7 +62,7 @@ export function ResourceOverview() {
     setFilterByHideEmptyResourceGroupsState(value);
     localStorage.setItem(
       getLocalStorageFilterKey(PersistedFilterProps.hideEmptyResourceGroups),
-      value === true ? 'true' : 'false'
+      value === true ? 'true' : 'false',
     );
   }, []);
 
@@ -122,7 +122,7 @@ export function ResourceOverview() {
               onlyWithPermissions: filterByOnlyWithPermissions,
             }}
             hideIfEmpty={filterByHideEmptyResourceGroups}
-            className="flex flex-1 min-w-[100%] md:min-w-[500px]"
+            className="flex flex-1 min-w-0 basis-full xl:basis-[calc(50%-1rem)]"
           />
         ))}
       </div>

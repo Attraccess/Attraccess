@@ -63,7 +63,9 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
       .spyOn((provider as unknown as { client: { request: jest.Mock } }).client, 'request')
       .mockRejectedValue(new HttpException('not found', HttpStatus.NOT_FOUND));
 
-    await expect(provider.revoke({ mqttServerId: 4, identity: 'controller-a', username: 'wago-controller-a', vhost: '/' })).resolves.toBeUndefined();
+    await expect(
+      provider.revoke({ mqttServerId: 4, identity: 'controller-a', username: 'wago-controller-a', vhost: '/' }),
+    ).resolves.toBeUndefined();
 
     expect(request).toHaveBeenCalledWith(expect.anything(), 'DELETE', '/users/wago-controller-a');
   });

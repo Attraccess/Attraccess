@@ -19,7 +19,7 @@ void ResourceDetailsScreen::init()
    lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(this->screen, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_set_style_bg_image_src(this->screen, &lockscreen_background_image, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::applyScreen(this->screen);
    lv_obj_set_style_pad_left(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_right(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_top(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -43,8 +43,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(logoutButton, LV_ALIGN_CENTER);
    lv_obj_add_flag(logoutButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(logoutButton, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_bg_color(logoutButton, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(logoutButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::button(logoutButton, DisplayTheme::danger(), DisplayTheme::onPrimary());
    lv_obj_add_event_cb(logoutButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_LOGOUT, {}});
 
    lv_obj_t *labelForLogoutButton = lv_label_create(logoutButton);
@@ -72,9 +71,8 @@ void ResourceDetailsScreen::init()
    lv_obj_set_height(this->loginUserLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->loginUserLabel, LV_ALIGN_CENTER);
    lv_label_set_text(this->loginUserLabel, this->loginUsernameCache.c_str());
-   lv_obj_set_style_text_font(this->loginUserLabel, &attractap_font_montserrat_latin1_10, LV_PART_MAIN | LV_STATE_DEFAULT);
-   // Ensure the username is visible on the background image
-   lv_obj_set_style_text_color(this->loginUserLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->loginUserLabel, &attractap_font_montserrat_latin1_10, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->loginUserLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(this->loginUserLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->sessionTimeoutIndicator = lv_bar_create(userAndTimeoutContainer);
@@ -86,7 +84,8 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(this->sessionTimeoutIndicator, lv_pct(100));
    lv_obj_set_align(this->sessionTimeoutIndicator, LV_ALIGN_CENTER);
 
-   lv_obj_set_style_bg_color(this->sessionTimeoutIndicator, lv_color_hex(0xF31260), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_color(this->sessionTimeoutIndicator, DisplayTheme::primarySoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_color(this->sessionTimeoutIndicator, DisplayTheme::primary(), LV_PART_INDICATOR | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(this->sessionTimeoutIndicator, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
    // Compensating for LVGL9.1 draw crash with bar/slider max value when top-padding is nonzero and right-padding is 0
@@ -119,8 +118,8 @@ void ResourceDetailsScreen::init()
    lv_obj_set_height(this->resourceName, LV_SIZE_CONTENT);
    lv_obj_set_align(this->resourceName, LV_ALIGN_CENTER);
    lv_obj_remove_flag(this->resourceName, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_text_font(this->resourceName, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->resourceName, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->resourceName, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->resourceName, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->resourceDescription = lv_label_create(resouceDetails);
    lv_obj_set_height(this->resourceDescription, 28);
@@ -128,8 +127,8 @@ void ResourceDetailsScreen::init()
    lv_label_set_long_mode(this->resourceDescription, LV_LABEL_LONG_SCROLL);
    lv_obj_set_align(this->resourceDescription, LV_ALIGN_CENTER);
    lv_obj_remove_flag(this->resourceDescription, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_text_color(this->resourceDescription, lv_color_hex(0xE5E5E5), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->resourceDescription, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->resourceDescription, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->resourceDescription, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->sessionDetailsContainer = lv_obj_create(this->screen);
    lv_obj_remove_style_all(this->sessionDetailsContainer);
@@ -156,7 +155,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_height(labelForSessionStartTime, LV_SIZE_CONTENT);
    lv_obj_set_align(labelForSessionStartTime, LV_ALIGN_CENTER);
    lv_label_set_text(labelForSessionStartTime, "Startzeit");
-   lv_obj_set_style_text_color(labelForSessionStartTime, lv_color_hex(0xE5E5E5), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(labelForSessionStartTime, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(labelForSessionStartTime, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->sessionStartTimeLabel = lv_label_create(sessionStartTimeContainer);
@@ -165,7 +164,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(this->sessionStartTimeLabel, LV_ALIGN_CENTER);
    lv_label_set_text(this->sessionStartTimeLabel, "??.??. ??:??");
    lv_obj_set_style_text_font(this->sessionStartTimeLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->sessionStartTimeLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->sessionStartTimeLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *currentUserContainer = lv_obj_create(this->sessionDetailsContainer);
    lv_obj_remove_style_all(currentUserContainer);
@@ -186,7 +185,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_flex_flow(labelForCurrentUser, LV_FLEX_FLOW_ROW);
    lv_obj_set_flex_align(labelForCurrentUser, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
    lv_label_set_text(labelForCurrentUser, "Nutzer");
-   lv_obj_set_style_text_color(labelForCurrentUser, lv_color_hex(0xE5E5E5), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(labelForCurrentUser, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(labelForCurrentUser, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->currentUser = lv_label_create(currentUserContainer);
@@ -196,8 +195,8 @@ void ResourceDetailsScreen::init()
    lv_label_set_long_mode(this->currentUser, LV_LABEL_LONG_SCROLL_CIRCULAR);
    lv_obj_set_style_text_align(this->currentUser, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_label_set_text(this->currentUser, "JappyJan");
-   lv_obj_set_style_text_font(this->currentUser, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->currentUser, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->currentUser, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->currentUser, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *elapsedTimeContainer = lv_obj_create(this->sessionDetailsContainer);
    lv_obj_remove_style_all(elapsedTimeContainer);
@@ -214,7 +213,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_height(labelForElapsedTime, LV_SIZE_CONTENT);
    lv_obj_set_align(labelForElapsedTime, LV_ALIGN_CENTER);
    lv_label_set_text(labelForElapsedTime, "Dauer");
-   lv_obj_set_style_text_color(labelForElapsedTime, lv_color_hex(0xE5E5E5), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(labelForElapsedTime, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(labelForElapsedTime, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->elapsedTime = lv_label_create(elapsedTimeContainer);
@@ -223,7 +222,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(this->elapsedTime, LV_ALIGN_CENTER);
    lv_label_set_text(this->elapsedTime, "00:23:46");
    lv_obj_set_style_text_font(this->elapsedTime, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->elapsedTime, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->elapsedTime, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->sessionControls = lv_obj_create(this->screen);
    lv_obj_remove_style_all(this->sessionControls);
@@ -254,8 +253,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_flex_grow(this->projectsButton, 1);
    lv_obj_add_flag(this->projectsButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(this->projectsButton, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_bg_color(this->projectsButton, lv_color_hex(0x006FEE), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(this->projectsButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::button(this->projectsButton);
    lv_obj_add_event_cb(this->projectsButton, &ResourceDetailsScreen::onProjectsButtonClick, LV_EVENT_CLICKED, this);
 
     this->projectsButtonLabel = lv_label_create(this->projectsButton);
@@ -269,7 +267,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(this->clearProjectButton, LV_SIZE_CONTENT);
    lv_obj_set_align(this->clearProjectButton, LV_ALIGN_CENTER);
    lv_obj_remove_flag(this->clearProjectButton, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_bg_color(this->clearProjectButton, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::button(this->clearProjectButton, DisplayTheme::danger(), DisplayTheme::onPrimary());
    lv_obj_add_event_cb(this->clearProjectButton, &ResourceDetailsScreen::onClearProjectSelectionClick, LV_EVENT_CLICKED, this);
 
    lv_obj_t *clearProjectLabel = lv_label_create(this->clearProjectButton);
@@ -284,8 +282,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(this->startSessionButton, LV_ALIGN_CENTER);
    lv_obj_add_flag(this->startSessionButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(this->startSessionButton, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_bg_color(this->startSessionButton, lv_color_hex(0x17C964), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(this->startSessionButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::button(this->startSessionButton);
    lv_obj_add_flag(this->startSessionButton, LV_OBJ_FLAG_HIDDEN);
    lv_obj_add_event_cb(this->startSessionButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_START_SESSION, {}});
 
@@ -300,7 +297,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_height(this->stopOtherUserNote, LV_SIZE_CONTENT);
    lv_label_set_long_mode(this->stopOtherUserNote, LV_LABEL_LONG_WRAP);
    lv_label_set_text(this->stopOtherUserNote, "Achtung: Sie beenden die laufende Sitzung eines anderen Nutzers.");
-   lv_obj_set_style_text_color(this->stopOtherUserNote, lv_color_hex(0xF5A524), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->stopOtherUserNote, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(this->stopOtherUserNote, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_flag(this->stopOtherUserNote, LV_OBJ_FLAG_HIDDEN);
 
@@ -310,8 +307,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(this->stopSessionButton, LV_ALIGN_CENTER);
    lv_obj_add_flag(this->stopSessionButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(this->stopSessionButton, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_bg_color(this->stopSessionButton, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(this->stopSessionButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::button(this->stopSessionButton, DisplayTheme::danger(), DisplayTheme::onPrimary());
    lv_obj_add_flag(this->stopSessionButton, LV_OBJ_FLAG_HIDDEN);
    lv_obj_add_event_cb(this->stopSessionButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_STOP_SESSION, {}});
 
@@ -338,8 +334,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(lockDoorButton, LV_ALIGN_CENTER);
    lv_obj_add_flag(lockDoorButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(lockDoorButton, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_bg_color(lockDoorButton, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(lockDoorButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::button(lockDoorButton, DisplayTheme::danger(), DisplayTheme::onPrimary());
    lv_obj_add_event_cb(lockDoorButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_LOCK_DOOR, {}});
 
    lv_obj_t *labelForLockDoorButton = lv_label_create(lockDoorButton);
@@ -354,8 +349,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(unlockDoorButton, LV_ALIGN_CENTER);
    lv_obj_add_flag(unlockDoorButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(unlockDoorButton, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_bg_color(unlockDoorButton, lv_color_hex(0x17C964), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(unlockDoorButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::button(unlockDoorButton);
    lv_obj_add_event_cb(unlockDoorButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_UNLOCK_DOOR, {}});
 
    lv_obj_t *labelForUnlockDoorButton = lv_label_create(unlockDoorButton);
@@ -370,8 +364,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(unlatchDoorButton, LV_ALIGN_CENTER);
    lv_obj_add_flag(unlatchDoorButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(unlatchDoorButton, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_bg_color(unlatchDoorButton, lv_color_hex(0x9353D3), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(unlatchDoorButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::button(unlatchDoorButton);
    lv_obj_add_event_cb(unlatchDoorButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_UNLATCH_DOOR, {}});
 
    lv_obj_t *labelForUnlatchDoorButton = lv_label_create(unlatchDoorButton);
@@ -399,15 +392,17 @@ void ResourceDetailsScreen::init()
    lv_obj_set_flex_flow(this->noIntroductionPanel, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(this->noIntroductionPanel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
    lv_obj_remove_flag(this->noIntroductionPanel, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_bg_color(this->noIntroductionPanel, lv_color_hex(0xF5A524), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(this->noIntroductionPanel, 200, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::applySurface(this->noIntroductionPanel);
+   lv_obj_set_style_bg_color(this->noIntroductionPanel, DisplayTheme::warningSoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_border_color(this->noIntroductionPanel, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->noIntroductionPanel, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *noIntroductionInfoLabel = lv_label_create(this->noIntroductionPanel);
    lv_obj_set_width(noIntroductionInfoLabel, lv_pct(100));
    lv_obj_set_height(noIntroductionInfoLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(noIntroductionInfoLabel, LV_ALIGN_CENTER);
    lv_label_set_text(noIntroductionInfoLabel, "Sie benoetigen eine Einweisung, bevor Sie diese Ressource nutzen koennen. Bitte wenden Sie sich an einen der unten aufgefuehrten Einweiser.");
-   lv_obj_set_style_text_color(noIntroductionInfoLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(noIntroductionInfoLabel, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(noIntroductionInfoLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->introducersListLabel = lv_label_create(this->noIntroductionPanel);
@@ -424,8 +419,10 @@ void ResourceDetailsScreen::init()
    lv_obj_set_flex_flow(this->maintenancePanel, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(this->maintenancePanel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
    lv_obj_remove_flag(this->maintenancePanel, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_bg_color(this->maintenancePanel, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(this->maintenancePanel, 200, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::applySurface(this->maintenancePanel);
+   lv_obj_set_style_bg_color(this->maintenancePanel, DisplayTheme::dangerSoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_border_color(this->maintenancePanel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->maintenancePanel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_flag(this->maintenancePanel, LV_OBJ_FLAG_HIDDEN);
 
    lv_obj_t *maintenanceInfoLabel = lv_label_create(this->maintenancePanel);
@@ -433,7 +430,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_height(maintenanceInfoLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(maintenanceInfoLabel, LV_ALIGN_CENTER);
    lv_label_set_text(maintenanceInfoLabel, MAINTENANCE_INFO_TEXT);
-   lv_obj_set_style_text_color(maintenanceInfoLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(maintenanceInfoLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(maintenanceInfoLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->maintenanceIntroducersLabel = lv_label_create(this->maintenancePanel);
@@ -450,8 +447,10 @@ void ResourceDetailsScreen::init()
    lv_obj_set_flex_flow(this->healthPanel, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(this->healthPanel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
    lv_obj_remove_flag(this->healthPanel, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_style_bg_color(this->healthPanel, lv_color_hex(0xC20E4D), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(this->healthPanel, 200, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::applySurface(this->healthPanel);
+   lv_obj_set_style_bg_color(this->healthPanel, DisplayTheme::dangerSoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_border_color(this->healthPanel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->healthPanel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_flag(this->healthPanel, LV_OBJ_FLAG_HIDDEN);
 
    lv_obj_t *healthInfoLabel = lv_label_create(this->healthPanel);
@@ -459,7 +458,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_height(healthInfoLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(healthInfoLabel, LV_ALIGN_CENTER);
    lv_label_set_text(healthInfoLabel, "Diese Ressource ist derzeit nicht betriebsbereit und kann nicht verwendet werden.");
-   lv_obj_set_style_text_color(healthInfoLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(healthInfoLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(healthInfoLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->healthReasonLabel = lv_label_create(this->healthPanel);
@@ -468,7 +467,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_align(this->healthReasonLabel, LV_ALIGN_CENTER);
    lv_label_set_long_mode(this->healthReasonLabel, LV_LABEL_LONG_WRAP);
    lv_label_set_text(this->healthReasonLabel, "");
-    lv_obj_set_style_text_color(this->healthReasonLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->healthReasonLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(this->healthReasonLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->healthReasonLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -556,8 +555,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
       lv_obj_set_align(flowButton, LV_ALIGN_CENTER);
       lv_obj_add_flag(flowButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
       lv_obj_remove_flag(flowButton, LV_OBJ_FLAG_SCROLLABLE);
-      lv_obj_set_style_bg_color(flowButton, lv_color_hex(0x006FEE), LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_obj_set_style_bg_opa(flowButton, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+      DisplayTheme::button(flowButton);
 
       ButtonClickEventData *evt = new ButtonClickEventData{this, BUTTON_CLICK_TYPE_FLOW_BUTTON, {}};
       strlcpy(evt->flowButtonId, fb.id, API::MAX_FLOW_BUTTON_ID_LEN);
@@ -683,15 +681,15 @@ void ResourceDetailsScreen::refreshAccessState()
 
          // Differentiate stopping your own session from force-stopping someone else's:
          // - own session: solid danger red, full prominence, plain label, no note
-         // - foreign session: softened/darker red, warning label + orange note
+         // - foreign session: soft danger surface, warning label + amber note
          bool isForeignStop = showStop && !ownsActiveUsage;
          if (this->stopOtherUserNote)
          {
             lv_obj_set_flag(this->stopOtherUserNote, LV_OBJ_FLAG_HIDDEN, !isForeignStop);
          }
-         lv_color_t stopBgColor = isForeignStop ? lv_color_hex(0x920B3A) : lv_color_hex(0xF31260);
-         lv_obj_set_style_bg_color(this->stopSessionButton, stopBgColor, LV_PART_MAIN | LV_STATE_DEFAULT);
-         lv_obj_set_style_bg_opa(this->stopSessionButton, isForeignStop ? 200 : 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+         lv_color_t stopBgColor = isForeignStop ? DisplayTheme::dangerSoft() : DisplayTheme::danger();
+         DisplayTheme::button(this->stopSessionButton, stopBgColor,
+                              isForeignStop ? DisplayTheme::danger() : DisplayTheme::onPrimary());
          if (this->stopSessionButtonLabel)
          {
             lv_label_set_text(this->stopSessionButtonLabel,
@@ -703,9 +701,9 @@ void ResourceDetailsScreen::refreshAccessState()
             lv_label_set_text(this->startSessionButtonLabel,
                               isTakeover ? "Uebernehmen" : "Ressource verwenden");
          }
-         // Takeover = warning orange (danger-soft on web), normal start = success green
-         lv_color_t startBgColor = isTakeover ? lv_color_hex(0xF5A524) : lv_color_hex(0x17C964);
-         lv_obj_set_style_bg_color(this->startSessionButton, startBgColor, LV_PART_MAIN | LV_STATE_DEFAULT);
+         // Takeover retains its warning role; starting is a primary action.
+         lv_color_t startBgColor = isTakeover ? DisplayTheme::warning() : DisplayTheme::primary();
+         DisplayTheme::button(this->startSessionButton, startBgColor, DisplayTheme::onPrimary());
       }
    }
 

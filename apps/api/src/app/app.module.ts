@@ -1,4 +1,5 @@
 import { AppController } from './app.controller';
+import { AuditModule } from '../audit/audit.module';
 import { AppService } from './app.service';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -48,6 +49,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     UsersAndAuthModule,
     SettingsModule,
     TypeOrmModule.forRoot(dataSourceConfig),
+    AuditModule,
     ResourcesModule,
     ServeStaticModule.forRootAsync({
       imports: [ConfigModule],

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../IScreen.hpp"
-#include "../../images/lockscreen_background_image.hpp"
 #include <ArduinoJson.h>
 #include <functional>
 #include <string>

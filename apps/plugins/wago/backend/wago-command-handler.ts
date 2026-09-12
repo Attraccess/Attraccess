@@ -4,6 +4,9 @@ import type { PluginContext, Repository } from '@attraccess/plugins-backend-sdk'
 import { commandTopic } from './protocol';
 import { WagoController } from './wago-controller.entity';
 import { WagoConfigurationRevision } from './wago-configuration-revision.entity';
+import { WagoConfigurationDraft } from './wago-configuration-draft.entity';
+import { outputBehavior, supportsOutputAction } from '../channel-behavior';
+import type { WagoConfigurationSnapshot } from './configuration';
 
 const DEFAULT_COMMAND_TIMEOUT_SECONDS = 30;
 const MAX_COMMAND_TIMEOUT_SECONDS = 300;
@@ -35,6 +38,8 @@ type Dependencies = {
   claimedController: (id: number) => Promise<WagoController>;
   getSettings: () => Promise<{ operationalPrefix: string }>;
   appliedRevision: (controllerId: number) => Promise<WagoConfigurationRevision | null>;
+  onCommand?: (controllerId: number, channelId: string, id: string) => void;
+  onCommandFailure?: (id: string, status: 'dispatch-failed' | 'timeout') => void;
 };
 
 export class WagoCommandHandler {
@@ -51,13 +56,20 @@ export class WagoCommandHandler {
       .find({ where: { trustState: 'claimed' }, order: { name: 'ASC' } });
     const controllerId = positiveInteger(config.controllerId);
     const revision = controllerId ? await this.dependencies.appliedRevision(controllerId) : null;
-    const snapshot = revision
-      ? (JSON.parse(revision.snapshot) as {
-          logicalChannels: Array<{ id: string; profile: string; capabilities: string[] }>;
-        })
-      : null;
+    const snapshot = revision ? (JSON.parse(revision.snapshot) as WagoConfigurationSnapshot) : null;
     const channelId = typeof config.channelId === 'string' ? config.channelId : undefined;
-    const channel = snapshot?.logicalChannels.find((item) => item.id === channelId);
+    const outputChannels = snapshot?.logicalChannels.filter((item) => item.capabilities.includes('output')) ?? [];
+    let names: Record<string, unknown> = {};
+    if (controllerId) {
+      const draft = await this.dependencies.context.getRepository(WagoConfigurationDraft).findOneBy({ controllerId });
+      try {
+        const storedNames = JSON.parse(revision?.presetProvenance ?? draft?.presetProvenance ?? 'null')?.editor?.names;
+        if (storedNames && typeof storedNames === 'object' && !Array.isArray(storedNames)) names = storedNames;
+      } catch {
+        /* Drafts created before the visual editor have no channel labels. */
+      }
+    }
+    const channel = outputChannels.find((item) => item.id === channelId);
     const references = channelId && controllerId ? await this.references(controllerId, channelId, resourceId) : [];
     const properties: Record<string, unknown> = {
       controllerId: {
@@ -69,28 +81,45 @@ export class WagoCommandHandler {
           title: controller.name ?? controller.hardwareId,
         })),
         refreshesSchema: true,
+        description:
+          controllerId && !revision
+            ? 'Publish a configuration and wait for the controller to apply it before authoring commands.'
+            : undefined,
       },
     };
     if (controllerId && revision && snapshot) {
       properties.channelId = {
         type: 'string',
         title: 'Logical Channel',
-        oneOf: snapshot.logicalChannels.map((item) => ({ const: item.id, title: `${item.id} (${item.profile})` })),
+        oneOf: outputChannels.map((item) => ({
+          const: item.id,
+          title: typeof names[item.id] === 'string' ? names[item.id] : `${item.id} (${item.profile})`,
+        })),
         refreshesSchema: true,
-        helpText: references.length
+        description: references.length
           ? `Also controlled by resource flow node${references.length === 1 ? '' : 's'}: ${references.join(', ')}. Reuse is allowed.`
-          : undefined,
+          : outputChannels.length
+            ? undefined
+            : 'This applied configuration has no output channels. Add an output and publish it first.',
       };
     }
     if (channel) {
-      const actions = channel.capabilities.includes('output')
-        ? [
-            { const: 'set', title: 'Set state' },
-            ...(channel.capabilities.includes('pulse') ? [{ const: 'pulse', title: 'Pulse' }] : []),
-          ]
-        : [];
-      properties.action = { type: 'string', title: 'Operation', oneOf: actions, refreshesSchema: true };
-      if (config.action === 'set') properties.value = { type: 'boolean', title: 'State' };
+      const pulsed = outputBehavior(channel) === 'pulsed';
+      const action = pulsed ? 'pulse' : 'set';
+      properties.action = {
+        type: 'string',
+        title: 'Operation',
+        oneOf: [{ const: action, title: pulsed ? 'Trigger pulse' : 'Turn on / turn off' }],
+        // Never silently reinterpret an existing incompatible flow action.
+        ...(config.action === undefined ? { default: action } : {}),
+        refreshesSchema: true,
+        description: pulsed
+          ? channel.pulse
+            ? `Turns on for ${channel.pulse.durationMs} ms, then off automatically. Change the duration in the controller configuration.`
+            : 'This pulsed channel is missing its duration. Correct and publish its controller configuration.'
+          : 'Stays on or off until another command or the configured disconnect policy changes it.',
+      };
+      if (!pulsed) properties.value = { type: 'boolean', title: 'Output on', default: false };
       properties.expectedConfigurationRevision = {
         type: 'number',
         title: 'Configuration revision',
@@ -131,7 +160,15 @@ export class WagoCommandHandler {
       dynamic: true,
       type: 'object',
       properties,
-      required: Object.keys(properties).filter((key) => key !== 'value'),
+      required: [
+        ...new Set([
+          'controllerId',
+          'channelId',
+          'action',
+          'expectedConfigurationRevision',
+          ...Object.keys(properties),
+        ]),
+      ],
     };
   }
 
@@ -155,19 +192,27 @@ export class WagoCommandHandler {
           message: 'The controller configuration changed. Reopen the node and save the current revision.',
         },
       ];
-    const snapshot = JSON.parse(revision.snapshot) as {
-      logicalChannels: Array<{ id: string; capabilities: string[] }>;
-    };
+    const snapshot = JSON.parse(revision.snapshot) as WagoConfigurationSnapshot;
     const channel = snapshot.logicalChannels.find((item) => item.id === channelId);
     if (!channel) return [{ field: 'channelId', message: 'The selected Logical Channel no longer exists.' }];
     if (!channel.capabilities.includes('output'))
       return [{ field: 'channelId', message: 'The selected Logical Channel no longer supports output commands.' }];
-    if (action === 'pulse' && !channel.capabilities.includes('pulse'))
-      return [{ field: 'action', message: 'The selected Logical Channel no longer supports pulses.' }];
+    if (!supportsOutputAction(channel, action))
+      return [
+        {
+          field: 'action',
+          message:
+            outputBehavior(channel) === 'pulsed'
+              ? action === 'set'
+                ? 'This channel is configured as pulsed. Reopen this node and explicitly select Trigger pulse, or change the channel to switched behavior and publish it.'
+                : 'This pulsed channel has invalid pulse settings. Correct and publish its controller configuration.'
+              : 'This channel is configured as switched. Reopen this node and explicitly select Turn on / turn off, or change the channel to pulsed behavior and publish it.',
+        },
+      ];
     return [];
   }
 
-  async execute(config: Record<string, unknown>): Promise<void> {
+  async execute(config: Record<string, unknown>, commandId = randomUUID()): Promise<void> {
     const errors = await this.validate(config);
     if (errors.length)
       throw new WagoCommandError(errors.map((error) => error.message).join(' '), 'controller-rejection');
@@ -187,7 +232,8 @@ export class WagoCommandHandler {
     if (!controller.mqttServerId)
       throw new WagoCommandError(`WAGO controller ${controllerId} has no MQTT server`, 'transport-dispatch');
     const settings = await this.dependencies.getSettings();
-    const id = randomUUID();
+    const id = commandId;
+    this.dependencies.onCommand?.(controllerId, channelId, id);
     const command = JSON.stringify({
       id,
       expiresAt: new Date(Date.now() + acknowledgementTimeoutSeconds * 1000).toISOString(),
@@ -200,21 +246,42 @@ export class WagoCommandHandler {
       completionBehavior === 'acknowledged'
         ? this.waitForAcknowledgement(id, controllerId, acknowledgementTimeoutSeconds)
         : undefined;
+    // Observe rejection immediately: publication can stall after the controller rejects or times out.
+    const acknowledgementFailure = acknowledgement
+      ? new Promise<never>((_resolve, reject) =>
+          acknowledgement.then(
+            () => undefined,
+            (error) => reject({ acknowledgementError: error }),
+          ),
+        )
+      : undefined;
+    let dispatchTimer: ReturnType<typeof setTimeout> | undefined;
+    const dispatchDeadline = new Promise<never>((_resolve, reject) => {
+      dispatchTimer = setTimeout(
+        () => reject(new WagoCommandError('WAGO command dispatch timed out', 'acknowledgement-timeout')),
+        acknowledgementTimeoutSeconds * 1000,
+      );
+    });
     try {
-      await this.dependencies.context.mqtt.publish(
+      const publication = this.dependencies.context.mqtt.publish(
         controller.mqttServerId,
         commandTopic(settings.operationalPrefix, controller.hardwareId),
         command,
         { qos: 1, retain: false },
       );
+      await Promise.race([publication, dispatchDeadline, ...(acknowledgementFailure ? [acknowledgementFailure] : [])]);
     } catch (error) {
-      const dispatchError = new WagoCommandError(
-        `Failed to publish WAGO command: ${String(error)}`,
-        'transport-dispatch',
-      );
+      if (isAcknowledgementFailure(error)) throw error.acknowledgementError;
+      this.dependencies.onCommandFailure?.(id, 'dispatch-failed');
+      const dispatchError =
+        error instanceof WagoCommandError
+          ? error
+          : new WagoCommandError(`Failed to publish WAGO command: ${String(error)}`, 'transport-dispatch');
       this.reject(id, dispatchError);
       if (acknowledgement) await acknowledgement.catch(() => undefined);
       throw dispatchError;
+    } finally {
+      clearTimeout(dispatchTimer);
     }
     await acknowledgement;
   }
@@ -227,6 +294,8 @@ export class WagoCommandHandler {
       return;
     }
     if (
+      !acknowledgement ||
+      typeof acknowledgement !== 'object' ||
       typeof acknowledgement.id !== 'string' ||
       !['accepted', 'duplicate', 'rejected'].includes(acknowledgement.status as string)
     )
@@ -369,6 +438,8 @@ export class WagoCommandHandler {
     pending.resolve();
   }
   private reject(id: string, error: Error): void {
+    if (error instanceof WagoCommandError && error.kind === 'acknowledgement-timeout')
+      this.dependencies.onCommandFailure?.(id, 'timeout');
     const pending = this.pending.get(id);
     if (!pending) return;
     this.pending.delete(id);
@@ -382,6 +453,15 @@ export class WagoCommandHandler {
     context.set(key, value);
     return value;
   }
+}
+
+function isAcknowledgementFailure(error: unknown): error is { acknowledgementError: Error } {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'acknowledgementError' in error &&
+    (error as { acknowledgementError: unknown }).acknowledgementError instanceof Error
+  );
 }
 
 function positiveInteger(value: unknown): number | undefined {

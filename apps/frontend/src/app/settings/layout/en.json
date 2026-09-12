@@ -41,6 +41,10 @@
       "label": "Monitoring",
       "description": "Metrics endpoint and instrumentation"
     },
+    "auditLog": {
+      "label": "Audit log",
+      "description": "Administrative activity and retention"
+    },
     "plugins": {
       "label": "Plugins",
       "description": "Installed plugins"

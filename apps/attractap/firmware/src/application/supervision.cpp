@@ -6,7 +6,7 @@
 #include "../display/display.hpp"
 #endif
 
-SupervisionFlow::SupervisionFlow(API &api, NFC &nfc, Beeper &beeper, Logger &logger,
+SupervisionFlow::SupervisionFlow(API &api, INfc &nfc, Beeper &beeper, Logger &logger,
                                  SupervisionScreen &screen)
     : api(api), nfc(nfc), beeper(beeper), logger(logger), screen(screen) {}
 

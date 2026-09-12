@@ -257,7 +257,9 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
                 {t('takeover.button')}
               </Button>
               <Dropdown>
-                <DropdownTrigger className={buttonVariants({ isIconOnly: true, variant: 'danger-soft' })}>
+                <DropdownTrigger
+                  className={`${buttonVariants({ isIconOnly: true, variant: 'danger-soft' })} inline-flex items-center justify-center`}
+                >
                   <ChevronDownIcon />
                 </DropdownTrigger>
                 <DropdownPopover>
@@ -287,7 +289,9 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
                 {t('stopOtherUserSession.button')}
               </Button>
               <Dropdown>
-                <DropdownTrigger className={buttonVariants({ isIconOnly: true, variant: 'danger' })}>
+                <DropdownTrigger
+                  className={`${buttonVariants({ isIconOnly: true, variant: 'danger' })} inline-flex items-center justify-center`}
+                >
                   <ChevronDownIcon />
                 </DropdownTrigger>
                 <DropdownPopover>

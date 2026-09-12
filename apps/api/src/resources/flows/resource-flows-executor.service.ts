@@ -123,6 +123,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
 
   private readonly resourceActivity: Map<Resource['id'], Date> = new Map();
   private readonly heartbeatLastSeen: Map<string, Date> = new Map();
+  /** Preserve event lookup order without serializing the flow runs they launch. */
+  private pluginFlowLookupQueue: Promise<void> = Promise.resolve();
 
   private readonly templateVariables = new WeakMap<object, TemplateVariables>();
 
@@ -485,7 +487,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
   public async triggerPluginFlows(
     pluginName: string,
     nodeType: string,
-    matches: (config: Record<string, unknown>) => boolean,
+    matches: (config: Record<string, unknown>, nodeId: string) => boolean,
     payload: object,
   ): Promise<void> {
     const definition = getPluginFlowNode(nodeType);
@@ -501,14 +503,16 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     const concurrency = 10;
     let lastId: string | undefined;
     for (;;) {
-      const nodes = await this.flowNodeRepository.find({
-        where: {
-          type: nodeType as ResourceFlowNodeType,
-          ...(lastId ? { id: MoreThan(lastId) } : {}),
-        },
-        order: { id: 'ASC' },
-        take: pageSize,
-      });
+      const nodes = await this.queuedPluginFlowLookup(() =>
+        this.flowNodeRepository.find({
+          where: {
+            type: nodeType as ResourceFlowNodeType,
+            ...(lastId ? { id: MoreThan(lastId) } : {}),
+          },
+          order: { id: 'ASC' },
+          take: pageSize,
+        }),
+      );
 
       if (nodes.length === 0) return;
       lastId = nodes[nodes.length - 1].id;
@@ -517,7 +521,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
         await Promise.allSettled(nodes.slice(offset, offset + concurrency).map(async (node) => {
           let isMatch: boolean;
           try {
-            isMatch = matches(node.data as Record<string, unknown>);
+            isMatch = matches(node.data as Record<string, unknown>, node.id);
           } catch (error) {
             this.logger.error(
               `Failed to match plugin flow trigger node ID: ${node.id} (Type: ${nodeType})`,
@@ -534,6 +538,15 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
 
       if (nodes.length < pageSize) return;
     }
+  }
+
+  private queuedPluginFlowLookup(lookup: () => Promise<ResourceFlowNode[]>): Promise<ResourceFlowNode[]> {
+    const queued = this.pluginFlowLookupQueue.then(lookup, lookup);
+    this.pluginFlowLookupQueue = queued.then(
+      () => undefined,
+      () => undefined,
+    );
+    return queued;
   }
 
   public async startFlow(
@@ -679,15 +692,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     } catch (error) {
       const processingTime = Date.now() - startTime;
       const failureBehavior = dispatchStarted ? getExternalEffectFailureBehavior(node.type, node.data) : undefined;
-      const pluginNode = getPluginFlowNode(node.type);
-      const pluginFailureBehavior =
-        dispatchStarted && pluginNode && !pluginNode.isInput
-          ? pluginNode.getFailureBehavior?.(node.data as Record<string, unknown>)
-          : undefined;
       const failureKind = dispatchStarted
-        ? (this.nodeExecutors[node.type]?.getFailureKind?.(error) ??
-          (pluginNode && !pluginNode.isInput ? pluginNode.getFailureKind?.(error) : undefined) ??
-          'node-failure')
+        ? (this.nodeExecutors[node.type]?.getFailureKind?.(error) ?? 'node-failure')
         : 'node-failure';
       const errorMessage = this.errorReason(error);
       this.logger.error(
@@ -700,21 +706,20 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
         nodeId: node.id,
         resourceId: node.resourceId,
         type: ResourceFlowLogType.NODE_PROCESSING_FAILED,
-        payload: () => ({ error: errorMessage, failureKind, failureBehavior: pluginFailureBehavior ?? failureBehavior ?? 'fail-flow' }),
+        payload: () => ({ error: errorMessage, failureKind, failureBehavior: failureBehavior ?? 'fail-flow' }),
       });
 
-      const effectiveFailureBehavior = pluginFailureBehavior ?? failureBehavior;
-      if (!effectiveFailureBehavior || effectiveFailureBehavior === 'fail-flow') {
-        throw effectiveFailureBehavior === 'fail-flow' ? new ExternalEffectFailureError(errorMessage, error, failureKind) : error;
+      if (!failureBehavior || failureBehavior === 'fail-flow') {
+        throw failureBehavior === 'fail-flow' ? new ExternalEffectFailureError(errorMessage, error, failureKind) : error;
       }
 
       const payload =
-        effectiveFailureBehavior === 'failure-output'
+        failureBehavior === 'failure-output'
           ? { ...resultOfPreviousNode.payload, flowError: { kind: failureKind, message: errorMessage } }
           : resultOfPreviousNode.payload;
       responseOfNode = {
         payload,
-        outputHandle: effectiveFailureBehavior === 'failure-output' ? 'failure' : 'output',
+        outputHandle: failureBehavior === 'failure-output' ? 'failure' : 'output',
       };
     }
 

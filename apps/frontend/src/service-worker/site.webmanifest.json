@@ -4,8 +4,8 @@
   "short_name": "Attraccess",
   "description": "Attraccess is a platform for managing access to resources in a collaborative environment (e.g. Makerspaces and FabLabs).",
   "start_url": "/?pwa=true",
-  "theme_color": "#000000",
-  "background_color": "#000000",
+  "theme_color": "#256d7b",
+  "background_color": "#ffffff",
   "id": "/",
   "icons": [
     { "src": "/favicon.ico", "type": "image/x-icon", "sizes": "16x16 32x32" },
