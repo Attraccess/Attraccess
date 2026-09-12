@@ -71,6 +71,11 @@ set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/logos.S" PROPERTIES
 
 add_library(attractap-production-host
     ${ATTRACTAP_FIRMWARE_SOURCES}
+    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_10.c"
+    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_14.c"
+    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_18.c"
+    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_24.c"
+    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_36.c"
     src/host_beeper.cpp
     src/host_utils.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/logos.S")

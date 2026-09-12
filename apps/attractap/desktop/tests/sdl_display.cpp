@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <cstring>
 #include <filesystem>
 #include <utility>
 #include <vector>
@@ -62,6 +63,57 @@ void screenshot(const std::filesystem::path &directory, const char *name)
     assert(SDL_SavePNG(frame, (directory / name).c_str()));
     SDL_DestroySurface(frame);
 }
+
+lv_obj_t *findLabel(lv_obj_t *root, const char *text)
+{
+    if (lv_obj_check_type(root, &lv_label_class) && std::strcmp(lv_label_get_text(root), text) == 0)
+        return root;
+    for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i)
+        if (auto *label = findLabel(lv_obj_get_child(root, i), text)) return label;
+    return nullptr;
+}
+
+void expectUmlaut(lv_obj_t *label)
+{
+    assert(label);
+    lv_font_glyph_dsc_t glyph{};
+    assert(lv_font_get_glyph_dsc(lv_obj_get_style_text_font(label, LV_PART_MAIN), &glyph, 0xFC, 'n'));
+    assert(!glyph.is_placeholder);
+    assert(glyph.box_w > 0 && glyph.box_h > 0);
+}
+
+void testLockscreen(SdlDisplay &display, const std::filesystem::path &screenshots)
+{
+    // Exercise selection -> lockscreen with the simulator's production theme,
+    // router and SDL renderer, rather than just inspecting a font asset.
+    constexpr char resourceName[] = "Jappys Dingalüng";
+    API::ResourceList resources{};
+    resources.count = 1;
+    resources.items[0].id = 1;
+    std::strcpy(resources.items[0].name, resourceName);
+    Display::resourceListScreen.setResourceList(resources);
+    Display::resourceListScreen.setResourceSelectionCallback([](const API::ResourceBrief &resource) {
+        Display::lockscreen.setResourceName(resource.name);
+        Display::lockscreen.setUsageInfo(false, "", false);
+        Display::transitionToScreen(&Display::lockscreen);
+    });
+    Display::transitionToScreen(&Display::resourceListScreen);
+    lv_refr_now(nullptr);
+    auto *selectionLabel = findLabel(lv_screen_active(), resourceName);
+    expectUmlaut(selectionLabel);
+    lv_obj_send_event(lv_obj_get_parent(selectionLabel), LV_EVENT_CLICKED, nullptr);
+    Display::loop();
+    lv_refr_now(nullptr);
+    assert(lv_screen_active() == Display::lockscreen.getScreen());
+    expectUmlaut(findLabel(lv_screen_active(), resourceName));
+    expectUmlaut(findLabel(lv_screen_active(), "Verfügbar"));
+    assert(display.pollEvents());
+    screenshot(screenshots, "lockscreen-umlaut.png");
+    Display::resourceListScreen.setResourceSelectionCallback({});
+    Display::transitionToScreen(&Display::initScreen);
+    Display::loop();
+    lv_refr_now(nullptr);
+}
 }
 
 int main(int argc, char **argv)
@@ -88,6 +140,7 @@ int main(int argc, char **argv)
     assert(SDL_SyncWindow(window));
     assert(display.pollEvents());
     screenshot(screenshots, "device.png");
+    testLockscreen(display, screenshots);
 
     TouchPoint touch{};
     // The firmware still sees a 480 x 480 screen, offset inside the CAD face.

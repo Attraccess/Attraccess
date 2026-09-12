@@ -91,70 +91,6 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   private readonly connectedAt = new WeakMap<object, bigint>();
 
-  private makeStringLVGLReady(input: string): string {
-    if (!input) return input;
-
-    // Step 1: Explicit language-aware replacements (keep before diacritic removal)
-    const explicitReplacements: Array<[RegExp, string]> = [
-      // German umlauts and sharp s
-      [/ä/g, 'ae'],
-      [/ö/g, 'oe'],
-      [/ü/g, 'ue'],
-      [/Ä/g, 'Ae'],
-      [/Ö/g, 'Oe'],
-      [/Ü/g, 'Ue'],
-      [/ß/g, 'ss'],
-
-      // Common symbols and punctuation
-      [/\u00A0/g, ' '], // NBSP -> space
-      [/\u2018|\u2019|\u201A|\u2032/g, "'"], // smart single quotes, prime
-      [/\u201C|\u201D|\u201E|\u2033/g, '"'], // smart double quotes, double prime
-      [/\u2013|\u2014|\u2015/g, '-'], // en/em/horizontal bar -> hyphen
-      [/\u2026/g, '...'], // ellipsis
-      [/\u2022/g, '-'], // bullet -> hyphen
-      [/\u00B0/g, 'deg'], // degree
-      [/\u2122/g, 'TM'], // trademark
-      [/\u00AE/g, '(R)'], // registered
-    ];
-
-    let output = input;
-    for (const [pattern, replacement] of explicitReplacements) {
-      output = output.replace(pattern, replacement);
-    }
-
-    // Step 2: Remove remaining diacritics (NFD decomposition)
-    output = output.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-    // Step 3: Replace any remaining non-ASCII characters with '?'
-    // Allow printable ASCII range only (space 0x20 to tilde 0x7E)
-    output = output.replace(/[^\x20-\x7E]/g, '?');
-
-    return output;
-  }
-
-  private sanitizeForLVGL<T>(value: T): T {
-    const seen = new WeakSet<object>();
-
-    const sanitize = (v: unknown): unknown => {
-      if (typeof v === 'string') return this.makeStringLVGLReady(v);
-      if (v === null || v === undefined) return v;
-      if (Array.isArray(v)) return v.map((item) => sanitize(item));
-      if (typeof v === 'object') {
-        const obj = v as Record<string, unknown>;
-        if (seen.has(obj)) return obj;
-        seen.add(obj);
-        const out: Record<string, unknown> = {};
-        for (const [k, val] of Object.entries(obj)) {
-          out[k] = sanitize(val);
-        }
-        return out;
-      }
-      return v;
-    };
-
-    return sanitize(value) as T;
-  }
-
   public async handleConnection(client: WebSocket) {
     this.connectedAt.set(client as unknown as object, process.hrtime.bigint());
     this.logger.log('Client connected via WebSocket');
@@ -186,8 +122,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
           `Sending ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`,
           message.data.payload,
         );
-        const sanitized = this.sanitizeForLVGL(message);
-        const stringifiedMessage = JSON.stringify(sanitized);
+        const stringifiedMessage = JSON.stringify(message);
         client.send(stringifiedMessage);
 
         this.logger.debug(

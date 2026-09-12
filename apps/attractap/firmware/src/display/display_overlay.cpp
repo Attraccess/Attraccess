@@ -1,4 +1,5 @@
 #include "display.hpp"
+#include "display/fonts/attractap_fonts.hpp"
 #include "display/theme.hpp"
 
 #include <cstdlib>
@@ -42,7 +43,7 @@ void Display::initDeviceOverlay()
 
     lv_obj_set_style_text_color(Display::deviceNameLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(Display::deviceNameLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(Display::deviceNameLabel, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(Display::deviceNameLabel, &attractap_font_montserrat_latin1_10, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_t *firmwareLabel = lv_label_create(deviceInfoContainer);
     lv_obj_set_width(firmwareLabel, LV_SIZE_CONTENT);

@@ -2,6 +2,7 @@
 
 #include "demoSettingsScreen.hpp"
 #include "display/theme.hpp"
+#include "display/fonts/attractap_fonts.hpp"
 #include <string>
 #include <cstdio>
 #include "platform.hpp"
@@ -58,10 +59,10 @@ void DemoSettingsScreen::init()
     DisplayTheme::button(addBtn);
     lv_obj_add_event_cb(addBtn, &DemoSettingsScreen::onAddCardBtn, LV_EVENT_CLICKED, this);
     lv_obj_t *addLbl = lv_label_create(addBtn);
-    lv_label_set_text(addLbl, "Karte hinzufuegen");
+    lv_label_set_text(addLbl, "Karte hinzufügen");
     lv_obj_set_align(addLbl, LV_ALIGN_CENTER);
     lv_obj_set_style_text_color(addLbl, DisplayTheme::onPrimary(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(addLbl, &lv_font_montserrat_16, LV_PART_MAIN);
+    lv_obj_set_style_text_font(addLbl, &attractap_font_montserrat_latin1_14, LV_PART_MAIN);
 
 #ifdef HAS_POWER_BUTTON
     // Power-off button (V4 hardware with SYS_EN latch only).
@@ -208,10 +209,10 @@ void DemoSettingsScreen::rebuildCardList()
         _delPayloads[i] = {this, i};
         lv_obj_add_event_cb(delBtn, &DemoSettingsScreen::onDeleteCardBtn, LV_EVENT_CLICKED, &_delPayloads[i]);
         lv_obj_t *delBtnInner = lv_label_create(delBtn);
-        lv_label_set_text(delBtnInner, "Loeschen");
+        lv_label_set_text(delBtnInner, "Löschen");
         lv_obj_set_align(delBtnInner, LV_ALIGN_CENTER);
         lv_obj_set_style_text_color(delBtnInner, DisplayTheme::onPrimary(), LV_PART_MAIN);
-        lv_obj_set_style_text_font(delBtnInner, &lv_font_montserrat_14, LV_PART_MAIN);
+        lv_obj_set_style_text_font(delBtnInner, &attractap_font_montserrat_latin1_14, LV_PART_MAIN);
     }
 }
 
@@ -237,9 +238,9 @@ void DemoSettingsScreen::showScanOverlay()
     lv_obj_set_style_pad_row(_scanOverlay, 24, LV_PART_MAIN);
 
     lv_obj_t *lbl = lv_label_create(_scanOverlay);
-    lv_label_set_text(lbl, "Karte ans Lesegeraet halten...");
+    lv_label_set_text(lbl, "Karte ans Lesegerät halten...");
     lv_obj_set_style_text_color(lbl, DisplayTheme::text(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_24, LV_PART_MAIN);
+    lv_obj_set_style_text_font(lbl, &attractap_font_montserrat_latin1_24, LV_PART_MAIN);
     lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
 
     lv_obj_t *cancelBtn = lv_button_create(_scanOverlay);
@@ -292,11 +293,11 @@ void DemoSettingsScreen::showRolePicker(const std::string &uid)
     lv_obj_set_style_pad_row(_rolePicker, 14, LV_PART_MAIN);
 
     char titleBuf[64];
-    snprintf(titleBuf, sizeof(titleBuf), "Rolle fuer Karte %s", uid.c_str());
+    snprintf(titleBuf, sizeof(titleBuf), "Rolle für Karte %s", uid.c_str());
     lv_obj_t *titleLbl = lv_label_create(_rolePicker);
     lv_label_set_text(titleLbl, titleBuf);
     lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(titleLbl, &lv_font_montserrat_20, LV_PART_MAIN);
+    lv_obj_set_style_text_font(titleLbl, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
     lv_label_set_long_mode(titleLbl, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(titleLbl, lv_pct(100));
 

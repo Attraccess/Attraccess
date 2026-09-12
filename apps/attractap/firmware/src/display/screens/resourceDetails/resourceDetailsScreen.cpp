@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
-static const char *MAINTENANCE_INFO_TEXT = "Diese Ressource ist wegen Wartungsarbeiten nicht verfuegbar. Wartungsarbeiten duerfen nur von den unten aufgefuehrten Personen durchgefuehrt werden.";
+static const char *MAINTENANCE_INFO_TEXT = "Diese Ressource ist wegen Wartungsarbeiten nicht verfügbar. Wartungsarbeiten dürfen nur von den unten aufgeführten Personen durchgeführt werden.";
 
 void ResourceDetailsScreen::init()
 {
@@ -257,7 +257,7 @@ void ResourceDetailsScreen::init()
    lv_obj_add_event_cb(this->projectsButton, &ResourceDetailsScreen::onProjectsButtonClick, LV_EVENT_CLICKED, this);
 
     this->projectsButtonLabel = lv_label_create(this->projectsButton);
-    lv_label_set_text(this->projectsButtonLabel, "Projekt waehlen");
+    lv_label_set_text(this->projectsButtonLabel, "Projekt wählen");
     lv_obj_set_align(this->projectsButtonLabel, LV_ALIGN_CENTER);
     lv_obj_set_style_text_align(this->projectsButtonLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(this->projectsButtonLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -291,6 +291,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_height(this->startSessionButtonLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->startSessionButtonLabel, LV_ALIGN_CENTER);
    lv_label_set_text(this->startSessionButtonLabel, "Ressource verwenden");
+   lv_obj_set_style_text_font(this->startSessionButtonLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
 
    this->stopOtherUserNote = lv_label_create(this->sessionControls);
    lv_obj_set_width(this->stopOtherUserNote, lv_pct(100));
@@ -371,7 +372,8 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(labelForUnlatchDoorButton, LV_SIZE_CONTENT);
    lv_obj_set_height(labelForUnlatchDoorButton, LV_SIZE_CONTENT);
    lv_obj_set_align(labelForUnlatchDoorButton, LV_ALIGN_CENTER);
-   lv_label_set_text(labelForUnlatchDoorButton, "Falle oeffnen");
+   lv_label_set_text(labelForUnlatchDoorButton, "Falle öffnen");
+   lv_obj_set_style_text_font(labelForUnlatchDoorButton, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
 
    this->flowButtonsContainer = lv_obj_create(this->sessionControls);
    lv_obj_remove_style_all(this->flowButtonsContainer);
@@ -401,7 +403,8 @@ void ResourceDetailsScreen::init()
    lv_obj_set_width(noIntroductionInfoLabel, lv_pct(100));
    lv_obj_set_height(noIntroductionInfoLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(noIntroductionInfoLabel, LV_ALIGN_CENTER);
-   lv_label_set_text(noIntroductionInfoLabel, "Sie benoetigen eine Einweisung, bevor Sie diese Ressource nutzen koennen. Bitte wenden Sie sich an einen der unten aufgefuehrten Einweiser.");
+   lv_label_set_text(noIntroductionInfoLabel, "Sie benötigen eine Einweisung, bevor Sie diese Ressource nutzen können. Bitte wenden Sie sich an einen der unten aufgeführten Einweiser.");
+   lv_obj_set_style_text_font(noIntroductionInfoLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
    lv_obj_set_style_text_color(noIntroductionInfoLabel, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(noIntroductionInfoLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -430,6 +433,7 @@ void ResourceDetailsScreen::init()
    lv_obj_set_height(maintenanceInfoLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(maintenanceInfoLabel, LV_ALIGN_CENTER);
    lv_label_set_text(maintenanceInfoLabel, MAINTENANCE_INFO_TEXT);
+   lv_obj_set_style_text_font(maintenanceInfoLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
    lv_obj_set_style_text_color(maintenanceInfoLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_opa(maintenanceInfoLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -586,7 +590,7 @@ std::string ResourceDetailsScreen::buildIntroducersText(const API::ResourceBrief
    }
    if (list.length() == 0)
    {
-      list = "-- kein Einweiser verfuegbar --";
+      list = "-- kein Einweiser verfügbar --";
    }
    return list;
 }
@@ -699,7 +703,7 @@ void ResourceDetailsScreen::refreshAccessState()
          if (this->startSessionButtonLabel)
          {
             lv_label_set_text(this->startSessionButtonLabel,
-                              isTakeover ? "Uebernehmen" : "Ressource verwenden");
+                              isTakeover ? "Übernehmen" : "Ressource verwenden");
          }
          // Takeover retains its warning role; starting is a primary action.
          lv_color_t startBgColor = isTakeover ? DisplayTheme::warning() : DisplayTheme::primary();

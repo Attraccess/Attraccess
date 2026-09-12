@@ -714,7 +714,7 @@ void Application::processReset() {
       this->beeper.errorBeep();
       Display::resetScreen.setStatus(ResetScreen::STATUS_ERROR);
       Display::resetScreen.setStatusMessage(
-          "Karte konnte nicht\nzurueckgesetzt werden");
+          "Karte konnte nicht\nzurückgesetzt werden");
       this->resetPhase = RESET_PHASE_ERROR;
     }
     this->resetPhaseChangedMs = now;

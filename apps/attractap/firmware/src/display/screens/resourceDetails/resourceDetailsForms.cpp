@@ -7,9 +7,9 @@
 #include <stdio.h>
 #include <cstdlib>
 
-static const char *SELECT_FIELD_PLACEHOLDER = "Bitte Option waehlen";
-static const char *SELECT_FIELD_NO_OPTIONS = "Keine Optionen verfuegbar";
-static const char *SELECT_FIELD_INVALID = "Ungueltige Auswahl";
+static const char *SELECT_FIELD_PLACEHOLDER = "Bitte Option wählen";
+static const char *SELECT_FIELD_NO_OPTIONS = "Keine Optionen verfügbar";
+static const char *SELECT_FIELD_INVALID = "Ungültige Auswahl";
 static const lv_coord_t SELECT_FIELD_OPTION_GAP = 6;
 
 void ResourceDetailsScreen::disposeFormsModal()
@@ -154,7 +154,7 @@ void ResourceDetailsScreen::showFormPageErrors(const API::ResourceUsageFormPageR
    }
    if (this->formsModalErrorLabel)
    {
-      lv_label_set_text(this->formsModalErrorLabel, shown ? "Bitte Eingabe korrigieren." : "Eingabe ungueltig.");
+      lv_label_set_text(this->formsModalErrorLabel, shown ? "Bitte Eingabe korrigieren." : "Eingabe ungültig.");
    }
 }
 void ResourceDetailsScreen::hideFormsModal()
@@ -292,7 +292,8 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_style_pad_all(backBtn, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
    DisplayTheme::secondaryButton(backBtn);
    lv_obj_t *backLabel = lv_label_create(backBtn);
-   lv_label_set_text(backLabel, "Zurueck");
+   lv_label_set_text(backLabel, "Zurück");
+   lv_obj_set_style_text_font(backLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
    lv_obj_set_align(backLabel, LV_ALIGN_CENTER);
    lv_obj_add_event_cb(backBtn, &ResourceDetailsScreen::onFormsBack, LV_EVENT_CLICKED, this);
 
@@ -468,22 +469,22 @@ void ResourceDetailsScreen::buildCurrentFormField()
       return;
    }
 
-   std::string pageTitle = "Bitte Formular ausfuellen";
+   std::string pageTitle = "Bitte Formular ausfüllen";
    std::string resourceName = "";
 
    if (this->formsModalMeta)
    {
       if (this->formsModalMeta->action == API::ResourceUsageFormActionType::START)
       {
-         pageTitle = "Bitte vor dem Start ausfuellen";
+         pageTitle = "Bitte vor dem Start ausfüllen";
       }
       else if (this->formsModalMeta->action == API::ResourceUsageFormActionType::END)
       {
-         pageTitle = "Bitte vor dem Ende ausfuellen";
+         pageTitle = "Bitte vor dem Ende ausfüllen";
       }
       else if (this->formsModalMeta->action == API::ResourceUsageFormActionType::TAKEOVER)
       {
-         pageTitle = "Bitte vor der Uebernahme ausfuellen";
+         pageTitle = "Bitte vor der Übernahme ausfüllen";
       }
 
       if (this->formsModalMeta->resourceName.length() > 0)
@@ -803,7 +804,7 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
    {
       if (this->formsModalErrorLabel)
       {
-         lv_label_set_text(this->formsModalErrorLabel, "Bitte markierte Felder ausfuellen.");
+         lv_label_set_text(this->formsModalErrorLabel, "Bitte markierte Felder ausfüllen.");
       }
       return false;
    }
