@@ -43,7 +43,13 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
-import { usePluginsServiceDeletePlugin, usePluginsServiceGetPlugins } from '@attraccess/react-query-client';
+import {
+  usePluginsServiceDeletePlugin,
+  usePluginsServiceGetPluginSystemStatus,
+  usePluginsServiceGetPlugins,
+  usePluginsServiceRetryPlugin,
+  type PluginSystemStatusDto,
+} from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { SettingsSection } from '../../components/SettingsSection';
 import { Button } from '../../../../components/button';
@@ -60,6 +66,47 @@ import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { Select } from '../../../../components/select';
 
 const DOCS_URL = 'https://docs.attraccess.org/#/plugins/developing-plugins';
+const SERVER_READY_POLL_INTERVAL_MS = 250;
+const SERVER_RESTART_TIMEOUT_MS = 30_000;
+const SERVER_STATUS_REQUEST_TIMEOUT_MS = 2_000;
+
+async function getServerInstanceId(getStatus: () => Promise<PluginSystemStatusDto | undefined>) {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const status = await Promise.race([
+    getStatus(),
+    new Promise<never>((_, reject) => {
+      timeout = setTimeout(
+        () => reject(new Error('Plugin system status request timed out')),
+        SERVER_STATUS_REQUEST_TIMEOUT_MS,
+      );
+    }),
+  ]).finally(() => clearTimeout(timeout));
+  if (!status || typeof status.instanceId !== 'string') throw new Error('Plugin system instance ID is missing');
+  return status.instanceId;
+}
+
+function wait(delay: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, delay));
+}
+
+async function waitForServerRestart(
+  previousInstanceId: string,
+  getStatus: () => Promise<PluginSystemStatusDto | undefined>,
+) {
+  const deadline = Date.now() + SERVER_RESTART_TIMEOUT_MS;
+
+  while (Date.now() < deadline) {
+    try {
+      if ((await getServerInstanceId(getStatus)) !== previousInstanceId) return;
+    } catch {
+      // A restart may temporarily make the status endpoint unavailable.
+    }
+
+    await wait(Math.min(SERVER_READY_POLL_INTERVAL_MS, deadline - Date.now()));
+  }
+
+  throw new Error('Plugin system restart timed out');
+}
 
 type VersionCandidate = {
   version: string;
@@ -138,8 +185,11 @@ export function PluginsSection() {
   const toast = useToastMessage();
 
   const { data: plugins } = usePluginsServiceGetPlugins();
-  const [pluginsDisabled, setPluginsDisabled] = useState(false);
-  const [failedPlugin, setFailedPlugin] = useState<{ name: string; error: string } | null>(null);
+  const { data: pluginSystemStatus, refetch: refetchPluginSystemStatus } = usePluginsServiceGetPluginSystemStatus();
+  const { mutateAsync: retryFailedPlugin } = usePluginsServiceRetryPlugin();
+  const pluginsDisabled = pluginSystemStatus?.disabled === true;
+  const [failedPlugin, setFailedPlugin] = useState<{ id: string; name: string; error: string } | null>(null);
+  const [isRetryingPlugin, setIsRetryingPlugin] = useState(false);
   const [pluginToDelete, setPluginToDelete] = useState<string | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [versionPlugin, setVersionPlugin] = useState<VersionPlugin | null>(null);
@@ -176,6 +226,25 @@ export function PluginsSection() {
   const latestRegistryTest = useRef<symbol | null>(null);
   const isLoadingMarketplace = isLoadingMarketplaceSearch || isLoadingMarketplaceDetail;
 
+  const retryPlugin = async () => {
+    if (!failedPlugin) return;
+
+    setIsRetryingPlugin(true);
+    try {
+      const getPluginSystemStatus = async () => (await refetchPluginSystemStatus()).data;
+      const previousInstanceId = await getServerInstanceId(getPluginSystemStatus);
+      await retryFailedPlugin({ pluginId: failedPlugin.id });
+      toast.success({ title: t('status.retrySuccess') });
+      await waitForServerRestart(previousInstanceId, getPluginSystemStatus);
+      window.location.reload();
+      setFailedPlugin(null);
+    } catch {
+      toast.error({ title: t('status.retryError') });
+    } finally {
+      setIsRetryingPlugin(false);
+    }
+  };
+
   useEffect(() => {
     if (!globalThis.fetch) return;
     void fetch(`${getBaseUrl()}/api/plugins/installed`, { credentials: 'include' })
@@ -186,14 +255,6 @@ export function PluginsSection() {
           new Map<string, InstalledNpmPlugin>(installed.map((plugin) => [plugin.name, plugin] as const)),
         );
       })
-      .catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    if (!globalThis.fetch) return;
-    void fetch(`${getBaseUrl()}/api/plugins/status`, { credentials: 'include' })
-      .then(async (response) => (response.ok ? (response.json() as Promise<{ disabled?: boolean }>) : undefined))
-      .then((status) => setPluginsDisabled(status?.disabled === true))
       .catch(() => undefined);
   }, []);
 
@@ -578,7 +639,9 @@ export function PluginsSection() {
                         <button
                           type="button"
                           className="rounded-medium outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                          onClick={() => setFailedPlugin({ name: plugin.name, error: plugin.error ?? '' })}
+                          onClick={() =>
+                            setFailedPlugin({ id: plugin.id, name: plugin.name, error: plugin.error ?? '' })
+                          }
                           aria-label={t('status.viewError', { pluginName: plugin.name })}
                           data-cy={`plugins-list-status-${plugin.id}`}
                         >
@@ -694,6 +757,14 @@ export function PluginsSection() {
               <ModalFooter>
                 <Button variant="secondary" onPress={close}>
                   {t('status.close')}
+                </Button>
+                <Button
+                  variant="primary"
+                  onPress={() => void retryPlugin()}
+                  isPending={isRetryingPlugin}
+                  data-cy="plugins-list-retry-load-button"
+                >
+                  {t('status.retry')}
                 </Button>
               </ModalFooter>
             </>

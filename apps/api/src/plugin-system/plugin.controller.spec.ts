@@ -1,4 +1,4 @@
-import { NotFoundException, StreamableFile } from '@nestjs/common';
+import { BadRequestException, NotFoundException, StreamableFile } from '@nestjs/common';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -22,7 +22,7 @@ function frontendPlugin(name: string): LoadedPluginManifest {
 
 describe('PluginController', () => {
   let root: string;
-  let service: { uploadPlugin: jest.Mock; deletePlugin: jest.Mock };
+  let service: { uploadPlugin: jest.Mock; deletePlugin: jest.Mock; requestRestart: jest.Mock };
   let npmService: {
     findInstalledByPluginId: jest.Mock;
     listInstalled: jest.Mock;
@@ -36,7 +36,7 @@ describe('PluginController', () => {
     root = mkdtempSync(join(tmpdir(), 'plugin-controller-'));
     PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
     PluginModule.configure({ DISABLE_PLUGINS: false });
-    service = { uploadPlugin: jest.fn(), deletePlugin: jest.fn() };
+    service = { uploadPlugin: jest.fn(), deletePlugin: jest.fn(), requestRestart: jest.fn() };
     npmService = {
       findInstalledByPluginId: jest.fn(),
       listInstalled: jest.fn().mockReturnValue([]),
@@ -63,7 +63,36 @@ describe('PluginController', () => {
   it('reports when plugins are globally disabled', () => {
     PluginModule.configure({ DISABLE_PLUGINS: true });
 
-    expect(controller.getPluginSystemStatus()).toEqual({ disabled: true });
+    expect(controller.getPluginSystemStatus()).toEqual({ disabled: true, instanceId: expect.any(String) });
+  });
+
+  describe('retryPlugin', () => {
+    it('clears a failed plugin quarantine and schedules a restart', () => {
+      const plugin = frontendPlugin('failed');
+      jest.spyOn(PluginService, 'getManifestById').mockReturnValue(plugin);
+      jest.spyOn(PluginService, 'isPluginQuarantined').mockReturnValue(true);
+      const clearQuarantine = jest.spyOn(PluginService, 'clearPluginQuarantine');
+
+      expect(controller.retryPlugin(plugin.id)).toEqual({ ok: true });
+      expect(clearQuarantine).toHaveBeenCalledWith(plugin.pluginDirectory);
+      expect(service.requestRestart).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects an unknown plugin without scheduling a restart', () => {
+      jest.spyOn(PluginService, 'getManifestById').mockReturnValue(undefined);
+
+      expect(() => controller.retryPlugin('missing')).toThrow(NotFoundException);
+      expect(service.requestRestart).not.toHaveBeenCalled();
+    });
+
+    it('rejects a plugin that is not quarantined', () => {
+      const plugin = frontendPlugin('loaded');
+      jest.spyOn(PluginService, 'getManifestById').mockReturnValue(plugin);
+      jest.spyOn(PluginService, 'isPluginQuarantined').mockReturnValue(false);
+
+      expect(() => controller.retryPlugin(plugin.id)).toThrow(BadRequestException);
+      expect(service.requestRestart).not.toHaveBeenCalled();
+    });
   });
 
   describe('getFrontendPluginFile', () => {

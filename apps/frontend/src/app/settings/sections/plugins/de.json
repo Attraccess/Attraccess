@@ -102,7 +102,10 @@
     "viewError": "Ladefehler für {{pluginName}} anzeigen",
     "errorTitle": "{{pluginName}} konnte nicht geladen werden",
     "errorDescription": "Der Server hat beim Start diesen Fehler gemeldet:",
-    "close": "Schließen"
+    "close": "Schließen",
+    "retry": "Erneut versuchen und neu starten",
+    "retrySuccess": "Das Plugin wird beim Neustart der App erneut geladen.",
+    "retryError": "Das Plugin konnte nicht erneut geladen werden."
   },
   "noPermissions": "Keine angefordert",
   "updatePolicy": {
