@@ -628,7 +628,6 @@ void ResourceDetailsScreen::buildCurrentFormField()
                   lv_obj_set_align(optLabel, LV_ALIGN_CENTER);
                   lv_label_set_text(optLabel, field.options.select.values[optIndex].c_str());
                   lv_label_set_long_mode(optLabel, LV_LABEL_LONG_WRAP);
-                  lv_obj_set_style_text_color(optLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
                   lv_obj_set_style_text_font(optLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
                   if (widget.selectOptionEventCount >= API::MAX_SELECT_OPTIONS)
