@@ -130,6 +130,20 @@ describe('AttractapGateway', () => {
     expect(gateway).toBeDefined();
   });
 
+  describe('LVGL output sanitization', () => {
+    const sanitize = (value: string) =>
+      (gateway as unknown as { makeStringLVGLReady: (input: string) => string }).makeStringLVGLReady(value);
+
+    it('preserves printable Latin-1 characters', () => {
+      expect(sanitize('ÄÖÜ äöü ß \u00A0°®')).toBe('ÄÖÜ äöü ß \u00A0°®');
+    });
+
+    it('uses readable fallbacks for unsupported characters', () => {
+      expect(sanitize('“München” — Größe™')).toBe('"München" - GrößeTM');
+      expect(sanitize('Cafe\u0301 ☃')).toBe('Cafe ?');
+    });
+  });
+
   describe('handleConnection', () => {
     it('closes the connection when license verification fails', async () => {
       licenseService.verifyLicense.mockRejectedValue(new Error('License invalid'));
