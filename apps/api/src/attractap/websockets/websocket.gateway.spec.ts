@@ -147,7 +147,7 @@ describe('AttractapGateway', () => {
       expect(sanitize('First line\nSecond line\r\n\tIndented')).toBe('First line\nSecond line\r\n\tIndented');
     });
 
-    it('does not rewrite form option or draft values', () => {
+    it('preserves form protocol values while sanitizing display metadata', () => {
       const message = new AttractapEvent(AttractapEventType.RESOURCE_USAGE_FORM_FIELDS, {
         fields: [
           {
@@ -156,16 +156,21 @@ describe('AttractapGateway', () => {
             options: ['Size™'],
             value: 'Size™',
           },
+          {
+            name: 'Note',
+            description: null,
+            options: { placeholder: '“Use Size™” — optional' },
+            value: null,
+          },
         ],
       });
-      const sanitized = (
-        gateway as unknown as { sanitizeForLVGL: <T>(value: T) => T }
-      ).sanitizeForLVGL(message);
+      const sanitized = (gateway as unknown as { sanitizeForLVGL: <T>(value: T) => T }).sanitizeForLVGL(message);
       const field = sanitized.data.payload.fields[0];
 
       expect(field.name).toBe('"Größe"');
       expect(field.options).toEqual(['Size™']);
       expect(field.value).toBe('Size™');
+      expect(sanitized.data.payload.fields[1].options).toEqual({ placeholder: '"Use SizeTM" - optional' });
     });
   });
 

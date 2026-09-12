@@ -12,6 +12,86 @@ static const char *SELECT_FIELD_NO_OPTIONS = "Keine Optionen verfügbar";
 static const char *SELECT_FIELD_INVALID = "Ungültige Auswahl";
 static const lv_coord_t SELECT_FIELD_OPTION_GAP = 6;
 
+// Select values must remain unchanged for submission, so prepare a separate
+// display string for code points not covered by the reader's Latin-1 fonts.
+static std::string makeLVGLDisplayText(const std::string &input)
+{
+   std::string output;
+   for (size_t index = 0; index < input.length();)
+   {
+      const unsigned char byte = static_cast<unsigned char>(input[index]);
+      if (byte < 0x80)
+      {
+         output += input[index++];
+         continue;
+      }
+
+      uint32_t codepoint = 0;
+      size_t length = 0;
+      if ((byte & 0xE0) == 0xC0 && index + 1 < input.length())
+      {
+         codepoint = ((byte & 0x1F) << 6) | (static_cast<unsigned char>(input[index + 1]) & 0x3F);
+         length = 2;
+      }
+      else if ((byte & 0xF0) == 0xE0 && index + 2 < input.length())
+      {
+         codepoint = ((byte & 0x0F) << 12) | ((static_cast<unsigned char>(input[index + 1]) & 0x3F) << 6) |
+                     (static_cast<unsigned char>(input[index + 2]) & 0x3F);
+         length = 3;
+      }
+      else
+      {
+         output += '?';
+         ++index;
+         continue;
+      }
+
+      if (codepoint >= 0xA0 && codepoint <= 0xFF)
+      {
+         output.append(input, index, length);
+      }
+      else if (codepoint >= 0x300 && codepoint <= 0x36F)
+      {
+         // Keep the base character of decomposed accents.
+      }
+      else
+      {
+         switch (codepoint)
+         {
+         case 0x2018:
+         case 0x2019:
+         case 0x201A:
+         case 0x2032:
+            output += '\'';
+            break;
+         case 0x201C:
+         case 0x201D:
+         case 0x201E:
+         case 0x2033:
+            output += '"';
+            break;
+         case 0x2013:
+         case 0x2014:
+         case 0x2015:
+         case 0x2022:
+            output += '-';
+            break;
+         case 0x2026:
+            output += "...";
+            break;
+         case 0x2122:
+            output += "TM";
+            break;
+         default:
+            output += '?';
+            break;
+         }
+      }
+      index += length;
+   }
+   return output;
+}
+
 void ResourceDetailsScreen::disposeFormsModal()
 {
    if (this->formsModalOverlay)
@@ -627,7 +707,8 @@ void ResourceDetailsScreen::buildCurrentFormField()
                   lv_obj_t *optLabel = lv_label_create(optBtn);
                   lv_obj_set_width(optLabel, lv_pct(100));
                   lv_obj_set_align(optLabel, LV_ALIGN_CENTER);
-                  lv_label_set_text(optLabel, field.options.select.values[optIndex].c_str());
+                  const std::string displayValue = makeLVGLDisplayText(field.options.select.values[optIndex]);
+                  lv_label_set_text(optLabel, displayValue.c_str());
                   lv_label_set_long_mode(optLabel, LV_LABEL_LONG_WRAP);
                   lv_obj_set_style_text_font(optLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 

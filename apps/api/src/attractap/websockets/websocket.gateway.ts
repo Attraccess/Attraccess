@@ -137,9 +137,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         seen.add(obj);
         const out: Record<string, unknown> = {};
         for (const [k, val] of Object.entries(obj)) {
-          // Form options and draft values are protocol values: changing them
+          // Select options and draft values are protocol values: changing them
           // prevents the firmware from submitting the value the API validates.
-          out[k] = k === 'options' || k === 'value' || k === 'answers' ? val : sanitize(val);
+          // Object-based options contain display metadata such as placeholders.
+          out[k] = (k === 'options' && Array.isArray(val)) || k === 'value' || k === 'answers' ? val : sanitize(val);
         }
         return out;
       }
