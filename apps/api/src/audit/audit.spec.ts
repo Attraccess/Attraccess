@@ -58,7 +58,11 @@ const event = (): PluginAuditEvent & { pluginId: string } => ({
   subject: { type: 'wago.controller', id: 7 },
   details: { revision: 2 },
 });
-const config = { enabled: true, domains: ['administration', 'resource', 'wago', 'identity'], retention_days: 90 };
+const config = {
+  enabled: true,
+  domains: ['administration', 'project', 'resource', 'wago', 'identity'],
+  retention_days: 90,
+};
 
 describe('durable audit SQLite', () => {
   let directory: string;
@@ -331,39 +335,105 @@ describe('durable audit SQLite', () => {
 
   it('persists resource system and device origins, honors suppression, and filters lifecycle actions', async () => {
     await service.recordResource({
-      action: 'health.transition', actorId: null, subjectId: 7,
+      action: 'health.transition',
+      actorId: null,
+      subjectId: 7,
       details: { previousStatus: 'healthy', status: 'unhealthy', healthSource: 'heartbeat' },
     });
     await service.recordResource({
-      action: 'usage_session.started', actorId: 8, authenticationMethod: null, subjectId: 7,
+      action: 'usage_session.started',
+      actorId: 8,
+      authenticationMethod: null,
+      subjectId: 7,
       details: { usageId: 4, usageUserId: 8 },
     });
     await service.recordResource({
-      action: 'retraining.cleared', actorId: 8, authenticationMethod: null, subjectType: 'resource.group', subjectId: 3,
+      action: 'retraining.cleared',
+      actorId: 8,
+      authenticationMethod: null,
+      subjectType: 'resource.group',
+      subjectId: 3,
       details: { introductionId: 2, usageUserId: 8 },
     });
     expect((await service.list({ domain: 'resource', eventPrefix: 'health.' } as AuditQueryDto)).items).toEqual([
       expect.objectContaining({ action: 'health.transition', actorId: null, authenticationMethod: null, subjectId: 7 }),
     ]);
-    expect((await service.list({ domain: 'resource', action: 'usage_session.started' } as AuditQueryDto)).items).toEqual([
-      expect.objectContaining({ actorId: 8, authenticationMethod: null, subjectId: 7 }),
-    ]);
+    expect(
+      (await service.list({ domain: 'resource', action: 'usage_session.started' } as AuditQueryDto)).items,
+    ).toEqual([expect.objectContaining({ actorId: 8, authenticationMethod: null, subjectId: 7 })]);
     expect((await service.list({ domain: 'resource', subjectType: 'resource.group' } as AuditQueryDto)).items).toEqual([
       expect.objectContaining({ action: 'retraining.cleared', subjectId: 3, actorId: 8, authenticationMethod: null }),
     ]);
     await store.setPlainSetting('audit', 'domains', '[]');
     await service.recordResource({
-      action: 'retraining.required', actorId: null, subjectId: 7,
+      action: 'retraining.required',
+      actorId: null,
+      subjectId: 7,
       details: { introductionId: 2, usageUserId: 8, retrainingReason: 'age' },
     });
     expect((await service.list({ domain: 'resource' } as AuditQueryDto)).items).toHaveLength(3);
     await store.setPlainSetting('audit', 'domains', '["resource"]');
     await store.setPlainSetting('audit', 'enabled', 'false');
     await service.recordResource({
-      action: 'retraining.required', actorId: null, subjectId: 7,
+      action: 'retraining.required',
+      actorId: null,
+      subjectId: 7,
       details: { introductionId: 3, usageUserId: 8, retrainingReason: 'age' },
     });
     expect((await service.list({ domain: 'resource' } as AuditQueryDto)).items).toHaveLength(3);
+  });
+
+  it('records project administration events with only safe allowlisted details', async () => {
+    await service.recordProject({
+      action: 'project.invitation.sent',
+      actorId: 42,
+      subjectType: 'project.invitation',
+      subjectId: 7,
+      details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
+    });
+    await service.recordProject({
+      action: 'project.invitation.sent',
+      actorId: 42,
+      subjectType: 'project.invitation',
+      subjectId: 8,
+      details: { email: 'person@example.test' },
+    } as never);
+
+    expect((await service.list({ limit: 10 })).items).toEqual([
+      expect.objectContaining({
+        domain: 'project',
+        action: 'project.invitation.sent',
+        actorId: 42,
+        subjectType: 'project.invitation',
+        subjectId: 7,
+        details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
+      }),
+    ]);
+  });
+
+  it('persists project API-token attribution only with a valid token context', async () => {
+    await service.recordProject({
+      action: 'project.created',
+      actorId: 42,
+      authenticationMethod: 'api-token',
+      apiTokenId: 9,
+      subjectType: 'project',
+      subjectId: 7,
+      details: { projectId: 7, 'after.name': 'Project', 'after.hasLogo': 0 },
+    });
+    await service.recordProject({
+      action: 'project.created',
+      actorId: 42,
+      authenticationMethod: 'session',
+      apiTokenId: 9,
+      subjectType: 'project',
+      subjectId: 8,
+      details: { projectId: 8, 'after.name': 'Project', 'after.hasLogo': 0 },
+    } as never);
+
+    expect((await service.list({ limit: 10 })).items).toEqual([
+      expect.objectContaining({ domain: 'project', subjectId: 7, authenticationMethod: 'api-token', apiTokenId: 9 }),
+    ]);
   });
 
   it('records a billing event only after its originating transaction commits', async () => {
@@ -769,7 +839,9 @@ describe('durable audit SQLite', () => {
 
   it('deduplicates required retraining within a training cycle and survives restart', async () => {
     await service.recordResource({
-      action: 'retraining.required', actorId: null, subjectId: 7,
+      action: 'retraining.required',
+      actorId: null,
+      subjectId: 7,
       details: { introductionId: 3, usageUserId: 42, retrainingReason: 'age' },
     });
     const row = (await service.list({ limit: 1 })).items[0];
@@ -782,7 +854,9 @@ describe('durable audit SQLite', () => {
     expect(await service.hasResourceIntroductionEvent('retraining.required', 3, 7, trainedAfter)).toBe(false);
     expect(await service.hasResourceIntroductionEvent('retraining.required', 4, 7, trainedBefore)).toBe(false);
     expect(await service.hasResourceIntroductionEvent('retraining.required', 3, 8, trainedBefore)).toBe(false);
-    expect(await service.hasResourceIntroductionEvent('retraining.required', 3, 7, trainedBefore, 'resource.group')).toBe(false);
+    expect(
+      await service.hasResourceIntroductionEvent('retraining.required', 3, 7, trainedBefore, 'resource.group'),
+    ).toBe(false);
   });
 
   it('rejects oversized details at the database boundary too', async () => {
@@ -1346,7 +1420,9 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       WHEN OLD.id IN (SELECT id FROM "audit_log" WHERE "at" < '2026-06-15 12:00:00.000')
       BEGIN SELECT RAISE(ABORT, 'audit cleanup failed'); END`);
     await migratedAudit.cleanup();
-    expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toHaveLength(1);
+    expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toHaveLength(
+      1,
+    );
     await source.query('DROP TRIGGER abort_audit_cleanup');
     await migratedAudit.cleanup();
     expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toEqual([]);

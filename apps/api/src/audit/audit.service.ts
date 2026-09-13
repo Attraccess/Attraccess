@@ -14,8 +14,10 @@ import { readAuditSettings } from './audit.config';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import {
   IdentityAuditEvent,
+  ProjectAuditEvent,
   projectAuditEvent,
   projectIdentityAuditEvent,
+  projectProjectAuditEvent,
   projectResourceAuditEvent,
   ResourceAuditEvent,
 } from './audit-policy';
@@ -309,6 +311,30 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     return row;
   }
 
+  async recordProject(event: Omit<ProjectAuditEvent, 'operationId'>): Promise<void> {
+    try {
+      const snapshot = projectProjectAuditEvent({ ...event, operationId: randomUUID() });
+      if (!snapshot) return;
+      await this.recordSnapshot({
+        domain: 'project',
+        pluginId: 'core',
+        action: snapshot.action,
+        operationId: snapshot.operationId,
+        actorId: snapshot.actorId,
+        authenticationMethod: snapshot.authenticationMethod ?? 'session',
+        apiTokenId: snapshot.apiTokenId ?? null,
+        outcome: 'succeeded',
+        subjectType: snapshot.subjectType,
+        subjectId: snapshot.subjectId,
+        ipAddress: null,
+        userAgent: null,
+        details: snapshot.details,
+      });
+    } catch {
+      /* Audit persistence must not affect project operations. */
+    }
+  }
+
   afterTransactionCommit({ queryRunner }: TransactionCommitEvent): void {
     // Nested transaction commits release a savepoint; wait for the owning transaction.
     if (queryRunner.isTransactionActive) {
@@ -353,7 +379,7 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
         (!finalSettingsChange &&
           (!config.enabled ||
             !config.domains.includes(
-              event.domain as 'administration' | 'billing' | 'resource' | 'wago' | 'identity',
+              event.domain as 'administration' | 'project' | 'billing' | 'resource' | 'wago' | 'identity',
             ))) ||
         this.stopping
       )
