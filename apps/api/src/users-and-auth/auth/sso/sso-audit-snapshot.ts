@@ -94,10 +94,9 @@ export function ssoAuditSnapshot(provider: SSOProvider): string {
       : {
           entryPoint: boundedString(auditEndpointUrl(provider.samlConfiguration?.entryPoint), 'entryPoint', omitted),
           issuer: auditSamlEntityId(provider.samlConfiguration?.issuer, 'issuer', omitted),
-          audience:
-            provider.samlConfiguration?.audience === null
-              ? null
-              : auditSamlEntityId(provider.samlConfiguration?.audience, 'audience', omitted),
+          audience: !provider.samlConfiguration?.audience
+            ? null
+            : auditSamlEntityId(provider.samlConfiguration?.audience, 'audience', omitted),
           signRequest: provider.samlConfiguration?.signRequest ?? false,
           wantAssertionsSigned: provider.samlConfiguration?.wantAssertionsSigned ?? false,
           wantAuthnResponseSigned: provider.samlConfiguration?.wantAuthnResponseSigned ?? false,

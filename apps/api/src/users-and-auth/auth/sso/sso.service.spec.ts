@@ -394,5 +394,23 @@ describe('SsoService', () => {
         }),
       );
     });
+
+    it('does not re-encrypt a canonical-equivalent signing key', async () => {
+      samlConfigRepository.findOne.mockResolvedValue({
+        ...baseSamlConfig,
+        spSigningKeyEncrypted: 'enc:-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----',
+      });
+
+      await (
+        service as unknown as {
+          updateSAMLConfiguration: (providerId: number, config: { spSigningPrivateKey: string }) => Promise<void>;
+        }
+      ).updateSAMLConfiguration(1, {
+        spSigningPrivateKey: '-----BEGIN PRIVATE KEY-----secret-----END PRIVATE KEY-----',
+      });
+
+      expect(encryptionService.encrypt).not.toHaveBeenCalled();
+      expect(samlConfigRepository.update).toHaveBeenCalledWith({ ssoProviderId: 1 }, {});
+    });
   });
 });

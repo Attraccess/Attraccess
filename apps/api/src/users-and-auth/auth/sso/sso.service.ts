@@ -293,8 +293,14 @@ export class SSOService {
     }
     if (typeof config.spSigningPrivateKey !== 'undefined') {
       if (config.spSigningPrivateKey) {
-        payload.spSigningKeyEncrypted = this.encryptPrivateKey(config.spSigningPrivateKey);
-        payload.spSigningKeyEncryptionKeyId = this.getEncryptionKeyId();
+        const canonicalPrivateKey = this.canonicalizePrivateKey(config.spSigningPrivateKey);
+        const existingPrivateKey = existing.spSigningKeyEncrypted
+          ? this.encryptionService.decryptIfEncrypted(existing.spSigningKeyEncrypted)
+          : null;
+        if (canonicalPrivateKey !== (existingPrivateKey ? this.canonicalizePrivateKey(existingPrivateKey) : null)) {
+          payload.spSigningKeyEncrypted = this.encryptionService.encrypt(canonicalPrivateKey);
+          payload.spSigningKeyEncryptionKeyId = this.getEncryptionKeyId();
+        }
       } else {
         payload.spSigningKeyEncrypted = null;
         payload.spSigningKeyEncryptionKeyId = null;

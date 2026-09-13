@@ -71,6 +71,31 @@ describe('SSO audit policy', () => {
     expect(JSON.stringify(snapshot)).not.toContain('encrypted-private-key');
   });
 
+  it('normalizes an empty optional SAML audience so its audit event is retained', () => {
+    const snapshot = ssoAuditSnapshot({
+      id: 4,
+      name: 'Workforce',
+      type: SSOProviderType.SAML,
+      samlConfiguration: {
+        entryPoint: 'https://idp.example.com/sso',
+        issuer: 'https://app.example.com',
+        audience: '',
+      },
+    } as never);
+
+    expect(JSON.parse(snapshot).configuration.audience).toBeNull();
+    expect(
+      projectSsoAuditEvent({
+        action: 'sso.provider.created',
+        operationId: randomUUID(),
+        actorId: 7,
+        authenticationMethod: 'session',
+        subject: { type: 'sso.provider', id: 4 },
+        details: { before: 'null', after: snapshot },
+      }),
+    ).not.toBeNull();
+  });
+
   it('strips endpoint credentials, queries, and fragments while retaining a bounded mapping summary', () => {
     const snapshot = ssoAuditSnapshot({
       id: 4,
