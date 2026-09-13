@@ -226,7 +226,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
 
     try {
       // On success the armer's callbacks report SUPERVISION_RESOLVED, so nothing to send here.
-      await this.supervisionService.approve(flow.requestId, supervisor);
+      await this.supervisionService.approve(flow.requestId, supervisor, null);
     } catch (error) {
       // approve() only invokes the callbacks for failures raised *inside* it — an authorization or
       // not-found throw happens before that, and would leave the reader sitting in its "starting"

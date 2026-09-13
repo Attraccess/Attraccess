@@ -289,7 +289,7 @@ describe('AttractapSupervisionHandler', () => {
 
       await confirm(socket, { resourceId: RESOURCE_ID });
 
-      expect(supervisionService.approve).toHaveBeenCalledWith('req-1', expect.objectContaining({ id: 2 }));
+      expect(supervisionService.approve).toHaveBeenCalledWith('req-1', expect.objectContaining({ id: 2 }), null);
       expect(socket.sendMessage).not.toHaveBeenCalled();
     });
 
