@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { PluginAuditEvent } from '@attraccess/plugins-backend-sdk';
-import { projectAuditEvent, projectResourceAuditEvent } from './audit-policy';
+import { projectAuditEvent, projectIdentityAuditEvent, projectResourceAuditEvent } from './audit-policy';
 
 function event(): PluginAuditEvent & { pluginId: string } {
   return {
@@ -132,5 +132,18 @@ describe('audit storage safe snapshot', () => {
     expect(projectResourceAuditEvent(resourceEvent)).toEqual(resourceEvent);
     expect(projectResourceAuditEvent({ ...resourceEvent, authenticationMethod: 'session' })).toBeNull();
     expect(projectResourceAuditEvent({ ...resourceEvent, apiTokenId: 4 })).toBeNull();
+  });
+
+  it('accepts generated role keys truncated after a separator', () => {
+    expect(
+      projectIdentityAuditEvent({
+        action: 'role_created',
+        operationId: randomUUID(),
+        outcome: 'succeeded',
+        subjectType: 'identity.role',
+        subjectId: 1,
+        details: { role: `${'a'.repeat(79)}-` },
+      }),
+    ).toMatchObject({ details: { role: `${'a'.repeat(79)}-` } });
   });
 });

@@ -560,6 +560,118 @@ describe('durable audit SQLite', () => {
     expect(await source.getRepository(AuditLog).count()).toBe(3);
   });
 
+  it('does not roll back a recorded event when a paused cleanup transaction fails', async () => {
+    await source.getRepository(AuditLog).insert({
+      at: new Date(0),
+      domain: 'wago',
+      pluginId: 'abcdefghijklmnopqrstu',
+      action: 'wago.publication',
+      operationId: randomUUID(),
+      actorId: 42,
+      authenticationMethod: 'session',
+      apiTokenId: null,
+      outcome: 'succeeded',
+      subjectType: 'wago.controller',
+      subjectId: 7,
+      ipAddress: null,
+      userAgent: null,
+      details: { revision: 1 },
+    });
+    await source.query(`CREATE TRIGGER fail_audit_cleanup BEFORE DELETE ON audit_log
+      BEGIN SELECT RAISE(ROLLBACK, 'cleanup delete failure'); END`);
+    const storage = (service as unknown as { storage: DataSource }).storage;
+    const originalTransaction = storage.transaction.bind(storage);
+    let releaseCleanup!: () => void;
+    const cleanupPaused = new Promise<void>((resolve) => {
+      releaseCleanup = resolve;
+    });
+    let transactionStarted!: () => void;
+    const cleanupStarted = new Promise<void>((resolve) => {
+      transactionStarted = resolve;
+    });
+    const transaction = jest.spyOn(storage, 'transaction').mockImplementation(async (callback) =>
+      originalTransaction(async (manager) => {
+        transactionStarted();
+        await cleanupPaused;
+        return callback(manager);
+      }),
+    );
+
+    try {
+      const cleanup = service.cleanup();
+      await cleanupStarted;
+      let recorded = false;
+      const receipt = service.record(event()).then((value) => {
+        recorded = true;
+        return value;
+      });
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(recorded).toBe(false);
+
+      releaseCleanup();
+      await cleanup;
+      await expect(receipt).resolves.toEqual({ status: 'recorded' });
+      expect(await source.getRepository(AuditLog).count()).toBe(2);
+    } finally {
+      transaction.mockRestore();
+    }
+  });
+
+  it('records an event after a paused cleanup transaction commits', async () => {
+    await source.getRepository(AuditLog).insert({
+      at: new Date(0),
+      domain: 'wago',
+      pluginId: 'abcdefghijklmnopqrstu',
+      action: 'wago.publication',
+      operationId: randomUUID(),
+      actorId: 42,
+      authenticationMethod: 'session',
+      apiTokenId: null,
+      outcome: 'succeeded',
+      subjectType: 'wago.controller',
+      subjectId: 7,
+      ipAddress: null,
+      userAgent: null,
+      details: { revision: 1 },
+    });
+    const storage = (service as unknown as { storage: DataSource }).storage;
+    const originalTransaction = storage.transaction.bind(storage);
+    let releaseCleanup!: () => void;
+    const cleanupPaused = new Promise<void>((resolve) => {
+      releaseCleanup = resolve;
+    });
+    let transactionStarted!: () => void;
+    const cleanupStarted = new Promise<void>((resolve) => {
+      transactionStarted = resolve;
+    });
+    const transaction = jest.spyOn(storage, 'transaction').mockImplementation(async (callback) =>
+      originalTransaction(async (manager) => {
+        transactionStarted();
+        await cleanupPaused;
+        return callback(manager);
+      }),
+    );
+
+    try {
+      const cleanup = service.cleanup();
+      await cleanupStarted;
+      let recorded = false;
+      const receipt = service.record(event()).then((value) => {
+        recorded = true;
+        return value;
+      });
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(recorded).toBe(false);
+
+      releaseCleanup();
+      await cleanup;
+      await expect(receipt).resolves.toEqual({ status: 'recorded' });
+      expect(await source.getRepository(AuditLog).count()).toBe(1);
+    } finally {
+      transaction.mockRestore();
+    }
+  });
+
   it('fails closed on disabled capture, unsupported domains, invalid input and write failure', async () => {
     for (const disabled of [
       { ...config, enabled: false },
@@ -1230,6 +1342,12 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       VALUES ('2026-06-15 13:00:00.000', 'identity', 'identity.password_policy_updated', 'e3aedfb1-15c7-4290-9a0c-777f27a8357f', 'succeeded', 'identity.password_policy', 1,
         '{"migrationSource":"password_policy_audit","legacyAuditId":998,"detailsTruncated":true}')`);
     await migratedStore.setPlainSetting('audit', 'retention_days', '1');
+    await source.query(`CREATE TRIGGER abort_audit_cleanup BEFORE DELETE ON "audit_log"
+      WHEN OLD.id IN (SELECT id FROM "audit_log" WHERE "at" < '2026-06-15 12:00:00.000')
+      BEGIN SELECT RAISE(ABORT, 'audit cleanup failed'); END`);
+    await migratedAudit.cleanup();
+    expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toHaveLength(1);
+    await source.query('DROP TRIGGER abort_audit_cleanup');
     await migratedAudit.cleanup();
     expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toEqual([]);
     expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 998')).toHaveLength(
