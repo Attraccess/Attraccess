@@ -1096,7 +1096,8 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
     (migration) =>
       migration !== DurableAudit1783700000000 &&
       migration !== IdentityAudit1783800000000 &&
-      migration !== RetirePasswordPolicyAudit1783900000000,
+      migration !== RetirePasswordPolicyAudit1783900000000 &&
+      migration !== migrations.AttractapAuditDomain1784000000000,
   );
   const database = join(directory, 'upgrade.sqlite');
   let source = new DataSource({ type: 'sqlite', database, entities: Object.values(entities), migrations: prior });
@@ -1129,11 +1130,12 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       'DurableAudit1783700000000',
       'IdentityAudit1783800000000',
       'RetirePasswordPolicyAudit1783900000000',
+      'AttractapAuditDomain1784000000000',
     ]);
     expect(source.hasMetadata(AuditLog)).toBeTruthy();
     expect(await source.query('PRAGMA foreign_key_list(audit_log)')).toEqual([]);
     expect(await source.query(`SELECT "value" FROM "setting" WHERE "parent" = 'audit' AND "key" = 'domains'`)).toEqual([
-      { value: '["billing","resource","wago","identity"]' },
+      { value: '["billing","resource","wago","identity","attractap"]' },
     ]);
     expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(
       2,
@@ -1206,6 +1208,7 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
     await source.query(`UPDATE "setting" SET "value" = '["identity"]'
       WHERE "parent" = 'audit' AND "key" = 'domains'`);
     await source.undoLastMigration();
+    await source.undoLastMigration();
     expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toHaveLength(1);
     expect(await source.query('SELECT * FROM password_policy_audit')).toHaveLength(4);
     expect(
@@ -1234,10 +1237,12 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
     ]);
     expect((await source.runMigrations()).map((migration) => migration.name)).toEqual([
       'RetirePasswordPolicyAudit1783900000000',
+      'AttractapAuditDomain1784000000000',
     ]);
     expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(
       4,
     );
+    await source.undoLastMigration();
     await source.undoLastMigration();
     expect(
       await source.query(`SELECT "requestId", "before", "after" FROM password_policy_audit WHERE "requestId" = ?`, [
@@ -1253,6 +1258,7 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       'DurableAudit1783700000000',
       'IdentityAudit1783800000000',
       'RetirePasswordPolicyAudit1783900000000',
+      'AttractapAuditDomain1784000000000',
     ]);
   } finally {
     if (source.isInitialized) await source.destroy();

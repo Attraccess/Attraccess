@@ -87,15 +87,16 @@ export class AttractapCardHandler {
           ...(authenticationMethod === 'api-token' ? { apiTokenId: data.apiTokenId } : {}),
         },
       };
+      const enrollment = socket.state.enrollment;
       try {
         const delivered = await socket.sendMessage(
           new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO, {
             username: user.username,
           }),
         );
-        if (!delivered) socket.state.enrollment = null;
+        if (!delivered && socket.state.enrollment === enrollment) socket.state.enrollment = null;
       } catch (error) {
-        socket.state.enrollment = null;
+        if (socket.state.enrollment === enrollment) socket.state.enrollment = null;
         // Log and continue; other sockets may still deliver the event
         this.logger.debug(
           `Failed to send ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO to client ${socket.id}: ${String(error)}`,
@@ -125,6 +126,7 @@ export class AttractapCardHandler {
     }
 
     const existingCard = await this.attractapService.getNFCCardByUID(uid);
+    if (socket.state.enrollment !== enrollment) return;
     if (existingCard) {
       await socket.sendMessage(
         new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY, { error: 'CARD_ALREADY_ENROLLED' }),
@@ -137,6 +139,7 @@ export class AttractapCardHandler {
       keyNo,
       cardUID: uid,
     });
+    if (socket.state.enrollment !== enrollment) return;
 
     const keyString = this.attractapService.uint8ArrayToHexString(key);
 
@@ -167,7 +170,9 @@ export class AttractapCardHandler {
       return;
     }
 
-    const { key, keyNo, cardUID, auditPrincipal } = socket.state.enrollNewCardData;
+    const cardData = socket.state.enrollNewCardData;
+    const enrollment = socket.state.enrollment;
+    const { key, keyNo, cardUID, auditPrincipal } = cardData;
 
     if (!key || typeof key !== 'string' || !keyNo || typeof keyNo !== 'number') {
       await socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { error: 'KEY_NOT_SET' }));
@@ -193,9 +198,11 @@ export class AttractapCardHandler {
       }).catch(() => undefined);
     }
 
-    socket.state.enrollNewCardData = null;
-    socket.state.enrollment = null;
-    socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { success: true }));
+    if (socket.state.enrollNewCardData === cardData) {
+      socket.state.enrollNewCardData = null;
+      if (socket.state.enrollment === enrollment) socket.state.enrollment = null;
+      socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { success: true }));
+    }
   }
 
   // Reader actively cancelled (user pressed cancel) or the enrollment timed out.
@@ -232,14 +239,13 @@ export class AttractapCardHandler {
     if (!socket) {
       throw new Error(`Reader not connected: ${data.readerId}`);
     }
-    if (socket.state.enrollment || socket.state.resetNfcCardData) {
-      throw new Error(`Reader already has an active card operation: ${data.readerId}`);
-    }
-
     const nfcCard = await this.attractapService.getNFCCardByID(data.cardId);
 
     if (!nfcCard) {
       throw new Error(`NFC card not found: ${data.cardId}`);
+    }
+    if (socket.state.enrollment || socket.state.resetNfcCardData) {
+      throw new Error(`Reader already has an active card operation: ${data.readerId}`);
     }
 
     // Hand the reader everything it needs to reset the card in one go: the
@@ -257,6 +263,7 @@ export class AttractapCardHandler {
         ...(data.authenticationMethod === 'api-token' ? { apiTokenId: data.apiTokenId } : {}),
       },
     };
+    const reset = socket.state.resetNfcCardData;
 
     try {
       const delivered = await socket.sendMessage(
@@ -266,10 +273,11 @@ export class AttractapCardHandler {
           key: nfcCard.key,
         }),
       );
-      if (!delivered) socket.state.resetNfcCardData = null;
+      if (!delivered && socket.state.resetNfcCardData === reset) socket.state.resetNfcCardData = null;
     } catch (error) {
-      socket.state.resetNfcCardData = null;
+      if (socket.state.resetNfcCardData === reset) socket.state.resetNfcCardData = null;
       this.logger.debug(`Failed to send RESET_NFC_CARD to client ${socket.id}: ${String(error)}`);
+      throw error;
     }
   }
 
@@ -289,7 +297,8 @@ export class AttractapCardHandler {
       return;
     }
 
-    const { cardId, auditPrincipal } = socket.state.resetNfcCardData;
+    const reset = socket.state.resetNfcCardData;
+    const { cardId, auditPrincipal } = reset;
 
     // The card was wiped back to the factory key on the reader; drop the DB
     // record so the (now blank) card is no longer recognised.
@@ -303,8 +312,10 @@ export class AttractapCardHandler {
       }).catch(() => undefined);
     }
 
-    socket.state.resetNfcCardData = null;
-    socket.sendMessage(new AttractapEvent(AttractapEventType.RESET_NFC_CARD, { success: true }));
+    if (socket.state.resetNfcCardData === reset) {
+      socket.state.resetNfcCardData = null;
+      socket.sendMessage(new AttractapEvent(AttractapEventType.RESET_NFC_CARD, { success: true }));
+    }
   }
 
   // Reader actively cancelled (user pressed cancel) or the reset timed out.
