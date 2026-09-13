@@ -162,3 +162,4 @@ export * from './1783900000000-retire-password-policy-audit';
 export * from './1784000000000-attractap-audit-domain';
 export * from './1765442000000-form-field-position';
 export * from './1783700000000-refresh-default-email-layout';
+export * from './1784100000000-full-audit-domains';

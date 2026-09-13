@@ -141,4 +141,52 @@ describe('persisted audit names', () => {
       }),
     ]);
   });
+  it('keeps recorded SSO provider names after deletion and labels provisioning targets as users', async () => {
+    await source.getRepository(AuditLog).insert([
+      {
+        at: new Date(),
+        domain: 'sso',
+        pluginId: null,
+        action: 'sso.provider.deleted',
+        operationId: randomUUID(),
+        actorId: 7,
+        authenticationMethod: 'session',
+        apiTokenId: null,
+        outcome: 'succeeded',
+        subjectType: 'sso.provider',
+        subjectId: 7,
+        details: { before: JSON.stringify({ id: 7, name: 'Former identity provider' }), after: 'null' },
+      },
+      {
+        at: new Date(),
+        domain: 'sso',
+        pluginId: null,
+        action: 'sso.provisioning.user_created',
+        operationId: randomUUID(),
+        actorId: null,
+        authenticationMethod: null,
+        apiTokenId: null,
+        outcome: 'succeeded',
+        subjectType: 'user',
+        subjectId: 7,
+        details: {},
+      },
+    ]);
+    const { items } = await controller.list({ domain: 'sso', limit: 50 });
+    expect(items.find((entry) => entry.subjectType === 'sso.provider')).toMatchObject({
+      subjectLabel: 'Former identity provider',
+      subjectLabelSource: 'recorded',
+    });
+    expect(items.find((entry) => entry.subjectType === 'user')).toMatchObject({
+      subjectLabel: 'Current admin',
+      subjectLabelSource: 'current',
+    });
+    expect(JSON.stringify(items)).not.toContain('private');
+    await source.getRepository(User).delete(7);
+    const deleted = await controller.list({ domain: 'sso', limit: 50 });
+    expect(deleted.items.find((entry) => entry.subjectType === 'user')?.subjectLabel).toBeUndefined();
+    expect(deleted.items.find((entry) => entry.subjectType === 'sso.provider')?.subjectLabel).toBe(
+      'Former identity provider',
+    );
+  });
 });

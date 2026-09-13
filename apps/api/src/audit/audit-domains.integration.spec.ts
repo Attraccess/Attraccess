@@ -7,7 +7,7 @@ import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
-import { AuditLog, Setting, entities } from '@attraccess/database-entities';
+import { AuditLog, Setting, SSOProviderType, entities } from '@attraccess/database-entities';
 import * as migrations from '../database/migrations';
 import { AuditController } from './audit.controller';
 import { AuditService } from './audit.service';
@@ -19,6 +19,7 @@ import { SessionService } from '../users-and-auth/auth/session.service';
 import { TwoFactorService } from '../users-and-auth/auth/two-factor.service';
 import { ApiTokenService } from '../users-and-auth/auth/api-token/api-token.service';
 import { RbacService } from '../users-and-auth/rbac/rbac.service';
+import { ssoAuditSnapshot } from '../users-and-auth/auth/sso/sso-audit-snapshot';
 import { AuthAuditLogger } from '../users-and-auth/rate-limiting/auth-audit.logger';
 
 interface DomainScenario {
@@ -92,6 +93,84 @@ const scenarios: DomainScenario[] = [
         subjectType: 'mqtt-server',
         subjectId: 104,
         details: { serverName: 'Workshop broker', host: 'mqtt.example.test', port: 1883, useTls: 0 },
+      }),
+  },
+  {
+    domain: 'identity',
+    action: 'identity.user_updated',
+    subjectType: 'identity.user',
+    subjectId: 105,
+    emit: (audit) =>
+      audit.recordIdentity({
+        action: 'user_updated',
+        operationId: randomUUID(),
+        actorId: 42,
+        authenticationMethod: 'session',
+        outcome: 'succeeded',
+        subjectType: 'identity.user',
+        subjectId: 105,
+        details: { field: 'username' },
+        request: { ipAddress: '2001:db8::1', userAgent: 'Audit verification' },
+      }),
+  },
+  {
+    domain: 'project',
+    action: 'project.created',
+    subjectType: 'project',
+    subjectId: 106,
+    emit: (audit) =>
+      audit.recordProject({
+        action: 'project.created',
+        actorId: 42,
+        subjectType: 'project',
+        subjectId: 106,
+        details: { projectId: 106, 'after.name': 'Workshop project', 'after.hasLogo': 0 },
+      }),
+  },
+  {
+    domain: 'attractap',
+    action: 'attractap.reader.deregistered',
+    subjectType: 'attractap.reader',
+    subjectId: 107,
+    emit: (audit) =>
+      audit.recordAttractap({
+        action: 'reader.deregistered',
+        actorId: 42,
+        authenticationMethod: 'session',
+        subjectId: 107,
+        details: { source: 'admin-api' },
+      }),
+  },
+  {
+    domain: 'sso',
+    action: 'sso.provider.created',
+    subjectType: 'sso.provider',
+    subjectId: 108,
+    emit: (audit) =>
+      audit.recordSso({
+        action: 'sso.provider.created',
+        operationId: randomUUID(),
+        actorId: 42,
+        authenticationMethod: 'session',
+        subject: { type: 'sso.provider', id: 108 },
+        details: {
+          before: 'null',
+          after: ssoAuditSnapshot({
+            id: 108,
+            name: 'Workshop identity provider',
+            type: SSOProviderType.OIDC,
+            oidcConfiguration: {
+              issuer: 'https://idp.example.test',
+              authorizationURL: 'https://idp.example.test/authorize',
+              tokenURL: 'https://idp.example.test/token',
+              userInfoURL: 'https://idp.example.test/userinfo',
+              clientId: 'workshop',
+              clientSecret: 'never-record-this-secret',
+              scopes: ['email'],
+              roleMappings: null,
+            },
+          } as never),
+        },
       }),
   },
 ];
@@ -268,5 +347,108 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
     await audit.cleanup();
     expect(await source.getRepository(AuditLog).findOneBy({ id: expired.id })).toBeNull();
     expect(scenarioEntries(await source.getRepository(AuditLog).find())).toHaveLength(scenarios.length);
+  });
+  it('keeps representative credential-bearing inputs out of stored and exported details', async () => {
+    const secret = 'audit-security-sentinel-secret';
+    await emitAll();
+    await audit.record({
+      pluginId: 'abcdefghijklmnopqrstu',
+      action: 'wago.publication',
+      operationId: randomUUID(),
+      principal: { userId: 42, authenticationMethod: 'session' },
+      outcome: 'succeeded',
+      subject: { type: 'wago.controller', id: 102 },
+      details: { password: secret },
+    } as never);
+    await audit.recordResource({
+      action: 'maintenance_schedule.updated',
+      actorId: 42,
+      subjectId: 101,
+      details: { scheduleId: 12, password: secret },
+    } as never);
+    await audit.recordIdentity({
+      action: 'user_updated',
+      operationId: randomUUID(),
+      actorId: 42,
+      outcome: 'succeeded',
+      subjectType: 'identity.user',
+      subjectId: 105,
+      details: { password: secret },
+    });
+    await audit.recordProject({
+      action: 'project.created',
+      actorId: 42,
+      subjectType: 'project',
+      subjectId: 106,
+      details: { projectId: 106, invitationToken: secret },
+    } as never);
+    await audit.recordAdministration({
+      action: 'mqtt_server.created',
+      actorId: 42,
+      subjectType: 'mqtt-server',
+      subjectId: 104,
+      details: { password: secret },
+    } as never);
+    await audit.recordAttractap({
+      action: 'card.linked',
+      actorId: 42,
+      authenticationMethod: 'session',
+      subjectId: 107,
+      details: { source: 'reader-enrollment', cardKey: secret },
+    } as never);
+    await audit.recordSso({
+      action: 'sso.provider.created',
+      operationId: randomUUID(),
+      actorId: 42,
+      authenticationMethod: 'session',
+      subject: { type: 'sso.provider', id: 108 },
+      details: {
+        before: 'null',
+        after: JSON.stringify({
+          id: 108,
+          name: 'Unsafe provider',
+          type: 'oidc',
+          configuration: { clientSecret: secret },
+        }),
+      },
+    });
+    // Billing projects its own scalar fields and never copies provider payloads.
+    await audit.recordBillingTransaction({
+      transactionId: 109,
+      userId: 42,
+      initiatorId: 42,
+      amount: 125,
+      status: 'completed',
+      source: 'manual',
+      providerPayload: { token: secret },
+    } as never);
+    const { body } = await read().expect(200);
+    expect(body.items).toHaveLength(scenarios.length + 1);
+    expect(JSON.stringify(body)).not.toContain(secret);
+    expect(JSON.stringify(body)).not.toContain('never-record-this-secret');
+    expect(JSON.stringify(await source.getRepository(AuditLog).find())).not.toContain(secret);
+  });
+
+  it('records password-policy snapshots for valid generated role keys ending in a separator', async () => {
+    const role = `${'a'.repeat(79)}-`;
+    await expect(
+      audit.recordIdentity({
+        action: 'password_policy_override_updated',
+        operationId: randomUUID(),
+        actorId: 42,
+        authenticationMethod: 'session',
+        outcome: 'succeeded',
+        subjectType: 'identity.password_policy',
+        subjectId: 110,
+        details: {
+          role,
+          before: JSON.stringify({ role, minLength: 8 }),
+          after: JSON.stringify({ role, minLength: 12 }),
+        },
+      }),
+    ).resolves.toEqual({ status: 'recorded' });
+    await read({ domain: 'identity', action: 'identity.password_policy_override_updated' })
+      .expect(200)
+      .expect(({ body }) => expect(body.items).toHaveLength(1));
   });
 });

@@ -565,11 +565,19 @@ export function AuditLogSection() {
                         {actor(entry, t)} · {target(entry, t)}
                       </Card.Description>
                     </Card.Header>
-                    <Card.Footer>
+                    <Card.Footer className="justify-between">
                       <Button size="sm" variant="ghost" onPress={() => setSelected(entry)}>
                         {t('inspect')}
                         <ChevronRightIcon size={16} />
                       </Button>
+                      <Chip
+                        size="sm"
+                        color={
+                          entry.outcome === 'failed' ? 'danger' : entry.outcome === 'succeeded' ? 'success' : 'default'
+                        }
+                      >
+                        {t(`outcomes.${entry.outcome}`)}
+                      </Chip>
                     </Card.Footer>
                   </Card>
                 ))}

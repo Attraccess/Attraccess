@@ -115,7 +115,8 @@ describe('audit admin workflows', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Password')).toBeInTheDocument();
     expect(within(dialog).getAllByText('Not recorded')).toHaveLength(2);
-    expect(within(dialog).getByText('["password"]')).toBeInTheDocument();
+    const changedFields = within(dialog).getByText(/\[\s*"password"\s*\]/);
+    expect(JSON.parse(changedFields.textContent ?? '')).toEqual(['password']);
   });
   it('keeps malformed change metadata visible and identifies current names in the event details', async () => {
     list.mockResolvedValue({
