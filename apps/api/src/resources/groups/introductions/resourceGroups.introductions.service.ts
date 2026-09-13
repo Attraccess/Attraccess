@@ -89,9 +89,9 @@ export class ResourceGroupsIntroductionsService {
     nextStatus: IntroductionHistoryAction,
     data?: UpdateResourceGroupIntroductionDto,
     tutorUserId?: number,
-    performedByUserId?: number,
-    authenticationMethod?: 'session' | 'api-token',
-    apiTokenId?: number,
+    performedByUserId?: number | null,
+    authenticationMethod?: 'session' | 'api-token' | null,
+    apiTokenId?: number | null,
   ): Promise<ResourceIntroductionHistoryItem> {
     let existingIntroduction = await this.resourceIntroductionRepository.findOne({
       where: {
@@ -129,7 +129,7 @@ export class ResourceGroupsIntroductionsService {
       await this.audit.recordResource({
         action: nextStatus === IntroductionHistoryAction.GRANT ? 'introduction.granted' : 'introduction.revoked',
         actorId: performedByUserId, authenticationMethod, apiTokenId, subjectType: 'resource_group', subjectId: groupId,
-        details: { recipientUserId: userId },
+        details: { recipientUserId: userId, ...(tutorUserId === undefined ? {} : { tutorUserId }) },
       });
     }
     return savedHistoryItem;
@@ -149,7 +149,12 @@ export class ResourceGroupsIntroductionsService {
     groupId: number,
     userId: number,
     data?: UpdateResourceGroupIntroductionDto,
-    options?: { tutorUserId?: number; performedByUserId?: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+    options?: {
+      tutorUserId?: number;
+      performedByUserId?: number | null;
+      authenticationMethod?: 'session' | 'api-token' | null;
+      apiTokenId?: number | null;
+    },
   ): Promise<ResourceIntroductionHistoryItem> {
     return await this.updateIntroductionStatus(
       groupId,
@@ -167,7 +172,11 @@ export class ResourceGroupsIntroductionsService {
     groupId: number,
     userId: number,
     data?: UpdateResourceGroupIntroductionDto,
-    options?: { performedByUserId?: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+    options?: {
+      performedByUserId?: number | null;
+      authenticationMethod?: 'session' | 'api-token' | null;
+      apiTokenId?: number | null;
+    },
   ): Promise<ResourceIntroductionHistoryItem> {
     return await this.updateIntroductionStatus(
       groupId,

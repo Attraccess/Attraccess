@@ -220,7 +220,7 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
             action: snapshot.action,
             operationId: snapshot.operationId,
             actorId: snapshot.actorId,
-            authenticationMethod: snapshot.authenticationMethod ?? 'session',
+            authenticationMethod: snapshot.actorId === null ? null : (snapshot.authenticationMethod ?? 'session'),
             apiTokenId: snapshot.apiTokenId ?? null,
             outcome: 'succeeded',
             subjectType: snapshot.subjectType ?? 'resource',

@@ -173,8 +173,8 @@ export class ResourceGroupsService {
 
     const savedResourceGroup = await this.resourceGroupRepository.save({
       ...resourceGroup,
-      name: updateDto.name,
-      description: updateDto.description,
+      name: updateDto.name !== undefined ? updateDto.name : resourceGroup.name,
+      description: updateDto.description !== undefined ? updateDto.description : resourceGroup.description,
       retrainingMaxAgeDays:
         updateDto.retrainingMaxAgeDays !== undefined ? updateDto.retrainingMaxAgeDays : resourceGroup.retrainingMaxAgeDays,
       retrainingMaxInactivityDays:

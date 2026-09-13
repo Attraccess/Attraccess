@@ -74,7 +74,9 @@ export class SupervisedUsageAutoPromotionListener {
         `after ${count} supervised session(s) (threshold ${threshold})`,
     );
     await this.resourceIntroductionsService.grant(resourceId, userId, undefined, {
-      tutorUserId: supervisorUserId, performedByUserId: supervisorUserId,
+      tutorUserId: supervisorUserId,
+      performedByUserId: null,
+      authenticationMethod: null,
     });
   }
 
@@ -113,7 +115,9 @@ export class SupervisedUsageAutoPromotionListener {
         `after ${count} supervised session(s) across ${resourceIds.length} resource(s) (threshold ${threshold})`,
     );
     await this.resourceGroupsIntroductionsService.grant(groupId, userId, undefined, {
-      tutorUserId: supervisorUserId, performedByUserId: supervisorUserId,
+      tutorUserId: supervisorUserId,
+      performedByUserId: null,
+      authenticationMethod: null,
     });
   }
 

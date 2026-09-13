@@ -100,7 +100,10 @@ describe('audit storage safe snapshot', () => {
     expect(projectResourceAuditEvent(resourceEvent)).toEqual(resourceEvent);
     expect(projectResourceAuditEvent({ ...resourceEvent, details: { password: 'raw-secret' } })).toBeNull();
     const deletion = {
-      action: 'resource.deleted' as const, operationId: randomUUID(), actorId: 42, subjectId: 7,
+      action: 'resource.deleted' as const,
+      operationId: randomUUID(),
+      actorId: 42,
+      subjectId: 7,
       details: { 'before.name': 'Lathe', 'before.type': 'machine' },
     };
     expect(projectResourceAuditEvent(deletion)).toEqual(deletion);
@@ -118,5 +121,19 @@ describe('audit storage safe snapshot', () => {
         details: { role: `${'a'.repeat(79)}-` },
       }),
     ).toMatchObject({ details: { role: `${'a'.repeat(79)}-` } });
+  });
+
+  it('allows explicitly system-originated introductions without synthesizing a user session', () => {
+    const event = {
+      action: 'introduction.granted' as const,
+      operationId: randomUUID(),
+      actorId: null,
+      authenticationMethod: null,
+      subjectId: 7,
+      details: { recipientUserId: 3, tutorUserId: 9 },
+    };
+
+    expect(projectResourceAuditEvent(event)).toEqual(event);
+    expect(projectResourceAuditEvent({ ...event, authenticationMethod: 'session' })).toBeNull();
   });
 });
