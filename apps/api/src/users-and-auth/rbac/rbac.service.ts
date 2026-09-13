@@ -137,7 +137,8 @@ export class RbacService {
         .toLowerCase()
         .trim()
         .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
+        .replace(/^-/, '')
+        .replace(/-$/, '')
         .slice(0, 80) || 'role';
     let candidate = base;
     for (let suffix = 2; await this.roleRepository.existsBy({ key: candidate }); suffix++) {
