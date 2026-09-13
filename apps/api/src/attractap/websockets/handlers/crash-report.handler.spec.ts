@@ -13,6 +13,7 @@ describe('AttractapCrashReportHandler', () => {
   };
   let mockAttractapService: { createCrashReport: jest.Mock };
   let mockMetricsService: { attractapCrashReportsTotal: { inc: jest.Mock } };
+  let mockAudit: { recordAttractap: jest.Mock };
 
   beforeEach(() => {
     handler = Object.create(AttractapCrashReportHandler.prototype);
@@ -38,9 +39,11 @@ describe('AttractapCrashReportHandler', () => {
     mockMetricsService = {
       attractapCrashReportsTotal: { inc: jest.fn() },
     };
+    mockAudit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
 
     (handler as any).attractapService = mockAttractapService;
     (handler as any).metricsService = mockMetricsService;
+    (handler as any).audit = mockAudit;
   });
 
   describe('handleCrashReport - invalid payload guard', () => {
@@ -133,6 +136,10 @@ describe('AttractapCrashReportHandler', () => {
 
       expect(mockAttractapService.createCrashReport).toHaveBeenCalledWith(42, payload);
       expect(mockMetricsService.attractapCrashReportsTotal.inc).toHaveBeenCalled();
+      expect(mockAudit.recordAttractap).toHaveBeenCalledWith({
+        action: 'reader.crash_reported', actorId: null, authenticationMethod: null, subjectId: 42,
+        details: { source: 'reader-websocket', resetReason: 'PANIC', hasCoredump: false },
+      });
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -161,6 +168,17 @@ describe('AttractapCrashReportHandler', () => {
             payload: { received: true, id: 'report-min' },
           }),
         }),
+      );
+    });
+
+    it('maps unknown reset reasons to UNKNOWN before auditing', async () => {
+      const payload = { resetReason: 'diagnostic-secret-123' };
+      mockAttractapService.createCrashReport.mockResolvedValue({ id: 'report-unknown', ...payload });
+
+      await handler.handleCrashReport(mockSocket as any, { payload } as AttractapEvent['data']);
+
+      expect(mockAudit.recordAttractap).toHaveBeenCalledWith(
+        expect.objectContaining({ details: { source: 'reader-websocket', resetReason: 'UNKNOWN', hasCoredump: false } }),
       );
     });
   });

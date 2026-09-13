@@ -62,6 +62,8 @@ export class AttractapController {
     await this.attractapGateway.startEnrollOfNewNfcCard({
       readerId: enrollData.readerId,
       userId: req.user.id,
+      authenticationMethod: req.user.authenticationMethod ?? 'session',
+      ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
     });
 
     return {
@@ -86,6 +88,8 @@ export class AttractapController {
       readerId: resetData.readerId,
       cardId: resetData.cardId,
       userId: req.user.id,
+      authenticationMethod: req.user.authenticationMethod ?? 'session',
+      ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
     });
 
     return {
@@ -198,7 +202,14 @@ export class AttractapController {
   @ApiOperation({ summary: 'Delete a reader', operationId: 'deleteReader' })
   @ApiParam({ name: 'readerId', description: 'The ID of the reader to delete', example: 1 })
   @ApiResponse({ status: 200, description: 'Reader deleted successfully' })
-  async deleteReader(@Param('readerId', ParseIntPipe) readerId: number): Promise<void> {
-    await this.attractapService.deleteReader(readerId);
+  async deleteReader(@Param('readerId', ParseIntPipe) readerId: number, @Req() req: AuthenticatedRequest): Promise<void> {
+    const deleted = await this.attractapService.deleteReader(readerId);
+    if (deleted) {
+      await this.attractapService.recordReaderDeregistration(readerId, {
+        userId: req.user.id,
+        authenticationMethod: req.user.authenticationMethod ?? 'session',
+        ...(req.user.authenticationMethod === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
+      });
+    }
   }
 }

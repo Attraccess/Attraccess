@@ -57,7 +57,7 @@ const event = (): PluginAuditEvent & { pluginId: string } => ({
   subject: { type: 'wago.controller', id: 7 },
   details: { revision: 2 },
 });
-const config = { enabled: true, domains: ['resource', 'wago', 'identity'], retention_days: 90 };
+const config = { enabled: true, domains: ['attractap', 'resource', 'wago', 'identity'], retention_days: 90 };
 
 describe('durable audit SQLite', () => {
   let directory: string;
@@ -267,6 +267,33 @@ describe('durable audit SQLite', () => {
         source: 'sumup-topup',
       }),
     ).toEqual({ status: 'unavailable' });
+  });
+
+  it('records and filters Attractap events, respecting global and domain suppression', async () => {
+    await store.setPlainSetting('audit', 'domains', '["attractap"]');
+    await service.recordAttractap({
+      action: 'reader.crash_reported', actorId: null, authenticationMethod: null, subjectId: 7,
+      details: { source: 'reader-websocket', resetReason: 'PANIC', hasCoredump: false },
+    });
+    expect((await service.list({ domain: 'attractap', subjectType: 'attractap.reader', limit: 1 })).items[0]).toMatchObject({
+      action: 'attractap.reader.crash_reported', actorId: null, authenticationMethod: null,
+      subjectId: 7, details: { source: 'reader-websocket', resetReason: 'PANIC', hasCoredump: false },
+    });
+
+    await store.setPlainSetting('audit', 'domains', '["resource"]');
+    await service.recordAttractap({
+      action: 'reader.registered', actorId: null, authenticationMethod: null, subjectId: 8,
+      details: { source: 'reader-websocket' },
+    });
+    expect((await service.list({ domain: 'attractap', action: 'attractap.reader.registered', limit: 1 })).items).toHaveLength(0);
+
+    await store.setPlainSetting('audit', 'domains', '["attractap"]');
+    await store.setPlainSetting('audit', 'enabled', 'false');
+    await service.recordAttractap({
+      action: 'reader.registered', actorId: null, authenticationMethod: null, subjectId: 9,
+      details: { source: 'reader-websocket' },
+    });
+    expect((await service.list({ domain: 'attractap', subjectId: 9, limit: 1 })).items).toHaveLength(0);
   });
 
   it('records a billing event only after its originating transaction commits', async () => {
