@@ -67,6 +67,7 @@ describe('ProjectsService', () => {
       save: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+      findOneByOrFail: jest.fn(),
     } as unknown as jest.Mocked<Repository<Project>>;
 
     resourceUsageRepository = {
@@ -346,19 +347,25 @@ describe('ProjectsService', () => {
       });
     });
 
-    it('does not audit lifecycle requests that did not transition a row', async () => {
+    it('returns the refetched lifecycle state without recording a duplicate event', async () => {
       const archivedProject = { id: 3, name: 'Archived', archivedAt: new Date(), logo: null } as Project;
       const activeProject = { id: 4, name: 'Active', archivedAt: null, logo: null } as Project;
+      const concurrentlyArchived = { id: 3, name: 'Archived', archivedAt: new Date(), logo: null } as Project;
+      const concurrentlyUnarchived = { id: 4, name: 'Active', archivedAt: null, logo: null } as Project;
       projectAccessService.ensureOwner.mockResolvedValueOnce(archivedProject).mockResolvedValueOnce(activeProject);
       projectRepository.update.mockResolvedValue({ affected: 0 } as never);
+      projectRepository.findOneByOrFail.mockResolvedValueOnce(concurrentlyArchived).mockResolvedValueOnce(concurrentlyUnarchived);
 
-      await service.archiveOne(2, 3);
-      await service.unarchiveOne(2, 4);
+      expect(await service.archiveOne(2, 3)).toBe(concurrentlyArchived);
+      expect(await service.unarchiveOne(2, 4)).toBe(concurrentlyUnarchived);
 
       expect(projectRepository.save).not.toHaveBeenCalled();
       expect(projectRepository.update).toHaveBeenCalledTimes(2);
+      expect(projectRepository.findOneByOrFail).toHaveBeenNthCalledWith(1, { id: 3 });
+      expect(projectRepository.findOneByOrFail).toHaveBeenNthCalledWith(2, { id: 4 });
       expect(audit.recordProject).not.toHaveBeenCalled();
     });
+
   });
 
   describe('membership and invitation audit events', () => {
@@ -384,6 +391,27 @@ describe('ProjectsService', () => {
         action: 'project.invitation.revoked', actorId: 2, authenticationMethod: 'session', apiTokenId: undefined, subjectType: 'project.invitation', subjectId: 7,
         details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
       });
+    });
+
+    it('uses request foreign keys when auditing a newly created invitation', async () => {
+      const project = { id: 3, name: 'Project', owner: { id: 2 } } as Project;
+      const savedInvitation = { id: 7 } as ProjectInvitation;
+      const invitation = {
+        id: 7, projectId: 3, inviterId: 2, invitedUserId: 9, requestedRole: 'viewer', status: 'pending',
+      } as ProjectInvitation;
+      projectAccessService.ensureOwner.mockResolvedValue(project);
+      userRepository.findOne.mockResolvedValue({ id: 9 } as User);
+      projectMemberRepository.findOne.mockResolvedValue(null);
+      projectInvitationRepository.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(invitation);
+      projectInvitationRepository.save.mockResolvedValue(savedInvitation);
+
+      await service.createProjectInvitation(2, 3, 9);
+
+      expect(audit.recordProject).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'project.invitation.sent',
+        subjectId: 7,
+        details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
+      }));
     });
 
     it('records the owner and affected membership after removal', async () => {
