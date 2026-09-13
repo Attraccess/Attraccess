@@ -36,7 +36,9 @@ export class ResourceIntroductionsController {
     @Body() data: UpdateResourceIntroductionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem> {
-    return await this.resourceIntroductionsService.grant(resourceId, userId, data, { performedByUserId: req.user.id });
+    return await this.resourceIntroductionsService.grant(resourceId, userId, data, {
+      performedByUserId: req.user.id, authenticationMethod: req.user.authenticationMethod, apiTokenId: req.user.apiTokenId,
+    });
   }
 
   @Delete('/:userId/revoke')
@@ -56,7 +58,9 @@ export class ResourceIntroductionsController {
     @Body() data: UpdateResourceIntroductionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem> {
-    return await this.resourceIntroductionsService.revoke(resourceId, userId, data, { performedByUserId: req.user.id });
+    return await this.resourceIntroductionsService.revoke(resourceId, userId, data, {
+      performedByUserId: req.user.id, authenticationMethod: req.user.authenticationMethod, apiTokenId: req.user.apiTokenId,
+    });
   }
 
   @Get('/:userId/history')

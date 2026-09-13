@@ -3,6 +3,16 @@ import { isIP } from 'node:net';
 
 export interface ResourceAuditEvent {
   action:
+    | 'resource.created'
+    | 'resource.updated'
+    | 'resource.deleted'
+    | 'resource_group.created'
+    | 'resource_group.updated'
+    | 'resource_group.deleted'
+    | 'resource_group.resource_added'
+    | 'resource_group.resource_removed'
+    | 'introduction.granted'
+    | 'introduction.revoked'
     | 'maintenance_schedule.created'
     | 'maintenance_schedule.updated'
     | 'maintenance_schedule.deleted'
@@ -12,6 +22,7 @@ export interface ResourceAuditEvent {
   actorId: number;
   authenticationMethod?: 'session' | 'api-token';
   apiTokenId?: number;
+  subjectType?: 'resource' | 'resource_group';
   subjectId: number;
   details: Record<string, string | number>;
 }
@@ -151,39 +162,57 @@ export function projectAuditEvent(input: unknown): (PluginAuditEvent & { pluginI
 
 export const AUDIT_ACTIONS = Object.keys(policies).map((action) => `wago.${action}`);
 
-const resourceActions = new Set<ResourceAuditEvent['action']>([
+export const RESOURCE_AUDIT_ACTIONS: ResourceAuditEvent['action'][] = [
+  'resource.created',
+  'resource.updated',
+  'resource.deleted',
+  'resource_group.created',
+  'resource_group.updated',
+  'resource_group.deleted',
+  'resource_group.resource_added',
+  'resource_group.resource_removed',
+  'introduction.granted',
+  'introduction.revoked',
   'maintenance_schedule.created',
   'maintenance_schedule.updated',
   'maintenance_schedule.deleted',
   'supervision.approved',
   'supervision.rejected',
-]);
-const resourceDetailFields = new Set([
-  'scheduleId',
-  'enabled',
-  'triggerType',
-  'name',
-  'usageDuration',
-  'usageUnit',
-  'usageThreshold',
-  'requesterUserId',
-  'supervisorUserId',
-  'requestId',
-]);
+];
+const resourceActions = new Set<ResourceAuditEvent['action']>(RESOURCE_AUDIT_ACTIONS);
+const resourceDetailFields: Partial<Record<ResourceAuditEvent['action'], readonly string[]>> = {
+  'resource.created': ['after.name', 'after.type'],
+  'resource.updated': ['before.name', 'after.name', 'before.type', 'after.type', 'changedFields'],
+  'resource.deleted': ['before.name', 'before.type'],
+  'resource_group.created': ['after.name', 'after.isHidden'],
+  'resource_group.updated': ['before.name', 'after.name', 'before.isHidden', 'after.isHidden', 'changedFields'],
+  'resource_group.deleted': ['before.name', 'before.isHidden'],
+  'resource_group.resource_added': ['resourceId'],
+  'resource_group.resource_removed': ['resourceId'],
+  'introduction.granted': ['recipientUserId'],
+  'introduction.revoked': ['recipientUserId'],
+  'maintenance_schedule.created': ['scheduleId', 'enabled', 'triggerType', 'name', 'usageDuration', 'usageUnit', 'usageThreshold'],
+  'maintenance_schedule.updated': ['scheduleId', 'enabled', 'triggerType', 'name', 'usageDuration', 'usageUnit', 'usageThreshold'],
+  'maintenance_schedule.deleted': ['scheduleId', 'enabled', 'triggerType', 'name', 'usageDuration', 'usageUnit', 'usageThreshold'],
+  'supervision.approved': ['requesterUserId', 'supervisorUserId', 'requestId'],
+  'supervision.rejected': ['requesterUserId', 'supervisorUserId', 'requestId'],
+};
 
 export function projectResourceAuditEvent(input: ResourceAuditEvent): ResourceAuditEvent | null {
   if (
     !resourceActions.has(input.action) ||
     !uuid(input.operationId) ||
-    !positive(input.actorId) ||
-    !positive(input.subjectId)
+    !positive(input.subjectId) ||
+    (input.subjectType !== undefined && input.subjectType !== 'resource' && input.subjectType !== 'resource_group')
   ) {
     return null;
   }
-  const details = dataFields(input.details, [...resourceDetailFields]);
+  const allowedFields = resourceDetailFields[input.action];
+  if (!allowedFields) return null;
+  const details = dataFields(input.details, allowedFields);
   if (!details) return null;
   for (const [key, value] of Object.entries(details)) {
-    if (!resourceDetailFields.has(key) || (typeof value !== 'string' && typeof value !== 'number')) return null;
+    if (!allowedFields.includes(key) || (typeof value !== 'string' && typeof value !== 'number')) return null;
   }
   if (Buffer.byteLength(JSON.stringify(details), 'utf8') > 4096) return null;
   if (
