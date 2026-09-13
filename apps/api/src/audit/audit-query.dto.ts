@@ -43,7 +43,7 @@ export class AuditQueryDto {
   @IsIn(ALL_AUDIT_ACTIONS)
   action?: string;
 
-  @ApiPropertyOptional({ default: 50, minimum: 1, maximum: 100 })
+  @ApiPropertyOptional({ type: Number, default: 50, minimum: 1, maximum: 100 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

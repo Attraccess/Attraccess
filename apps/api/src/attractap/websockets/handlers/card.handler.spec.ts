@@ -497,7 +497,79 @@ describe('AttractapCardHandler', () => {
     });
   });
 
+  it.each(['lookup', 'key generation'])('does not revive cancelled enrollment after %s', async (stage) => {
+    const socket = createMockSocket();
+    socket.state.enrollment = { userId: 1, auditPrincipal: { userId: 1, authenticationMethod: 'session' } };
+    let finish!: (value: any) => void;
+    const pendingLookup = new Promise((resolve) => { finish = resolve; });
+    (stage === 'lookup' ? attractapService.getNFCCardByUID : attractapService.generateNTAG424Key)
+      .mockReturnValueOnce(pendingLookup);
+    const pending = handler.onEnrollNewCardRequestNFCKey(socket, { payload: { uid: 'abc', keyNo: 1 } } as any);
+    await new Promise(setImmediate);
+    await handler.onEnrollNewCardCancel(socket);
+    finish(stage === 'lookup' ? null : new Uint8Array([1, 2, 3]));
+    await pending;
+    expect(socket.state.enrollNewCardData).toBeNull();
+    expect(socket.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('preserves a newer enrollment while auditing an older committed card', async () => {
+    const socket = createMockSocket();
+    websocketService.sockets.set(socket.id, socket);
+    const principal = { userId: 1, authenticationMethod: 'api-token', apiTokenId: 9 };
+    socket.state.enrollment = { userId: 1, auditPrincipal: principal };
+    socket.state.enrollNewCardData = { key: 'deadbeef', keyNo: 1, cardUID: 'abc', auditPrincipal: principal };
+    let finish!: (value: { id: number }) => void;
+    attractapService.createNFCCard.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    const pending = handler.onEnrollNewCard(socket, { payload: { success: true } } as any);
+    await new Promise(setImmediate);
+    await handler.onEnrollNewCardCancel(socket);
+    usersService.findOne.mockResolvedValueOnce({ id: 2, username: 'second' });
+    await handler.startEnrollOfNewNfcCard({ readerId: 42, userId: 2 });
+    const replacement = socket.state.enrollment;
+    finish({ id: 8 });
+    await pending;
+    expect(socket.state.enrollment).toBe(replacement);
+    expect(replacement.userId).toBe(2);
+    expect(audit.recordAttractap).toHaveBeenCalledTimes(1);
+    expect(audit.recordAttractap).toHaveBeenCalledWith(expect.objectContaining({ actorId: 1, apiTokenId: 9, subjectId: 8 }));
+    expect(socket.sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not clear a newer enrollment when the previous send fails late', async () => {
+    const socket = createMockSocket();
+    websocketService.sockets.set(socket.id, socket);
+    let finish!: (delivered: boolean) => void;
+    socket.sendMessage.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    const pending = handler.startEnrollOfNewNfcCard({ readerId: 42, userId: 1 });
+    await new Promise(setImmediate);
+    await handler.onEnrollNewCardCancel(socket);
+    await handler.startEnrollOfNewNfcCard({ readerId: 42, userId: 1 });
+    const replacement = socket.state.enrollment;
+    finish(false);
+    await pending;
+    expect(socket.state.enrollment).toBe(replacement);
+  });
+
   describe('startResetOfNfcCard', () => {
+    it('reserves once when card lookups complete concurrently', async () => {
+      const socket = createMockSocket();
+      websocketService.sockets.set(socket.id, socket);
+      usersService.findOne.mockImplementation(({ id }) => Promise.resolve({ id, username: `user-${id}` }));
+      let finish!: (card: any) => void;
+      attractapService.getNFCCardByID
+        .mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }))
+        .mockResolvedValueOnce({ id: 8, key: 'second-key', keyNo: 2, user: mockUser });
+      const first = handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 }).catch((error) => error);
+      await new Promise(setImmediate);
+      await handler.startResetOfNfcCard({ readerId: 42, userId: 2, cardId: 8 });
+      finish({ id: 7, key: 'first-key', keyNo: 1, user: mockUser });
+      expect(await first).toEqual(expect.objectContaining({ message: 'Reader already has an active card operation: 42' }));
+      expect(socket.sendMessage).toHaveBeenCalledTimes(1);
+      await handler.onResetNfcCard(socket, { payload: { success: true } } as any);
+      expect(attractapService.deleteNFCCard).toHaveBeenCalledWith(8);
+      expect(audit.recordAttractap).toHaveBeenCalledWith(expect.objectContaining({ actorId: 2, subjectId: 8 }));
+    });
     it('throws when the reader is not found', async () => {
       attractapService.findReaderById.mockResolvedValueOnce(null);
 
@@ -557,16 +629,24 @@ describe('AttractapCardHandler', () => {
       );
     });
 
-    it.each([
-      ['returns false', jest.fn().mockResolvedValue(false)],
-      ['rejects', jest.fn().mockRejectedValue(new Error('send failed'))],
-    ])('clears reset state when sending the command %s', async (_result, sendMessage) => {
-      const socket = createMockSocket({ sendMessage });
+    it('clears reset state when sending the command returns false', async () => {
+      const socket = createMockSocket({ sendMessage: jest.fn().mockResolvedValue(false) });
       websocketService.sockets.set('socket-1', socket);
 
       await expect(
         handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 }),
       ).resolves.toBeUndefined();
+
+      expect(socket.state.resetNfcCardData).toBeNull();
+    });
+
+    it('clears reset state and propagates a send error', async () => {
+      const socket = createMockSocket({ sendMessage: jest.fn().mockRejectedValue(new Error('send failed')) });
+      websocketService.sockets.set('socket-1', socket);
+
+      await expect(
+        handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 }),
+      ).rejects.toThrow('send failed');
 
       expect(socket.state.resetNfcCardData).toBeNull();
     });
