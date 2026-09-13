@@ -10,7 +10,11 @@ const RESOURCE_AUDIT_ACTIONS = [
   'supervision.approved',
   'supervision.rejected',
 ];
-const ALL_AUDIT_ACTIONS = [...AUDIT_ACTIONS, ...RESOURCE_AUDIT_ACTIONS];
+const SSO_AUDIT_ACTIONS = [
+  'sso.provider.created', 'sso.provider.updated', 'sso.provider.deleted',
+  'sso.provisioning.sessions_revoked', 'sso.provisioning.user_deleted', 'sso.provisioning.permissions_synced',
+];
+const ALL_AUDIT_ACTIONS = [...AUDIT_ACTIONS, ...RESOURCE_AUDIT_ACTIONS, ...SSO_AUDIT_ACTIONS];
 
 const timestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
 
@@ -19,7 +23,7 @@ export class AuditQueryDto {
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  @Matches(/^(?:maintenance_schedule|supervision|wago)(?:\.[a-z_]+)*\.?$/)
+  @Matches(/^(?:maintenance_schedule|supervision|sso|wago)(?:\.[a-z_]+)*\.?$/)
   eventPrefix?: string;
 
   @ApiPropertyOptional({ description: 'Inclusive event timestamp lower bound' })
@@ -57,9 +61,9 @@ export class AuditQueryDto {
   @Max(Number.MAX_SAFE_INTEGER)
   beforeId?: number;
 
-  @ApiPropertyOptional({ enum: ['resource', 'wago'] })
+  @ApiPropertyOptional({ enum: ['resource', 'sso', 'wago'] })
   @IsOptional()
-  @IsIn(['resource', 'wago'])
+  @IsIn(['resource', 'sso', 'wago'])
   domain?: string;
 
   @ApiPropertyOptional({ enum: ['attempted', 'succeeded', 'failed'] })
@@ -88,8 +92,8 @@ export class AuditQueryDto {
   @Max(Number.MAX_SAFE_INTEGER)
   subjectId?: number;
 
-  @ApiPropertyOptional({ enum: ['resource', 'wago.controller', 'wago.commissioning'] })
+  @ApiPropertyOptional({ enum: ['resource', 'sso.provider', 'user', 'wago.controller', 'wago.commissioning'] })
   @IsOptional()
-  @IsIn(['resource', 'wago.controller', 'wago.commissioning'])
+  @IsIn(['resource', 'sso.provider', 'user', 'wago.controller', 'wago.commissioning'])
   subjectType?: string;
 }
