@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { IsISO8601, IsString, Matches, MaxLength, IsIn, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { AUDIT_ACTIONS } from './audit-policy';
+import { AUDIT_ACTIONS, SSO_AUDIT_ACTIONS } from './audit-policy';
 
 const timestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
 
@@ -10,7 +10,7 @@ export class AuditQueryDto {
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  @Matches(/^wago(?:\.[a-z_]+)*\.?$/)
+  @Matches(/^(?:wago|sso)(?:\.[a-z_]+)*\.?$/)
   eventPrefix?: string;
 
   @ApiPropertyOptional({ description: 'Inclusive event timestamp lower bound' })
@@ -27,9 +27,9 @@ export class AuditQueryDto {
   @IsISO8601({ strict: true })
   to?: string;
 
-  @ApiPropertyOptional({ enum: AUDIT_ACTIONS })
+  @ApiPropertyOptional({ enum: [...AUDIT_ACTIONS, ...SSO_AUDIT_ACTIONS] })
   @IsOptional()
-  @IsIn(AUDIT_ACTIONS)
+  @IsIn([...AUDIT_ACTIONS, ...SSO_AUDIT_ACTIONS])
   action?: string;
 
   @ApiPropertyOptional({ default: 50, minimum: 1, maximum: 100 })
@@ -48,9 +48,9 @@ export class AuditQueryDto {
   @Max(Number.MAX_SAFE_INTEGER)
   beforeId?: number;
 
-  @ApiPropertyOptional({ enum: ['wago'] })
+  @ApiPropertyOptional({ enum: ['wago', 'sso'] })
   @IsOptional()
-  @IsIn(['wago'])
+  @IsIn(['wago', 'sso'])
   domain?: string;
 
   @ApiPropertyOptional({ enum: ['attempted', 'succeeded', 'failed'] })
@@ -79,8 +79,8 @@ export class AuditQueryDto {
   @Max(Number.MAX_SAFE_INTEGER)
   subjectId?: number;
 
-  @ApiPropertyOptional({ enum: ['wago.controller', 'wago.commissioning'] })
+  @ApiPropertyOptional({ enum: ['wago.controller', 'wago.commissioning', 'sso.provider', 'user'] })
   @IsOptional()
-  @IsIn(['wago.controller', 'wago.commissioning'])
+  @IsIn(['wago.controller', 'wago.commissioning', 'sso.provider', 'user'])
   subjectType?: string;
 }

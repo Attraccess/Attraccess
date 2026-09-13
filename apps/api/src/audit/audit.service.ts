@@ -5,7 +5,7 @@ import { AuditLog } from '@attraccess/database-entities';
 import { PluginAuditEvent, PluginAuditHostProvider, PluginAuditReceipt } from '@attraccess/plugins-backend-sdk';
 import { readAuditSettings } from './audit.config';
 import { SettingsStoreService } from '../settings/settings-store.service';
-import { projectAuditEvent } from './audit-policy';
+import { projectAuditEvent, projectSsoAuditEvent, SsoAuditEvent } from './audit-policy';
 import { AuditQueryDto } from './audit-query.dto';
 
 @Injectable()
@@ -37,7 +37,8 @@ export class AuditService implements PluginAuditHostProvider, OnModuleInit, OnMo
     });
     try {
       await storage.initialize();
-      await storage.query('PRAGMA busy_timeout = 100');
+      // Audit capture is strictly best-effort; fail quickly instead of queuing behind a domain write.
+      await storage.query('PRAGMA busy_timeout = 25');
       await storage.query('PRAGMA synchronous = FULL');
       this.storage = storage;
       await this.cleanup();
@@ -91,6 +92,41 @@ export class AuditService implements PluginAuditHostProvider, OnModuleInit, OnMo
       }
     } catch {
       // Never log the event, SQLite parameters, or exception (may contain secrets).
+      return { status: 'unavailable' };
+    }
+  }
+
+  /** Records a core SSO event through the same independent, best-effort storage path as plugin events. */
+  async recordSso(event: SsoAuditEvent): Promise<PluginAuditReceipt> {
+    try {
+      const snapshot = projectSsoAuditEvent(event);
+      if (!snapshot || this.stopping || !this.storage?.isInitialized || this.pending >= 8)
+        return { status: 'unavailable' };
+      if (this.source.createQueryRunner().isTransactionActive) return { status: 'unavailable' };
+      this.pending++;
+      try {
+        const config = await readAuditSettings(this.settings);
+        if (!config.enabled || !config.domains.includes('sso') || this.stopping || this.source.createQueryRunner().isTransactionActive)
+          return { status: 'unavailable' };
+        await this.storage.getRepository(AuditLog).insert({
+          at: new Date(),
+          domain: 'sso',
+          pluginId: 'core',
+          action: snapshot.action,
+          operationId: snapshot.operationId,
+          actorId: snapshot.actorId,
+          authenticationMethod: snapshot.authenticationMethod,
+          apiTokenId: snapshot.apiTokenId ?? null,
+          outcome: 'succeeded',
+          subjectType: snapshot.subject.type,
+          subjectId: snapshot.subject.id,
+          details: snapshot.details,
+        });
+        return { status: 'recorded' };
+      } finally {
+        this.pending--;
+      }
+    } catch {
       return { status: 'unavailable' };
     }
   }

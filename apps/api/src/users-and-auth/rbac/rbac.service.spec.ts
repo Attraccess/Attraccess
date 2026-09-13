@@ -465,7 +465,9 @@ describe('RbacService', () => {
       userRoleRepo.save.mockRejectedValue(uniqueViolation);
 
       // Should NOT throw
-      await expect(service.syncSsoRoles(10, [{ roleKey: 'editor' }], SSO_TYPE, SSO_ID)).resolves.toBeUndefined();
+      await expect(service.syncSsoRoles(10, [{ roleKey: 'editor' }], SSO_TYPE, SSO_ID)).resolves.toEqual({
+        added: [], removed: [], updated: [],
+      });
     });
 
     it('handles unique constraint violation (SQLITE_CONSTRAINT) gracefully when adding', async () => {
@@ -479,7 +481,9 @@ describe('RbacService', () => {
       });
       userRoleRepo.save.mockRejectedValue(sqliteViolation);
 
-      await expect(service.syncSsoRoles(10, [{ roleKey: 'editor' }], SSO_TYPE, SSO_ID)).resolves.toBeUndefined();
+      await expect(service.syncSsoRoles(10, [{ roleKey: 'editor' }], SSO_TYPE, SSO_ID)).resolves.toEqual({
+        added: [], removed: [], updated: [],
+      });
     });
 
     it('rethrows non-unique SQLITE_CONSTRAINT errors (e.g. FK violation)', async () => {
@@ -514,7 +518,9 @@ describe('RbacService', () => {
       userRoleRepo.find.mockResolvedValue([]);
       roleRepo.findOne.mockResolvedValue(null); // unknown role key
 
-      await expect(service.syncSsoRoles(10, [{ roleKey: 'unknown-role' }], SSO_TYPE, SSO_ID)).resolves.toBeUndefined();
+      await expect(service.syncSsoRoles(10, [{ roleKey: 'unknown-role' }], SSO_TYPE, SSO_ID)).resolves.toEqual({
+        added: [], removed: [], updated: [],
+      });
       expect(userRoleRepo.save).not.toHaveBeenCalled();
     });
   });

@@ -134,3 +134,59 @@ export function projectAuditEvent(input: unknown): (PluginAuditEvent & { pluginI
 }
 
 export const AUDIT_ACTIONS = Object.keys(policies).map((action) => `wago.${action}`);
+
+const ssoPolicies = {
+  'provider.created': ['before', 'after'],
+  'provider.updated': ['before', 'after'],
+  'provider.deleted': ['before', 'after'],
+  'provisioning.sessions_revoked': ['provider', 'changes'],
+  'provisioning.user_deleted': ['provider', 'changes'],
+  'provisioning.permissions_synced': ['provider', 'changes'],
+} as const;
+
+export type SsoAuditEvent = {
+  action: `sso.${keyof typeof ssoPolicies}`;
+  operationId: string;
+  actorId: number;
+  authenticationMethod: 'session' | 'api-token' | 'sso-provider';
+  apiTokenId?: number;
+  subject: { type: 'sso.provider' | 'user'; id: number };
+  details: Record<string, string>;
+};
+
+/** Projects core SSO events through a closed schema so request data and credentials cannot leak into audit storage. */
+export function projectSsoAuditEvent(input: unknown): SsoAuditEvent | null {
+  try {
+    const event = dataFields(input, ['action', 'operationId', 'actorId', 'authenticationMethod', 'apiTokenId', 'subject', 'details']);
+    if (!event || typeof event.action !== 'string' || !event.action.startsWith('sso.') || !uuid(event.operationId)) return null;
+    const action = event.action.slice(4) as keyof typeof ssoPolicies;
+    const allowed = ssoPolicies[action];
+    if (!allowed || !positive(event.actorId)) return null;
+    const authenticationMethod = event.authenticationMethod;
+    if (authenticationMethod !== 'session' && authenticationMethod !== 'api-token' && authenticationMethod !== 'sso-provider') return null;
+    if (authenticationMethod === 'api-token' ? !positive(event.apiTokenId) : event.apiTokenId !== undefined) return null;
+    const subject = dataFields(event.subject, ['type', 'id']);
+    if (!subject || !positive(subject.id) || (subject.type !== 'sso.provider' && subject.type !== 'user')) return null;
+    const source = dataFields(event.details, allowed);
+    if (!source) return null;
+    const details: Record<string, string> = Object.create(null);
+    for (const [key, value] of Object.entries(source)) {
+      if (typeof value !== 'string' || value.length > 1800) return null;
+      details[key] = value;
+    }
+    if (Buffer.byteLength(JSON.stringify(details), 'utf8') > 4096) return null;
+    return {
+      action: event.action as SsoAuditEvent['action'],
+      operationId: event.operationId,
+      actorId: event.actorId,
+      authenticationMethod,
+      ...(authenticationMethod === 'api-token' ? { apiTokenId: event.apiTokenId as number } : {}),
+      subject: { type: subject.type, id: subject.id },
+      details,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export const SSO_AUDIT_ACTIONS = Object.keys(ssoPolicies).map((action) => `sso.${action}`);
