@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { IsISO8601, IsString, Matches, MaxLength, IsIn, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { AUDIT_ACTIONS, IDENTITY_AUDIT_ACTIONS } from './audit-policy';
+import { ATTRACTAP_AUDIT_ACTIONS, AUDIT_ACTIONS, IDENTITY_AUDIT_ACTIONS } from './audit-policy';
 
 const RESOURCE_AUDIT_ACTIONS = [
   'maintenance_schedule.created',
@@ -10,7 +10,7 @@ const RESOURCE_AUDIT_ACTIONS = [
   'supervision.approved',
   'supervision.rejected',
 ];
-const ALL_AUDIT_ACTIONS = [...AUDIT_ACTIONS, ...IDENTITY_AUDIT_ACTIONS, ...RESOURCE_AUDIT_ACTIONS];
+const ALL_AUDIT_ACTIONS = [...ATTRACTAP_AUDIT_ACTIONS, ...AUDIT_ACTIONS, ...IDENTITY_AUDIT_ACTIONS, ...RESOURCE_AUDIT_ACTIONS];
 
 const timestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
 
@@ -19,7 +19,7 @@ export class AuditQueryDto {
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  @Matches(/^(?:maintenance_schedule|supervision|wago|identity)(?:\.[a-z_]+)*\.?$/)
+  @Matches(/^(?:attractap|maintenance_schedule|supervision|wago|identity)(?:\.[a-z_]+)*\.?$/)
   eventPrefix?: string;
 
   @ApiPropertyOptional({ description: 'Inclusive event timestamp lower bound' })
@@ -57,9 +57,9 @@ export class AuditQueryDto {
   @Max(Number.MAX_SAFE_INTEGER)
   beforeId?: number;
 
-  @ApiPropertyOptional({ enum: ['billing', 'resource', 'wago', 'identity'] })
+  @ApiPropertyOptional({ enum: ['attractap', 'billing', 'resource', 'wago', 'identity'] })
   @IsOptional()
-  @IsIn(['billing', 'resource', 'wago', 'identity'])
+  @IsIn(['attractap', 'billing', 'resource', 'wago', 'identity'])
   domain?: string;
 
   @ApiPropertyOptional({ enum: ['attempted', 'succeeded', 'failed'] })
@@ -89,9 +89,9 @@ export class AuditQueryDto {
   subjectId?: number;
 
   @ApiPropertyOptional({
-    enum: ['resource', 'billing.transaction', 'wago.controller', 'wago.commissioning', 'identity.user', 'identity.role', 'identity.password_policy'],
+    enum: ['resource', 'billing.transaction', 'wago.controller', 'wago.commissioning', 'identity.user', 'identity.role', 'identity.password_policy', 'attractap.reader', 'attractap.card'],
   })
   @IsOptional()
-  @IsIn(['resource', 'billing.transaction', 'wago.controller', 'wago.commissioning', 'identity.user', 'identity.role', 'identity.password_policy'])
+  @IsIn(['resource', 'billing.transaction', 'wago.controller', 'wago.commissioning', 'identity.user', 'identity.role', 'identity.password_policy', 'attractap.reader', 'attractap.card'])
   subjectType?: string;
 }
