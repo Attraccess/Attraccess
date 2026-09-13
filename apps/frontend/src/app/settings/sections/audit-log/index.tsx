@@ -7,6 +7,7 @@ import { useAuth } from '../../../../hooks/useAuth';
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsRow } from '../../components/SettingsRow';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
+import { AuditLogPrototype } from './AuditLog.prototype';
 
 type AuditEntry = {
   id: number;
@@ -81,6 +82,8 @@ export function AuditLogSection() {
       URL.revokeObjectURL(url);
     } finally { setExporting(false); }
   };
+
+  if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('variant')) return <AuditLogPrototype />;
 
   return <SettingsSection title="Audit log" description="Search administrative activity and configure how long it is retained.">
     <div className="flex flex-col gap-4">
