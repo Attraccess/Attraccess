@@ -915,7 +915,8 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
     const migratedAudit = new AuditService(source, migratedStore);
     await migratedAudit.onModuleInit();
     const migratedList = await new AuditController(migratedAudit).list({ limit: 10 });
-    expect(migratedList.items.find((item) => item.details.legacyAuditId === 2)).toMatchObject({
+    const migratedOversizedEvent = migratedList.items.find((item) => item.details.legacyAuditId === 2);
+    expect(migratedOversizedEvent).toMatchObject({
       details: {
         detailsTruncated: 1,
         actorUsername: 'migration-user',
@@ -925,6 +926,15 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
         changedFields: '["minLength"]',
       },
     });
+    expect(migratedOversizedEvent?.operationId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    await expect(
+      new ValidationPipe({ transform: true }).transform(
+        { operationId: migratedOversizedEvent?.operationId },
+        { type: 'query', metatype: AuditQueryDto },
+      ),
+    ).resolves.toMatchObject({ operationId: migratedOversizedEvent?.operationId });
     await source.query(`INSERT INTO "password_policy_audit_overflow" ("legacyAuditId", "metadata")
       VALUES (999, '{"actorUsername":"expired-user"}')`);
     await source.query(`INSERT INTO "audit_log" ("at", "domain", "action", "operationId", "outcome", "subjectType", "subjectId", "details")
