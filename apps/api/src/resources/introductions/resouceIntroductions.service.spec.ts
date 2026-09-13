@@ -10,6 +10,8 @@ import { ResourceIntroductionsService } from './resouceIntroductions.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { ResourceRetrainingService } from '../retraining/resourceRetraining.service';
+import { AuditService } from '../../audit/audit.service';
 
 describe('ResourceIntroductionsService notifications', () => {
   let service: ResourceIntroductionsService;
@@ -41,6 +43,8 @@ describe('ResourceIntroductionsService notifications', () => {
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         { provide: MetricsService, useValue: { resourceIntroductionsTotal: { inc: jest.fn() } } },
         { provide: NotificationDispatchService, useValue: notifications },
+        { provide: ResourceRetrainingService, useValue: { getResourceRetrainingStatus: jest.fn().mockResolvedValue({ isDue: false }) } },
+        { provide: AuditService, useValue: { recordResource: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
 

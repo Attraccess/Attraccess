@@ -6,14 +6,23 @@ export interface ResourceAuditEvent {
     | 'maintenance_schedule.updated'
     | 'maintenance_schedule.deleted'
     | 'supervision.approved'
-    | 'supervision.rejected';
+    | 'supervision.rejected'
+    | 'health.transition'
+    | 'usage_session.started'
+    | 'usage_session.ended'
+    | 'retraining.required'
+    | 'retraining.cleared';
   operationId: string;
-  actorId: number;
+  actorId: number | null;
   authenticationMethod?: 'session' | 'api-token';
   apiTokenId?: number;
   subjectId: number;
   details: Record<string, string | number>;
 }
+
+export type ResourceAuditOrigin =
+  | { actorId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number }
+  | { actorId: null };
 
 const positive = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) > 0;
 const uuid = (v: unknown): v is string =>
@@ -156,6 +165,11 @@ const resourceActions = new Set<ResourceAuditEvent['action']>([
   'maintenance_schedule.deleted',
   'supervision.approved',
   'supervision.rejected',
+  'health.transition',
+  'usage_session.started',
+  'usage_session.ended',
+  'retraining.required',
+  'retraining.cleared',
 ]);
 const resourceDetailFields = new Set([
   'scheduleId',
@@ -168,10 +182,18 @@ const resourceDetailFields = new Set([
   'requesterUserId',
   'supervisorUserId',
   'requestId',
+  'healthSource',
+  'previousStatus',
+  'status',
+  'usageId',
+  'usageUserId',
+  'supervisorUserId',
+  'introductionId',
+  'retrainingReason',
 ]);
 
 export function projectResourceAuditEvent(input: ResourceAuditEvent): ResourceAuditEvent | null {
-  if (!resourceActions.has(input.action) || !uuid(input.operationId) || !positive(input.actorId) || !positive(input.subjectId)) {
+  if (!resourceActions.has(input.action) || !uuid(input.operationId) || !positive(input.subjectId)) {
     return null;
   }
   const details = dataFields(input.details, [...resourceDetailFields]);
@@ -180,11 +202,13 @@ export function projectResourceAuditEvent(input: ResourceAuditEvent): ResourceAu
     if (!resourceDetailFields.has(key) || (typeof value !== 'string' && typeof value !== 'number')) return null;
   }
   if (Buffer.byteLength(JSON.stringify(details), 'utf8') > 4096) return null;
-  if (
-    (input.authenticationMethod !== undefined &&
-      input.authenticationMethod !== 'session' &&
-      input.authenticationMethod !== 'api-token') ||
-    (input.apiTokenId !== undefined && !positive(input.apiTokenId))
+  const authenticationMethod = input.authenticationMethod ?? 'session';
+  if (input.actorId === null) {
+    if (input.authenticationMethod !== undefined || input.apiTokenId !== undefined) return null;
+  } else if (
+    !positive(input.actorId) ||
+    (authenticationMethod !== 'session' && authenticationMethod !== 'api-token') ||
+    (authenticationMethod === 'api-token' ? !positive(input.apiTokenId) : input.apiTokenId !== undefined)
   ) {
     return null;
   }

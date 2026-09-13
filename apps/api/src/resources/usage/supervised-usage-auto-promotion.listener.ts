@@ -73,7 +73,10 @@ export class SupervisedUsageAutoPromotionListener {
       `Auto-promoting user ${userId} to a resource introduction for resource ${resourceId} ` +
         `after ${count} supervised session(s) (threshold ${threshold})`,
     );
-    await this.resourceIntroductionsService.grant(resourceId, userId, undefined, { tutorUserId: supervisorUserId });
+    await this.resourceIntroductionsService.grant(resourceId, userId, undefined, {
+      tutorUserId: supervisorUserId,
+      auditOrigin: { actorId: null },
+    });
   }
 
   private async promoteForGroup(

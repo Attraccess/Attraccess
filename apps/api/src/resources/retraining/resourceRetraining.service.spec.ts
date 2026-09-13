@@ -22,6 +22,7 @@ describe('ResourceRetrainingService.evaluate', () => {
       null as never,
       null as never,
       null as never,
+      null as never,
     );
   });
 
@@ -75,5 +76,32 @@ describe('ResourceRetrainingService.evaluate', () => {
     const p = policy({ retrainingMaxAgeDays: 1, retrainingBlocksAccess: true });
     const result = service.evaluate(p, trainedAt, null, new Date(trainedAt.getTime() + 2 * DAY));
     expect(result.blocksAccess).toBe(true);
+  });
+
+  it('records a system-origin required transition when the scheduled evaluation first notifies', async () => {
+    const audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
+    const introductionRepository = { update: jest.fn().mockResolvedValue(undefined) };
+    const service = new ResourceRetrainingService(
+      { findOne: jest.fn().mockResolvedValue({ id: 1, name: 'Lathe', retrainingMaxAgeDays: 1, retrainingMaxInactivityDays: null, retrainingBlocksAccess: true }) } as never,
+      null as never,
+      { findOne: jest.fn().mockResolvedValue(null) } as never,
+      introductionRepository as never,
+      { findOne: jest.fn().mockResolvedValue({ createdAt: trainedAt }) } as never,
+      null as never,
+      null as never,
+      audit as never,
+    );
+
+    await (service as never as { notifyIfDue: (introduction: object, now: Date) => Promise<void> }).notifyIfDue(
+      { id: 3, resourceId: 1, receiverUserId: 2, retrainingNotifiedAt: null },
+      new Date('2026-01-03T00:00:00.000Z'),
+    );
+
+    expect(audit.recordResource).toHaveBeenCalledWith({
+      action: 'retraining.required',
+      actorId: null,
+      subjectId: 1,
+      details: { introductionId: 3, usageUserId: 2, retrainingReason: 'age' },
+    });
   });
 });
