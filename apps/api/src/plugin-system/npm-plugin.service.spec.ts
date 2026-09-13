@@ -90,6 +90,7 @@ describe('NpmPluginService', () => {
     async (migrationOutcome) => {
       const name = '@attraccess/plugin';
       const tarball = await packageTarball(name, ['READ_USERS']);
+      const shasum = createHash('sha1').update(tarball).digest('hex');
       const settings = {
         getPlainSetting: jest.fn(
           async (_parent, key) => ({ enabled: 'true', domains: '["administration"]', retention_days: '90' })[key],
@@ -108,7 +109,7 @@ describe('NpmPluginService', () => {
             version: '1.2.3',
             dist: {
               tarball: 'plugin',
-              shasum: createHash('sha1').update(tarball).digest('hex'),
+              shasum,
             },
           },
         },
@@ -121,6 +122,8 @@ describe('NpmPluginService', () => {
       expect(service.listInstalled()[0]).not.toHaveProperty('pendingAudit');
       const persisted = JSON.parse(readFileSync(join(root, '.npm-plugin-state.json'), 'utf8'));
       expect(persisted[0].pendingAudit.operationId).toBe(state.context.operationId);
+      expect(state.integrity).toBe(`sha1-${Buffer.from(shasum, 'hex').toString('base64')}`);
+      expect(persisted[0].integrity).toBe(`sha1-${Buffer.from(shasum, 'hex').toString('base64')}`);
       await recordNpmBootMigrationOutcome(root, name, '1.2.3', migrationOutcome);
       const manifest = PluginService.getPlugins()[0];
       jest

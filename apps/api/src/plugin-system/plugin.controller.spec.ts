@@ -177,13 +177,15 @@ describe('PluginController', () => {
   it('delegates upload to the plugin service', async () => {
     const file = { originalname: 'plugin.zip' } as FileUpload;
     service.uploadPlugin.mockResolvedValue({ name: 'uploaded' });
-    await expect(controller.uploadPlugin(file, {})).resolves.toEqual({ name: 'uploaded' });
-    expect(service.uploadPlugin).toHaveBeenCalledWith(file, false);
+    await expect(controller.uploadPlugin(file, {}, req)).resolves.toEqual({ name: 'uploaded' });
+    expect(service.uploadPlugin).toHaveBeenCalledWith(file, true);
+    expect(service.requestRestart).toHaveBeenCalledTimes(1);
   });
 
   it('delegates non-npm plugin deletion to the plugin service', async () => {
-    await controller.deletePlugin('plugin-id');
-    expect(service.deletePlugin).toHaveBeenCalledWith('plugin-id', false);
+    await controller.deletePlugin('plugin-id', req);
+    expect(service.deletePlugin).toHaveBeenCalledWith('plugin-id', true);
+    expect(service.requestRestart).toHaveBeenCalledTimes(1);
   });
 
   it('delegates marketplace search with an optional registry', () => {
@@ -201,18 +203,20 @@ describe('PluginController', () => {
     jest.spyOn(PluginService, 'getPlugins').mockReturnValue([plugin]);
     npmService.listInstalled.mockReturnValue([{ name: '@attraccess/plugin', installPath: plugin.pluginDirectory }]);
 
-    await controller.deletePlugin(plugin.id);
+    await controller.deletePlugin(plugin.id, req);
 
-    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin', false);
+    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin', true);
+    expect(service.requestRestart).toHaveBeenCalledTimes(1);
     expect(service.deletePlugin).not.toHaveBeenCalled();
   });
 
   it('uses the data-preserving npm removal flow when npm manifest discovery fails', async () => {
     npmService.findInstalledByPluginId.mockReturnValue({ name: '@attraccess/plugin' });
 
-    await controller.deletePlugin('npm-plugin-id');
+    await controller.deletePlugin('npm-plugin-id', req);
 
-    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin', false);
+    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin', true);
+    expect(service.requestRestart).toHaveBeenCalledTimes(1);
     expect(service.deletePlugin).not.toHaveBeenCalled();
   });
 
@@ -223,9 +227,10 @@ describe('PluginController', () => {
       { name: '@attraccess/plugin', installPath: 'npm-QGF0dHJhY2Nlc3MvcGx1Z2lu' },
     ]);
 
-    await controller.deletePlugin(plugin.id);
+    await controller.deletePlugin(plugin.id, req);
 
-    expect(service.deletePlugin).toHaveBeenCalledWith(plugin.id, false);
+    expect(service.deletePlugin).toHaveBeenCalledWith(plugin.id, true);
+    expect(service.requestRestart).toHaveBeenCalledTimes(1);
     expect(npmService.removeInstalled).not.toHaveBeenCalled();
   });
 });

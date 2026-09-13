@@ -739,7 +739,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
     if (audit)
       Object.assign(audit, {
         integrityResult: 'verified',
-        integrity: packageVersion.dist.integrity ?? `sha1-${packageVersion.dist.shasum}`,
+        integrity: distIntegrity(packageVersion.dist),
       });
     await mkdir(PluginService.PLUGIN_PATH, { recursive: true });
     const staging = await mkdtemp(join(PluginService.PLUGIN_PATH, '.npm-staging-'));
@@ -789,7 +789,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
         requestedSpec,
         registryId: registry.id,
         registryUrl: registry.url,
-        integrity: packageVersion.dist.integrity ?? `sha1-${packageVersion.dist.shasum}`,
+        integrity: distIntegrity(packageVersion.dist),
         installPath: pluginDirectory(name),
         permissions: manifest.permissions,
         compatibility: { host: pkg.attraccess.host, sdk: pkg.attraccess.sdk },
@@ -1422,10 +1422,12 @@ function publisherName(value: unknown): string | null {
   return typeof username === 'string' ? username : typeof name === 'string' ? name : null;
 }
 
-function distIntegrity(pkg: NpmPluginPackage): string | null {
-  const dist = (pkg as NpmPluginPackage & { dist?: { integrity?: unknown; shasum?: unknown } }).dist;
+function distIntegrity(value: { integrity?: unknown; shasum?: unknown } | NpmPluginPackage): string | null {
+  const dist = ('dist' in value ? value.dist : value) as { integrity?: unknown; shasum?: unknown };
   if (typeof dist?.integrity === 'string') return dist.integrity;
-  return typeof dist?.shasum === 'string' ? `sha1-${dist.shasum}` : null;
+  return typeof dist?.shasum === 'string'
+    ? `sha1-${Buffer.from(dist.shasum, 'hex').toString('base64')}`
+    : null;
 }
 
 function packageProvenance(pkg: NpmPluginPackage): string | null {
