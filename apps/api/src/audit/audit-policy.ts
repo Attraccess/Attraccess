@@ -281,11 +281,10 @@ export function projectProjectAuditEvent(input: ProjectAuditEvent): ProjectAudit
   ) {
     return null;
   }
+  const authenticationMethod = input.authenticationMethod ?? 'session';
   if (
-    (input.authenticationMethod !== undefined &&
-      input.authenticationMethod !== 'session' &&
-      input.authenticationMethod !== 'api-token') ||
-    (input.apiTokenId !== undefined && !positive(input.apiTokenId))
+    (authenticationMethod === 'api-token' && !positive(input.apiTokenId)) ||
+    (authenticationMethod === 'session' && input.apiTokenId !== undefined)
   ) {
     return null;
   }

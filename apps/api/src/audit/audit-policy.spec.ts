@@ -117,6 +117,12 @@ describe('audit storage safe snapshot', () => {
     expect(projectProjectAuditEvent({ ...projectEvent, details: { role: 'administrator' } })).toBeNull();
     expect(projectProjectAuditEvent({ ...projectEvent, details: { hasLogo: 2 } })).toBeNull();
     expect(projectProjectAuditEvent({ ...projectEvent, details: { changedFields: 'logo' } })).toBeNull();
+    expect(projectProjectAuditEvent({ ...projectEvent, authenticationMethod: 'api-token' })).toBeNull();
+    expect(projectProjectAuditEvent({ ...projectEvent, authenticationMethod: 'session', apiTokenId: 9 })).toBeNull();
+    expect(projectProjectAuditEvent({ ...projectEvent, apiTokenId: 9 })).toBeNull();
+    expect(projectProjectAuditEvent({ ...projectEvent, authenticationMethod: 'api-token', apiTokenId: 9 })).toEqual(
+      expect.objectContaining({ authenticationMethod: 'api-token', apiTokenId: 9 }),
+    );
     expect(projectProjectAuditEvent({ ...projectEvent, details: { 'after.nameOmitted': 1 } })).toEqual(
       expect.objectContaining({ details: { 'after.nameOmitted': 1 } }),
     );

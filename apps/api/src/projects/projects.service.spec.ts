@@ -73,6 +73,13 @@ describe('ProjectsService', () => {
     resourceUsageRepository = {
       update: jest.fn(),
     } as unknown as jest.Mocked<Repository<ResourceUsage>>;
+    Object.assign(projectRepository, {
+      manager: {
+        transaction: jest.fn(async (work) => work({
+          getRepository: (entity: unknown) => entity === ResourceUsage ? resourceUsageRepository : projectRepository,
+        })),
+      },
+    });
 
     projectMemberRepository = {
       findOne: jest.fn(),
@@ -244,6 +251,17 @@ describe('ProjectsService', () => {
         action: 'project.deleted', actorId: 7, authenticationMethod: 'session', apiTokenId: undefined, subjectType: 'project', subjectId: 99,
         details: { projectId: 99, 'before.name': 'Deleted', 'before.hasLogo': 0 },
       });
+    });
+
+    it('rolls back usage detachment when the project delete affects no row', async () => {
+      resourceUsageRepository.update.mockResolvedValue({} as never);
+      projectRepository.delete.mockResolvedValueOnce({ affected: 0 } as never);
+      projectAccessService.ensureOwner.mockResolvedValueOnce({ id: 99, name: 'Deleted', logo: null } as Project);
+
+      await expect(service.deleteOne(7, 99)).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(audit.recordProject).not.toHaveBeenCalled();
+      expect(mockMetricsService.projectsTotal.dec).not.toHaveBeenCalled();
     });
   });
 

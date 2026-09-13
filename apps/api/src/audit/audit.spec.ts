@@ -189,6 +189,21 @@ describe('durable audit SQLite', () => {
     ]);
   });
 
+  it('persists project API-token attribution only with a valid token context', async () => {
+    await service.recordProject({
+      action: 'project.created', actorId: 42, authenticationMethod: 'api-token', apiTokenId: 9,
+      subjectType: 'project', subjectId: 7, details: { projectId: 7, 'after.name': 'Project', 'after.hasLogo': 0 },
+    });
+    await service.recordProject({
+      action: 'project.created', actorId: 42, authenticationMethod: 'session', apiTokenId: 9,
+      subjectType: 'project', subjectId: 8, details: { projectId: 8, 'after.name': 'Project', 'after.hasLogo': 0 },
+    } as never);
+
+    expect((await service.list({ limit: 10 })).items).toEqual([
+      expect.objectContaining({ domain: 'project', subjectId: 7, authenticationMethod: 'api-token', apiTokenId: 9 }),
+    ]);
+  });
+
   it('records a billing event only after its originating transaction commits', async () => {
     await store.setPlainSetting('audit', 'domains', '["billing"]');
     let receipt: Promise<{ status: string }> | undefined;

@@ -177,9 +177,11 @@ export class ProjectsService {
   ): Promise<void> {
     const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
     const details = this.projectDetails(project, 'before');
-    await this.resourceUsageRepository.update({ projectId: id }, { projectId: null });
-    const result = await this.projectRepository.delete(id);
-    if (result.affected !== 1) return;
+    await this.projectRepository.manager.transaction(async (manager) => {
+      await manager.getRepository(ResourceUsage).update({ projectId: id }, { projectId: null });
+      const result = await manager.getRepository(Project).delete(id);
+      if (result.affected !== 1) throw new NotFoundException('Project not found');
+    });
     this.metricsService.projectsTotal.dec();
     await this.audit.recordProject({
       action: 'project.deleted',
