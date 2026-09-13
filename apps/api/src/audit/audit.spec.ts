@@ -463,6 +463,118 @@ describe('durable audit SQLite', () => {
     expect(await source.getRepository(AuditLog).count()).toBe(3);
   });
 
+  it('does not roll back a recorded event when a paused cleanup transaction fails', async () => {
+    await source.getRepository(AuditLog).insert({
+      at: new Date(0),
+      domain: 'wago',
+      pluginId: 'abcdefghijklmnopqrstu',
+      action: 'wago.publication',
+      operationId: randomUUID(),
+      actorId: 42,
+      authenticationMethod: 'session',
+      apiTokenId: null,
+      outcome: 'succeeded',
+      subjectType: 'wago.controller',
+      subjectId: 7,
+      ipAddress: null,
+      userAgent: null,
+      details: { revision: 1 },
+    });
+    await source.query(`CREATE TRIGGER fail_audit_cleanup BEFORE DELETE ON audit_log
+      BEGIN SELECT RAISE(ROLLBACK, 'cleanup delete failure'); END`);
+    const storage = (service as unknown as { storage: DataSource }).storage;
+    const originalTransaction = storage.transaction.bind(storage);
+    let releaseCleanup!: () => void;
+    const cleanupPaused = new Promise<void>((resolve) => {
+      releaseCleanup = resolve;
+    });
+    let transactionStarted!: () => void;
+    const cleanupStarted = new Promise<void>((resolve) => {
+      transactionStarted = resolve;
+    });
+    const transaction = jest.spyOn(storage, 'transaction').mockImplementation(async (callback) =>
+      originalTransaction(async (manager) => {
+        transactionStarted();
+        await cleanupPaused;
+        return callback(manager);
+      }),
+    );
+
+    try {
+      const cleanup = service.cleanup();
+      await cleanupStarted;
+      let recorded = false;
+      const receipt = service.record(event()).then((value) => {
+        recorded = true;
+        return value;
+      });
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(recorded).toBe(false);
+
+      releaseCleanup();
+      await cleanup;
+      await expect(receipt).resolves.toEqual({ status: 'recorded' });
+      expect(await source.getRepository(AuditLog).count()).toBe(2);
+    } finally {
+      transaction.mockRestore();
+    }
+  });
+
+  it('records an event after a paused cleanup transaction commits', async () => {
+    await source.getRepository(AuditLog).insert({
+      at: new Date(0),
+      domain: 'wago',
+      pluginId: 'abcdefghijklmnopqrstu',
+      action: 'wago.publication',
+      operationId: randomUUID(),
+      actorId: 42,
+      authenticationMethod: 'session',
+      apiTokenId: null,
+      outcome: 'succeeded',
+      subjectType: 'wago.controller',
+      subjectId: 7,
+      ipAddress: null,
+      userAgent: null,
+      details: { revision: 1 },
+    });
+    const storage = (service as unknown as { storage: DataSource }).storage;
+    const originalTransaction = storage.transaction.bind(storage);
+    let releaseCleanup!: () => void;
+    const cleanupPaused = new Promise<void>((resolve) => {
+      releaseCleanup = resolve;
+    });
+    let transactionStarted!: () => void;
+    const cleanupStarted = new Promise<void>((resolve) => {
+      transactionStarted = resolve;
+    });
+    const transaction = jest.spyOn(storage, 'transaction').mockImplementation(async (callback) =>
+      originalTransaction(async (manager) => {
+        transactionStarted();
+        await cleanupPaused;
+        return callback(manager);
+      }),
+    );
+
+    try {
+      const cleanup = service.cleanup();
+      await cleanupStarted;
+      let recorded = false;
+      const receipt = service.record(event()).then((value) => {
+        recorded = true;
+        return value;
+      });
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(recorded).toBe(false);
+
+      releaseCleanup();
+      await cleanup;
+      await expect(receipt).resolves.toEqual({ status: 'recorded' });
+      expect(await source.getRepository(AuditLog).count()).toBe(1);
+    } finally {
+      transaction.mockRestore();
+    }
+  });
+
   it('fails closed on disabled capture, unsupported domains, invalid input and write failure', async () => {
     for (const disabled of [
       { ...config, enabled: false },

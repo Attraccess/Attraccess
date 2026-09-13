@@ -206,25 +206,28 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
   async recordResource(event: Omit<ResourceAuditEvent, 'operationId'>): Promise<void> {
     try {
       const snapshot = projectResourceAuditEvent({ ...event, operationId: randomUUID() });
-      if (!snapshot || this.stopping || !this.storage?.isInitialized || this.pending >= 8) return;
+      const storage = this.storage;
+      if (!snapshot || this.stopping || !storage?.isInitialized || this.pending >= 8) return;
       this.pending++;
       try {
         const config = await readAuditSettings(this.settings);
         if (!config.enabled || !config.domains.includes('resource') || this.stopping) return;
-        await this.storage.getRepository(AuditLog).insert({
-          at: new Date(),
-          domain: 'resource',
-          pluginId: 'core',
-          action: snapshot.action,
-          operationId: snapshot.operationId,
-          actorId: snapshot.actorId,
-          authenticationMethod: snapshot.authenticationMethod ?? 'session',
-          apiTokenId: snapshot.apiTokenId ?? null,
-          outcome: 'succeeded',
-          subjectType: 'resource',
-          subjectId: snapshot.subjectId,
-          details: snapshot.details,
-        });
+        await this.serializeStorageWrite(() =>
+          storage.getRepository(AuditLog).insert({
+            at: new Date(),
+            domain: 'resource',
+            pluginId: 'core',
+            action: snapshot.action,
+            operationId: snapshot.operationId,
+            actorId: snapshot.actorId,
+            authenticationMethod: snapshot.authenticationMethod ?? 'session',
+            apiTokenId: snapshot.apiTokenId ?? null,
+            outcome: 'succeeded',
+            subjectType: 'resource',
+            subjectId: snapshot.subjectId,
+            details: snapshot.details,
+          }),
+        );
       } finally {
         this.pending--;
       }
@@ -276,15 +279,7 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
         this.stopping
       )
         return { status: 'unavailable' };
-      // sqlite3 queues concurrent statements after a busy timeout. Keep those writes in our
-      // bounded admission queue instead, so a released lock cannot revive stale audit writes.
-      const precedingWrite = this.writeTail;
-      let releaseWrite: () => void;
-      this.writeTail = new Promise<void>((resolve) => {
-        releaseWrite = resolve;
-      });
-      try {
-        await precedingWrite;
+      const unavailable = await this.serializeStorageWrite<PluginAuditReceipt | undefined>(async () => {
         if (this.contended) {
           // Drop the already-admitted burst, then give the first later write a short chance
           // to observe a released SQLite lock without reviving the whole stale burst.
@@ -298,9 +293,8 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
           this.contended = true;
           return { status: 'unavailable' };
         }
-      } finally {
-        releaseWrite();
-      }
+      });
+      if (unavailable) return unavailable;
       return { status: 'recorded' };
     } finally {
       this.pending--;
@@ -315,31 +309,53 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     return date.toISOString().replace('T', ' ').replace('Z', '');
   }
 
+  /** Serializes every write on the audit storage connection, including cleanup transactions. */
+  private async serializeStorageWrite<T>(write: () => Promise<T>): Promise<T> {
+    const precedingWrite = this.writeTail;
+    let releaseWrite!: () => void;
+    this.writeTail = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    try {
+      await precedingWrite;
+      return await write();
+    } finally {
+      releaseWrite();
+    }
+  }
+
   @Interval(60 * 60 * 1000)
   async cleanup(): Promise<void> {
-    if (this.stopping || !this.storage?.isInitialized || this.cleaning) return;
+    const storage = this.storage;
+    if (this.stopping || !storage?.isInitialized || this.cleaning) return;
     this.cleaning = true;
     try {
       const config = await readAuditSettings(this.settings);
       const cutoff = this.sqliteDate(this.cutoff(config.retention_days));
       while (!this.stopping) {
         const hasOverflow = await this.hasPasswordPolicyOverflow();
-        const count = await this.storage.transaction(async (manager) => {
-          const rows = await manager.query<{ id: number }[]>(
-            'SELECT id FROM audit_log WHERE at < ? ORDER BY at, id LIMIT 1000',
-            [cutoff],
-          );
-          if (rows.length === 0) return 0;
-          const ids = rows.map(({ id }) => id);
-          const placeholders = ids.map(() => '?').join(', ');
-          if (hasOverflow) {
-            await manager.query(`DELETE FROM password_policy_audit_overflow
-              WHERE legacyAuditId IN (
-                SELECT json_extract(details, '$.legacyAuditId') FROM audit_log WHERE id IN (${placeholders})
-              )`, ids);
-          }
-          await manager.query(`DELETE FROM audit_log WHERE id IN (${placeholders})`, ids);
-          return rows.length;
+        const count = await this.serializeStorageWrite(async () => {
+          if (this.stopping) return 0;
+          return storage.transaction(async (manager) => {
+            const rows = await manager.query<{ id: number }[]>(
+              'SELECT id FROM audit_log WHERE at < ? ORDER BY at, id LIMIT 1000',
+              [cutoff],
+            );
+            if (rows.length === 0) return 0;
+            const ids = rows.map(({ id }) => id);
+            const placeholders = ids.map(() => '?').join(', ');
+            if (hasOverflow) {
+              await manager.query(
+                `DELETE FROM password_policy_audit_overflow
+                WHERE legacyAuditId IN (
+                  SELECT json_extract(details, '$.legacyAuditId') FROM audit_log WHERE id IN (${placeholders})
+                )`,
+                ids,
+              );
+            }
+            await manager.query(`DELETE FROM audit_log WHERE id IN (${placeholders})`, ids);
+            return rows.length;
+          });
         });
         if (count > 0) this.logger.log(`Deleted ${count} expired audit rows`);
         if (count < 1000) break;
