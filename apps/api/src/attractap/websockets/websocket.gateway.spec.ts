@@ -34,6 +34,7 @@ import { SupervisionService } from '../../resources/supervision/supervision.serv
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Resource } from '@attraccess/database-entities';
 import { RbacService } from '../../users-and-auth/rbac/rbac.service';
+import { AuditService } from '../../audit/audit.service';
 
 const mockMetricsService = {
   attractapDevicesConnected: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
@@ -60,6 +61,7 @@ function createMockSocket(overrides: Partial<AuthenticatedWebSocket> = {}): Auth
     close: jest.fn(),
     state: {
       lastAuthenticatedUserId: null,
+      auditPrincipal: null,
       enrollNewCardData: null,
       resetNfcCardData: null,
       ota: null,
@@ -107,6 +109,7 @@ describe('AttractapGateway', () => {
         { provide: MetricsToggleService, useValue: mockMetricsToggle },
         { provide: SupervisionService, useValue: {} },
         { provide: RbacService, useValue: {} },
+        { provide: AuditService, useValue: { recordAttractap: jest.fn().mockResolvedValue(undefined) } },
         { provide: getRepositoryToken(Resource), useValue: {} },
         ResourceListService,
         ResourceActionGuard,

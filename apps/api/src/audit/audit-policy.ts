@@ -16,6 +16,15 @@ export interface ResourceAuditEvent {
   details: Record<string, string | number>;
 }
 
+export interface AttractapAuditEvent {
+  action: 'reader.registered' | 'reader.deregistered' | 'card.linked' | 'card.unlinked' | 'reader.crash_reported';
+  actorId: number | null;
+  authenticationMethod: 'session' | 'api-token' | null;
+  apiTokenId?: number;
+  subjectId: number;
+  details: Record<string, string | number | boolean>;
+}
+
 const positive = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) > 0;
 const uuid = (v: unknown): v is string =>
   typeof v === 'string' && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);
@@ -170,6 +179,40 @@ const resourceDetailFields = new Set([
   'supervisorUserId',
   'requestId',
 ]);
+
+const attractapDetails: Record<AttractapAuditEvent['action'], ReadonlySet<string>> = {
+  'reader.registered': new Set(['source']),
+  'reader.deregistered': new Set(['source']),
+  'card.linked': new Set(['readerId', 'source']),
+  'card.unlinked': new Set(['readerId', 'source']),
+  'reader.crash_reported': new Set(['source', 'resetReason', 'hasCoredump']),
+};
+const attractapResetReasons = new Set([
+  'POWERON', 'EXT', 'SW', 'PANIC', 'INT_WDT', 'TASK_WDT', 'WDT', 'DEEPSLEEP', 'BROWNOUT', 'SDIO', 'UNKNOWN',
+]);
+
+export function projectAttractapAuditEvent(input: AttractapAuditEvent): AttractapAuditEvent | null {
+  if (!positive(input.subjectId) || !attractapDetails[input.action]) return null;
+  const deviceActor = input.authenticationMethod === null;
+  if (deviceActor ? input.actorId !== null || input.apiTokenId !== undefined : !positive(input.actorId)) return null;
+  if (
+    !deviceActor &&
+    input.authenticationMethod !== 'session' &&
+    input.authenticationMethod !== 'api-token'
+  ) return null;
+  if (input.authenticationMethod === 'api-token' ? !positive(input.apiTokenId) : input.apiTokenId !== undefined) return null;
+  const details = dataFields(input.details, [...attractapDetails[input.action]]);
+  if (!details) return null;
+  for (const [key, value] of Object.entries(details)) {
+    if (!attractapDetails[input.action].has(key) || (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean')) return null;
+    if (key === 'source' && !oneOf('reader-websocket', 'admin-api', 'reader-enrollment', 'reader-reset')(value)) return null;
+    if (key === 'resetReason' && !attractapResetReasons.has(value as string)) return null;
+    if (key === 'hasCoredump' && typeof value !== 'boolean') return null;
+    if (key === 'readerId' && !positive(value)) return null;
+  }
+  if (Buffer.byteLength(JSON.stringify(details), 'utf8') > 4096) return null;
+  return { ...input, details: details as Record<string, string | number | boolean> };
+}
 
 export function projectResourceAuditEvent(input: ResourceAuditEvent): ResourceAuditEvent | null {
   if (
@@ -405,3 +448,11 @@ export function projectIdentityAuditEvent(input: unknown): ProjectedIdentityAudi
 }
 
 export const IDENTITY_AUDIT_ACTIONS = Object.keys(identityPolicies).map((action) => `identity.${action}`);
+
+export const ATTRACTAP_AUDIT_ACTIONS = [
+  'attractap.reader.registered',
+  'attractap.reader.deregistered',
+  'attractap.card.linked',
+  'attractap.card.unlinked',
+  'attractap.reader.crash_reported',
+];

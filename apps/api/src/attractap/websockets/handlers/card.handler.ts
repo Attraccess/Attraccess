@@ -10,6 +10,7 @@ import { ResourceIntroducersService } from '../../../resources/introducers/resou
 import { MetricsService } from '../../../metrics/metrics.service';
 import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../websocket.types';
+import { AuditService } from '../../../audit/audit.service';
 
 @Injectable()
 export class AttractapCardHandler {
@@ -39,7 +40,15 @@ export class AttractapCardHandler {
   @InjectRepository(Resource)
   private resourceRepository: Repository<Resource>;
 
-  public async startEnrollOfNewNfcCard(data: { readerId: number; userId: number }) {
+  @Inject(AuditService)
+  private audit: AuditService;
+
+  public async startEnrollOfNewNfcCard(data: {
+    readerId: number;
+    userId: number;
+    authenticationMethod?: 'session' | 'api-token';
+    apiTokenId?: number;
+  }) {
     const reader = await this.attractapService.findReaderById(data.readerId);
 
     if (!reader) {
@@ -67,6 +76,12 @@ export class AttractapCardHandler {
     // Send to all active sockets for this reader to avoid targeting a stale/disconnecting socket
     const tasks = sockets.map(async (socket) => {
       socket.state.lastAuthenticatedUserId = user.id;
+      const authenticationMethod = data.authenticationMethod ?? 'session';
+      socket.state.auditPrincipal = {
+        userId: user.id,
+        authenticationMethod,
+        ...(authenticationMethod === 'api-token' ? { apiTokenId: data.apiTokenId } : {}),
+      };
       try {
         await socket.sendMessage(
           new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO, {
@@ -156,14 +171,23 @@ export class AttractapCardHandler {
       return;
     }
 
-    await this.attractapService.createNFCCard(user, {
+    const card = await this.attractapService.createNFCCard(user, {
       key,
       keyNo,
       uid: cardUID,
     });
+    const principal = socket.state.auditPrincipal;
+    if (principal && socket.readerId) {
+      await this.audit.recordAttractap({
+        action: 'card.linked', actorId: principal.userId, authenticationMethod: principal.authenticationMethod,
+        ...(principal.authenticationMethod === 'api-token' ? { apiTokenId: principal.apiTokenId } : {}),
+        subjectId: card.id, details: { readerId: socket.readerId, source: 'reader-enrollment' },
+      }).catch(() => undefined);
+    }
 
     socket.state.enrollNewCardData = null;
     socket.state.lastAuthenticatedUserId = null;
+    socket.state.auditPrincipal = null;
     socket.sendMessage(new AttractapEvent(AttractapEventType.ENROLL_NEW_CARD, { success: true }));
   }
 
@@ -173,9 +197,16 @@ export class AttractapCardHandler {
     this.logger.log('Enroll new card cancelled by reader');
     socket.state.enrollNewCardData = null;
     socket.state.lastAuthenticatedUserId = null;
+    socket.state.auditPrincipal = null;
   }
 
-  public async startResetOfNfcCard(data: { readerId: number; userId: number; cardId: number }) {
+  public async startResetOfNfcCard(data: {
+    readerId: number;
+    userId: number;
+    cardId: number;
+    authenticationMethod?: 'session' | 'api-token';
+    apiTokenId?: number;
+  }) {
     const reader = await this.attractapService.findReaderById(data.readerId);
 
     if (!reader) {
@@ -211,6 +242,11 @@ export class AttractapCardHandler {
       cardId: nfcCard.id,
       key: nfcCard.key,
       keyNo: nfcCard.keyNo,
+      auditPrincipal: {
+        userId: user.id,
+        authenticationMethod: data.authenticationMethod ?? 'session',
+        ...(data.authenticationMethod === 'api-token' ? { apiTokenId: data.apiTokenId } : {}),
+      },
     };
 
     await socket.sendMessage(
@@ -238,11 +274,19 @@ export class AttractapCardHandler {
       return;
     }
 
-    const { cardId } = socket.state.resetNfcCardData;
+    const { cardId, auditPrincipal } = socket.state.resetNfcCardData;
 
     // The card was wiped back to the factory key on the reader; drop the DB
     // record so the (now blank) card is no longer recognised.
-    await this.attractapService.deleteNFCCard(cardId);
+    const result = await this.attractapService.deleteNFCCard(cardId);
+    if (result.affected && socket.readerId && auditPrincipal) {
+      await this.audit.recordAttractap({
+        action: 'card.unlinked', actorId: auditPrincipal.userId,
+        authenticationMethod: auditPrincipal.authenticationMethod,
+        ...(auditPrincipal.authenticationMethod === 'api-token' ? { apiTokenId: auditPrincipal.apiTokenId } : {}),
+        subjectId: cardId, details: { readerId: socket.readerId, source: 'reader-reset' },
+      }).catch(() => undefined);
+    }
 
     socket.state.resetNfcCardData = null;
     socket.sendMessage(new AttractapEvent(AttractapEventType.RESET_NFC_CARD, { success: true }));

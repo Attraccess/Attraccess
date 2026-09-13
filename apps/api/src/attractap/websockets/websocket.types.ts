@@ -111,6 +111,7 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   sendBinaryData: (data: Buffer) => void;
   state: {
     lastAuthenticatedUserId: number | null;
+    auditPrincipal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number } | null;
     enrollNewCardData: {
       key: string;
       keyNo: number;
@@ -120,6 +121,7 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       cardId: number;
       key: string;
       keyNo: number;
+      auditPrincipal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number };
     } | null;
     // Two-card supervision flow (ATT-493). Present while the reader is waiting
     // for a supervisor to authorise a non-introduced user's session — either by
