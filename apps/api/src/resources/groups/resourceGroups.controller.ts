@@ -26,8 +26,8 @@ export class ResourceGroupsController {
     type: ResourceGroup,
   })
   @Auth('resources.update')
-  async createOne(@Body() createDto: CreateResourceGroupDto): Promise<ResourceGroup> {
-    return await this.resourceGroupsService.createOne(createDto);
+  async createOne(@Body() createDto: CreateResourceGroupDto, @Req() req: AuthenticatedRequest): Promise<ResourceGroup> {
+    return await this.resourceGroupsService.createOne(createDto, req.user);
   }
 
   @Get()
@@ -74,9 +74,10 @@ export class ResourceGroupsController {
   })
   async updateOne(
     @Param('id', ParseIntPipe) id: number,
-    @Body() updateDto: UpdateResourceGroupDto
+    @Body() updateDto: UpdateResourceGroupDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceGroup> {
-    return await this.resourceGroupsService.updateOneById(id, updateDto);
+    return await this.resourceGroupsService.updateOneById(id, updateDto, req.user);
   }
 
   @Post(':groupId/resources/:resourceId')
@@ -90,9 +91,10 @@ export class ResourceGroupsController {
   })
   async addResource(
     @Param('groupId', ParseIntPipe) groupId: number,
-    @Param('resourceId', ParseIntPipe) resourceId: number
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest,
   ): Promise<void> {
-    return await this.resourceGroupsService.addResource(groupId, resourceId);
+    return await this.resourceGroupsService.addResource(groupId, resourceId, req.user);
   }
 
   @Delete(':groupId/resources/:resourceId')
@@ -106,9 +108,10 @@ export class ResourceGroupsController {
   })
   async removeResource(
     @Param('groupId', ParseIntPipe) groupId: number,
-    @Param('resourceId', ParseIntPipe) resourceId: number
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest,
   ): Promise<void> {
-    return await this.resourceGroupsService.removeResource(groupId, resourceId);
+    return await this.resourceGroupsService.removeResource(groupId, resourceId, req.user);
   }
 
   @Delete(':groupId')
@@ -119,8 +122,8 @@ export class ResourceGroupsController {
     status: 200,
     description: 'The resource group has been successfully deleted.',
   })
-  async deleteOne(@Param('groupId', ParseIntPipe) groupId: number): Promise<{ OK: true }> {
-    await this.resourceGroupsService.deleteOne(groupId);
+  async deleteOne(@Param('groupId', ParseIntPipe) groupId: number, @Req() req: AuthenticatedRequest): Promise<{ OK: true }> {
+    await this.resourceGroupsService.deleteOne(groupId, req.user);
 
     return {
       OK: true,

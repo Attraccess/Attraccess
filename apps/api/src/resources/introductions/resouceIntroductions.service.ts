@@ -13,6 +13,7 @@ import { ResourceIntroductionChangedEvent } from './events/resource-introduction
 import { MetricsService } from '../../metrics/metrics.service';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { AuditService } from '../../audit/audit.service';
 
 @Injectable()
 export class ResourceIntroductionsService {
@@ -27,6 +28,7 @@ export class ResourceIntroductionsService {
     private readonly eventEmitter: EventEmitter2,
     private readonly metricsService: MetricsService,
     private readonly notifications: NotificationDispatchService,
+    private readonly audit: AuditService,
   ) {}
 
   private notifyIntroductionChange(resourceId: number, userId: number, granted: boolean): void {
@@ -138,7 +140,9 @@ export class ResourceIntroductionsService {
     nextStatus: IntroductionHistoryAction,
     data?: UpdateResourceIntroductionDto,
     tutorUserId?: number,
-    performedByUserId = userId,
+    performedByUserId?: number,
+    authenticationMethod?: 'session' | 'api-token',
+    apiTokenId?: number,
   ) {
     this.logger.debug(`Updating introduction status to ${nextStatus} for resourceId: ${resourceId}, userId: ${userId}`);
     let resourceIntroduction = await this.getIntroductionOfUser(resourceId, userId);
@@ -159,7 +163,7 @@ export class ResourceIntroductionsService {
       introduction: { id: resourceIntroduction.id },
       action: nextStatus,
       comment: data?.comment,
-      performedByUser: { id: performedByUserId },
+      performedByUser: { id: performedByUserId ?? userId },
     });
 
     const savedHistoryItem = await this.resourceIntroductionHistoryItemRepository.save(historyItem);
@@ -173,6 +177,13 @@ export class ResourceIntroductionsService {
       this.notifyIntroductionChange(resourceId, userId, nextStatus === IntroductionHistoryAction.GRANT);
     }
 
+    if (performedByUserId !== undefined) {
+      await this.audit.recordResource({
+        action: nextStatus === IntroductionHistoryAction.GRANT ? 'introduction.granted' : 'introduction.revoked',
+        actorId: performedByUserId, authenticationMethod, apiTokenId, subjectId: resourceId,
+        details: { recipientUserId: userId },
+      });
+    }
     return savedHistoryItem;
   }
 
@@ -205,7 +216,7 @@ export class ResourceIntroductionsService {
     resourceId: number,
     userId: number,
     data?: UpdateResourceIntroductionDto,
-    options?: { tutorUserId?: number; performedByUserId?: number },
+    options?: { tutorUserId?: number; performedByUserId?: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
   ): Promise<ResourceIntroductionHistoryItem> {
     this.logger.debug(`Granting introduction for resourceId: ${resourceId}, userId: ${userId}`);
     const result = await this.updateIntroductionStatus(
@@ -215,6 +226,8 @@ export class ResourceIntroductionsService {
       data,
       options?.tutorUserId,
       options?.performedByUserId,
+      options?.authenticationMethod,
+      options?.apiTokenId,
     );
     this.metricsService.resourceIntroductionsTotal.inc();
     this.logger.debug(`Grant operation completed for resourceId: ${resourceId}, userId: ${userId}`);
@@ -225,7 +238,7 @@ export class ResourceIntroductionsService {
     resourceId: number,
     userId: number,
     data?: UpdateResourceIntroductionDto,
-    options?: { performedByUserId?: number },
+    options?: { performedByUserId?: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
   ): Promise<ResourceIntroductionHistoryItem> {
     this.logger.debug(`Revoking introduction for resourceId: ${resourceId}, userId: ${userId}`);
     const result = await this.updateIntroductionStatus(
@@ -235,6 +248,8 @@ export class ResourceIntroductionsService {
       data,
       undefined,
       options?.performedByUserId,
+      options?.authenticationMethod,
+      options?.apiTokenId,
     );
     this.logger.debug(`Revoke operation completed for resourceId: ${resourceId}, userId: ${userId}`);
     return result;
