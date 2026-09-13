@@ -24,7 +24,7 @@ import { randomUUID } from 'crypto';
 
 const billingStatuses = new Set(['pending', 'completed', 'failed']);
 const billingSources = new Set(['manual', 'resource-usage', 'refund', 'sumup-topup']);
-const SQLITE_BUSY_TIMEOUT_MS = 100;
+const SQLITE_BUSY_TIMEOUT_MS = 10;
 const SQLITE_CONTENTION_RECOVERY_DELAY_MS = 500;
 
 export interface BillingTransactionAuditEvent {
@@ -76,6 +76,7 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
       synchronize: false,
       migrationsRun: false,
       logging: false,
+      busyTimeout: 10,
     });
     try {
       await storage.initialize();

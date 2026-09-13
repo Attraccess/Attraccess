@@ -231,7 +231,8 @@ const identityFields: Record<string, (value: unknown) => boolean> = {
     'dependency_failure',
   ),
   providerId: positive,
-  role: (value) => typeof value === 'string' && /^[a-z][a-z0-9_-]{0,63}$/.test(value),
+  // RbacService.generateRoleKey lowercases names and joins alphanumeric parts with hyphens.
+  role: (value) => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value),
   field: oneOf(
     'username',
     'email',
@@ -271,7 +272,7 @@ function policySnapshot(value: unknown): boolean {
         (typeof entry === 'boolean' ||
           typeof entry === 'number' ||
           entry === null ||
-          (key === 'role' && typeof entry === 'string' && /^[a-z][a-z0-9_-]{0,63}$/.test(entry))),
+          (key === 'role' && typeof entry === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entry))),
     );
   } catch {
     return false;
@@ -344,12 +345,10 @@ export function projectIdentityAuditEvent(input: unknown): ProjectedIdentityAudi
     }
     const request =
       event.request === undefined ? Object.create(null) : dataFields(event.request, ['ipAddress', 'userAgent']);
-    if (
-      !request ||
-      (request.ipAddress !== undefined && !ipAddress(request.ipAddress)) ||
-      (request.userAgent !== undefined && !userAgent(request.userAgent))
-    )
-      return null;
+    // Request metadata is client-controlled and optional; a bad header must not suppress the audit event.
+    const ip = request && typeof request.ipAddress === 'string' && ipAddress(request.ipAddress) ? request.ipAddress : null;
+    const agent =
+      request && typeof request.userAgent === 'string' ? request.userAgent.replace(/[\r\n]/g, '').slice(0, 512) : null;
     if (Buffer.byteLength(JSON.stringify(details), 'utf8') > 4096) return null;
     return {
       action: `identity.${action}`,
@@ -359,8 +358,8 @@ export function projectIdentityAuditEvent(input: unknown): ProjectedIdentityAudi
       subjectType: (event.subjectType as IdentityAuditEvent['subjectType'] | undefined) ?? 'identity.user',
       subjectId: (event.subjectId as number | undefined) ?? null,
       details,
-      ipAddress: (request.ipAddress as string | undefined) ?? null,
-      userAgent: (request.userAgent as string | undefined) ?? null,
+      ipAddress: ip,
+      userAgent: agent !== null && userAgent(agent) ? agent : null,
     };
   } catch {
     return null;

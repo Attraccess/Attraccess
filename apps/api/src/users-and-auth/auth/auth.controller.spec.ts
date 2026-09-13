@@ -10,11 +10,13 @@ import { LoginRateLimitGuard } from '../rate-limiting/login.rate-limit.guard';
 import { BruteForceProtectionService } from '../rate-limiting/brute-force.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
 import { UsersService } from '../users/users.service';
+import { IdentityAuditService } from '../../audit/identity-audit.service';
 
 describe('AuthController', () => {
   let authController: AuthController;
   let sessionService: SessionService;
   let cookieConfigService: CookieConfigService;
+  let identityAudit: { record: jest.Mock };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -51,6 +53,7 @@ describe('AuthController', () => {
         },
         { provide: AuthAuditLogger, useValue: { log: jest.fn() } },
         { provide: UsersService, useValue: { findOne: jest.fn() } },
+        { provide: IdentityAuditService, useValue: { record: jest.fn() } },
         { provide: LoginRateLimitGuard, useValue: { canActivate: jest.fn().mockResolvedValue(true) } },
       ],
     }).compile();
@@ -58,6 +61,7 @@ describe('AuthController', () => {
     authController = module.get<AuthController>(AuthController);
     sessionService = module.get<SessionService>(SessionService);
     cookieConfigService = module.get<CookieConfigService>(CookieConfigService);
+    identityAudit = module.get(IdentityAuditService);
   });
 
   it('should be defined', () => {
@@ -154,7 +158,10 @@ describe('AuthController', () => {
         authorization: 'Bearer test-session-token',
       },
       cookies: {},
-      logout: jest.fn().mockImplementation((cb) => cb()),
+      logout: jest.fn().mockImplementation((cb) => {
+        mockRequest.user = undefined as never;
+        cb();
+      }),
     } as AuthenticatedRequest;
 
     const mockResponse = {
@@ -166,6 +173,9 @@ describe('AuthController', () => {
     expect(mockRequest.logout).toHaveBeenCalled();
     expect(sessionService.revokeSession).toHaveBeenCalledWith('test-session-token');
     expect(cookieConfigService.clearAuthCookie).toHaveBeenCalledWith(mockResponse);
+    expect(identityAudit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'logout', actorId: 1, subjectId: 1 }),
+    );
   });
 
   it('should delete a session with cookie token', async () => {
