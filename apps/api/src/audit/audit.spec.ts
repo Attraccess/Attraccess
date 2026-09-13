@@ -755,7 +755,7 @@ describe('audit policy and authorization', () => {
     }
   });
 
-  it('validates audit query bounds, resource action prefixes, and recognized fields', async () => {
+  it('validates audit query bounds and allows the registered resource and billing filters', async () => {
     const pipe = new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true });
     for (const query of [{ limit: '101' }, { beforeId: '-1' }, { raw: 'secret' }]) {
       await expect(pipe.transform(query, { type: 'query', metatype: AuditQueryDto })).rejects.toThrow();
@@ -767,6 +767,15 @@ describe('audit policy and authorization', () => {
     await expect(
       pipe.transform({ eventPrefix: 'supervision.' }, { type: 'query', metatype: AuditQueryDto }),
     ).resolves.toMatchObject({ eventPrefix: 'supervision.' });
+    const billingFilters = {
+      domain: 'billing',
+      eventPrefix: 'billing.transaction.',
+      action: 'billing.transaction.updated',
+      subjectType: 'billing.transaction',
+    };
+    await expect(pipe.transform(billingFilters, { type: 'query', metatype: AuditQueryDto })).resolves.toMatchObject(
+      billingFilters,
+    );
   });
 });
 

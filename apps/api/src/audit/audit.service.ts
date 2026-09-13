@@ -15,6 +15,7 @@ import { SettingsStoreService } from '../settings/settings-store.service';
 import { projectAuditEvent, projectResourceAuditEvent, ResourceAuditEvent } from './audit-policy';
 import { AuditQueryDto } from './audit-query.dto';
 import { randomUUID } from 'crypto';
+import { auditEntriesWithLabels } from './audit-labels';
 
 const billingStatuses = new Set(['pending', 'completed', 'failed']);
 const billingSources = new Set(['manual', 'resource-usage', 'refund', 'sumup-topup']);
@@ -320,7 +321,7 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
         .take(limit + 1)
         .getMany();
       const hasMore = rows.length > limit;
-      const items = rows.slice(0, limit);
+      const items = await auditEntriesWithLabels(this.source, rows.slice(0, limit));
       return { items, nextCursor: hasMore ? items[items.length - 1].id : null };
     } finally {
       this.activeReads--;
