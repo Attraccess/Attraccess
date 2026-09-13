@@ -12,7 +12,7 @@ static const char *SELECT_FIELD_NO_OPTIONS = "Keine Optionen verfügbar";
 static const char *SELECT_FIELD_INVALID = "Ungültige Auswahl";
 static const lv_coord_t SELECT_FIELD_OPTION_GAP = 6;
 
-// Select values must remain unchanged for submission, so prepare a separate
+// Form values must remain unchanged for submission, so prepare a separate
 // display string for code points not covered by the reader's Latin-1 fonts.
 static std::string makeLVGLDisplayText(const std::string &input)
 {
@@ -121,6 +121,7 @@ void ResourceDetailsScreen::resetFormsModalState()
    this->formsEditorSpacer = nullptr;
    this->formsEditorKeyboard = nullptr;
    this->formsEditorWidgetIndex = 0;
+   this->formsEditorInitialText.clear();
    this->formsBusy = false;
    this->formsModalMeta = nullptr;
    this->formsModalPage = nullptr;
@@ -955,7 +956,8 @@ void ResourceDetailsScreen::updateFieldPreview(FormFieldWidget &widget)
    }
    else
    {
-      lv_label_set_text(widget.previewLabel, widget.textValue.c_str());
+      const std::string displayValue = makeLVGLDisplayText(widget.textValue);
+      lv_label_set_text(widget.previewLabel, displayValue.c_str());
       lv_obj_set_style_text_color(widget.previewLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 }
@@ -1002,7 +1004,8 @@ void ResourceDetailsScreen::openFormsEditor(uint16_t widgetIndex)
       placeholder = widget.definition->options.text.placeholder.c_str();
    }
    lv_textarea_set_placeholder_text(this->formsEditorTextarea, placeholder);
-   lv_textarea_set_text(this->formsEditorTextarea, widget.textValue.c_str());
+   this->formsEditorInitialText = makeLVGLDisplayText(widget.textValue);
+   lv_textarea_set_text(this->formsEditorTextarea, this->formsEditorInitialText.c_str());
    lv_textarea_set_cursor_pos(this->formsEditorTextarea, LV_TEXTAREA_CURSOR_LAST);
 
    lv_keyboard_set_mode(this->formsEditorKeyboard,
@@ -1026,7 +1029,13 @@ void ResourceDetailsScreen::closeFormsEditor(bool commit)
           widget.type != API::ResourceUsageFormFieldType::SELECT)
       {
          const char *text = lv_textarea_get_text(this->formsEditorTextarea);
-         widget.textValue = text ? std::string(text) : std::string("");
+         const std::string editedText = text ? std::string(text) : std::string("");
+         // Opening/confirming a fallback-rendered draft must not rewrite its
+         // original protocol value. Only an actual edit replaces the draft.
+         if (editedText != this->formsEditorInitialText)
+         {
+            widget.textValue = editedText;
+         }
          this->updateFieldPreview(widget);
       }
    }

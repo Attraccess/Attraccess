@@ -150,6 +150,7 @@ private:
     lv_obj_t *formsEditorSpacer = nullptr; // pushes keyboard to the bottom for one-line fields
     lv_obj_t *formsEditorKeyboard = nullptr;
     uint16_t formsEditorWidgetIndex = 0;
+    std::string formsEditorInitialText;
     bool formsBusy = false;
     const API::ResourceUsageFormRequest *formsModalMeta = nullptr;
     const API::ResourceUsageFormFieldsPage *formsModalPage = nullptr;

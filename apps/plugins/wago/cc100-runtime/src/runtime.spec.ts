@@ -1809,16 +1809,25 @@ describe('WagoRuntime', () => {
       contentHash: hash(monitored),
       snapshot: monitored,
     });
-    await transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'set', value: true }));
-    await transport.send(commands, validCommand({ id: 'command-2', channelId: 'load', action: 'set', value: false }));
-    await new Promise((resolve) => setTimeout(resolve, 25));
+    // Disk and command acknowledgement latency must not advance the feedback deadline.
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+    try {
+      await transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'set', value: true }));
+      await transport.send(commands, validCommand({ id: 'command-2', channelId: 'load', action: 'set', value: false }));
+      const read = jest.spyOn(device, 'read');
+      await jest.advanceTimersByTimeAsync(25);
+      expect(read).toHaveBeenCalledWith(monitored.physicalPoints[1]);
+      read.mockRestore();
 
-    expect(transport.published).not.toContainEqual(
-      expect.objectContaining({
-        topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
-        payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),
-      }),
-    );
+      expect(transport.published).not.toContainEqual(
+        expect.objectContaining({
+          topic: 'attraccess/wago/v1/controllers/cc100-1/faults',
+          payload: expect.objectContaining({ channelId: 'load', code: 'feedback_mismatch' }),
+        }),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('keeps the prior feedback check when a replacement write fails', async () => {

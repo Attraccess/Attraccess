@@ -82,6 +82,66 @@ void expectUmlaut(lv_obj_t *label)
     assert(glyph.box_w > 0 && glyph.box_h > 0);
 }
 
+lv_obj_t *findWidget(lv_obj_t *root, const lv_obj_class_t *type)
+{
+    if (lv_obj_check_type(root, type)) return root;
+    for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i)
+        if (auto *widget = findWidget(lv_obj_get_child(root, i), type)) return widget;
+    return nullptr;
+}
+
+void testFormDrafts()
+{
+    auto &screen = Display::resourceDetailsScreen;
+    Display::transitionToScreen(&screen);
+    Display::loop();
+    API::ResourceUsageFormRequest request{};
+    request.resourceId = 1;
+    request.formCount = 1;
+    request.forms[0].id = 1;
+    request.forms[0].name = "Draft";
+    request.forms[0].fieldCount = 1;
+    API::ResourceUsageFormFieldsPage page{};
+    page.resourceId = 1;
+    page.formId = 1;
+    page.fieldCount = 1;
+    page.totalFieldCount = 1;
+    auto &field = page.fields[0];
+    field.id = 1;
+    field.name = "Note";
+    field.type = API::ResourceUsageFormFieldType::TEXT;
+    field.hasValue = true;
+    field.options.text.multiline = true;
+    field.value = "Size™\n“München” — Größe";
+    constexpr char displayValue[] = "SizeTM\n\"München\" - Größe";
+    std::string submitted;
+    screen.setFormPageNextCallback([&](const API::FormPageSubmission &submission) {
+        assert(submission.answerCount == 1);
+        submitted = submission.answers[0].stringValue;
+    });
+    for (const bool edit : {false, true}) {
+        screen.showFormsModal(request);
+        screen.renderFormField(page, false, true, 1, 1);
+        auto *preview = findLabel(lv_layer_top(), displayValue);
+        assert(preview);
+        lv_obj_send_event(lv_obj_get_parent(preview), LV_EVENT_CLICKED, nullptr);
+        auto *textarea = findWidget(lv_layer_top(), &lv_textarea_class);
+        auto *keyboard = findWidget(lv_layer_top(), &lv_keyboard_class);
+        assert(textarea && keyboard);
+        assert(std::strcmp(lv_textarea_get_text(textarea), displayValue) == 0);
+        if (edit) lv_textarea_set_text(textarea, "Geändert\nGröße");
+        lv_obj_send_event(keyboard, LV_EVENT_READY, nullptr);
+        auto *submit = findLabel(lv_layer_top(), "Absenden");
+        assert(submit);
+        lv_obj_send_event(lv_obj_get_parent(submit), LV_EVENT_CLICKED, nullptr);
+        assert(submitted == (edit ? "Geändert\nGröße" : field.value));
+    }
+    screen.hideFormsModal();
+    screen.setFormPageNextCallback({});
+    Display::transitionToScreen(&Display::initScreen);
+    Display::loop();
+}
+
 void testLockscreen(SdlDisplay &display, const std::filesystem::path &screenshots)
 {
     // Exercise selection -> lockscreen with the simulator's production theme,
@@ -141,6 +201,7 @@ int main(int argc, char **argv)
     assert(display.pollEvents());
     screenshot(screenshots, "device.png");
     testLockscreen(display, screenshots);
+    testFormDrafts();
 
     TouchPoint touch{};
     // The firmware still sees a 480 x 480 screen, offset inside the CAD face.
