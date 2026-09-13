@@ -14,21 +14,25 @@ import { ResourceChangedEvent } from './events/resource-changed.event';
 import { MetricsService } from '../metrics/metrics.service';
 import { AuditService } from '../audit/audit.service';
 
-const MAX_AUDIT_RESOURCE_NAME_BYTES = 1024;
+const MAX_AUDIT_DETAILS_BYTES = 4096;
 
-function auditResourceName(name: string): string {
-  if (Buffer.byteLength(name, 'utf8') <= MAX_AUDIT_RESOURCE_NAME_BYTES) return name;
+function auditResourceName(name: string, maxJsonBytes: number): string {
+  if (Buffer.byteLength(JSON.stringify(name), 'utf8') <= maxJsonBytes) return name;
 
   const suffix = '...';
   let result = '';
-  let byteLength = Buffer.byteLength(suffix, 'utf8');
   for (const character of name) {
-    const characterByteLength = Buffer.byteLength(character, 'utf8');
-    if (byteLength + characterByteLength > MAX_AUDIT_RESOURCE_NAME_BYTES) break;
+    if (Buffer.byteLength(JSON.stringify(result + character + suffix), 'utf8') > maxJsonBytes) break;
     result += character;
-    byteLength += characterByteLength;
   }
   return result + suffix;
+}
+
+function auditResourceNames(names: Record<string, string>, details: Record<string, string>): Record<string, string> {
+  const emptyNames = Object.fromEntries(Object.keys(names).map((key) => [key, '']));
+  const availableBytes = MAX_AUDIT_DETAILS_BYTES - Buffer.byteLength(JSON.stringify({ ...details, ...emptyNames }), 'utf8');
+  const maxJsonBytes = Math.floor(availableBytes / Object.keys(names).length);
+  return Object.fromEntries(Object.entries(names).map(([key, name]) => [key, auditResourceName(name, maxJsonBytes)]));
 }
 
 @Injectable()
@@ -104,7 +108,7 @@ export class ResourcesService {
       await this.audit.recordResource({
         action: 'resource.created', actorId: actor.id, authenticationMethod: actor.authenticationMethod,
         apiTokenId: actor.apiTokenId, subjectId: resource.id,
-        details: { 'after.name': auditResourceName(resource.name), 'after.type': resource.type },
+        details: { ...auditResourceNames({ 'after.name': resource.name }, { 'after.type': resource.type }), 'after.type': resource.type },
       });
     }
 
@@ -210,15 +214,6 @@ export class ResourcesService {
     const updatedResource = await this.resourceRepository.save(resource);
     this.eventEmitter.emit(ResourceChangedEvent.EVENT_NAME, new ResourceChangedEvent(updatedResource.id));
     if (actor) {
-      const details: Record<string, string> = {};
-      if (before.name !== updatedResource.name) {
-        details['before.name'] = auditResourceName(before.name);
-        details['after.name'] = auditResourceName(updatedResource.name);
-      }
-      if (before.type !== updatedResource.type) {
-        details['before.type'] = before.type;
-        details['after.type'] = updatedResource.type;
-      }
       const changedFields = [
         ...(before.name !== updatedResource.name ? ['name'] : []),
         ...(before.type !== updatedResource.type ? ['type'] : []),
@@ -238,7 +233,17 @@ export class ResourcesService {
         ...(before.autoIntroductionTarget !== updatedResource.autoIntroductionTarget ? ['autoIntroductionTarget'] : []),
         ...(before.autoIntroductionGroupId !== updatedResource.autoIntroductionGroupId ? ['autoIntroductionGroupId'] : []),
       ];
-      if (changedFields.length) details.changedFields = JSON.stringify(changedFields);
+      const details: Record<string, string> = changedFields.length ? { changedFields: JSON.stringify(changedFields) } : {};
+      if (before.type !== updatedResource.type) {
+        details['before.type'] = before.type;
+        details['after.type'] = updatedResource.type;
+      }
+      if (before.name !== updatedResource.name) {
+        Object.assign(details, auditResourceNames(
+          { 'before.name': before.name, 'after.name': updatedResource.name },
+          details,
+        ));
+      }
       if (Object.keys(details).length) {
         await this.audit.recordResource({
           action: 'resource.updated', actorId: actor.id, authenticationMethod: actor.authenticationMethod,
@@ -265,7 +270,7 @@ export class ResourcesService {
       await this.audit.recordResource({
         action: 'resource.deleted', actorId: actor.id, authenticationMethod: actor.authenticationMethod,
         apiTokenId: actor.apiTokenId, subjectId: id,
-        details: { 'before.name': auditResourceName(resource.name), 'before.type': resource.type },
+        details: { ...auditResourceNames({ 'before.name': resource.name }, { 'before.type': resource.type }), 'before.type': resource.type },
       });
     }
   }
