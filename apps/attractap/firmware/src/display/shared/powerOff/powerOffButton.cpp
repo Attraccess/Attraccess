@@ -2,6 +2,7 @@
 
 #include "powerOffButton.hpp"
 #include "display/theme.hpp"
+#include "display/fonts/attractap_fonts.hpp"
 
 namespace
 {
@@ -74,9 +75,9 @@ namespace
         lv_obj_set_flex_align(dialog, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
         lv_obj_t *lbl = lv_label_create(dialog);
-        lv_label_set_text(lbl, "Geraet ausschalten?");
+        lv_label_set_text(lbl, "Gerät ausschalten?");
         lv_obj_set_style_text_color(lbl, DisplayTheme::text(), LV_PART_MAIN);
-        lv_obj_set_style_text_font(lbl, &lv_font_montserrat_24, LV_PART_MAIN);
+        lv_obj_set_style_text_font(lbl, &attractap_font_montserrat_latin1_24, LV_PART_MAIN);
         lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
 
         lv_obj_t *row = lv_obj_create(dialog);

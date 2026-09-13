@@ -158,7 +158,7 @@ void Application::handleResourceDetailsButtonClick(
     }
 
     Display::resourceDetailsScreen.showActionProgress(
-        isTakeover ? "Uebernehme Sitzung" : "Starte Sitzung");
+        isTakeover ? "Übernehme Sitzung" : "Starte Sitzung");
     this->beginActionPause();
     this->pendingActionType = PENDING_ACTION_START_SESSION;
     this->pendingActionResourceId = this->selectedResourceId;
@@ -183,22 +183,22 @@ void Application::handleResourceDetailsButtonClick(
     this->api.stopResourceUsageSession(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
-    Display::resourceDetailsScreen.showActionProgress("Sperre Tuer");
+    Display::resourceDetailsScreen.showActionProgress("Sperre Tür");
     this->beginActionPause();
     this->api.lockDoor(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR:
-    Display::resourceDetailsScreen.showActionProgress("Entsperre Tuer");
+    Display::resourceDetailsScreen.showActionProgress("Entsperre Tür");
     this->beginActionPause();
     this->api.unlockDoor(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR:
-    Display::resourceDetailsScreen.showActionProgress("Oeffne Tuer-Riegel");
+    Display::resourceDetailsScreen.showActionProgress("Öffne Tür-Riegel");
     this->beginActionPause();
     this->api.unlatchDoor(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_FLOW_BUTTON:
-    Display::resourceDetailsScreen.showActionProgress("Aktion Ausfuehren");
+    Display::resourceDetailsScreen.showActionProgress("Aktion Ausführen");
     this->beginActionPause();
     this->api.triggerFlowButton(this->selectedResourceId, evt.flowButtonId);
     break;

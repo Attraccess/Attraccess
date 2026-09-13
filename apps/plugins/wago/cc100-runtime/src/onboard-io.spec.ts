@@ -325,6 +325,11 @@ describe('CC100 packed digital I/O', () => {
       await write(physical, value);
       if (!value) retried.resolve();
     });
+    const outputs = runtime['outputs'];
+    const shutdown = jest.spyOn(
+      outputs as unknown as { writePulseShutdown: (typeof outputs)['writePulseShutdown'] },
+      'writePulseShutdown',
+    );
     await command('DO1', true, 'pulse', 'pulse');
     await started.promise;
     try {
@@ -332,6 +337,10 @@ describe('CC100 packed digital I/O', () => {
       expect(await readFile(paths.output, 'utf8')).toBe('0');
     } finally {
       release.resolve();
+      // The adapter write finishes before the retry saves state and publishes it.
+      // Drain that work before afterEach removes the simulated I/O directory.
+      await Promise.all(shutdown.mock.results.map((result) => result.value));
+      shutdown.mockRestore();
       await runtime.pollInputs();
     }
   });

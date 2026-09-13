@@ -130,6 +130,50 @@ describe('AttractapGateway', () => {
     expect(gateway).toBeDefined();
   });
 
+  describe('LVGL output sanitization', () => {
+    const sanitize = (value: string) =>
+      (gateway as unknown as { makeStringLVGLReady: (input: string) => string }).makeStringLVGLReady(value);
+
+    it('preserves printable Latin-1 characters', () => {
+      expect(sanitize('ÄÖÜ äöü ß \u00A0°®')).toBe('ÄÖÜ äöü ß \u00A0°®');
+    });
+
+    it('uses readable fallbacks for unsupported characters', () => {
+      expect(sanitize('“München” — Größe™')).toBe('"München" - GrößeTM');
+      expect(sanitize('Cafe\u0301 ☃')).toBe('Cafe ?');
+    });
+
+    it('preserves layout controls', () => {
+      expect(sanitize('First line\nSecond line\r\n\tIndented')).toBe('First line\nSecond line\r\n\tIndented');
+    });
+
+    it('preserves form protocol values while sanitizing display metadata', () => {
+      const message = new AttractapEvent(AttractapEventType.RESOURCE_USAGE_FORM_FIELDS, {
+        fields: [
+          {
+            name: '“Größe”',
+            description: null,
+            options: ['Size™'],
+            value: 'Size™',
+          },
+          {
+            name: 'Note',
+            description: null,
+            options: { placeholder: '“Use Size™” — optional' },
+            value: null,
+          },
+        ],
+      });
+      const sanitized = (gateway as unknown as { sanitizeForLVGL: <T>(value: T) => T }).sanitizeForLVGL(message);
+      const field = sanitized.data.payload.fields[0];
+
+      expect(field.name).toBe('"Größe"');
+      expect(field.options).toEqual(['Size™']);
+      expect(field.value).toBe('Size™');
+      expect(sanitized.data.payload.fields[1].options).toEqual({ placeholder: '"Use SizeTM" - optional' });
+    });
+  });
+
   describe('handleConnection', () => {
     it('closes the connection when license verification fails', async () => {
       licenseService.verifyLicense.mockRejectedValue(new Error('License invalid'));

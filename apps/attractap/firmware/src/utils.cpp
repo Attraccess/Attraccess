@@ -341,21 +341,21 @@ std::string translateReaderError(const std::string &errorKey)
 {
     // Card / enrollment errors
     if (errorKey == "USER_NOT_SET")
-        return "Kein Benutzer ausgewaehlt";
+        return "Kein Benutzer ausgewählt";
     if (errorKey == "INVALID_PARAMS")
-        return "Ungueltige Anfrage";
+        return "Ungültige Anfrage";
     if (errorKey == "CARD_ALREADY_ENROLLED")
         return "Karte ist bereits registriert";
     if (errorKey == "ENROLL_NEW_CARD_DATA_NOT_SET")
         return "Registrierungsdaten fehlen";
     if (errorKey == "KEY_NOT_SET")
-        return "Schluessel fehlt";
+        return "Schlüssel fehlt";
     if (errorKey == "USER_NOT_FOUND")
         return "Benutzer nicht gefunden";
     if (errorKey == "RESET_NFC_CARD_DATA_NOT_SET")
-        return "Daten zum Zuruecksetzen fehlen";
+        return "Daten zum Zurücksetzen fehlen";
     if (errorKey == "INVALID_UID")
-        return "Ungueltige Karten-UID";
+        return "Ungültige Karten-UID";
     if (errorKey == "CARD_NOT_FOUND")
         return "Karte nicht gefunden";
     if (errorKey == "CARD_NOT_ACTIVE")
@@ -363,7 +363,7 @@ std::string translateReaderError(const std::string &errorKey)
 
     // Resource usage / session errors
     if (errorKey == "INVALID_RESOURCE_ID")
-        return "Ungueltige Ressource";
+        return "Ungültige Ressource";
     if (errorKey == "READER_NOT_FOUND")
         return "Leser nicht gefunden";
     if (errorKey == "RESOURCE_NOT_ASSOCIATED_WITH_READER")
@@ -377,9 +377,9 @@ std::string translateReaderError(const std::string &errorKey)
     if (errorKey == "SUMUP_NOT_ENABLED")
         return "Bezahlung nicht aktiviert";
     if (errorKey == "INVALID_AMOUNT")
-        return "Ungueltiger Betrag";
+        return "Ungültiger Betrag";
     if (errorKey == "NO_SUMUP_TERMINALS_AVAILABLE")
-        return "Kein Zahlungsterminal verfuegbar";
+        return "Kein Zahlungsterminal verfügbar";
     if (errorKey == "SUMUP_TOPUP_FAILED")
         return "Aufladung fehlgeschlagen";
 

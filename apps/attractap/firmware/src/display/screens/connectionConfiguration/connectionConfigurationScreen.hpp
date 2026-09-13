@@ -33,7 +33,7 @@ public:
     void setOnResetCertificateCallback(std::function<void()> onResetCertificateCallback);
 #ifdef HAS_POWER_BUTTON
     // Application wires this to IOExpander::powerOff(). Invoked after the user
-    // confirms the power-off dialog on the "Geraet" tab.
+    // confirms the power-off dialog on the "Gerät" tab.
     void setOnPowerOffCallback(std::function<void()> cb) { onPowerOffCallback = cb; }
 #endif
     void disablePinLock();

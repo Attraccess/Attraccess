@@ -1,4 +1,5 @@
 #include "display/theme.hpp"
+#include "display/fonts/attractap_fonts.hpp"
 #include "display/images/logo_40h.hpp"
 #include "display/images/lockscreen_background_image.hpp"
 #include "display/screens/lockscreen/lockscreen.hpp"
@@ -211,6 +212,37 @@ void expectFlat(lv_obj_t *obj, int32_t radius)
     expect(lv_obj_get_style_bg_grad_dir(obj, LV_PART_MAIN) == LV_GRAD_DIR_NONE, "No gradient");
     expect(lv_obj_get_style_shadow_width(obj, LV_PART_MAIN) == 0, "No shadow");
     expect(lv_obj_get_style_radius(obj, LV_PART_MAIN) == radius, "Theme corner radius");
+}
+
+void testLatin1Fonts(Renderer &renderer)
+{
+    const std::array<const lv_font_t *, 10> fonts = {
+        &attractap_font_montserrat_latin1_10, &attractap_font_montserrat_latin1_14,
+        &attractap_font_montserrat_latin1_16, &attractap_font_montserrat_latin1_18,
+        &attractap_font_montserrat_latin1_20, &attractap_font_montserrat_latin1_24,
+        &attractap_font_montserrat_latin1_26, &attractap_font_montserrat_latin1_28,
+        &attractap_font_montserrat_latin1_32, &attractap_font_montserrat_latin1_36};
+    ScreenGuard screen(lv_obj_create(nullptr));
+    auto *sample = label(screen.root, "ÄÖÜ äöü ß | München, Größe, für\nASCII: Abc 0123");
+    lv_obj_set_width(sample, 460);
+    lv_obj_center(sample);
+    for (size_t i = 0; i < fonts.size(); ++i) {
+        for (uint32_t codepoint = 0x21; codepoint <= 0xFF; ++codepoint) {
+            if (codepoint >= 0x7F && codepoint <= 0xA0) continue;
+            lv_font_glyph_dsc_t glyph{};
+            expect(lv_font_get_glyph_dsc(fonts[i], &glyph, codepoint, 0) && !glyph.is_placeholder,
+                   "Every printable ASCII and Latin-1 glyph exists at every configured size");
+            if (glyph.box_w == 0 || glyph.box_h == 0) continue;
+            auto *buffer = lv_draw_buf_create(glyph.box_w, glyph.box_h, LV_COLOR_FORMAT_A8, LV_STRIDE_AUTO);
+            expect(buffer != nullptr, "Allocate glyph draw buffer");
+            const bool rendered = lv_font_get_glyph_bitmap(&glyph, buffer) != nullptr;
+            lv_font_glyph_release_draw_data(&glyph);
+            lv_draw_buf_destroy(buffer);
+            expect(rendered, "LVGL decodes the actual glyph bitmap with production compression settings");
+        }
+        lv_obj_set_style_text_font(sample, fonts[i], LV_PART_MAIN);
+        renderer.capture("latin1-font-" + std::to_string(i));
+    }
 }
 
 void testSurfaces(Renderer &renderer)
@@ -504,6 +536,8 @@ void testCard(Renderer &renderer, const std::string &name, const char *writing, 
         if (states[i] == CardScreen::STATUS_ERROR) card.setStatusMessage(Fixtures::errorMessage);
         auto *status = requireObject(screen.root, &lv_label_class, text[i]);
         expectColor(lv_obj_get_style_text_color(status, LV_PART_MAIN), colors[i], name + ": status color");
+        expect(lv_obj_get_style_text_font(status, LV_PART_MAIN) == &attractap_font_montserrat_latin1_32,
+               name + ": server-derived status uses a Latin-1 font");
         expect(lv_obj_has_flag(cancel, LV_OBJ_FLAG_HIDDEN) == (states[i] == CardScreen::STATUS_SUCCESS), name + ": cancel visibility");
         renderer.capture(name + "-" + suffix[i]);
         expect(lv_bar_get_value(bar) == 30, name + ": fixed 30-second countdown");
@@ -526,7 +560,9 @@ void testSupervision(Renderer &renderer)
     supervision.init();
     ScreenGuard screen(supervision.getScreen(), &supervision);
     requireObject(screen.root, &lv_label_class, Fixtures::userName);
-    requireObject(screen.root, &lv_label_class, Fixtures::supervisorHint);
+    auto *hint = requireObject(screen.root, &lv_label_class, Fixtures::supervisorHint);
+    expect(lv_obj_get_style_text_font(hint, LV_PART_MAIN) == &attractap_font_montserrat_latin1_18,
+           "Supervision hint uses a Latin-1 font");
     auto *cancel = lv_obj_get_parent(requireObject(screen.root, &lv_label_class, "Abbrechen"));
     const std::array<SupervisionScreen::Status, 4> states = {SupervisionScreen::STATUS_WAITING, SupervisionScreen::STATUS_VERIFYING,
         SupervisionScreen::STATUS_SUCCESS, SupervisionScreen::STATUS_ERROR};
@@ -538,6 +574,8 @@ void testSupervision(Renderer &renderer)
         supervision.render(view);
         auto *status = requireObject(screen.root, &lv_label_class, text[i]);
         expectColor(lv_obj_get_style_text_color(status, LV_PART_MAIN), colors[i], "Supervision status color");
+        expect(lv_obj_get_style_text_font(status, LV_PART_MAIN) == &attractap_font_montserrat_latin1_28,
+               "Supervision server-derived status uses a Latin-1 font");
         expect(lv_obj_has_flag(cancel, LV_OBJ_FLAG_HIDDEN) == (view.status == SupervisionScreen::STATUS_SUCCESS), "Supervision cancel visibility");
         renderer.capture(std::string("supervision-") + suffix[i]);
     }
@@ -556,10 +594,16 @@ void testSupervision(Renderer &renderer)
 void testPin(Renderer &renderer)
 {
     PinInputPage pin;
-    ScreenGuard screen(pin.init("Geraete-PIN"));
+    ScreenGuard screen(pin.init("Geräte-PIN"));
     auto *field = requireObject(screen.root, &lv_textarea_class);
     auto *keyboard = requireObject(screen.root, &lv_keyboard_class);
-    auto *title = requireObject(screen.root, &lv_label_class, "Geraete-PIN");
+    auto *title = requireObject(screen.root, &lv_label_class, "Geräte-PIN");
+    expect(lv_obj_get_style_text_font(title, LV_PART_MAIN) == &attractap_font_montserrat_latin1_32,
+           "Device PIN title preserves its original 32px size");
+    lv_font_glyph_dsc_t titleGlyph{};
+    expect(lv_font_get_glyph_dsc(lv_obj_get_style_text_font(title, LV_PART_MAIN), &titleGlyph, 0xE4, 0)
+               && !titleGlyph.is_placeholder,
+           "Device PIN title renders its umlaut without a placeholder");
     expect(lv_keyboard_get_textarea(keyboard) == field, "Production PIN keyboard is bound to field");
     setState(field, LV_STATE_FOCUSED);
     renderer.capture("pin-empty");
@@ -628,14 +672,26 @@ void testBackgroundScreens(Renderer &renderer)
 {
     expect(reinterpret_cast<uintptr_t>(lockscreen_map) % 4 == 0, "Background data aligned");
     expect(static_cast<size_t>(backgroundEnd - lockscreen_map) == 480 * 480 * 2, "Background byte count");
+    for (const uint32_t glyph : {0x00C4, 0x00D6, 0x00DC, 0x00DF, 0x00E4, 0x00F6, 0x00FC})
+    {
+        lv_font_glyph_dsc_t descriptor{};
+        expect(lv_font_get_glyph_dsc(&attractap_font_montserrat_latin1_18, &descriptor, glyph, 0),
+               "Lockscreen font contains each German Latin-1 glyph");
+    }
     {
         Lockscreen lock;
-        lock.setResourceName("Lasercutter");
+        lock.setResourceName("CNC Fräse");
         lock.init();
         ScreenGuard guard(lock.getScreen(), &lock);
         lock.setUsageInfo(false, "", false);
+        auto *resourceName = requireObject(guard.root, &lv_label_class, "CNC Fräse");
+        expect(lv_obj_get_style_text_font(resourceName, LV_PART_MAIN) == &attractap_font_montserrat_latin1_18,
+               "Lockscreen resource name uses a Latin-1 font");
         expectBackground(renderer, guard.root, "lockscreen-available");
-        lock.setUsageInfo(true, "Alex", false);
+        lock.setUsageInfo(true, "Müller", false);
+        auto *usage = requireObject(guard.root, &lv_label_class, "In Verwendung: Müller");
+        expect(lv_obj_get_style_text_font(usage, LV_PART_MAIN) == &attractap_font_montserrat_latin1_18,
+               "Lockscreen active username uses a Latin-1 font");
         expectBackground(renderer, guard.root, "lockscreen-in-use");
         lock.setUsageInfo(false, "", true);
         expectBackground(renderer, guard.root, "lockscreen-maintenance");
@@ -701,6 +757,7 @@ int main(int argc, char **argv)
                 std::cerr << "FAIL " << name << ": " << error.what() << '\n';
             }
         };
+        test("render/latin1-all-sizes", [&] { testLatin1Fonts(renderer); });
         test("theme/surfaces-and-font", [&] { testSurfaces(renderer); });
         test("theme/automatic-button-states", [&] { testButtons(renderer, false); });
         test("theme/helper-button-states", [&] { testButtons(renderer, true); });
@@ -710,7 +767,7 @@ int main(int argc, char **argv)
         test("screen/boot", [&] { testBoot(renderer); });
         test("screen/init", [&] { testInit(renderer); });
         test("screen/enrollment", [&] { testCard<EnrollmentScreen>(renderer, "enrollment", "Karte wird beschrieben...\nbitte nicht bewegen", "Karte registriert!"); });
-        test("screen/reset", [&] { testCard<ResetScreen>(renderer, "reset", "Karte wird zurueckgesetzt...\nbitte nicht bewegen", "Karte zurueckgesetzt!"); });
+        test("screen/reset", [&] { testCard<ResetScreen>(renderer, "reset", "Karte wird zurückgesetzt...\nbitte nicht bewegen", "Karte zurückgesetzt!"); });
         test("screen/supervision", [&] { testSupervision(renderer); });
         test("screen/pin-and-real-keyboard-events", [&] { testPin(renderer); });
         std::cout << "RESULT " << passed << " passed, " << failed << " failed; " << checks << " checks; "
