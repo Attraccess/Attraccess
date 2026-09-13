@@ -62,7 +62,11 @@ export class AdminPasswordPolicyController {
     summary: 'Server-side preview: evaluate a candidate password against the current (or draft) policy',
     operationId: 'previewAdminPasswordPolicy',
   })
-  @ApiResponse({ status: 200, description: 'Full preview result including zxcvbn + HIBP + history checks.', type: PreviewPasswordResultDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Full preview result including zxcvbn + HIBP + history checks.',
+    type: PreviewPasswordResultDto,
+  })
   async preview(@Body() body: PreviewPasswordDto): Promise<PreviewPasswordResultDto> {
     let policyOverride: PasswordPolicyConfig | undefined;
     if (body.draftPolicy) {
@@ -90,7 +94,12 @@ export class AdminPasswordPolicyController {
   @Auth('system.settings.manage')
   @ApiParam({ name: 'role', enum: PasswordPolicyRole, enumName: 'PasswordPolicyRole' })
   @ApiOperation({ summary: 'Get the per-role override for a single role', operationId: 'getPasswordPolicyOverride' })
-  @ApiResponse({ status: 200, description: 'The override row, or null if unset.', type: PasswordPolicyOverrideDto, nullable: true })
+  @ApiResponse({
+    status: 200,
+    description: 'The override row, or null if unset.',
+    type: PasswordPolicyOverrideDto,
+    nullable: true,
+  })
   async getOverride(
     @Param('role', new ParseEnumPipe(PasswordPolicyRole)) role: PasswordPolicyRole,
   ): Promise<PasswordPolicyOverrideDto | null> {
@@ -165,10 +174,11 @@ export class AdminPasswordPolicyController {
     return {
       actorId: request.user?.id ?? null,
       actorUsername: request.user?.username ?? null,
+      authenticationMethod: request.user?.authenticationMethod ?? 'session',
+      apiTokenId: request.user?.apiTokenId ?? null,
       ip: request.ip ?? null,
       userAgent: userAgent ?? null,
       requestId: requestId ?? null,
     };
   }
-
 }

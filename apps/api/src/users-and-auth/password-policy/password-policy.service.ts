@@ -72,6 +72,8 @@ export interface ValidateOptions {
 export interface AuditContext {
   actorId: number | null;
   actorUsername: string | null;
+  authenticationMethod: 'session' | 'api-token';
+  apiTokenId: number | null;
   ip: string | null;
   userAgent: string | null;
   requestId: string | null;
@@ -151,10 +153,7 @@ export class PasswordPolicyService implements OnModuleInit {
     return perms.has('system.settings.manage') ? PasswordPolicyRole.ADMIN : undefined;
   }
 
-  public async updatePolicy(
-    input: PartialPasswordPolicy,
-    audit?: AuditContext,
-  ): Promise<PasswordPolicyConfig> {
+  public async updatePolicy(input: PartialPasswordPolicy, audit?: AuditContext): Promise<PasswordPolicyConfig> {
     const sanitized = this.sanitizePartial(input);
     try {
       let auditInput: Parameters<typeof this.persistAudit>[0] | undefined;
@@ -296,7 +295,9 @@ export class PasswordPolicyService implements OnModuleInit {
     const baseResult = validatePassword(password, policy, userCtx, { commonPasswords: COMMON_PASSWORDS });
     const errors: PolicyError[] = [...baseResult.errors];
 
-    const zxcvbnInputs = [userCtx.username, userCtx.email].filter((v): v is string => typeof v === 'string' && v.length > 0);
+    const zxcvbnInputs = [userCtx.username, userCtx.email].filter(
+      (v): v is string => typeof v === 'string' && v.length > 0,
+    );
     const zxcvbnResult = this.zxcvbn.evaluate(password, zxcvbnInputs);
     if (zxcvbnResult.score < policy.minZxcvbnScore) {
       errors.push({
@@ -427,6 +428,8 @@ export class PasswordPolicyService implements OnModuleInit {
       operationId: randomUUID(),
       outcome: 'succeeded',
       actorId: input.audit.actorId ?? undefined,
+      authenticationMethod: input.audit.authenticationMethod,
+      apiTokenId: input.audit.apiTokenId ?? undefined,
       subjectType: 'identity.password_policy',
       subjectId: PASSWORD_POLICY_SINGLETON_ID,
       details,

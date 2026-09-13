@@ -61,7 +61,10 @@ export class RbacController {
 
   @Delete('roles/:id')
   @Auth('system.settings.manage')
-  @ApiOperation({ summary: 'Delete a custom role, removing or reassigning its user assignments', operationId: 'deleteRole' })
+  @ApiOperation({
+    summary: 'Delete a custom role, removing or reassigning its user assignments',
+    operationId: 'deleteRole',
+  })
   @ApiQuery({
     name: 'reassignToRoleId',
     required: false,
@@ -80,12 +83,18 @@ export class RbacController {
     if (role) this.record('role_deleted', role, request);
   }
 
-  private record(action: 'role_created' | 'role_updated' | 'role_deleted', role: Role, request: AuthenticatedRequest): void {
+  private record(
+    action: 'role_created' | 'role_updated' | 'role_deleted',
+    role: Role,
+    request: AuthenticatedRequest,
+  ): void {
     void this.identityAudit?.record({
       action,
       operationId: randomUUID(),
       outcome: 'succeeded',
       actorId: request.user.id,
+      authenticationMethod: request.user.authenticationMethod ?? 'session',
+      apiTokenId: request.user.apiTokenId,
       subjectType: 'identity.role',
       subjectId: role.id,
       details: { role: role.key },
