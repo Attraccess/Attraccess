@@ -65,6 +65,7 @@ describe('ProjectsService', () => {
     projectRepository = {
       createQueryBuilder: jest.fn().mockReturnValue(queryBuilder),
       save: jest.fn(),
+      update: jest.fn(),
       delete: jest.fn(),
     } as unknown as jest.Mocked<Repository<Project>>;
 
@@ -291,6 +292,21 @@ describe('ProjectsService', () => {
       });
     });
 
+    it('records an update when its only project save succeeds', async () => {
+      const existing = { id: 3, name: 'Old', description: 'Old', logo: 'old.png' } as Project;
+      const payload = { name: 'New', logo: Buffer.from('n') as unknown as FileUpload } as UpdateProjectDto;
+      projectAccessService.ensureOwner.mockResolvedValueOnce(existing);
+      fileStorageService.saveFile.mockResolvedValueOnce('new.png');
+      projectRepository.save.mockImplementation(async (entity: Project) => entity);
+
+      await service.updateOne(1, 3, payload);
+
+      expect(projectRepository.save).toHaveBeenCalledTimes(1);
+      expect(audit.recordProject).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'project.updated', details: expect.objectContaining({ changedFields: '["name","logo"]' }),
+      }));
+    });
+
     it('does not record an update when safe state values are unchanged', async () => {
       const existing = { id: 3, name: 'Same', description: 'Same', logo: null } as Project;
       projectAccessService.ensureOwner.mockResolvedValueOnce(existing);
@@ -315,7 +331,7 @@ describe('ProjectsService', () => {
     it('records archive lifecycle changes with the initiating actor', async () => {
       const project = { id: 3, name: 'Project', logo: null } as Project;
       projectAccessService.ensureOwner.mockResolvedValue(project);
-      projectRepository.save.mockImplementation(async (entity: Project) => entity);
+      projectRepository.update.mockResolvedValue({ affected: 1 } as never);
 
       await service.archiveOne(2, 3);
       await service.unarchiveOne(2, 3);
@@ -330,15 +346,17 @@ describe('ProjectsService', () => {
       });
     });
 
-    it('does not save or audit archive lifecycle requests already in the requested state', async () => {
+    it('does not audit lifecycle requests that did not transition a row', async () => {
       const archivedProject = { id: 3, name: 'Archived', archivedAt: new Date(), logo: null } as Project;
       const activeProject = { id: 4, name: 'Active', archivedAt: null, logo: null } as Project;
       projectAccessService.ensureOwner.mockResolvedValueOnce(archivedProject).mockResolvedValueOnce(activeProject);
+      projectRepository.update.mockResolvedValue({ affected: 0 } as never);
 
       await service.archiveOne(2, 3);
       await service.unarchiveOne(2, 4);
 
       expect(projectRepository.save).not.toHaveBeenCalled();
+      expect(projectRepository.update).toHaveBeenCalledTimes(2);
       expect(audit.recordProject).not.toHaveBeenCalled();
     });
   });
