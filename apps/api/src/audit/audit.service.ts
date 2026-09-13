@@ -319,6 +319,14 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
       const config = await readAuditSettings(this.settings);
       const cutoff = this.cutoff(config.retention_days);
       while (!this.stopping) {
+        if (await this.hasPasswordPolicyOverflow()) {
+          await this.storage.query(`DELETE FROM password_policy_audit_overflow
+            WHERE legacyAuditId IN (
+              SELECT json_extract(details, '$.legacyAuditId') FROM audit_log
+              WHERE at < ? AND json_extract(details, '$.migrationSource') = 'password_policy_audit'
+              ORDER BY at LIMIT 1000
+            )`, [cutoff.toISOString()]);
+        }
         const result = await this.storage
           .getRepository(AuditLog)
           .createQueryBuilder()
@@ -372,10 +380,55 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
         .take(limit + 1)
         .getMany();
       const hasMore = rows.length > limit;
-      const items = await auditEntriesWithLabels(this.source, rows.slice(0, limit));
+      const retainedRows = rows.slice(0, limit);
+      await this.hydrateLegacyPasswordPolicyDetails(retainedRows);
+      const items = await auditEntriesWithLabels(this.source, retainedRows);
       return { items, nextCursor: hasMore ? items[items.length - 1].id : null };
     } finally {
       this.activeReads--;
+    }
+  }
+
+  private async hasPasswordPolicyOverflow(): Promise<boolean> {
+    const storage = this.storage;
+    if (!storage) return false;
+    const rows = await storage.query(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'password_policy_audit_overflow' LIMIT 1",
+    );
+    return rows.some((row: { name?: unknown }) => row.name === 'password_policy_audit_overflow');
+  }
+
+  /** Hydrate only legacy rows returned on this page; current audit event details stay bounded at write time. */
+  private async hydrateLegacyPasswordPolicyDetails(items: AuditLog[]): Promise<void> {
+    const legacyIds = items
+      .map((item) => {
+        const legacyAuditId = Number(item.details.legacyAuditId);
+        return Number.isSafeInteger(legacyAuditId) ? legacyAuditId : null;
+      })
+      .filter((id): id is number => id !== null);
+    if (!legacyIds.length || !(await this.hasPasswordPolicyOverflow())) return;
+    const storage = this.storage;
+    if (!storage) return;
+    const placeholders = legacyIds.map(() => '?').join(', ');
+    const archived = await storage.query(
+      `SELECT legacyAuditId, metadata FROM password_policy_audit_overflow WHERE legacyAuditId IN (${placeholders})`,
+      legacyIds,
+    );
+    const metadata = new Map<string, Record<string, string | number | boolean | null>>();
+    for (const row of archived) {
+      try {
+        const legacyAuditId = Number(row.legacyAuditId ?? row.legacyauditid);
+        const value = JSON.parse(String(row.metadata));
+        if (Number.isSafeInteger(legacyAuditId) && value && typeof value === 'object' && !Array.isArray(value))
+          metadata.set(String(legacyAuditId), value);
+      } catch {
+        // A malformed archive must not make the audit list unavailable.
+      }
+    }
+    for (const item of items) {
+      const legacyId = item.details.legacyAuditId;
+      if (Number.isSafeInteger(legacyId) && metadata.has(String(legacyId)))
+        item.details = { ...item.details, ...metadata.get(String(legacyId)) };
     }
   }
 }

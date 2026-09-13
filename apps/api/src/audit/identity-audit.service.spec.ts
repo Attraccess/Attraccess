@@ -42,6 +42,20 @@ describe('identity audit policy', () => {
     });
   });
 
+  it('omits malformed IP addresses without dropping the event', () => {
+    for (const ipAddress of ['999.999.999.999', 'deadbeef', ':']) {
+      expect(
+        projectIdentityAuditEvent({
+          action: 'login',
+          operationId: randomUUID(),
+          outcome: 'failed',
+          details: { reason: 'invalid_credentials' },
+          request: { ipAddress },
+        }),
+      ).toMatchObject({ action: 'identity.login', ipAddress: null });
+    }
+  });
+
   it('rejects secrets and arbitrary identity details', () => {
     const event = {
       action: 'login' as const,
@@ -72,6 +86,25 @@ describe('identity audit policy', () => {
       subjectType: 'identity.password_policy',
       details: { role: '24-hour-access' },
     });
+  });
+
+  it('rejects password policy snapshots with unapproved fields and invalid values', () => {
+    for (const snapshot of [
+      { unapprovedBoolean: true },
+      { unapprovedNumber: 1 },
+      { minLength: 7 },
+      { minZxcvbnScore: 5 },
+      { requireDigit: 1 },
+    ]) {
+      expect(
+        projectIdentityAuditEvent({
+          action: 'password_policy_updated',
+          operationId: randomUUID(),
+          outcome: 'succeeded',
+          details: { before: JSON.stringify(snapshot), field: 'minLength' },
+        }),
+      ).toBeNull();
+    }
   });
 
   it('accepts long role keys generated after collisions', () => {

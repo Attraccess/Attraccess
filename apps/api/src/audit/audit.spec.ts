@@ -911,6 +911,29 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
         }),
       },
     ]);
+    const migratedStore = new SettingsStoreService(source.getRepository(Setting), null);
+    const migratedAudit = new AuditService(source, migratedStore);
+    await migratedAudit.onModuleInit();
+    const migratedList = await new AuditController(migratedAudit).list({ limit: 10 });
+    expect(migratedList.items.find((item) => item.details.legacyAuditId === 2)).toMatchObject({
+      details: {
+        detailsTruncated: 1,
+        actorUsername: 'migration-user',
+        requestId: oversizedRequestId,
+        before: oversizedBefore,
+        after: oversizedAfter,
+        changedFields: '["minLength"]',
+      },
+    });
+    await source.query(`INSERT INTO "password_policy_audit_overflow" ("legacyAuditId", "metadata")
+      VALUES (999, '{"actorUsername":"expired-user"}')`);
+    await source.query(`INSERT INTO "audit_log" ("at", "domain", "action", "operationId", "outcome", "subjectType", "subjectId", "details")
+      VALUES (datetime('now', '-2 days'), 'identity', 'identity.password_policy_updated', 'password-policy-audit-999', 'succeeded', 'identity.password_policy', 1,
+        '{"migrationSource":"password_policy_audit","legacyAuditId":999,"detailsTruncated":true}')`);
+    await migratedStore.setPlainSetting('audit', 'retention_days', '1');
+    await migratedAudit.cleanup();
+    expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toEqual([]);
+    await migratedAudit.onModuleDestroy();
     await source.query(`INSERT INTO "audit_log" ("at", "domain", "action", "operationId", "outcome", "subjectType", "subjectId", "details")
       VALUES (datetime('now'), 'identity', 'identity.password_policy_updated', 'f4ae9dd5-3b66-4d5e-a46c-03cfaa25e266', 'succeeded', 'identity.password_policy', 1, '{"field":"minLength"}')`);
     await source.query(`UPDATE "setting" SET "value" = '["identity"]'
