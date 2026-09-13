@@ -151,6 +151,14 @@ describe('RbacService', () => {
     expect(service).toBeDefined();
   });
 
+  it('looks up a single role key without loading role permissions', async () => {
+    roleRepo.findOne.mockResolvedValue(makeRole({ id: 7, key: 'operator' }));
+
+    await expect(service.getRoleKey(7)).resolves.toBe('operator');
+    expect(roleRepo.findOne).toHaveBeenCalledWith({ where: { id: 7 }, select: { key: true } });
+    expect(roleRepo.find).not.toHaveBeenCalled();
+  });
+
   // ───────────────────────── getEffectivePermissions ─────────────────────────
 
   describe('getEffectivePermissions', () => {

@@ -8,6 +8,7 @@ import * as migrations from '../database/migrations';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { AuditService } from './audit.service';
 import { AuditController } from './audit.controller';
+import { auditSettingsSchema } from './audit.config';
 
 describe('persisted audit names', () => {
   let directory: string;
@@ -23,7 +24,9 @@ describe('persisted audit names', () => {
       migrations: Object.values(migrations),
     }).initialize();
     await source.runMigrations();
-    service = new AuditService(source, new SettingsStoreService(source.getRepository(Setting), null));
+    const settings = new SettingsStoreService(source.getRepository(Setting), null);
+    await settings.setPlainSetting('audit', 'domains', JSON.stringify(auditSettingsSchema.parse({}).domains));
+    service = new AuditService(source, settings);
     await service.onModuleInit();
     controller = new AuditController(service);
     await source.getRepository(User).insert({

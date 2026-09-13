@@ -35,6 +35,8 @@ import {
   PluginAuditEvent,
 } from '@attraccess/plugins-backend-sdk';
 import { DurableAudit1783700000000 } from '../database/migrations/1783700000000-durable-audit';
+import { IdentityAudit1783800000000 } from '../database/migrations/1783800000000-identity-audit';
+import { RetirePasswordPolicyAudit1783900000000 } from '../database/migrations/1783900000000-retire-password-policy-audit';
 import { AuditService } from './audit.service';
 import { AuditModule } from './audit.module';
 import { AuditController } from './audit.controller';
@@ -56,7 +58,7 @@ const event = (): PluginAuditEvent & { pluginId: string } => ({
   subject: { type: 'wago.controller', id: 7 },
   details: { revision: 2 },
 });
-const config = { enabled: true, domains: ['administration', 'resource', 'wago'], retention_days: 90 };
+const config = { enabled: true, domains: ['administration', 'resource', 'wago', 'identity'], retention_days: 90 };
 
 describe('durable audit SQLite', () => {
   let directory: string;
@@ -64,6 +66,7 @@ describe('durable audit SQLite', () => {
   let service: AuditService;
   let store: SettingsStoreService;
   const migration = new DurableAudit1783700000000();
+  const identityMigration = new IdentityAudit1783800000000();
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'audit-'));
     source = await new DataSource({
@@ -78,6 +81,7 @@ describe('durable audit SQLite', () => {
     await source.query('CREATE TABLE api_token_permission (apiTokenId integer, permissionKey text)');
     await source.query("INSERT INTO role VALUES (1, 'administrator'), (2, 'member')");
     await migration.up(source.createQueryRunner());
+    await identityMigration.up(source.createQueryRunner());
     await source.query(
       'CREATE TABLE IF NOT EXISTS setting (id integer PRIMARY KEY AUTOINCREMENT, parent varchar NOT NULL, key varchar NOT NULL, value varchar NOT NULL, createdAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP)',
     );
@@ -171,11 +175,115 @@ describe('durable audit SQLite', () => {
       expect.objectContaining({ actorId: 42, details: { revision: 2 } }),
     ]);
     await service.onModuleDestroy();
+    await identityMigration.down(source.createQueryRunner());
     await migration.down(source.createQueryRunner());
     expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toEqual([]);
     expect(await source.query('SELECT * FROM permission')).toEqual([]);
     expect(await source.query('SELECT * FROM role')).toEqual([{ id: 2, key: 'member' }]);
     await migration.up(source.createQueryRunner());
+    await identityMigration.up(source.createQueryRunner());
+  });
+
+  it('preserves shared audit rows through identity downgrade and re-upgrade', async () => {
+    const rows = [
+      [
+        901,
+        'resource',
+        null,
+        'resource.usage_auto_closed',
+        '00000000-0000-4000-8000-000000000901',
+        null,
+        null,
+        null,
+        'resource.usage',
+        11,
+        null,
+        null,
+      ],
+      [
+        902,
+        'wago',
+        'abcdefghijklmnopqrstu',
+        'wago.device_connected',
+        '00000000-0000-4000-8000-000000000902',
+        42,
+        'api_token',
+        7,
+        'wago.device',
+        12,
+        '192.0.2.42',
+        'WAGO/1.0',
+      ],
+      [
+        903,
+        'resource',
+        null,
+        'resource.maintenance_started',
+        '00000000-0000-4000-8000-000000000903',
+        null,
+        null,
+        null,
+        'resource.maintenance',
+        13,
+        '2001:db8::3',
+        'Resource worker/1.0',
+      ],
+    ];
+
+    for (const row of rows) {
+      await source.query(
+        `INSERT INTO "audit_log" ("id", "at", "domain", "pluginId", "action", "operationId", "actorId", "authenticationMethod", "apiTokenId", "outcome", "subjectType", "subjectId", "ipAddress", "userAgent", "details")
+         VALUES (?, datetime('now'), ?, ?, ?, ?, ?, ?, ?, 'succeeded', ?, ?, ?, ?, '{"source":"migration-test"}')`,
+        row,
+      );
+    }
+
+    await identityMigration.down(source.createQueryRunner());
+    await identityMigration.up(source.createQueryRunner());
+
+    expect(
+      await source.query(`SELECT "id", "pluginId", "actorId", "authenticationMethod", "apiTokenId", "ipAddress", "userAgent"
+        FROM "audit_log" WHERE "id" IN (901, 902, 903) ORDER BY "id"`),
+    ).toEqual([
+      {
+        id: 901,
+        pluginId: null,
+        actorId: null,
+        authenticationMethod: null,
+        apiTokenId: null,
+        ipAddress: null,
+        userAgent: null,
+      },
+      {
+        id: 902,
+        pluginId: 'abcdefghijklmnopqrstu',
+        actorId: 42,
+        authenticationMethod: 'api_token',
+        apiTokenId: 7,
+        ipAddress: '192.0.2.42',
+        userAgent: 'WAGO/1.0',
+      },
+      {
+        id: 903,
+        pluginId: null,
+        actorId: null,
+        authenticationMethod: null,
+        apiTokenId: null,
+        ipAddress: '2001:db8::3',
+        userAgent: 'Resource worker/1.0',
+      },
+    ]);
+    expect((await source.query('PRAGMA index_list(audit_log)')).map(({ name }: { name: string }) => name)).toEqual(
+      expect.arrayContaining([
+        'IDX_audit_log_at',
+        'IDX_audit_log_domain_id',
+        'IDX_audit_log_actor_id',
+        'IDX_audit_log_subject_id',
+        'IDX_audit_log_operation_id',
+        'IDX_audit_log_domain_at',
+      ]),
+    );
+    await expect(source.query("UPDATE audit_log SET outcome = 'failed' WHERE id = 901")).rejects.toThrow('immutable');
   });
 
   it('never acknowledges or persists an event in an originating transaction that rolls back', async () => {
@@ -429,12 +537,85 @@ describe('durable audit SQLite', () => {
     }
     await store.setPlainSetting('audit', 'enabled', 'true');
     await store.setPlainSetting('audit', 'domains', '["wago"]');
+    await service.recordResource({
+      action: 'resource.created',
+      actorId: 42,
+      subjectId: 7,
+      details: { 'after.name': 'Lathe', 'after.type': 'machine' },
+    });
+    expect(await source.getRepository(AuditLog).count()).toBe(0);
     expect(await service.record({ ...event(), details: { password: 'not-stored' } })).toEqual({
       status: 'unavailable',
     });
     await source.query('DROP TABLE audit_log');
     expect(await service.record(event())).toEqual({ status: 'unavailable' });
     await expect(service.cleanup()).resolves.toBeUndefined();
+  });
+
+  it('records an anonymous identity event when the identity domain is enabled', async () => {
+    await store.setPlainSetting('audit', 'domains', '["identity"]');
+    const operationId = randomUUID();
+    expect(
+      await service.recordIdentity({
+        action: 'login',
+        operationId,
+        outcome: 'failed',
+        details: { reason: 'invalid_credentials' },
+        request: { ipAddress: '203.0.113.7', userAgent: 'Attraccess/1.0' },
+      }),
+    ).toEqual({ status: 'recorded' });
+    expect((await service.list({ limit: 1, operationId })).items[0]).toMatchObject({
+      domain: 'identity',
+      action: 'identity.login',
+      actorId: null,
+      subjectId: null,
+      ipAddress: '203.0.113.7',
+      userAgent: 'Attraccess/1.0',
+      details: { reason: 'invalid_credentials' },
+    });
+  });
+
+  it('records system-originated resource introductions without a synthesized session', async () => {
+    await store.setPlainSetting('audit', 'domains', '["resource"]');
+
+    await service.recordResource({
+      action: 'introduction.granted',
+      actorId: null,
+      authenticationMethod: null,
+      subjectId: 7,
+      details: { recipientUserId: 3, tutorUserId: 9 },
+    });
+
+    expect((await service.list({ limit: 1 })).items[0]).toMatchObject({
+      domain: 'resource',
+      action: 'introduction.granted',
+      actorId: null,
+      authenticationMethod: null,
+      subjectId: 7,
+      details: { recipientUserId: 3, tutorUserId: 9 },
+    });
+  });
+
+  it('records identity API-token attribution', async () => {
+    await store.setPlainSetting('audit', 'domains', '["identity"]');
+    const operationId = randomUUID();
+    expect(
+      await service.recordIdentity({
+        action: 'user_updated',
+        operationId,
+        outcome: 'succeeded',
+        actorId: 42,
+        authenticationMethod: 'api-token',
+        apiTokenId: 9,
+        subjectId: 7,
+        details: { field: 'email' },
+      }),
+    ).toEqual({ status: 'recorded' });
+    expect((await service.list({ limit: 1, operationId })).items[0]).toMatchObject({
+      actorId: 42,
+      authenticationMethod: 'api-token',
+      apiTokenId: 9,
+    });
   });
 
   it('rejects oversized details at the database boundary too', async () => {
@@ -528,6 +709,7 @@ describe('durable audit SQLite', () => {
   });
 
   it('declines writes under SQLite contention within a deadline and recovers', async () => {
+    await source.query('PRAGMA busy_timeout = 10');
     const lock = await new DataSource({ type: 'sqlite', database: source.options.database }).initialize();
     try {
       await lock.query('BEGIN IMMEDIATE');
@@ -540,7 +722,7 @@ describe('durable audit SQLite', () => {
     } finally {
       await lock.destroy();
     }
-  });
+  }, 10_000);
 
   it('enforces HTTP session permissions, token ceilings, query validation and persisted settings updates', async () => {
     const ownerPermissions = new Set(['system.audit.read', 'system.settings.manage', 'users.api-tokens.manage']);
@@ -589,6 +771,13 @@ describe('durable audit SQLite', () => {
     try {
       await app.listen(0, '127.0.0.1');
       await service.record(event());
+      await service.recordResource({
+        action: 'resource_group.resource_added',
+        actorId: 42,
+        subjectType: 'resource_group',
+        subjectId: 7,
+        details: { resourceId: 3 },
+      });
       const server = app.getHttpServer();
       await request(server).get('/api/admin/audit-log').expect(401);
       await request(server).get('/api/admin/audit-log').set('Authorization', 'Bearer invalid').expect(401);
@@ -619,6 +808,11 @@ describe('durable audit SQLite', () => {
       }
       await request(server)
         .get('/api/admin/audit-log?eventPrefix=wago.pub&from=2020-01-01T00:00:00Z')
+        .set('Cookie', 'auth-session=session')
+        .expect(200)
+        .expect(({ body }) => expect(body.items).toHaveLength(1));
+      await request(server)
+        .get('/api/admin/audit-log?action=resource_group.resource_added&subjectType=resource_group&domain=resource')
         .set('Cookie', 'auth-session=session')
         .expect(200)
         .expect(({ body }) => expect(body.items).toHaveLength(1));
@@ -854,17 +1048,61 @@ describe('audit policy and authorization', () => {
     await expect(pipe.transform(billingFilters, { type: 'query', metatype: AuditQueryDto })).resolves.toMatchObject(
       billingFilters,
     );
+    await expect(
+      pipe.transform(
+        {
+          eventPrefix: 'resource_group.',
+          action: 'introduction.granted',
+          subjectType: 'resource_group',
+          domain: 'resource',
+        },
+        { type: 'query', metatype: AuditQueryDto },
+      ),
+    ).resolves.toMatchObject({ action: 'introduction.granted', subjectType: 'resource_group', domain: 'resource' });
+    await expect(
+      pipe.transform(
+        {
+          eventPrefix: 'billing.',
+          action: 'billing.transaction.created',
+          subjectType: 'billing.transaction',
+          domain: 'billing',
+        },
+        { type: 'query', metatype: AuditQueryDto },
+      ),
+    ).resolves.toMatchObject({
+      action: 'billing.transaction.created',
+      subjectType: 'billing.transaction',
+      domain: 'billing',
+    });
   });
 });
 
 it('upgrades the full registered schema, reverts the audit migration, and reapplies it', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'audit-upgrade-'));
-  const prior = Object.values(migrations).filter((migration) => migration !== DurableAudit1783700000000);
+  const prior = Object.values(migrations).filter(
+    (migration) =>
+      migration !== DurableAudit1783700000000 &&
+      migration !== IdentityAudit1783800000000 &&
+      migration !== RetirePasswordPolicyAudit1783900000000,
+  );
   const database = join(directory, 'upgrade.sqlite');
   let source = new DataSource({ type: 'sqlite', database, entities: Object.values(entities), migrations: prior });
   try {
     await source.initialize();
     await source.runMigrations();
+    await source.query(`INSERT INTO "password_policy_audit" ("event", "actorId", "actorUsername", "ip", "userAgent", "requestId", "before", "after", "changedFields")
+      VALUES ('global_policy_updated', 1, 'migration-user', '127.0.0.1', 'migration-test', 'migration-request', '{"minLength":12}', '{"minLength":16}', '["minLength"]')`);
+    const oversizedRequestId = 'r'.repeat(5_000);
+    const oversizedBefore = JSON.stringify({ minLength: 12, requireUppercase: true });
+    const oversizedAfter = JSON.stringify({ minLength: 16, requireUppercase: false });
+    await source.query(
+      `INSERT INTO "password_policy_audit" ("event", "actorId", "actorUsername", "ip", "userAgent", "requestId", "before", "after", "changedFields")
+      VALUES ('global_policy_updated', 1, 'migration-user', '127.0.0.1', 'migration-test', ?, ?, ?, '["minLength"]')`,
+      [oversizedRequestId, oversizedBefore, oversizedAfter],
+    );
+    await source.query(
+      `INSERT INTO "setting" ("parent", "key", "value") VALUES ('audit', 'domains', '["billing","resource","wago"]')`,
+    );
     await source.destroy();
     source = new DataSource({
       type: 'sqlite',
@@ -874,12 +1112,129 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
     });
     await source.initialize();
     const applied = await source.runMigrations();
-    expect(applied.map((migration) => migration.name)).toEqual(['DurableAudit1783700000000']);
+    expect(applied.map((migration) => migration.name)).toEqual([
+      'DurableAudit1783700000000',
+      'IdentityAudit1783800000000',
+      'RetirePasswordPolicyAudit1783900000000',
+    ]);
     expect(source.hasMetadata(AuditLog)).toBeTruthy();
     expect(await source.query('PRAGMA foreign_key_list(audit_log)')).toEqual([]);
+    expect(await source.query(`SELECT "value" FROM "setting" WHERE "parent" = 'audit' AND "key" = 'domains'`)).toEqual([
+      { value: '["billing","resource","wago","identity"]' },
+    ]);
+    expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(
+      2,
+    );
+    expect(
+      await source.query(`SELECT "metadata" FROM "password_policy_audit_overflow" WHERE "legacyAuditId" = 2`),
+    ).toEqual([
+      {
+        metadata: JSON.stringify({
+          actorUsername: 'migration-user',
+          requestId: oversizedRequestId,
+          role: null,
+          before: oversizedBefore,
+          after: oversizedAfter,
+          changedFields: '["minLength"]',
+        }),
+      },
+    ]);
+    const migratedStore = new SettingsStoreService(source.getRepository(Setting), null);
+    const migratedAudit = new AuditService(source, migratedStore);
+    await migratedAudit.onModuleInit();
+    const migratedList = await new AuditController(migratedAudit).list({ limit: 10 });
+    const migratedOversizedEvent = migratedList.items.find((item) => item.details.legacyAuditId === 2);
+    expect(migratedOversizedEvent).toMatchObject({
+      details: {
+        detailsTruncated: 1,
+        actorUsername: 'migration-user',
+        requestId: oversizedRequestId,
+        before: oversizedBefore,
+        after: oversizedAfter,
+        changedFields: '["minLength"]',
+      },
+    });
+    expect(migratedOversizedEvent?.operationId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    await expect(
+      new ValidationPipe({ transform: true }).transform(
+        { operationId: migratedOversizedEvent?.operationId },
+        { type: 'query', metatype: AuditQueryDto },
+      ),
+    ).resolves.toMatchObject({ operationId: migratedOversizedEvent?.operationId });
+    const now = jest.spyOn(Date, 'now').mockReturnValue(new Date('2026-06-16T12:00:00.000Z').getTime());
+    await source.query(`INSERT INTO "password_policy_audit_overflow" ("legacyAuditId", "metadata")
+      VALUES (999, '{"actorUsername":"expired-user"}')`);
+    await source.query(`INSERT INTO "audit_log" ("at", "domain", "action", "operationId", "outcome", "subjectType", "subjectId", "details")
+      VALUES ('2026-06-15 11:00:00.000', 'identity', 'identity.password_policy_updated', 'password-policy-audit-999', 'succeeded', 'identity.password_policy', 1,
+         '{"migrationSource":"password_policy_audit","legacyAuditId":999,"detailsTruncated":true}')`);
+    await source.query(`INSERT INTO "password_policy_audit_overflow" ("legacyAuditId", "metadata")
+      VALUES (998, '{"actorUsername":"retained-user"}')`);
+    await source.query(`INSERT INTO "audit_log" ("at", "domain", "action", "operationId", "outcome", "subjectType", "subjectId", "details")
+      VALUES ('2026-06-15 13:00:00.000', 'identity', 'identity.password_policy_updated', 'e3aedfb1-15c7-4290-9a0c-777f27a8357f', 'succeeded', 'identity.password_policy', 1,
+        '{"migrationSource":"password_policy_audit","legacyAuditId":998,"detailsTruncated":true}')`);
+    await migratedStore.setPlainSetting('audit', 'retention_days', '1');
+    await migratedAudit.cleanup();
+    expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toEqual([]);
+    expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 998')).toHaveLength(
+      1,
+    );
+    now.mockRestore();
+    await migratedAudit.onModuleDestroy();
+    await source.query(`INSERT INTO "audit_log" ("at", "domain", "action", "operationId", "outcome", "subjectType", "subjectId", "details")
+      VALUES (datetime('now'), 'identity', 'identity.password_policy_updated', 'f4ae9dd5-3b66-4d5e-a46c-03cfaa25e266', 'succeeded', 'identity.password_policy', 1, '{"field":"minLength"}')`);
+    await source.query(`UPDATE "setting" SET "value" = '["identity"]'
+      WHERE "parent" = 'audit' AND "key" = 'domains'`);
+    await source.undoLastMigration();
+    expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toHaveLength(1);
+    expect(await source.query('SELECT * FROM password_policy_audit')).toHaveLength(4);
+    expect(
+      await source.query(
+        `SELECT "actorUsername", "requestId", "before", "after", "changedFields" FROM password_policy_audit WHERE "requestId" = 'migration-request'`,
+      ),
+    ).toEqual([
+      {
+        actorUsername: 'migration-user',
+        requestId: 'migration-request',
+        before: '{"minLength":12}',
+        after: '{"minLength":16}',
+        changedFields: '["minLength"]',
+      },
+    ]);
+    expect(
+      await source.query(`SELECT "requestId", "before", "after" FROM password_policy_audit WHERE "requestId" = ?`, [
+        oversizedRequestId,
+      ]),
+    ).toEqual([{ requestId: oversizedRequestId, before: oversizedBefore, after: oversizedAfter }]);
+    expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(
+      0,
+    );
+    expect(await source.query(`SELECT "value" FROM "setting" WHERE "parent" = 'audit' AND "key" = 'domains'`)).toEqual([
+      { value: '[]' },
+    ]);
+    expect((await source.runMigrations()).map((migration) => migration.name)).toEqual([
+      'RetirePasswordPolicyAudit1783900000000',
+    ]);
+    expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(
+      4,
+    );
+    await source.undoLastMigration();
+    expect(
+      await source.query(`SELECT "requestId", "before", "after" FROM password_policy_audit WHERE "requestId" = ?`, [
+        oversizedRequestId,
+      ]),
+    ).toEqual([{ requestId: oversizedRequestId, before: oversizedBefore, after: oversizedAfter }]);
+    expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toHaveLength(1);
+    await source.undoLastMigration();
+    expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toHaveLength(1);
     await source.undoLastMigration();
     expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toEqual([]);
-    expect((await source.runMigrations()).map((migration) => migration.name)).toEqual(['DurableAudit1783700000000']);
+    expect((await source.runMigrations()).map((migration) => migration.name)).toEqual([
+      'DurableAudit1783700000000',
+      'IdentityAudit1783800000000',
+      'RetirePasswordPolicyAudit1783900000000',
+    ]);
   } finally {
     if (source.isInitialized) await source.destroy();
     await rm(directory, { recursive: true, force: true });

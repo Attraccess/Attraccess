@@ -6,7 +6,6 @@ import {
   AuthenticationType,
   PasswordHistory,
   PasswordPolicy,
-  PasswordPolicyAudit,
   PasswordPolicyOverride,
   Setting,
 } from '@attraccess/database-entities';
@@ -134,10 +133,6 @@ async function buildController(opts: BuildOpts = {}) {
           delete: jest.fn(async () => ({ affected: 0 })),
           remove: jest.fn(async (row) => row),
         },
-      },
-      {
-        provide: getRepositoryToken(PasswordPolicyAudit),
-        useValue: { create: jest.fn((row) => row), save: jest.fn(async (row) => row) },
       },
       {
         provide: DataSource,

@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   Get,
   Logger,
+  Optional,
   Param,
   ParseIntPipe,
   Patch,
@@ -29,6 +30,8 @@ import { ChangeEmailDto } from './dtos/changeEmail.dto';
 import { ChangeBillingFactorDto } from './dtos/changeBillingFactor.dto';
 import { mapEmailSendError } from './email-send-error.util';
 import { computeNextPage } from '../../types/response';
+import { IdentityAuditService } from '../../audit/identity-audit.service';
+import { randomUUID } from 'node:crypto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -39,6 +42,7 @@ export class UsersAdminController {
   constructor(
     private readonly usersService: UsersService,
     private readonly passwordService: UserPasswordService,
+    @Optional() private readonly identityAudit?: IdentityAuditService,
   ) {}
 
   @Auth()
@@ -95,6 +99,7 @@ export class UsersAdminController {
     }
 
     await this.usersService.deleteOne(id);
+    await this.record('user_deleted', id, request);
   }
 
   @Get()
@@ -188,6 +193,7 @@ export class UsersAdminController {
     @Req() request: AuthenticatedRequest,
   ): Promise<{ message: string }> {
     await this.passwordService.setUserPassword(id, body, request.user);
+    await this.record('user_updated', id, request, 'password');
     return { message: 'Password updated successfully' };
   }
 
@@ -200,7 +206,9 @@ export class UsersAdminController {
     @Body() body: ChangeUsernameDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<User> {
-    return await this.usersService.changeUsername(id, body.username, request.user);
+    const user = await this.usersService.changeUsername(id, body.username, request.user);
+    await this.record('user_updated', id, request, 'username');
+    return user;
   }
 
   @Patch(':id/email')
@@ -213,7 +221,9 @@ export class UsersAdminController {
     @Req() request: AuthenticatedRequest,
   ): Promise<User> {
     try {
-      return await this.usersService.changeEmail(id, body.email, request.user);
+      const user = await this.usersService.changeEmail(id, body.email, request.user);
+      await this.record('user_updated', id, request, 'email');
+      return user;
     } catch (error) {
       throw mapEmailSendError(error);
     }
@@ -226,7 +236,29 @@ export class UsersAdminController {
   async changeUserBillingFactor(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: ChangeBillingFactorDto,
+    @Req() request: AuthenticatedRequest,
   ): Promise<User> {
-    return await this.usersService.changeBillingFactor(id, body.billingFactor);
+    const user = await this.usersService.changeBillingFactor(id, body.billingFactor);
+    await this.record('user_updated', id, request, 'billingFactor');
+    return user;
+  }
+
+  private record(
+    action: 'user_deleted' | 'user_updated',
+    subjectId: number,
+    request: AuthenticatedRequest,
+    field?: 'username' | 'email' | 'password' | 'billingFactor',
+  ): Promise<void> {
+    return Promise.resolve(this.identityAudit?.record({
+      action,
+      operationId: randomUUID(),
+      outcome: 'succeeded',
+      actorId: request.user.id,
+      authenticationMethod: request.user.authenticationMethod ?? 'session',
+      apiTokenId: request.user.apiTokenId,
+      subjectId,
+      details: field ? { field } : {},
+      request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+    })).then(() => undefined);
   }
 }

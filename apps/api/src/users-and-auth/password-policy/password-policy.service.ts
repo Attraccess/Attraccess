@@ -8,6 +8,7 @@ import {
   Logger,
   NotFoundException,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, OptimisticLockVersionMismatchError, QueryFailedError, Repository } from 'typeorm';
@@ -17,8 +18,6 @@ import {
   AuthenticationType,
   PasswordHistory,
   PasswordPolicy,
-  PasswordPolicyAudit,
-  PasswordPolicyAuditEvent,
   PasswordPolicyOverride,
   PasswordPolicyRole,
   PASSWORD_POLICY_SINGLETON_ID,
@@ -37,6 +36,8 @@ import { HibpClient } from './hibp.client';
 import { ZxcvbnService } from './zxcvbn.service';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { RbacService } from '../rbac/rbac.service';
+import { IdentityAuditService } from '../../audit/identity-audit.service';
+import { randomUUID } from 'node:crypto';
 
 export const POLICY_FIELDS: Array<keyof PasswordPolicyConfig> = [
   'minLength',
@@ -71,6 +72,8 @@ export interface ValidateOptions {
 export interface AuditContext {
   actorId: number | null;
   actorUsername: string | null;
+  authenticationMethod: 'session' | 'api-token';
+  apiTokenId: number | null;
   ip: string | null;
   userAgent: string | null;
   requestId: string | null;
@@ -87,8 +90,6 @@ export class PasswordPolicyService implements OnModuleInit {
     private readonly repo: Repository<PasswordPolicy>,
     @InjectRepository(PasswordPolicyOverride)
     private readonly overrideRepo: Repository<PasswordPolicyOverride>,
-    @InjectRepository(PasswordPolicyAudit)
-    private readonly auditRepo: Repository<PasswordPolicyAudit>,
     @InjectRepository(PasswordHistory)
     private readonly historyRepo: Repository<PasswordHistory>,
     @InjectRepository(AuthenticationDetail)
@@ -97,6 +98,7 @@ export class PasswordPolicyService implements OnModuleInit {
     private readonly hibp: HibpClient,
     private readonly zxcvbn: ZxcvbnService,
     private readonly rbacService: RbacService,
+    @Optional() private readonly identityAudit?: IdentityAuditService,
   ) {}
 
   public async onModuleInit(): Promise<void> {
@@ -151,16 +153,13 @@ export class PasswordPolicyService implements OnModuleInit {
     return perms.has('system.settings.manage') ? PasswordPolicyRole.ADMIN : undefined;
   }
 
-  public async updatePolicy(
-    input: PartialPasswordPolicy,
-    audit?: AuditContext,
-  ): Promise<PasswordPolicyConfig> {
+  public async updatePolicy(input: PartialPasswordPolicy, audit?: AuditContext): Promise<PasswordPolicyConfig> {
     const sanitized = this.sanitizePartial(input);
     try {
-      return await this.dataSource.transaction(async (manager) => {
+      let auditInput: Parameters<typeof this.persistAudit>[0] | undefined;
+      const after = await this.dataSource.transaction(async (manager) => {
         const repo = manager.getRepository(PasswordPolicy);
         const overrideRepo = manager.getRepository(PasswordPolicyOverride);
-        const auditRepo = manager.getRepository(PasswordPolicyAudit);
 
         const row = await repo.findOne({ where: { id: PASSWORD_POLICY_SINGLETON_ID } });
         if (!row) {
@@ -177,17 +176,19 @@ export class PasswordPolicyService implements OnModuleInit {
         }
 
         if (audit) {
-          await this.persistAudit(auditRepo, {
-            event: PasswordPolicyAuditEvent.GLOBAL_POLICY_UPDATED,
+          auditInput = {
+            event: 'global_policy_updated',
             audit,
             role: null,
             before,
             after,
             changedFields: Object.keys(sanitized),
-          });
+          };
         }
         return after;
       });
+      if (auditInput) await this.persistAudit(auditInput);
+      return after;
     } catch (err) {
       this.rethrowConcurrencyOrSqliteConflict(err);
     }
@@ -208,9 +209,9 @@ export class PasswordPolicyService implements OnModuleInit {
   ): Promise<PasswordPolicyOverride> {
     const sanitized = this.sanitizeOverride(input);
     try {
-      return await this.dataSource.transaction(async (manager) => {
+      let auditInput: Parameters<typeof this.persistAudit>[0] | undefined;
+      const saved = await this.dataSource.transaction(async (manager) => {
         const overrideRepo = manager.getRepository(PasswordPolicyOverride);
-        const auditRepo = manager.getRepository(PasswordPolicyAudit);
         const policy = await manager.getRepository(PasswordPolicy).findOne({
           where: { id: PASSWORD_POLICY_SINGLETON_ID },
         });
@@ -239,17 +240,19 @@ export class PasswordPolicyService implements OnModuleInit {
 
         const after = this.snapshotOverride(saved);
         if (audit) {
-          await this.persistAudit(auditRepo, {
-            event: PasswordPolicyAuditEvent.OVERRIDE_UPSERTED,
+          auditInput = {
+            event: 'override_upserted',
             audit,
             role,
             before,
             after,
             changedFields: Object.keys(sanitized),
-          });
+          };
         }
         return saved;
       });
+      if (auditInput) await this.persistAudit(auditInput);
+      return saved;
     } catch (err) {
       this.rethrowConcurrencyOrSqliteConflict(err);
     }
@@ -257,9 +260,9 @@ export class PasswordPolicyService implements OnModuleInit {
 
   public async deleteOverride(role: PasswordPolicyRole, audit?: AuditContext): Promise<void> {
     try {
+      let auditInput: Parameters<typeof this.persistAudit>[0] | undefined;
       await this.dataSource.transaction(async (manager) => {
         const overrideRepo = manager.getRepository(PasswordPolicyOverride);
-        const auditRepo = manager.getRepository(PasswordPolicyAudit);
         const existing = await overrideRepo.findOne({ where: { role } });
         if (!existing) {
           throw new NotFoundException(`No password policy override for role=${role}`);
@@ -267,16 +270,17 @@ export class PasswordPolicyService implements OnModuleInit {
         const before = this.snapshotOverride(existing);
         await overrideRepo.remove(existing);
         if (audit) {
-          await this.persistAudit(auditRepo, {
-            event: PasswordPolicyAuditEvent.OVERRIDE_DELETED,
+          auditInput = {
+            event: 'override_deleted',
             audit,
             role,
             before,
             after: null,
             changedFields: [],
-          });
+          };
         }
       });
+      if (auditInput) await this.persistAudit(auditInput);
     } catch (err) {
       this.rethrowConcurrencyOrSqliteConflict(err);
     }
@@ -291,7 +295,9 @@ export class PasswordPolicyService implements OnModuleInit {
     const baseResult = validatePassword(password, policy, userCtx, { commonPasswords: COMMON_PASSWORDS });
     const errors: PolicyError[] = [...baseResult.errors];
 
-    const zxcvbnInputs = [userCtx.username, userCtx.email].filter((v): v is string => typeof v === 'string' && v.length > 0);
+    const zxcvbnInputs = [userCtx.username, userCtx.email].filter(
+      (v): v is string => typeof v === 'string' && v.length > 0,
+    );
     const zxcvbnResult = this.zxcvbn.evaluate(password, zxcvbnInputs);
     if (zxcvbnResult.score < policy.minZxcvbnScore) {
       errors.push({
@@ -398,30 +404,40 @@ export class PasswordPolicyService implements OnModuleInit {
     }
   }
 
-  private async persistAudit(
-    repo: Repository<PasswordPolicyAudit>,
-    input: {
-      event: PasswordPolicyAuditEvent;
-      audit: AuditContext;
-      role: PasswordPolicyRole | null;
-      before: object | null;
-      after: object | null;
-      changedFields: string[];
-    },
-  ): Promise<void> {
-    const entity = repo.create({
-      event: input.event,
-      actorId: input.audit.actorId,
-      actorUsername: input.audit.actorUsername,
-      ip: input.audit.ip,
-      userAgent: input.audit.userAgent,
-      requestId: input.audit.requestId,
-      role: input.role,
-      before: input.before ? JSON.stringify(input.before) : null,
-      after: input.after ? JSON.stringify(input.after) : null,
-      changedFields: input.changedFields.length > 0 ? JSON.stringify(input.changedFields) : null,
+  private async persistAudit(input: {
+    event: 'global_policy_updated' | 'override_upserted' | 'override_deleted';
+    audit: AuditContext;
+    role: PasswordPolicyRole | null;
+    before: object | null;
+    after: object | null;
+    changedFields: string[];
+  }): Promise<void> {
+    const action =
+      input.event === 'global_policy_updated'
+        ? 'password_policy_updated'
+        : input.event === 'override_deleted'
+          ? 'password_policy_override_deleted'
+          : 'password_policy_override_updated';
+    const details: Record<string, string> = {};
+    if (input.role) details.role = input.role;
+    if (input.before) details.before = JSON.stringify(input.before);
+    if (input.after) details.after = JSON.stringify(input.after);
+    if (input.changedFields.length === 1) details.field = input.changedFields[0];
+    await this.identityAudit?.record({
+      action,
+      operationId: randomUUID(),
+      outcome: 'succeeded',
+      actorId: input.audit.actorId ?? undefined,
+      authenticationMethod: input.audit.authenticationMethod,
+      apiTokenId: input.audit.apiTokenId ?? undefined,
+      subjectType: 'identity.password_policy',
+      subjectId: PASSWORD_POLICY_SINGLETON_ID,
+      details,
+      request: {
+        ipAddress: input.audit.ip ?? undefined,
+        userAgent: input.audit.userAgent ?? undefined,
+      },
     });
-    await repo.save(entity);
   }
 
   private rethrowConcurrencyOrSqliteConflict(err: unknown): never {
