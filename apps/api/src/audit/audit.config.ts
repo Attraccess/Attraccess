@@ -5,15 +5,15 @@ import { SettingsStoreService } from '../settings/settings-store.service';
 const fields = {
   enabled: z.boolean(),
   domains: z
-    .array(z.enum(['administration', 'attractap', 'project', 'billing', 'resource', 'wago', 'identity']))
-    .max(7),
+    .array(z.enum(['administration', 'sso', 'attractap', 'project', 'billing', 'resource', 'wago', 'identity']))
+    .max(8),
   retention_days: z.number().int().min(1).max(3650),
 };
 export const auditSettingsUpdateSchema = z.object(fields).partial().strict();
 export const auditSettingsSchema = z
   .object({
     enabled: fields.enabled.default(true),
-    domains: fields.domains.default(['administration', 'attractap', 'project', 'resource', 'wago', 'identity']),
+    domains: fields.domains.default(['administration', 'sso', 'attractap', 'project', 'resource', 'wago', 'identity']),
     retention_days: fields.retention_days.default(90),
   })
   .strict();
