@@ -167,8 +167,8 @@ export const ADMINISTRATION_AUDIT_ACTIONS = Object.keys(rules);
 
 export type PreviousAuditSettings = { enabled: boolean; domains: readonly string[] };
 
-/** Numeric grouping key for string-keyed subjects; retain the original key in event details.
- * This encoding is persisted: changing it would split a subject's audit history. */
+/** Numeric grouping key for public string-keyed subjects; retain the original key in event details.
+ * This persisted identifier hash is never a password hash; changing it would split audit history. */
 export function auditSubjectKeyId(value: string): number {
   return Number.parseInt(createHash('sha256').update(value).digest('hex').slice(0, 13), 16) || 1;
 }

@@ -300,7 +300,7 @@ export class PluginController {
     }
 
     PluginService.clearPluginQuarantine(plugin.pluginDirectory);
-    await this.record(req, 'plugin.retry_requested', auditSubjectKeyId(pluginId), 'plugin-package', {
+    await this.record(req, 'plugin.retry_requested', auditSubjectKeyId(plugin.name), 'plugin-package', {
       pluginId,
       restartRequested: 1,
     });
@@ -388,7 +388,7 @@ export class PluginController {
       return;
     }
     await this.pluginService.deletePlugin(pluginId, Boolean(req));
-    await this.record(req, 'plugin.zip_deleted', auditSubjectKeyId(pluginId), 'plugin-package', {
+    await this.record(req, 'plugin.zip_deleted', auditSubjectKeyId(plugin?.name ?? pluginId), 'plugin-package', {
       pluginId,
       restartRequested: 1,
     });
