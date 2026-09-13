@@ -25,7 +25,7 @@ fi
 
 # Resolve the pinned converter once for the whole set, reusing npm's cache across
 # firmware variants. Resolving it separately for every size adds network waits.
-npx --yes --prefer-offline --package=lv_font_conv@1.5.3 -- bash -c '
+npx --yes --prefer-offline --package=lv_font_conv@1.5.3 -- bash -euo pipefail -c '
 for size in "$@"; do
     lv_font_conv --size "$size" --bpp 4 --no-compress --format lvgl --lv-include lvgl.h \
         --font Montserrat-Medium.ttf -r 0x20-0x7E -r 0xA0-0xFF \
