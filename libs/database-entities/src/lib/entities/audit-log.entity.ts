@@ -28,10 +28,10 @@ export class AuditLog {
   operationId!: string;
 
   @Column({ type: 'integer' })
-  actorId!: number;
+  actorId!: number | null;
 
   @Column({ type: 'varchar' })
-  authenticationMethod!: 'session' | 'api-token';
+  authenticationMethod!: 'session' | 'api-token' | 'device';
 
   @Column({ type: 'integer', nullable: true })
   apiTokenId!: number | null;

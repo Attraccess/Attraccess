@@ -20,6 +20,7 @@ describe('AttractapCardHandler', () => {
   let metricsService: { attractapNfcTapsTotal: { inc: jest.Mock } };
   let resourceRepository: { findOne: jest.Mock };
   let rbacService: { getEffectivePermissions: jest.Mock };
+  let audit: { recordAttractap: jest.Mock };
 
   const mockUser = { id: 1, username: 'testuser' };
   const mockReaderWithEnrollment = {
@@ -33,6 +34,7 @@ describe('AttractapCardHandler', () => {
       readerId: 42,
       state: {
         lastAuthenticatedUserId: null,
+        auditPrincipal: null,
         enrollNewCardData: null,
         resetNfcCardData: null,
         ...(overrides.state || {}),
@@ -61,7 +63,7 @@ describe('AttractapCardHandler', () => {
         .mockResolvedValue({ id: 7, key: 'aabbccddeeff00112233445566778899', keyNo: 1, user: mockUser }),
       generateNTAG424Key: jest.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
       uint8ArrayToHexString: jest.fn().mockReturnValue('deadbeef'),
-      createNFCCard: jest.fn().mockResolvedValue(undefined),
+      createNFCCard: jest.fn().mockResolvedValue({ id: 8 }),
       deleteNFCCard: jest.fn().mockResolvedValue({ affected: 1 }),
     };
     usersService = { findOne: jest.fn().mockResolvedValue(mockUser) };
@@ -71,6 +73,7 @@ describe('AttractapCardHandler', () => {
     // Default: a resource that does not support supervision (introduction_required).
     resourceRepository = { findOne: jest.fn().mockResolvedValue({ id: 10, supervisionMode: 'introduction_required' }) };
     rbacService = { getEffectivePermissions: jest.fn().mockResolvedValue(new Set<string>()) };
+    audit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
 
     (handler as any).websocketService = websocketService;
     (handler as any).attractapService = attractapService;
@@ -80,6 +83,7 @@ describe('AttractapCardHandler', () => {
     (handler as any).metricsService = metricsService;
     (handler as any).resourceRepository = resourceRepository;
     (handler as any).rbacService = rbacService;
+    (handler as any).audit = audit;
   });
 
   describe('startEnrollOfNewNfcCard', () => {
@@ -324,6 +328,7 @@ describe('AttractapCardHandler', () => {
       const socket = createMockSocket({
         state: {
           lastAuthenticatedUserId: 1,
+          auditPrincipal: { userId: 1, authenticationMethod: 'api-token', apiTokenId: 9 },
           enrollNewCardData: { key: 'deadbeef', keyNo: 1, cardUID: 'abc' },
         },
       });
@@ -382,6 +387,7 @@ describe('AttractapCardHandler', () => {
       const socket = createMockSocket({
         state: {
           lastAuthenticatedUserId: 1,
+          auditPrincipal: { userId: 1, authenticationMethod: 'api-token', apiTokenId: 9 },
           enrollNewCardData: { key: 'deadbeef', keyNo: 1, cardUID: 'abc' },
         },
       });
@@ -404,6 +410,7 @@ describe('AttractapCardHandler', () => {
       const socket = createMockSocket({
         state: {
           lastAuthenticatedUserId: 1,
+          auditPrincipal: { userId: 1, authenticationMethod: 'api-token', apiTokenId: 9 },
           enrollNewCardData: { key: 'deadbeef', keyNo: 1, cardUID: 'abc' },
         },
       });
@@ -415,6 +422,10 @@ describe('AttractapCardHandler', () => {
         key: 'deadbeef',
         keyNo: 1,
         uid: 'abc',
+      });
+      expect(audit.recordAttractap).toHaveBeenCalledWith({
+        action: 'card.linked', actorId: 1, authenticationMethod: 'api-token', apiTokenId: 9, subjectId: 8,
+        details: { readerId: 42, source: 'reader-enrollment' },
       });
       expect(socket.state.enrollNewCardData).toBeNull();
       expect(socket.state.lastAuthenticatedUserId).toBeNull();
@@ -477,6 +488,7 @@ describe('AttractapCardHandler', () => {
         cardId: 7,
         key: 'aabbccddeeff00112233445566778899',
         keyNo: 1,
+        auditPrincipal: { userId: 1, authenticationMethod: 'session' },
       });
       expect(socket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({

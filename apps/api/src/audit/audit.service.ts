@@ -12,7 +12,7 @@ import { AuditLog } from '@attraccess/database-entities';
 import { PluginAuditEvent, PluginAuditHostProvider, PluginAuditReceipt } from '@attraccess/plugins-backend-sdk';
 import { readAuditSettings } from './audit.config';
 import { SettingsStoreService } from '../settings/settings-store.service';
-import { projectAuditEvent, projectResourceAuditEvent, ResourceAuditEvent } from './audit-policy';
+import { AttractapAuditEvent, projectAttractapAuditEvent, projectAuditEvent, projectResourceAuditEvent, ResourceAuditEvent } from './audit-policy';
 import { AuditQueryDto } from './audit-query.dto';
 import { randomUUID } from 'crypto';
 
@@ -185,6 +185,21 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     } catch { /* Audit persistence must not affect resource operations. */ }
   }
 
+  async recordAttractap(event: AttractapAuditEvent): Promise<void> {
+    try {
+      const snapshot = projectAttractapAuditEvent(event);
+      if (!snapshot) return;
+      await this.recordSnapshot({
+        domain: 'attractap', pluginId: 'core', action: `attractap.${snapshot.action}`,
+        operationId: randomUUID(), actorId: snapshot.actorId,
+        authenticationMethod: snapshot.authenticationMethod, apiTokenId: snapshot.apiTokenId ?? null,
+        outcome: 'succeeded',
+        subjectType: snapshot.action.startsWith('card.') ? 'attractap.card' : 'attractap.reader',
+        subjectId: snapshot.subjectId, details: snapshot.details,
+      });
+    } catch { /* Audit persistence must not affect Attractap operations. */ }
+  }
+
   afterTransactionCommit({ queryRunner }: TransactionCommitEvent): void {
     // Nested transaction commits release a savepoint; wait for the owning transaction.
     if (queryRunner.isTransactionActive) {
@@ -222,7 +237,7 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     this.pending++;
     try {
       const config = await readAuditSettings(this.settings);
-      if (!config.enabled || !config.domains.includes(event.domain as 'billing' | 'wago') || this.stopping)
+      if (!config.enabled || !config.domains.includes(event.domain as 'attractap' | 'billing' | 'wago') || this.stopping)
         return { status: 'unavailable' };
       // sqlite3 queues concurrent statements after a busy timeout. Keep those writes in our
       // bounded admission queue instead, so a released lock cannot revive stale audit writes.
