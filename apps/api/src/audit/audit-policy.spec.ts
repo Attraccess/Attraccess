@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { PluginAuditEvent } from '@attraccess/plugins-backend-sdk';
-import { projectAuditEvent, projectResourceAuditEvent } from './audit-policy';
+import { projectAuditEvent, projectProjectAuditEvent, projectResourceAuditEvent } from './audit-policy';
 
 function event(): PluginAuditEvent & { pluginId: string } {
   return {
@@ -100,5 +100,23 @@ describe('audit storage safe snapshot', () => {
     expect(projectResourceAuditEvent(resourceEvent)).toEqual(resourceEvent);
     expect(projectResourceAuditEvent({ ...resourceEvent, details: { password: 'raw-secret' } })).toBeNull();
     expect(projectResourceAuditEvent({ ...resourceEvent, action: 'resource.deleted' as never })).toBeNull();
+  });
+
+  it('allows only safe project administration snapshots', () => {
+    const projectEvent = {
+      action: 'project.invitation.sent' as const,
+      operationId: randomUUID(),
+      actorId: 42,
+      subjectType: 'project.invitation' as const,
+      subjectId: 7,
+      details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
+    };
+    expect(projectProjectAuditEvent(projectEvent)).toEqual(projectEvent);
+    expect(projectProjectAuditEvent({ ...projectEvent, details: { email: 'person@example.test' } })).toBeNull();
+    expect(projectProjectAuditEvent({ ...projectEvent, details: { projectId: 0 } })).toBeNull();
+    expect(projectProjectAuditEvent({ ...projectEvent, details: { role: 'administrator' } })).toBeNull();
+    expect(projectProjectAuditEvent({ ...projectEvent, details: { hasLogo: 2 } })).toBeNull();
+    expect(projectProjectAuditEvent({ ...projectEvent, details: { changedFields: 'logo' } })).toBeNull();
+    expect(projectProjectAuditEvent({ ...projectEvent, action: 'project.invitation.resent' as never })).toBeNull();
   });
 });

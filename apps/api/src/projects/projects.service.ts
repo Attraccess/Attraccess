@@ -21,6 +21,7 @@ import { EmailService } from '../email/email.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../notifications/notification-types';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class ProjectsService {
@@ -40,6 +41,7 @@ export class ProjectsService {
     private readonly emailService: EmailService,
     private readonly metricsService: MetricsService,
     private readonly notifications: NotificationDispatchService,
+    private readonly audit: AuditService,
   ) {}
 
   public async findMany(userId: number, query: FindManyProjectsQueryDto): Promise<ProjectWithAccessDto[]> {
@@ -91,7 +93,12 @@ export class ProjectsService {
     await this.projectRepository.save(project);
   }
 
-  public async create(ownerUserId: number, data: CreateProjectDto): Promise<Project> {
+  public async create(
+    ownerUserId: number,
+    data: CreateProjectDto,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<Project> {
     const project = await this.projectRepository.save({
       owner: { id: ownerUserId },
       name: data.name,
@@ -103,29 +110,86 @@ export class ProjectsService {
     }
 
     this.metricsService.projectsTotal.inc();
+    await this.audit.recordProject({
+      action: 'project.created',
+      actorId: ownerUserId,
+      authenticationMethod,
+      apiTokenId,
+      subjectType: 'project',
+      subjectId: project.id,
+      details: this.projectDetails(project, 'after'),
+    });
     return project;
   }
 
-  public async archiveOne(ownerUserId: number, id: number): Promise<Project> {
+  public async archiveOne(
+    ownerUserId: number,
+    id: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<Project> {
     const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
     project.archivedAt = new Date();
-    return await this.projectRepository.save(project);
+    const saved = await this.projectRepository.save(project);
+    await this.audit.recordProject({
+      action: 'project.archived', actorId: ownerUserId, authenticationMethod, apiTokenId,
+      subjectType: 'project', subjectId: saved.id,
+      details: { ...this.projectDetails(saved, 'after'), 'after.archived': 1 },
+    });
+    return saved;
   }
 
-  public async unarchiveOne(ownerUserId: number, id: number): Promise<Project> {
+  public async unarchiveOne(
+    ownerUserId: number,
+    id: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<Project> {
     const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
     project.archivedAt = null;
-    return await this.projectRepository.save(project);
+    const saved = await this.projectRepository.save(project);
+    await this.audit.recordProject({
+      action: 'project.unarchived', actorId: ownerUserId, authenticationMethod, apiTokenId,
+      subjectType: 'project', subjectId: saved.id,
+      details: { ...this.projectDetails(saved, 'after'), 'after.archived': 0 },
+    });
+    return saved;
   }
 
-  public async deleteOne(id: number): Promise<void> {
-    await this.resourceUsageRepository.update({ projectId: id }, { projectId: null });
-    await this.projectRepository.delete(id);
-    this.metricsService.projectsTotal.dec();
-  }
-
-  public async updateOne(ownerUserId: number, id: number, data: UpdateProjectDto): Promise<Project> {
+  public async deleteOne(
+    ownerUserId: number,
+    id: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<void> {
     const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
+    const details = this.projectDetails(project, 'before');
+    await this.resourceUsageRepository.update({ projectId: id }, { projectId: null });
+    const result = await this.projectRepository.delete(id);
+    if (result.affected !== 1) return;
+    this.metricsService.projectsTotal.dec();
+    await this.audit.recordProject({
+      action: 'project.deleted',
+      actorId: ownerUserId,
+      authenticationMethod,
+      apiTokenId,
+      subjectType: 'project',
+      subjectId: id,
+      details,
+    });
+  }
+
+  public async updateOne(
+    ownerUserId: number,
+    id: number,
+    data: UpdateProjectDto,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<Project> {
+    const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
+    const before = this.projectDetails(project, 'before');
+    const beforeDescription = project.description;
+    const beforeLogo = project.logo;
 
     if (data.description !== undefined) {
       project.description = data.description;
@@ -146,7 +210,29 @@ export class ProjectsService {
       }
     }
 
-    return await this.projectRepository.save(project);
+    const saved = await this.projectRepository.save(project);
+    const changedFields = [
+      ...(before['before.name'] !== saved.name ? ['name'] : []),
+      ...(data.description !== undefined && data.description !== beforeDescription ? ['description'] : []),
+      ...(beforeLogo !== saved.logo ? ['logo'] : []),
+    ];
+    if (changedFields.length) {
+      await this.audit.recordProject({
+        action: 'project.updated',
+        actorId: ownerUserId,
+        authenticationMethod,
+        apiTokenId,
+        subjectType: 'project',
+        subjectId: saved.id,
+        details: {
+          ...before,
+          ...this.projectDetails(saved, 'after'),
+          ...(data.description !== undefined && data.description !== beforeDescription ? { descriptionChanged: 1 } : {}),
+          changedFields: JSON.stringify(changedFields),
+        },
+      });
+    }
+    return saved;
   }
 
   public async listMembers(projectId: number): Promise<ProjectMember[]> {
@@ -157,7 +243,14 @@ export class ProjectsService {
     });
   }
 
-  public async removeMember(projectId: number, memberId: number): Promise<void> {
+  public async removeMember(
+    actorId: number,
+    projectId: number,
+    memberId: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<void> {
+    await this.projectAccessService.ensureOwner(actorId, projectId);
     const member = await this.projectMemberRepository.findOne({
       where: { id: memberId, project: { id: projectId } },
     });
@@ -166,7 +259,17 @@ export class ProjectsService {
       throw new NotFoundException('Project member not found');
     }
 
-    await this.projectMemberRepository.delete(member.id);
+    const result = await this.projectMemberRepository.delete(member.id);
+    if (result.affected !== 1) return;
+    await this.audit.recordProject({
+      action: 'project.member.removed',
+      actorId,
+      authenticationMethod,
+      apiTokenId,
+      subjectType: 'project.member',
+      subjectId: member.id,
+      details: { projectId, memberId: member.id, userId: member.userId, role: member.role },
+    });
   }
 
   public async listProjectInvitations(projectId: number): Promise<ProjectInvitation[]> {
@@ -182,6 +285,8 @@ export class ProjectsService {
     projectId: number,
     invitedUserId: number,
     role: ProjectMemberRole = ProjectMemberRole.VIEWER,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
   ): Promise<ProjectInvitation> {
     const project = await this.projectAccessService.ensureOwner(ownerId, projectId);
     const invitedUser = await this.userRepository.findOne({ where: { id: invitedUserId } });
@@ -223,6 +328,15 @@ export class ProjectsService {
       requestedRole: role,
     });
 
+    await this.audit.recordProject({
+      action: 'project.invitation.sent',
+      actorId: ownerId,
+      authenticationMethod,
+      apiTokenId,
+      subjectType: 'project.invitation',
+      subjectId: invitation.id,
+      details: this.invitationDetails(invitation),
+    });
     const hydratedInvitation = await this.getInvitationWithRelations(invitation.id);
     await this.dispatchProjectInvitationNotification(invitedUser, project, hydratedInvitation);
     return hydratedInvitation;
@@ -232,6 +346,8 @@ export class ProjectsService {
     ownerId: number,
     projectId: number,
     invitationId: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
   ): Promise<ProjectInvitation> {
     await this.projectAccessService.ensureOwner(ownerId, projectId);
     const invitation = await this.getInvitationWithRelations(invitationId);
@@ -244,9 +360,18 @@ export class ProjectsService {
       throw new BadRequestException('Only pending invitations can be resent');
     }
 
-    await this.dispatchProjectInvitationNotification(invitation.invitedUser, invitation.project, invitation);
     invitation.updatedAt = new Date();
     await this.projectInvitationRepository.save(invitation);
+    await this.audit.recordProject({
+      action: 'project.invitation.sent',
+      actorId: ownerId,
+      authenticationMethod,
+      apiTokenId,
+      subjectType: 'project.invitation',
+      subjectId: invitation.id,
+      details: this.invitationDetails(invitation),
+    });
+    await this.dispatchProjectInvitationNotification(invitation.invitedUser, invitation.project, invitation);
 
     return this.getInvitationWithRelations(invitation.id);
   }
@@ -255,6 +380,8 @@ export class ProjectsService {
     ownerId: number,
     projectId: number,
     invitationId: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
   ): Promise<ProjectInvitation> {
     await this.projectAccessService.ensureOwner(ownerId, projectId);
     const invitation = await this.getInvitationWithRelations(invitationId);
@@ -271,6 +398,15 @@ export class ProjectsService {
     invitation.respondedAt = new Date();
     await this.projectInvitationRepository.save(invitation);
 
+    await this.audit.recordProject({
+      action: 'project.invitation.revoked',
+      actorId: ownerId,
+      authenticationMethod,
+      apiTokenId,
+      subjectType: 'project.invitation',
+      subjectId: invitation.id,
+      details: this.invitationDetails(invitation),
+    });
     return this.getInvitationWithRelations(invitation.id);
   }
 
@@ -282,18 +418,30 @@ export class ProjectsService {
     });
   }
 
-  public async acceptInvitation(userId: number, invitationId: number): Promise<ProjectInvitation> {
-    return await this.respondToInvitation(userId, invitationId, ProjectInvitationStatus.ACCEPTED);
+  public async acceptInvitation(
+    userId: number,
+    invitationId: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<ProjectInvitation> {
+    return await this.respondToInvitation(userId, invitationId, ProjectInvitationStatus.ACCEPTED, authenticationMethod, apiTokenId);
   }
 
-  public async declineInvitation(userId: number, invitationId: number): Promise<ProjectInvitation> {
-    return await this.respondToInvitation(userId, invitationId, ProjectInvitationStatus.DECLINED);
+  public async declineInvitation(
+    userId: number,
+    invitationId: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<ProjectInvitation> {
+    return await this.respondToInvitation(userId, invitationId, ProjectInvitationStatus.DECLINED, authenticationMethod, apiTokenId);
   }
 
   private async respondToInvitation(
     userId: number,
     invitationId: number,
     status: ProjectInvitationStatus,
+    authenticationMethod: 'session' | 'api-token',
+    apiTokenId?: number,
   ): Promise<ProjectInvitation> {
     const invitation = await this.getInvitationWithRelations(invitationId);
 
@@ -310,9 +458,29 @@ export class ProjectsService {
     await this.projectInvitationRepository.save(invitation);
 
     if (status === ProjectInvitationStatus.ACCEPTED) {
-      await this.ensureMemberRecord(invitation.projectId, userId, invitation.requestedRole);
+      const member = await this.ensureMemberRecord(invitation.projectId, userId, invitation.requestedRole);
+      if (member) {
+        await this.audit.recordProject({
+          action: 'project.member.added',
+          actorId: userId,
+          authenticationMethod,
+          apiTokenId,
+          subjectType: 'project.member',
+          subjectId: member.id,
+          details: { projectId: invitation.projectId, memberId: member.id, userId, role: member.role },
+        });
+      }
     }
 
+    await this.audit.recordProject({
+      action: status === ProjectInvitationStatus.ACCEPTED ? 'project.invitation.accepted' : 'project.invitation.rejected',
+      actorId: userId,
+      authenticationMethod,
+      apiTokenId,
+      subjectType: 'project.invitation',
+      subjectId: invitation.id,
+      details: this.invitationDetails(invitation),
+    });
     return this.getInvitationWithRelations(invitation.id);
   }
 
@@ -320,7 +488,7 @@ export class ProjectsService {
     projectId: number,
     userId: number,
     role: ProjectMemberRole = ProjectMemberRole.VIEWER,
-  ): Promise<void> {
+  ): Promise<ProjectMember | null> {
     const existingMembership = await this.projectMemberRepository.findOne({
       where: {
         project: { id: projectId },
@@ -329,10 +497,10 @@ export class ProjectsService {
     });
 
     if (existingMembership) {
-      return;
+      return null;
     }
 
-    await this.projectMemberRepository.save({
+    return await this.projectMemberRepository.save({
       project: { id: projectId },
       user: { id: userId },
       role,
@@ -366,5 +534,18 @@ export class ProjectsService {
       url: `/projects?invitation=${invitation.id}`,
       sendEmail: (recipient) => this.emailService.sendProjectInvitationEmail(recipient, project, invitation),
     });
+  }
+
+  private projectDetails(project: Project, state: 'before' | 'after'): Record<string, string | number> {
+    return { projectId: project.id, [`${state}.name`]: project.name, [`${state}.hasLogo`]: project.logo ? 1 : 0 };
+  }
+
+  private invitationDetails(invitation: ProjectInvitation): Record<string, string | number> {
+    return {
+      projectId: invitation.projectId,
+      invitationId: invitation.id,
+      userId: invitation.invitedUserId,
+      role: invitation.requestedRole,
+    };
   }
 }

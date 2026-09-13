@@ -13,6 +13,7 @@ import { EmailService } from '../email/email.service';
 import { NotFoundException } from '@nestjs/common';
 import { MetricsService } from '../metrics/metrics.service';
 import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
+import { AuditService } from '../audit/audit.service';
 
 const mockMetricsService = {
   projectsTotal: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
@@ -54,6 +55,10 @@ describe('ProjectsService', () => {
     ensureOwner: jest.Mock;
     getAccessOrThrow: jest.Mock;
   };
+  let projectMemberRepository: jest.Mocked<Repository<ProjectMember>>;
+  let projectInvitationRepository: jest.Mocked<Repository<ProjectInvitation>>;
+  let userRepository: jest.Mocked<Repository<User>>;
+  let audit: { recordProject: jest.Mock };
 
   beforeEach(async () => {
     const queryBuilder = createMockQueryBuilder();
@@ -66,6 +71,18 @@ describe('ProjectsService', () => {
     resourceUsageRepository = {
       update: jest.fn(),
     } as unknown as jest.Mocked<Repository<ResourceUsage>>;
+
+    projectMemberRepository = {
+      findOne: jest.fn(),
+      save: jest.fn(),
+      delete: jest.fn(),
+    } as unknown as jest.Mocked<Repository<ProjectMember>>;
+    projectInvitationRepository = {
+      findOne: jest.fn(),
+      save: jest.fn(),
+    } as unknown as jest.Mocked<Repository<ProjectInvitation>>;
+    userRepository = { findOne: jest.fn() } as unknown as jest.Mocked<Repository<User>>;
+    audit = { recordProject: jest.fn().mockResolvedValue(undefined) };
 
     fileStorageService = {
       saveFile: jest.fn(),
@@ -82,15 +99,16 @@ describe('ProjectsService', () => {
       providers: [
         ProjectsService,
         { provide: getRepositoryToken(Project), useValue: projectRepository },
-        { provide: getRepositoryToken(ProjectMember), useValue: {} },
-        { provide: getRepositoryToken(ProjectInvitation), useValue: {} },
+        { provide: getRepositoryToken(ProjectMember), useValue: projectMemberRepository },
+        { provide: getRepositoryToken(ProjectInvitation), useValue: projectInvitationRepository },
         { provide: getRepositoryToken(ResourceUsage), useValue: resourceUsageRepository },
-        { provide: getRepositoryToken(User), useValue: {} },
+        { provide: getRepositoryToken(User), useValue: userRepository },
         { provide: FileStorageService, useValue: fileStorageService },
         { provide: ProjectAccessService, useValue: projectAccessService },
         { provide: EmailService, useValue: { sendProjectInvitationEmail: jest.fn() } },
         { provide: MetricsService, useValue: mockMetricsService },
         { provide: NotificationDispatchService, useValue: { dispatch: jest.fn() } },
+        { provide: AuditService, useValue: audit },
       ],
     }).compile();
 
@@ -159,6 +177,10 @@ describe('ProjectsService', () => {
       expect(projectRepository.save).toHaveBeenCalledWith(expect.objectContaining(payload));
       expect(created).toEqual(expect.objectContaining({ id: 1, name: 'New' }));
       expect(fileStorageService.saveFile).not.toHaveBeenCalled();
+      expect(audit.recordProject).toHaveBeenCalledWith({
+        action: 'project.created', actorId: 2, authenticationMethod: 'session', apiTokenId: undefined, subjectType: 'project', subjectId: 1,
+        details: { projectId: 1, 'after.name': 'New', 'after.hasLogo': 0 },
+      });
     });
 
     it('stores the logo when provided', async () => {
@@ -181,11 +203,17 @@ describe('ProjectsService', () => {
   describe('deleteOne', () => {
     it('unlinks resource usage entries before deleting the project', async () => {
       resourceUsageRepository.update.mockResolvedValue({} as never);
+      projectRepository.delete.mockResolvedValueOnce({ affected: 1 } as never);
 
-      await service.deleteOne(99);
+      projectAccessService.ensureOwner.mockResolvedValueOnce({ id: 99, name: 'Deleted', logo: null } as Project);
+      await service.deleteOne(7, 99);
 
       expect(resourceUsageRepository.update).toHaveBeenCalledWith({ projectId: 99 }, { projectId: null });
       expect(projectRepository.delete).toHaveBeenCalledWith(99);
+      expect(audit.recordProject).toHaveBeenCalledWith({
+        action: 'project.deleted', actorId: 7, authenticationMethod: 'session', apiTokenId: undefined, subjectType: 'project', subjectId: 99,
+        details: { projectId: 99, 'before.name': 'Deleted', 'before.hasLogo': 0 },
+      });
     });
   });
 
@@ -204,6 +232,13 @@ describe('ProjectsService', () => {
 
       expect(projectRepository.save).toHaveBeenCalledWith(expect.objectContaining({ id: 3, name: 'New' }));
       expect(updated.name).toBe('New');
+      expect(audit.recordProject).toHaveBeenCalledWith({
+        action: 'project.updated', actorId: 1, authenticationMethod: 'session', apiTokenId: undefined, subjectType: 'project', subjectId: 3,
+        details: {
+          projectId: 3, 'before.name': 'Old', 'before.hasLogo': 0,
+          'after.name': 'New', 'after.hasLogo': 0, changedFields: '["name"]',
+        },
+      });
     });
 
     it('replaces logos when requested', async () => {
@@ -218,6 +253,125 @@ describe('ProjectsService', () => {
       expect(fileStorageService.deleteFile).toHaveBeenCalledWith('projects/3', 'old.png');
       expect(fileStorageService.saveFile).toHaveBeenCalledWith(payload.logo, 'projects/3');
       expect(result.logo).toBe('new.png');
+      expect(audit.recordProject).toHaveBeenCalledWith({
+        action: 'project.updated', actorId: 1, authenticationMethod: 'session', apiTokenId: undefined,
+        subjectType: 'project', subjectId: 3,
+        details: {
+          projectId: 3, 'before.name': 'Old', 'before.hasLogo': 1,
+          'after.name': 'Old', 'after.hasLogo': 1, changedFields: '["logo"]',
+        },
+      });
+    });
+
+    it('does not record an update when safe state values are unchanged', async () => {
+      const existing = { id: 3, name: 'Same', description: 'Same', logo: null } as Project;
+      projectAccessService.ensureOwner.mockResolvedValueOnce(existing);
+      projectRepository.save.mockImplementation(async (entity: Project) => entity);
+
+      await service.updateOne(1, 3, { name: 'Same', description: 'Same' } as UpdateProjectDto);
+
+      expect(audit.recordProject).not.toHaveBeenCalled();
+    });
+
+    it('records archive lifecycle changes with the initiating actor', async () => {
+      const project = { id: 3, name: 'Project', logo: null } as Project;
+      projectAccessService.ensureOwner.mockResolvedValue(project);
+      projectRepository.save.mockImplementation(async (entity: Project) => entity);
+
+      await service.archiveOne(2, 3);
+      await service.unarchiveOne(2, 3);
+
+      expect(audit.recordProject).toHaveBeenNthCalledWith(1, {
+        action: 'project.archived', actorId: 2, authenticationMethod: 'session', apiTokenId: undefined,
+        subjectType: 'project', subjectId: 3, details: { projectId: 3, 'after.name': 'Project', 'after.hasLogo': 0, 'after.archived': 1 },
+      });
+      expect(audit.recordProject).toHaveBeenNthCalledWith(2, {
+        action: 'project.unarchived', actorId: 2, authenticationMethod: 'session', apiTokenId: undefined,
+        subjectType: 'project', subjectId: 3, details: { projectId: 3, 'after.name': 'Project', 'after.hasLogo': 0, 'after.archived': 0 },
+      });
+    });
+  });
+
+  describe('membership and invitation audit events', () => {
+    it('records invitations sent and revoked by the project owner', async () => {
+      const project = { id: 3, name: 'Project', owner: { id: 2 } } as Project;
+      const invitation = {
+        id: 7, projectId: 3, inviterId: 2, invitedUserId: 9, requestedRole: 'viewer', status: 'pending',
+      } as ProjectInvitation;
+      projectAccessService.ensureOwner.mockResolvedValue(project);
+      userRepository.findOne.mockResolvedValue({ id: 9 } as User);
+      projectMemberRepository.findOne.mockResolvedValue(null);
+      projectInvitationRepository.findOne.mockResolvedValueOnce(null).mockResolvedValue(invitation);
+      projectInvitationRepository.save.mockResolvedValue(invitation);
+
+      await service.createProjectInvitation(2, 3, 9);
+      await service.cancelProjectInvitation(2, 3, 7);
+
+      expect(audit.recordProject).toHaveBeenNthCalledWith(1, {
+        action: 'project.invitation.sent', actorId: 2, authenticationMethod: 'session', apiTokenId: undefined, subjectType: 'project.invitation', subjectId: 7,
+        details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
+      });
+      expect(audit.recordProject).toHaveBeenNthCalledWith(2, {
+        action: 'project.invitation.revoked', actorId: 2, authenticationMethod: 'session', apiTokenId: undefined, subjectType: 'project.invitation', subjectId: 7,
+        details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
+      });
+    });
+
+    it('records the owner and affected membership after removal', async () => {
+      projectMemberRepository.findOne.mockResolvedValueOnce({ id: 8, userId: 9, role: 'viewer' } as ProjectMember);
+      projectMemberRepository.delete.mockResolvedValueOnce({ affected: 1 } as never);
+
+      await service.removeMember(2, 3, 8);
+
+      expect(audit.recordProject).toHaveBeenCalledWith({
+        action: 'project.member.removed', actorId: 2, authenticationMethod: 'session', apiTokenId: undefined, subjectType: 'project.member', subjectId: 8,
+        details: { projectId: 3, memberId: 8, userId: 9, role: 'viewer' },
+      });
+    });
+
+    it('does not audit a membership removal that did not affect a row', async () => {
+      projectMemberRepository.findOne.mockResolvedValueOnce({ id: 8, userId: 9, role: 'viewer' } as ProjectMember);
+      projectMemberRepository.delete.mockResolvedValueOnce({ affected: 0 } as never);
+
+      await service.removeMember(2, 3, 8);
+
+      expect(audit.recordProject).not.toHaveBeenCalled();
+    });
+
+    it('records accepted invitations and the membership role using the accepting user as actor', async () => {
+      const invitation = {
+        id: 7, projectId: 3, invitedUserId: 9, requestedRole: 'viewer', status: 'pending',
+      } as ProjectInvitation;
+      projectInvitationRepository.findOne.mockResolvedValue(invitation);
+      projectInvitationRepository.save.mockResolvedValue(invitation);
+      projectMemberRepository.findOne.mockResolvedValue(null);
+      projectMemberRepository.save.mockResolvedValue({ id: 8, projectId: 3, userId: 9, role: 'viewer' } as ProjectMember);
+
+      await service.acceptInvitation(9, 7);
+
+      expect(audit.recordProject).toHaveBeenNthCalledWith(1, {
+        action: 'project.member.added', actorId: 9, authenticationMethod: 'session', apiTokenId: undefined, subjectType: 'project.member', subjectId: 8,
+        details: { projectId: 3, memberId: 8, userId: 9, role: 'viewer' },
+      });
+      expect(audit.recordProject).toHaveBeenNthCalledWith(2, {
+        action: 'project.invitation.accepted', actorId: 9, authenticationMethod: 'session', apiTokenId: undefined, subjectType: 'project.invitation', subjectId: 7,
+        details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
+      });
+    });
+
+    it('records rejected invitations using the invited user as actor', async () => {
+      const invitation = {
+        id: 7, projectId: 3, invitedUserId: 9, requestedRole: 'viewer', status: 'pending',
+      } as ProjectInvitation;
+      projectInvitationRepository.findOne.mockResolvedValue(invitation);
+      projectInvitationRepository.save.mockResolvedValue(invitation);
+
+      await service.declineInvitation(9, 7);
+
+      expect(audit.recordProject).toHaveBeenCalledWith({
+        action: 'project.invitation.rejected', actorId: 9, authenticationMethod: 'session', apiTokenId: undefined, subjectType: 'project.invitation', subjectId: 7,
+        details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
+      });
     });
   });
 });
