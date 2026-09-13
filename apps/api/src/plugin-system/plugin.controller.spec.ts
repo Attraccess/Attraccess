@@ -1,3 +1,4 @@
+import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { BadRequestException, NotFoundException, StreamableFile } from '@nestjs/common';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -19,6 +20,8 @@ function frontendPlugin(name: string): LoadedPluginManifest {
     attraccessVersion: { min: '1.0.0' },
   } as LoadedPluginManifest;
 }
+
+const req = { user: { id: 42, authenticationMethod: 'session' } } as AuthenticatedRequest;
 
 describe('PluginController', () => {
   let root: string;
@@ -44,7 +47,11 @@ describe('PluginController', () => {
       searchMarketplace: jest.fn(),
       marketplacePackage: jest.fn(),
     };
-    controller = new PluginController(service as unknown as PluginService, npmService as never);
+    controller = new PluginController(
+      service as unknown as PluginService,
+      npmService as never,
+      { recordAdministration: jest.fn() } as never,
+    );
   });
 
   afterEach(() => {
@@ -67,30 +74,30 @@ describe('PluginController', () => {
   });
 
   describe('retryPlugin', () => {
-    it('clears a failed plugin quarantine and schedules a restart', () => {
+    it('clears a failed plugin quarantine and schedules a restart', async () => {
       const plugin = frontendPlugin('failed');
       jest.spyOn(PluginService, 'getManifestById').mockReturnValue(plugin);
       jest.spyOn(PluginService, 'isPluginQuarantined').mockReturnValue(true);
       const clearQuarantine = jest.spyOn(PluginService, 'clearPluginQuarantine');
 
-      expect(controller.retryPlugin(plugin.id)).toEqual({ ok: true });
+      await expect(controller.retryPlugin(plugin.id, req)).resolves.toEqual({ ok: true });
       expect(clearQuarantine).toHaveBeenCalledWith(plugin.pluginDirectory);
       expect(service.requestRestart).toHaveBeenCalledTimes(1);
     });
 
-    it('rejects an unknown plugin without scheduling a restart', () => {
+    it('rejects an unknown plugin without scheduling a restart', async () => {
       jest.spyOn(PluginService, 'getManifestById').mockReturnValue(undefined);
 
-      expect(() => controller.retryPlugin('missing')).toThrow(NotFoundException);
+      await expect(controller.retryPlugin('missing', req)).rejects.toThrow(NotFoundException);
       expect(service.requestRestart).not.toHaveBeenCalled();
     });
 
-    it('rejects a plugin that is not quarantined', () => {
+    it('rejects a plugin that is not quarantined', async () => {
       const plugin = frontendPlugin('loaded');
       jest.spyOn(PluginService, 'getManifestById').mockReturnValue(plugin);
       jest.spyOn(PluginService, 'isPluginQuarantined').mockReturnValue(false);
 
-      expect(() => controller.retryPlugin(plugin.id)).toThrow(BadRequestException);
+      await expect(controller.retryPlugin(plugin.id, req)).rejects.toThrow(BadRequestException);
       expect(service.requestRestart).not.toHaveBeenCalled();
     });
   });
@@ -153,12 +160,12 @@ describe('PluginController', () => {
     const file = { originalname: 'plugin.zip' } as FileUpload;
     service.uploadPlugin.mockResolvedValue({ name: 'uploaded' });
     await expect(controller.uploadPlugin(file, {})).resolves.toEqual({ name: 'uploaded' });
-    expect(service.uploadPlugin).toHaveBeenCalledWith(file);
+    expect(service.uploadPlugin).toHaveBeenCalledWith(file, false);
   });
 
   it('delegates non-npm plugin deletion to the plugin service', async () => {
     await controller.deletePlugin('plugin-id');
-    expect(service.deletePlugin).toHaveBeenCalledWith('plugin-id');
+    expect(service.deletePlugin).toHaveBeenCalledWith('plugin-id', false);
   });
 
   it('delegates marketplace search with an optional registry', () => {
@@ -178,7 +185,7 @@ describe('PluginController', () => {
 
     await controller.deletePlugin(plugin.id);
 
-    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin');
+    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin', false);
     expect(service.deletePlugin).not.toHaveBeenCalled();
   });
 
@@ -187,7 +194,7 @@ describe('PluginController', () => {
 
     await controller.deletePlugin('npm-plugin-id');
 
-    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin');
+    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin', false);
     expect(service.deletePlugin).not.toHaveBeenCalled();
   });
 
@@ -200,7 +207,7 @@ describe('PluginController', () => {
 
     await controller.deletePlugin(plugin.id);
 
-    expect(service.deletePlugin).toHaveBeenCalledWith(plugin.id);
+    expect(service.deletePlugin).toHaveBeenCalledWith(plugin.id, false);
     expect(npmService.removeInstalled).not.toHaveBeenCalled();
   });
 });

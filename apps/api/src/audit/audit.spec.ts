@@ -1,3 +1,4 @@
+import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { PluginModule } from '../plugin-system/plugin.module';
 import { PluginService } from '../plugin-system/plugin.service';
 import { PluginSandboxService } from '../plugin-system/plugin-sandbox.service';
@@ -55,7 +56,7 @@ const event = (): PluginAuditEvent & { pluginId: string } => ({
   subject: { type: 'wago.controller', id: 7 },
   details: { revision: 2 },
 });
-const config = { enabled: true, domains: ['resource', 'wago'], retention_days: 90 };
+const config = { enabled: true, domains: ['administration', 'resource', 'wago'], retention_days: 90 };
 
 describe('durable audit SQLite', () => {
   let directory: string;
@@ -88,6 +89,65 @@ describe('durable audit SQLite', () => {
     await service.onModuleDestroy();
     if (source.isInitialized) await source.destroy();
     await rm(directory, { recursive: true, force: true });
+  });
+
+  it.each([{ enabled: false }, { domains: ['wago'] }])(
+    'records the final disabling settings change and suppresses subsequent events (%j)',
+    async (update) => {
+      const settings = new SettingsService(null, store, null);
+      await settings.updateAuditSettings(config);
+      const controller = new SettingsController(settings, service);
+      await controller.updateAuditSettings(update, {
+        user: { id: 42, authenticationMethod: 'session' },
+      } as AuthenticatedRequest);
+      await service.recordAdministration({
+        action: 'mqtt_server.created',
+        actorId: 42,
+        subjectType: 'mqtt-server',
+        subjectId: 1,
+        details: { host: 'mqtt.example' },
+      });
+      const rows = (await service.list(new AuditQueryDto())).items;
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        action: 'settings.updated',
+        details: { settingKey: update.enabled === false ? 'audit.enabled' : 'audit.domains' },
+      });
+      expect(rows[0].details.before).not.toBe(rows[0].details.after);
+      await settings.updateAuditSettings(config);
+      await service.recordAdministration({
+        action: 'mqtt_server.created',
+        actorId: 42,
+        subjectType: 'mqtt-server',
+        subjectId: 1,
+        details: { host: 'mqtt.example' },
+      });
+      expect((await service.list(new AuditQueryDto())).items).toHaveLength(2);
+    },
+  );
+
+  it('records allowlisted administration metadata and rejects credential-bearing fields', async () => {
+    await service.recordAdministration({
+      action: 'mqtt_server.created',
+      actorId: 42,
+      subjectType: 'mqtt-server',
+      subjectId: 7,
+      details: { host: 'mqtt.example.test', port: 8883, passwordChanged: 1 },
+    });
+    await service.recordAdministration({
+      action: 'mqtt_server.created',
+      actorId: 42,
+      subjectType: 'mqtt-server',
+      subjectId: 8,
+      details: { password: 'do-not-store' } as never,
+    });
+    expect((await service.list(new AuditQueryDto())).items).toEqual([
+      expect.objectContaining({
+        action: 'mqtt_server.created',
+        subjectId: 7,
+        details: { host: 'mqtt.example.test', port: 8883, passwordChanged: 1 },
+      }),
+    ]);
   });
 
   it('upgrades additively, survives connection restart and principal deletion, prevents updates, and reverts', async () => {
@@ -165,13 +225,16 @@ describe('durable audit SQLite', () => {
     await store.setPlainSetting('audit', 'domains', '["billing"]');
     let receipt: Promise<{ status: string }> | undefined;
     await source.transaction(async (manager) => {
-      receipt = service.recordBillingTransactionAfterCommit({
-        transactionId: 8,
-        userId: 42,
-        amount: 0,
-        status: 'pending',
-        source: 'resource-usage',
-      }, manager);
+      receipt = service.recordBillingTransactionAfterCommit(
+        {
+          transactionId: 8,
+          userId: 42,
+          amount: 0,
+          status: 'pending',
+          source: 'resource-usage',
+        },
+        manager,
+      );
       expect((await service.list({ limit: 1 })).items).toHaveLength(0);
     });
     await expect(receipt).resolves.toEqual({ status: 'recorded' });
@@ -183,13 +246,16 @@ describe('durable audit SQLite', () => {
     let receipt: Promise<{ status: string }> | undefined;
     await expect(
       source.transaction(async (manager) => {
-        receipt = service.recordBillingTransactionAfterCommit({
-          transactionId: 8,
-          userId: 42,
-          amount: 0,
-          status: 'pending',
-          source: 'resource-usage',
-        }, manager);
+        receipt = service.recordBillingTransactionAfterCommit(
+          {
+            transactionId: 8,
+            userId: 42,
+            amount: 0,
+            status: 'pending',
+            source: 'resource-usage',
+          },
+          manager,
+        );
         throw new Error('rollback');
       }),
     ).rejects.toThrow('rollback');
@@ -202,22 +268,28 @@ describe('durable audit SQLite', () => {
     let outerReceipt: Promise<{ status: string }> | undefined;
     let nestedReceipt: Promise<{ status: string }> | undefined;
     await source.transaction(async (manager) => {
-      outerReceipt = service.recordBillingTransactionAfterCommit({
-        transactionId: 8,
-        userId: 42,
-        amount: 0,
-        status: 'pending',
-        source: 'resource-usage',
-      }, manager);
+      outerReceipt = service.recordBillingTransactionAfterCommit(
+        {
+          transactionId: 8,
+          userId: 42,
+          amount: 0,
+          status: 'pending',
+          source: 'resource-usage',
+        },
+        manager,
+      );
       await expect(
         manager.transaction(async (nestedManager) => {
-          nestedReceipt = service.recordBillingTransactionAfterCommit({
-            transactionId: 9,
-            userId: 42,
-            amount: 0,
-            status: 'pending',
-            source: 'resource-usage',
-          }, nestedManager);
+          nestedReceipt = service.recordBillingTransactionAfterCommit(
+            {
+              transactionId: 9,
+              userId: 42,
+              amount: 0,
+              status: 'pending',
+              source: 'resource-usage',
+            },
+            nestedManager,
+          );
           throw new Error('nested rollback');
         }),
       ).rejects.toThrow('nested rollback');
@@ -233,23 +305,29 @@ describe('durable audit SQLite', () => {
     let rolledBackReceipt: Promise<{ status: string }> | undefined;
     await source.transaction(async (manager) => {
       await manager.transaction(async (nestedManager) => {
-        committedReceipt = service.recordBillingTransactionAfterCommit({
-          transactionId: 8,
-          userId: 42,
-          amount: 0,
-          status: 'pending',
-          source: 'resource-usage',
-        }, nestedManager);
-      });
-      await expect(
-        manager.transaction(async (nestedManager) => {
-          rolledBackReceipt = service.recordBillingTransactionAfterCommit({
-            transactionId: 9,
+        committedReceipt = service.recordBillingTransactionAfterCommit(
+          {
+            transactionId: 8,
             userId: 42,
             amount: 0,
             status: 'pending',
             source: 'resource-usage',
-          }, nestedManager);
+          },
+          nestedManager,
+        );
+      });
+      await expect(
+        manager.transaction(async (nestedManager) => {
+          rolledBackReceipt = service.recordBillingTransactionAfterCommit(
+            {
+              transactionId: 9,
+              userId: 42,
+              amount: 0,
+              status: 'pending',
+              source: 'resource-usage',
+            },
+            nestedManager,
+          );
           throw new Error('nested rollback');
         }),
       ).rejects.toThrow('nested rollback');
