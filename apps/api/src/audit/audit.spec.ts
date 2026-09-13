@@ -624,6 +624,27 @@ describe('durable audit SQLite', () => {
     });
   });
 
+  it('records system-originated resource introductions without a synthesized session', async () => {
+    await store.setPlainSetting('audit', 'domains', '["resource"]');
+
+    await service.recordResource({
+      action: 'introduction.granted',
+      actorId: null,
+      authenticationMethod: null,
+      subjectId: 7,
+      details: { recipientUserId: 3, tutorUserId: 9 },
+    });
+
+    expect((await service.list({ limit: 1 })).items[0]).toMatchObject({
+      domain: 'resource',
+      action: 'introduction.granted',
+      actorId: null,
+      authenticationMethod: null,
+      subjectId: 7,
+      details: { recipientUserId: 3, tutorUserId: 9 },
+    });
+  });
+
   it('records identity API-token attribution', async () => {
     await store.setPlainSetting('audit', 'domains', '["identity"]');
     const operationId = randomUUID();
