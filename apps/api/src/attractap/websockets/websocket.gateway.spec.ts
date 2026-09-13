@@ -61,7 +61,7 @@ function createMockSocket(overrides: Partial<AuthenticatedWebSocket> = {}): Auth
     close: jest.fn(),
     state: {
       lastAuthenticatedUserId: null,
-      auditPrincipal: null,
+      enrollment: null,
       enrollNewCardData: null,
       resetNfcCardData: null,
       ota: null,

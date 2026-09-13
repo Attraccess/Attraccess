@@ -224,6 +224,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       sendBinaryData,
       state: {
         lastAuthenticatedUserId: null,
+        enrollment: null,
         enrollNewCardData: null,
         resetNfcCardData: null,
         ota: null,
