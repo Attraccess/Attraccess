@@ -31,7 +31,7 @@ export class RetirePasswordPolicyAudit1783900000000 implements MigrationInterfac
           WHEN 'override_deleted' THEN 'identity.password_policy_override_deleted'
           ELSE 'identity.password_policy_override_updated'
         END,
-        'password-policy-audit-' || "id",
+        lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))), 2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))), 2) || '-' || lower(hex(randomblob(6))),
         "actorId", NULL, NULL, 'succeeded', 'identity.password_policy', 1, "ip", "userAgent",
         CASE WHEN length(CAST(json_object(
           'migrationSource', 'password_policy_audit', 'legacyAuditId', "id", 'actorUsername', "actorUsername",
