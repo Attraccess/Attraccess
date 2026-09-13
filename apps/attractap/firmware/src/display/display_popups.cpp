@@ -263,7 +263,7 @@ void Display::showInsufficientBalancePopup(std::function<void(uint32_t amountCen
         lv_obj_t *dialog = lv_obj_get_parent(footer);
         lv_obj_clean(dialog);
         lv_obj_t *infoLbl = lv_label_create(dialog);
-        lv_label_set_text(infoLbl, "Bitte am Zahlungsterminal fortfahren …");
+        lv_label_set_text(infoLbl, "Bitte am Zahlungsterminal fortfahren ...");
         lv_obj_set_style_text_color(infoLbl, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_obj_set_style_text_font(infoLbl, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
