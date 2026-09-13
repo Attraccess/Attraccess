@@ -252,19 +252,39 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     auditedAt: Date,
   ): Promise<boolean> {
     try {
-      const snapshot = projectResourceAuditEvent({ ...event, action: 'retraining.required', operationId: randomUUID() });
+      const snapshot = projectResourceAuditEvent({
+        ...event,
+        action: 'retraining.required',
+        operationId: randomUUID(),
+      });
       if (!snapshot || this.stopping) return false;
       const config = await readAuditSettings(this.settings);
       if (!config.enabled || !config.domains.includes('resource') || this.stopping) return false;
       await this.source.transaction(async (manager) => {
         await manager.getRepository(AuditLog).insert({
-          at: new Date(), domain: 'resource', pluginId: 'core', action: snapshot.action, operationId: snapshot.operationId,
+          at: new Date(),
+          domain: 'resource',
+          pluginId: 'core',
+          action: snapshot.action,
+          operationId: snapshot.operationId,
           actorId: snapshot.actorId,
-          authenticationMethod: snapshot.authenticationMethod === undefined ? (snapshot.actorId === null ? null : 'session') : snapshot.authenticationMethod,
-          apiTokenId: snapshot.apiTokenId ?? null, outcome: 'succeeded', subjectType: snapshot.subjectType ?? 'resource',
-          subjectId: snapshot.subjectId, ipAddress: null, userAgent: null, details: snapshot.details,
+          authenticationMethod:
+            snapshot.authenticationMethod === undefined
+              ? snapshot.actorId === null
+                ? null
+                : 'session'
+              : snapshot.authenticationMethod,
+          apiTokenId: snapshot.apiTokenId ?? null,
+          outcome: 'succeeded',
+          subjectType: snapshot.subjectType ?? 'resource',
+          subjectId: snapshot.subjectId,
+          ipAddress: null,
+          userAgent: null,
+          details: snapshot.details,
         });
-        await manager.getRepository(ResourceIntroduction).update(introductionId, { retrainingRequiredAuditedAt: auditedAt });
+        await manager
+          .getRepository(ResourceIntroduction)
+          .update(introductionId, { retrainingRequiredAuditedAt: auditedAt });
       });
       return true;
     } catch {

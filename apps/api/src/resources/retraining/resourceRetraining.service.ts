@@ -185,16 +185,22 @@ export class ResourceRetrainingService {
     // This marker survives audit retention but is reset by a newer training cycle.
     if (!introduction.retrainingRequiredAuditedAt || introduction.retrainingRequiredAuditedAt < trainedAt) {
       const subjectId = introduction.resourceId ?? introduction.resourceGroupId;
-      await this.audit.recordResourceIntroductionRequired({
-        actorId: null,
-        subjectId,
-        ...(introduction.resourceId ? {} : { subjectType: 'resource.group' }),
-        details: {
-          introductionId: introduction.id,
-          usageUserId: introduction.receiverUserId,
-          retrainingReason: evaluation.reason ?? 'unknown',
-        },
-      }, introduction.id, now).catch(() => false);
+      await this.audit
+        .recordResourceIntroductionRequired(
+          {
+            actorId: null,
+            subjectId,
+            ...(introduction.resourceId ? {} : { subjectType: 'resource.group' }),
+            details: {
+              introductionId: introduction.id,
+              usageUserId: introduction.receiverUserId,
+              retrainingReason: evaluation.reason ?? 'unknown',
+            },
+          },
+          introduction.id,
+          now,
+        )
+        .catch(() => false);
     }
     if (introduction.retrainingNotifiedAt && introduction.retrainingNotifiedAt.getTime() >= trainedAt.getTime()) {
       return;
@@ -281,10 +287,7 @@ export class ResourceRetrainingService {
 
     const soonest = applicable
       .filter((evaluation) => evaluation.dueAt)
-      .reduce(
-        (a, b) => (a && a.dueAt.getTime() <= b.dueAt.getTime() ? a : b),
-        null as RetrainingEvaluation | null,
-      );
+      .reduce((a, b) => (a && a.dueAt.getTime() <= b.dueAt.getTime() ? a : b), null as RetrainingEvaluation | null);
 
     return {
       applies: true,

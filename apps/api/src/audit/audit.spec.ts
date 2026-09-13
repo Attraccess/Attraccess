@@ -271,39 +271,83 @@ describe('durable audit SQLite', () => {
 
   it('persists resource system and device origins, honors suppression, and filters lifecycle actions', async () => {
     await service.recordResource({
-      action: 'health.transition', actorId: null, subjectId: 7,
+      action: 'health.transition',
+      actorId: null,
+      subjectId: 7,
       details: { previousStatus: 'healthy', status: 'unhealthy', healthSource: 'heartbeat' },
     });
     await service.recordResource({
-      action: 'usage_session.started', actorId: 8, authenticationMethod: null, subjectId: 7,
+      action: 'usage_session.started',
+      actorId: 8,
+      authenticationMethod: null,
+      subjectId: 7,
       details: { usageId: 4, usageUserId: 8 },
     });
     await service.recordResource({
-      action: 'retraining.cleared', actorId: 8, authenticationMethod: null, subjectType: 'resource.group', subjectId: 3,
+      action: 'retraining.cleared',
+      actorId: 8,
+      authenticationMethod: null,
+      subjectType: 'resource.group',
+      subjectId: 3,
       details: { introductionId: 2, usageUserId: 8 },
     });
     expect((await service.list({ domain: 'resource', eventPrefix: 'health.' } as AuditQueryDto)).items).toEqual([
       expect.objectContaining({ action: 'health.transition', actorId: null, authenticationMethod: null, subjectId: 7 }),
     ]);
-    expect((await service.list({ domain: 'resource', action: 'usage_session.started' } as AuditQueryDto)).items).toEqual([
-      expect.objectContaining({ actorId: 8, authenticationMethod: null, subjectId: 7 }),
-    ]);
+    expect(
+      (await service.list({ domain: 'resource', action: 'usage_session.started' } as AuditQueryDto)).items,
+    ).toEqual([expect.objectContaining({ actorId: 8, authenticationMethod: null, subjectId: 7 })]);
     expect((await service.list({ domain: 'resource', subjectType: 'resource.group' } as AuditQueryDto)).items).toEqual([
       expect.objectContaining({ action: 'retraining.cleared', subjectId: 3, actorId: 8, authenticationMethod: null }),
     ]);
     await store.setPlainSetting('audit', 'domains', '[]');
     await service.recordResource({
-      action: 'retraining.required', actorId: null, subjectId: 7,
+      action: 'retraining.required',
+      actorId: null,
+      subjectId: 7,
       details: { introductionId: 2, usageUserId: 8, retrainingReason: 'age' },
     });
     expect((await service.list({ domain: 'resource' } as AuditQueryDto)).items).toHaveLength(3);
     await store.setPlainSetting('audit', 'domains', '["resource"]');
     await store.setPlainSetting('audit', 'enabled', 'false');
     await service.recordResource({
-      action: 'retraining.required', actorId: null, subjectId: 7,
+      action: 'retraining.required',
+      actorId: null,
+      subjectId: 7,
       details: { introductionId: 3, usageUserId: 8, retrainingReason: 'age' },
     });
     expect((await service.list({ domain: 'resource' } as AuditQueryDto)).items).toHaveLength(3);
+  });
+
+  it('rolls back the retraining audit insert when updating its cycle marker fails', async () => {
+    const auditLogRepository = { insert: jest.fn().mockResolvedValue(undefined) };
+    const introductionRepository = { update: jest.fn().mockRejectedValue(new Error('marker unavailable')) };
+    const manager = {
+      getRepository: jest.fn().mockReturnValueOnce(auditLogRepository).mockReturnValueOnce(introductionRepository),
+    };
+    const transaction = jest.fn(async (callback: (manager: typeof manager) => Promise<void>) => callback(manager));
+    const transactionalService = new AuditService(
+      { transaction } as never,
+      { getPlainSetting: jest.fn().mockResolvedValue(null) } as never,
+    );
+
+    await expect(
+      transactionalService.recordResourceIntroductionRequired(
+        {
+          actorId: null,
+          subjectId: 7,
+          details: { introductionId: 3, usageUserId: 2, retrainingReason: 'age' },
+        },
+        3,
+        new Date(),
+      ),
+    ).resolves.toBe(false);
+
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(auditLogRepository.insert).toHaveBeenCalledTimes(1);
+    expect(introductionRepository.update).toHaveBeenCalledWith(3, {
+      retrainingRequiredAuditedAt: expect.any(Date),
+    });
   });
 
   it('records a billing event only after its originating transaction commits', async () => {
@@ -1202,7 +1246,9 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       WHEN OLD.id IN (SELECT id FROM "audit_log" WHERE "at" < '2026-06-15 12:00:00.000')
       BEGIN SELECT RAISE(ABORT, 'audit cleanup failed'); END`);
     await migratedAudit.cleanup();
-    expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toHaveLength(1);
+    expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toHaveLength(
+      1,
+    );
     await source.query('DROP TRIGGER abort_audit_cleanup');
     await migratedAudit.cleanup();
     expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toEqual([]);
