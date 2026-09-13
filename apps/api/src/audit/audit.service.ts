@@ -113,6 +113,8 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
         outcome: snapshot.outcome,
         subjectType: snapshot.subject.type,
         subjectId: snapshot.subject.id,
+        ipAddress: null,
+        userAgent: null,
         details: snapshot.details as Record<string, string | number>,
       });
     } catch {
@@ -148,6 +150,8 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
         outcome: 'succeeded',
         subjectType: 'billing.transaction',
         subjectId: event.transactionId,
+        ipAddress: null,
+        userAgent: null,
         details: {
           amount: event.amount,
           status: event.status,
