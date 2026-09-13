@@ -1049,6 +1049,12 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       VALUES ('2026-06-15 13:00:00.000', 'identity', 'identity.password_policy_updated', 'e3aedfb1-15c7-4290-9a0c-777f27a8357f', 'succeeded', 'identity.password_policy', 1,
         '{"migrationSource":"password_policy_audit","legacyAuditId":998,"detailsTruncated":true}')`);
     await migratedStore.setPlainSetting('audit', 'retention_days', '1');
+    await source.query(`CREATE TRIGGER abort_audit_cleanup BEFORE DELETE ON "audit_log"
+      WHEN OLD.id IN (SELECT id FROM "audit_log" WHERE "at" < '2026-06-15 12:00:00.000')
+      BEGIN SELECT RAISE(ABORT, 'audit cleanup failed'); END`);
+    await migratedAudit.cleanup();
+    expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toHaveLength(1);
+    await source.query('DROP TRIGGER abort_audit_cleanup');
     await migratedAudit.cleanup();
     expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toEqual([]);
     expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 998')).toHaveLength(

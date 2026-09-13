@@ -237,8 +237,8 @@ const identityFields: Record<string, (value: unknown) => boolean> = {
     'dependency_failure',
   ),
   providerId: positive,
-  // RbacService.generateRoleKey lowercases names and joins alphanumeric parts with hyphens.
-  role: (value) => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value),
+  // RbacService truncates normalized names after joining parts, which can leave a trailing hyphen.
+  role: (value) => typeof value === 'string' && /^[a-z0-9][a-z0-9-]*$/.test(value),
   field: oneOf(
     'username',
     'email',

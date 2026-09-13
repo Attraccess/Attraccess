@@ -323,21 +323,24 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
       const config = await readAuditSettings(this.settings);
       const cutoff = this.sqliteDate(this.cutoff(config.retention_days));
       while (!this.stopping) {
-        if (await this.hasPasswordPolicyOverflow()) {
-          await this.storage.query(`DELETE FROM password_policy_audit_overflow
-            WHERE legacyAuditId IN (
-              SELECT json_extract(details, '$.legacyAuditId') FROM audit_log
-              WHERE at < ? AND json_extract(details, '$.migrationSource') = 'password_policy_audit'
-              ORDER BY at LIMIT 1000
-            )`, [cutoff]);
-        }
-        const result = await this.storage
-          .getRepository(AuditLog)
-          .createQueryBuilder()
-          .delete()
-          .where('id IN (SELECT id FROM audit_log WHERE at < :cutoff ORDER BY at LIMIT 1000)', { cutoff })
-          .execute();
-        const count = result.affected ?? 0;
+        const hasOverflow = await this.hasPasswordPolicyOverflow();
+        const count = await this.storage.transaction(async (manager) => {
+          const rows = await manager.query<{ id: number }[]>(
+            'SELECT id FROM audit_log WHERE at < ? ORDER BY at, id LIMIT 1000',
+            [cutoff],
+          );
+          if (rows.length === 0) return 0;
+          const ids = rows.map(({ id }) => id);
+          const placeholders = ids.map(() => '?').join(', ');
+          if (hasOverflow) {
+            await manager.query(`DELETE FROM password_policy_audit_overflow
+              WHERE legacyAuditId IN (
+                SELECT json_extract(details, '$.legacyAuditId') FROM audit_log WHERE id IN (${placeholders})
+              )`, ids);
+          }
+          await manager.query(`DELETE FROM audit_log WHERE id IN (${placeholders})`, ids);
+          return rows.length;
+        });
         if (count > 0) this.logger.log(`Deleted ${count} expired audit rows`);
         if (count < 1000) break;
         await new Promise<void>((resolve) => setImmediate(resolve));
