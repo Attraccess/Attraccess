@@ -31,8 +31,14 @@ describe('ResourceHealthController', () => {
 
   it('delegates clearResourceHealthEntry to the service', async () => {
     service.clearEntry.mockResolvedValue(undefined);
-    await controller.clearResourceHealthEntry(7, 42);
-    expect(service.clearEntry).toHaveBeenCalledWith(7, 42);
+    await controller.clearResourceHealthEntry(7, 42, {
+      user: { id: 4, authenticationMethod: 'api-token', apiTokenId: 8 },
+    } as never);
+    expect(service.clearEntry).toHaveBeenCalledWith(7, 42, {
+      actorId: 4,
+      authenticationMethod: 'api-token',
+      apiTokenId: 8,
+    });
   });
 
   it('returns the summary from the service', async () => {

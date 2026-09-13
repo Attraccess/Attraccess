@@ -74,6 +74,7 @@ describe('SupervisedUsageAutoPromotionListener', () => {
       });
       expect(introductionsService.grant).toHaveBeenCalledWith(RESOURCE_ID, USER_ID, undefined, {
         tutorUserId: SUPERVISOR_ID,
+        auditOrigin: { actorId: null },
       });
       expect(groupIntroductionsService.grant).not.toHaveBeenCalled();
     });
@@ -104,6 +105,7 @@ describe('SupervisedUsageAutoPromotionListener', () => {
 
       expect(introductionsService.grant).toHaveBeenCalledWith(RESOURCE_ID, USER_ID, undefined, {
         tutorUserId: SUPERVISOR_ID,
+        auditOrigin: { actorId: null },
       });
     });
   });
@@ -129,6 +131,7 @@ describe('SupervisedUsageAutoPromotionListener', () => {
       });
       expect(groupIntroductionsService.grant).toHaveBeenCalledWith(GROUP_ID, USER_ID, undefined, {
         tutorUserId: SUPERVISOR_ID,
+        auditOrigin: { actorId: null },
       });
       expect(introductionsService.grant).not.toHaveBeenCalled();
     });

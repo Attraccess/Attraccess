@@ -93,7 +93,7 @@ describe('EndUsageSessionExecutor', () => {
       5,
       user,
       { notes: 'compiled notes' },
-      { skipFormSubmissions: true, skipNoteNotification: true },
+      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
     );
     expect(result).toEqual({ payload: input });
   });
@@ -111,7 +111,7 @@ describe('EndUsageSessionExecutor', () => {
       1,
       user,
       { notes: 'raw value' },
-      { skipFormSubmissions: true, skipNoteNotification: true },
+      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
     );
   });
 
@@ -128,7 +128,7 @@ describe('EndUsageSessionExecutor', () => {
       1,
       user,
       { notes: '' },
-      { skipFormSubmissions: true, skipNoteNotification: true },
+      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
     );
   });
 
@@ -145,7 +145,7 @@ describe('EndUsageSessionExecutor', () => {
       1,
       user,
       { notes: '' },
-      { skipFormSubmissions: true, skipNoteNotification: true },
+      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
     );
   });
 
@@ -162,7 +162,7 @@ describe('EndUsageSessionExecutor', () => {
       1,
       user,
       { notes: '' },
-      { skipFormSubmissions: true, skipNoteNotification: true },
+      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
     );
     expect(result).toEqual({ payload: { foo: 'bar' } });
   });

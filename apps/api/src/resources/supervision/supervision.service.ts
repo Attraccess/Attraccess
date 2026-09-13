@@ -411,6 +411,11 @@ export class SupervisionService {
     try {
       const session = await this.resourceUsageService.startSession(request.resourceId, request.requester, request.dto, {
         supervisorUserId: supervisor.id,
+        auditOrigin: {
+          actorId: supervisor.id,
+          authenticationMethod,
+          ...(apiTokenId === undefined ? {} : { apiTokenId }),
+        },
       });
       this.fulfil(request, session);
       void this.audit.recordResource({
