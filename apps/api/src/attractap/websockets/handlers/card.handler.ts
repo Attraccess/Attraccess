@@ -266,14 +266,13 @@ export class AttractapCardHandler {
     const reset = socket.state.resetNfcCardData;
 
     try {
-      const delivered = await socket.sendMessage(
+      await socket.sendMessage(
         new AttractapEvent(AttractapEventType.RESET_NFC_CARD, {
           username: nfcCard.user.username,
           keyNo: nfcCard.keyNo,
           key: nfcCard.key,
         }),
       );
-      if (!delivered && socket.state.resetNfcCardData === reset) socket.state.resetNfcCardData = null;
     } catch (error) {
       if (socket.state.resetNfcCardData === reset) socket.state.resetNfcCardData = null;
       this.logger.debug(`Failed to send RESET_NFC_CARD to client ${socket.id}: ${String(error)}`);

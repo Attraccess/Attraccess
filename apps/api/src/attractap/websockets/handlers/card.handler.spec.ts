@@ -629,7 +629,7 @@ describe('AttractapCardHandler', () => {
       );
     });
 
-    it('clears reset state when sending the command returns false', async () => {
+    it('retains reset state when the command is sent but its ACK is missing', async () => {
       const socket = createMockSocket({ sendMessage: jest.fn().mockResolvedValue(false) });
       websocketService.sockets.set('socket-1', socket);
 
@@ -637,6 +637,18 @@ describe('AttractapCardHandler', () => {
         handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 }),
       ).resolves.toBeUndefined();
 
+      expect(socket.state.resetNfcCardData).toEqual(expect.objectContaining({ cardId: 7 }));
+      await expect(
+        handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 }),
+      ).rejects.toThrow('Reader already has an active card operation: 42');
+
+      await handler.onResetNfcCard(socket, { payload: { success: true } } as AttractapEvent['data']);
+
+      expect(attractapService.deleteNFCCard).toHaveBeenCalledWith(7);
+      expect(audit.recordAttractap).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'card.unlinked',
+        subjectId: 7,
+      }));
       expect(socket.state.resetNfcCardData).toBeNull();
     });
 
