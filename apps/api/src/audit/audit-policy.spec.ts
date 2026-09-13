@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { PluginAuditEvent } from '@attraccess/plugins-backend-sdk';
 import {
+  projectAttractapAuditEvent,
   projectAuditEvent,
   projectIdentityAuditEvent,
   projectProjectAuditEvent,
@@ -181,5 +182,19 @@ describe('audit storage safe snapshot', () => {
       expect.objectContaining({ details: { 'after.nameOmitted': 1 } }),
     );
     expect(projectProjectAuditEvent({ ...projectEvent, action: 'project.invitation.resent' as never })).toBeNull();
+  });
+
+  it('allows only firmware reset reasons in Attractap crash events', () => {
+    const crash = {
+      action: 'reader.crash_reported' as const,
+      actorId: null,
+      authenticationMethod: null,
+      subjectId: 7,
+      details: { source: 'reader-websocket', resetReason: 'PANIC', hasCoredump: false },
+    };
+    expect(projectAttractapAuditEvent(crash)).toEqual(crash);
+    expect(
+      projectAttractapAuditEvent({ ...crash, details: { ...crash.details, resetReason: 'raw-secret' } }),
+    ).toBeNull();
   });
 });

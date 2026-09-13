@@ -13,9 +13,11 @@ import { PluginAuditEvent, PluginAuditHostProvider, PluginAuditReceipt } from '@
 import { readAuditSettings } from './audit.config';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import {
+  AttractapAuditEvent,
   IdentityAuditEvent,
   ProjectAuditEvent,
   projectAuditEvent,
+  projectAttractapAuditEvent,
   projectIdentityAuditEvent,
   projectProjectAuditEvent,
   projectResourceAuditEvent,
@@ -335,6 +337,30 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     }
   }
 
+  async recordAttractap(event: AttractapAuditEvent): Promise<void> {
+    try {
+      const snapshot = projectAttractapAuditEvent(event);
+      if (!snapshot) return;
+      await this.recordSnapshot({
+        domain: 'attractap',
+        pluginId: 'core',
+        action: `attractap.${snapshot.action}`,
+        operationId: randomUUID(),
+        actorId: snapshot.actorId,
+        authenticationMethod: snapshot.authenticationMethod,
+        apiTokenId: snapshot.apiTokenId ?? null,
+        outcome: 'succeeded',
+        subjectType: snapshot.action.startsWith('card.') ? 'attractap.card' : 'attractap.reader',
+        subjectId: snapshot.subjectId,
+        ipAddress: null,
+        userAgent: null,
+        details: snapshot.details,
+      });
+    } catch {
+      /* Audit persistence must not affect Attractap operations. */
+    }
+  }
+
   afterTransactionCommit({ queryRunner }: TransactionCommitEvent): void {
     // Nested transaction commits release a savepoint; wait for the owning transaction.
     if (queryRunner.isTransactionActive) {
@@ -379,7 +405,7 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
         (!finalSettingsChange &&
           (!config.enabled ||
             !config.domains.includes(
-              event.domain as 'administration' | 'project' | 'billing' | 'resource' | 'wago' | 'identity',
+              event.domain as 'administration' | 'attractap' | 'project' | 'billing' | 'resource' | 'wago' | 'identity',
             ))) ||
         this.stopping
       )

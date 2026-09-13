@@ -224,6 +224,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       sendBinaryData,
       state: {
         lastAuthenticatedUserId: null,
+        enrollment: null,
         enrollNewCardData: null,
         resetNfcCardData: null,
         ota: null,
@@ -535,11 +536,22 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     await Promise.all(sockets.map((socket) => socket.close()));
   }
 
-  public async startEnrollOfNewNfcCard(data: { readerId: number; userId: number }) {
+  public async startEnrollOfNewNfcCard(data: {
+    readerId: number;
+    userId: number;
+    authenticationMethod?: 'session' | 'api-token';
+    apiTokenId?: number;
+  }) {
     return this.cardHandler.startEnrollOfNewNfcCard(data);
   }
 
-  public async startResetOfNfcCard(data: { readerId: number; userId: number; cardId: number }) {
+  public async startResetOfNfcCard(data: {
+    readerId: number;
+    userId: number;
+    cardId: number;
+    authenticationMethod?: 'session' | 'api-token';
+    apiTokenId?: number;
+  }) {
     return this.cardHandler.startResetOfNfcCard(data);
   }
 }
