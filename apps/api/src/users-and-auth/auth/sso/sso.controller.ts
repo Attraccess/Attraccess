@@ -17,6 +17,7 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { SSOOIDCGuard } from './oidc/oidc.guard';
 import { AuthenticationType, SSOProvider, SSOProviderType } from '@attraccess/database-entities';
@@ -48,6 +49,8 @@ import { InvalidSSOProviderIdException, SSOProviderNotFoundException } from './e
 import { resolveSsoRoleAssignments } from './permission-mapping';
 import { RbacService } from '../../rbac/rbac.service';
 import { MetricsService } from '../../../metrics/metrics.service';
+import { IdentityAuditService } from '../../../audit/identity-audit.service';
+import { randomUUID } from 'node:crypto';
 @ApiTags('Authentication')
 @Controller('auth/sso')
 @RequiresLicense(LicenseModuleType.SSO)
@@ -64,6 +67,7 @@ export class SSOController {
     private readonly settingsService: SettingsService,
     private readonly metricsService: MetricsService,
     private readonly rbacService: RbacService,
+    @Optional() private readonly identityAudit?: IdentityAuditService,
   ) {}
 
   @Get('providers')
@@ -673,13 +677,14 @@ export class SSOController {
     @Req() request: AuthenticatedRequest,
     @Query('redirectTo') redirectToQuery: string | undefined,
     @Res({ passthrough: true }) response: Response,
+    @Param('providerId') providerId?: string,
   ): Promise<CreateSessionResponse | void> {
     const redirectTo = getRedirectToFromRequest(
       request as unknown as Record<string, unknown>,
       redirectToQuery,
     );
     this.metricsService.authSsoLoginTotal.inc({ provider_type: 'oidc' });
-    return this.finalizeLogin(request, response, redirectTo);
+    return this.finalizeLogin(request, response, redirectTo, providerId ? this.parseProviderId(providerId) : undefined);
   }
 
   @Get(`/${SSOProviderType.SAML}/:providerId/login`)
@@ -728,17 +733,19 @@ export class SSOController {
     @Body('RelayState') relayState: string,
     @Query('RelayState') relayStateQuery: string,
     @Res({ passthrough: true }) response: Response,
+    @Param('providerId') providerId?: string,
   ): Promise<CreateSessionResponse | void> {
     const defaultRedirect = await this.settingsService.getUrl();
     const target = redirectTo || relayState || relayStateQuery || defaultRedirect;
     this.metricsService.authSsoLoginTotal.inc({ provider_type: 'saml' });
-    return this.finalizeLogin(request, response, target);
+    return this.finalizeLogin(request, response, target, providerId ? this.parseProviderId(providerId) : undefined);
   }
 
   private async finalizeLogin(
     request: AuthenticatedRequest,
     response: Response,
     redirectTo?: string,
+    providerId?: number,
   ): Promise<CreateSessionResponse | void> {
     const sessionToken = await this.sessionService.createSession(request.user, {
       userAgent: request.headers['user-agent'],
@@ -746,6 +753,20 @@ export class SSOController {
     });
 
     await this.cookieConfigService.setAuthCookie(response, sessionToken);
+    if (providerId) {
+      void this.identityAudit?.record({
+        action: 'sso_login',
+        operationId: randomUUID(),
+        outcome: 'succeeded',
+        actorId: request.user.id,
+        subjectId: request.user.id,
+        details: { providerId },
+        request: {
+          ipAddress: request.ip || request.connection.remoteAddress,
+          userAgent: request.headers['user-agent'],
+        },
+      });
+    }
 
     const auth: CreateSessionResponse = {
       user: request.user,
