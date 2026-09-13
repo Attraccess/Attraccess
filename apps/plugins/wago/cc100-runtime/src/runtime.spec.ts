@@ -1968,17 +1968,22 @@ describe('WagoRuntime', () => {
           profile: 'generic-digital-output',
           capabilities: ['output', 'feedback'],
           disconnectPolicy: { mode: 'immediate' },
-          feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 5 },
+          feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 100 },
         },
       ],
     };
     let delayNextRead = false;
     let resolveRead: ((value: boolean) => void) | undefined;
+    let signalReadStarted!: () => void;
+    const readStarted = new Promise<void>((resolve) => {
+      signalReadStarted = resolve;
+    });
     const delayedReadDevice = {
       write: async () => undefined,
       read: async () => {
         if (!delayNextRead) return false;
         delayNextRead = false;
+        signalReadStarted();
         return new Promise<boolean>((resolve) => {
           resolveRead = resolve;
         });
@@ -2001,10 +2006,9 @@ describe('WagoRuntime', () => {
     await transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'set', value: true }));
     await runtime.pollInputs();
     delayNextRead = true;
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await readStarted;
     await transport.send(commands, validCommand({ id: 'command-2', channelId: 'load', action: 'set', value: false }));
     resolveRead?.(false);
-    await new Promise((resolve) => setTimeout(resolve, 10));
 
     expect(transport.published).not.toContainEqual(
       expect.objectContaining({
@@ -2032,17 +2036,22 @@ describe('WagoRuntime', () => {
           profile: 'generic-digital-output',
           capabilities: ['output', 'feedback'],
           disconnectPolicy: { mode: 'immediate' },
-          feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 5 },
+          feedback: { channelId: 'feedback', expected: 'match', timeoutMs: 100 },
         },
       ],
     };
     let delayNextRead = false;
     let resolveRead: ((value: boolean) => void) | undefined;
+    let signalReadStarted!: () => void;
+    const readStarted = new Promise<void>((resolve) => {
+      signalReadStarted = resolve;
+    });
     const delayedReadDevice = {
       write: async () => undefined,
       read: async () => {
         if (!delayNextRead) return false;
         delayNextRead = false;
+        signalReadStarted();
         return new Promise<boolean>((resolve) => {
           resolveRead = resolve;
         });
@@ -2065,7 +2074,7 @@ describe('WagoRuntime', () => {
     await transport.send(commands, validCommand({ id: 'command-1', channelId: 'load', action: 'set', value: true }));
     await runtime.pollInputs();
     delayNextRead = true;
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await readStarted;
     await transport.send(desired, {
       protocolVersion: 1,
       revision: 2,
@@ -2073,7 +2082,6 @@ describe('WagoRuntime', () => {
       snapshot: monitored,
     });
     resolveRead?.(false);
-    await new Promise((resolve) => setTimeout(resolve, 10));
 
     expect(transport.published).not.toContainEqual(
       expect.objectContaining({
