@@ -1,4 +1,5 @@
 import { PluginAuditEvent } from '@attraccess/plugins-backend-sdk';
+import { isIP } from 'node:net';
 
 export interface ResourceAuditEvent {
   action:
@@ -271,18 +272,30 @@ function policySnapshot(value: unknown): boolean {
   try {
     const snapshot = JSON.parse(value);
     if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return false;
-    return Object.entries(snapshot).every(
-      ([key, entry]) =>
-        /^[a-zA-Z][a-zA-Z0-9]{0,63}$/.test(key) &&
-        (typeof entry === 'boolean' ||
-          typeof entry === 'number' ||
-          entry === null ||
-          (key === 'role' && typeof entry === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entry))),
-    );
+    return Object.entries(snapshot).every(([key, entry]) => policySnapshotFields[key]?.(entry) === true);
   } catch {
     return false;
   }
 }
+
+const nullable = (validate: (value: unknown) => boolean) => (value: unknown) => value === null || validate(value);
+const integerBetween = (minimum: number, maximum: number) =>
+  (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= minimum && value <= maximum;
+const policySnapshotFields: Record<string, (value: unknown) => boolean> = {
+  role: (value) => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value),
+  minLength: nullable(integerBetween(8, 1024)),
+  maxLength: nullable(integerBetween(8, 1024)),
+  allowAllUnicode: nullable((value) => typeof value === 'boolean'),
+  requireUppercase: nullable((value) => typeof value === 'boolean'),
+  requireLowercase: nullable((value) => typeof value === 'boolean'),
+  requireDigit: nullable((value) => typeof value === 'boolean'),
+  requireSpecial: nullable((value) => typeof value === 'boolean'),
+  checkHIBP: nullable((value) => typeof value === 'boolean'),
+  checkCommonPasswords: nullable((value) => typeof value === 'boolean'),
+  minZxcvbnScore: nullable(integerBetween(0, 4)),
+  historySize: nullable(integerBetween(0, 50)),
+  rotationDays: nullable(integerBetween(0, 3650)),
+};
 
 export type IdentityAuditAction = keyof typeof identityPolicies;
 
@@ -313,7 +326,7 @@ export interface ProjectedIdentityAuditEvent {
   userAgent: string | null;
 }
 
-const ipAddress = (value: unknown) => typeof value === 'string' && value.length <= 45 && /^[0-9a-f:.]+$/i.test(value);
+const ipAddress = (value: unknown) => typeof value === 'string' && value.length <= 45 && isIP(value) !== 0;
 const userAgent = (value: unknown) => typeof value === 'string' && value.length <= 512 && !/[\r\n]/.test(value);
 
 /** Closed identity event schema. Request metadata is copied separately from event details. */

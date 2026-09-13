@@ -206,6 +206,21 @@ describe('AuthController', () => {
     expect(cookieConfigService.clearAuthCookie).toHaveBeenCalledWith(mockResponse);
   });
 
+  it('does not record a successful logout when Passport reports a callback error', async () => {
+    const logoutError = new Error('logout failed');
+    const mockRequest = {
+      ...Object.create(Request.prototype),
+      user: { id: 1, username: 'testuser' },
+      headers: {},
+      cookies: {},
+      logout: jest.fn().mockImplementation((cb) => cb(logoutError)),
+    } as AuthenticatedRequest;
+    const mockResponse = { clearCookie: jest.fn() } as unknown as Response;
+
+    await expect(authController.endSession(mockRequest, mockResponse)).rejects.toThrow(logoutError);
+    expect(identityAudit.record).not.toHaveBeenCalled();
+  });
+
   it('should refresh session for programmatic client', async () => {
     const mockUser = {
       id: 1,
