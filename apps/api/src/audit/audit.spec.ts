@@ -57,7 +57,7 @@ const event = (): PluginAuditEvent & { pluginId: string } => ({
   subject: { type: 'wago.controller', id: 7 },
   details: { revision: 2 },
 });
-const config = { enabled: true, domains: ['resource', 'wago'], retention_days: 90 };
+const config = { enabled: true, domains: ['resource', 'wago', 'identity'], retention_days: 90 };
 
 describe('durable audit SQLite', () => {
   let directory: string;
@@ -824,6 +824,7 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
     await source.runMigrations();
     await source.query(`INSERT INTO "password_policy_audit" ("event", "actorId", "ip", "userAgent", "before", "after")
       VALUES ('global_policy_updated', 1, '127.0.0.1', 'migration-test', '{"minLength":12}', '{"minLength":16}')`);
+    await source.query(`INSERT INTO "setting" ("parent", "key", "value") VALUES ('audit', 'domains', '["wago"]')`);
     await source.destroy();
     source = new DataSource({
       type: 'sqlite',
@@ -840,6 +841,9 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
     ]);
     expect(source.hasMetadata(AuditLog)).toBeTruthy();
     expect(await source.query('PRAGMA foreign_key_list(audit_log)')).toEqual([]);
+    expect(await source.query(`SELECT "value" FROM "setting" WHERE "parent" = 'audit' AND "key" = 'domains'`)).toEqual([
+      { value: '["wago","identity"]' },
+    ]);
     expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(1);
     await source.undoLastMigration();
     expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toHaveLength(1);
