@@ -211,18 +211,10 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
         const config = await readAuditSettings(this.settings);
         if (!config.enabled || !config.domains.includes('resource') || this.stopping) return;
         await this.storage.getRepository(AuditLog).insert({
-          at: new Date(),
-          domain: 'resource',
-          pluginId: 'core',
-          action: snapshot.action,
-          operationId: snapshot.operationId,
-          actorId: snapshot.actorId,
-          authenticationMethod: snapshot.authenticationMethod ?? 'session',
-          apiTokenId: snapshot.apiTokenId ?? null,
-          outcome: 'succeeded',
-          subjectType: 'resource',
-          subjectId: snapshot.subjectId,
-          details: snapshot.details,
+          at: new Date(), domain: 'resource', pluginId: 'core', action: snapshot.action,
+          operationId: snapshot.operationId, actorId: snapshot.actorId,
+          authenticationMethod: snapshot.authenticationMethod ?? 'session', apiTokenId: snapshot.apiTokenId ?? null,
+          outcome: 'succeeded', subjectType: snapshot.subjectType ?? 'resource', subjectId: snapshot.subjectId, details: snapshot.details,
         });
       } finally {
         this.pending--;

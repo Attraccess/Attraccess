@@ -89,7 +89,7 @@ describe('audit storage safe snapshot', () => {
     ).toBeNull();
   });
 
-  it('allows only the reviewed resource maintenance and supervision fields', () => {
+  it('allows only reviewed resource fields, including safe resource administration projections', () => {
     const resourceEvent = {
       action: 'maintenance_schedule.created' as const,
       operationId: randomUUID(),
@@ -99,6 +99,11 @@ describe('audit storage safe snapshot', () => {
     };
     expect(projectResourceAuditEvent(resourceEvent)).toEqual(resourceEvent);
     expect(projectResourceAuditEvent({ ...resourceEvent, details: { password: 'raw-secret' } })).toBeNull();
-    expect(projectResourceAuditEvent({ ...resourceEvent, action: 'resource.deleted' as never })).toBeNull();
+    const deletion = {
+      action: 'resource.deleted' as const, operationId: randomUUID(), actorId: 42, subjectId: 7,
+      details: { 'before.name': 'Lathe', 'before.type': 'machine' },
+    };
+    expect(projectResourceAuditEvent(deletion)).toEqual(deletion);
+    expect(projectResourceAuditEvent({ ...deletion, details: { password: 'raw-secret' } })).toBeNull();
   });
 });

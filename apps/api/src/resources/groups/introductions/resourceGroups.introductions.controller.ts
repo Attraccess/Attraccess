@@ -65,6 +65,8 @@ export class ResourceGroupsIntroductionsController {
   ): Promise<ResourceIntroductionHistoryItem> {
     return await this.resourceGroupsIntroductionsService.grant(groupId, userId, data, {
       performedByUserId: req.user.id,
+      authenticationMethod: req.user.authenticationMethod,
+      apiTokenId: req.user.apiTokenId,
     });
   }
 
@@ -89,6 +91,8 @@ export class ResourceGroupsIntroductionsController {
   ): Promise<ResourceIntroductionHistoryItem> {
     return await this.resourceGroupsIntroductionsService.revoke(groupId, userId, data, {
       performedByUserId: req.user.id,
+      authenticationMethod: req.user.authenticationMethod,
+      apiTokenId: req.user.apiTokenId,
     });
   }
 }

@@ -52,8 +52,8 @@ export class ResourcesController {
   @Auth('resources.create')
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('image'))
-  async createOne(@Body() createDto: CreateResourceDto, @UploadedFile() image?: FileUpload): Promise<Resource> {
-    const resource = await this.resourcesService.createResource(createDto, image);
+  async createOne(@Body() createDto: CreateResourceDto, @Req() req: AuthenticatedRequest, @UploadedFile() image?: FileUpload): Promise<Resource> {
+    const resource = await this.resourcesService.createResource(createDto, image, req.user);
     return this.transformResource(resource);
   }
 
@@ -145,9 +145,10 @@ export class ResourcesController {
   async updateOne(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateResourceDto,
+    @Req() req: AuthenticatedRequest,
     @UploadedFile() image?: FileUpload,
   ): Promise<Resource> {
-    const resource = await this.resourcesService.updateResource(id, updateDto, image);
+    const resource = await this.resourcesService.updateResource(id, updateDto, image, req.user);
     return this.transformResource(resource);
   }
 
@@ -158,7 +159,7 @@ export class ResourcesController {
     description: 'The resource has been successfully deleted.',
   })
   @Auth('resources.delete')
-  async deleteOne(@Param('id', ParseIntPipe) id: number): Promise<void> {
-    await this.resourcesService.deleteResource(id);
+  async deleteOne(@Param('id', ParseIntPipe) id: number, @Req() req: AuthenticatedRequest): Promise<void> {
+    await this.resourcesService.deleteResource(id, req.user);
   }
 }
