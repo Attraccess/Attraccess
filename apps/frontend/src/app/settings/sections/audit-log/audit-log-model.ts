@@ -120,7 +120,7 @@ export function changes(entry: AuditEntryDto) {
 }
 
 export function displayValue(value: unknown): string {
-  if (typeof value === 'string' && /^[\s]*[\[{]/.test(value)) {
+  if (typeof value === 'string' && /^\s*[[{]/.test(value)) {
     try {
       return JSON.stringify(JSON.parse(value), null, 2);
     } catch {
