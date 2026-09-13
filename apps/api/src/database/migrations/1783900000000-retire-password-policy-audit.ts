@@ -46,11 +46,12 @@ export class RetirePasswordPolicyAudit1783900000000 implements MigrationInterfac
         json_extract("details", '$.role'), json_extract("details", '$.before'), json_extract("details", '$.after'), json_extract("details", '$.changedFields')
       FROM "audit_log"
       WHERE "domain" = 'identity' AND "subjectType" = 'identity.password_policy'
-        AND json_extract("details", '$.migrationSource') = 'password_policy_audit'
         AND "action" IN ('identity.password_policy_updated', 'identity.password_policy_override_updated', 'identity.password_policy_override_deleted')`);
     await runner.query(`DELETE FROM "audit_log"
       WHERE "domain" = 'identity' AND "subjectType" = 'identity.password_policy'
-        AND json_extract("details", '$.migrationSource') = 'password_policy_audit'
         AND "action" IN ('identity.password_policy_updated', 'identity.password_policy_override_updated', 'identity.password_policy_override_deleted')`);
+    await runner.query(`UPDATE "setting"
+      SET "value" = '["wago"]'
+      WHERE "parent" = 'audit' AND "key" = 'domains'`);
   }
 }
