@@ -150,6 +150,37 @@ export function projectAuditEvent(input: unknown): (PluginAuditEvent & { pluginI
 
 export const AUDIT_ACTIONS = Object.keys(policies).map((action) => `wago.${action}`);
 
+const ssoActions = new Set([
+  'sso.provider.created', 'sso.provider.updated', 'sso.provider.deleted',
+  'sso.provisioning.sessions_revoked', 'sso.provisioning.user_deleted', 'sso.provisioning.permissions_synced',
+]);
+export type SsoAuditEvent = { action: string; operationId: string; actorId: number; authenticationMethod: 'session' | 'api-token' | 'sso-provider'; apiTokenId?: number; subject: { type: 'sso.provider' | 'user'; id: number }; details: Record<string, string> };
+function providerSnapshot(value: unknown): boolean {
+  if (typeof value !== 'string' || value.length > 1800) return false;
+  try {
+    const snapshot = dataFields(JSON.parse(value), ['id', 'name', 'type']);
+    if (!snapshot || !positive(snapshot.id) || typeof snapshot.name !== 'string' || typeof snapshot.type !== 'string') return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+export function projectSsoAuditEvent(input: unknown): SsoAuditEvent | null {
+  const event = dataFields(input, ['action', 'operationId', 'actorId', 'authenticationMethod', 'apiTokenId', 'subject', 'details']);
+  if (!event || !ssoActions.has(event.action as string) || !uuid(event.operationId) || !positive(event.actorId)) return null;
+  if (event.authenticationMethod !== 'session' && event.authenticationMethod !== 'api-token' && event.authenticationMethod !== 'sso-provider') return null;
+  if (event.authenticationMethod === 'api-token' ? !positive(event.apiTokenId) : event.apiTokenId !== undefined) return null;
+  const subject = dataFields(event.subject, ['type', 'id']);
+  const details = dataFields(event.details, ['before', 'after', 'provider', 'changes']);
+  if (!subject || !positive(subject.id) || (subject.type !== 'sso.provider' && subject.type !== 'user') || !details) return null;
+  if (Object.values(details).some((value) => typeof value !== 'string' || value.length > 1800) || Buffer.byteLength(JSON.stringify(details), 'utf8') > 4096) return null;
+  if (event.action === 'sso.provider.created' && (details.before !== 'null' || !providerSnapshot(details.after))) return null;
+  if (event.action === 'sso.provider.deleted' && (!providerSnapshot(details.before) || details.after !== 'null')) return null;
+  if (event.action === 'sso.provider.updated' && (!providerSnapshot(details.before) || !providerSnapshot(details.after))) return null;
+  if (event.action.startsWith('sso.provisioning.') && (!details.provider || !details.changes)) return null;
+  return { action: event.action as string, operationId: event.operationId as string, actorId: event.actorId as number, authenticationMethod: event.authenticationMethod as SsoAuditEvent['authenticationMethod'], ...(event.apiTokenId === undefined ? {} : { apiTokenId: event.apiTokenId as number }), subject: { type: subject.type as 'sso.provider' | 'user', id: subject.id as number }, details: details as Record<string, string> };
+}
+
 const resourceActions = new Set<ResourceAuditEvent['action']>([
   'maintenance_schedule.created',
   'maintenance_schedule.updated',

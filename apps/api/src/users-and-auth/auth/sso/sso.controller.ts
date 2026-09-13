@@ -48,6 +48,8 @@ import { InvalidSSOProviderIdException, SSOProviderNotFoundException } from './e
 import { resolveSsoRoleAssignments } from './permission-mapping';
 import { RbacService } from '../../rbac/rbac.service';
 import { MetricsService } from '../../../metrics/metrics.service';
+import { AuditService } from '../../../audit/audit.service';
+import { randomUUID } from 'crypto';
 @ApiTags('Authentication')
 @Controller('auth/sso')
 @RequiresLicense(LicenseModuleType.SSO)
@@ -64,6 +66,7 @@ export class SSOController {
     private readonly settingsService: SettingsService,
     private readonly metricsService: MetricsService,
     private readonly rbacService: RbacService,
+    private readonly auditService: AuditService,
   ) {}
 
   @Get('providers')
@@ -214,7 +217,9 @@ export class SSOController {
       }
       await this.assertPermissionMappingCeiling([oidcMappings, samlMappings], actor.effectivePermissions);
     }
-    return this.ssoService.createProvider(createDto);
+    const provider = await this.ssoService.createProvider(createDto);
+    await this.recordProviderAudit('provider.created', request, provider, undefined, provider);
+    return provider;
   }
 
   @Put('providers/:id')
@@ -246,6 +251,7 @@ export class SSOController {
     @Req() request: AuthenticatedRequest,
   ): Promise<SSOProvider> {
     const providerId = parseInt(id, 10);
+    const before = await this.ssoService.getProviderById(providerId);
 
     const oidcMappings = updateDto.oidcConfiguration?.roleMappings;
     const samlMappings = updateDto.samlConfiguration?.roleMappings;
@@ -258,7 +264,9 @@ export class SSOController {
       await this.assertPermissionMappingCeiling([oidcMappings, samlMappings], actor.effectivePermissions);
     }
 
-    return this.ssoService.updateProvider(providerId, updateDto);
+    const provider = await this.ssoService.updateProvider(providerId, updateDto);
+    await this.recordProviderAudit('provider.updated', request, provider, before, provider);
+    return provider;
   }
 
   @Delete('providers/:id')
@@ -282,8 +290,11 @@ export class SSOController {
     status: 404,
     description: 'Provider not found',
   })
-  async deleteOne(@Param('id') id: string): Promise<void> {
-    return this.ssoService.deleteProvider(parseInt(id, 10));
+  async deleteOne(@Param('id') id: string, @Req() request: AuthenticatedRequest): Promise<void> {
+    const providerId = parseInt(id, 10);
+    const provider = await this.ssoService.getProviderById(providerId);
+    await this.ssoService.deleteProvider(providerId);
+    await this.recordProviderAudit('provider.deleted', request, provider, provider);
   }
 
   @Get('discovery/authentik')
@@ -559,7 +570,8 @@ export class SSOController {
     this.assertProvisioningAuthorized(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.OIDC, parsedProviderId, body);
-    await this.applyProvisioningPermissions(user.id, provider, body);
+    const changes = await this.applyProvisioningPermissions(user.id, provider, body);
+    void changes;
 
     return { OK: true };
   }
@@ -603,7 +615,8 @@ export class SSOController {
     this.assertProvisioningAuthorized(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.SAML, parsedProviderId, body);
-    await this.applyProvisioningPermissions(user.id, provider, body);
+    const changes = await this.applyProvisioningPermissions(user.id, provider, body);
+    void changes;
 
     return { OK: true };
   }
@@ -903,7 +916,7 @@ export class SSOController {
     userId: number,
     provider: SSOProvider,
     payload: SSOProvisioningPermissionsDto,
-  ): Promise<void> {
+  ): Promise<{ added: string[]; removed: string[]; updated: string[] } | undefined> {
     const mapping =
       provider.type === SSOProviderType.OIDC
         ? provider.oidcConfiguration?.roleMappings
@@ -911,11 +924,43 @@ export class SSOController {
 
     // If the payload contains no `roles` field at all, treat as "no permission info" and skip
     // sync to avoid wiping SSO-granted roles on incremental provisioning calls.
-    if (payload.roles === undefined) return;
+    if (payload.roles === undefined) return undefined;
 
     const roleNames = payload.roles.map((r) => r.trim()).filter((r) => r.length > 0);
     const roleAssignments = resolveSsoRoleAssignments(roleNames, mapping);
 
-    await this.rbacService.syncSsoRoles(userId, roleAssignments, provider.type, provider.id);
+    return this.rbacService.syncSsoRoles(userId, roleAssignments, provider.type, provider.id);
+  }
+
+  private recordProviderAudit(
+    action: 'provider.created' | 'provider.updated' | 'provider.deleted',
+    request: AuthenticatedRequest,
+    provider: SSOProvider,
+    before?: SSOProvider,
+    after?: SSOProvider,
+  ): Promise<void> {
+    const actor = request.user as AuthenticatedUser;
+    if (!actor?.id) return Promise.resolve();
+    const details =
+      action === 'provider.created'
+        ? { before: 'null', after: this.providerSnapshot(after ?? provider) }
+        : action === 'provider.deleted'
+          ? { before: this.providerSnapshot(before ?? provider), after: 'null' }
+          : { before: this.providerSnapshot(before ?? provider), after: this.providerSnapshot(after ?? provider) };
+    return this.auditService.recordSso({
+      action: `sso.${action}`,
+      operationId: randomUUID(),
+      actorId: actor.id,
+      authenticationMethod: actor.authenticationMethod ?? 'session',
+      ...(actor.authenticationMethod === 'api-token' && actor.apiTokenId ? { apiTokenId: actor.apiTokenId } : {}),
+      subject: { type: 'sso.provider', id: provider.id },
+      details,
+    }).then(() => undefined, () => undefined);
+  }
+
+  private providerSnapshot(provider: SSOProvider): string {
+    const config = provider.type === SSOProviderType.OIDC ? provider.oidcConfiguration : provider.samlConfiguration;
+    void config;
+    return JSON.stringify({ id: provider.id, name: provider.name, type: provider.type });
   }
 }
