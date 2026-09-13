@@ -41,7 +41,13 @@ export class ResourceUsageController {
     @Body() dto: StartUsageSessionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    return this.resourceUsageService.startSession(resourceId, req.user, dto);
+    return this.resourceUsageService.startSession(resourceId, req.user, dto, {
+      auditOrigin: {
+        actorId: req.user.id,
+        authenticationMethod: req.user.authenticationMethod,
+        ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
+      },
+    });
   }
 
   @Put('end')
@@ -69,7 +75,13 @@ export class ResourceUsageController {
     @Body() dto: EndUsageSessionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    return this.resourceUsageService.endSession(resourceId, req.user, dto);
+    return this.resourceUsageService.endSession(resourceId, req.user, dto, {
+      auditOrigin: {
+        actorId: req.user.id,
+        authenticationMethod: req.user.authenticationMethod,
+        ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
+      },
+    });
   }
 
   @Put('sessions/:usageId/project')

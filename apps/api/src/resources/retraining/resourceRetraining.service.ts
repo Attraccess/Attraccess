@@ -12,6 +12,7 @@ import {
 } from '@attraccess/database-entities';
 import { ResourceGroupsService } from '../groups/resourceGroups.service';
 import { EmailService } from '../../email/email.service';
+import { AuditService } from '../../audit/audit.service';
 
 export interface RetrainingPolicy {
   retrainingMaxAgeDays: number | null;
@@ -59,6 +60,7 @@ export class ResourceRetrainingService {
     private readonly historyRepository: Repository<ResourceIntroductionHistoryItem>,
     private readonly resourceGroupsService: ResourceGroupsService,
     private readonly emailService: EmailService,
+    private readonly audit: AuditService,
   ) {}
 
   public evaluate(
@@ -185,6 +187,20 @@ export class ResourceRetrainingService {
     }
 
     await this.resourceIntroductionRepository.update(introduction.id, { retrainingNotifiedAt: now });
+    // A notification marker is the durable edge for a required transition. Avoid writing an
+    // event from read-time policy evaluation, which would repeat for every access check.
+    if (introduction.resourceId) {
+      await this.audit.recordResource({
+        action: 'retraining.required',
+        actorId: null,
+        subjectId: introduction.resourceId,
+        details: {
+          introductionId: introduction.id,
+          usageUserId: introduction.receiverUserId,
+          retrainingReason: evaluation.reason ?? 'unknown',
+        },
+      }).catch(() => undefined);
+    }
   }
 
   private async evaluateResourceIntroduction(
