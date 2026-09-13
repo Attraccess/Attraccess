@@ -8,7 +8,7 @@ import {
   TransactionCommitEvent,
   TransactionRollbackEvent,
 } from 'typeorm';
-import { AuditLog } from '@attraccess/database-entities';
+import { AuditLog, ResourceIntroduction } from '@attraccess/database-entities';
 import { PluginAuditEvent, PluginAuditHostProvider, PluginAuditReceipt } from '@attraccess/plugins-backend-sdk';
 import { readAuditSettings } from './audit.config';
 import { SettingsStoreService } from '../settings/settings-store.service';
@@ -241,6 +241,33 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
       }
     } catch {
       /* Audit persistence must not affect resource operations. */
+      return false;
+    }
+  }
+
+  /** Keep the required transition and its training-cycle marker in one database transaction. */
+  async recordResourceIntroductionRequired(
+    event: Omit<ResourceAuditEvent, 'operationId' | 'action'>,
+    introductionId: number,
+    auditedAt: Date,
+  ): Promise<boolean> {
+    try {
+      const snapshot = projectResourceAuditEvent({ ...event, action: 'retraining.required', operationId: randomUUID() });
+      if (!snapshot || this.stopping) return false;
+      const config = await readAuditSettings(this.settings);
+      if (!config.enabled || !config.domains.includes('resource') || this.stopping) return false;
+      await this.source.transaction(async (manager) => {
+        await manager.getRepository(AuditLog).insert({
+          at: new Date(), domain: 'resource', pluginId: 'core', action: snapshot.action, operationId: snapshot.operationId,
+          actorId: snapshot.actorId,
+          authenticationMethod: snapshot.authenticationMethod === undefined ? (snapshot.actorId === null ? null : 'session') : snapshot.authenticationMethod,
+          apiTokenId: snapshot.apiTokenId ?? null, outcome: 'succeeded', subjectType: snapshot.subjectType ?? 'resource',
+          subjectId: snapshot.subjectId, ipAddress: null, userAgent: null, details: snapshot.details,
+        });
+        await manager.getRepository(ResourceIntroduction).update(introductionId, { retrainingRequiredAuditedAt: auditedAt });
+      });
+      return true;
+    } catch {
       return false;
     }
   }

@@ -185,8 +185,7 @@ export class ResourceRetrainingService {
     // This marker survives audit retention but is reset by a newer training cycle.
     if (!introduction.retrainingRequiredAuditedAt || introduction.retrainingRequiredAuditedAt < trainedAt) {
       const subjectId = introduction.resourceId ?? introduction.resourceGroupId;
-      const recorded = await this.audit.recordResource({
-        action: 'retraining.required',
+      await this.audit.recordResourceIntroductionRequired({
         actorId: null,
         subjectId,
         ...(introduction.resourceId ? {} : { subjectType: 'resource.group' }),
@@ -195,10 +194,7 @@ export class ResourceRetrainingService {
           usageUserId: introduction.receiverUserId,
           retrainingReason: evaluation.reason ?? 'unknown',
         },
-      });
-      if (recorded) {
-        await this.resourceIntroductionRepository.update(introduction.id, { retrainingRequiredAuditedAt: now });
-      }
+      }, introduction.id, now).catch(() => false);
     }
     if (introduction.retrainingNotifiedAt && introduction.retrainingNotifiedAt.getTime() >= trainedAt.getTime()) {
       return;
@@ -318,7 +314,7 @@ export class ResourceRetrainingService {
   private async getTrainedAt(introduction: ResourceIntroduction): Promise<Date | null> {
     const latestGrant = await this.historyRepository.findOne({
       where: { introduction: { id: introduction.id }, action: IntroductionHistoryAction.GRANT },
-      order: { createdAt: 'DESC' },
+      order: { createdAt: 'DESC', id: 'DESC' },
     });
     return latestGrant?.createdAt ?? introduction.completedAt ?? introduction.createdAt ?? null;
   }
@@ -326,7 +322,7 @@ export class ResourceRetrainingService {
   private async isValid(introductionId: number): Promise<boolean> {
     const lastHistoryItem = await this.historyRepository.findOne({
       where: { introduction: { id: introductionId } },
-      order: { createdAt: 'DESC' },
+      order: { createdAt: 'DESC', id: 'DESC' },
     });
     return lastHistoryItem?.action === IntroductionHistoryAction.GRANT;
   }

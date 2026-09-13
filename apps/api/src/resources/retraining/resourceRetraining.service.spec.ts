@@ -80,7 +80,7 @@ describe('ResourceRetrainingService.evaluate', () => {
   });
 
   it('records a system-origin required transition when the scheduled evaluation first notifies', async () => {
-    const audit = { recordResource: jest.fn().mockResolvedValue(true) };
+    const audit = { recordResourceIntroductionRequired: jest.fn().mockResolvedValue(true) };
     const introductionRepository = { update: jest.fn().mockResolvedValue(undefined) };
     const service = new ResourceRetrainingService(
       { findOne: jest.fn().mockResolvedValue({ id: 1, name: 'Lathe', retrainingMaxAgeDays: 1, retrainingMaxInactivityDays: null, retrainingBlocksAccess: true }) } as never,
@@ -98,17 +98,15 @@ describe('ResourceRetrainingService.evaluate', () => {
       new Date('2026-01-03T00:00:00.000Z'),
     );
 
-    expect(audit.recordResource).toHaveBeenCalledWith({
-      action: 'retraining.required',
+    expect(audit.recordResourceIntroductionRequired).toHaveBeenCalledWith({
       actorId: null,
       subjectId: 1,
       details: { introductionId: 3, usageUserId: 2, retrainingReason: 'age' },
-    });
-    expect(introductionRepository.update).toHaveBeenCalledWith(3, { retrainingRequiredAuditedAt: expect.any(Date) });
+    }, 3, expect.any(Date));
   });
 
   it('retries failed email delivery without marking the notification delivered', async () => {
-    const audit = { recordResource: jest.fn().mockResolvedValue(true) };
+    const audit = { recordResourceIntroductionRequired: jest.fn().mockResolvedValue(true) };
     const introductionRepository = { update: jest.fn().mockResolvedValue(undefined) };
     const email = { sendUserRetrainingEmail: jest.fn().mockRejectedValueOnce(new Error('SMTP unavailable')).mockResolvedValueOnce(undefined) };
     const service = new ResourceRetrainingService(
@@ -131,12 +129,12 @@ describe('ResourceRetrainingService.evaluate', () => {
     expect(introductionRepository.update).not.toHaveBeenCalledWith(3, expect.objectContaining({ retrainingNotifiedAt: expect.any(Date) }));
     await notify(introduction, new Date('2026-01-04T00:00:00.000Z'));
     expect(email.sendUserRetrainingEmail).toHaveBeenCalledTimes(2);
-    expect(audit.recordResource).not.toHaveBeenCalled();
+    expect(audit.recordResourceIntroductionRequired).not.toHaveBeenCalled();
     expect(introductionRepository.update).toHaveBeenCalledWith(3, expect.objectContaining({ retrainingNotifiedAt: expect.any(Date) }));
   });
 
   it('retries a missing required event after the email has been delivered', async () => {
-    const audit = { recordResource: jest.fn().mockResolvedValue(true) };
+    const audit = { recordResourceIntroductionRequired: jest.fn().mockResolvedValue(true) };
     const introductionRepository = { update: jest.fn() };
     const email = { sendUserRetrainingEmail: jest.fn() };
     const service = new ResourceRetrainingService(
@@ -158,13 +156,12 @@ describe('ResourceRetrainingService.evaluate', () => {
       new Date('2026-01-04T00:00:00.000Z'),
     );
 
-    expect(audit.recordResource).toHaveBeenCalledTimes(1);
+    expect(audit.recordResourceIntroductionRequired).toHaveBeenCalledTimes(1);
     expect(email.sendUserRetrainingEmail).not.toHaveBeenCalled();
-    expect(introductionRepository.update).toHaveBeenCalledWith(3, { retrainingRequiredAuditedAt: expect.any(Date) });
   });
 
   it('does not record retraining for a revoked introduction', async () => {
-    const audit = { recordResource: jest.fn().mockResolvedValue(true) };
+    const audit = { recordResourceIntroductionRequired: jest.fn().mockResolvedValue(true) };
     const service = new ResourceRetrainingService(
       null as never, null as never, { findOne: jest.fn().mockResolvedValue(null) } as never,
       { update: jest.fn() } as never,
@@ -176,11 +173,45 @@ describe('ResourceRetrainingService.evaluate', () => {
       { id: 3, resourceId: 1, receiverUserId: 2 }, new Date('2026-01-03T00:00:00.000Z'),
     );
 
-    expect(audit.recordResource).not.toHaveBeenCalled();
+    expect(audit.recordResourceIntroductionRequired).not.toHaveBeenCalled();
+  });
+
+  it('uses the highest ID when grant and revoke share a timestamp', async () => {
+    const history = { findOne: jest.fn().mockResolvedValue({ id: 2, action: IntroductionHistoryAction.REVOKE }) };
+    const audit = { recordResourceIntroductionRequired: jest.fn().mockResolvedValue(true) };
+    const service = new ResourceRetrainingService(
+      null as never, null as never, null as never, null as never, history as never,
+      null as never, null as never, audit as never,
+    );
+
+    await (service as never as { notifyIfDue: (introduction: object, now: Date) => Promise<void> }).notifyIfDue(
+      { id: 3, resourceId: 1, receiverUserId: 2 }, new Date('2026-01-03T00:00:00.000Z'),
+    );
+
+    expect(history.findOne).toHaveBeenCalledWith(expect.objectContaining({ order: { createdAt: 'DESC', id: 'DESC' } }));
+    expect(audit.recordResourceIntroductionRequired).not.toHaveBeenCalled();
+  });
+
+  it('continues notification when atomic audit bookkeeping is rejected', async () => {
+    const audit = { recordResourceIntroductionRequired: jest.fn().mockResolvedValue(false) };
+    const email = { sendUserRetrainingEmail: jest.fn().mockResolvedValue(undefined) };
+    const introductionRepository = { update: jest.fn().mockResolvedValue(undefined) };
+    const service = new ResourceRetrainingService(
+      { findOne: jest.fn().mockResolvedValue({ id: 1, name: 'Lathe', retrainingMaxAgeDays: 1, retrainingMaxInactivityDays: null, retrainingBlocksAccess: true }) } as never,
+      null as never, { findOne: jest.fn().mockResolvedValue(null) } as never, introductionRepository as never,
+      { findOne: jest.fn().mockResolvedValue({ createdAt: trainedAt, action: IntroductionHistoryAction.GRANT }) } as never,
+      null as never, email as never, audit as never,
+    );
+    await (service as never as { notifyIfDue: (introduction: object, now: Date) => Promise<void> }).notifyIfDue(
+      { id: 3, resourceId: 1, receiverUserId: 2, receiverUser: { email: 'user@example.com' }, retrainingRequiredAuditedAt: null },
+      new Date('2026-01-03T00:00:00.000Z'),
+    );
+    expect(email.sendUserRetrainingEmail).toHaveBeenCalled();
+    expect(introductionRepository.update).toHaveBeenCalledWith(3, expect.objectContaining({ retrainingNotifiedAt: expect.any(Date) }));
   });
 
   it('uses the introduction marker after audit retention has removed the audit row', async () => {
-    const audit = { recordResource: jest.fn().mockResolvedValue(true) };
+    const audit = { recordResourceIntroductionRequired: jest.fn().mockResolvedValue(true) };
     const service = new ResourceRetrainingService(
       { findOne: jest.fn().mockResolvedValue({ id: 1, name: 'Lathe', retrainingMaxAgeDays: 1, retrainingMaxInactivityDays: null, retrainingBlocksAccess: true }) } as never,
       null as never, { findOne: jest.fn().mockResolvedValue(null) } as never,
@@ -194,6 +225,6 @@ describe('ResourceRetrainingService.evaluate', () => {
       new Date('2026-01-03T00:00:00.000Z'),
     );
 
-    expect(audit.recordResource).not.toHaveBeenCalled();
+    expect(audit.recordResourceIntroductionRequired).not.toHaveBeenCalled();
   });
 });
