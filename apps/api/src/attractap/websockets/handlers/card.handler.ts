@@ -258,13 +258,19 @@ export class AttractapCardHandler {
       },
     };
 
-    await socket.sendMessage(
-      new AttractapEvent(AttractapEventType.RESET_NFC_CARD, {
-        username: nfcCard.user.username,
-        keyNo: nfcCard.keyNo,
-        key: nfcCard.key,
-      }),
-    );
+    try {
+      const delivered = await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.RESET_NFC_CARD, {
+          username: nfcCard.user.username,
+          keyNo: nfcCard.keyNo,
+          key: nfcCard.key,
+        }),
+      );
+      if (!delivered) socket.state.resetNfcCardData = null;
+    } catch (error) {
+      socket.state.resetNfcCardData = null;
+      this.logger.debug(`Failed to send RESET_NFC_CARD to client ${socket.id}: ${String(error)}`);
+    }
   }
 
   public async onResetNfcCard(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
