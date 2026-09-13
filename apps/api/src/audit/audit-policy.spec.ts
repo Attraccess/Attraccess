@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { PluginAuditEvent } from '@attraccess/plugins-backend-sdk';
-import { projectAuditEvent } from './audit-policy';
+import { projectAuditEvent, projectSsoAuditEvent } from './audit-policy';
 
 function event(): PluginAuditEvent & { pluginId: string } {
   return {
@@ -15,6 +15,19 @@ function event(): PluginAuditEvent & { pluginId: string } {
 }
 
 describe('audit storage safe snapshot', () => {
+  it('accepts only the reviewed SSO fields and excludes credentials', () => {
+    const input = {
+      action: 'sso.provider.updated',
+      operationId: randomUUID(),
+      actorId: 42,
+      authenticationMethod: 'session',
+      subject: { type: 'sso.provider', id: 7 },
+      details: { before: '{"name":"before"}', after: '{"name":"after"}' },
+    };
+    expect(projectSsoAuditEvent(input)).toEqual(input);
+    expect(projectSsoAuditEvent({ ...input, details: { ...input.details, clientSecret: 'raw-secret' } })).toBeNull();
+  });
+
   it('detaches all caller data before asynchronous work', () => {
     const input = event();
     const snapshot = projectAuditEvent(input);

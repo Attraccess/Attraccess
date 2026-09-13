@@ -458,7 +458,7 @@ export class RbacService {
     roles: Array<{ roleKey: string; externalValue?: string | null }>,
     ssoProviderType: string,
     ssoProviderId: number,
-  ): Promise<void> {
+  ): Promise<{ added: string[]; removed: string[]; updated: string[] }> {
     // roleKey -> external claim value that granted it (source metadata for the UI)
     const targetByKey = new Map(roles.map((r) => [r.roleKey, r.externalValue ?? null]));
 
@@ -466,6 +466,9 @@ export class RbacService {
       where: { userId, source: UserRoleSource.SSO, ssoProviderType, ssoProviderId },
       relations: ['role'],
     });
+    const removed: string[] = [];
+    const added: string[] = [];
+    const updated: string[] = [];
 
     for (const ur of currentSsoRoles) {
       if (!targetByKey.has(ur.role.key)) {
@@ -482,6 +485,7 @@ export class RbacService {
           }
         }
         await this.userRoleRepository.delete({ id: ur.id });
+        removed.push(ur.role.key);
       }
     }
 
@@ -491,6 +495,7 @@ export class RbacService {
       if (current) {
         if ((current.externalValue ?? null) !== externalValue) {
           await this.userRoleRepository.update({ id: current.id }, { externalValue });
+          updated.push(roleKey);
         }
         continue;
       }
@@ -511,6 +516,7 @@ export class RbacService {
               externalValue,
             }),
           );
+          added.push(roleKey);
         } catch (err) {
           // ponytail: '23505' = Postgres unique; SQLite reuses SQLITE_CONSTRAINT for FK/CHECK/NOT NULL too, so narrow by message
           const code = (err as QueryFailedError & { code?: string }).code;
@@ -528,5 +534,6 @@ export class RbacService {
     }
     this.permissionsCache.delete(userId);
     await this.permissionsChanged(userId);
+    return { added, removed, updated };
   }
 }

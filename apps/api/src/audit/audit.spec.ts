@@ -128,6 +128,26 @@ describe('durable audit SQLite', () => {
     expect(await service.record(event())).toEqual({ status: 'recorded' });
   });
 
+  it('persists enabled SSO permission deltas and rejects the domain when disabled', async () => {
+    const input = {
+      action: 'sso.provisioning.permissions_synced' as const,
+      operationId: randomUUID(),
+      actorId: 7,
+      authenticationMethod: 'sso-provider' as const,
+      subject: { type: 'user' as const, id: 42 },
+      details: { provider: 'OIDC:7', changes: '{"added":["user-manager"],"removed":[],"updated":[]}' },
+    };
+    expect(await service.recordSso(input)).toEqual({ status: 'unavailable' });
+    await store.setPlainSetting('audit', 'domains', '["wago","sso"]');
+    expect(await service.recordSso(input)).toEqual({ status: 'recorded' });
+    expect((await service.list({ domain: 'sso', subjectId: 42 })).items).toEqual([
+      expect.objectContaining({ action: input.action, actorId: 7, subjectType: 'user', details: input.details }),
+    ]);
+    expect(await service.recordSso({ ...input, details: { provider: 'OIDC:7', secret: 'raw-secret' } })).toEqual({
+      status: 'unavailable',
+    });
+  });
+
   it('persists every registered action lifecycle and preserves manual command and profile references', async () => {
     for (const action of AUDIT_ACTIONS) {
       for (const terminal of ['succeeded', 'failed'] as const) {

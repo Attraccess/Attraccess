@@ -31,7 +31,7 @@ export class AuditLog {
   actorId!: number;
 
   @Column({ type: 'varchar' })
-  authenticationMethod!: 'session' | 'api-token';
+  authenticationMethod!: 'session' | 'api-token' | 'sso-provider';
 
   @Column({ type: 'integer', nullable: true })
   apiTokenId!: number | null;

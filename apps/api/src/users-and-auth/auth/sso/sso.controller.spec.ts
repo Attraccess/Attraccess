@@ -20,6 +20,7 @@ import { SSOLinkTokenService } from './link-token.service';
 import { SettingsService } from '../../../settings/settings.service';
 import { SSO_OIDC_REDIRECT_FROM_STATE_REQUEST_KEY } from './oidc/oidc-cookie-state-store';
 import { MetricsService } from '../../../metrics/metrics.service';
+import { AuditService } from '../../../audit/audit.service';
 
 const mockMetricsService = {
   authSsoLoginTotal: { inc: jest.fn() },
@@ -128,7 +129,7 @@ describe('SsoController', () => {
         {
           provide: RbacService,
           useValue: {
-            syncSsoRoles: jest.fn().mockResolvedValue(undefined),
+            syncSsoRoles: jest.fn().mockResolvedValue({ added: ['user-manager'], removed: [], updated: [] }),
           },
         },
         {
@@ -181,6 +182,10 @@ describe('SsoController', () => {
         {
           provide: MetricsService,
           useValue: mockMetricsService,
+        },
+        {
+          provide: AuditService,
+          useValue: { recordSso: jest.fn().mockResolvedValue({ status: 'recorded' }) },
         },
         SSOOIDCGuard,
       ],
@@ -237,6 +242,14 @@ describe('SsoController', () => {
 
       expect(result).toEqual(mockSSOProvider);
       expect(ssoService.createProvider).toHaveBeenCalledWith(createDto);
+      expect(module.get(AuditService).recordSso).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'sso.provider.created',
+          actorId: 1,
+          subject: { type: 'sso.provider', id: 1 },
+          details: expect.objectContaining({ before: 'null', after: expect.not.stringContaining('test-client-secret') }),
+        }),
+      );
     });
   });
 
@@ -259,6 +272,9 @@ describe('SsoController', () => {
 
       expect(result).toEqual(mockSSOProvider);
       expect(ssoService.updateProvider).toHaveBeenCalledWith(1, updateDto);
+      expect(module.get(AuditService).recordSso).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'sso.provider.updated', details: expect.objectContaining({ before: expect.any(String), after: expect.any(String) }) }),
+      );
     });
 
     it('gates explicit null roleMappings behind users.roles.manage', async () => {
@@ -275,9 +291,12 @@ describe('SsoController', () => {
 
   describe('deleteProvider', () => {
     it('should delete a provider when user has permission', async () => {
-      await controller.deleteOne('1');
+      await controller.deleteOne('1', { user: { id: 1 } } as AuthenticatedRequest);
 
       expect(ssoService.deleteProvider).toHaveBeenCalledWith(1);
+      expect(module.get(AuditService).recordSso).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'sso.provider.deleted', actorId: 1, details: expect.objectContaining({ after: 'null' }) }),
+      );
     });
   });
 
@@ -646,6 +665,9 @@ describe('SsoController', () => {
 
       expect(result).toEqual({ OK: true });
       expect(sessionService.revokeAllUserSessions).toHaveBeenCalledWith(55);
+      expect(module.get(AuditService).recordSso).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'sso.provisioning.sessions_revoked', actorId: 1, subject: { type: 'user', id: 55 } }),
+      );
     });
 
     it('deletes users for oidc delete requests', async () => {
@@ -661,6 +683,9 @@ describe('SsoController', () => {
 
       expect(result).toEqual({ OK: true });
       expect(usersService.deleteOne).toHaveBeenCalledWith(77);
+      expect(module.get(AuditService).recordSso).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'sso.provisioning.user_deleted', actorId: 1, subject: { type: 'user', id: 77 } }),
+      );
     });
 
     it('does not sync RBAC roles when roles field is absent (incremental provisioning)', async () => {
@@ -703,6 +728,9 @@ describe('SsoController', () => {
         expect.arrayContaining([expect.objectContaining({ roleKey: 'user-manager' })]),
         SSOProviderType.OIDC,
         1,
+      );
+      expect(module.get(AuditService).recordSso).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'sso.provisioning.permissions_synced', subject: { type: 'user', id: 99 } }),
       );
     });
 
