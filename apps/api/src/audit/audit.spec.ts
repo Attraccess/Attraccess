@@ -935,14 +935,22 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
         { type: 'query', metatype: AuditQueryDto },
       ),
     ).resolves.toMatchObject({ operationId: migratedOversizedEvent?.operationId });
+    const now = jest.spyOn(Date, 'now').mockReturnValue(new Date('2026-06-16T12:00:00.000Z').getTime());
     await source.query(`INSERT INTO "password_policy_audit_overflow" ("legacyAuditId", "metadata")
       VALUES (999, '{"actorUsername":"expired-user"}')`);
     await source.query(`INSERT INTO "audit_log" ("at", "domain", "action", "operationId", "outcome", "subjectType", "subjectId", "details")
-      VALUES (datetime('now', '-2 days'), 'identity', 'identity.password_policy_updated', 'password-policy-audit-999', 'succeeded', 'identity.password_policy', 1,
-        '{"migrationSource":"password_policy_audit","legacyAuditId":999,"detailsTruncated":true}')`);
+      VALUES ('2026-06-15 11:00:00.000', 'identity', 'identity.password_policy_updated', 'password-policy-audit-999', 'succeeded', 'identity.password_policy', 1,
+         '{"migrationSource":"password_policy_audit","legacyAuditId":999,"detailsTruncated":true}')`);
+    await source.query(`INSERT INTO "password_policy_audit_overflow" ("legacyAuditId", "metadata")
+      VALUES (998, '{"actorUsername":"retained-user"}')`);
+    await source.query(`INSERT INTO "audit_log" ("at", "domain", "action", "operationId", "outcome", "subjectType", "subjectId", "details")
+      VALUES ('2026-06-15 13:00:00.000', 'identity', 'identity.password_policy_updated', 'e3aedfb1-15c7-4290-9a0c-777f27a8357f', 'succeeded', 'identity.password_policy', 1,
+        '{"migrationSource":"password_policy_audit","legacyAuditId":998,"detailsTruncated":true}')`);
     await migratedStore.setPlainSetting('audit', 'retention_days', '1');
     await migratedAudit.cleanup();
     expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toEqual([]);
+    expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 998')).toHaveLength(1);
+    now.mockRestore();
     await migratedAudit.onModuleDestroy();
     await source.query(`INSERT INTO "audit_log" ("at", "domain", "action", "operationId", "outcome", "subjectType", "subjectId", "details")
       VALUES (datetime('now'), 'identity', 'identity.password_policy_updated', 'f4ae9dd5-3b66-4d5e-a46c-03cfaa25e266', 'succeeded', 'identity.password_policy', 1, '{"field":"minLength"}')`);
@@ -950,7 +958,7 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       WHERE "parent" = 'audit' AND "key" = 'domains'`);
     await source.undoLastMigration();
     expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toHaveLength(1);
-    expect(await source.query('SELECT * FROM password_policy_audit')).toHaveLength(3);
+    expect(await source.query('SELECT * FROM password_policy_audit')).toHaveLength(4);
     expect(
       await source.query(
         `SELECT "actorUsername", "requestId", "before", "after", "changedFields" FROM password_policy_audit WHERE "requestId" = 'migration-request'`,
@@ -979,7 +987,7 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       'RetirePasswordPolicyAudit1783900000000',
     ]);
     expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(
-      3,
+      4,
     );
     await source.undoLastMigration();
     expect(

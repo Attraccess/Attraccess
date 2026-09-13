@@ -311,13 +311,17 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     return new Date(Date.now() - retentionDays * 86_400_000);
   }
 
+  private sqliteDate(date: Date): string {
+    return date.toISOString().replace('T', ' ').replace('Z', '');
+  }
+
   @Interval(60 * 60 * 1000)
   async cleanup(): Promise<void> {
     if (this.stopping || !this.storage?.isInitialized || this.cleaning) return;
     this.cleaning = true;
     try {
       const config = await readAuditSettings(this.settings);
-      const cutoff = this.cutoff(config.retention_days);
+      const cutoff = this.sqliteDate(this.cutoff(config.retention_days));
       while (!this.stopping) {
         if (await this.hasPasswordPolicyOverflow()) {
           await this.storage.query(`DELETE FROM password_policy_audit_overflow
@@ -325,7 +329,7 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
               SELECT json_extract(details, '$.legacyAuditId') FROM audit_log
               WHERE at < ? AND json_extract(details, '$.migrationSource') = 'password_policy_audit'
               ORDER BY at LIMIT 1000
-            )`, [cutoff.toISOString()]);
+            )`, [cutoff]);
         }
         const result = await this.storage
           .getRepository(AuditLog)

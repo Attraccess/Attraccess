@@ -80,7 +80,7 @@ export class UsersRegistrationController {
     const acceptLanguage = req.headers['accept-language'];
     const locale = (acceptLanguage?.split(',')[0]?.split(';')[0] ?? '').trim() || 'en';
     const user = await this.registrationService.createOne(body, locale);
-    void this.identityAudit?.record({
+    await this.identityAudit?.record({
       action: 'user_created',
       operationId: randomUUID(),
       outcome: 'succeeded',

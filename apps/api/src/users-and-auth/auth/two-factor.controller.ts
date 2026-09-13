@@ -36,7 +36,7 @@ export class TwoFactorController {
   })
   async setup(@Req() request: AuthenticatedRequest): Promise<TwoFactorSetupResponseDto> {
     const result = await this.twoFactorService.createSetup(request.user);
-    this.record('two_factor_setup_started', request);
+    await this.record('two_factor_setup_started', request);
     return result;
   }
 
@@ -50,7 +50,7 @@ export class TwoFactorController {
   })
   async verify(@Req() request: AuthenticatedRequest, @Body() body: TwoFactorCodeDto): Promise<TwoFactorStatusDto> {
     await this.twoFactorService.enable(request.user, body.code);
-    this.record('two_factor_enabled', request);
+    await this.record('two_factor_enabled', request);
     return this.twoFactorService.getStatus(request.user);
   }
 
@@ -63,7 +63,7 @@ export class TwoFactorController {
   })
   async disable(@Req() request: AuthenticatedRequest, @Body() body: TwoFactorCodeDto): Promise<void> {
     await this.twoFactorService.disable(request.user, body.code);
-    this.record('two_factor_disabled', request);
+    await this.record('two_factor_disabled', request);
   }
 
   @SessionAuth('users.update')
@@ -95,8 +95,8 @@ export class TwoFactorController {
   private record(
     action: 'two_factor_setup_started' | 'two_factor_enabled' | 'two_factor_disabled',
     request: AuthenticatedRequest,
-  ): void {
-    void this.identityAudit?.record({
+  ): Promise<void> {
+    return Promise.resolve(this.identityAudit?.record({
       action,
       operationId: randomUUID(),
       outcome: 'succeeded',
@@ -106,6 +106,6 @@ export class TwoFactorController {
       subjectId: request.user.id,
       details: {},
       request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
-    });
+    })).then(() => undefined);
   }
 }

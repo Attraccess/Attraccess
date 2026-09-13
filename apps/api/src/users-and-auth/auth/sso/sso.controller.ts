@@ -736,7 +736,7 @@ export class SSOController {
 
     await this.cookieConfigService.setAuthCookie(response, sessionToken);
     if (providerId) {
-      void this.identityAudit?.record({
+      await this.identityAudit?.record({
         action: 'sso_login',
         operationId: randomUUID(),
         outcome: 'succeeded',

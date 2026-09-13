@@ -12,6 +12,10 @@ import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
 import { UsersService } from '../users/users.service';
 import { IdentityAuditService } from '../../audit/identity-audit.service';
 
+const passportRequest = require('passport/lib/http/request') as {
+  logout(this: object, callback: (error?: Error) => void): void;
+};
+
 describe('AuthController', () => {
   let authController: AuthController;
   let sessionService: SessionService;
@@ -144,13 +148,16 @@ describe('AuthController', () => {
     expect(cookieConfigService.setAuthCookie).toHaveBeenCalledWith(mockResponse, 'test-session-token');
   });
 
-  it('should delete a session and revoke session token', async () => {
+  it('uses Passport logout with its request receiver and awaits the audit receipt', async () => {
     const mockUser = {
       id: 1,
       username: 'testuser',
       jwtTokenId: 'test-jwt-token-id',
     };
 
+    const sessionManager = {
+      logOut: jest.fn((_request, _options, callback) => callback()),
+    };
     const mockRequest = {
       ...Object.create(Request.prototype),
       user: mockUser,
@@ -158,24 +165,34 @@ describe('AuthController', () => {
         authorization: 'Bearer test-session-token',
       },
       cookies: {},
-      logout: jest.fn().mockImplementation((cb) => {
-        mockRequest.user = undefined as never;
-        cb();
-      }),
+      _userProperty: 'user',
+      _sessionManager: sessionManager,
+      logout: passportRequest.logout,
     } as AuthenticatedRequest;
 
     const mockResponse = {
       clearCookie: jest.fn(),
     } as unknown as Response;
 
-    await authController.endSession(mockRequest, mockResponse);
+    let resolveAudit: () => void;
+    identityAudit.record.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveAudit = resolve;
+      }),
+    );
+    const completed = authController.endSession(mockRequest, mockResponse);
+    await new Promise<void>((resolve) => setImmediate(resolve));
 
-    expect(mockRequest.logout).toHaveBeenCalled();
+    expect(mockRequest.user).toBeNull();
+    expect(sessionManager.logOut).toHaveBeenCalledWith(mockRequest, {}, expect.any(Function));
     expect(sessionService.revokeSession).toHaveBeenCalledWith('test-session-token');
     expect(cookieConfigService.clearAuthCookie).toHaveBeenCalledWith(mockResponse);
     expect(identityAudit.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'logout', actorId: 1, subjectId: 1 }),
     );
+    if (!resolveAudit) throw new Error('audit receipt was not requested');
+    resolveAudit();
+    await completed;
   });
 
   it('should delete a session with cookie token', async () => {
@@ -208,16 +225,22 @@ describe('AuthController', () => {
 
   it('does not record a successful logout when Passport reports a callback error', async () => {
     const logoutError = new Error('logout failed');
+    const sessionManager = {
+      logOut: jest.fn((_request, _options, callback) => callback(logoutError)),
+    };
     const mockRequest = {
       ...Object.create(Request.prototype),
       user: { id: 1, username: 'testuser' },
       headers: {},
       cookies: {},
-      logout: jest.fn().mockImplementation((cb) => cb(logoutError)),
+      _userProperty: 'user',
+      _sessionManager: sessionManager,
+      logout: passportRequest.logout,
     } as AuthenticatedRequest;
     const mockResponse = { clearCookie: jest.fn() } as unknown as Response;
 
     await expect(authController.endSession(mockRequest, mockResponse)).rejects.toThrow(logoutError);
+    expect(sessionManager.logOut).toHaveBeenCalledWith(mockRequest, {}, expect.any(Function));
     expect(identityAudit.record).not.toHaveBeenCalled();
   });
 

@@ -64,7 +64,7 @@ export class PasskeyController {
       body.name,
       requestOrigin(request),
     );
-    this.record('passkey_created', request);
+    await this.record('passkey_created', request);
     return passkey;
   }
 
@@ -78,7 +78,7 @@ export class PasskeyController {
     @Body() body: RenamePasskeyDto,
   ): Promise<Passkey> {
     const passkey = await this.passkeyService.rename(request.user.id, id, body.name);
-    this.record('passkey_renamed', request);
+    await this.record('passkey_renamed', request);
     return passkey;
   }
 
@@ -88,7 +88,7 @@ export class PasskeyController {
   @ApiOkResponse({ description: 'The passkey has been deleted' })
   async delete(@Req() request: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number): Promise<void> {
     await this.passkeyService.delete(request.user.id, id);
-    this.record('passkey_deleted', request);
+    await this.record('passkey_deleted', request);
   }
 
   @Post('/passkey/authenticate/options')
@@ -120,12 +120,12 @@ export class PasskeyController {
       );
     } catch (error) {
       await this.bruteForce.recordFailure('login', ip, null);
-      this.audit.log({ type: 'login', outcome: 'invalid_credentials', ip, reason: 'passkey_rejected' });
+      await this.audit.log({ type: 'login', outcome: 'invalid_credentials', ip, reason: 'passkey_rejected' });
       throw error;
     }
 
     await this.bruteForce.recordSuccess('login', ip, user.id, user.username);
-    this.audit.log({ type: 'login', outcome: 'success', ip, userId: user.id, username: user.username });
+    await this.audit.log({ type: 'login', outcome: 'success', ip, userId: user.id, username: user.username });
 
     // A passkey proves possession of the authenticator (and usually a biometric/PIN on top of it),
     // so it stands on its own and does not additionally prompt for the TOTP code.
@@ -148,7 +148,7 @@ export class PasskeyController {
       await this.bruteForce.assertIpAllowed('login', ip);
     } catch (error) {
       setRetryAfter(request.res as Response, error);
-      this.audit.log({ type: 'login', outcome: 'rate_limited', ip, reason: 'ip_throttled' });
+      await this.audit.log({ type: 'login', outcome: 'rate_limited', ip, reason: 'ip_throttled' });
       throw error;
     }
   }
@@ -156,8 +156,8 @@ export class PasskeyController {
   private record(
     action: 'passkey_created' | 'passkey_renamed' | 'passkey_deleted',
     request: AuthenticatedRequest,
-  ): void {
-    void this.identityAudit?.record({
+  ): Promise<void> {
+    return Promise.resolve(this.identityAudit?.record({
       action,
       operationId: randomUUID(),
       outcome: 'succeeded',
@@ -167,7 +167,7 @@ export class PasskeyController {
       subjectId: request.user.id,
       details: {},
       request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
-    });
+    })).then(() => undefined);
   }
 }
 
