@@ -92,12 +92,17 @@ export class TwoFactorController {
     return { policy: body.policy };
   }
 
-  private record(action: 'two_factor_setup_started' | 'two_factor_enabled' | 'two_factor_disabled', request: AuthenticatedRequest): void {
+  private record(
+    action: 'two_factor_setup_started' | 'two_factor_enabled' | 'two_factor_disabled',
+    request: AuthenticatedRequest,
+  ): void {
     void this.identityAudit?.record({
       action,
       operationId: randomUUID(),
       outcome: 'succeeded',
       actorId: request.user.id,
+      authenticationMethod: request.user.authenticationMethod ?? 'session',
+      apiTokenId: request.user.apiTokenId,
       subjectId: request.user.id,
       details: {},
       request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },

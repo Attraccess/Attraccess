@@ -90,6 +90,10 @@ export class RbacService {
     return this.roleRepository.find({ relations: ['rolePermissions'] });
   }
 
+  async getRoleKey(roleId: number): Promise<string | null> {
+    return (await this.roleRepository.findOne({ where: { id: roleId }, select: { key: true } }))?.key ?? null;
+  }
+
   async getRolesWithUsage(): Promise<RoleWithUsageDto[]> {
     const roles = await this.roleRepository.find({
       relations: ['rolePermissions'],
@@ -103,7 +107,9 @@ export class RbacService {
       .groupBy('ur.roleId')
       .getRawMany<{ roleId: number; userCount: string }>();
     const countByRoleId = new Map(counts.map((c) => [Number(c.roleId), Number(c.userCount)]));
-    return roles.map((role) => Object.assign(new RoleWithUsageDto(), role, { userCount: countByRoleId.get(role.id) ?? 0 }));
+    return roles.map((role) =>
+      Object.assign(new RoleWithUsageDto(), role, { userCount: countByRoleId.get(role.id) ?? 0 }),
+    );
   }
 
   private async resolvePermissionKeys(keys: string[]): Promise<string[]> {
@@ -126,12 +132,13 @@ export class RbacService {
   }
 
   private async generateRoleKey(name: string): Promise<string> {
-    const base = name
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 80) || 'role';
+    const base =
+      name
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 80) || 'role';
     let candidate = base;
     for (let suffix = 2; await this.roleRepository.existsBy({ key: candidate }); suffix++) {
       candidate = `${base}-${suffix}`;
@@ -260,7 +267,9 @@ export class RbacService {
     // Delete blocks only if it would reduce the administrator-equivalent user count from >0 to 0.
     const adminsWithoutRole = await this.countAdministratorEquivalentUsers(roleId);
     if (adminsWithoutRole === 0 && (await this.countAdministratorEquivalentUsers()) > 0) {
-      throw new ForbiddenException('Deleting this role would leave no active user with full administrative permissions');
+      throw new ForbiddenException(
+        'Deleting this role would leave no active user with full administrative permissions',
+      );
     }
 
     await this.roleRepository.manager.transaction(async (manager) => {
@@ -337,9 +346,7 @@ export class RbacService {
       where: { userId, roleId: role.id, source: UserRoleSource.MANUAL },
     });
     if (existing) return existing;
-    const result = await urRepo.save(
-      urRepo.create({ userId, roleId: role.id, source: UserRoleSource.MANUAL }),
-    );
+    const result = await urRepo.save(urRepo.create({ userId, roleId: role.id, source: UserRoleSource.MANUAL }));
     if (!em) {
       this.permissionsCache.delete(userId);
       await this.permissionsChanged(userId);
@@ -437,7 +444,9 @@ export class RbacService {
         }
         const result = await manager.delete(UserRole, { userId, roleId, source: UserRoleSource.MANUAL });
         if (!result.affected) {
-          throw new ConflictException('Role is not manually assigned to this user and cannot be revoked via this endpoint');
+          throw new ConflictException(
+            'Role is not manually assigned to this user and cannot be revoked via this endpoint',
+          );
         }
       });
       this.permissionsCache.delete(userId);

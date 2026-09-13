@@ -1,4 +1,16 @@
-import { Body, Controller, Delete, ForbiddenException, Get, Optional, Param, ParseIntPipe, Post, Req, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  Optional,
+  Param,
+  ParseIntPipe,
+  Post,
+  Req,
+  UseInterceptors,
+} from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@attraccess/database-entities';
 import { AuthenticatedRequest, Auth, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
@@ -76,18 +88,20 @@ export class UserPermissionsController {
     roleId: number,
     request: AuthenticatedRequest,
   ): void {
+    if (!this.identityAudit) return;
     void this.rbacService
-      .getRoles()
-      .then((roles) => {
-        const role = roles.find((candidate) => candidate.id === roleId);
-        if (!role) return;
+      .getRoleKey(roleId)
+      .then((roleKey) => {
+        if (!roleKey) return;
         return this.identityAudit?.record({
           action,
           operationId: randomUUID(),
           outcome: 'succeeded',
           actorId: request.user.id,
+          authenticationMethod: request.user.authenticationMethod ?? 'session',
+          apiTokenId: request.user.apiTokenId,
           subjectId: userId,
-          details: { role: role.key },
+          details: { role: roleKey },
           request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
         });
       })

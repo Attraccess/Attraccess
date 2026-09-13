@@ -178,14 +178,20 @@ export class AuthController {
     }
 
     // Passport clears request.user as part of logout, so retain the principal for the audit record.
-    const userId = request.user.id;
+    const principal = {
+      userId: request.user.id,
+      authenticationMethod: request.user.authenticationMethod ?? 'session',
+      apiTokenId: request.user.apiTokenId,
+    };
     await new Promise<void>((resolve) => request.logout(resolve));
     void this.identityAudit?.record({
       action: 'logout',
       operationId: randomUUID(),
       outcome: 'succeeded',
-      actorId: userId,
-      subjectId: userId,
+      actorId: principal.userId,
+      authenticationMethod: principal.authenticationMethod,
+      apiTokenId: principal.apiTokenId,
+      subjectId: principal.userId,
       details: {},
       request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
     });

@@ -170,10 +170,19 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
       const snapshot = projectIdentityAuditEvent(event);
       if (!snapshot) return { status: 'unavailable' };
       return await this.recordSnapshot({
-        domain: 'identity', pluginId: null, action: snapshot.action, operationId: snapshot.operationId,
-        actorId: snapshot.actorId, authenticationMethod: null, apiTokenId: null, outcome: snapshot.outcome,
-        subjectType: snapshot.subjectType, subjectId: snapshot.subjectId, ipAddress: snapshot.ipAddress,
-        userAgent: snapshot.userAgent, details: snapshot.details,
+        domain: 'identity',
+        pluginId: null,
+        action: snapshot.action,
+        operationId: snapshot.operationId,
+        actorId: snapshot.actorId,
+        authenticationMethod: snapshot.authenticationMethod,
+        apiTokenId: snapshot.apiTokenId,
+        outcome: snapshot.outcome,
+        subjectType: snapshot.subjectType,
+        subjectId: snapshot.subjectId,
+        ipAddress: snapshot.ipAddress,
+        userAgent: snapshot.userAgent,
+        details: snapshot.details,
       });
     } catch {
       return { status: 'unavailable' };
@@ -203,13 +212,25 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
         const config = await readAuditSettings(this.settings);
         if (!config.enabled || !config.domains.includes('resource') || this.stopping) return;
         await this.storage.getRepository(AuditLog).insert({
-          at: new Date(), domain: 'resource', pluginId: 'core', action: snapshot.action,
-          operationId: snapshot.operationId, actorId: snapshot.actorId,
-          authenticationMethod: snapshot.authenticationMethod ?? 'session', apiTokenId: snapshot.apiTokenId ?? null,
-          outcome: 'succeeded', subjectType: 'resource', subjectId: snapshot.subjectId, details: snapshot.details,
+          at: new Date(),
+          domain: 'resource',
+          pluginId: 'core',
+          action: snapshot.action,
+          operationId: snapshot.operationId,
+          actorId: snapshot.actorId,
+          authenticationMethod: snapshot.authenticationMethod ?? 'session',
+          apiTokenId: snapshot.apiTokenId ?? null,
+          outcome: 'succeeded',
+          subjectType: 'resource',
+          subjectId: snapshot.subjectId,
+          details: snapshot.details,
         });
-      } finally { this.pending--; }
-    } catch { /* Audit persistence must not affect resource operations. */ }
+      } finally {
+        this.pending--;
+      }
+    } catch {
+      /* Audit persistence must not affect resource operations. */
+    }
   }
 
   afterTransactionCommit({ queryRunner }: TransactionCommitEvent): void {
@@ -249,7 +270,11 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     this.pending++;
     try {
       const config = await readAuditSettings(this.settings);
-      if (!config.enabled || !config.domains.includes(event.domain as 'billing' | 'resource' | 'wago' | 'identity') || this.stopping)
+      if (
+        !config.enabled ||
+        !config.domains.includes(event.domain as 'billing' | 'resource' | 'wago' | 'identity') ||
+        this.stopping
+      )
         return { status: 'unavailable' };
       // sqlite3 queues concurrent statements after a busy timeout. Keep those writes in our
       // bounded admission queue instead, so a released lock cannot revive stale audit writes.

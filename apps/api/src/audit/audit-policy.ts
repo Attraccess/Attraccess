@@ -171,7 +171,12 @@ const resourceDetailFields = new Set([
 ]);
 
 export function projectResourceAuditEvent(input: ResourceAuditEvent): ResourceAuditEvent | null {
-  if (!resourceActions.has(input.action) || !uuid(input.operationId) || !positive(input.actorId) || !positive(input.subjectId)) {
+  if (
+    !resourceActions.has(input.action) ||
+    !uuid(input.operationId) ||
+    !positive(input.actorId) ||
+    !positive(input.subjectId)
+  ) {
     return null;
   }
   const details = dataFields(input.details, [...resourceDetailFields]);
@@ -286,6 +291,8 @@ export interface IdentityAuditEvent {
   operationId: string;
   outcome: 'attempted' | 'succeeded' | 'failed';
   actorId?: number;
+  authenticationMethod?: 'session' | 'api-token';
+  apiTokenId?: number;
   subjectType?: 'identity.user' | 'identity.role' | 'identity.password_policy';
   subjectId?: number;
   details: Record<string, unknown>;
@@ -297,6 +304,8 @@ export interface ProjectedIdentityAuditEvent {
   operationId: string;
   outcome: IdentityAuditEvent['outcome'];
   actorId: number | null;
+  authenticationMethod: 'session' | 'api-token' | null;
+  apiTokenId: number | null;
   subjectType: NonNullable<IdentityAuditEvent['subjectType']>;
   subjectId: number | null;
   details: Record<string, string | number | boolean | null>;
@@ -315,6 +324,8 @@ export function projectIdentityAuditEvent(input: unknown): ProjectedIdentityAudi
       'operationId',
       'outcome',
       'actorId',
+      'authenticationMethod',
+      'apiTokenId',
       'subjectType',
       'subjectId',
       'details',
@@ -330,6 +341,17 @@ export function projectIdentityAuditEvent(input: unknown): ProjectedIdentityAudi
     if (!uuid(event.operationId) || !['attempted', 'succeeded', 'failed'].includes(event.outcome as string))
       return null;
     if (event.actorId !== undefined && !positive(event.actorId)) return null;
+    const authenticationMethod = event.authenticationMethod;
+    const apiTokenId = event.apiTokenId;
+    if (
+      (authenticationMethod !== undefined &&
+        authenticationMethod !== 'session' &&
+        authenticationMethod !== 'api-token') ||
+      (apiTokenId !== undefined && !positive(apiTokenId)) ||
+      (authenticationMethod === 'api-token' && !positive(apiTokenId)) ||
+      (authenticationMethod !== 'api-token' && apiTokenId !== undefined)
+    )
+      return null;
     if (
       event.subjectType !== undefined &&
       !['identity.user', 'identity.role', 'identity.password_policy'].includes(event.subjectType as string)
@@ -346,7 +368,8 @@ export function projectIdentityAuditEvent(input: unknown): ProjectedIdentityAudi
     const request =
       event.request === undefined ? Object.create(null) : dataFields(event.request, ['ipAddress', 'userAgent']);
     // Request metadata is client-controlled and optional; a bad header must not suppress the audit event.
-    const ip = request && typeof request.ipAddress === 'string' && ipAddress(request.ipAddress) ? request.ipAddress : null;
+    const ip =
+      request && typeof request.ipAddress === 'string' && ipAddress(request.ipAddress) ? request.ipAddress : null;
     const agent =
       request && typeof request.userAgent === 'string' ? request.userAgent.replace(/[\r\n]/g, '').slice(0, 512) : null;
     if (Buffer.byteLength(JSON.stringify(details), 'utf8') > 4096) return null;
@@ -355,6 +378,8 @@ export function projectIdentityAuditEvent(input: unknown): ProjectedIdentityAudi
       operationId: event.operationId,
       outcome: event.outcome as IdentityAuditEvent['outcome'],
       actorId: (event.actorId as number | undefined) ?? null,
+      authenticationMethod: (authenticationMethod as 'session' | 'api-token' | undefined) ?? null,
+      apiTokenId: (apiTokenId as number | undefined) ?? null,
       subjectType: (event.subjectType as IdentityAuditEvent['subjectType'] | undefined) ?? 'identity.user',
       subjectId: (event.subjectId as number | undefined) ?? null,
       details,

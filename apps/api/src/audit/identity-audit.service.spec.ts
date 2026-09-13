@@ -16,6 +16,8 @@ describe('identity audit policy', () => {
       operationId: expect.any(String),
       outcome: 'failed',
       actorId: null,
+      authenticationMethod: null,
+      apiTokenId: null,
       subjectType: 'identity.user',
       subjectId: null,
       details: { reason: 'invalid_credentials' },
@@ -84,5 +86,20 @@ describe('identity audit policy', () => {
         details: { role },
       }),
     ).toMatchObject({ details: { role } });
+  });
+
+  it('retains API-token attribution for an authenticated actor', () => {
+    expect(
+      projectIdentityAuditEvent({
+        action: 'user_updated',
+        operationId: randomUUID(),
+        outcome: 'succeeded',
+        actorId: 7,
+        authenticationMethod: 'api-token',
+        apiTokenId: 19,
+        subjectId: 4,
+        details: { field: 'email' },
+      }),
+    ).toMatchObject({ actorId: 7, authenticationMethod: 'api-token', apiTokenId: 19 });
   });
 });

@@ -162,6 +162,8 @@ export class PasskeyController {
       operationId: randomUUID(),
       outcome: 'succeeded',
       actorId: request.user.id,
+      authenticationMethod: request.user.authenticationMethod ?? 'session',
+      apiTokenId: request.user.apiTokenId,
       subjectId: request.user.id,
       details: {},
       request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },

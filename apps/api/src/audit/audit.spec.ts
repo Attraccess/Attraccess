@@ -171,13 +171,16 @@ describe('durable audit SQLite', () => {
     await store.setPlainSetting('audit', 'domains', '["billing"]');
     let receipt: Promise<{ status: string }> | undefined;
     await source.transaction(async (manager) => {
-      receipt = service.recordBillingTransactionAfterCommit({
-        transactionId: 8,
-        userId: 42,
-        amount: 0,
-        status: 'pending',
-        source: 'resource-usage',
-      }, manager);
+      receipt = service.recordBillingTransactionAfterCommit(
+        {
+          transactionId: 8,
+          userId: 42,
+          amount: 0,
+          status: 'pending',
+          source: 'resource-usage',
+        },
+        manager,
+      );
       expect((await service.list({ limit: 1 })).items).toHaveLength(0);
     });
     await expect(receipt).resolves.toEqual({ status: 'recorded' });
@@ -189,13 +192,16 @@ describe('durable audit SQLite', () => {
     let receipt: Promise<{ status: string }> | undefined;
     await expect(
       source.transaction(async (manager) => {
-        receipt = service.recordBillingTransactionAfterCommit({
-          transactionId: 8,
-          userId: 42,
-          amount: 0,
-          status: 'pending',
-          source: 'resource-usage',
-        }, manager);
+        receipt = service.recordBillingTransactionAfterCommit(
+          {
+            transactionId: 8,
+            userId: 42,
+            amount: 0,
+            status: 'pending',
+            source: 'resource-usage',
+          },
+          manager,
+        );
         throw new Error('rollback');
       }),
     ).rejects.toThrow('rollback');
@@ -208,22 +214,28 @@ describe('durable audit SQLite', () => {
     let outerReceipt: Promise<{ status: string }> | undefined;
     let nestedReceipt: Promise<{ status: string }> | undefined;
     await source.transaction(async (manager) => {
-      outerReceipt = service.recordBillingTransactionAfterCommit({
-        transactionId: 8,
-        userId: 42,
-        amount: 0,
-        status: 'pending',
-        source: 'resource-usage',
-      }, manager);
+      outerReceipt = service.recordBillingTransactionAfterCommit(
+        {
+          transactionId: 8,
+          userId: 42,
+          amount: 0,
+          status: 'pending',
+          source: 'resource-usage',
+        },
+        manager,
+      );
       await expect(
         manager.transaction(async (nestedManager) => {
-          nestedReceipt = service.recordBillingTransactionAfterCommit({
-            transactionId: 9,
-            userId: 42,
-            amount: 0,
-            status: 'pending',
-            source: 'resource-usage',
-          }, nestedManager);
+          nestedReceipt = service.recordBillingTransactionAfterCommit(
+            {
+              transactionId: 9,
+              userId: 42,
+              amount: 0,
+              status: 'pending',
+              source: 'resource-usage',
+            },
+            nestedManager,
+          );
           throw new Error('nested rollback');
         }),
       ).rejects.toThrow('nested rollback');
@@ -239,23 +251,29 @@ describe('durable audit SQLite', () => {
     let rolledBackReceipt: Promise<{ status: string }> | undefined;
     await source.transaction(async (manager) => {
       await manager.transaction(async (nestedManager) => {
-        committedReceipt = service.recordBillingTransactionAfterCommit({
-          transactionId: 8,
-          userId: 42,
-          amount: 0,
-          status: 'pending',
-          source: 'resource-usage',
-        }, nestedManager);
-      });
-      await expect(
-        manager.transaction(async (nestedManager) => {
-          rolledBackReceipt = service.recordBillingTransactionAfterCommit({
-            transactionId: 9,
+        committedReceipt = service.recordBillingTransactionAfterCommit(
+          {
+            transactionId: 8,
             userId: 42,
             amount: 0,
             status: 'pending',
             source: 'resource-usage',
-          }, nestedManager);
+          },
+          nestedManager,
+        );
+      });
+      await expect(
+        manager.transaction(async (nestedManager) => {
+          rolledBackReceipt = service.recordBillingTransactionAfterCommit(
+            {
+              transactionId: 9,
+              userId: 42,
+              amount: 0,
+              status: 'pending',
+              source: 'resource-usage',
+            },
+            nestedManager,
+          );
           throw new Error('nested rollback');
         }),
       ).rejects.toThrow('nested rollback');
@@ -385,6 +403,28 @@ describe('durable audit SQLite', () => {
       ipAddress: '203.0.113.7',
       userAgent: 'Attraccess/1.0',
       details: { reason: 'invalid_credentials' },
+    });
+  });
+
+  it('records identity API-token attribution', async () => {
+    await store.setPlainSetting('audit', 'domains', '["identity"]');
+    const operationId = randomUUID();
+    expect(
+      await service.recordIdentity({
+        action: 'user_updated',
+        operationId,
+        outcome: 'succeeded',
+        actorId: 42,
+        authenticationMethod: 'api-token',
+        apiTokenId: 9,
+        subjectId: 7,
+        details: { field: 'email' },
+      }),
+    ).toEqual({ status: 'recorded' });
+    expect((await service.list({ limit: 1, operationId })).items[0]).toMatchObject({
+      actorId: 42,
+      authenticationMethod: 'api-token',
+      apiTokenId: 9,
     });
   });
 
@@ -824,7 +864,17 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
     await source.runMigrations();
     await source.query(`INSERT INTO "password_policy_audit" ("event", "actorId", "actorUsername", "ip", "userAgent", "requestId", "before", "after", "changedFields")
       VALUES ('global_policy_updated', 1, 'migration-user', '127.0.0.1', 'migration-test', 'migration-request', '{"minLength":12}', '{"minLength":16}', '["minLength"]')`);
-    await source.query(`INSERT INTO "setting" ("parent", "key", "value") VALUES ('audit', 'domains', '["billing","resource","wago"]')`);
+    const oversizedRequestId = 'r'.repeat(5_000);
+    const oversizedBefore = JSON.stringify({ minLength: 12, requireUppercase: true });
+    const oversizedAfter = JSON.stringify({ minLength: 16, requireUppercase: false });
+    await source.query(
+      `INSERT INTO "password_policy_audit" ("event", "actorId", "actorUsername", "ip", "userAgent", "requestId", "before", "after", "changedFields")
+      VALUES ('global_policy_updated', 1, 'migration-user', '127.0.0.1', 'migration-test', ?, ?, ?, '["minLength"]')`,
+      [oversizedRequestId, oversizedBefore, oversizedAfter],
+    );
+    await source.query(
+      `INSERT INTO "setting" ("parent", "key", "value") VALUES ('audit', 'domains', '["billing","resource","wago"]')`,
+    );
     await source.destroy();
     source = new DataSource({
       type: 'sqlite',
@@ -845,14 +895,34 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       { value: '["billing","resource","wago","identity"]' },
     ]);
     expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(
-      1,
+      2,
     );
+    expect(
+      await source.query(`SELECT "metadata" FROM "password_policy_audit_overflow" WHERE "legacyAuditId" = 2`),
+    ).toEqual([
+      {
+        metadata: JSON.stringify({
+          actorUsername: 'migration-user',
+          requestId: oversizedRequestId,
+          role: null,
+          before: oversizedBefore,
+          after: oversizedAfter,
+          changedFields: '["minLength"]',
+        }),
+      },
+    ]);
     await source.query(`INSERT INTO "audit_log" ("at", "domain", "action", "operationId", "outcome", "subjectType", "subjectId", "details")
       VALUES (datetime('now'), 'identity', 'identity.password_policy_updated', 'f4ae9dd5-3b66-4d5e-a46c-03cfaa25e266', 'succeeded', 'identity.password_policy', 1, '{"field":"minLength"}')`);
+    await source.query(`UPDATE "setting" SET "value" = '["identity"]'
+      WHERE "parent" = 'audit' AND "key" = 'domains'`);
     await source.undoLastMigration();
     expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toHaveLength(1);
-    expect(await source.query('SELECT * FROM password_policy_audit')).toHaveLength(2);
-    expect(await source.query(`SELECT "actorUsername", "requestId", "before", "after", "changedFields" FROM password_policy_audit WHERE "requestId" = 'migration-request'`)).toEqual([
+    expect(await source.query('SELECT * FROM password_policy_audit')).toHaveLength(3);
+    expect(
+      await source.query(
+        `SELECT "actorUsername", "requestId", "before", "after", "changedFields" FROM password_policy_audit WHERE "requestId" = 'migration-request'`,
+      ),
+    ).toEqual([
       {
         actorUsername: 'migration-user',
         requestId: 'migration-request',
@@ -861,19 +931,29 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
         changedFields: '["minLength"]',
       },
     ]);
+    expect(
+      await source.query(`SELECT "requestId", "before", "after" FROM password_policy_audit WHERE "requestId" = ?`, [
+        oversizedRequestId,
+      ]),
+    ).toEqual([{ requestId: oversizedRequestId, before: oversizedBefore, after: oversizedAfter }]);
     expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(
       0,
     );
     expect(await source.query(`SELECT "value" FROM "setting" WHERE "parent" = 'audit' AND "key" = 'domains'`)).toEqual([
-      { value: '["billing","resource","wago"]' },
+      { value: '[]' },
     ]);
     expect((await source.runMigrations()).map((migration) => migration.name)).toEqual([
       'RetirePasswordPolicyAudit1783900000000',
     ]);
     expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(
-      2,
+      3,
     );
     await source.undoLastMigration();
+    expect(
+      await source.query(`SELECT "requestId", "before", "after" FROM password_policy_audit WHERE "requestId" = ?`, [
+        oversizedRequestId,
+      ]),
+    ).toEqual([{ requestId: oversizedRequestId, before: oversizedBefore, after: oversizedAfter }]);
     expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toHaveLength(1);
     await source.undoLastMigration();
     expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toHaveLength(1);
