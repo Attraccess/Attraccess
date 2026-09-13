@@ -556,6 +556,20 @@ describe('AttractapCardHandler', () => {
         }),
       );
     });
+
+    it.each([
+      ['returns false', jest.fn().mockResolvedValue(false)],
+      ['rejects', jest.fn().mockRejectedValue(new Error('send failed'))],
+    ])('clears reset state when sending the command %s', async (_result, sendMessage) => {
+      const socket = createMockSocket({ sendMessage });
+      websocketService.sockets.set('socket-1', socket);
+
+      await expect(
+        handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 }),
+      ).resolves.toBeUndefined();
+
+      expect(socket.state.resetNfcCardData).toBeNull();
+    });
   });
 
   describe('handleCardAuthenticationRequest', () => {
