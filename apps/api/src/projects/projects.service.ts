@@ -105,11 +105,6 @@ export class ProjectsService {
       description: data.description,
     });
 
-    if (data.logo) {
-      await this.setLogo(project, data.logo);
-    }
-
-    this.metricsService.projectsTotal.inc();
     await this.audit.recordProject({
       action: 'project.created',
       actorId: ownerUserId,
@@ -119,6 +114,21 @@ export class ProjectsService {
       subjectId: project.id,
       details: this.projectDetails(project, 'after'),
     });
+    this.metricsService.projectsTotal.inc();
+
+    if (data.logo) {
+      const before = this.projectDetails(project, 'before');
+      await this.setLogo(project, data.logo);
+      await this.audit.recordProject({
+        action: 'project.updated',
+        actorId: ownerUserId,
+        authenticationMethod,
+        apiTokenId,
+        subjectType: 'project',
+        subjectId: project.id,
+        details: { ...before, ...this.projectDetails(project, 'after'), changedFields: JSON.stringify(['logo']) },
+      });
+    }
     return project;
   }
 
@@ -129,6 +139,7 @@ export class ProjectsService {
     apiTokenId?: number,
   ): Promise<Project> {
     const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
+    if (project.archivedAt) return project;
     project.archivedAt = new Date();
     const saved = await this.projectRepository.save(project);
     await this.audit.recordProject({
@@ -146,6 +157,7 @@ export class ProjectsService {
     apiTokenId?: number,
   ): Promise<Project> {
     const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
+    if (!project.archivedAt) return project;
     project.archivedAt = null;
     const saved = await this.projectRepository.save(project);
     await this.audit.recordProject({
@@ -188,6 +200,7 @@ export class ProjectsService {
   ): Promise<Project> {
     const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
     const before = this.projectDetails(project, 'before');
+    const beforeName = project.name;
     const beforeDescription = project.description;
     const beforeLogo = project.logo;
 
@@ -212,7 +225,7 @@ export class ProjectsService {
 
     const saved = await this.projectRepository.save(project);
     const changedFields = [
-      ...(before['before.name'] !== saved.name ? ['name'] : []),
+      ...(beforeName !== saved.name ? ['name'] : []),
       ...(data.description !== undefined && data.description !== beforeDescription ? ['description'] : []),
       ...(beforeLogo !== saved.logo ? ['logo'] : []),
     ];
@@ -457,6 +470,16 @@ export class ProjectsService {
     invitation.respondedAt = new Date();
     await this.projectInvitationRepository.save(invitation);
 
+    await this.audit.recordProject({
+      action: status === ProjectInvitationStatus.ACCEPTED ? 'project.invitation.accepted' : 'project.invitation.rejected',
+      actorId: userId,
+      authenticationMethod,
+      apiTokenId,
+      subjectType: 'project.invitation',
+      subjectId: invitation.id,
+      details: this.invitationDetails(invitation),
+    });
+
     if (status === ProjectInvitationStatus.ACCEPTED) {
       const member = await this.ensureMemberRecord(invitation.projectId, userId, invitation.requestedRole);
       if (member) {
@@ -472,15 +495,6 @@ export class ProjectsService {
       }
     }
 
-    await this.audit.recordProject({
-      action: status === ProjectInvitationStatus.ACCEPTED ? 'project.invitation.accepted' : 'project.invitation.rejected',
-      actorId: userId,
-      authenticationMethod,
-      apiTokenId,
-      subjectType: 'project.invitation',
-      subjectId: invitation.id,
-      details: this.invitationDetails(invitation),
-    });
     return this.getInvitationWithRelations(invitation.id);
   }
 
@@ -537,7 +551,19 @@ export class ProjectsService {
   }
 
   private projectDetails(project: Project, state: 'before' | 'after'): Record<string, string | number> {
-    return { projectId: project.id, [`${state}.name`]: project.name, [`${state}.hasLogo`]: project.logo ? 1 : 0 };
+    const details: Record<string, string | number> = { projectId: project.id, [`${state}.hasLogo`]: project.logo ? 1 : 0 };
+    const name = project.name.trim();
+    if (!name) return { ...details, [`${state}.nameOmitted`]: 1 };
+    let displayName = '';
+    for (const character of name) {
+      if (Buffer.byteLength(displayName + character, 'utf8') > 160) break;
+      displayName += character;
+    }
+    return {
+      ...details,
+      [`${state}.name`]: displayName,
+      ...(displayName === name ? {} : { [`${state}.nameTruncated`]: 1 }),
+    };
   }
 
   private invitationDetails(invitation: ProjectInvitation): Record<string, string | number> {

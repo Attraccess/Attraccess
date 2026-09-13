@@ -183,6 +183,18 @@ describe('ProjectsService', () => {
       });
     });
 
+    it('records a legacy empty project name as omitted instead of dropping the deletion event', async () => {
+      resourceUsageRepository.update.mockResolvedValue({} as never);
+      projectRepository.delete.mockResolvedValueOnce({ affected: 1 } as never);
+      projectAccessService.ensureOwner.mockResolvedValueOnce({ id: 99, name: '   ', logo: null } as Project);
+
+      await service.deleteOne(7, 99);
+
+      expect(audit.recordProject).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'project.deleted', details: { projectId: 99, 'before.hasLogo': 0, 'before.nameOmitted': 1 },
+      }));
+    });
+
     it('stores the logo when provided', async () => {
       const payload = {
         name: 'New',
@@ -197,6 +209,22 @@ describe('ProjectsService', () => {
 
       expect(fileStorageService.saveFile).toHaveBeenCalledWith(payload.logo, 'projects/4');
       expect(created.logo).toBe('logo.png');
+      expect(audit.recordProject).toHaveBeenNthCalledWith(1, expect.objectContaining({ action: 'project.created' }));
+      expect(audit.recordProject).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        action: 'project.updated', details: expect.objectContaining({ changedFields: '["logo"]' }),
+      }));
+    });
+
+    it('records creation before a later logo write fails', async () => {
+      const payload = { name: 'New', description: 'Desc', logo: Buffer.from('x') as unknown as FileUpload } as CreateProjectDto;
+      projectRepository.save.mockImplementationOnce(async (entity: Project) => ({ id: 4, ...entity }));
+      fileStorageService.saveFile.mockRejectedValueOnce(new Error('storage unavailable'));
+
+      await expect(service.create(2, payload)).rejects.toThrow('storage unavailable');
+
+      expect(audit.recordProject).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'project.created', subjectId: 4, details: { projectId: 4, 'after.name': 'New', 'after.hasLogo': 0 },
+      }));
     });
   });
 
@@ -273,6 +301,17 @@ describe('ProjectsService', () => {
       expect(audit.recordProject).not.toHaveBeenCalled();
     });
 
+    it('does not record an unchanged legacy long-name update', async () => {
+      const longName = '😀'.repeat(100);
+      const existing = { id: 3, name: longName, description: 'Same', logo: null } as Project;
+      projectAccessService.ensureOwner.mockResolvedValueOnce(existing);
+      projectRepository.save.mockImplementation(async (entity: Project) => entity);
+
+      await service.updateOne(1, 3, { name: longName } as UpdateProjectDto);
+
+      expect(audit.recordProject).not.toHaveBeenCalled();
+    });
+
     it('records archive lifecycle changes with the initiating actor', async () => {
       const project = { id: 3, name: 'Project', logo: null } as Project;
       projectAccessService.ensureOwner.mockResolvedValue(project);
@@ -289,6 +328,18 @@ describe('ProjectsService', () => {
         action: 'project.unarchived', actorId: 2, authenticationMethod: 'session', apiTokenId: undefined,
         subjectType: 'project', subjectId: 3, details: { projectId: 3, 'after.name': 'Project', 'after.hasLogo': 0, 'after.archived': 0 },
       });
+    });
+
+    it('does not save or audit archive lifecycle requests already in the requested state', async () => {
+      const archivedProject = { id: 3, name: 'Archived', archivedAt: new Date(), logo: null } as Project;
+      const activeProject = { id: 4, name: 'Active', archivedAt: null, logo: null } as Project;
+      projectAccessService.ensureOwner.mockResolvedValueOnce(archivedProject).mockResolvedValueOnce(activeProject);
+
+      await service.archiveOne(2, 3);
+      await service.unarchiveOne(2, 4);
+
+      expect(projectRepository.save).not.toHaveBeenCalled();
+      expect(audit.recordProject).not.toHaveBeenCalled();
     });
   });
 
@@ -350,12 +401,12 @@ describe('ProjectsService', () => {
       await service.acceptInvitation(9, 7);
 
       expect(audit.recordProject).toHaveBeenNthCalledWith(1, {
-        action: 'project.member.added', actorId: 9, authenticationMethod: 'session', apiTokenId: undefined, subjectType: 'project.member', subjectId: 8,
-        details: { projectId: 3, memberId: 8, userId: 9, role: 'viewer' },
-      });
-      expect(audit.recordProject).toHaveBeenNthCalledWith(2, {
         action: 'project.invitation.accepted', actorId: 9, authenticationMethod: 'session', apiTokenId: undefined, subjectType: 'project.invitation', subjectId: 7,
         details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
+      });
+      expect(audit.recordProject).toHaveBeenNthCalledWith(2, {
+        action: 'project.member.added', actorId: 9, authenticationMethod: 'session', apiTokenId: undefined, subjectType: 'project.member', subjectId: 8,
+        details: { projectId: 3, memberId: 8, userId: 9, role: 'viewer' },
       });
     });
 
@@ -372,6 +423,31 @@ describe('ProjectsService', () => {
         action: 'project.invitation.rejected', actorId: 9, authenticationMethod: 'session', apiTokenId: undefined, subjectType: 'project.invitation', subjectId: 7,
         details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
       });
+    });
+
+    it('records acceptance before a later membership write fails', async () => {
+      const invitation = { id: 7, projectId: 3, invitedUserId: 9, requestedRole: 'viewer', status: 'pending' } as ProjectInvitation;
+      projectInvitationRepository.findOne.mockResolvedValue(invitation);
+      projectInvitationRepository.save.mockResolvedValue(invitation);
+      projectMemberRepository.findOne.mockResolvedValue(null);
+      projectMemberRepository.save.mockRejectedValueOnce(new Error('membership unavailable'));
+
+      await expect(service.acceptInvitation(9, 7)).rejects.toThrow('membership unavailable');
+
+      expect(audit.recordProject).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'project.invitation.accepted', subjectId: 7,
+      }));
+    });
+
+    it('projects legacy empty and long UTF-8 names without suppressing audit events', async () => {
+      const longName = '😀'.repeat(100);
+      projectRepository.save.mockImplementationOnce(async (entity: Project) => ({ id: 1, ...entity }));
+
+      await service.create(2, { name: longName, description: 'Desc' } as CreateProjectDto);
+
+      expect(audit.recordProject).toHaveBeenCalledWith(expect.objectContaining({
+        details: expect.objectContaining({ 'after.nameTruncated': 1, 'after.hasLogo': 0 }),
+      }));
     });
   });
 });
