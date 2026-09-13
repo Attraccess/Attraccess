@@ -184,8 +184,8 @@ export class AuthController {
       apiTokenId: request.user.apiTokenId,
     };
     const logout = request.logout as unknown as (callback: (error?: Error) => void) => void;
-    await new Promise<void>((resolve, reject) => logout((error) => (error ? reject(error) : resolve())));
-    void this.identityAudit?.record({
+    await new Promise<void>((resolve, reject) => logout.call(request, (error) => (error ? reject(error) : resolve())));
+    await this.identityAudit?.record({
       action: 'logout',
       operationId: randomUUID(),
       outcome: 'succeeded',

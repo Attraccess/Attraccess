@@ -40,7 +40,7 @@ export class RbacController {
   async createRole(@Body() body: CreateRoleDto, @Req() request: AuthenticatedRequest): Promise<Role> {
     const actor = request.user as AuthenticatedUser;
     const role = await this.rbacService.createRole(body, actor.effectivePermissions ?? new Set());
-    this.record('role_created', role, request);
+    await this.record('role_created', role, request);
     return role;
   }
 
@@ -55,7 +55,7 @@ export class RbacController {
   ): Promise<Role> {
     const actor = request.user as AuthenticatedUser;
     const role = await this.rbacService.updateRole(id, body, actor.effectivePermissions ?? new Set());
-    this.record('role_updated', role, request);
+    await this.record('role_updated', role, request);
     return role;
   }
 
@@ -80,15 +80,15 @@ export class RbacController {
     const actor = request.user as AuthenticatedUser;
     const role = (await this.rbacService.getRoles()).find((candidate) => candidate.id === id);
     await this.rbacService.deleteRole(id, actor.effectivePermissions ?? new Set(), reassignToRoleId);
-    if (role) this.record('role_deleted', role, request);
+    if (role) await this.record('role_deleted', role, request);
   }
 
   private record(
     action: 'role_created' | 'role_updated' | 'role_deleted',
     role: Role,
     request: AuthenticatedRequest,
-  ): void {
-    void this.identityAudit?.record({
+  ): Promise<void> {
+    return Promise.resolve(this.identityAudit?.record({
       action,
       operationId: randomUUID(),
       outcome: 'succeeded',
@@ -99,6 +99,6 @@ export class RbacController {
       subjectId: role.id,
       details: { role: role.key },
       request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
-    });
+    })).then(() => undefined);
   }
 }

@@ -35,7 +35,7 @@ export class AuthAuditLogger {
 
   constructor(@Optional() private readonly identityAudit?: IdentityAuditService) {}
 
-  log(fields: AuthAuditFields): void {
+  async log(fields: AuthAuditFields): Promise<void> {
     const line = formatLine(fields);
     if (fields.outcome === 'success') {
       this.logger.log(line);
@@ -46,7 +46,7 @@ export class AuthAuditLogger {
     const action = actionFor(fields.type);
     if (!action) return;
     const reason = fields.outcome === 'success' ? undefined : fields.outcome;
-    void this.identityAudit
+    await this.identityAudit
       ?.record({
         action,
         operationId: randomUUID(),

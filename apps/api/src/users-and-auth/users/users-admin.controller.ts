@@ -99,7 +99,7 @@ export class UsersAdminController {
     }
 
     await this.usersService.deleteOne(id);
-    this.record('user_deleted', id, request);
+    await this.record('user_deleted', id, request);
   }
 
   @Get()
@@ -193,7 +193,7 @@ export class UsersAdminController {
     @Req() request: AuthenticatedRequest,
   ): Promise<{ message: string }> {
     await this.passwordService.setUserPassword(id, body, request.user);
-    this.record('user_updated', id, request, 'password');
+    await this.record('user_updated', id, request, 'password');
     return { message: 'Password updated successfully' };
   }
 
@@ -207,7 +207,7 @@ export class UsersAdminController {
     @Req() request: AuthenticatedRequest,
   ): Promise<User> {
     const user = await this.usersService.changeUsername(id, body.username, request.user);
-    this.record('user_updated', id, request, 'username');
+    await this.record('user_updated', id, request, 'username');
     return user;
   }
 
@@ -222,7 +222,7 @@ export class UsersAdminController {
   ): Promise<User> {
     try {
       const user = await this.usersService.changeEmail(id, body.email, request.user);
-      this.record('user_updated', id, request, 'email');
+      await this.record('user_updated', id, request, 'email');
       return user;
     } catch (error) {
       throw mapEmailSendError(error);
@@ -239,7 +239,7 @@ export class UsersAdminController {
     @Req() request: AuthenticatedRequest,
   ): Promise<User> {
     const user = await this.usersService.changeBillingFactor(id, body.billingFactor);
-    this.record('user_updated', id, request, 'billingFactor');
+    await this.record('user_updated', id, request, 'billingFactor');
     return user;
   }
 
@@ -248,8 +248,8 @@ export class UsersAdminController {
     subjectId: number,
     request: AuthenticatedRequest,
     field?: 'username' | 'email' | 'password' | 'billingFactor',
-  ): void {
-    void this.identityAudit?.record({
+  ): Promise<void> {
+    return Promise.resolve(this.identityAudit?.record({
       action,
       operationId: randomUUID(),
       outcome: 'succeeded',
@@ -259,6 +259,6 @@ export class UsersAdminController {
       subjectId,
       details: field ? { field } : {},
       request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
-    });
+    })).then(() => undefined);
   }
 }
