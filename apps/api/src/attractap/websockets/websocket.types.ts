@@ -111,11 +111,15 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   sendBinaryData: (data: Buffer) => void;
   state: {
     lastAuthenticatedUserId: number | null;
-    auditPrincipal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number } | null;
+    enrollment: {
+      userId: number;
+      auditPrincipal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number };
+    } | null;
     enrollNewCardData: {
       key: string;
       keyNo: number;
       cardUID: string;
+      auditPrincipal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number };
     } | null;
     resetNfcCardData: {
       cardId: number;
