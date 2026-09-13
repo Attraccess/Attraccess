@@ -146,7 +146,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
         10,
         mockUser,
         { projectId: 7, formSubmissions },
-        {},
+        { auditOrigin: { actorId: 1, authenticationMethod: null } },
       );
       expect(mockFormsHandler.clearFormDraft).toHaveBeenCalledWith(mockSocket, 10, ResourceFormAction.START);
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
@@ -173,7 +173,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
         10,
         mockUser,
         { projectId: 7, formSubmissions: [] },
-        { supervisorUserId: 2 },
+        { supervisorUserId: 2, auditOrigin: { actorId: 1, authenticationMethod: null } },
       );
       expect(mockSupervisionService.settleByCard).toHaveBeenCalledWith('req-1');
       expect((mockSocket.state as any).supervisionFlow).toBeNull();
@@ -325,7 +325,9 @@ describe('AttractapSessionHandler – session + flow button', () => {
 
       await (handler as any).handleStopResourceUsageSession(mockSocket, eventData);
 
-      expect(mockResourceUsageService.endSession).toHaveBeenCalledWith(10, mockUser, { formSubmissions });
+      expect(mockResourceUsageService.endSession).toHaveBeenCalledWith(10, mockUser, { formSubmissions }, {
+        auditOrigin: { actorId: 1, authenticationMethod: null },
+      });
       expect(mockFormsHandler.clearFormDraft).toHaveBeenCalledWith(mockSocket, 10, ResourceFormAction.END);
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({

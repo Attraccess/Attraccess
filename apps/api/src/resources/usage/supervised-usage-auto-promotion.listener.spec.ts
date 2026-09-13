@@ -26,7 +26,7 @@ describe('SupervisedUsageAutoPromotionListener', () => {
       autoIntroductionTarget: AutoIntroductionTarget.RESOURCE,
       autoIntroductionGroupId: null,
       ...overrides,
-    } as Resource);
+    }) as Resource;
 
   const event = new ResourceSupervisedUsageEndedEvent(RESOURCE_ID, USER_ID, SUPERVISOR_ID, 99);
 
@@ -162,7 +162,8 @@ describe('SupervisedUsageAutoPromotionListener', () => {
 
     it('skips when the group target has no autoIntroductionGroupId', async () => {
       resourceRepository.findOne.mockResolvedValue(
-        groupResource() && buildResource({ autoIntroductionTarget: AutoIntroductionTarget.GROUP, autoIntroductionGroupId: null }),
+        groupResource() &&
+          buildResource({ autoIntroductionTarget: AutoIntroductionTarget.GROUP, autoIntroductionGroupId: null }),
       );
 
       await listener.handleSupervisedUsageEnded(event);

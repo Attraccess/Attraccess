@@ -13,7 +13,9 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceGroupIntroductionChangedEvent } from './events/resource-group-introduction-changed.event';
 import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../../notifications/notification-types';
+import { ResourceRetrainingService } from '../../retraining/resourceRetraining.service';
 import { AuditService } from '../../../audit/audit.service';
+import { ResourceAuditOrigin } from '../../../audit/audit-policy';
 
 @Injectable()
 export class ResourceGroupsIntroductionsService {
@@ -27,6 +29,7 @@ export class ResourceGroupsIntroductionsService {
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
     private readonly notifications: NotificationDispatchService,
+    private readonly retraining: ResourceRetrainingService,
     private readonly audit: AuditService,
   ) {}
 
@@ -37,20 +40,24 @@ export class ResourceGroupsIntroductionsService {
       : `Your introduction for group #${groupId} was revoked.`;
     const url = `/resource-groups/${groupId}`;
 
-    void this.notifications.dispatch({
-      category: NotificationCategory.ACCESS_CHANGES,
-      recipients: [{ id: userId } as User],
-      title,
-      body,
-      url,
-      dedupeKey: `group-introduction-${groupId}-${userId}-${granted ? 'granted' : 'revoked'}`,
-      sendEmail: (recipient) =>
-        this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
-          accessChange: { title, body, url },
-        }),
-    }).catch((error) => {
-      this.logger.error(`Failed to notify user ${userId} about group introduction changes: ${(error as Error).message}`);
-    });
+    void this.notifications
+      .dispatch({
+        category: NotificationCategory.ACCESS_CHANGES,
+        recipients: [{ id: userId } as User],
+        title,
+        body,
+        url,
+        dedupeKey: `group-introduction-${groupId}-${userId}-${granted ? 'granted' : 'revoked'}`,
+        sendEmail: (recipient) =>
+          this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
+            accessChange: { title, body, url },
+          }),
+      })
+      .catch((error) => {
+        this.logger.error(
+          `Failed to notify user ${userId} about group introduction changes: ${(error as Error).message}`,
+        );
+      });
   }
 
   private async getLastHistoryItemOfIntroduction(
@@ -92,7 +99,13 @@ export class ResourceGroupsIntroductionsService {
     performedByUserId?: number | null,
     authenticationMethod?: 'session' | 'api-token' | null,
     apiTokenId?: number | null,
+    auditOrigin?: ResourceAuditOrigin,
   ): Promise<ResourceIntroductionHistoryItem> {
+    const origin = auditOrigin ?? {
+      actorId: performedByUserId ?? null,
+      authenticationMethod: performedByUserId == null ? null : authenticationMethod,
+      apiTokenId: apiTokenId ?? undefined,
+    };
     let existingIntroduction = await this.resourceIntroductionRepository.findOne({
       where: {
         receiverUser: { id: userId },
@@ -109,6 +122,9 @@ export class ResourceGroupsIntroductionsService {
     }
 
     const previousHistoryItem = await this.getLastHistoryItemOfIntroduction(existingIntroduction.id);
+    const retrainingWasDue =
+      nextStatus === IntroductionHistoryAction.GRANT &&
+      (await this.retraining.getIntroductionRetrainingStatus(existingIntroduction.id))?.isDue === true;
 
     const historyItem = this.resourceIntroductionHistoryItemRepository.create({
       introduction: existingIntroduction,
@@ -122,15 +138,34 @@ export class ResourceGroupsIntroductionsService {
       ResourceGroupIntroductionChangedEvent.EVENT_NAME,
       new ResourceGroupIntroductionChangedEvent(groupId),
     );
-    if (previousHistoryItem?.action !== nextStatus && (previousHistoryItem || nextStatus === IntroductionHistoryAction.GRANT)) {
+    if (
+      previousHistoryItem?.action !== nextStatus &&
+      (previousHistoryItem || nextStatus === IntroductionHistoryAction.GRANT)
+    ) {
       this.notifyIntroductionChange(groupId, userId, nextStatus === IntroductionHistoryAction.GRANT);
     }
-    if (performedByUserId !== undefined) {
+    if (performedByUserId !== undefined || auditOrigin !== undefined) {
       await this.audit.recordResource({
         action: nextStatus === IntroductionHistoryAction.GRANT ? 'introduction.granted' : 'introduction.revoked',
-        actorId: performedByUserId, authenticationMethod, apiTokenId, subjectType: 'resource_group', subjectId: groupId,
+        ...origin,
+        subjectType: 'resource_group',
+        subjectId: groupId,
         details: { recipientUserId: userId, ...(tutorUserId === undefined ? {} : { tutorUserId }) },
       });
+    }
+    const retrainingIsDue =
+      nextStatus === IntroductionHistoryAction.GRANT &&
+      (await this.retraining.getIntroductionRetrainingStatus(existingIntroduction.id))?.isDue === true;
+    if (retrainingWasDue && !retrainingIsDue) {
+      await this.audit
+        .recordResource({
+          action: 'retraining.cleared',
+          ...origin,
+          subjectType: 'resource.group',
+          subjectId: groupId,
+          details: { introductionId: existingIntroduction.id, usageUserId: userId },
+        })
+        .catch(() => undefined);
     }
     return savedHistoryItem;
   }
@@ -151,6 +186,7 @@ export class ResourceGroupsIntroductionsService {
     data?: UpdateResourceGroupIntroductionDto,
     options?: {
       tutorUserId?: number;
+      auditOrigin?: ResourceAuditOrigin;
       performedByUserId?: number | null;
       authenticationMethod?: 'session' | 'api-token' | null;
       apiTokenId?: number | null;
@@ -165,6 +201,7 @@ export class ResourceGroupsIntroductionsService {
       options?.performedByUserId,
       options?.authenticationMethod,
       options?.apiTokenId,
+      options?.auditOrigin,
     );
   }
 

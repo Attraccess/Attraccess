@@ -14,7 +14,7 @@ const ALL_AUDIT_ACTIONS = [
 ];
 const timestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
 const eventPrefix =
-  /^(?:introduction|resource|resource_group|billing|maintenance_schedule|supervision|wago|identity|settings|email_template|email_layout|mqtt_server|plugin)(?:\.[a-z_]+)*\.?$/;
+  /^(?:health|usage_session|retraining|introduction|resource|resource_group|billing|maintenance_schedule|supervision|wago|identity|settings|email_template|email_layout|mqtt_server|plugin)(?:\.[a-z_]+)*\.?$/;
 
 export class AuditQueryDto {
   @ApiPropertyOptional({ description: 'Event action prefix', pattern: eventPrefix.source, maxLength: 100 })
@@ -102,6 +102,7 @@ export class AuditQueryDto {
       'billing.transaction',
       'resource',
       'resource_group',
+      'resource.group',
       'wago.controller',
       'wago.commissioning',
       'identity.user',
@@ -121,6 +122,7 @@ export class AuditQueryDto {
     'billing.transaction',
     'resource',
     'resource_group',
+    'resource.group',
     'wago.controller',
     'wago.commissioning',
     'identity.user',

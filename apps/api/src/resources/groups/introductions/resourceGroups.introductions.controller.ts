@@ -39,7 +39,7 @@ export class ResourceGroupsIntroductionsController {
   @IsResourceGroupIntroducer()
   async getHistory(
     @Param('groupId', ParseIntPipe) groupId: number,
-    @Param('userId', ParseIntPipe) userId: number
+    @Param('userId', ParseIntPipe) userId: number,
   ): Promise<ResourceIntroductionHistoryItem[]> {
     return await this.resourceGroupsIntroductionsService.getHistoryByGroupIdAndUserId(groupId, userId);
   }
@@ -65,8 +65,11 @@ export class ResourceGroupsIntroductionsController {
   ): Promise<ResourceIntroductionHistoryItem> {
     return await this.resourceGroupsIntroductionsService.grant(groupId, userId, data, {
       performedByUserId: req.user.id,
-      authenticationMethod: req.user.authenticationMethod,
-      apiTokenId: req.user.apiTokenId,
+      auditOrigin: {
+        actorId: req.user.id,
+        authenticationMethod: req.user.authenticationMethod,
+        ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
+      },
     });
   }
 

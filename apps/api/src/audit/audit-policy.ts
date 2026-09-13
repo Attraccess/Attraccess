@@ -17,15 +17,25 @@ export interface ResourceAuditEvent {
     | 'maintenance_schedule.updated'
     | 'maintenance_schedule.deleted'
     | 'supervision.approved'
-    | 'supervision.rejected';
+    | 'supervision.rejected'
+    | 'health.transition'
+    | 'usage_session.started'
+    | 'usage_session.ended'
+    | 'retraining.required'
+    | 'retraining.cleared';
   operationId: string;
   actorId: number | null;
   authenticationMethod?: 'session' | 'api-token' | null;
   apiTokenId?: number | null;
-  subjectType?: 'resource' | 'resource_group';
   subjectId: number;
+  subjectType?: 'resource' | 'resource_group' | 'resource.group';
   details: Record<string, string | number>;
 }
+
+export type ResourceAuditOrigin =
+  | { actorId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number }
+  | { actorId: number; authenticationMethod: null }
+  | { actorId: null };
 
 const positive = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) > 0;
 const uuid = (v: unknown): v is string =>
@@ -178,6 +188,11 @@ export const RESOURCE_AUDIT_ACTIONS: ResourceAuditEvent['action'][] = [
   'maintenance_schedule.deleted',
   'supervision.approved',
   'supervision.rejected',
+  'health.transition',
+  'usage_session.started',
+  'usage_session.ended',
+  'retraining.required',
+  'retraining.cleared',
 ];
 const resourceActions = new Set<ResourceAuditEvent['action']>(RESOURCE_AUDIT_ACTIONS);
 const resourceDetailFields: Partial<Record<ResourceAuditEvent['action'], readonly string[]>> = {
@@ -218,6 +233,11 @@ const resourceDetailFields: Partial<Record<ResourceAuditEvent['action'], readonl
     'usageUnit',
     'usageThreshold',
   ],
+  'health.transition': ['healthSource', 'previousStatus', 'status'],
+  'usage_session.started': ['usageId', 'usageUserId', 'supervisorUserId'],
+  'usage_session.ended': ['usageId', 'usageUserId', 'supervisorUserId'],
+  'retraining.required': ['introductionId', 'usageUserId', 'retrainingReason'],
+  'retraining.cleared': ['introductionId', 'usageUserId'],
   'supervision.approved': ['requesterUserId', 'supervisorUserId', 'requestId'],
   'supervision.rejected': ['requesterUserId', 'supervisorUserId', 'requestId'],
 };
@@ -228,7 +248,10 @@ export function projectResourceAuditEvent(input: ResourceAuditEvent): ResourceAu
     !uuid(input.operationId) ||
     (input.actorId !== null && !positive(input.actorId)) ||
     !positive(input.subjectId) ||
-    (input.subjectType !== undefined && input.subjectType !== 'resource' && input.subjectType !== 'resource_group')
+    (input.subjectType !== undefined &&
+      input.subjectType !== 'resource' &&
+      input.subjectType !== 'resource_group' &&
+      input.subjectType !== 'resource.group')
   ) {
     return null;
   }
@@ -240,19 +263,20 @@ export function projectResourceAuditEvent(input: ResourceAuditEvent): ResourceAu
     if (!allowedFields.includes(key) || (typeof value !== 'string' && typeof value !== 'number')) return null;
   }
   if (Buffer.byteLength(JSON.stringify(details), 'utf8') > 4096) return null;
+  const authenticationMethod = input.authenticationMethod === undefined ? 'session' : input.authenticationMethod;
   if (input.actorId === null) {
-    if (input.authenticationMethod !== null || (input.apiTokenId !== undefined && input.apiTokenId !== null))
+    if ((input.authenticationMethod !== undefined && input.authenticationMethod !== null) || input.apiTokenId != null)
       return null;
   } else if (
-    (input.authenticationMethod !== undefined &&
-      input.authenticationMethod !== 'session' &&
-      input.authenticationMethod !== 'api-token') ||
-    (input.apiTokenId !== undefined && input.apiTokenId !== null && !positive(input.apiTokenId))
+    !positive(input.actorId) ||
+    (authenticationMethod !== 'session' && authenticationMethod !== 'api-token' && authenticationMethod !== null) ||
+    (authenticationMethod === 'api-token' ? !positive(input.apiTokenId) : input.apiTokenId != null)
   ) {
     return null;
   }
   return { ...input, details: details as Record<string, string | number> };
 }
+
 
 const identityPolicies = {
   login: ['reason'],

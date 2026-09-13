@@ -9,12 +9,14 @@ import {
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ResourceIntroducersModule } from '../introducers/resourceIntroducers.module';
 import { NotificationsModule } from '../../notifications/notifications.module';
+import { ResourceRetrainingModule } from '../retraining/resourceRetraining.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ResourceIntroduction, ResourceIntroducer, ResourceIntroductionHistoryItem]),
     ResourceIntroducersModule,
     NotificationsModule,
+    ResourceRetrainingModule,
   ],
   controllers: [ResourceIntroductionsController],
   providers: [ResourceIntroductionsService],

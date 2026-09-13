@@ -13,7 +13,9 @@ import { ResourceIntroductionChangedEvent } from './events/resource-introduction
 import { MetricsService } from '../../metrics/metrics.service';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { ResourceRetrainingService } from '../retraining/resourceRetraining.service';
 import { AuditService } from '../../audit/audit.service';
+import { ResourceAuditOrigin } from '../../audit/audit-policy';
 
 @Injectable()
 export class ResourceIntroductionsService {
@@ -28,6 +30,7 @@ export class ResourceIntroductionsService {
     private readonly eventEmitter: EventEmitter2,
     private readonly metricsService: MetricsService,
     private readonly notifications: NotificationDispatchService,
+    private readonly retraining: ResourceRetrainingService,
     private readonly audit: AuditService,
   ) {}
 
@@ -38,20 +41,24 @@ export class ResourceIntroductionsService {
       : `Your introduction for resource #${resourceId} was revoked.`;
     const url = `/resources/${resourceId}`;
 
-    void this.notifications.dispatch({
-      category: NotificationCategory.ACCESS_CHANGES,
-      recipients: [{ id: userId } as User],
-      title,
-      body,
-      url,
-      dedupeKey: `resource-introduction-${resourceId}-${userId}-${granted ? 'granted' : 'revoked'}`,
-      sendEmail: (recipient) =>
-        this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
-          accessChange: { title, body, url },
-        }),
-    }).catch((error) => {
-      this.logger.error(`Failed to notify user ${userId} about resource introduction changes: ${(error as Error).message}`);
-    });
+    void this.notifications
+      .dispatch({
+        category: NotificationCategory.ACCESS_CHANGES,
+        recipients: [{ id: userId } as User],
+        title,
+        body,
+        url,
+        dedupeKey: `resource-introduction-${resourceId}-${userId}-${granted ? 'granted' : 'revoked'}`,
+        sendEmail: (recipient) =>
+          this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
+            accessChange: { title, body, url },
+          }),
+      })
+      .catch((error) => {
+        this.logger.error(
+          `Failed to notify user ${userId} about resource introduction changes: ${(error as Error).message}`,
+        );
+      });
   }
 
   private async getIntroductionOfUser(
@@ -143,7 +150,13 @@ export class ResourceIntroductionsService {
     performedByUserId?: number | null,
     authenticationMethod?: 'session' | 'api-token' | null,
     apiTokenId?: number | null,
+    auditOrigin?: ResourceAuditOrigin,
   ) {
+    const origin = auditOrigin ?? {
+      actorId: performedByUserId ?? null,
+      authenticationMethod: performedByUserId == null ? null : authenticationMethod,
+      apiTokenId: apiTokenId ?? undefined,
+    };
     this.logger.debug(`Updating introduction status to ${nextStatus} for resourceId: ${resourceId}, userId: ${userId}`);
     let resourceIntroduction = await this.getIntroductionOfUser(resourceId, userId);
 
@@ -157,6 +170,9 @@ export class ResourceIntroductionsService {
     }
 
     const previousHistoryItem = await this.getLastHistoryItemOfIntroduction(resourceIntroduction.id);
+    const retrainingWasDue =
+      nextStatus === IntroductionHistoryAction.GRANT &&
+      (await this.retraining.getIntroductionRetrainingStatus(resourceIntroduction.id))?.isDue === true;
 
     this.logger.debug(`Creating new history item with action: ${nextStatus}`);
     const historyItem = this.resourceIntroductionHistoryItemRepository.create({
@@ -173,14 +189,31 @@ export class ResourceIntroductionsService {
       ResourceIntroductionChangedEvent.EVENT_NAME,
       new ResourceIntroductionChangedEvent(resourceIntroduction.id),
     );
-    if (previousHistoryItem?.action !== nextStatus && (previousHistoryItem || nextStatus === IntroductionHistoryAction.GRANT)) {
+    if (
+      previousHistoryItem?.action !== nextStatus &&
+      (previousHistoryItem || nextStatus === IntroductionHistoryAction.GRANT)
+    ) {
       this.notifyIntroductionChange(resourceId, userId, nextStatus === IntroductionHistoryAction.GRANT);
     }
+    const retrainingIsDue =
+      nextStatus === IntroductionHistoryAction.GRANT &&
+      (await this.retraining.getIntroductionRetrainingStatus(resourceIntroduction.id))?.isDue === true;
+    if (retrainingWasDue && !retrainingIsDue) {
+      await this.audit
+        .recordResource({
+          action: 'retraining.cleared',
+          ...origin,
+          subjectId: resourceId,
+          details: { introductionId: resourceIntroduction.id, usageUserId: userId },
+        })
+        .catch(() => undefined);
+    }
 
-    if (performedByUserId !== undefined) {
+    if (performedByUserId !== undefined || auditOrigin !== undefined) {
       await this.audit.recordResource({
         action: nextStatus === IntroductionHistoryAction.GRANT ? 'introduction.granted' : 'introduction.revoked',
-        actorId: performedByUserId, authenticationMethod, apiTokenId, subjectId: resourceId,
+        ...origin,
+        subjectId: resourceId,
         details: { recipientUserId: userId, ...(tutorUserId === undefined ? {} : { tutorUserId }) },
       });
     }
@@ -218,6 +251,7 @@ export class ResourceIntroductionsService {
     data?: UpdateResourceIntroductionDto,
     options?: {
       tutorUserId?: number;
+      auditOrigin?: ResourceAuditOrigin;
       performedByUserId?: number | null;
       authenticationMethod?: 'session' | 'api-token' | null;
       apiTokenId?: number | null;
@@ -233,6 +267,7 @@ export class ResourceIntroductionsService {
       options?.performedByUserId,
       options?.authenticationMethod,
       options?.apiTokenId,
+      options?.auditOrigin,
     );
     this.metricsService.resourceIntroductionsTotal.inc();
     this.logger.debug(`Grant operation completed for resourceId: ${resourceId}, userId: ${userId}`);

@@ -104,7 +104,10 @@ describe('SupervisionService', () => {
 
     const approved = await service.approve(requestId, supervisor, 'api-token', 9);
 
-    expect(resourceUsageService.startSession).toHaveBeenCalledWith(5, requester, dto, { supervisorUserId: 2 });
+    expect(resourceUsageService.startSession).toHaveBeenCalledWith(5, requester, dto, {
+      supervisorUserId: 2,
+      auditOrigin: { actorId: 2, authenticationMethod: 'api-token', apiTokenId: 9 },
+    });
     expect(approved).toBe(startedSession);
     await expect(pending).resolves.toBe(startedSession);
     expect(service.listPendingForSupervisor(2)).toHaveLength(0);
@@ -223,7 +226,10 @@ describe('SupervisionService', () => {
 
       const session = await service.approve(requestId, otherSupervisor);
 
-      expect(resourceUsageService.startSession).toHaveBeenCalledWith(5, requester, {}, { supervisorUserId: 3 });
+      expect(resourceUsageService.startSession).toHaveBeenCalledWith(5, requester, {}, {
+        supervisorUserId: 3,
+        auditOrigin: { actorId: 3, authenticationMethod: 'session' },
+      });
       expect(session).toBe(startedSession);
       expect(onResolved).toHaveBeenCalledWith(startedSession, { id: 3, username: 'other' });
       const resolvedTargets = live.emitToSupervisor.mock.calls
@@ -249,7 +255,10 @@ describe('SupervisionService', () => {
       const session = await service.approve(requestId, newlyGrantedIntroducer);
 
       expect(resourceUsageService.validateSupervisedStart).toHaveBeenCalledWith(5, requester, 9);
-      expect(resourceUsageService.startSession).toHaveBeenCalledWith(5, requester, {}, { supervisorUserId: 9 });
+      expect(resourceUsageService.startSession).toHaveBeenCalledWith(5, requester, {}, {
+        supervisorUserId: 9,
+        auditOrigin: { actorId: 9, authenticationMethod: 'session' },
+      });
       expect(session).toBe(startedSession);
       expect(onResolved).toHaveBeenCalledWith(startedSession, { id: 9, username: 'new-introducer' });
     });
@@ -337,6 +346,7 @@ describe('SupervisionService', () => {
       await expect(pending).resolves.toBe(startedSession);
       expect(resourceUsageService.startSession).toHaveBeenCalledWith(5, requester, readerDto, {
         supervisorUserId: 2,
+        auditOrigin: { actorId: 2, authenticationMethod: 'session' },
       });
       // The reader is told through the callbacks the armer handed back.
       expect(readerCallbacks.onResolved).toHaveBeenCalledWith(startedSession, { id: 2, username: 'supervisor' });
