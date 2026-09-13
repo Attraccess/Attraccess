@@ -13,6 +13,9 @@ import { ResourceIntroductionChangedEvent } from './events/resource-introduction
 import { MetricsService } from '../../metrics/metrics.service';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { ResourceRetrainingService } from '../retraining/resourceRetraining.service';
+import { AuditService } from '../../audit/audit.service';
+import { ResourceAuditOrigin } from '../../audit/audit-policy';
 
 @Injectable()
 export class ResourceIntroductionsService {
@@ -27,6 +30,8 @@ export class ResourceIntroductionsService {
     private readonly eventEmitter: EventEmitter2,
     private readonly metricsService: MetricsService,
     private readonly notifications: NotificationDispatchService,
+    private readonly retraining: ResourceRetrainingService,
+    private readonly audit: AuditService,
   ) {}
 
   private notifyIntroductionChange(resourceId: number, userId: number, granted: boolean): void {
@@ -139,6 +144,7 @@ export class ResourceIntroductionsService {
     data?: UpdateResourceIntroductionDto,
     tutorUserId?: number,
     performedByUserId = userId,
+    auditOrigin: ResourceAuditOrigin = { actorId: performedByUserId, authenticationMethod: 'session' },
   ) {
     this.logger.debug(`Updating introduction status to ${nextStatus} for resourceId: ${resourceId}, userId: ${userId}`);
     let resourceIntroduction = await this.getIntroductionOfUser(resourceId, userId);
@@ -153,6 +159,9 @@ export class ResourceIntroductionsService {
     }
 
     const previousHistoryItem = await this.getLastHistoryItemOfIntroduction(resourceIntroduction.id);
+    const retrainingWasDue =
+      nextStatus === IntroductionHistoryAction.GRANT &&
+      (await this.retraining.getIntroductionRetrainingStatus(resourceIntroduction.id))?.isDue === true;
 
     this.logger.debug(`Creating new history item with action: ${nextStatus}`);
     const historyItem = this.resourceIntroductionHistoryItemRepository.create({
@@ -171,6 +180,17 @@ export class ResourceIntroductionsService {
     );
     if (previousHistoryItem?.action !== nextStatus && (previousHistoryItem || nextStatus === IntroductionHistoryAction.GRANT)) {
       this.notifyIntroductionChange(resourceId, userId, nextStatus === IntroductionHistoryAction.GRANT);
+    }
+    const retrainingIsDue =
+      nextStatus === IntroductionHistoryAction.GRANT &&
+      (await this.retraining.getIntroductionRetrainingStatus(resourceIntroduction.id))?.isDue === true;
+    if (retrainingWasDue && !retrainingIsDue) {
+      await this.audit.recordResource({
+        action: 'retraining.cleared',
+        ...auditOrigin,
+        subjectId: resourceId,
+        details: { introductionId: resourceIntroduction.id, usageUserId: userId },
+      }).catch(() => undefined);
     }
 
     return savedHistoryItem;
@@ -205,7 +225,7 @@ export class ResourceIntroductionsService {
     resourceId: number,
     userId: number,
     data?: UpdateResourceIntroductionDto,
-    options?: { tutorUserId?: number; performedByUserId?: number },
+    options?: { tutorUserId?: number; performedByUserId?: number; auditOrigin?: ResourceAuditOrigin },
   ): Promise<ResourceIntroductionHistoryItem> {
     this.logger.debug(`Granting introduction for resourceId: ${resourceId}, userId: ${userId}`);
     const result = await this.updateIntroductionStatus(
@@ -215,6 +235,7 @@ export class ResourceIntroductionsService {
       data,
       options?.tutorUserId,
       options?.performedByUserId,
+      options?.auditOrigin,
     );
     this.metricsService.resourceIntroductionsTotal.inc();
     this.logger.debug(`Grant operation completed for resourceId: ${resourceId}, userId: ${userId}`);

@@ -73,7 +73,10 @@ export class SupervisedUsageAutoPromotionListener {
       `Auto-promoting user ${userId} to a resource introduction for resource ${resourceId} ` +
         `after ${count} supervised session(s) (threshold ${threshold})`,
     );
-    await this.resourceIntroductionsService.grant(resourceId, userId, undefined, { tutorUserId: supervisorUserId });
+    await this.resourceIntroductionsService.grant(resourceId, userId, undefined, {
+      tutorUserId: supervisorUserId,
+      auditOrigin: { actorId: null },
+    });
   }
 
   private async promoteForGroup(
@@ -110,7 +113,10 @@ export class SupervisedUsageAutoPromotionListener {
       `Auto-promoting user ${userId} to a group introduction for group ${groupId} ` +
         `after ${count} supervised session(s) across ${resourceIds.length} resource(s) (threshold ${threshold})`,
     );
-    await this.resourceGroupsIntroductionsService.grant(groupId, userId, undefined, { tutorUserId: supervisorUserId });
+    await this.resourceGroupsIntroductionsService.grant(groupId, userId, undefined, {
+      tutorUserId: supervisorUserId,
+      auditOrigin: { actorId: null },
+    });
   }
 
   // Counts the user's completed supervised sessions across the given resources.
