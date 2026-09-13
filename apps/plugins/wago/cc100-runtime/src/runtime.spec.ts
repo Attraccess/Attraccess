@@ -1996,6 +1996,11 @@ describe('WagoRuntime', () => {
       transport,
       device: delayedReadDevice,
     });
+    const outputs = runtime['outputs'];
+    const verification = jest.spyOn(
+      outputs as unknown as { verifyFeedback: (typeof outputs)['verifyFeedback'] },
+      'verifyFeedback',
+    );
     await runtime.start();
     await transport.send(desired, {
       protocolVersion: 1,
@@ -2008,7 +2013,12 @@ describe('WagoRuntime', () => {
     delayNextRead = true;
     await readStarted;
     await transport.send(commands, validCommand({ id: 'command-2', channelId: 'load', action: 'set', value: false }));
+    expect(verification).toHaveBeenCalledTimes(1);
+    const pendingVerification = verification.mock.results[0].value;
     resolveRead?.(false);
+    // Includes any fault publication and its asynchronous state reservation.
+    await pendingVerification;
+    verification.mockRestore();
 
     expect(transport.published).not.toContainEqual(
       expect.objectContaining({
@@ -2064,6 +2074,11 @@ describe('WagoRuntime', () => {
       transport,
       device: delayedReadDevice,
     });
+    const outputs = runtime['outputs'];
+    const verification = jest.spyOn(
+      outputs as unknown as { verifyFeedback: (typeof outputs)['verifyFeedback'] },
+      'verifyFeedback',
+    );
     await runtime.start();
     await transport.send(desired, {
       protocolVersion: 1,
@@ -2081,7 +2096,12 @@ describe('WagoRuntime', () => {
       contentHash: hash(monitored),
       snapshot: monitored,
     });
+    expect(verification).toHaveBeenCalledTimes(1);
+    const pendingVerification = verification.mock.results[0].value;
     resolveRead?.(false);
+    // Includes any fault publication and its asynchronous state reservation.
+    await pendingVerification;
+    verification.mockRestore();
 
     expect(transport.published).not.toContainEqual(
       expect.objectContaining({

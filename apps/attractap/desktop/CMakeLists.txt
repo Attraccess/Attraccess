@@ -7,6 +7,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 get_filename_component(FIRMWARE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../firmware" ABSOLUTE)
 
+include("${FIRMWARE_DIR}/tools/latin1_fonts.cmake")
+attractap_latin1_fonts(ATTRACTAP_LATIN1_FONTS)
+
 set(LVGL_SOURCE_DIR "" CACHE PATH "Existing LVGL 9.3.0 source tree (never modified)")
 set(LV_BUILD_CONF_PATH "${CMAKE_CURRENT_SOURCE_DIR}/lv_conf.h" CACHE PATH "" FORCE)
 set(CONFIG_LV_BUILD_DEMOS OFF CACHE BOOL "" FORCE)
@@ -71,11 +74,7 @@ set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/logos.S" PROPERTIES
 
 add_library(attractap-production-host
     ${ATTRACTAP_FIRMWARE_SOURCES}
-    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_10.c"
-    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_14.c"
-    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_18.c"
-    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_24.c"
-    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_36.c"
+    ${ATTRACTAP_LATIN1_FONTS}
     src/host_beeper.cpp
     src/host_utils.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/logos.S")

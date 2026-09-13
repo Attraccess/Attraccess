@@ -62,7 +62,7 @@ void DemoSettingsScreen::init()
     lv_label_set_text(addLbl, "Karte hinzufügen");
     lv_obj_set_align(addLbl, LV_ALIGN_CENTER);
     lv_obj_set_style_text_color(addLbl, DisplayTheme::onPrimary(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(addLbl, &attractap_font_montserrat_latin1_14, LV_PART_MAIN);
+    lv_obj_set_style_text_font(addLbl, &attractap_font_montserrat_latin1_16, LV_PART_MAIN);
 
 #ifdef HAS_POWER_BUTTON
     // Power-off button (V4 hardware with SYS_EN latch only).
@@ -297,7 +297,7 @@ void DemoSettingsScreen::showRolePicker(const std::string &uid)
     lv_obj_t *titleLbl = lv_label_create(_rolePicker);
     lv_label_set_text(titleLbl, titleBuf);
     lv_obj_set_style_text_color(titleLbl, DisplayTheme::text(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(titleLbl, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
+    lv_obj_set_style_text_font(titleLbl, &attractap_font_montserrat_latin1_20, LV_PART_MAIN);
     lv_label_set_long_mode(titleLbl, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(titleLbl, lv_pct(100));
 

@@ -6,6 +6,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 get_filename_component(FIRMWARE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 
+include("${FIRMWARE_DIR}/tools/latin1_fonts.cmake")
+attractap_latin1_fonts(ATTRACTAP_LATIN1_FONTS)
+
 set(LVGL_SOURCE_DIR "" CACHE PATH "Existing LVGL 9.3.0 source tree (never modified)")
 set(LV_BUILD_CONF_PATH "${CMAKE_CURRENT_SOURCE_DIR}/lv_conf.h" CACHE PATH "" FORCE)
 set(CONFIG_LV_BUILD_DEMOS OFF CACHE BOOL "" FORCE)
@@ -49,11 +52,7 @@ add_executable(display-theme-host
     "${FIRMWARE_DIR}/src/display/screens/enrollment/enrollmentScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/reset/resetScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/supervision/supervisionScreen.cpp"
-    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_10.c"
-    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_14.c"
-    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_18.c"
-    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_24.c"
-    "${FIRMWARE_DIR}/src/display/fonts/attractap_font_montserrat_latin1_36.c"
+    ${ATTRACTAP_LATIN1_FONTS}
     "${FIRMWARE_DIR}/src/display/shared/pinInput/pinInputPage.cpp")
 target_include_directories(display-theme-host PRIVATE shims "${FIRMWARE_DIR}/src")
 target_compile_definitions(display-theme-host PRIVATE

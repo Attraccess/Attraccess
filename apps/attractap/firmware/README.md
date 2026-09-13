@@ -105,16 +105,26 @@ hardware before deployment.
 
 ## Latin-1 Font Smoke Test
 
-The generated Montserrat assets in `src/display/fonts/` cover ASCII and Latin-1
-for dynamic-text sizes 10, 14, 18, 24, and 36. Regenerate them after changing
-the font source or coverage with `tools/generate_latin1_fonts.sh`.
+CMake generates uncompressed Montserrat fonts in each build directory for sizes
+10, 14, 16, 18, 20, 24, 26, 28, 32, and 36. The original configured sizes remain
+unchanged. Firmware, desktop, and host rendering tests share
+`tools/latin1_fonts.cmake`. Builds require Node.js/npm (`npx`) and curl; the first
+build downloads the pinned LVGL 9.3.0 font source (SHA-256 verified) and
+`lv_font_conv@1.5.3`. Subsequent builds reuse their generated files. Do not commit
+the generated C files. For standalone generation, run
+`tools/generate_latin1_fonts.sh` (outputs to the ignored `.cache/latin1-fonts/`).
 
-On a touch device, verify `ÄÖÜ äöü ß | München, Größe, für` in a resource name
-and description, a form label and description, a select option, and the
-resource details screen. Also verify a signed-in username at 10px and an
-enrollment, reset, or supervision username at 36px. Confirm every character
-renders without a missing-glyph box and that the existing text hierarchy remains
-unchanged.
+On a touch device, verify `ÄÖÜ äöü ß | München, Größe, für` in resource names and
+descriptions, form labels/descriptions/placeholders, select options, text editors
+and value previews, project names, popup messages, introducer lists, health
+reasons, and flow-button labels. Also verify a signed-in username at 10px and an
+enrollment, reset, or supervision username at 36px. Check card statuses at 32px,
+supervision statuses and reset titles at 28px, empty-resource messages at 26px,
+and the PIN title at 32px. Compare ASCII text, hierarchy, wrapping, and clipping
+with the previous firmware. Confirm no missing-glyph boxes, preserved multiline
+layout, and that selecting an option such as `Size™` still submits its original
+value while displaying `SizeTM`. Host rendering checks do not replace this
+on-device smoke test.
 
 ## Serial provisioning console
 

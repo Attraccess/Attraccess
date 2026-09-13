@@ -214,6 +214,37 @@ void expectFlat(lv_obj_t *obj, int32_t radius)
     expect(lv_obj_get_style_radius(obj, LV_PART_MAIN) == radius, "Theme corner radius");
 }
 
+void testLatin1Fonts(Renderer &renderer)
+{
+    const std::array<const lv_font_t *, 10> fonts = {
+        &attractap_font_montserrat_latin1_10, &attractap_font_montserrat_latin1_14,
+        &attractap_font_montserrat_latin1_16, &attractap_font_montserrat_latin1_18,
+        &attractap_font_montserrat_latin1_20, &attractap_font_montserrat_latin1_24,
+        &attractap_font_montserrat_latin1_26, &attractap_font_montserrat_latin1_28,
+        &attractap_font_montserrat_latin1_32, &attractap_font_montserrat_latin1_36};
+    ScreenGuard screen(lv_obj_create(nullptr));
+    auto *sample = label(screen.root, "ÄÖÜ äöü ß | München, Größe, für\nASCII: Abc 0123");
+    lv_obj_set_width(sample, 460);
+    lv_obj_center(sample);
+    for (size_t i = 0; i < fonts.size(); ++i) {
+        for (uint32_t codepoint = 0x21; codepoint <= 0xFF; ++codepoint) {
+            if (codepoint >= 0x7F && codepoint <= 0xA0) continue;
+            lv_font_glyph_dsc_t glyph{};
+            expect(lv_font_get_glyph_dsc(fonts[i], &glyph, codepoint, 0) && !glyph.is_placeholder,
+                   "Every printable ASCII and Latin-1 glyph exists at every configured size");
+            if (glyph.box_w == 0 || glyph.box_h == 0) continue;
+            auto *buffer = lv_draw_buf_create(glyph.box_w, glyph.box_h, LV_COLOR_FORMAT_A8, LV_STRIDE_AUTO);
+            expect(buffer != nullptr, "Allocate glyph draw buffer");
+            const bool rendered = lv_font_get_glyph_bitmap(&glyph, buffer) != nullptr;
+            lv_font_glyph_release_draw_data(&glyph);
+            lv_draw_buf_destroy(buffer);
+            expect(rendered, "LVGL decodes the actual glyph bitmap with production compression settings");
+        }
+        lv_obj_set_style_text_font(sample, fonts[i], LV_PART_MAIN);
+        renderer.capture("latin1-font-" + std::to_string(i));
+    }
+}
+
 void testSurfaces(Renderer &renderer)
 {
     expectColor(DisplayTheme::primary(), lv_color_hex(0x82C4CE), "Frontend dark primary token");
@@ -505,7 +536,7 @@ void testCard(Renderer &renderer, const std::string &name, const char *writing, 
         if (states[i] == CardScreen::STATUS_ERROR) card.setStatusMessage(Fixtures::errorMessage);
         auto *status = requireObject(screen.root, &lv_label_class, text[i]);
         expectColor(lv_obj_get_style_text_color(status, LV_PART_MAIN), colors[i], name + ": status color");
-        expect(lv_obj_get_style_text_font(status, LV_PART_MAIN) == &attractap_font_montserrat_latin1_24,
+        expect(lv_obj_get_style_text_font(status, LV_PART_MAIN) == &attractap_font_montserrat_latin1_32,
                name + ": server-derived status uses a Latin-1 font");
         expect(lv_obj_has_flag(cancel, LV_OBJ_FLAG_HIDDEN) == (states[i] == CardScreen::STATUS_SUCCESS), name + ": cancel visibility");
         renderer.capture(name + "-" + suffix[i]);
@@ -543,7 +574,7 @@ void testSupervision(Renderer &renderer)
         supervision.render(view);
         auto *status = requireObject(screen.root, &lv_label_class, text[i]);
         expectColor(lv_obj_get_style_text_color(status, LV_PART_MAIN), colors[i], "Supervision status color");
-        expect(lv_obj_get_style_text_font(status, LV_PART_MAIN) == &attractap_font_montserrat_latin1_24,
+        expect(lv_obj_get_style_text_font(status, LV_PART_MAIN) == &attractap_font_montserrat_latin1_28,
                "Supervision server-derived status uses a Latin-1 font");
         expect(lv_obj_has_flag(cancel, LV_OBJ_FLAG_HIDDEN) == (view.status == SupervisionScreen::STATUS_SUCCESS), "Supervision cancel visibility");
         renderer.capture(std::string("supervision-") + suffix[i]);
@@ -567,6 +598,8 @@ void testPin(Renderer &renderer)
     auto *field = requireObject(screen.root, &lv_textarea_class);
     auto *keyboard = requireObject(screen.root, &lv_keyboard_class);
     auto *title = requireObject(screen.root, &lv_label_class, "Geräte-PIN");
+    expect(lv_obj_get_style_text_font(title, LV_PART_MAIN) == &attractap_font_montserrat_latin1_32,
+           "Device PIN title preserves its original 32px size");
     lv_font_glyph_dsc_t titleGlyph{};
     expect(lv_font_get_glyph_dsc(lv_obj_get_style_text_font(title, LV_PART_MAIN), &titleGlyph, 0xE4, 0)
                && !titleGlyph.is_placeholder,
@@ -724,6 +757,7 @@ int main(int argc, char **argv)
                 std::cerr << "FAIL " << name << ": " << error.what() << '\n';
             }
         };
+        test("render/latin1-all-sizes", [&] { testLatin1Fonts(renderer); });
         test("theme/surfaces-and-font", [&] { testSurfaces(renderer); });
         test("theme/automatic-button-states", [&] { testButtons(renderer, false); });
         test("theme/helper-button-states", [&] { testButtons(renderer, true); });

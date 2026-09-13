@@ -28,7 +28,7 @@ void NoResourcesScreen::init()
 
    State::ApiState apiState = State::getApiState();
    lv_label_set_text(noResourcesMessage, "Keine Ressourcen mit diesem Lesegerät verknüpft, bitte konfigurieren Sie das Lesegerät in der Attraccess Administration");
-   lv_obj_set_style_text_font(noResourcesMessage, &attractap_font_montserrat_latin1_24, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(noResourcesMessage, &attractap_font_montserrat_latin1_26, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_color(noResourcesMessage, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 
