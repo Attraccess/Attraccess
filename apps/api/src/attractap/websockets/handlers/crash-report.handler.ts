@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AttractapService } from '../../attractap.service';
 import { MetricsService } from '../../../metrics/metrics.service';
+import { AuditService } from '../../../audit/audit.service';
 import {
   AuthenticatedWebSocket,
   AttractapEvent,
@@ -18,6 +19,9 @@ export class AttractapCrashReportHandler {
   @Inject(MetricsService)
   private metricsService: MetricsService;
 
+  @Inject(AuditService)
+  private audit: AuditService;
+
   public async handleCrashReport(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     const payload = data.payload as ReaderCrashReportPayload;
 
@@ -31,6 +35,13 @@ export class AttractapCrashReportHandler {
 
     try {
       const report = await this.attractapService.createCrashReport(socket.readerId, payload);
+      void this.audit.recordAttractap({
+        action: 'reader.crash_reported', actorId: null, authenticationMethod: 'device', subjectId: socket.readerId,
+        details: {
+          source: 'reader-websocket', resetReason: this.normalizeResetReason(report.resetReason),
+          hasCoredump: report.coredumpSize ? 1 : 0,
+        },
+      });
       this.logger.warn(
         `Stored crash report ${report.id} for reader ${socket.readerId}: reason=${report.resetReason} ` +
           `rebootReason=${report.rebootReason ?? 'n/a'} ` +
