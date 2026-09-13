@@ -188,7 +188,7 @@ export class PasswordPolicyService implements OnModuleInit {
         }
         return after;
       });
-      if (auditInput) void this.persistAudit(auditInput);
+      if (auditInput) await this.persistAudit(auditInput);
       return after;
     } catch (err) {
       this.rethrowConcurrencyOrSqliteConflict(err);
@@ -252,7 +252,7 @@ export class PasswordPolicyService implements OnModuleInit {
         }
         return saved;
       });
-      if (auditInput) void this.persistAudit(auditInput);
+      if (auditInput) await this.persistAudit(auditInput);
       return saved;
     } catch (err) {
       this.rethrowConcurrencyOrSqliteConflict(err);
@@ -281,7 +281,7 @@ export class PasswordPolicyService implements OnModuleInit {
           };
         }
       });
-      if (auditInput) void this.persistAudit(auditInput);
+      if (auditInput) await this.persistAudit(auditInput);
     } catch (err) {
       this.rethrowConcurrencyOrSqliteConflict(err);
     }
@@ -403,14 +403,14 @@ export class PasswordPolicyService implements OnModuleInit {
     }
   }
 
-  private persistAudit(input: {
+  private async persistAudit(input: {
     event: 'global_policy_updated' | 'override_upserted' | 'override_deleted';
     audit: AuditContext;
     role: PasswordPolicyRole | null;
     before: object | null;
     after: object | null;
     changedFields: string[];
-  }): void {
+  }): Promise<void> {
     const action =
       input.event === 'global_policy_updated'
         ? 'password_policy_updated'
@@ -422,7 +422,7 @@ export class PasswordPolicyService implements OnModuleInit {
     if (input.before) details.before = JSON.stringify(input.before);
     if (input.after) details.after = JSON.stringify(input.after);
     if (input.changedFields.length === 1) details.field = input.changedFields[0];
-    void this.identityAudit?.record({
+    await this.identityAudit?.record({
       action,
       operationId: randomUUID(),
       outcome: 'succeeded',

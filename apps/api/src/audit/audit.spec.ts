@@ -822,9 +822,9 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
   try {
     await source.initialize();
     await source.runMigrations();
-    await source.query(`INSERT INTO "password_policy_audit" ("event", "actorId", "ip", "userAgent", "before", "after")
-      VALUES ('global_policy_updated', 1, '127.0.0.1', 'migration-test', '{"minLength":12}', '{"minLength":16}')`);
-    await source.query(`INSERT INTO "setting" ("parent", "key", "value") VALUES ('audit', 'domains', '["wago"]')`);
+    await source.query(`INSERT INTO "password_policy_audit" ("event", "actorId", "actorUsername", "ip", "userAgent", "requestId", "before", "after", "changedFields")
+      VALUES ('global_policy_updated', 1, 'migration-user', '127.0.0.1', 'migration-test', 'migration-request', '{"minLength":12}', '{"minLength":16}', '["minLength"]')`);
+    await source.query(`INSERT INTO "setting" ("parent", "key", "value") VALUES ('audit', 'domains', '["billing","resource","wago"]')`);
     await source.destroy();
     source = new DataSource({
       type: 'sqlite',
@@ -842,7 +842,7 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
     expect(source.hasMetadata(AuditLog)).toBeTruthy();
     expect(await source.query('PRAGMA foreign_key_list(audit_log)')).toEqual([]);
     expect(await source.query(`SELECT "value" FROM "setting" WHERE "parent" = 'audit' AND "key" = 'domains'`)).toEqual([
-      { value: '["wago","identity"]' },
+      { value: '["billing","resource","wago","identity"]' },
     ]);
     expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(
       1,
@@ -852,11 +852,20 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
     await source.undoLastMigration();
     expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toHaveLength(1);
     expect(await source.query('SELECT * FROM password_policy_audit')).toHaveLength(2);
+    expect(await source.query(`SELECT "actorUsername", "requestId", "before", "after", "changedFields" FROM password_policy_audit WHERE "requestId" = 'migration-request'`)).toEqual([
+      {
+        actorUsername: 'migration-user',
+        requestId: 'migration-request',
+        before: '{"minLength":12}',
+        after: '{"minLength":16}',
+        changedFields: '["minLength"]',
+      },
+    ]);
     expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(
       0,
     );
     expect(await source.query(`SELECT "value" FROM "setting" WHERE "parent" = 'audit' AND "key" = 'domains'`)).toEqual([
-      { value: '["wago"]' },
+      { value: '["billing","resource","wago"]' },
     ]);
     expect((await source.runMigrations()).map((migration) => migration.name)).toEqual([
       'RetirePasswordPolicyAudit1783900000000',
