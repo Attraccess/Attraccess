@@ -141,7 +141,7 @@ export class ProjectsService {
     const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
     const archivedAt = new Date();
     const result = await this.projectRepository.update({ id, archivedAt: IsNull() }, { archivedAt });
-    if (result.affected !== 1) return project;
+    if (result.affected !== 1) return await this.projectRepository.findOneByOrFail({ id });
     project.archivedAt = archivedAt;
     await this.audit.recordProject({
       action: 'project.archived', actorId: ownerUserId, authenticationMethod, apiTokenId,
@@ -159,7 +159,7 @@ export class ProjectsService {
   ): Promise<Project> {
     const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
     const result = await this.projectRepository.update({ id, archivedAt: Not(IsNull()) }, { archivedAt: null });
-    if (result.affected !== 1) return project;
+    if (result.affected !== 1) return await this.projectRepository.findOneByOrFail({ id });
     project.archivedAt = null;
     await this.audit.recordProject({
       action: 'project.unarchived', actorId: ownerUserId, authenticationMethod, apiTokenId,
@@ -349,7 +349,7 @@ export class ProjectsService {
       apiTokenId,
       subjectType: 'project.invitation',
       subjectId: invitation.id,
-      details: this.invitationDetails(invitation),
+      details: { projectId, invitationId: invitation.id, userId: invitedUserId, role },
     });
     const hydratedInvitation = await this.getInvitationWithRelations(invitation.id);
     await this.dispatchProjectInvitationNotification(invitedUser, project, hydratedInvitation);
