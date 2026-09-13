@@ -5,17 +5,19 @@ export class AuditEntryDto {
   @ApiProperty() id!: number;
   @ApiProperty({ type: String, format: 'date-time' }) at!: Date;
   @ApiProperty() domain!: string;
-  @ApiProperty() pluginId!: string;
+  @ApiProperty({ type: String, nullable: true }) pluginId!: string | null;
   @ApiProperty() action!: string;
   @ApiProperty() operationId!: string;
   @ApiProperty({ type: Number, nullable: true }) actorId!: number | null;
   @ApiPropertyOptional({ type: String, nullable: true }) actorUsername?: string | null;
+  @ApiPropertyOptional({ enum: ['recorded', 'current'] }) actorUsernameSource?: 'recorded' | 'current';
   @ApiProperty({ type: String, nullable: true }) authenticationMethod!: string | null;
   @ApiProperty({ type: Number, nullable: true }) apiTokenId!: number | null;
   @ApiProperty({ enum: ['attempted', 'succeeded', 'failed'] }) outcome!: 'attempted' | 'succeeded' | 'failed';
   @ApiProperty() subjectType!: string;
   @ApiProperty({ type: Number, nullable: true }) subjectId!: number | null;
   @ApiPropertyOptional({ type: String, nullable: true }) subjectLabel?: string | null;
+  @ApiPropertyOptional({ enum: ['recorded', 'current'] }) subjectLabelSource?: 'recorded' | 'current';
   @ApiProperty({
     type: 'object',
     additionalProperties: { oneOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, { type: 'null' }] },

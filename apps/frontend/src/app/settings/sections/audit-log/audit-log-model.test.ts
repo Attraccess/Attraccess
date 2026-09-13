@@ -53,6 +53,18 @@ describe('audit export and filtering', () => {
     expect(filterRequest({ ...emptyFilters, actorId: '9007199254740992' })).toEqual({ error: 'invalidId' });
     expect(filterRequest({ ...emptyFilters, from: 'invalid' })).toEqual({ error: 'invalidDate' });
   });
+  it('rejects unsupported free-text filters before they can be applied', () => {
+    expect(filterRequest({ ...emptyFilters, eventPrefix: 'resource..updated' })).toEqual({
+      error: 'invalidEventPrefix',
+    });
+    expect(filterRequest({ ...emptyFilters, subjectType: 'transaction' })).toEqual({ error: 'invalidSubjectType' });
+    expect(filterRequest({ ...emptyFilters, eventPrefix: 'billing.transaction.' })).toEqual({
+      request: { eventPrefix: 'billing.transaction.' },
+    });
+    expect(filterRequest({ ...emptyFilters, subjectType: 'billing.transaction' })).toEqual({
+      request: { subjectType: 'billing.transaction' },
+    });
+  });
   it('renders old malformed snapshots without dropping their recorded value', () => {
     expect(changes({ ...entry, details: { before: '{"truncated":', after: '{"valid":true}' } })).toEqual([
       { field: 'value', before: '{"truncated":', after: undefined },
@@ -71,5 +83,11 @@ describe('audit export and filtering', () => {
         },
       }),
     ).toEqual([{ field: 'logicalChannelCount', before: 2, after: 3 }]);
+  });
+  it('shows explicitly recorded changed fields when snapshots are absent or partial', () => {
+    expect(changes({ ...entry, details: { changedFields: '["name","enabled"]', 'after.enabled': 0 } })).toEqual([
+      { field: 'enabled', before: undefined, after: 0 },
+      { field: 'name', before: undefined, after: undefined },
+    ]);
   });
 });

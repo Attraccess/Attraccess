@@ -18,13 +18,14 @@ const ALL_AUDIT_ACTIONS = [
 ];
 
 const timestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
+const eventPrefix = /^(?:billing|maintenance_schedule|supervision|wago)(?:\.[a-z_]+)*\.?$/;
 
 export class AuditQueryDto {
-  @ApiPropertyOptional({ description: 'Event action prefix' })
+  @ApiPropertyOptional({ description: 'Event action prefix', pattern: eventPrefix.source, maxLength: 100 })
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  @Matches(/^(?:billing|maintenance_schedule|supervision|wago)(?:\.[a-z_]+)*\.?$/)
+  @Matches(eventPrefix)
   eventPrefix?: string;
 
   @ApiPropertyOptional({ description: 'Inclusive event timestamp lower bound' })

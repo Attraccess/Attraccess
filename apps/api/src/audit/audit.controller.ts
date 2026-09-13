@@ -1,11 +1,12 @@
 import { BadRequestException, Controller, Get, Query, ValidationPipe } from '@nestjs/common';
 import { Auth } from '@attraccess/plugins-backend-sdk';
-import { ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiExtraModels, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { AuditService } from './audit.service';
 import { AuditQueryDto } from './audit-query.dto';
 import { AuditPageDto } from './audit-response.dto';
 
 @ApiTags('Audit')
+@ApiExtraModels(AuditQueryDto)
 @Controller('admin/audit-log')
 export class AuditController {
   constructor(private readonly audit: AuditService) {}

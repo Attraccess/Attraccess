@@ -83,6 +83,35 @@ afterEach(() => {
 });
 
 describe('audit admin workflows', () => {
+  it('explains missing snapshots and preserves changed-field metadata', async () => {
+    list.mockResolvedValue({ items: [{ ...entry, details: { changedFields: '["password"]' } }], nextCursor: null });
+    mount();
+    await userEvent.click(await screen.findByRole('button', { name: 'View event #52' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Password')).toBeInTheDocument();
+    expect(within(dialog).getAllByText('Not recorded')).toHaveLength(2);
+    expect(within(dialog).getByText('["password"]')).toBeInTheDocument();
+  });
+  it('keeps malformed change metadata visible and identifies current names in the event details', async () => {
+    list.mockResolvedValue({
+      items: [
+        {
+          ...entry,
+          actorUsernameSource: 'current',
+          subjectLabelSource: 'current',
+          details: { changedFields: '["truncated' },
+        },
+      ],
+      nextCursor: null,
+    });
+    mount();
+    await userEvent.click(await screen.findByRole('button', { name: 'View event #52' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('["truncated')).toBeInTheDocument();
+    expect(within(dialog).getAllByText('Current name; may have changed since this event')).toHaveLength(2);
+    expect(within(dialog).getByText('#7')).toBeInTheDocument();
+    expect(within(dialog).getByText('resource #2')).toBeInTheDocument();
+  });
   it('opens a readable change comparison and exposes only changed fields', async () => {
     mount();
     await userEvent.click(await screen.findByRole('button', { name: 'View event #52' }));

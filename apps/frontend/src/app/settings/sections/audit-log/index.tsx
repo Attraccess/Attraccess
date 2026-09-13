@@ -111,18 +111,23 @@ function AuditSelect({
 }
 
 function actor(entry: AuditEntryDto, t: Translate) {
-  return entry.actorUsername || (entry.actorId === null ? t('unknownActor') : `#${entry.actorId}`);
+  return entry.actorUsername
+    ? `${entry.actorUsername}${entry.actorUsernameSource === 'current' ? ` (${t('currentNameShort')})` : ''}`
+    : entry.actorId === null
+      ? t('unknownActor')
+      : `#${entry.actorId}`;
 }
 function target(entry: AuditEntryDto, t: Translate) {
   return (
-    entry.subjectLabel ||
+    (entry.subjectLabel &&
+      `${entry.subjectLabel}${entry.subjectLabelSource === 'current' ? ` (${t('currentNameShort')})` : ''}`) ||
     (entry.subjectId === null ? t('noTarget') : `${humanize(entry.subjectType)} #${entry.subjectId}`)
   );
 }
 
 function EntryDetails({ entry, t }: { entry: AuditEntryDto; t: Translate }) {
   const diff = changes(entry);
-  const metadata = Object.entries(entry.details).filter(([key]) => !['before', 'after', 'changedFields'].includes(key));
+  const metadata = Object.entries(entry.details).filter(([key]) => !['before', 'after'].includes(key));
   return (
     <div className="space-y-6">
       <Chip
@@ -135,9 +140,20 @@ function EntryDetails({ entry, t }: { entry: AuditEntryDto; t: Translate }) {
         <dt className="text-muted">{t('time')}</dt>
         <dd>{new Date(entry.at).toLocaleString()}</dd>
         <dt className="text-muted">{t('actor')}</dt>
-        <dd className="break-words">{actor(entry, t)}</dd>
+        <dd className="break-words">
+          {actor(entry, t)}
+          {entry.actorId !== null && <p className="text-xs text-muted">#{entry.actorId}</p>}
+          {entry.actorUsernameSource && <p className="text-xs text-muted">{t(`${entry.actorUsernameSource}Name`)}</p>}
+        </dd>
         <dt className="text-muted">{t('target')}</dt>
-        <dd className="break-words">{target(entry, t)}</dd>
+        <dd className="break-words">
+          {target(entry, t)}
+          <p className="text-xs text-muted">
+            {entry.subjectType}
+            {entry.subjectId === null ? '' : ` #${entry.subjectId}`}
+          </p>
+          {entry.subjectLabelSource && <p className="text-xs text-muted">{t(`${entry.subjectLabelSource}Name`)}</p>}
+        </dd>
         <dt className="text-muted">{t('source')}</dt>
         <dd>{entry.authenticationMethod ?? entry.pluginId}</dd>
       </dl>
@@ -152,11 +168,15 @@ function EntryDetails({ entry, t }: { entry: AuditEntryDto; t: Translate }) {
               <Card.Content className="grid grid-cols-2 gap-4 text-sm">
                 <div className="min-w-0">
                   <p className="mb-1 text-xs text-muted">{t('before')}</p>
-                  <pre className="whitespace-pre-wrap break-words font-sans">{displayValue(change.before)}</pre>
+                  <pre className="whitespace-pre-wrap break-words font-sans">
+                    {change.before === undefined ? t('notRecorded') : displayValue(change.before)}
+                  </pre>
                 </div>
                 <div className="min-w-0">
                   <p className="mb-1 text-xs text-muted">{t('after')}</p>
-                  <pre className="whitespace-pre-wrap break-words font-sans">{displayValue(change.after)}</pre>
+                  <pre className="whitespace-pre-wrap break-words font-sans">
+                    {change.after === undefined ? t('notRecorded') : displayValue(change.after)}
+                  </pre>
                 </div>
               </Card.Content>
             </Card>

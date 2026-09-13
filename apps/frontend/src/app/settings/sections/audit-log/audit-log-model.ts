@@ -1,5 +1,6 @@
 import {
   $AuditSettingsDto,
+  $AuditQueryDto,
   AuditControllerListData,
   AuditEntryDto,
   AuditPageDto,
@@ -7,6 +8,8 @@ import {
 } from '@attraccess/react-query-client';
 
 export const auditDomains = $AuditSettingsDto.properties.domains.items.enum;
+const eventPrefix = new RegExp($AuditQueryDto.properties.eventPrefix.pattern);
+const subjectTypes: readonly string[] = $AuditQueryDto.properties.subjectType.enum;
 export type AuditDomain = AuditSettingsDto['domains'][number];
 export type AuditFilters = {
   domain: string;
@@ -46,7 +49,14 @@ export function filterRequest(
     request[key] = date.toISOString();
   }
   if (request.from && request.to && request.from > request.to) return { error: 'invalidRange' };
-  for (const key of ['domain', 'eventPrefix', 'subjectType', 'outcome'] as const) {
+  const prefix = filters.eventPrefix.trim();
+  if (prefix && (prefix.length > $AuditQueryDto.properties.eventPrefix.maxLength || !eventPrefix.test(prefix)))
+    return { error: 'invalidEventPrefix' };
+  if (prefix) request.eventPrefix = prefix;
+  const subjectType = filters.subjectType.trim();
+  if (subjectType && !subjectTypes.includes(subjectType)) return { error: 'invalidSubjectType' };
+  if (subjectType) request.subjectType = subjectType;
+  for (const key of ['domain', 'outcome'] as const) {
     if (filters[key].trim()) request[key] = filters[key].trim();
   }
   return { request };
@@ -85,8 +95,16 @@ export function changes(entry: AuditEntryDto) {
     if (key.startsWith('before.')) before[key.slice(7)] = value;
     if (key.startsWith('after.')) after[key.slice(6)] = value;
   }
-  return [...new Set([...Object.keys(before), ...Object.keys(after)])]
-    .filter((field) => JSON.stringify(before[field]) !== JSON.stringify(after[field]))
+  let changedFields: string[] = [];
+  try {
+    const fields = JSON.parse(String(entry.details.changedFields));
+    if (Array.isArray(fields) && fields.every((field) => typeof field === 'string' && field.length > 0))
+      changedFields = fields;
+  } catch {
+    /* The original value remains visible in recorded details. */
+  }
+  return [...new Set([...Object.keys(before), ...Object.keys(after), ...changedFields])]
+    .filter((field) => changedFields.includes(field) || JSON.stringify(before[field]) !== JSON.stringify(after[field]))
     .map((field) => ({ field, before: before[field], after: after[field] }));
 }
 
@@ -116,9 +134,11 @@ export function auditCsv(entries: AuditEntryDto[]): string {
       'Outcome',
       'Actor ID',
       'Actor',
+      'Actor name source',
       'Target type',
       'Target ID',
       'Target',
+      'Target name source',
       'Operation ID',
       'Details',
     ],
@@ -132,9 +152,11 @@ export function auditCsv(entries: AuditEntryDto[]): string {
       row.outcome,
       row.actorId,
       row.actorUsername,
+      row.actorUsernameSource,
       row.subjectType,
       row.subjectId,
       row.subjectLabel,
+      row.subjectLabelSource,
       row.operationId,
       row.details,
     ]);
