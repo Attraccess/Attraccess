@@ -479,6 +479,7 @@ describe('durable audit SQLite', () => {
   });
 
   it('declines writes under SQLite contention within a deadline and recovers', async () => {
+    await source.query('PRAGMA busy_timeout = 10');
     const lock = await new DataSource({ type: 'sqlite', database: source.options.database }).initialize();
     try {
       await lock.query('BEGIN IMMEDIATE');
@@ -491,7 +492,7 @@ describe('durable audit SQLite', () => {
     } finally {
       await lock.destroy();
     }
-  });
+  }, 10_000);
 
   it('enforces HTTP session permissions, token ceilings, query validation and persisted settings updates', async () => {
     const ownerPermissions = new Set(['system.audit.read', 'system.settings.manage', 'users.api-tokens.manage']);
@@ -839,9 +840,17 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
     ]);
     expect(source.hasMetadata(AuditLog)).toBeTruthy();
     expect(await source.query('PRAGMA foreign_key_list(audit_log)')).toEqual([]);
+    expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(1);
     await source.undoLastMigration();
     expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toHaveLength(1);
     expect(await source.query('SELECT * FROM password_policy_audit')).toHaveLength(1);
+    expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(0);
+    expect((await source.runMigrations()).map((migration) => migration.name)).toEqual([
+      'RetirePasswordPolicyAudit1783900000000',
+    ]);
+    expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(1);
+    await source.undoLastMigration();
+    expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toHaveLength(1);
     await source.undoLastMigration();
     expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toHaveLength(1);
     await source.undoLastMigration();

@@ -177,14 +177,15 @@ export class AuthController {
       await this.sessionService.revokeSession(sessionToken);
     }
 
-    // Logout from passport session
+    // Passport clears request.user as part of logout, so retain the principal for the audit record.
+    const userId = request.user.id;
     await new Promise<void>((resolve) => request.logout(resolve));
     void this.identityAudit?.record({
       action: 'logout',
       operationId: randomUUID(),
       outcome: 'succeeded',
-      actorId: request.user.id,
-      subjectId: request.user.id,
+      actorId: userId,
+      subjectId: userId,
       details: {},
       request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
     });
