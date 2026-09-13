@@ -1,3 +1,4 @@
+import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { BadRequestException, NotFoundException, StreamableFile } from '@nestjs/common';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -7,6 +8,7 @@ import { PluginService } from './plugin.service';
 import { PluginModule } from './plugin.module';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { FileUpload } from '../common/types/file-upload.types';
+import { auditSubjectKeyId } from '../audit/audit-administration-policy';
 
 function frontendPlugin(name: string): LoadedPluginManifest {
   return {
@@ -20,6 +22,8 @@ function frontendPlugin(name: string): LoadedPluginManifest {
   } as LoadedPluginManifest;
 }
 
+const req = { user: { id: 42, authenticationMethod: 'session' } } as AuthenticatedRequest;
+
 describe('PluginController', () => {
   let root: string;
   let service: { uploadPlugin: jest.Mock; deletePlugin: jest.Mock; requestRestart: jest.Mock };
@@ -30,6 +34,7 @@ describe('PluginController', () => {
     searchMarketplace: jest.Mock;
     marketplacePackage: jest.Mock;
   };
+  let audit: { recordAdministration: jest.Mock };
   let controller: PluginController;
 
   beforeEach(() => {
@@ -44,7 +49,12 @@ describe('PluginController', () => {
       searchMarketplace: jest.fn(),
       marketplacePackage: jest.fn(),
     };
-    controller = new PluginController(service as unknown as PluginService, npmService as never);
+    audit = { recordAdministration: jest.fn() };
+    controller = new PluginController(
+      service as unknown as PluginService,
+      npmService as never,
+      audit as never,
+    );
   });
 
   afterEach(() => {
@@ -67,30 +77,45 @@ describe('PluginController', () => {
   });
 
   describe('retryPlugin', () => {
-    it('clears a failed plugin quarantine and schedules a restart', () => {
+    it('clears a failed plugin quarantine and schedules a restart', async () => {
       const plugin = frontendPlugin('failed');
       jest.spyOn(PluginService, 'getManifestById').mockReturnValue(plugin);
       jest.spyOn(PluginService, 'isPluginQuarantined').mockReturnValue(true);
       const clearQuarantine = jest.spyOn(PluginService, 'clearPluginQuarantine');
 
-      expect(controller.retryPlugin(plugin.id)).toEqual({ ok: true });
+      await expect(controller.retryPlugin(plugin.id, req)).resolves.toEqual({ ok: true });
       expect(clearQuarantine).toHaveBeenCalledWith(plugin.pluginDirectory);
       expect(service.requestRestart).toHaveBeenCalledTimes(1);
     });
 
-    it('rejects an unknown plugin without scheduling a restart', () => {
+    it('uses the manifest name, not the directory ID, for the ZIP audit subject', async () => {
+      const plugin = { ...frontendPlugin('stable-name'), id: 'directory-id' };
+      jest.spyOn(PluginService, 'getManifestById').mockReturnValue(plugin);
+      jest.spyOn(PluginService, 'isPluginQuarantined').mockReturnValue(true);
+
+      await controller.retryPlugin(plugin.id, req);
+
+      expect(audit.recordAdministration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subjectId: auditSubjectKeyId(plugin.name), details: expect.objectContaining({ pluginId: plugin.id }),
+        }),
+        undefined,
+      );
+    });
+
+    it('rejects an unknown plugin without scheduling a restart', async () => {
       jest.spyOn(PluginService, 'getManifestById').mockReturnValue(undefined);
 
-      expect(() => controller.retryPlugin('missing')).toThrow(NotFoundException);
+      await expect(controller.retryPlugin('missing', req)).rejects.toThrow(NotFoundException);
       expect(service.requestRestart).not.toHaveBeenCalled();
     });
 
-    it('rejects a plugin that is not quarantined', () => {
+    it('rejects a plugin that is not quarantined', async () => {
       const plugin = frontendPlugin('loaded');
       jest.spyOn(PluginService, 'getManifestById').mockReturnValue(plugin);
       jest.spyOn(PluginService, 'isPluginQuarantined').mockReturnValue(false);
 
-      expect(() => controller.retryPlugin(plugin.id)).toThrow(BadRequestException);
+      await expect(controller.retryPlugin(plugin.id, req)).rejects.toThrow(BadRequestException);
       expect(service.requestRestart).not.toHaveBeenCalled();
     });
   });
@@ -152,13 +177,15 @@ describe('PluginController', () => {
   it('delegates upload to the plugin service', async () => {
     const file = { originalname: 'plugin.zip' } as FileUpload;
     service.uploadPlugin.mockResolvedValue({ name: 'uploaded' });
-    await expect(controller.uploadPlugin(file, {})).resolves.toEqual({ name: 'uploaded' });
-    expect(service.uploadPlugin).toHaveBeenCalledWith(file);
+    await expect(controller.uploadPlugin(file, {}, req)).resolves.toEqual({ name: 'uploaded' });
+    expect(service.uploadPlugin).toHaveBeenCalledWith(file, true);
+    expect(service.requestRestart).toHaveBeenCalledTimes(1);
   });
 
   it('delegates non-npm plugin deletion to the plugin service', async () => {
-    await controller.deletePlugin('plugin-id');
-    expect(service.deletePlugin).toHaveBeenCalledWith('plugin-id');
+    await controller.deletePlugin('plugin-id', req);
+    expect(service.deletePlugin).toHaveBeenCalledWith('plugin-id', true);
+    expect(service.requestRestart).toHaveBeenCalledTimes(1);
   });
 
   it('delegates marketplace search with an optional registry', () => {
@@ -176,18 +203,20 @@ describe('PluginController', () => {
     jest.spyOn(PluginService, 'getPlugins').mockReturnValue([plugin]);
     npmService.listInstalled.mockReturnValue([{ name: '@attraccess/plugin', installPath: plugin.pluginDirectory }]);
 
-    await controller.deletePlugin(plugin.id);
+    await controller.deletePlugin(plugin.id, req);
 
-    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin');
+    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin', true);
+    expect(service.requestRestart).toHaveBeenCalledTimes(1);
     expect(service.deletePlugin).not.toHaveBeenCalled();
   });
 
   it('uses the data-preserving npm removal flow when npm manifest discovery fails', async () => {
     npmService.findInstalledByPluginId.mockReturnValue({ name: '@attraccess/plugin' });
 
-    await controller.deletePlugin('npm-plugin-id');
+    await controller.deletePlugin('npm-plugin-id', req);
 
-    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin');
+    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin', true);
+    expect(service.requestRestart).toHaveBeenCalledTimes(1);
     expect(service.deletePlugin).not.toHaveBeenCalled();
   });
 
@@ -198,9 +227,10 @@ describe('PluginController', () => {
       { name: '@attraccess/plugin', installPath: 'npm-QGF0dHJhY2Nlc3MvcGx1Z2lu' },
     ]);
 
-    await controller.deletePlugin(plugin.id);
+    await controller.deletePlugin(plugin.id, req);
 
-    expect(service.deletePlugin).toHaveBeenCalledWith(plugin.id);
+    expect(service.deletePlugin).toHaveBeenCalledWith(plugin.id, true);
+    expect(service.requestRestart).toHaveBeenCalledTimes(1);
     expect(npmService.removeInstalled).not.toHaveBeenCalled();
   });
 });

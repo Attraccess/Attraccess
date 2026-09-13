@@ -171,7 +171,12 @@ const resourceDetailFields = new Set([
 ]);
 
 export function projectResourceAuditEvent(input: ResourceAuditEvent): ResourceAuditEvent | null {
-  if (!resourceActions.has(input.action) || !uuid(input.operationId) || !positive(input.actorId) || !positive(input.subjectId)) {
+  if (
+    !resourceActions.has(input.action) ||
+    !uuid(input.operationId) ||
+    !positive(input.actorId) ||
+    !positive(input.subjectId)
+  ) {
     return null;
   }
   const details = dataFields(input.details, [...resourceDetailFields]);
