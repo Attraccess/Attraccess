@@ -1,9 +1,12 @@
 import { ModuleRef } from '@nestjs/core';
-import { SSOProviderSAMLConfiguration, SSOProviderType } from '@attraccess/database-entities';
+import { SSOProvider, SSOProviderSAMLConfiguration, SSOProviderType } from '@attraccess/database-entities';
 import { SSOSamlStrategy } from './saml.strategy';
 import { SSOSamlRequest } from './saml.types';
 import { AccountLinkingRequiredException } from '../oidc/exceptions/account-linking-required.exception';
 import { RbacService } from '../../../rbac/rbac.service';
+import { UsersService } from '../../../users/users.service';
+import { SSOService } from '../sso.service';
+import { SsoAuditService } from '../../../../audit/sso-audit.service';
 
 type SamlProfile = Record<string, unknown>;
 
@@ -131,6 +134,37 @@ describe('SSOSamlStrategy', () => {
       }),
     );
     expect(user.username).toBe('name.surname');
+  });
+
+  it('audits successful SAML user creation and the committed role delta', async () => {
+    const usersService = { findOne: jest.fn().mockResolvedValue(null), buildUsernameFromSSOClaim: jest.fn((value: string) => value), createOne: jest.fn().mockResolvedValue({ id: 101, username: 'User', email: 'user@example.com' }) };
+    const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue({ added: ['user-manager'], removed: [], updated: [] }) };
+    const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
+    const provider = { id: 30, name: 'Workforce', type: SSOProviderType.SAML, samlConfiguration: { entryPoint: 'https://idp.example.com/sso', issuer: 'https://app.example.com', audience: null, signRequest: false, wantAssertionsSigned: false, wantAuthnResponseSigned: true, forceAuthn: false, emailAttributeKeys: ['email'], roleMappings: { 'user-manager': ['admins'] } } } as SSOProvider;
+    const moduleRef = { get: jest.fn((token: unknown) => token === UsersService ? usersService : token === RbacService ? rbacService : token === SSOService ? { getProviderByTypeAndIdWithConfiguration: jest.fn().mockResolvedValue(provider) } : token === SsoAuditService ? audit : undefined) } as unknown as ModuleRef;
+    const strategy = new SSOSamlStrategy(moduleRef);
+    const request = buildRequest(30, 'email');
+    request.ssoSamlOptions.samlConfiguration.roleMappings = { 'user-manager': ['admins'] };
+
+    await strategy.validate(request, { nameID: 'subject', email: 'user@example.com', groups: ['admins'] } as SamlProfile);
+
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'sso.provisioning.user_created', subject: { type: 'user', id: 101 } }));
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'sso.provisioning.permissions_synced', details: expect.objectContaining({ changes: JSON.stringify({ added: ['user-manager'], removed: [], updated: [] }) }) }));
+  });
+
+  it('records a created user even when a later role sync fails', async () => {
+    const usersService = { findOne: jest.fn().mockResolvedValue(null), buildUsernameFromSSOClaim: jest.fn((value: string) => value), createOne: jest.fn().mockResolvedValue({ id: 101, username: 'User', email: 'user@example.com' }) };
+    const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
+    const provider = { id: 30, name: 'Workforce', type: SSOProviderType.SAML, samlConfiguration: { entryPoint: 'https://idp.example.com/sso', issuer: 'https://app.example.com', audience: null, signRequest: false, wantAssertionsSigned: false, wantAuthnResponseSigned: true, forceAuthn: false, emailAttributeKeys: ['email'], roleMappings: { 'user-manager': ['admins'] } } } as SSOProvider;
+    const moduleRef = { get: jest.fn((token: unknown) => token === UsersService ? usersService : token === RbacService ? { syncSsoRoles: jest.fn().mockRejectedValue(new Error('role write failed')) } : token === SSOService ? { getProviderByTypeAndIdWithConfiguration: jest.fn().mockResolvedValue(provider) } : token === SsoAuditService ? audit : undefined) } as unknown as ModuleRef;
+    const strategy = new SSOSamlStrategy(moduleRef);
+    const request = buildRequest(30, 'email');
+    request.ssoSamlOptions.samlConfiguration.roleMappings = { 'user-manager': ['admins'] };
+
+    await expect(strategy.validate(request, { nameID: 'subject', email: 'user@example.com', groups: ['admins'] } as SamlProfile)).rejects.toThrow('role write failed');
+
+    expect(audit.record).toHaveBeenCalledTimes(1);
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'sso.provisioning.user_created', subject: { type: 'user', id: 101 } }));
   });
 
   it('does not sync roles when profile has no role/group attributes (only email, name, etc.)', async () => {

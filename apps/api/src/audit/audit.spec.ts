@@ -428,6 +428,41 @@ describe('durable audit SQLite', () => {
     });
   });
 
+  it('persists provider-origin SSO role deltas and filters them by domain', async () => {
+    await store.setPlainSetting('audit', 'domains', '["sso"]');
+    const operationId = randomUUID();
+    expect(
+      await service.recordSso({
+        action: 'sso.provisioning.permissions_synced',
+        operationId,
+        actorId: null,
+        authenticationMethod: null,
+        subject: { type: 'user', id: 7 },
+        details: {
+          provider: JSON.stringify({ id: 3, name: 'Company IdP', type: 'saml', configuration: { entryPoint: 'https://idp.example.com/sso', issuer: 'https://app.example.com', audience: null, signRequest: false, wantAssertionsSigned: false, wantAuthnResponseSigned: true, forceAuthn: false, emailAttributeKeys: null, roleMappings: null, signingMaterial: { identityProviderCertificateConfigured: true, provisioningSecretConfigured: false, signingCertificateConfigured: false, signingPrivateKeyConfigured: false }, omitted: {} } }),
+          changes: JSON.stringify({ added: ['billing-manager'], removed: [], updated: [] }),
+        },
+      }),
+    ).toEqual({ status: 'recorded' });
+    expect((await service.list({ domain: 'sso', action: 'sso.provisioning.permissions_synced', limit: 1 })).items).toEqual([
+      expect.objectContaining({ domain: 'sso', actorId: null, subjectType: 'user', subjectId: 7 }),
+    ]);
+  });
+
+  it('does not persist SSO events while the SSO domain is disabled', async () => {
+    await store.setPlainSetting('audit', 'domains', '["identity"]');
+    expect(
+      await service.recordSso({
+        action: 'sso.provider.created',
+        operationId: randomUUID(),
+        actorId: 4,
+        authenticationMethod: 'session',
+        subject: { type: 'sso.provider', id: 3 },
+        details: { before: 'null', after: JSON.stringify({ id: 3, name: 'Company IdP', type: 'oidc', configuration: { issuer: 'https://idp.example.com', authorizationURL: 'https://idp.example.com/authorize', tokenURL: 'https://idp.example.com/token', userInfoURL: 'https://idp.example.com/userinfo', clientId: 'client-id', clientSecretConfigured: true, scopes: null, usernameClaimPaths: null, emailClaimPaths: null, roleMappings: null } }) },
+      }),
+    ).toEqual({ status: 'unavailable' });
+  });
+
   it('rejects oversized details at the database boundary too', async () => {
     await service.record(event());
     const row = (await service.list({ limit: 1 })).items[0];
@@ -837,6 +872,9 @@ describe('audit policy and authorization', () => {
     await expect(
       pipe.transform({ eventPrefix: 'supervision.' }, { type: 'query', metatype: AuditQueryDto }),
     ).resolves.toMatchObject({ eventPrefix: 'supervision.' });
+    await expect(
+      pipe.transform({ domain: 'sso', action: 'sso.provider.created' }, { type: 'query', metatype: AuditQueryDto }),
+    ).resolves.toMatchObject({ domain: 'sso', action: 'sso.provider.created' });
   });
 });
 

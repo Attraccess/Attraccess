@@ -4,7 +4,7 @@ import { SettingsStoreService } from '../settings/settings-store.service';
 
 const fields = {
   enabled: z.boolean(),
-  domains: z.array(z.enum(['billing', 'resource', 'wago', 'identity'])).max(4),
+  domains: z.array(z.enum(['billing', 'resource', 'sso', 'wago', 'identity'])).max(5),
   retention_days: z.number().int().min(1).max(3650),
 };
 export const auditSettingsUpdateSchema = z.object(fields).partial().strict();

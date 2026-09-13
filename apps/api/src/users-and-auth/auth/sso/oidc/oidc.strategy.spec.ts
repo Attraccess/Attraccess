@@ -12,6 +12,8 @@ import {
 } from '@attraccess/database-entities';
 import { UsersService } from '../../../users/users.service';
 import { RbacService } from '../../../rbac/rbac.service';
+import { SSOService } from '../sso.service';
+import { SsoAuditService } from '../../../../audit/sso-audit.service';
 
 describe('SSOOIDCStrategy - claim path resolution', () => {
   const callbackURL = 'http://localhost/cb';
@@ -22,12 +24,16 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     usersServiceMock: Partial<UsersService>,
     authServiceMock: Partial<AuthService>,
     rbacServiceMock?: Partial<RbacService>,
+    ssoServiceMock?: Partial<SSOService>,
+    ssoAuditMock?: Partial<SsoAuditService>,
   ) {
     const moduleRef = {
       get: jest.fn((token: unknown) => {
         if (token === UsersService) return usersServiceMock;
         if (token === AuthService) return authServiceMock;
         if (token === RbacService) return rbacServiceMock ?? { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
+        if (token === SSOService) return ssoServiceMock;
+        if (token === SsoAuditService) return ssoAuditMock;
         throw new Error('Unexpected dependency request');
       }),
     } as unknown as ModuleRef;
@@ -134,6 +140,158 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     const user = await strategy.validate('https://issuer', profile);
     expect(user.email).toBe('jsonmail@example.com');
     expect(usersService.createOne).toHaveBeenCalled();
+  });
+
+  it('audits successful OIDC user creation and the committed role delta', async () => {
+    const usersService = {
+      findOne: jest.fn().mockResolvedValue(null),
+      buildUsernameFromSSOClaim: jest.fn((value: string) => value),
+      createOne: jest.fn().mockResolvedValue({ id: 123, username: 'user', email: 'user@example.com' }),
+    };
+    const authService = { findUserIdBySSO: jest.fn().mockResolvedValue(null), addAuthenticationDetails: jest.fn() };
+    const rbacService = {
+      syncSsoRoles: jest.fn().mockResolvedValue({ added: ['user-manager'], removed: [], updated: [] }),
+    };
+    const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
+    const provider = {
+      id: 1,
+      name: 'Workforce',
+      type: SSOProviderType.OIDC,
+      oidcConfiguration: {
+        issuer: 'https://issuer',
+        authorizationURL: 'https://issuer/auth',
+        tokenURL: 'https://issuer/token',
+        userInfoURL: 'https://issuer/userinfo',
+        clientId: 'client',
+        scopes: null,
+        usernameClaimPaths: null,
+        emailClaimPaths: null,
+        roleMappings: { 'user-manager': ['admins'] },
+      },
+    } as SSOProvider;
+    const strategy = createStrategy(
+      { roleMappings: { 'user-manager': ['admins'] } },
+      usersService,
+      authService,
+      rbacService,
+      { getProviderByTypeAndIdWithConfiguration: jest.fn().mockResolvedValue(provider) },
+      audit,
+    );
+
+    await strategy.validate('https://issuer', {
+      id: 'subject',
+      emails: [{ value: 'user@example.com' }],
+      _json: { groups: ['admins'] },
+    } as unknown as Profile);
+
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'sso.provisioning.user_created', subject: { type: 'user', id: 123 } }),
+    );
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'sso.provisioning.permissions_synced',
+        details: expect.objectContaining({
+          changes: JSON.stringify({ added: ['user-manager'], removed: [], updated: [] }),
+        }),
+      }),
+    );
+  });
+
+  it('records a created user even when a later role sync fails', async () => {
+    const usersService = {
+      findOne: jest.fn().mockResolvedValue(null),
+      buildUsernameFromSSOClaim: jest.fn((value: string) => value),
+      createOne: jest.fn().mockResolvedValue({ id: 123, username: 'user', email: 'user@example.com' }),
+    };
+    const authService = { findUserIdBySSO: jest.fn().mockResolvedValue(null), addAuthenticationDetails: jest.fn() };
+    const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
+    const provider = {
+      id: 1,
+      name: 'Workforce',
+      type: SSOProviderType.OIDC,
+      oidcConfiguration: {
+        issuer: 'https://issuer',
+        authorizationURL: 'https://issuer/auth',
+        tokenURL: 'https://issuer/token',
+        userInfoURL: 'https://issuer/userinfo',
+        clientId: 'client',
+        scopes: null,
+        usernameClaimPaths: null,
+        emailClaimPaths: null,
+        roleMappings: { 'user-manager': ['admins'] },
+      },
+    } as SSOProvider;
+    const strategy = createStrategy(
+      { roleMappings: { 'user-manager': ['admins'] } },
+      usersService,
+      authService,
+      { syncSsoRoles: jest.fn().mockRejectedValue(new Error('role write failed')) },
+      { getProviderByTypeAndIdWithConfiguration: jest.fn().mockResolvedValue(provider) },
+      audit,
+    );
+
+    await expect(
+      strategy.validate('https://issuer', {
+        id: 'subject',
+        emails: [{ value: 'user@example.com' }],
+        _json: { groups: ['admins'] },
+      } as unknown as Profile),
+    ).rejects.toThrow('role write failed');
+
+    expect(audit.record).toHaveBeenCalledTimes(1);
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'sso.provisioning.user_created', subject: { type: 'user', id: 123 } }),
+    );
+  });
+
+  it('records a newly created user before binding failure without silently deleting it', async () => {
+    const usersService = {
+      findOne: jest.fn().mockResolvedValue(null),
+      buildUsernameFromSSOClaim: jest.fn((value: string) => value),
+      createOne: jest.fn().mockResolvedValue({ id: 123, username: 'user', email: 'user@example.com' }),
+      deleteOne: jest.fn().mockResolvedValue(undefined),
+    };
+    const authService = {
+      findUserIdBySSO: jest.fn().mockResolvedValue(null),
+      addAuthenticationDetails: jest.fn().mockRejectedValue(new Error('binding failed')),
+    };
+    const audit = { record: jest.fn() };
+    const provider = {
+      id: 1,
+      name: 'Workforce',
+      type: SSOProviderType.OIDC,
+      oidcConfiguration: {
+        issuer: 'https://issuer',
+        authorizationURL: 'https://issuer/auth',
+        tokenURL: 'https://issuer/token',
+        userInfoURL: 'https://issuer/userinfo',
+        clientId: 'client',
+        scopes: null,
+        usernameClaimPaths: null,
+        emailClaimPaths: null,
+        roleMappings: null,
+      },
+    } as SSOProvider;
+    const strategy = createStrategy(
+      {},
+      usersService,
+      authService,
+      undefined,
+      { getProviderByTypeAndIdWithConfiguration: jest.fn().mockResolvedValue(provider) },
+      audit,
+    );
+
+    await expect(
+      strategy.validate('https://issuer', {
+        id: 'subject',
+        emails: [{ value: 'user@example.com' }],
+      } as unknown as Profile),
+    ).rejects.toThrow('binding failed');
+
+    expect(usersService.deleteOne).not.toHaveBeenCalled();
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'sso.provisioning.user_created', subject: { type: 'user', id: 123 } }),
+    );
   });
 
   it('normalizes SSO usernames before user creation', async () => {
@@ -423,11 +581,18 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       });
       const strategy = createStrategy(
         {},
-        { findOne: jest.fn(), updateOne: jest.fn(), buildUsernameFromSSOClaim: jest.fn((s: string) => s), createOne: jest.fn() },
+        {
+          findOne: jest.fn(),
+          updateOne: jest.fn(),
+          buildUsernameFromSSOClaim: jest.fn((s: string) => s),
+          createOne: jest.fn(),
+        },
         { findUserIdBySSO: jest.fn(), addAuthenticationDetails: jest.fn() },
       );
       const dynamicCallback = 'https://api.example.com/api/auth/sso/oidc/1/callback?redirectTo=/dashboard';
-      const req = { [SSO_OIDC_CALLBACK_URL_REQUEST_KEY]: dynamicCallback } as unknown as Parameters<SSOOIDCStrategy['authenticate']>[0];
+      const req = { [SSO_OIDC_CALLBACK_URL_REQUEST_KEY]: dynamicCallback } as unknown as Parameters<
+        SSOOIDCStrategy['authenticate']
+      >[0];
 
       strategy.authenticate(req, undefined);
 
@@ -441,7 +606,12 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       });
       const strategy = createStrategy(
         {},
-        { findOne: jest.fn(), updateOne: jest.fn(), buildUsernameFromSSOClaim: jest.fn((s: string) => s), createOne: jest.fn() },
+        {
+          findOne: jest.fn(),
+          updateOne: jest.fn(),
+          buildUsernameFromSSOClaim: jest.fn((s: string) => s),
+          createOne: jest.fn(),
+        },
         { findUserIdBySSO: jest.fn(), addAuthenticationDetails: jest.fn() },
       );
       const req = {} as unknown as Parameters<SSOOIDCStrategy['authenticate']>[0];
