@@ -106,4 +106,18 @@ describe('audit storage safe snapshot', () => {
     expect(projectResourceAuditEvent(deletion)).toEqual(deletion);
     expect(projectResourceAuditEvent({ ...deletion, details: { password: 'raw-secret' } })).toBeNull();
   });
+
+  it('allows explicitly system-originated introductions without synthesizing a user session', () => {
+    const event = {
+      action: 'introduction.granted' as const,
+      operationId: randomUUID(),
+      actorId: null,
+      authenticationMethod: null,
+      subjectId: 7,
+      details: { recipientUserId: 3, tutorUserId: 9 },
+    };
+
+    expect(projectResourceAuditEvent(event)).toEqual(event);
+    expect(projectResourceAuditEvent({ ...event, authenticationMethod: 'session' })).toBeNull();
+  });
 });

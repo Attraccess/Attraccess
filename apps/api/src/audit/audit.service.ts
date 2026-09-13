@@ -214,7 +214,8 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
         await this.storage.getRepository(AuditLog).insert({
           at: new Date(), domain: 'resource', pluginId: 'core', action: snapshot.action,
           operationId: snapshot.operationId, actorId: snapshot.actorId,
-          authenticationMethod: snapshot.authenticationMethod ?? 'session', apiTokenId: snapshot.apiTokenId ?? null,
+          authenticationMethod: snapshot.actorId === null ? null : snapshot.authenticationMethod ?? 'session',
+          apiTokenId: snapshot.apiTokenId ?? null,
           outcome: 'succeeded', subjectType: snapshot.subjectType ?? 'resource', subjectId: snapshot.subjectId, details: snapshot.details,
         });
       } finally {

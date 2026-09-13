@@ -140,9 +140,9 @@ export class ResourceIntroductionsService {
     nextStatus: IntroductionHistoryAction,
     data?: UpdateResourceIntroductionDto,
     tutorUserId?: number,
-    performedByUserId?: number,
-    authenticationMethod?: 'session' | 'api-token',
-    apiTokenId?: number,
+    performedByUserId?: number | null,
+    authenticationMethod?: 'session' | 'api-token' | null,
+    apiTokenId?: number | null,
   ) {
     this.logger.debug(`Updating introduction status to ${nextStatus} for resourceId: ${resourceId}, userId: ${userId}`);
     let resourceIntroduction = await this.getIntroductionOfUser(resourceId, userId);
@@ -181,7 +181,7 @@ export class ResourceIntroductionsService {
       await this.audit.recordResource({
         action: nextStatus === IntroductionHistoryAction.GRANT ? 'introduction.granted' : 'introduction.revoked',
         actorId: performedByUserId, authenticationMethod, apiTokenId, subjectId: resourceId,
-        details: { recipientUserId: userId },
+        details: { recipientUserId: userId, ...(tutorUserId === undefined ? {} : { tutorUserId }) },
       });
     }
     return savedHistoryItem;
@@ -216,7 +216,12 @@ export class ResourceIntroductionsService {
     resourceId: number,
     userId: number,
     data?: UpdateResourceIntroductionDto,
-    options?: { tutorUserId?: number; performedByUserId?: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+    options?: {
+      tutorUserId?: number;
+      performedByUserId?: number | null;
+      authenticationMethod?: 'session' | 'api-token' | null;
+      apiTokenId?: number | null;
+    },
   ): Promise<ResourceIntroductionHistoryItem> {
     this.logger.debug(`Granting introduction for resourceId: ${resourceId}, userId: ${userId}`);
     const result = await this.updateIntroductionStatus(
@@ -238,7 +243,11 @@ export class ResourceIntroductionsService {
     resourceId: number,
     userId: number,
     data?: UpdateResourceIntroductionDto,
-    options?: { performedByUserId?: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+    options?: {
+      performedByUserId?: number | null;
+      authenticationMethod?: 'session' | 'api-token' | null;
+      apiTokenId?: number | null;
+    },
   ): Promise<ResourceIntroductionHistoryItem> {
     this.logger.debug(`Revoking introduction for resourceId: ${resourceId}, userId: ${userId}`);
     const result = await this.updateIntroductionStatus(

@@ -19,9 +19,9 @@ export interface ResourceAuditEvent {
     | 'supervision.approved'
     | 'supervision.rejected';
   operationId: string;
-  actorId: number;
-  authenticationMethod?: 'session' | 'api-token';
-  apiTokenId?: number;
+  actorId: number | null;
+  authenticationMethod?: 'session' | 'api-token' | null;
+  apiTokenId?: number | null;
   subjectType?: 'resource' | 'resource_group';
   subjectId: number;
   details: Record<string, string | number>;
@@ -189,7 +189,7 @@ const resourceDetailFields: Partial<Record<ResourceAuditEvent['action'], readonl
   'resource_group.deleted': ['before.name', 'before.isHidden'],
   'resource_group.resource_added': ['resourceId'],
   'resource_group.resource_removed': ['resourceId'],
-  'introduction.granted': ['recipientUserId'],
+  'introduction.granted': ['recipientUserId', 'tutorUserId'],
   'introduction.revoked': ['recipientUserId'],
   'maintenance_schedule.created': ['scheduleId', 'enabled', 'triggerType', 'name', 'usageDuration', 'usageUnit', 'usageThreshold'],
   'maintenance_schedule.updated': ['scheduleId', 'enabled', 'triggerType', 'name', 'usageDuration', 'usageUnit', 'usageThreshold'],
@@ -202,6 +202,7 @@ export function projectResourceAuditEvent(input: ResourceAuditEvent): ResourceAu
   if (
     !resourceActions.has(input.action) ||
     !uuid(input.operationId) ||
+    (input.actorId !== null && !positive(input.actorId)) ||
     !positive(input.subjectId) ||
     (input.subjectType !== undefined && input.subjectType !== 'resource' && input.subjectType !== 'resource_group')
   ) {
@@ -215,11 +216,13 @@ export function projectResourceAuditEvent(input: ResourceAuditEvent): ResourceAu
     if (!allowedFields.includes(key) || (typeof value !== 'string' && typeof value !== 'number')) return null;
   }
   if (Buffer.byteLength(JSON.stringify(details), 'utf8') > 4096) return null;
-  if (
+  if (input.actorId === null) {
+    if (input.authenticationMethod !== null || (input.apiTokenId !== undefined && input.apiTokenId !== null)) return null;
+  } else if (
     (input.authenticationMethod !== undefined &&
       input.authenticationMethod !== 'session' &&
       input.authenticationMethod !== 'api-token') ||
-    (input.apiTokenId !== undefined && !positive(input.apiTokenId))
+    (input.apiTokenId !== undefined && input.apiTokenId !== null && !positive(input.apiTokenId))
   ) {
     return null;
   }

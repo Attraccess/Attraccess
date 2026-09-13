@@ -2,6 +2,7 @@ import { Resource, ResourceGroup, ResourceIntroducer, ResourceIntroduction } fro
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test } from '@nestjs/testing';
+import { DataSource, EntitySchema } from 'typeorm';
 import { AuditService } from '../../audit/audit.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { ResourceGroupsService } from './resourceGroups.service';
@@ -69,5 +70,64 @@ describe('ResourceGroupsService audit events', () => {
     expect(audit.recordResource).toHaveBeenLastCalledWith(expect.objectContaining({
       action: 'resource_group.deleted', details: { 'before.name': 'Workshop', 'before.isHidden': 0 },
     }));
+  });
+});
+
+describe('ResourceGroupsService partial updates', () => {
+  const resourceGroupSchema = new EntitySchema({
+    name: 'resource_group',
+    columns: {
+      id: { type: Number, primary: true, generated: true },
+      name: { type: String },
+      description: { type: String, nullable: true },
+      retrainingMaxAgeDays: { type: Number, nullable: true },
+      retrainingMaxInactivityDays: { type: Number, nullable: true },
+      retrainingBlocksAccess: { type: Boolean, default: false },
+      isHidden: { type: Boolean, default: false },
+    },
+  });
+  const audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
+  let source: DataSource;
+  let service: ResourceGroupsService;
+
+  beforeEach(async () => {
+    source = await new DataSource({ type: 'sqlite', database: ':memory:', entities: [resourceGroupSchema], synchronize: true }).initialize();
+    service = new ResourceGroupsService(
+      source.getRepository('resource_group') as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      { emit: jest.fn() } as never,
+      { resourceGroupsTotal: { inc: jest.fn(), dec: jest.fn() } } as never,
+      audit as never,
+    );
+    audit.recordResource.mockClear();
+  });
+
+  afterEach(async () => {
+    await source.destroy();
+  });
+
+  it('preserves omitted fields with SQLite persistence and skips no-op audits', async () => {
+    const repository = source.getRepository('resource_group');
+    const group = await repository.save({
+      name: 'Workshop',
+      description: 'Original description',
+      retrainingBlocksAccess: false,
+      isHidden: false,
+    });
+
+    await service.updateOneById(group.id, { isHidden: true }, { id: 9 });
+
+    expect(await repository.findOneByOrFail({ id: group.id })).toEqual(expect.objectContaining({
+      name: 'Workshop', description: 'Original description', isHidden: true,
+    }));
+    expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
+      details: { 'before.isHidden': 0, 'after.isHidden': 1, changedFields: '["isHidden"]' },
+    }));
+
+    audit.recordResource.mockClear();
+    await service.updateOneById(group.id, { isHidden: true }, { id: 9 });
+    expect(audit.recordResource).not.toHaveBeenCalled();
   });
 });
