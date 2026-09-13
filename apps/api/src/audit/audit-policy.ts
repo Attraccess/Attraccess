@@ -283,6 +283,7 @@ export function projectProjectAuditEvent(input: ProjectAuditEvent): ProjectAudit
   }
   const authenticationMethod = input.authenticationMethod ?? 'session';
   if (
+    (input.authenticationMethod !== undefined && input.authenticationMethod !== 'session' && input.authenticationMethod !== 'api-token') ||
     (authenticationMethod === 'api-token' && !positive(input.apiTokenId)) ||
     (authenticationMethod === 'session' && input.apiTokenId !== undefined)
   ) {

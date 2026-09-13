@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { ProjectsService } from './projects.service';
-import { Project, ProjectInvitation, ProjectMember, ResourceUsage, User } from '@attraccess/database-entities';
+import { entities, Project, ProjectInvitation, ProjectMember, ResourceUsage, User } from '@attraccess/database-entities';
 import { FileStorageService } from '../common/services/file-storage.service';
 import { CreateProjectDto } from './dto/create.dto';
 import { FileUpload } from '../common/types/file-upload.types';
@@ -262,6 +262,41 @@ describe('ProjectsService', () => {
 
       expect(audit.recordProject).not.toHaveBeenCalled();
       expect(mockMetricsService.projectsTotal.dec).not.toHaveBeenCalled();
+    });
+
+    it('rolls back SQLite usage detachment on a delete abort and records only the successful delete', async () => {
+      const source = await new DataSource({ type: 'sqlite', database: ':memory:', entities: Object.values(entities), synchronize: true }).initialize();
+      try {
+        await source.query('PRAGMA foreign_keys = OFF');
+        await source.query("INSERT INTO user (username, email) VALUES ('owner', 'owner@example.test')");
+        await source.query("INSERT INTO project (userId, name) VALUES (1, 'Project')");
+        await source.query("INSERT INTO resource_usage (usageAction, resourceId, startTime, projectId) VALUES ('usage', 1, CURRENT_TIMESTAMP, 1)");
+        const projects = source.getRepository(Project);
+        const sqliteAudit = { recordProject: jest.fn().mockResolvedValue(undefined) };
+        const sqliteMetrics = { projectsTotal: { inc: jest.fn(), dec: jest.fn() } };
+        const sqliteService = new ProjectsService(
+          projects, source.getRepository(ProjectMember), source.getRepository(ProjectInvitation), source.getRepository(User),
+          source.getRepository(ResourceUsage), {} as FileStorageService,
+          { ensureOwner: jest.fn().mockResolvedValue({ id: 1, name: 'Project', logo: null }) } as unknown as ProjectAccessService,
+          {} as EmailService, sqliteMetrics as MetricsService, {} as NotificationDispatchService, sqliteAudit as unknown as AuditService,
+        );
+        await source.query("CREATE TRIGGER abort_project_delete BEFORE DELETE ON project BEGIN SELECT RAISE(ABORT, 'delete aborted'); END");
+
+        await expect(sqliteService.deleteOne(1, 1)).rejects.toThrow('delete aborted');
+        expect((await source.query('SELECT projectId FROM resource_usage WHERE id = 1'))[0].projectId).toBe(1);
+        expect(sqliteAudit.recordProject).not.toHaveBeenCalled();
+        expect(sqliteMetrics.projectsTotal.dec).not.toHaveBeenCalled();
+
+        await source.query('DROP TRIGGER abort_project_delete');
+        await sqliteService.deleteOne(1, 1);
+        expect((await source.query('SELECT projectId FROM resource_usage WHERE id = 1'))[0].projectId).toBeNull();
+        expect(sqliteAudit.recordProject).toHaveBeenCalledTimes(1);
+        expect(sqliteMetrics.projectsTotal.dec).toHaveBeenCalledTimes(1);
+        await expect(sqliteService.deleteOne(1, 1)).rejects.toBeInstanceOf(NotFoundException);
+        expect(sqliteAudit.recordProject).toHaveBeenCalledTimes(1);
+      } finally {
+        await source.destroy();
+      }
     });
   });
 
