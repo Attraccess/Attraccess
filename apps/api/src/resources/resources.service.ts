@@ -14,6 +14,23 @@ import { ResourceChangedEvent } from './events/resource-changed.event';
 import { MetricsService } from '../metrics/metrics.service';
 import { AuditService } from '../audit/audit.service';
 
+const MAX_AUDIT_RESOURCE_NAME_BYTES = 1024;
+
+function auditResourceName(name: string): string {
+  if (Buffer.byteLength(name, 'utf8') <= MAX_AUDIT_RESOURCE_NAME_BYTES) return name;
+
+  const suffix = '...';
+  let result = '';
+  let byteLength = Buffer.byteLength(suffix, 'utf8');
+  for (const character of name) {
+    const characterByteLength = Buffer.byteLength(character, 'utf8');
+    if (byteLength + characterByteLength > MAX_AUDIT_RESOURCE_NAME_BYTES) break;
+    result += character;
+    byteLength += characterByteLength;
+  }
+  return result + suffix;
+}
+
 @Injectable()
 export class ResourcesService {
   private readonly logger = new Logger(ResourcesService.name);
@@ -87,7 +104,7 @@ export class ResourcesService {
       await this.audit.recordResource({
         action: 'resource.created', actorId: actor.id, authenticationMethod: actor.authenticationMethod,
         apiTokenId: actor.apiTokenId, subjectId: resource.id,
-        details: { 'after.name': resource.name, 'after.type': resource.type },
+        details: { 'after.name': auditResourceName(resource.name), 'after.type': resource.type },
       });
     }
 
@@ -195,8 +212,8 @@ export class ResourcesService {
     if (actor) {
       const details: Record<string, string> = {};
       if (before.name !== updatedResource.name) {
-        details['before.name'] = before.name;
-        details['after.name'] = updatedResource.name;
+        details['before.name'] = auditResourceName(before.name);
+        details['after.name'] = auditResourceName(updatedResource.name);
       }
       if (before.type !== updatedResource.type) {
         details['before.type'] = before.type;
@@ -248,7 +265,7 @@ export class ResourcesService {
       await this.audit.recordResource({
         action: 'resource.deleted', actorId: actor.id, authenticationMethod: actor.authenticationMethod,
         apiTokenId: actor.apiTokenId, subjectId: id,
-        details: { 'before.name': resource.name, 'before.type': resource.type },
+        details: { 'before.name': auditResourceName(resource.name), 'before.type': resource.type },
       });
     }
   }
