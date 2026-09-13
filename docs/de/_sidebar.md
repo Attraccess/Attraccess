@@ -84,6 +84,7 @@
 - **Systemeinstellungen**
   - [Überblick](settings/overview.md)
   - [Sicherheit](settings/security.md)
+  - [Audit-Protokoll](settings/audit-log.md)
 
 - **Für Entwickler**
   - [Überblick](developer/overview.md)

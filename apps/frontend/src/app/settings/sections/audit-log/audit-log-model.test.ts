@@ -40,11 +40,21 @@ describe('audit export and filtering', () => {
     expect(csvCell(' =HYPERLINK("https://example.test")')).toBe('"\' =HYPERLINK(""https://example.test"")"');
     expect(csvCell('value, "quoted"')).toBe('"value, ""quoted"""');
     const csv = auditCsv([
-      { ...entry, subjectLabel: '=1+1', details: { before: '{"name":"old"}', after: '{"name":"new"}' } },
+      {
+        ...entry,
+        subjectLabel: '=1+1',
+        authenticationMethod: 'api-token',
+        apiTokenId: 19,
+        pluginId: 'wago-fixture',
+        ipAddress: '2001:db8::1',
+        userAgent: '=diagnostic',
+        details: { before: '{"name":"old"}', after: '{"name":"new"}' },
+      },
     ]);
     expect(csv).toContain("'=1+1");
     expect(csv).toContain('old');
     expect(csv).toContain('new');
+    expect(csv).toContain('"api-token","19","wago-fixture","2001:db8::1","\'=diagnostic"');
   });
   it('rejects reversed dates and unsafe IDs without throwing', () => {
     expect(filterRequest({ ...emptyFilters, from: '2026-09-13T12:00', to: '2026-09-12T12:00' })).toEqual({

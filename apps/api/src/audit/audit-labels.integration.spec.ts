@@ -26,22 +26,18 @@ describe('persisted audit names', () => {
     service = new AuditService(source, new SettingsStoreService(source.getRepository(Setting), null));
     await service.onModuleInit();
     controller = new AuditController(service);
-    await source
-      .getRepository(User)
-      .insert({
-        id: 7,
-        username: 'Current admin',
-        email: 'private@example.test',
-        passwordResetToken: 'private-reset-token',
-      });
-    await source
-      .getRepository(Resource)
-      .insert({
-        id: 7,
-        name: 'Current lathe',
-        type: ResourceType.Machine,
-        documentationMarkdown: 'private documentation',
-      });
+    await source.getRepository(User).insert({
+      id: 7,
+      username: 'Current admin',
+      email: 'private@example.test',
+      passwordResetToken: 'private-reset-token',
+    });
+    await source.getRepository(Resource).insert({
+      id: 7,
+      name: 'Current lathe',
+      type: ResourceType.Machine,
+      documentationMarkdown: 'private documentation',
+    });
   }, 60_000);
   afterEach(async () => {
     await service?.onModuleDestroy();
@@ -82,24 +78,22 @@ describe('persisted audit names', () => {
   });
 
   it('retains recorded names after deletion and never joins WAGO target IDs to core resources', async () => {
-    await source
-      .getRepository(AuditLog)
-      .insert([
-        {
-          at: new Date(),
-          domain: 'resource',
-          pluginId: 'core',
-          action: 'resource.deleted',
-          operationId: randomUUID(),
-          actorId: 7,
-          authenticationMethod: 'session',
-          apiTokenId: null,
-          outcome: 'succeeded',
-          subjectType: 'resource',
-          subjectId: 7,
-          details: { actorUsername: 'Original admin', 'before.name': 'Original lathe' },
-        },
-      ]);
+    await source.getRepository(AuditLog).insert([
+      {
+        at: new Date(),
+        domain: 'resource',
+        pluginId: 'core',
+        action: 'resource.deleted',
+        operationId: randomUUID(),
+        actorId: 7,
+        authenticationMethod: 'session',
+        apiTokenId: null,
+        outcome: 'succeeded',
+        subjectType: 'resource',
+        subjectId: 7,
+        details: { actorUsername: 'Original admin', 'before.name': 'Original lathe' },
+      },
+    ]);
     await service.record({
       pluginId: 'abcdefghijklmnopqrstu',
       action: 'wago.publication',
@@ -125,5 +119,23 @@ describe('persisted audit names', () => {
     expect(items.find((entry) => entry.domain === 'wago')).toMatchObject({ actorId: 7, subjectId: 7 });
     expect(items.find((entry) => entry.domain === 'wago')?.actorUsername).toBeUndefined();
     expect(await source.getRepository(AuditLog).count()).toBe(2);
+  });
+
+  it('uses recorded MQTT names without joining coincident resource IDs', async () => {
+    await service.recordAdministration({
+      action: 'mqtt_server.deleted',
+      actorId: 7,
+      subjectType: 'mqtt-server',
+      subjectId: 7,
+      details: { serverName: 'Former workshop broker', host: 'mqtt.example.test', port: 1883, useTls: 0 },
+    });
+    const { items } = await controller.list({ domain: 'administration' });
+    expect(items).toEqual([
+      expect.objectContaining({
+        subjectId: 7,
+        subjectLabel: 'Former workshop broker',
+        subjectLabelSource: 'recorded',
+      }),
+    ]);
   });
 });

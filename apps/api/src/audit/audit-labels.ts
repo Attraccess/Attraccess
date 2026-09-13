@@ -8,10 +8,13 @@ const name = (value: unknown): string | undefined =>
 function recordedSubjectLabel(entry: AuditLog): string | undefined {
   const details = entry.details;
   if (name(details.subjectLabel)) return name(details.subjectLabel);
+  if (entry.domain === 'administration' && entry.subjectType === 'mqtt-server') return name(details.serverName);
+  if (entry.domain === 'administration' && entry.subjectType === 'plugin-package')
+    return name(details.pluginName) ?? name(details.packageName);
   // A maintenance schedule's name belongs to the schedule, not its resource subject.
   const isResource =
     entry.domain === 'resource' && entry.subjectType === 'resource' && entry.action.startsWith('resource.');
-  const isGroup = entry.domain === 'resource' && entry.subjectType === 'resource_group';
+  const isGroup = entry.domain === 'resource' && ['resource_group', 'resource.group'].includes(entry.subjectType);
   const isProject = entry.domain === 'project' && entry.subjectType === 'project';
   if (isResource || isGroup || isProject)
     return name(details['after.name']) ?? name(details['before.name']) ?? name(details.name);
@@ -44,9 +47,9 @@ async function currentNames(
 
 /** Adds explicitly labelled read-time names without mutating immutable historical rows. */
 export async function auditEntriesWithLabels(source: DataSource, entries: AuditLog[]): Promise<AuditEntryDto[]> {
-  const subjects = (domain: string, type: string) =>
+  const subjects = (domain: string, ...types: string[]) =>
     entries
-      .filter((entry) => entry.domain === domain && entry.subjectType === type && !recordedSubjectLabel(entry))
+      .filter((entry) => entry.domain === domain && types.includes(entry.subjectType) && !recordedSubjectLabel(entry))
       .map((entry) => entry.subjectId);
   const [users, resources, groups, projects] = await Promise.all([
     currentNames(
@@ -59,7 +62,7 @@ export async function auditEntriesWithLabels(source: DataSource, entries: AuditL
       'username',
     ),
     currentNames(source, Resource, subjects('resource', 'resource'), 'name'),
-    currentNames(source, ResourceGroup, subjects('resource', 'resource_group'), 'name'),
+    currentNames(source, ResourceGroup, subjects('resource', 'resource_group', 'resource.group'), 'name'),
     currentNames(source, Project, subjects('project', 'project'), 'name'),
   ]);
   return entries.map((entry) => {
@@ -69,7 +72,7 @@ export async function auditEntriesWithLabels(source: DataSource, entries: AuditL
     const subjectNames =
       entry.domain === 'resource' && entry.subjectType === 'resource'
         ? resources
-        : entry.domain === 'resource' && entry.subjectType === 'resource_group'
+        : entry.domain === 'resource' && ['resource_group', 'resource.group'].includes(entry.subjectType)
           ? groups
           : entry.domain === 'project' && entry.subjectType === 'project'
             ? projects

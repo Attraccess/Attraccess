@@ -13,6 +13,8 @@ export class AuditEntryDto {
   @ApiPropertyOptional({ enum: ['recorded', 'current'] }) actorUsernameSource?: 'recorded' | 'current';
   @ApiProperty({ type: String, nullable: true }) authenticationMethod!: string | null;
   @ApiProperty({ type: Number, nullable: true }) apiTokenId!: number | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) ipAddress?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) userAgent?: string | null;
   @ApiProperty({ enum: ['attempted', 'succeeded', 'failed'] }) outcome!: 'attempted' | 'succeeded' | 'failed';
   @ApiProperty() subjectType!: string;
   @ApiProperty({ type: Number, nullable: true }) subjectId!: number | null;
