@@ -121,6 +121,20 @@ describe('SsoService', () => {
     ssoProviderRepository = module.get<Repository<SSOProvider>>(SSOProviderRepository);
     oidcConfigRepository = module.get<Repository<SSOProviderOIDCConfiguration>>(SSOProviderOIDCConfigurationRepository);
     samlConfigRepository = module.get<Repository<SSOProviderSAMLConfiguration>>(SSOProviderSAMLConfigurationRepository);
+    Object.assign(ssoProviderRepository, {
+      manager: {
+        transaction: jest.fn((callback: (manager: { getRepository: (entity: unknown) => unknown }) => Promise<unknown>) =>
+          callback({
+            getRepository: (entity) =>
+              entity === SSOProvider
+                ? ssoProviderRepository
+                : entity === SSOProviderOIDCConfiguration
+                  ? oidcConfigRepository
+                  : samlConfigRepository,
+          }),
+        ),
+      },
+    });
     encryptionService = module.get<EncryptionService>(EncryptionService);
   });
 
@@ -187,6 +201,16 @@ describe('SsoService', () => {
       expect(ssoProviderRepository.save).toHaveBeenCalled();
       expect(result).toEqual(mockSSOProviderWithOIDCConfig);
     });
+
+    it('rolls back provider creation when the committed provider cannot be reloaded', async () => {
+      jest.spyOn(ssoProviderRepository, 'findOne').mockResolvedValueOnce(null);
+
+      await expect(service.createProvider({
+        name: 'New Provider', type: SSOProviderType.OIDC,
+        oidcConfiguration: { issuer: 'https://new-issuer.com', authorizationURL: 'https://new-issuer.com/auth', tokenURL: 'https://new-issuer.com/token', userInfoURL: 'https://new-issuer.com/userinfo', clientId: 'new-client-id', clientSecret: 'new-client-secret' },
+      })).rejects.toThrow('Provider not found after create');
+      expect(ssoProviderRepository.manager.transaction).toHaveBeenCalled();
+    });
   });
 
   describe('updateProvider', () => {
@@ -199,6 +223,21 @@ describe('SsoService', () => {
 
       expect(ssoProviderRepository.update).toHaveBeenCalledWith(1, { name: updateDto.name });
       expect(result).toEqual(mockSSOProviderWithOIDCConfig);
+    });
+
+    it('does not commit a provider update when its configuration write fails', async () => {
+      oidcConfigRepository.update.mockRejectedValueOnce(new Error('configuration write failed'));
+
+      await expect(service.updateProvider(1, { oidcConfiguration: { issuer: 'https://changed.example.com' } })).rejects.toThrow('configuration write failed');
+      expect(ssoProviderRepository.manager.transaction).toHaveBeenCalled();
+      expect(ssoProviderRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('rolls back a provider update when the committed provider cannot be reloaded', async () => {
+      jest.spyOn(ssoProviderRepository, 'findOne').mockResolvedValueOnce(mockSSOProviderWithOIDCConfig).mockResolvedValueOnce(null);
+
+      await expect(service.updateProvider(1, { name: 'Changed Provider' })).rejects.toThrow('Provider not found after update');
+      expect(ssoProviderRepository.manager.transaction).toHaveBeenCalled();
     });
   });
 

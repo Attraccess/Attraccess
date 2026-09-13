@@ -18,6 +18,8 @@ import {
   projectIdentityAuditEvent,
   projectResourceAuditEvent,
   ResourceAuditEvent,
+  projectSsoAuditEvent,
+  SsoAuditEvent,
 } from './audit-policy';
 import { AuditQueryDto } from './audit-query.dto';
 import { randomUUID } from 'crypto';
@@ -120,6 +122,16 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
       });
     } catch {
       // Never log the event, SQLite parameters, or exception (may contain secrets).
+      return { status: 'unavailable' };
+    }
+  }
+
+  async recordSso(event: SsoAuditEvent): Promise<PluginAuditReceipt> {
+    try {
+      const snapshot = projectSsoAuditEvent(event);
+      if (!snapshot) return { status: 'unavailable' };
+      return await this.recordSnapshot({ domain: 'sso', pluginId: null, action: snapshot.action, operationId: snapshot.operationId, actorId: snapshot.actorId, authenticationMethod: snapshot.authenticationMethod, apiTokenId: snapshot.apiTokenId ?? null, outcome: 'succeeded', subjectType: snapshot.subject.type, subjectId: snapshot.subject.id, ipAddress: null, userAgent: null, details: snapshot.details });
+    } catch {
       return { status: 'unavailable' };
     }
   }
@@ -275,7 +287,7 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
       const config = await readAuditSettings(this.settings);
       if (
         !config.enabled ||
-        !config.domains.includes(event.domain as 'billing' | 'resource' | 'wago' | 'identity') ||
+        !config.domains.includes(event.domain as 'billing' | 'resource' | 'sso' | 'wago' | 'identity') ||
         this.stopping
       )
         return { status: 'unavailable' };
