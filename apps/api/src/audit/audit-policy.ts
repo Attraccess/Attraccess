@@ -15,6 +15,28 @@ export interface ResourceAuditEvent {
   details: Record<string, string | number>;
 }
 
+export interface ProjectAuditEvent {
+  action:
+    | 'project.created'
+    | 'project.updated'
+    | 'project.deleted'
+    | 'project.archived'
+    | 'project.unarchived'
+    | 'project.member.added'
+    | 'project.member.removed'
+    | 'project.invitation.sent'
+    | 'project.invitation.accepted'
+    | 'project.invitation.rejected'
+    | 'project.invitation.revoked';
+  operationId: string;
+  actorId: number;
+  authenticationMethod?: 'session' | 'api-token';
+  apiTokenId?: number;
+  subjectType: 'project' | 'project.member' | 'project.invitation';
+  subjectId: number;
+  details: Record<string, string | number>;
+}
+
 const positive = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) > 0;
 const uuid = (v: unknown): v is string =>
   typeof v === 'string' && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);
@@ -188,5 +210,88 @@ export function projectResourceAuditEvent(input: ResourceAuditEvent): ResourceAu
   ) {
     return null;
   }
+  return { ...input, details: details as Record<string, string | number> };
+}
+
+const projectActions = new Set<ProjectAuditEvent['action']>([
+  'project.created',
+  'project.updated',
+  'project.deleted',
+  'project.archived',
+  'project.unarchived',
+  'project.member.added',
+  'project.member.removed',
+  'project.invitation.sent',
+  'project.invitation.accepted',
+  'project.invitation.rejected',
+  'project.invitation.revoked',
+]);
+const projectDetailFields = new Set([
+  'projectId',
+  'memberId',
+  'userId',
+  'invitationId',
+  'role',
+  'before.name',
+  'after.name',
+  'descriptionChanged',
+  'changedFields',
+  'before.hasLogo',
+  'after.hasLogo',
+  'after.archived',
+]);
+const projectDetailValidators: Record<string, (value: string | number) => boolean> = {
+  projectId: positive,
+  memberId: positive,
+  userId: positive,
+  invitationId: positive,
+  role: oneOf('viewer'),
+  'before.name': (value) => typeof value === 'string' && value.length <= 255 && !!value.trim(),
+  'after.name': (value) => typeof value === 'string' && value.length <= 255 && !!value.trim(),
+  descriptionChanged: (value) => value === 1,
+  changedFields: (value) => {
+    try {
+      const fields = JSON.parse(value as string);
+      return Array.isArray(fields) && fields.length > 0 && fields.every((field) => ['name', 'description', 'logo'].includes(field));
+    } catch {
+      return false;
+    }
+  },
+  'before.hasLogo': (value) => value === 0 || value === 1,
+  'after.hasLogo': (value) => value === 0 || value === 1,
+  'after.archived': (value) => value === 0 || value === 1,
+};
+
+/** Project administration snapshots intentionally exclude descriptions, email addresses, and invitation credentials. */
+export function projectProjectAuditEvent(input: ProjectAuditEvent): ProjectAuditEvent | null {
+  if (
+    !projectActions.has(input.action) ||
+    !uuid(input.operationId) ||
+    !positive(input.actorId) ||
+    !positive(input.subjectId) ||
+    !['project', 'project.member', 'project.invitation'].includes(input.subjectType)
+  ) {
+    return null;
+  }
+  if (
+    (input.authenticationMethod !== undefined &&
+      input.authenticationMethod !== 'session' &&
+      input.authenticationMethod !== 'api-token') ||
+    (input.apiTokenId !== undefined && !positive(input.apiTokenId))
+  ) {
+    return null;
+  }
+  const details = dataFields(input.details, [...projectDetailFields]);
+  if (!details) return null;
+  for (const [key, value] of Object.entries(details)) {
+    if (
+      !projectDetailFields.has(key) ||
+      (typeof value !== 'string' && typeof value !== 'number') ||
+      !projectDetailValidators[key](value)
+    ) {
+      return null;
+    }
+  }
+  if (Buffer.byteLength(JSON.stringify(details), 'utf8') > 4096) return null;
   return { ...input, details: details as Record<string, string | number> };
 }

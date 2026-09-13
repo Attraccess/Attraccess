@@ -55,7 +55,7 @@ const event = (): PluginAuditEvent & { pluginId: string } => ({
   subject: { type: 'wago.controller', id: 7 },
   details: { revision: 2 },
 });
-const config = { enabled: true, domains: ['resource', 'wago'], retention_days: 90 };
+const config = { enabled: true, domains: ['project', 'resource', 'wago'], retention_days: 90 };
 
 describe('durable audit SQLite', () => {
   let directory: string;
@@ -159,6 +159,34 @@ describe('durable audit SQLite', () => {
         source: 'sumup-topup',
       }),
     ).toEqual({ status: 'unavailable' });
+  });
+
+  it('records project administration events with only safe allowlisted details', async () => {
+    await service.recordProject({
+      action: 'project.invitation.sent',
+      actorId: 42,
+      subjectType: 'project.invitation',
+      subjectId: 7,
+      details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
+    });
+    await service.recordProject({
+      action: 'project.invitation.sent',
+      actorId: 42,
+      subjectType: 'project.invitation',
+      subjectId: 8,
+      details: { email: 'person@example.test' },
+    } as never);
+
+    expect((await service.list({ limit: 10 })).items).toEqual([
+      expect.objectContaining({
+        domain: 'project',
+        action: 'project.invitation.sent',
+        actorId: 42,
+        subjectType: 'project.invitation',
+        subjectId: 7,
+        details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
+      }),
+    ]);
   });
 
   it('records a billing event only after its originating transaction commits', async () => {

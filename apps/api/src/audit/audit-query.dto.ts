@@ -10,15 +10,24 @@ const RESOURCE_AUDIT_ACTIONS = [
   'supervision.approved',
   'supervision.rejected',
 ];
-const ALL_AUDIT_ACTIONS = [
-  ...AUDIT_ACTIONS,
-  ...RESOURCE_AUDIT_ACTIONS,
-  'billing.transaction.created',
-  'billing.transaction.updated',
+const PROJECT_AUDIT_ACTIONS = [
+  'project.created',
+  'project.updated',
+  'project.deleted',
+  'project.archived',
+  'project.unarchived',
+  'project.member.added',
+  'project.member.removed',
+  'project.invitation.sent',
+  'project.invitation.accepted',
+  'project.invitation.rejected',
+  'project.invitation.revoked',
 ];
+const ALL_AUDIT_ACTIONS = [...AUDIT_ACTIONS, ...RESOURCE_AUDIT_ACTIONS, ...PROJECT_AUDIT_ACTIONS, 'billing.transaction.created', 'billing.transaction.updated'];
 
 const timestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
-const eventPrefix = /^(?:billing|maintenance_schedule|supervision|wago)(?:\.[a-z_]+)*\.?$/;
+
+const eventPrefix = /^(?:billing|maintenance_schedule|project|supervision|wago)(?:\.[a-z_]+)*\.?$/;
 
 export class AuditQueryDto {
   @ApiPropertyOptional({ description: 'Event action prefix', pattern: eventPrefix.source, maxLength: 100 })
@@ -63,9 +72,9 @@ export class AuditQueryDto {
   @Max(Number.MAX_SAFE_INTEGER)
   beforeId?: number;
 
-  @ApiPropertyOptional({ enum: ['billing', 'resource', 'wago'] })
+  @ApiPropertyOptional({ enum: ['billing', 'project', 'resource', 'wago'] })
   @IsOptional()
-  @IsIn(['billing', 'resource', 'wago'])
+  @IsIn(['billing', 'project', 'resource', 'wago'])
   domain?: string;
 
   @ApiPropertyOptional({ enum: ['attempted', 'succeeded', 'failed'] })
@@ -94,8 +103,8 @@ export class AuditQueryDto {
   @Max(Number.MAX_SAFE_INTEGER)
   subjectId?: number;
 
-  @ApiPropertyOptional({ enum: ['billing.transaction', 'resource', 'wago.controller', 'wago.commissioning'] })
+  @ApiPropertyOptional({ enum: ['billing.transaction', 'project', 'project.member', 'project.invitation', 'resource', 'wago.controller', 'wago.commissioning'] })
   @IsOptional()
-  @IsIn(['billing.transaction', 'resource', 'wago.controller', 'wago.commissioning'])
+  @IsIn(['billing.transaction', 'project', 'project.member', 'project.invitation', 'resource', 'wago.controller', 'wago.commissioning'])
   subjectType?: string;
 }

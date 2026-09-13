@@ -90,8 +90,7 @@ export class ProjectsController {
   @ApiResponse({ status: 204, description: 'The project has been successfully deleted.' })
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
   async deleteOne(@Req() req: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number): Promise<void> {
-    await this.projectAccessService.ensureOwner(req.user.id, id);
-    await this.projectsService.deleteOne(id);
+    await this.projectsService.deleteOne(req.user.id, id, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
   }
 
   @Post(':id/archive')
@@ -103,7 +102,7 @@ export class ProjectsController {
     @Req() req: AuthenticatedRequest,
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ProjectWithAccessDto> {
-    await this.projectsService.archiveOne(req.user.id, id);
+    await this.projectsService.archiveOne(req.user.id, id, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
     const projectWithAccess = await this.projectAccessService.getAccessOrThrow(req.user.id, id);
     return this.transformProject(projectWithAccess);
   }
@@ -117,7 +116,7 @@ export class ProjectsController {
     @Req() req: AuthenticatedRequest,
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ProjectWithAccessDto> {
-    await this.projectsService.unarchiveOne(req.user.id, id);
+    await this.projectsService.unarchiveOne(req.user.id, id, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
     const projectWithAccess = await this.projectAccessService.getAccessOrThrow(req.user.id, id);
     return this.transformProject(projectWithAccess);
   }
@@ -137,7 +136,7 @@ export class ProjectsController {
     if (logo) {
       data.logo = logo;
     }
-    const project = await this.projectsService.create(req.user.id, data);
+    const project = await this.projectsService.create(req.user.id, data, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
     const projectWithAccess = await this.projectAccessService.getAccessOrThrow(req.user.id, project.id);
     return this.transformProject(projectWithAccess);
   }
@@ -158,7 +157,7 @@ export class ProjectsController {
     if (logo) {
       data.logo = logo;
     }
-    const project = await this.projectsService.updateOne(req.user.id, id, data);
+    const project = await this.projectsService.updateOne(req.user.id, id, data, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
     const projectWithAccess = await this.projectAccessService.getAccessOrThrow(req.user.id, project.id);
     return this.transformProject(projectWithAccess);
   }
@@ -221,8 +220,7 @@ export class ProjectsController {
     @Param('id', ParseIntPipe) id: number,
     @Param('memberId', ParseIntPipe) memberId: number,
   ): Promise<void> {
-    await this.projectAccessService.ensureOwner(req.user.id, id);
-    await this.projectsService.removeMember(id, memberId);
+    await this.projectsService.removeMember(req.user.id, id, memberId, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
   }
 
   @Get(':id/invitations')
@@ -246,7 +244,9 @@ export class ProjectsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() data: CreateProjectInvitationDto,
   ): Promise<ProjectInvitation> {
-    return await this.projectsService.createProjectInvitation(req.user.id, id, data.invitedUserId, data.role);
+    return await this.projectsService.createProjectInvitation(
+      req.user.id, id, data.invitedUserId, data.role, req.user.authenticationMethod ?? 'session', req.user.apiTokenId,
+    );
   }
 
   @Post(':id/invitations/:invitationId/resend')
@@ -258,7 +258,7 @@ export class ProjectsController {
     @Param('id', ParseIntPipe) id: number,
     @Param('invitationId', ParseIntPipe) invitationId: number,
   ): Promise<ProjectInvitation> {
-    return await this.projectsService.resendProjectInvitation(req.user.id, id, invitationId);
+    return await this.projectsService.resendProjectInvitation(req.user.id, id, invitationId, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
   }
 
   @Delete(':id/invitations/:invitationId')
@@ -270,6 +270,6 @@ export class ProjectsController {
     @Param('id', ParseIntPipe) id: number,
     @Param('invitationId', ParseIntPipe) invitationId: number,
   ): Promise<ProjectInvitation> {
-    return await this.projectsService.cancelProjectInvitation(req.user.id, id, invitationId);
+    return await this.projectsService.cancelProjectInvitation(req.user.id, id, invitationId, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
   }
 }
