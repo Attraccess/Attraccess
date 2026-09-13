@@ -9,7 +9,7 @@ import {
 } from '@attraccess/database-entities';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { FindManyProjectsQueryDto } from './dto/find-many-query.dto';
 import { CreateProjectDto } from './dto/create.dto';
 import { FileStorageService } from '../common/services/file-storage.service';
@@ -90,7 +90,6 @@ export class ProjectsService {
   private async setLogo(project: Project, logo: FileUpload) {
     const logoFilename = await this.fileStorageService.saveFile(logo, `projects/${project.id}`);
     project.logo = logoFilename;
-    await this.projectRepository.save(project);
   }
 
   public async create(
@@ -119,6 +118,7 @@ export class ProjectsService {
     if (data.logo) {
       const before = this.projectDetails(project, 'before');
       await this.setLogo(project, data.logo);
+      await this.projectRepository.save(project);
       await this.audit.recordProject({
         action: 'project.updated',
         actorId: ownerUserId,
@@ -139,15 +139,16 @@ export class ProjectsService {
     apiTokenId?: number,
   ): Promise<Project> {
     const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
-    if (project.archivedAt) return project;
-    project.archivedAt = new Date();
-    const saved = await this.projectRepository.save(project);
+    const archivedAt = new Date();
+    const result = await this.projectRepository.update({ id, archivedAt: IsNull() }, { archivedAt });
+    if (result.affected !== 1) return project;
+    project.archivedAt = archivedAt;
     await this.audit.recordProject({
       action: 'project.archived', actorId: ownerUserId, authenticationMethod, apiTokenId,
-      subjectType: 'project', subjectId: saved.id,
-      details: { ...this.projectDetails(saved, 'after'), 'after.archived': 1 },
+      subjectType: 'project', subjectId: project.id,
+      details: { ...this.projectDetails(project, 'after'), 'after.archived': 1 },
     });
-    return saved;
+    return project;
   }
 
   public async unarchiveOne(
@@ -157,15 +158,15 @@ export class ProjectsService {
     apiTokenId?: number,
   ): Promise<Project> {
     const project = await this.projectAccessService.ensureOwner(ownerUserId, id);
-    if (!project.archivedAt) return project;
+    const result = await this.projectRepository.update({ id, archivedAt: Not(IsNull()) }, { archivedAt: null });
+    if (result.affected !== 1) return project;
     project.archivedAt = null;
-    const saved = await this.projectRepository.save(project);
     await this.audit.recordProject({
       action: 'project.unarchived', actorId: ownerUserId, authenticationMethod, apiTokenId,
-      subjectType: 'project', subjectId: saved.id,
-      details: { ...this.projectDetails(saved, 'after'), 'after.archived': 0 },
+      subjectType: 'project', subjectId: project.id,
+      details: { ...this.projectDetails(project, 'after'), 'after.archived': 0 },
     });
-    return saved;
+    return project;
   }
 
   public async deleteOne(
