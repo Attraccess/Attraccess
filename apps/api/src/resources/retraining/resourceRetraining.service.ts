@@ -160,6 +160,9 @@ export class ResourceRetrainingService {
   }
 
   private async notifyIfDue(introduction: ResourceIntroduction, now: Date): Promise<void> {
+    if (!(await this.isValid(introduction.id))) {
+      return;
+    }
     const trainedAt = await this.getTrainedAt(introduction);
     if (!trainedAt) {
       return;
@@ -179,21 +182,23 @@ export class ResourceRetrainingService {
       return;
     }
 
-    // Capture the required transition once per training cycle, independently of email retries.
-    const subjectId = introduction.resourceId ?? introduction.resourceGroupId;
-    const subjectType = introduction.resourceId ? 'resource' : 'resource.group';
-    if (!(await this.audit.hasResourceIntroductionEvent('retraining.required', introduction.id, subjectId, trainedAt, subjectType).catch(() => false))) {
-      await this.audit.recordResource({
+    // This marker survives audit retention but is reset by a newer training cycle.
+    if (!introduction.retrainingRequiredAuditedAt || introduction.retrainingRequiredAuditedAt < trainedAt) {
+      const subjectId = introduction.resourceId ?? introduction.resourceGroupId;
+      const recorded = await this.audit.recordResource({
         action: 'retraining.required',
         actorId: null,
         subjectId,
-        ...(subjectType === 'resource' ? {} : { subjectType }),
+        ...(introduction.resourceId ? {} : { subjectType: 'resource.group' }),
         details: {
           introductionId: introduction.id,
           usageUserId: introduction.receiverUserId,
           retrainingReason: evaluation.reason ?? 'unknown',
         },
-      }).catch(() => undefined);
+      });
+      if (recorded) {
+        await this.resourceIntroductionRepository.update(introduction.id, { retrainingRequiredAuditedAt: now });
+      }
     }
     if (introduction.retrainingNotifiedAt && introduction.retrainingNotifiedAt.getTime() >= trainedAt.getTime()) {
       return;

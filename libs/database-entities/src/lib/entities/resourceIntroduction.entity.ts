@@ -63,6 +63,9 @@ export class ResourceIntroduction {
   })
   retrainingNotifiedAt!: Date | null;
 
+  @Column({ type: 'datetime', nullable: true })
+  retrainingRequiredAuditedAt!: Date | null;
+
   @CreateDateColumn()
   @ApiProperty({
     description: 'When the introduction record was created',

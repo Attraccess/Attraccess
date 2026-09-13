@@ -159,5 +159,6 @@ export * from './1783700000000-durable-audit';
 export * from './1783800000000-mqtt-server-management-port';
 export * from './1783800000000-identity-audit';
 export * from './1783900000000-retire-password-policy-audit';
+export * from './1784000000000-retraining-audit-marker';
 export * from './1765442000000-form-field-position';
 export * from './1783700000000-refresh-default-email-layout';

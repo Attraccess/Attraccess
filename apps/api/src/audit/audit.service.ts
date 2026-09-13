@@ -203,15 +203,15 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     });
   }
 
-  async recordResource(event: Omit<ResourceAuditEvent, 'operationId'>): Promise<void> {
+  async recordResource(event: Omit<ResourceAuditEvent, 'operationId'>): Promise<boolean> {
     try {
       const snapshot = projectResourceAuditEvent({ ...event, operationId: randomUUID() });
       const storage = this.storage;
-      if (!snapshot || this.stopping || !storage?.isInitialized || this.pending >= 8) return;
+      if (!snapshot || this.stopping || !storage?.isInitialized || this.pending >= 8) return false;
       this.pending++;
       try {
         const config = await readAuditSettings(this.settings);
-        if (!config.enabled || !config.domains.includes('resource') || this.stopping) return;
+        if (!config.enabled || !config.domains.includes('resource') || this.stopping) return false;
         await this.serializeStorageWrite(() =>
           storage.getRepository(AuditLog).insert({
             at: new Date(),
@@ -235,34 +235,14 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
             details: snapshot.details,
           }),
         );
+        return true;
       } finally {
         this.pending--;
       }
     } catch {
       /* Audit persistence must not affect resource operations. */
+      return false;
     }
-  }
-
-  /** A persisted lifecycle row is the dedupe marker when delivery retries independently. */
-  async hasResourceIntroductionEvent(
-    action: 'retraining.required',
-    introductionId: number,
-    subjectId: number,
-    trainedAt: Date,
-    subjectType: 'resource' | 'resource.group' = 'resource',
-  ): Promise<boolean> {
-    if (this.stopping || !this.storage?.isInitialized) return false;
-    const row = await this.storage
-      .getRepository(AuditLog)
-      .createQueryBuilder('audit')
-      .where('audit.domain = :domain', { domain: 'resource' })
-      .andWhere('audit.action = :action', { action })
-      .andWhere('audit.subjectId = :subjectId', { subjectId })
-      .andWhere('audit.subjectType = :subjectType', { subjectType })
-      .andWhere('audit.at >= :trainedAt', { trainedAt: trainedAt.toISOString().replace('T', ' ').replace('Z', '') })
-      .andWhere("json_extract(audit.details, '$.introductionId') = :introductionId", { introductionId })
-      .getExists();
-    return row;
   }
 
   afterTransactionCommit({ queryRunner }: TransactionCommitEvent): void {

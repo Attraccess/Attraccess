@@ -679,24 +679,6 @@ describe('durable audit SQLite', () => {
     });
   });
 
-  it('deduplicates required retraining within a training cycle and survives restart', async () => {
-    await service.recordResource({
-      action: 'retraining.required', actorId: null, subjectId: 7,
-      details: { introductionId: 3, usageUserId: 42, retrainingReason: 'age' },
-    });
-    const row = (await service.list({ limit: 1 })).items[0];
-    await service.onModuleDestroy();
-    service = new AuditService(source, store);
-    await service.onModuleInit();
-    const trainedBefore = new Date(new Date(row.at).getTime() - 1);
-    const trainedAfter = new Date(new Date(row.at).getTime() + 1);
-    expect(await service.hasResourceIntroductionEvent('retraining.required', 3, 7, trainedBefore)).toBe(true);
-    expect(await service.hasResourceIntroductionEvent('retraining.required', 3, 7, trainedAfter)).toBe(false);
-    expect(await service.hasResourceIntroductionEvent('retraining.required', 4, 7, trainedBefore)).toBe(false);
-    expect(await service.hasResourceIntroductionEvent('retraining.required', 3, 8, trainedBefore)).toBe(false);
-    expect(await service.hasResourceIntroductionEvent('retraining.required', 3, 7, trainedBefore, 'resource.group')).toBe(false);
-  });
-
   it('rejects oversized details at the database boundary too', async () => {
     await service.record(event());
     const row = (await service.list({ limit: 1 })).items[0];
