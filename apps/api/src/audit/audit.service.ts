@@ -12,7 +12,13 @@ import { AuditLog } from '@attraccess/database-entities';
 import { PluginAuditEvent, PluginAuditHostProvider, PluginAuditReceipt } from '@attraccess/plugins-backend-sdk';
 import { readAuditSettings } from './audit.config';
 import { SettingsStoreService } from '../settings/settings-store.service';
-import { projectAuditEvent, projectResourceAuditEvent, ResourceAuditEvent } from './audit-policy';
+import {
+  IdentityAuditEvent,
+  projectAuditEvent,
+  projectIdentityAuditEvent,
+  projectResourceAuditEvent,
+  ResourceAuditEvent,
+} from './audit-policy';
 import { AuditQueryDto } from './audit-query.dto';
 import { randomUUID } from 'crypto';
 import { auditEntriesWithLabels } from './audit-labels';
@@ -154,6 +160,21 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     }
   }
 
+  async recordIdentity(event: IdentityAuditEvent): Promise<PluginAuditReceipt> {
+    try {
+      const snapshot = projectIdentityAuditEvent(event);
+      if (!snapshot) return { status: 'unavailable' };
+      return await this.recordSnapshot({
+        domain: 'identity', pluginId: null, action: snapshot.action, operationId: snapshot.operationId,
+        actorId: snapshot.actorId, authenticationMethod: null, apiTokenId: null, outcome: snapshot.outcome,
+        subjectType: snapshot.subjectType, subjectId: snapshot.subjectId, ipAddress: snapshot.ipAddress,
+        userAgent: snapshot.userAgent, details: snapshot.details,
+      });
+    } catch {
+      return { status: 'unavailable' };
+    }
+  }
+
   /** Defers billing audit writes until the supplied transaction has committed. */
   recordBillingTransactionAfterCommit(
     event: BillingTransactionAuditEvent,
@@ -223,7 +244,7 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     this.pending++;
     try {
       const config = await readAuditSettings(this.settings);
-      if (!config.enabled || !config.domains.includes(event.domain as 'billing' | 'wago') || this.stopping)
+      if (!config.enabled || !config.domains.includes(event.domain as 'billing' | 'resource' | 'wago' | 'identity') || this.stopping)
         return { status: 'unavailable' };
       // sqlite3 queues concurrent statements after a busy timeout. Keep those writes in our
       // bounded admission queue instead, so a released lock cannot revive stale audit writes.

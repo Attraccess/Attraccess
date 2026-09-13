@@ -8,7 +8,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Logger,
   Param,
   ParseEnumPipe,
   Patch,
@@ -33,8 +32,6 @@ import {
 @ApiTags('Password Policy Admin')
 @Controller('admin/password-policy')
 export class AdminPasswordPolicyController {
-  private readonly logger = new Logger('PasswordPolicyAudit');
-
   constructor(private readonly service: PasswordPolicyService) {}
 
   @Get()
@@ -55,7 +52,6 @@ export class AdminPasswordPolicyController {
   ): Promise<PasswordPolicyDto> {
     const audit = this.buildAudit(request);
     const after = await this.service.updatePolicy(body, audit);
-    this.mirrorAuditToLogger('global_policy_updated', audit, { changed: Object.keys(body) });
     return after;
   }
 
@@ -114,7 +110,6 @@ export class AdminPasswordPolicyController {
   ): Promise<PasswordPolicyOverrideDto> {
     const audit = this.buildAudit(request);
     const saved = await this.service.upsertOverride(role, body, audit);
-    this.mirrorAuditToLogger('override_upserted', audit, { role, changed: Object.keys(body) });
     return this.toOverrideDto(saved);
   }
 
@@ -130,7 +125,6 @@ export class AdminPasswordPolicyController {
   ): Promise<void> {
     const audit = this.buildAudit(request);
     await this.service.deleteOverride(role, audit);
-    this.mirrorAuditToLogger('override_deleted', audit, { role });
   }
 
   private mergeDraft(base: PasswordPolicyConfig, draft: UpdatePasswordPolicyDto): PasswordPolicyConfig {
@@ -177,17 +171,4 @@ export class AdminPasswordPolicyController {
     };
   }
 
-  private mirrorAuditToLogger(event: string, audit: AuditContext, extra: Record<string, unknown>): void {
-    this.logger.log(
-      JSON.stringify({
-        event,
-        actorId: audit.actorId,
-        actorUsername: audit.actorUsername,
-        ip: audit.ip,
-        requestId: audit.requestId,
-        at: new Date().toISOString(),
-        ...extra,
-      }),
-    );
-  }
 }

@@ -88,7 +88,6 @@ import {
   PasswordPolicyRole,
   PASSWORD_POLICY_ROLES,
 } from './entities/password-policy-override.entity';
-import { PasswordPolicyAudit, PasswordPolicyAuditEvent } from './entities/password-policy-audit.entity';
 import { Conversation } from './entities/conversation.entity';
 import { ConversationParticipant } from './entities/conversation-participant.entity';
 import { Message, MessageReferenceType } from './entities/message.entity';
@@ -201,8 +200,6 @@ export {
   PasswordPolicyOverride,
   PasswordPolicyRole,
   PASSWORD_POLICY_ROLES,
-  PasswordPolicyAudit,
-  PasswordPolicyAuditEvent,
   Conversation,
   ConversationParticipant,
   Message,
@@ -268,7 +265,6 @@ export const entities = {
   PasswordPolicy,
   PasswordHistory,
   PasswordPolicyOverride,
-  PasswordPolicyAudit,
   Conversation,
   ConversationParticipant,
   Message,

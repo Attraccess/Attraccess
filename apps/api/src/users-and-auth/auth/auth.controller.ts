@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Optional, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { SessionService } from './session.service';
 import { LoginRateLimitGuard } from '../rate-limiting/login.rate-limit.guard';
@@ -6,6 +6,8 @@ import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-s
 import { CreateSessionResponse } from './auth.types';
 import { ApiBody, ApiOkResponse, ApiResponse, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CookieConfigService } from '../../common/services/cookie-config.service';
+import { IdentityAuditService } from '../../audit/identity-audit.service';
+import { randomUUID } from 'node:crypto';
 
 @ApiTags('Authentication')
 @Controller('/auth')
@@ -13,6 +15,7 @@ export class AuthController {
   constructor(
     private readonly sessionService: SessionService,
     private readonly cookieConfigService: CookieConfigService,
+    @Optional() private readonly identityAudit?: IdentityAuditService,
   ) {}
 
   @Post('/session/local')
@@ -176,5 +179,14 @@ export class AuthController {
 
     // Logout from passport session
     await new Promise<void>((resolve) => request.logout(resolve));
+    void this.identityAudit?.record({
+      action: 'logout',
+      operationId: randomUUID(),
+      outcome: 'succeeded',
+      actorId: request.user.id,
+      subjectId: request.user.id,
+      details: {},
+      request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+    });
   }
 }

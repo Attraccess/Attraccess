@@ -34,6 +34,8 @@ import {
   PluginAuditEvent,
 } from '@attraccess/plugins-backend-sdk';
 import { DurableAudit1783700000000 } from '../database/migrations/1783700000000-durable-audit';
+import { IdentityAudit1783800000000 } from '../database/migrations/1783800000000-identity-audit';
+import { RetirePasswordPolicyAudit1783900000000 } from '../database/migrations/1783900000000-retire-password-policy-audit';
 import { AuditService } from './audit.service';
 import { AuditModule } from './audit.module';
 import { AuditController } from './audit.controller';
@@ -63,6 +65,7 @@ describe('durable audit SQLite', () => {
   let service: AuditService;
   let store: SettingsStoreService;
   const migration = new DurableAudit1783700000000();
+  const identityMigration = new IdentityAudit1783800000000();
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'audit-'));
     source = await new DataSource({
@@ -77,6 +80,7 @@ describe('durable audit SQLite', () => {
     await source.query('CREATE TABLE api_token_permission (apiTokenId integer, permissionKey text)');
     await source.query("INSERT INTO role VALUES (1, 'administrator'), (2, 'member')");
     await migration.up(source.createQueryRunner());
+    await identityMigration.up(source.createQueryRunner());
     await source.query(
       'CREATE TABLE IF NOT EXISTS setting (id integer PRIMARY KEY AUTOINCREMENT, parent varchar NOT NULL, key varchar NOT NULL, value varchar NOT NULL, createdAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP)',
     );
@@ -111,11 +115,13 @@ describe('durable audit SQLite', () => {
       expect.objectContaining({ actorId: 42, details: { revision: 2 } }),
     ]);
     await service.onModuleDestroy();
+    await identityMigration.down(source.createQueryRunner());
     await migration.down(source.createQueryRunner());
     expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toEqual([]);
     expect(await source.query('SELECT * FROM permission')).toEqual([]);
     expect(await source.query('SELECT * FROM role')).toEqual([{ id: 2, key: 'member' }]);
     await migration.up(source.createQueryRunner());
+    await identityMigration.up(source.createQueryRunner());
   });
 
   it('never acknowledges or persists an event in an originating transaction that rolls back', async () => {
@@ -357,6 +363,29 @@ describe('durable audit SQLite', () => {
     await source.query('DROP TABLE audit_log');
     expect(await service.record(event())).toEqual({ status: 'unavailable' });
     await expect(service.cleanup()).resolves.toBeUndefined();
+  });
+
+  it('records an anonymous identity event when the identity domain is enabled', async () => {
+    await store.setPlainSetting('audit', 'domains', '["identity"]');
+    const operationId = randomUUID();
+    expect(
+      await service.recordIdentity({
+        action: 'login',
+        operationId,
+        outcome: 'failed',
+        details: { reason: 'invalid_credentials' },
+        request: { ipAddress: '203.0.113.7', userAgent: 'Attraccess/1.0' },
+      }),
+    ).toEqual({ status: 'recorded' });
+    expect((await service.list({ limit: 1, operationId })).items[0]).toMatchObject({
+      domain: 'identity',
+      action: 'identity.login',
+      actorId: null,
+      subjectId: null,
+      ipAddress: '203.0.113.7',
+      userAgent: 'Attraccess/1.0',
+      details: { reason: 'invalid_credentials' },
+    });
   });
 
   it('rejects oversized details at the database boundary too', async () => {
@@ -781,12 +810,19 @@ describe('audit policy and authorization', () => {
 
 it('upgrades the full registered schema, reverts the audit migration, and reapplies it', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'audit-upgrade-'));
-  const prior = Object.values(migrations).filter((migration) => migration !== DurableAudit1783700000000);
+  const prior = Object.values(migrations).filter(
+    (migration) =>
+      migration !== DurableAudit1783700000000 &&
+      migration !== IdentityAudit1783800000000 &&
+      migration !== RetirePasswordPolicyAudit1783900000000,
+  );
   const database = join(directory, 'upgrade.sqlite');
   let source = new DataSource({ type: 'sqlite', database, entities: Object.values(entities), migrations: prior });
   try {
     await source.initialize();
     await source.runMigrations();
+    await source.query(`INSERT INTO "password_policy_audit" ("event", "actorId", "ip", "userAgent", "before", "after")
+      VALUES ('global_policy_updated', 1, '127.0.0.1', 'migration-test', '{"minLength":12}', '{"minLength":16}')`);
     await source.destroy();
     source = new DataSource({
       type: 'sqlite',
@@ -796,12 +832,25 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
     });
     await source.initialize();
     const applied = await source.runMigrations();
-    expect(applied.map((migration) => migration.name)).toEqual(['DurableAudit1783700000000']);
+    expect(applied.map((migration) => migration.name)).toEqual([
+      'DurableAudit1783700000000',
+      'IdentityAudit1783800000000',
+      'RetirePasswordPolicyAudit1783900000000',
+    ]);
     expect(source.hasMetadata(AuditLog)).toBeTruthy();
     expect(await source.query('PRAGMA foreign_key_list(audit_log)')).toEqual([]);
     await source.undoLastMigration();
+    expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toHaveLength(1);
+    expect(await source.query('SELECT * FROM password_policy_audit')).toHaveLength(1);
+    await source.undoLastMigration();
+    expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toHaveLength(1);
+    await source.undoLastMigration();
     expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toEqual([]);
-    expect((await source.runMigrations()).map((migration) => migration.name)).toEqual(['DurableAudit1783700000000']);
+    expect((await source.runMigrations()).map((migration) => migration.name)).toEqual([
+      'DurableAudit1783700000000',
+      'IdentityAudit1783800000000',
+      'RetirePasswordPolicyAudit1783900000000',
+    ]);
   } finally {
     if (source.isInitialized) await source.destroy();
     await rm(directory, { recursive: true, force: true });
