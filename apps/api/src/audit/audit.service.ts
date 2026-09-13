@@ -220,11 +220,18 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
             action: snapshot.action,
             operationId: snapshot.operationId,
             actorId: snapshot.actorId,
-            authenticationMethod: snapshot.authenticationMethod ?? 'session',
+            authenticationMethod:
+              snapshot.authenticationMethod === undefined
+                ? snapshot.actorId === null
+                  ? null
+                  : 'session'
+                : snapshot.authenticationMethod,
             apiTokenId: snapshot.apiTokenId ?? null,
             outcome: 'succeeded',
-            subjectType: 'resource',
+            subjectType: snapshot.subjectType ?? 'resource',
             subjectId: snapshot.subjectId,
+            ipAddress: null,
+            userAgent: null,
             details: snapshot.details,
           }),
         );
@@ -234,6 +241,28 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     } catch {
       /* Audit persistence must not affect resource operations. */
     }
+  }
+
+  /** A persisted lifecycle row is the dedupe marker when delivery retries independently. */
+  async hasResourceIntroductionEvent(
+    action: 'retraining.required',
+    introductionId: number,
+    subjectId: number,
+    trainedAt: Date,
+    subjectType: 'resource' | 'resource.group' = 'resource',
+  ): Promise<boolean> {
+    if (this.stopping || !this.storage?.isInitialized) return false;
+    const row = await this.storage
+      .getRepository(AuditLog)
+      .createQueryBuilder('audit')
+      .where('audit.domain = :domain', { domain: 'resource' })
+      .andWhere('audit.action = :action', { action })
+      .andWhere('audit.subjectId = :subjectId', { subjectId })
+      .andWhere('audit.subjectType = :subjectType', { subjectType })
+      .andWhere('audit.at >= :trainedAt', { trainedAt: trainedAt.toISOString().replace('T', ' ').replace('Z', '') })
+      .andWhere("json_extract(audit.details, '$.introductionId') = :introductionId", { introductionId })
+      .getExists();
+    return row;
   }
 
   afterTransactionCommit({ queryRunner }: TransactionCommitEvent): void {
