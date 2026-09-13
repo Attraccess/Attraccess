@@ -58,6 +58,7 @@
   - [Hardware](attractap/hardware.md)
   - [Setup](attractap/setup.md)
   - [NFC Cards](attractap/nfc-cards.md)
+  - [Desktop Simulator](attractap/desktop-simulator.md)
   - [Firmware Updates](attractap/firmware-updates.md)
   - [LED Guide (Lite)](attractap/led-guide.md)
 
