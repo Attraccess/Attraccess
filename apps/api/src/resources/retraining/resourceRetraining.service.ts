@@ -179,10 +179,6 @@ export class ResourceRetrainingService {
       return;
     }
 
-    if (introduction.retrainingNotifiedAt && introduction.retrainingNotifiedAt.getTime() >= trainedAt.getTime()) {
-      return;
-    }
-
     // Capture the required transition once per training cycle, independently of email retries.
     const subjectId = introduction.resourceId ?? introduction.resourceGroupId;
     const subjectType = introduction.resourceId ? 'resource' : 'resource.group';
@@ -198,6 +194,9 @@ export class ResourceRetrainingService {
           retrainingReason: evaluation.reason ?? 'unknown',
         },
       }).catch(() => undefined);
+    }
+    if (introduction.retrainingNotifiedAt && introduction.retrainingNotifiedAt.getTime() >= trainedAt.getTime()) {
+      return;
     }
     if (introduction.receiverUser?.email) {
       await this.emailService.sendUserRetrainingEmail(
