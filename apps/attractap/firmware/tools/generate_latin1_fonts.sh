@@ -23,9 +23,13 @@ if [[ "${actual_sha256%% *}" != "$font_sha256" ]]; then
     exit 1
 fi
 
+# Resolve the pinned converter once for the whole set, reusing npm's cache across
+# firmware variants. Resolving it separately for every size adds network waits.
+npx --yes --prefer-offline --package=lv_font_conv@1.5.3 -- bash -c '
 for size in "$@"; do
-    npx --yes lv_font_conv@1.5.3 --size "$size" --bpp 4 --no-compress --format lvgl --lv-include lvgl.h \
-        --font "$font_file" -r 0x20-0x7E -r 0xA0-0xFF \
+    lv_font_conv --size "$size" --bpp 4 --no-compress --format lvgl --lv-include lvgl.h \
+        --font Montserrat-Medium.ttf -r 0x20-0x7E -r 0xA0-0xFF \
         --lv-font-name "attractap_font_montserrat_latin1_$size" \
         --output "attractap_font_montserrat_latin1_$size.c"
 done
+' generate-latin1-fonts "$@"
