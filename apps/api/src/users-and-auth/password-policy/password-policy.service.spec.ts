@@ -7,7 +7,6 @@ import {
   AuthenticationType,
   PasswordHistory,
   PasswordPolicy,
-  PasswordPolicyAudit,
   PasswordPolicyOverride,
   PasswordPolicyRole,
 } from '@attraccess/database-entities';
@@ -74,7 +73,6 @@ describe('PasswordPolicyService', () => {
     create: jest.Mock;
     createQueryBuilder: jest.Mock;
   };
-  let auditRepo: { create: jest.Mock; save: jest.Mock };
   let authDetailRepo: { findOne: jest.Mock };
   let hibp: { check: jest.Mock };
   let zxcvbn: { evaluate: jest.Mock };
@@ -109,17 +107,12 @@ describe('PasswordPolicyService', () => {
       create: jest.fn((row) => row),
       createQueryBuilder: jest.fn(() => deleteBuilder),
     };
-    auditRepo = {
-      create: jest.fn((row) => row),
-      save: jest.fn(async (row) => row),
-    };
     authDetailRepo = { findOne: jest.fn(async () => null) };
     hibp = { check: jest.fn(async () => ({ pwned: false, count: 0, available: true })) };
     zxcvbn = { evaluate: jest.fn(() => ({ score: 4, guessesLog10: 12, crackTimesSeconds: {}, warning: '', suggestions: [] })) };
     const repoByEntity = new Map<unknown, unknown>([
       [PasswordPolicy, repo],
       [PasswordPolicyOverride, overrideRepo],
-      [PasswordPolicyAudit, auditRepo],
     ]);
     const fakeManager = {
       getRepository: (entity: unknown) => repoByEntity.get(entity) ?? {},
@@ -134,7 +127,6 @@ describe('PasswordPolicyService', () => {
         PasswordPolicyService,
         { provide: getRepositoryToken(PasswordPolicy), useValue: repo },
         { provide: getRepositoryToken(PasswordPolicyOverride), useValue: overrideRepo },
-        { provide: getRepositoryToken(PasswordPolicyAudit), useValue: auditRepo },
         { provide: getRepositoryToken(PasswordHistory), useValue: historyRepo },
         { provide: getRepositoryToken(AuthenticationDetail), useValue: authDetailRepo },
         { provide: DataSource, useValue: dataSource },

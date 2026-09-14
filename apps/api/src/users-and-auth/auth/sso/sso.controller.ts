@@ -17,6 +17,7 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { SSOOIDCGuard } from './oidc/oidc.guard';
 import { AuthenticationType, SSOProvider, SSOProviderType } from '@attraccess/database-entities';
@@ -48,6 +49,11 @@ import { InvalidSSOProviderIdException, SSOProviderNotFoundException } from './e
 import { resolveSsoRoleAssignments } from './permission-mapping';
 import { RbacService } from '../../rbac/rbac.service';
 import { MetricsService } from '../../../metrics/metrics.service';
+import { IdentityAuditService } from '../../../audit/identity-audit.service';
+import { SsoAuditService } from '../../../audit/sso-audit.service';
+import { randomUUID } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
+import { ssoAuditSnapshot } from './sso-audit-snapshot';
 @ApiTags('Authentication')
 @Controller('auth/sso')
 @RequiresLicense(LicenseModuleType.SSO)
@@ -64,6 +70,8 @@ export class SSOController {
     private readonly settingsService: SettingsService,
     private readonly metricsService: MetricsService,
     private readonly rbacService: RbacService,
+    @Optional() private readonly identityAudit?: IdentityAuditService,
+    @Optional() private readonly ssoAudit?: SsoAuditService,
   ) {}
 
   @Get('providers')
@@ -159,7 +167,6 @@ export class SSOController {
 
   @Get('providers/:id')
   @Auth('system.sso.manage')
-
   @ApiOperation({ summary: 'Get SSO provider by ID with full configuration', operationId: 'getOneSSOProviderById' })
   @ApiParam({
     name: 'id',
@@ -182,17 +189,13 @@ export class SSOController {
   async getOneById(@Param('id') id: string): Promise<SSOProvider> {
     const providerId = parseInt(id, 10);
     const provider = await this.ssoService.getProviderById(providerId);
-    const withConfig = await this.ssoService.getProviderByTypeAndIdWithConfiguration(
-      provider.type,
-      providerId
-    );
+    const withConfig = await this.ssoService.getProviderByTypeAndIdWithConfiguration(provider.type, providerId);
     if (!withConfig) throw new SSOProviderNotFoundException();
     return withConfig;
   }
 
   @Post('providers')
   @Auth('system.sso.manage')
-
   @ApiOperation({ summary: 'Create a new SSO provider', operationId: 'createOneSsoProvider' })
   @ApiBody({ type: CreateSSOProviderDto })
   @ApiResponse({
@@ -214,12 +217,13 @@ export class SSOController {
       }
       await this.assertPermissionMappingCeiling([oidcMappings, samlMappings], actor.effectivePermissions);
     }
-    return this.ssoService.createProvider(createDto);
+    const provider = await this.ssoService.createProvider(createDto);
+    await this.recordProviderAudit('created', request, provider);
+    return provider;
   }
 
   @Put('providers/:id')
   @Auth('system.sso.manage')
-
   @ApiOperation({ summary: 'Update an existing SSO provider', operationId: 'updateOneSSOProvider' })
   @ApiParam({
     name: 'id',
@@ -246,6 +250,7 @@ export class SSOController {
     @Req() request: AuthenticatedRequest,
   ): Promise<SSOProvider> {
     const providerId = parseInt(id, 10);
+    const before = await this.ssoService.getProviderById(providerId);
 
     const oidcMappings = updateDto.oidcConfiguration?.roleMappings;
     const samlMappings = updateDto.samlConfiguration?.roleMappings;
@@ -258,12 +263,13 @@ export class SSOController {
       await this.assertPermissionMappingCeiling([oidcMappings, samlMappings], actor.effectivePermissions);
     }
 
-    return this.ssoService.updateProvider(providerId, updateDto);
+    const provider = await this.ssoService.updateProvider(providerId, updateDto);
+    await this.recordProviderAudit('updated', request, provider, before, this.providerRotationFlags(before, provider));
+    return provider;
   }
 
   @Delete('providers/:id')
   @Auth('system.sso.manage')
-
   @ApiOperation({ summary: 'Delete an SSO provider', operationId: 'deleteOneSSOProvider' })
   @ApiParam({
     name: 'id',
@@ -282,13 +288,15 @@ export class SSOController {
     status: 404,
     description: 'Provider not found',
   })
-  async deleteOne(@Param('id') id: string): Promise<void> {
-    return this.ssoService.deleteProvider(parseInt(id, 10));
+  async deleteOne(@Param('id') id: string, @Req() request: AuthenticatedRequest): Promise<void> {
+    const providerId = parseInt(id, 10);
+    const provider = await this.ssoService.getProviderById(providerId);
+    await this.ssoService.deleteProvider(providerId);
+    await this.recordProviderAudit('deleted', request, provider);
   }
 
   @Get('discovery/authentik')
   @Auth('system.sso.manage')
-
   @ApiOperation({ summary: 'Proxy Authentik OIDC well-known discovery', operationId: 'discoverAuthentikOidc' })
   @ApiQuery({ name: 'host', required: true, description: 'Authentik host, e.g. http://localhost:9000' })
   @ApiQuery({ name: 'applicationName', required: true, description: 'Authentik application slug' })
@@ -317,7 +325,6 @@ export class SSOController {
 
   @Get('discovery/keycloak')
   @Auth('system.sso.manage')
-
   @ApiOperation({ summary: 'Proxy Keycloak OIDC well-known discovery', operationId: 'discoverKeycloakOidc' })
   @ApiQuery({ name: 'host', required: true, description: 'Keycloak host, e.g. http://localhost:8080' })
   @ApiQuery({ name: 'realm', required: true, description: 'Keycloak realm name' })
@@ -345,7 +352,6 @@ export class SSOController {
   }
 
   @Post(`/${SSOProviderType.OIDC}/:providerId/logout`)
-
   @ApiOperation({ summary: 'SSO-initiated logout', operationId: 'ssoOidcLogout' })
   @ApiParam({
     name: 'providerId',
@@ -384,12 +390,12 @@ export class SSOController {
 
     const user = await this.resolveProvisioningUser(SSOProviderType.OIDC, parsedProviderId, body);
     await this.sessionService.revokeAllUserSessions(user.id);
+    await this.recordProvisioningAudit('sessions_revoked', provider, user.id, { sessionsRevoked: true });
 
     return { OK: true };
   }
 
   @Post(`/${SSOProviderType.SAML}/:providerId/logout`)
-
   @ApiOperation({ summary: 'SAML-initiated logout', operationId: 'ssoSamlLogout' })
   @ApiParam({
     name: 'providerId',
@@ -428,12 +434,12 @@ export class SSOController {
 
     const user = await this.resolveProvisioningUser(SSOProviderType.SAML, parsedProviderId, body);
     await this.sessionService.revokeAllUserSessions(user.id);
+    await this.recordProvisioningAudit('sessions_revoked', provider, user.id, { sessionsRevoked: true });
 
     return { OK: true };
   }
 
   @Post(`/${SSOProviderType.OIDC}/:providerId/users/delete`)
-
   @ApiOperation({ summary: 'SSO-initiated user deletion', operationId: 'ssoOidcDeleteUser' })
   @ApiParam({
     name: 'providerId',
@@ -472,12 +478,12 @@ export class SSOController {
 
     const user = await this.resolveProvisioningUser(SSOProviderType.OIDC, parsedProviderId, body);
     await this.usersService.deleteOne(user.id);
+    await this.recordProvisioningAudit('user_deleted', provider, user.id, { userDeleted: true });
 
     return { OK: true };
   }
 
   @Post(`/${SSOProviderType.SAML}/:providerId/users/delete`)
-
   @ApiOperation({ summary: 'SAML-initiated user deletion', operationId: 'ssoSamlDeleteUser' })
   @ApiParam({
     name: 'providerId',
@@ -516,12 +522,12 @@ export class SSOController {
 
     const user = await this.resolveProvisioningUser(SSOProviderType.SAML, parsedProviderId, body);
     await this.usersService.deleteOne(user.id);
+    await this.recordProvisioningAudit('user_deleted', provider, user.id, { userDeleted: true });
 
     return { OK: true };
   }
 
   @Post(`/${SSOProviderType.OIDC}/:providerId/users/permissions`)
-
   @ApiOperation({ summary: 'SSO-initiated permission update', operationId: 'ssoOidcUpdatePermissions' })
   @ApiParam({
     name: 'providerId',
@@ -559,13 +565,13 @@ export class SSOController {
     this.assertProvisioningAuthorized(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.OIDC, parsedProviderId, body);
-    await this.applyProvisioningPermissions(user.id, provider, body);
+    const changes = await this.applyProvisioningPermissions(user.id, provider, body);
+    if (changes) await this.recordProvisioningAudit('permissions_synced', provider, user.id, changes);
 
     return { OK: true };
   }
 
   @Post(`/${SSOProviderType.SAML}/:providerId/users/permissions`)
-
   @ApiOperation({ summary: 'SAML-initiated permission update', operationId: 'ssoSamlUpdatePermissions' })
   @ApiParam({
     name: 'providerId',
@@ -603,7 +609,8 @@ export class SSOController {
     this.assertProvisioningAuthorized(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.SAML, parsedProviderId, body);
-    await this.applyProvisioningPermissions(user.id, provider, body);
+    const changes = await this.applyProvisioningPermissions(user.id, provider, body);
+    if (changes) await this.recordProvisioningAudit('permissions_synced', provider, user.id, changes);
 
     return { OK: true };
   }
@@ -673,13 +680,11 @@ export class SSOController {
     @Req() request: AuthenticatedRequest,
     @Query('redirectTo') redirectToQuery: string | undefined,
     @Res({ passthrough: true }) response: Response,
+    @Param('providerId') providerId?: string,
   ): Promise<CreateSessionResponse | void> {
-    const redirectTo = getRedirectToFromRequest(
-      request as unknown as Record<string, unknown>,
-      redirectToQuery,
-    );
+    const redirectTo = getRedirectToFromRequest(request as unknown as Record<string, unknown>, redirectToQuery);
     this.metricsService.authSsoLoginTotal.inc({ provider_type: 'oidc' });
-    return this.finalizeLogin(request, response, redirectTo);
+    return this.finalizeLogin(request, response, redirectTo, providerId ? this.parseProviderId(providerId) : undefined);
   }
 
   @Get(`/${SSOProviderType.SAML}/:providerId/login`)
@@ -728,17 +733,19 @@ export class SSOController {
     @Body('RelayState') relayState: string,
     @Query('RelayState') relayStateQuery: string,
     @Res({ passthrough: true }) response: Response,
+    @Param('providerId') providerId?: string,
   ): Promise<CreateSessionResponse | void> {
     const defaultRedirect = await this.settingsService.getUrl();
     const target = redirectTo || relayState || relayStateQuery || defaultRedirect;
     this.metricsService.authSsoLoginTotal.inc({ provider_type: 'saml' });
-    return this.finalizeLogin(request, response, target);
+    return this.finalizeLogin(request, response, target, providerId ? this.parseProviderId(providerId) : undefined);
   }
 
   private async finalizeLogin(
     request: AuthenticatedRequest,
     response: Response,
     redirectTo?: string,
+    providerId?: number,
   ): Promise<CreateSessionResponse | void> {
     const sessionToken = await this.sessionService.createSession(request.user, {
       userAgent: request.headers['user-agent'],
@@ -746,6 +753,22 @@ export class SSOController {
     });
 
     await this.cookieConfigService.setAuthCookie(response, sessionToken);
+    if (providerId) {
+      await this.identityAudit?.record({
+        action: 'sso_login',
+        operationId: randomUUID(),
+        outcome: 'succeeded',
+        actorId: request.user.id,
+        authenticationMethod: request.user.authenticationMethod ?? 'session',
+        apiTokenId: request.user.apiTokenId,
+        subjectId: request.user.id,
+        details: { providerId },
+        request: {
+          ipAddress: request.ip || request.connection.remoteAddress,
+          userAgent: request.headers['user-agent'],
+        },
+      });
+    }
 
     const auth: CreateSessionResponse = {
       user: request.user,
@@ -903,7 +926,7 @@ export class SSOController {
     userId: number,
     provider: SSOProvider,
     payload: SSOProvisioningPermissionsDto,
-  ): Promise<void> {
+  ): Promise<{ added: string[]; removed: string[]; updated: string[] } | undefined> {
     const mapping =
       provider.type === SSOProviderType.OIDC
         ? provider.oidcConfiguration?.roleMappings
@@ -911,11 +934,125 @@ export class SSOController {
 
     // If the payload contains no `roles` field at all, treat as "no permission info" and skip
     // sync to avoid wiping SSO-granted roles on incremental provisioning calls.
-    if (payload.roles === undefined) return;
+    if (payload.roles === undefined) return undefined;
 
     const roleNames = payload.roles.map((r) => r.trim()).filter((r) => r.length > 0);
     const roleAssignments = resolveSsoRoleAssignments(roleNames, mapping);
 
-    await this.rbacService.syncSsoRoles(userId, roleAssignments, provider.type, provider.id);
+    return this.rbacService.syncSsoRoles(userId, roleAssignments, provider.type, provider.id);
+  }
+
+  private async recordProviderAudit(
+    action: 'created' | 'updated' | 'deleted',
+    request: AuthenticatedRequest,
+    provider: SSOProvider,
+    before?: SSOProvider,
+    rotated: string[] = [],
+  ): Promise<void> {
+    const actor = request.user as AuthenticatedUser;
+    const snapshot = this.providerSnapshot(provider);
+    const beforeSnapshot = this.providerSnapshot(before ?? provider);
+    const changes = this.providerChanges(before ?? provider, provider, rotated);
+    if (action === 'updated' && changes === '{"changed":[],"rotated":[]}') return;
+    await this.recordSso({
+      action: `sso.provider.${action}`,
+      operationId: randomUUID(),
+      actorId: actor.id,
+      authenticationMethod: actor.authenticationMethod ?? 'session',
+      ...(actor.authenticationMethod === 'api-token' && actor.apiTokenId ? { apiTokenId: actor.apiTokenId } : {}),
+      subject: { type: 'sso.provider', id: provider.id },
+      details:
+        action === 'created'
+          ? { before: 'null', after: snapshot }
+          : action === 'deleted'
+            ? { before: snapshot, after: 'null' }
+            : { before: beforeSnapshot, after: snapshot, changes },
+    });
+  }
+
+  private async recordProvisioningAudit(
+    action: 'sessions_revoked' | 'user_created' | 'user_deleted' | 'permissions_synced',
+    provider: SSOProvider,
+    userId: number,
+    changes:
+      | { sessionsRevoked: true }
+      | { userCreated: true }
+      | { userDeleted: true }
+      | { added: string[]; removed: string[]; updated: string[] },
+  ): Promise<void> {
+    await this.recordSso({
+      action: `sso.provisioning.${action}`,
+      operationId: randomUUID(),
+      actorId: null,
+      authenticationMethod: null,
+      subject: { type: 'user', id: userId },
+      details: { provider: this.providerSnapshot(provider), changes: JSON.stringify(changes) },
+    });
+  }
+
+  private async recordSso(event: Parameters<SsoAuditService['record']>[0]): Promise<void> {
+    try {
+      await this.ssoAudit?.record(event);
+    } catch {
+      // Auditing must not roll back an already-completed SSO operation.
+    }
+  }
+
+  private providerSnapshot(provider: SSOProvider): string {
+    return ssoAuditSnapshot(provider);
+  }
+
+  private providerChanges(before: SSOProvider, after: SSOProvider, rotated: string[]): string {
+    const beforeConfiguration = (before.type === SSOProviderType.OIDC
+      ? before.oidcConfiguration
+      : before.samlConfiguration) as unknown as Record<string, unknown> | undefined;
+    const afterConfiguration = (after.type === SSOProviderType.OIDC
+      ? after.oidcConfiguration
+      : after.samlConfiguration) as unknown as Record<string, unknown> | undefined;
+    const fields =
+      before.type === SSOProviderType.OIDC
+        ? [
+            'issuer',
+            'authorizationURL',
+            'tokenURL',
+            'userInfoURL',
+            'clientId',
+            'scopes',
+            'usernameClaimPaths',
+            'emailClaimPaths',
+            'roleMappings',
+          ]
+        : [
+            'entryPoint',
+            'issuer',
+            'audience',
+            'signRequest',
+            'wantAssertionsSigned',
+            'wantAuthnResponseSigned',
+            'forceAuthn',
+            'emailAttributeKeys',
+            'roleMappings',
+          ];
+    const changed = [
+      ...(before.name === after.name ? [] : ['name']),
+      ...fields
+        .filter((key) => !isDeepStrictEqual(beforeConfiguration?.[key], afterConfiguration?.[key]))
+        .map((key) => `configuration.${key}`),
+    ];
+    return JSON.stringify({ changed, rotated });
+  }
+
+  private providerRotationFlags(before: SSOProvider, after: SSOProvider): string[] {
+    const rotated: string[] = [];
+    if (before.oidcConfiguration?.clientSecret !== after.oidcConfiguration?.clientSecret) rotated.push('clientSecret');
+    if (before.samlConfiguration?.provisioningSecret !== after.samlConfiguration?.provisioningSecret)
+      rotated.push('provisioningSecret');
+    if (before.samlConfiguration?.certificate !== after.samlConfiguration?.certificate)
+      rotated.push('identityProviderCertificate');
+    if (before.samlConfiguration?.spSigningCertificate !== after.samlConfiguration?.spSigningCertificate)
+      rotated.push('signingCertificate');
+    if (before.samlConfiguration?.spSigningKeyEncrypted !== after.samlConfiguration?.spSigningKeyEncrypted)
+      rotated.push('signingPrivateKey');
+    return rotated;
   }
 }

@@ -12,7 +12,17 @@ import { AuditLog } from '@attraccess/database-entities';
 import { PluginAuditEvent, PluginAuditHostProvider, PluginAuditReceipt } from '@attraccess/plugins-backend-sdk';
 import { readAuditSettings } from './audit.config';
 import { SettingsStoreService } from '../settings/settings-store.service';
-import { projectAuditEvent, projectResourceAuditEvent, ResourceAuditEvent } from './audit-policy';
+import {
+  AttractapAuditEvent,
+  IdentityAuditEvent,
+  projectAuditEvent,
+  projectAttractapAuditEvent,
+  projectIdentityAuditEvent,
+  projectResourceAuditEvent,
+  ResourceAuditEvent,
+  projectSsoAuditEvent,
+  SsoAuditEvent,
+} from './audit-policy';
 import { AuditQueryDto } from './audit-query.dto';
 import { randomUUID } from 'crypto';
 import { auditEntriesWithLabels } from './audit-labels';
@@ -24,7 +34,7 @@ import {
 
 const billingStatuses = new Set(['pending', 'completed', 'failed']);
 const billingSources = new Set(['manual', 'resource-usage', 'refund', 'sumup-topup']);
-const SQLITE_BUSY_TIMEOUT_MS = 100;
+const SQLITE_BUSY_TIMEOUT_MS = 10;
 const SQLITE_CONTENTION_RECOVERY_DELAY_MS = 500;
 
 export interface BillingTransactionAuditEvent {
@@ -76,6 +86,7 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
       synchronize: false,
       migrationsRun: false,
       logging: false,
+      busyTimeout: 10,
     });
     try {
       await storage.initialize();
@@ -112,10 +123,22 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
         outcome: snapshot.outcome,
         subjectType: snapshot.subject.type,
         subjectId: snapshot.subject.id,
+        ipAddress: null,
+        userAgent: null,
         details: snapshot.details as Record<string, string | number>,
       });
     } catch {
       // Never log the event, SQLite parameters, or exception (may contain secrets).
+      return { status: 'unavailable' };
+    }
+  }
+
+  async recordSso(event: SsoAuditEvent): Promise<PluginAuditReceipt> {
+    try {
+      const snapshot = projectSsoAuditEvent(event);
+      if (!snapshot) return { status: 'unavailable' };
+      return await this.recordSnapshot({ domain: 'sso', pluginId: null, action: snapshot.action, operationId: snapshot.operationId, actorId: snapshot.actorId, authenticationMethod: snapshot.authenticationMethod, apiTokenId: snapshot.apiTokenId ?? null, outcome: 'succeeded', subjectType: snapshot.subject.type, subjectId: snapshot.subject.id, ipAddress: null, userAgent: null, details: snapshot.details });
+    } catch {
       return { status: 'unavailable' };
     }
   }
@@ -147,12 +170,38 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
         outcome: 'succeeded',
         subjectType: 'billing.transaction',
         subjectId: event.transactionId,
+        ipAddress: null,
+        userAgent: null,
         details: {
           amount: event.amount,
           status: event.status,
           ...(event.previousStatus === undefined ? {} : { previousStatus: event.previousStatus }),
           source: event.source,
         },
+      });
+    } catch {
+      return { status: 'unavailable' };
+    }
+  }
+
+  async recordIdentity(event: IdentityAuditEvent): Promise<PluginAuditReceipt> {
+    try {
+      const snapshot = projectIdentityAuditEvent(event);
+      if (!snapshot) return { status: 'unavailable' };
+      return await this.recordSnapshot({
+        domain: 'identity',
+        pluginId: null,
+        action: snapshot.action,
+        operationId: snapshot.operationId,
+        actorId: snapshot.actorId,
+        authenticationMethod: snapshot.authenticationMethod,
+        apiTokenId: snapshot.apiTokenId,
+        outcome: snapshot.outcome,
+        subjectType: snapshot.subjectType,
+        subjectId: snapshot.subjectId,
+        ipAddress: snapshot.ipAddress,
+        userAgent: snapshot.userAgent,
+        details: snapshot.details,
       });
     } catch {
       return { status: 'unavailable' };
@@ -173,33 +222,45 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     });
   }
 
-  async recordResource(event: Omit<ResourceAuditEvent, 'operationId'>): Promise<void> {
+  async recordResource(event: Omit<ResourceAuditEvent, 'operationId'>): Promise<boolean> {
     try {
       const snapshot = projectResourceAuditEvent({ ...event, operationId: randomUUID() });
-      if (!snapshot || this.stopping || !this.storage?.isInitialized || this.pending >= 8) return;
+      const storage = this.storage;
+      if (!snapshot || this.stopping || !storage?.isInitialized || this.pending >= 8) return false;
       this.pending++;
       try {
         const config = await readAuditSettings(this.settings);
-        if (!config.enabled || !config.domains.includes('resource') || this.stopping) return;
-        await this.storage.getRepository(AuditLog).insert({
-          at: new Date(),
-          domain: 'resource',
-          pluginId: 'core',
-          action: snapshot.action,
-          operationId: snapshot.operationId,
-          actorId: snapshot.actorId,
-          authenticationMethod: snapshot.authenticationMethod ?? 'session',
-          apiTokenId: snapshot.apiTokenId ?? null,
-          outcome: 'succeeded',
-          subjectType: 'resource',
-          subjectId: snapshot.subjectId,
-          details: snapshot.details,
-        });
+        if (!config.enabled || !config.domains.includes('resource') || this.stopping) return false;
+        await this.serializeStorageWrite(() =>
+          storage.getRepository(AuditLog).insert({
+            at: new Date(),
+            domain: 'resource',
+            pluginId: 'core',
+            action: snapshot.action,
+            operationId: snapshot.operationId,
+            actorId: snapshot.actorId,
+            authenticationMethod:
+              snapshot.authenticationMethod === undefined
+                ? snapshot.actorId === null
+                  ? null
+                  : 'session'
+                : snapshot.authenticationMethod,
+            apiTokenId: snapshot.apiTokenId ?? null,
+            outcome: 'succeeded',
+            subjectType: snapshot.subjectType ?? 'resource',
+            subjectId: snapshot.subjectId,
+            ipAddress: null,
+            userAgent: null,
+            details: snapshot.details,
+          }),
+        );
+        return true;
       } finally {
         this.pending--;
       }
     } catch {
       /* Audit persistence must not affect resource operations. */
+      return false;
     }
   }
 
@@ -231,6 +292,8 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
           subjectType: snapshot.subjectType,
           subjectId: snapshot.subjectId,
           details: snapshot.details,
+          ipAddress: null,
+          userAgent: null,
         },
         finalSettingsChange,
       );
@@ -238,6 +301,21 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
       // Audit persistence must not affect administration operations.
       return { status: 'unavailable' };
     }
+  }
+
+  async recordAttractap(event: AttractapAuditEvent): Promise<void> {
+    try {
+      const snapshot = projectAttractapAuditEvent(event);
+      if (!snapshot) return;
+      await this.recordSnapshot({
+        domain: 'attractap', pluginId: 'core', action: `attractap.${snapshot.action}`,
+        operationId: randomUUID(), actorId: snapshot.actorId,
+        authenticationMethod: snapshot.authenticationMethod, apiTokenId: snapshot.apiTokenId ?? null,
+        outcome: 'succeeded',
+        subjectType: snapshot.action.startsWith('card.') ? 'attractap.card' : 'attractap.reader',
+        subjectId: snapshot.subjectId, ipAddress: null, userAgent: null, details: snapshot.details,
+      });
+    } catch { /* Audit persistence must not affect Attractap operations. */ }
   }
 
   afterTransactionCommit({ queryRunner }: TransactionCommitEvent): void {
@@ -282,19 +360,14 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
       const config = await readAuditSettings(this.settings);
       if (
         (!finalSettingsChange &&
-          (!config.enabled || !config.domains.includes(event.domain as 'administration' | 'billing' | 'wago'))) ||
+          (!config.enabled ||
+            !config.domains.includes(
+              event.domain as 'administration' | 'attractap' | 'billing' | 'identity' | 'resource' | 'sso' | 'wago',
+            ))) ||
         this.stopping
       )
         return { status: 'unavailable' };
-      // sqlite3 queues concurrent statements after a busy timeout. Keep those writes in our
-      // bounded admission queue instead, so a released lock cannot revive stale audit writes.
-      const precedingWrite = this.writeTail;
-      let releaseWrite: () => void;
-      this.writeTail = new Promise<void>((resolve) => {
-        releaseWrite = resolve;
-      });
-      try {
-        await precedingWrite;
+      const unavailable = await this.serializeStorageWrite<PluginAuditReceipt | undefined>(async () => {
         if (this.contended) {
           // Drop the already-admitted burst, then give the first later write a short chance
           // to observe a released SQLite lock without reviving the whole stale burst.
@@ -308,9 +381,8 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
           this.contended = true;
           return { status: 'unavailable' };
         }
-      } finally {
-        releaseWrite();
-      }
+      });
+      if (unavailable) return unavailable;
       return { status: 'recorded' };
     } finally {
       this.pending--;
@@ -321,21 +393,58 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     return new Date(Date.now() - retentionDays * 86_400_000);
   }
 
+  private sqliteDate(date: Date): string {
+    return date.toISOString().replace('T', ' ').replace('Z', '');
+  }
+
+  /** Serializes every write on the audit storage connection, including cleanup transactions. */
+  private async serializeStorageWrite<T>(write: () => Promise<T>): Promise<T> {
+    const precedingWrite = this.writeTail;
+    let releaseWrite!: () => void;
+    this.writeTail = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    try {
+      await precedingWrite;
+      return await write();
+    } finally {
+      releaseWrite();
+    }
+  }
+
   @Interval(60 * 60 * 1000)
   async cleanup(): Promise<void> {
-    if (this.stopping || !this.storage?.isInitialized || this.cleaning) return;
+    const storage = this.storage;
+    if (this.stopping || !storage?.isInitialized || this.cleaning) return;
     this.cleaning = true;
     try {
       const config = await readAuditSettings(this.settings);
-      const cutoff = this.cutoff(config.retention_days);
+      const cutoff = this.sqliteDate(this.cutoff(config.retention_days));
       while (!this.stopping) {
-        const result = await this.storage
-          .getRepository(AuditLog)
-          .createQueryBuilder()
-          .delete()
-          .where('id IN (SELECT id FROM audit_log WHERE at < :cutoff ORDER BY at LIMIT 1000)', { cutoff })
-          .execute();
-        const count = result.affected ?? 0;
+        const hasOverflow = await this.hasPasswordPolicyOverflow();
+        const count = await this.serializeStorageWrite(async () => {
+          if (this.stopping) return 0;
+          return storage.transaction(async (manager) => {
+            const rows = await manager.query<{ id: number }[]>(
+              'SELECT id FROM audit_log WHERE at < ? ORDER BY at, id LIMIT 1000',
+              [cutoff],
+            );
+            if (rows.length === 0) return 0;
+            const ids = rows.map(({ id }) => id);
+            const placeholders = ids.map(() => '?').join(', ');
+            if (hasOverflow) {
+              await manager.query(
+                `DELETE FROM password_policy_audit_overflow
+                WHERE legacyAuditId IN (
+                  SELECT json_extract(details, '$.legacyAuditId') FROM audit_log WHERE id IN (${placeholders})
+                )`,
+                ids,
+              );
+            }
+            await manager.query(`DELETE FROM audit_log WHERE id IN (${placeholders})`, ids);
+            return rows.length;
+          });
+        });
         if (count > 0) this.logger.log(`Deleted ${count} expired audit rows`);
         if (count < 1000) break;
         await new Promise<void>((resolve) => setImmediate(resolve));
@@ -382,10 +491,55 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
         .take(limit + 1)
         .getMany();
       const hasMore = rows.length > limit;
-      const items = await auditEntriesWithLabels(this.source, rows.slice(0, limit));
+      const retainedRows = rows.slice(0, limit);
+      await this.hydrateLegacyPasswordPolicyDetails(retainedRows);
+      const items = await auditEntriesWithLabels(this.source, retainedRows);
       return { items, nextCursor: hasMore ? items[items.length - 1].id : null };
     } finally {
       this.activeReads--;
+    }
+  }
+
+  private async hasPasswordPolicyOverflow(): Promise<boolean> {
+    const storage = this.storage;
+    if (!storage) return false;
+    const rows = await storage.query(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'password_policy_audit_overflow' LIMIT 1",
+    );
+    return rows.some((row: { name?: unknown }) => row.name === 'password_policy_audit_overflow');
+  }
+
+  /** Hydrate only legacy rows returned on this page; current audit event details stay bounded at write time. */
+  private async hydrateLegacyPasswordPolicyDetails(items: AuditLog[]): Promise<void> {
+    const legacyIds = items
+      .map((item) => {
+        const legacyAuditId = Number(item.details.legacyAuditId);
+        return Number.isSafeInteger(legacyAuditId) ? legacyAuditId : null;
+      })
+      .filter((id): id is number => id !== null);
+    if (!legacyIds.length || !(await this.hasPasswordPolicyOverflow())) return;
+    const storage = this.storage;
+    if (!storage) return;
+    const placeholders = legacyIds.map(() => '?').join(', ');
+    const archived = await storage.query(
+      `SELECT legacyAuditId, metadata FROM password_policy_audit_overflow WHERE legacyAuditId IN (${placeholders})`,
+      legacyIds,
+    );
+    const metadata = new Map<string, Record<string, string | number | boolean | null>>();
+    for (const row of archived) {
+      try {
+        const legacyAuditId = Number(row.legacyAuditId ?? row.legacyauditid);
+        const value = JSON.parse(String(row.metadata));
+        if (Number.isSafeInteger(legacyAuditId) && value && typeof value === 'object' && !Array.isArray(value))
+          metadata.set(String(legacyAuditId), value);
+      } catch {
+        // A malformed archive must not make the audit list unavailable.
+      }
+    }
+    for (const item of items) {
+      const legacyId = item.details.legacyAuditId;
+      if (Number.isSafeInteger(legacyId) && metadata.has(String(legacyId)))
+        item.details = { ...item.details, ...metadata.get(String(legacyId)) };
     }
   }
 }

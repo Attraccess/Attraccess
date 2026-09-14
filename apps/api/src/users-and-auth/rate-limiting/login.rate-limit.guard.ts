@@ -27,7 +27,7 @@ export class LoginRateLimitGuard extends AuthGuard(['local']) {
       await this.bruteForce.assertIpAllowed('login', ip, username);
     } catch (error) {
       setRetryAfter(response, error);
-      this.audit.log({ type: 'login', outcome: 'rate_limited', ip, username, reason: 'ip_throttled' });
+      await this.audit.log({ type: 'login', outcome: 'rate_limited', ip, username, reason: 'ip_throttled' });
       throw error;
     }
 
@@ -40,7 +40,7 @@ export class LoginRateLimitGuard extends AuthGuard(['local']) {
           await this.bruteForce.assertAccountAllowed(user);
         } catch (error) {
           setRetryAfter(response, error);
-          this.audit.log({
+          await this.audit.log({
             type: 'login',
             outcome: 'account_locked',
             ip,
@@ -60,7 +60,7 @@ export class LoginRateLimitGuard extends AuthGuard(['local']) {
     } catch (error) {
       const outcome = classifyLoginFailure(error);
       await this.bruteForce.recordFailure('login', ip, preCheckedUserId, username);
-      this.audit.log({
+      await this.audit.log({
         type: 'login',
         outcome,
         ip,
@@ -73,7 +73,7 @@ export class LoginRateLimitGuard extends AuthGuard(['local']) {
 
     const user = (request as Request & { user?: { id: number; username?: string } }).user;
     await this.bruteForce.recordSuccess('login', ip, user?.id ?? preCheckedUserId, username);
-    this.audit.log({
+    await this.audit.log({
       type: 'login',
       outcome: 'success',
       ip,

@@ -1,4 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { IdentityAuditService } from '../../audit/identity-audit.service';
 
 export type AuthAuditType =
   'login' | 'register' | 'password_reset_request' | 'password_reset_complete' | 'delete_account_confirm' | 'api_token';
@@ -31,14 +33,39 @@ export interface AuthAuditFields {
 export class AuthAuditLogger {
   private readonly logger = new Logger('AuthAudit');
 
-  log(fields: AuthAuditFields): void {
+  constructor(@Optional() private readonly identityAudit?: IdentityAuditService) {}
+
+  async log(fields: AuthAuditFields): Promise<void> {
     const line = formatLine(fields);
     if (fields.outcome === 'success') {
       this.logger.log(line);
     } else {
       this.logger.warn(line);
     }
+
+    const action = actionFor(fields.type);
+    if (!action) return;
+    const reason = fields.outcome === 'success' ? undefined : fields.outcome;
+    await this.identityAudit
+      ?.record({
+        action,
+        operationId: randomUUID(),
+        outcome: fields.outcome === 'success' ? 'succeeded' : 'failed',
+        actorId: fields.userId ?? undefined,
+        subjectId: fields.userId ?? undefined,
+        details: reason ? { reason } : {},
+        request: { ipAddress: fields.ip },
+      })
+      .catch(() => undefined);
   }
+}
+
+function actionFor(type: AuthAuditType) {
+  if (type === 'login') return 'login' as const;
+  if (type === 'register') return 'registration' as const;
+  if (type === 'password_reset_request') return 'password_reset_requested' as const;
+  if (type === 'password_reset_complete') return 'password_reset_completed' as const;
+  return null;
 }
 
 function formatLine(fields: AuthAuditFields): string {

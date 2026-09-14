@@ -18,8 +18,8 @@ export class AuditLog {
   @Column({ type: 'varchar' })
   domain!: string;
 
-  @Column({ type: 'varchar' })
-  pluginId!: string;
+  @Column({ type: 'varchar', nullable: true })
+  pluginId!: string | null;
 
   @Column({ type: 'varchar' })
   action!: string;
@@ -27,11 +27,11 @@ export class AuditLog {
   @Column({ type: 'varchar' })
   operationId!: string;
 
-  @Column({ type: 'integer' })
-  actorId!: number;
+  @Column({ type: 'integer', nullable: true })
+  actorId!: number | null;
 
-  @Column({ type: 'varchar' })
-  authenticationMethod!: 'session' | 'api-token';
+  @Column({ type: 'varchar', nullable: true })
+  authenticationMethod!: 'session' | 'api-token' | null;
 
   @Column({ type: 'integer', nullable: true })
   apiTokenId!: number | null;
@@ -42,9 +42,15 @@ export class AuditLog {
   @Column({ type: 'varchar' })
   subjectType!: string;
 
-  @Column({ type: 'integer' })
-  subjectId!: number;
+  @Column({ type: 'integer', nullable: true })
+  subjectId!: number | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  ipAddress!: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  userAgent!: string | null;
 
   @Column({ type: 'simple-json' })
-  details!: Record<string, string | number>;
+  details!: Record<string, string | number | boolean | null>;
 }
