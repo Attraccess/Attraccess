@@ -741,7 +741,7 @@ const nullable = (validate: (value: unknown) => boolean) => (value: unknown) => 
 const integerBetween = (minimum: number, maximum: number) => (value: unknown) =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= minimum && value <= maximum;
 const policySnapshotFields: Record<string, (value: unknown) => boolean> = {
-  role: (value) => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value),
+  role: (value) => typeof value === 'string' && /^[a-z0-9][a-z0-9-]*$/.test(value),
   minLength: nullable(integerBetween(8, 1024)),
   maxLength: nullable(integerBetween(8, 1024)),
   allowAllUnicode: nullable((value) => typeof value === 'boolean'),
