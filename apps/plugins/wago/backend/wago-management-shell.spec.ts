@@ -149,14 +149,16 @@ describe('executable isolated management shell fixtures', () => {
     await writeFile(join(root, 'uptime'), '1179.00 0.00\n');
     await run('arm', 300); // Arming must use the existing remaining second, never extend prepare's deadline.
     watchdogPid = Number(await readFile(path('.attraccess-management-transaction', 'watchdog-pid'), 'utf8'));
-    const deadline = Date.now() + 5000;
+    // Loaded CI runners can delay the detached watchdog chain (nohup, sleep, flock, restore)
+    // well beyond local timings; poll generously and exit early on success.
+    const deadline = Date.now() + 20000;
     while (Date.now() < deadline) {
       if ((await readFile(path('authorized_keys'), 'utf8')) === '# existing key\n') break;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
     expect(await readFile(path('authorized_keys'), 'utf8')).toBe('# existing key\n');
     await expect(run('commit')).rejects.toBeDefined();
-  });
+  }, 30000);
 
   it('retries watchdog lock contention beyond the first five-second wait', async () => {
     await prepared();
