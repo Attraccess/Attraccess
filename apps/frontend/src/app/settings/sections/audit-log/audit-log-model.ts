@@ -87,9 +87,20 @@ function snapshot(value: unknown): Record<string, unknown> {
     : { value };
 }
 
+function flatSnapshot(value: Record<string, unknown>, prefix = ''): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, field]) => {
+      const path = prefix ? `${prefix}.${key}` : key;
+      return field !== null && typeof field === 'object' && !Array.isArray(field) && Object.keys(field).length
+        ? Object.entries(flatSnapshot(field as Record<string, unknown>, path))
+        : [[path, field]];
+    }),
+  );
+}
+
 export function changes(entry: AuditEntryDto) {
-  const before = snapshot(entry.details.before);
-  const after = snapshot(entry.details.after);
+  const before = flatSnapshot(snapshot(entry.details.before));
+  const after = flatSnapshot(snapshot(entry.details.after));
   // WAGO summary events store safe scalar changes as before.field / after.field.
   for (const [key, value] of Object.entries(entry.details)) {
     if (key.startsWith('before.')) before[key.slice(7)] = value;
@@ -109,6 +120,13 @@ export function changes(entry: AuditEntryDto) {
 }
 
 export function displayValue(value: unknown): string {
+  if (typeof value === 'string' && /^[\s]*[\[{]/.test(value)) {
+    try {
+      return JSON.stringify(JSON.parse(value), null, 2);
+    } catch {
+      /* Retain malformed historical values. */
+    }
+  }
   return value === undefined || value === null
     ? '—'
     : typeof value === 'object'
@@ -135,6 +153,11 @@ export function auditCsv(entries: AuditEntryDto[]): string {
       'Actor ID',
       'Actor',
       'Actor name source',
+      'Authentication method',
+      'API token ID',
+      'Integration ID',
+      'IP address',
+      'User agent',
       'Target type',
       'Target ID',
       'Target',
@@ -153,6 +176,11 @@ export function auditCsv(entries: AuditEntryDto[]): string {
       row.actorId,
       row.actorUsername,
       row.actorUsernameSource,
+      row.authenticationMethod,
+      row.apiTokenId,
+      row.pluginId,
+      row.ipAddress,
+      row.userAgent,
       row.subjectType,
       row.subjectId,
       row.subjectLabel,
