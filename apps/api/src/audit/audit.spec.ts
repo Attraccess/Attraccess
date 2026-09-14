@@ -589,6 +589,10 @@ describe('durable audit SQLite', () => {
     }
     await store.setPlainSetting('audit', 'enabled', 'true');
     await store.setPlainSetting('audit', 'domains', '["wago"]');
+    await service.recordResource({
+      action: 'resource.created', actorId: 42, subjectId: 7, details: { 'after.name': 'Lathe', 'after.type': 'machine' },
+    });
+    expect(await source.getRepository(AuditLog).count()).toBe(0);
     expect(await service.record({ ...event(), details: { password: 'not-stored' } })).toEqual({
       status: 'unavailable',
     });
@@ -617,6 +621,27 @@ describe('durable audit SQLite', () => {
       ipAddress: '203.0.113.7',
       userAgent: 'Attraccess/1.0',
       details: { reason: 'invalid_credentials' },
+    });
+  });
+
+  it('records system-originated resource introductions without a synthesized session', async () => {
+    await store.setPlainSetting('audit', 'domains', '["resource"]');
+
+    await service.recordResource({
+      action: 'introduction.granted',
+      actorId: null,
+      authenticationMethod: null,
+      subjectId: 7,
+      details: { recipientUserId: 3, tutorUserId: 9 },
+    });
+
+    expect((await service.list({ limit: 1 })).items[0]).toMatchObject({
+      domain: 'resource',
+      action: 'introduction.granted',
+      actorId: null,
+      authenticationMethod: null,
+      subjectId: 7,
+      details: { recipientUserId: 3, tutorUserId: 9 },
     });
   });
 
@@ -795,6 +820,10 @@ describe('durable audit SQLite', () => {
     try {
       await app.listen(0, '127.0.0.1');
       await service.record(event());
+      await service.recordResource({
+        action: 'resource_group.resource_added', actorId: 42, subjectType: 'resource_group', subjectId: 7,
+        details: { resourceId: 3 },
+      });
       const server = app.getHttpServer();
       await request(server).get('/api/admin/audit-log').expect(401);
       await request(server).get('/api/admin/audit-log').set('Authorization', 'Bearer invalid').expect(401);
@@ -825,6 +854,11 @@ describe('durable audit SQLite', () => {
       }
       await request(server)
         .get('/api/admin/audit-log?eventPrefix=wago.pub&from=2020-01-01T00:00:00Z')
+        .set('Cookie', 'auth-session=session')
+        .expect(200)
+        .expect(({ body }) => expect(body.items).toHaveLength(1));
+      await request(server)
+        .get('/api/admin/audit-log?action=resource_group.resource_added&subjectType=resource_group&domain=resource')
         .set('Cookie', 'auth-session=session')
         .expect(200)
         .expect(({ body }) => expect(body.items).toHaveLength(1));
@@ -1060,6 +1094,15 @@ describe('audit policy and authorization', () => {
     await expect(pipe.transform(billingFilters, { type: 'query', metatype: AuditQueryDto })).resolves.toMatchObject(
       billingFilters,
     );
+    await expect(
+      pipe.transform(
+        { eventPrefix: 'resource_group.', action: 'introduction.granted', subjectType: 'resource_group', domain: 'resource' },
+        { type: 'query', metatype: AuditQueryDto },
+      ),
+    ).resolves.toMatchObject({ action: 'introduction.granted', subjectType: 'resource_group', domain: 'resource' });
+    await expect(
+      pipe.transform({ eventPrefix: 'billing.', action: 'billing.transaction.created', subjectType: 'billing.transaction', domain: 'billing' }, { type: 'query', metatype: AuditQueryDto }),
+    ).resolves.toMatchObject({ action: 'billing.transaction.created', subjectType: 'billing.transaction', domain: 'billing' });
   });
 });
 
