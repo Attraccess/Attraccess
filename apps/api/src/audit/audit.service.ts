@@ -15,12 +15,14 @@ import { SettingsStoreService } from '../settings/settings-store.service';
 import {
   AttractapAuditEvent,
   IdentityAuditEvent,
+  ProjectAuditEvent,
   projectAuditEvent,
   projectAttractapAuditEvent,
   projectIdentityAuditEvent,
+  projectProjectAuditEvent,
   projectResourceAuditEvent,
-  ResourceAuditEvent,
   projectSsoAuditEvent,
+  ResourceAuditEvent,
   SsoAuditEvent,
 } from './audit-policy';
 import { AuditQueryDto } from './audit-query.dto';
@@ -316,6 +318,41 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
         subjectId: snapshot.subjectId, ipAddress: null, userAgent: null, details: snapshot.details,
       });
     } catch { /* Audit persistence must not affect Attractap operations. */ }
+  }
+
+  async recordProject(event: Omit<ProjectAuditEvent, 'operationId'>): Promise<void> {
+    try {
+      const snapshot = projectProjectAuditEvent({ ...event, operationId: randomUUID() });
+      const storage = this.storage;
+      if (!snapshot || this.stopping || !storage?.isInitialized || this.pending >= 8) return;
+      this.pending++;
+      try {
+        const config = await readAuditSettings(this.settings);
+        if (!config.enabled || !config.domains.includes('project') || this.stopping) return;
+        await this.serializeStorageWrite(() =>
+          storage.getRepository(AuditLog).insert({
+            at: new Date(),
+            domain: 'project',
+            pluginId: 'core',
+            action: snapshot.action,
+            operationId: snapshot.operationId,
+            actorId: snapshot.actorId,
+            authenticationMethod: snapshot.authenticationMethod ?? 'session',
+            apiTokenId: snapshot.apiTokenId ?? null,
+            outcome: 'succeeded',
+            subjectType: snapshot.subjectType,
+            subjectId: snapshot.subjectId,
+            ipAddress: null,
+            userAgent: null,
+            details: snapshot.details,
+          }),
+        );
+      } finally {
+        this.pending--;
+      }
+    } catch {
+      /* Audit persistence must not affect project operations. */
+    }
   }
 
   afterTransactionCommit({ queryRunner }: TransactionCommitEvent): void {

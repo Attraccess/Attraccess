@@ -60,7 +60,7 @@ const event = (): PluginAuditEvent & { pluginId: string } => ({
 });
 const config = {
   enabled: true,
-  domains: ['administration', 'attractap', 'identity', 'resource', 'wago'],
+  domains: ['administration', 'attractap', 'identity', 'project', 'resource', 'wago'],
   retention_days: 90,
 };
 
@@ -331,6 +331,49 @@ describe('durable audit SQLite', () => {
         source: 'sumup-topup',
       }),
     ).toEqual({ status: 'unavailable' });
+  });
+
+  it('records project administration events with only safe allowlisted details', async () => {
+    await service.recordProject({
+      action: 'project.invitation.sent',
+      actorId: 42,
+      subjectType: 'project.invitation',
+      subjectId: 7,
+      details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
+    });
+    await service.recordProject({
+      action: 'project.invitation.sent',
+      actorId: 42,
+      subjectType: 'project.invitation',
+      subjectId: 8,
+      details: { email: 'person@example.test' },
+    } as never);
+
+    expect((await service.list({ limit: 10 })).items).toEqual([
+      expect.objectContaining({
+        domain: 'project',
+        action: 'project.invitation.sent',
+        actorId: 42,
+        subjectType: 'project.invitation',
+        subjectId: 7,
+        details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
+      }),
+    ]);
+  });
+
+  it('persists project API-token attribution only with a valid token context', async () => {
+    await service.recordProject({
+      action: 'project.created', actorId: 42, authenticationMethod: 'api-token', apiTokenId: 9,
+      subjectType: 'project', subjectId: 7, details: { projectId: 7, 'after.name': 'Project', 'after.hasLogo': 0 },
+    });
+    await service.recordProject({
+      action: 'project.created', actorId: 42, authenticationMethod: 'session', apiTokenId: 9,
+      subjectType: 'project', subjectId: 8, details: { projectId: 8, 'after.name': 'Project', 'after.hasLogo': 0 },
+    } as never);
+
+    expect((await service.list({ limit: 10 })).items).toEqual([
+      expect.objectContaining({ domain: 'project', subjectId: 7, authenticationMethod: 'api-token', apiTokenId: 9 }),
+    ]);
   });
 
   it('records and filters Attractap events, respecting global and domain suppression', async () => {
@@ -1310,6 +1353,11 @@ describe('audit policy and authorization', () => {
     await expect(
       pipe.transform({ eventPrefix: 'billing.', action: 'billing.transaction.created', subjectType: 'billing.transaction', domain: 'billing' }, { type: 'query', metatype: AuditQueryDto }),
     ).resolves.toMatchObject({ action: 'billing.transaction.created', subjectType: 'billing.transaction', domain: 'billing' });
+    for (const subjectType of ['project', 'project.member', 'project.invitation']) {
+      await expect(
+        pipe.transform({ domain: 'project', subjectType }, { type: 'query', metatype: AuditQueryDto }),
+      ).resolves.toMatchObject({ domain: 'project', subjectType });
+    }
   });
 });
 
