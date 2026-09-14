@@ -16,6 +16,10 @@ import { MetricsService } from '../../../../metrics/metrics.service';
 import { classifySsoFailureReason, markSsoFailureMetricRecorded, recordSsoLoginFailure } from '../sso-metrics';
 import { resolveSsoRoleAssignments } from '../permission-mapping';
 import { RbacService } from '../../../rbac/rbac.service';
+import { SSOService } from '../sso.service';
+import { SsoAuditService } from '../../../../audit/sso-audit.service';
+import { ssoAuditSnapshot } from '../sso-audit-snapshot';
+import { randomUUID } from 'node:crypto';
 
 type StrategyCtor = new (...args: unknown[]) => Strategy;
 type SamlOptionsCallback = (error: Error | null, samlOptions?: PassportSamlConfig) => void;
@@ -251,6 +255,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
       throw error;
     }
 
+    await this.recordProvisioningAudit(user.id, config.ssoProviderId, 'user_created');
     return await this.syncPermissionsFromClaims(user, profile, config);
   }
 
@@ -319,14 +324,41 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     // a wholly absent attribute (IdP misconfiguration, transient omission) must not silently
     // revoke anything. Intentionally not gated on a configured mapping: a cleared mapping must
     // still sync (with zero assignments) so roles granted under the old mapping get revoked.
+    let changes: { added: string[]; removed: string[]; updated: string[] } | undefined;
     if (rbacService && claimValues.length > 0) {
-      await rbacService.syncSsoRoles(
+      changes = await rbacService.syncSsoRoles(
         user.id,
         roleAssignments,
         SSOProviderType.SAML,
         config.ssoProviderId,
       );
     }
+    if (changes) await this.recordProvisioningAudit(user.id, config.ssoProviderId, 'permissions_synced', changes);
     return user;
+  }
+
+  private async recordProvisioningAudit(
+    userId: number,
+    providerId: number,
+    action: 'user_created' | 'permissions_synced',
+    changes?: { added: string[]; removed: string[]; updated: string[] },
+  ): Promise<void> {
+    try {
+      const ssoService = this.moduleRef.get(SSOService, { strict: false });
+      const audit = this.moduleRef.get(SsoAuditService, { strict: false });
+      const provider = await ssoService?.getProviderByTypeAndIdWithConfiguration(SSOProviderType.SAML, providerId);
+      if (!audit || !provider) return;
+      const details = { provider: ssoAuditSnapshot(provider) };
+      await audit.record({
+        action: `sso.provisioning.${action}`,
+        operationId: randomUUID(),
+        actorId: null,
+        authenticationMethod: null,
+        subject: { type: 'user', id: userId },
+        details: { ...details, changes: JSON.stringify(action === 'user_created' ? { userCreated: true } : changes) },
+      });
+    } catch (error) {
+      this.logger.warn(`Failed to record committed SAML provisioning audit: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 }

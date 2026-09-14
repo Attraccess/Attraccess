@@ -1,3 +1,4 @@
+import { AuditService } from '../audit/audit.service';
 // Regression test for ATT-496: the Shelly plugin's REST controller must actually
 // mount into the host API. After the plugin loaded successfully, POST
 // /api/shelly/devices still 404'd — so this proves a plugin-supplied
@@ -26,8 +27,11 @@ let hostDataSource: DataSource;
 
 @Global()
 @Module({
-  providers: [{ provide: DataSource, useFactory: () => hostDataSource }],
-  exports: [DataSource],
+  providers: [
+    { provide: AuditService, useValue: { recordAdministration: jest.fn().mockResolvedValue({ status: 'recorded' }) } },
+    { provide: DataSource, useFactory: () => hostDataSource },
+  ],
+  exports: [AuditService, DataSource],
 })
 class HostModule {}
 
@@ -100,12 +104,14 @@ describe('Shelly plugin REST controller mounts into the host API', () => {
     // The upload path schedules a 1s restart timer that calls process.exit();
     // no-op only that timer so the test process is not killed mid-run.
     const realSetTimeout = global.setTimeout;
-    jest
-      .spyOn(global, 'setTimeout')
-      .mockImplementation(((fn: (...a: unknown[]) => void, delay?: number, ...rest: unknown[]) => {
-        if (delay === 1000) return 0 as unknown as NodeJS.Timeout;
-        return realSetTimeout(fn, delay as number, ...rest);
-      }) as unknown as typeof setTimeout);
+    jest.spyOn(global, 'setTimeout').mockImplementation(((
+      fn: (...a: unknown[]) => void,
+      delay?: number,
+      ...rest: unknown[]
+    ) => {
+      if (delay === 1000) return 0 as unknown as NodeJS.Timeout;
+      return realSetTimeout(fn, delay as number, ...rest);
+    }) as unknown as typeof setTimeout);
 
     PluginService.configure({ PLUGIN_DIR: PLUGIN_PATH, RESTART_BY_EXIT: true });
 

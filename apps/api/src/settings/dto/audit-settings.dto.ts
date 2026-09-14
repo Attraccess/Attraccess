@@ -6,12 +6,16 @@ export class AuditSettingsDto {
   @IsBoolean()
   enabled!: boolean;
 
-  @ApiProperty({ enum: ['attractap', 'billing', 'resource', 'wago', 'identity'], isArray: true, default: ['attractap', 'resource', 'wago', 'identity'] })
+  @ApiProperty({
+    enum: ['administration', 'attractap', 'billing', 'identity', 'resource', 'sso', 'wago'],
+    isArray: true,
+    default: ['administration', 'attractap', 'identity', 'resource', 'wago'],
+  })
   @IsArray()
-  @ArrayMaxSize(5)
+  @ArrayMaxSize(7)
   @ArrayUnique()
-  @IsIn(['attractap', 'billing', 'resource', 'wago', 'identity'], { each: true })
-  domains!: Array<'attractap' | 'billing' | 'resource' | 'wago' | 'identity'>;
+  @IsIn(['administration', 'attractap', 'billing', 'identity', 'resource', 'sso', 'wago'], { each: true })
+  domains!: ('administration' | 'attractap' | 'billing' | 'identity' | 'resource' | 'sso' | 'wago')[];
 
   @ApiProperty({ default: 90, minimum: 1, maximum: 3650 })
   @IsInt()

@@ -13,6 +13,7 @@ import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 describe('ResourcesController', () => {
   let controller: ResourcesController;
   let service: ResourcesService;
+  const request = { user: { id: 9 } } as AuthenticatedRequest;
 
   beforeEach(async () => {
     const mockResourcesService = {
@@ -140,10 +141,10 @@ describe('ResourcesController', () => {
 
       jest.spyOn(service, 'createResource').mockResolvedValue(newResource);
 
-      const result = await controller.createOne(createDto);
+      const result = await controller.createOne(createDto, request);
 
       expect(result).toEqual(newResource);
-      expect(service.createResource).toHaveBeenCalledWith(createDto, undefined);
+      expect(service.createResource).toHaveBeenCalledWith(createDto, undefined, request.user);
     });
   });
 
@@ -171,10 +172,10 @@ describe('ResourcesController', () => {
 
       jest.spyOn(service, 'updateResource').mockResolvedValue(updatedResource);
 
-      const result = await controller.updateOne(1, updateDto);
+      const result = await controller.updateOne(1, updateDto, request);
 
       expect(result).toEqual(updatedResource);
-      expect(service.updateResource).toHaveBeenCalledWith(1, updateDto, undefined);
+      expect(service.updateResource).toHaveBeenCalledWith(1, updateDto, undefined, request.user);
     });
 
     it('should throw NotFoundException if resource not found', async () => {
@@ -185,7 +186,7 @@ describe('ResourcesController', () => {
 
       jest.spyOn(service, 'updateResource').mockRejectedValue(new NotFoundException());
 
-      await expect(controller.updateOne(999, updateDto)).rejects.toThrow(NotFoundException);
+      await expect(controller.updateOne(999, updateDto, request)).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -193,15 +194,15 @@ describe('ResourcesController', () => {
     it('should delete a resource', async () => {
       jest.spyOn(service, 'deleteResource').mockResolvedValue(undefined);
 
-      await controller.deleteOne(1);
+      await controller.deleteOne(1, request);
 
-      expect(service.deleteResource).toHaveBeenCalledWith(1);
+      expect(service.deleteResource).toHaveBeenCalledWith(1, request.user);
     });
 
     it('should throw NotFoundException if resource not found', async () => {
       jest.spyOn(service, 'deleteResource').mockRejectedValue(new NotFoundException());
 
-      await expect(controller.deleteOne(999)).rejects.toThrow(NotFoundException);
+      await expect(controller.deleteOne(999, request)).rejects.toThrow(NotFoundException);
     });
   });
 });

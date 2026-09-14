@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   Resource,
@@ -21,7 +21,7 @@ import { ResourceRetrainingController } from './resourceRetraining.controller';
       ResourceIntroduction,
       ResourceIntroductionHistoryItem,
     ]),
-    ResourceGroupsModule,
+    forwardRef(() => ResourceGroupsModule),
     EmailModule,
   ],
   controllers: [ResourceRetrainingController],
