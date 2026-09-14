@@ -222,7 +222,9 @@ export class ResourcesService {
         ...(before.documentationType !== updatedResource.documentationType ||
         before.documentationMarkdown !== updatedResource.documentationMarkdown ||
         before.documentationUrl !== updatedResource.documentationUrl ? ['documentation'] : []),
-        ...(JSON.stringify(before.metadata) !== JSON.stringify(updatedResource.metadata) ? ['metadata'] : []),
+        ...(JSON.stringify(before.metadata ?? {}) !== JSON.stringify(updatedResource.metadata ?? {})
+          ? ['metadata']
+          : []),
         ...(before.imageFilename !== updatedResource.imageFilename ? ['image'] : []),
         ...(before.allowTakeOver !== updatedResource.allowTakeOver ? ['allowTakeOver'] : []),
         ...(before.retrainingMaxAgeDays !== updatedResource.retrainingMaxAgeDays ? ['retrainingMaxAgeDays'] : []),
