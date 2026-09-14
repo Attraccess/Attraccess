@@ -58,7 +58,11 @@ const event = (): PluginAuditEvent & { pluginId: string } => ({
   subject: { type: 'wago.controller', id: 7 },
   details: { revision: 2 },
 });
-const config = { enabled: true, domains: ['administration', 'identity', 'resource', 'wago'], retention_days: 90 };
+const config = {
+  enabled: true,
+  domains: ['administration', 'attractap', 'identity', 'resource', 'wago'],
+  retention_days: 90,
+};
 
 describe('durable audit SQLite', () => {
   let directory: string;
@@ -327,6 +331,33 @@ describe('durable audit SQLite', () => {
         source: 'sumup-topup',
       }),
     ).toEqual({ status: 'unavailable' });
+  });
+
+  it('records and filters Attractap events, respecting global and domain suppression', async () => {
+    await store.setPlainSetting('audit', 'domains', '["attractap"]');
+    await service.recordAttractap({
+      action: 'reader.crash_reported', actorId: null, authenticationMethod: null, subjectId: 7,
+      details: { source: 'reader-websocket', resetReason: 'PANIC', hasCoredump: false },
+    });
+    expect((await service.list({ domain: 'attractap', subjectType: 'attractap.reader', limit: 1 })).items[0]).toMatchObject({
+      action: 'attractap.reader.crash_reported', actorId: null, authenticationMethod: null,
+      subjectId: 7, details: { source: 'reader-websocket', resetReason: 'PANIC', hasCoredump: false },
+    });
+
+    await store.setPlainSetting('audit', 'domains', '["resource"]');
+    await service.recordAttractap({
+      action: 'reader.registered', actorId: null, authenticationMethod: null, subjectId: 8,
+      details: { source: 'reader-websocket' },
+    });
+    expect((await service.list({ domain: 'attractap', action: 'attractap.reader.registered', limit: 1 })).items).toHaveLength(0);
+
+    await store.setPlainSetting('audit', 'domains', '["attractap"]');
+    await store.setPlainSetting('audit', 'enabled', 'false');
+    await service.recordAttractap({
+      action: 'reader.registered', actorId: null, authenticationMethod: null, subjectId: 9,
+      details: { source: 'reader-websocket' },
+    });
+    expect((await service.list({ domain: 'attractap', subjectId: 9, limit: 1 })).items).toHaveLength(0);
   });
 
   it('persists resource system and device origins, honors suppression, and filters lifecycle actions', async () => {
@@ -1288,7 +1319,8 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
     (migration) =>
       migration !== DurableAudit1783700000000 &&
       migration !== IdentityAudit1783800000000 &&
-      migration !== RetirePasswordPolicyAudit1783900000000,
+      migration !== RetirePasswordPolicyAudit1783900000000 &&
+      migration !== migrations.AttractapAuditDomain1784000000000,
   );
   const database = join(directory, 'upgrade.sqlite');
   let source = new DataSource({ type: 'sqlite', database, entities: Object.values(entities), migrations: prior });
@@ -1321,11 +1353,12 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       'DurableAudit1783700000000',
       'IdentityAudit1783800000000',
       'RetirePasswordPolicyAudit1783900000000',
+      'AttractapAuditDomain1784000000000',
     ]);
     expect(source.hasMetadata(AuditLog)).toBeTruthy();
     expect(await source.query('PRAGMA foreign_key_list(audit_log)')).toEqual([]);
     expect(await source.query(`SELECT "value" FROM "setting" WHERE "parent" = 'audit' AND "key" = 'domains'`)).toEqual([
-      { value: '["billing","resource","wago","identity"]' },
+      { value: '["billing","resource","wago","identity","attractap"]' },
     ]);
     expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(
       2,
@@ -1400,6 +1433,7 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
     await source.query(`UPDATE "setting" SET "value" = '["identity"]'
       WHERE "parent" = 'audit' AND "key" = 'domains'`);
     await source.undoLastMigration();
+    await source.undoLastMigration();
     expect(await source.query("SELECT name FROM sqlite_master WHERE name = 'audit_log'")).toHaveLength(1);
     expect(await source.query('SELECT * FROM password_policy_audit')).toHaveLength(4);
     expect(
@@ -1428,10 +1462,12 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
     ]);
     expect((await source.runMigrations()).map((migration) => migration.name)).toEqual([
       'RetirePasswordPolicyAudit1783900000000',
+      'AttractapAuditDomain1784000000000',
     ]);
     expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(
       4,
     );
+    await source.undoLastMigration();
     await source.undoLastMigration();
     expect(
       await source.query(`SELECT "requestId", "before", "after" FROM password_policy_audit WHERE "requestId" = ?`, [
@@ -1447,6 +1483,7 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       'DurableAudit1783700000000',
       'IdentityAudit1783800000000',
       'RetirePasswordPolicyAudit1783900000000',
+      'AttractapAuditDomain1784000000000',
     ]);
   } finally {
     if (source.isInitialized) await source.destroy();

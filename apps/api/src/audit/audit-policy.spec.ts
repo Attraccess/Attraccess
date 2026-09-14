@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { PluginAuditEvent } from '@attraccess/plugins-backend-sdk';
-import { projectAuditEvent, projectIdentityAuditEvent, projectResourceAuditEvent } from './audit-policy';
+import {
+  projectAttractapAuditEvent,
+  projectAuditEvent,
+  projectIdentityAuditEvent,
+  projectResourceAuditEvent,
+} from './audit-policy';
 
 function event(): PluginAuditEvent & { pluginId: string } {
   return {
@@ -121,6 +126,20 @@ describe('audit storage safe snapshot', () => {
         details: { role: `${'a'.repeat(79)}-` },
       }),
     ).toMatchObject({ details: { role: `${'a'.repeat(79)}-` } });
+  });
+
+  it('allows only firmware reset reasons in Attractap crash events', () => {
+    const crash = {
+      action: 'reader.crash_reported' as const,
+      actorId: null,
+      authenticationMethod: null,
+      subjectId: 7,
+      details: { source: 'reader-websocket', resetReason: 'PANIC', hasCoredump: false },
+    };
+    expect(projectAttractapAuditEvent(crash)).toEqual(crash);
+    expect(
+      projectAttractapAuditEvent({ ...crash, details: { ...crash.details, resetReason: 'raw-secret' } }),
+    ).toBeNull();
   });
 
   it('allows system-origin lifecycle events but rejects mixed origins', () => {
