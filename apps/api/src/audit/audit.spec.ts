@@ -727,6 +727,82 @@ describe('durable audit SQLite', () => {
     });
   });
 
+  it('persists provider-origin SSO role deltas and filters them by domain', async () => {
+    await store.setPlainSetting('audit', 'domains', '["sso"]');
+    const operationId = randomUUID();
+    expect(
+      await service.recordSso({
+        action: 'sso.provisioning.permissions_synced',
+        operationId,
+        actorId: null,
+        authenticationMethod: null,
+        subject: { type: 'user', id: 7 },
+        details: {
+          provider: JSON.stringify({
+            id: 3,
+            name: 'Company IdP',
+            type: 'saml',
+            configuration: {
+              entryPoint: 'https://idp.example.com/sso',
+              issuer: 'https://app.example.com',
+              audience: null,
+              signRequest: false,
+              wantAssertionsSigned: false,
+              wantAuthnResponseSigned: true,
+              forceAuthn: false,
+              emailAttributeKeys: null,
+              roleMappings: null,
+              signingMaterial: {
+                identityProviderCertificateConfigured: true,
+                provisioningSecretConfigured: false,
+                signingCertificateConfigured: false,
+                signingPrivateKeyConfigured: false,
+              },
+              omitted: {},
+            },
+          }),
+          changes: JSON.stringify({ added: ['billing-manager'], removed: [], updated: [] }),
+        },
+      }),
+    ).toEqual({ status: 'recorded' });
+    expect(
+      (await service.list({ domain: 'sso', action: 'sso.provisioning.permissions_synced', limit: 1 })).items,
+    ).toEqual([expect.objectContaining({ domain: 'sso', actorId: null, subjectType: 'user', subjectId: 7 })]);
+  });
+
+  it('does not persist SSO events while the SSO domain is disabled', async () => {
+    await store.setPlainSetting('audit', 'domains', '["identity"]');
+    expect(
+      await service.recordSso({
+        action: 'sso.provider.created',
+        operationId: randomUUID(),
+        actorId: 4,
+        authenticationMethod: 'session',
+        subject: { type: 'sso.provider', id: 3 },
+        details: {
+          before: 'null',
+          after: JSON.stringify({
+            id: 3,
+            name: 'Company IdP',
+            type: 'oidc',
+            configuration: {
+              issuer: 'https://idp.example.com',
+              authorizationURL: 'https://idp.example.com/authorize',
+              tokenURL: 'https://idp.example.com/token',
+              userInfoURL: 'https://idp.example.com/userinfo',
+              clientId: 'client-id',
+              clientSecretConfigured: true,
+              scopes: null,
+              usernameClaimPaths: null,
+              emailClaimPaths: null,
+              roleMappings: null,
+            },
+          }),
+        },
+      }),
+    ).toEqual({ status: 'unavailable' });
+  });
+
   it('rejects oversized details at the database boundary too', async () => {
     await service.record(event());
     const row = (await service.list({ limit: 1 })).items[0];
@@ -1155,6 +1231,9 @@ describe('audit policy and authorization', () => {
       billingFilters,
     );
     await expect(
+      pipe.transform({ domain: 'sso', action: 'sso.provider.created' }, { type: 'query', metatype: AuditQueryDto }),
+    ).resolves.toMatchObject({ domain: 'sso', action: 'sso.provider.created' });
+    await expect(
       pipe.transform(
         { eventPrefix: 'resource_group.', action: 'introduction.granted', subjectType: 'resource_group', domain: 'resource' },
         { type: 'query', metatype: AuditQueryDto },
@@ -1268,7 +1347,9 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       WHEN OLD.id IN (SELECT id FROM "audit_log" WHERE "at" < '2026-06-15 12:00:00.000')
       BEGIN SELECT RAISE(ABORT, 'audit cleanup failed'); END`);
     await migratedAudit.cleanup();
-    expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toHaveLength(1);
+    expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toHaveLength(
+      1,
+    );
     await source.query('DROP TRIGGER abort_audit_cleanup');
     await migratedAudit.cleanup();
     expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toEqual([]);

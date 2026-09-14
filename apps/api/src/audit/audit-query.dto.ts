@@ -4,11 +4,21 @@ import { IsISO8601, IsString, Matches, MaxLength, IsIn, IsInt, IsOptional, IsUUI
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { AUDIT_ACTIONS, IDENTITY_AUDIT_ACTIONS, RESOURCE_AUDIT_ACTIONS } from './audit-policy';
 
+const SSO_AUDIT_ACTIONS = [
+  'sso.provider.created',
+  'sso.provider.updated',
+  'sso.provider.deleted',
+  'sso.provisioning.sessions_revoked',
+  'sso.provisioning.user_created',
+  'sso.provisioning.user_deleted',
+  'sso.provisioning.permissions_synced',
+];
 const ALL_AUDIT_ACTIONS = [
   ...AUDIT_ACTIONS,
   ...IDENTITY_AUDIT_ACTIONS,
   ...RESOURCE_AUDIT_ACTIONS,
   ...ADMINISTRATION_AUDIT_ACTIONS,
+  ...SSO_AUDIT_ACTIONS,
   'billing.transaction.created',
   'billing.transaction.updated',
 ];
@@ -16,7 +26,7 @@ const ALL_AUDIT_ACTIONS = [
 const timestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
 
 const eventPrefix =
-  /^(?:billing|email_layout|email_template|identity|introduction|maintenance_schedule|mqtt_server|plugin|resource|resource_group|settings|supervision|wago)(?:\.[a-z_]+)*\.?$/;
+  /^(?:billing|email_layout|email_template|identity|introduction|maintenance_schedule|mqtt_server|plugin|resource|resource_group|settings|sso|supervision|wago)(?:\.[a-z_]+)*\.?$/;
 
 export class AuditQueryDto {
   @ApiPropertyOptional({ description: 'Event action prefix', pattern: eventPrefix.source, maxLength: 100 })
@@ -61,9 +71,9 @@ export class AuditQueryDto {
   @Max(Number.MAX_SAFE_INTEGER)
   beforeId?: number;
 
-  @ApiPropertyOptional({ enum: ['administration', 'billing', 'identity', 'resource', 'wago'] })
+  @ApiPropertyOptional({ enum: ['administration', 'billing', 'identity', 'resource', 'sso', 'wago'] })
   @IsOptional()
-  @IsIn(['administration', 'billing', 'identity', 'resource', 'wago'])
+  @IsIn(['administration', 'billing', 'identity', 'resource', 'sso', 'wago'])
   domain?: string;
 
   @ApiPropertyOptional({ enum: ['attempted', 'succeeded', 'failed'] })
@@ -107,6 +117,8 @@ export class AuditQueryDto {
       'identity.user',
       'resource',
       'resource_group',
+      'sso.provider',
+      'user',
       'wago.controller',
       'wago.commissioning',
     ],
@@ -126,6 +138,8 @@ export class AuditQueryDto {
     'identity.user',
     'resource',
     'resource_group',
+    'sso.provider',
+    'user',
     'wago.controller',
     'wago.commissioning',
   ])
