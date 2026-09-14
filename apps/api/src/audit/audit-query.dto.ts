@@ -1,13 +1,22 @@
+import { ADMINISTRATION_AUDIT_ACTIONS } from './audit-administration-policy';
 import { Type } from 'class-transformer';
 import { IsISO8601, IsString, Matches, MaxLength, IsIn, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { AUDIT_ACTIONS, IDENTITY_AUDIT_ACTIONS, RESOURCE_AUDIT_ACTIONS } from './audit-policy';
 
-const ALL_AUDIT_ACTIONS = [...AUDIT_ACTIONS, ...IDENTITY_AUDIT_ACTIONS, ...RESOURCE_AUDIT_ACTIONS, 'billing.transaction.created', 'billing.transaction.updated'];
+const ALL_AUDIT_ACTIONS = [
+  ...AUDIT_ACTIONS,
+  ...IDENTITY_AUDIT_ACTIONS,
+  ...RESOURCE_AUDIT_ACTIONS,
+  ...ADMINISTRATION_AUDIT_ACTIONS,
+  'billing.transaction.created',
+  'billing.transaction.updated',
+];
 
 const timestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
 
-const eventPrefix = /^(?:introduction|resource|resource_group|billing|maintenance_schedule|supervision|wago|identity)(?:\.[a-z_]+)*\.?$/;
+const eventPrefix =
+  /^(?:billing|email_layout|email_template|identity|introduction|maintenance_schedule|mqtt_server|plugin|resource|resource_group|settings|supervision|wago)(?:\.[a-z_]+)*\.?$/;
 
 export class AuditQueryDto {
   @ApiPropertyOptional({ description: 'Event action prefix', pattern: eventPrefix.source, maxLength: 100 })
@@ -52,9 +61,9 @@ export class AuditQueryDto {
   @Max(Number.MAX_SAFE_INTEGER)
   beforeId?: number;
 
-  @ApiPropertyOptional({ enum: ['billing', 'resource', 'wago', 'identity'] })
+  @ApiPropertyOptional({ enum: ['administration', 'billing', 'identity', 'resource', 'wago'] })
   @IsOptional()
-  @IsIn(['billing', 'resource', 'wago', 'identity'])
+  @IsIn(['administration', 'billing', 'identity', 'resource', 'wago'])
   domain?: string;
 
   @ApiPropertyOptional({ enum: ['attempted', 'succeeded', 'failed'] })
@@ -84,9 +93,41 @@ export class AuditQueryDto {
   subjectId?: number;
 
   @ApiPropertyOptional({
-    enum: ['billing.transaction', 'resource', 'resource_group', 'wago.controller', 'wago.commissioning', 'identity.user', 'identity.role', 'identity.password_policy'],
+    enum: [
+      'setting',
+      'email-template',
+      'email-layout',
+      'mqtt-server',
+      'plugin-package',
+      'plugin-registry',
+      'plugin-policy',
+      'billing.transaction',
+      'identity.password_policy',
+      'identity.role',
+      'identity.user',
+      'resource',
+      'resource_group',
+      'wago.controller',
+      'wago.commissioning',
+    ],
   })
   @IsOptional()
-  @IsIn(['billing.transaction', 'resource', 'resource_group', 'wago.controller', 'wago.commissioning', 'identity.user', 'identity.role', 'identity.password_policy'])
+  @IsIn([
+    'setting',
+    'email-template',
+    'email-layout',
+    'mqtt-server',
+    'plugin-package',
+    'plugin-registry',
+    'plugin-policy',
+    'billing.transaction',
+    'identity.password_policy',
+    'identity.role',
+    'identity.user',
+    'resource',
+    'resource_group',
+    'wago.controller',
+    'wago.commissioning',
+  ])
   subjectType?: string;
 }

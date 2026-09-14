@@ -1,3 +1,4 @@
+import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { PluginModule } from '../plugin-system/plugin.module';
 import { PluginService } from '../plugin-system/plugin.service';
 import { PluginSandboxService } from '../plugin-system/plugin-sandbox.service';
@@ -57,7 +58,7 @@ const event = (): PluginAuditEvent & { pluginId: string } => ({
   subject: { type: 'wago.controller', id: 7 },
   details: { revision: 2 },
 });
-const config = { enabled: true, domains: ['resource', 'wago', 'identity'], retention_days: 90 };
+const config = { enabled: true, domains: ['administration', 'identity', 'resource', 'wago'], retention_days: 90 };
 
 describe('durable audit SQLite', () => {
   let directory: string;
@@ -92,6 +93,65 @@ describe('durable audit SQLite', () => {
     await service.onModuleDestroy();
     if (source.isInitialized) await source.destroy();
     await rm(directory, { recursive: true, force: true });
+  });
+
+  it.each([{ enabled: false }, { domains: ['wago'] }])(
+    'records the final disabling settings change and suppresses subsequent events (%j)',
+    async (update) => {
+      const settings = new SettingsService(null, store, null);
+      await settings.updateAuditSettings(config);
+      const controller = new SettingsController(settings, service);
+      await controller.updateAuditSettings(update, {
+        user: { id: 42, authenticationMethod: 'session' },
+      } as AuthenticatedRequest);
+      await service.recordAdministration({
+        action: 'mqtt_server.created',
+        actorId: 42,
+        subjectType: 'mqtt-server',
+        subjectId: 1,
+        details: { host: 'mqtt.example' },
+      });
+      const rows = (await service.list(new AuditQueryDto())).items;
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        action: 'settings.updated',
+        details: { settingKey: update.enabled === false ? 'audit.enabled' : 'audit.domains' },
+      });
+      expect(rows[0].details.before).not.toBe(rows[0].details.after);
+      await settings.updateAuditSettings(config);
+      await service.recordAdministration({
+        action: 'mqtt_server.created',
+        actorId: 42,
+        subjectType: 'mqtt-server',
+        subjectId: 1,
+        details: { host: 'mqtt.example' },
+      });
+      expect((await service.list(new AuditQueryDto())).items).toHaveLength(2);
+    },
+  );
+
+  it('records allowlisted administration metadata and rejects credential-bearing fields', async () => {
+    await service.recordAdministration({
+      action: 'mqtt_server.created',
+      actorId: 42,
+      subjectType: 'mqtt-server',
+      subjectId: 7,
+      details: { host: 'mqtt.example.test', port: 8883, passwordChanged: 1 },
+    });
+    await service.recordAdministration({
+      action: 'mqtt_server.created',
+      actorId: 42,
+      subjectType: 'mqtt-server',
+      subjectId: 8,
+      details: { password: 'do-not-store' } as never,
+    });
+    expect((await service.list(new AuditQueryDto())).items).toEqual([
+      expect.objectContaining({
+        action: 'mqtt_server.created',
+        subjectId: 7,
+        details: { host: 'mqtt.example.test', port: 8883, passwordChanged: 1 },
+      }),
+    ]);
   });
 
   it('upgrades additively, survives connection restart and principal deletion, prevents updates, and reverts', async () => {
