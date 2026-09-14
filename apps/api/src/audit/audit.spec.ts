@@ -329,6 +329,43 @@ describe('durable audit SQLite', () => {
     ).toEqual({ status: 'unavailable' });
   });
 
+  it('persists resource system and device origins, honors suppression, and filters lifecycle actions', async () => {
+    await service.recordResource({
+      action: 'health.transition', actorId: null, subjectId: 7,
+      details: { previousStatus: 'healthy', status: 'unhealthy', healthSource: 'heartbeat' },
+    });
+    await service.recordResource({
+      action: 'usage_session.started', actorId: 8, authenticationMethod: null, subjectId: 7,
+      details: { usageId: 4, usageUserId: 8 },
+    });
+    await service.recordResource({
+      action: 'retraining.cleared', actorId: 8, authenticationMethod: null, subjectType: 'resource_group', subjectId: 3,
+      details: { introductionId: 2, usageUserId: 8 },
+    });
+    expect((await service.list({ domain: 'resource', eventPrefix: 'health.' } as AuditQueryDto)).items).toEqual([
+      expect.objectContaining({ action: 'health.transition', actorId: null, authenticationMethod: null, subjectId: 7 }),
+    ]);
+    expect((await service.list({ domain: 'resource', action: 'usage_session.started' } as AuditQueryDto)).items).toEqual([
+      expect.objectContaining({ actorId: 8, authenticationMethod: null, subjectId: 7 }),
+    ]);
+    expect((await service.list({ domain: 'resource', subjectType: 'resource_group' } as AuditQueryDto)).items).toEqual([
+      expect.objectContaining({ action: 'retraining.cleared', subjectId: 3, actorId: 8, authenticationMethod: null }),
+    ]);
+    await store.setPlainSetting('audit', 'domains', '[]');
+    await service.recordResource({
+      action: 'retraining.required', actorId: null, subjectId: 7,
+      details: { introductionId: 2, usageUserId: 8, retrainingReason: 'age' },
+    });
+    expect((await service.list({ domain: 'resource' } as AuditQueryDto)).items).toHaveLength(3);
+    await store.setPlainSetting('audit', 'domains', '["resource"]');
+    await store.setPlainSetting('audit', 'enabled', 'false');
+    await service.recordResource({
+      action: 'retraining.required', actorId: null, subjectId: 7,
+      details: { introductionId: 3, usageUserId: 8, retrainingReason: 'age' },
+    });
+    expect((await service.list({ domain: 'resource' } as AuditQueryDto)).items).toHaveLength(3);
+  });
+
   it('records a billing event only after its originating transaction commits', async () => {
     await store.setPlainSetting('audit', 'domains', '["billing"]');
     let receipt: Promise<{ status: string }> | undefined;

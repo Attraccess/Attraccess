@@ -13,7 +13,9 @@ import { ResourceIntroductionChangedEvent } from './events/resource-introduction
 import { MetricsService } from '../../metrics/metrics.service';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { ResourceRetrainingService } from '../retraining/resourceRetraining.service';
 import { AuditService } from '../../audit/audit.service';
+import { ResourceAuditOrigin } from '../../audit/audit-policy';
 
 @Injectable()
 export class ResourceIntroductionsService {
@@ -28,6 +30,7 @@ export class ResourceIntroductionsService {
     private readonly eventEmitter: EventEmitter2,
     private readonly metricsService: MetricsService,
     private readonly notifications: NotificationDispatchService,
+    private readonly retraining: ResourceRetrainingService,
     private readonly audit: AuditService,
   ) {}
 
@@ -157,6 +160,9 @@ export class ResourceIntroductionsService {
     }
 
     const previousHistoryItem = await this.getLastHistoryItemOfIntroduction(resourceIntroduction.id);
+    const retrainingWasDue =
+      nextStatus === IntroductionHistoryAction.GRANT &&
+      (await this.retraining.getIntroductionRetrainingStatus(resourceIntroduction.id))?.isDue === true;
 
     this.logger.debug(`Creating new history item with action: ${nextStatus}`);
     const historyItem = this.resourceIntroductionHistoryItemRepository.create({
@@ -175,6 +181,25 @@ export class ResourceIntroductionsService {
     );
     if (previousHistoryItem?.action !== nextStatus && (previousHistoryItem || nextStatus === IntroductionHistoryAction.GRANT)) {
       this.notifyIntroductionChange(resourceId, userId, nextStatus === IntroductionHistoryAction.GRANT);
+    }
+    const retrainingIsDue =
+      nextStatus === IntroductionHistoryAction.GRANT &&
+      (await this.retraining.getIntroductionRetrainingStatus(resourceIntroduction.id))?.isDue === true;
+    if (retrainingWasDue && !retrainingIsDue) {
+      const retrainingOrigin: ResourceAuditOrigin =
+        performedByUserId === null
+          ? { actorId: null }
+          : {
+              actorId: performedByUserId ?? userId,
+              authenticationMethod: authenticationMethod === undefined ? 'session' : authenticationMethod,
+              ...(apiTokenId === undefined || apiTokenId === null ? {} : { apiTokenId }),
+            };
+      await this.audit.recordResource({
+        action: 'retraining.cleared',
+        ...retrainingOrigin,
+        subjectId: resourceId,
+        details: { introductionId: resourceIntroduction.id, usageUserId: userId },
+      });
     }
 
     if (performedByUserId !== undefined) {

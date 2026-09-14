@@ -220,15 +220,15 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     });
   }
 
-  async recordResource(event: Omit<ResourceAuditEvent, 'operationId'>): Promise<void> {
+  async recordResource(event: Omit<ResourceAuditEvent, 'operationId'>): Promise<boolean> {
     try {
       const snapshot = projectResourceAuditEvent({ ...event, operationId: randomUUID() });
       const storage = this.storage;
-      if (!snapshot || this.stopping || !storage?.isInitialized || this.pending >= 8) return;
+      if (!snapshot || this.stopping || !storage?.isInitialized || this.pending >= 8) return false;
       this.pending++;
       try {
         const config = await readAuditSettings(this.settings);
-        if (!config.enabled || !config.domains.includes('resource') || this.stopping) return;
+        if (!config.enabled || !config.domains.includes('resource') || this.stopping) return false;
         await this.serializeStorageWrite(() =>
           storage.getRepository(AuditLog).insert({
             at: new Date(),
@@ -237,19 +237,28 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
             action: snapshot.action,
             operationId: snapshot.operationId,
             actorId: snapshot.actorId,
-            authenticationMethod: snapshot.actorId === null ? null : (snapshot.authenticationMethod ?? 'session'),
+            authenticationMethod:
+              snapshot.authenticationMethod === undefined
+                ? snapshot.actorId === null
+                  ? null
+                  : 'session'
+                : snapshot.authenticationMethod,
             apiTokenId: snapshot.apiTokenId ?? null,
             outcome: 'succeeded',
             subjectType: snapshot.subjectType ?? 'resource',
             subjectId: snapshot.subjectId,
+            ipAddress: null,
+            userAgent: null,
             details: snapshot.details,
           }),
         );
+        return true;
       } finally {
         this.pending--;
       }
     } catch {
       /* Audit persistence must not affect resource operations. */
+      return false;
     }
   }
 

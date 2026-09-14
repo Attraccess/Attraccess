@@ -26,7 +26,7 @@ const ALL_AUDIT_ACTIONS = [
 const timestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
 
 const eventPrefix =
-  /^(?:billing|email_layout|email_template|identity|introduction|maintenance_schedule|mqtt_server|plugin|resource|resource_group|settings|sso|supervision|wago)(?:\.[a-z_]+)*\.?$/;
+  /^(?:billing|email_layout|email_template|health|identity|introduction|maintenance_schedule|mqtt_server|plugin|resource|resource_group|retraining|settings|sso|supervision|usage_session|wago)(?:\.[a-z_]+)*\.?$/;
 
 export class AuditQueryDto {
   @ApiPropertyOptional({ description: 'Event action prefix', pattern: eventPrefix.source, maxLength: 100 })

@@ -12,6 +12,8 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
 import { ResourceHealthSummaryDto } from './dtos/resource-health-state.dto';
+import { AuditService } from '../../audit/audit.service';
+import { ResourceAuditOrigin } from '../../audit/audit-policy';
 
 interface ReportInput {
   resourceId: number;
@@ -20,6 +22,7 @@ interface ReportInput {
   reason?: string | null;
   source: ResourceHealthSource;
   reportedAt?: Date;
+  auditOrigin?: ResourceAuditOrigin;
 }
 
 @Injectable()
@@ -32,6 +35,7 @@ export class ResourceHealthService {
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
     private readonly eventEmitter: EventEmitter2,
+    private readonly audit: AuditService,
   ) {}
 
   private normalizeIdentifier(identifier?: string | null): string {
@@ -77,6 +81,16 @@ export class ResourceHealthService {
     }
 
     if (previousStatus !== input.status) {
+      await this.audit.recordResource({
+        action: 'health.transition',
+        ...(input.auditOrigin ?? { actorId: null }),
+        subjectId: input.resourceId,
+        details: {
+          previousStatus: previousStatus ?? 'none',
+          status: input.status,
+          healthSource: input.source,
+        },
+      }).catch(() => undefined);
       this.logger.log(
         `Resource ${input.resourceId} health changed (identifier="${identifier}"): ${
           previousStatus ?? 'none'
@@ -136,7 +150,9 @@ export class ResourceHealthService {
     return count > 0;
   }
 
-  async clearEntry(resourceId: number, entryId: number): Promise<void> {
+  async clearEntry(resourceId: number, entryId: number, auditOrigin: ResourceAuditOrigin = {
+    actorId: null,
+  }): Promise<void> {
     const entry = await this.healthRepository.findOne({
       where: { id: entryId, resourceId },
     });
@@ -147,6 +163,16 @@ export class ResourceHealthService {
     await this.healthRepository.remove(entry);
 
     if (entry.status === ResourceHealthStatus.UNHEALTHY) {
+      await this.audit.recordResource({
+        action: 'health.transition',
+        ...auditOrigin,
+        subjectId: resourceId,
+        details: {
+          previousStatus: entry.status,
+          status: ResourceHealthStatus.HEALTHY,
+          healthSource: entry.source,
+        },
+      }).catch(() => undefined);
       this.logger.log(
         `Resource ${resourceId} health entry cleared (identifier="${entry.identifier}"): ${entry.status} -> cleared`,
       );

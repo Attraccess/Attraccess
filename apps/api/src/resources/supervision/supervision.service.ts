@@ -393,7 +393,7 @@ export class SupervisionService {
   public async approve(
     requestId: string,
     supervisor: User,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: 'session' | 'api-token' | null = 'session',
     apiTokenId?: number,
   ): Promise<ResourceUsage> {
     const request = this.getPendingForSupervisorOrThrow(requestId, supervisor, { allowAnyAuthorized: true });
@@ -411,6 +411,11 @@ export class SupervisionService {
     try {
       const session = await this.resourceUsageService.startSession(request.resourceId, request.requester, request.dto, {
         supervisorUserId: supervisor.id,
+        auditOrigin: {
+          actorId: supervisor.id,
+          authenticationMethod,
+          ...(apiTokenId === undefined ? {} : { apiTokenId }),
+        },
       });
       this.fulfil(request, session);
       void this.audit.recordResource({

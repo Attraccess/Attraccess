@@ -17,15 +17,25 @@ export interface ResourceAuditEvent {
     | 'maintenance_schedule.updated'
     | 'maintenance_schedule.deleted'
     | 'supervision.approved'
-    | 'supervision.rejected';
+    | 'supervision.rejected'
+    | 'health.transition'
+    | 'usage_session.started'
+    | 'usage_session.ended'
+    | 'retraining.required'
+    | 'retraining.cleared';
   operationId: string;
   actorId: number | null;
   authenticationMethod?: 'session' | 'api-token' | null;
   apiTokenId?: number | null;
-  subjectType?: 'resource' | 'resource_group';
   subjectId: number;
+  subjectType?: 'resource' | 'resource_group';
   details: Record<string, string | number>;
 }
+
+export type ResourceAuditOrigin =
+  | { actorId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number }
+  | { actorId: number; authenticationMethod: null }
+  | { actorId: null };
 
 const positive = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) > 0;
 const uuid = (v: unknown): v is string =>
@@ -533,6 +543,11 @@ export const RESOURCE_AUDIT_ACTIONS: ResourceAuditEvent['action'][] = [
   'maintenance_schedule.deleted',
   'supervision.approved',
   'supervision.rejected',
+  'health.transition',
+  'usage_session.started',
+  'usage_session.ended',
+  'retraining.required',
+  'retraining.cleared',
 ];
 const resourceActions = new Set<ResourceAuditEvent['action']>(RESOURCE_AUDIT_ACTIONS);
 const resourceDetailFields: Partial<Record<ResourceAuditEvent['action'], readonly string[]>> = {
@@ -551,6 +566,11 @@ const resourceDetailFields: Partial<Record<ResourceAuditEvent['action'], readonl
   'maintenance_schedule.deleted': ['scheduleId', 'enabled', 'triggerType', 'name', 'usageDuration', 'usageUnit', 'usageThreshold'],
   'supervision.approved': ['requesterUserId', 'supervisorUserId', 'requestId'],
   'supervision.rejected': ['requesterUserId', 'supervisorUserId', 'requestId'],
+  'health.transition': ['healthSource', 'previousStatus', 'status'],
+  'usage_session.started': ['supervisorUserId', 'usageId', 'usageUserId'],
+  'usage_session.ended': ['usageId', 'usageUserId'],
+  'retraining.required': ['introductionId', 'retrainingReason', 'usageUserId'],
+  'retraining.cleared': ['introductionId', 'usageUserId'],
 };
 
 export function projectResourceAuditEvent(input: ResourceAuditEvent): ResourceAuditEvent | null {
@@ -572,12 +592,21 @@ export function projectResourceAuditEvent(input: ResourceAuditEvent): ResourceAu
   }
   if (Buffer.byteLength(JSON.stringify(details), 'utf8') > 4096) return null;
   if (input.actorId === null) {
-    if (input.authenticationMethod !== null || (input.apiTokenId !== undefined && input.apiTokenId !== null)) return null;
+    if (
+      (input.authenticationMethod !== undefined && input.authenticationMethod !== null) ||
+      (input.apiTokenId !== undefined && input.apiTokenId !== null)
+    )
+      return null;
   } else if (
     (input.authenticationMethod !== undefined &&
+      input.authenticationMethod !== null &&
       input.authenticationMethod !== 'session' &&
       input.authenticationMethod !== 'api-token') ||
-    (input.apiTokenId !== undefined && input.apiTokenId !== null && !positive(input.apiTokenId))
+    ((input.authenticationMethod === undefined || input.authenticationMethod === null) &&
+      input.apiTokenId !== undefined &&
+      input.apiTokenId !== null) ||
+    (input.apiTokenId !== undefined && input.apiTokenId !== null && !positive(input.apiTokenId)) ||
+    (input.authenticationMethod === 'api-token' && (input.apiTokenId === undefined || input.apiTokenId === null))
   ) {
     return null;
   }

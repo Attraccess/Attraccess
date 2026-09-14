@@ -123,6 +123,19 @@ describe('audit storage safe snapshot', () => {
     ).toMatchObject({ details: { role: `${'a'.repeat(79)}-` } });
   });
 
+  it('allows system-origin lifecycle events but rejects mixed origins', () => {
+    const resourceEvent = {
+      action: 'usage_session.ended' as const,
+      operationId: randomUUID(),
+      actorId: null,
+      subjectId: 7,
+      details: { usageId: 3, usageUserId: 42 },
+    };
+    expect(projectResourceAuditEvent(resourceEvent)).toEqual(resourceEvent);
+    expect(projectResourceAuditEvent({ ...resourceEvent, authenticationMethod: 'session' })).toBeNull();
+    expect(projectResourceAuditEvent({ ...resourceEvent, apiTokenId: 4 })).toBeNull();
+  });
+
   it('allows explicitly system-originated introductions without synthesizing a user session', () => {
     const event = {
       action: 'introduction.granted' as const,
