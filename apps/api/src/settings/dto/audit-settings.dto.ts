@@ -9,7 +9,7 @@ export class AuditSettingsDto {
   @ApiProperty({
     enum: ['administration', 'attractap', 'billing', 'identity', 'project', 'resource', 'sso', 'wago'],
     isArray: true,
-    default: ['administration', 'attractap', 'identity', 'project', 'resource', 'wago'],
+    default: ['administration', 'attractap', 'identity', 'project', 'resource', 'sso', 'wago'],
   })
   @IsArray()
   @ArrayMaxSize(8)

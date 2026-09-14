@@ -88,6 +88,7 @@
 - **System Settings**
   - [Overview](settings/overview.md)
   - [Security](settings/security.md)
+  - [Audit log](settings/audit-log.md)
 
 - **Developer Guide**
   - [Overview](developer/overview.md)

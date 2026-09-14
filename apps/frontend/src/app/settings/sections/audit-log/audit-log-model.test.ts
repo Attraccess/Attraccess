@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AuditEntryDto } from '@attraccess/react-query-client';
-import { auditCsv, changes, csvCell, emptyFilters, exportAuditEntries, filterRequest } from './audit-log-model';
+import {
+  auditCsv,
+  changes,
+  csvCell,
+  displayValue,
+  emptyFilters,
+  exportAuditEntries,
+  filterRequest,
+} from './audit-log-model';
 
 const entry: AuditEntryDto = {
   id: 10,
@@ -40,11 +48,21 @@ describe('audit export and filtering', () => {
     expect(csvCell(' =HYPERLINK("https://example.test")')).toBe('"\' =HYPERLINK(""https://example.test"")"');
     expect(csvCell('value, "quoted"')).toBe('"value, ""quoted"""');
     const csv = auditCsv([
-      { ...entry, subjectLabel: '=1+1', details: { before: '{"name":"old"}', after: '{"name":"new"}' } },
+      {
+        ...entry,
+        subjectLabel: '=1+1',
+        authenticationMethod: 'api-token',
+        apiTokenId: 19,
+        pluginId: 'wago-fixture',
+        ipAddress: '2001:db8::1',
+        userAgent: '=diagnostic',
+        details: { before: '{"name":"old"}', after: '{"name":"new"}' },
+      },
     ]);
     expect(csv).toContain("'=1+1");
     expect(csv).toContain('old');
     expect(csv).toContain('new');
+    expect(csv).toContain('"api-token","19","wago-fixture","2001:db8::1","\'=diagnostic"');
   });
   it('rejects reversed dates and unsafe IDs without throwing', () => {
     expect(filterRequest({ ...emptyFilters, from: '2026-09-13T12:00', to: '2026-09-12T12:00' })).toEqual({
@@ -89,5 +107,16 @@ describe('audit export and filtering', () => {
       { field: 'enabled', before: undefined, after: 0 },
       { field: 'name', before: undefined, after: undefined },
     ]);
+  });
+  it('shows only changed nested SSO fields and formats recorded structured metadata', () => {
+    const before = { name: 'Company IdP', configuration: { issuer: 'https://old.example.test', scopes: ['email'] } };
+    const after = { ...before, configuration: { ...before.configuration, issuer: 'https://new.example.test' } };
+    expect(changes({ ...entry, details: { before: JSON.stringify(before), after: JSON.stringify(after) } })).toEqual([
+      { field: 'configuration.issuer', before: 'https://old.example.test', after: 'https://new.example.test' },
+    ]);
+    expect(displayValue('{"added":["reader"],"removed":[]}')).toBe(
+      JSON.stringify({ added: ['reader'], removed: [] }, null, 2),
+    );
+    expect(displayValue('{"truncated":')).toBe('{"truncated":');
   });
 });
