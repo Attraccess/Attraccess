@@ -19,7 +19,11 @@ describe('ResourceIntroductionsController', () => {
 
       await controller[action](7, 3, data, req);
 
-      expect(resourceIntroductionsService[action]).toHaveBeenCalledWith(7, 3, data, { performedByUserId: 9, ...(action === 'grant' ? { auditOrigin: { actorId: 9, authenticationMethod: undefined } } : {}) });
+      expect(resourceIntroductionsService[action]).toHaveBeenCalledWith(7, 3, data, {
+        performedByUserId: 9,
+        authenticationMethod: undefined,
+        apiTokenId: undefined,
+      });
     },
   );
 });

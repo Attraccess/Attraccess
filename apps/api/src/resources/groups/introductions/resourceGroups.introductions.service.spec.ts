@@ -51,6 +51,7 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
     }).compile();
 
     service = module.get(ResourceGroupsIntroductionsService);
+    audit.recordResource.mockClear();
   });
 
   it('notifies the user when a group introduction is granted', async () => {
@@ -84,6 +85,10 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
     await service.grant(5, 3, undefined, { performedByUserId: 9 });
 
     expect(historyRepository.create).toHaveBeenCalledWith(expect.objectContaining({ performedByUser: { id: 9 } }));
+    expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'introduction.granted', actorId: 9, subjectType: 'resource_group', subjectId: 5,
+      details: { recipientUserId: 3 },
+    }));
   });
 
   it('records a cleared event only when the renewed group introduction was due', async () => {
@@ -93,7 +98,7 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
     await service.grant(5, 3);
 
     expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
-      action: 'retraining.cleared', subjectType: 'resource.group', subjectId: 5,
+      action: 'retraining.cleared', subjectType: 'resource_group', subjectId: 5,
       details: { introductionId: 10, usageUserId: 3 },
     }));
   });
@@ -113,6 +118,7 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
     await service.revoke(5, 3, undefined, { performedByUserId: 9 });
 
     expect(historyRepository.create).toHaveBeenCalledWith(expect.objectContaining({ performedByUser: { id: 9 } }));
+    expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({ action: 'introduction.revoked', actorId: 9 }));
   });
 
   it('does not notify when a group introduction is granted twice without an effective access change', async () => {

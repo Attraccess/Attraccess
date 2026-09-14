@@ -11,7 +11,7 @@ function recordedSubjectLabel(entry: AuditLog): string | undefined {
   // A maintenance schedule's name belongs to the schedule, not its resource subject.
   const isResource =
     entry.domain === 'resource' && entry.subjectType === 'resource' && entry.action.startsWith('resource.');
-  const isGroup = entry.domain === 'resource' && entry.subjectType === 'resource.group';
+  const isGroup = entry.domain === 'resource' && entry.subjectType === 'resource_group';
   const isProject = entry.domain === 'project' && entry.subjectType === 'project';
   if (isResource || isGroup || isProject)
     return name(details['after.name']) ?? name(details['before.name']) ?? name(details.name);
@@ -59,7 +59,7 @@ export async function auditEntriesWithLabels(source: DataSource, entries: AuditL
       'username',
     ),
     currentNames(source, Resource, subjects('resource', 'resource'), 'name'),
-    currentNames(source, ResourceGroup, subjects('resource', 'resource.group'), 'name'),
+    currentNames(source, ResourceGroup, subjects('resource', 'resource_group'), 'name'),
     currentNames(source, Project, subjects('project', 'project'), 'name'),
   ]);
   return entries.map((entry) => {
@@ -69,7 +69,7 @@ export async function auditEntriesWithLabels(source: DataSource, entries: AuditL
     const subjectNames =
       entry.domain === 'resource' && entry.subjectType === 'resource'
         ? resources
-        : entry.domain === 'resource' && entry.subjectType === 'resource.group'
+        : entry.domain === 'resource' && entry.subjectType === 'resource_group'
           ? groups
           : entry.domain === 'project' && entry.subjectType === 'project'
             ? projects

@@ -53,6 +53,7 @@ describe('ResourceIntroductionsService notifications', () => {
     }).compile();
 
     service = module.get(ResourceIntroductionsService);
+    audit.recordResource.mockClear();
   });
 
   it('notifies the user when a resource introduction is granted', async () => {
@@ -73,6 +74,9 @@ describe('ResourceIntroductionsService notifications', () => {
     await service.grant(7, 3, undefined, { performedByUserId: 9 });
 
     expect(historyRepository.create).toHaveBeenCalledWith(expect.objectContaining({ performedByUser: { id: 9 } }));
+    expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'introduction.granted', actorId: 9, subjectId: 7, details: { recipientUserId: 3 },
+    }));
   });
 
   it('records a cleared event only when the renewed resource introduction was due', async () => {
@@ -101,6 +105,7 @@ describe('ResourceIntroductionsService notifications', () => {
     await service.revoke(7, 3, undefined, { performedByUserId: 9 });
 
     expect(historyRepository.create).toHaveBeenCalledWith(expect.objectContaining({ performedByUser: { id: 9 } }));
+    expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({ action: 'introduction.revoked', actorId: 9 }));
   });
 
   it('does not notify when a resource introduction is granted twice without an effective access change', async () => {

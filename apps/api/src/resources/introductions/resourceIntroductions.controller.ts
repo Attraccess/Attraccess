@@ -37,12 +37,7 @@ export class ResourceIntroductionsController {
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem> {
     return await this.resourceIntroductionsService.grant(resourceId, userId, data, {
-      performedByUserId: req.user.id,
-      auditOrigin: {
-        actorId: req.user.id,
-        authenticationMethod: req.user.authenticationMethod,
-        ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
-      },
+      performedByUserId: req.user.id, authenticationMethod: req.user.authenticationMethod, apiTokenId: req.user.apiTokenId,
     });
   }
 
@@ -63,7 +58,9 @@ export class ResourceIntroductionsController {
     @Body() data: UpdateResourceIntroductionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceIntroductionHistoryItem> {
-    return await this.resourceIntroductionsService.revoke(resourceId, userId, data, { performedByUserId: req.user.id });
+    return await this.resourceIntroductionsService.revoke(resourceId, userId, data, {
+      performedByUserId: req.user.id, authenticationMethod: req.user.authenticationMethod, apiTokenId: req.user.apiTokenId,
+    });
   }
 
   @Get('/:userId/history')

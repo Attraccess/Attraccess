@@ -189,7 +189,7 @@ export class ResourceRetrainingService {
         action: 'retraining.required',
         actorId: null,
         subjectId,
-        ...(introduction.resourceId ? {} : { subjectType: 'resource.group' }),
+        ...(introduction.resourceId ? {} : { subjectType: 'resource_group' }),
         details: {
           introductionId: introduction.id,
           usageUserId: introduction.receiverUserId,

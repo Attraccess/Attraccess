@@ -92,8 +92,9 @@ export class ResourceGroupsIntroductionsService {
     nextStatus: IntroductionHistoryAction,
     data?: UpdateResourceGroupIntroductionDto,
     tutorUserId?: number,
-    performedByUserId = userId,
-    auditOrigin: ResourceAuditOrigin = { actorId: performedByUserId, authenticationMethod: 'session' },
+    performedByUserId?: number | null,
+    authenticationMethod?: 'session' | 'api-token' | null,
+    apiTokenId?: number | null,
   ): Promise<ResourceIntroductionHistoryItem> {
     let existingIntroduction = await this.resourceIntroductionRepository.findOne({
       where: {
@@ -118,7 +119,7 @@ export class ResourceGroupsIntroductionsService {
     const historyItem = this.resourceIntroductionHistoryItemRepository.create({
       introduction: existingIntroduction,
       action: nextStatus,
-      performedByUser: { id: performedByUserId },
+      performedByUser: { id: performedByUserId ?? userId },
       comment: data?.comment,
     });
 
@@ -134,13 +135,28 @@ export class ResourceGroupsIntroductionsService {
       nextStatus === IntroductionHistoryAction.GRANT &&
       (await this.retraining.getIntroductionRetrainingStatus(existingIntroduction.id))?.isDue === true;
     if (retrainingWasDue && !retrainingIsDue) {
+      const retrainingOrigin: ResourceAuditOrigin =
+        performedByUserId === null
+          ? { actorId: null }
+          : {
+              actorId: performedByUserId ?? userId,
+              authenticationMethod: authenticationMethod === undefined ? 'session' : authenticationMethod,
+              ...(apiTokenId === undefined || apiTokenId === null ? {} : { apiTokenId }),
+            };
       await this.audit.recordResource({
         action: 'retraining.cleared',
-        ...auditOrigin,
-        subjectType: 'resource.group',
+        ...retrainingOrigin,
+        subjectType: 'resource_group',
         subjectId: groupId,
         details: { introductionId: existingIntroduction.id, usageUserId: userId },
-      }).catch(() => undefined);
+      });
+    }
+    if (performedByUserId !== undefined) {
+      await this.audit.recordResource({
+        action: nextStatus === IntroductionHistoryAction.GRANT ? 'introduction.granted' : 'introduction.revoked',
+        actorId: performedByUserId, authenticationMethod, apiTokenId, subjectType: 'resource_group', subjectId: groupId,
+        details: { recipientUserId: userId, ...(tutorUserId === undefined ? {} : { tutorUserId }) },
+      });
     }
     return savedHistoryItem;
   }
@@ -159,7 +175,12 @@ export class ResourceGroupsIntroductionsService {
     groupId: number,
     userId: number,
     data?: UpdateResourceGroupIntroductionDto,
-    options?: { tutorUserId?: number; performedByUserId?: number; auditOrigin?: ResourceAuditOrigin },
+    options?: {
+      tutorUserId?: number;
+      performedByUserId?: number | null;
+      authenticationMethod?: 'session' | 'api-token' | null;
+      apiTokenId?: number | null;
+    },
   ): Promise<ResourceIntroductionHistoryItem> {
     return await this.updateIntroductionStatus(
       groupId,
@@ -168,7 +189,8 @@ export class ResourceGroupsIntroductionsService {
       data,
       options?.tutorUserId,
       options?.performedByUserId,
-      options?.auditOrigin,
+      options?.authenticationMethod,
+      options?.apiTokenId,
     );
   }
 
@@ -176,7 +198,11 @@ export class ResourceGroupsIntroductionsService {
     groupId: number,
     userId: number,
     data?: UpdateResourceGroupIntroductionDto,
-    options?: { performedByUserId?: number },
+    options?: {
+      performedByUserId?: number | null;
+      authenticationMethod?: 'session' | 'api-token' | null;
+      apiTokenId?: number | null;
+    },
   ): Promise<ResourceIntroductionHistoryItem> {
     return await this.updateIntroductionStatus(
       groupId,
@@ -185,6 +211,8 @@ export class ResourceGroupsIntroductionsService {
       data,
       undefined,
       options?.performedByUserId,
+      options?.authenticationMethod,
+      options?.apiTokenId,
     );
   }
 

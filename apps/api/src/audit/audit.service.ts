@@ -18,10 +18,17 @@ import {
   projectIdentityAuditEvent,
   projectResourceAuditEvent,
   ResourceAuditEvent,
+  projectSsoAuditEvent,
+  SsoAuditEvent,
 } from './audit-policy';
 import { AuditQueryDto } from './audit-query.dto';
 import { randomUUID } from 'crypto';
 import { auditEntriesWithLabels } from './audit-labels';
+import {
+  AdministrationAuditEvent,
+  PreviousAuditSettings,
+  projectAdministrationAuditEvent,
+} from './audit-administration-policy';
 
 const billingStatuses = new Set(['pending', 'completed', 'failed']);
 const billingSources = new Set(['manual', 'resource-usage', 'refund', 'sumup-topup']);
@@ -120,6 +127,16 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
       });
     } catch {
       // Never log the event, SQLite parameters, or exception (may contain secrets).
+      return { status: 'unavailable' };
+    }
+  }
+
+  async recordSso(event: SsoAuditEvent): Promise<PluginAuditReceipt> {
+    try {
+      const snapshot = projectSsoAuditEvent(event);
+      if (!snapshot) return { status: 'unavailable' };
+      return await this.recordSnapshot({ domain: 'sso', pluginId: null, action: snapshot.action, operationId: snapshot.operationId, actorId: snapshot.actorId, authenticationMethod: snapshot.authenticationMethod, apiTokenId: snapshot.apiTokenId ?? null, outcome: 'succeeded', subjectType: snapshot.subject.type, subjectId: snapshot.subject.id, ipAddress: null, userAgent: null, details: snapshot.details });
+    } catch {
       return { status: 'unavailable' };
     }
   }
@@ -245,6 +262,45 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     }
   }
 
+  /** Records only reviewed scalar administration metadata; callers must never pass request bodies. */
+  async recordAdministration(
+    event: AdministrationAuditEvent,
+    previousAuditSettings?: PreviousAuditSettings,
+  ): Promise<PluginAuditReceipt> {
+    try {
+      const snapshot = projectAdministrationAuditEvent(event);
+      if (!snapshot) return { status: 'unavailable' };
+      // A successful change that turns recording off is its own final event. The exception
+      // is restricted to audit settings and the caller's previously enabled administration policy.
+      const finalSettingsChange =
+        snapshot.action === 'settings.updated' &&
+        String(snapshot.details.settingKey).startsWith('audit.') &&
+        previousAuditSettings?.enabled === true &&
+        previousAuditSettings.domains.includes('administration');
+      return await this.recordSnapshot(
+        {
+          domain: 'administration',
+          pluginId: 'core',
+          action: snapshot.action,
+          operationId: snapshot.operationId ?? randomUUID(),
+          actorId: snapshot.actorId,
+          authenticationMethod: snapshot.authenticationMethod ?? 'session',
+          apiTokenId: snapshot.apiTokenId ?? null,
+          outcome: snapshot.outcome ?? 'succeeded',
+          subjectType: snapshot.subjectType,
+          subjectId: snapshot.subjectId,
+          details: snapshot.details,
+          ipAddress: null,
+          userAgent: null,
+        },
+        finalSettingsChange,
+      );
+    } catch {
+      // Audit persistence must not affect administration operations.
+      return { status: 'unavailable' };
+    }
+  }
+
   afterTransactionCommit({ queryRunner }: TransactionCommitEvent): void {
     // Nested transaction commits release a savepoint; wait for the owning transaction.
     if (queryRunner.isTransactionActive) {
@@ -276,15 +332,21 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     return (queryRunner as QueryRunner & { transactionDepth: number }).transactionDepth;
   }
 
-  private async recordSnapshot(event: Omit<AuditLog, 'id' | 'at'>): Promise<PluginAuditReceipt> {
+  private async recordSnapshot(
+    event: Omit<AuditLog, 'id' | 'at'>,
+    finalSettingsChange = false,
+  ): Promise<PluginAuditReceipt> {
     if (this.stopping || !this.storage?.isInitialized || this.pending >= 8) return { status: 'unavailable' };
     if (this.source.createQueryRunner().isTransactionActive) return { status: 'unavailable' };
     this.pending++;
     try {
       const config = await readAuditSettings(this.settings);
       if (
-        !config.enabled ||
-        !config.domains.includes(event.domain as 'billing' | 'resource' | 'wago' | 'identity') ||
+        (!finalSettingsChange &&
+          (!config.enabled ||
+            !config.domains.includes(
+              event.domain as 'administration' | 'billing' | 'identity' | 'resource' | 'sso' | 'wago',
+            ))) ||
         this.stopping
       )
         return { status: 'unavailable' };

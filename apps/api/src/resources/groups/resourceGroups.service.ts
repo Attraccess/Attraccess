@@ -9,6 +9,7 @@ import { ResourceNotFoundException } from '../../exceptions/resource.notFound.ex
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceGroupIntroductionChangedEvent } from './introductions/events/resource-group-introduction-changed.event';
 import { MetricsService } from '../../metrics/metrics.service';
+import { AuditService } from '../../audit/audit.service';
 
 interface GetOneSearchOptions {
   id: number;
@@ -33,6 +34,7 @@ export class ResourceGroupsService {
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
     private readonly metricsService: MetricsService,
+    private readonly audit: AuditService,
   ) {}
 
   /**
@@ -81,7 +83,10 @@ export class ResourceGroupsService {
     ) = 'grant'
   )`;
 
-  public async createOne(dto: CreateResourceGroupDto): Promise<ResourceGroup> {
+  public async createOne(
+    dto: CreateResourceGroupDto,
+    actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+  ): Promise<ResourceGroup> {
     const resourceGroup = this.resourceGroupRepository.create({
       name: dto.name,
       description: dto.description,
@@ -96,6 +101,13 @@ export class ResourceGroupsService {
       new ResourceGroupIntroductionChangedEvent(savedResourceGroup.id),
     );
     this.metricsService.resourceGroupsTotal.inc();
+    if (actor) {
+      await this.audit.recordResource({
+        action: 'resource_group.created', actorId: actor.id, authenticationMethod: actor.authenticationMethod,
+        apiTokenId: actor.apiTokenId, subjectType: 'resource_group', subjectId: savedResourceGroup.id,
+        details: { 'after.name': savedResourceGroup.name, 'after.isHidden': Number(savedResourceGroup.isHidden) },
+      });
+    }
     return savedResourceGroup;
   }
 
@@ -144,13 +156,25 @@ export class ResourceGroupsService {
     return group;
   }
 
-  public async updateOneById(id: number, updateDto: UpdateResourceGroupDto): Promise<ResourceGroup> {
+  public async updateOneById(
+    id: number,
+    updateDto: UpdateResourceGroupDto,
+    actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+  ): Promise<ResourceGroup> {
     const resourceGroup = await this.getOne({ id });
+    const before = {
+      name: resourceGroup.name,
+      description: resourceGroup.description,
+      retrainingMaxAgeDays: resourceGroup.retrainingMaxAgeDays,
+      retrainingMaxInactivityDays: resourceGroup.retrainingMaxInactivityDays,
+      retrainingBlocksAccess: resourceGroup.retrainingBlocksAccess,
+      isHidden: resourceGroup.isHidden,
+    };
 
     const savedResourceGroup = await this.resourceGroupRepository.save({
       ...resourceGroup,
-      name: updateDto.name,
-      description: updateDto.description,
+      name: updateDto.name !== undefined ? updateDto.name : resourceGroup.name,
+      description: updateDto.description !== undefined ? updateDto.description : resourceGroup.description,
       retrainingMaxAgeDays:
         updateDto.retrainingMaxAgeDays !== undefined ? updateDto.retrainingMaxAgeDays : resourceGroup.retrainingMaxAgeDays,
       retrainingMaxInactivityDays:
@@ -167,10 +191,40 @@ export class ResourceGroupsService {
       ResourceGroupIntroductionChangedEvent.EVENT_NAME,
       new ResourceGroupIntroductionChangedEvent(savedResourceGroup.id),
     );
+    if (actor) {
+      const details: Record<string, string | number> = {};
+      if (before.name !== savedResourceGroup.name) {
+        details['before.name'] = before.name;
+        details['after.name'] = savedResourceGroup.name;
+      }
+      if (before.isHidden !== savedResourceGroup.isHidden) {
+        details['before.isHidden'] = Number(before.isHidden);
+        details['after.isHidden'] = Number(savedResourceGroup.isHidden);
+      }
+      const changedFields = [
+        ...(before.name !== savedResourceGroup.name ? ['name'] : []),
+        ...(before.description !== savedResourceGroup.description ? ['description'] : []),
+        ...(before.retrainingMaxAgeDays !== savedResourceGroup.retrainingMaxAgeDays ? ['retrainingMaxAgeDays'] : []),
+        ...(before.retrainingMaxInactivityDays !== savedResourceGroup.retrainingMaxInactivityDays ? ['retrainingMaxInactivityDays'] : []),
+        ...(before.retrainingBlocksAccess !== savedResourceGroup.retrainingBlocksAccess ? ['retrainingBlocksAccess'] : []),
+        ...(before.isHidden !== savedResourceGroup.isHidden ? ['isHidden'] : []),
+      ];
+      if (changedFields.length) details.changedFields = JSON.stringify(changedFields);
+      if (Object.keys(details).length) {
+        await this.audit.recordResource({
+          action: 'resource_group.updated', actorId: actor.id, authenticationMethod: actor.authenticationMethod,
+          apiTokenId: actor.apiTokenId, subjectType: 'resource_group', subjectId: savedResourceGroup.id, details,
+        });
+      }
+    }
     return savedResourceGroup;
   }
 
-  public async addResource(groupId: number, resourceId: number): Promise<void> {
+  public async addResource(
+    groupId: number,
+    resourceId: number,
+    actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+  ): Promise<void> {
     const resourceGroup = await this.getOne({ id: groupId }, ['resources']);
 
     const existingResource = resourceGroup.resources.find((resource) => resource.id === resourceId);
@@ -195,9 +249,19 @@ export class ResourceGroupsService {
       ResourceGroupIntroductionChangedEvent.EVENT_NAME,
       new ResourceGroupIntroductionChangedEvent(savedResourceGroup.id, [resourceId]),
     );
+    if (actor) {
+      await this.audit.recordResource({
+        action: 'resource_group.resource_added', actorId: actor.id, authenticationMethod: actor.authenticationMethod,
+        apiTokenId: actor.apiTokenId, subjectType: 'resource_group', subjectId: groupId, details: { resourceId },
+      });
+    }
   }
 
-  public async removeResource(groupId: number, resourceId: number): Promise<void> {
+  public async removeResource(
+    groupId: number,
+    resourceId: number,
+    actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+  ): Promise<void> {
     const resourceGroup = await this.getOne({ id: groupId }, ['resources']);
     const resource = resourceGroup.resources.find((resource) => resource.id === resourceId);
 
@@ -211,9 +275,18 @@ export class ResourceGroupsService {
       ResourceGroupIntroductionChangedEvent.EVENT_NAME,
       new ResourceGroupIntroductionChangedEvent(savedResourceGroup.id, [resourceId]),
     );
+    if (actor) {
+      await this.audit.recordResource({
+        action: 'resource_group.resource_removed', actorId: actor.id, authenticationMethod: actor.authenticationMethod,
+        apiTokenId: actor.apiTokenId, subjectType: 'resource_group', subjectId: groupId, details: { resourceId },
+      });
+    }
   }
 
-  public async deleteOne(groupId: number): Promise<void> {
+  public async deleteOne(
+    groupId: number,
+    actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+  ): Promise<void> {
     const resourceGroup = await this.getOne({ id: groupId }, ['resources']);
     const result = await this.resourceGroupRepository.delete(groupId);
     if (result.affected === 0) {
@@ -227,6 +300,13 @@ export class ResourceGroupsService {
       ),
     );
     this.metricsService.resourceGroupsTotal.dec();
+    if (actor) {
+      await this.audit.recordResource({
+        action: 'resource_group.deleted', actorId: actor.id, authenticationMethod: actor.authenticationMethod,
+        apiTokenId: actor.apiTokenId, subjectType: 'resource_group', subjectId: groupId,
+        details: { 'before.name': resourceGroup.name, 'before.isHidden': Number(resourceGroup.isHidden) },
+      });
+    }
   }
 
   public async getGroupsOfResource(

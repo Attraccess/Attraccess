@@ -1,3 +1,4 @@
+import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { PluginModule } from '../plugin-system/plugin.module';
 import { PluginService } from '../plugin-system/plugin.service';
 import { PluginSandboxService } from '../plugin-system/plugin-sandbox.service';
@@ -57,7 +58,7 @@ const event = (): PluginAuditEvent & { pluginId: string } => ({
   subject: { type: 'wago.controller', id: 7 },
   details: { revision: 2 },
 });
-const config = { enabled: true, domains: ['resource', 'wago', 'identity'], retention_days: 90 };
+const config = { enabled: true, domains: ['administration', 'identity', 'resource', 'wago'], retention_days: 90 };
 
 describe('durable audit SQLite', () => {
   let directory: string;
@@ -92,6 +93,65 @@ describe('durable audit SQLite', () => {
     await service.onModuleDestroy();
     if (source.isInitialized) await source.destroy();
     await rm(directory, { recursive: true, force: true });
+  });
+
+  it.each([{ enabled: false }, { domains: ['wago'] }])(
+    'records the final disabling settings change and suppresses subsequent events (%j)',
+    async (update) => {
+      const settings = new SettingsService(null, store, null);
+      await settings.updateAuditSettings(config);
+      const controller = new SettingsController(settings, service);
+      await controller.updateAuditSettings(update, {
+        user: { id: 42, authenticationMethod: 'session' },
+      } as AuthenticatedRequest);
+      await service.recordAdministration({
+        action: 'mqtt_server.created',
+        actorId: 42,
+        subjectType: 'mqtt-server',
+        subjectId: 1,
+        details: { host: 'mqtt.example' },
+      });
+      const rows = (await service.list(new AuditQueryDto())).items;
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        action: 'settings.updated',
+        details: { settingKey: update.enabled === false ? 'audit.enabled' : 'audit.domains' },
+      });
+      expect(rows[0].details.before).not.toBe(rows[0].details.after);
+      await settings.updateAuditSettings(config);
+      await service.recordAdministration({
+        action: 'mqtt_server.created',
+        actorId: 42,
+        subjectType: 'mqtt-server',
+        subjectId: 1,
+        details: { host: 'mqtt.example' },
+      });
+      expect((await service.list(new AuditQueryDto())).items).toHaveLength(2);
+    },
+  );
+
+  it('records allowlisted administration metadata and rejects credential-bearing fields', async () => {
+    await service.recordAdministration({
+      action: 'mqtt_server.created',
+      actorId: 42,
+      subjectType: 'mqtt-server',
+      subjectId: 7,
+      details: { host: 'mqtt.example.test', port: 8883, passwordChanged: 1 },
+    });
+    await service.recordAdministration({
+      action: 'mqtt_server.created',
+      actorId: 42,
+      subjectType: 'mqtt-server',
+      subjectId: 8,
+      details: { password: 'do-not-store' } as never,
+    });
+    expect((await service.list(new AuditQueryDto())).items).toEqual([
+      expect.objectContaining({
+        action: 'mqtt_server.created',
+        subjectId: 7,
+        details: { host: 'mqtt.example.test', port: 8883, passwordChanged: 1 },
+      }),
+    ]);
   });
 
   it('upgrades additively, survives connection restart and principal deletion, prevents updates, and reverts', async () => {
@@ -279,7 +339,7 @@ describe('durable audit SQLite', () => {
       details: { usageId: 4, usageUserId: 8 },
     });
     await service.recordResource({
-      action: 'retraining.cleared', actorId: 8, authenticationMethod: null, subjectType: 'resource.group', subjectId: 3,
+      action: 'retraining.cleared', actorId: 8, authenticationMethod: null, subjectType: 'resource_group', subjectId: 3,
       details: { introductionId: 2, usageUserId: 8 },
     });
     expect((await service.list({ domain: 'resource', eventPrefix: 'health.' } as AuditQueryDto)).items).toEqual([
@@ -288,7 +348,7 @@ describe('durable audit SQLite', () => {
     expect((await service.list({ domain: 'resource', action: 'usage_session.started' } as AuditQueryDto)).items).toEqual([
       expect.objectContaining({ actorId: 8, authenticationMethod: null, subjectId: 7 }),
     ]);
-    expect((await service.list({ domain: 'resource', subjectType: 'resource.group' } as AuditQueryDto)).items).toEqual([
+    expect((await service.list({ domain: 'resource', subjectType: 'resource_group' } as AuditQueryDto)).items).toEqual([
       expect.objectContaining({ action: 'retraining.cleared', subjectId: 3, actorId: 8, authenticationMethod: null }),
     ]);
     await store.setPlainSetting('audit', 'domains', '[]');
@@ -626,6 +686,10 @@ describe('durable audit SQLite', () => {
     }
     await store.setPlainSetting('audit', 'enabled', 'true');
     await store.setPlainSetting('audit', 'domains', '["wago"]');
+    await service.recordResource({
+      action: 'resource.created', actorId: 42, subjectId: 7, details: { 'after.name': 'Lathe', 'after.type': 'machine' },
+    });
+    expect(await source.getRepository(AuditLog).count()).toBe(0);
     expect(await service.record({ ...event(), details: { password: 'not-stored' } })).toEqual({
       status: 'unavailable',
     });
@@ -657,6 +721,27 @@ describe('durable audit SQLite', () => {
     });
   });
 
+  it('records system-originated resource introductions without a synthesized session', async () => {
+    await store.setPlainSetting('audit', 'domains', '["resource"]');
+
+    await service.recordResource({
+      action: 'introduction.granted',
+      actorId: null,
+      authenticationMethod: null,
+      subjectId: 7,
+      details: { recipientUserId: 3, tutorUserId: 9 },
+    });
+
+    expect((await service.list({ limit: 1 })).items[0]).toMatchObject({
+      domain: 'resource',
+      action: 'introduction.granted',
+      actorId: null,
+      authenticationMethod: null,
+      subjectId: 7,
+      details: { recipientUserId: 3, tutorUserId: 9 },
+    });
+  });
+
   it('records identity API-token attribution', async () => {
     await store.setPlainSetting('audit', 'domains', '["identity"]');
     const operationId = randomUUID();
@@ -677,6 +762,82 @@ describe('durable audit SQLite', () => {
       authenticationMethod: 'api-token',
       apiTokenId: 9,
     });
+  });
+
+  it('persists provider-origin SSO role deltas and filters them by domain', async () => {
+    await store.setPlainSetting('audit', 'domains', '["sso"]');
+    const operationId = randomUUID();
+    expect(
+      await service.recordSso({
+        action: 'sso.provisioning.permissions_synced',
+        operationId,
+        actorId: null,
+        authenticationMethod: null,
+        subject: { type: 'user', id: 7 },
+        details: {
+          provider: JSON.stringify({
+            id: 3,
+            name: 'Company IdP',
+            type: 'saml',
+            configuration: {
+              entryPoint: 'https://idp.example.com/sso',
+              issuer: 'https://app.example.com',
+              audience: null,
+              signRequest: false,
+              wantAssertionsSigned: false,
+              wantAuthnResponseSigned: true,
+              forceAuthn: false,
+              emailAttributeKeys: null,
+              roleMappings: null,
+              signingMaterial: {
+                identityProviderCertificateConfigured: true,
+                provisioningSecretConfigured: false,
+                signingCertificateConfigured: false,
+                signingPrivateKeyConfigured: false,
+              },
+              omitted: {},
+            },
+          }),
+          changes: JSON.stringify({ added: ['billing-manager'], removed: [], updated: [] }),
+        },
+      }),
+    ).toEqual({ status: 'recorded' });
+    expect(
+      (await service.list({ domain: 'sso', action: 'sso.provisioning.permissions_synced', limit: 1 })).items,
+    ).toEqual([expect.objectContaining({ domain: 'sso', actorId: null, subjectType: 'user', subjectId: 7 })]);
+  });
+
+  it('does not persist SSO events while the SSO domain is disabled', async () => {
+    await store.setPlainSetting('audit', 'domains', '["identity"]');
+    expect(
+      await service.recordSso({
+        action: 'sso.provider.created',
+        operationId: randomUUID(),
+        actorId: 4,
+        authenticationMethod: 'session',
+        subject: { type: 'sso.provider', id: 3 },
+        details: {
+          before: 'null',
+          after: JSON.stringify({
+            id: 3,
+            name: 'Company IdP',
+            type: 'oidc',
+            configuration: {
+              issuer: 'https://idp.example.com',
+              authorizationURL: 'https://idp.example.com/authorize',
+              tokenURL: 'https://idp.example.com/token',
+              userInfoURL: 'https://idp.example.com/userinfo',
+              clientId: 'client-id',
+              clientSecretConfigured: true,
+              scopes: null,
+              usernameClaimPaths: null,
+              emailClaimPaths: null,
+              roleMappings: null,
+            },
+          }),
+        },
+      }),
+    ).toEqual({ status: 'unavailable' });
   });
 
   it('rejects oversized details at the database boundary too', async () => {
@@ -832,6 +993,10 @@ describe('durable audit SQLite', () => {
     try {
       await app.listen(0, '127.0.0.1');
       await service.record(event());
+      await service.recordResource({
+        action: 'resource_group.resource_added', actorId: 42, subjectType: 'resource_group', subjectId: 7,
+        details: { resourceId: 3 },
+      });
       const server = app.getHttpServer();
       await request(server).get('/api/admin/audit-log').expect(401);
       await request(server).get('/api/admin/audit-log').set('Authorization', 'Bearer invalid').expect(401);
@@ -862,6 +1027,11 @@ describe('durable audit SQLite', () => {
       }
       await request(server)
         .get('/api/admin/audit-log?eventPrefix=wago.pub&from=2020-01-01T00:00:00Z')
+        .set('Cookie', 'auth-session=session')
+        .expect(200)
+        .expect(({ body }) => expect(body.items).toHaveLength(1));
+      await request(server)
+        .get('/api/admin/audit-log?action=resource_group.resource_added&subjectType=resource_group&domain=resource')
         .set('Cookie', 'auth-session=session')
         .expect(200)
         .expect(({ body }) => expect(body.items).toHaveLength(1));
@@ -1097,6 +1267,18 @@ describe('audit policy and authorization', () => {
     await expect(pipe.transform(billingFilters, { type: 'query', metatype: AuditQueryDto })).resolves.toMatchObject(
       billingFilters,
     );
+    await expect(
+      pipe.transform({ domain: 'sso', action: 'sso.provider.created' }, { type: 'query', metatype: AuditQueryDto }),
+    ).resolves.toMatchObject({ domain: 'sso', action: 'sso.provider.created' });
+    await expect(
+      pipe.transform(
+        { eventPrefix: 'resource_group.', action: 'introduction.granted', subjectType: 'resource_group', domain: 'resource' },
+        { type: 'query', metatype: AuditQueryDto },
+      ),
+    ).resolves.toMatchObject({ action: 'introduction.granted', subjectType: 'resource_group', domain: 'resource' });
+    await expect(
+      pipe.transform({ eventPrefix: 'billing.', action: 'billing.transaction.created', subjectType: 'billing.transaction', domain: 'billing' }, { type: 'query', metatype: AuditQueryDto }),
+    ).resolves.toMatchObject({ action: 'billing.transaction.created', subjectType: 'billing.transaction', domain: 'billing' });
   });
 });
 
@@ -1202,7 +1384,9 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       WHEN OLD.id IN (SELECT id FROM "audit_log" WHERE "at" < '2026-06-15 12:00:00.000')
       BEGIN SELECT RAISE(ABORT, 'audit cleanup failed'); END`);
     await migratedAudit.cleanup();
-    expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toHaveLength(1);
+    expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toHaveLength(
+      1,
+    );
     await source.query('DROP TRIGGER abort_audit_cleanup');
     await migratedAudit.cleanup();
     expect(await source.query('SELECT * FROM password_policy_audit_overflow WHERE legacyAuditId = 999')).toEqual([]);

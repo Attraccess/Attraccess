@@ -75,7 +75,8 @@ export class SupervisedUsageAutoPromotionListener {
     );
     await this.resourceIntroductionsService.grant(resourceId, userId, undefined, {
       tutorUserId: supervisorUserId,
-      auditOrigin: { actorId: null },
+      performedByUserId: null,
+      authenticationMethod: null,
     });
   }
 
@@ -115,7 +116,8 @@ export class SupervisedUsageAutoPromotionListener {
     );
     await this.resourceGroupsIntroductionsService.grant(groupId, userId, undefined, {
       tutorUserId: supervisorUserId,
-      auditOrigin: { actorId: null },
+      performedByUserId: null,
+      authenticationMethod: null,
     });
   }
 
