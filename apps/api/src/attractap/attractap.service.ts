@@ -15,6 +15,7 @@ import { AttractapFirmwareService } from './firmware.service';
 import { AttractapCrashReportDto } from './dtos/crash-report.dto';
 import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../notifications/notification-types';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class AttractapService {
@@ -38,6 +39,7 @@ export class AttractapService {
     private readonly coredumpSymbolicationService: CoredumpSymbolicationService,
     private readonly firmwareService: AttractapFirmwareService,
     private readonly notifications: NotificationDispatchService,
+    private readonly audit: AuditService,
   ) {}
 
   private notifyNfcCardChange(card: NFCCard | undefined, action: 'registered' | 'activated' | 'deactivated' | 'deleted'): void {
@@ -256,10 +258,23 @@ export class AttractapService {
     return response;
   }
 
-  public async deleteReader(id: number) {
-    await this.readerRepository.delete(id);
+  public async deleteReader(id: number): Promise<boolean> {
+    const result = await this.readerRepository.delete(id);
+    if (!result.affected) return false;
 
     this.eventEmitter.emit(ReaderDeletedEvent.EVENT_NAME, new ReaderDeletedEvent(id));
+    return true;
+  }
+
+  public async recordReaderDeregistration(
+    readerId: number,
+    principal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number },
+  ): Promise<void> {
+    await this.audit.recordAttractap({
+      action: 'reader.deregistered', actorId: principal.userId, authenticationMethod: principal.authenticationMethod,
+      ...(principal.authenticationMethod === 'api-token' ? { apiTokenId: principal.apiTokenId } : {}),
+      subjectId: readerId, details: { source: 'admin-api' },
+    });
   }
 
   /**

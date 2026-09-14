@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { PluginAuditEvent } from '@attraccess/plugins-backend-sdk';
-import { projectAuditEvent, projectProjectAuditEvent, projectResourceAuditEvent } from './audit-policy';
+import {
+  projectAttractapAuditEvent,
+  projectAuditEvent,
+  projectIdentityAuditEvent,
+  projectProjectAuditEvent,
+  projectResourceAuditEvent,
+} from './audit-policy';
 
 function event(): PluginAuditEvent & { pluginId: string } {
   return {
@@ -89,7 +95,7 @@ describe('audit storage safe snapshot', () => {
     ).toBeNull();
   });
 
-  it('allows only the reviewed resource maintenance and supervision fields', () => {
+  it('allows only reviewed resource fields, including safe resource administration projections', () => {
     const resourceEvent = {
       action: 'maintenance_schedule.created' as const,
       operationId: randomUUID(),
@@ -99,7 +105,69 @@ describe('audit storage safe snapshot', () => {
     };
     expect(projectResourceAuditEvent(resourceEvent)).toEqual(resourceEvent);
     expect(projectResourceAuditEvent({ ...resourceEvent, details: { password: 'raw-secret' } })).toBeNull();
-    expect(projectResourceAuditEvent({ ...resourceEvent, action: 'resource.deleted' as never })).toBeNull();
+    const deletion = {
+      action: 'resource.deleted' as const,
+      operationId: randomUUID(),
+      actorId: 42,
+      subjectId: 7,
+      details: { 'before.name': 'Lathe', 'before.type': 'machine' },
+    };
+    expect(projectResourceAuditEvent(deletion)).toEqual(deletion);
+    expect(projectResourceAuditEvent({ ...deletion, details: { password: 'raw-secret' } })).toBeNull();
+  });
+
+  it('accepts generated role keys truncated after a separator', () => {
+    expect(
+      projectIdentityAuditEvent({
+        action: 'role_created',
+        operationId: randomUUID(),
+        outcome: 'succeeded',
+        subjectType: 'identity.role',
+        subjectId: 1,
+        details: { role: `${'a'.repeat(79)}-` },
+      }),
+    ).toMatchObject({ details: { role: `${'a'.repeat(79)}-` } });
+  });
+
+  it('allows only firmware reset reasons in Attractap crash events', () => {
+    const crash = {
+      action: 'reader.crash_reported' as const,
+      actorId: null,
+      authenticationMethod: null,
+      subjectId: 7,
+      details: { source: 'reader-websocket', resetReason: 'PANIC', hasCoredump: false },
+    };
+    expect(projectAttractapAuditEvent(crash)).toEqual(crash);
+    expect(
+      projectAttractapAuditEvent({ ...crash, details: { ...crash.details, resetReason: 'raw-secret' } }),
+    ).toBeNull();
+  });
+
+  it('allows system-origin lifecycle events but rejects mixed origins', () => {
+    const resourceEvent = {
+      action: 'usage_session.ended' as const,
+      operationId: randomUUID(),
+      actorId: null,
+      subjectId: 7,
+      details: { usageId: 3, usageUserId: 42 },
+    };
+    expect(projectResourceAuditEvent(resourceEvent)).toEqual(resourceEvent);
+    expect(projectResourceAuditEvent({ ...resourceEvent, authenticationMethod: 'session' })).toBeNull();
+    expect(projectResourceAuditEvent({ ...resourceEvent, apiTokenId: 4 })).toBeNull();
+  });
+
+  it('allows explicitly system-originated introductions without synthesizing a user session', () => {
+    const event = {
+      action: 'introduction.granted' as const,
+      operationId: randomUUID(),
+      actorId: null,
+      authenticationMethod: null,
+      subjectId: 7,
+      details: { recipientUserId: 3, tutorUserId: 9 },
+    };
+
+    expect(projectResourceAuditEvent(event)).toEqual(event);
+    expect(projectResourceAuditEvent({ ...event, authenticationMethod: 'session' })).toBeNull();
   });
 
   it('allows only safe project administration snapshots', () => {

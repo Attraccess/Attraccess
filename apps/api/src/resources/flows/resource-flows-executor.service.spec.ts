@@ -818,7 +818,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       {
         notes: 'Ended by bob',
       },
-      { skipFormSubmissions: true, skipNoteNotification: true },
+      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
     );
   });
 

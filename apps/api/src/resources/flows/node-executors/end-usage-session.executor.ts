@@ -33,6 +33,7 @@ export class EndUsageSessionExecutor implements NodeExecutor {
       {
         skipFormSubmissions: true,
         skipNoteNotification: true,
+        auditOrigin: { actorId: null },
       },
     );
 

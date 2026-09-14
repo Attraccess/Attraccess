@@ -20,6 +20,8 @@ import { SSOLinkTokenService } from './link-token.service';
 import { SettingsService } from '../../../settings/settings.service';
 import { SSO_OIDC_REDIRECT_FROM_STATE_REQUEST_KEY } from './oidc/oidc-cookie-state-store';
 import { MetricsService } from '../../../metrics/metrics.service';
+import { IdentityAuditService } from '../../../audit/identity-audit.service';
+import { SsoAuditService } from '../../../audit/sso-audit.service';
 
 const mockMetricsService = {
   authSsoLoginTotal: { inc: jest.fn() },
@@ -32,6 +34,8 @@ describe('SsoController', () => {
   let module: TestingModule;
   let cookieConfigService: CookieConfigService;
   let linkTokenService: SSOLinkTokenService;
+  const identityAudit = { record: jest.fn() };
+  const ssoAudit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
 
   const mockSSOProvider: SSOProvider = {
     id: 1,
@@ -128,7 +132,8 @@ describe('SsoController', () => {
         {
           provide: RbacService,
           useValue: {
-            syncSsoRoles: jest.fn().mockResolvedValue(undefined),
+            syncSsoRoles: jest.fn().mockResolvedValue({ added: ['user-manager'], removed: [], updated: [] }),
+            getRoles: jest.fn().mockResolvedValue([]),
           },
         },
         {
@@ -182,6 +187,8 @@ describe('SsoController', () => {
           provide: MetricsService,
           useValue: mockMetricsService,
         },
+        { provide: IdentityAuditService, useValue: identityAudit },
+        { provide: SsoAuditService, useValue: ssoAudit },
         SSOOIDCGuard,
       ],
       controllers: [SSOController],
@@ -191,6 +198,8 @@ describe('SsoController', () => {
     ssoService = module.get<SSOService>(SSOService);
     cookieConfigService = module.get<CookieConfigService>(CookieConfigService);
     linkTokenService = module.get<SSOLinkTokenService>(SSOLinkTokenService);
+    identityAudit.record.mockReset();
+    ssoAudit.record.mockReset().mockResolvedValue({ status: 'recorded' });
   });
 
   it('should be defined', () => {
@@ -233,10 +242,30 @@ describe('SsoController', () => {
         },
       };
 
-      const result = await controller.createOne(createDto);
+      const result = await controller.createOne(createDto, { user: { id: 1 } } as AuthenticatedRequest);
 
       expect(result).toEqual(mockSSOProvider);
       expect(ssoService.createProvider).toHaveBeenCalledWith(createDto);
+      expect(ssoAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'sso.provider.created',
+          actorId: 1,
+          details: { before: 'null', after: expect.not.stringContaining('test-client-secret') },
+        }),
+      );
+    });
+
+    it('keeps provider creation successful when the awaited audit receipt fails', async () => {
+      ssoAudit.record.mockRejectedValueOnce(new Error('audit unavailable'));
+
+      await expect(
+        controller.createOne(
+          { name: 'New Provider', type: SSOProviderType.OIDC } as CreateSSOProviderDto,
+          {
+            user: { id: 1 },
+          } as AuthenticatedRequest,
+        ),
+      ).resolves.toEqual(mockSSOProvider);
     });
   });
 
@@ -252,11 +281,19 @@ describe('SsoController', () => {
         oidcConfiguration: { ...mockSSOProvider.oidcConfiguration, roleMappings: {} },
       } as SSOProvider);
 
-      const mockReq = { user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) } } as unknown as AuthenticatedRequest;
+      const mockReq = {
+        user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) },
+      } as unknown as AuthenticatedRequest;
       const result = await controller.updateOne('1', updateDto, mockReq);
 
       expect(result).toEqual(mockSSOProvider);
       expect(ssoService.updateProvider).toHaveBeenCalledWith(1, updateDto);
+      expect(ssoAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'sso.provider.updated',
+          details: expect.objectContaining({ before: expect.any(String), after: expect.any(String) }),
+        }),
+      );
     });
 
     it('gates explicit null roleMappings behind users.roles.manage', async () => {
@@ -269,13 +306,157 @@ describe('SsoController', () => {
       await expect(controller.updateOne('1', updateDto, mockReq)).rejects.toThrow(ForbiddenException);
       expect(ssoService.updateProvider).not.toHaveBeenCalled();
     });
+
+    it('does not audit a provider update that fails before commit', async () => {
+      jest.spyOn(ssoService, 'updateProvider').mockRejectedValueOnce(new Error('configuration write failed'));
+      const request = {
+        user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) },
+      } as unknown as AuthenticatedRequest;
+
+      await expect(controller.updateOne('1', { name: 'Updated Provider' }, request)).rejects.toThrow(
+        'configuration write failed',
+      );
+
+      expect(ssoAudit.record).not.toHaveBeenCalled();
+    });
+
+    it('suppresses a true no-op but records a safe secret rotation flag', async () => {
+      const request = {
+        user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) },
+      } as unknown as AuthenticatedRequest;
+
+      await controller.updateOne('1', {}, request);
+      expect(ssoAudit.record).not.toHaveBeenCalled();
+
+      await controller.updateOne(
+        '1',
+        {
+          oidcConfiguration: { clientSecret: mockSSOProvider.oidcConfiguration?.clientSecret },
+        } as UpdateSSOProviderDto,
+        request,
+      );
+      expect(ssoAudit.record).not.toHaveBeenCalled();
+
+      jest.spyOn(ssoService, 'updateProvider').mockResolvedValueOnce({
+        ...mockSSOProvider,
+        oidcConfiguration: { ...mockSSOProvider.oidcConfiguration, clientSecret: 'replacement' },
+      } as SSOProvider);
+      await controller.updateOne(
+        '1',
+        { oidcConfiguration: { clientSecret: 'replacement' } } as UpdateSSOProviderDto,
+        request,
+      );
+      expect(ssoAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'sso.provider.updated',
+          details: expect.objectContaining({ changes: JSON.stringify({ changed: [], rotated: ['clientSecret'] }) }),
+        }),
+      );
+    });
+
+    it('does not report rotation when a SAML form resubmits its unchanged certificate', async () => {
+      jest.spyOn(ssoService, 'getProviderById').mockResolvedValueOnce(mockSamlProvider);
+      jest.spyOn(ssoService, 'updateProvider').mockResolvedValueOnce(mockSamlProvider);
+      const request = {
+        user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) },
+      } as unknown as AuthenticatedRequest;
+      await controller.updateOne(
+        '2',
+        { samlConfiguration: { certificate: mockSamlProvider.samlConfiguration?.certificate } } as UpdateSSOProviderDto,
+        request,
+      );
+      expect(ssoAudit.record).not.toHaveBeenCalled();
+    });
+
+    it('uses the authoritative configuration to detect same-count mapping and query-only URL changes', async () => {
+      const before = {
+        ...mockSSOProvider,
+        oidcConfiguration: {
+          ...mockSSOProvider.oidcConfiguration,
+          authorizationURL: 'https://test-issuer.com/auth?tenant=one',
+          roleMappings: { 'user-manager': ['admins'] },
+        },
+      } as SSOProvider;
+      const after = {
+        ...before,
+        oidcConfiguration: {
+          ...before.oidcConfiguration,
+          authorizationURL: 'https://test-issuer.com/auth?tenant=two',
+          roleMappings: { 'billing-manager': ['billing'] },
+        },
+      } as SSOProvider;
+      jest.spyOn(ssoService, 'getProviderById').mockResolvedValueOnce(before);
+      jest.spyOn(ssoService, 'updateProvider').mockResolvedValueOnce(after);
+      jest
+        .spyOn(module.get(RbacService), 'getRoles')
+        .mockResolvedValue([{ key: 'billing-manager', rolePermissions: [] }] as never);
+      const request = {
+        user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) },
+      } as unknown as AuthenticatedRequest;
+
+      await controller.updateOne(
+        '1',
+        {
+          oidcConfiguration: {
+            authorizationURL: after.oidcConfiguration?.authorizationURL,
+            roleMappings: after.oidcConfiguration?.roleMappings,
+          },
+        },
+        request,
+      );
+
+      expect(ssoAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          details: expect.objectContaining({
+            changes: JSON.stringify({
+              changed: ['configuration.authorizationURL', 'configuration.roleMappings'],
+              rotated: [],
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('records certificate replacement as a rotation without retaining certificate material', async () => {
+      const before = mockSamlProvider;
+      const after = {
+        ...before,
+        samlConfiguration: { ...before.samlConfiguration, certificate: 'REPLACEMENT' },
+      } as SSOProvider;
+      jest.spyOn(ssoService, 'getProviderById').mockResolvedValueOnce(before);
+      jest.spyOn(ssoService, 'updateProvider').mockResolvedValueOnce(after);
+      const request = {
+        user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) },
+      } as unknown as AuthenticatedRequest;
+
+      await controller.updateOne(
+        '2',
+        { samlConfiguration: { certificate: 'REPLACEMENT' } } as UpdateSSOProviderDto,
+        request,
+      );
+
+      expect(ssoAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          details: expect.objectContaining({
+            changes: JSON.stringify({ changed: [], rotated: ['identityProviderCertificate'] }),
+          }),
+        }),
+      );
+    });
   });
 
   describe('deleteProvider', () => {
     it('should delete a provider when user has permission', async () => {
-      await controller.deleteOne('1');
+      await controller.deleteOne('1', { user: { id: 1 } } as AuthenticatedRequest);
 
       expect(ssoService.deleteProvider).toHaveBeenCalledWith(1);
+      expect(ssoAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'sso.provider.deleted',
+          actorId: 1,
+          details: expect.objectContaining({ after: 'null' }),
+        }),
+      );
     });
   });
 
@@ -314,9 +495,7 @@ describe('SsoController', () => {
       (authService.findSSOAuthenticationDetail as jest.Mock).mockResolvedValue(existingSSODetail);
       (authService.updateSSOSubject as jest.Mock).mockResolvedValue(undefined);
       (authService.validateAuthenticationDetails as jest.Mock).mockResolvedValue(passwordOk);
-      (authService.findUserIdBySSO as jest.Mock).mockResolvedValue(
-        ssoSubjectExistsForOtherUser ? 999 : null,
-      );
+      (authService.findUserIdBySSO as jest.Mock).mockResolvedValue(ssoSubjectExistsForOtherUser ? 999 : null);
       (authService.addAuthenticationDetails as jest.Mock).mockResolvedValue(undefined);
       (authService.removeAuthenticationDetails as jest.Mock).mockResolvedValue(undefined);
       (usersService.updateOne as jest.Mock).mockResolvedValue(undefined);
@@ -391,9 +570,9 @@ describe('SsoController', () => {
           passwordOk: false,
         });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'wrong' }),
-        ).rejects.toThrow(UnauthorizedException);
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'wrong' })).rejects.toThrow(
+          UnauthorizedException,
+        );
 
         expect(authService.updateSSOSubject).not.toHaveBeenCalled();
       });
@@ -420,9 +599,9 @@ describe('SsoController', () => {
           ssoSubjectExistsForOtherUser: true,
         });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow(BadRequestException);
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          BadRequestException,
+        );
 
         expect(authService.updateSSOSubject).not.toHaveBeenCalled();
       });
@@ -441,9 +620,9 @@ describe('SsoController', () => {
       it('rejects linking when user is already linked to a different provider', async () => {
         const { authService } = setupLinkMocks({ existingSSODetail: existingSSODetailDifferentProvider });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow(BadRequestException);
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          BadRequestException,
+        );
 
         expect(authService.addAuthenticationDetails).not.toHaveBeenCalled();
         expect(authService.updateSSOSubject).not.toHaveBeenCalled();
@@ -452,17 +631,17 @@ describe('SsoController', () => {
       it('throws SSO_ALREADY_LINKED error message for cross-provider linking', async () => {
         setupLinkMocks({ existingSSODetail: existingSSODetailDifferentProvider });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow('SSO_ALREADY_LINKED');
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          'SSO_ALREADY_LINKED',
+        );
       });
 
       it('does not validate password when rejecting cross-provider link', async () => {
         const { authService } = setupLinkMocks({ existingSSODetail: existingSSODetailDifferentProvider });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow(BadRequestException);
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          BadRequestException,
+        );
 
         expect(authService.validateAuthenticationDetails).not.toHaveBeenCalled();
       });
@@ -472,49 +651,49 @@ describe('SsoController', () => {
       it('throws UnauthorizedException when user not found by email', async () => {
         setupLinkMocks({ userExists: false });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow(UnauthorizedException);
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          UnauthorizedException,
+        );
       });
 
       it('rejects when no local password is present', async () => {
         setupLinkMocks({ hasLocalPassword: false });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow(BadRequestException);
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          BadRequestException,
+        );
       });
 
       it('throws PASSWORD_REQUIRED when no local password exists', async () => {
         setupLinkMocks({ hasLocalPassword: false });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow('PASSWORD_REQUIRED');
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          'PASSWORD_REQUIRED',
+        );
       });
 
       it('rejects when password verification fails', async () => {
         setupLinkMocks({ passwordOk: false });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow(UnauthorizedException);
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          UnauthorizedException,
+        );
       });
 
       it('rejects when SSO subject is already linked to another user', async () => {
         setupLinkMocks({ ssoSubjectExistsForOtherUser: true });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow(BadRequestException);
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          BadRequestException,
+        );
       });
 
       it('throws SSO_SUBJECT_ALREADY_LINKED for subject collision', async () => {
         setupLinkMocks({ ssoSubjectExistsForOtherUser: true });
 
-        await expect(
-          controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
-        ).rejects.toThrow('SSO_SUBJECT_ALREADY_LINKED');
+        await expect(controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' })).rejects.toThrow(
+          'SSO_SUBJECT_ALREADY_LINKED',
+        );
       });
     });
   });
@@ -592,6 +771,26 @@ describe('SsoController', () => {
       });
     });
 
+    it('records a safe successful SSO login event', async () => {
+      await controller.oidcLoginCallback(
+        mockRequest as unknown as AuthenticatedRequest,
+        undefined,
+        mockResponse as unknown as Response,
+        '1',
+      );
+
+      expect(identityAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'sso_login',
+          outcome: 'succeeded',
+          actorId: 1,
+          subjectId: 1,
+          details: { providerId: 1 },
+          request: { ipAddress: '127.0.0.1', userAgent: mockRequest.headers['user-agent'] },
+        }),
+      );
+    });
+
     it('should redirect without leaking user data in URL', async () => {
       const redirectTo = 'http://localhost:3000/dashboard';
 
@@ -627,9 +826,7 @@ describe('SsoController', () => {
         mockResponse as unknown as Response,
       );
 
-      expect(mockResponse.redirect).toHaveBeenCalledWith(
-        expect.stringContaining(redirectFromState),
-      );
+      expect(mockResponse.redirect).toHaveBeenCalledWith(expect.stringContaining(redirectFromState));
     });
   });
 
@@ -648,6 +845,13 @@ describe('SsoController', () => {
 
       expect(result).toEqual({ OK: true });
       expect(sessionService.revokeAllUserSessions).toHaveBeenCalledWith(55);
+      expect(ssoAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'sso.provisioning.sessions_revoked',
+          actorId: null,
+          subject: { type: 'user', id: 55 },
+        }),
+      );
     });
 
     it('deletes users for oidc delete requests', async () => {
@@ -663,6 +867,13 @@ describe('SsoController', () => {
 
       expect(result).toEqual({ OK: true });
       expect(usersService.deleteOne).toHaveBeenCalledWith(77);
+      expect(ssoAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'sso.provisioning.user_deleted',
+          actorId: null,
+          subject: { type: 'user', id: 77 },
+        }),
+      );
     });
 
     it('does not sync RBAC roles when roles field is absent (incremental provisioning)', async () => {
@@ -706,6 +917,16 @@ describe('SsoController', () => {
         SSOProviderType.OIDC,
         1,
       );
+      expect(ssoAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'sso.provisioning.permissions_synced',
+          actorId: null,
+          subject: { type: 'user', id: 99 },
+          details: expect.objectContaining({
+            changes: JSON.stringify({ added: ['user-manager'], removed: [], updated: [] }),
+          }),
+        }),
+      );
     });
 
     it('handles SAML provisioning logout', async () => {
@@ -727,6 +948,13 @@ describe('SsoController', () => {
 
       expect(result).toEqual({ OK: true });
       expect(sessionService.revokeAllUserSessions).toHaveBeenCalledWith(101);
+      expect(ssoAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'sso.provisioning.sessions_revoked',
+          actorId: null,
+          subject: { type: 'user', id: 101 },
+        }),
+      );
     });
 
     it('handles SAML provisioning delete', async () => {
@@ -743,7 +971,9 @@ describe('SsoController', () => {
         headers: { authorization: 'Bearer saml-secret' },
       } as unknown as AuthenticatedRequest;
 
-      const result = await controller.samlDeleteUser('2', mockRequest as unknown as Request, { subject: 'saml-user-2' });
+      const result = await controller.samlDeleteUser('2', mockRequest as unknown as Request, {
+        subject: 'saml-user-2',
+      });
 
       expect(result).toEqual({ OK: true });
       expect(usersService.deleteOne).toHaveBeenCalledWith(102);

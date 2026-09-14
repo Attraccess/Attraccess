@@ -21,7 +21,11 @@ describe('ResourceGroupsIntroductionsController', () => {
 
       await controller[action](5, 3, data, req);
 
-      expect(resourceGroupsIntroductionsService[action]).toHaveBeenCalledWith(5, 3, data, { performedByUserId: 9 });
+      expect(resourceGroupsIntroductionsService[action]).toHaveBeenCalledWith(5, 3, data, {
+        performedByUserId: 9,
+        authenticationMethod: undefined,
+        apiTokenId: undefined,
+      });
     },
   );
 });
