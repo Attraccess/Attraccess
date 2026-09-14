@@ -1545,7 +1545,13 @@ describe('WagoRuntime', () => {
   });
 
   it('shuts off a delayed pulse after a newer pulse succeeds', async () => {
-    const snapshot = pulsedSnapshot;
+    // A generous pulse duration keeps the repeated pulse's registration safely ahead of the
+    // first shutoff timer on loaded runners; the property under test is the cancellation of
+    // the superseded shutoff, not the timer granularity.
+    const snapshot: Snapshot = {
+      ...pulsedSnapshot,
+      logicalChannels: [{ ...pulsedSnapshot.logicalChannels[0], pulse: { durationMs: 250 } }],
+    };
     let resolvePulseWrite: (() => void) | undefined;
     let notifyPulseWriteStarted: (() => void) | undefined;
     const pulseWriteStarted = new Promise<void>((resolve) => {
@@ -1583,10 +1589,14 @@ describe('WagoRuntime', () => {
     resolvePulseWrite?.();
     await pulse;
     await repeatedPulse;
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(writes).toEqual([true, true]);
 
+    const deadline = Date.now() + 2000;
+    while (Date.now() < deadline && writes.length < 3) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
     expect(writes).toEqual([true, true, false]);
-  });
+  }, 15000);
 
   it('does not let a stale pulse shutoff override a set command after changing to switched behavior', async () => {
     let resolvePulseWrite: (() => void) | undefined;
