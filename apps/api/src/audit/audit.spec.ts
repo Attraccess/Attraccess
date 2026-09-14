@@ -1353,6 +1353,11 @@ describe('audit policy and authorization', () => {
     await expect(
       pipe.transform({ eventPrefix: 'billing.', action: 'billing.transaction.created', subjectType: 'billing.transaction', domain: 'billing' }, { type: 'query', metatype: AuditQueryDto }),
     ).resolves.toMatchObject({ action: 'billing.transaction.created', subjectType: 'billing.transaction', domain: 'billing' });
+    for (const subjectType of ['project', 'project.member', 'project.invitation']) {
+      await expect(
+        pipe.transform({ domain: 'project', subjectType }, { type: 'query', metatype: AuditQueryDto }),
+      ).resolves.toMatchObject({ domain: 'project', subjectType });
+    }
   });
 });
 
