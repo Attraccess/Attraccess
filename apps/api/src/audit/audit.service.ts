@@ -269,6 +269,8 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
           subjectType: snapshot.subjectType,
           subjectId: snapshot.subjectId,
           details: snapshot.details,
+          ipAddress: null,
+          userAgent: null,
         },
         finalSettingsChange,
       );
