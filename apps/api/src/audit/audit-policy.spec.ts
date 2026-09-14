@@ -129,6 +129,25 @@ describe('audit storage safe snapshot', () => {
     ).toMatchObject({ details: { role: `${'a'.repeat(79)}-` } });
   });
 
+  it('accepts truncated generated role keys inside password-policy override snapshots', () => {
+    const role = `${'a'.repeat(79)}-`;
+    expect(
+      projectIdentityAuditEvent({
+        action: 'password_policy_override_updated',
+        operationId: randomUUID(),
+        outcome: 'succeeded',
+        subjectType: 'identity.password_policy',
+        subjectId: 1,
+        details: {
+          role,
+          before: JSON.stringify({ role, minLength: 10 }),
+          after: JSON.stringify({ role, minLength: 12 }),
+          field: 'minLength',
+        },
+      }),
+    ).toMatchObject({ details: { role, field: 'minLength' } });
+  });
+
   it('allows only firmware reset reasons in Attractap crash events', () => {
     const crash = {
       action: 'reader.crash_reported' as const,
