@@ -1,6 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-// eslint-disable-next-line @nx/enforce-module-boundaries -- test covers host behavior against plugin controller integration.
-import { ShellyController } from '../../../plugins/shelly/backend/shelly.controller';
+import { ShellyController } from './shelly.controller';
 
 describe('ShellyController ATT-501 firmware', () => {
   const registry = { list: jest.fn(), findById: jest.fn(), updateProbe: jest.fn() };
