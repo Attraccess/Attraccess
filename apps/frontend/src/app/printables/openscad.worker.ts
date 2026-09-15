@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 import scadSource from './nfc-keychain-card.scad?raw';
 import { NO_OUTPUT_ERROR } from './errors';
+import { createSerialQueue } from './serialQueue';
 
 // OpenSCAD is GPL-licensed and deliberately kept at arm's length: it is fetched as an
 // unbundled static asset and driven through argv + a virtual filesystem, exactly like the
@@ -150,34 +151,6 @@ export function assertionMessage(errors: string[]): string | null {
  */
 export function renderErrorReason(errors: string[]): string {
   return assertionMessage(errors) ?? NO_OUTPUT_ERROR;
-}
-
-/**
- * Serialises submitted work so at most one task runs at a time, and drops any task already
- * superseded by a later submission before its turn comes.
- *
- * Renders need this because each one builds two Emscripten instances. The compiled wasm module
- * is shared via the vendored loader's cache, but each instance still gets its own linear
- * memory, and the Manifold booleans in the .scad are where the allocation actually happens.
- * The main thread's 500 ms debounce does not prevent overlap — it only bounds how fast requests
- * arrive, and a render takes longer than that on anything but a fast desktop — so without a
- * queue, requests stack up unboundedly with nothing tearing down the superseded ones.
- *
- * Note the supersede check applies to any task that has not started yet, including the most
- * recently submitted one if a newer submission lands before the microtask queue drains. That
- * is intended: only the newest request's result is ever consumed.
- */
-export function createSerialQueue(): (id: number, task: () => Promise<void>) => void {
-  let tail: Promise<void> = Promise.resolve();
-  let latestId = 0;
-
-  return (id, task) => {
-    latestId = id;
-    tail = tail
-      .then(() => (id === latestId ? task() : undefined))
-      // A rejection must not poison the chain for every later submission.
-      .catch(() => undefined);
-  };
 }
 
 const submit = createSerialQueue();
