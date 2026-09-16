@@ -1,6 +1,5 @@
 import { createServer, type Server, type Socket } from 'node:net';
 // The fixture exercises the same pure configuration model as the plugin.
-// eslint-disable-next-line @nx/enforce-module-boundaries
 import {
   BUILTIN_MODBUS_PROFILES,
   duplicateProfile,

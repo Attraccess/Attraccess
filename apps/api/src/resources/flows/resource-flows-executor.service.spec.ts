@@ -921,7 +921,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         id: 'heartbeat-1',
         type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT,
         resourceId,
-        data: { identifier: 'Shelly', timeoutSeconds: 60, unhealthyReason: 'no signal' },
+        data: { identifier: 'ir-bridge', timeoutSeconds: 60, unhealthyReason: 'no signal' },
       });
       nodesById[inputNode.id] = inputNode;
       nodesById[heartbeatNode.id] = heartbeatNode;
@@ -934,13 +934,13 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
         expect.objectContaining({
           resourceId,
-          identifier: 'Shelly',
+          identifier: 'ir-bridge',
           status: 'healthy',
           source: 'heartbeat',
         }),
       );
 
-      const lastSeen = service.getHeartbeatLastSeen(resourceId, 'Shelly');
+      const lastSeen = service.getHeartbeatLastSeen(resourceId, 'ir-bridge');
       expect(lastSeen).toBeInstanceOf(Date);
     });
 
@@ -1007,7 +1007,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         id: 'set-ovs',
         type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
         resourceId,
-        data: { identifier: 'Shelly', status: 'healthy', reason: 'fallback' },
+        data: { identifier: 'ir-bridge', status: 'healthy', reason: 'fallback' },
       });
       nodesById[inputNode.id] = inputNode;
       nodesById[setNode.id] = setNode;
@@ -1022,7 +1022,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
         expect.objectContaining({
           resourceId,
-          identifier: 'Shelly',
+          identifier: 'ir-bridge',
           status: 'unhealthy',
           reason: 'lost wifi',
           source: 'payload',
@@ -1111,20 +1111,20 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         id: 'hb-timeout',
         type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT,
         resourceId,
-        data: { identifier: 'Shelly', timeoutSeconds: 60, unhealthyReason: 'no signal' },
+        data: { identifier: 'ir-bridge', timeoutSeconds: 60, unhealthyReason: 'no signal' },
       });
 
       (flowNodeRepository.find as jest.Mock).mockResolvedValueOnce([heartbeatNode]);
 
       const heartbeatLastSeen = (service as unknown as { heartbeatLastSeen: Map<string, Date> }).heartbeatLastSeen;
-      heartbeatLastSeen.set(`${resourceId}::Shelly`, new Date(Date.now() - 5 * 60 * 1000));
+      heartbeatLastSeen.set(`${resourceId}::ir-bridge`, new Date(Date.now() - 5 * 60 * 1000));
 
       await service.checkHealthHeartbeats();
 
       expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
         expect.objectContaining({
           resourceId,
-          identifier: 'Shelly',
+          identifier: 'ir-bridge',
           status: 'unhealthy',
           reason: 'no signal',
           source: 'heartbeat',

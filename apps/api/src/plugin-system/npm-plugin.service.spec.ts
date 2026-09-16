@@ -295,9 +295,9 @@ describe('NpmPluginService', () => {
     jest.spyOn(axios, 'get').mockResolvedValue({
       data: {
         objects: [
-          { package: { name: '@attraccess/plugin-shelly' } },
+          { package: { name: '@attraccess/plugin-example' } },
           // Registry search can report the same package twice; results are deduplicated.
-          { package: { name: '@attraccess/plugin-shelly' } },
+          { package: { name: '@attraccess/plugin-example' } },
         ],
       },
     });
@@ -322,13 +322,13 @@ describe('NpmPluginService', () => {
       },
     }));
 
-    const result = await service.searchMarketplace('shelly');
+    const result = await service.searchMarketplace('example');
 
     expect(result).toMatchObject({ errors: [] });
     expect(result.results).toEqual([
-      expect.objectContaining({ name: '@attraccess/plugin-shelly', classification: 'official' }),
+      expect.objectContaining({ name: '@attraccess/plugin-example', classification: 'official' }),
     ]);
-    expect(packageMetadata).not.toHaveBeenCalledWith('@attraccess/plugin-rabbitmq', 'npm');
+    expect(packageMetadata).not.toHaveBeenCalledWith('@attraccess/plugin-other', 'npm');
   });
 
   it('retains hydrated marketplace packages when another result no longer has metadata', async () => {
@@ -378,12 +378,12 @@ describe('NpmPluginService', () => {
       'dist-tags': { latest: '1.2.3' },
       versions: {
         '1.2.3': {
-          name: '@attraccess/plugin-shelly',
+          name: '@attraccess/plugin-example',
           version: '1.2.3',
           keywords: ['attraccess-plugin'],
           peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
           attraccess: {
-            displayName: 'Shelly',
+            displayName: 'Example',
             host: '*',
             backend: 'dist/index.js',
             sdk: { backend: '*' },
@@ -394,7 +394,7 @@ describe('NpmPluginService', () => {
       },
     });
 
-    await expect(service.marketplacePackage('@attraccess/plugin-shelly')).resolves.toMatchObject({
+    await expect(service.marketplacePackage('@attraccess/plugin-example')).resolves.toMatchObject({
       classification: 'community',
       classificationReason: 'Not published by Attraccess on npm',
     });
@@ -407,7 +407,7 @@ describe('NpmPluginService', () => {
       'dist-tags': { latest: '1.2.3' },
       versions: {
         '1.2.3': {
-          name: '@attraccess/plugin-shelly',
+          name: '@attraccess/plugin-example',
           version: '1.2.3',
           keywords: ['attraccess-plugin'],
         },
@@ -698,7 +698,7 @@ describe('NpmPluginService', () => {
   });
 
   it('classifies an installation using the selected version publisher', async () => {
-    const name = '@attraccess/plugin-shelly';
+    const name = '@attraccess/plugin-example';
     const tarball = await packageTarball(name);
     const service = new NpmPluginService({} as never);
     const internals = service as unknown as ServiceInternals;
@@ -1214,7 +1214,7 @@ describe('NpmPluginService', () => {
       join(root, '.npm-plugin-state.json'),
       JSON.stringify([
         {
-          name: '@attraccess/plugin-shelly',
+          name: '@attraccess/plugin-example',
           version: '1.0.0',
           registryId: 'npm',
           registryUrl: 'https://registry.npmjs.org',
@@ -1230,18 +1230,18 @@ describe('NpmPluginService', () => {
       publisher: { name: 'attraccess' },
       versions: {
         '1.1.0': {
-          name: '@attraccess/plugin-shelly',
+          name: '@attraccess/plugin-example',
           version: '1.1.0',
           _npmUser: { name: 'unapproved-publisher' },
           keywords: ['attraccess-plugin'],
           peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
-          attraccess: { displayName: 'Shelly', host: '*', backend: 'index.js', permissions: [], sdk: { backend: '*' } },
+          attraccess: { displayName: 'Example', host: '*', backend: 'index.js', permissions: [], sdk: { backend: '*' } },
         },
       },
     });
     jest.spyOn(service as unknown as ServiceInternals, 'hostVersion').mockReturnValue('1.9.0');
 
-    await expect(service.installedVersionCandidates('@attraccess/plugin-shelly')).resolves.toEqual([
+    await expect(service.installedVersionCandidates('@attraccess/plugin-example')).resolves.toEqual([
       expect.objectContaining({
         version: '1.1.0',
         classification: 'community',

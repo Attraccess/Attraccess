@@ -1457,7 +1457,7 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       [oversizedRequestId, oversizedBefore, oversizedAfter],
     );
     await source.query(
-      `INSERT INTO "setting" ("parent", "key", "value") VALUES ('audit', 'domains', '["billing","resource","wago"]')`,
+      `INSERT INTO "setting" ("parent", "key", "value") VALUES ('audit', 'domains', '["billing","resource","demo-plugin"]')`,
     );
     await source.destroy();
     source = new DataSource({

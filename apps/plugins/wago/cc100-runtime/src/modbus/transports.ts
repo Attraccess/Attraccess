@@ -4,7 +4,6 @@ import { Readable } from 'node:stream';
 import { WriteAdmissionError } from '../runtime-types';
 import { posix } from 'node:path';
 // Shared pure configuration model is bundled into the standalone runtime.
-// eslint-disable-next-line @nx/enforce-module-boundaries
 import { type ModbusConnection, modbusHostIdentity } from '../../../modbus/model';
 import { crc16, rtuFrame, validateResponse, validateRequest, ModbusException } from './protocol';
 

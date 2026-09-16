@@ -189,8 +189,8 @@ describe('PluginController', () => {
   });
 
   it('delegates marketplace search with an optional registry', () => {
-    controller.searchMarketplace('shelly', 'private');
-    expect(npmService.searchMarketplace).toHaveBeenCalledWith('shelly', 'private');
+    controller.searchMarketplace('demo', 'private');
+    expect(npmService.searchMarketplace).toHaveBeenCalledWith('demo', 'private');
   });
 
   it('delegates direct marketplace lookup with its selected registry', () => {

@@ -259,7 +259,7 @@ export const HealthStateOptionEnum = z.enum(['healthy', 'unhealthy']);
 export const ResourceHealthHeartbeatNodeDataSchema = z.object({
   identifier: z.string().optional().default('').meta({
     helpText:
-      'Optional label identifying which subsystem reports this heartbeat (e.g. "Shelly"). Leave empty for the resource default.',
+      'Optional label identifying which subsystem reports this heartbeat (e.g. "ir-bridge"). Leave empty for the resource default.',
   }),
   timeoutSeconds: z
     .number()
@@ -275,7 +275,7 @@ export const ResourceHealthSetNodeDataSchema = z.object({
   identifier: z.string().optional().default('').meta({
     overrideWithInput: 'health.identifier',
     helpText:
-      'Optional label identifying which subsystem this state refers to (e.g. "Shelly"). Overridable via payload path "health.identifier".',
+      'Optional label identifying which subsystem this state refers to (e.g. "ir-bridge"). Overridable via payload path "health.identifier".',
   }),
   status: HealthStateOptionEnum.meta({
     overrideWithInput: 'health.status',

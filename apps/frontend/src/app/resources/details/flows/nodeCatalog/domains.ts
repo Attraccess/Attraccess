@@ -116,7 +116,7 @@ export function getDomainDef(domain: string): DomainDef {
 }
 
 /**
- * For plugin domains (e.g. "plugin.shelly") returns a capitalised label ("Shelly").
+ * For plugin domains (e.g. "plugin.demo") returns a capitalised label ("Demo").
  * Returns null for static core domains — let the caller use its translation key instead.
  */
 export function getPluginDomainLabel(domain: string): string | null {
@@ -131,7 +131,7 @@ export function getPluginDomainLabel(domain: string): string | null {
  */
 export function nodeTypeDomain(nodeType: string): string {
   if (nodeType.startsWith('plugin.')) {
-    // plugin.shelly.send-on → 'plugin.shelly'
+    // plugin.demo.send-on → 'plugin.demo'
     const parts = nodeType.split('.');
     return parts.length >= 2 ? `plugin.${parts[1]}` : 'plugin';
   }

@@ -160,6 +160,18 @@ jobs:
         run: pnpm nx affected --target=lint --parallel=3 --base=${{ env.NX_AFFECTED_BASE }} --exclude='*,!tag:type:plugin'
       - name: Test and pack affected plugin apps
         run: pnpm nx affected --target=test,e2e,pack-test --parallel=3 --base=${{ env.NX_AFFECTED_BASE }} --exclude='*,!tag:type:plugin'
+      # The cross-project HeroUI guard (generators:no-fields-in-cards) also scans plugin
+      # sources, but `generators` deliberately does not list plugin projects as implicit
+      # dependencies (core tooling must not know plugin names). Run it here whenever any
+      # plugin is affected so plugin UI changes cannot slip past the guard.
+      - name: Detect affected plugin apps
+        id: plugin-affected
+        run: |
+          count=$(pnpm nx show projects --affected --base=${{ env.NX_AFFECTED_BASE }} --exclude='*,!tag:type:plugin' | wc -l | tr -d ' ')
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+      - name: Run cross-project UI guard for plugin changes
+        if: steps.plugin-affected.outputs.count != '0'
+        run: pnpm nx run generators:test
       - name: Test packed Hello World fixture
         run: pnpm --dir examples/plugin-hello-world run pack-test
 

@@ -166,7 +166,7 @@ export interface PluginContext {
    * (decrypted) credentials. Requires the ACCESS_MQTT_SERVERS permission.
    * Returns null when no server with the given id exists. The host performs all
    * credential decryption; the plugin only ever receives the mapped config — it
-   * stays broker-agnostic (no RabbitMQ awareness).
+   * stays broker-agnostic (no broker-vendor awareness).
    */
   getMqttServerConfig(serverId: number): Promise<MqttServerConnectionConfig | null>;
 

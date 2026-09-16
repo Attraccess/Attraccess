@@ -39,7 +39,7 @@ describe('Full Audit Log domain rollout', () => {
   });
 
   it('strips plugin-contributed domains from the core allowlist', async () => {
-    await write('domains', '["resource","wago","identity","attractap"]');
+    await write('domains', '["resource","demo-plugin","identity","attractap"]');
     await migration.up(runner);
     expect(JSON.parse(await read('domains'))).toEqual([
       'resource',

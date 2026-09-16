@@ -10,7 +10,7 @@ import { ReactNode } from 'react';
 //
 // The host owns both the concrete slot ids and the shape of the context it
 // passes per slot — this contract stays deliberately agnostic about both, so no
-// domain knowledge (RabbitMQ, MQTT, or anything else) leaks into the SDK. A slot
+// domain knowledge (broker, transport, or anything else) leaks into the SDK. A slot
 // id is just a documented string the host exposes, exactly like a route `path`.
 
 // Identifies a host extension point. The host defines the concrete ids it

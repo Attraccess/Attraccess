@@ -16,10 +16,12 @@ import * as path from 'path';
  * Fields inside a modal/drawer are exempt even under a Card, because the dialog portals
  * to <body> and renders on the overlay surface, not the Card's.
  *
- * `generators` lists the projects scanned here under implicitDependencies, so `nx affected`
- * runs this whenever one of them changes — otherwise the guard would never fire in CI.
- * Hardware boards are not scanned, and a test asserts every scanned project is listed, so
- * the two cannot drift apart silently.
+ * `generators` lists the core projects scanned here under implicitDependencies, so
+ * `nx affected` runs this whenever one of them changes — otherwise the guard would never
+ * fire in CI. Plugin projects are deliberately NOT listed (core tooling must not know
+ * plugin names); the CI `plugins` job runs this guard whenever any plugin is affected.
+ * Hardware boards are not scanned, and a test asserts every scanned non-plugin project
+ * is listed, so the two cannot drift apart silently.
  *
  * KNOWN GAPS — a green run means "none of the shapes below", not "no field on a Card surface".
  * None of these hides a violation today; they are listed so the next reader does not over-trust
@@ -62,7 +64,7 @@ const FIELD_PRIMITIVES = new Set([
 /**
  * Components that portal their children to <body>, so their subtree renders on the overlay
  * surface and never on the Card. Matched by suffix so wrappers count too — `StandardModal`,
- * `RabbitmqPermissionsModal`, `DeviceInfoDrawer`.
+ * `PermissionsModal`, `DeviceInfoDrawer`.
  */
 const isPortal = (tag: string) => /(?:Modal|Drawer|Dialog|Popover|Tooltip)$/.test(tag);
 
@@ -1257,10 +1259,13 @@ describe('form fields are not wrapped in Cards (ATT-294 / ATT-834)', () => {
     ) as { implicitDependencies?: string[] };
     const wired = new Set(generatorsJson.implicitDependencies ?? []);
 
+    // Plugin projects are intentionally unwired: core tooling must not enumerate
+    // plugins by name. The CI `plugins` job runs this guard whenever any plugin
+    // is affected, so plugin sources stay covered without the name coupling.
     const owners = new Set<string>();
     for (const file of scannedTsxFiles()) {
       const project = owningProject(file);
-      if (project) owners.add(project.name);
+      if (project && !project.tags.includes('type:plugin')) owners.add(project.name);
     }
 
     const unwired = [...owners].filter((name) => !wired.has(name));

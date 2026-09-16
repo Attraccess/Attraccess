@@ -2,7 +2,6 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 // Exercise the real persistence and runtime validators against the same snapshots.
-// eslint-disable-next-line @nx/enforce-module-boundaries
 import { validateSnapshot as validateBackend } from '../../../backend/configuration';
 import {
   hash,
