@@ -12,14 +12,39 @@ const { list, getMeta, getSettings, updateSettings, permissions } = vi.hoisted((
   updateSettings: vi.fn(),
   permissions: new Set<string>(),
 }));
-vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@attraccess/react-query-client')>()),
-  AuditService: { auditControllerList: list, auditControllerMeta: getMeta },
-  SettingsService: {
-    settingsControllerGetAuditSettings: getSettings,
-    settingsControllerUpdateAuditSettings: updateSettings,
-  },
-}));
+vi.mock('@attraccess/react-query-client', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@attraccess/react-query-client')>();
+  // Route the generated hooks through the real react-query primitives into the test
+  // doubles, so caching, retries and key-driven refetches behave as in production.
+  const { useMutation, useQuery } = await import('@tanstack/react-query');
+  return {
+    ...original,
+    AuditService: { auditControllerList: list },
+    useAuditServiceAuditControllerList: (params?: object, _queryKey?: unknown, options?: object) =>
+      useQuery({
+        queryKey: original.UseAuditServiceAuditControllerListKeyFn(params as never),
+        queryFn: () => list(params),
+        ...options,
+      }),
+    useAuditServiceAuditControllerMeta: (_queryKey?: unknown, options?: object) =>
+      useQuery({
+        queryKey: original.UseAuditServiceAuditControllerMetaKeyFn(),
+        queryFn: () => getMeta(),
+        ...options,
+      }),
+    useSettingsServiceSettingsControllerGetAuditSettings: (_queryKey?: unknown, options?: object) =>
+      useQuery({
+        queryKey: original.UseSettingsServiceSettingsControllerGetAuditSettingsKeyFn(),
+        queryFn: () => getSettings(),
+        ...options,
+      }),
+    useSettingsServiceSettingsControllerUpdateAuditSettings: (options?: object) =>
+      useMutation({
+        mutationFn: (variables: { requestBody: unknown }) => updateSettings(variables),
+        ...options,
+      }),
+  };
+});
 vi.mock('../../../../hooks/useAuth', () => ({
   useAuth: () => ({ hasPermission: (permission: string) => permissions.has(permission) }),
 }));

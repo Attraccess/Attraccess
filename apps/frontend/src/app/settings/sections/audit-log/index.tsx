@@ -20,9 +20,19 @@ import {
   Tabs,
   TextField,
 } from '@heroui/react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { AuditEntryDto, AuditService, AuditSettingsDto, SettingsService } from '@attraccess/react-query-client';
+import {
+  AuditEntryDto,
+  AuditService,
+  AuditSettingsDto,
+  useAuditServiceAuditControllerList,
+  useAuditServiceAuditControllerMeta,
+  useSettingsServiceSettingsControllerGetAuditSettings,
+  useSettingsServiceSettingsControllerUpdateAuditSettings,
+  UseAuditServiceAuditControllerListKeyFn,
+  UseSettingsServiceSettingsControllerGetAuditSettingsKeyFn,
+} from '@attraccess/react-query-client';
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -227,33 +237,19 @@ export function AuditLogSection() {
   const [exportError, setExportError] = useState(false);
   const [draft, setDraft] = useState<AuditSettingsDto>();
   const [saved, setSaved] = useState(false);
-  const meta = useQuery({
-    queryKey: ['audit-meta'],
-    queryFn: () => AuditService.auditControllerMeta(),
-    enabled: canRead || canManage,
-  });
+  const meta = useAuditServiceAuditControllerMeta(undefined, { enabled: canRead || canManage });
   const pluginDomainEntries = pluginDomains(meta.data);
   const parsed = filterRequest(applied, meta.data?.subjectTypes);
   const request = { ...parsed.request, beforeId: cursors.at(-1), limit: 50 };
-  const activity = useQuery({
-    queryKey: ['audit-log', request],
-    queryFn: () => AuditService.auditControllerList(request),
-    enabled: canRead,
-  });
-  const settings = useQuery({
-    queryKey: ['audit-settings'],
-    queryFn: () => SettingsService.settingsControllerGetAuditSettings(),
-    enabled: canManage,
-  });
+  const activity = useAuditServiceAuditControllerList(request, undefined, { enabled: canRead });
+  const settings = useSettingsServiceSettingsControllerGetAuditSettings(undefined, { enabled: canManage });
   const currentSettings = draft ?? settings.data;
-  const saveSettings = useMutation({
-    mutationFn: (next: AuditSettingsDto) =>
-      SettingsService.settingsControllerUpdateAuditSettings({ requestBody: next }),
+  const saveSettings = useSettingsServiceSettingsControllerUpdateAuditSettings({
     onSuccess: (next) => {
-      client.setQueryData(['audit-settings'], next);
+      client.setQueryData(UseSettingsServiceSettingsControllerGetAuditSettingsKeyFn(), next);
       setDraft(undefined);
       setSaved(true);
-      void client.invalidateQueries({ queryKey: ['audit-log'] });
+      void client.invalidateQueries({ queryKey: UseAuditServiceAuditControllerListKeyFn() });
     },
   });
   const domainLabel = (domain: string) =>
@@ -676,7 +672,7 @@ export function AuditLogSection() {
                       currentSettings.retention_days < 1 ||
                       currentSettings.retention_days > 3650
                     }
-                    onSave={() => saveSettings.mutate(currentSettings)}
+                    onSave={() => saveSettings.mutate({ requestBody: currentSettings })}
                     onDiscard={() => {
                       setDraft(undefined);
                       saveSettings.reset();
