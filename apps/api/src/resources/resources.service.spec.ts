@@ -639,6 +639,22 @@ describe('ResourcesService', () => {
       }));
     });
 
+    it('does not audit metadata that only normalized from absent to empty', async () => {
+      const existingResource = createMockResource({ id: 1, name: 'Old', metadata: null });
+      const updatedResource = createMockResource({ id: 1, name: 'New', metadata: {} });
+      jest.spyOn(service, 'getResourceById').mockResolvedValue(existingResource);
+      resourceRepository.save.mockResolvedValue(updatedResource);
+
+      await service.updateResource(1, { name: 'New', metadata: {} }, undefined, { id: 9 });
+
+      expect(audit.recordResource).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'resource.updated',
+          details: { 'before.name': 'Old', 'after.name': 'New', changedFields: '["name"]' },
+        }),
+      );
+    });
+
     it('bounds both names in a rename audit projection', async () => {
       const existingResource = createMockResource({ id: 1, name: '"'.repeat(5000) });
       const updatedResource = createMockResource({ id: 1, name: '\\'.repeat(5000) + '🚪'.repeat(5000) });

@@ -8,6 +8,20 @@ const name = (value: unknown): string | undefined =>
 function recordedSubjectLabel(entry: AuditLog): string | undefined {
   const details = entry.details;
   if (name(details.subjectLabel)) return name(details.subjectLabel);
+  if (entry.domain === 'administration' && entry.subjectType === 'mqtt-server') return name(details.serverName);
+  if (entry.domain === 'administration' && entry.subjectType === 'plugin-package')
+    return name(details.pluginName) ?? name(details.packageName);
+  if (entry.domain === 'sso' && entry.subjectType === 'sso.provider') {
+    for (const value of [details.after, details.before]) {
+      if (typeof value !== 'string') continue;
+      try {
+        const provider = JSON.parse(value);
+        if (provider?.id === entry.subjectId && name(provider.name)) return name(provider.name);
+      } catch {
+        /* Historical malformed snapshots retain their original details. */
+      }
+    }
+  }
   // A maintenance schedule's name belongs to the schedule, not its resource subject.
   const isResource =
     entry.domain === 'resource' && entry.subjectType === 'resource' && entry.action.startsWith('resource.');
@@ -55,6 +69,7 @@ export async function auditEntriesWithLabels(source: DataSource, entries: AuditL
       [
         ...entries.filter((entry) => !name(entry.details.actorUsername)).map((entry) => entry.actorId),
         ...subjects('identity', 'identity.user'),
+        ...subjects('sso', 'user'),
       ],
       'username',
     ),
@@ -73,7 +88,8 @@ export async function auditEntriesWithLabels(source: DataSource, entries: AuditL
           ? groups
           : entry.domain === 'project' && entry.subjectType === 'project'
             ? projects
-            : entry.domain === 'identity' && entry.subjectType === 'identity.user'
+            : (entry.domain === 'identity' && entry.subjectType === 'identity.user') ||
+                (entry.domain === 'sso' && entry.subjectType === 'user')
               ? users
               : undefined;
     const subjectLabel = recordedSubject ?? subjectNames?.get(entry.subjectId);

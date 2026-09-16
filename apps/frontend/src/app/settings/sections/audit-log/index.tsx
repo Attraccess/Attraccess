@@ -67,6 +67,10 @@ import de from './de.json';
 
 type Translate = (key: string) => string;
 
+function auditLabel(section: 'events' | 'targets' | 'fields' | 'settingNames', value: string, t: Translate) {
+  return Object.hasOwn(en[section], value) ? t(`${section}[${JSON.stringify(value)}]`) : humanize(value);
+}
+
 function Notice({
   title,
   description,
@@ -131,10 +135,12 @@ function actor(entry: AuditEntryDto, t: Translate) {
       : `#${entry.actorId}`;
 }
 function target(entry: AuditEntryDto, t: Translate) {
+  if (entry.subjectType === 'setting' && typeof entry.details.settingKey === 'string')
+    return auditLabel('settingNames', entry.details.settingKey, t);
   return (
     (entry.subjectLabel &&
       `${entry.subjectLabel}${entry.subjectLabelSource === 'current' ? ` (${t('currentNameShort')})` : ''}`) ||
-    (entry.subjectId === null ? t('noTarget') : `${humanize(entry.subjectType)} #${entry.subjectId}`)
+    (entry.subjectId === null ? t('noTarget') : `${auditLabel('targets', entry.subjectType, t)} #${entry.subjectId}`)
   );
 }
 
@@ -150,6 +156,8 @@ function EntryDetails({ entry, t }: { entry: AuditEntryDto; t: Translate }) {
         {t(`outcomes.${entry.outcome}`)}
       </Chip>
       <dl className="grid grid-cols-[auto_1fr] gap-x-5 gap-y-3 text-sm">
+        <dt className="text-muted">{t('eventType')}</dt>
+        <dd className="break-all">{entry.action}</dd>
         <dt className="text-muted">{t('time')}</dt>
         <dd>{new Date(entry.at).toLocaleString()}</dd>
         <dt className="text-muted">{t('actor')}</dt>
@@ -168,7 +176,31 @@ function EntryDetails({ entry, t }: { entry: AuditEntryDto; t: Translate }) {
           {entry.subjectLabelSource && <p className="text-xs text-muted">{t(`${entry.subjectLabelSource}Name`)}</p>}
         </dd>
         <dt className="text-muted">{t('source')}</dt>
-        <dd>{entry.authenticationMethod ?? entry.pluginId}</dd>
+        <dd>{entry.authenticationMethod ?? entry.pluginId ?? t('notRecorded')}</dd>
+        {typeof entry.apiTokenId === 'number' && (
+          <>
+            <dt className="text-muted">{t('apiTokenId')}</dt>
+            <dd>#{entry.apiTokenId}</dd>
+          </>
+        )}
+        {entry.pluginId && (
+          <>
+            <dt className="text-muted">{t('pluginId')}</dt>
+            <dd className="break-all">{entry.pluginId}</dd>
+          </>
+        )}
+        {entry.ipAddress && (
+          <>
+            <dt className="text-muted">{t('ipAddress')}</dt>
+            <dd className="break-all">{entry.ipAddress}</dd>
+          </>
+        )}
+        {entry.userAgent && (
+          <>
+            <dt className="text-muted">{t('userAgent')}</dt>
+            <dd className="break-all">{entry.userAgent}</dd>
+          </>
+        )}
       </dl>
       {diff.length > 0 && (
         <section className="space-y-3">
@@ -176,7 +208,7 @@ function EntryDetails({ entry, t }: { entry: AuditEntryDto; t: Translate }) {
           {diff.map((change) => (
             <Card key={change.field} variant="secondary">
               <Card.Header>
-                <Card.Title className="text-sm">{humanize(change.field)}</Card.Title>
+                <Card.Title className="text-sm">{auditLabel('fields', change.field, t)}</Card.Title>
               </Card.Header>
               <Card.Content className="grid grid-cols-2 gap-4 text-sm">
                 <div className="min-w-0">
@@ -202,7 +234,7 @@ function EntryDetails({ entry, t }: { entry: AuditEntryDto; t: Translate }) {
           <dl className="space-y-3">
             {metadata.map(([key, value]) => (
               <div key={key} className="space-y-1">
-                <dt className="text-xs text-muted">{humanize(key)}</dt>
+                <dt className="text-xs text-muted">{auditLabel('fields', key, t)}</dt>
                 <dd className="whitespace-pre-wrap break-words text-sm">{displayValue(value)}</dd>
               </div>
             ))}
@@ -489,7 +521,7 @@ export function AuditLogSection() {
                           <Table.Row key={entry.id} id={entry.id} textValue={entry.action}>
                             <Table.Cell>
                               <div className="space-y-1">
-                                <p className="font-medium">{humanize(entry.action)}</p>
+                                <p className="font-medium">{auditLabel('events', entry.action, t)}</p>
                                 <div className="flex flex-wrap gap-2 text-xs text-muted">
                                   <span>{domainLabel(entry.domain)}</span>
                                   <span>·</span>
@@ -535,16 +567,24 @@ export function AuditLogSection() {
                           {new Date(entry.at).toLocaleString()}
                         </time>
                       </div>
-                      <Card.Title>{humanize(entry.action)}</Card.Title>
+                      <Card.Title>{auditLabel('events', entry.action, t)}</Card.Title>
                       <Card.Description>
                         {actor(entry, t)} · {target(entry, t)}
                       </Card.Description>
                     </Card.Header>
-                    <Card.Footer>
+                    <Card.Footer className="justify-between">
                       <Button size="sm" variant="ghost" onPress={() => setSelected(entry)}>
                         {t('inspect')}
                         <ChevronRightIcon size={16} />
                       </Button>
+                      <Chip
+                        size="sm"
+                        color={
+                          entry.outcome === 'failed' ? 'danger' : entry.outcome === 'succeeded' ? 'success' : 'default'
+                        }
+                      >
+                        {t(`outcomes.${entry.outcome}`)}
+                      </Chip>
                     </Card.Footer>
                   </Card>
                 ))}
@@ -695,7 +735,9 @@ export function AuditLogSection() {
             <Drawer.Dialog className="w-full max-w-xl">
               <Drawer.CloseTrigger />
               <Drawer.Header>
-                <Drawer.Heading>{selected ? humanize(selected.action) : t('eventDetails')}</Drawer.Heading>
+                <Drawer.Heading>
+                  {selected ? auditLabel('events', selected.action, t) : t('eventDetails')}
+                </Drawer.Heading>
                 <p className="text-xs text-muted">
                   {t('eventDetails')} #{selected?.id}
                 </p>
