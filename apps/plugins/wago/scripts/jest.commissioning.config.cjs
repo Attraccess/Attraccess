@@ -1,4 +1,4 @@
-const base = require('./test-wago-production-fleet.config.cjs');
+const base = require('./jest.acceptance-base.config.cjs');
 module.exports = {
   ...base,
   displayName: 'commissioning-acceptance',

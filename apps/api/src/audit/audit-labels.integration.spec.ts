@@ -8,6 +8,12 @@ import * as migrations from '../database/migrations';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { AuditService } from './audit.service';
 import { AuditController } from './audit.controller';
+import {
+  registerPluginAuditDomains,
+  resetPluginAuditRegistry,
+} from '../plugin-system/plugin-audit-registry';
+
+const fixturePluginId = 'abcdefghijklmnopqrstu';
 
 describe('persisted audit names', () => {
   let directory: string;
@@ -15,6 +21,19 @@ describe('persisted audit names', () => {
   let service: AuditService;
   let controller: AuditController;
   beforeEach(async () => {
+    resetPluginAuditRegistry();
+    registerPluginAuditDomains({ name: 'labels-fixture-plugin', id: fixturePluginId }, [
+      {
+        domain: 'demo',
+        actions: [
+          {
+            action: 'demo.publication',
+            subjectTypes: ['demo.device'],
+            details: { revision: { type: 'number', integer: true, min: 1 } },
+          },
+        ],
+      },
+    ]);
     directory = await mkdtemp(join(tmpdir(), 'audit-labels-'));
     source = await new DataSource({
       type: 'sqlite',
@@ -44,6 +63,7 @@ describe('persisted audit names', () => {
       });
   }, 60_000);
   afterEach(async () => {
+    resetPluginAuditRegistry();
     await service?.onModuleDestroy();
     if (source?.isInitialized) await source.destroy();
     await rm(directory, { recursive: true, force: true });
@@ -81,7 +101,7 @@ describe('persisted audit names', () => {
     expect(JSON.stringify(items)).not.toContain('private');
   });
 
-  it('retains recorded names after deletion and never joins WAGO target IDs to core resources', async () => {
+  it('retains recorded names after deletion and never joins plugin target IDs to core resources', async () => {
     await source
       .getRepository(AuditLog)
       .insert([
@@ -100,17 +120,19 @@ describe('persisted audit names', () => {
           details: { actorUsername: 'Original admin', 'before.name': 'Original lathe' },
         },
       ]);
-    await service.record({
-      pluginId: 'abcdefghijklmnopqrstu',
-      action: 'wago.publication',
-      operationId: randomUUID(),
-      principal: { userId: 7, authenticationMethod: 'session' },
-      outcome: 'succeeded',
-      subject: { type: 'wago.controller', id: 7 },
-      details: { revision: 2 },
-    });
+    expect(
+      await service.record({
+        pluginId: fixturePluginId,
+        action: 'demo.publication',
+        operationId: randomUUID(),
+        principal: { userId: 7, authenticationMethod: 'session' },
+        outcome: 'succeeded',
+        subject: { type: 'demo.device', id: 7 },
+        details: { revision: 2 },
+      }),
+    ).toEqual({ status: 'recorded' });
     const live = await controller.list({ limit: 50 });
-    expect(live.items.find((entry) => entry.domain === 'wago')?.subjectLabel).toBeUndefined();
+    expect(live.items.find((entry) => entry.domain === 'demo')?.subjectLabel).toBeUndefined();
     await source.getRepository(Resource).delete(7);
     await source.getRepository(User).delete(7);
     const { items } = await controller.list({ limit: 50 });
@@ -122,8 +144,8 @@ describe('persisted audit names', () => {
       subjectLabel: 'Original lathe',
       subjectLabelSource: 'recorded',
     });
-    expect(items.find((entry) => entry.domain === 'wago')).toMatchObject({ actorId: 7, subjectId: 7 });
-    expect(items.find((entry) => entry.domain === 'wago')?.actorUsername).toBeUndefined();
+    expect(items.find((entry) => entry.domain === 'demo')).toMatchObject({ actorId: 7, subjectId: 7 });
+    expect(items.find((entry) => entry.domain === 'demo')?.actorUsername).toBeUndefined();
     expect(await source.getRepository(AuditLog).count()).toBe(2);
   });
 });

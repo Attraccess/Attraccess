@@ -39,7 +39,7 @@ import { LabeledSwitch } from '../../../../components/labeledSwitch';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
 import {
   auditCsv,
-  auditDomains,
+  coreAuditDomains,
   AuditFilters,
   changes,
   displayValue,
@@ -47,7 +47,10 @@ import {
   exportAuditEntries,
   filterRequest,
   humanize,
+  pluginDomainLabel,
+  pluginDomains,
   toggleDomain,
+  togglePluginDomain,
 } from './audit-log-model';
 import en from './en.json';
 import de from './de.json';
@@ -208,7 +211,7 @@ function EntryDetails({ entry, t }: { entry: AuditEntryDto; t: Translate }) {
 }
 
 export function AuditLogSection() {
-  const { t } = useTranslations({ en, de });
+  const { t, language } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
   const client = useQueryClient();
   const canRead = hasPermission('system.audit.read');
@@ -224,7 +227,13 @@ export function AuditLogSection() {
   const [exportError, setExportError] = useState(false);
   const [draft, setDraft] = useState<AuditSettingsDto>();
   const [saved, setSaved] = useState(false);
-  const parsed = filterRequest(applied);
+  const meta = useQuery({
+    queryKey: ['audit-meta'],
+    queryFn: () => AuditService.auditControllerMeta(),
+    enabled: canRead || canManage,
+  });
+  const pluginDomainEntries = pluginDomains(meta.data);
+  const parsed = filterRequest(applied, meta.data?.subjectTypes);
   const request = { ...parsed.request, beforeId: cursors.at(-1), limit: 50 };
   const activity = useQuery({
     queryKey: ['audit-log', request],
@@ -248,7 +257,10 @@ export function AuditLogSection() {
     },
   });
   const domainLabel = (domain: string) =>
-    Object.hasOwn(en.domains, domain) ? t(`domains.${domain}`) : humanize(domain);
+    pluginDomainLabel(
+      pluginDomainEntries.find((entry) => entry.id === domain)?.labels,
+      language,
+    ) ?? (Object.hasOwn(en.domains, domain) ? t(`domains.${domain}`) : humanize(domain));
   const updateFilter = (key: keyof AuditFilters, value: string) =>
     setFilters((current) => ({ ...current, [key]: value }));
   const clearFilters = () => {
@@ -258,7 +270,7 @@ export function AuditLogSection() {
     setFilterError(undefined);
   };
   const applyFilters = () => {
-    const result = filterRequest(filters);
+    const result = filterRequest(filters, meta.data?.subjectTypes);
     if (result.error) {
       setFilterError(t(result.error));
       return;
@@ -367,7 +379,8 @@ export function AuditLogSection() {
                 onChange={(value) => updateFilter('domain', value)}
                 options={[
                   { value: '', label: t('allDomains') },
-                  ...auditDomains.map((domain) => ({ value: domain, label: domainLabel(domain) })),
+                  ...coreAuditDomains.map((domain) => ({ value: domain, label: domainLabel(domain) })),
+                  ...pluginDomainEntries.map((domain) => ({ value: domain.id, label: domainLabel(domain.id) })),
                 ]}
               />
               <TextField value={filters.eventPrefix} onChange={(value) => updateFilter('eventPrefix', value)}>
@@ -603,7 +616,7 @@ export function AuditLogSection() {
                       <p className="mt-1 text-sm text-muted">{t('domainsHint')}</p>
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
-                      {auditDomains.map((domain) => (
+                      {coreAuditDomains.map((domain) => (
                         <LabeledSwitch
                           key={domain}
                           isSelected={currentSettings.domains.includes(domain)}
@@ -616,6 +629,25 @@ export function AuditLogSection() {
                           }
                         >
                           {domainLabel(domain)}
+                        </LabeledSwitch>
+                      ))}
+                      {pluginDomainEntries.map((domain) => (
+                        <LabeledSwitch
+                          key={domain.id}
+                          isSelected={!currentSettings.plugin_domains_disabled.includes(domain.id)}
+                          isDisabled={saveSettings.isPending}
+                          onChange={(enabled) =>
+                            editSettings({
+                              ...currentSettings,
+                              plugin_domains_disabled: togglePluginDomain(
+                                currentSettings.plugin_domains_disabled,
+                                domain.id,
+                                enabled,
+                              ),
+                            })
+                          }
+                        >
+                          {domainLabel(domain.id)}
                         </LabeledSwitch>
                       ))}
                     </div>

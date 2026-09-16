@@ -313,7 +313,7 @@ process.exit(result.status ?? 1);
     rmSync(join(fixture.root, config, 'runtime.env.next'));
     fixture.file(
       'bin/flock',
-      '#!/usr/bin/python3\nimport fcntl,sys\ntry: fcntl.flock(int(sys.argv[2]),fcntl.LOCK_EX|fcntl.LOCK_NB)\nexcept OSError: sys.exit(1)\n',
+      `#!${process.env.PYTHON || '/usr/bin/python3'}\nimport fcntl,sys\ntry: fcntl.flock(int(sys.argv[2]),fcntl.LOCK_EX|fcntl.LOCK_NB)\nexcept OSError: sys.exit(1)\n`,
       0o700,
     );
     const { bundle, script } = delivery();

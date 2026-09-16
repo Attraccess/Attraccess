@@ -21,6 +21,7 @@ import { WagoCommissioningLeaseEntity } from './wago-commissioning-lease.entity'
 import { createWagoCommandNode } from './wago-command-node';
 import { WagoFlowService } from './wago-flow.service';
 import { createWagoStateNodes } from './wago-state-nodes';
+import { WAGO_AUDIT_DOMAIN } from './wago-audit-policy';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 class WagoPluginModule {}
@@ -50,6 +51,7 @@ const plugin: PluginBackendModule = {
     createWagoCommandNode(() => services(context).command),
     ...createWagoStateNodes(() => services(context).state),
   ],
+  auditDomains: [WAGO_AUDIT_DOMAIN],
   register(context: PluginContext): DynamicModule {
     return {
       module: WagoPluginModule,

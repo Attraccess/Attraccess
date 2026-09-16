@@ -33,6 +33,7 @@ import { PluginClassificationService } from './plugin-classification.service';
 import { SettingsModule } from '../settings/settings.module';
 import { loadPluginEntryExports } from './plugin-loader';
 import { registerPluginFlowNodes } from './plugin-flow-node-registry';
+import { registerPluginAuditDomains } from './plugin-audit-registry';
 import { PluginMqttService } from './plugin-mqtt.service';
 import { MqttModule } from '../mqtt/mqtt.module';
 import { MqttCredentialProvisioningService } from '../mqtt/mqtt-credential-provisioning.service';
@@ -155,6 +156,18 @@ export class PluginModule {
     if (pluginFlowNodes?.length) {
       registerPluginFlowNodes(manifest.name, pluginFlowNodes);
       this.logger.log(`Registered ${pluginFlowNodes.length} flow node(s) from plugin ${manifest.name}`);
+    }
+
+    // Register any audit domains contributed by this plugin. Throws on invalid or
+    // colliding declarations, which quarantines the plugin like any other load failure.
+    const configuredAuditDomains = (exported as PluginBackendModule)?.auditDomains;
+    const pluginAuditDomains =
+      typeof configuredAuditDomains === 'function' ? configuredAuditDomains(context) : configuredAuditDomains;
+    if (pluginAuditDomains?.length) {
+      registerPluginAuditDomains({ name: manifest.name, id: manifest.id }, pluginAuditDomains);
+      this.logger.log(
+        `Registered audit domain(s) ${pluginAuditDomains.map((declaration) => declaration.domain).join(', ')} from plugin ${manifest.name}`,
+      );
     }
 
     if (typeof (exported as PluginBackendModule)?.register !== 'function') {

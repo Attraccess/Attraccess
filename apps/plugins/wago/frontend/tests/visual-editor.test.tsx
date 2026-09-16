@@ -186,7 +186,7 @@ function mount() {
 }
 
 async function section(user: ReturnType<typeof userEvent.setup>, name: string) {
-  const button = await screen.findByRole('button', { name, exact: true });
+  const button = await screen.findByRole('button', { name });
   await waitFor(() => expect(button).toBeEnabled());
   await user.click(button);
 }

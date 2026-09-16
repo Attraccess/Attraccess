@@ -62,7 +62,10 @@ to 50 and is bounded to 1..100; invalid or unknown query fields are rejected.
 Supported filters are `domain=wago`, exact `action`, `eventPrefix` (for example
 `wago.commissioning.`), `outcome`, `operationId`, `actorId`, `subjectType`,
 `subjectId`, and inclusive ISO timestamp bounds `from`/`to`. Subject types are
-`wago.controller` and `wago.commissioning`. Dates are returned as ISO timestamps.
+`wago.controller` and `wago.commissioning`. `GET /api/admin/audit-log/meta`
+enumerates the domains, actions and subject types currently known to the host —
+core values plus the contributions of loaded plugins — so clients never hardcode
+the WAGO vocabulary. Dates are returned as ISO timestamps.
 Rows retain identifiers and explicitly safe metadata, not actor names, command
 values, credential values, arbitrary error strings or raw configuration snapshots.
 
@@ -73,7 +76,8 @@ parent `audit` and the following JSON-encoded keys:
 | Key | Default | Bounds |
 | --- | --- | --- |
 | `enabled` | `true` | Boolean master switch. |
-| `domains` | `["wago"]` | All currently registered domains; `[]` disables capture. |
+| `domains` | Core domains | Allowlist of core (host-owned) domains only. |
+| `plugin_domains_disabled` | `[]` | Blocklist of plugin-contributed domains. The `wago` domain records while the plugin is loaded and absent from this list; administrators turn it off here. |
 | `retention_days` | `90` | Integer 1..3650. |
 
 PATCH accepts these fields, for example `{ "retention_days": 30 }`. Invalid
@@ -84,12 +88,19 @@ minute to refresh on another process. No environment-only second settings store
 is introduced.
 
 The sink admits at most eight outstanding writes and retains no retry queue.
-Details are bounded to 4 KiB and validated against per-action allowlists. Caller
-objects are snapshotted once from data properties; accessors, custom prototypes,
-unknown fields and unsupported events are rejected before persistence. Extending
-the generic store to another domain requires an explicit reviewed event policy,
-not permission to submit arbitrary JSON. In particular, telemetry events are not
-accepted.
+Details are bounded to 4 KiB and validated against per-action allowlists that the
+plugin itself declares. The WAGO backend module exports its policy as
+`WAGO_AUDIT_DOMAIN` (`apps/plugins/wago/backend/wago-audit-policy.ts`) through
+`PluginBackendModule.auditDomains`; the host registers the declaration at plugin
+load and enforces it on every recorded event. The core application contains no
+WAGO-specific audit code: an event is admitted only when its action prefix
+resolves to a domain registered by the recording plugin, the action and subject
+type are declared, and every detail field passes its declared field policy.
+Caller objects are snapshotted once from data properties; accessors, custom
+prototypes, unknown fields, foreign plugin identities and unsupported events are
+rejected before persistence. Extending audit coverage requires an explicit
+reviewed declaration in the plugin, not permission to submit arbitrary JSON. In
+particular, telemetry events are not accepted.
 
 Retention runs at startup and hourly, deleting expired rows in batches of 1,000
 and yielding between batches until the backlog is drained. Only deletion counts

@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { promisify } from 'node:util';
 
 const exec = promisify(execFile);
-const runner = resolve(import.meta.dirname, 'test-wago-production-fleet.mjs');
+const runner = resolve(import.meta.dirname, 'test-production-fleet.mjs');
 
 // Run the actual CLI with a fake Docker executable. No daemon or broker is used.
 const fakeDocker = `#!${process.execPath}

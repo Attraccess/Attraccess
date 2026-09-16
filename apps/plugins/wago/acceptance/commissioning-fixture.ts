@@ -18,11 +18,14 @@ import { WagoRuntimeArtifactCatalog, WagoRuntimeArtifactsService } from '../back
 import { WagoArtifactsController } from '../backend/wago-artifacts.controller';
 import { WagoControllerApi } from '../backend/wago.controller';
 import { WagoCommissioningService } from '../backend/wago-commissioning.service';
+import { WagoCredentialRotationService } from '../backend/wago-credential-rotation';
+import { WAGO_PRESETS } from '../backend/configuration';
 import { fw31IdentityOutput } from '../backend/fixtures/fw31-identity';
 import { WagoCommissioningSession } from '../backend/wago-commissioning-session.entity';
 import { WagoController } from '../backend/wago-controller.entity';
 import { WagoService } from '../backend/wago.service';
 import { MANAGEMENT_INSPECTION_COMMAND } from '../backend/wago-management-inspection';
+import { CLOCK_INSPECTION_SCRIPT } from '../backend/wago-commissioning-clock';
 import { signingFixture } from './commissioning-signing-fixture';
 
 export async function commissioningFixture() {
@@ -84,6 +87,11 @@ export async function commissioningFixture() {
       },
       list: () => database.getRepository(WagoController).find(),
       getSettings: async () => ({ defaultMqttServerId: 1 }),
+      // The full-page configuration workspace (post-modal era) loads draft,
+      // baseline and preset data before it enables channel editing.
+      getDraft: jest.fn(async () => null),
+      getConfigurationBaseline: jest.fn(async () => null),
+      presets: jest.fn(() => WAGO_PRESETS),
       createEnrollment: jest.fn(async () => ({
         id: 7,
         username: 'fixture-enrollment',
@@ -134,6 +142,10 @@ export async function commissioningFixture() {
       codesys: 'inactive',
     });
     service['sudoRunScript'] = async (_host, _fingerprint, _credential, script) => {
+      if (script === CLOCK_INSPECTION_SCRIPT) {
+        // Sample at invocation time so the real clock gate verifies fresh, aligned UTC.
+        return `epoch=${Math.floor(Date.now() / 1000)}\nuptime=120.00\nboot=11111111-1111-4111-8111-111111111111\ntool=supported\n`;
+      }
       if (script.includes('version=1') && script.includes('platform=')) {
         transport.platformCalls++;
         return 'version=1\nplatform=supported\nhardware=accessible\nexclusivity=clear\ndocker=running\nconfigDocker=present\nprovision=prepare-controller\nqualification=software-supported\n';
@@ -176,6 +188,7 @@ export async function commissioningFixture() {
         { provide: WagoCommissioningService, useValue: service },
         { provide: WagoService, useValue: wago },
         { provide: Symbol.for('attraccess.plugin.context'), useValue: context },
+        WagoCredentialRotationService,
       ],
     })
       .overrideGuard(DualAuthGuard)

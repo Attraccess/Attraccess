@@ -3,12 +3,12 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 export class RetirePasswordPolicyAudit1783900000000 implements MigrationInterface {
   async up(runner: QueryRunner): Promise<void> {
     await runner.query(`INSERT INTO "setting" ("parent", "key", "value")
-      VALUES ('audit', 'domains', '["resource","wago","identity"]')
+      VALUES ('audit', 'domains', '["resource","identity"]')
       ON CONFLICT ("parent", "key") DO UPDATE SET "value" =
         CASE
           WHEN json_valid("setting"."value") AND json_type("setting"."value") = 'array'
             THEN json_insert("setting"."value", '$[#]', 'identity')
-          ELSE '["resource","wago","identity"]'
+          ELSE '["resource","identity"]'
         END
       WHERE NOT EXISTS (
         SELECT 1 FROM json_each("setting"."value") WHERE value = 'identity'

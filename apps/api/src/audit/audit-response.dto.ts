@@ -29,3 +29,22 @@ export class AuditPageDto {
   @ApiProperty({ type: [AuditEntryDto] }) items!: AuditEntryDto[];
   @ApiProperty({ type: Number, nullable: true }) nextCursor!: number | null;
 }
+
+/** One audit domain known to the host: a core domain or a domain contributed by a loaded plugin. */
+export class AuditDomainMetaDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ enum: ['core', 'plugin'] }) source!: 'core' | 'plugin';
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: { type: 'string' },
+    description: 'Plugin-provided display labels keyed by locale, e.g. { en: "Demo devices" }.',
+  })
+  labels?: Record<string, string>;
+}
+
+/** Enumerates the currently known audit filter vocabulary: core values plus plugin contributions. */
+export class AuditMetaDto {
+  @ApiProperty({ type: [AuditDomainMetaDto] }) domains!: AuditDomainMetaDto[];
+  @ApiProperty({ type: [String] }) subjectTypes!: string[];
+  @ApiProperty({ type: [String] }) actions!: string[];
+}

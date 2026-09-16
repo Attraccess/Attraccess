@@ -1,6 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AuditEntryDto } from '@attraccess/react-query-client';
-import { auditCsv, changes, csvCell, emptyFilters, exportAuditEntries, filterRequest } from './audit-log-model';
+import type { AuditEntryDto, AuditMetaDto } from '@attraccess/react-query-client';
+import {
+  auditCsv,
+  changes,
+  csvCell,
+  emptyFilters,
+  exportAuditEntries,
+  filterRequest,
+  pluginDomainLabel,
+  pluginDomains,
+  togglePluginDomain,
+} from './audit-log-model';
 
 const entry: AuditEntryDto = {
   id: 10,
@@ -54,16 +64,48 @@ describe('audit export and filtering', () => {
     expect(filterRequest({ ...emptyFilters, from: 'invalid' })).toEqual({ error: 'invalidDate' });
   });
   it('rejects unsupported free-text filters before they can be applied', () => {
+    const subjectTypes = ['billing.transaction', 'resource'];
     expect(filterRequest({ ...emptyFilters, eventPrefix: 'resource..updated' })).toEqual({
       error: 'invalidEventPrefix',
     });
-    expect(filterRequest({ ...emptyFilters, subjectType: 'transaction' })).toEqual({ error: 'invalidSubjectType' });
+    expect(filterRequest({ ...emptyFilters, subjectType: 'transaction' }, subjectTypes)).toEqual({
+      error: 'invalidSubjectType',
+    });
     expect(filterRequest({ ...emptyFilters, eventPrefix: 'billing.transaction.' })).toEqual({
       request: { eventPrefix: 'billing.transaction.' },
     });
-    expect(filterRequest({ ...emptyFilters, subjectType: 'billing.transaction' })).toEqual({
+    expect(filterRequest({ ...emptyFilters, subjectType: 'billing.transaction' }, subjectTypes)).toEqual({
       request: { subjectType: 'billing.transaction' },
     });
+  });
+  it('accepts plugin subject types from meta and falls back to the API shape', () => {
+    expect(filterRequest({ ...emptyFilters, subjectType: 'demo.device' }, ['demo.device'])).toEqual({
+      request: { subjectType: 'demo.device' },
+    });
+    expect(filterRequest({ ...emptyFilters, subjectType: 'demo.device' })).toEqual({
+      request: { subjectType: 'demo.device' },
+    });
+    expect(filterRequest({ ...emptyFilters, subjectType: 'Demo..Device' })).toEqual({ error: 'invalidSubjectType' });
+  });
+  it('exposes plugin-contributed domains and localized labels from meta only', () => {
+    const meta: AuditMetaDto = {
+      domains: [
+        { id: 'resource', source: 'core' },
+        { id: 'demo', source: 'plugin', labels: { en: 'Demo devices', de: 'Demo-Geräte' } },
+      ],
+      subjectTypes: ['resource', 'demo.device'],
+      actions: ['resource.updated', 'demo.publication'],
+    };
+    expect(pluginDomains(meta)).toEqual([{ id: 'demo', source: 'plugin', labels: { en: 'Demo devices', de: 'Demo-Geräte' } }]);
+    expect(pluginDomains(undefined)).toEqual([]);
+    expect(pluginDomainLabel(pluginDomains(meta)[0].labels, 'de')).toBe('Demo-Geräte');
+    expect(pluginDomainLabel(pluginDomains(meta)[0].labels, 'en')).toBe('Demo devices');
+    expect(pluginDomainLabel(undefined, 'en')).toBeUndefined();
+  });
+  it('toggles plugin domains through the disabled blocklist', () => {
+    expect(togglePluginDomain([], 'demo', false)).toEqual(['demo']);
+    expect(togglePluginDomain(['demo'], 'demo', false)).toEqual(['demo']);
+    expect(togglePluginDomain(['demo', 'other'], 'demo', true)).toEqual(['other']);
   });
   it('renders old malformed snapshots without dropping their recorded value', () => {
     expect(changes({ ...entry, details: { before: '{"truncated":', after: '{"valid":true}' } })).toEqual([
@@ -71,18 +113,18 @@ describe('audit export and filtering', () => {
       { field: 'valid', before: undefined, after: true },
     ]);
   });
-  it('compares the scalar before and after summaries emitted by WAGO', () => {
+  it('compares the scalar before and after summaries emitted by plugins', () => {
     expect(
       changes({
         ...entry,
         details: {
-          'before.logicalChannelCount': 2,
-          'after.logicalChannelCount': 3,
-          'before.physicalPointCount': 4,
-          'after.physicalPointCount': 4,
+          'before.channelCount': 2,
+          'after.channelCount': 3,
+          'before.pointCount': 4,
+          'after.pointCount': 4,
         },
       }),
-    ).toEqual([{ field: 'logicalChannelCount', before: 2, after: 3 }]);
+    ).toEqual([{ field: 'channelCount', before: 2, after: 3 }]);
   });
   it('shows explicitly recorded changed fields when snapshots are absent or partial', () => {
     expect(changes({ ...entry, details: { changedFields: '["name","enabled"]', 'after.enabled': 0 } })).toEqual([

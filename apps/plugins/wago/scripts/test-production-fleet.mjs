@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 // Fixture evidence only: real RabbitMQ and production code, no qualified hardware.
 // Every run owns one container, ephemeral loopback port, and temporary directory.
 const exec = promisify(execFile);
-const root = resolve(import.meta.dirname, '..');
+const root = resolve(import.meta.dirname, '../../../..');
 const temporary = await mkdtemp(join(tmpdir(), 'wago-production-fleet-'));
 const name = `wago-production-fleet-${randomUUID()}`;
 const owner = randomUUID();
@@ -92,7 +92,7 @@ try {
       [
         join(root, 'node_modules/jest/bin/jest.js'),
         '--config',
-        'scripts/test-wago-production-fleet.config.cjs',
+        'apps/plugins/wago/scripts/jest.production-fleet.config.cjs',
         '--runInBand',
       ],
       {

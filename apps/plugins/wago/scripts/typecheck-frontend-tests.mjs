@@ -14,14 +14,9 @@ const result = spawnSync(
 if (result.error) throw result.error;
 if (result.signal) throw new Error(`Frontend tsc terminated by ${result.signal}`);
 const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.replaceAll('\r\n', '\n');
-// Temporary, explicit owner boundary: these two invalid Testing Library options
-// are in the concurrently maintained commissioning modal. Every other diagnostic fails.
-const known = [108, 179].map(
-  (line, index) =>
-    `apps/plugins/wago/frontend/src/CommissioningModal.test.tsx(${line},${index === 0 ? 88 : 65}): error TS2769: No overload matches this call.\n` +
-    '  The last overload gave the following error.\n' +
-    "    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.\n",
-);
+// No diagnostic is whitelisted: the historical commissioning-modal baseline was
+// fixed at the source, so every TypeScript diagnostic in the test sources fails this gate.
+const known = [];
 let remaining = output;
 let count = 0;
 for (const diagnostic of known) {

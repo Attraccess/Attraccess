@@ -58,6 +58,7 @@ export const SETTING_KEYS = [
   'smtp.passwordChanged',
   'audit.enabled',
   'audit.domains',
+  'audit.plugin_domains_disabled',
   'audit.retention_days',
   'metrics.apiKeyConfigured',
   'metrics.slowQueryThresholdSeconds',

@@ -2,18 +2,19 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AuditEntryDto, AuditSettingsDto } from '@attraccess/react-query-client';
+import type { AuditEntryDto, AuditMetaDto, AuditSettingsDto } from '@attraccess/react-query-client';
 import { AuditLogSection } from './index';
 
-const { list, getSettings, updateSettings, permissions } = vi.hoisted(() => ({
+const { list, getMeta, getSettings, updateSettings, permissions } = vi.hoisted(() => ({
   list: vi.fn(),
+  getMeta: vi.fn(),
   getSettings: vi.fn(),
   updateSettings: vi.fn(),
   permissions: new Set<string>(),
 }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/react-query-client')>()),
-  AuditService: { auditControllerList: list },
+  AuditService: { auditControllerList: list, auditControllerMeta: getMeta },
   SettingsService: {
     settingsControllerGetAuditSettings: getSettings,
     settingsControllerUpdateAuditSettings: updateSettings,
@@ -24,6 +25,7 @@ vi.mock('../../../../hooks/useAuth', () => ({
 }));
 vi.mock('@attraccess/plugins-frontend-ui', () => ({
   useTranslations: ({ en }: { en: Record<string, unknown> }) => ({
+    language: 'en',
     t: (key: string) =>
       key
         .split('.')
@@ -55,7 +57,22 @@ const entry: AuditEntryDto = {
     scheduleId: 5,
   },
 };
-const settings: AuditSettingsDto = { enabled: true, domains: ['billing', 'resource', 'wago'], retention_days: 90 };
+const settings: AuditSettingsDto = {
+  enabled: true,
+  domains: ['billing', 'resource'],
+  plugin_domains_disabled: [],
+  retention_days: 90,
+};
+// Plugin domains come from the API meta endpoint; the UI never hardcodes one.
+const meta: AuditMetaDto = {
+  domains: [
+    { id: 'billing', source: 'core' },
+    { id: 'resource', source: 'core' },
+    { id: 'demo', source: 'plugin', labels: { en: 'Demo devices', de: 'Demo-Geräte' } },
+  ],
+  subjectTypes: ['resource', 'billing.transaction', 'demo.device'],
+  actions: ['resource.updated', 'demo.publication'],
+};
 let client: QueryClient;
 function mount() {
   client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } });
@@ -74,6 +91,7 @@ beforeEach(() => {
   permissions.add('system.audit.read');
   permissions.add('system.settings.manage');
   list.mockResolvedValue({ items: [entry], nextCursor: 51 });
+  getMeta.mockResolvedValue(meta);
   getSettings.mockResolvedValue(settings);
   updateSettings.mockImplementation(async ({ requestBody }) => requestBody);
 });
@@ -155,13 +173,15 @@ describe('audit admin workflows', () => {
     );
   });
 
-  it('preserves other domains when WAGO is switched off, saves and displays persisted settings', async () => {
+  it('preserves other domains when a plugin domain is switched off, saves and displays persisted settings', async () => {
     mount();
     await userEvent.click(await screen.findByRole('tab', { name: 'Logging settings' }));
-    await userEvent.click(await screen.findByRole('switch', { name: 'WAGO controllers' }));
+    await userEvent.click(await screen.findByRole('switch', { name: 'Demo devices' }));
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() =>
-      expect(updateSettings).toHaveBeenCalledWith({ requestBody: { ...settings, domains: ['billing', 'resource'] } }),
+      expect(updateSettings).toHaveBeenCalledWith({
+        requestBody: { ...settings, plugin_domains_disabled: ['demo'] },
+      }),
     );
     expect(await screen.findByText('Logging settings saved.')).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Billing' })).toBeChecked();
@@ -172,12 +192,12 @@ describe('audit admin workflows', () => {
     updateSettings.mockRejectedValue(new Error('offline'));
     mount();
     await userEvent.click(await screen.findByRole('tab', { name: 'Logging settings' }));
-    await userEvent.click(await screen.findByRole('switch', { name: 'WAGO controllers' }));
+    await userEvent.click(await screen.findByRole('switch', { name: 'Demo devices' }));
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(
       await screen.findByText('Settings could not be saved. Your changes are still available.'),
     ).toBeInTheDocument();
-    expect(screen.getByRole('switch', { name: 'WAGO controllers' })).not.toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Demo devices' })).not.toBeChecked();
     expect(screen.getByRole('button', { name: 'Discard' })).toBeInTheDocument();
   });
 

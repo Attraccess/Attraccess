@@ -3,13 +3,20 @@ import { Auth } from '@attraccess/plugins-backend-sdk';
 import { ApiExtraModels, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { AuditService } from './audit.service';
 import { AuditQueryDto } from './audit-query.dto';
-import { AuditPageDto } from './audit-response.dto';
+import { AuditMetaDto, AuditPageDto } from './audit-response.dto';
 
 @ApiTags('Audit')
 @ApiExtraModels(AuditQueryDto)
 @Controller('admin/audit-log')
 export class AuditController {
   constructor(private readonly audit: AuditService) {}
+
+  @Get('meta')
+  @Auth('system.audit.read')
+  @ApiOkResponse({ type: AuditMetaDto })
+  meta(): AuditMetaDto {
+    return this.audit.meta();
+  }
 
   @Get()
   @Auth('system.audit.read')

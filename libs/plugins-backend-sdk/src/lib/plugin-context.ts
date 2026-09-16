@@ -6,7 +6,7 @@ import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscri
 import type { PluginEntityClass } from './entity';
 import type { MqttCredentialProvisioningProviderFactory } from './mqtt-credential-provisioning';
 import type { MqttCredentialProvisioningHostProvider } from './mqtt-credential-provisioning';
-import type { PluginAuditContext } from './plugin-audit';
+import type { PluginAuditContext, PluginAuditDomainDeclaration } from './plugin-audit';
 
 /**
  * DI token under which a plugin's own services can inject the PluginContext.
@@ -205,6 +205,16 @@ export interface PluginBackendModule {
    * Type naming convention: "plugin.<pluginName>.<nodeName>".
    */
   flowNodes?: PluginFlowNodeDefinition[] | ((context: PluginContext) => PluginFlowNodeDefinition[]);
+
+  /**
+   * Optional audit domains this plugin contributes. The host registers the
+   * declarations at load time and enforces them on every event the plugin
+   * records through {@link PluginContext.audit}: only declared actions, subject
+   * types and detail fields are accepted, and events are stored under the
+   * declared domain. Domains must not collide with host domains or with other
+   * plugins. No extra permission is required.
+   */
+  auditDomains?: PluginAuditDomainDeclaration[] | ((context: PluginContext) => PluginAuditDomainDeclaration[]);
 
   /** Optional broker credential provider offered to other integrations by this plugin. */
   credentialProvisioningProvider?: MqttCredentialProvisioningProviderFactory;

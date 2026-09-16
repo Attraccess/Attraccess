@@ -25,7 +25,7 @@ describe('management TLS with an isolated loopback CA', () => {
   };
 
   beforeAll(async () => {
-    directory = mkdtempSync(join(tmpdir(), 'wago-management-tls-'));
+    directory = mkdtempSync(join(tmpdir(), 'rabbitmq-management-tls-'));
     execFileSync(
       'openssl',
       [

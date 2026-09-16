@@ -10,7 +10,7 @@
       "cache": false,
       "dependsOn": ["typecheck-acceptance", "test-production-fleet-cleanup"],
       "options": {
-        "command": "node scripts/test-wago-production-fleet.mjs"
+        "command": "node apps/plugins/wago/scripts/test-production-fleet.mjs"
       }
     },
     "typecheck-acceptance": {
@@ -22,7 +22,7 @@
     "test-production-fleet-cleanup": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "node --test scripts/test-wago-production-fleet.test.mjs"
+        "command": "node --test apps/plugins/wago/scripts/test-production-fleet.test.mjs"
       }
     },
     "typecheck": {
@@ -157,8 +157,9 @@
           "node apps/plugins/wago/cc100-runtime/integration/run.mjs",
           "pnpm nx run plugin-wago:production-fleet",
           "pnpm nx run plugin-wago:test-commissioning-acceptance",
+          "pnpm nx run plugin-wago:e2e",
           "bash apps/plugins/wago/frontend/tests/run_browser_tests.sh",
-          "node --test scripts/check-wago-acceptance.test.mjs"
+          "node --test apps/plugins/wago/scripts/check-acceptance.test.mjs"
         ],
         "parallel": false
       }
@@ -173,10 +174,18 @@
       "executor": "nx:run-commands",
       "options": {
         "commands": [
-          "node --test scripts/typecheck-wago-frontend-tests.test.mjs",
-          "node scripts/typecheck-wago-frontend-tests.mjs"
+          "node --test apps/plugins/wago/scripts/typecheck-frontend-tests.test.mjs",
+          "node apps/plugins/wago/scripts/typecheck-frontend-tests.mjs"
         ],
         "parallel": false
+      }
+    },
+    "e2e": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["typecheck-acceptance"],
+      "options": {
+        "command": "pnpm exec jest --config apps/plugins/wago/scripts/jest.audit-hooks.config.cjs --runInBand"
       }
     },
     "test-commissioning-acceptance": {
@@ -185,9 +194,9 @@
       "dependsOn": ["typecheck-acceptance", "typecheck-frontend-tests"],
       "options": {
         "commands": [
-          "pnpm exec jest --config scripts/test-wago-commissioning.config.cjs --runInBand",
+          "pnpm exec jest --config apps/plugins/wago/scripts/jest.commissioning.config.cjs --runInBand",
           "pnpm exec vite build --config apps/plugins/wago/frontend/tests/commissioning-harness/vite.config.mts",
-          "pnpm exec jest --config scripts/test-wago-commissioning-browser.config.cjs --runInBand"
+          "pnpm exec jest --config apps/plugins/wago/scripts/jest.commissioning-browser.config.cjs --runInBand"
         ],
         "parallel": false
       }

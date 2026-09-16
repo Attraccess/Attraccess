@@ -140,15 +140,15 @@ const seedDatabase = async (dataSource: DataSource) => {
 
   await ensureEntity(dataSource.getRepository(AuditLog), () => ({
     at: new Date(),
-    domain: 'wago',
+    domain: 'demo',
     pluginId: 'abcdefghijklmnopqrstu',
-    action: 'wago.publication',
+    action: 'demo.publication',
     operationId: '00000000-0000-4000-8000-000000000001',
     actorId: primaryUser.id,
     authenticationMethod: 'session',
     apiTokenId: null,
     outcome: 'succeeded',
-    subjectType: 'wago.controller',
+    subjectType: 'demo.device',
     subjectId: 7,
     details: { revision: 1 },
   }));

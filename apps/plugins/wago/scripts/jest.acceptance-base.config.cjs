@@ -1,10 +1,10 @@
+// Shared base for the WAGO acceptance jest configs. rootDir is the workspace root
+// so specs can compose host (apps/api) and plugin sources.
 module.exports = {
-  displayName: 'production-fleet-fixture',
-  rootDir: '..',
+  rootDir: '../../../..',
   testEnvironment: 'node',
   // Crawl source packages, not duplicate manifests restored in Nx/build artifacts.
   roots: ['<rootDir>/apps', '<rootDir>/libs'],
-  testMatch: ['<rootDir>/apps/plugins/wago/acceptance/production-fleet*.spec.ts'],
   modulePathIgnorePatterns: [
     '<rootDir>/(?:[.]nx|dist|build|output|coverage)/',
     '<rootDir>/apps/plugins/[^/]+/package/',

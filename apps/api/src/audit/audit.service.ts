@@ -10,13 +10,12 @@ import {
 } from 'typeorm';
 import { AuditLog } from '@attraccess/database-entities';
 import { PluginAuditEvent, PluginAuditHostProvider, PluginAuditReceipt } from '@attraccess/plugins-backend-sdk';
-import { readAuditSettings } from './audit.config';
+import { AuditSettings, readAuditSettings } from './audit.config';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import {
   AttractapAuditEvent,
   IdentityAuditEvent,
   ProjectAuditEvent,
-  projectAuditEvent,
   projectAttractapAuditEvent,
   projectIdentityAuditEvent,
   projectProjectAuditEvent,
@@ -25,6 +24,11 @@ import {
   ResourceAuditEvent,
   SsoAuditEvent,
 } from './audit-policy';
+import { projectPluginAuditEvent } from './plugin-audit-policy';
+import { getPluginAuditDomain, getRegisteredPluginAuditDomains } from '../plugin-system/plugin-audit-registry';
+import { CORE_AUDIT_DOMAINS } from './audit-domains';
+import { knownAuditActions, knownSubjectTypes } from './audit-vocabulary';
+import { AuditMetaDto } from './audit-response.dto';
 import { AuditQueryDto } from './audit-query.dto';
 import { randomUUID } from 'crypto';
 import { auditEntriesWithLabels } from './audit-labels';
@@ -110,24 +114,25 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     if (storage?.isInitialized) await storage.destroy().catch(() => undefined);
   }
 
+  /** Host bridge for plugin audit events: validated against the recording plugin's registered domain declaration. */
   async record(event: PluginAuditEvent & { pluginId: string }): Promise<PluginAuditReceipt> {
     try {
-      const snapshot = projectAuditEvent(event);
+      const snapshot = projectPluginAuditEvent(event);
       if (!snapshot) return { status: 'unavailable' };
       return await this.recordSnapshot({
-        domain: 'wago',
+        domain: snapshot.domain,
         pluginId: snapshot.pluginId,
         action: snapshot.action,
         operationId: snapshot.operationId,
-        actorId: snapshot.principal.userId,
-        authenticationMethod: snapshot.principal.authenticationMethod,
-        apiTokenId: snapshot.principal.apiTokenId ?? null,
+        actorId: snapshot.actorId,
+        authenticationMethod: snapshot.authenticationMethod,
+        apiTokenId: snapshot.apiTokenId ?? null,
         outcome: snapshot.outcome,
-        subjectType: snapshot.subject.type,
-        subjectId: snapshot.subject.id,
+        subjectType: snapshot.subjectType,
+        subjectId: snapshot.subjectId,
         ipAddress: null,
         userAgent: null,
-        details: snapshot.details as Record<string, string | number>,
+        details: snapshot.details,
       });
     } catch {
       // Never log the event, SQLite parameters, or exception (may contain secrets).
@@ -386,6 +391,13 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     return (queryRunner as QueryRunner & { transactionDepth: number }).transactionDepth;
   }
 
+  /** Core domains follow the configured allowlist; plugin domains record while registered unless explicitly disabled. */
+  private domainEnabled(config: AuditSettings, domain: string): boolean {
+    return getPluginAuditDomain(domain) !== undefined
+      ? !config.plugin_domains_disabled.includes(domain)
+      : (config.domains as readonly string[]).includes(domain);
+  }
+
   private async recordSnapshot(
     event: Omit<AuditLog, 'id' | 'at'>,
     finalSettingsChange = false,
@@ -395,14 +407,7 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     this.pending++;
     try {
       const config = await readAuditSettings(this.settings);
-      if (
-        (!finalSettingsChange &&
-          (!config.enabled ||
-            !config.domains.includes(
-              event.domain as 'administration' | 'attractap' | 'billing' | 'identity' | 'resource' | 'sso' | 'wago',
-            ))) ||
-        this.stopping
-      )
+      if ((!finalSettingsChange && (!config.enabled || !this.domainEnabled(config, event.domain))) || this.stopping)
         return { status: 'unavailable' };
       const unavailable = await this.serializeStorageWrite<PluginAuditReceipt | undefined>(async () => {
         if (this.contended) {
@@ -491,6 +496,22 @@ export class AuditService implements PluginAuditHostProvider, EntitySubscriberIn
     } finally {
       this.cleaning = false;
     }
+  }
+
+  /** Current audit filter vocabulary: core values plus contributions from loaded plugins. */
+  meta(): AuditMetaDto {
+    return {
+      domains: [
+        ...CORE_AUDIT_DOMAINS.map((id) => ({ id, source: 'core' as const })),
+        ...getRegisteredPluginAuditDomains().map(({ domain, labels }) => ({
+          id: domain,
+          source: 'plugin' as const,
+          labels: { ...labels },
+        })),
+      ],
+      subjectTypes: knownSubjectTypes(),
+      actions: knownAuditActions(),
+    };
   }
 
   async list(query: AuditQueryDto) {

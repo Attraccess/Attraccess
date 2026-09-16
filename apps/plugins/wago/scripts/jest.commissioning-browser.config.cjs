@@ -1,4 +1,4 @@
-const base = require('./test-wago-commissioning.config.cjs');
+const base = require('./jest.commissioning.config.cjs');
 module.exports = {
   ...base,
   displayName: 'commissioning-browser-acceptance',
