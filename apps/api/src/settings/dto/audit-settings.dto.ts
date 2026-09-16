@@ -10,7 +10,7 @@ export class AuditSettingsDto {
   @ApiProperty({
     enum: CORE_AUDIT_DOMAINS,
     isArray: true,
-    default: ['administration', 'attractap', 'identity', 'project', 'resource'],
+    default: ['administration', 'attractap', 'identity', 'project', 'resource', 'sso'],
   })
   @IsArray()
   @ArrayMaxSize(CORE_AUDIT_DOMAINS.length)

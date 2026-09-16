@@ -48,18 +48,15 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
 vi.mock('../../../../hooks/useAuth', () => ({
   useAuth: () => ({ hasPermission: (permission: string) => permissions.has(permission) }),
 }));
-vi.mock('@attraccess/plugins-frontend-ui', () => ({
-  useTranslations: ({ en }: { en: Record<string, unknown> }) => ({
-    language: 'en',
-    t: (key: string) =>
-      key
-        .split('.')
-        .reduce<unknown>(
-          (value, part) => (value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined),
-          en,
-        ) ?? key,
-  }),
-}));
+vi.mock('@attraccess/plugins-frontend-ui', async () => {
+  const { get } = await import('lodash-es');
+  return {
+    useTranslations: ({ en }: { en: Record<string, unknown> }) => ({
+      language: 'en',
+      t: (key: string) => get(en, key, key),
+    }),
+  };
+});
 
 const entry: AuditEntryDto = {
   id: 52,
@@ -126,6 +123,36 @@ afterEach(() => {
 });
 
 describe('audit admin workflows', () => {
+  it('shows localized settings and preserves API-token and request provenance in the details', async () => {
+    list.mockResolvedValue({
+      items: [
+        {
+          ...entry,
+          domain: 'administration',
+          action: 'settings.updated',
+          subjectType: 'setting',
+          subjectId: 123456,
+          authenticationMethod: 'api-token',
+          apiTokenId: 19,
+          ipAddress: '192.0.2.7',
+          userAgent: 'Audit verification client',
+          details: { settingKey: 'audit.enabled', before: 'true', after: 'false' },
+        },
+      ],
+      nextCursor: null,
+    });
+    mount();
+    await userEvent.click(await screen.findByRole('button', { name: 'View event #52' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Audit logging')).toBeInTheDocument();
+    expect(within(dialog).getByText('settings.updated')).toBeInTheDocument();
+    expect(within(dialog).getByText('setting #123456')).toBeInTheDocument();
+    expect(within(dialog).getByText('api-token')).toBeInTheDocument();
+    expect(within(dialog).getByText('#19')).toBeInTheDocument();
+    expect(within(dialog).getByText('192.0.2.7')).toBeInTheDocument();
+    expect(within(dialog).getByText('Audit verification client')).toBeInTheDocument();
+    expect(within(dialog).getByText('audit.enabled')).toBeInTheDocument();
+  });
   it('explains missing snapshots and preserves changed-field metadata', async () => {
     list.mockResolvedValue({ items: [{ ...entry, details: { changedFields: '["password"]' } }], nextCursor: null });
     mount();
@@ -133,7 +160,8 @@ describe('audit admin workflows', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Password')).toBeInTheDocument();
     expect(within(dialog).getAllByText('Not recorded')).toHaveLength(2);
-    expect(within(dialog).getByText('["password"]')).toBeInTheDocument();
+    const changedFields = within(dialog).getByText(/\[\s*"password"\s*\]/);
+    expect(JSON.parse(changedFields.textContent ?? '')).toEqual(['password']);
   });
   it('keeps malformed change metadata visible and identifies current names in the event details', async () => {
     list.mockResolvedValue({
