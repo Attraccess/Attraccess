@@ -74,6 +74,7 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
   let runtime: WagoRuntime;
   let backend: WagoService;
   let flow: WagoFlowService;
+  let flowBinding: { onModuleDestroy(): void } | undefined;
   let deviceClient: MqttClient;
   let backendClient: MqttClient;
   let observer: MqttClient;
@@ -103,7 +104,7 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
     const url = process.env.WAGO_FLEET_MQTT_URL;
     if (!temporary || !url || !/^mqtt:\/\/127\.0\.0\.1:\d+$/.test(url))
       throw new Error(
-        'Run node scripts/test-wago-production-fleet.mjs; only a runner-owned loopback broker is allowed',
+        'Run node apps/plugins/wago/scripts/test-production-fleet.mjs; only a runner-owned loopback broker is allowed',
       );
     jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
@@ -315,13 +316,21 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
       flows: { trigger: (type, matches, payload) => executor.triggerPluginFlows('wago', type, matches, payload) },
     } as unknown as PluginContext;
     backend = new WagoService(context);
+    flow = new WagoFlowService(context);
     const module = plugin.register(context);
-    const provider = (module.providers ?? []).find(
-      (provider) => typeof provider === 'object' && 'provide' in provider && provider.provide === WagoFlowService,
+    // The plugin binds its flow node factories through the 'wago-flow-services' factory
+    // provider when Nest initialises the module. Invoke it the same way with the real
+    // service instances so plugin.flowNodes(context) resolves against the production graph.
+    const binding = (module.providers ?? []).find(
+      (provider) => typeof provider === 'object' && 'provide' in provider && provider.provide === 'wago-flow-services',
     );
-    if (!provider || typeof provider !== 'object' || !('useValue' in provider))
-      throw new Error('Missing production flow provider');
-    flow = provider.useValue;
+    if (!binding || typeof binding !== 'object' || !('useFactory' in binding))
+      throw new Error('Missing production flow services binding');
+    const bound = (binding.useFactory as (command: WagoService, state: WagoFlowService) => { onModuleDestroy(): void })(
+      backend,
+      flow,
+    );
+    flowBinding = bound;
     if (typeof plugin.flowNodes !== 'function') throw new Error('Missing production node factory');
     registerPluginFlowNodes('wago', plugin.flowNodes(context));
     // Only host persistence for the saved graph and unrelated application services
@@ -404,6 +413,8 @@ describe('production fleet acceptance — RabbitMQ / packed-register / Modbus TC
     await heldAcknowledgement?.release();
     flow?.onModuleDestroy();
     backend?.onModuleDestroy();
+    flowBinding?.onModuleDestroy();
+    flowBinding = undefined;
     await Promise.all([deviceClient, backendClient, observer].filter(Boolean).map((client) => client.endAsync(true)));
     for (const socket of sockets) socket.destroy();
     if (server) await new Promise<void>((resolve) => server.close(() => resolve()));

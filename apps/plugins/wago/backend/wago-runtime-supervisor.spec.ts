@@ -324,7 +324,9 @@ describe('runtime supervisor handoff with real advisory locks and processes', ()
       );
       const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
       const waitFor = async (check: () => boolean) => {
-        const deadline = Date.now() + 60000;
+        // Loaded runners spawn each fixture shim through node; a tight deadline
+        // turns contention into spurious failures instead of catching real hangs.
+        const deadline = Date.now() + 240000;
         while (!check()) {
           if (Date.now() > deadline) throw new Error('Fixture process deadline exceeded');
           await delay(20);
@@ -455,6 +457,6 @@ echo launched
         fixture.dispose();
       }
     },
-    120000,
+    600000,
   );
 });

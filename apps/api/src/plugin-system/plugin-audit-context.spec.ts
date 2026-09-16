@@ -3,9 +3,9 @@ import { createPluginAuditContext } from './plugin-audit-context';
 
 describe('plugin audit host bridge', () => {
   const event: PluginAuditEvent = {
-    action: 'wago.claim', operationId: 'operation-id', outcome: 'succeeded',
+    action: 'demo.claim', operationId: 'operation-id', outcome: 'succeeded',
     principal: { userId: 7, authenticationMethod: 'session' },
-    subject: { type: 'wago.controller', id: 2 }, details: {},
+    subject: { type: 'demo.device', id: 2 }, details: {},
   };
 
   it('uses the host manifest identity and returns the durable sink receipt', async () => {

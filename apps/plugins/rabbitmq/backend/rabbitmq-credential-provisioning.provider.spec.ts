@@ -36,7 +36,7 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
       provider.provision({
         mqttServerId: 4,
         identity: 'controller-a',
-        username: 'wago-controller-a',
+        username: 'device-controller-a',
         vhost: '/',
         topicPolicy: { publish: ['devices/controller-a/#/state'], subscribe: [] },
       }),
@@ -50,7 +50,7 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
       provider.provision({
         mqttServerId: 4,
         identity: 'controller-a',
-        username: 'wago-controller-a',
+        username: 'device-controller-a',
         vhost: '/',
         topicPolicy: { publish: ['devices/controller.a/reported'], subscribe: [] },
       }),
@@ -64,10 +64,10 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
       .mockRejectedValue(new HttpException('not found', HttpStatus.NOT_FOUND));
 
     await expect(
-      provider.revoke({ mqttServerId: 4, identity: 'controller-a', username: 'wago-controller-a', vhost: '/' }),
+      provider.revoke({ mqttServerId: 4, identity: 'controller-a', username: 'device-controller-a', vhost: '/' }),
     ).resolves.toBeUndefined();
 
-    expect(request).toHaveBeenCalledWith(expect.anything(), 'DELETE', '/users/wago-controller-a');
+    expect(request).toHaveBeenCalledWith(expect.anything(), 'DELETE', '/users/device-controller-a');
   });
 
   it('creates user, vhost, and topic permissions and returns the password only to the caller', async () => {
@@ -81,22 +81,22 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
     const credential = await provider.provision({
       mqttServerId: 4,
       identity: 'controller-a',
-      username: 'wago-controller-a',
+      username: 'device-controller-a',
       vhost: '/',
       topicPolicy: { publish: ['devices/controller-a/reported/#'], subscribe: ['devices/controller-a/desired/#'] },
     });
 
-    expect(credential).toMatchObject({ identity: 'controller-a', username: 'wago-controller-a', vhost: '/' });
+    expect(credential).toMatchObject({ identity: 'controller-a', username: 'device-controller-a', vhost: '/' });
     expect(credential.password).toEqual(expect.any(String));
     expect(request).toHaveBeenNthCalledWith(3, expect.anything(), 'PUT', '/vhosts/%2F');
     expect(request).toHaveBeenNthCalledWith(
       4,
       expect.anything(),
       'PUT',
-      '/users/wago-controller-a',
+      '/users/device-controller-a',
       expect.objectContaining({ password: credential.password }),
     );
-    expect(request).toHaveBeenNthCalledWith(6, expect.anything(), 'PUT', '/topic-permissions/%2F/wago-controller-a', {
+    expect(request).toHaveBeenNthCalledWith(6, expect.anything(), 'PUT', '/topic-permissions/%2F/device-controller-a', {
       exchange: 'amq.topic',
       write: '^(?:devices\\.controller-a\\.reported(?:\\..*)?)$',
       read: '^(?:devices\\.controller-a\\.desired(?:\\..*)?)$',
@@ -120,18 +120,18 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
       provider.rotate({
         mqttServerId: 4,
         identity: 'controller-a',
-        username: 'wago-controller-a',
+        username: 'device-controller-a',
         vhost: '/',
         topicPolicy: { publish: ['devices/controller-a/reported/#'], subscribe: ['devices/controller-a/desired/#'] },
       }),
     ).rejects.toThrow('topic permissions failed');
 
-    expect(request).toHaveBeenNthCalledWith(8, expect.anything(), 'PUT', '/permissions/%2F/wago-controller-a', {
+    expect(request).toHaveBeenNthCalledWith(8, expect.anything(), 'PUT', '/permissions/%2F/device-controller-a', {
       configure: '^old$',
       write: '^old$',
       read: '^old$',
     });
-    expect(request).toHaveBeenNthCalledWith(9, expect.anything(), 'PUT', '/topic-permissions/%2F/wago-controller-a', {
+    expect(request).toHaveBeenNthCalledWith(9, expect.anything(), 'PUT', '/topic-permissions/%2F/device-controller-a', {
       exchange: 'amq.topic',
       write: '^old-write$',
       read: '^old-read$',
@@ -156,13 +156,13 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
       provider.rotate({
         mqttServerId: 4,
         identity: 'controller-a',
-        username: 'wago-controller-a',
+        username: 'device-controller-a',
         vhost: '/',
         topicPolicy: { publish: ['devices/controller-a/reported/#'], subscribe: ['devices/controller-a/desired/#'] },
       }),
     ).rejects.toThrow('rollback was incomplete');
 
-    expect(request).toHaveBeenNthCalledWith(9, expect.anything(), 'PUT', '/topic-permissions/%2F/wago-controller-a', {
+    expect(request).toHaveBeenNthCalledWith(9, expect.anything(), 'PUT', '/topic-permissions/%2F/device-controller-a', {
       exchange: 'amq.topic',
       write: '^old-write$',
       read: '^old-read$',
@@ -184,13 +184,13 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
       provider.provision({
         mqttServerId: 4,
         identity: 'controller-a',
-        username: 'wago-controller-a',
+        username: 'device-controller-a',
         vhost: '/',
         topicPolicy: { publish: ['devices/controller-a/reported/#'], subscribe: ['devices/controller-a/desired/#'] },
       }),
     ).rejects.toThrow('permissions failed');
 
-    expect(request).toHaveBeenNthCalledWith(6, expect.anything(), 'DELETE', '/users/wago-controller-a');
+    expect(request).toHaveBeenNthCalledWith(6, expect.anything(), 'DELETE', '/users/device-controller-a');
     expect(request).toHaveBeenNthCalledWith(7, expect.anything(), 'DELETE', '/vhosts/%2F');
   });
 
@@ -199,7 +199,7 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
     const credential = {
       providerId: 'rabbitmq',
       identity: 'controller-a',
-      username: 'wago-controller-a',
+      username: 'device-controller-a',
       vhost: '/',
       password: 'generated',
     };
@@ -219,7 +219,7 @@ describe('RabbitmqCredentialProvisioningProvider', () => {
     const request = {
       mqttServerId: 4,
       identity: 'controller-a',
-      username: 'wago-controller-a',
+      username: 'device-controller-a',
       vhost: '/',
       topicPolicy: { publish: ['devices/controller-a/reported/#'], subscribe: [] },
     };

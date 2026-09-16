@@ -81,7 +81,7 @@ export function checkWagoAcceptance(evidence) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    if (process.argv.length !== 3) throw new Error('Usage: node scripts/check-wago-acceptance.mjs <evidence.json>');
+    if (process.argv.length !== 3) throw new Error('Usage: node apps/plugins/wago/scripts/check-acceptance.mjs <evidence.json>');
     const errors = checkWagoAcceptance(JSON.parse(readFileSync(process.argv[2], 'utf8')));
     if (errors.length) {
       console.error(['WAGO evidence incomplete:', ...errors.map((error) => `- ${error}`)].join('\n'));
@@ -90,7 +90,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       console.log('Evidence fields complete. Human review of linked hardware/user/audit evidence is still required. No release was published.');
     }
   } catch {
-    console.error('Could not validate evidence. Supply one readable JSON file: node scripts/check-wago-acceptance.mjs <evidence.json>');
+    console.error('Could not validate evidence. Supply one readable JSON file: node apps/plugins/wago/scripts/check-acceptance.mjs <evidence.json>');
     process.exitCode = 1;
   }
 }

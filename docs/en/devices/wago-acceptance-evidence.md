@@ -18,7 +18,7 @@ For each required check, record the observed behavior and link a timestamped rec
 
 ## Required Evidence
 
-The offline completeness checker exports the authoritative list as `requiredChecks` in `scripts/check-wago-acceptance.mjs`. It includes commissioning/hardening, permanent enrollment/revocation, visual digital I/O and Modbus, configuration readiness, first flow with acknowledgement, packed-bit independence and concurrent outputs, restart/reboot, rejection/rollback, expired/duplicate commands, operational policies/guards, interrupted commissioning and credential recovery, re-enrollment, Modbus failure and stale waits, desktop/mobile, shared conformance, and audit redaction.
+The offline completeness checker exports the authoritative list as `requiredChecks` in `apps/plugins/wago/scripts/check-acceptance.mjs`. It includes commissioning/hardening, permanent enrollment/revocation, visual digital I/O and Modbus, configuration readiness, first flow with acknowledgement, packed-bit independence and concurrent outputs, restart/reboot, rejection/rollback, expired/duplicate commands, operational policies/guards, interrupted commissioning and credential recovery, re-enrollment, Modbus failure and stale waits, desktop/mobile, shared conformance, and audit redaction.
 
 For the current guided deployment, restart/reboot and interrupted-installation
 evidence must exercise the host gate with Docker restart policy `no`: CODESYS
@@ -51,8 +51,8 @@ Retain one JSON evidence record outside the source tree with these fields:
 Release engineers, not the operator participant, can run the offline check:
 
 ```sh
-node --test scripts/check-wago-acceptance.test.mjs
-node scripts/check-wago-acceptance.mjs /path/to/reviewed-evidence.json
+node --test apps/plugins/wago/scripts/check-acceptance.test.mjs
+node apps/plugins/wago/scripts/check-acceptance.mjs /path/to/reviewed-evidence.json
 ```
 
 The checker never connects to hardware, changes Linear, signs artifacts or publishes anything. Its tests use synthetic fixtures and are not ATT-984 hardware evidence. A successful result means required fields are present, **not** that the observations are true or the release is authorized. A human reviewer must inspect every linked artifact, verify matching builds and resolve participant obstacles before approving the gate.

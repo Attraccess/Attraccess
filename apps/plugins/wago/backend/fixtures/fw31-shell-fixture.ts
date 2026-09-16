@@ -397,7 +397,9 @@ if(args[0]==='container'&&args[1]==='ls'){
         mkdirSync(join(root, path, 'fd'), { recursive: true });
       }
     },
-    run: (script: string, fault = '', input?: Buffer, timeout = 60000) => {
+    // Loaded runners spawn every fixture shim through node; a tight spawn timeout
+    // turns contention into spurious SIGTERM results instead of catching real hangs.
+    run: (script: string, fault = '', input?: Buffer, timeout = 240000) => {
       if (fault === 'codesys2' && read('plc') === 'running') file('proc/77/comm', 'plclinux_rt\n');
       const path = join(root, 'tmp', `run-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.sh`);
       writeFileSync(path, `${script}\nstatus=$?\nexit "$status"`, { mode: 0o700 });

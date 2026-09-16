@@ -5,20 +5,21 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
-const baseline = [
-  'apps/plugins/wago/frontend/src/CommissioningModal.test.tsx(108,88): error TS2769: No overload matches this call.',
-  'apps/plugins/wago/frontend/src/CommissioningModal.test.tsx(179,65): error TS2769: No overload matches this call.',
-].map((line) => `${line}\n  The last overload gave the following error.\n` +
-  "    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.\n").join('');
+const sample = 'apps/plugins/wago/frontend/src/example.spec.tsx(1,1): error TS2322: Type mismatch.\n';
+// The historical whitelisted commissioning-modal diagnostic; it must no longer be accepted.
+const historicalBaseline =
+  'apps/plugins/wago/frontend/src/CommissioningModal.test.tsx(108,88): error TS2769: No overload matches this call.\n' +
+  '  The last overload gave the following error.\n' +
+  "    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.\n";
 const warning = 'WARN Issue while reading fixture .npmrc. Failed to replace env in config: ${NODE_AUTH_TOKEN}\n';
 
 // Exercise the real wrapper against a local compiler fixture, with no package
 // manager, repository config, credentials, or network involved.
-async function runCompilerFixture({ stdout = baseline, stderr = '', status = 1 } = {}) {
+async function runCompilerFixture({ stdout = sample, stderr = '', status = 1 } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'wago-typecheck-test-'));
   try {
     const script = join(directory, 'typecheck.mjs');
-    await copyFile(new URL('./typecheck-wago-frontend-tests.mjs', import.meta.url), script);
+    await copyFile(new URL('./typecheck-frontend-tests.mjs', import.meta.url), script);
     const compilerDirectory = join(directory, 'node_modules/typescript/bin');
     await mkdir(compilerDirectory, { recursive: true });
     await writeFile(join(compilerDirectory, '../package.json'), JSON.stringify({
@@ -56,22 +57,14 @@ async function runCompilerFixture({ stdout = baseline, stderr = '', status = 1 }
   }
 }
 
-test('accepts exactly the two baseline errors without invoking the warning-producing package manager', async () => {
+test('rejects any TypeScript diagnostic without invoking the warning-producing package manager', async () => {
   const result = await runCompilerFixture();
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stderr, '');
-  assert.equal(result.stdout, 'Raw frontend test tsc exit: 1; commissioning baseline accepted 2 known diagnostics and no others.\n' + baseline);
-});
-
-test('rejects a new TypeScript diagnostic alongside the baseline', async () => {
-  const stdout = baseline + 'frontend/new.ts(1,1): error TS2322: Type mismatch.\n';
-  const result = await runCompilerFixture({ stdout });
   assert.equal(result.status, 1);
-  assert.equal(result.stderr, stdout);
+  assert.equal(result.stderr, sample);
 });
 
-test('rejects a changed commissioning diagnostic', async () => {
-  const stdout = baseline.replace('(108,88)', '(109,88)');
+test('no longer whitelists the historical commissioning-modal diagnostic', async () => {
+  const stdout = historicalBaseline + sample;
   const result = await runCompilerFixture({ stdout });
   assert.equal(result.status, 1);
   assert.equal(result.stderr, stdout);
@@ -80,7 +73,7 @@ test('rejects a changed commissioning diagnostic', async () => {
 test('does not whitelist package-manager warnings if they appear in compiler output', async () => {
   const result = await runCompilerFixture({ stderr: warning });
   assert.equal(result.status, 1);
-  assert.equal(result.stderr, baseline + warning);
+  assert.equal(result.stderr, sample + warning);
 });
 
 test('accepts a successful compiler with no diagnostics', async () => {

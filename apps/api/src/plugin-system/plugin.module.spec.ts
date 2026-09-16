@@ -200,9 +200,9 @@ describe('PluginModule', () => {
         token === PLUGIN_AUDIT_HOST_PROVIDER ? { record } : undefined,
       );
       await expect(build([]).audit.record({
-        action: 'wago.claim', operationId: 'operation-id', outcome: 'succeeded',
+        action: 'demo.claim', operationId: 'operation-id', outcome: 'succeeded',
         principal: { userId: 7, authenticationMethod: 'session' },
-        subject: { type: 'wago.controller', id: 2 }, details: {},
+        subject: { type: 'demo.device', id: 2 }, details: {},
       })).resolves.toEqual({ status: 'recorded' });
       expect(record).toHaveBeenCalledWith(expect.objectContaining({ pluginId: 'plugin-id' }));
       expect(moduleRef.get).toHaveBeenCalledWith(PLUGIN_AUDIT_HOST_PROVIDER, { strict: false });

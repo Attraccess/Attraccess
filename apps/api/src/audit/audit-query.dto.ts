@@ -1,54 +1,97 @@
-import { ADMINISTRATION_AUDIT_ACTIONS } from './audit-administration-policy';
 import { Type } from 'class-transformer';
-import { IsISO8601, IsString, Matches, MaxLength, IsIn, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import {
+  IsISO8601,
+  IsString,
+  Matches,
+  MaxLength,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsUUID,
+  Max,
+  Min,
+  registerDecorator,
+  ValidationArguments,
+  ValidationOptions,
+} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { ATTRACTAP_AUDIT_ACTIONS, AUDIT_ACTIONS, IDENTITY_AUDIT_ACTIONS, RESOURCE_AUDIT_ACTIONS } from './audit-policy';
-
-const SSO_AUDIT_ACTIONS = [
-  'sso.provider.created',
-  'sso.provider.updated',
-  'sso.provider.deleted',
-  'sso.provisioning.sessions_revoked',
-  'sso.provisioning.user_created',
-  'sso.provisioning.user_deleted',
-  'sso.provisioning.permissions_synced',
-];
-const PROJECT_AUDIT_ACTIONS = [
-  'project.created',
-  'project.updated',
-  'project.deleted',
-  'project.archived',
-  'project.unarchived',
-  'project.member.added',
-  'project.member.removed',
-  'project.invitation.sent',
-  'project.invitation.accepted',
-  'project.invitation.rejected',
-  'project.invitation.revoked',
-];
-const ALL_AUDIT_ACTIONS = [
-  ...ATTRACTAP_AUDIT_ACTIONS,
-  ...AUDIT_ACTIONS,
-  ...IDENTITY_AUDIT_ACTIONS,
-  ...RESOURCE_AUDIT_ACTIONS,
-  ...ADMINISTRATION_AUDIT_ACTIONS,
-  ...PROJECT_AUDIT_ACTIONS,
-  ...SSO_AUDIT_ACTIONS,
-  'billing.transaction.created',
-  'billing.transaction.updated',
-];
+import {
+  AUDIT_ACTION_QUERY_PATTERN,
+  AUDIT_DOMAIN_QUERY_PATTERN,
+  AUDIT_EVENT_PREFIX_QUERY_PATTERN,
+  AUDIT_SUBJECT_TYPE_QUERY_PATTERN,
+} from './audit-domains';
+import { knownAuditActions, knownAuditDomains, knownEventPrefixes, knownSubjectTypes } from './audit-vocabulary';
 
 const timestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
 
-const eventPrefix =
-  /^(?:attractap|billing|email_layout|email_template|health|identity|introduction|maintenance_schedule|mqtt_server|plugin|project|resource|resource_group|retraining|settings|sso|supervision|usage_session|wago)(?:\.[a-z_]+)*\.?$/;
+/**
+ * Filter values validate against the live audit vocabulary: core constants plus
+ * the domains, actions and subject types that loaded plugins registered. The
+ * host never hardcodes a plugin value; `GET /admin/audit-log/meta` enumerates
+ * what is currently known. All filters bind as SQL parameters.
+ */
+function IsKnownAuditValue(
+  name: string,
+  shape: RegExp,
+  known: () => readonly string[],
+  validationOptions?: ValidationOptions,
+) {
+  return function (object: object, propertyName: string): void {
+    registerDecorator({
+      name,
+      target: object.constructor,
+      propertyName,
+      options: validationOptions,
+      validator: {
+        validate(value: unknown): boolean {
+          return typeof value === 'string' && shape.test(value) && known().includes(value);
+        },
+        defaultMessage(args: ValidationArguments): string {
+          return `${args.property} must be a recognized audit value`;
+        },
+      },
+    });
+  };
+}
+
+const IsKnownAuditDomain = () =>
+  IsKnownAuditValue('isKnownAuditDomain', AUDIT_DOMAIN_QUERY_PATTERN, knownAuditDomains);
+const IsKnownAuditAction = () =>
+  IsKnownAuditValue('isKnownAuditAction', AUDIT_ACTION_QUERY_PATTERN, knownAuditActions);
+const IsKnownSubjectType = () =>
+  IsKnownAuditValue('isKnownSubjectType', AUDIT_SUBJECT_TYPE_QUERY_PATTERN, knownSubjectTypes);
+
+/** Shape-checked, and the leading segment must be a known action prefix (core or plugin domain). */
+const IsKnownEventPrefix = (validationOptions?: ValidationOptions) =>
+  function (object: object, propertyName: string): void {
+    registerDecorator({
+      name: 'isKnownEventPrefix',
+      target: object.constructor,
+      propertyName,
+      options: validationOptions,
+      validator: {
+        validate(value: unknown): boolean {
+          if (typeof value !== 'string' || !AUDIT_EVENT_PREFIX_QUERY_PATTERN.test(value)) return false;
+          return knownEventPrefixes().includes(value.split('.')[0]);
+        },
+        defaultMessage(args: ValidationArguments): string {
+          return `${args.property} must start with a recognized audit event prefix`;
+        },
+      },
+    });
+  };
 
 export class AuditQueryDto {
-  @ApiPropertyOptional({ description: 'Event action prefix', pattern: eventPrefix.source, maxLength: 100 })
+  @ApiPropertyOptional({
+    description: 'Event action prefix, e.g. resource. or a plugin domain prefix',
+    pattern: AUDIT_EVENT_PREFIX_QUERY_PATTERN.source,
+    maxLength: 100,
+  })
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  @Matches(eventPrefix)
+  @IsKnownEventPrefix()
   eventPrefix?: string;
 
   @ApiPropertyOptional({ description: 'Inclusive event timestamp lower bound' })
@@ -65,9 +108,15 @@ export class AuditQueryDto {
   @IsISO8601({ strict: true })
   to?: string;
 
-  @ApiPropertyOptional({ enum: ALL_AUDIT_ACTIONS })
+  @ApiPropertyOptional({
+    description: 'Exact event action, e.g. resource.updated. Plugin actions use their domain prefix.',
+    pattern: AUDIT_ACTION_QUERY_PATTERN.source,
+    maxLength: 128,
+  })
   @IsOptional()
-  @IsIn(ALL_AUDIT_ACTIONS)
+  @IsString()
+  @MaxLength(128)
+  @IsKnownAuditAction()
   action?: string;
 
   @ApiPropertyOptional({ type: Number, default: 50, minimum: 1, maximum: 100 })
@@ -86,9 +135,15 @@ export class AuditQueryDto {
   @Max(Number.MAX_SAFE_INTEGER)
   beforeId?: number;
 
-  @ApiPropertyOptional({ enum: ['administration', 'attractap', 'billing', 'identity', 'project', 'resource', 'sso', 'wago'] })
+  @ApiPropertyOptional({
+    description: 'Audit domain: a core domain or one contributed by an installed plugin.',
+    pattern: AUDIT_DOMAIN_QUERY_PATTERN.source,
+    maxLength: 32,
+  })
   @IsOptional()
-  @IsIn(['administration', 'attractap', 'billing', 'identity', 'project', 'resource', 'sso', 'wago'])
+  @IsString()
+  @MaxLength(32)
+  @IsKnownAuditDomain()
   domain?: string;
 
   @ApiPropertyOptional({ enum: ['attempted', 'succeeded', 'failed'] })
@@ -118,55 +173,13 @@ export class AuditQueryDto {
   subjectId?: number;
 
   @ApiPropertyOptional({
-    enum: [
-      'attractap.reader',
-      'attractap.card',
-      'setting',
-      'email-template',
-      'email-layout',
-      'mqtt-server',
-      'plugin-package',
-      'plugin-registry',
-      'plugin-policy',
-      'billing.transaction',
-      'project',
-      'project.invitation',
-      'project.member',
-      'identity.password_policy',
-      'identity.role',
-      'identity.user',
-      'resource',
-      'resource_group',
-      'sso.provider',
-      'user',
-      'wago.controller',
-      'wago.commissioning',
-    ],
+    description: 'Exact subject type, e.g. resource or identity.user. Plugin subject types use their domain prefix.',
+    pattern: AUDIT_SUBJECT_TYPE_QUERY_PATTERN.source,
+    maxLength: 64,
   })
   @IsOptional()
-  @IsIn([
-    'attractap.reader',
-    'attractap.card',
-    'setting',
-    'email-template',
-    'email-layout',
-    'mqtt-server',
-    'plugin-package',
-    'plugin-registry',
-    'plugin-policy',
-    'billing.transaction',
-    'project',
-    'project.invitation',
-    'project.member',
-    'identity.password_policy',
-    'identity.role',
-    'identity.user',
-    'resource',
-    'resource_group',
-    'sso.provider',
-    'user',
-    'wago.controller',
-    'wago.commissioning',
-  ])
+  @IsString()
+  @MaxLength(64)
+  @IsKnownSubjectType()
   subjectType?: string;
 }

@@ -76,7 +76,6 @@
   "domains": {
     "billing": "Billing",
     "resource": "Resources",
-    "wago": "WAGO controllers",
     "identity": "Identity and access",
     "sso": "SSO",
     "sso_provider": "SSO providers",

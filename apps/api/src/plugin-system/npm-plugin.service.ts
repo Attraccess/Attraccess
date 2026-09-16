@@ -371,21 +371,12 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
         }
       }),
     );
-    const normalizedQuery = query.trim().toLowerCase();
-    const officialResults =
-      !registryId || registryId === 'npm'
-        ? await Promise.allSettled(
-            this.classification
-              .officialPackages()
-              .filter(({ name }) => !normalizedQuery || name.toLowerCase().includes(normalizedQuery))
-              .map(({ name }) => this.marketplacePackage(name)),
-          )
-        : [];
+    // No hardcoded package list: official plugins are discovered through the same
+    // keyword search as community plugins and classified by publisher and scope.
     const results = new Map(
-      [
-        ...responses.flatMap(({ results }) => results),
-        ...officialResults.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])),
-      ].map((plugin) => [`${plugin.registry.id}:${plugin.name}`, plugin]),
+      responses
+        .flatMap(({ results }) => results)
+        .map((plugin) => [`${plugin.registry.id}:${plugin.name}`, plugin]),
     );
     return {
       results: [...results.values()],

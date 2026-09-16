@@ -13,7 +13,7 @@ describe('Attractap audit domain rollout', () => {
 
   it('enables Attractap on a fresh database', async () => {
     await migration.up(source.createQueryRunner());
-    expect(JSON.parse(await domains())).toEqual(['resource', 'wago', 'identity', 'attractap']);
+    expect(JSON.parse(await domains())).toEqual(['resource', 'identity', 'attractap']);
   });
 
   it('preserves saved domain selections and global pause through upgrade and rollback', async () => {

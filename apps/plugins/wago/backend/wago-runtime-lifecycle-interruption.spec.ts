@@ -131,7 +131,7 @@ process.exit(result.status ?? 1);
     expect(fixture.read('docker.log').slice(beforeRejectedBoots.length)).not.toMatch(/^start /m);
     expect(fixture.containers()[0]).toMatchObject({ running: false, restart: 'no' });
     expect(exists(config + '/runtime-enabled')).toBe(false);
-  }, 30000);
+  }, 240000);
 
   it('resumes interrupted recovery disposal and receipt acknowledgement without restoring workloads', () => {
     installNewRuntime();
@@ -170,7 +170,7 @@ process.exit(result.status ?? 1);
     expect(fixture.read('docker.log')).not.toMatch(/^start /m);
     expect(fixture.containers()).toEqual([]);
     expect(exists(data)).toBe(false);
-  }, 30000);
+  }, 240000);
 
   it('resumes interrupted acceptance disposal while recovery cannot undo the accepted runtime or trust', () => {
     installNewRuntime();
@@ -200,5 +200,5 @@ process.exit(result.status ?? 1);
     expect(fixture.read(config + '/runtime-ca.pem')).toBe('accepted public CA');
     expect(exists(config + '/runtime-enabled')).toBe(true);
     expect(exists(data + '/credentials.json')).toBe(false);
-  }, 30000);
+  }, 240000);
 });

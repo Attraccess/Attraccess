@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { checkWagoAcceptance, requiredChecks } from './check-wago-acceptance.mjs';
+import { checkWagoAcceptance, requiredChecks } from './check-acceptance.mjs';
 
 // Synthetic fixtures test the validator, not a controller or a release claim.
 const fixture = () => ({

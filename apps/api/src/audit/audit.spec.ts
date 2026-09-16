@@ -46,21 +46,77 @@ import { SettingsStoreService } from '../settings/settings-store.service';
 import { SettingsService } from '../settings/settings.service';
 import { SettingsModule } from '../settings/settings.module';
 import { Module } from '@nestjs/common';
-import { AUDIT_ACTIONS, projectAuditEvent } from './audit-policy';
 import { createPluginAuditContext } from '../plugin-system/plugin-audit-context';
+import {
+  registerPluginAuditDomains,
+  resetPluginAuditRegistry,
+} from '../plugin-system/plugin-audit-registry';
+import type { PluginAuditDomainDeclaration } from '@attraccess/plugins-backend-sdk';
+
+const fixturePluginId = 'abcdefghijklmnopqrstu';
+
+/** Neutral stand-in for a plugin-contributed audit domain; the host never names a real plugin. */
+const demoDomain: PluginAuditDomainDeclaration = {
+  domain: 'demo',
+  labels: { en: 'Demo devices' },
+  actions: [
+    { action: 'demo.claim', subjectTypes: ['demo.device'] },
+    {
+      action: 'demo.publication',
+      subjectTypes: ['demo.device'],
+      details: { revision: { type: 'number', integer: true, min: 1 } },
+    },
+    {
+      action: 'demo.rollback',
+      subjectTypes: ['demo.device'],
+      details: {
+        sourceRevision: { type: 'number', integer: true, min: 1 },
+        revision: { type: 'number', integer: true, min: 1 },
+      },
+    },
+    {
+      action: 'demo.manual_command',
+      subjectTypes: ['demo.device'],
+      details: {
+        channelId: { type: 'string', pattern: '[a-zA-Z0-9_-]{1,64}' },
+        commandId: {
+          type: 'string',
+          pattern: '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}',
+        },
+        operation: { type: 'string', oneOf: ['set', 'pulse'] },
+        result: { type: 'string', oneOf: ['dispatched', 'acknowledged', 'rejected', 'timeout', 'transport_failure'] },
+      },
+    },
+    {
+      action: 'demo.profile_change',
+      subjectTypes: ['demo.device'],
+      details: {
+        profileId: { type: 'string', maxLength: 160, pattern: '(?=[\\s\\S]*\\S)[\\s\\S]*' },
+        profileVersion: { type: 'number', integer: true, min: 1, max: 1_000_000 },
+        'before.physicalPointCount': { type: 'number', integer: true, min: 0 },
+        'before.logicalChannelCount': { type: 'number', integer: true, min: 0 },
+        'after.physicalPointCount': { type: 'number', integer: true, min: 0 },
+        'after.logicalChannelCount': { type: 'number', integer: true, min: 0 },
+      },
+    },
+    { action: 'demo.commissioning.install', subjectTypes: ['demo.commissioning'] },
+    { action: 'demo.commissioning.recover', subjectTypes: ['demo.commissioning'] },
+  ],
+};
 
 const event = (): PluginAuditEvent & { pluginId: string } => ({
-  pluginId: 'abcdefghijklmnopqrstu',
-  action: 'wago.publication',
+  pluginId: fixturePluginId,
+  action: 'demo.publication',
   operationId: randomUUID(),
   principal: { userId: 42, authenticationMethod: 'session' },
   outcome: 'succeeded',
-  subject: { type: 'wago.controller', id: 7 },
+  subject: { type: 'demo.device', id: 7 },
   details: { revision: 2 },
 });
 const config = {
   enabled: true,
-  domains: ['administration', 'attractap', 'identity', 'project', 'resource', 'wago'],
+  domains: ['administration', 'attractap', 'identity', 'project', 'resource'],
+  plugin_domains_disabled: [],
   retention_days: 90,
 };
 
@@ -72,6 +128,8 @@ describe('durable audit SQLite', () => {
   const migration = new DurableAudit1783700000000();
   const identityMigration = new IdentityAudit1783800000000();
   beforeEach(async () => {
+    resetPluginAuditRegistry();
+    registerPluginAuditDomains({ name: 'audit-fixture-plugin', id: fixturePluginId }, [demoDomain]);
     directory = await mkdtemp(join(tmpdir(), 'audit-'));
     source = await new DataSource({
       type: 'sqlite',
@@ -94,12 +152,13 @@ describe('durable audit SQLite', () => {
     await service.onModuleInit();
   });
   afterEach(async () => {
+    resetPluginAuditRegistry();
     await service.onModuleDestroy();
     if (source.isInitialized) await source.destroy();
     await rm(directory, { recursive: true, force: true });
   });
 
-  it.each([{ enabled: false }, { domains: ['wago'] }])(
+  it.each([{ enabled: false }, { domains: ['resource'] }])(
     'records the final disabling settings change and suppresses subsequent events (%j)',
     async (update) => {
       const settings = new SettingsService(null, store, null);
@@ -206,17 +265,17 @@ describe('durable audit SQLite', () => {
       ],
       [
         902,
-        'wago',
+        'demo',
         'abcdefghijklmnopqrstu',
-        'wago.device_connected',
+        'demo.device_connected',
         '00000000-0000-4000-8000-000000000902',
         42,
         'api_token',
         7,
-        'wago.device',
+        'demo.device',
         12,
         '192.0.2.42',
-        'WAGO/1.0',
+        'Demo/1.0',
       ],
       [
         903,
@@ -265,7 +324,7 @@ describe('durable audit SQLite', () => {
         authenticationMethod: 'api_token',
         apiTokenId: 7,
         ipAddress: '192.0.2.42',
-        userAgent: 'WAGO/1.0',
+        userAgent: 'Demo/1.0',
       },
       {
         id: 903,
@@ -556,22 +615,19 @@ describe('durable audit SQLite', () => {
     expect((await service.list({ limit: 10 })).items.map((item) => item.subjectId)).toEqual([8]);
   });
 
-  it('persists every registered action lifecycle and preserves manual command and profile references', async () => {
-    for (const action of AUDIT_ACTIONS) {
+  it('persists every registered plugin action lifecycle and preserves declared detail fields', async () => {
+    for (const policy of demoDomain.actions) {
       for (const terminal of ['succeeded', 'failed'] as const) {
         const operationId = randomUUID();
         for (const outcome of ['attempted', terminal] as const) {
           expect(
             await service.record({
               ...event(),
-              action,
+              action: policy.action,
               operationId,
               outcome,
               details: {},
-              subject: {
-                id: 7,
-                type: action.startsWith('wago.commissioning.') ? 'wago.commissioning' : 'wago.controller',
-              },
+              subject: { id: 7, type: policy.subjectTypes[0] },
             }),
           ).toEqual({ status: 'recorded' });
         }
@@ -586,7 +642,7 @@ describe('durable audit SQLite', () => {
     expect(
       await service.record({
         ...event(),
-        action: 'wago.manual_command',
+        action: 'demo.manual_command',
         principal: { userId: 42, authenticationMethod: 'api-token', apiTokenId: 9 },
         details,
       }),
@@ -595,7 +651,7 @@ describe('durable audit SQLite', () => {
     expect(
       await service.record({
         ...event(),
-        action: 'wago.profile_change',
+        action: 'demo.profile_change',
         details: {
           profileId: 'custom-profile',
           profileVersion: 2,
@@ -620,10 +676,10 @@ describe('durable audit SQLite', () => {
     expect(page.nextCursor).toBe(3);
     expect((await service.list({ limit: 10, beforeId: page.nextCursor })).items.map((row) => row.id)).toEqual([2, 1]);
     expect(
-      (await service.list({ limit: 10, outcome: 'failed', actorId: 42, subjectId: 7, action: 'wago.publication' }))
+      (await service.list({ limit: 10, outcome: 'failed', actorId: 42, subjectId: 7, action: 'demo.publication' }))
         .items,
     ).toHaveLength(1);
-    expect((await service.list({ limit: 10, subjectType: 'wago.commissioning' })).items).toHaveLength(0);
+    expect((await service.list({ limit: 10, subjectType: 'demo.commissioning' })).items).toHaveLength(0);
     const old = source
       .getRepository(AuditLog)
       .create({ ...(await service.list({ limit: 1 })).items[0], id: undefined, at: new Date(0) });
@@ -637,15 +693,15 @@ describe('durable audit SQLite', () => {
   it('does not roll back a recorded event when a paused cleanup transaction fails', async () => {
     await source.getRepository(AuditLog).insert({
       at: new Date(0),
-      domain: 'wago',
+      domain: 'demo',
       pluginId: 'abcdefghijklmnopqrstu',
-      action: 'wago.publication',
+      action: 'demo.publication',
       operationId: randomUUID(),
       actorId: 42,
       authenticationMethod: 'session',
       apiTokenId: null,
       outcome: 'succeeded',
-      subjectType: 'wago.controller',
+      subjectType: 'demo.device',
       subjectId: 7,
       ipAddress: null,
       userAgent: null,
@@ -694,15 +750,15 @@ describe('durable audit SQLite', () => {
   it('records an event after a paused cleanup transaction commits', async () => {
     await source.getRepository(AuditLog).insert({
       at: new Date(0),
-      domain: 'wago',
+      domain: 'demo',
       pluginId: 'abcdefghijklmnopqrstu',
-      action: 'wago.publication',
+      action: 'demo.publication',
       operationId: randomUUID(),
       actorId: 42,
       authenticationMethod: 'session',
       apiTokenId: null,
       outcome: 'succeeded',
-      subjectType: 'wago.controller',
+      subjectType: 'demo.device',
       subjectId: 7,
       ipAddress: null,
       userAgent: null,
@@ -749,7 +805,7 @@ describe('durable audit SQLite', () => {
   it('fails closed on disabled capture, unsupported domains, invalid input and write failure', async () => {
     for (const disabled of [
       { ...config, enabled: false },
-      { ...config, domains: [] },
+      { ...config, plugin_domains_disabled: ['demo'] },
     ]) {
       for (const [key, value] of Object.entries(disabled))
         await store.setPlainSetting('audit', key, JSON.stringify(value));
@@ -759,7 +815,8 @@ describe('durable audit SQLite', () => {
       await sink.onModuleDestroy();
     }
     await store.setPlainSetting('audit', 'enabled', 'true');
-    await store.setPlainSetting('audit', 'domains', '["wago"]');
+    await store.setPlainSetting('audit', 'plugin_domains_disabled', '[]');
+    await store.setPlainSetting('audit', 'domains', '[]');
     await service.recordResource({
       action: 'resource.created', actorId: 42, subjectId: 7, details: { 'after.name': 'Lathe', 'after.type': 'machine' },
     });
@@ -938,11 +995,16 @@ describe('durable audit SQLite', () => {
     await settings.updateAuditSettings({ enabled: false, domains: [], retention_days: 2 });
     await service.onModuleDestroy();
     store = new SettingsStoreService(source.getRepository(Setting), null);
-    expect(await readAuditSettings(store)).toEqual({ enabled: false, domains: [], retention_days: 2 });
+    expect(await readAuditSettings(store)).toEqual({
+      enabled: false,
+      domains: [],
+      plugin_domains_disabled: [],
+      retention_days: 2,
+    });
     service = new AuditService(source, store);
     await service.onModuleInit();
     expect(await service.record(event())).toEqual({ status: 'unavailable' });
-    await settings.updateAuditSettings({ enabled: true, domains: ['wago'] });
+    await settings.updateAuditSettings({ enabled: true, domains: ['resource'] });
     jest.spyOn(store, 'getPlainSetting').mockRejectedValue(new Error('private failure'));
     expect(await service.record(event())).toEqual({ status: 'unavailable' });
     await expect(service.list({ limit: 1 })).rejects.toThrow('Audit settings unavailable');
@@ -977,7 +1039,7 @@ describe('durable audit SQLite', () => {
     });
     const pending = Array.from({ length: 8 }, () => service.record(event()));
     expect(await service.record(event())).toEqual({ status: 'unavailable' });
-    expect(read).toHaveBeenCalledTimes(24);
+    expect(read).toHaveBeenCalledTimes(32);
     release();
     expect((await Promise.all(pending)).every((receipt) => receipt.status === 'unavailable')).toBe(true);
     read.mockRestore();
@@ -997,10 +1059,10 @@ describe('durable audit SQLite', () => {
     await service.cleanup();
     expect(await source.getRepository(AuditLog).count()).toBe(1);
     expect(
-      (await service.list({ limit: 10, eventPrefix: 'wago.pub', from: row.at.toISOString(), to: row.at.toISOString() }))
+      (await service.list({ limit: 10, eventPrefix: 'demo.pub', from: row.at.toISOString(), to: row.at.toISOString() }))
         .items,
     ).toHaveLength(1);
-    expect((await service.list({ limit: 10, eventPrefix: 'wago.commissioning.' })).items).toHaveLength(0);
+    expect((await service.list({ limit: 10, eventPrefix: 'demo.commissioning.' })).items).toHaveLength(0);
     expect((await service.list({ limit: 10, to: new Date(0).toISOString() })).items).toHaveLength(0);
   });
 
@@ -1087,7 +1149,9 @@ describe('durable audit SQLite', () => {
       await request(server).get('/api/admin/audit-log').set('Cookie', 'auth-session=session').expect(403);
       ownerPermissions.add('system.audit.read');
       for (const query of [
-        'eventPrefix=wago.%25',
+        'eventPrefix=demo.%25',
+        'domain=Demo',
+        'subjectType=demo..device',
         'from=invalid',
         'from=2026-W01-1',
         'from=2026-09-02T00:00:00Z&to=2026-09-01T00:00:00Z',
@@ -1100,7 +1164,7 @@ describe('durable audit SQLite', () => {
           .expect(400);
       }
       await request(server)
-        .get('/api/admin/audit-log?eventPrefix=wago.pub&from=2020-01-01T00:00:00Z')
+        .get('/api/admin/audit-log?eventPrefix=demo.pub&from=2020-01-01T00:00:00Z')
         .set('Cookie', 'auth-session=session')
         .expect(200)
         .expect(({ body }) => expect(body.items).toHaveLength(1));
@@ -1113,23 +1177,24 @@ describe('durable audit SQLite', () => {
         .patch('/api/settings/audit')
         .set('Authorization', 'Bearer settings-token')
         .send({ enabled: false, retention_days: 3, domains: [] })
-        .expect(200, { enabled: false, retention_days: 3, domains: [] });
+        .expect(200, { enabled: false, retention_days: 3, domains: [], plugin_domains_disabled: [] });
       expect(await service.record(event())).toEqual({ status: 'unavailable' });
       await request(server)
         .patch('/api/settings/audit')
         .set('Authorization', 'Bearer settings-token')
         .send({ retention_days: 4 })
-        .expect(200, { enabled: false, retention_days: 4, domains: [] });
+        .expect(200, { enabled: false, retention_days: 4, domains: [], plugin_domains_disabled: [] });
       await request(server)
         .patch('/api/settings/audit')
         .set('Authorization', 'Bearer settings-token')
         .send({})
-        .expect(200, { enabled: false, retention_days: 4, domains: [] });
+        .expect(200, { enabled: false, retention_days: 4, domains: [], plugin_domains_disabled: [] });
       for (const body of [
         { enabled: null },
         { enabled: 'false' },
         { retention_days: '90' },
         { domains: ['unknown'] },
+        { plugin_domains_disabled: ['Not A Domain'] },
         { retention_days: 0 },
         { secret: 'private' },
       ]) {
@@ -1142,7 +1207,12 @@ describe('durable audit SQLite', () => {
       ownerPermissions.delete('users.api-tokens.manage');
       await request(server).get('/api/settings/audit').set('Authorization', 'Bearer settings-token').expect(401);
       const restartedStore = new SettingsStoreService(source.getRepository(Setting), null);
-      expect(await readAuditSettings(restartedStore)).toEqual({ enabled: false, retention_days: 4, domains: [] });
+      expect(await readAuditSettings(restartedStore)).toEqual({
+        enabled: false,
+        retention_days: 4,
+        domains: [],
+        plugin_domains_disabled: [],
+      });
     } finally {
       await app.close();
     }
@@ -1196,8 +1266,12 @@ describe('durable audit SQLite', () => {
     ]);
     const quarantined = jest.spyOn(PluginService, 'isPluginQuarantined').mockReturnValue(false);
     const markLoaded = jest.spyOn(PluginService, 'markPluginAsLoaded').mockImplementation(() => undefined);
+    // The host registers plugin-declared audit domains during forRoot; drop the
+    // beforeEach registration so this exercises the real PluginModule wiring.
+    resetPluginAuditRegistry();
     const loader = jest.spyOn(pluginLoader, 'loadPluginEntryExports').mockReturnValue({
       default: {
+        auditDomains: [demoDomain],
         register: (value: PluginContext) => {
           context = value;
           return { module: FixturePlugin };
@@ -1262,41 +1336,7 @@ describe('durable audit SQLite', () => {
   });
 });
 
-describe('audit policy and authorization', () => {
-  it('accepts every current controller and f136365b commissioning action with the correct subject', () => {
-    for (const action of AUDIT_ACTIONS) {
-      expect(
-        projectAuditEvent({
-          ...event(),
-          action,
-          details: {},
-          subject: { id: 1, type: action.startsWith('wago.commissioning.') ? 'wago.commissioning' : 'wago.controller' },
-        }),
-      ).toBeTruthy();
-    }
-    expect(
-      projectAuditEvent({
-        ...event(),
-        action: 'wago.profile_change',
-        details: { profileId: '  自定义  ', profileVersion: 1, 'before.physicalPointCount': 0 },
-      }),
-    ).toBeTruthy();
-  });
-
-  it('rejects arbitrary events, cross-event details, unsafe values and incorrect principals', () => {
-    for (const override of [
-      { action: 'wago.telemetry' },
-      { action: 'wago.toString' },
-      { details: { raw: 'payload' } },
-      { details: { channelId: 'valid-but-wrong-event' } },
-      { details: { revision: Infinity } },
-      { action: 'wago.profile_change', details: { profileId: 'x'.repeat(161) } },
-      { principal: { userId: 1, authenticationMethod: 'api-token' } },
-      { subject: { type: 'wago.commissioning', id: 1 } },
-    ])
-      expect(projectAuditEvent({ ...event(), ...override } as ReturnType<typeof event>)).toBeNull();
-  });
-
+describe('audit authorization and query validation', () => {
   it('uses the effective permission guard for both session and token ceilings', () => {
     const guard = new EffectivePermissionsGuard(new Reflector());
     const context = (user: unknown) =>
@@ -1358,6 +1398,36 @@ describe('audit policy and authorization', () => {
         pipe.transform({ domain: 'project', subjectType }, { type: 'query', metatype: AuditQueryDto }),
       ).resolves.toMatchObject({ domain: 'project', subjectType });
     }
+    // Plugin-contributed filter values validate against the live registry.
+    resetPluginAuditRegistry();
+    registerPluginAuditDomains({ name: 'query-fixture', id: 'q'.repeat(21) }, [demoDomain]);
+    try {
+      const pluginFilters = {
+        domain: 'demo',
+        eventPrefix: 'demo.commissioning.',
+        action: 'demo.commissioning.install',
+        subjectType: 'demo.device',
+      };
+      await expect(pipe.transform(pluginFilters, { type: 'query', metatype: AuditQueryDto })).resolves.toMatchObject(
+        pluginFilters,
+      );
+      for (const query of [
+        { domain: 'Demo' },
+        { domain: 'demo-device' },
+        { domain: 'unregistered' },
+        { action: 'demo.Action' },
+        { action: '.demo' },
+        { action: 'demo.unregistered_action' },
+        { subjectType: 'demo..device' },
+        { subjectType: 'demo.unregistered' },
+        { eventPrefix: 'demo.%' },
+        { eventPrefix: 'unregistered.' },
+      ]) {
+        await expect(pipe.transform(query, { type: 'query', metatype: AuditQueryDto })).rejects.toThrow();
+      }
+    } finally {
+      resetPluginAuditRegistry();
+    }
   });
 });
 
@@ -1386,7 +1456,7 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       [oversizedRequestId, oversizedBefore, oversizedAfter],
     );
     await source.query(
-      `INSERT INTO "setting" ("parent", "key", "value") VALUES ('audit', 'domains', '["billing","resource","wago"]')`,
+      `INSERT INTO "setting" ("parent", "key", "value") VALUES ('audit', 'domains', '["billing","resource"]')`,
     );
     await source.destroy();
     source = new DataSource({
@@ -1406,7 +1476,7 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
     expect(source.hasMetadata(AuditLog)).toBeTruthy();
     expect(await source.query('PRAGMA foreign_key_list(audit_log)')).toEqual([]);
     expect(await source.query(`SELECT "value" FROM "setting" WHERE "parent" = 'audit' AND "key" = 'domains'`)).toEqual([
-      { value: '["billing","resource","wago","identity","attractap"]' },
+      { value: '["billing","resource","identity","attractap"]' },
     ]);
     expect(await source.query("SELECT * FROM audit_log WHERE subjectType = 'identity.password_policy'")).toHaveLength(
       2,

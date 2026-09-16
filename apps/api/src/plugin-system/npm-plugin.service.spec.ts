@@ -287,48 +287,19 @@ describe('NpmPluginService', () => {
     });
   });
 
-  it('includes official allowlisted packages even when npm search omits them', async () => {
-    const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
-    const internals = service as unknown as ServiceInternals;
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
-    jest.spyOn(axios, 'get').mockResolvedValue({ data: { objects: [] } });
-    jest.spyOn(service, 'packageMetadata').mockImplementation(async (name) => ({
-      name,
-      publisher: { username: 'attraccess' },
-      'dist-tags': { latest: '1.2.3' },
-      versions: {
-        '1.2.3': {
-          name,
-          version: '1.2.3',
-          keywords: ['attraccess-plugin'],
-          peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
-          attraccess: {
-            displayName: name,
-            host: '*',
-            backend: 'dist/index.js',
-            sdk: { backend: '*' },
-            permissions: [],
-          },
-        },
-      },
-    }));
-
-    await expect(service.searchMarketplace('')).resolves.toMatchObject({
-      results: expect.arrayContaining([
-        expect.objectContaining({ name: '@attraccess/plugin-shelly', classification: 'official' }),
-        expect.objectContaining({ name: '@attraccess/plugin-rabbitmq', classification: 'official' }),
-      ]),
-    });
-  });
-
-  it('filters official fallback packages by query and deduplicates npm search results', async () => {
+  it('discovers plugins through registry keyword search without a hardcoded package list', async () => {
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
     const internals = service as unknown as ServiceInternals;
     jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
     jest.mocked(lookup).mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
     jest.spyOn(axios, 'get').mockResolvedValue({
-      data: { objects: [{ package: { name: '@attraccess/plugin-shelly' } }] },
+      data: {
+        objects: [
+          { package: { name: '@attraccess/plugin-shelly' } },
+          // Registry search can report the same package twice; results are deduplicated.
+          { package: { name: '@attraccess/plugin-shelly' } },
+        ],
+      },
     });
     const packageMetadata = jest.spyOn(service, 'packageMetadata').mockImplementation(async (name) => ({
       name,
