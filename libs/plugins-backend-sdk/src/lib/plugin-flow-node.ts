@@ -4,7 +4,7 @@
  * Usage:
  *   export default {
  *     register(context) { ... },
- *     flowNodes: [shellyOnNode, shellyOffNode],
+ *     flowNodes: [demoOnNode, demoOffNode],
  *   } satisfies PluginBackendModule;
  */
 
@@ -43,7 +43,7 @@ export type PluginFlowNodeValidationContext = Map<string, unknown>;
  * Describes a single custom flow node contributed by a plugin.
  *
  * Node type naming convention: use "plugin.<pluginName>.<nodeName>" to
- * guarantee no collision with core node types, e.g. "plugin.shelly.send-on".
+ * guarantee no collision with core node types, e.g. "plugin.demo.send-on".
  */
 interface PluginFlowNodeDefinitionBase {
   /**

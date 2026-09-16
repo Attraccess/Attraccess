@@ -50,7 +50,7 @@ describe('nodeTypeDomain', () => {
   });
 
   it('maps plugin nodes to a per-plugin domain', () => {
-    expect(nodeTypeDomain('plugin.shelly.send-on')).toBe('plugin.shelly');
+    expect(nodeTypeDomain('plugin.demo.send-on')).toBe('plugin.demo');
     expect(nodeTypeDomain('plugin.homeassistant.turn-on')).toBe('plugin.homeassistant');
   });
 });
@@ -81,7 +81,7 @@ describe('getDomainDef', () => {
   });
 
   it('returns the plugin fallback def for an unknown plugin domain', () => {
-    const def = getDomainDef('plugin.shelly');
+    const def = getDomainDef('plugin.demo');
     expect(def).toBeDefined();
     expect(def.icon).toBeDefined();
   });
@@ -89,7 +89,7 @@ describe('getDomainDef', () => {
 
 describe('getPluginDomainLabel', () => {
   it('capitalises the plugin name from a plugin domain', () => {
-    expect(getPluginDomainLabel('plugin.shelly')).toBe('Shelly');
+    expect(getPluginDomainLabel('plugin.demo')).toBe('Demo');
     expect(getPluginDomainLabel('plugin.homeassistant')).toBe('Homeassistant');
   });
 

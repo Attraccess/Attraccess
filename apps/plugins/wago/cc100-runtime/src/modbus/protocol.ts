@@ -1,5 +1,4 @@
 // Shared pure configuration model is bundled into both the plugin and standalone runtime.
-// eslint-disable-next-line @nx/enforce-module-boundaries
 import { registerCount, type RegisterFormat, wireAddress } from '../../../modbus/model';
 
 export class ModbusException extends Error {

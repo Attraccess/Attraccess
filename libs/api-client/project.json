@@ -3,7 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/api-client/src",
   "projectType": "library",
-  "tags": [],
+  "tags": ["type:lib", "scope:core"],
   "// targets": "to see all targets run: nx show project api-client --web",
   "targets": {
     "build": {

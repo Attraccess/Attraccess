@@ -3,7 +3,8 @@
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "sourceRoot": "apps/plugins/wago",
-  "tags": ["type:plugin"],
+  "tags": ["type:plugin", "scope:plugin"],
+  "// lint": "lint runs from the workspace root on purpose: @nx/enforce-module-boundaries no-ops when eslint runs from inside a project directory. See eslint.config.cjs for the plugin isolation rules.",
   "targets": {
     "production-fleet": {
       "executor": "nx:run-commands",
@@ -38,8 +39,7 @@
     "lint": {
       "executor": "nx:run-commands",
       "options": {
-        "cwd": "apps/plugins/wago",
-        "command": "eslint backend frontend/src frontend/tests acceptance modbus measurement-contract.ts channel-behavior.ts"
+        "command": "eslint apps/plugins/wago/backend apps/plugins/wago/frontend/src apps/plugins/wago/frontend/tests apps/plugins/wago/acceptance apps/plugins/wago/modbus apps/plugins/wago/measurement-contract.ts apps/plugins/wago/channel-behavior.ts"
       }
     },
     "test": {

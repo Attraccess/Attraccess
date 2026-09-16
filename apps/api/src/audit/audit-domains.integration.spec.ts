@@ -36,8 +36,8 @@ interface DomainScenario {
   emit: (audit: AuditService) => Promise<unknown>;
 }
 
-// The plugin-contributed domain stands in for any installed plugin (for example WAGO):
-// the host enables it through the registry plus the plugin blocklist, never a core enum.
+// The plugin-contributed domain stands in for any installed plugin: the host
+// enables it through the registry plus the plugin blocklist, never a core enum.
 const fixturePluginId = 'abcdefghijklmnopqrstu';
 const pluginDomain = 'demo';
 

@@ -3,7 +3,8 @@
   "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/plugins/wago/cc100-runtime/src",
   "projectType": "application",
-  "tags": ["scope:hardware", "type:plugin"],
+  "tags": ["type:plugin", "scope:plugin", "scope:hardware"],
+  "// lint": "lint runs from the workspace root on purpose: @nx/enforce-module-boundaries no-ops when eslint runs from inside a project directory. See eslint.config.cjs for the plugin isolation rules.",
   "targets": {
     "test-simulator-integration": {
       "executor": "nx:run-commands",
@@ -50,8 +51,7 @@
     "lint": {
       "executor": "nx:run-commands",
       "options": {
-        "cwd": "apps/plugins/wago/cc100-runtime",
-        "command": "eslint src --max-warnings=0 && prettier --check src"
+        "command": "eslint apps/plugins/wago/cc100-runtime/src --max-warnings=0 && prettier --check apps/plugins/wago/cc100-runtime/src"
       }
     },
     "typecheck": {

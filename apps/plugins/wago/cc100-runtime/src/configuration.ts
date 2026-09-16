@@ -1,9 +1,7 @@
 import { createHash } from 'node:crypto';
 
 // Keep persisted runtime snapshots subject to the same Modbus contract as API acceptance.
-// eslint-disable-next-line @nx/enforce-module-boundaries
 import { validateModbus, validateModbusBindings } from '../../modbus/model';
-// eslint-disable-next-line @nx/enforce-module-boundaries
 import { pulseBehaviorError } from '../../channel-behavior';
 import { type Snapshot, type ValidationError } from './runtime-types';
 

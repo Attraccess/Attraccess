@@ -49,7 +49,7 @@ describe('ResourceHealthController', () => {
         {
           id: 1,
           resourceId: 7,
-          identifier: 'Shelly',
+          identifier: 'ir-bridge',
           status: ResourceHealthStatus.UNHEALTHY,
           reason: 'no connection',
           source: ResourceHealthSource.HEARTBEAT,
@@ -60,7 +60,7 @@ describe('ResourceHealthController', () => {
         {
           id: 1,
           resourceId: 7,
-          identifier: 'Shelly',
+          identifier: 'ir-bridge',
           status: ResourceHealthStatus.UNHEALTHY,
           reason: 'no connection',
           source: ResourceHealthSource.HEARTBEAT,

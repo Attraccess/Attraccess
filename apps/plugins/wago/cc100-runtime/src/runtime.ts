@@ -1,10 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { acquireMeasurements, measurementErrorCode } from './modbus/acquisition';
 // The standalone runtime bundles the plugin-owned measurement contract.
-// eslint-disable-next-line @nx/enforce-module-boundaries
 import { encodeMeasurement } from '../../measurement-contract';
 // The API and standalone runtime enforce the same configured output behavior.
-// eslint-disable-next-line @nx/enforce-module-boundaries
 import { supportsOutputAction } from '../../channel-behavior';
 import { hash, validateDesired } from './configuration';
 import { OutputController } from './output-controller';

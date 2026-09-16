@@ -78,9 +78,9 @@ beforeEach(() => {
     vi.fn((input: { url?: string } | string) => {
       const url = typeof input === 'string' ? input : (input.url ?? '');
       const plugin = {
-        name: '@attraccess/plugin-shelly',
+        name: '@attraccess/plugin-example',
         version: '1.0.0',
-        displayName: 'Shelly',
+        displayName: 'Example',
         description: 'Official integration',
         permissions: [],
         hostRange: '^1.0.0',
@@ -137,7 +137,7 @@ describe('PluginsSection', () => {
     render(<PluginsSection />);
     await openMarketplace(user);
 
-    expect(await screen.findByText('Shelly')).toBeInTheDocument();
+    expect(await screen.findByText('Example')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Official plugins' })).toBeInTheDocument();
     expect(screen.getByText('Official')).toBeInTheDocument();
     expect(screen.getByText('Version: 1.0.0')).toBeInTheDocument();
@@ -226,10 +226,10 @@ describe('PluginsSection', () => {
     render(<PluginsSection />);
     await openMarketplace(user);
 
-    await user.click(await screen.findByText('Shelly'));
+    await user.click(await screen.findByText('Example'));
     await user.click(screen.getByRole('button', { name: 'Install' }));
 
-    const installDialog = screen.getByRole('heading', { name: 'Install Shelly?' }).closest('[role="dialog"]');
+    const installDialog = screen.getByRole('heading', { name: 'Install Example?' }).closest('[role="dialog"]');
     expect(installDialog).not.toBeNull();
     const confirm = within(installDialog as HTMLElement).getByRole('button', { name: 'Install plugin' });
     expect(confirm).toBeDisabled();
@@ -430,12 +430,12 @@ describe('PluginsSection', () => {
   });
 
   it('renders community for an installed plugin until its npm classification is available', () => {
-    hoisted.plugins = [makePlugin({ name: '@attraccess/plugin-shelly' })];
+    hoisted.plugins = [makePlugin({ name: '@attraccess/plugin-example' })];
     const installedResponse = {
       ok: true,
       json: async () => [
         {
-          name: '@attraccess/plugin-shelly',
+          name: '@attraccess/plugin-example',
           version: '1.0.0',
           classification: 'official',
           classificationReason: 'Published by Attraccess on npm',
@@ -528,9 +528,9 @@ describe('PluginsSection', () => {
             json: async () => ({
               results: [
                 {
-                  name: '@attraccess/plugin-shelly',
+                  name: '@attraccess/plugin-example',
                   version: '1.0.0',
-                  displayName: 'Shelly',
+                  displayName: 'Example',
                   permissions: [],
                   registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
                   classification: 'official',
@@ -549,14 +549,14 @@ describe('PluginsSection', () => {
     render(<PluginsSection />);
     await openMarketplace(user);
 
-    await user.click(await screen.findByText('Shelly'));
+    await user.click(await screen.findByText('Example'));
     await user.keyboard('{Escape}');
     detail.resolve({
       ok: true,
       json: async () => ({
-        name: '@attraccess/plugin-shelly',
+        name: '@attraccess/plugin-example',
         version: '1.0.0',
-        displayName: 'Shelly',
+        displayName: 'Example',
         permissions: [],
         registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
         classification: 'official',
@@ -574,9 +574,9 @@ describe('PluginsSection', () => {
   it('opens details when a debounced search starts after the details click', async () => {
     const detail = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
     const plugin = {
-      name: '@attraccess-plugins/shelly',
+      name: '@attraccess-plugins/example',
       version: '1.0.0',
-      displayName: 'Shelly',
+      displayName: 'Example',
       description: null,
       permissions: [],
       registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
@@ -601,7 +601,7 @@ describe('PluginsSection', () => {
     await openMarketplace(user);
 
     await user.type(screen.getByLabelText('Search plugins'), 's');
-    await user.click(await screen.findByText('Shelly'));
+    await user.click(await screen.findByText('Example'));
     await new Promise((resolve) => setTimeout(resolve, 350));
     detail.resolve({ ok: true, json: async () => plugin });
 
@@ -612,9 +612,9 @@ describe('PluginsSection', () => {
     const detail = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
     const refreshedSearch = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
     const plugin = {
-      name: '@attraccess-plugins/shelly',
+      name: '@attraccess-plugins/example',
       version: '1.0.0',
-      displayName: 'Shelly',
+      displayName: 'Example',
       description: null,
       permissions: [],
       registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
@@ -643,7 +643,7 @@ describe('PluginsSection', () => {
     render(<PluginsSection />);
     await openMarketplace(user);
 
-    await user.click(await screen.findByText('Shelly'));
+    await user.click(await screen.findByText('Example'));
     await user.type(screen.getByLabelText('Search plugins'), 's');
     await new Promise((resolve) => setTimeout(resolve, 350));
     refreshedSearch.resolve({ ok: true, json: async () => ({ results: [plugin], errors: [] }) });

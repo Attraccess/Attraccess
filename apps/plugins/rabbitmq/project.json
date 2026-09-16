@@ -3,7 +3,8 @@
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "sourceRoot": "apps/plugins/rabbitmq",
-  "tags": ["type:plugin"],
+  "tags": ["type:plugin", "scope:plugin"],
+  "// lint": "lint runs from the workspace root on purpose: @nx/enforce-module-boundaries no-ops when eslint runs from inside a project directory. See eslint.config.cjs for the plugin isolation rules.",
   "targets": {
     "lint": {
       "executor": "nx:run-commands",
@@ -11,8 +12,7 @@
       "inputs": ["{projectRoot}/backend/**/*", "{projectRoot}/frontend/src/**/*", "{workspaceRoot}/eslint.config.cjs"],
       "outputs": [],
       "options": {
-        "cwd": "apps/plugins/rabbitmq",
-        "command": "eslint backend frontend/src --max-warnings=0 && prettier --check backend frontend/src"
+        "command": "eslint apps/plugins/rabbitmq/backend apps/plugins/rabbitmq/frontend/src --max-warnings=0 && prettier --check apps/plugins/rabbitmq/backend apps/plugins/rabbitmq/frontend/src"
       }
     },
     "test": {

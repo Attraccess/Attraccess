@@ -3,16 +3,13 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "tools/generators/src",
   "projectType": "library",
-  "tags": [],
+  "tags": ["type:tool", "scope:core"],
   "implicitDependencies": [
     "frontend",
     "companion",
     "ui",
     "plugins-frontend-ui",
-    "plugins-frontend-sdk",
-    "plugin-shelly",
-    "plugin-rabbitmq",
-    "plugin-wago"
+    "plugins-frontend-sdk"
   ],
   "targets": {
     "build": {

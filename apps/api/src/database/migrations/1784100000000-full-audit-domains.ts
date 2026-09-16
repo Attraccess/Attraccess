@@ -1,8 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 // Freeze the core domains here so later application changes cannot alter this migration.
-// Plugin-contributed domains (such as historical "wago" entries) never belong in the core
-// allowlist; leaving one stored here would fail the settings schema and disable audit reads.
+// Plugin-contributed domains never belong in the core allowlist; leaving one
+// stored here would fail the settings schema and disable audit reads.
 const coreDomains = ['administration', 'attractap', 'billing', 'identity', 'project', 'resource', 'sso'];
 // Domains introduced after the audit settings shipped; enable them for preexisting selections.
 const addedDomains = ['administration', 'project', 'sso'];
