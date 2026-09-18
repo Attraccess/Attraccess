@@ -1,5 +1,7 @@
 #include "serialCommandHandler.hpp"
 
+#ifndef ATTRACTAP_HOST
+
 #include <ArduinoJson.h>
 #include <lwip/inet.h>
 #include "freertos/FreeRTOS.h"
@@ -24,6 +26,7 @@ void SerialCommandHandler::setup()
     logger.info("Serial command handler ready");
     inputBuffer.reserve(MAX_COMMAND_LENGTH);
 }
+#endif
 
 void SerialCommandHandler::loop()
 {

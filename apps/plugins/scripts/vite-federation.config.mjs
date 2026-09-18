@@ -23,6 +23,7 @@ export const HOST_SHARED = {
   'react-router-dom': { singleton: true, requiredVersion: '*', import: false, generate: false },
   '@heroui/react': { singleton: true, requiredVersion: '*', import: false, generate: false },
   'lucide-react': { singleton: true, requiredVersion: '*', import: false, generate: false },
+  '@tanstack/react-query': { singleton: true, requiredVersion: '*', import: false, generate: false },
 };
 
 /**

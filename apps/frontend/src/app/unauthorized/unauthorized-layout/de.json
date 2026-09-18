@@ -1,4 +1,8 @@
 {
-    "title": "Willkommen bei Attraccess",
-    "subtitle": "Dein Schlüssel zum Makerspace! Erhalte schnellen Zugang zu 3D-Druckern, Lasercuttern, CNC-Maschinen und allen coolen Werkzeugen in deinem Fab Lab oder Makerspace. Buche Maschinen, verfolge deine Projekte und lege direkt los - alles an einem Ort."
+  "eyebrow": "Dein Makerspace. Verbunden.",
+  "title": "Mehr Raum zum Machen.",
+  "subtitle": "Maschinen, Zugang und deine Community. Alles, was du für deinen Makerspace brauchst, an einem Ort.",
+  "access": "Einfacher, sicherer Zugang",
+  "resources": "Werkzeuge bereit für deine Ideen",
+  "community": "Für deine Community gemacht"
 }

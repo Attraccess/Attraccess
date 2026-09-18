@@ -2,8 +2,10 @@ import { registerAs } from '@nestjs/config';
 import * as path from 'path';
 import { z } from 'zod';
 
+export const DEFAULT_STORAGE_ROOT = path.join(process.cwd(), 'storage');
+
 export const StorageEnvSchema = z.object({
-  STORAGE_ROOT: z.string().default(path.join(process.cwd(), 'storage')),
+  STORAGE_ROOT: z.string().default(DEFAULT_STORAGE_ROOT),
   MAX_FILE_SIZE_BYTES: z.coerce
     .number()
     .positive()

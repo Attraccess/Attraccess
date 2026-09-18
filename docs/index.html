@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <title>Attraccess Dokumentation</title>
@@ -14,157 +14,131 @@
   <style>
     /* ===== Attraccess Light Theme (default) ===== */
     :root {
-      --theme-color: #006FEE;
+      color-scheme: light;
+      --theme-color: #256D7B;
+      --theme-color-foreground: #fff;
 
       /* Cover */
       --cover-background-image: none;
-      --cover-background-color: #006FEE;
-      --cover-color: #fff;
-      --cover-heading-color: #fff;
-      --cover-blockquote-color: rgba(255,255,255,0.85);
-      --cover-button-background: #006FEE;
-      --cover-button-border: none;
-      --cover-button-color: #fff;
-      --cover-button-primary-background: #fff;
-      --cover-button-primary-border: none;
-      --cover-button-primary-color: #006FEE;
+      --cover-background-color: #fff;
+      --cover-color: var(--base-color);
+      --cover-heading-color: var(--theme-color);
+      --cover-blockquote-color: var(--blockquote-color);
+      --cover-button-background: transparent;
+      --cover-button-background--hover: var(--table-head-background);
+      --cover-button-border: 1px solid var(--theme-color);
+      --cover-button-color: var(--theme-color);
+      --cover-button-color--hover: var(--link-color--hover);
+      --cover-button-primary-background: var(--theme-color);
+      --cover-button-primary-background--hover: var(--link-color--hover);
+      --cover-button-primary-border: 1px solid var(--theme-color);
+      --cover-button-primary-color: var(--theme-color-foreground);
+      --cover-button-primary-color--hover: var(--theme-color-foreground);
 
-      /* Sidebar — matches app bg-gray-100 */
-      --sidebar-background: #f3f4f6;
-      --sidebar-border-color: #e4e4e7;
+      /* Sidebar */
+      --sidebar-background: #f4f6f6;
+      --sidebar-border-color: #d6dede;
       --sidebar-width: 260px;
-      --sidebar-name-color: #006FEE;
+      --sidebar-name-color: var(--theme-color);
       --sidebar-name-font-weight: 700;
-      --sidebar-nav-link-color: #374151;
-      --sidebar-nav-link-color--active: #006FEE;
+      --sidebar-nav-link-color: #364449;
+      --sidebar-nav-link-color--active: var(--theme-color);
       --sidebar-nav-link-font-weight--active: 600;
-      --sidebar-nav-link-border-color--active: #006FEE;
-      --sidebar-toggle-background: #006FEE;
+      --sidebar-nav-link-border-color--active: var(--theme-color);
+      --sidebar-toggle-background: var(--theme-color);
 
-      /* Content — matches app text-gray-900 on bg-white */
+      /* Content */
       --base-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       --base-font-size: 16px;
       --base-line-height: 1.7;
-      --base-color: #111827;
+      --base-color: #202b30;
       --base-background-color: #ffffff;
-      --heading-color: #111827;
-      --heading-h1-color: #111827;
-      --heading-h2-color: #111827;
-      --heading-h3-color: #111827;
-      --heading-h4-color: #111827;
-      --link-color: #006FEE;
-      --link-color--hover: #005bc4;
-      --blockquote-border-color: #006FEE;
-      --blockquote-color: #4b5563;
+      --heading-color: var(--base-color);
+      --heading-h1-color: var(--base-color);
+      --heading-h2-color: var(--base-color);
+      --heading-h3-color: var(--base-color);
+      --heading-h4-color: var(--base-color);
+      --link-color: var(--theme-color);
+      --link-color--hover: #1c5560;
+      --blockquote-border-color: var(--theme-color);
+      --blockquote-color: #536369;
 
       /* Code */
       --code-font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
-      --code-inline-background: #f4f4f5;
-      --code-inline-color: #7828c8;
-      --code-block-background: #18181b;
-      --code-block-color: #ECEDEE;
+      --code-inline-background: #eef3f3;
+      --code-inline-color: var(--theme-color);
+      --code-block-background: #f4f6f6;
+      --code-block-color: var(--base-color);
+      --code-block-border-radius: 6px;
 
-      /* Table — matches app card styling */
-      --table-head-background: #f3f4f6;
-      --table-head-color: #111827;
+      /* Table */
+      --table-head-background: #f4f6f6;
+      --table-head-color: var(--base-color);
       --table-body-background: #ffffff;
-      --table-row-odd-background: #f9fafb;
-      --table-cell-border-color: #e4e4e7;
+      --table-row-odd-background: #fafbfb;
+      --table-cell-border-color: #d6dede;
 
       /* Notice / Alerts */
       --notice-tip-border-color: #17c964;
-      --notice-important-border-color: #006FEE;
+      --notice-important-border-color: var(--theme-color);
 
       /* Pagination */
-      --pagination-border-color: #e4e4e7;
-      --pagination-title-color: #006FEE;
+      --pagination-border-color: #d6dede;
+      --pagination-title-color: var(--theme-color);
 
       /* Search */
-      --search-background: #f3f4f6;
+      --search-background: #f4f6f6;
       --search-input-background: #ffffff;
-      --search-input-border-color: #e4e4e7;
-      --search-result-keyword-color: #006FEE;
+      --search-input-border-color: #d6dede;
+      --search-input-border-radius: 4px;
+      --search-result-keyword-color: var(--theme-color);
     }
 
     /* ===== Attraccess Dark Theme ===== */
     /* Applied on html element so :root variables are overridden */
     html[data-theme="dark"] {
-      --theme-color: #006FEE;
+      color-scheme: dark;
+      --theme-color: #79bac6;
+      --theme-color-foreground: #172125;
 
       /* Cover */
-      --cover-background-color: #000;
-      --cover-heading-color: #fff;
-      --cover-button-background: #006FEE;
-      --cover-button-primary-background: #fff;
-      --cover-button-primary-color: #006FEE;
+      --cover-background-color: #172125;
 
-      /* Sidebar — matches app dark:bg-gray-900 */
-      --sidebar-background: #111827;
-      --sidebar-border-color: #1f2937;
-      --sidebar-name-color: #006FEE;
-      --sidebar-nav-link-color: #d1d5db;
-      --sidebar-nav-link-color--active: #006FEE;
-      --sidebar-nav-link-border-color--active: #006FEE;
-      --sidebar-toggle-background: #006FEE;
+      /* Sidebar */
+      --sidebar-background: #1e2a2f;
+      --sidebar-border-color: #36464c;
+      --sidebar-nav-link-color: #d3dede;
 
-      /* Content — matches app dark:text-white on dark:bg-gray-800 */
-      --base-color: #ECEDEE;
-      --base-background-color: #000000;
-      --heading-color: #ffffff;
-      --heading-h1-color: #ffffff;
-      --heading-h2-color: #f4f4f5;
-      --heading-h3-color: #e4e4e7;
-      --heading-h4-color: #d4d4d8;
-      --link-color: #338ef7;
-      --link-color--hover: #66aaf9;
-      --blockquote-border-color: #006FEE;
-      --blockquote-color: #9ca3af;
+      /* Content */
+      --base-color: #edf2f2;
+      --base-background-color: #172125;
+      --link-color--hover: #a1d2db;
+      --blockquote-color: #b2c1c5;
 
       /* Code */
-      --code-inline-background: #1f2937;
-      --code-inline-color: #c084fc;
-      --code-block-background: #111827;
-      --code-block-color: #ECEDEE;
+      --code-inline-background: #26363c;
+      --code-block-background: #1e2a2f;
 
-      /* Table — matches app dark cards */
-      --table-head-background: #1f2937;
-      --table-head-color: #ECEDEE;
-      --table-body-background: #000000;
-      --table-row-odd-background: #111827;
-      --table-cell-border-color: #1f2937;
-
-      /* Notice */
-      --notice-tip-border-color: #17c964;
-      --notice-important-border-color: #006FEE;
+      /* Table */
+      --table-head-background: #26363c;
+      --table-body-background: #172125;
+      --table-row-odd-background: #1e2a2f;
+      --table-cell-border-color: #36464c;
 
       /* Pagination */
-      --pagination-border-color: #1f2937;
-      --pagination-title-color: #338ef7;
+      --pagination-border-color: #36464c;
 
       /* Search */
-      --search-background: #111827;
-      --search-input-background: #1f2937;
-      --search-input-border-color: #374151;
-      --search-result-keyword-color: #338ef7;
+      --search-background: #1e2a2f;
+      --search-input-background: #26363c;
+      --search-input-border-color: #536369;
     }
 
-    /* ===== Cover Page — fullscreen with parallax ===== */
+    /* ===== Cover Page ===== */
     section.cover {
-      background: none !important;
-    }
-    section.cover::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      z-index: 0;
-      background: var(--cover-bg-image) center / cover no-repeat;
-    }
-    section.cover::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      z-index: 1;
-      background: linear-gradient(135deg, rgba(0,111,238,0.82) 0%, rgba(120,40,200,0.68) 100%);
+      background: var(--cover-background-color) !important;
+      border-top: 6px solid var(--theme-color);
+      border-bottom: 1px solid var(--sidebar-border-color);
     }
     section.cover .mask {
       display: none !important;
@@ -175,18 +149,14 @@
       max-width: 700px;
     }
     section.cover .cover-main > p:last-child a {
-      border-radius: 8px;
+      border-radius: 4px;
       padding: 10px 28px;
       font-weight: 600;
-      transition: all 0.2s ease;
-    }
-    section.cover .cover-main > p:last-child a:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(0,111,238,0.3);
+      transition: background-color 0.15s ease, color 0.15s ease;
     }
     section.cover img {
       width: 120px;
-      border-radius: 16px;
+      border-radius: 6px;
     }
 
     /* ===== Language Switcher ===== */
@@ -199,20 +169,20 @@
       gap: 4px;
       background: var(--sidebar-background);
       border: 1px solid var(--sidebar-border-color);
-      border-radius: 8px;
+      border-radius: 6px;
       padding: 3px;
       font-size: 13px;
     }
     .lang-switcher a {
       padding: 4px 10px;
-      border-radius: 6px;
+      border-radius: 4px;
       text-decoration: none;
       color: var(--sidebar-nav-link-color);
       transition: all 0.15s ease;
     }
     .lang-switcher a.active {
       background: var(--theme-color);
-      color: #fff;
+      color: var(--theme-color-foreground);
     }
     .lang-switcher a:hover:not(.active) {
       background: var(--table-head-background);
@@ -226,7 +196,7 @@
       z-index: 100;
       background: var(--sidebar-background);
       border: 1px solid var(--sidebar-border-color);
-      border-radius: 8px;
+      border-radius: 4px;
       padding: 4px 10px;
       cursor: pointer;
       font-size: 16px;
@@ -235,6 +205,12 @@
     }
     .theme-toggle:hover {
       background: var(--table-head-background);
+    }
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible {
+      outline: 2px solid var(--theme-color);
+      outline-offset: 3px;
     }
 
     /* ===== Content Styling ===== */
@@ -296,8 +272,7 @@
       background: var(--table-row-odd-background);
     }
     .markdown-section img {
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      border-radius: 6px;
     }
     .markdown-section blockquote {
       color: var(--blockquote-color);
@@ -316,17 +291,17 @@
     .markdown-section .tip,
     .markdown-section .warn,
     .markdown-section .note {
-      border-radius: 8px;
+      border-radius: 6px;
       padding: 16px 20px;
     }
 
     /* Flexible alerts dark mode */
     html[data-theme="dark"] .markdown-section .alert {
-      background-color: #111827;
-      color: #ECEDEE;
+      background-color: var(--sidebar-background);
+      color: var(--base-color);
     }
     html[data-theme="dark"] .markdown-section .alert p {
-      color: #d1d5db;
+      color: var(--base-color);
     }
 
     /* Sidebar logo */
@@ -338,19 +313,19 @@
 
     /* Dark mode: force sidebar and toggle colors */
     html[data-theme="dark"] .sidebar {
-      background: #111827 !important;
-      border-right-color: #1f2937 !important;
+      background: var(--sidebar-background) !important;
+      border-right-color: var(--sidebar-border-color) !important;
     }
     html[data-theme="dark"] .sidebar-toggle {
-      background: #111827 !important;
+      background: var(--sidebar-background) !important;
     }
     html[data-theme="dark"] .search input {
       background: var(--search-input-background) !important;
       border-color: var(--search-input-border-color) !important;
-      color: #ECEDEE !important;
+      color: var(--base-color) !important;
     }
     html[data-theme="dark"] .search .matching-post {
-      border-color: #1f2937 !important;
+      border-color: var(--sidebar-border-color) !important;
     }
 
     /* Sidebar top-level nav items — pointer cursor for collapsible sections */
@@ -450,7 +425,7 @@
       }
       section.cover img {
         width: 80px;
-        border-radius: 12px;
+        border-radius: 6px;
       }
       section.cover .cover-main > p:last-child a {
         display: block;
@@ -545,8 +520,7 @@
 
     // ===== Dark Mode — set on html element so :root CSS variables work =====
     var savedTheme = localStorage.getItem('attraccess-docs-theme');
-    var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    var theme = savedTheme || (prefersDark ? 'dark' : 'light');
+    var theme = savedTheme === 'dark' ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', theme);
 
     // ===== Resolve base path: works at site root (GitHub Pages) and under /docs/ (Docker) =====
@@ -555,7 +529,6 @@
       if (path.charAt(path.length - 1) !== '/') path += '/';
       return path;
     })();
-    document.documentElement.style.setProperty('--cover-bg-image', "url('" + docsBase + "_media/login-wallpaper-blue.jpg')");
 
     // ===== Docsify Configuration =====
     window.$docsify = {

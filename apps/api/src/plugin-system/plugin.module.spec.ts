@@ -5,7 +5,7 @@ import { join } from 'path';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ModuleRef } from '@nestjs/core';
 import { DataSource } from 'typeorm';
-import { PluginPermission, PluginPermissionError } from '@attraccess/plugins-backend-sdk';
+import { PluginPermission, PluginPermissionError, PLUGIN_AUDIT_HOST_PROVIDER } from '@attraccess/plugins-backend-sdk';
 import { PluginModule } from './plugin.module';
 import { PluginService } from './plugin.service';
 import { PluginSandboxService } from './plugin-sandbox.service';
@@ -95,6 +95,25 @@ describe('PluginModule', () => {
       expect(PluginService.getManifestById(discovered[0].id)).toBeDefined();
     });
 
+    it('does not import a plugin persisted as quarantined after a previous failure', () => {
+      mkdirSync(join(root, 'quarantined', 'dist'), { recursive: true });
+      writeFileSync(
+        join(root, 'quarantined', 'plugin.json'),
+        JSON.stringify({
+          name: 'quarantined',
+          version: '1.0.0',
+          main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+          attraccessVersion: { min: '1.0.0' },
+        }),
+      );
+      writeFileSync(join(root, 'quarantined', 'dist', 'index.js'), 'throw new Error("must not be imported");');
+      const [plugin] = PluginService.getPlugins();
+      PluginService.quarantinePlugin(plugin, new Error('prior crash'));
+
+      expect(PluginModule.forRoot().imports).toEqual([SettingsModule, MqttModule]);
+      expect(PluginService.getPluginsWithLoadStatus()[0]).toMatchObject({ status: 'error', error: 'prior crash' });
+    });
+
     it('does not register a credential provider from a plugin whose factory fails', () => {
       mkdirSync(join(root, 'broken-provider', 'dist'), { recursive: true });
       writeFileSync(
@@ -173,6 +192,20 @@ describe('PluginModule', () => {
         version: '1.0.0',
         pluginDirectory: 'ctx-plugin',
       });
+    });
+
+    it('exposes the audit sink through the guarded context with host-bound plugin identity', async () => {
+      const record = jest.fn(async () => ({ status: 'recorded' as const }));
+      (moduleRef.get as jest.Mock).mockImplementation((token: unknown) =>
+        token === PLUGIN_AUDIT_HOST_PROVIDER ? { record } : undefined,
+      );
+      await expect(build([]).audit.record({
+        action: 'demo.claim', operationId: 'operation-id', outcome: 'succeeded',
+        principal: { userId: 7, authenticationMethod: 'session' },
+        subject: { type: 'demo.device', id: 2 }, details: {},
+      })).resolves.toEqual({ status: 'recorded' });
+      expect(record).toHaveBeenCalledWith(expect.objectContaining({ pluginId: 'plugin-id' }));
+      expect(moduleRef.get).toHaveBeenCalledWith(PLUGIN_AUDIT_HOST_PROVIDER, { strict: false });
     });
 
     it('hands back the live host DataSource when DATABASE_ACCESS is granted', () => {

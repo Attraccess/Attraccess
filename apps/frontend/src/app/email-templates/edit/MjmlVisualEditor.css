@@ -1,3 +1,15 @@
+.mjml-visual-editor {
+  /* Theme editor chrome only; the email canvas keeps its authored colors. */
+  --gjs-primary-color: var(--surface);
+  --gjs-secondary-color: var(--foreground);
+  --gjs-tertiary-color: var(--accent-soft);
+  --gjs-quaternary-color: var(--accent);
+  --gjs-main-color: var(--surface);
+  --gjs-font-color: var(--foreground);
+  --gjs-font-color-active: var(--accent-soft-foreground);
+  --gjs-arrow-color: var(--muted);
+}
+
 /* GrapesJS sizes its views panel at 15% of the editor, which gets unusably
    narrow below desktop widths; pin it to a fixed width, and drop it entirely
    on phones where the canvas needs every pixel (inline text editing still

@@ -70,12 +70,15 @@ import { VALKEY_CLIENT } from '../../valkey/valkey.module';
 import type { Redis } from 'ioredis';
 import { ExternalEffectFailureError } from '../flows/errors/external-effect-failure.error';
 import { ResourceOperatingAttributionService } from '../operating-intervals/resource-operating-attribution.service';
+import { AuditService } from '../../audit/audit.service';
+import { ResourceAuditOrigin } from '../../audit/audit-policy';
 
 export interface EndSessionOptions {
   /** Skip persisting required END-action form submissions (used by automated/flow paths). */
   skipFormSubmissions?: boolean;
   /** Skip emitting ResourceUsageNoteAddedEvent (used when the note is auto-generated, e.g. flow-ended). */
   skipNoteNotification?: boolean;
+  auditOrigin?: ResourceAuditOrigin;
 }
 
 export interface StartSessionOptions {
@@ -84,6 +87,7 @@ export interface StartSessionOptions {
    * The supervisor is validated as an introducer for the resource.
    */
   supervisorUserId?: number;
+  auditOrigin?: ResourceAuditOrigin;
 }
 
 @Injectable()
@@ -174,6 +178,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     private readonly resourceHealthService: ResourceHealthService,
     private readonly pluginEvents: PluginEventsService,
     private readonly rbacService: RbacService,
+    private readonly audit: AuditService,
     @Inject(VALKEY_CLIENT) private readonly valkeyClient: Redis | null,
   ) {}
 
@@ -666,6 +671,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     this.logger.debug(`Starting session for resource ${resourceId} by user ${user.id}`, { dto, options });
 
     const supervisorUserId = options.supervisorUserId ?? null;
+    const auditOrigin = options.auditOrigin ?? { actorId: user.id, authenticationMethod: 'session' as const };
 
     // Defer event emission until after the transaction commits to avoid stale reads in listeners
     let endedUsageIdToEmit: number | null = null;
@@ -864,6 +870,27 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       });
     });
 
+    if (endedUsageIdToEmit && takeoverEndedUser) {
+      await this.audit.recordResource({
+        action: 'usage_session.ended',
+        ...auditOrigin,
+        subjectId: resourceId,
+        details: { usageId: endedUsageIdToEmit, usageUserId: takeoverEndedUser.id },
+      }).catch(() => undefined);
+    }
+    if (newSession) {
+      await this.audit.recordResource({
+        action: 'usage_session.started',
+        ...auditOrigin,
+        subjectId: resourceId,
+        details: {
+          usageId: newSession.id,
+          usageUserId: newSession.userId,
+          ...(supervisorUserId === null ? {} : { supervisorUserId }),
+        },
+      }).catch(() => undefined);
+    }
+
     // Emit events after the transaction committed to ensure readers can observe DB state
     try {
       if (endedUsageIdToEmit) {
@@ -916,6 +943,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
   ): Promise<ResourceUsage> {
     // skipNoteNotification: flow-ended sessions carry an auto-generated note, not a human one — skip personnel notification.
     const { skipFormSubmissions = false, skipNoteNotification = false } = options;
+    const auditOrigin = options.auditOrigin ?? { actorId: user.id, authenticationMethod: 'session' as const };
 
     this.logger.debug(`Ending session for resource ${resourceId} by user ${user.id}`, { dto });
 
@@ -1011,6 +1039,15 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       });
 
     const updatedUsage = await this.runSerializedIfSqlite(this.resourceUsageRepository.manager, executeEndSession);
+
+    if (updatedUsage) {
+      await this.audit.recordResource({
+        action: 'usage_session.ended',
+        ...auditOrigin,
+        subjectId: resourceId,
+        details: { usageId: updatedUsage.id, usageUserId: updatedUsage.userId },
+      }).catch(() => undefined);
+    }
 
     if (endFlowPayload) {
       await this.runUsageFlow(

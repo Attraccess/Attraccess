@@ -291,7 +291,7 @@ void API::sendPendingCrashReport()
     }
     buf.get()[pos] = '\0';
 
-    this->websocket.sendMessage(buf.get(), pos);
+    this->transport.sendMessage(buf.get(), pos);
     this->crashReportAwaitingAck = true;
 }
 

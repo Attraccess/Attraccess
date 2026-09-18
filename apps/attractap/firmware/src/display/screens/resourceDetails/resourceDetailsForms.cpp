@@ -1,4 +1,5 @@
 #include "resourceDetailsScreen.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 #include <lvgl.h>
@@ -6,10 +7,90 @@
 #include <stdio.h>
 #include <cstdlib>
 
-static const char *SELECT_FIELD_PLACEHOLDER = "Bitte Option waehlen";
-static const char *SELECT_FIELD_NO_OPTIONS = "Keine Optionen verfuegbar";
-static const char *SELECT_FIELD_INVALID = "Ungueltige Auswahl";
+static const char *SELECT_FIELD_PLACEHOLDER = "Bitte Option wählen";
+static const char *SELECT_FIELD_NO_OPTIONS = "Keine Optionen verfügbar";
+static const char *SELECT_FIELD_INVALID = "Ungültige Auswahl";
 static const lv_coord_t SELECT_FIELD_OPTION_GAP = 6;
+
+// Form values must remain unchanged for submission, so prepare a separate
+// display string for code points not covered by the reader's Latin-1 fonts.
+static std::string makeLVGLDisplayText(const std::string &input)
+{
+   std::string output;
+   for (size_t index = 0; index < input.length();)
+   {
+      const unsigned char byte = static_cast<unsigned char>(input[index]);
+      if (byte < 0x80)
+      {
+         output += input[index++];
+         continue;
+      }
+
+      uint32_t codepoint = 0;
+      size_t length = 0;
+      if ((byte & 0xE0) == 0xC0 && index + 1 < input.length())
+      {
+         codepoint = ((byte & 0x1F) << 6) | (static_cast<unsigned char>(input[index + 1]) & 0x3F);
+         length = 2;
+      }
+      else if ((byte & 0xF0) == 0xE0 && index + 2 < input.length())
+      {
+         codepoint = ((byte & 0x0F) << 12) | ((static_cast<unsigned char>(input[index + 1]) & 0x3F) << 6) |
+                     (static_cast<unsigned char>(input[index + 2]) & 0x3F);
+         length = 3;
+      }
+      else
+      {
+         output += '?';
+         ++index;
+         continue;
+      }
+
+      if (codepoint >= 0xA0 && codepoint <= 0xFF)
+      {
+         output.append(input, index, length);
+      }
+      else if (codepoint >= 0x300 && codepoint <= 0x36F)
+      {
+         // Keep the base character of decomposed accents.
+      }
+      else
+      {
+         switch (codepoint)
+         {
+         case 0x2018:
+         case 0x2019:
+         case 0x201A:
+         case 0x2032:
+            output += '\'';
+            break;
+         case 0x201C:
+         case 0x201D:
+         case 0x201E:
+         case 0x2033:
+            output += '"';
+            break;
+         case 0x2013:
+         case 0x2014:
+         case 0x2015:
+         case 0x2022:
+            output += '-';
+            break;
+         case 0x2026:
+            output += "...";
+            break;
+         case 0x2122:
+            output += "TM";
+            break;
+         default:
+            output += '?';
+            break;
+         }
+      }
+      index += length;
+   }
+   return output;
+}
 
 void ResourceDetailsScreen::disposeFormsModal()
 {
@@ -33,14 +114,14 @@ void ResourceDetailsScreen::resetFormsModalState()
    this->formsBackButton = nullptr;
    this->formsNextButton = nullptr;
    this->formsNextLabel = nullptr;
-   this->formsBusyOverlay = nullptr;
-   this->formsBusyLabel = nullptr;
+   this->formsNextSpinner = nullptr;
    this->formsEditorOverlay = nullptr;
    this->formsEditorTitleLabel = nullptr;
    this->formsEditorTextarea = nullptr;
    this->formsEditorSpacer = nullptr;
    this->formsEditorKeyboard = nullptr;
    this->formsEditorWidgetIndex = 0;
+   this->formsEditorInitialText.clear();
    this->formsBusy = false;
    this->formsModalMeta = nullptr;
    this->formsModalPage = nullptr;
@@ -72,7 +153,7 @@ void ResourceDetailsScreen::showFormsModal(const API::ResourceUsageFormRequest &
       lv_obj_clean(this->formsModalList);
       lv_obj_t *loading = lv_label_create(this->formsModalList);
       lv_label_set_text(loading, "Laden...");
-      lv_obj_set_style_text_color(loading, lv_color_hex(0xE5E7EB), LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_set_style_text_color(loading, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
    if (this->formsModalErrorLabel)
    {
@@ -154,7 +235,7 @@ void ResourceDetailsScreen::showFormPageErrors(const API::ResourceUsageFormPageR
    }
    if (this->formsModalErrorLabel)
    {
-      lv_label_set_text(this->formsModalErrorLabel, shown ? "Bitte Eingabe korrigieren." : "Eingabe ungueltig.");
+      lv_label_set_text(this->formsModalErrorLabel, shown ? "Bitte Eingabe korrigieren." : "Eingabe ungültig.");
    }
 }
 void ResourceDetailsScreen::hideFormsModal()
@@ -179,7 +260,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_add_flag(overlay, LV_OBJ_FLAG_HIDDEN);
    lv_obj_add_flag(overlay, LV_OBJ_FLAG_CLICKABLE);
    lv_obj_set_size(overlay, lv_pct(100), lv_pct(100));
-   lv_obj_set_style_bg_color(overlay, lv_color_black(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_color(overlay, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(overlay, 170, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_all(overlay, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_flex_flow(overlay, LV_FLEX_FLOW_COLUMN);
@@ -190,9 +271,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_remove_style_all(panel);
    lv_obj_set_size(panel, lv_pct(100), lv_pct(100));
    lv_obj_set_style_max_width(panel, LV_COORD_MAX, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_color(panel, lv_color_hex(0x111827), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(panel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_radius(panel, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::applySurface(panel);
    lv_obj_set_style_pad_all(panel, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_flex_flow(panel, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(panel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
@@ -210,19 +289,16 @@ void ResourceDetailsScreen::ensureFormsModal()
 
    this->formsModalProgressLabel = lv_label_create(header);
    lv_label_set_text(this->formsModalProgressLabel, "");
-   lv_obj_set_style_text_color(this->formsModalProgressLabel, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->formsModalProgressLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_text_font(this->formsModalProgressLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *cancelBtn = lv_button_create(header);
    this->formsCancelButton = cancelBtn;
    lv_obj_remove_style_all(cancelBtn);
    lv_obj_set_size(cancelBtn, 34, 34);
-   lv_obj_set_style_radius(cancelBtn, LV_RADIUS_CIRCLE, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_color(cancelBtn, lv_color_hex(0x1F2937), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(cancelBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::secondaryButton(cancelBtn);
    lv_obj_t *cancelLabel = lv_label_create(cancelBtn);
    lv_label_set_text(cancelLabel, LV_SYMBOL_CLOSE);
-   lv_obj_set_style_text_color(cancelLabel, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_center(cancelLabel);
    lv_obj_add_event_cb(cancelBtn, &ResourceDetailsScreen::onFormsCancel, LV_EVENT_CLICKED, this);
 
@@ -233,10 +309,10 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_style_margin_top(this->formsProgressBar, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_margin_bottom(this->formsProgressBar, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_radius(this->formsProgressBar, 3, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_color(this->formsProgressBar, lv_color_hex(0x374151), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_color(this->formsProgressBar, DisplayTheme::primarySoft(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(this->formsProgressBar, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_radius(this->formsProgressBar, 3, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_color(this->formsProgressBar, lv_color_hex(0x10B981), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_color(this->formsProgressBar, DisplayTheme::primary(), LV_PART_INDICATOR | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(this->formsProgressBar, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
    lv_bar_set_range(this->formsProgressBar, 0, 100);
    lv_bar_set_value(this->formsProgressBar, 0, LV_ANIM_OFF);
@@ -257,15 +333,15 @@ void ResourceDetailsScreen::ensureFormsModal()
 
    this->formsBreadcrumbLabel = lv_label_create(content);
    lv_label_set_text(this->formsBreadcrumbLabel, "");
-   lv_obj_set_style_text_color(this->formsBreadcrumbLabel, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->formsBreadcrumbLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->formsBreadcrumbLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->formsBreadcrumbLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_width(this->formsBreadcrumbLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_label_set_long_mode(this->formsBreadcrumbLabel, LV_LABEL_LONG_WRAP);
 
    this->formsModalErrorLabel = lv_label_create(content);
    lv_label_set_text(this->formsModalErrorLabel, "");
-   lv_obj_set_style_text_color(this->formsModalErrorLabel, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->formsModalErrorLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->formsModalErrorLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->formsModalErrorLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *list = lv_obj_create(content);
    this->formsModalList = list;
@@ -295,10 +371,10 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_flex_grow(backBtn, 1);
    lv_obj_set_height(backBtn, LV_SIZE_CONTENT);
    lv_obj_set_style_pad_all(backBtn, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_color(backBtn, lv_color_hex(0x1F2937), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(backBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::secondaryButton(backBtn);
    lv_obj_t *backLabel = lv_label_create(backBtn);
-   lv_label_set_text(backLabel, "Zurueck");
+   lv_label_set_text(backLabel, "Zurück");
+   lv_obj_set_style_text_font(backLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
    lv_obj_set_align(backLabel, LV_ALIGN_CENTER);
    lv_obj_add_event_cb(backBtn, &ResourceDetailsScreen::onFormsBack, LV_EVENT_CLICKED, this);
 
@@ -307,11 +383,18 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_flex_grow(nextBtn, 2);
    lv_obj_set_height(nextBtn, LV_SIZE_CONTENT);
    lv_obj_set_style_pad_all(nextBtn, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_color(nextBtn, lv_color_hex(0x10B981), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(nextBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::button(nextBtn);
    this->formsNextLabel = lv_label_create(nextBtn);
    lv_label_set_text(this->formsNextLabel, "Weiter");
    lv_obj_set_align(this->formsNextLabel, LV_ALIGN_CENTER);
+   this->formsNextSpinner = lv_spinner_create(nextBtn);
+   lv_obj_set_style_arc_color(this->formsNextSpinner, DisplayTheme::border(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_arc_color(this->formsNextSpinner, DisplayTheme::muted(), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+   lv_obj_update_layout(nextBtn);
+   const lv_coord_t nextLabelHeight = lv_obj_get_height(this->formsNextLabel);
+   lv_obj_set_size(this->formsNextSpinner, nextLabelHeight, nextLabelHeight);
+   lv_obj_set_align(this->formsNextSpinner, LV_ALIGN_CENTER);
+   lv_obj_add_flag(this->formsNextSpinner, LV_OBJ_FLAG_HIDDEN);
    lv_obj_add_event_cb(nextBtn, &ResourceDetailsScreen::onFormsNext, LV_EVENT_CLICKED, this);
 
    // Fullscreen text editor overlay: opened when a text/number preview box is
@@ -327,8 +410,7 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_remove_flag(editor, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_size(editor, lv_pct(100), lv_pct(100));
    lv_obj_set_align(editor, LV_ALIGN_CENTER);
-   lv_obj_set_style_bg_color(editor, lv_color_hex(0x111827), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(editor, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::applyScreen(editor);
    lv_obj_set_style_pad_top(editor, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_left(editor, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_right(editor, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -351,18 +433,15 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_label_set_text(this->formsEditorTitleLabel, "");
    lv_obj_set_flex_grow(this->formsEditorTitleLabel, 1);
    lv_label_set_long_mode(this->formsEditorTitleLabel, LV_LABEL_LONG_DOT);
-   lv_obj_set_style_text_color(this->formsEditorTitleLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->formsEditorTitleLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(this->formsEditorTitleLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->formsEditorTitleLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *editorCancelBtn = lv_button_create(editorHeader);
    lv_obj_remove_style_all(editorCancelBtn);
    lv_obj_set_size(editorCancelBtn, 34, 34);
-   lv_obj_set_style_radius(editorCancelBtn, LV_RADIUS_CIRCLE, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_color(editorCancelBtn, lv_color_hex(0x1F2937), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(editorCancelBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::secondaryButton(editorCancelBtn);
    lv_obj_t *editorCancelLabel = lv_label_create(editorCancelBtn);
    lv_label_set_text(editorCancelLabel, LV_SYMBOL_CLOSE);
-   lv_obj_set_style_text_color(editorCancelLabel, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_center(editorCancelLabel);
    lv_obj_add_event_cb(editorCancelBtn, &ResourceDetailsScreen::onFormsEditorCancel, LV_EVENT_CLICKED, this);
 
@@ -371,8 +450,8 @@ void ResourceDetailsScreen::ensureFormsModal()
    this->formsEditorTextarea = editorTa;
    lv_obj_set_width(editorTa, lv_pct(100));
    lv_obj_set_flex_grow(editorTa, 1);
-   lv_obj_set_style_bg_color(editorTa, lv_color_hex(0x374151), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(editorTa, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    DisplayTheme::field(editorTa);
+    lv_obj_set_style_text_font(editorTa, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Spacer keeps the keyboard pinned to the bottom when the textarea is
    // one-line (multiline textareas grow instead, see openFormsEditor).
@@ -385,47 +464,20 @@ void ResourceDetailsScreen::ensureFormsModal()
    lv_obj_set_flex_grow(editorSpacer, 1);
 
    this->formsEditorKeyboard = lv_keyboard_create(editor);
+   DisplayTheme::keyboard(this->formsEditorKeyboard);
    lv_obj_set_width(this->formsEditorKeyboard, lv_pct(100));
    lv_obj_set_height(this->formsEditorKeyboard, lv_pct(45));
    lv_obj_add_event_cb(this->formsEditorKeyboard, &ResourceDetailsScreen::onFormsEditorKeyboardEvent, LV_EVENT_ALL, this);
 
-   // Busy overlay: created last so it floats above the panel + keyboard. While
-   // visible it blocks all input behind it (CLICKABLE) until the server responds.
-   lv_obj_t *busy = lv_obj_create(overlay);
-   this->formsBusyOverlay = busy;
-   lv_obj_remove_style_all(busy);
-   lv_obj_add_flag(busy, LV_OBJ_FLAG_IGNORE_LAYOUT);
-   lv_obj_add_flag(busy, LV_OBJ_FLAG_CLICKABLE);
-   lv_obj_add_flag(busy, LV_OBJ_FLAG_HIDDEN);
-   lv_obj_remove_flag(busy, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_size(busy, lv_pct(100), lv_pct(100));
-   lv_obj_set_align(busy, LV_ALIGN_CENTER);
-   lv_obj_set_style_bg_color(busy, lv_color_black(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(busy, 160, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_flex_flow(busy, LV_FLEX_FLOW_COLUMN);
-   lv_obj_set_flex_align(busy, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-   lv_obj_set_style_pad_row(busy, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   lv_obj_t *busySpinner = lv_spinner_create(busy);
-   lv_obj_set_size(busySpinner, 48, 48);
-   lv_obj_remove_flag(busySpinner, LV_OBJ_FLAG_CLICKABLE);
-
-   this->formsBusyLabel = lv_label_create(busy);
-   lv_label_set_text(this->formsBusyLabel, "Bitte warten");
-   lv_obj_set_style_text_color(this->formsBusyLabel, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
 }
-void ResourceDetailsScreen::setFormsBusy(bool busy, const char *text)
+void ResourceDetailsScreen::setFormsBusy(bool busy, const char *)
 {
    this->formsBusy = busy;
    if (busy)
    {
       this->closeFormsEditor(false);
    }
-   if (this->formsBusyLabel && text)
-   {
-      lv_label_set_text(this->formsBusyLabel, text);
-   }
-   // Disable footer buttons as well so they read as inactive behind the overlay.
+   // Disable controls while a request is in flight, without redrawing an overlay.
    lv_obj_t *const buttons[] = {this->formsNextButton, this->formsBackButton, this->formsCancelButton};
    for (lv_obj_t *button : buttons)
    {
@@ -442,21 +494,39 @@ void ResourceDetailsScreen::setFormsBusy(bool busy, const char *text)
          lv_obj_clear_state(button, LV_STATE_DISABLED);
       }
    }
+   for (uint16_t i = 0; i < this->formFieldWidgetCount; ++i)
+   {
+      lv_obj_t *input = this->formFieldWidgets[i].input;
+      if (!input)
+      {
+         continue;
+      }
+      if (busy)
+      {
+         lv_obj_add_state(input, LV_STATE_DISABLED);
+      }
+      else
+      {
+         lv_obj_clear_state(input, LV_STATE_DISABLED);
+      }
+   }
    // Back button stays disabled on the first field even when not busy.
    if (!busy && this->formsBackButton && !this->formsCanGoBack)
    {
       lv_obj_add_state(this->formsBackButton, LV_STATE_DISABLED);
    }
-   if (this->formsBusyOverlay)
+   if (this->formsNextLabel && this->formsNextSpinner)
    {
       if (busy)
       {
-         lv_obj_clear_flag(this->formsBusyOverlay, LV_OBJ_FLAG_HIDDEN);
-         lv_obj_move_foreground(this->formsBusyOverlay);
+         lv_obj_add_flag(this->formsNextLabel, LV_OBJ_FLAG_HIDDEN);
+         lv_obj_clear_flag(this->formsNextSpinner, LV_OBJ_FLAG_HIDDEN);
       }
       else
       {
-         lv_obj_add_flag(this->formsBusyOverlay, LV_OBJ_FLAG_HIDDEN);
+         lv_obj_clear_flag(this->formsNextLabel, LV_OBJ_FLAG_HIDDEN);
+         lv_obj_add_flag(this->formsNextSpinner, LV_OBJ_FLAG_HIDDEN);
+         lv_label_set_text(this->formsNextLabel, this->formsIsLastField ? "Absenden" : "Weiter");
       }
    }
 }
@@ -480,22 +550,22 @@ void ResourceDetailsScreen::buildCurrentFormField()
       return;
    }
 
-   std::string pageTitle = "Bitte Formular ausfuellen";
+   std::string pageTitle = "Bitte Formular ausfüllen";
    std::string resourceName = "";
 
    if (this->formsModalMeta)
    {
       if (this->formsModalMeta->action == API::ResourceUsageFormActionType::START)
       {
-         pageTitle = "Bitte vor dem Start ausfuellen";
+         pageTitle = "Bitte vor dem Start ausfüllen";
       }
       else if (this->formsModalMeta->action == API::ResourceUsageFormActionType::END)
       {
-         pageTitle = "Bitte vor dem Ende ausfuellen";
+         pageTitle = "Bitte vor dem Ende ausfüllen";
       }
       else if (this->formsModalMeta->action == API::ResourceUsageFormActionType::TAKEOVER)
       {
-         pageTitle = "Bitte vor der Uebernahme ausfuellen";
+         pageTitle = "Bitte vor der Übernahme ausfüllen";
       }
 
       if (this->formsModalMeta->resourceName.length() > 0)
@@ -557,8 +627,8 @@ void ResourceDetailsScreen::buildCurrentFormField()
          }
          lv_obj_t *fieldLabel = lv_label_create(fieldContainer);
          lv_label_set_text(fieldLabel, fieldTitle.c_str());
-         lv_obj_set_style_text_font(fieldLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
-         lv_obj_set_style_text_color(fieldLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+          lv_obj_set_style_text_font(fieldLabel, &attractap_font_montserrat_latin1_24, LV_PART_MAIN | LV_STATE_DEFAULT);
+          lv_obj_set_style_text_color(fieldLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
          lv_obj_set_style_width(fieldLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
          lv_label_set_long_mode(fieldLabel, LV_LABEL_LONG_WRAP);
 
@@ -566,8 +636,8 @@ void ResourceDetailsScreen::buildCurrentFormField()
          {
             lv_obj_t *desc = lv_label_create(fieldContainer);
             lv_label_set_text(desc, field.description.c_str());
-            lv_obj_set_style_text_color(desc, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_text_font(desc, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+             lv_obj_set_style_text_color(desc, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
+             lv_obj_set_style_text_font(desc, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_width(desc, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_label_set_long_mode(desc, LV_LABEL_LONG_WRAP);
          }
@@ -591,7 +661,9 @@ void ResourceDetailsScreen::buildCurrentFormField()
             lv_obj_t *sw = lv_switch_create(fieldContainer);
             widget.input = sw;
             lv_obj_set_size(sw, 64, 32);
-            lv_obj_set_style_bg_color(sw, lv_color_hex(0x10B981), LV_PART_INDICATOR | LV_STATE_CHECKED);
+            lv_obj_set_style_bg_color(sw, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_bg_color(sw, DisplayTheme::primary(), LV_PART_INDICATOR | LV_STATE_CHECKED);
+            lv_obj_set_style_bg_color(sw, DisplayTheme::onPrimary(), LV_PART_KNOB | LV_STATE_DEFAULT);
             if (field.hasValue && field.value == "true")
             {
                lv_obj_add_state(sw, LV_STATE_CHECKED);
@@ -618,8 +690,8 @@ void ResourceDetailsScreen::buildCurrentFormField()
             {
                lv_obj_t *info = lv_label_create(selectContainer);
                lv_label_set_text(info, SELECT_FIELD_NO_OPTIONS);
-               lv_obj_set_style_text_color(info, lv_color_hex(0xF5A524), LV_PART_MAIN | LV_STATE_DEFAULT);
-               lv_obj_set_style_text_font(info, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+                lv_obj_set_style_text_color(info, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
+                lv_obj_set_style_text_font(info, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
                lv_obj_set_style_width(info, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
                lv_label_set_long_mode(info, LV_LABEL_LONG_WRAP);
             }
@@ -631,16 +703,15 @@ void ResourceDetailsScreen::buildCurrentFormField()
                   lv_obj_t *optBtn = lv_button_create(selectContainer);
                   lv_obj_set_height(optBtn, 48);
                   lv_obj_set_style_pad_all(optBtn, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
-                  lv_obj_set_style_bg_color(optBtn, lv_color_hex(0x374151), LV_PART_MAIN | LV_STATE_DEFAULT);
-                  lv_obj_set_style_bg_opa(optBtn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-                  lv_obj_set_style_radius(optBtn, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
+                  DisplayTheme::secondaryButton(optBtn);
 
                   lv_obj_t *optLabel = lv_label_create(optBtn);
                   lv_obj_set_width(optLabel, lv_pct(100));
                   lv_obj_set_align(optLabel, LV_ALIGN_CENTER);
-                  lv_label_set_text(optLabel, field.options.select.values[optIndex].c_str());
+                  const std::string displayValue = makeLVGLDisplayText(field.options.select.values[optIndex]);
+                  lv_label_set_text(optLabel, displayValue.c_str());
                   lv_label_set_long_mode(optLabel, LV_LABEL_LONG_WRAP);
-                  lv_obj_set_style_text_color(optLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+                  lv_obj_set_style_text_font(optLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
                   if (widget.selectOptionEventCount >= API::MAX_SELECT_OPTIONS)
                   {
@@ -685,9 +756,7 @@ void ResourceDetailsScreen::buildCurrentFormField()
             lv_obj_remove_flag(preview, LV_OBJ_FLAG_SCROLLABLE);
             lv_obj_set_width(preview, lv_pct(100));
             lv_obj_set_height(preview, multiline ? 96 : 52);
-            lv_obj_set_style_bg_color(preview, lv_color_hex(0x374151), LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_bg_opa(preview, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_radius(preview, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
+            DisplayTheme::field(preview);
             lv_obj_set_style_pad_all(preview, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_pad_column(preview, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_flex_flow(preview, LV_FLEX_FLOW_ROW);
@@ -697,12 +766,13 @@ void ResourceDetailsScreen::buildCurrentFormField()
             lv_obj_t *valueLabel = lv_label_create(preview);
             widget.previewLabel = valueLabel;
             lv_obj_set_flex_grow(valueLabel, 1);
+            lv_obj_set_style_text_font(valueLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
             // Multiline: wrap and clip at the fixed preview height. Single line: ellipsis.
             lv_label_set_long_mode(valueLabel, multiline ? LV_LABEL_LONG_WRAP : LV_LABEL_LONG_DOT);
 
             lv_obj_t *editIcon = lv_label_create(preview);
             lv_label_set_text(editIcon, LV_SYMBOL_EDIT);
-            lv_obj_set_style_text_color(editIcon, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_color(editIcon, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
             lv_obj_add_event_cb(preview, &ResourceDetailsScreen::onFieldPreviewClick, LV_EVENT_CLICKED, this);
             this->updateFieldPreview(widget);
@@ -710,8 +780,8 @@ void ResourceDetailsScreen::buildCurrentFormField()
 
          widget.errorLabel = lv_label_create(fieldContainer);
          lv_label_set_text(widget.errorLabel, "");
-         lv_obj_set_style_text_color(widget.errorLabel, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
-         lv_obj_set_style_text_font(widget.errorLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+          lv_obj_set_style_text_color(widget.errorLabel, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
+          lv_obj_set_style_text_font(widget.errorLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
       }
    }
 
@@ -816,7 +886,7 @@ bool ResourceDetailsScreen::collectCurrentField(API::FormPageSubmission &outPage
    {
       if (this->formsModalErrorLabel)
       {
-         lv_label_set_text(this->formsModalErrorLabel, "Bitte markierte Felder ausfuellen.");
+         lv_label_set_text(this->formsModalErrorLabel, "Bitte markierte Felder ausfüllen.");
       }
       return false;
    }
@@ -882,12 +952,13 @@ void ResourceDetailsScreen::updateFieldPreview(FormFieldWidget &widget)
          hint = widget.definition->options.text.placeholder.c_str();
       }
       lv_label_set_text(widget.previewLabel, hint);
-      lv_obj_set_style_text_color(widget.previewLabel, lv_color_hex(0x9CA3AF), LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_set_style_text_color(widget.previewLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
    else
    {
-      lv_label_set_text(widget.previewLabel, widget.textValue.c_str());
-      lv_obj_set_style_text_color(widget.previewLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+      const std::string displayValue = makeLVGLDisplayText(widget.textValue);
+      lv_label_set_text(widget.previewLabel, displayValue.c_str());
+      lv_obj_set_style_text_color(widget.previewLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 }
 void ResourceDetailsScreen::openFormsEditor(uint16_t widgetIndex)
@@ -933,7 +1004,8 @@ void ResourceDetailsScreen::openFormsEditor(uint16_t widgetIndex)
       placeholder = widget.definition->options.text.placeholder.c_str();
    }
    lv_textarea_set_placeholder_text(this->formsEditorTextarea, placeholder);
-   lv_textarea_set_text(this->formsEditorTextarea, widget.textValue.c_str());
+   this->formsEditorInitialText = makeLVGLDisplayText(widget.textValue);
+   lv_textarea_set_text(this->formsEditorTextarea, this->formsEditorInitialText.c_str());
    lv_textarea_set_cursor_pos(this->formsEditorTextarea, LV_TEXTAREA_CURSOR_LAST);
 
    lv_keyboard_set_mode(this->formsEditorKeyboard,
@@ -943,11 +1015,6 @@ void ResourceDetailsScreen::openFormsEditor(uint16_t widgetIndex)
 
    lv_obj_clear_flag(this->formsEditorOverlay, LV_OBJ_FLAG_HIDDEN);
    lv_obj_move_foreground(this->formsEditorOverlay);
-   // Busy overlay must stay above everything when it shows up later.
-   if (this->formsBusyOverlay)
-   {
-      lv_obj_move_foreground(this->formsBusyOverlay);
-   }
 }
 void ResourceDetailsScreen::closeFormsEditor(bool commit)
 {
@@ -962,7 +1029,13 @@ void ResourceDetailsScreen::closeFormsEditor(bool commit)
           widget.type != API::ResourceUsageFormFieldType::SELECT)
       {
          const char *text = lv_textarea_get_text(this->formsEditorTextarea);
-         widget.textValue = text ? std::string(text) : std::string("");
+         const std::string editedText = text ? std::string(text) : std::string("");
+         // Opening/confirming a fallback-rendered draft must not rewrite its
+         // original protocol value. Only an actual edit replaces the draft.
+         if (editedText != this->formsEditorInitialText)
+         {
+            widget.textValue = editedText;
+         }
          this->updateFieldPreview(widget);
       }
    }
@@ -1106,6 +1179,10 @@ void ResourceDetailsScreen::onSelectOptionClick(lv_event_t *e)
    }
 
    auto *self = evtData->self;
+   if (self->formsBusy)
+   {
+      return;
+   }
    if (evtData->widgetIndex >= self->formFieldWidgetCount)
    {
       return;
@@ -1154,11 +1231,11 @@ void ResourceDetailsScreen::updateSelectButtonStyles(FormFieldWidget &widget)
       bool isSelected = (widget.selectedOptionIndex == (i + 1));
       if (isSelected)
       {
-         lv_obj_set_style_bg_color(btn, lv_color_hex(0x10B981), LV_PART_MAIN | LV_STATE_DEFAULT);
+         DisplayTheme::button(btn);
       }
       else
       {
-         lv_obj_set_style_bg_color(btn, lv_color_hex(0x374151), LV_PART_MAIN | LV_STATE_DEFAULT);
+         DisplayTheme::secondaryButton(btn);
       }
    }
 }

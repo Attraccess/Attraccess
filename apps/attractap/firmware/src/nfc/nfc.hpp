@@ -7,10 +7,11 @@
 #include "../state/state.hpp"
 #include "../utils.hpp"
 #include <functional>
+#include "nfc_contract.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
-class NFC
+class NFC : public INfc
 {
 public:
     // Card technology detected at tap time (GetVersion HWType). Routing:
@@ -18,18 +19,13 @@ public:
     // run the same EV2First handshake inside the Attraccess application
     // (selected/created via the DESFire native commands). Unknown cards fall
     // back to the legacy NTAG424 path (pre-DESFire behavior).
-    enum CardType
-    {
-        CARD_TYPE_UNKNOWN = 0,
-        CARD_TYPE_NTAG424,
-        CARD_TYPE_DESFIRE,
-    };
+    using CardType = INfc::CardType;
 
     NFC() : logger("NFC"), pn532(PN532_I2C_ADDRESS)
     {
     }
 
-    void setup();
+    void setup() override;
 
     /**
      * Runs on the main application loop (the dedicated NFC task from ATT-554
@@ -39,21 +35,21 @@ public:
      * and every PN532 conversation holds the shared I2CBusGuard against the
      * touch reads on LvglTask.
      */
-    void loop();
+    void loop() override;
 
-    bool changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint8_t *newKey, uint8_t keyVersion = 0x01);
-    bool authenticate(uint8_t keyNumber, uint8_t *key);
-    void enableCardDetection();
-    void setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)> callback);
-    void setCardRemovalCallback(std::function<void(uint32_t presentationTimeMs)> callback);
-    void disableCardDetection();
+    bool changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey, uint8_t *newKey, uint8_t keyVersion = 0x01) override;
+    bool authenticate(uint8_t keyNumber, uint8_t *key) override;
+    void enableCardDetection() override;
+    void setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)> callback) override;
+    void setCardRemovalCallback(std::function<void(uint32_t presentationTimeMs)> callback) override;
+    void disableCardDetection() override;
 
     // Forget the currently tracked card so the next enableCardDetection() cycle
     // re-detects from a clean state (fresh readPassiveTargetID) instead of
     // assuming the previously held card is still present.
-    void resetCardPresence();
+    void resetCardPresence() override;
 
-    bool getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo);
+    bool getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo) override;
 
     // Card type of the currently tracked card (valid while isCardPresent()).
     CardType getDetectedCardType();
@@ -71,13 +67,11 @@ public:
     // (0x80 = AES | 6 keys, mirroring the NTAG424 key slots 0-5).
     static const uint8_t DESFIRE_APP_KEY_SETTINGS_1 = 0x0F;
     static const uint8_t DESFIRE_APP_KEY_SETTINGS_2 = 0x86;
-    static const uint8_t CARD_KEY_VERSION_FREE = 0x00;
-    static const uint8_t CARD_KEY_VERSION_ENROLLED = 0x01;
-
     bool isCardDetectionEnabled();
 
     // True while a card is physically on the reader (tracked by handleCardDetection).
-    bool isCardPresent();
+    bool isCardPresent() override;
+    uint8_t *getFactoryKey() override { return FACTORY_KEY; }
 
 private:
     Logger logger;

@@ -19,6 +19,8 @@ describe('AdminPasswordPolicyController', () => {
   const auditContext = {
     actorId: 1,
     actorUsername: 'root',
+    authenticationMethod: 'session' as const,
+    apiTokenId: null,
     ip: '127.0.0.1',
     userAgent: 'jest',
     requestId: 'req-1',

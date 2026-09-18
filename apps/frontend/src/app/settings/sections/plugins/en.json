@@ -1,6 +1,10 @@
 {
   "title": "Plugins",
   "description": "Plugins installed on this instance, and what each of them loaded.",
+  "disabledWarning": {
+    "title": "Plugins are disabled",
+    "description": "Plugins are disabled by the DISABLE_PLUGINS setting and will not load until the application is restarted with it disabled."
+  },
   "installPlugin": "Install plugin",
   "uploadButton": "Upload ZIP file",
   "docsButton": "Documentation",
@@ -26,6 +30,18 @@
     "search": "Search plugins",
     "searchPlaceholder": "Search plugins or enter an exact package name",
     "loading": "Searching plugins...",
+    "back": "Back",
+    "about": "About this plugin",
+    "links": "Package links",
+    "versionLabel": "Version",
+    "publisherLabel": "Publisher",
+    "hostCompatibilityLabel": "Host compatibility",
+    "sdkCompatibilityLabel": "SDK compatibility",
+    "sdkCompatibilityValue": "Backend {{backend}}, frontend {{frontend}}",
+    "licenseLabel": "License",
+    "sourceLabel": "Source",
+    "permissionsLabel": "Requested permissions",
+    "safetyWarning": "Review the source and requested permissions before installing.",
     "details": "Details",
     "installed": "Installed",
     "install": "Install",
@@ -82,7 +98,14 @@
     "loaded": "Loaded",
     "error": "Failed to load",
     "unknown": "Frontend only",
-    "errorTooltip": "This plugin failed to load on the server: {{message}}"
+    "errorTooltip": "View the server load error",
+    "viewError": "View load error for {{pluginName}}",
+    "errorTitle": "{{pluginName}} failed to load",
+    "errorDescription": "The server reported this error during startup:",
+    "close": "Close",
+    "retry": "Retry and restart",
+    "retrySuccess": "The plugin will be retried when the app restarts.",
+    "retryError": "Could not retry the plugin."
   },
   "noPermissions": "None requested",
   "updatePolicy": {
@@ -147,7 +170,13 @@
     "savePolicy": "Save version policy",
     "policySaved": "Plugin version policy saved",
     "policyError": "Could not save plugin version policy",
-    "overrides": { "inherit": "Inherit global policy", "off": "Off", "patch": "Patch only", "minor": "Patch and minor", "follow": "Follow package policy" },
+    "overrides": {
+      "inherit": "Inherit global policy",
+      "off": "Off",
+      "patch": "Patch only",
+      "minor": "Patch and minor",
+      "follow": "Follow package policy"
+    },
     "published": "Published: {{date}}",
     "permissionApproval": "I approve these new permissions: {{permissions}}",
     "permissionRemovals": "Removed permissions: {{permissions}}",

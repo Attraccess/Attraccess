@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react';
 import {
   Modal,
   ModalBackdrop,
@@ -19,17 +18,11 @@ interface Props extends Omit<ModalProps, 'children'> {
   dialogProps?: Omit<ModalDialogProps, 'children'>;
 }
 
-const DEFAULT_DIALOG_CLASSNAME = 'bg-surface-secondary';
-
-const FIELD_CONTRAST_STYLE: CSSProperties = {
-  ['--field-border' as never]: 'var(--border-secondary)',
-  ['--border-width-field' as never]: '1px',
-};
+const DEFAULT_DIALOG_CLASSNAME = 'bg-overlay';
 
 /**
  * Single source of truth for modal chrome. Wraps HeroUI's Modal primitives and
- * applies a distinct surface background (bg-surface-secondary) for contrast
- * against the backdrop plus the same field-contrast defaults as StandardDrawer.
+ * uses the shared overlay and field tokens, like StandardDrawer.
  *
  * Per-modal overrides pass through: `size` and `containerProps` reach the
  * ModalContainer, `dialogProps` reach the ModalDialog, and any remaining props
@@ -42,13 +35,11 @@ export function StandardModal(props: Props) {
     ? `${DEFAULT_DIALOG_CLASSNAME} ${dialogProps.className}`
     : DEFAULT_DIALOG_CLASSNAME;
 
-  const mergedStyle = { ...FIELD_CONTRAST_STYLE, ...dialogProps?.style };
-
   return (
     <Modal {...modalProps}>
       <ModalBackdrop {...backdropProps}>
         <ModalContainer size={size} {...containerProps}>
-          <ModalDialog {...dialogProps} className={mergedDialogClassName} style={mergedStyle}>
+          <ModalDialog {...dialogProps} className={mergedDialogClassName}>
             {children}
           </ModalDialog>
         </ModalContainer>

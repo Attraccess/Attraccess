@@ -46,7 +46,7 @@ describe('HealthHeartbeatExecutor', () => {
   describe('invalid node data (schema safeParse failure)', () => {
     it('warns and returns the input untouched without reporting health', async () => {
       // timeoutSeconds is required (positive int); omitting it fails the schema.
-      const node = createNode({ data: { identifier: 'Shelly' } });
+      const node = createNode({ data: { identifier: 'ir-bridge' } });
       const input = { foo: 'bar' };
 
       const result = await executor.execute(node, input);
@@ -75,7 +75,7 @@ describe('HealthHeartbeatExecutor', () => {
     it('stamps the last-seen map and reports HEALTHY with the trimmed identifier', async () => {
       const node = createNode({
         resourceId: 42,
-        data: { identifier: '  Shelly  ', timeoutSeconds: 30 },
+        data: { identifier: '  ir-bridge  ', timeoutSeconds: 30 },
       });
       const input = { payload: 'in' };
 
@@ -87,7 +87,7 @@ describe('HealthHeartbeatExecutor', () => {
       expect(result.payload).toBe(input);
 
       // Map stamped at heartbeatKey(resourceId, trimmedIdentifier)
-      const key = heartbeatKey(42, 'Shelly');
+      const key = heartbeatKey(42, 'ir-bridge');
       expect(heartbeatLastSeen.has(key)).toBe(true);
       const stamped = heartbeatLastSeen.get(key) as Date;
       expect(stamped).toBeInstanceOf(Date);
@@ -98,7 +98,7 @@ describe('HealthHeartbeatExecutor', () => {
       expect(resourceHealthService.reportHealth).toHaveBeenCalledTimes(1);
       expect(resourceHealthService.reportHealth).toHaveBeenCalledWith({
         resourceId: 42,
-        identifier: 'Shelly',
+        identifier: 'ir-bridge',
         status: ResourceHealthStatus.HEALTHY,
         reason: null,
         source: ResourceHealthSource.HEARTBEAT,

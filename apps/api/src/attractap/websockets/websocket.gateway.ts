@@ -11,12 +11,7 @@ import { Server } from 'ws';
 import { closeSync } from 'fs';
 import { Inject, Logger, UseInterceptors } from '@nestjs/common';
 import { WebsocketService } from './websocket.service';
-import {
-  AuthenticatedWebSocket,
-  AttractapEvent,
-  AttractapMessage,
-  AttractapEventType,
-} from './websocket.types';
+import { AuthenticatedWebSocket, AttractapEvent, AttractapMessage, AttractapEventType } from './websocket.types';
 import { AttractapService } from '../attractap.service';
 import { randomBytes } from 'crypto';
 import { Mutex } from 'async-mutex';
@@ -99,27 +94,15 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   private makeStringLVGLReady(input: string): string {
     if (!input) return input;
 
-    // Step 1: Explicit language-aware replacements (keep before diacritic removal)
+    // Step 1: Explicit replacements for unsupported punctuation and symbols
     const explicitReplacements: Array<[RegExp, string]> = [
-      // German umlauts and sharp s
-      [/ä/g, 'ae'],
-      [/ö/g, 'oe'],
-      [/ü/g, 'ue'],
-      [/Ä/g, 'Ae'],
-      [/Ö/g, 'Oe'],
-      [/Ü/g, 'Ue'],
-      [/ß/g, 'ss'],
-
       // Common symbols and punctuation
-      [/\u00A0/g, ' '], // NBSP -> space
       [/\u2018|\u2019|\u201A|\u2032/g, "'"], // smart single quotes, prime
       [/\u201C|\u201D|\u201E|\u2033/g, '"'], // smart double quotes, double prime
       [/\u2013|\u2014|\u2015/g, '-'], // en/em/horizontal bar -> hyphen
       [/\u2026/g, '...'], // ellipsis
       [/\u2022/g, '-'], // bullet -> hyphen
-      [/\u00B0/g, 'deg'], // degree
       [/\u2122/g, 'TM'], // trademark
-      [/\u00AE/g, '(R)'], // registered
     ];
 
     let output = input;
@@ -127,14 +110,18 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       output = output.replace(pattern, replacement);
     }
 
-    // Step 2: Remove remaining diacritics (NFD decomposition)
-    output = output.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    // The reader's Latin-1 fonts cover printable ASCII plus U+00A0-U+00FF.
+    // Normalize only unsupported code points so existing Latin-1 glyphs survive.
+    return Array.from(output)
+      .map((character) => {
+        if (/^[\n\r\t\x20-\x7E\xA0-\xFF]$/.test(character)) {
+          return character;
+        }
 
-    // Step 3: Replace any remaining non-ASCII characters with '?'
-    // Allow printable ASCII range only (space 0x20 to tilde 0x7E)
-    output = output.replace(/[^\x20-\x7E]/g, '?');
-
-    return output;
+        const fallback = character.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        return /^[\x20-\x7E]*$/.test(fallback) ? fallback : '?';
+      })
+      .join('');
   }
 
   private sanitizeForLVGL<T>(value: T): T {
@@ -150,7 +137,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         seen.add(obj);
         const out: Record<string, unknown> = {};
         for (const [k, val] of Object.entries(obj)) {
-          out[k] = sanitize(val);
+          // Select options and draft values are protocol values: changing them
+          // prevents the firmware from submitting the value the API validates.
+          // Object-based options contain display metadata such as placeholders.
+          out[k] = (k === 'options' && Array.isArray(val)) || k === 'value' || k === 'answers' ? val : sanitize(val);
         }
         return out;
       }
@@ -191,8 +181,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
           `Sending ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`,
           message.data.payload,
         );
-        const sanitized = this.sanitizeForLVGL(message);
-        const stringifiedMessage = JSON.stringify(sanitized);
+        const stringifiedMessage = JSON.stringify(this.sanitizeForLVGL(message));
         client.send(stringifiedMessage);
 
         this.logger.debug(
@@ -235,6 +224,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       sendBinaryData,
       state: {
         lastAuthenticatedUserId: null,
+        enrollment: null,
         enrollNewCardData: null,
         resetNfcCardData: null,
         ota: null,
@@ -499,6 +489,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         await this.formsHandler.handleResourceUsageFormSubmitPage(socket, eventData);
         break;
 
+      case AttractapEventType.RESOURCE_USAGE_FORM_CANCEL:
+        this.formsHandler.handleResourceUsageFormCancel(socket, eventData);
+        break;
+
       case AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED:
         // no-op on server; metadata-only event sent by server
         break;
@@ -542,11 +536,22 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     await Promise.all(sockets.map((socket) => socket.close()));
   }
 
-  public async startEnrollOfNewNfcCard(data: { readerId: number; userId: number }) {
+  public async startEnrollOfNewNfcCard(data: {
+    readerId: number;
+    userId: number;
+    authenticationMethod?: 'session' | 'api-token';
+    apiTokenId?: number;
+  }) {
     return this.cardHandler.startEnrollOfNewNfcCard(data);
   }
 
-  public async startResetOfNfcCard(data: { readerId: number; userId: number; cardId: number }) {
+  public async startResetOfNfcCard(data: {
+    readerId: number;
+    userId: number;
+    cardId: number;
+    authenticationMethod?: 'session' | 'api-token';
+    apiTokenId?: number;
+  }) {
     return this.cardHandler.startResetOfNfcCard(data);
   }
 }

@@ -1,13 +1,13 @@
 {
-  "title": "Upload Plugin",
-  "description": "Upload a plugin as a ZIP file. The plugin must be properly structured with a manifest.json file.",
+  "title": "Upload or Update Plugin",
+  "description": "Upload a plugin as a ZIP file. If a plugin with the same name is already installed, it will be replaced after the archive is validated. The archive must include a plugin.json manifest.",
   "fileInputDescription": "Select a .zip plugin file",
   "selectedFile": "Selected file",
-  "upload": "Upload",
+  "upload": "Upload or update",
   "cancel": "Cancel",
   "success": {
     "title": "Success",
-    "description": "Plugin uploaded successfully. Application will restart in 5 seconds."
+    "description": "Plugin uploaded or updated successfully. Application will restart in 5 seconds."
   },
   "error": {
     "title": "Error",
@@ -16,4 +16,4 @@
   "errors": {
     "invalidFile": "Please select a valid .zip file"
   }
-} 
+}

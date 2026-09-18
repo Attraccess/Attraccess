@@ -1,7 +1,11 @@
+import { AuditService } from '../audit/audit.service';
+import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { Test } from '@nestjs/testing';
 import { SettingsController } from './settings.controller';
 import { SettingsService } from './settings.service';
 import { METRICS_SLOW_QUERY_THRESHOLD_DEFAULT_SECONDS, METRICS_TOGGLE_DEFAULTS } from './constants';
+
+const req = { user: { id: 42, authenticationMethod: 'session' } } as AuthenticatedRequest;
 
 describe('SettingsController (metrics endpoints)', () => {
   let controller: SettingsController;
@@ -31,7 +35,13 @@ describe('SettingsController (metrics endpoints)', () => {
 
     const moduleRef = await Test.createTestingModule({
       controllers: [SettingsController],
-      providers: [{ provide: SettingsService, useValue: settingsService }],
+      providers: [
+        { provide: SettingsService, useValue: settingsService },
+        {
+          provide: AuditService,
+          useValue: { recordAdministration: jest.fn().mockResolvedValue({ status: 'recorded' }) },
+        },
+      ],
     }).compile();
 
     controller = moduleRef.get(SettingsController);
@@ -70,9 +80,7 @@ describe('SettingsController (metrics endpoints)', () => {
     it('includes all 7 toggle keys in the response', async () => {
       const result = await controller.getMetricsSettings();
 
-      expect(Object.keys(result.toggles).sort()).toEqual(
-        ['cron', 'db', 'external', 'flow', 'http', 'sse', 'ws'],
-      );
+      expect(Object.keys(result.toggles).sort()).toEqual(['cron', 'db', 'external', 'flow', 'http', 'sse', 'ws']);
     });
   });
 
@@ -82,7 +90,7 @@ describe('SettingsController (metrics endpoints)', () => {
       settingsService.updateMetricsToggles.mockResolvedValue(next);
       settingsService.getMetricsToggles.mockResolvedValue(next);
 
-      const result = await controller.updateMetricsSettings({ toggles: { db: true } });
+      const result = await controller.updateMetricsSettings({ toggles: { db: true } }, req);
 
       expect(settingsService.updateMetricsToggles).toHaveBeenCalledWith({ db: true });
       expect(result.toggles.db).toBe(true);
@@ -90,7 +98,7 @@ describe('SettingsController (metrics endpoints)', () => {
     });
 
     it('skips writes when toggles is omitted', async () => {
-      const result = await controller.updateMetricsSettings({});
+      const result = await controller.updateMetricsSettings({}, req);
 
       expect(settingsService.updateMetricsToggles).not.toHaveBeenCalled();
       expect(result.toggles).toEqual(METRICS_TOGGLE_DEFAULTS);
@@ -100,7 +108,7 @@ describe('SettingsController (metrics endpoints)', () => {
       settingsService.getMetricsApiKey.mockResolvedValue({ value: 'k', configured: true });
       settingsService.getMetricsToggles.mockResolvedValue(METRICS_TOGGLE_DEFAULTS);
 
-      const result = await controller.updateMetricsSettings({ toggles: { http: true } });
+      const result = await controller.updateMetricsSettings({ toggles: { http: true } }, req);
 
       expect(result).toEqual({
         apiKeyConfigured: true,
@@ -112,14 +120,14 @@ describe('SettingsController (metrics endpoints)', () => {
     it('persists the slow query threshold update', async () => {
       settingsService.getMetricsSlowQueryThresholdSeconds.mockResolvedValue(2.5);
 
-      const result = await controller.updateMetricsSettings({ slowQueryThresholdSeconds: 2.5 });
+      const result = await controller.updateMetricsSettings({ slowQueryThresholdSeconds: 2.5 }, req);
 
       expect(settingsService.setMetricsSlowQueryThresholdSeconds).toHaveBeenCalledWith(2.5);
       expect(result.slowQueryThresholdSeconds).toBe(2.5);
     });
 
     it('skips slow query threshold writes when omitted', async () => {
-      await controller.updateMetricsSettings({});
+      await controller.updateMetricsSettings({}, req);
 
       expect(settingsService.setMetricsSlowQueryThresholdSeconds).not.toHaveBeenCalled();
     });
@@ -129,7 +137,7 @@ describe('SettingsController (metrics endpoints)', () => {
     it('returns the newly generated key (one-time display) and apiKeyConfigured: true', async () => {
       settingsService.generateMetricsApiKey.mockResolvedValue({ apiKey: 'new-key-abc123' });
 
-      const result = await controller.generateMetricsApiKey();
+      const result = await controller.generateMetricsApiKey(req);
 
       expect(settingsService.generateMetricsApiKey).toHaveBeenCalledTimes(1);
       expect(result).toEqual({ apiKeyConfigured: true, apiKey: 'new-key-abc123' });
@@ -138,7 +146,7 @@ describe('SettingsController (metrics endpoints)', () => {
     it('propagates service errors to the caller', async () => {
       settingsService.generateMetricsApiKey.mockRejectedValue(new Error('storage failure'));
 
-      await expect(controller.generateMetricsApiKey()).rejects.toThrow('storage failure');
+      await expect(controller.generateMetricsApiKey(req)).rejects.toThrow('storage failure');
     });
   });
 
@@ -146,7 +154,7 @@ describe('SettingsController (metrics endpoints)', () => {
     it('clears the key via setMetricsApiKey(null) and returns apiKeyConfigured: false with toggles', async () => {
       settingsService.setMetricsApiKey.mockResolvedValue(undefined as unknown as void);
 
-      const result = await controller.deleteMetricsApiKey();
+      const result = await controller.deleteMetricsApiKey(req);
 
       expect(settingsService.setMetricsApiKey).toHaveBeenCalledWith(null);
       expect(result.apiKeyConfigured).toBe(false);

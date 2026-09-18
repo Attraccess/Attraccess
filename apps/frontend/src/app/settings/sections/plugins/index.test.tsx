@@ -11,10 +11,13 @@ interface DeleteOptions {
 
 const hoisted = vi.hoisted(() => ({
   deleteMutateMock: vi.fn(),
+  retryMutateAsyncMock: vi.fn(),
+  statusRefetchMock: vi.fn(),
   successToast: vi.fn(),
   errorToast: vi.fn(),
   showToast: vi.fn(),
   plugins: [] as unknown[],
+  pluginSystemStatus: { disabled: false, instanceId: 'original-instance' },
   deleteOptions: undefined as DeleteOptions | undefined,
 }));
 
@@ -28,6 +31,11 @@ function deferred<T>() {
 
 vi.mock('@attraccess/react-query-client', () => ({
   usePluginsServiceGetPlugins: () => ({ data: hoisted.plugins }),
+  usePluginsServiceGetPluginSystemStatus: () => ({
+    data: hoisted.pluginSystemStatus,
+    refetch: hoisted.statusRefetchMock,
+  }),
+  usePluginsServiceRetryPlugin: () => ({ mutateAsync: hoisted.retryMutateAsyncMock, isPending: false }),
   usePluginsServiceDeletePlugin: (options: DeleteOptions) => {
     hoisted.deleteOptions = options;
     return { mutate: hoisted.deleteMutateMock, isPending: false };
@@ -56,18 +64,23 @@ function makePlugin(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   hoisted.deleteMutateMock.mockReset();
+  hoisted.retryMutateAsyncMock.mockReset();
+  hoisted.statusRefetchMock.mockReset();
   hoisted.successToast.mockReset();
   hoisted.errorToast.mockReset();
   hoisted.plugins = [];
+  hoisted.pluginSystemStatus = { disabled: false, instanceId: 'original-instance' };
   hoisted.deleteOptions = undefined;
+  hoisted.statusRefetchMock.mockResolvedValue({ data: hoisted.pluginSystemStatus });
+  hoisted.retryMutateAsyncMock.mockResolvedValue({ ok: true });
   vi.stubGlobal(
     'fetch',
     vi.fn((input: { url?: string } | string) => {
       const url = typeof input === 'string' ? input : (input.url ?? '');
       const plugin = {
-        name: '@attraccess/plugin-shelly',
+        name: '@attraccess/plugin-example',
         version: '1.0.0',
-        displayName: 'Shelly',
+        displayName: 'Example',
         description: 'Official integration',
         permissions: [],
         hostRange: '^1.0.0',
@@ -97,6 +110,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe('PluginsSection', () => {
@@ -123,10 +137,20 @@ describe('PluginsSection', () => {
     render(<PluginsSection />);
     await openMarketplace(user);
 
-    expect(await screen.findByText('Shelly')).toBeInTheDocument();
+    expect(await screen.findByText('Example')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Official plugins' })).toBeInTheDocument();
     expect(screen.getByText('Official')).toBeInTheDocument();
     expect(screen.getByText('Version: 1.0.0')).toBeInTheDocument();
+  });
+
+  it('closes the marketplace with its Cancel button', async () => {
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+    await openMarketplace(user);
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('heading', { name: 'Plugin marketplace' })).not.toBeInTheDocument();
   });
 
   it('uses exact package lookup when a selected registry cannot be searched', async () => {
@@ -202,10 +226,10 @@ describe('PluginsSection', () => {
     render(<PluginsSection />);
     await openMarketplace(user);
 
-    await user.click(await screen.findByRole('button', { name: 'Details' }));
+    await user.click(await screen.findByText('Example'));
     await user.click(screen.getByRole('button', { name: 'Install' }));
 
-    const installDialog = screen.getByRole('heading', { name: 'Install Shelly?' }).closest('[role="dialog"]');
+    const installDialog = screen.getByRole('heading', { name: 'Install Example?' }).closest('[role="dialog"]');
     expect(installDialog).not.toBeNull();
     const confirm = within(installDialog as HTMLElement).getByRole('button', { name: 'Install plugin' });
     expect(confirm).toBeDisabled();
@@ -248,7 +272,7 @@ describe('PluginsSection', () => {
 
     await user.selectOptions(screen.getByLabelText('Registry'), 'private');
     await user.type(screen.getByLabelText('Search plugins'), '@private/plugin');
-    await user.click(await screen.findByRole('button', { name: 'Details' }));
+    await user.click(await screen.findByText('Private plugin'));
     await user.click(await screen.findByRole('button', { name: 'Install' }));
     await user.click(screen.getByRole('checkbox'));
     const installDialog = screen.getByRole('heading', { name: 'Install Private plugin?' }).closest('[role="dialog"]');
@@ -295,7 +319,8 @@ describe('PluginsSection', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((input: { url?: string } | string, init?: { method?: string }) => {
-        const request = typeof input === 'string' ? { url: input, method: init?.method } : input;
+        const request: { url?: string; method?: string } =
+          typeof input === 'string' ? { url: input, method: init?.method } : input;
         if (request.url?.endsWith('/api/plugins/registries')) {
           if (request.method === 'POST') return Promise.resolve({ ok: true });
           registryLoads += 1;
@@ -332,7 +357,8 @@ describe('PluginsSection', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((input: { url?: string } | string, init?: { method?: string }) => {
-        const request = typeof input === 'string' ? { url: input, method: init?.method } : input;
+        const request: { url?: string; method?: string } =
+          typeof input === 'string' ? { url: input, method: init?.method } : input;
         if (request.url?.endsWith('/api/plugins/registries')) {
           if (request.method === 'POST') return Promise.resolve({ ok: true });
           registryLoads += 1;
@@ -404,12 +430,12 @@ describe('PluginsSection', () => {
   });
 
   it('renders community for an installed plugin until its npm classification is available', () => {
-    hoisted.plugins = [makePlugin({ name: '@attraccess/plugin-shelly' })];
+    hoisted.plugins = [makePlugin({ name: '@attraccess/plugin-example' })];
     const installedResponse = {
       ok: true,
       json: async () => [
         {
-          name: '@attraccess/plugin-shelly',
+          name: '@attraccess/plugin-example',
           version: '1.0.0',
           classification: 'official',
           classificationReason: 'Published by Attraccess on npm',
@@ -453,7 +479,7 @@ describe('PluginsSection', () => {
     );
   });
 
-  it('replaces the marketplace with package details', async () => {
+  it('opens package details in the marketplace and returns to the catalog', async () => {
     const plugin = (name: string) => ({
       name,
       version: '1.0.0',
@@ -482,17 +508,75 @@ describe('PluginsSection', () => {
     render(<PluginsSection />);
     await openMarketplace(user);
 
-    await user.click((await screen.findAllByRole('button', { name: 'Details' }))[1]);
-    expect(await screen.findByRole('heading', { name: 'Second details' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Plugin marketplace' })).not.toBeInTheDocument();
+    await user.click((await screen.findAllByText('Second'))[1]);
+    expect(await screen.findByRole('heading', { name: 'Second' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByRole('heading', { name: 'Plugin marketplace' })).toBeInTheDocument();
+  });
+
+  it('discards detail responses that arrive after closing the marketplace', async () => {
+    const detail = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: { url?: string } | string) => {
+        const url = typeof input === 'string' ? input : (input.url ?? '');
+        if (url.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
+        if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+        if (url.includes('/marketplace/search'))
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              results: [
+                {
+                  name: '@attraccess/plugin-example',
+                  version: '1.0.0',
+                  displayName: 'Example',
+                  permissions: [],
+                  registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
+                  classification: 'official',
+                  classificationReason: 'Published by Attraccess on npm',
+                  installable: true,
+                  incompatibilityReason: null,
+                },
+              ],
+              errors: [],
+            }),
+          });
+        return detail.promise;
+      }),
+    );
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+    await openMarketplace(user);
+
+    await user.click(await screen.findByText('Example'));
+    await user.keyboard('{Escape}');
+    detail.resolve({
+      ok: true,
+      json: async () => ({
+        name: '@attraccess/plugin-example',
+        version: '1.0.0',
+        displayName: 'Example',
+        permissions: [],
+        registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
+        classification: 'official',
+        classificationReason: 'Published by Attraccess on npm',
+        installable: true,
+        incompatibilityReason: null,
+      }),
+    });
+    await openMarketplace(user);
+
+    expect(await screen.findByRole('heading', { name: 'Plugin marketplace' })).toBeInTheDocument();
+    expect(screen.queryByText('About this plugin')).not.toBeInTheDocument();
   });
 
   it('opens details when a debounced search starts after the details click', async () => {
     const detail = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
     const plugin = {
-      name: '@attraccess-plugins/shelly',
+      name: '@attraccess-plugins/example',
       version: '1.0.0',
-      displayName: 'Shelly',
+      displayName: 'Example',
       description: null,
       permissions: [],
       registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
@@ -517,20 +601,20 @@ describe('PluginsSection', () => {
     await openMarketplace(user);
 
     await user.type(screen.getByLabelText('Search plugins'), 's');
-    await user.click(await screen.findByRole('button', { name: 'Details' }));
+    await user.click(await screen.findByText('Example'));
     await new Promise((resolve) => setTimeout(resolve, 350));
     detail.resolve({ ok: true, json: async () => plugin });
 
-    expect(await screen.findByRole('heading', { name: 'Shelly details' })).toBeInTheDocument();
+    expect(await screen.findByText('About this plugin')).toBeInTheDocument();
   });
 
   it('keeps the marketplace loading indicator visible while details are pending after a search completes', async () => {
     const detail = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
     const refreshedSearch = deferred<{ ok: boolean; json: () => Promise<unknown> }>();
     const plugin = {
-      name: '@attraccess-plugins/shelly',
+      name: '@attraccess-plugins/example',
       version: '1.0.0',
-      displayName: 'Shelly',
+      displayName: 'Example',
       description: null,
       permissions: [],
       registry: { id: 'npm', name: 'npm', url: 'https://registry.npmjs.org' },
@@ -559,7 +643,7 @@ describe('PluginsSection', () => {
     render(<PluginsSection />);
     await openMarketplace(user);
 
-    await user.click(await screen.findByRole('button', { name: 'Details' }));
+    await user.click(await screen.findByText('Example'));
     await user.type(screen.getByLabelText('Search plugins'), 's');
     await new Promise((resolve) => setTimeout(resolve, 350));
     refreshedSearch.resolve({ ok: true, json: async () => ({ results: [plugin], errors: [] }) });
@@ -568,11 +652,24 @@ describe('PluginsSection', () => {
     detail.resolve({ ok: true, json: async () => plugin });
   });
 
-  it('flags a plugin whose backend failed to load', () => {
+  it('shows a plugin load error in a modal', async () => {
     hoisted.plugins = [makePlugin({ status: 'error', error: "Cannot find module '@nestjs/common'" })];
+    const user = userEvent.setup();
     render(<PluginsSection />);
 
     expect(screen.getByText('Failed to load')).toBeInTheDocument();
+    expect(screen.queryByText("Cannot find module '@nestjs/common'")).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'View load error for Cool Plugin' }));
+
+    expect(await screen.findByRole('heading', { name: 'Cool Plugin failed to load' })).toBeInTheDocument();
+    expect(screen.getByText("Cannot find module '@nestjs/common'")).toBeInTheDocument();
+  });
+
+  it('warns when plugins are globally disabled', async () => {
+    hoisted.pluginSystemStatus = { disabled: true, instanceId: 'original-instance' };
+    render(<PluginsSection />);
+
+    expect(await screen.findByText('Plugins are disabled')).toBeInTheDocument();
   });
 
   it('marks a successfully loaded plugin', () => {
@@ -580,6 +677,49 @@ describe('PluginsSection', () => {
     render(<PluginsSection />);
 
     expect(screen.getByText('Loaded')).toBeInTheDocument();
+  });
+
+  it('retries a failed plugin when the restarted server becomes available without observing downtime', async () => {
+    hoisted.statusRefetchMock
+      .mockResolvedValueOnce({ data: { disabled: false, instanceId: 'original-instance' } })
+      .mockResolvedValueOnce({ data: { disabled: false, instanceId: 'restarted-instance' } });
+    hoisted.plugins = [makePlugin({ status: 'error', error: 'Plugin startup failed' })];
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+
+    await user.click(screen.getByRole('button', { name: 'View load error for Cool Plugin' }));
+    await user.click(screen.getByRole('button', { name: 'Retry and restart' }));
+
+    await waitFor(() => expect(hoisted.retryMutateAsyncMock).toHaveBeenCalledWith({ pluginId: 'plugin-1' }));
+    expect(hoisted.successToast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'The plugin will be retried when the app restarts.' }),
+    );
+    await waitFor(() => expect(hoisted.statusRefetchMock).toHaveBeenCalledTimes(2));
+    expect(hoisted.statusRefetchMock.mock.invocationCallOrder[0]).toBeLessThan(
+      hoisted.retryMutateAsyncMock.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('keeps the retry action pending while it waits for the restarted server', async () => {
+    const restartStatus = deferred<{ data: { disabled: boolean; instanceId: string } }>();
+    hoisted.statusRefetchMock
+      .mockResolvedValueOnce({ data: { disabled: false, instanceId: 'original-instance' } })
+      .mockReturnValueOnce(restartStatus.promise);
+    hoisted.plugins = [makePlugin({ status: 'error', error: 'Plugin startup failed' })];
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+
+    await user.click(screen.getByRole('button', { name: 'View load error for Cool Plugin' }));
+    await user.click(screen.getByRole('button', { name: 'Retry and restart' }));
+
+    await waitFor(() => expect(hoisted.statusRefetchMock).toHaveBeenCalledTimes(2));
+    expect(document.querySelector('[data-cy="plugins-list-retry-load-button"]')).toHaveAttribute(
+      'data-pending',
+      'true',
+    );
+
+    restartStatus.resolve({ data: { disabled: false, instanceId: 'restarted-instance' } });
+    await waitFor(() => expect(hoisted.successToast).toHaveBeenCalled());
   });
 
   it('shows the empty state when no plugins are installed', () => {

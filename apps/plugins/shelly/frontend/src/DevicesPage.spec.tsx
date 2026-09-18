@@ -28,7 +28,7 @@ describe('DeviceInfoCards', () => {
             sys: { device: { name: 'Workshop Dimmer' }, location: { tz: 'Europe/Amsterdam' } },
           },
         }}
-      />
+      />,
     );
 
     expect(screen.getByText('Workshop Dimmer')).toBeInTheDocument();
@@ -50,7 +50,7 @@ describe('DeviceInfoCards', () => {
           },
           config: {},
         }}
-      />
+      />,
     );
 
     expect(screen.getAllByText('On').length).toBeGreaterThan(0);
@@ -72,7 +72,7 @@ describe('RowActions', () => {
         onAuth={onAuth}
         onReprobe={() => undefined}
         onDelete={() => undefined}
-      />
+      />,
     );
 
     expect(screen.getByRole('button', { name: 'View device info' })).toHaveTextContent('');

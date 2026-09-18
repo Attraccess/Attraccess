@@ -49,6 +49,10 @@ function buildBaseContext(events: EventEmitter2): PluginContext {
     flows: {
       trigger: jest.fn(async () => undefined),
     },
+    secrets: {
+      encrypt: (value) => `encrypted:${value}`,
+      decrypt: (value) => value.replace('encrypted:', ''),
+    },
   };
 }
 
@@ -260,6 +264,14 @@ describe('PluginSandboxService', () => {
       const granted = PluginSandboxService.createGuardedContext(base, [PluginPermission.TRIGGER_FLOWS]);
       await granted.flows.trigger('plugin.test.trigger', () => true, {});
       expect(base.flows.trigger).toHaveBeenCalledWith('plugin.test.trigger', expect.any(Function), {});
+    });
+
+    it('gates host-managed secret encryption behind MANAGE_SECRETS', () => {
+      const denied = PluginSandboxService.createGuardedContext(buildBaseContext(events), []);
+      expect(() => denied.secrets.encrypt('secret')).toThrow(/MANAGE_SECRETS/);
+
+      const granted = PluginSandboxService.createGuardedContext(buildBaseContext(events), [PluginPermission.MANAGE_SECRETS]);
+      expect(granted.secrets.decrypt(granted.secrets.encrypt('secret'))).toBe('secret');
     });
   });
 });

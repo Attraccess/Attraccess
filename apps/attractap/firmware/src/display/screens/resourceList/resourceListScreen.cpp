@@ -1,4 +1,7 @@
 #include "resourceListScreen.hpp"
+#include "display/theme.hpp"
+#include "display/images/lockscreen_background_image.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 
@@ -12,7 +15,8 @@ void ResourceListScreen::init()
    lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(this->screen, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_set_style_bg_image_src(this->screen, &lockscreen_background_image, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::applyScreen(this->screen);
+   lv_obj_set_style_bg_image_src(this->screen, &lockscreen_background_image, LV_PART_MAIN);
    lv_obj_set_style_pad_left(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_right(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_top(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -69,6 +73,7 @@ void ResourceListScreen::setResourceList(const API::ResourceList &resourceList)
 void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
 {
    lv_obj_t *resourceButton = lv_button_create(this->resourceContainer);
+   DisplayTheme::secondaryButton(resourceButton);
    lv_obj_set_width(resourceButton, lv_pct(100));
    lv_obj_set_height(resourceButton, LV_SIZE_CONTENT);
    // lv_obj_set_x(resourceButton, -18);
@@ -85,15 +90,15 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
    // Status priority mirrors the web resource list: in use > maintenance > available.
    if (resource.hasActiveUsage)
    {
-      lv_obj_set_style_border_color(resourceButton, lv_color_hex(0xF31260), LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_set_style_border_color(resourceButton, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
    else if (resource.isUnderMaintenance)
    {
-      lv_obj_set_style_border_color(resourceButton, lv_color_hex(0xF5A524), LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_set_style_border_color(resourceButton, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
    else
    {
-      lv_obj_set_style_border_color(resourceButton, lv_color_hex(0x00FF00), LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_set_style_border_color(resourceButton, DisplayTheme::success(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 
    lv_obj_t *resourceNameLabel = lv_label_create(resourceButton);
@@ -101,11 +106,12 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
    lv_obj_set_height(resourceNameLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(resourceNameLabel, LV_ALIGN_CENTER);
    lv_label_set_text(resourceNameLabel, resource.name);
+   lv_obj_set_style_text_color(resourceNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_remove_flag(resourceNameLabel, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_remove_flag(resourceNameLabel, LV_OBJ_FLAG_SCROLL_ELASTIC);
    lv_obj_remove_flag(resourceNameLabel, LV_OBJ_FLAG_SCROLL_MOMENTUM);
    lv_obj_remove_flag(resourceNameLabel, LV_OBJ_FLAG_SCROLL_CHAIN);
-   lv_obj_set_style_text_font(resourceNameLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(resourceNameLabel, &attractap_font_montserrat_latin1_24, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_min_width(resourceNameLabel, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_max_width(resourceNameLabel, 370, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_label_set_long_mode(resourceNameLabel, LV_LABEL_LONG_SCROLL);
@@ -115,11 +121,12 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
    lv_obj_set_width(resourceDescriptionContainer, LV_SIZE_CONTENT);
    lv_obj_set_align(resourceDescriptionContainer, LV_ALIGN_CENTER);
    lv_label_set_text(resourceDescriptionContainer, resource.description);
+   lv_obj_set_style_text_color(resourceDescriptionContainer, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_remove_flag(resourceDescriptionContainer, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_remove_flag(resourceDescriptionContainer, LV_OBJ_FLAG_SCROLL_ELASTIC);
    lv_obj_remove_flag(resourceDescriptionContainer, LV_OBJ_FLAG_SCROLL_MOMENTUM);
    lv_obj_remove_flag(resourceDescriptionContainer, LV_OBJ_FLAG_SCROLL_CHAIN);
-   lv_obj_set_style_text_font(resourceDescriptionContainer, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_font(resourceDescriptionContainer, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_min_width(resourceDescriptionContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_max_width(resourceDescriptionContainer, 300, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_label_set_long_mode(resourceDescriptionContainer, LV_LABEL_LONG_DOT);
@@ -136,9 +143,9 @@ void ResourceListScreen::setNoResourcesMessage()
    lv_obj_set_width(noResourcesMessage, lv_pct(100));
    lv_obj_set_height(noResourcesMessage, LV_SIZE_CONTENT);
    lv_obj_set_align(noResourcesMessage, LV_ALIGN_CENTER);
-   lv_label_set_text(noResourcesMessage, "Keine Ressourcen mit diesem Reader verknuepft, bitte konfigurieren Sie den Reader in der Attraccess Administration");
-   lv_obj_set_style_text_font(noResourcesMessage, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(noResourcesMessage, lv_color_hex(0xff0000), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_label_set_text(noResourcesMessage, "Keine Ressourcen mit diesem Reader verknüpft, bitte konfigurieren Sie den Reader in der Attraccess Administration");
+   lv_obj_set_style_text_font(noResourcesMessage, &attractap_font_montserrat_latin1_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(noResourcesMessage, DisplayTheme::danger(), LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 
 lv_obj_t *ResourceListScreen::getScreen()

@@ -4,7 +4,13 @@ import { ArrowLeft } from 'lucide-react';
 import { Button, cn } from '@heroui/react';
 import { PageAction, PageHeaderActions } from './actions';
 
-export type { PageAction, PageActionPress, PageActionRender, PageActionTriggerProps, PageActionVariant } from './actions';
+export type {
+  PageAction,
+  PageActionPress,
+  PageActionRender,
+  PageActionTriggerProps,
+  PageActionVariant,
+} from './actions';
 export { PageHeaderActions } from './actions';
 
 interface PageHeaderProps {
@@ -39,8 +45,8 @@ export function PageHeader({
   const hasActions = !!actions && actions.some((a) => !a.isHidden);
 
   return (
-    <div className={cn('flex items-center w-full justify-between mb-8 flex-wrap gap-y-8', noMargin && 'mb-0')}>
-      <div className="flex items-center">
+    <div className={cn('flex items-center w-full justify-between mb-8 flex-wrap gap-4', noMargin && 'mb-0')}>
+      <div className="flex items-center min-w-0">
         {(backTo || onBack) && (
           <Button
             variant="ghost"
@@ -70,16 +76,16 @@ export function PageHeader({
           )}
         </div>
 
-        <div className="flex-shrink">
+        <div className="min-w-0">
           <div className="flex items-start gap-2 ">
-            <h1 className="text-2xl font-bold">{title}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight break-words">{title}</h1>
           </div>
 
           {subtitle &&
             (typeof subtitle === 'string' ? (
-              <p className="mt-1 text-sm text-foreground-500">{subtitle}</p>
+              <p className="mt-1 text-sm text-muted">{subtitle}</p>
             ) : (
-              <div className="mt-1 text-sm text-foreground-500">{subtitle}</div>
+              <div className="mt-1 text-sm text-muted">{subtitle}</div>
             ))}
         </div>
       </div>

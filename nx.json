@@ -91,7 +91,10 @@
       "dependsOn": ["^build"]
     },
     "publish": {
-      "inputs": ["{workspaceRoot}/apps/plugins/scripts/publish-plugin.mjs"]
+      "inputs": [
+        "{workspaceRoot}/apps/plugins/scripts/publish-plugin.mjs",
+        "{workspaceRoot}/apps/plugins/scripts/npm-dist-tag.mjs"
+      ]
     },
     "lint": {
       "cache": true,

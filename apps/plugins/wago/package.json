@@ -1,6 +1,6 @@
 {
   "name": "@attraccess/plugin-wago",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.0",
   "description": "Official Attraccess integration for WAGO CC100 controllers.",
   "keywords": [
     "attraccess-plugin",
@@ -36,7 +36,8 @@
     "styles": "frontend/style.css",
     "permissions": [
       "DATABASE_ACCESS",
-      "ACCESS_MQTT_SERVERS"
+      "ACCESS_MQTT_SERVERS",
+      "TRIGGER_FLOWS"
     ],
     "sdk": {
       "backend": "^1.9.0",

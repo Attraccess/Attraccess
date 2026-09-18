@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsNumber, IsOptional, IsBoolean, IsIn } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsOptional, IsBoolean, IsIn, IsInt, Min, Max } from 'class-validator';
 import { PartialType } from '@nestjs/swagger';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -22,6 +22,21 @@ export class CreateMqttServerDto {
   @IsNotEmpty()
   @ApiProperty({ description: 'Port number of the MQTT server', example: 1883 })
   port!: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  @ApiProperty({
+    description: 'Optional management API port on the broker host. Null uses the provider default.',
+    type: 'integer',
+    required: false,
+    nullable: true,
+    minimum: 1,
+    maximum: 65535,
+    example: 25671,
+  })
+  managementPort?: number | null;
 
   @IsString()
   @IsOptional()

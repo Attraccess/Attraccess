@@ -3,7 +3,8 @@
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "sourceRoot": "apps/plugins/shelly",
-  "tags": ["type:plugin"],
+  "tags": ["type:plugin", "scope:plugin"],
+  "// lint": "lint runs from the workspace root on purpose: @nx/enforce-module-boundaries no-ops when eslint runs from inside a project directory. See eslint.config.cjs for the plugin isolation rules.",
   "targets": {
     "lint": {
       "executor": "nx:run-commands",
@@ -11,8 +12,7 @@
       "inputs": ["{projectRoot}/backend/**/*", "{projectRoot}/frontend/src/**/*", "{workspaceRoot}/eslint.config.cjs"],
       "outputs": [],
       "options": {
-        "cwd": "apps/plugins/shelly",
-        "command": "eslint backend frontend/src"
+        "command": "eslint apps/plugins/shelly/backend apps/plugins/shelly/frontend/src --max-warnings=0 && prettier --check apps/plugins/shelly/backend apps/plugins/shelly/frontend/src"
       }
     },
     "test-frontend": {
@@ -60,11 +60,22 @@
       "executor": "nx:run-commands",
       "cache": true,
       "dependsOn": ["build-backend", "build-frontend"],
-      "inputs": ["{projectRoot}/package.json"],
+      "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json"],
       "outputs": ["{projectRoot}/package"],
       "options": {
         "cwd": "apps/plugins/shelly",
-        "command": "node -e \"require('fs').copyFileSync('package.json','package/package.json')\""
+        "command": "node -e \"for (const file of ['package.json', 'plugin.json']) require('fs').copyFileSync(file, 'package/' + file)\""
+      }
+    },
+    "zip": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build"],
+      "inputs": ["{projectRoot}/package/**/*", "{workspaceRoot}/apps/plugins/scripts/zip-plugin.mjs"],
+      "outputs": ["{projectRoot}/dist/plugin-shelly.zip"],
+      "options": {
+        "cwd": "apps/plugins/shelly",
+        "command": "node ../scripts/zip-plugin.mjs --src package --out dist/plugin-shelly.zip"
       }
     },
     "pack": {

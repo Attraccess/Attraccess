@@ -2,17 +2,25 @@
 
 #include <string>
 
+#ifndef ATTRACTAP_HOST
 #include "esp_netif.h"
 #include "../network/wifi/wifi.hpp"
+#endif
 #include "../logger/logger.hpp"
 
 class SerialCommandHandler
 {
 public:
+#ifdef ATTRACTAP_HOST
+    static void setup() {}
+    static void loop() {}
+#else
     static void setup();
     static void loop();
+#endif
 
 private:
+#ifndef ATTRACTAP_HOST
     static constexpr size_t MAX_COMMAND_LENGTH = 256;
 
     static std::string inputBuffer;
@@ -30,4 +38,5 @@ private:
 
     static void sendJsonResponse(const std::string &topic, const std::string &payload);
     static void sendErrorResponse(const std::string &topic, const char *error);
+#endif
 };

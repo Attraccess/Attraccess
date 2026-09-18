@@ -5,7 +5,6 @@ import {
 } from '@attraccess/react-query-client';
 import { Button, Card, CardProps, Skeleton } from '@heroui/react';
 import { EmptyState } from '../../../components/emptyState';
-import { PageHeader } from '../../../components/pageHeader';
 import { ResourceListItem } from '../../../components/ResourceListItem';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -111,15 +110,19 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
 
   return (
     <Card aria-label={accessibleTitle} {...cardProps}>
-      <Card.Header className="flex flex-row justify-between">
+      <Card.Header className="flex flex-row items-start justify-between border-b border-separator pb-4">
         {groupIsFetched ? (
-          <PageHeader title={title} subtitle={subtitle} noMargin />
+          <div className="min-w-0">
+            <Card.Title className="text-lg font-semibold tracking-tight">{title}</Card.Title>
+            {subtitle && <Card.Description className="mt-1 text-muted">{subtitle}</Card.Description>}
+          </div>
         ) : (
           <Skeleton className="w-full h-10" />
         )}
 
         {groupId !== 'none' && hasAccessToGroupSettings && (
           <Button
+            variant="ghost"
             onPress={() => navigate(`/resource-groups/${groupId}`)}
             isIconOnly
             aria-label={t('actions.openGroupSettings')}
@@ -133,7 +136,7 @@ export function ResourceGroupCard(props: Readonly<Props & Omit<CardProps, 'child
         {resources?.data.length === 0 ? (
           <EmptyState />
         ) : (
-          <div className="space-y-2">
+          <div className="divide-y divide-separator">
             {(resources?.data ?? []).map((resource) => (
               <ResourceListItem
                 key={resource.id}

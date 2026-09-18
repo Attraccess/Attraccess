@@ -93,7 +93,6 @@ jobs:
       - name: Publish changed official plugin packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_DIST_TAG: ${{ github.event.release.prerelease && 'next' || 'latest' }}
         run: |
           git diff --name-only "$(git describe --tags --abbrev=0 "${RELEASE_VERSION}^" 2>/dev/null || git rev-list --max-parents=0 HEAD)" "$GITHUB_SHA" -- . ':(exclude).github/workflows/**' |
             pnpm nx affected --target=publish --parallel=3 --stdin --exclude='*,!tag:type:plugin'

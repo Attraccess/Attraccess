@@ -441,7 +441,7 @@ bool NFC::getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNo)
             }
 
             this->logger.debugf("getAvailableKeyNo, DESFire key %d version 0x%02X", i, keyVersion);
-            if (keyVersion == NFC::CARD_KEY_VERSION_FREE)
+            if (keyVersion == INfc::CARD_KEY_VERSION_FREE)
             {
                 if (!this->pn532.ntag424_AuthenticateEV2First(NFC::FACTORY_KEY, 0, 0x71))
                 {

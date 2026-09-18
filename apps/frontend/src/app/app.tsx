@@ -6,7 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useAllRoutes } from './routes';
 import { VerifyEmail } from './verify-email';
 import { ToastProvider } from '../components/toastProvider';
-import { I18nProvider, RouterProvider, Spinner, useTheme } from '@heroui/react';
+import { I18nProvider, RouterProvider, Spinner } from '@heroui/react';
 import { OpenAPI } from '@attraccess/react-query-client';
 import { RouteConfig } from '@attraccess/plugins-frontend-sdk';
 import { hasRequiredPermissions } from './routes/routeAccess';
@@ -29,6 +29,7 @@ import { SupervisorApprovalListener } from '../components/supervisorApproval/Sup
 import { KioskGuard } from './kiosk/KioskGuard';
 import { useLocaleSync } from '../hooks/useLocaleSync';
 import { NotFound } from './not-found';
+import { ThemeToggle } from '../components/themeToggle';
 
 // Exported for settingsAccess.spec.tsx, which drives the real route table through this gate.
 export function useRoutesWithAuthElements(routes: RouteConfig[]) {
@@ -91,7 +92,7 @@ function useIsTouchDevice() {
 }
 
 function AppLayout(props: PropsWithChildren) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, needsTwoFactorSetup } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -105,6 +106,11 @@ function AppLayout(props: PropsWithChildren) {
     <RouterProvider navigate={navigate}>
       <I18nProvider locale={language}>
         <ToastProvider>
+          {(!isAuthenticated || needsTwoFactorSetup) && (
+            <div className="fixed top-4 right-4 z-30">
+              <ThemeToggle />
+            </div>
+          )}
           <ReactFlowProvider>
             <AttraccessUserActionsBridge>
               {props.children}
@@ -203,24 +209,7 @@ function AppContent() {
 
 export function App() {
   const { isInitialized } = useAuth();
-  const { setTheme } = useTheme();
   useLocaleSync();
-
-  useEffect(() => {
-    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    setTheme(systemTheme);
-
-    let metaTheme = document.querySelector('meta[name="theme-color"]');
-    if (!metaTheme) {
-      metaTheme = document.createElement('meta');
-      metaTheme.setAttribute('name', 'theme-color');
-    }
-
-    const darkBackground = 'rgb(0,0,0)';
-    const lightBackground = 'rgb(255,255,255)';
-
-    metaTheme.setAttribute('content', systemTheme === 'dark' ? darkBackground : lightBackground);
-  }, [setTheme]);
 
   OpenAPI.BASE = getBaseUrl();
 

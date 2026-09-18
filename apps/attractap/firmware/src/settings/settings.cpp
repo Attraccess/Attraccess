@@ -1,7 +1,11 @@
 #include "settings.hpp"
 #include <string>
 
+#ifdef ATTRACTAP_HOST
+#include <random>
+#else
 #include "esp_random.h"
+#endif
 
 KVStore Settings::preferences;
 Logger Settings::logger("Settings");
@@ -159,7 +163,11 @@ std::string Settings::getHostname()
     if (_hostname.empty())
     {
         // Same range as Arduino random(1000, 9999): 1000..9998
+        #ifdef ATTRACTAP_HOST
+        std::string randomSuffix = "desktop";
+        #else
         std::string randomSuffix = std::to_string(1000 + (esp_random() % 8999));
+        #endif
         _hostname = std::string(FIRMWARE_FRIENDLY_NAME) + "-" + FIRMWARE_VARIANT_FRIENDLY_NAME + "-" + randomSuffix;
         preferences.begin("settings", false);
         preferences.putString("hostname", _hostname);

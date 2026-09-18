@@ -188,5 +188,5 @@ No additional settings.
 
 - [Flow Editor](flows/flow-editor.md) -- How to place and connect nodes
 - [Flows Overview](flows/overview.md) -- What flows are and how they work
-- [MQTT & IoT](mqtt/overview.md) -- Setting up MQTT
+- [MQTT & IoT](devices/mqtt/overview.md) -- Setting up MQTT
 - [Billing](billing/overview.md) -- Billing system details

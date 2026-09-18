@@ -30,8 +30,36 @@ module.exports = [
         'error',
         {
           enforceBuildableLibDependency: true,
-          allow: ['^.*/eslint(\\.base)?\\.config\\.[cm]?js$'],
+          allow: [
+            '^.*/eslint(\\.base)?\\.config\\.[cm]?js$',
+            // A plugin may be split into several nx projects inside its own directory
+            // (e.g. a device-runtime container built and shipped separately from the
+            // plugin server bundle). Those family projects share the parent plugin's
+            // contract modules through relative paths. Any cross-plugin or
+            // plugin-to-core path necessarily contains another project segment
+            // ("../../<other-plugin>/...", "../../api/...") and therefore never
+            // matches these patterns.
+            '^(\\.\\./)+(modbus|backend)/',
+            '^(\\.\\./)+(channel-behavior|measurement-contract)$',
+          ],
           depConstraints: [
+            // Plugins are encapsulated, separately shipped products. They may build
+            // only on the public plugin SDKs — never on core apps, core libs, or
+            // other plugins.
+            {
+              sourceTag: 'type:plugin',
+              onlyDependOnLibsWithTags: ['scope:plugin-sdk'],
+            },
+            // The core application must never know any concrete plugin: no core
+            // project may depend on anything tagged type:plugin.
+            {
+              sourceTag: 'scope:core',
+              notDependOnLibsWithTags: ['type:plugin'],
+            },
+            {
+              sourceTag: 'scope:hardware',
+              notDependOnLibsWithTags: ['type:plugin'],
+            },
             {
               sourceTag: '*',
               onlyDependOnLibsWithTags: ['*'],
@@ -41,6 +69,19 @@ module.exports = [
       ],
       'no-warning-comments': 'off',
       'no-console': 'error',
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+    },
+  },
+  {
+    // Plugin acceptance tests are the one place where host and plugin are composed
+    // inside a single process: they boot real core services around a real plugin
+    // build to prove end-to-end behavior (see apps/plugins/*/acceptance). They
+    // are test-only and never part of a shipped plugin bundle, so module
+    // boundaries are relaxed here — and only here. Shipped plugin code
+    // (backend/, frontend/, shared contracts) stays fully isolated.
+    files: ['apps/plugins/*/acceptance/**/*.ts'],
+    rules: {
+      '@nx/enforce-module-boundaries': 'off',
     },
   },
   // ATT-294 / ATT-834: the "no form fields inside a Card" guard is not an ESLint rule.
@@ -52,10 +93,10 @@ module.exports = [
   // Add special configuration for CI environment that converts warnings to errors
   ...(process.env.CI === 'true'
     ? [
-      {
-        files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx', '**/*.cjs', '**/*.mjs'],
-        rules: {},
-      },
-    ]
+        {
+          files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx', '**/*.cjs', '**/*.mjs'],
+          rules: {},
+        },
+      ]
     : []),
 ];

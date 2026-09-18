@@ -1,4 +1,5 @@
 // Import entities
+import { AuditLog } from './entities/audit-log.entity';
 import { EmailTemplate } from './entities/email-template.entity';
 import { EmailTemplateTranslation } from './entities/email-template-translation.entity';
 import { AuthenticationDetail } from './entities/authenticationDetail.entity';
@@ -88,7 +89,6 @@ import {
   PasswordPolicyRole,
   PASSWORD_POLICY_ROLES,
 } from './entities/password-policy-override.entity';
-import { PasswordPolicyAudit, PasswordPolicyAuditEvent } from './entities/password-policy-audit.entity';
 import { Conversation } from './entities/conversation.entity';
 import { ConversationParticipant } from './entities/conversation-participant.entity';
 import { Message, MessageReferenceType } from './entities/message.entity';
@@ -107,6 +107,7 @@ import { ResourceOperatingInterval } from './entities/resource-operating-interva
 
 // Export all entities individually
 export {
+  AuditLog,
   AuthenticationDetail,
   MqttServer,
   Resource,
@@ -201,8 +202,6 @@ export {
   PasswordPolicyOverride,
   PasswordPolicyRole,
   PASSWORD_POLICY_ROLES,
-  PasswordPolicyAudit,
-  PasswordPolicyAuditEvent,
   Conversation,
   ConversationParticipant,
   Message,
@@ -226,6 +225,7 @@ export {
 
 // Export the entities object
 export const entities = {
+  AuditLog,
   User,
   AuthenticationDetail,
   Session,
@@ -267,7 +267,6 @@ export const entities = {
   PasswordPolicy,
   PasswordHistory,
   PasswordPolicyOverride,
-  PasswordPolicyAudit,
   Conversation,
   ConversationParticipant,
   Message,

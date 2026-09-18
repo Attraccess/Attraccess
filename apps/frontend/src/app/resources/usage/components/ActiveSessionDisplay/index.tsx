@@ -158,7 +158,9 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
             {t('endSession')}
           </Button>
           <Dropdown>
-            <DropdownTrigger className={buttonVariants({ isIconOnly: true, variant: 'danger' })}>
+            <DropdownTrigger
+              className={`${buttonVariants({ isIconOnly: true, variant: 'danger' })} inline-flex items-center justify-center`}
+            >
               <ChevronDownIcon />
             </DropdownTrigger>
             <DropdownPopover>

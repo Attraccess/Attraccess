@@ -1,4 +1,5 @@
 #include "resourceDetailsScreen.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 #include <lvgl.h>
@@ -164,13 +165,14 @@ void ResourceDetailsScreen::refreshProjectsButtonLabel()
       return;
    }
 
-   std::string label = "Projekt waehlen";
+   std::string label = "Projekt wählen";
    if (this->selectedProjectId != 0 && this->selectedProjectName.length() > 0)
    {
       label = "Projekt: " + this->selectedProjectName;
    }
 
    lv_label_set_text(this->projectsButtonLabel, label.c_str());
+   lv_obj_set_style_text_font(this->projectsButtonLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 void ResourceDetailsScreen::updateClearProjectButtonState()
 {
@@ -217,7 +219,7 @@ void ResourceDetailsScreen::ensureProjectsModal()
    lv_obj_add_flag(overlay, LV_OBJ_FLAG_CLICKABLE);
    lv_obj_set_size(overlay, lv_pct(100), lv_pct(100));
    lv_obj_set_align(overlay, LV_ALIGN_CENTER);
-   lv_obj_set_style_bg_color(overlay, lv_color_black(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_bg_color(overlay, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_bg_opa(overlay, 160, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_flex_flow(overlay, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(overlay, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -228,9 +230,7 @@ void ResourceDetailsScreen::ensureProjectsModal()
    lv_obj_set_width(panel, lv_pct(90));
    lv_obj_set_style_max_width(panel, 400, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_min_height(panel, 370, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_color(panel, lv_color_hex(0x1F1F1F), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_bg_opa(panel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_radius(panel, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
+   DisplayTheme::applySurface(panel);
    lv_obj_set_style_pad_left(panel, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_right(panel, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_top(panel, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -247,11 +247,12 @@ void ResourceDetailsScreen::ensureProjectsModal()
    lv_obj_set_style_margin_bottom(header, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *title = lv_label_create(header);
-   lv_label_set_text(title, "Projekt auswaehlen");
-   lv_obj_set_style_text_font(title, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(title, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_label_set_text(title, "Projekt auswählen");
+    lv_obj_set_style_text_font(title, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(title, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *closeButton = lv_button_create(header);
+   DisplayTheme::secondaryButton(closeButton);
    lv_obj_set_size(closeButton, 32, 32);
    lv_obj_set_style_pad_all(closeButton, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_event_cb(closeButton, &ResourceDetailsScreen::onProjectsModalClose, LV_EVENT_CLICKED, this);
@@ -280,19 +281,22 @@ void ResourceDetailsScreen::ensureProjectsModal()
    lv_obj_set_flex_align(footer, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
    this->projectsPrevButton = lv_button_create(footer);
+   DisplayTheme::secondaryButton(this->projectsPrevButton);
    lv_obj_set_height(this->projectsPrevButton, 36);
    lv_obj_set_width(this->projectsPrevButton, LV_SIZE_CONTENT);
    lv_obj_set_style_pad_left(this->projectsPrevButton, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_right(this->projectsPrevButton, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_event_cb(this->projectsPrevButton, &ResourceDetailsScreen::onProjectsPrevPage, LV_EVENT_CLICKED, this);
    lv_obj_t *prevLabel = lv_label_create(this->projectsPrevButton);
-   lv_label_set_text(prevLabel, "Zurueck");
+   lv_label_set_text(prevLabel, "Zurück");
+   lv_obj_set_style_text_font(prevLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
 
    this->projectsPaginationLabel = lv_label_create(footer);
    lv_label_set_text(this->projectsPaginationLabel, "Seite 1");
-   lv_obj_set_style_text_color(this->projectsPaginationLabel, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(this->projectsPaginationLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->projectsNextButton = lv_button_create(footer);
+   DisplayTheme::button(this->projectsNextButton);
    lv_obj_set_height(this->projectsNextButton, 36);
    lv_obj_set_width(this->projectsNextButton, LV_SIZE_CONTENT);
    lv_obj_set_style_pad_left(this->projectsNextButton, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -341,6 +345,7 @@ void ResourceDetailsScreen::showProjectsLoading()
    lv_obj_clean(this->projectsListContainer);
    lv_obj_t *loadingLabel = lv_label_create(this->projectsListContainer);
    lv_label_set_text(loadingLabel, "Lade Projekte ...");
+   lv_obj_set_style_text_color(loadingLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
    if (this->projectsPrevButton)
    {
       lv_obj_add_state(this->projectsPrevButton, LV_STATE_DISABLED);
@@ -366,7 +371,9 @@ void ResourceDetailsScreen::rebuildProjectsList()
    if (this->projectsCache.count == 0)
    {
       lv_obj_t *emptyLabel = lv_label_create(this->projectsListContainer);
-      lv_label_set_text(emptyLabel, this->projectsDataInitialized ? "Keine Projekte verfuegbar" : "Lade Projekte ...");
+      lv_label_set_text(emptyLabel, this->projectsDataInitialized ? "Keine Projekte verfügbar" : "Lade Projekte ...");
+      lv_obj_set_style_text_font(emptyLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
+      lv_obj_set_style_text_color(emptyLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
       this->updateProjectsPaginationControls();
       return;
    }
@@ -379,12 +386,11 @@ void ResourceDetailsScreen::rebuildProjectsList()
       lv_obj_set_height(btn, 48);
       lv_obj_add_flag(btn, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
       lv_obj_remove_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
-      lv_obj_set_style_bg_color(btn, lv_color_hex(0x5B5B5B), LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_obj_set_style_bg_opa(btn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+      DisplayTheme::secondaryButton(btn);
 
       if (project.id == this->selectedProjectId && this->selectedProjectId != 0)
       {
-         lv_obj_set_style_bg_color(btn, lv_color_hex(0x10B981), LV_PART_MAIN | LV_STATE_DEFAULT);
+         DisplayTheme::button(btn);
       }
 
       ProjectButtonEventData *evt = new ProjectButtonEventData{this, i};
@@ -401,6 +407,7 @@ void ResourceDetailsScreen::rebuildProjectsList()
          lv_label_set_text(label, "Unbenanntes Projekt");
       }
       lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_set_style_text_font(label, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 
    this->updateProjectsPaginationControls();

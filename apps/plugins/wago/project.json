@@ -3,47 +3,120 @@
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "sourceRoot": "apps/plugins/wago",
-  "tags": ["type:plugin"],
+  "tags": ["type:plugin", "scope:plugin"],
+  "// lint": "lint runs from the workspace root on purpose: @nx/enforce-module-boundaries no-ops when eslint runs from inside a project directory. See eslint.config.cjs for the plugin isolation rules.",
   "targets": {
+    "production-fleet": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["typecheck-acceptance", "test-production-fleet-cleanup"],
+      "options": {
+        "command": "node apps/plugins/wago/scripts/test-production-fleet.mjs"
+      }
+    },
+    "typecheck-acceptance": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsc --noEmit -p apps/plugins/wago/acceptance/tsconfig.json"
+      }
+    },
+    "test-production-fleet-cleanup": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node --test apps/plugins/wago/scripts/test-production-fleet.test.mjs"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "pnpm exec tsc --noEmit -p apps/plugins/wago/tsconfig.spec.json",
+          "pnpm exec tsc --noEmit -p apps/plugins/wago/acceptance/tsconfig.json"
+        ],
+        "parallel": false
+      }
+    },
     "lint": {
       "executor": "nx:run-commands",
-      "options": { "cwd": "apps/plugins/wago", "command": "eslint backend frontend/src" }
+      "options": {
+        "command": "eslint apps/plugins/wago/backend apps/plugins/wago/frontend/src apps/plugins/wago/frontend/tests apps/plugins/wago/acceptance apps/plugins/wago/modbus apps/plugins/wago/measurement-contract.ts apps/plugins/wago/channel-behavior.ts"
+      }
     },
     "test": {
       "executor": "@nx/jest:jest",
-      "options": { "jestConfig": "apps/plugins/wago/jest.config.ts", "passWithNoTests": true }
+      "dependsOn": ["test-frontend"],
+      "options": {
+        "jestConfig": "apps/plugins/wago/jest.config.ts",
+        "passWithNoTests": true
+      }
+    },
+    "test-frontend": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["{projectRoot}/frontend/**/*", "{projectRoot}/modbus/**/*", "{projectRoot}/channel-behavior.ts"],
+      "options": {
+        "command": "pnpm exec vitest run --config apps/plugins/wago/frontend/vitest.config.mts"
+      }
     },
     "build-backend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/backend/**/*", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
+      "inputs": [
+        "{projectRoot}/diagnostics-types.ts",
+        "{projectRoot}/channel-behavior.ts",
+        "{projectRoot}/backend/**/*",
+        "{projectRoot}/modbus/**/*",
+        "{projectRoot}/measurement-contract.ts",
+        "{projectRoot}/cc100-runtime/signing-public-key.pub",
+        "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"
+      ],
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/wago",
-        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js"
+        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js && cp cc100-runtime/signing-public-key.pub package/dist/signing-public-key.pub"
       }
     },
     "build-frontend": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/frontend/**/*", "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"],
+      "inputs": [
+        "{projectRoot}/diagnostics-types.ts",
+        "{projectRoot}/channel-behavior.ts",
+        "{projectRoot}/frontend/**/*",
+        "{projectRoot}/modbus/**/*",
+        "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs"
+      ],
       "outputs": ["{projectRoot}/package/frontend"],
-      "options": { "cwd": "apps/plugins/wago", "command": "pnpm exec vite build --config frontend/vite.config.ts" }
+      "options": {
+        "cwd": "apps/plugins/wago",
+        "command": "pnpm exec vite build --config frontend/vite.config.ts"
+      }
     },
     "build": {
       "executor": "nx:run-commands",
       "cache": true,
       "dependsOn": ["build-backend", "build-frontend"],
-      "inputs": ["{projectRoot}/package.json"],
-      "outputs": ["{projectRoot}/package"],
+      "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json"],
+      "outputs": ["{projectRoot}/package/package.json", "{projectRoot}/package/plugin.json"],
       "options": {
         "cwd": "apps/plugins/wago",
-        "command": "node -e \"require('fs').copyFileSync('package.json','package/package.json')\""
+        "command": "node -e \"for (const file of ['package.json', 'plugin.json']) require('fs').copyFileSync(file, 'package/' + file)\""
+      }
+    },
+    "zip": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["build"],
+      "inputs": ["{projectRoot}/package/**/*", "{workspaceRoot}/apps/plugins/scripts/zip-plugin.mjs"],
+      "outputs": ["{projectRoot}/dist/plugin-wago.zip"],
+      "options": {
+        "cwd": "apps/plugins/wago",
+        "command": "node ../scripts/zip-plugin.mjs --src package --out dist/plugin-wago.zip"
       }
     },
     "pack": {
       "executor": "nx:run-commands",
-      "cache": true,
+      "cache": false,
       "dependsOn": ["build"],
       "inputs": ["{projectRoot}/package/**/*"],
       "outputs": ["{projectRoot}/dist"],
@@ -54,7 +127,7 @@
     },
     "pack-test": {
       "executor": "nx:run-commands",
-      "cache": true,
+      "cache": false,
       "dependsOn": ["pack", "plugins-backend-sdk:build"],
       "inputs": [
         "{projectRoot}/package/**/*",
@@ -73,6 +146,59 @@
       "options": {
         "cwd": "apps/plugins/wago",
         "command": "node ../scripts/publish-plugin.mjs package dist"
+      }
+    },
+    "fleet-acceptance": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "commands": [
+          "pnpm nx run-many -p plugin-wago,wago-cc100-runtime -t test,typecheck,lint,build --parallel=2",
+          "node apps/plugins/wago/cc100-runtime/integration/run.mjs",
+          "pnpm nx run plugin-wago:production-fleet",
+          "pnpm nx run plugin-wago:test-commissioning-acceptance",
+          "pnpm nx run plugin-wago:e2e",
+          "bash apps/plugins/wago/frontend/tests/run_browser_tests.sh",
+          "node --test apps/plugins/wago/scripts/check-acceptance.test.mjs"
+        ],
+        "parallel": false
+      }
+    },
+    "typecheck-frontend-tests": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec tsc --noEmit -p apps/plugins/wago/frontend/tsconfig.tests.json"
+      }
+    },
+    "test-typecheck-frontend-gate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "node --test apps/plugins/wago/scripts/typecheck-frontend-tests.test.mjs",
+          "node apps/plugins/wago/scripts/typecheck-frontend-tests.mjs"
+        ],
+        "parallel": false
+      }
+    },
+    "e2e": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["typecheck-acceptance"],
+      "options": {
+        "command": "pnpm exec jest --config apps/plugins/wago/scripts/jest.audit-hooks.config.cjs --runInBand"
+      }
+    },
+    "test-commissioning-acceptance": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["typecheck-acceptance", "typecheck-frontend-tests"],
+      "options": {
+        "commands": [
+          "pnpm exec jest --config apps/plugins/wago/scripts/jest.commissioning.config.cjs --runInBand",
+          "pnpm exec vite build --config apps/plugins/wago/frontend/tests/commissioning-harness/vite.config.mts",
+          "pnpm exec jest --config apps/plugins/wago/scripts/jest.commissioning-browser.config.cjs --runInBand"
+        ],
+        "parallel": false
       }
     }
   }

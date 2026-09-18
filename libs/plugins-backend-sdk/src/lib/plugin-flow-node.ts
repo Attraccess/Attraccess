@@ -4,7 +4,7 @@
  * Usage:
  *   export default {
  *     register(context) { ... },
- *     flowNodes: [shellyOnNode, shellyOffNode],
+ *     flowNodes: [demoOnNode, demoOffNode],
  *   } satisfies PluginBackendModule;
  */
 
@@ -22,11 +22,28 @@ export interface PluginNodeExecutionContext {
   compileTemplate(template: string, data: object): string;
 }
 
+export type PluginFlowFailureKind =
+  | 'transport-dispatch'
+  | 'acknowledgement-timeout'
+  | 'controller-rejection'
+  | 'node-failure';
+
+export type PluginFlowFailureBehavior = 'fail-flow' | 'failure-output' | 'log-and-continue';
+
+export interface PluginFlowNodeValidationError {
+  field: string;
+  message: string;
+  value?: unknown;
+}
+
+/** Request-scoped storage shared while validating all nodes in a flow. */
+export type PluginFlowNodeValidationContext = Map<string, unknown>;
+
 /**
  * Describes a single custom flow node contributed by a plugin.
  *
  * Node type naming convention: use "plugin.<pluginName>.<nodeName>" to
- * guarantee no collision with core node types, e.g. "plugin.shelly.send-on".
+ * guarantee no collision with core node types, e.g. "plugin.demo.send-on".
  */
 interface PluginFlowNodeDefinitionBase {
   /**
@@ -60,7 +77,10 @@ interface PluginFlowNodeDefinitionBase {
    * schema must set `dynamic: true`; fields that should trigger a refresh set
    * `refreshesSchema: true`.
    */
-  resolveConfigSchema?(currentConfig: Record<string, unknown>): Promise<Record<string, unknown>>;
+  resolveConfigSchema?(
+    currentConfig: Record<string, unknown>,
+    context: { resourceId: number },
+  ): Promise<Record<string, unknown>>;
 
   /** Handle IDs accepted as inputs (e.g. ['input']). Empty for trigger nodes. */
   readonly inputs: readonly string[];
@@ -79,6 +99,18 @@ interface PluginFlowNodeDefinitionBase {
    * expected). Controls the direction indicator in the catalog UI.
    */
   readonly isOutput?: boolean;
+
+  /** Validates persisted configuration independently of the editor schema. */
+  validateConfig?(
+    config: Record<string, unknown>,
+    context: PluginFlowNodeValidationContext,
+  ): Promise<PluginFlowNodeValidationError[]>;
+
+  /** Enables the host's shared external-effect failure policy for this node. */
+  getFailureBehavior?(config: Record<string, unknown>): PluginFlowFailureBehavior | undefined;
+
+  /** Classifies an execution failure for flow logs and failure outputs. */
+  getFailureKind?(error: unknown): PluginFlowFailureKind;
 }
 
 /** A plugin node that starts a flow when the plugin calls context.flows.trigger(). */

@@ -32,6 +32,18 @@ export class MqttServer {
   })
   port!: number;
 
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'Optional management API port on the broker host. Null uses the provider default.',
+    type: 'integer',
+    required: false,
+    nullable: true,
+    minimum: 1,
+    maximum: 65535,
+    example: 25671,
+  })
+  managementPort!: number | null;
+
   @Column({ nullable: true, type: 'text' })
   @ApiProperty({
     description: 'Optional authentication username',

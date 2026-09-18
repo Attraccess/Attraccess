@@ -1,11 +1,39 @@
 {
   "runtime": "attraccess-wago-cc100",
   "runtimeVersion": "0.1.0",
-  "image": "ghcr.io/attraccess/wago-cc100-runtime:0.1.0",
-  "imageDigest": "published-by-ci",
+  "image": "ghcr.io/attraccess/wago-cc100-runtime:<commit-sha>",
+  "imageDigest": "Recorded by the publishing workflow as ghcr.io/attraccess/wago-cc100-runtime:<commit-sha>@sha256:<digest>",
   "protocolVersion": "1.0.0",
-  "hardware": { "model": "751-9301", "firmwareBaseline": "WAGO CC100 Linux firmware with Docker" },
-  "capabilities": ["claim", "heartbeat", "configuration-v1", "commands", "state", "measurement", "fault", "acknowledgement"],
+  "hardware": {
+    "model": "751-9301",
+    "platform": "linux/arm/v7",
+    "firmwareBaseline": "31"
+  },
+  "capabilities": [
+    "claim",
+    "heartbeat",
+    "configuration-v1",
+    "commands",
+    "state",
+    "measurement",
+    "fault",
+    "acknowledgement"
+  ],
   "security": { "arbitraryCodeUpload": false, "safetyRated": false },
-  "deployment": { "privileged": true, "releaseRequirement": "Replace privileged mode with documented minimum device and bind mounts after hardware validation." }
+  "deployment": {
+    "privileged": false,
+    "hardwareProfile": "cc100-751-9301-fw31-digital-v1",
+    "user": "10001",
+    "capDrop": ["ALL"],
+    "securityOpt": ["no-new-privileges"],
+    "mounts": [
+      {
+        "source": "/sys/devices/platform/soc/44009000.spi/spi_master/spi0/spi0.0/din",
+        "target": "/run/attraccess-wago/io/din",
+        "readOnly": true
+      },
+      { "source": "/sys/kernel/dout_drv/DOUT_DATA", "target": "/run/attraccess-wago/io/dout", "readOnly": false }
+    ],
+    "releaseRequirement": "ATT-984 must validate firmware-31 register access, UID 10001 permissions, exclusive output ownership and restart behavior on physical hardware. Installer integration is required; this manifest is not an installer."
+  }
 }

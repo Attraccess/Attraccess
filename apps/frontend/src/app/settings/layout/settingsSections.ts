@@ -80,6 +80,12 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     permission: 'system.settings.manage',
   },
   {
+    key: 'auditLog',
+    path: '/settings/audit-log',
+    group: 'operations',
+    permission: 'system.audit.read',
+  },
+  {
     key: 'plugins',
     path: '/settings/plugins',
     group: 'operations',

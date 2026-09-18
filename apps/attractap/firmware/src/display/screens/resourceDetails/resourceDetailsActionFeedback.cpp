@@ -3,15 +3,6 @@
 #include <time.h>
 #include <stdio.h>
 
-void ResourceDetailsScreen::disposeActionOverlay()
-{
-   if (this->actionOverlay)
-   {
-      lv_obj_del(this->actionOverlay);
-   }
-   this->actionOverlay = nullptr;
-   this->actionOverlayLabel = nullptr;
-}
 void ResourceDetailsScreen::disposeSuccessToast()
 {
    if (this->successToastTimer)
@@ -29,42 +20,58 @@ void ResourceDetailsScreen::onToastDelete(lv_event_t *e)
 {
    (void)e;
 }
-void ResourceDetailsScreen::showActionProgress(const char *text)
+void ResourceDetailsScreen::showActionProgress(const char *)
 {
-   if (!this->actionOverlay)
+   // The originating button can disappear during a screen transition, but the
+   // request must still block additional actions until its result arrives.
+   this->actionInProgress = true;
+
+   if (!this->activeActionButton || !lv_obj_is_valid(this->activeActionButton))
    {
-      lv_obj_t *top = lv_layer_top();
-      this->actionOverlay = lv_obj_create(top);
-      lv_obj_remove_style_all(this->actionOverlay);
-      lv_obj_add_flag(this->actionOverlay, LV_OBJ_FLAG_IGNORE_LAYOUT);
-      lv_obj_add_flag(this->actionOverlay, LV_OBJ_FLAG_CLICKABLE); // block input behind
-      lv_obj_remove_flag(this->actionOverlay, LV_OBJ_FLAG_SCROLLABLE);
-      lv_obj_set_size(this->actionOverlay, lv_pct(100), lv_pct(100));
-      lv_obj_set_align(this->actionOverlay, LV_ALIGN_CENTER);
-      lv_obj_set_style_bg_color(this->actionOverlay, lv_color_black(), LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_obj_set_style_bg_opa(this->actionOverlay, 128, LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_obj_set_flex_flow(this->actionOverlay, LV_FLEX_FLOW_COLUMN);
-      lv_obj_set_flex_align(this->actionOverlay, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-
-      lv_obj_t *spinner = lv_spinner_create(this->actionOverlay);
-      lv_obj_set_size(spinner, 48, 48);
-
-      this->actionOverlayLabel = lv_label_create(this->actionOverlay);
-      lv_label_set_text(this->actionOverlayLabel, "Bitte warten");
-      lv_obj_set_style_text_color(this->actionOverlayLabel, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+      return;
    }
 
-   if (text && this->actionOverlayLabel)
+   if (!this->activeActionSpinner || !lv_obj_is_valid(this->activeActionSpinner))
    {
-      lv_label_set_text(this->actionOverlayLabel, text);
+      this->activeActionSpinner = lv_spinner_create(this->activeActionButton);
+      lv_obj_set_style_arc_color(this->activeActionSpinner, DisplayTheme::border(), LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_set_style_arc_color(this->activeActionSpinner, DisplayTheme::muted(), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+      lv_obj_update_layout(this->activeActionButton);
+      const lv_coord_t labelHeight = this->activeActionLabel ? lv_obj_get_height(this->activeActionLabel) : 20;
+      lv_obj_set_size(this->activeActionSpinner, labelHeight, labelHeight);
+      lv_obj_set_align(this->activeActionSpinner, LV_ALIGN_CENTER);
+      lv_obj_add_flag(this->activeActionSpinner, LV_OBJ_FLAG_HIDDEN);
    }
-   lv_obj_clear_flag(this->actionOverlay, LV_OBJ_FLAG_HIDDEN);
+
+   if (this->activeActionLabel && lv_obj_is_valid(this->activeActionLabel))
+   {
+      lv_obj_add_flag(this->activeActionLabel, LV_OBJ_FLAG_HIDDEN);
+   }
+   lv_obj_clear_flag(this->activeActionSpinner, LV_OBJ_FLAG_HIDDEN);
+   lv_obj_add_state(this->activeActionButton, LV_STATE_DISABLED);
 }
 void ResourceDetailsScreen::hideActionProgress()
 {
-   if (!this->actionOverlay)
-      return;
-   lv_obj_add_flag(this->actionOverlay, LV_OBJ_FLAG_HIDDEN);
+   this->hideActionProgressVisual();
+   if (this->activeActionButton && lv_obj_is_valid(this->activeActionButton))
+   {
+      lv_obj_clear_state(this->activeActionButton, LV_STATE_DISABLED);
+   }
+   this->activeActionButton = nullptr;
+   this->activeActionLabel = nullptr;
+   this->activeActionSpinner = nullptr;
+   this->actionInProgress = false;
+}
+void ResourceDetailsScreen::hideActionProgressVisual()
+{
+   if (this->activeActionSpinner && lv_obj_is_valid(this->activeActionSpinner))
+   {
+      lv_obj_add_flag(this->activeActionSpinner, LV_OBJ_FLAG_HIDDEN);
+   }
+   if (this->activeActionLabel && lv_obj_is_valid(this->activeActionLabel))
+   {
+      lv_obj_clear_flag(this->activeActionLabel, LV_OBJ_FLAG_HIDDEN);
+   }
 }
 void ResourceDetailsScreen::showSuccessToast(const char *text, uint16_t ms)
 {
@@ -79,20 +86,20 @@ void ResourceDetailsScreen::showSuccessToast(const char *text, uint16_t ms)
       lv_obj_remove_style_all(this->successToast);
       lv_obj_set_size(this->successToast, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
       lv_obj_set_align(this->successToast, LV_ALIGN_BOTTOM_MID);
-      lv_obj_set_style_bg_color(this->successToast, lv_color_hex(0x10B981), LV_PART_MAIN | LV_STATE_DEFAULT); // green
-      lv_obj_set_style_bg_opa(this->successToast, 230, LV_PART_MAIN | LV_STATE_DEFAULT);
+      DisplayTheme::applySurface(this->successToast);
+      lv_obj_set_style_bg_color(this->successToast, DisplayTheme::success(), LV_PART_MAIN | LV_STATE_DEFAULT);
+      lv_obj_set_style_border_color(this->successToast, DisplayTheme::success(), LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_obj_set_style_pad_left(this->successToast, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_obj_set_style_pad_right(this->successToast, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_obj_set_style_pad_top(this->successToast, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
       lv_obj_set_style_pad_bottom(this->successToast, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_obj_set_style_radius(this->successToast, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 
    // Replace content
    lv_obj_clean(this->successToast);
    lv_obj_t *lbl = lv_label_create(this->successToast);
    lv_label_set_text(lbl, text ? text : "Erfolgreich");
-   lv_obj_set_style_text_color(lbl, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_text_color(lbl, DisplayTheme::onPrimary(), LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Show now
    lv_obj_clear_flag(this->successToast, LV_OBJ_FLAG_HIDDEN);

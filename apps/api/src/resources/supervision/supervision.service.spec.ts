@@ -13,6 +13,7 @@ import { ResourceUsageService } from '../usage/resourceUsage.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto';
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
+import { AuditService } from '../../audit/audit.service';
 // Lets pending request promises settle/flush without depending on real timers.
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
@@ -25,6 +26,7 @@ describe('SupervisionService', () => {
   };
   let introducers: { getMany: jest.Mock };
   let live: { emitToSupervisor: jest.Mock; getSupervisorSubject: jest.Mock };
+  let audit: { recordResource: jest.Mock };
   const requester: User = { id: 1, username: 'requester' } as User;
   const supervisor: User = { id: 2, username: 'supervisor' } as User;
   const dto: RequestSupervisedSessionDto = { supervisorUserId: 2, notes: 'please supervise' };
@@ -43,6 +45,7 @@ describe('SupervisionService', () => {
       emitToSupervisor: jest.fn(),
       getSupervisorSubject: jest.fn(),
     };
+    audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -50,6 +53,7 @@ describe('SupervisionService', () => {
         { provide: ResourceUsageService, useValue: resourceUsageService },
         { provide: ResourceIntroducersService, useValue: introducers },
         { provide: SupervisionLiveService, useValue: live },
+        { provide: AuditService, useValue: audit },
       ],
     }).compile();
 
@@ -98,21 +102,32 @@ describe('SupervisionService', () => {
   it('starts the session on approval and resolves the requester', async () => {
     const { pending, requestId } = await createRequest();
 
-    const approved = await service.approve(requestId, supervisor);
+    const approved = await service.approve(requestId, supervisor, 'api-token', 9);
 
-    expect(resourceUsageService.startSession).toHaveBeenCalledWith(5, requester, dto, { supervisorUserId: 2 });
+    expect(resourceUsageService.startSession).toHaveBeenCalledWith(5, requester, dto, {
+      supervisorUserId: 2,
+      auditOrigin: { actorId: 2, authenticationMethod: 'api-token', apiTokenId: 9 },
+    });
     expect(approved).toBe(startedSession);
     await expect(pending).resolves.toBe(startedSession);
     expect(service.listPendingForSupervisor(2)).toHaveLength(0);
     expect(
       live.emitToSupervisor.mock.calls.some((c) => c[1].type === SupervisionLiveEventType.RESOLVED),
     ).toBe(true);
+    expect(audit.recordResource).toHaveBeenCalledWith({
+      action: 'supervision.approved',
+      actorId: 2,
+      authenticationMethod: 'api-token',
+      apiTokenId: 9,
+      subjectId: 5,
+      details: expect.objectContaining({ requesterUserId: 1, supervisorUserId: 2 }),
+    });
   });
 
   it('rejects the requester when the supervisor rejects the request', async () => {
     const { pending, requestId } = await createRequest();
 
-    const result = service.reject(requestId, supervisor);
+    const result = service.reject(requestId, supervisor, 'api-token', 9);
 
     expect(result).toEqual({ status: 'rejected', requestId });
     await expect(pending).rejects.toBeInstanceOf(ForbiddenException);
@@ -120,6 +135,14 @@ describe('SupervisionService', () => {
     expect(
       live.emitToSupervisor.mock.calls.some((c) => c[1].type === SupervisionLiveEventType.REJECTED),
     ).toBe(true);
+    expect(audit.recordResource).toHaveBeenCalledWith({
+      action: 'supervision.rejected',
+      actorId: 2,
+      authenticationMethod: 'api-token',
+      apiTokenId: 9,
+      subjectId: 5,
+      details: expect.objectContaining({ requesterUserId: 1, supervisorUserId: 2 }),
+    });
   });
 
   it('expires the request after 30s and times out the requester', async () => {
@@ -203,7 +226,10 @@ describe('SupervisionService', () => {
 
       const session = await service.approve(requestId, otherSupervisor);
 
-      expect(resourceUsageService.startSession).toHaveBeenCalledWith(5, requester, {}, { supervisorUserId: 3 });
+      expect(resourceUsageService.startSession).toHaveBeenCalledWith(5, requester, {}, {
+        supervisorUserId: 3,
+        auditOrigin: { actorId: 3, authenticationMethod: 'session' },
+      });
       expect(session).toBe(startedSession);
       expect(onResolved).toHaveBeenCalledWith(startedSession, { id: 3, username: 'other' });
       const resolvedTargets = live.emitToSupervisor.mock.calls
@@ -229,7 +255,10 @@ describe('SupervisionService', () => {
       const session = await service.approve(requestId, newlyGrantedIntroducer);
 
       expect(resourceUsageService.validateSupervisedStart).toHaveBeenCalledWith(5, requester, 9);
-      expect(resourceUsageService.startSession).toHaveBeenCalledWith(5, requester, {}, { supervisorUserId: 9 });
+      expect(resourceUsageService.startSession).toHaveBeenCalledWith(5, requester, {}, {
+        supervisorUserId: 9,
+        auditOrigin: { actorId: 9, authenticationMethod: 'session' },
+      });
       expect(session).toBe(startedSession);
       expect(onResolved).toHaveBeenCalledWith(startedSession, { id: 9, username: 'new-introducer' });
     });
@@ -317,6 +346,7 @@ describe('SupervisionService', () => {
       await expect(pending).resolves.toBe(startedSession);
       expect(resourceUsageService.startSession).toHaveBeenCalledWith(5, requester, readerDto, {
         supervisorUserId: 2,
+        auditOrigin: { actorId: 2, authenticationMethod: 'session' },
       });
       // The reader is told through the callbacks the armer handed back.
       expect(readerCallbacks.onResolved).toHaveBeenCalledWith(startedSession, { id: 2, username: 'supervisor' });

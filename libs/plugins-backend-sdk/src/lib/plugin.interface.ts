@@ -56,6 +56,8 @@ export enum PluginPermission {
   ACCESS_MQTT_SERVERS = 'ACCESS_MQTT_SERVERS',
   /** Start flows from plugin-declared trigger nodes via flows.trigger(). */
   TRIGGER_FLOWS = 'TRIGGER_FLOWS',
+  /** Encrypt and decrypt plugin-owned secret material through the host key service. */
+  MANAGE_SECRETS = 'MANAGE_SECRETS',
 }
 
 /**
@@ -72,6 +74,7 @@ export const PLUGIN_PERMISSION_DESCRIPTIONS: Record<PluginPermission, string> = 
   [PluginPermission.RESOLVE_HOST_PROVIDERS]: 'Resolve arbitrary host services by injection token.',
   [PluginPermission.ACCESS_MQTT_SERVERS]: "Read an MQTT server's connection configuration and resolved credentials.",
   [PluginPermission.TRIGGER_FLOWS]: 'Start flows from plugin-declared trigger nodes.',
+  [PluginPermission.MANAGE_SECRETS]: 'Encrypt and decrypt plugin-owned secret material through the host key service.',
 };
 
 /**

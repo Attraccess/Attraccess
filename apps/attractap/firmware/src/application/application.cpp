@@ -22,7 +22,9 @@ void Application::networkTask(void *parameter) {
     esp_task_wdt_reset();
 #endif
     Network::loop();
+#ifdef ESP_PLATFORM
     vTaskDelay(100 / portTICK_PERIOD_MS);
+#endif
   }
 }
 
@@ -37,6 +39,7 @@ void Application::ledTask(void *parameter) {
 #endif
 
 void Application::setup() {
+#ifdef ESP_PLATFORM
   // Confirm OTA image on first boot after update to avoid rollback
   const esp_partition_t *running = esp_ota_get_running_partition();
   esp_ota_img_states_t ota_state;
@@ -46,6 +49,7 @@ void Application::setup() {
       esp_ota_mark_app_valid_cancel_rollback();
     }
   }
+#endif
 
   Settings::setup();
   this->setupBootDiagnostics();
@@ -69,7 +73,9 @@ void Application::setup() {
 #else
   this->beeper.setup();
 #ifdef HAS_LVGL_DISPLAY
+#ifndef ATTRACTAP_HOST
   Display::setup();
+#endif
 #endif
 #endif
 
@@ -459,23 +465,32 @@ void Application::setup() {
   this->api.setResourceFormsRequestCallback(
       [this](const API::ResourceUsageFormRequest &request) {
         // DO NOT copy the large struct here - websocket task has limited
-        // stack/heap. Just set a flag; the LVGL async handler will do the copy
-        // on the main thread.
-        (void)request; // The data is in api.getFormRequestScratch()
-        this->pendingFormRequestReady = true;
-        // Schedule the copy + UI update on LVGL thread
+        // stack/heap. Queue only its identity; LVGL validates it against the
+        // pending action before copying the complete request metadata.
+        struct Payload {
+          Application *self;
+          uint32_t resourceId;
+          API::ResourceUsageFormActionType action;
+        };
+        Payload *payload = new Payload{this, request.resourceId, request.action};
+        if (!payload) {
+          return;
+        }
         Display::asyncCall(
             [](void *u) {
-              auto *self = static_cast<Application *>(u);
-              if (self && self->pendingFormRequestReady) {
-                self->pendingFormRequestReady = false;
-                // Copy from API's scratch buffer on the main thread (safe
-                // stack/heap)
-                self->pendingFormRequest = self->api.getFormRequestScratch();
-                self->handleFormsRequest(self->pendingFormRequest);
+              auto *payload = static_cast<Payload *>(u);
+              if (payload && payload->self) {
+                // The scratch buffer can hold a newer request by the time this
+                // runs, so only process the request represented by this payload.
+                const auto &request = payload->self->api.getFormRequestScratch();
+                if (request.resourceId == payload->resourceId &&
+                    request.action == payload->action) {
+                  payload->self->handleFormsRequest(request);
+                }
               }
+              delete payload;
             },
-            this);
+            payload);
       });
 
   this->api.setResourceFormFieldsCallback(
@@ -587,7 +602,7 @@ void Application::setup() {
   });
 #endif
 
-#ifndef DEMO_MODE
+#if !defined(DEMO_MODE) && defined(ESP_PLATFORM)
   xTaskCreate(Application::networkTask, "NetworkTask", 4096, nullptr,
               tskIDLE_PRIORITY, nullptr);
 #endif

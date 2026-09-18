@@ -13,14 +13,67 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
     ...actual,
     useResourceFlowsServiceGetNodeSchemas: () => ({
       isLoading: mockIsLoading,
-      data: mockIsLoading ? undefined : [
-        { type: 'input.button', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
-        { type: 'input.resource.door.locked', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
-        { type: 'output.http.sendRequest', inputs: ['input'], outputs: [], isOutput: true, supportedByResource: true, configSchema: {} },
-        { type: 'processing.wait', inputs: ['input'], outputs: ['output'], isOutput: false, supportedByResource: true, configSchema: {} },
-        { type: 'input.mqtt.message.received', inputs: [], outputs: ['output'], isOutput: false, supportedByResource: false, configSchema: {} },
-        { type: 'plugin.example.trigger', inputs: [], outputs: ['output'], isOutput: false, isInput: true, supportedByResource: true, configSchema: {} },
-      ],
+      data: mockIsLoading
+        ? undefined
+        : [
+            {
+              type: 'input.button',
+              inputs: [],
+              outputs: ['output'],
+              isOutput: false,
+              supportedByResource: true,
+              configSchema: {},
+            },
+            {
+              type: 'input.resource.door.locked',
+              inputs: [],
+              outputs: ['output'],
+              isOutput: false,
+              supportedByResource: true,
+              configSchema: {},
+            },
+            {
+              type: 'output.http.sendRequest',
+              inputs: ['input'],
+              outputs: [],
+              isOutput: true,
+              supportedByResource: true,
+              configSchema: {},
+            },
+            {
+              type: 'processing.wait',
+              inputs: ['input'],
+              outputs: ['output'],
+              isOutput: false,
+              supportedByResource: true,
+              configSchema: {},
+            },
+            {
+              type: 'input.mqtt.message.received',
+              inputs: [],
+              outputs: ['output'],
+              isOutput: false,
+              supportedByResource: true,
+              configSchema: {},
+            },
+            {
+              type: 'input.resource.usage.started',
+              inputs: [],
+              outputs: ['output'],
+              isOutput: false,
+              supportedByResource: false,
+              configSchema: {},
+            },
+            {
+              type: 'plugin.example.trigger',
+              inputs: [],
+              outputs: ['output'],
+              isOutput: false,
+              isInput: true,
+              supportedByResource: true,
+              configSchema: {},
+            },
+          ],
     }),
   };
 });
@@ -34,15 +87,18 @@ describe('useNodeCatalog', () => {
   it('groups supported schemas by domain in DOMAIN_ORDER', () => {
     const { result } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
     const domains = result.current.groups.map((g) => g.domain);
-    expect(domains).toEqual(['triggers', 'manual', 'door', 'http', 'logic']);
-    expect(result.current.groups.find((g) => g.domain === 'manual')?.nodes).toHaveLength(1);
-    expect(result.current.groups.find((g) => g.domain === 'triggers')?.nodes).toHaveLength(1);
+    expect(domains).toEqual(['access-doors', 'messaging', 'web-requests', 'flow-control', 'plugin.example']);
+    expect(result.current.groups.find((g) => g.domain === 'flow-control')?.nodes).toHaveLength(2);
+    expect(result.current.groups.find((g) => g.domain === 'access-doors')?.nodes).toHaveLength(1);
+    expect(result.current.groups.find((g) => g.domain === 'messaging')?.nodes.map((n) => n.schema.type)).toContain(
+      'input.mqtt.message.received',
+    );
   });
 
   it('omits unsupported schemas', () => {
     const { result } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
-    const mqttGroup = result.current.groups.find((g) => g.domain === 'mqtt');
-    expect(mqttGroup).toBeUndefined();
+    const nodeTypes = result.current.groups.flatMap((g) => g.nodes.map((n) => n.schema.type));
+    expect(nodeTypes).not.toContain('input.resource.usage.started');
   });
 
   it('annotates each row with a direction (down/up/both)', () => {
@@ -55,16 +111,41 @@ describe('useNodeCatalog', () => {
 
   it('expands all domains by default and toggles via setDomainExpanded', () => {
     const { result } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
-    expect(result.current.isDomainExpanded('manual')).toBe(true);
-    act(() => result.current.setDomainExpanded('manual', false));
-    expect(result.current.isDomainExpanded('manual')).toBe(false);
-    expect(window.localStorage.getItem('nodeCatalog.expanded.manual')).toBe('false');
+    expect(result.current.isDomainExpanded('flow-control')).toBe(true);
+    act(() => result.current.setDomainExpanded('flow-control', false));
+    expect(result.current.isDomainExpanded('flow-control')).toBe(false);
+    expect(window.localStorage.getItem('nodeCatalog.expanded.flow-control')).toBe('false');
   });
 
-  it('hydrates expanded state from localStorage', () => {
+  it('migrates expanded state from legacy categories', () => {
     window.localStorage.setItem('nodeCatalog.expanded.door', 'false');
     const { result } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
-    expect(result.current.isDomainExpanded('door')).toBe(false);
+    expect(result.current.isDomainExpanded('access-doors')).toBe(false);
+    expect(window.localStorage.getItem('nodeCatalog.expanded.door')).toBeNull();
+  });
+
+  it('migrates a collapsed legacy triggers category to its replacement groups', () => {
+    window.localStorage.setItem('nodeCatalog.expanded.triggers', 'false');
+    const { result } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
+    expect(result.current.isDomainExpanded('access-doors')).toBe(false);
+    expect(result.current.isDomainExpanded('flow-control')).toBe(false);
+    expect(result.current.isDomainExpanded('plugin.example')).toBe(false);
+    expect(window.localStorage.getItem('nodeCatalog.expanded.triggers')).toBeNull();
+  });
+
+  it('waits for schemas before migrating plugin category state', () => {
+    mockIsLoading = true;
+    window.localStorage.setItem('nodeCatalog.expanded.triggers', 'false');
+    const { result, rerender } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
+
+    expect(window.localStorage.getItem('nodeCatalog.expanded.triggers')).toBe('false');
+    expect(window.localStorage.getItem('nodeCatalog.storageVersion')).toBeNull();
+
+    mockIsLoading = false;
+    rerender();
+
+    expect(result.current.isDomainExpanded('plugin.example')).toBe(false);
+    expect(window.localStorage.getItem('nodeCatalog.expanded.triggers')).toBeNull();
   });
 
   it('toggles sidebar collapsed state and persists it', () => {
@@ -77,10 +158,10 @@ describe('useNodeCatalog', () => {
 
   it('updates isDomainExpanded result after setDomainExpanded across renders', () => {
     const { result, rerender } = renderHook(() => useNodeCatalog({ resourceId: 1 }));
-    expect(result.current.isDomainExpanded('manual')).toBe(true);
-    act(() => result.current.setDomainExpanded('manual', false));
+    expect(result.current.isDomainExpanded('flow-control')).toBe(true);
+    act(() => result.current.setDomainExpanded('flow-control', false));
     rerender();
-    expect(result.current.isDomainExpanded('manual')).toBe(false);
+    expect(result.current.isDomainExpanded('flow-control')).toBe(false);
   });
 
   it('returns at least one group when supported schemas exist', () => {

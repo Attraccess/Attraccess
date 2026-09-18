@@ -87,7 +87,10 @@ export class AttractapSessionHandler {
         resourceId,
         user,
         { projectId, formSubmissions, forceTakeOver },
-        supervisorUserId ? { supervisorUserId } : {},
+        {
+          ...(supervisorUserId ? { supervisorUserId } : {}),
+          auditOrigin: { actorId: user.id, authenticationMethod: null },
+        },
       );
       this.formsHandler.clearFormDraft(socket, resourceId, formAction);
       // The card channel won — settle the still-open web request so any supervisor popups close.
@@ -153,7 +156,9 @@ export class AttractapSessionHandler {
     }
 
     try {
-      await this.resourceUsageService.endSession(resourceId, user, { formSubmissions });
+      await this.resourceUsageService.endSession(resourceId, user, { formSubmissions }, {
+        auditOrigin: { actorId: user.id, authenticationMethod: null },
+      });
       this.formsHandler.clearFormDraft(socket, resourceId, ResourceFormAction.END);
       await socket.sendMessage(new AttractapEvent(AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { success: true }));
     } catch (error) {

@@ -9,7 +9,7 @@ describe('OperatingTransitionExecutor', () => {
       transition: jest.fn().mockResolvedValue(null),
     } as unknown as ResourceOperatingIntervalService;
     const executor = new OperatingTransitionExecutor(transitions, 'operating');
-    const node = { resourceId: 7, type: ResourceFlowNodeType.OUTPUT_RESOURCE_OPERATING } as ResourceFlowNode;
+    const node = { resourceId: 7, type: ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_OPERATING } as ResourceFlowNode;
     const payload = { source: 'mqtt' };
 
     const transactionManager = {} as EntityManager;
@@ -23,7 +23,7 @@ describe('OperatingTransitionExecutor', () => {
       transition: jest.fn().mockResolvedValue(null),
     } as unknown as ResourceOperatingIntervalService;
     const executor = new OperatingTransitionExecutor(transitions, 'idle');
-    const node = { resourceId: 7, type: ResourceFlowNodeType.OUTPUT_RESOURCE_IDLE } as ResourceFlowNode;
+    const node = { resourceId: 7, type: ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE } as ResourceFlowNode;
 
     await executor.execute(node, {}, {} as never);
 

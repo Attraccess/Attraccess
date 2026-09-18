@@ -46,6 +46,7 @@ import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import { UserPermissionsChangedEvent } from '../../users-and-auth/rbac/events/user-permissions-changed.event';
 import { VALKEY_CLIENT } from '../../valkey/valkey.module';
 import { ExternalEffectFailureError } from '../flows/errors/external-effect-failure.error';
+import { AuditService } from '../../audit/audit.service';
 
 const mockRbacService = {
   getEffectivePermissions: jest.fn().mockResolvedValue(new Set<string>()),
@@ -64,6 +65,7 @@ const mockMetricsService = {
   authorizationCacheRequestsTotal: { inc: jest.fn() },
   authorizationCacheSize: { set: jest.fn() },
 };
+const mockAuditService = { recordResource: jest.fn().mockResolvedValue(undefined) };
 
 describe('ResourceUsageService', () => {
   let service: ResourceUsageService;
@@ -286,6 +288,7 @@ describe('ResourceUsageService', () => {
           provide: RbacService,
           useValue: mockRbacService,
         },
+        { provide: AuditService, useValue: mockAuditService },
       ],
     }).compile();
 
@@ -929,6 +932,13 @@ describe('ResourceUsageService', () => {
       expect(mockQueryBuilder.insert).toHaveBeenCalled();
       expect(eventEmitter.emitAsync).toHaveBeenCalledWith(ResourceSessionStartedEvent.EVENT_NAME, expect.any(Object));
       expect(flowExecutorService.trackResourceActivity).toHaveBeenCalledWith(createdSession.resourceId);
+      expect(mockAuditService.recordResource).toHaveBeenCalledWith({
+        action: 'usage_session.started',
+        actorId: 1,
+        authenticationMethod: 'session',
+        subjectId: 1,
+        details: { usageId: 1, usageUserId: 1 },
+      });
     });
   });
 
@@ -1152,6 +1162,13 @@ describe('ResourceUsageService', () => {
       const eventPayload = emitted?.[1] as ResourceSessionStartedEvent;
       expect(eventPayload).toBeInstanceOf(ResourceSessionStartedEvent);
       expect(eventPayload.usage).toMatchObject({ id: 1, userId: 1, endNotes: 'Session completed' });
+      expect(mockAuditService.recordResource).toHaveBeenCalledWith({
+        action: 'usage_session.ended',
+        actorId: 1,
+        authenticationMethod: 'session',
+        subjectId: 1,
+        details: { usageId: 1, usageUserId: 1 },
+      });
     });
 
     it('runs the stopped-session flow after the usage transaction commits', async () => {

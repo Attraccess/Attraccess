@@ -6,7 +6,7 @@
 
 #include "../IScreen.hpp"
 #include "../../../logger/logger.hpp"
-#include "../../images/lockscreen_background_image.hpp"
+#include "display/theme.hpp"
 #include "../../../utils.hpp"
 #include "../../../api/api.hpp"
 
@@ -142,8 +142,7 @@ private:
     lv_obj_t *formsBackButton = nullptr;
     lv_obj_t *formsNextButton = nullptr;
     lv_obj_t *formsNextLabel = nullptr;
-    lv_obj_t *formsBusyOverlay = nullptr;
-    lv_obj_t *formsBusyLabel = nullptr;
+    lv_obj_t *formsNextSpinner = nullptr;
     // Fullscreen text editor overlay: textarea on top, keyboard pinned below.
     lv_obj_t *formsEditorOverlay = nullptr;
     lv_obj_t *formsEditorTitleLabel = nullptr;
@@ -151,6 +150,7 @@ private:
     lv_obj_t *formsEditorSpacer = nullptr; // pushes keyboard to the bottom for one-line fields
     lv_obj_t *formsEditorKeyboard = nullptr;
     uint16_t formsEditorWidgetIndex = 0;
+    std::string formsEditorInitialText;
     bool formsBusy = false;
     const API::ResourceUsageFormRequest *formsModalMeta = nullptr;
     const API::ResourceUsageFormFieldsPage *formsModalPage = nullptr;
@@ -230,9 +230,11 @@ private:
     std::string buildIntroducersText(const API::ResourceBrief &resource);
     void refreshAccessState();
 
-    // overlay/toast state
-    lv_obj_t *actionOverlay = nullptr;
-    lv_obj_t *actionOverlayLabel = nullptr;
+    // The action that initiated the current request shows its progress inline.
+    lv_obj_t *activeActionButton = nullptr;
+    lv_obj_t *activeActionLabel = nullptr;
+    lv_obj_t *activeActionSpinner = nullptr;
+    bool actionInProgress = false;
     lv_obj_t *successToast = nullptr;
     lv_timer_t *successToastTimer = nullptr;
 
@@ -264,7 +266,7 @@ private:
     void applyCachedState();
     void disposeProjectsModal();
     void disposeFormsModal();
-    void disposeActionOverlay();
     void disposeSuccessToast();
+    void hideActionProgressVisual();
     void resetFormsModalState();
 };

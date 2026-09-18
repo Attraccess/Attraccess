@@ -1,37 +1,48 @@
 import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
-import { join } from 'path';
+import { basename, isAbsolute, join, relative, resolve } from 'path';
 import type { PluginManifestInfo } from '@attraccess/plugins-backend-sdk';
 import { PluginManifest, PluginManifestSchema, LoadedPluginManifest } from './plugin.manifest';
 import { PluginSandboxService } from './plugin-sandbox.service';
 import { PluginMigrationService } from './plugin-migration.service';
-import { existsSync, readdirSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs';
 import { FileUpload } from '../common/types/file-upload.types';
 import { rename, rm } from 'fs/promises';
 import decompress from 'decompress';
 import { createHash, randomBytes } from 'crypto';
 import { spawn } from 'child_process';
 
-const INTERNAL_PLUGIN_DIRECTORIES = new Set(['.npm-backups']);
+const INTERNAL_PLUGIN_DIRECTORIES = new Set(['.npm-backups', '.plugin-failures.json', '.plugin-boot-guard.json']);
+const PLUGIN_FAILURES_FILE = '.plugin-failures.json';
+const PLUGIN_BOOT_GUARD_FILE = '.plugin-boot-guard.json';
 
+type PluginFailure = { pluginDirectory: string; message: string };
 
 export class PluginService {
   private static plugins: LoadedPluginManifest[] | null = null;
   private static loadedPlugins: Set<string> = new Set();
   private static pluginLoadErrors: Map<string, Error> = new Map();
+  private static pluginFailures: Map<string, PluginFailure> = new Map();
   private static logger = new Logger(PluginService.name);
+  private static readonly pluginUploadLocks = new Map<string, Promise<void>>();
   public static PLUGIN_PATH: string;
   private static RESTART_BY_EXIT_FLAG: boolean;
 
-  public static configure(config: { PLUGIN_DIR: string, RESTART_BY_EXIT: boolean }): void {
+  public static configure(config: { PLUGIN_DIR: string; RESTART_BY_EXIT: boolean }): void {
     PluginService.PLUGIN_PATH = config.PLUGIN_DIR; // Assume PLUGIN_DIR from appConfig is already resolved or correct
     PluginService.RESTART_BY_EXIT_FLAG = config.RESTART_BY_EXIT;
     PluginService.plugins = null; // Discovery may have been cached with an unset path before configure() ran; force a re-scan.
-    PluginService.logger.log(`PluginService configured. Path: ${PluginService.PLUGIN_PATH}, RestartByExit: ${PluginService.RESTART_BY_EXIT_FLAG}`);
+    PluginService.loadedPlugins.clear();
+    PluginService.pluginLoadErrors.clear();
+    PluginService.pluginFailures = new Map(
+      PluginService.readFailures().map((failure) => [failure.pluginDirectory, failure]),
+    );
+    PluginService.logger.log(
+      `PluginService configured. Path: ${PluginService.PLUGIN_PATH}, RestartByExit: ${PluginService.RESTART_BY_EXIT_FLAG}`,
+    );
     if (!PluginService.PLUGIN_PATH) {
-        PluginService.logger.error('PLUGIN_DIR is not configured in AppConfig! Plugin system may not work.');
+      PluginService.logger.error('PLUGIN_DIR is not configured in AppConfig! Plugin system may not work.');
     }
   }
-
 
   public static getPlugins(): LoadedPluginManifest[] {
     if (!PluginService.plugins) {
@@ -84,6 +95,93 @@ export class PluginService {
     PluginService.pluginLoadErrors.set(pluginName, error);
   }
 
+  /**
+   * Persist a failed plugin outside its package. A subsequent process must never
+   * retry code which already prevented the host from starting.
+   */
+  public static quarantinePlugin(manifest: LoadedPluginManifest, error: Error): void {
+    const key = `${manifest.name}@${manifest.version}`;
+    PluginService.setPluginLoadError(key, error);
+    try {
+      PluginService.quarantinePluginDirectory(manifest.pluginDirectory, error);
+    } catch (persistenceError) {
+      PluginService.logger.error(`Failed to persist quarantine for ${key}`, persistenceError as Error);
+    }
+  }
+
+  public static quarantinePluginDirectory(pluginDirectory: string, error: Error): void {
+    PluginService.pluginFailures.set(pluginDirectory, { pluginDirectory, message: error.message });
+    PluginService.writeFailures([...PluginService.pluginFailures.values()]);
+  }
+
+  public static isPluginQuarantined(manifest: Pick<LoadedPluginManifest, 'pluginDirectory'>): boolean {
+    return PluginService.pluginFailures.has(manifest.pluginDirectory);
+  }
+
+  /** Marks active plugins only while Nest is running their lifecycle hooks. */
+  public static beginBootGuard(): void {
+    const previous = PluginService.readBootGuard();
+    if (previous.length > 0) {
+      for (const pluginDirectory of previous) {
+        if (!PluginService.pluginFailures.has(pluginDirectory)) {
+          PluginService.pluginFailures.set(pluginDirectory, {
+            pluginDirectory,
+            message: 'Plugin was disabled after an incomplete startup with no attributable stack frame.',
+          });
+        }
+      }
+      PluginService.writeFailures([...PluginService.pluginFailures.values()]);
+      PluginService.logger.error(`Disabled ${previous.length} plugin(s) after an incomplete previous startup.`);
+    }
+
+    const active = PluginService.getPlugins()
+      .filter((manifest) => !PluginService.pluginFailures.has(manifest.pluginDirectory))
+      .map((manifest) => manifest.pluginDirectory);
+    PluginService.writeBootGuard(active);
+  }
+
+  /**
+   * Records the error that prevented the guarded startup from completing so the
+   * next process can show the actionable cause rather than a generic warning.
+   */
+  public static recordBootFailure(error: unknown): void {
+    const active = PluginService.readBootGuard();
+    if (active.length === 0) return;
+
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? (error.stack ?? '') : '';
+    const affected = active.filter((pluginDirectory) =>
+      stack.includes(join(PluginService.PLUGIN_PATH, pluginDirectory)),
+    );
+    if (affected.length === 0) {
+      PluginService.logger.error('Could not attribute the startup failure to a plugin; no plugins were quarantined.');
+      return;
+    }
+
+    for (const pluginDirectory of affected) {
+      PluginService.pluginFailures.set(pluginDirectory, { pluginDirectory, message });
+    }
+    PluginService.writeFailures([...PluginService.pluginFailures.values()]);
+  }
+
+  public static clearBootGuard(): void {
+    const path = join(PluginService.PLUGIN_PATH, PLUGIN_BOOT_GUARD_FILE);
+    if (existsSync(path)) rmSync(path, { force: true });
+  }
+
+  public static clearPluginQuarantine(pluginDirectory: string): void {
+    const failure = PluginService.pluginFailures.get(pluginDirectory);
+    if (!failure) return;
+
+    PluginService.pluginFailures.delete(pluginDirectory);
+    try {
+      PluginService.writeFailures([...PluginService.pluginFailures.values()]);
+    } catch (error) {
+      PluginService.pluginFailures.set(pluginDirectory, failure);
+      throw error;
+    }
+  }
+
   private static findPluginsInFolder(rootFolder: string): LoadedPluginManifest[] {
     // if folder does not exist, return empty array
     if (!existsSync(rootFolder)) {
@@ -95,11 +193,11 @@ export class PluginService {
     PluginService.logger.log(`Found ${potentialPluginFolders.length} folders in ${rootFolder}`);
 
     return potentialPluginFolders
-      .filter((pluginFolder) => !INTERNAL_PLUGIN_DIRECTORIES.has(pluginFolder))
+      .filter((pluginFolder) => !pluginFolder.startsWith('.') && !INTERNAL_PLUGIN_DIRECTORIES.has(pluginFolder))
       .map((pluginFolder) => {
         const manifest = PluginService.findPluginManifestInPluginFolder(
           rootFolder,
-          pluginFolder
+          pluginFolder,
         ) as LoadedPluginManifest | null;
         if (!manifest) {
           return null;
@@ -109,6 +207,11 @@ export class PluginService {
         // The directory is the installation identity. Keeping its derived ID stable
         // prevents registrations from changing every time the host restarts.
         manifest.id = createHash('sha256').update(pluginFolder).digest('base64url').slice(0, 21);
+
+        const failure = PluginService.pluginFailures.get(pluginFolder);
+        if (failure) {
+          PluginService.setPluginLoadError(`${manifest.name}@${manifest.version}`, new Error(failure.message));
+        }
 
         try {
           manifest.permissions = PluginSandboxService.validateDeclaredPermissions(manifest.name, manifest.permissions);
@@ -147,7 +250,45 @@ export class PluginService {
     return manifest;
   }
 
-  public async uploadPlugin(zipFile: FileUpload) {
+  private static readFailures(): PluginFailure[] {
+    return PluginService.readJsonFile<PluginFailure[]>(PLUGIN_FAILURES_FILE, []);
+  }
+
+  private static writeFailures(failures: PluginFailure[]): void {
+    PluginService.writeJsonFile(PLUGIN_FAILURES_FILE, failures);
+  }
+
+  private static readBootGuard(): string[] {
+    return PluginService.readJsonFile<string[]>(PLUGIN_BOOT_GUARD_FILE, []);
+  }
+
+  private static writeBootGuard(pluginDirectories: string[]): void {
+    PluginService.writeJsonFile(PLUGIN_BOOT_GUARD_FILE, pluginDirectories);
+  }
+
+  private static readJsonFile<T>(name: string, fallback: T): T {
+    try {
+      const value: unknown = JSON.parse(readFileSync(join(PluginService.PLUGIN_PATH, name), 'utf8'));
+      return Array.isArray(fallback) && !Array.isArray(value) ? fallback : (value as T);
+    } catch {
+      return fallback;
+    }
+  }
+
+  private static writeJsonFile(name: string, value: unknown): void {
+    mkdirSync(PluginService.PLUGIN_PATH, { recursive: true });
+    const path = join(PluginService.PLUGIN_PATH, name);
+    const temporary = `${path}.${randomBytes(8).toString('hex')}.tmp`;
+    try {
+      writeFileSync(temporary, JSON.stringify(value));
+      renameSync(temporary, path);
+    } catch (error) {
+      rmSync(temporary, { force: true });
+      throw error;
+    }
+  }
+
+  public async uploadPlugin(zipFile: FileUpload, deferRestart = false) {
     // check if file is a zip file
     if (zipFile.mimetype !== 'application/zip') {
       PluginService.logger.error(`File ${zipFile.originalname} is not a zip file`);
@@ -180,28 +321,88 @@ export class PluginService {
       PluginService.logger.debug(`Validating manifest`, manifestContent);
       const manifest = PluginManifestSchema.parse(manifestContent);
 
-      // if folder exists throw error
-      const pluginFolder = join(PluginService.PLUGIN_PATH, manifest.name);
-      PluginService.logger.debug(`Checking if plugin folder ${pluginFolder} exists`, pluginFolder);
-      if (existsSync(pluginFolder)) {
-        PluginService.logger.error(`Plugin ${manifest.name} already exists`);
-        throw new BadRequestException('Plugin already exists');
-      }
+      const pluginName = PluginService.safePluginName(manifest.name);
+      await PluginService.withPluginUploadLock(pluginName, async () => {
+        const pluginFolder = join(PluginService.PLUGIN_PATH, pluginName);
+        const backupFolder = join(PluginService.PLUGIN_PATH, `.${pluginName}-${randomBytes(8).toString('hex')}`);
+        const replacing = existsSync(pluginFolder);
 
-      // move plugin to plugins folder
-      PluginService.logger.debug(`Moving plugin to plugins folder ${pluginFolder}`);
-      await rename(sourceFolder, pluginFolder);
+        // A zip upload is the update mechanism for uploaded plugins. Keep the
+        // old archive on disk until the new one has been placed successfully.
+        if (replacing) {
+          PluginService.logger.log(`Replacing uploaded plugin ${pluginName}`);
+          await rename(pluginFolder, backupFolder);
+        }
 
-      // restart app in 1 second
-      setTimeout(() => {
-        this.restartApp();
-      }, 1000);
+        try {
+          PluginService.logger.debug(`Moving plugin to plugins folder ${pluginFolder}`);
+          await rename(sourceFolder, pluginFolder);
+        } catch (error) {
+          if (replacing) await rename(backupFolder, pluginFolder);
+          throw error;
+        }
+
+        // The replacement is complete once the new directory is in place.
+        // A stale backup must not prevent activating the uploaded plugin.
+        if (!deferRestart) this.requestRestart();
+
+        if (replacing) {
+          try {
+            await rm(backupFolder, { recursive: true, force: true });
+          } catch (error) {
+            PluginService.logger.error(`Failed to remove plugin backup ${backupFolder}`, error as Error);
+          }
+        }
+
+        try {
+          PluginService.clearPluginQuarantine(pluginName);
+        } catch (error) {
+          PluginService.logger.error(`Failed to clear quarantine for uploaded plugin ${pluginName}`, error as Error);
+        }
+      });
 
       // return manifest
       PluginService.logger.debug(`Returning manifest ${manifest}`);
       return manifest;
     } finally {
       await rm(tempFolder, { recursive: true, force: true });
+    }
+  }
+
+  private static safePluginName(name: string): string {
+    const safeName = basename(name);
+    const root = resolve(PluginService.PLUGIN_PATH);
+    const target = resolve(root, safeName);
+    const targetRelativeToRoot = relative(root, target);
+    if (
+      !safeName ||
+      safeName.startsWith('.') ||
+      safeName !== name ||
+      name.includes('\\') ||
+      targetRelativeToRoot.startsWith('..') ||
+      isAbsolute(targetRelativeToRoot)
+    )
+      throw new BadRequestException('Plugin name must be a visible single path segment');
+    return safeName;
+  }
+
+  private static async withPluginUploadLock<T>(pluginName: string, action: () => Promise<T>): Promise<T> {
+    const previous = PluginService.pluginUploadLocks.get(pluginName) ?? Promise.resolve();
+    let release!: () => void;
+    const current = previous.then(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+    PluginService.pluginUploadLocks.set(pluginName, current);
+    await previous;
+    try {
+      return await action();
+    } finally {
+      release();
+      if (PluginService.pluginUploadLocks.get(pluginName) === current)
+        PluginService.pluginUploadLocks.delete(pluginName);
     }
   }
 
@@ -245,7 +446,7 @@ export class PluginService {
     setTimeout(() => this.restartApp(), 1000);
   }
 
-  public async deletePlugin(pluginId: string) {
+  public async deletePlugin(pluginId: string, deferRestart = false) {
     const plugin = PluginService.getPlugins().find((plugin) => plugin.id === pluginId);
 
     if (!plugin) {
@@ -271,17 +472,20 @@ export class PluginService {
       } catch (error) {
         PluginService.logger.error(
           `Failed to revert migrations for plugin ${plugin.name}; removing files anyway. Its tables may be orphaned.`,
-          error as Error
+          error as Error,
         );
       }
     }
 
     // delete folder
     await rm(pluginFolder, { recursive: true });
+    try {
+      PluginService.clearPluginQuarantine(plugin.pluginDirectory);
+    } catch (error) {
+      PluginService.logger.error(`Failed to clear quarantine for deleted plugin ${plugin.name}`, error as Error);
+    }
 
     // restart app
-    setTimeout(() => {
-      this.restartApp();
-    }, 1000);
+    if (!deferRestart) this.requestRestart();
   }
 }

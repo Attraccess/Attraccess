@@ -44,9 +44,12 @@ function PermissionChips({ user }: { user: RabbitmqUser }) {
   return (
     <div className="rmq:flex rmq:flex-wrap rmq:gap-1">
       {user.permissions.map((permission) => (
-        <Chip key={permission.vhost} size="sm" variant="soft" title={
-          `configure: ${permission.configure}\nwrite: ${permission.write}\nread: ${permission.read}`
-        }>
+        <Chip
+          key={permission.vhost}
+          size="sm"
+          variant="soft"
+          title={`configure: ${permission.configure}\nwrite: ${permission.write}\nread: ${permission.read}`}
+        >
           {permission.vhost}
         </Chip>
       ))}
@@ -88,7 +91,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
         setData(list);
         // Keep the permissions modal's user in sync after edits.
         setPermissionsUser((current) =>
-          current ? list.users.find((user) => user.name === current.name) ?? current : null
+          current ? (list.users.find((user) => user.name === current.name) ?? current) : null,
         );
       }
     } catch (err) {
@@ -141,7 +144,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
     >
       <Card.Header className="rmq:flex rmq:flex-row rmq:items-center rmq:justify-between rmq:gap-2">
         <div className="rmq:flex rmq:items-center rmq:gap-2">
-          <UsersIcon className="rmq:w-5 rmq:h-5 rmq:text-primary" />
+          <UsersIcon className="rmq:w-5 rmq:h-5 rmq:text-accent-soft-foreground" />
           <p className="rmq:text-base rmq:font-semibold rmq:text-default-700">RabbitMQ users</p>
         </div>
         <div className="rmq:flex rmq:items-center rmq:gap-2">

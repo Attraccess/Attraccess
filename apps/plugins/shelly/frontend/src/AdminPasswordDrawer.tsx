@@ -56,7 +56,7 @@ export function AdminPasswordDrawer({
       event.preventDefault();
       void submit();
     },
-    [submit]
+    [submit],
   );
 
   return (

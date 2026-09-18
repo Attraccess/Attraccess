@@ -46,6 +46,15 @@ void API::submitFormPage(uint32_t resourceId, ResourceUsageFormActionType action
     this->sendMessage("RESOURCE_USAGE_FORM_SUBMIT_PAGE", payload);
 }
 
+void API::cancelForm(uint32_t resourceId, ResourceUsageFormActionType action)
+{
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["resourceId"] = resourceId;
+    payload["action"] = API::formActionToString(action);
+    this->sendMessage("RESOURCE_USAGE_FORM_CANCEL", payload);
+}
+
 void API::onResourceUsageFormRequest(JsonObject data)
 {
     if (!this->resourceFormsRequestCallback)

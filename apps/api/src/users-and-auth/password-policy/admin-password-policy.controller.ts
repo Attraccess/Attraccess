@@ -8,7 +8,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Logger,
   Param,
   ParseEnumPipe,
   Patch,
@@ -33,8 +32,6 @@ import {
 @ApiTags('Password Policy Admin')
 @Controller('admin/password-policy')
 export class AdminPasswordPolicyController {
-  private readonly logger = new Logger('PasswordPolicyAudit');
-
   constructor(private readonly service: PasswordPolicyService) {}
 
   @Get()
@@ -55,7 +52,6 @@ export class AdminPasswordPolicyController {
   ): Promise<PasswordPolicyDto> {
     const audit = this.buildAudit(request);
     const after = await this.service.updatePolicy(body, audit);
-    this.mirrorAuditToLogger('global_policy_updated', audit, { changed: Object.keys(body) });
     return after;
   }
 
@@ -66,7 +62,11 @@ export class AdminPasswordPolicyController {
     summary: 'Server-side preview: evaluate a candidate password against the current (or draft) policy',
     operationId: 'previewAdminPasswordPolicy',
   })
-  @ApiResponse({ status: 200, description: 'Full preview result including zxcvbn + HIBP + history checks.', type: PreviewPasswordResultDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Full preview result including zxcvbn + HIBP + history checks.',
+    type: PreviewPasswordResultDto,
+  })
   async preview(@Body() body: PreviewPasswordDto): Promise<PreviewPasswordResultDto> {
     let policyOverride: PasswordPolicyConfig | undefined;
     if (body.draftPolicy) {
@@ -94,7 +94,12 @@ export class AdminPasswordPolicyController {
   @Auth('system.settings.manage')
   @ApiParam({ name: 'role', enum: PasswordPolicyRole, enumName: 'PasswordPolicyRole' })
   @ApiOperation({ summary: 'Get the per-role override for a single role', operationId: 'getPasswordPolicyOverride' })
-  @ApiResponse({ status: 200, description: 'The override row, or null if unset.', type: PasswordPolicyOverrideDto, nullable: true })
+  @ApiResponse({
+    status: 200,
+    description: 'The override row, or null if unset.',
+    type: PasswordPolicyOverrideDto,
+    nullable: true,
+  })
   async getOverride(
     @Param('role', new ParseEnumPipe(PasswordPolicyRole)) role: PasswordPolicyRole,
   ): Promise<PasswordPolicyOverrideDto | null> {
@@ -114,7 +119,6 @@ export class AdminPasswordPolicyController {
   ): Promise<PasswordPolicyOverrideDto> {
     const audit = this.buildAudit(request);
     const saved = await this.service.upsertOverride(role, body, audit);
-    this.mirrorAuditToLogger('override_upserted', audit, { role, changed: Object.keys(body) });
     return this.toOverrideDto(saved);
   }
 
@@ -130,7 +134,6 @@ export class AdminPasswordPolicyController {
   ): Promise<void> {
     const audit = this.buildAudit(request);
     await this.service.deleteOverride(role, audit);
-    this.mirrorAuditToLogger('override_deleted', audit, { role });
   }
 
   private mergeDraft(base: PasswordPolicyConfig, draft: UpdatePasswordPolicyDto): PasswordPolicyConfig {
@@ -171,23 +174,11 @@ export class AdminPasswordPolicyController {
     return {
       actorId: request.user?.id ?? null,
       actorUsername: request.user?.username ?? null,
+      authenticationMethod: request.user?.authenticationMethod ?? 'session',
+      apiTokenId: request.user?.apiTokenId ?? null,
       ip: request.ip ?? null,
       userAgent: userAgent ?? null,
       requestId: requestId ?? null,
     };
-  }
-
-  private mirrorAuditToLogger(event: string, audit: AuditContext, extra: Record<string, unknown>): void {
-    this.logger.log(
-      JSON.stringify({
-        event,
-        actorId: audit.actorId,
-        actorUsername: audit.actorUsername,
-        ip: audit.ip,
-        requestId: audit.requestId,
-        at: new Date().toISOString(),
-        ...extra,
-      }),
-    );
   }
 }

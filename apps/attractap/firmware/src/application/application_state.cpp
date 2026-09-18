@@ -185,6 +185,7 @@ void Application::processState() {
         this->pendingActionType = PENDING_ACTION_START_SESSION;
         this->pendingActionResourceId = this->selectedResourceId;
         this->pendingActionProjectId = this->selectedProjectId;
+        this->pendingActionIsTakeover = false;
         this->hasPendingFormRequest = false;
         this->api.startResourceUsageSession(this->selectedResourceId, this->selectedProjectId);
       }
@@ -582,9 +583,9 @@ void Application::processEnrollment() {
 
   case ENROLL_PHASE_WRITING: {
     bool ok = this->nfc.changeKey(
-        this->apiEnrollNewCardData.keyNo, this->nfc.FACTORY_KEY,
-        this->nfc.FACTORY_KEY, this->apiEnrollNewCardData.keyBytes,
-        NFC::CARD_KEY_VERSION_ENROLLED);
+        this->apiEnrollNewCardData.keyNo, this->nfc.getFactoryKey(),
+        this->nfc.getFactoryKey(), this->apiEnrollNewCardData.keyBytes,
+        INfc::CARD_KEY_VERSION_ENROLLED);
     this->api.sendEnrollNewCard(ok);
     if (ok) {
       this->beeper.successBeep();
@@ -700,10 +701,10 @@ void Application::processReset() {
     // Authenticate as the (still factory) application master key, then change
     // the stored slot from the card's current key back to the factory key.
     bool ok = this->nfc.changeKey(this->apiResetNfcCardData.keyNo,
-                                  this->nfc.FACTORY_KEY,
+                                  this->nfc.getFactoryKey(),
                                   this->apiResetNfcCardData.keyBytes,
-                                  this->nfc.FACTORY_KEY,
-                                  NFC::CARD_KEY_VERSION_FREE);
+                                  this->nfc.getFactoryKey(),
+                                  INfc::CARD_KEY_VERSION_FREE);
     this->api.sendResetNfcCard(ok);
     if (ok) {
       this->beeper.successBeep();
@@ -713,7 +714,7 @@ void Application::processReset() {
       this->beeper.errorBeep();
       Display::resetScreen.setStatus(ResetScreen::STATUS_ERROR);
       Display::resetScreen.setStatusMessage(
-          "Karte konnte nicht\nzurueckgesetzt werden");
+          "Karte konnte nicht\nzurückgesetzt werden");
       this->resetPhase = RESET_PHASE_ERROR;
     }
     this->resetPhaseChangedMs = now;

@@ -2,13 +2,15 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import { npmDistTag } from './npm-dist-tag.mjs';
+
 const packageDir = process.argv[2];
 const distDir = process.argv[3];
 if (!packageDir || !distDir) throw new Error('usage: publish-plugin.mjs <package-dir> <dist-dir>');
 
 const packageJsonPath = join(packageDir, 'package.json');
 const pkg = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
-const tag = process.env.NPM_DIST_TAG ?? (pkg.version.includes('-') ? 'next' : 'latest');
+const tag = process.env.NPM_DIST_TAG ?? npmDistTag(pkg.version);
 
 if (process.env.NPM_NIGHTLY === 'true') {
   const runNumber = process.env.GITHUB_RUN_NUMBER;

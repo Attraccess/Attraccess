@@ -10,7 +10,7 @@ export class ResourceHealthStateDto {
 
   @ApiProperty({
     description: 'Identifier for the source reporting health (empty for the resource default).',
-    example: 'Shelly',
+    example: 'ir-bridge',
   })
   identifier!: string;
 

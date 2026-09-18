@@ -158,7 +158,12 @@ export function RowActions({
             <DropdownItem id="reprobe" onPress={onReprobe} data-cy={`shelly-device-reprobe-${deviceId}`}>
               <RefreshCwIcon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> Re-probe device
             </DropdownItem>
-            <DropdownItem id="delete" onPress={onDelete} className="sh:text-danger" data-cy={`shelly-device-delete-${deviceId}`}>
+            <DropdownItem
+              id="delete"
+              onPress={onDelete}
+              className="sh:text-danger"
+              data-cy={`shelly-device-delete-${deviceId}`}
+            >
               <Trash2Icon className="sh:mr-2 sh:inline sh:h-4 sh:w-4" /> Delete device
             </DropdownItem>
           </DropdownMenu>
@@ -172,7 +177,9 @@ function EmptyDevices({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="sh:flex sh:flex-col sh:items-center sh:justify-center sh:gap-3 sh:px-4 sh:py-12">
       <MehIcon size={36} className="sh:text-default-300" />
-      <p className="sh:text-sm sh:text-default-500">No devices yet. Run discovery, or add your first Shelly by its IP.</p>
+      <p className="sh:text-sm sh:text-default-500">
+        No devices yet. Run discovery, or add your first Shelly by its IP.
+      </p>
       <Button variant="secondary" size="sm" onPress={onAdd} data-cy="shelly-add-open-empty">
         <PlusIcon className="sh:h-4 sh:w-4" /> Add device
       </Button>
@@ -236,7 +243,7 @@ export function DevicesPage() {
         setRowBusyId(null);
       }
     },
-    [refresh]
+    [refresh],
   );
 
   const confirmDelete = useCallback(async () => {
@@ -308,13 +315,18 @@ export function DevicesPage() {
                   <TableRow key={device.id} id={device.id} data-cy={`shelly-device-row-${device.id}`}>
                     <TableCell className="sh:whitespace-nowrap">
                       <div className="sh:flex sh:items-center sh:gap-1">
-                        <span className="sh:max-w-36 sh:truncate sh:font-medium sh:text-default-800 sh:sm:max-w-48" title={device.name}>
+                        <span
+                          className="sh:max-w-36 sh:truncate sh:font-medium sh:text-default-800 sh:sm:max-w-48"
+                          title={device.name}
+                        >
                           {device.name}
                         </span>
                         {device.lastProbeError && <ProbeErrorIndicator message={device.lastProbeError} />}
                         <UpdateAvailableIndicator entry={firmware[device.id]} />
                       </div>
-                      <div className="sh:text-xs sh:text-default-500 sh:sm:hidden sh:md:block sh:lg:hidden">{device.ipAddress}</div>
+                      <div className="sh:text-xs sh:text-default-500 sh:sm:hidden sh:md:block sh:lg:hidden">
+                        {device.ipAddress}
+                      </div>
                     </TableCell>
                     <TableCell className="sh:hidden sh:whitespace-nowrap sh:text-default-600 sh:sm:table-cell sh:md:hidden sh:lg:table-cell">
                       {device.ipAddress}
@@ -355,13 +367,13 @@ export function DevicesPage() {
       )}
 
       <AddDeviceDrawer isOpen={addDrawer.isOpen} onOpenChange={addDrawer.setOpen} onAdded={refresh} />
-      <DiscoverDrawer
-        isOpen={discoverDrawer.isOpen}
-        onOpenChange={discoverDrawer.setOpen}
-        onDiscovered={refresh}
-      />
+      <DiscoverDrawer isOpen={discoverDrawer.isOpen} onOpenChange={discoverDrawer.setOpen} onDiscovered={refresh} />
       <DeviceInfoDrawer device={infoDevice} onOpenChange={(open) => !open && setInfoDevice(null)} />
-      <AdminPasswordDrawer device={authDevice} onOpenChange={(open) => !open && setAuthDevice(null)} onSaved={refresh} />
+      <AdminPasswordDrawer
+        device={authDevice}
+        onOpenChange={(open) => !open && setAuthDevice(null)}
+        onSaved={refresh}
+      />
       <FirmwareDrawer
         device={firmwareDevice}
         onOpenChange={(open) => !open && setFirmwareDevice(null)}
@@ -383,8 +395,8 @@ export function DevicesPage() {
               </ModalHeader>
               <ModalBody>
                 <p>
-                  Remove <span className="sh:font-semibold">{deleteTarget?.name}</span> ({deleteTarget?.ipAddress}) from the
-                  registry? The device itself is not changed.
+                  Remove <span className="sh:font-semibold">{deleteTarget?.name}</span> ({deleteTarget?.ipAddress}) from
+                  the registry? The device itself is not changed.
                 </p>
               </ModalBody>
               <ModalFooter>

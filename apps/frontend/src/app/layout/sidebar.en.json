@@ -8,6 +8,12 @@
     "de": "Deutsch"
   },
   "account": "Account",
+  "design": "Design ({{variant}})",
+  "designVariants": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
   "userMenu": "User menu",
   "groups": {
     "##default##": {

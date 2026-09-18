@@ -67,9 +67,9 @@ Mark pages with [x] when completed.
 - [x] `attractap/firmware-updates.md` — Firmware updates (OTA)
 
 ### MQTT & IoT Integration (IT Administrators)
-- [x] `mqtt/overview.md` — MQTT integration overview
-- [x] `mqtt/server-setup.md` — Configuring MQTT servers
-- [x] `mqtt/examples.md` — Integration examples
+- [x] `devices/mqtt/overview.md` — MQTT integration overview
+- [x] `devices/mqtt/server-setup.md` — Configuring MQTT servers
+- [x] `devices/mqtt/examples.md` — Integration examples
 
 ### Billing (Administrators)
 - [x] `billing/overview.md` — Billing system overview
