@@ -12,4 +12,5 @@ export default {
   booleanNo: 'Nein',
   projectSelectLabel: 'Projekt',
   supervisor: 'Aufsicht',
+  machineRunningTime: 'Maschinenlaufzeit während dieser Sitzung',
 };
