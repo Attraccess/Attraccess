@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ResourceOperatingInterval, ResourceUsage, ResourceUsageAction } from '@attraccess/database-entities';
-import { In, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
+import { EntityManager, In, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
 
 const ATTRIBUTION_LOOKBACK_MS = 31 * 24 * 60 * 60_000;
 
@@ -152,6 +152,22 @@ export class ResourceOperatingAttributionService {
         ),
       ]),
     );
+  }
+
+  async getForUsage(usage: ResourceUsage, manager: EntityManager): Promise<number> {
+    if (!usage.endTime) {
+      return 0;
+    }
+
+    const intervals = await manager.getRepository(ResourceOperatingInterval).find({
+      where: [
+        { resourceId: usage.resourceId, startTime: LessThan(usage.endTime), endTime: IsNull() },
+        { resourceId: usage.resourceId, startTime: LessThan(usage.endTime), endTime: MoreThan(usage.startTime) },
+      ],
+      order: { startTime: 'ASC' },
+    });
+    const { attributedOperatingDurationMs } = this.derive(intervals, [usage], usage.endTime, usage.startTime);
+    return (attributedOperatingDurationMs ?? 0) / 60_000;
   }
 
   derive(

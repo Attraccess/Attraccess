@@ -36,6 +36,7 @@
     "system": {
       "PER_SESSION": "Pro Sitzung",
       "PER_MINUTE": "Pro Minute",
+      "PER_ATTRIBUTABLE_OPERATING_MINUTE": "Pro zugeordneter Betriebsminute",
       "BILLING_FACTOR": "Zahlungsfaktor"
     },
     "empty": "Keine Positionen",

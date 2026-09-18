@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
   ResourceMaintenanceSchedule,
+  ResourceMaintenanceScheduleDurationBasis,
   ResourceMaintenanceScheduleTriggerType,
   ResourceMaintenanceScheduleUsageHoursConfig,
   ResourceMaintenanceScheduleUsageCountConfig,
@@ -64,6 +65,7 @@ export class MaintenanceScheduleService {
       resourceId,
       name: dto.name ?? null,
       triggerType: dto.triggerType,
+      durationBasis: dto.durationBasis ?? ResourceMaintenanceScheduleDurationBasis.SESSION_DURATION,
       enabled: dto.enabled ?? true,
     });
     const saved = await this.scheduleRepository.save(schedule);
@@ -98,6 +100,7 @@ export class MaintenanceScheduleService {
 
     if (dto.name !== undefined) schedule.name = dto.name ?? null;
     if (dto.enabled !== undefined) schedule.enabled = dto.enabled;
+    if (dto.durationBasis !== undefined) schedule.durationBasis = dto.durationBasis;
     const triggerType = dto.triggerType ?? schedule.triggerType;
     if (dto.triggerType !== undefined) schedule.triggerType = triggerType;
 

@@ -163,5 +163,6 @@ export * from './1783900000000-retire-password-policy-audit';
 export * from './1784000000000-retraining-audit-marker';
 export * from './1784000000000-attractap-audit-domain';
 export * from './1784100000000-full-audit-domains';
+export * from './1784200000000-operating-duration-billing-and-maintenance';
 export * from './1765442000000-form-field-position';
 export * from './1783700000000-refresh-default-email-layout';
