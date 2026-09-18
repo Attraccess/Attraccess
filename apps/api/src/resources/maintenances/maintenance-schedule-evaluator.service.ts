@@ -6,6 +6,7 @@ import { In, Repository } from 'typeorm';
 import {
   ResourceMaintenance,
   ResourceMaintenanceSchedule,
+  ResourceMaintenanceScheduleDurationBasis,
   ResourceMaintenanceScheduleTriggerType,
   Resource,
   ResourceUsage,
@@ -63,7 +64,8 @@ export const buildScheduleEvaluationQuery = (
                  b.scheduleId AS scheduleId,
                  b.baseline AS baseline,
                  b.hasActiveMaintenance AS hasActiveMaintenance,
-                 COALESCE(SUM(u.usageInMinutes), 0) AS totalMinutes,
+                  COALESCE(SUM(u.usageInMinutes), 0) AS totalMinutes,
+                  COALESCE(SUM(u.attributedOperatingDurationInMinutes), 0) AS totalOperatingMinutes,
                  COUNT(u.id) AS totalCount
           FROM baselines b
           LEFT JOIN "${usageTable}" u
@@ -168,16 +170,24 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
   /**
    * Sum usage minutes for the resource since baseline (completed sessions only).
    */
-  private async getUsageMinutesSince(resourceId: number, since: Date): Promise<number> {
+  private async getUsageMinutesSince(
+    resourceId: number,
+    since: Date,
+    durationBasis: ResourceMaintenanceScheduleDurationBasis,
+  ): Promise<number> {
+    const durationColumn =
+      durationBasis === ResourceMaintenanceScheduleDurationBasis.ATTRIBUTABLE_OPERATING_DURATION
+        ? 'usage.attributedOperatingDurationInMinutes'
+        : 'usage.usageInMinutes';
     const result = await this.usageRepository
       .createQueryBuilder('usage')
-      .select('COALESCE(SUM(usage.usageInMinutes), 0)', 'total')
+      .select(`COALESCE(SUM(${durationColumn}), 0)`, 'total')
       .where('usage.resourceId = :resourceId', { resourceId })
       .andWhere('usage.endTime IS NOT NULL')
       .andWhere('usage.endTime >= :since', { since })
       .getRawOne<{ total: string }>();
 
-    return parseInt(result?.total ?? '0', 10);
+    return Number(result?.total ?? '0');
   }
 
   /**
@@ -252,7 +262,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
     let usageCount = 0;
 
     if (schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS) {
-      usageMinutes = await this.getUsageMinutesSince(resourceId, baseline);
+      usageMinutes = await this.getUsageMinutesSince(resourceId, baseline, schedule.durationBasis);
     } else if (schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT) {
       usageCount = await this.getUsageSessionCountSince(resourceId, baseline);
     }
@@ -269,13 +279,18 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
     resourceId: number,
     baseline: Date,
     now: Date,
-    usageAggBySchedule: Map<string, { totalMinutes: number; totalCount: number }>,
+    usageAggBySchedule: Map<string, { totalMinutes: number; totalOperatingMinutes: number; totalCount: number }>,
   ): boolean {
-    const { totalMinutes, totalCount } = usageAggBySchedule.get(`${schedule.id}:${resourceId}`) ?? {
+    const { totalMinutes, totalOperatingMinutes, totalCount } = usageAggBySchedule.get(`${schedule.id}:${resourceId}`) ?? {
       totalMinutes: 0,
+      totalOperatingMinutes: 0,
       totalCount: 0,
     };
-    return this.evaluateTriggerThreshold(schedule, baseline, now, totalMinutes, totalCount);
+    const usageMinutes =
+      schedule.durationBasis === ResourceMaintenanceScheduleDurationBasis.ATTRIBUTABLE_OPERATING_DURATION
+        ? totalOperatingMinutes
+        : totalMinutes;
+    return this.evaluateTriggerThreshold(schedule, baseline, now, usageMinutes, totalCount);
   }
 
   /**
@@ -507,7 +522,11 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
 
       // 3. Time schedules only need baseline and active state. Usage schedules resolve their
       // baseline and aggregate usage in one statement below so both values share a DB snapshot.
-      const usageAggBySchedule = new Map<string, { totalMinutes: number; totalCount: number }>();
+      const usageAggBySchedule = new Map<string, {
+        totalMinutes: number;
+        totalOperatingMinutes: number;
+        totalCount: number;
+      }>();
       const baselineMap = new Map<string, Date>();
       const activeResourceIds = new Set<number>();
       const pairs = allSchedules
@@ -567,8 +586,9 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
           scheduleId: number;
           baseline?: string | Date;
           hasActiveMaintenance?: number | boolean;
-          totalMinutes: number | string | null;
-          totalCount: number | string | null;
+           totalMinutes: number | string | null;
+           totalOperatingMinutes: number | string | null;
+           totalCount: number | string | null;
         }> = await this.usageRepository.query(
           buildScheduleEvaluationQuery(
             this.maintenanceRepository.metadata.tableName,
@@ -584,8 +604,9 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
           setState(row);
           const key = `${row.scheduleId}:${row.resourceId}`;
           usageAggBySchedule.set(key, {
-            totalMinutes: Number(row.totalMinutes ?? 0),
-            totalCount: Number(row.totalCount ?? 0),
+              totalMinutes: Number(row.totalMinutes ?? 0),
+              totalOperatingMinutes: Number(row.totalOperatingMinutes ?? 0),
+              totalCount: Number(row.totalCount ?? 0),
           });
         }
       }
