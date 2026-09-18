@@ -52,3 +52,15 @@ export function attributedDurationByResourceAndUsage(
 
   return result;
 }
+
+export function combinedOperatingDurationStatus(
+  summary: Pick<OperatingDurationSummary, 'operatingDataAvailable' | 'isProvisional'> | undefined,
+  labels: { provisional: string; unavailable: string },
+): string {
+  if (!summary) return '';
+
+  const status: string[] = [];
+  if (summary.isProvisional) status.push(labels.provisional);
+  if (!summary.operatingDataAvailable) status.push(labels.unavailable);
+  return status.join('; ');
+}

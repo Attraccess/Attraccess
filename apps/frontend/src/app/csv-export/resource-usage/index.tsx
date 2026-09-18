@@ -12,6 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getBaseUrl } from '../../../api';
 import {
   attributedDurationByResourceAndUsage,
+  combinedOperatingDurationStatus,
   mergeOperatingDurationSummaries,
   operatingDurationWindows,
   type OperatingDurationSummary,
@@ -188,11 +189,11 @@ export function ResourceUsageExport(props: ExportProps) {
       {
         label: t('columns.durationStatus'),
         key: 'durationStatus',
-        getter: (item) => {
-          const duration = operatingDurations?.[item.resourceId];
-          if (!duration?.operatingDataAvailable) return t('status.unavailable');
-          return duration.isProvisional ? t('status.provisional') : '';
-        },
+        getter: (item) =>
+          combinedOperatingDurationStatus(operatingDurations?.[item.resourceId], {
+            provisional: t('status.provisional'),
+            unavailable: t('status.unavailable'),
+          }),
         selectedByDefault: true,
       },
       {

@@ -5,6 +5,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './operatingDurationCard.de.json';
 import en from './operatingDurationCard.en.json';
 import { useCanViewOperatingDuration, useOperatingDuration } from '../../operatingDuration';
+import { formatDurationMs } from '@attraccess/shared';
 
 interface OperatingDurationCardProps {
   resourceId: number;
@@ -12,12 +13,7 @@ interface OperatingDurationCardProps {
 }
 
 function formatDuration(durationMs: number | null, unavailable: string): string {
-  if (durationMs === null) return unavailable;
-
-  const seconds = Math.floor(durationMs / 1000);
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+  return durationMs === null ? unavailable : formatDurationMs(durationMs);
 }
 
 export function OperatingDurationCard({ resourceId, className }: OperatingDurationCardProps) {
