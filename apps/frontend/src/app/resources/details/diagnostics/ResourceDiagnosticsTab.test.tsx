@@ -7,17 +7,19 @@ import { ResourceDiagnosticsTab } from './ResourceDiagnosticsTab';
 
 const getState = vi.fn();
 const getTransitions = vi.fn();
-const getUnattributed = vi.fn();
 const getDataQuality = vi.fn();
 const verifyTimeline = vi.fn();
+const useOperatingDurationMock = vi.fn();
 
 vi.mock('react-router-dom', () => ({ useParams: () => ({ id: '11' }) }));
 vi.mock('@attraccess/react-query-client', () => ({
   useResourcesServiceResourceOperatingDiagnosticsGetState: (...args: unknown[]) => getState(...args),
   useResourcesServiceResourceOperatingDiagnosticsGetTransitions: (...args: unknown[]) => getTransitions(...args),
-  useResourcesServiceResourceOperatingDiagnosticsGetUnattributed: (...args: unknown[]) => getUnattributed(...args),
   useResourcesServiceResourceOperatingDiagnosticsGetDataQuality: (...args: unknown[]) => getDataQuality(...args),
   useResourcesServiceResourceOperatingDiagnosticsVerifyTimeline: (...args: unknown[]) => verifyTimeline(...args),
+}));
+vi.mock('../../operatingDuration', () => ({
+  useOperatingDuration: (...args: unknown[]) => useOperatingDurationMock(...args),
 }));
 
 const MINUTE = 60_000;
@@ -45,21 +47,22 @@ describe('ResourceDiagnosticsTab', () => {
       },
       isLoading: false,
     });
-    getUnattributed.mockReturnValue({
+    useOperatingDurationMock.mockReturnValue({
       data: {
+        sessionDurationMs: 100 * MINUTE,
+        operatingDataAvailable: true,
         operatingDurationMs: 120 * MINUTE,
-        attributedOperatingDurationMs: 90 * MINUTE,
         unattributedOperatingDurationMs: 30 * MINUTE,
+        isOperating: true,
         isProvisional: true,
+        attributions: [],
       },
       isLoading: false,
     });
     getDataQuality.mockReturnValue({
       data: {
         trackingConfigured: true,
-        issues: [
-          { kind: 'stale-signal', count: 1, message: 'No signal recently', intervalIds: [] },
-        ],
+        issues: [{ kind: 'stale-signal', count: 1, message: 'No signal recently', intervalIds: [] }],
       },
       isLoading: false,
     });
@@ -80,12 +83,36 @@ describe('ResourceDiagnosticsTab', () => {
     expect(screen.getByText('No signal recently')).toBeInTheDocument();
   });
 
-  it('renders the unattributed summary in minutes with a provisional badge', () => {
+  it('renders the shared unattributed summary with the shared duration formatter', () => {
     render(<ResourceDiagnosticsTab />);
 
-    expect(screen.getByTestId('diagnostics-operating-duration')).toHaveTextContent('2h');
-    expect(screen.getByTestId('diagnostics-unattributed-duration')).toHaveTextContent('30m');
+    // The summary comes from the shared operating-attribution endpoint (single derivation path).
+    expect(useOperatingDurationMock).toHaveBeenCalledWith(11, true, expect.objectContaining({ start: expect.any(Date), end: expect.any(Date) }));
+    expect(screen.getByTestId('diagnostics-operating-duration')).toHaveTextContent('2:00:00');
+    expect(screen.getByTestId('diagnostics-attributed-duration')).toHaveTextContent('1:30:00');
+    expect(screen.getByTestId('diagnostics-unattributed-duration')).toHaveTextContent('0:30:00');
     expect(screen.getByText('Provisional (open intervals included)')).toBeInTheDocument();
+  });
+
+  it('shows unavailable instead of zero when the resource never produced operating data', () => {
+    useOperatingDurationMock.mockReturnValue({
+      data: {
+        sessionDurationMs: 60 * MINUTE,
+        operatingDataAvailable: false,
+        operatingDurationMs: null,
+        unattributedOperatingDurationMs: null,
+        isOperating: false,
+        isProvisional: false,
+        attributions: [],
+      },
+      isLoading: false,
+    });
+    render(<ResourceDiagnosticsTab />);
+
+    expect(screen.getByTestId('diagnostics-unattributed-unavailable')).toHaveTextContent(
+      'No operating data has ever been recorded for this resource — durations are unavailable, not zero.',
+    );
+    expect(screen.queryByTestId('diagnostics-operating-duration')).not.toBeInTheDocument();
   });
 
   it('renders the derived transition history', () => {
@@ -104,6 +131,7 @@ describe('ResourceDiagnosticsTab', () => {
       data: {
         consistent: true,
         recomputedOperatingDurationMs: 120 * MINUTE,
+        operatingDataAvailable: true,
         reportedOperatingDurationMs: 120 * MINUTE,
         intervalCount: 4,
         checks: [
@@ -121,9 +149,28 @@ describe('ResourceDiagnosticsTab', () => {
 
     await waitFor(() => expect(refetch).toHaveBeenCalled());
     expect(screen.getByText('Timeline consistent')).toBeInTheDocument();
+    expect(screen.getByTestId('diagnostics-verification')).toHaveTextContent('2:00:00');
     expect(screen.getByTestId('diagnostics-check-operating-duration-matches')).toHaveTextContent(
       'Operating duration matches the timeline',
     );
+  });
+
+  it('renders a null reported duration as unavailable, not as zero', () => {
+    verifyTimeline.mockReturnValue({
+      data: {
+        consistent: true,
+        recomputedOperatingDurationMs: 0,
+        operatingDataAvailable: false,
+        reportedOperatingDurationMs: null,
+        intervalCount: 0,
+        checks: [{ name: 'operating-duration-matches', passed: true, detail: null }],
+      },
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+    render(<ResourceDiagnosticsTab />);
+
+    expect(screen.getByTestId('diagnostics-verification')).toHaveTextContent('unavailable');
   });
 
   it('does not run verification before the operator asks for it', () => {

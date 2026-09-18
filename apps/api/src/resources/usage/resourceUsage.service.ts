@@ -8,6 +8,7 @@ import {
   forwardRef,
   OnModuleInit,
   OnModuleDestroy,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, In, FindOneOptions, EntityManager } from 'typeorm';
@@ -68,6 +69,7 @@ import {
 import { VALKEY_CLIENT } from '../../valkey/valkey.module';
 import type { Redis } from 'ioredis';
 import { ExternalEffectFailureError } from '../flows/errors/external-effect-failure.error';
+import { ResourceOperatingAttributionService } from '../operating-intervals/resource-operating-attribution.service';
 import { AuditService } from '../../audit/audit.service';
 import { ResourceAuditOrigin } from '../../audit/audit-policy';
 
@@ -144,6 +146,14 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private async persistAttributedOperatingDuration(usage: ResourceUsage, manager: EntityManager): Promise<void> {
+    const attributedOperatingDurationInMinutes = this.operatingAttributionService
+      ? await this.operatingAttributionService.getForUsage(usage, manager)
+      : 0;
+    await manager.update(ResourceUsage, usage.id, { attributedOperatingDurationInMinutes });
+    usage.attributedOperatingDurationInMinutes = attributedOperatingDurationInMinutes;
+  }
+
   constructor(
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
@@ -159,6 +169,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     private readonly resourceMaintenanceService: ResourceMaintenanceService,
     private readonly eventEmitter: EventEmitter2,
     private readonly billingService: BillingService,
+    @Optional() private readonly operatingAttributionService: ResourceOperatingAttributionService | undefined,
     @Inject(forwardRef(() => ResourceFlowsExecutorService))
     private readonly flowExecutorService: ResourceFlowsExecutorService,
     private readonly projectsService: ProjectsService,
@@ -729,6 +740,11 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
             relations: ['user', 'resource'],
           });
 
+          if (!updatedSession) {
+            throw new Error(`Failed to retrieve ended session ${existingActiveSession.id}`);
+          }
+          await this.persistAttributedOperatingDuration(updatedSession, transactionalEntityManager);
+
           // Charge the previous user's ended session
           await this.billingService.chargeForResourceUsage(updatedSession, transactionalEntityManager);
 
@@ -754,6 +770,13 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
         endNotes: null,
         isFinalized: false,
       };
+
+      const billingConfiguration = await this.billingService.getResourceBillingConfiguration(
+        resourceId,
+        transactionalEntityManager,
+      );
+      usageData.sessionDurationCreditsPerMinute = billingConfiguration.creditsPerMinute;
+      usageData.operatingDurationCreditsPerMinute = billingConfiguration.creditsPerOperatingMinute;
 
       if (supervisorUserId !== null) {
         usageData.supervisorUserId = supervisorUserId;
@@ -998,6 +1021,12 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
           where: { id: activeSession.id },
           relations: ['resource', 'user'],
         });
+
+        if (!updatedUsage) {
+          throw new Error(`Failed to retrieve ended session ${activeSession.id}`);
+        }
+
+        await this.persistAttributedOperatingDuration(updatedUsage, transactionalEntityManager);
 
         await this.billingService.chargeForResourceUsage(updatedUsage, transactionalEntityManager);
 

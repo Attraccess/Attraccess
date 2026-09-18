@@ -6,9 +6,13 @@ import { ResourceOperatingAttributionService } from './resource-operating-attrib
 import { ResourceOperatingDiagnosticsController } from './resource-operating-diagnostics.controller';
 import { ResourceOperatingDiagnosticsService } from './resource-operating-diagnostics.service';
 import { ResourceOperatingIntervalService } from './resource-operating-interval.service';
+import { ResourceMaintenanceModule } from '../maintenances/maintenance.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ResourceOperatingInterval, ResourceUsage, ResourceFlowNode])],
+  imports: [
+    TypeOrmModule.forFeature([ResourceOperatingInterval, ResourceUsage, ResourceFlowNode]),
+    ResourceMaintenanceModule,
+  ],
   controllers: [ResourceOperatingAttributionController, ResourceOperatingDiagnosticsController],
   providers: [ResourceOperatingIntervalService, ResourceOperatingAttributionService, ResourceOperatingDiagnosticsService],
   exports: [ResourceOperatingIntervalService, ResourceOperatingAttributionService, ResourceOperatingDiagnosticsService],

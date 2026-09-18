@@ -1,7 +1,6 @@
 import { BadRequestException, Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth } from '@attraccess/plugins-backend-sdk';
-import { ResourceOperatingAttributionSummary } from './resource-operating-attribution.service';
 import { ResourceOperatingDiagnosticsService } from './resource-operating-diagnostics.service';
 import { OperatingDiagnosticsPageQueryDto, OperatingDiagnosticsRangeQueryDto } from './dtos/operating-diagnostics-query.dto';
 import {
@@ -9,7 +8,6 @@ import {
   OperatingStateDto,
   OperatingTimelineVerificationDto,
   OperatingTransitionPageDto,
-  OperatingUnattributedSummaryDto,
 } from './dtos/operating-diagnostics-response.dto';
 
 /**
@@ -47,37 +45,9 @@ export class ResourceOperatingDiagnosticsController {
     return this.diagnosticsService.getTransitionHistory(resourceId, query.page ?? 1, query.limit ?? 20);
   }
 
-  @Get('unattributed')
-  @Auth('resources.update')
-  @ApiOperation({
-    summary: 'Summarize unattributed operating duration for a resource over a date range',
-    operationId: 'resourceOperatingDiagnosticsGetUnattributed',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Unattributed operating summary retrieved successfully.',
-    type: OperatingUnattributedSummaryDto,
-  })
-  async getUnattributed(
-    @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Query() query: OperatingDiagnosticsRangeQueryDto,
-  ): Promise<OperatingUnattributedSummaryDto> {
-    const { from, to } = this.resolveRange(query);
-    const summary: ResourceOperatingAttributionSummary = await this.diagnosticsService.getUnattributedSummary(
-      resourceId,
-      from,
-      to,
-    );
-    return {
-      asOf: summary.asOf,
-      windowStart: summary.windowStart ?? from,
-      operatingDurationMs: summary.operatingDurationMs,
-      attributedOperatingDurationMs: summary.attributedOperatingDurationMs,
-      unattributedOperatingDurationMs: summary.unattributedOperatingDurationMs,
-      isProvisional: summary.isProvisional,
-      attributionCount: summary.attributions.length,
-    };
-  }
+  // Unattributed summaries are served by GET resources/:resourceId/operating-attribution?start&end
+  // (ATT-1025/ATT-1027) — the single derivation path; this controller deliberately does not
+  // duplicate that endpoint (ATT-1024).
 
   @Get('data-quality')
   @Auth('resources.update')

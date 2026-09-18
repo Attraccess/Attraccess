@@ -48,7 +48,8 @@ interface ItemRow {
 }
 
 export function CsvExportDrawerContent<TData extends Row>(props: Props<TData>) {
-  const { columns, items, refetch, options, setOption, filename, queryStatus, onFetchAllPages, isFetchingAllPages } = props;
+  const { columns, items, refetch, options, setOption, filename, queryStatus, onFetchAllPages, isFetchingAllPages } =
+    props;
 
   const { t } = useTranslations({ de, en });
 
@@ -77,10 +78,9 @@ export function CsvExportDrawerContent<TData extends Row>(props: Props<TData>) {
 
   const downloadCsv = useCallback(() => {
     const headerRow = selectedColumns.map((column) => column.label);
-    const csv = [
-      headerRow.join(';'),
-      ...itemRows.map((row) => row.columns.map((col) => col.value).join(';')),
-    ].join('\n');
+    const csv = [headerRow.join(';'), ...itemRows.map((row) => row.columns.map((col) => col.value).join(';'))].join(
+      '\n',
+    );
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -93,11 +93,13 @@ export function CsvExportDrawerContent<TData extends Row>(props: Props<TData>) {
 
   // When all pages finish loading after user triggered export, auto-download
   useEffect(() => {
-    if (pendingDownload && !isFetchingAllPages) {
+    if (pendingDownload && queryStatus === 'error') {
+      setPendingDownload(false);
+    } else if (pendingDownload && !isFetchingAllPages && queryStatus === 'success') {
       setPendingDownload(false);
       downloadCsv();
     }
-  }, [pendingDownload, isFetchingAllPages, downloadCsv]);
+  }, [pendingDownload, isFetchingAllPages, queryStatus, downloadCsv]);
 
   const handleExport = useCallback(() => {
     if (onFetchAllPages) {
@@ -109,6 +111,7 @@ export function CsvExportDrawerContent<TData extends Row>(props: Props<TData>) {
   }, [onFetchAllPages, downloadCsv]);
 
   const isExporting = pendingDownload || !!isFetchingAllPages;
+  const cannotExport = queryStatus !== 'success';
 
   const columnsLite = useMemo(() => columns.map((c) => ({ key: c.key, label: c.label })), [columns]);
 
@@ -148,7 +151,7 @@ export function CsvExportDrawerContent<TData extends Row>(props: Props<TData>) {
           variant="primary"
           className="w-full sm:w-auto"
           onPress={handleExport}
-          isDisabled={selectedColumns.length === 0 || items.length === 0 || isExporting}
+          isDisabled={selectedColumns.length === 0 || items.length === 0 || isExporting || cannotExport}
           isPending={isExporting}
           data-cy="resource-usage-export-download-csv-button"
         >

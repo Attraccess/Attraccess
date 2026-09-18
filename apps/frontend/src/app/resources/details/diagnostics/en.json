@@ -21,7 +21,9 @@
     "operating": "Operating",
     "attributed": "Attributed",
     "unattributed": "Unattributed",
-    "provisional": "Provisional (open intervals included)"
+    "provisional": "Provisional (open intervals included)",
+    "noData": "No operating data has ever been recorded for this resource — durations are unavailable, not zero.",
+    "unavailable": "unavailable"
   },
   "dataQuality": {
     "title": "Data quality",
@@ -64,6 +66,7 @@
       "operating-duration-matches": "Operating duration matches the timeline",
       "attribution-partition-matches": "Attributed + unattributed equals operating duration",
       "attributions-within-operating-duration": "Attributed duration does not exceed operating duration"
-    }
+    },
+    "unavailable": "unavailable"
   }
 }

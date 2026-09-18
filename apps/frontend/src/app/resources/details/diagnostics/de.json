@@ -21,7 +21,9 @@
     "operating": "Betrieb",
     "attributed": "Zugeordnet",
     "unattributed": "Nicht zugeordnet",
-    "provisional": "Vorläufig (offene Intervalle enthalten)"
+    "provisional": "Vorläufig (offene Intervalle enthalten)",
+    "noData": "Für diese Ressource wurden nie Betriebsdaten aufgezeichnet — Dauern sind nicht verfügbar, nicht null.",
+    "unavailable": "nicht verfügbar"
   },
   "dataQuality": {
     "title": "Datenqualität",
@@ -64,6 +66,7 @@
       "operating-duration-matches": "Betriebsdauer stimmt mit der Zeitleiste überein",
       "attribution-partition-matches": "Zugeordnet + nicht zugeordnet entspricht der Betriebsdauer",
       "attributions-within-operating-duration": "Zugeordnete Dauer übersteigt die Betriebsdauer nicht"
-    }
+    },
+    "unavailable": "nicht verfügbar"
   }
 }

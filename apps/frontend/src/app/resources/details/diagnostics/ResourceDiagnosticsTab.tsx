@@ -12,14 +12,15 @@ import {
   ChevronRightIcon,
   ShieldCheckIcon,
 } from 'lucide-react';
-import { DateTimeDisplay, DurationDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   useResourcesServiceResourceOperatingDiagnosticsGetDataQuality,
   useResourcesServiceResourceOperatingDiagnosticsGetState,
   useResourcesServiceResourceOperatingDiagnosticsGetTransitions,
-  useResourcesServiceResourceOperatingDiagnosticsGetUnattributed,
   useResourcesServiceResourceOperatingDiagnosticsVerifyTimeline,
 } from '@attraccess/react-query-client';
+import { formatDurationMs } from '@attraccess/shared';
+import { useOperatingDuration } from '../../operatingDuration';
 import { Button } from '../../../../components/button';
 import { FlatSection } from '../../../../components/flatSection';
 import { Select } from '../../../../components/select';
@@ -34,13 +35,16 @@ const RANGE_OPTIONS = [
   { key: '90', labelKey: 'unattributed.ranges.90' },
 ] as const;
 
-function rangeToIso(days: string): { from: string; to: string } {
-  const to = new Date();
-  const from = new Date(to.getTime() - Number(days) * 24 * 60 * 60_000);
-  return { from: from.toISOString(), to: to.toISOString() };
+function rangeToBounds(days: string): { from: string; to: string; start: Date; end: Date } {
+  const end = new Date();
+  const start = new Date(end.getTime() - Number(days) * 24 * 60 * 60_000);
+  return { from: start.toISOString(), to: end.toISOString(), start, end };
 }
 
-const msToMinutes = (ms: number | undefined) => (ms === undefined ? undefined : Math.round(ms / 60_000));
+/** null means "operating data unavailable" (ATT-1027 semantics) — never render it as 0. */
+function formatDuration(durationMs: number | null | undefined, unavailable: string): string {
+  return durationMs === null || durationMs === undefined ? unavailable : formatDurationMs(durationMs);
+}
 
 export function ResourceDiagnosticsTab() {
   const { id } = useParams<{ id: string }>();
@@ -51,14 +55,18 @@ export function ResourceDiagnosticsTab() {
   const [page, setPage] = useState(1);
   const [verificationRequested, setVerificationRequested] = useState(false);
 
-  const range = useMemo(() => rangeToIso(rangeDays), [rangeDays]);
+  const range = useMemo(() => rangeToBounds(rangeDays), [rangeDays]);
 
   const { data: state, isLoading: isLoadingState } =
     useResourcesServiceResourceOperatingDiagnosticsGetState({ resourceId });
   const { data: transitions, isLoading: isLoadingTransitions } =
     useResourcesServiceResourceOperatingDiagnosticsGetTransitions({ resourceId, page, limit: PAGE_LIMIT });
-  const { data: unattributed, isLoading: isLoadingUnattributed } =
-    useResourcesServiceResourceOperatingDiagnosticsGetUnattributed({ resourceId, ...range });
+  // Unattributed summary rides the shared operating-attribution endpoint (ATT-1025/ATT-1027) —
+  // the single derivation path — instead of a diagnostics-only duplicate.
+  const { data: unattributed, isLoading: isLoadingUnattributed } = useOperatingDuration(resourceId, true, {
+    start: range.start,
+    end: range.end,
+  });
   const { data: dataQuality, isLoading: isLoadingDataQuality } =
     useResourcesServiceResourceOperatingDiagnosticsGetDataQuality({ resourceId, ...range });
   const {
@@ -70,6 +78,15 @@ export function ResourceDiagnosticsTab() {
   });
 
   const totalPages = Math.max(1, Math.ceil((transitions?.totalIntervals ?? 0) / PAGE_LIMIT));
+
+  // The shared attribution summary reports operating and unattributed; attributed is the remainder.
+  const attributedMs =
+    unattributed &&
+    unattributed.operatingDataAvailable &&
+    unattributed.operatingDurationMs !== null &&
+    unattributed.unattributedOperatingDurationMs !== null
+      ? unattributed.operatingDurationMs - unattributed.unattributedOperatingDurationMs
+      : null;
 
   return (
     <div className="flex flex-col gap-4 pb-8" data-testid="resource-diagnostics-tab">
@@ -156,27 +173,31 @@ export function ResourceDiagnosticsTab() {
       >
         {isLoadingUnattributed ? (
           <Spinner size="sm" />
+        ) : !unattributed?.operatingDataAvailable ? (
+          <p className="text-sm text-muted" data-testid="diagnostics-unattributed-unavailable">
+            {t('unattributed.noData')}
+          </p>
         ) : (
-          <div className="flex flex-wrap gap-6">
+          <div className="flex flex-wrap items-center gap-6">
             <Card variant="secondary" className="min-w-36 p-3">
               <p className="text-xs text-muted">{t('unattributed.operating')}</p>
               <p className="text-lg font-semibold" data-testid="diagnostics-operating-duration">
-                <DurationDisplay minutes={msToMinutes(unattributed?.operatingDurationMs)} alternativeText="–" />
+                {formatDuration(unattributed.operatingDurationMs, t('unattributed.unavailable'))}
               </p>
             </Card>
             <Card variant="secondary" className="min-w-36 p-3">
               <p className="text-xs text-muted">{t('unattributed.attributed')}</p>
-              <p className="text-lg font-semibold">
-                <DurationDisplay minutes={msToMinutes(unattributed?.attributedOperatingDurationMs)} alternativeText="–" />
+              <p className="text-lg font-semibold" data-testid="diagnostics-attributed-duration">
+                {formatDuration(attributedMs, t('unattributed.unavailable'))}
               </p>
             </Card>
             <Card variant="secondary" className="min-w-36 p-3">
               <p className="text-xs text-muted">{t('unattributed.unattributed')}</p>
               <p className="text-lg font-semibold" data-testid="diagnostics-unattributed-duration">
-                <DurationDisplay minutes={msToMinutes(unattributed?.unattributedOperatingDurationMs)} alternativeText="–" />
+                {formatDuration(unattributed.unattributedOperatingDurationMs, t('unattributed.unavailable'))}
               </p>
             </Card>
-            {unattributed?.isProvisional && <Chip size="sm" color="warning">{t('unattributed.provisional')}</Chip>}
+            {unattributed.isProvisional && <Chip size="sm" color="warning">{t('unattributed.provisional')}</Chip>}
           </div>
         )}
       </FlatSection>
@@ -208,8 +229,8 @@ export function ResourceDiagnosticsTab() {
                     {verification.consistent ? t('verification.consistent') : t('verification.inconsistent')}
                   </AlertTitle>
                   <AlertDescription>
-                    {t('verification.recomputed')}: <DurationDisplay minutes={msToMinutes(verification.recomputedOperatingDurationMs)} /> ·{' '}
-                    {t('verification.reported')}: <DurationDisplay minutes={msToMinutes(verification.reportedOperatingDurationMs)} /> ·{' '}
+                    {t('verification.recomputed')}: {formatDurationMs(verification.recomputedOperatingDurationMs)} ·{' '}
+                    {t('verification.reported')}: {formatDuration(verification.reportedOperatingDurationMs, t('verification.unavailable'))} ·{' '}
                     {t('verification.intervalCount')}: {verification.intervalCount}
                   </AlertDescription>
                 </AlertContent>

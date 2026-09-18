@@ -13,10 +13,7 @@ import {
   OperatingDataQualityFailureKind,
   OperatingMetricsRecorder,
 } from '../../metrics/instrumentation/operating/operating.helper';
-import {
-  ResourceOperatingAttributionService,
-  ResourceOperatingAttributionSummary,
-} from './resource-operating-attribution.service';
+import { ResourceOperatingAttributionService } from './resource-operating-attribution.service';
 import {
   OperatingDataQualityIssueDto,
   OperatingDataQualityReportDto,
@@ -107,15 +104,6 @@ export class ResourceOperatingDiagnosticsService {
     return { items, totalIntervals, page, limit };
   }
 
-  /** Unattributed operation for an explicit range — a thin pass-through to the ATT-1025 attribution logic. */
-  async getUnattributedSummary(
-    resourceId: number,
-    from: Date,
-    to: Date,
-  ): Promise<ResourceOperatingAttributionSummary> {
-    return this.attributionService.getForResourceRange(resourceId, from, to);
-  }
-
   async getDataQualityReport(resourceId: number, to = new Date()): Promise<OperatingDataQualityReportDto> {
     const from = new Date(to.getTime() - STALE_SIGNAL_DAYS * DAY_MS);
     const [trackingNodes, intervals, openCount] = await Promise.all([
@@ -199,35 +187,45 @@ export class ResourceOperatingDiagnosticsService {
       })),
     );
 
-    const summary = await this.attributionService.getForResourceRange(resourceId, from, to);
+    const summary = await this.attributionService.getForResource(resourceId, to, from);
+
+    // ATT-1027 semantics: null durations mean "operating data unavailable" (the resource never
+    // produced an interval row), which is distinct from a measured 0. Verification leans on that:
+    // an unavailable view is consistent exactly when the timeline recomputes to zero.
+    const { operatingDataAvailable } = summary;
+    const reported = summary.operatingDurationMs;
+    const attributed = summary.attributedOperatingDurationMs;
+    const unattributed = summary.unattributedOperatingDurationMs;
+
+    const operatingMatches = operatingDataAvailable
+      ? recomputedOperatingDurationMs === reported
+      : reported === null && recomputedOperatingDurationMs === 0;
+    const partitionMatches = operatingDataAvailable
+      ? attributed !== null && unattributed !== null && reported !== null && attributed + unattributed === reported
+      : attributed === null && unattributed === null;
+    const withinMatches = operatingDataAvailable
+      ? attributed !== null && reported !== null && attributed <= reported
+      : attributed === null;
 
     const checks: OperatingTimelineVerificationCheckDto[] = [
       {
         name: 'operating-duration-matches',
-        passed: recomputedOperatingDurationMs === summary.operatingDurationMs,
-        detail:
-          recomputedOperatingDurationMs === summary.operatingDurationMs
-            ? null
-            : `Recomputed ${recomputedOperatingDurationMs}ms from ${intervals.length} interval rows, derived view reports ${summary.operatingDurationMs}ms`,
+        passed: operatingMatches,
+        detail: operatingMatches
+          ? null
+          : `Recomputed ${recomputedOperatingDurationMs}ms from ${intervals.length} interval rows, derived view reports ${reported === null ? 'unavailable' : `${reported}ms`}`,
       },
       {
         name: 'attribution-partition-matches',
-        passed:
-          summary.attributedOperatingDurationMs + summary.unattributedOperatingDurationMs ===
-          summary.operatingDurationMs,
-        detail:
-          summary.attributedOperatingDurationMs + summary.unattributedOperatingDurationMs ===
-          summary.operatingDurationMs
-            ? null
-            : `Attributed ${summary.attributedOperatingDurationMs}ms + unattributed ${summary.unattributedOperatingDurationMs}ms != operating ${summary.operatingDurationMs}ms`,
+        passed: partitionMatches,
+        detail: partitionMatches
+          ? null
+          : `Attributed ${attributed}ms + unattributed ${unattributed}ms != operating ${reported}ms`,
       },
       {
         name: 'attributions-within-operating-duration',
-        passed: summary.attributedOperatingDurationMs <= summary.operatingDurationMs,
-        detail:
-          summary.attributedOperatingDurationMs <= summary.operatingDurationMs
-            ? null
-            : `Attributed ${summary.attributedOperatingDurationMs}ms exceeds operating ${summary.operatingDurationMs}ms`,
+        passed: withinMatches,
+        detail: withinMatches ? null : `Attributed ${attributed}ms exceeds operating ${reported}ms`,
       },
     ];
 
@@ -237,9 +235,10 @@ export class ResourceOperatingDiagnosticsService {
       to,
       consistent: checks.every((check) => check.passed),
       recomputedOperatingDurationMs,
-      reportedOperatingDurationMs: summary.operatingDurationMs,
-      reportedAttributedDurationMs: summary.attributedOperatingDurationMs,
-      reportedUnattributedDurationMs: summary.unattributedOperatingDurationMs,
+      operatingDataAvailable,
+      reportedOperatingDurationMs: reported,
+      reportedAttributedDurationMs: attributed,
+      reportedUnattributedDurationMs: unattributed,
       intervalCount: intervals.length,
       aggregatesPresent: false,
       note: 'No persisted aggregates exist; derived views are computed directly from the authoritative interval rows and verified against them.',

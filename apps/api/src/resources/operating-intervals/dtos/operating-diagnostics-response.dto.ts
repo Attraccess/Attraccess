@@ -58,29 +58,6 @@ export class OperatingTransitionPageDto {
   limit!: number;
 }
 
-export class OperatingUnattributedSummaryDto {
-  @ApiProperty({ description: 'Snapshot time the summary was derived at', format: 'date-time' })
-  asOf!: Date;
-
-  @ApiProperty({ description: 'Start of the summarized range', format: 'date-time' })
-  windowStart!: Date;
-
-  @ApiProperty({ description: 'Total operating duration in the range, in ms' })
-  operatingDurationMs!: number;
-
-  @ApiProperty({ description: 'Operating duration attributed to usage sessions, in ms' })
-  attributedOperatingDurationMs!: number;
-
-  @ApiProperty({ description: 'Operating duration not attributed to any usage session, in ms' })
-  unattributedOperatingDurationMs!: number;
-
-  @ApiProperty({ description: 'True while open intervals or sessions make the summary provisional' })
-  isProvisional!: boolean;
-
-  @ApiProperty({ description: 'Number of attribution intersections behind the summary', example: 3 })
-  attributionCount!: number;
-}
-
 export class OperatingDataQualityIssueDto {
   @ApiProperty({
     description: 'Stable identifier of the data-quality check that failed',
@@ -139,14 +116,19 @@ export class OperatingTimelineVerificationDto {
   @ApiProperty({ description: 'Operating duration recomputed directly from authoritative interval rows, in ms' })
   recomputedOperatingDurationMs!: number;
 
-  @ApiProperty({ description: 'Operating duration reported by the derived attribution view, in ms' })
-  reportedOperatingDurationMs!: number;
+  @ApiProperty({
+    description: 'False when the resource never produced operating data; reported durations are then null (unavailable), distinct from a measured 0',
+  })
+  operatingDataAvailable!: boolean;
 
-  @ApiProperty({ description: 'Attributed operating duration reported by the derived view, in ms' })
-  reportedAttributedDurationMs!: number;
+  @ApiProperty({ description: 'Operating duration reported by the derived attribution view, in ms; null when unavailable', nullable: true })
+  reportedOperatingDurationMs!: number | null;
 
-  @ApiProperty({ description: 'Unattributed operating duration reported by the derived view, in ms' })
-  reportedUnattributedDurationMs!: number;
+  @ApiProperty({ description: 'Attributed operating duration reported by the derived view, in ms; null when unavailable', nullable: true })
+  reportedAttributedDurationMs!: number | null;
+
+  @ApiProperty({ description: 'Unattributed operating duration reported by the derived view, in ms; null when unavailable', nullable: true })
+  reportedUnattributedDurationMs!: number | null;
 
   @ApiProperty({ description: 'Number of authoritative interval rows overlapping the range', example: 7 })
   intervalCount!: number;

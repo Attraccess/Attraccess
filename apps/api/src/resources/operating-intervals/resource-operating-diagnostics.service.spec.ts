@@ -16,9 +16,12 @@ function summary(overrides: Partial<ResourceOperatingAttributionSummary> = {}): 
   return {
     asOf: at(20, '12:00:00'),
     windowStart: at(1, '00:00:00'),
+    sessionDurationMs: 0,
+    operatingDataAvailable: true,
     operatingDurationMs: 0,
     attributedOperatingDurationMs: 0,
     unattributedOperatingDurationMs: 0,
+    isOperating: false,
     isProvisional: false,
     attributions: [],
     ...overrides,
@@ -30,7 +33,7 @@ describe('ResourceOperatingDiagnosticsService', () => {
     Pick<Repository<ResourceOperatingInterval>, 'findOne' | 'find' | 'findAndCount' | 'count'>
   >;
   let flowNodeRepository: jest.Mocked<Pick<Repository<ResourceFlowNode>, 'count'>>;
-  let attributionService: jest.Mocked<Pick<ResourceOperatingAttributionService, 'getForResourceRange'>>;
+  let attributionService: jest.Mocked<Pick<ResourceOperatingAttributionService, 'getForResource'>>;
   let operatingMetrics: jest.Mocked<OperatingMetricsRecorder>;
   let service: ResourceOperatingDiagnosticsService;
 
@@ -42,7 +45,7 @@ describe('ResourceOperatingDiagnosticsService', () => {
       count: jest.fn().mockResolvedValue(0),
     };
     flowNodeRepository = { count: jest.fn().mockResolvedValue(0) };
-    attributionService = { getForResourceRange: jest.fn().mockResolvedValue(summary()) };
+    attributionService = { getForResource: jest.fn().mockResolvedValue(summary()) };
     operatingMetrics = {
       recordTransition: jest.fn(),
       setResourceState: jest.fn(),
@@ -200,7 +203,7 @@ describe('ResourceOperatingDiagnosticsService', () => {
       ]);
       // open interval 2 clipped at `to`: 12th 09:00 -> 20th 00:00
       const openMs = to.getTime() - at(12, '09:00:00').getTime();
-      attributionService.getForResourceRange.mockResolvedValue(
+      attributionService.getForResource.mockResolvedValue(
         summary({
           operatingDurationMs: 2 * 60 * 60_000 + openMs,
           attributedOperatingDurationMs: 60 * 60_000,
@@ -216,12 +219,12 @@ describe('ResourceOperatingDiagnosticsService', () => {
       expect(result.aggregatesPresent).toBe(false);
       expect(result.note).toContain('No persisted aggregates');
       expect(result.checks.every((check) => check.passed)).toBe(true);
-      expect(attributionService.getForResourceRange).toHaveBeenCalledWith(1, from, to);
+      expect(attributionService.getForResource).toHaveBeenCalledWith(1, to, from);
     });
 
     it('reports inconsistency when the derived view disagrees with the timeline', async () => {
       intervalRepository.find.mockResolvedValue([interval(1, at(10, '08:00:00'), at(10, '10:00:00'))]);
-      attributionService.getForResourceRange.mockResolvedValue(
+      attributionService.getForResource.mockResolvedValue(
         summary({
           operatingDurationMs: 3 * 60 * 60_000,
           attributedOperatingDurationMs: 60 * 60_000,
@@ -239,7 +242,7 @@ describe('ResourceOperatingDiagnosticsService', () => {
 
     it('reports a broken attributed/unattributed partition', async () => {
       intervalRepository.find.mockResolvedValue([interval(1, at(10, '08:00:00'), at(10, '10:00:00'))]);
-      attributionService.getForResourceRange.mockResolvedValue(
+      attributionService.getForResource.mockResolvedValue(
         summary({
           operatingDurationMs: 2 * 60 * 60_000,
           attributedOperatingDurationMs: 90 * 60_000,
@@ -253,6 +256,43 @@ describe('ResourceOperatingDiagnosticsService', () => {
       expect(result.checks.find((check) => check.name === 'attribution-partition-matches')?.passed).toBe(false);
     });
 
+    it('treats an unavailable operating view (null, not 0) as consistent with an empty timeline', async () => {
+      intervalRepository.find.mockResolvedValue([]);
+      attributionService.getForResource.mockResolvedValue(
+        summary({
+          operatingDataAvailable: false,
+          operatingDurationMs: null,
+          attributedOperatingDurationMs: null,
+          unattributedOperatingDurationMs: null,
+        }),
+      );
+
+      const result = await service.verifyTimeline(1, from, to);
+
+      expect(result.operatingDataAvailable).toBe(false);
+      expect(result.reportedOperatingDurationMs).toBeNull();
+      expect(result.consistent).toBe(true);
+    });
+
+    it('flags an unavailable view that hides existing interval rows', async () => {
+      intervalRepository.find.mockResolvedValue([interval(1, at(10, '08:00:00'), at(10, '10:00:00'))]);
+      attributionService.getForResource.mockResolvedValue(
+        summary({
+          operatingDataAvailable: false,
+          operatingDurationMs: null,
+          attributedOperatingDurationMs: null,
+          unattributedOperatingDurationMs: null,
+        }),
+      );
+
+      const result = await service.verifyTimeline(1, from, to);
+
+      expect(result.consistent).toBe(false);
+      expect(result.checks.find((check) => check.name === 'operating-duration-matches')).toEqual(
+        expect.objectContaining({ passed: false, detail: expect.stringContaining('unavailable') }),
+      );
+    });
+
     it('clips intervals that straddle the range boundaries', async () => {
       const before = new Date(from.getTime() - 60 * 60_000);
       const after = new Date(to.getTime() + 60 * 60_000);
@@ -260,7 +300,7 @@ describe('ResourceOperatingDiagnosticsService', () => {
         interval(1, before, at(2, '00:00:00')),
         interval(2, at(19, '00:00:00'), after),
       ]);
-      attributionService.getForResourceRange.mockResolvedValue(summary({ operatingDurationMs: 0 }));
+      attributionService.getForResource.mockResolvedValue(summary({ operatingDurationMs: 0 }));
 
       const result = await service.verifyTimeline(1, from, to);
 

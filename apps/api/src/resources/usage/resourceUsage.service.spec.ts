@@ -381,6 +381,7 @@ describe('ResourceUsageService', () => {
       resource: undefined as unknown as never,
       creditsPerUsage: 0,
       creditsPerMinute: 0,
+      creditsPerOperatingMinute: 0,
     } as ResourceBillingConfiguration);
   });
 
@@ -466,6 +467,8 @@ describe('ResourceUsageService', () => {
         endTime: null,
         endNotes: null,
         isFinalized: false,
+        sessionDurationCreditsPerMinute: 0,
+        operatingDurationCreditsPerMinute: 0,
       });
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
       expect(eventEmitter.emitAsync).not.toHaveBeenCalled();
