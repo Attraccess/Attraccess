@@ -197,6 +197,21 @@ describe('ResourceOperatingAttributionService', () => {
     });
   });
 
+  it('derives an explicit diagnostics range through the same sweep as the default window (ATT-1024)', async () => {
+    intervalRepository.find.mockResolvedValue([operating(1, '10:00:00', '11:00:00')] as ResourceOperatingInterval[]);
+    usageRepository.find.mockResolvedValue([usage(2, '10:15:00', '10:45:00')] as ResourceUsage[]);
+    const windowStart = at('09:00:00');
+
+    const result = await service.getForResourceRange(1, windowStart, asOf);
+
+    expect(result.windowStart).toEqual(windowStart);
+    expect(result).toMatchObject({
+      operatingDurationMs: 60 * 60_000,
+      attributedOperatingDurationMs: 30 * 60_000,
+      unattributedOperatingDurationMs: 30 * 60_000,
+    });
+  });
+
   it('loads only intervals that overlap the recent attribution window', async () => {
     intervalRepository.find.mockResolvedValue([] as ResourceOperatingInterval[]);
     usageRepository.find.mockResolvedValue([] as ResourceUsage[]);

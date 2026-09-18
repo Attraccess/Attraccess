@@ -1,14 +1,16 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ResourceOperatingInterval, ResourceUsage } from '@attraccess/database-entities';
+import { ResourceFlowNode, ResourceOperatingInterval, ResourceUsage } from '@attraccess/database-entities';
 import { ResourceOperatingAttributionController } from './resource-operating-attribution.controller';
 import { ResourceOperatingAttributionService } from './resource-operating-attribution.service';
+import { ResourceOperatingDiagnosticsController } from './resource-operating-diagnostics.controller';
+import { ResourceOperatingDiagnosticsService } from './resource-operating-diagnostics.service';
 import { ResourceOperatingIntervalService } from './resource-operating-interval.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ResourceOperatingInterval, ResourceUsage])],
-  controllers: [ResourceOperatingAttributionController],
-  providers: [ResourceOperatingIntervalService, ResourceOperatingAttributionService],
-  exports: [ResourceOperatingIntervalService, ResourceOperatingAttributionService],
+  imports: [TypeOrmModule.forFeature([ResourceOperatingInterval, ResourceUsage, ResourceFlowNode])],
+  controllers: [ResourceOperatingAttributionController, ResourceOperatingDiagnosticsController],
+  providers: [ResourceOperatingIntervalService, ResourceOperatingAttributionService, ResourceOperatingDiagnosticsService],
+  exports: [ResourceOperatingIntervalService, ResourceOperatingAttributionService, ResourceOperatingDiagnosticsService],
 })
 export class ResourceOperatingIntervalModule {}

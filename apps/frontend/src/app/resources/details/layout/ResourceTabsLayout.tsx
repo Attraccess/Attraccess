@@ -13,6 +13,7 @@ import {
   PenSquareIcon,
   QrCodeIcon,
   ShapesIcon,
+  StethoscopeIcon,
   Trash,
   Users,
   WorkflowIcon,
@@ -47,6 +48,7 @@ const TAB_ICONS: Record<ResourceTabKey, JSX.Element> = {
   maintenance: <WrenchIcon className="w-4 h-4" />,
   flows: <WorkflowIcon className="w-4 h-4" />,
   forms: <ListChecks className="w-4 h-4" />,
+  diagnostics: <StethoscopeIcon className="w-4 h-4" />,
 };
 
 function ResourceTabsLayoutComponent({ children }: { children?: ReactNode }) {

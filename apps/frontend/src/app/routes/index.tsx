@@ -28,6 +28,7 @@ import { UserManagementDetailsPage } from '../user-management/details';
 import FlowsPage from '../resources/details/flows';
 import { MaintenanceHubPage } from '../resources/details/maintenance-hub';
 import { FormEditorPage, FormListPage } from '../resources/details/forms';
+import { ResourceDiagnosticsTab } from '../resources/details/diagnostics/ResourceDiagnosticsTab';
 import AccountPage from '../account';
 import { ConfirmDeleteAccount } from '../confirm-delete-account';
 import ChangelogPage from '../changelog/ChangelogPage';
@@ -176,6 +177,15 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/resources/:id/forms/:formId',
     element: <FormEditorPage />,
+    authRequired: 'resources.update',
+  },
+  {
+    path: '/resources/:id/diagnostics',
+    element: (
+      <ResourceTabsLayout>
+        <ResourceDiagnosticsTab />
+      </ResourceTabsLayout>
+    ),
     authRequired: 'resources.update',
   },
   {

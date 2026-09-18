@@ -12,7 +12,8 @@ export type ResourceTabKey =
   | 'groups'
   | 'maintenance'
   | 'flows'
-  | 'forms';
+  | 'forms'
+  | 'diagnostics';
 
 export interface ResourceTabDescriptor {
   key: ResourceTabKey;
@@ -64,6 +65,8 @@ export function useResourceTabs(resourceId: number): {
     if (canUpdateResources) {
       list.push({ key: 'flows', path: 'flows', translationKey: 'tabs.flows' });
       list.push({ key: 'forms', path: 'forms', translationKey: 'tabs.forms' });
+      // Operating-timeline diagnostics (ATT-1024) are an admin surface, gated like flows/forms.
+      list.push({ key: 'diagnostics', path: 'diagnostics', translationKey: 'tabs.diagnostics' });
     }
     return list;
   }, [isIntroducer, canManageAccess, canUpdateResources, canManageMaintenance]);

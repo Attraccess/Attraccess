@@ -1,14 +1,21 @@
 import { ResourceOperatingInterval } from '@attraccess/database-entities';
 import { EntityManager, QueryFailedError, Repository } from 'typeorm';
+import { OperatingMetricsRecorder } from '../../metrics/instrumentation/operating/operating.helper';
 import { ResourceOperatingIntervalService } from './resource-operating-interval.service';
 
 describe('ResourceOperatingIntervalService', () => {
   let openInterval: ResourceOperatingInterval | null;
   let repository: jest.Mocked<Pick<Repository<ResourceOperatingInterval>, 'findOne' | 'create' | 'save'>>;
+  let operatingMetrics: jest.Mocked<OperatingMetricsRecorder>;
   let service: ResourceOperatingIntervalService;
 
   beforeEach(() => {
     openInterval = null;
+    operatingMetrics = {
+      recordTransition: jest.fn(),
+      setResourceState: jest.fn(),
+      recordDataQualityFailures: jest.fn(),
+    };
     repository = {
       findOne: jest.fn(async () => openInterval),
       create: jest.fn((value) => value as ResourceOperatingInterval),
@@ -22,7 +29,10 @@ describe('ResourceOperatingIntervalService', () => {
       transaction: jest.fn((callback) => callback(manager)),
       query: jest.fn(),
     } as unknown as EntityManager;
-    service = new ResourceOperatingIntervalService({ manager } as Repository<ResourceOperatingInterval>);
+    service = new ResourceOperatingIntervalService(
+      { manager } as Repository<ResourceOperatingInterval>,
+      operatingMetrics,
+    );
   });
 
   afterEach(() => jest.useRealTimers());
@@ -105,5 +115,20 @@ describe('ResourceOperatingIntervalService', () => {
     );
 
     await expect(service.transition(3, 'operating')).resolves.toBeNull();
+  });
+
+  it('records applied transitions and the resulting state for observability', async () => {
+    await service.transition(3, 'operating');
+
+    expect(operatingMetrics.recordTransition).toHaveBeenCalledWith('operating', true);
+    expect(operatingMetrics.setResourceState).toHaveBeenCalledWith(3, 'operating');
+  });
+
+  it('records duplicate transitions as noop while the state still reflects the signal', async () => {
+    await service.transition(3, 'operating');
+    await service.transition(3, 'operating');
+
+    expect(operatingMetrics.recordTransition).toHaveBeenNthCalledWith(2, 'operating', false);
+    expect(operatingMetrics.setResourceState).toHaveBeenNthCalledWith(2, 3, 'operating');
   });
 });

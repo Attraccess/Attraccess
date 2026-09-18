@@ -1,0 +1,69 @@
+{
+  "title": "Betriebsdiagnose",
+  "description": "Diagnose der maßgeblichen Betriebs-Zeitleiste: aktueller Zustand, Übergänge, nicht zugeordneter Betrieb, Datenqualität und Verifizierung.",
+  "loading": "Diagnose wird geladen…",
+  "state": {
+    "title": "Aktueller Zustand",
+    "operating": "In Betrieb",
+    "idle": "Inaktiv",
+    "openSince": "In Betrieb seit",
+    "lastTransition": "Letzter Übergang",
+    "never": "Noch keine Übergänge aufgezeichnet"
+  },
+  "unattributed": {
+    "title": "Nicht zugeordneter Betrieb",
+    "rangeLabel": "Zeitraum",
+    "ranges": {
+      "7": "Letzte 7 Tage",
+      "30": "Letzte 30 Tage",
+      "90": "Letzte 90 Tage"
+    },
+    "operating": "Betrieb",
+    "attributed": "Zugeordnet",
+    "unattributed": "Nicht zugeordnet",
+    "provisional": "Vorläufig (offene Intervalle enthalten)"
+  },
+  "dataQuality": {
+    "title": "Datenqualität",
+    "clean": "Keine Datenqualitätsprobleme im untersuchten Zeitraum gefunden.",
+    "trackingConfigured": "Die Betriebserfassung ist für diese Ressource konfiguriert.",
+    "trackingMissing": "Keine Betriebs-/Inaktiv-Flowknoten konfiguriert — die Zeitleiste bleibt leer, bis die Erfassung eingerichtet ist.",
+    "kinds": {
+      "stale-signal": "Erfassung konfiguriert, aber kürzlich kein Signal",
+      "overlapping-intervals": "Überlappende Intervalle (doppelte oder ungeordnete Übergänge)",
+      "negative-duration": "Intervalle, deren Ende nicht nach ihrem Start liegt",
+      "multiple-open-intervals": "Mehr als ein offenes Intervall"
+    }
+  },
+  "transitions": {
+    "title": "Übergangsverlauf",
+    "empty": "Noch keine Übergänge aufgezeichnet.",
+    "columns": {
+      "timestamp": "Zeitstempel",
+      "state": "Zustand",
+      "source": "Quelle",
+      "interval": "Intervall"
+    },
+    "sourceFlowSignal": "Flow-Signal",
+    "page": "Seite {page} · {total} Intervalle",
+    "previous": "Zurück",
+    "next": "Weiter"
+  },
+  "verification": {
+    "title": "Verifizierung der Zeitleiste",
+    "description": "Berechnet abgeleitete Betriebsdauern aus den maßgeblichen Intervallzeilen neu und vergleicht sie.",
+    "run": "Verifizierung ausführen",
+    "running": "Wird verifiziert…",
+    "consistent": "Zeitleiste konsistent",
+    "inconsistent": "Unstimmigkeiten gefunden",
+    "recomputed": "Aus Intervallen neu berechnet",
+    "reported": "Von abgeleiteter Sicht berichtet",
+    "intervalCount": "Intervalle im Zeitraum",
+    "noAggregates": "Es existieren keine persistierten Aggregate; abgeleitete Sichten werden direkt gegen die Zeitleiste verifiziert.",
+    "checks": {
+      "operating-duration-matches": "Betriebsdauer stimmt mit der Zeitleiste überein",
+      "attribution-partition-matches": "Zugeordnet + nicht zugeordnet entspricht der Betriebsdauer",
+      "attributions-within-operating-duration": "Zugeordnete Dauer übersteigt die Betriebsdauer nicht"
+    }
+  }
+}

@@ -53,7 +53,18 @@ export class ResourceOperatingAttributionService {
   ) {}
 
   async getForResource(resourceId: number, asOf = new Date()): Promise<ResourceOperatingAttributionSummary> {
-    const windowStart = new Date(asOf.getTime() - ATTRIBUTION_LOOKBACK_MS);
+    return this.getForResourceRange(resourceId, new Date(asOf.getTime() - ATTRIBUTION_LOOKBACK_MS), asOf);
+  }
+
+  /**
+   * Attribution over an explicit [windowStart, asOf] range. Shared by the default lookback snapshot
+   * and the diagnostics endpoints (ATT-1024) so the sweep logic stays in exactly one place.
+   */
+  async getForResourceRange(
+    resourceId: number,
+    windowStart: Date,
+    asOf: Date,
+  ): Promise<ResourceOperatingAttributionSummary> {
     const [operatingIntervals, usages] = await Promise.all([
       this.intervalRepository.find({
         where: [

@@ -1,0 +1,69 @@
+{
+  "title": "Operating diagnostics",
+  "description": "Diagnostics over the authoritative operating timeline: current state, transitions, unattributed operation, data quality and timeline verification.",
+  "loading": "Loading diagnostics…",
+  "state": {
+    "title": "Current state",
+    "operating": "Operating",
+    "idle": "Idle",
+    "openSince": "Operating since",
+    "lastTransition": "Last transition",
+    "never": "No transitions recorded yet"
+  },
+  "unattributed": {
+    "title": "Unattributed operation",
+    "rangeLabel": "Range",
+    "ranges": {
+      "7": "Last 7 days",
+      "30": "Last 30 days",
+      "90": "Last 90 days"
+    },
+    "operating": "Operating",
+    "attributed": "Attributed",
+    "unattributed": "Unattributed",
+    "provisional": "Provisional (open intervals included)"
+  },
+  "dataQuality": {
+    "title": "Data quality",
+    "clean": "No data-quality issues found in the scanned window.",
+    "trackingConfigured": "Operating tracking is configured for this resource.",
+    "trackingMissing": "No operating/idle flow nodes are configured — the timeline stays empty until tracking is set up.",
+    "kinds": {
+      "stale-signal": "Tracking configured but no signal recently",
+      "overlapping-intervals": "Overlapping intervals (duplicate or out-of-order transitions)",
+      "negative-duration": "Intervals whose end is not after their start",
+      "multiple-open-intervals": "More than one open interval"
+    }
+  },
+  "transitions": {
+    "title": "Transition history",
+    "empty": "No transitions recorded yet.",
+    "columns": {
+      "timestamp": "Timestamp",
+      "state": "State",
+      "source": "Source",
+      "interval": "Interval"
+    },
+    "sourceFlowSignal": "Flow signal",
+    "page": "Page {page} · {total} intervals",
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "verification": {
+    "title": "Timeline verification",
+    "description": "Recomputes derived operating durations from the authoritative interval rows and compares them.",
+    "run": "Run verification",
+    "running": "Verifying…",
+    "consistent": "Timeline consistent",
+    "inconsistent": "Inconsistencies found",
+    "recomputed": "Recomputed from intervals",
+    "reported": "Reported by derived view",
+    "intervalCount": "Intervals in range",
+    "noAggregates": "No persisted aggregates exist; derived views are verified directly against the timeline.",
+    "checks": {
+      "operating-duration-matches": "Operating duration matches the timeline",
+      "attribution-partition-matches": "Attributed + unattributed equals operating duration",
+      "attributions-within-operating-duration": "Attributed duration does not exceed operating duration"
+    }
+  }
+}
