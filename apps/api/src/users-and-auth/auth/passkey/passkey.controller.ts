@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Optional, Param, ParseIntPipe, Patch, Post, Req, Res } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk';
@@ -17,6 +17,8 @@ import { CookieConfigService } from '../../../common/services/cookie-config.serv
 import { BruteForceProtectionService } from '../../rate-limiting/brute-force.service';
 import { AuthAuditLogger } from '../../rate-limiting/auth-audit.logger';
 import { resolveIp, setRetryAfter } from '../../rate-limiting/login.rate-limit.guard';
+import { IdentityAuditService } from '../../../audit/identity-audit.service';
+import { randomUUID } from 'node:crypto';
 
 @ApiTags('Passkeys')
 @Controller('/auth')
@@ -27,6 +29,7 @@ export class PasskeyController {
     private readonly cookieConfigService: CookieConfigService,
     private readonly bruteForce: BruteForceProtectionService,
     private readonly audit: AuthAuditLogger,
+    @Optional() private readonly identityAudit?: IdentityAuditService,
   ) {}
 
   @SessionAuth()
@@ -55,12 +58,14 @@ export class PasskeyController {
     @Req() request: AuthenticatedRequest,
     @Body() body: VerifyPasskeyRegistrationDto,
   ): Promise<Passkey> {
-    return this.passkeyService.verifyRegistration(
+    const passkey = await this.passkeyService.verifyRegistration(
       request.user,
       body.response as unknown as RegistrationResponseJSON,
       body.name,
       requestOrigin(request),
     );
+    await this.record('passkey_created', request);
+    return passkey;
   }
 
   @SessionAuth()
@@ -72,7 +77,9 @@ export class PasskeyController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: RenamePasskeyDto,
   ): Promise<Passkey> {
-    return this.passkeyService.rename(request.user.id, id, body.name);
+    const passkey = await this.passkeyService.rename(request.user.id, id, body.name);
+    await this.record('passkey_renamed', request);
+    return passkey;
   }
 
   @SessionAuth()
@@ -80,7 +87,8 @@ export class PasskeyController {
   @ApiOperation({ summary: 'Delete one of the current users passkeys', operationId: 'deletePasskey' })
   @ApiOkResponse({ description: 'The passkey has been deleted' })
   async delete(@Req() request: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number): Promise<void> {
-    return this.passkeyService.delete(request.user.id, id);
+    await this.passkeyService.delete(request.user.id, id);
+    await this.record('passkey_deleted', request);
   }
 
   @Post('/passkey/authenticate/options')
@@ -112,12 +120,12 @@ export class PasskeyController {
       );
     } catch (error) {
       await this.bruteForce.recordFailure('login', ip, null);
-      this.audit.log({ type: 'login', outcome: 'invalid_credentials', ip, reason: 'passkey_rejected' });
+      await this.audit.log({ type: 'login', outcome: 'invalid_credentials', ip, reason: 'passkey_rejected' });
       throw error;
     }
 
     await this.bruteForce.recordSuccess('login', ip, user.id, user.username);
-    this.audit.log({ type: 'login', outcome: 'success', ip, userId: user.id, username: user.username });
+    await this.audit.log({ type: 'login', outcome: 'success', ip, userId: user.id, username: user.username });
 
     // A passkey proves possession of the authenticator (and usually a biometric/PIN on top of it),
     // so it stands on its own and does not additionally prompt for the TOTP code.
@@ -140,9 +148,26 @@ export class PasskeyController {
       await this.bruteForce.assertIpAllowed('login', ip);
     } catch (error) {
       setRetryAfter(request.res as Response, error);
-      this.audit.log({ type: 'login', outcome: 'rate_limited', ip, reason: 'ip_throttled' });
+      await this.audit.log({ type: 'login', outcome: 'rate_limited', ip, reason: 'ip_throttled' });
       throw error;
     }
+  }
+
+  private record(
+    action: 'passkey_created' | 'passkey_renamed' | 'passkey_deleted',
+    request: AuthenticatedRequest,
+  ): Promise<void> {
+    return Promise.resolve(this.identityAudit?.record({
+      action,
+      operationId: randomUUID(),
+      outcome: 'succeeded',
+      actorId: request.user.id,
+      authenticationMethod: request.user.authenticationMethod ?? 'session',
+      apiTokenId: request.user.apiTokenId,
+      subjectId: request.user.id,
+      details: {},
+      request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+    })).then(() => undefined);
   }
 }
 

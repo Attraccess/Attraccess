@@ -1,4 +1,17 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit, Optional } from '@nestjs/common';
+import { AuditService } from '../audit/audit.service';
+import { AuditQueryDto } from '../audit/audit-query.dto';
+import { readAuditSettings } from '../audit/audit.config';
+import { auditSubjectKeyId, safeAuditOrigin, safeRequestedSpec } from '../audit/audit-administration-policy';
+import { PendingNpmPluginAudit } from './npm-plugin-audit-state';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleInit,
+  OnApplicationBootstrap,
+  Optional,
+} from '@nestjs/common';
 import axios from 'axios';
 import { createHash, randomUUID } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
@@ -32,6 +45,27 @@ export const MAX_CONFIGURED_REGISTRIES = 5;
 export type StoredRegistry = { id: string; name: string; url: string };
 type Registry = StoredRegistry & { token: string | null };
 type PackageVersion = { version: string; dist: { tarball: string; integrity?: string; shasum?: string } };
+
+/** Per-operation observations; contains no registry tokens, errors or plugin configuration. */
+export type NpmPluginAuditState = {
+  context?: Omit<PendingNpmPluginAudit, 'details' | 'migrationOutcome'>;
+  packageName: string;
+  requestedSpec: string;
+  oldVersion?: string;
+  newVersion?: string;
+  registryId?: string;
+  registryUrl?: string;
+  integrity?: string;
+  classification?: 'official' | 'community';
+  permissionAdditions?: string;
+  permissionRemovals?: string;
+  integrityResult: 'not-checked' | 'verified';
+  provenanceResult: 'not-verified';
+  migrationOutcome: 'not-run' | 'pending-restart' | 'not-applicable';
+  activationOutcome: 'not-attempted' | 'failed' | 'quarantined' | 'restart-requested' | 'removed';
+  restartRequested: number;
+  rollbackOutcome: 'not-needed' | 'succeeded' | 'failed' | 'unknown';
+};
 
 export type InstalledNpmPluginVersion = {
   version: string;
@@ -119,7 +153,7 @@ export type MarketplacePlugin = {
 };
 
 @Injectable()
-export class NpmPluginService implements OnModuleInit {
+export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
   private readonly logger = new Logger(NpmPluginService.name);
   private static readonly recoveryLogger = new Logger(NpmPluginService.name);
   private registryMutation = Promise.resolve();
@@ -128,6 +162,7 @@ export class NpmPluginService implements OnModuleInit {
   constructor(
     private readonly settings: SettingsStoreService,
     @Optional() classification?: PluginClassificationService,
+    @Optional() private readonly audit?: AuditService,
   ) {
     this.classification = classification ?? new PluginClassificationService();
   }
@@ -136,6 +171,61 @@ export class NpmPluginService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await NpmPluginService.recoverBackups();
+  }
+
+  async onApplicationBootstrap(): Promise<void> {
+    if (!this.audit) return;
+    const manifests = PluginService.getPluginsWithLoadStatus();
+    for (const installed of readInstalledNpmPlugins()) {
+      const pending = installed.pendingAudit;
+      if (!pending) continue;
+      const manifest = manifests.find((entry) => entry.name === installed.name && entry.version === installed.version);
+      const quarantined =
+        installed.state === 'quarantined' || (manifest && PluginService.isPluginQuarantined(manifest));
+      const loaded = manifest?.status === 'loaded' && !quarantined;
+      if (!loaded && !quarantined && manifest?.status !== 'error') continue;
+      try {
+        const config = await readAuditSettings(this.settings);
+        if (config.enabled && config.domains.includes('administration')) {
+          const existing = await this.audit.list(
+            Object.assign(new AuditQueryDto(), {
+              action: 'plugin.activation_completed',
+              operationId: pending.operationId,
+              limit: 1,
+            }),
+          );
+          if (!existing.items.length) {
+            const receipt = await this.audit.recordAdministration({
+              action: 'plugin.activation_completed',
+              operationId: pending.operationId,
+              actorId: pending.actorId,
+              authenticationMethod: pending.authenticationMethod,
+              apiTokenId: pending.apiTokenId,
+              subjectType: 'plugin-package',
+              subjectId: auditSubjectKeyId(installed.name),
+              outcome: loaded ? 'succeeded' : 'failed',
+              details: {
+                ...pending.details,
+                migrationOutcome: pending.migrationOutcome,
+                activationOutcome: loaded ? 'succeeded' : 'quarantined',
+                restartRequested: 1,
+              },
+            });
+            if (receipt.status !== 'recorded') continue;
+          }
+        }
+        // Clear only the operation observed above; a newer installation must retain its context.
+        await this.mutateInstalls(async () => {
+          const current = readInstalledNpmPlugins().find((item) => item.name === installed.name);
+          if (current?.pendingAudit?.operationId !== pending.operationId) return;
+          const { pendingAudit: completed, ...record } = current;
+          void completed;
+          await this.writeState(record, null);
+        });
+      } catch {
+        /* Keep the correlation for a later startup if storage was unavailable. */
+      }
+    }
   }
 
   static async recoverBackups(): Promise<void> {
@@ -281,21 +371,12 @@ export class NpmPluginService implements OnModuleInit {
         }
       }),
     );
-    const normalizedQuery = query.trim().toLowerCase();
-    const officialResults =
-      !registryId || registryId === 'npm'
-        ? await Promise.allSettled(
-            this.classification
-              .officialPackages()
-              .filter(({ name }) => !normalizedQuery || name.toLowerCase().includes(normalizedQuery))
-              .map(({ name }) => this.marketplacePackage(name)),
-          )
-        : [];
+    // No hardcoded package list: official plugins are discovered through the same
+    // keyword search as community plugins and classified by publisher and scope.
     const results = new Map(
-      [
-        ...responses.flatMap(({ results }) => results),
-        ...officialResults.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])),
-      ].map((plugin) => [`${plugin.registry.id}:${plugin.name}`, plugin]),
+      responses
+        .flatMap(({ results }) => results)
+        .map((plugin) => [`${plugin.registry.id}:${plugin.name}`, plugin]),
     );
     return {
       results: [...results.values()],
@@ -320,16 +401,21 @@ export class NpmPluginService implements OnModuleInit {
     return this.marketplacePlugin(pkg, registry, registryPublisher(pkg) ?? registryPublisher(metadata), name);
   }
 
-  async install(name: string, spec: string, registryId?: string): Promise<InstalledNpmPlugin> {
+  async install(
+    name: string,
+    spec: string,
+    registryId?: string,
+    audit?: NpmPluginAuditState,
+  ): Promise<InstalledNpmPlugin> {
     if (this.listInstalled().some((plugin) => plugin.name === name)) {
       throw new BadRequestException('Package is already installed; use the replacement endpoint');
     }
     const registry = await this.registry(registryId);
     const { version, metadata } = await this.resolveVersion(name, spec, registry);
-    return this.installFromRegistry(name, version, registry, undefined, [], spec, metadata);
+    return this.installFromRegistry(name, version, registry, undefined, [], spec, metadata, audit);
   }
 
-  async removeInstalled(name: string): Promise<void> {
+  async removeInstalled(name: string, deferRestart = false): Promise<void> {
     await this.mutateInstalls(async () => {
       const installed = this.installed(name);
       const target = join(PluginService.PLUGIN_PATH, installed.installPath);
@@ -358,7 +444,7 @@ export class NpmPluginService implements OnModuleInit {
       }
       // Data and secrets are deliberately retained. Removing them is a separate,
       // destructive recovery operation rather than part of package deactivation.
-      new PluginService().requestRestart();
+      if (!deferRestart) new PluginService().requestRestart();
     });
   }
 
@@ -404,6 +490,7 @@ export class NpmPluginService implements OnModuleInit {
     version: string,
     approvedPermissionAdditions: string[] = [],
     approvedMajorVersion = false,
+    audit?: NpmPluginAuditState,
   ): Promise<InstalledNpmPlugin> {
     const installed = this.installed(name);
     const candidates = await this.installedVersionCandidates(name);
@@ -424,6 +511,8 @@ export class NpmPluginService implements OnModuleInit {
       installed,
       approvedPermissionAdditions,
       installed.requestedSpec,
+      undefined,
+      audit,
     );
   }
 
@@ -614,7 +703,15 @@ export class NpmPluginService implements OnModuleInit {
       _npmUser?: unknown;
       maintainers?: unknown;
     },
+    audit?: NpmPluginAuditState,
   ): Promise<InstalledNpmPlugin> {
+    if (audit)
+      Object.assign(audit, {
+        newVersion: version,
+        registryId: registry.id,
+        registryUrl: registry.url,
+        ...(replacing ? { oldVersion: replacing.version } : {}),
+      });
     const metadata =
       resolvedMetadata ??
       ((await this.packageMetadata(name, registry.id)) as {
@@ -630,6 +727,11 @@ export class NpmPluginService implements OnModuleInit {
 
     const tarball = await this.download(packageVersion.dist.tarball, registry);
     verifyIntegrity(tarball, packageVersion.dist);
+    if (audit)
+      Object.assign(audit, {
+        integrityResult: 'verified',
+        integrity: distIntegrity(packageVersion.dist),
+      });
     await mkdir(PluginService.PLUGIN_PATH, { recursive: true });
     const staging = await mkdtemp(join(PluginService.PLUGIN_PATH, '.npm-staging-'));
     try {
@@ -646,6 +748,17 @@ export class NpmPluginService implements OnModuleInit {
       validateEntries(source, manifest);
       await writeFile(join(source, 'plugin.json'), JSON.stringify(manifest));
 
+      if (audit)
+        Object.assign(audit, {
+          permissionAdditions: JSON.stringify(
+            manifest.permissions.filter((permission) => !replacing?.permissions.includes(permission)),
+          ),
+          permissionRemovals: JSON.stringify(
+            (replacing?.permissions ?? []).filter(
+              (permission) => !manifest.permissions.some((value) => value === permission),
+            ),
+          ),
+        });
       if (replacing) {
         const permissionAdditions = manifest.permissions.filter(
           (permission) => !replacing.permissions.includes(permission),
@@ -660,13 +773,14 @@ export class NpmPluginService implements OnModuleInit {
 
       const publisher = registryPublisher(packageVersion) ?? registryPublisher(metadata);
       const classification = this.classification.classify(name, registry.url, publisher);
+      if (audit) audit.classification = classification.kind;
       const installed: InstalledNpmPlugin = {
         name,
         version,
         requestedSpec,
         registryId: registry.id,
         registryUrl: registry.url,
-        integrity: packageVersion.dist.integrity ?? `sha1-${packageVersion.dist.shasum}`,
+        integrity: distIntegrity(packageVersion.dist),
         installPath: pluginDirectory(name),
         permissions: manifest.permissions,
         compatibility: { host: pkg.attraccess.host, sdk: pkg.attraccess.sdk },
@@ -687,7 +801,8 @@ export class NpmPluginService implements OnModuleInit {
         if (!replacing && this.listInstalled().some((plugin) => plugin.name === name)) {
           throw new BadRequestException('Package is already installed; use the replacement endpoint');
         }
-        const activation = await this.activate(source, name);
+        if (audit) audit.activationOutcome = 'failed';
+        const activation = await this.activate(source, name, audit);
         // Do not expose replacement code as active until its prior quarantine has
         // been removed. If that cleanup fails, this state remains safely disabled.
         const pendingActivation: InstalledNpmPlugin = {
@@ -696,9 +811,9 @@ export class NpmPluginService implements OnModuleInit {
           lastError: 'Plugin activation is pending quarantine cleanup.',
         };
         try {
-          await this.writeState(pendingActivation);
+          await this.writeState(pendingActivation, this.pendingAudit(audit));
         } catch (error) {
-          await this.rollbackActivation(activation);
+          await this.rollbackForAudit(activation, audit);
           throw error;
         }
         try {
@@ -717,11 +832,12 @@ export class NpmPluginService implements OnModuleInit {
             // failure cannot make a quarantined package appear active.
             this.logger.error(`Failed to record quarantine cleanup failure for ${name}`, stateError);
           }
-          new PluginService().requestRestart();
+          if (audit) Object.assign(audit, { activationOutcome: 'quarantined', restartRequested: 1 });
+          if (!audit?.context) new PluginService().requestRestart();
           return quarantined;
         }
         try {
-          await this.writeState(installed);
+          await this.writeState(installed, this.pendingAudit(audit));
         } catch (error) {
           // The npm record alone is not used during module discovery, so restore
           // the real quarantine before returning this failed activation.
@@ -735,7 +851,7 @@ export class NpmPluginService implements OnModuleInit {
           } catch (quarantineError) {
             this.logger.error(`Failed to quarantine installed package ${name}`, quarantineError);
             try {
-              await this.rollbackActivation(activation);
+              await this.rollbackForAudit(activation, audit);
             } catch (rollbackError) {
               this.logger.error(`Failed to roll back installed package ${name}`, rollbackError);
               try {
@@ -743,7 +859,7 @@ export class NpmPluginService implements OnModuleInit {
                 // Removing the failed package makes the original backup eligible
                 // for restoration. Do not restore its active record until this
                 // retry has put the backup back at the discovery target.
-                await this.rollbackActivation(activation);
+                await this.rollbackForAudit(activation, audit);
               } catch (isolationError) {
                 throw new AggregateError(
                   [error, quarantineError, rollbackError, isolationError],
@@ -752,7 +868,7 @@ export class NpmPluginService implements OnModuleInit {
               }
             }
             try {
-              if (replacing) await this.writeState(replacing);
+              if (replacing) await this.writeState(replacing, null);
               else await this.writeStateWithout(name);
             } catch (stateError) {
               throw new AggregateError(
@@ -768,7 +884,14 @@ export class NpmPluginService implements OnModuleInit {
         } catch (error) {
           this.logger.error(`Failed to remove backup for ${name}`, error);
         }
-        new PluginService().requestRestart();
+        // Host migrations and runtime activation happen after restart, not during download.
+        if (audit)
+          Object.assign(audit, {
+            activationOutcome: 'restart-requested',
+            migrationOutcome: 'pending-restart',
+            restartRequested: 1,
+          });
+        if (!audit?.context) new PluginService().requestRestart();
         return installed;
       });
     } finally {
@@ -776,8 +899,33 @@ export class NpmPluginService implements OnModuleInit {
     }
   }
 
+  private pendingAudit(state?: NpmPluginAuditState): PendingNpmPluginAudit | undefined {
+    if (!state?.context) return undefined;
+    const { context, ...details } = state;
+    return {
+      ...context,
+      migrationOutcome: 'pending-restart',
+      details: {
+        ...details,
+        requestedSpec: safeRequestedSpec(state.requestedSpec),
+        ...(state.registryUrl ? { registryUrl: safeAuditOrigin(state.registryUrl) } : {}),
+      },
+    };
+  }
+
+  private async rollbackForAudit(activation: { target: string; backup: string }, audit?: NpmPluginAuditState) {
+    try {
+      await this.rollbackActivation(activation);
+      if (audit) audit.rollbackOutcome = 'succeeded';
+    } catch (error) {
+      if (audit) audit.rollbackOutcome = 'failed';
+      throw error;
+    }
+  }
+
   listInstalled(): InstalledNpmPlugin[] {
-    return readInstalledNpmPlugins().map((plugin) => {
+    return readInstalledNpmPlugins().map(({ pendingAudit, ...plugin }) => {
+      void pendingAudit;
       const classification = this.classification.classify(plugin.name, plugin.registryUrl, plugin.publisher);
       return { ...plugin, classification: classification.kind, classificationReason: classification.reason };
     });
@@ -855,7 +1003,11 @@ export class NpmPluginService implements OnModuleInit {
     }
   }
 
-  private async activate(source: string, name: string): Promise<{ target: string; backup: string }> {
+  private async activate(
+    source: string,
+    name: string,
+    audit?: NpmPluginAuditState,
+  ): Promise<{ target: string; backup: string }> {
     const target = join(PluginService.PLUGIN_PATH, pluginDirectory(name));
     const backupDirectory = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY);
     const backup = join(backupDirectory, backupDirectoryName(pluginDirectory(name)));
@@ -865,7 +1017,15 @@ export class NpmPluginService implements OnModuleInit {
       await rename(source, target);
       return { target, backup };
     } catch (error) {
-      if (existsSync(backup) && !existsSync(target)) await rename(backup, target);
+      if (existsSync(backup) && !existsSync(target)) {
+        try {
+          await rename(backup, target);
+          if (audit) audit.rollbackOutcome = 'succeeded';
+        } catch (rollbackError) {
+          if (audit) audit.rollbackOutcome = 'failed';
+          throw rollbackError;
+        }
+      }
       throw error;
     }
   }
@@ -886,12 +1046,18 @@ export class NpmPluginService implements OnModuleInit {
     return rm(backup, { recursive: true, force: true });
   }
 
-  private async writeState(installed: InstalledNpmPlugin): Promise<void> {
-    const records = this.listInstalled().filter(({ name }) => name !== installed.name);
+  private async writeState(installed: InstalledNpmPlugin, pendingAudit?: PendingNpmPluginAudit | null): Promise<void> {
+    const previous = readInstalledNpmPlugins();
+    const records = previous.filter(({ name }) => name !== installed.name);
+    const pending =
+      pendingAudit === undefined
+        ? previous.find((plugin) => plugin.name === installed.name)?.pendingAudit
+        : pendingAudit;
+    const stored = { ...installed, ...(pending ? { pendingAudit: pending } : {}) };
     const statePath = join(PluginService.PLUGIN_PATH, STATE_FILE);
     const temporaryPath = `${statePath}.${randomUUID()}.tmp`;
     try {
-      await writeFile(temporaryPath, JSON.stringify([...records, installed]));
+      await writeFile(temporaryPath, JSON.stringify([...records, stored]));
       await rename(temporaryPath, statePath);
     } catch (error) {
       await rm(temporaryPath, { force: true });
@@ -903,7 +1069,10 @@ export class NpmPluginService implements OnModuleInit {
     const statePath = join(PluginService.PLUGIN_PATH, STATE_FILE);
     const temporaryPath = `${statePath}.${randomUUID()}.tmp`;
     try {
-      await writeFile(temporaryPath, JSON.stringify(this.listInstalled().filter((plugin) => plugin.name !== name)));
+      await writeFile(
+        temporaryPath,
+        JSON.stringify(readInstalledNpmPlugins().filter((plugin) => plugin.name !== name)),
+      );
       await rename(temporaryPath, statePath);
     } catch (error) {
       await rm(temporaryPath, { force: true });
@@ -1034,7 +1203,7 @@ function packageVersion(directory: string): string | undefined {
     return undefined;
   }
 }
-function readInstalledNpmPlugins(): InstalledNpmPlugin[] {
+function readInstalledNpmPlugins(): Array<InstalledNpmPlugin & { pendingAudit?: PendingNpmPluginAudit }> {
   const statePath = join(PluginService.PLUGIN_PATH, STATE_FILE);
   if (!existsSync(statePath)) return [];
   try {
@@ -1244,10 +1413,12 @@ function publisherName(value: unknown): string | null {
   return typeof username === 'string' ? username : typeof name === 'string' ? name : null;
 }
 
-function distIntegrity(pkg: NpmPluginPackage): string | null {
-  const dist = (pkg as NpmPluginPackage & { dist?: { integrity?: unknown; shasum?: unknown } }).dist;
+function distIntegrity(value: { integrity?: unknown; shasum?: unknown } | NpmPluginPackage): string | null {
+  const dist = ('dist' in value ? value.dist : value) as { integrity?: unknown; shasum?: unknown };
   if (typeof dist?.integrity === 'string') return dist.integrity;
-  return typeof dist?.shasum === 'string' ? `sha1-${dist.shasum}` : null;
+  return typeof dist?.shasum === 'string'
+    ? `sha1-${Buffer.from(dist.shasum, 'hex').toString('base64')}`
+    : null;
 }
 
 function packageProvenance(pkg: NpmPluginPackage): string | null {

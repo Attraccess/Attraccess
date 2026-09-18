@@ -1,13 +1,16 @@
 #include "display.hpp"
+#include "theme.hpp"
 #include <vector>
 #include <string>
 #include <functional>
 
 #include "../utils.hpp"
 #include "platform.hpp"
+#ifndef ATTRACTAP_HOST
 #include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#endif
 
 #ifdef HAS_IO_EXPANDER
 #include "../ioexpander/ioexpander.hpp"
@@ -111,11 +114,15 @@ static void lvgl_log_cb(lv_log_level_t level, const char *buf)
 uint8_t Display::reboot_count = 0;
 void Display::increase_reboot(void *arg)
 {
+#ifndef ATTRACTAP_HOST
     Display::reboot_count++;
     if (Display::reboot_count == 30)
     {
         esp_restart();
     }
+#else
+    (void)arg;
+#endif
 }
 
 uint32_t Display::tick_cb()
@@ -123,13 +130,42 @@ uint32_t Display::tick_cb()
     return millis();
 }
 
-#ifdef HAS_IO_EXPANDER
+#ifdef ATTRACTAP_HOST
+void Display::setup(IDisplayDriver &hostDriver)
+#elif defined(HAS_IO_EXPANDER)
 void Display::setup(IOExpander *ioExpander)
 #else
 void Display::setup()
 #endif
 {
     Display::logger.info("Initializing");
+
+#ifdef ATTRACTAP_HOST
+    Display::driver = &hostDriver;
+    if (!Display::driver->begin())
+    {
+        Display::logger.error("Host display driver init failed");
+        return;
+    }
+    Display::screenWidth = Display::driver->width();
+    Display::screenHeight = Display::driver->height();
+    lv_init();
+    lv_tick_set_cb(Display::tick_cb);
+    static std::vector<uint16_t> buffer;
+    buffer.resize(Display::screenWidth * 80);
+    Display::disp = lv_display_create(static_cast<int32_t>(Display::screenWidth), static_cast<int32_t>(Display::screenHeight));
+    lv_display_set_color_format(Display::disp, LV_COLOR_FORMAT_RGB565);
+    lv_display_set_flush_cb(Display::disp, Display::flush);
+    lv_display_set_buffers(Display::disp, buffer.data(), nullptr, buffer.size() * sizeof(buffer.front()), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    Display::indev = lv_indev_create();
+    lv_indev_set_type(Display::indev, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_read_cb(Display::indev, Display::touchpad_read);
+    DisplayTheme::init(Display::disp);
+    Display::initDeviceOverlay();
+    Display::initDrawer();
+    Display::transitionToScreen(&Display::bootScreen);
+    Display::logger.info("Host display setup done");
+#else
 
 #if defined(DISPLAY_DRIVER_GT911)
 #ifdef HAS_IO_EXPANDER
@@ -253,29 +289,7 @@ void Display::setup()
         .name = "reboot",
         .skip_unhandled_events = false};
 
-    lv_theme_t *base_theme = lv_theme_default_init(
-        disp,
-        lv_palette_main(LV_PALETTE_BLUE),       /* Primary color */
-        lv_palette_lighten(LV_PALETTE_BLUE, 2), /* Secondary color */
-        false,                                  /* Dark mode */
-        &lv_font_montserrat_18                  /* Normal font */
-    );
-
-    static lv_style_t global_bg_style;
-    lv_style_init(&global_bg_style);
-
-    /* Background gradient */
-    lv_style_set_bg_color(&global_bg_style, lv_color_hex(0x1F2C47));
-    lv_style_set_bg_grad_color(&global_bg_style, lv_color_hex(0x364C7C));
-    lv_style_set_bg_grad_dir(&global_bg_style, LV_GRAD_DIR_VER);
-    lv_style_set_bg_opa(&global_bg_style, LV_OPA_COVER);
-
-    /* Default text color */
-    lv_style_set_text_color(&global_bg_style, lv_color_white());
-
-    lv_obj_t *scr = lv_disp_get_scr_act(disp);
-    lv_obj_add_style(scr, &global_bg_style, 0);
-    lv_display_set_theme(disp, base_theme);
+    DisplayTheme::init(disp);
 
     Display::initDeviceOverlay();
     Display::initDrawer();
@@ -295,10 +309,12 @@ void Display::setup()
     xTaskCreatePinnedToCore(Display::renderTask, "LvglTask", 8192, nullptr, 4, nullptr, 1);
 
     Display::logger.info("Setup done");
+#endif
 }
 
 void Display::renderTask(void *parameter)
 {
+#ifndef ATTRACTAP_HOST
     (void)parameter;
     while (true)
     {
@@ -319,13 +335,20 @@ void Display::renderTask(void *parameter)
         }
         vTaskDelay(pdMS_TO_TICKS(delayMs));
     }
+#else
+    (void)parameter;
+#endif
 }
 
 void Display::asyncCall(lv_async_cb_t cb, void *user_data)
 {
+#ifdef ATTRACTAP_HOST
+    lv_async_call(cb, user_data);
+#else
     lv_lock();
     lv_async_call(cb, user_data);
     lv_unlock();
+#endif
 }
 
 bool Display::hasTouchInput()
@@ -335,6 +358,11 @@ bool Display::hasTouchInput()
 
 void Display::loop()
 {
+#ifdef ATTRACTAP_HOST
+    Display::updateNetworkQualityOverlay();
+    Display::advanceScreenRouter();
+    return;
+#endif
     // Runs on the main application loop; rendering itself lives on LvglTask
     // (renderTask). Everything below mutates LVGL objects, so hold lv_lock for
     // the duration (recursive FreeRTOS mutex, also taken by lv_timer_handler).

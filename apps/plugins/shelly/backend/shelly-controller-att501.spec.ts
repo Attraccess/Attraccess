@@ -9,13 +9,7 @@ describe('ShellyController ATT-501 firmware', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
-    controller = new ShellyController(
-      registry as never,
-      probe as never,
-      {} as never,
-      {} as never,
-      firmware as never
-    );
+    controller = new ShellyController(registry as never, probe as never, {} as never, {} as never, firmware as never);
   });
 
   it('keeps the overview usable when a single device fails its firmware check', async () => {
@@ -41,14 +35,16 @@ describe('ShellyController ATT-501 firmware', () => {
     await expect(controller.startFirmwareUpdate(1, {})).resolves.toEqual({ started: true, stage: 'stable' });
     expect(firmware.startUpdate).toHaveBeenCalledWith(
       { ipAddress: '192.168.1.10', generation: 2, username: undefined, currentPassword: undefined },
-      'stable'
+      'stable',
     );
   });
 
   it('rejects an unknown update stage', async () => {
     registry.findById.mockResolvedValue({ id: 1, ipAddress: '192.168.1.10', generation: 2 });
 
-    await expect(controller.startFirmwareUpdate(1, { stage: 'nightly' as never })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(controller.startFirmwareUpdate(1, { stage: 'nightly' as never })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
     expect(firmware.startUpdate).not.toHaveBeenCalled();
   });
 });

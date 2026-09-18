@@ -19,7 +19,7 @@ describe('ShellyFirmwareService (ATT-501)', () => {
         old_version: '20221027-102237/v1.12.1',
         new_version: '20230913-114150/v1.14.0',
         beta_version: '20231107-165007/v1.14.1-rc1',
-      })
+      }),
     );
 
     const status = await service.getStatus({ ipAddress: '192.168.1.10', generation: 1 });
@@ -36,7 +36,13 @@ describe('ShellyFirmwareService (ATT-501)', () => {
 
   it('reports Gen1 devices without an update as up to date', async () => {
     fetchMock.mockResolvedValueOnce(
-      jsonResponse({ status: 'idle', has_update: false, old_version: 'v1.14.0', new_version: 'v1.14.0', beta_version: 'v1.14.0' })
+      jsonResponse({
+        status: 'idle',
+        has_update: false,
+        old_version: 'v1.14.0',
+        new_version: 'v1.14.0',
+        beta_version: 'v1.14.0',
+      }),
     );
 
     const status = await service.getStatus({ ipAddress: '192.168.1.10', generation: 1 });
@@ -45,9 +51,13 @@ describe('ShellyFirmwareService (ATT-501)', () => {
   });
 
   it('surfaces the Gen1 OTA progress state while it installs', async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse({ status: 'updating', has_update: true, old_version: 'v1.12.1', new_version: 'v1.14.0' }));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ status: 'updating', has_update: true, old_version: 'v1.12.1', new_version: 'v1.14.0' }),
+    );
 
-    await expect(service.getStatus({ ipAddress: '192.168.1.10', generation: 1 })).resolves.toMatchObject({ state: 'updating' });
+    await expect(service.getStatus({ ipAddress: '192.168.1.10', generation: 1 })).resolves.toMatchObject({
+      state: 'updating',
+    });
   });
 
   it('reads Gen2+ versions from GetDeviceInfo and CheckForUpdate', async () => {
@@ -81,7 +91,10 @@ describe('ShellyFirmwareService (ATT-501)', () => {
 
     await service.startUpdate({ ipAddress: '192.168.1.10', generation: 1 }, 'stable');
 
-    expect(fetchMock).toHaveBeenCalledWith('http://192.168.1.10/ota?update=true', expect.objectContaining({ method: 'GET' }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://192.168.1.10/ota?update=true',
+      expect.objectContaining({ method: 'GET' }),
+    );
   });
 
   it('triggers the Gen1 beta OTA over /ota?beta', async () => {
@@ -99,7 +112,7 @@ describe('ShellyFirmwareService (ATT-501)', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'http://192.168.1.11/rpc/Shelly.Update',
-      expect.objectContaining({ method: 'POST', body: JSON.stringify({ stage: 'beta' }) })
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ stage: 'beta' }) }),
     );
   });
 });

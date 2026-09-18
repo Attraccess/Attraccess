@@ -2,7 +2,7 @@ import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 import { parseNpmPluginPackage } from './npm-plugin-contract';
 
 const validPackage = {
-  name: '@attraccess/plugin-shelly',
+  name: '@attraccess/plugin-example',
   version: '1.2.3',
   keywords: ['attraccess-plugin'],
   peerDependencies: {
@@ -10,7 +10,7 @@ const validPackage = {
     '@attraccess/plugins-frontend-sdk': '^1.9.0',
   },
   attraccess: {
-    displayName: 'Shelly',
+    displayName: 'Example',
     host: '^1.9.0',
     backend: 'dist/index.js',
     frontend: 'frontend/remoteEntry.js',
@@ -25,7 +25,7 @@ describe('parseNpmPluginPackage', () => {
   it('maps the npm contract into the existing loader manifest', () => {
     const { manifest } = parseNpmPluginPackage(validPackage, '1.9.0');
     expect(manifest).toMatchObject({
-      name: '@attraccess/plugin-shelly', version: '1.2.3', permissions: [PluginPermission.DATABASE_ACCESS],
+      name: '@attraccess/plugin-example', version: '1.2.3', permissions: [PluginPermission.DATABASE_ACCESS],
       main: { backend: { directory: 'dist', entryPoint: 'index.js' }, frontend: { directory: 'frontend', entryPoint: 'remoteEntry.js', styles: 'style.css' } },
     });
   });

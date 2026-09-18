@@ -13,6 +13,9 @@ import { ResourceIntroductionChangedEvent } from './events/resource-introduction
 import { MetricsService } from '../../metrics/metrics.service';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
+import { ResourceRetrainingService } from '../retraining/resourceRetraining.service';
+import { AuditService } from '../../audit/audit.service';
+import { ResourceAuditOrigin } from '../../audit/audit-policy';
 
 @Injectable()
 export class ResourceIntroductionsService {
@@ -27,6 +30,8 @@ export class ResourceIntroductionsService {
     private readonly eventEmitter: EventEmitter2,
     private readonly metricsService: MetricsService,
     private readonly notifications: NotificationDispatchService,
+    private readonly retraining: ResourceRetrainingService,
+    private readonly audit: AuditService,
   ) {}
 
   private notifyIntroductionChange(resourceId: number, userId: number, granted: boolean): void {
@@ -138,7 +143,9 @@ export class ResourceIntroductionsService {
     nextStatus: IntroductionHistoryAction,
     data?: UpdateResourceIntroductionDto,
     tutorUserId?: number,
-    performedByUserId = userId,
+    performedByUserId?: number | null,
+    authenticationMethod?: 'session' | 'api-token' | null,
+    apiTokenId?: number | null,
   ) {
     this.logger.debug(`Updating introduction status to ${nextStatus} for resourceId: ${resourceId}, userId: ${userId}`);
     let resourceIntroduction = await this.getIntroductionOfUser(resourceId, userId);
@@ -153,13 +160,16 @@ export class ResourceIntroductionsService {
     }
 
     const previousHistoryItem = await this.getLastHistoryItemOfIntroduction(resourceIntroduction.id);
+    const retrainingWasDue =
+      nextStatus === IntroductionHistoryAction.GRANT &&
+      (await this.retraining.getIntroductionRetrainingStatus(resourceIntroduction.id))?.isDue === true;
 
     this.logger.debug(`Creating new history item with action: ${nextStatus}`);
     const historyItem = this.resourceIntroductionHistoryItemRepository.create({
       introduction: { id: resourceIntroduction.id },
       action: nextStatus,
       comment: data?.comment,
-      performedByUser: { id: performedByUserId },
+      performedByUser: { id: performedByUserId ?? userId },
     });
 
     const savedHistoryItem = await this.resourceIntroductionHistoryItemRepository.save(historyItem);
@@ -172,7 +182,33 @@ export class ResourceIntroductionsService {
     if (previousHistoryItem?.action !== nextStatus && (previousHistoryItem || nextStatus === IntroductionHistoryAction.GRANT)) {
       this.notifyIntroductionChange(resourceId, userId, nextStatus === IntroductionHistoryAction.GRANT);
     }
+    const retrainingIsDue =
+      nextStatus === IntroductionHistoryAction.GRANT &&
+      (await this.retraining.getIntroductionRetrainingStatus(resourceIntroduction.id))?.isDue === true;
+    if (retrainingWasDue && !retrainingIsDue) {
+      const retrainingOrigin: ResourceAuditOrigin =
+        performedByUserId === null
+          ? { actorId: null }
+          : {
+              actorId: performedByUserId ?? userId,
+              authenticationMethod: authenticationMethod === undefined ? 'session' : authenticationMethod,
+              ...(apiTokenId === undefined || apiTokenId === null ? {} : { apiTokenId }),
+            };
+      await this.audit.recordResource({
+        action: 'retraining.cleared',
+        ...retrainingOrigin,
+        subjectId: resourceId,
+        details: { introductionId: resourceIntroduction.id, usageUserId: userId },
+      });
+    }
 
+    if (performedByUserId !== undefined) {
+      await this.audit.recordResource({
+        action: nextStatus === IntroductionHistoryAction.GRANT ? 'introduction.granted' : 'introduction.revoked',
+        actorId: performedByUserId, authenticationMethod, apiTokenId, subjectId: resourceId,
+        details: { recipientUserId: userId, ...(tutorUserId === undefined ? {} : { tutorUserId }) },
+      });
+    }
     return savedHistoryItem;
   }
 
@@ -205,7 +241,12 @@ export class ResourceIntroductionsService {
     resourceId: number,
     userId: number,
     data?: UpdateResourceIntroductionDto,
-    options?: { tutorUserId?: number; performedByUserId?: number },
+    options?: {
+      tutorUserId?: number;
+      performedByUserId?: number | null;
+      authenticationMethod?: 'session' | 'api-token' | null;
+      apiTokenId?: number | null;
+    },
   ): Promise<ResourceIntroductionHistoryItem> {
     this.logger.debug(`Granting introduction for resourceId: ${resourceId}, userId: ${userId}`);
     const result = await this.updateIntroductionStatus(
@@ -215,6 +256,8 @@ export class ResourceIntroductionsService {
       data,
       options?.tutorUserId,
       options?.performedByUserId,
+      options?.authenticationMethod,
+      options?.apiTokenId,
     );
     this.metricsService.resourceIntroductionsTotal.inc();
     this.logger.debug(`Grant operation completed for resourceId: ${resourceId}, userId: ${userId}`);
@@ -225,7 +268,11 @@ export class ResourceIntroductionsService {
     resourceId: number,
     userId: number,
     data?: UpdateResourceIntroductionDto,
-    options?: { performedByUserId?: number },
+    options?: {
+      performedByUserId?: number | null;
+      authenticationMethod?: 'session' | 'api-token' | null;
+      apiTokenId?: number | null;
+    },
   ): Promise<ResourceIntroductionHistoryItem> {
     this.logger.debug(`Revoking introduction for resourceId: ${resourceId}, userId: ${userId}`);
     const result = await this.updateIntroductionStatus(
@@ -235,6 +282,8 @@ export class ResourceIntroductionsService {
       data,
       undefined,
       options?.performedByUserId,
+      options?.authenticationMethod,
+      options?.apiTokenId,
     );
     this.logger.debug(`Revoke operation completed for resourceId: ${resourceId}, userId: ${userId}`);
     return result;

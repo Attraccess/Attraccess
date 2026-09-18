@@ -98,7 +98,10 @@ export class ShellyFirmwareService {
   private async getGen2Status(target: DeviceTarget & DeviceCredentials): Promise<FirmwareStatus> {
     const [info, check] = await Promise.all([
       this.http.getJson(`http://${target.ipAddress}/rpc/Shelly.GetDeviceInfo`, target) as Promise<{ ver?: string }>,
-      this.http.getJson(`http://${target.ipAddress}/rpc/Shelly.CheckForUpdate`, target) as Promise<Gen2CheckForUpdateResponse>,
+      this.http.getJson(
+        `http://${target.ipAddress}/rpc/Shelly.CheckForUpdate`,
+        target,
+      ) as Promise<Gen2CheckForUpdateResponse>,
     ]);
 
     const stable = check?.stable?.version ?? null;

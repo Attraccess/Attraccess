@@ -12,6 +12,8 @@ One firmware per hardware flavor, defined by a file in `variants/`:
 | `attractap-touch-v2` | ESP32-S3 DevKitC (V4 hardware) | as above, 16-bit PCA9555-compatible expander @0x24, PN532 @0x64 |
 | `attractap-touch-ethernet` | Adafruit Qualia S3 RGB666 | TL040WVS03 panel via XCA9554 expander, FocalTech touch, W5500 ethernet |
 | `attractap-lite-ethernet` | Adafruit Qualia S3 | headless, WS2812 24-LED ring, W5500 ethernet |
+| `attractap-touch-demo` | V3 display hardware | Offline demo API and demo settings |
+| `attractap-touch-v2-demo` | V4 display hardware | Offline demo API, demo settings and power button |
 
 Each variant file sets the compile definitions (pins, feature flags, firmware
 name) and the source subtrees excluded for that hardware. The firmware version
@@ -56,6 +58,42 @@ Note: `tools/build_individual_ca_certs.py` needs network access on the first
 run (it downloads Mozilla's CA bundle, cached for 7 days). Run it once before
 `idf.py` when building without `build_firmwares.py`.
 
+## Display Theme
+
+All display variants use the web frontend's dark palette: deep blue-green
+backgrounds (`#162124`), raised surfaces (`#1E2C2F`), water-blue accents
+(`#82C4CE`), light text, small corners and restrained borders. Shared styles live
+in `src/display/theme.hpp` and `theme.cpp`, including pressed, disabled, focused
+and keyboard states. Green, amber and red retain their status/safety meanings.
+This is the firmware's fixed dark theme; the web application's saved dark-mode
+preference does not configure a reader. Lite's LED status colors are unchanged.
+
+The logos preserve the approved full-color mascot, with light vector lettering
+for dark backgrounds. From the repository root,
+run `node scripts/generate-brand-assets.mjs` to regenerate the 133 x 40 and
+400 x 120 `*.rgb565a8` assets alongside the web artwork, or add `--check` to
+verify them without writing files. They contain a little-endian RGB565 color
+plane followed by an A8 alpha plane. ESP-IDF embeds these binary assets only
+for display variants; the small image-descriptor headers are handwritten.
+The lockscreen, resource list and no-resources screens use a bottom-left square
+crop of `apps/frontend/public/login-wallpaper-RAL5020.png`, preserving the raccoon
+and the rings. The same brand generator produces a 480 x 480 PNG preview at
+`apps/frontend/public/login-wallpaper-RAL5020-480.png` and the firmware asset.
+`lockscreen.rgb565` is a 460,800-byte little-endian RGB565
+asset shared by those screens, embedded once with four-byte alignment through
+`logos.S.in`. No generated C++ pixel arrays are needed.
+
+## Host Tests
+
+From the repository root, run `pnpm nx run attractap-firmware:test`. It runs
+SupervisionFlow logic tests and the [real LVGL host-rendering harness](tests/display-theme/README.md).
+The latter checks theme states, both logo assets, selected production screens
+and deterministic 480 x 480 rendering. The dedicated firmware CI runs both.
+
+Host renders are not photographs or tests of a physical panel. Confirm actual
+device colors, touch/keyboard interactions and heap headroom on the target
+hardware before deployment.
+
 ## Flashing
 
 - **Web flasher (initial install):** the Attraccess frontend flashes the merged
@@ -64,6 +102,29 @@ run (it downloads Mozilla's CA bundle, cached for 7 days). Run it once before
 - **CLI:** `python -m esptool --chip esp32s3 write_flash 0x0 firmware_output/<name>_<variant>.bin`
 - **OTA:** upload `firmware_output` via the Attraccess server; updates stream to
   the readers over the websocket.
+
+## Latin-1 Font Smoke Test
+
+CMake generates uncompressed Montserrat fonts in each build directory for sizes
+10, 14, 16, 18, 20, 24, 26, 28, 32, and 36. The original configured sizes remain
+unchanged. Firmware, desktop, and host rendering tests share
+`tools/latin1_fonts.cmake`. Builds require Node.js/npm (`npx`) and curl; the first
+build downloads the pinned LVGL 9.3.0 font source (SHA-256 verified) and
+`lv_font_conv@1.5.3`. Subsequent builds reuse their generated files. Do not commit
+the generated C files. For standalone generation, run
+`tools/generate_latin1_fonts.sh` (outputs to the ignored `.cache/latin1-fonts/`).
+
+On a touch device, verify `ÄÖÜ äöü ß | München, Größe, für` in resource names and
+descriptions, form labels/descriptions/placeholders, select options, text editors
+and value previews, project names, popup messages, introducer lists, health
+reasons, and flow-button labels. Also verify a signed-in username at 10px and an
+enrollment, reset, or supervision username at 36px. Check card statuses at 32px,
+supervision statuses and reset titles at 28px, empty-resource messages at 26px,
+and the PIN title at 32px. Compare ASCII text, hierarchy, wrapping, and clipping
+with the previous firmware. Confirm no missing-glyph boxes, preserved multiline
+layout, and that selecting an option such as `Size™` still submits its original
+value while displaying `SizeTM`. Host rendering checks do not replace this
+on-device smoke test.
 
 ## Serial provisioning console
 

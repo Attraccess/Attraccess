@@ -9,7 +9,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Observable, tap } from 'rxjs';
+import { catchError, from, mergeMap, Observable, throwError } from 'rxjs';
 import { Request, Response } from 'express';
 import { BruteForceProtectionService, RateLimitScope } from './brute-force.service';
 import { AuthAuditLogger, AuthAuditOutcome, AuthAuditType } from './auth-audit.logger';
@@ -49,33 +49,35 @@ export class AuthRateLimitInterceptor implements NestInterceptor {
       await this.bruteForce.assertIpAllowed(scope, ip);
     } catch (error) {
       setRetryAfter(response, error);
-      this.audit.log({ type: auditType, outcome: 'rate_limited', ip, userId, reason: 'ip_throttled' });
+      await this.audit.log({ type: auditType, outcome: 'rate_limited', ip, userId, reason: 'ip_throttled' });
       throw error;
     }
 
     return next.handle().pipe(
-      tap({
-        next: () => {
+      mergeMap((value) => {
           if (clearFailuresOnSuccess) {
             this.bruteForce
               .recordSuccess(scope, ip, userId)
               .catch((err) => this.logger.error(`recordSuccess failed for scope=${scope}`, err as Error));
           }
-          this.audit.log({ type: auditType, outcome: 'success', ip, userId });
-        },
-        error: (err: unknown) => {
+          return from(Promise.resolve(this.audit.log({ type: auditType, outcome: 'success', ip, userId }))).pipe(
+            mergeMap(() => [value]),
+          );
+      }),
+      catchError((err: unknown) => {
           this.bruteForce
             .recordFailure(scope, ip, userId)
             .catch((recErr) => this.logger.error(`recordFailure failed for scope=${scope}`, recErr as Error));
-          this.audit.log({
+          setRetryAfter(response, err);
+          return from(Promise.resolve(this.audit.log({
             type: auditType,
             outcome: classifyOutcome(err),
             ip,
             userId,
             reason: errorName(err),
-          });
-          setRetryAfter(response, err);
-        },
+          }))).pipe(
+            mergeMap(() => throwError(() => err)),
+          );
       }),
     );
   }

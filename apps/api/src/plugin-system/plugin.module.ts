@@ -33,12 +33,15 @@ import { PluginClassificationService } from './plugin-classification.service';
 import { SettingsModule } from '../settings/settings.module';
 import { loadPluginEntryExports } from './plugin-loader';
 import { registerPluginFlowNodes } from './plugin-flow-node-registry';
+import { registerPluginAuditDomains } from './plugin-audit-registry';
 import { PluginMqttService } from './plugin-mqtt.service';
 import { MqttModule } from '../mqtt/mqtt.module';
 import { MqttCredentialProvisioningService } from '../mqtt/mqtt-credential-provisioning.service';
 import { join } from 'path';
 import { ResourceFlowsExecutorService } from '../resources/flows/resource-flows-executor.service';
 import { EncryptionService } from '../encryption/encryption.service';
+import { PLUGIN_AUDIT_HOST_PROVIDER, PluginAuditHostProvider } from '@attraccess/plugins-backend-sdk';
+import { createPluginAuditContext } from './plugin-audit-context';
 
 @Global()
 @Module({})
@@ -144,11 +147,27 @@ export class PluginModule {
     // resolvable so the plugin can use context.getRepository(Entity).
     PluginModule.registerPluginEntities(manifest, (exported as PluginBackendModule)?.entities);
 
+    const context = PluginModule.createPluginContext(manifest);
+
     // Register any custom flow nodes contributed by this plugin.
-    const pluginFlowNodes = (exported as PluginBackendModule)?.flowNodes;
+    const configuredFlowNodes = (exported as PluginBackendModule)?.flowNodes;
+    const pluginFlowNodes =
+      typeof configuredFlowNodes === 'function' ? configuredFlowNodes(context) : configuredFlowNodes;
     if (pluginFlowNodes?.length) {
       registerPluginFlowNodes(manifest.name, pluginFlowNodes);
       this.logger.log(`Registered ${pluginFlowNodes.length} flow node(s) from plugin ${manifest.name}`);
+    }
+
+    // Register any audit domains contributed by this plugin. Throws on invalid or
+    // colliding declarations, which quarantines the plugin like any other load failure.
+    const configuredAuditDomains = (exported as PluginBackendModule)?.auditDomains;
+    const pluginAuditDomains =
+      typeof configuredAuditDomains === 'function' ? configuredAuditDomains(context) : configuredAuditDomains;
+    if (pluginAuditDomains?.length) {
+      registerPluginAuditDomains({ name: manifest.name, id: manifest.id }, pluginAuditDomains);
+      this.logger.log(
+        `Registered audit domain(s) ${pluginAuditDomains.map((declaration) => declaration.domain).join(', ')} from plugin ${manifest.name}`,
+      );
     }
 
     if (typeof (exported as PluginBackendModule)?.register !== 'function') {
@@ -158,7 +177,6 @@ export class PluginModule {
       return exported as DynamicModule;
     }
 
-    const context = PluginModule.createPluginContext(manifest);
     const pluginModule = (exported as PluginBackendModule).register(context);
     const credentialProvider = (exported as PluginBackendModule).credentialProvisioningProvider;
     if (credentialProvider) {
@@ -224,6 +242,12 @@ export class PluginModule {
 
   private static createPluginContext(manifest: LoadedPluginManifest): PluginContext {
     const base: PluginContext = {
+      audit: createPluginAuditContext(manifest.id, () =>
+        PluginModule.requireRef(PluginModule.moduleRef, 'ModuleRef').get<PluginAuditHostProvider>(
+          PLUGIN_AUDIT_HOST_PROVIDER,
+          { strict: false },
+        ),
+      ),
       manifest: PluginService.toManifestInfo(manifest),
       logger: new Logger(`Plugin:${manifest.name}`),
       mqtt: {

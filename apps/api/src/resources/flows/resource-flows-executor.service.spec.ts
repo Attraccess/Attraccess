@@ -262,6 +262,63 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     expect(service.startFlow).toHaveBeenCalledTimes(101);
   });
 
+  it('evaluates concurrent plugin triggers in order without waiting for earlier flow runs', async () => {
+    registerPluginFlowNodes('ordering-test', [
+      {
+        type: 'plugin.ordering-test.trigger',
+        label: 'Ordering test trigger',
+        configSchema: {},
+        inputs: [],
+        outputs: ['output'],
+        isInput: true,
+      },
+    ]);
+    const node = createNode({ id: 'trigger', type: 'plugin.ordering-test.trigger' as ResourceFlowNodeType });
+    let resolveFirstLookup!: (nodes: ResourceFlowNode[]) => void;
+    const firstLookup = new Promise<ResourceFlowNode[]>((resolve) => {
+      resolveFirstLookup = resolve;
+    });
+    (flowNodeRepository.find as jest.Mock).mockImplementationOnce(() => firstLookup).mockResolvedValue([node]);
+    let releaseFirstFlow!: () => void;
+    const firstFlow = new Promise<NodeProcessingResult[]>((resolve) => {
+      releaseFirstFlow = () => resolve([]);
+    });
+    jest
+      .spyOn(service, 'startFlow')
+      .mockImplementationOnce(() => firstFlow)
+      .mockResolvedValueOnce([]);
+    const matched: string[] = [];
+
+    const first = service.triggerPluginFlows(
+      'ordering-test',
+      'plugin.ordering-test.trigger',
+      () => {
+        matched.push('first');
+        return true;
+      },
+      {},
+    );
+    const second = service.triggerPluginFlows(
+      'ordering-test',
+      'plugin.ordering-test.trigger',
+      () => {
+        matched.push('second');
+        return true;
+      },
+      {},
+    );
+
+    await Promise.resolve();
+    expect(flowNodeRepository.find).toHaveBeenCalledTimes(1);
+    resolveFirstLookup([node]);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(matched).toEqual(['first', 'second']);
+    expect(service.startFlow).toHaveBeenCalledTimes(2);
+    releaseFirstFlow();
+    await Promise.all([first, second]);
+  });
+
   it('rejects a plugin attempting to trigger a node owned by another plugin', async () => {
     registerPluginFlowNodes('owner-plugin', [
       {
@@ -761,7 +818,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       {
         notes: 'Ended by bob',
       },
-      { skipFormSubmissions: true, skipNoteNotification: true },
+      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
     );
   });
 
@@ -864,7 +921,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         id: 'heartbeat-1',
         type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT,
         resourceId,
-        data: { identifier: 'Shelly', timeoutSeconds: 60, unhealthyReason: 'no signal' },
+        data: { identifier: 'ir-bridge', timeoutSeconds: 60, unhealthyReason: 'no signal' },
       });
       nodesById[inputNode.id] = inputNode;
       nodesById[heartbeatNode.id] = heartbeatNode;
@@ -877,13 +934,13 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
         expect.objectContaining({
           resourceId,
-          identifier: 'Shelly',
+          identifier: 'ir-bridge',
           status: 'healthy',
           source: 'heartbeat',
         }),
       );
 
-      const lastSeen = service.getHeartbeatLastSeen(resourceId, 'Shelly');
+      const lastSeen = service.getHeartbeatLastSeen(resourceId, 'ir-bridge');
       expect(lastSeen).toBeInstanceOf(Date);
     });
 
@@ -950,7 +1007,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         id: 'set-ovs',
         type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
         resourceId,
-        data: { identifier: 'Shelly', status: 'healthy', reason: 'fallback' },
+        data: { identifier: 'ir-bridge', status: 'healthy', reason: 'fallback' },
       });
       nodesById[inputNode.id] = inputNode;
       nodesById[setNode.id] = setNode;
@@ -965,7 +1022,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
         expect.objectContaining({
           resourceId,
-          identifier: 'Shelly',
+          identifier: 'ir-bridge',
           status: 'unhealthy',
           reason: 'lost wifi',
           source: 'payload',
@@ -1054,20 +1111,20 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         id: 'hb-timeout',
         type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT,
         resourceId,
-        data: { identifier: 'Shelly', timeoutSeconds: 60, unhealthyReason: 'no signal' },
+        data: { identifier: 'ir-bridge', timeoutSeconds: 60, unhealthyReason: 'no signal' },
       });
 
       (flowNodeRepository.find as jest.Mock).mockResolvedValueOnce([heartbeatNode]);
 
       const heartbeatLastSeen = (service as unknown as { heartbeatLastSeen: Map<string, Date> }).heartbeatLastSeen;
-      heartbeatLastSeen.set(`${resourceId}::Shelly`, new Date(Date.now() - 5 * 60 * 1000));
+      heartbeatLastSeen.set(`${resourceId}::ir-bridge`, new Date(Date.now() - 5 * 60 * 1000));
 
       await service.checkHealthHeartbeats();
 
       expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
         expect.objectContaining({
           resourceId,
-          identifier: 'Shelly',
+          identifier: 'ir-bridge',
           status: 'unhealthy',
           reason: 'no signal',
           source: 'heartbeat',

@@ -41,7 +41,7 @@ export class RabbitmqUsersController {
   upsert(
     @Param('mqttServerId', ParseIntPipe) mqttServerId: number,
     @Param('username') username: string,
-    @Body() dto: UpsertRabbitmqUserDto
+    @Body() dto: UpsertRabbitmqUserDto,
   ): Promise<void> {
     return this.users.upsertUser(mqttServerId, username, dto ?? {});
   }
@@ -49,7 +49,7 @@ export class RabbitmqUsersController {
   @Delete('users/:mqttServerId/:username')
   remove(
     @Param('mqttServerId', ParseIntPipe) mqttServerId: number,
-    @Param('username') username: string
+    @Param('username') username: string,
   ): Promise<void> {
     return this.users.deleteUser(mqttServerId, username);
   }
@@ -58,7 +58,7 @@ export class RabbitmqUsersController {
   setPermissions(
     @Param('mqttServerId', ParseIntPipe) mqttServerId: number,
     @Param('username') username: string,
-    @Body() dto: SetRabbitmqPermissionDto
+    @Body() dto: SetRabbitmqPermissionDto,
   ): Promise<void> {
     if (!dto || typeof dto.vhost !== 'string') {
       throw new HttpException('A vhost is required.', HttpStatus.BAD_REQUEST);
@@ -70,7 +70,7 @@ export class RabbitmqUsersController {
   clearPermissions(
     @Param('mqttServerId', ParseIntPipe) mqttServerId: number,
     @Param('username') username: string,
-    @Query('vhost') vhost?: string
+    @Query('vhost') vhost?: string,
   ): Promise<void> {
     if (typeof vhost !== 'string' || vhost.length === 0) {
       throw new HttpException('A vhost query parameter is required.', HttpStatus.BAD_REQUEST);

@@ -102,7 +102,10 @@
     "viewError": "View load error for {{pluginName}}",
     "errorTitle": "{{pluginName}} failed to load",
     "errorDescription": "The server reported this error during startup:",
-    "close": "Close"
+    "close": "Close",
+    "retry": "Retry and restart",
+    "retrySuccess": "The plugin will be retried when the app restarts.",
+    "retryError": "Could not retry the plugin."
   },
   "noPermissions": "None requested",
   "updatePolicy": {

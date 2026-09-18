@@ -6,6 +6,11 @@
 #include "freertos/task.h"
 
 #include "application/application.hpp"
+#include "nfc/nfc.hpp"
+#include "websocket/websocket.hpp"
+#ifdef DEMO_MODE
+#include "api/demo_websocket.hpp"
+#endif
 #include "logger/logger.hpp"
 #include "platform.hpp"
 #include "utils.hpp"
@@ -16,7 +21,14 @@
 #error "PIN_NFC_I2C_SDA/PIN_NFC_I2C_SCL must be defined by the variant"
 #endif
 
-Application application;
+NFC nfc;
+#ifdef DEMO_MODE
+DemoWebsocket websocket;
+#else
+Websocket websocket;
+#endif
+API api(websocket);
+Application application(nfc, api);
 
 Logger mainLogger("Main");
 

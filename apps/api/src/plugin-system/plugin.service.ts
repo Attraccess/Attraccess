@@ -17,7 +17,6 @@ const PLUGIN_BOOT_GUARD_FILE = '.plugin-boot-guard.json';
 
 type PluginFailure = { pluginDirectory: string; message: string };
 
-
 export class PluginService {
   private static plugins: LoadedPluginManifest[] | null = null;
   private static loadedPlugins: Set<string> = new Set();
@@ -28,7 +27,7 @@ export class PluginService {
   public static PLUGIN_PATH: string;
   private static RESTART_BY_EXIT_FLAG: boolean;
 
-  public static configure(config: { PLUGIN_DIR: string, RESTART_BY_EXIT: boolean }): void {
+  public static configure(config: { PLUGIN_DIR: string; RESTART_BY_EXIT: boolean }): void {
     PluginService.PLUGIN_PATH = config.PLUGIN_DIR; // Assume PLUGIN_DIR from appConfig is already resolved or correct
     PluginService.RESTART_BY_EXIT_FLAG = config.RESTART_BY_EXIT;
     PluginService.plugins = null; // Discovery may have been cached with an unset path before configure() ran; force a re-scan.
@@ -37,12 +36,13 @@ export class PluginService {
     PluginService.pluginFailures = new Map(
       PluginService.readFailures().map((failure) => [failure.pluginDirectory, failure]),
     );
-    PluginService.logger.log(`PluginService configured. Path: ${PluginService.PLUGIN_PATH}, RestartByExit: ${PluginService.RESTART_BY_EXIT_FLAG}`);
+    PluginService.logger.log(
+      `PluginService configured. Path: ${PluginService.PLUGIN_PATH}, RestartByExit: ${PluginService.RESTART_BY_EXIT_FLAG}`,
+    );
     if (!PluginService.PLUGIN_PATH) {
-        PluginService.logger.error('PLUGIN_DIR is not configured in AppConfig! Plugin system may not work.');
+      PluginService.logger.error('PLUGIN_DIR is not configured in AppConfig! Plugin system may not work.');
     }
   }
-
 
   public static getPlugins(): LoadedPluginManifest[] {
     if (!PluginService.plugins) {
@@ -149,8 +149,10 @@ export class PluginService {
     if (active.length === 0) return;
 
     const message = error instanceof Error ? error.message : String(error);
-    const stack = error instanceof Error ? error.stack ?? '' : '';
-    const affected = active.filter((pluginDirectory) => stack.includes(join(PluginService.PLUGIN_PATH, pluginDirectory)));
+    const stack = error instanceof Error ? (error.stack ?? '') : '';
+    const affected = active.filter((pluginDirectory) =>
+      stack.includes(join(PluginService.PLUGIN_PATH, pluginDirectory)),
+    );
     if (affected.length === 0) {
       PluginService.logger.error('Could not attribute the startup failure to a plugin; no plugins were quarantined.');
       return;
@@ -195,7 +197,7 @@ export class PluginService {
       .map((pluginFolder) => {
         const manifest = PluginService.findPluginManifestInPluginFolder(
           rootFolder,
-          pluginFolder
+          pluginFolder,
         ) as LoadedPluginManifest | null;
         if (!manifest) {
           return null;
@@ -286,7 +288,7 @@ export class PluginService {
     }
   }
 
-  public async uploadPlugin(zipFile: FileUpload) {
+  public async uploadPlugin(zipFile: FileUpload, deferRestart = false) {
     // check if file is a zip file
     if (zipFile.mimetype !== 'application/zip') {
       PluginService.logger.error(`File ${zipFile.originalname} is not a zip file`);
@@ -342,9 +344,7 @@ export class PluginService {
 
         // The replacement is complete once the new directory is in place.
         // A stale backup must not prevent activating the uploaded plugin.
-        setTimeout(() => {
-          this.restartApp();
-        }, 1000);
+        if (!deferRestart) this.requestRestart();
 
         if (replacing) {
           try {
@@ -389,9 +389,12 @@ export class PluginService {
   private static async withPluginUploadLock<T>(pluginName: string, action: () => Promise<T>): Promise<T> {
     const previous = PluginService.pluginUploadLocks.get(pluginName) ?? Promise.resolve();
     let release!: () => void;
-    const current = previous.then(() => new Promise<void>((resolve) => {
-      release = resolve;
-    }));
+    const current = previous.then(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
     PluginService.pluginUploadLocks.set(pluginName, current);
     await previous;
     try {
@@ -443,7 +446,7 @@ export class PluginService {
     setTimeout(() => this.restartApp(), 1000);
   }
 
-  public async deletePlugin(pluginId: string) {
+  public async deletePlugin(pluginId: string, deferRestart = false) {
     const plugin = PluginService.getPlugins().find((plugin) => plugin.id === pluginId);
 
     if (!plugin) {
@@ -469,7 +472,7 @@ export class PluginService {
       } catch (error) {
         PluginService.logger.error(
           `Failed to revert migrations for plugin ${plugin.name}; removing files anyway. Its tables may be orphaned.`,
-          error as Error
+          error as Error,
         );
       }
     }
@@ -483,8 +486,6 @@ export class PluginService {
     }
 
     // restart app
-    setTimeout(() => {
-      this.restartApp();
-    }, 1000);
+    if (!deferRestart) this.requestRestart();
   }
 }

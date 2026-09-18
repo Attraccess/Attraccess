@@ -2,6 +2,10 @@
 
 #include <string>
 
+#ifdef ATTRACTAP_HOST
+#include "esp_netif.h"
+using wifi_auth_mode_t = int;
+#else
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_netif.h"
@@ -9,11 +13,16 @@
 #include "../../state/state.hpp"
 #include "../../logger/logger.hpp"
 #include "esp_heap_caps.h"
+#endif
 
 class Wifi
 {
 public:
+    #ifdef ATTRACTAP_HOST
+    static void loop() {}
+    #else
     static void loop();
+    #endif
     static const uint8_t MAX_KNOWN_WIFI_NETWORKS = 20;
     struct WifiCredentials
     {
@@ -43,6 +52,16 @@ public:
         uint8_t count;
     };
 
+    #ifdef ATTRACTAP_HOST
+    static void setup() {}
+    static void connectToNetwork(const std::string &, const std::string &) {}
+    static WifiState getState() { return WIFI_STATE_CONNECTED; }
+    static esp_ip4_addr_t getIPAddress() { return {}; }
+    static void startScan() {}
+    static bool isScanning() { return false; }
+    static WifiScanResult getKnownWifiNetworks() { return {}; }
+    static bool isConnected() { return true; }
+    #else
     static void setup();
     static void connectToNetwork(const std::string &ssid, const std::string &password);
     static WifiState getState();
@@ -51,8 +70,10 @@ public:
     static bool isScanning();
     static WifiScanResult getKnownWifiNetworks();
     static bool isConnected();
+    #endif
 
 private:
+#ifndef ATTRACTAP_HOST
     static WifiState _state;
     static bool is_setup;
     static bool is_scanning;
@@ -82,4 +103,5 @@ private:
 
     static esp_netif_t *wifi_interface;
     static Logger logger;
+#endif
 };

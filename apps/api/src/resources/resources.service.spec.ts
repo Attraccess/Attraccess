@@ -11,6 +11,9 @@ import { LicenseService } from '../license/license.service';
 import { createMockResource } from '../test-utils/resource.fixtures';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MetricsService } from '../metrics/metrics.service';
+import { AuditService } from '../audit/audit.service';
+import { projectResourceAuditEvent } from '../audit/audit-policy';
+import { randomUUID } from 'node:crypto';
 
 const mockMetricsService = {
   resourcesTotal: { inc: jest.fn(), dec: jest.fn(), set: jest.fn() },
@@ -26,6 +29,7 @@ const mockMetricsService = {
 describe('ResourcesService', () => {
   let service: ResourcesService;
   let resourceRepository: jest.Mocked<Repository<Resource>>;
+  const audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
   // ResourceImageService is injected but not directly used in these tests
 
   const mockResourceRepository = () => ({
@@ -83,11 +87,13 @@ describe('ResourcesService', () => {
           provide: MetricsService,
           useValue: mockMetricsService,
         },
+        { provide: AuditService, useValue: audit },
       ],
     }).compile();
 
     service = module.get<ResourcesService>(ResourcesService);
     resourceRepository = module.get(getRepositoryToken(Resource)) as jest.Mocked<Repository<Resource>>;
+    audit.recordResource.mockClear();
     // ResourceImageService is available but not directly used in tests
   });
 
@@ -542,6 +548,34 @@ describe('ResourcesService', () => {
       });
       expect(resourceRepository.save).toHaveBeenCalled();
     });
+
+    it('audits only the safe resource projection when an actor is available', async () => {
+      const resource = createMockResource({ id: 1, name: 'Lathe', type: ResourceType.Machine });
+      resourceRepository.create.mockReturnValue(resource);
+      resourceRepository.save.mockResolvedValue(resource);
+
+      await service.createResource({ name: 'Lathe', type: ResourceType.Machine }, undefined, { id: 9 });
+
+      expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'resource.created', actorId: 9, subjectId: 1,
+        details: { 'after.name': 'Lathe', 'after.type': ResourceType.Machine },
+      }));
+    });
+
+    it('bounds an oversized resource name in the audit projection', async () => {
+      const resource = createMockResource({ id: 1, name: '"\\\0🙂'.repeat(5000), type: ResourceType.Machine });
+      resourceRepository.create.mockReturnValue(resource);
+      resourceRepository.save.mockResolvedValue(resource);
+
+      await service.createResource({ name: resource.name, type: ResourceType.Machine }, undefined, { id: 9 });
+
+      const details = audit.recordResource.mock.calls[0][0].details;
+      expect(details['after.name']).toMatch(/\.\.\.$/);
+      expect(Buffer.byteLength(JSON.stringify(details), 'utf8')).toBeLessThanOrEqual(4096);
+      expect(projectResourceAuditEvent({
+        ...audit.recordResource.mock.calls[0][0], operationId: randomUUID(),
+      })).not.toBeNull();
+    });
   });
 
   describe('updateResource', () => {
@@ -588,6 +622,91 @@ describe('ResourcesService', () => {
       expect(resourceRepository.save).toHaveBeenCalled();
     });
 
+    it('audits changed safe fields without metadata or documentation', async () => {
+      const existingResource = createMockResource({ id: 1, name: 'Old', type: ResourceType.Lock });
+      const updatedResource = createMockResource({ id: 1, name: 'New', type: ResourceType.Machine });
+      updatedResource.metadata = { password: 'secret' };
+      jest.spyOn(service, 'getResourceById').mockResolvedValue(existingResource);
+      resourceRepository.save.mockResolvedValue(updatedResource);
+
+      await service.updateResource(1, { name: 'New', type: ResourceType.Machine, metadata: { password: 'secret' } }, undefined, { id: 9 });
+
+      expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'resource.updated', details: {
+          'before.name': 'Old', 'after.name': 'New', 'before.type': ResourceType.Lock, 'after.type': ResourceType.Machine,
+          changedFields: '["name","type","metadata"]',
+        },
+      }));
+    });
+
+    it('does not audit metadata that only normalized from absent to empty', async () => {
+      const existingResource = createMockResource({ id: 1, name: 'Old', metadata: null });
+      const updatedResource = createMockResource({ id: 1, name: 'New', metadata: {} });
+      jest.spyOn(service, 'getResourceById').mockResolvedValue(existingResource);
+      resourceRepository.save.mockResolvedValue(updatedResource);
+
+      await service.updateResource(1, { name: 'New', metadata: {} }, undefined, { id: 9 });
+
+      expect(audit.recordResource).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'resource.updated',
+          details: { 'before.name': 'Old', 'after.name': 'New', changedFields: '["name"]' },
+        }),
+      );
+    });
+
+    it('bounds both names in a rename audit projection', async () => {
+      const existingResource = createMockResource({ id: 1, name: '"'.repeat(5000) });
+      const updatedResource = createMockResource({ id: 1, name: '\\'.repeat(5000) + '🚪'.repeat(5000) });
+      jest.spyOn(service, 'getResourceById').mockResolvedValue(existingResource);
+      resourceRepository.save.mockResolvedValue(updatedResource);
+
+      await service.updateResource(1, { name: updatedResource.name }, undefined, { id: 9 });
+
+      const details = audit.recordResource.mock.calls[0][0].details;
+      expect(Buffer.byteLength(JSON.stringify(details), 'utf8')).toBeLessThanOrEqual(4096);
+      expect(projectResourceAuditEvent({
+        ...audit.recordResource.mock.calls[0][0], operationId: randomUUID(),
+      })).not.toBeNull();
+    });
+
+    it('audits a non-name update without recording its value', async () => {
+      const existingResource = createMockResource({ id: 1, allowTakeOver: false });
+      const updatedResource = createMockResource({ id: 1, allowTakeOver: true });
+      jest.spyOn(service, 'getResourceById').mockResolvedValue(existingResource);
+      resourceRepository.save.mockResolvedValue(updatedResource);
+
+      await service.updateResource(1, { allowTakeOver: true }, undefined, { id: 9 });
+
+      expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'resource.updated', details: { changedFields: '["allowTakeOver"]' },
+      }));
+    });
+
+    it('does not audit an unchanged resubmission', async () => {
+      const resource = createMockResource({ id: 1, allowTakeOver: false });
+      jest.spyOn(service, 'getResourceById').mockResolvedValue(resource);
+      resourceRepository.save.mockResolvedValue(resource);
+
+      await service.updateResource(1, { allowTakeOver: false }, undefined, { id: 9 });
+
+      expect(audit.recordResource).not.toHaveBeenCalled();
+    });
+
+    it('audits an image-only update without persisting the filename', async () => {
+      const resource = createMockResource({ id: 1, imageFilename: null });
+      const updatedResource = createMockResource({ id: 1, imageFilename: 'resource-1.png' });
+      jest.spyOn(service, 'getResourceById').mockResolvedValue(resource);
+      mockResourceImageService.saveImage.mockResolvedValue('resource-1.png');
+      resourceRepository.save.mockResolvedValue(updatedResource);
+
+      await service.updateResource(1, {}, {} as never, { id: 9 });
+
+      expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'resource.updated', details: { changedFields: '["image"]' },
+      }));
+    });
+
     it('should throw ResourceNotFoundException if resource not found', async () => {
       const resourceId = 999;
       const updateDto: UpdateResourceDto = {
@@ -608,6 +727,33 @@ describe('ResourcesService', () => {
       await service.deleteResource(1);
 
       expect(resourceRepository.softDelete).toHaveBeenCalledWith(1);
+    });
+
+    it('audits deletion with the pre-delete safe projection', async () => {
+      const resource = createMockResource({ id: 1, name: 'Lathe', type: ResourceType.Machine });
+      jest.spyOn(service, 'getResourceById').mockResolvedValue(resource);
+      resourceRepository.softDelete.mockResolvedValue({ affected: 1 } as never);
+
+      await service.deleteResource(1, { id: 9 });
+
+      expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'resource.deleted', actorId: 9, details: { 'before.name': 'Lathe', 'before.type': ResourceType.Machine },
+      }));
+    });
+
+    it('bounds an oversized resource name in a deletion audit projection', async () => {
+      const resource = createMockResource({ id: 1, name: '\0'.repeat(5000) + '🙂'.repeat(5000), type: ResourceType.Machine });
+      jest.spyOn(service, 'getResourceById').mockResolvedValue(resource);
+      resourceRepository.softDelete.mockResolvedValue({ affected: 1 } as never);
+
+      await service.deleteResource(1, { id: 9 });
+
+      const details = audit.recordResource.mock.calls[0][0].details;
+      expect(details['before.name']).toMatch(/\.\.\.$/);
+      expect(Buffer.byteLength(JSON.stringify(details), 'utf8')).toBeLessThanOrEqual(4096);
+      expect(projectResourceAuditEvent({
+        ...audit.recordResource.mock.calls[0][0], operationId: randomUUID(),
+      })).not.toBeNull();
     });
 
     it('should throw ResourceNotFoundException if resource not found', async () => {

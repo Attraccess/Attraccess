@@ -147,7 +147,7 @@ describe('PluginProvider', () => {
   });
 
   it('encodes scoped package names in frontend asset URLs', async () => {
-    const { name } = primeManifest({ name: '@attraccess/plugin-wago', styles: 'style.css' });
+    const { name } = primeManifest({ name: '@attraccess/plugin-demo', styles: 'style.css' });
     const appendChild = vi.spyOn(document.head, 'appendChild').mockImplementation((node) => node);
 
     render(<PluginProvider />);
@@ -156,13 +156,13 @@ describe('PluginProvider', () => {
 
     const remoteConfig = hoisted.setRemoteMock.mock.calls.at(-1)?.[1] as { url: () => Promise<string> };
     await expect(remoteConfig.url()).resolves.toBe(
-      'http://test.local/api/plugins/%40attraccess%2Fplugin-wago/frontend/module-federation/index.js'
+      'http://test.local/api/plugins/%40attraccess%2Fplugin-demo/frontend/module-federation/index.js'
     );
     const styleLink = appendChild.mock.calls.find(([node]) => node instanceof HTMLLinkElement)?.[0];
     expect(styleLink).toHaveAttribute('id', `plugin-styles-${name}`);
     expect(styleLink).toHaveAttribute(
       'href',
-      'http://test.local/api/plugins/%40attraccess%2Fplugin-wago/frontend/module-federation/style.css'
+      'http://test.local/api/plugins/%40attraccess%2Fplugin-demo/frontend/module-federation/style.css'
     );
   });
 

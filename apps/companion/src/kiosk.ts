@@ -8,7 +8,7 @@ import { openWizardWindow } from './wizard-window';
 // ponytail: increment per new kiosk window so each open gets a fresh web session (sign-out on close)
 let _kioskSessionId = 0;
 
-// dark blanks that cover secondary displays while the kiosk is locked
+// blocker pages that cover secondary displays while the kiosk is locked
 let secondaryOverlays: BrowserWindow[] = [];
 
 function kioskUrl(payload: CompanionAuthenticatedDto): string {
@@ -89,7 +89,7 @@ function addSecondaryOverlay(x: number, y: number, width: number, height: number
     frame: false,
     alwaysOnTop: true,
     skipTaskbar: true,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
     webPreferences: { nodeIntegration: false, contextIsolation: true },
   });
   overlay.setAlwaysOnTop(true, 'screen-saver');
@@ -100,11 +100,13 @@ function addSecondaryOverlay(x: number, y: number, width: number, height: number
   // and it covers the display's menu bar.
   if (process.platform === 'darwin') overlay.setKiosk(true);
   else overlay.setFullScreen(true);
-  // Centered, dimmed "Locked by" + Attraccess lockup on the dark blocker. color: drives the wordmark.
+  // Centered "Locked by" + Attraccess lockup. color: drives the wordmark.
   const blockerHtml =
-    `<!doctype html><html><body style="margin:0;height:100vh;display:flex;flex-direction:column;` +
-    `align-items:center;justify-content:center;gap:1.25rem;background:#0f172a;color:#cbd5e1;opacity:.55">` +
-    `<span style="font:500 14px/1 system-ui,sans-serif;letter-spacing:.06em">Locked by</span>` +
+    `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1">` +
+    `<meta name="color-scheme" content="light"></head><body style="margin:0;min-height:100vh;box-sizing:border-box;` +
+    `border-top:6px solid #256D7B;display:flex;flex-direction:column;align-items:center;justify-content:center;` +
+    `gap:1.25rem;background:#ffffff;color:#256D7B">` +
+    `<span style="font:500 14px/1 system-ui,sans-serif;letter-spacing:.06em;color:#536369">Locked by</span>` +
     `<div style="width:38vw;max-width:520px">${attraccessLogoSvg}</div></body></html>`;
   overlay.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(blockerHtml));
   overlay.on('closed', () => { secondaryOverlays = secondaryOverlays.filter(w => w !== overlay); });
@@ -129,7 +131,7 @@ export function showKioskOverlay(): void {
   win.show();
   registerLockShortcuts();
 
-  // cover any other displays with dark blanks
+  // cover any other displays with blocker pages
   const kioskBounds = win.getBounds();
   for (const display of screen.getAllDisplays()) {
     const { x, y, width, height } = display.bounds;

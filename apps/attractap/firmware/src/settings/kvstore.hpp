@@ -3,7 +3,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#ifdef ATTRACTAP_HOST
+class ProfileStore;
+#include <unordered_map>
+#include <vector>
+#else
 #include "nvs.h"
+#endif
 
 /**
  * Thin NVS wrapper with Arduino-Preferences-compatible semantics, so devices
@@ -42,8 +48,18 @@ public:
 
     bool remove(const char *key);
 
+#ifdef ATTRACTAP_HOST
+    // The desktop composition supplies its endpoint/reader-scoped profile before Settings::setup().
+    static void setHostProfile(ProfileStore *profile);
+#endif
+
 private:
+    #ifndef ATTRACTAP_HOST
     nvs_handle_t handle = 0;
+    #else
+    std::string namespaceName;
+    bool readOnly = false;
+    #endif
     bool opened = false;
 
     bool commit();

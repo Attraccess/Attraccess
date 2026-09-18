@@ -88,7 +88,12 @@ export class SupervisionController {
     @Param('requestId') requestId: string,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    return this.supervisionService.approve(requestId, req.user);
+    return this.supervisionService.approve(
+      requestId,
+      req.user,
+      req.user.authenticationMethod ?? 'session',
+      req.user.apiTokenId,
+    );
   }
 
   @Post('supervision/requests/:requestId/reject')
@@ -105,6 +110,11 @@ export class SupervisionController {
     @Param('requestId') requestId: string,
     @Req() req: AuthenticatedRequest,
   ): SupervisionDecisionResponseDto {
-    return this.supervisionService.reject(requestId, req.user);
+    return this.supervisionService.reject(
+      requestId,
+      req.user,
+      req.user.authenticationMethod ?? 'session',
+      req.user.apiTokenId,
+    );
   }
 }

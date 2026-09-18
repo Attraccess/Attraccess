@@ -33,22 +33,22 @@
       "resource": {
         "usage": {
           "started": {
-            "title": "Resource wurde gestartet",
-            "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource gestartet wird.",
+            "title": "Nutzung gestartet",
+            "description": "Wird ausgelöst, wenn eine Nutzungssitzung startet.",
             "outputs": {
               "output": "Ausgabe"
             }
           },
           "stopped": {
-            "title": "Resource wurde gestoppt",
-            "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource gestoppt wird.",
+            "title": "Nutzung beendet",
+            "description": "Wird ausgelöst, wenn eine Nutzungssitzung endet.",
             "outputs": {
               "output": "Ausgabe"
             }
           },
           "takeover": {
-            "title": "Ressource wurde übernommen",
-            "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource übernommen wird.",
+            "title": "Nutzung übernommen",
+            "description": "Wird ausgelöst, wenn eine Nutzungssitzung übernommen wird.",
             "outputs": {
               "output": "Ausgabe"
             }
@@ -56,8 +56,8 @@
         },
         "activity": {
           "no-activity": {
-            "title": "Ressource ist inaktiv",
-            "description": "Dieser Knoten wird ausgelöst, wenn eine Ressource inaktiv ist für eine bestimmte Zeit.",
+            "title": "Inaktivitäts-Timeout erreicht",
+            "description": "Wird ausgelöst, nachdem für die konfigurierte Dauer keine Aktivität für die Ressource aufgezeichnet wurde.",
             "outputs": {
               "output": "Ausgabe"
             },
@@ -608,22 +608,24 @@
         }
       },
       "resource": {
-        "operating": {
-          "title": "Ressource als in Betrieb markieren",
-          "description": "Zeichnet auf, dass die Maschine zur Serverzeit in Betrieb ist.",
-          "inputs": { "input": "Eingang" },
-          "outputs": { "output": "Ausgang" }
-        },
-        "idle": {
-          "title": "Ressource als inaktiv markieren",
-          "description": "Zeichnet auf, dass die Maschine zur Serverzeit den Betrieb beendet hat.",
-          "inputs": { "input": "Eingang" },
-          "outputs": { "output": "Ausgang" }
+        "activity": {
+          "operating": {
+            "title": "Betriebsbeginn aufzeichnen",
+            "description": "Zeichnet auf, dass die Ressource zum aktuellen Serverzeitpunkt den Betrieb aufgenommen hat.",
+            "inputs": { "input": "Eingang" },
+            "outputs": { "output": "Ausgang" }
+          },
+          "idle": {
+            "title": "Betriebsende aufzeichnen",
+            "description": "Zeichnet auf, dass die Ressource zum aktuellen Serverzeitpunkt den Betrieb beendet hat.",
+            "inputs": { "input": "Eingang" },
+            "outputs": { "output": "Ausgang" }
+          }
         },
         "usage": {
           "end-session": {
-            "title": "Nutzung beenden",
-            "description": "Beendet die aktive Nutzungssitzung. Optional mit Notizen (Template oder statisch).",
+            "title": "Aktive Sitzung beenden",
+            "description": "Beendet die aktuelle Nutzungssitzung, optional mit einer Notiz.",
             "inputs": { "input": "Eingabe" },
             "outputs": { "output": "Ausgabe", "failure": "Fehler" },
             "config": {
@@ -676,8 +678,8 @@
         },
         "activity": {
           "track-activity": {
-            "title": "Ressource war aktiv",
-            "description": "Nutze um Attraccess anzuzeigen, dass die Ressource aktiv war.",
+            "title": "Aktivität aufzeichnen",
+            "description": "Zeichnet Aktivität für diese Ressource zum aktuellen Serverzeitpunkt auf.",
             "inputs": {
               "input": "Eingabe"
             },
@@ -688,7 +690,7 @@
         },
         "health": {
           "heartbeat": {
-            "title": "Lebenszeichen",
+            "title": "Gesundheits-Lebenszeichen senden",
             "description": "Markiert die Ressource als gesund, wenn dieser Knoten ausgelöst wird. Erfolgt innerhalb des Timeouts kein neues Lebenszeichen, wird die Ressource automatisch als ungesund markiert.",
             "inputs": { "input": "Eingabe" },
             "outputs": { "output": "Ausgabe" },

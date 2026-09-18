@@ -28,7 +28,7 @@ export class ProjectInvitationsController {
     @Req() req: AuthenticatedRequest,
     @Param('invitationId', ParseIntPipe) invitationId: number,
   ): Promise<ProjectInvitation> {
-    return await this.projectsService.acceptInvitation(req.user.id, invitationId);
+    return await this.projectsService.acceptInvitation(req.user.id, invitationId, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
   }
 
   @Post(':invitationId/decline')
@@ -39,6 +39,6 @@ export class ProjectInvitationsController {
     @Req() req: AuthenticatedRequest,
     @Param('invitationId', ParseIntPipe) invitationId: number,
   ): Promise<ProjectInvitation> {
-    return await this.projectsService.declineInvitation(req.user.id, invitationId);
+    return await this.projectsService.declineInvitation(req.user.id, invitationId, req.user.authenticationMethod ?? 'session', req.user.apiTokenId);
   }
 }

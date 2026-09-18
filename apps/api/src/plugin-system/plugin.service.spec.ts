@@ -368,8 +368,8 @@ describe('PluginService', () => {
     it('unpacks a plugin whose contents sit in a single wrapper folder', async () => {
       const service = new PluginService();
       const file = zipFileUpload({
-        'plugin-shelly/plugin.json': JSON.stringify(VALID_MANIFEST),
-        'plugin-shelly/dist/index.js': 'module.exports = {};',
+        'plugin-example/plugin.json': JSON.stringify(VALID_MANIFEST),
+        'plugin-example/dist/index.js': 'module.exports = {};',
         '__MACOSX/._plugin.json': 'junk',
       });
 

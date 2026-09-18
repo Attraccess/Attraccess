@@ -7,7 +7,7 @@
 #include "../demo/demo_store.hpp"
 #endif
 
-#include "../nfc/nfc.hpp"
+#include "../nfc/nfc_contract.hpp"
 #include "../logger/logger.hpp"
 #include "settings/settings.hpp"
 #include "../network/network.hpp"
@@ -35,8 +35,9 @@
 class Application
 {
 public:
-    Application() : logger("Application"),
-                    api(),
+    Application(INfc &nfc, API &api) : nfc(nfc),
+                    logger("Application"),
+                    api(api),
                     externalState(EXTERNAL_STATE_NONE),
                     firmwareUpdateProgressPct(0),
 #ifdef HAS_LVGL_DISPLAY
@@ -60,9 +61,9 @@ private:
 #ifdef HAS_IO_EXPANDER
     IOExpander ioExpander;
 #endif
-    NFC nfc;
+    INfc &nfc;
     Logger logger;
-    API api;
+    API &api;
     Beeper beeper;
 
 #ifdef HAS_LVGL_DISPLAY

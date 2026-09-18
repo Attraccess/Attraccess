@@ -8,14 +8,14 @@
   "loading": "Loading nodes…",
   "error": "Failed to load nodes. Please try again.",
   "domains": {
-    "triggers": "Triggers",
-    "manual": "Manual",
-    "resource": "Resource",
-    "door": "Door",
-    "mqtt": "MQTT",
-    "http": "HTTP",
-    "logic": "Logic",
-    "health": "Health",
-    "companion": "Companion"
+    "usage-sessions": "Usage sessions",
+    "operation-activity": "Operation & activity",
+    "billing": "Billing",
+    "access-doors": "Access & doors",
+    "health-monitoring": "Health monitoring",
+    "companion-device": "Companion device",
+    "messaging": "Messaging",
+    "web-requests": "Web requests",
+    "flow-control": "Flow control"
   }
 }

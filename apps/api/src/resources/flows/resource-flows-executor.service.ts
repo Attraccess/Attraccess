@@ -123,6 +123,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
 
   private readonly resourceActivity: Map<Resource['id'], Date> = new Map();
   private readonly heartbeatLastSeen: Map<string, Date> = new Map();
+  /** Preserve event lookup order without serializing the flow runs they launch. */
+  private pluginFlowLookupQueue: Promise<void> = Promise.resolve();
 
   private readonly templateVariables = new WeakMap<object, TemplateVariables>();
 
@@ -190,11 +192,11 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       [ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE]: new MqttSendMessageExecutor(this.mqttClientService),
       [ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION]: new EndUsageSessionExecutor(this.resourceUsageService),
       [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY]: new ActivityTrackExecutor(this.resourceActivity),
-      [ResourceFlowNodeType.OUTPUT_RESOURCE_OPERATING]: new OperatingTransitionExecutor(
+      [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_OPERATING]: new OperatingTransitionExecutor(
         this.operatingIntervals,
         'operating',
       ),
-      [ResourceFlowNodeType.OUTPUT_RESOURCE_IDLE]: new OperatingTransitionExecutor(this.operatingIntervals, 'idle'),
+      [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE]: new OperatingTransitionExecutor(this.operatingIntervals, 'idle'),
 
       [ResourceFlowNodeType.PROCESSING_WAIT]: new WaitExecutor(),
       [ResourceFlowNodeType.PROCESSING_IF]: new IfExecutor(),
@@ -485,7 +487,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
   public async triggerPluginFlows(
     pluginName: string,
     nodeType: string,
-    matches: (config: Record<string, unknown>) => boolean,
+    matches: (config: Record<string, unknown>, nodeId: string) => boolean,
     payload: object,
   ): Promise<void> {
     const definition = getPluginFlowNode(nodeType);
@@ -501,14 +503,16 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     const concurrency = 10;
     let lastId: string | undefined;
     for (;;) {
-      const nodes = await this.flowNodeRepository.find({
-        where: {
-          type: nodeType as ResourceFlowNodeType,
-          ...(lastId ? { id: MoreThan(lastId) } : {}),
-        },
-        order: { id: 'ASC' },
-        take: pageSize,
-      });
+      const nodes = await this.queuedPluginFlowLookup(() =>
+        this.flowNodeRepository.find({
+          where: {
+            type: nodeType as ResourceFlowNodeType,
+            ...(lastId ? { id: MoreThan(lastId) } : {}),
+          },
+          order: { id: 'ASC' },
+          take: pageSize,
+        }),
+      );
 
       if (nodes.length === 0) return;
       lastId = nodes[nodes.length - 1].id;
@@ -517,7 +521,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
         await Promise.allSettled(nodes.slice(offset, offset + concurrency).map(async (node) => {
           let isMatch: boolean;
           try {
-            isMatch = matches(node.data as Record<string, unknown>);
+            isMatch = matches(node.data as Record<string, unknown>, node.id);
           } catch (error) {
             this.logger.error(
               `Failed to match plugin flow trigger node ID: ${node.id} (Type: ${nodeType})`,
@@ -534,6 +538,15 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
 
       if (nodes.length < pageSize) return;
     }
+  }
+
+  private queuedPluginFlowLookup(lookup: () => Promise<ResourceFlowNode[]>): Promise<ResourceFlowNode[]> {
+    const queued = this.pluginFlowLookupQueue.then(lookup, lookup);
+    this.pluginFlowLookupQueue = queued.then(
+      () => undefined,
+      () => undefined,
+    );
+    return queued;
   }
 
   public async startFlow(

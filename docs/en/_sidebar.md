@@ -65,6 +65,7 @@
   - [MQTT](devices/mqtt/overview.md)
   - [MQTT Server Setup](devices/mqtt/server-setup.md)
   - [MQTT Examples](devices/mqtt/examples.md)
+  - [Guided WAGO CC100 Commissioning](devices/wago-cc100-commissioning.md)
   - [WAGO CC100 Docker Runtime](devices/wago-cc100-runtime.md)
 
 - **Billing**
@@ -87,6 +88,7 @@
 - **System Settings**
   - [Overview](settings/overview.md)
   - [Security](settings/security.md)
+  - [Audit log](settings/audit-log.md)
 
 - **Developer Guide**
   - [Overview](developer/overview.md)

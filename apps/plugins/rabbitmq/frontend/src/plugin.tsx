@@ -57,15 +57,15 @@ function RabbitmqPage() {
   return (
     <div className="rmq:flex rmq:flex-col rmq:gap-6 rmq:p-6 rmq:max-w-4xl rmq:mx-auto">
       <div className="rmq:flex rmq:items-center rmq:gap-3">
-        <RabbitIcon className="rmq:w-6 rmq:h-6 rmq:text-primary" />
+        <RabbitIcon className="rmq:w-6 rmq:h-6 rmq:text-accent-soft-foreground" />
         <h1 className="rmq:text-2xl rmq:font-semibold rmq:text-default-800">RabbitMQ</h1>
       </div>
       <Card className="rmq:border rmq:border-default-200 rmq:dark:border-default-100">
         <Card.Content>
           <p className="rmq:text-sm rmq:text-default-500">
-            RabbitMQ management plugin. RabbitMQ MQTT servers show a detection badge and connection-status panel in
-            the MQTT settings, and broker users can be managed (create, edit, permissions, delete) from the MQTT
-            server detail view.
+            RabbitMQ management plugin. RabbitMQ MQTT servers show a detection badge and connection-status panel in the
+            MQTT settings, and broker users can be managed (create, edit, permissions, delete) from the MQTT server
+            detail view.
           </p>
         </Card.Content>
       </Card>

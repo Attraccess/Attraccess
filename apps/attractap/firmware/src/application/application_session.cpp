@@ -10,10 +10,21 @@
 #ifdef HAS_LVGL_DISPLAY
 void Application::handleConnectionConfigurationSave(
     const ConnectionConfigurationScreen::ConnectionConfig &cfg) {
-  // split cfg.host into hostname and port (if no port present, use 443)
+  // The desktop host accepts a full URL while the embedded screen stores host,
+  // port, and TLS separately. Normalize either form before persisting it.
   std::string host = cfg.host;
+  bool useSSL = cfg.useSSL;
+  if (host.rfind("http://", 0) == 0) {
+    host.erase(0, 7);
+    useSSL = false;
+  } else if (host.rfind("https://", 0) == 0) {
+    host.erase(0, 8);
+    useSSL = true;
+  }
+  const size_t pathPos = host.find_first_of("/?#");
+  if (pathPos != std::string::npos) host.erase(pathPos);
   std::string hostname = host;
-  std::string port = "443";
+  std::string port = useSSL ? "443" : "80";
   size_t colonPos = host.find(":");
   if (colonPos != std::string::npos) {
     hostname = host.substr(0, colonPos);
@@ -22,7 +33,7 @@ void Application::handleConnectionConfigurationSave(
   Settings::saveNetworkConfig(std::string(cfg.ssid.c_str()),
                               std::string(cfg.password.c_str()));
   Settings::saveAttraccessApiConfig(
-      hostname, (uint16_t)strtol(port.c_str(), nullptr, 10), cfg.useSSL);
+      hostname, (uint16_t)strtol(port.c_str(), nullptr, 10), useSSL);
 
     Settings::setDevicePin(std::string(cfg.devicePin.c_str()));
     Settings::setBeeperEnabled(cfg.beeperEnabled);
@@ -147,7 +158,7 @@ void Application::handleResourceDetailsButtonClick(
     }
 
     Display::resourceDetailsScreen.showActionProgress(
-        isTakeover ? "Uebernehme Sitzung" : "Starte Sitzung");
+        isTakeover ? "Übernehme Sitzung" : "Starte Sitzung");
     this->beginActionPause();
     this->pendingActionType = PENDING_ACTION_START_SESSION;
     this->pendingActionResourceId = this->selectedResourceId;
@@ -172,22 +183,22 @@ void Application::handleResourceDetailsButtonClick(
     this->api.stopResourceUsageSession(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
-    Display::resourceDetailsScreen.showActionProgress("Sperre Tuer");
+    Display::resourceDetailsScreen.showActionProgress("Sperre Tür");
     this->beginActionPause();
     this->api.lockDoor(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLOCK_DOOR:
-    Display::resourceDetailsScreen.showActionProgress("Entsperre Tuer");
+    Display::resourceDetailsScreen.showActionProgress("Entsperre Tür");
     this->beginActionPause();
     this->api.unlockDoor(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_UNLATCH_DOOR:
-    Display::resourceDetailsScreen.showActionProgress("Oeffne Tuer-Riegel");
+    Display::resourceDetailsScreen.showActionProgress("Öffne Tür-Riegel");
     this->beginActionPause();
     this->api.unlatchDoor(this->selectedResourceId);
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_FLOW_BUTTON:
-    Display::resourceDetailsScreen.showActionProgress("Aktion Ausfuehren");
+    Display::resourceDetailsScreen.showActionProgress("Aktion Ausführen");
     this->beginActionPause();
     this->api.triggerFlowButton(this->selectedResourceId, evt.flowButtonId);
     break;

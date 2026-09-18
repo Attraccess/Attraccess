@@ -18,8 +18,9 @@ describe('generateRowCells', () => {
       false,
     );
 
-    const supervisorCell = cells.find((cell) => cell.key === 'supervisor-1');
-    const endTimeCell = cells.find((cell) => cell.key === 'end-1');
+    const rowCells = cells as Array<{ key: string; props: { children: { props: { variant: string } }; className: string } }>;
+    const supervisorCell = rowCells.find((cell) => cell.key === 'supervisor-1');
+    const endTimeCell = rowCells.find((cell) => cell.key === 'end-1');
 
     expect(supervisorCell?.props.children.props.variant).toBe('mini');
     expect(endTimeCell?.props.className).toContain('hidden lg:table-cell');

@@ -123,6 +123,7 @@ export class PluginSandboxService {
 
     return {
       manifest: base.manifest,
+      audit: base.audit,
       logger: base.logger,
       mqtt: {
         subscribe(serverId, topicFilter, handler) {

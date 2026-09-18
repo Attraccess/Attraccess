@@ -7,6 +7,7 @@ async function main() {
   const logger = new Logger('Bootstrap');
   try {
     const { app, port, globalPrefix, nodeEnv, shouldGuardPluginLifecycle } = await bootstrap();
+    app.enableShutdownHooks(['SIGINT', 'SIGTERM']);
     // Plugin lifecycle hooks run during initialization, before socket binding.
     await app.init();
     if (shouldGuardPluginLifecycle) PluginService.clearBootGuard();

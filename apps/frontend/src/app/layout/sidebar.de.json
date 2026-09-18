@@ -8,6 +8,12 @@
     "de": "Deutsch"
   },
   "account": "Konto",
+  "design": "Darstellung ({{variant}})",
+  "designVariants": {
+    "light": "Hell",
+    "dark": "Dunkel",
+    "system": "System"
+  },
   "userMenu": "Benutzermenü",
   "groups": {
     "##default##": {

@@ -1,6 +1,18 @@
 # WAGO CC100 Docker Runtime
 
-> **Work in progress.** This guide documents the current `attraccess-wago-cc100` runtime release. It is not hardware-validated yet: [ATT-984](https://linear.app/attraccess/issue/ATT-984/validate-the-four-wago-package-assemblies) is the release gate. Do not use it to control equipment until the required hardware evidence, image digest, and least-privilege deployment are published.
+> **Engineering reference, not the supported operator installation path.** This guide records the manual runtime baseline at `9e0a1c47`. It is not hardware-validated: [ATT-984](https://linear.app/attraccess/issue/ATT-984/prove-the-no-code-cc100-journey-on-hardware-with-a-nontechnical-user) is the release gate. Do not use it to control equipment until required hardware/user evidence exists. Follow [Guided Commissioning](wago-cc100-commissioning.md) for the SSH-only UI path and [Acceptance Evidence](wago-acceptance-evidence.md) for release prerequisites. Manual shell, registry, JSON mapping and credential-copy steps below do not satisfy that gate.
+
+## Deployment Paths Must Not Be Mixed
+
+The first usable beta targets CC100 `751-9301` firmware **31**. Broader firmware references below are hardware background, not additional supported baselines. Guided commissioning uses a locally verified signed offline bundle, not a controller-side registry pull or mandatory WBM setup. It names its container `attraccess-wago` and bind-mounts the controller directory `/var/lib/attraccess-wago` there. As of **2026-09-06**, commissioning is destructive: existing applications/data may stop working or be erased, with no preservation, backup or restoration of preexisting CODESYS or other workloads by Attraccess. It always stops and permanently disables CODESYS and verifies this before I/O. Supported Docker setup and persistent narrow I/O permissions belong to the installer. See the current [platform contract](wago-commissioning-platform.md).
+
+The legacy manual example below names its container `attraccess-wago-cc100` and uses a named Docker volume instead. Those storage locations and its restart policy are **not interchangeable** with guided commissioning. Guided commissioning uses Docker restart policy `no` and a host supervisor that verifies CODESYS disablement, exclusive ownership and narrow register access before every start, including at most five crash restarts per supervisor run. It periodically checks the running writer and attempts containment on failed checks. The historical manual `unless-stopped` example does not provide that gate. Identify the actual installation before cleanup; do not run the manual install over a commissioned controller.
+
+For guided installations, Docker itself never restarts `attraccess-wago`. After an ordinary daemon-only restart, while runtime enablement remains present, the supervisor or `/etc/rc.d/S99_zz_attraccess_wago start` can resume the runtime through the full gate and within its limits. A daemon outage that causes a failed check can instead trigger latched containment.
+
+After failed checks or retry exhaustion, containment removes runtime enablement. The hook and a controller reboot do **not** re-enable it: hook `start` currently exits `0` without starting a disabled runtime, so that exit code is not startup evidence. Resolve the cause and use the [wizard cleanup/recommissioning route](wago-cc100-commissioning.md#recover-after-latched-containment); only installation recreates enablement. Do not recreate the marker manually or use `docker start`. An unavailable daemon cannot prove containment, and failed stop verification retains recovery ownership. This corrects the earlier hook-only recovery instruction and supersedes the [intermediate restart design](wago-fw31-support.md#security-follow-up-on-2026-09-06); physical restart/reboot acceptance remains separate.
+
+Both paths use `/etc/attraccess-wago/runtime.env` on the **controller host**. Docker reads it through `--env-file`; it is not mounted into the container. Runtime state is `/var/lib/attraccess-wago/state.json` **inside the container**, backed by the host directory for guided commissioning or by the named volume for the manual example. Both the host environment file and runtime state can contain credentials. A local Attraccess backup is not proof that either device-side file or SSH recovery access has been backed up. Verify recoverability before credential changes and keep secrets out of support evidence.
 
 The runtime runs on a WAGO CC100 `751-9301` with WAGO Linux firmware and Docker. It does not use CODESYS and does not accept uploaded controller code. Its current protocol version is `1.0.0`; runtime version is `0.1.0`.
 
@@ -22,18 +34,17 @@ Before deployment, confirm all of the following:
 
 ## Enable Docker
 
-Use the WAGO-supported Docker lifecycle through SSH. `config_docker activate` installs Docker if necessary, enables it at startup, enables IP forwarding, and starts the daemon.
-
-```sh
-config_docker install
-config_docker activate
-docker version
-docker info
-```
-
-Use the WBM Docker controls only if they perform the same install and activation lifecycle. Do not manually copy daemon binaries or enable an alternative container engine. If activation fails, collect the command output and WAGO system logs before making configuration changes.
-
-> WAGO's lifecycle script refuses a controller booted from an SD card. Treat that result as a deployment blocker and follow the WAGO-supported storage arrangement.
+Guided commissioning prepares the existing firmware-installed Docker facility
+within the single destructive-install approval. It uses the vendor activation
+path when needed and verifies daemon availability and boot enablement before I/O.
+The captured FW31 `config_docker install` only checks activation state; it does
+not download or extract Docker. Missing client/daemon binaries remain unsupported.
+Vendor activation can change saved startup, routing and firewall state; neither
+deactivation nor removal restores preexisting applications. The captured init
+script has no usable `status` action, so commissioning checks daemon observations
+and getter results instead. See [current support boundaries](wago-fw31-support.md)
+for exact-source provenance, remaining checks and the superseded preservation
+decision. WBM is not a required commissioning step.
 
 ## Obtain and verify the image
 
@@ -115,7 +126,7 @@ docker run -d \
   "$IMAGE"
 ```
 
-`--restart unless-stopped` starts the runtime after Docker and controller restarts unless an operator explicitly stopped it. It does not make the runtime safe after a failure. Record the command, image digest, environment-file checksum (not its contents), container ID, firmware version, and I/O map review in the deployment record.
+In this historical manual example, `--restart unless-stopped` starts the runtime after Docker and controller restarts unless an operator explicitly stopped it. It does not make the runtime safe after a failure and is not the current guided commissioning policy. Record the command, image digest, environment-file checksum (not its contents), container ID, firmware version, and I/O map review in the deployment record.
 
 Check startup and retain the output:
 
@@ -172,7 +183,40 @@ It publishes with QoS 1:
 
 Desired snapshots are validated before they are persisted. A rejected snapshot publishes field-level errors in Reported Configuration and leaves the last accepted configuration in place. Inspect the retained `configuration/reported` record after every update and compare its revision and hash with Desired Configuration. Do not send commands until the expected configuration is reported.
 
-Use the Attraccess controller detail and diagnostics views as the primary inspection surface. Broker-level topic inspection is restricted to authorised operators because messages can reveal controller topology and operating state.
+Use only diagnostics controls present in the exact tested plugin build. This manual baseline does not establish that a controller detail screen exists; verify the integrated UI before documenting its navigation. Broker-level topic inspection is an engineering tool, not normal operator acceptance, and messages can contain secrets as well as topology and operating state.
+
+## Resource flows
+
+Once a controller is claimed and its configuration is applied, the flow catalog offers four WAGO nodes:
+
+| Node                | Use                                                                                 | Outputs                                                          |
+| ------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| WAGO command        | Control an output using its configured switched or pulsed behavior.                 | `output`, `failure` (according to the selected failure behavior) |
+| WAGO event received | Start a flow on a channel state report, measurement, or fault.                      | `output`                                                         |
+| WAGO read state     | Read the latest received state or measurement without sending a controller command. | `output`, `unavailable`                                          |
+| WAGO wait for state | Wait for an available state or measurement to equal a configured value.             | `output`, `timeout`                                              |
+
+Select the controller, the named logical channel, and the operation or event/state category. Command nodes list only output channels and pin the applied configuration revision; reopen and save them after publishing a new revision. Event/read/wait nodes also support input and measurement channels.
+
+The channel's **Output behavior** is authoritative:
+
+| Configured behavior       | Command node operation | Result                                                                      |
+| ------------------------- | ---------------------- | --------------------------------------------------------------------------- |
+| Switched                  | Turn on / turn off     | Set the output to the selected boolean state.                               |
+| Pulsed                    | Trigger pulse          | Turn on for the channel's configured duration, then turn off automatically. |
+| Input or measurement only | No command operation   | Use event, read, or wait nodes.                                             |
+
+Setup presets copy starting settings into the channel. Their names do not constrain later customization: a channel created from a pulse preset can be changed to switched behavior. Pulse duration, operational guards, feedback monitoring, and disconnect behavior belong to the controller configuration. Flow nodes choose when to issue the permitted operation; they cannot override those settings or supply a different duration. Guards are checked and configured feedback is monitored for commands of either output behavior.
+
+The existing version 1 snapshot format is retained. The `pulse` capability and positive `pulse.durationMs` together define pulsed behavior; output channels without either are switched. Inconsistent pulse settings are rejected by both API and runtime configuration validation. The command wire actions remain `set` (with a boolean `value`) and `pulse`.
+
+**Existing flows:** set commands on pulsed channels are now invalid, including set-off. They are not automatically converted. Validation flags the node, and execution rejects it before publication. Explicitly select **Trigger pulse**, or change the channel to switched behavior, publish that configuration, and reopen the node to accept its new revision. Manual commands use the same restrictions. Updated CC100 runtimes also reject incompatible direct MQTT commands with `unsupported_operation`; deploying the plugin alone does not update a controller's installed runtime. Internal pulse shutdown and disconnect handling still turn outputs off.
+
+Event, read, and wait nodes put their result in `wago`, preserving the incoming payload. For example, `wago.value` contains a boolean state or numeric measurement, with freshness and availability information in `wago.available`, `wago.stale`, and `wago.offline` when a sample exists. Missing samples return `wago.available: false`; read nodes route missing or unavailable samples to `unavailable`, and waits only match available samples. Measurement values and comparisons use [wire units](wago-measurement-contract.md).
+
+State events are reports, including periodic snapshots; they are not limited to value changes. Use the event node's minimum interval to limit how frequently it starts a flow, and minimum change to filter measurements. An event can report unavailable data, so check `wago.available` when freshness matters.
+
+For example, connect **WAGO event received → WAGO read state → a condition** to react to a contact while inspecting another channel. Use **WAGO command → WAGO wait for state** when the flow should continue only after an input reports the expected state.
 
 ## Recovery
 
@@ -203,7 +247,7 @@ If it repeats, stop it and preserve logs before changing the image or configurat
 
 ### Controller reboot
 
-After the CC100 returns, confirm Docker is active, the container has restarted, and the runtime publishes a new heartbeat. Verify retained state and Reported Configuration before testing I/O. The persistent volume should restore the accepted snapshot and bounded command history; it does not replay acknowledged commands or pulses.
+After the CC100 returns, confirm Docker is active and the runtime publishes a new heartbeat. For guided commissioning, verify that the boot hook kept CODESYS disabled and verified narrow register access before starting Attraccess; failed checks must leave it stopped. Verify retained state and Reported Configuration before testing I/O. The persistent volume retains the accepted snapshot and bounded command history; it is not a preexisting-workload backup and does not replay acknowledged commands or pulses.
 
 ### Roll back an image or configuration
 

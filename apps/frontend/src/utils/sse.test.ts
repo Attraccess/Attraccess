@@ -1,8 +1,12 @@
 import '@testing-library/jest-dom/vitest';
 import { renderHook, act } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { events } from 'fetch-event-stream';
+import { events, type ServerSentEventMessage } from 'fetch-event-stream';
 import { useSSE } from './sse';
+
+type EventsStream = AsyncGenerator<ServerSentEventMessage, void, unknown>;
+
+const stubStream = (source: unknown): EventsStream => source as EventsStream;
 
 vi.mock('fetch-event-stream', () => ({
   events: vi.fn().mockReturnValue({
@@ -20,9 +24,11 @@ describe('useSSE', () => {
   beforeEach(() => {
     abortSpy = vi.spyOn(AbortController.prototype, 'abort');
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
-    vi.mocked(events).mockReturnValue({
-      [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => undefined) }),
-    });
+    vi.mocked(events).mockReturnValue(
+      stubStream({
+        [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => undefined) }),
+      }),
+    );
   });
 
   afterEach(() => {
@@ -71,9 +77,11 @@ describe('useSSE', () => {
   });
 
   it('creates a new connection after a completed stream', async () => {
-    vi.mocked(events).mockReturnValue({
-      [Symbol.asyncIterator]: () => ({ next: () => Promise.resolve({ done: true, value: undefined }) }),
-    });
+    vi.mocked(events).mockReturnValue(
+      stubStream({
+        [Symbol.asyncIterator]: () => ({ next: () => Promise.resolve({ done: true, value: undefined }) }),
+      }),
+    );
 
     const first = renderHook(() => useSSE({ path: '/resources/1/events', onUpdate: vi.fn(), enabled: true }));
 
@@ -124,14 +132,18 @@ describe('useSSE', () => {
     const firstSubscriber = vi.fn();
     const secondSubscriber = vi.fn();
     vi.mocked(events)
-      .mockReturnValueOnce({
-        [Symbol.asyncIterator]: () => ({ next: () => Promise.resolve({ done: true, value: undefined }) }),
-      })
-      .mockReturnValueOnce({
-        async *[Symbol.asyncIterator]() {
-          yield { data: JSON.stringify({ resourceId: 1 }) };
-        },
-      });
+      .mockReturnValueOnce(
+        stubStream({
+          [Symbol.asyncIterator]: () => ({ next: () => Promise.resolve({ done: true, value: undefined }) }),
+        }),
+      )
+      .mockReturnValueOnce(
+        stubStream({
+          async *[Symbol.asyncIterator]() {
+            yield { data: JSON.stringify({ resourceId: 1 }) };
+          },
+        }),
+      );
 
     const first = renderHook(() => useSSE({ path: '/resources/1/events', onUpdate: firstSubscriber, enabled: true }));
 
@@ -159,11 +171,13 @@ describe('useSSE', () => {
   it('delivers events to remaining subscribers when one throws', async () => {
     const onUpdate = vi.fn();
     const subscriberError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    vi.mocked(events).mockReturnValue({
-      async *[Symbol.asyncIterator]() {
-        yield { data: JSON.stringify({ resourceId: 1 }) };
-      },
-    });
+    vi.mocked(events).mockReturnValue(
+      stubStream({
+        async *[Symbol.asyncIterator]() {
+          yield { data: JSON.stringify({ resourceId: 1 }) };
+        },
+      }),
+    );
 
     const { unmount } = renderHook(() => {
       useSSE({

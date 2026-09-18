@@ -3,7 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/api/src",
   "projectType": "application",
-  "tags": ["scope:api"],
+  "tags": ["type:app", "scope:core"],
   "implicitDependencies": ["plugins-backend-sdk", "plugins-frontend-sdk"],
   "targets": {
     "copy-attractap-firmware-into-assets": {

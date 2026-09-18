@@ -3,7 +3,13 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FirmwareCell, FirmwareDetails, FirmwareDrawer, UpdateAvailableIndicator } from './FirmwareDrawer';
-import { getFirmware, startFirmwareUpdate, type FirmwareOverviewEntry, type FirmwareStatus, type ShellyDevice } from './api';
+import {
+  getFirmware,
+  startFirmwareUpdate,
+  type FirmwareOverviewEntry,
+  type FirmwareStatus,
+  type ShellyDevice,
+} from './api';
 
 vi.mock('./api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./api')>()),
@@ -49,7 +55,7 @@ describe('FirmwareCell', () => {
           hasUpdate: true,
           available: { stable: '20230913-114150/v1.14.0', beta: null },
         })}
-      />
+      />,
     );
 
     expect(screen.getByTitle('20221027-102237/v1.12.1')).toHaveTextContent('v1.12.1');
@@ -88,7 +94,7 @@ describe('UpdateAvailableIndicator', () => {
       <>
         <UpdateAvailableIndicator entry={entry()} />
         <UpdateAvailableIndicator entry={undefined} />
-      </>
+      </>,
     );
 
     expect(container).toBeEmptyDOMElement();
@@ -107,7 +113,7 @@ describe('FirmwareDetails', () => {
           state: 'idle',
           fetchedAt: '2026-07-28T10:00:00.000Z',
         }}
-      />
+      />,
     );
 
     expect(screen.getByText('v1.12.1')).toBeInTheDocument();

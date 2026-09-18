@@ -21,21 +21,38 @@ describe('ShellyController ATT-498 device info and auth', () => {
       probe as never,
       discovery as never,
       deviceApi as never,
-      {} as never
+      {} as never,
     );
   });
 
   it('returns device status and config for a registered device', async () => {
     registry.findById.mockResolvedValue({ id: 1, ipAddress: '192.168.1.20', generation: 2 });
-    deviceApi.getDeviceInfo.mockResolvedValue({ generation: 2, status: { ok: true }, config: { name: 'Relay' }, fetchedAt: 'now' });
+    deviceApi.getDeviceInfo.mockResolvedValue({
+      generation: 2,
+      status: { ok: true },
+      config: { name: 'Relay' },
+      fetchedAt: 'now',
+    });
 
-    await expect(controller.info(1, {})).resolves.toEqual({ generation: 2, status: { ok: true }, config: { name: 'Relay' }, fetchedAt: 'now' });
-    expect(deviceApi.getDeviceInfo).toHaveBeenCalledWith({ ipAddress: '192.168.1.20', generation: 2, username: undefined, currentPassword: undefined });
+    await expect(controller.info(1, {})).resolves.toEqual({
+      generation: 2,
+      status: { ok: true },
+      config: { name: 'Relay' },
+      fetchedAt: 'now',
+    });
+    expect(deviceApi.getDeviceInfo).toHaveBeenCalledWith({
+      ipAddress: '192.168.1.20',
+      generation: 2,
+      username: undefined,
+      currentPassword: undefined,
+    });
   });
 
   it('sets the admin password and marks auth required', async () => {
     const updated = { id: 1, ipAddress: '192.168.1.21', generation: 1, authState: 'required' };
-    registry.findById.mockResolvedValueOnce({ id: 1, ipAddress: '192.168.1.21', generation: 1 }).mockResolvedValueOnce(updated);
+    registry.findById
+      .mockResolvedValueOnce({ id: 1, ipAddress: '192.168.1.21', generation: 1 })
+      .mockResolvedValueOnce(updated);
 
     await expect(controller.setAuth(1, { password: 'secret', currentPassword: 'old' })).resolves.toBe(updated);
     expect(deviceApi.setAdminPassword).toHaveBeenCalledWith({

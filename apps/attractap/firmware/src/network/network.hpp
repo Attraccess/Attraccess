@@ -2,9 +2,11 @@
 
 #include <string>
 
+#ifndef ATTRACTAP_HOST
 #include "esp_netif.h"
 #include "wifi/wifi.hpp"
 #include "ethernet/ethernet.hpp"
+#endif
 #include "../logger/logger.hpp"
 
 /**

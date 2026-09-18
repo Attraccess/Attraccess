@@ -18,7 +18,7 @@ export class RabbitmqDetectionController {
   @Get('detection/:mqttServerId')
   detect(
     @Param('mqttServerId', ParseIntPipe) mqttServerId: number,
-    @Query('refresh') refresh?: string
+    @Query('refresh') refresh?: string,
   ): Promise<RabbitmqDetectionResult> {
     return this.detection.detect(mqttServerId, refresh === 'true');
   }
