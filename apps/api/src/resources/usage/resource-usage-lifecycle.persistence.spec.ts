@@ -518,6 +518,54 @@ describe('Usage lifecycle persistence around external flows', () => {
     expect(await source.getRepository(ResourceUsageLifecycleAttempt).count()).toBe(0);
   });
 
+  it('claims a candidate before stopped-flow effects so concurrent ends run them once', async () => {
+    const candidate = await source.getRepository(ResourceUsage).save({
+      resourceId: 1,
+      userId: 1,
+      usageAction: ResourceUsageAction.Usage,
+      startTime: new Date(),
+      endTime: null,
+      lifecyclePending: true,
+      isFinalized: false,
+    });
+    await source.getRepository(ResourceUsageLifecycleAttempt).save({
+      id: 'candidate-cancellation',
+      resourceId: 1,
+      kind: 'start',
+      previousUsageId: null,
+      candidateUsageId: candidate.id,
+      transitionTime: candidate.startTime,
+      formSubmissions: [],
+      billingItems: [],
+    });
+    let releaseFlow!: () => void;
+    const flowSettled = new Promise<void>((resolve) => {
+      releaseFlow = resolve;
+    });
+    let stoppedFlowStarted!: () => void;
+    const stoppedFlowStartedPromise = new Promise<void>((resolve) => {
+      stoppedFlowStarted = resolve;
+    });
+    flow.runFlow.mockImplementation(async () => {
+      stoppedFlowStarted();
+      await flowSettled;
+    });
+
+    const firstEnd = usage.endLifecycleCandidate('candidate-cancellation', 1, 'Stopped');
+    await stoppedFlowStartedPromise;
+    const secondEnd = usage.endLifecycleCandidate('candidate-cancellation', 1, 'Stopped');
+
+    await expect(secondEnd).rejects.toThrow('The usage lifecycle attempt has no candidate session');
+    expect(flow.runFlow).toHaveBeenCalledTimes(1);
+    expect(await source.getRepository(ResourceUsage).findOneBy({ id: candidate.id })).toBeNull();
+    await expect(
+      source.getRepository(ResourceUsageLifecycleAttempt).findOneByOrFail({ id: 'candidate-cancellation' }),
+    ).resolves.toMatchObject({ candidateUsageId: null });
+
+    releaseFlow();
+    await expect(firstEnd).resolves.toBeUndefined();
+  });
+
   it('aborts an abandoned takeover at startup without replaying flows or discarding accepted operation', async () => {
     const previous = await seedActiveSession();
     const before = await publishedState();

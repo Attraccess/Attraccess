@@ -241,17 +241,22 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  /** Run the normal stopped flow before discarding a tentative session. */
+  /** Claim and discard the candidate before dispatching stopped-flow effects. */
   async endLifecycleCandidate(attemptId: string, resourceId: number, endNotes: string): Promise<void> {
     const candidate = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
       const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
       if (attempt.candidateUsageId === null) {
         throw new ConflictException('The usage lifecycle attempt has no candidate session');
       }
-      return manager.findOneOrFail(ResourceUsage, {
+      const candidate = await manager.findOneOrFail(ResourceUsage, {
         where: { id: attempt.candidateUsageId, lifecyclePending: true },
         relations: ['resource', 'user', 'project'],
       });
+      const result = await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
+      if (result.affected === 0) throw new ConflictException('The tentative usage session no longer exists');
+      // Keep the reservation until the owning flow has settled all of its branches.
+      await manager.update(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId }, { candidateUsageId: null });
+      return candidate;
     });
 
     await this.runUsageFlow(
@@ -263,7 +268,6 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       attemptId,
       true,
     );
-    await this.cancelLifecycleCandidate(attemptId, resourceId);
   }
 
   /** A restart has the same outcome as a rolled-back lifecycle: never replay physical effects. */
