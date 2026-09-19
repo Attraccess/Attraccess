@@ -78,6 +78,7 @@ import { ExternalEffectFailureError } from './errors/external-effect-failure.err
 
 interface FlowExecutionOptions {
   lifecycleAttemptId?: string;
+  lifecycleCandidateCancellation?: boolean;
 }
 
 // Handlebars helpers
@@ -639,6 +640,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     return {
       flowRunId,
       lifecycleAttemptId: options.lifecycleAttemptId,
+      lifecycleCandidateCancellation: options.lifecycleCandidateCancellation,
       transactionManager,
       compileTemplate: (template, data) => this.compileTemplate(template, data),
       getTemplateVariables: (data) => this.templateVariables.get(data),

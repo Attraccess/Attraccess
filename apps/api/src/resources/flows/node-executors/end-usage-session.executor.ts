@@ -8,8 +8,18 @@ export class EndUsageSessionExecutor implements NodeExecutor {
   constructor(private readonly resourceUsageService: ResourceUsageService) {}
 
   async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
+    const { notes } = ResourceUsageEndSessionNodeDataSchema.parse(node.data ?? {});
+
+    let finalNotes = '';
+    if (typeof notes === 'string' && notes.length > 0) {
+      const compiled = ctx.compileTemplate(notes, input);
+      finalNotes = compiled && compiled.trim().length > 0 ? compiled : notes;
+    }
+
     if (ctx.lifecycleAttemptId) {
-      await this.resourceUsageService.cancelLifecycleCandidate(ctx.lifecycleAttemptId, node.resourceId);
+      // The stopped flow may include an end-session node; it has already claimed the candidate.
+      if (ctx.lifecycleCandidateCancellation) return { payload: input };
+      await this.resourceUsageService.endLifecycleCandidate(ctx.lifecycleAttemptId, node.resourceId, finalNotes);
       return { payload: input };
     }
 
@@ -21,14 +31,6 @@ export class EndUsageSessionExecutor implements NodeExecutor {
 
     if (!activeUsage.user) {
       throw new FlowExecutionError('Active session has no owner user; cannot end');
-    }
-
-    const { notes } = ResourceUsageEndSessionNodeDataSchema.parse(node.data ?? {});
-
-    let finalNotes = '';
-    if (typeof notes === 'string' && notes.length > 0) {
-      const compiled = ctx.compileTemplate(notes, input);
-      finalNotes = compiled && compiled.trim().length > 0 ? compiled : notes;
     }
 
     await this.resourceUsageService.endSession(

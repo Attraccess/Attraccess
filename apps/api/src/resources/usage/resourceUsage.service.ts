@@ -120,9 +120,16 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     payload: object,
     description: string,
     lifecycleAttemptId?: string,
+    lifecycleCandidateCancellation = false,
   ): Promise<void> {
     try {
-      await this.flowExecutorService.runFlow(resourceId, triggerNodeType, payload, manager, { lifecycleAttemptId });
+      await this.flowExecutorService.runFlow(
+        resourceId,
+        triggerNodeType,
+        payload,
+        manager,
+        lifecycleCandidateCancellation ? { lifecycleAttemptId, lifecycleCandidateCancellation: true } : { lifecycleAttemptId },
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Usage ${description} flow failed for resource ${resourceId}: ${message}`, error);
@@ -232,6 +239,31 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       // Keep the reservation until the owning flow has settled all of its branches.
       await manager.update(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId }, { candidateUsageId: null });
     });
+  }
+
+  /** Run the normal stopped flow before discarding a tentative session. */
+  async endLifecycleCandidate(attemptId: string, resourceId: number, endNotes: string): Promise<void> {
+    const candidate = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
+      const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
+      if (attempt.candidateUsageId === null) {
+        throw new ConflictException('The usage lifecycle attempt has no candidate session');
+      }
+      return manager.findOneOrFail(ResourceUsage, {
+        where: { id: attempt.candidateUsageId, lifecyclePending: true },
+        relations: ['resource', 'user', 'project'],
+      });
+    });
+
+    await this.runUsageFlow(
+      undefined,
+      resourceId,
+      ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+      { ...this.getResourceUsageFlowPayload(candidate), endTime: new Date(), endNotes },
+      'tentative end',
+      attemptId,
+      true,
+    );
+    await this.cancelLifecycleCandidate(attemptId, resourceId);
   }
 
   /** A restart has the same outcome as a rolled-back lifecycle: never replay physical effects. */
