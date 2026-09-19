@@ -21,6 +21,7 @@ import { FlowTimer } from '../../metrics/instrumentation/flow/flow.helper';
 import { CompanionGatewayService } from '../../companion/companion-gateway.service';
 import axios from 'axios';
 import { registerPluginFlowNodes } from '../../plugin-system/plugin-flow-node-registry';
+import { ExternalEffectFailureError } from './errors/external-effect-failure.error';
 
 jest.mock('axios');
 
@@ -176,6 +177,24 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       } as unknown as CompanionGatewayService,
       operatingIntervals as never,
     );
+  });
+
+  it('preserves an external-effect failure when another branch rejects first', async () => {
+    const externalFailure = new ExternalEffectFailureError('controller rejected', new Error('offline'));
+    let rejectExternal!: (error: Error) => void;
+    const laterExternalFailure = new Promise<never>((_resolve, reject) => {
+      rejectExternal = reject;
+    });
+    const ordinaryFailure = Promise.reject(new Error('ordinary node failure'));
+
+    const settled = service['settleFlowBranches']([
+      ordinaryFailure as Promise<NodeProcessingResult[]>,
+      laterExternalFailure as Promise<NodeProcessingResult[]>,
+    ]);
+    await Promise.resolve();
+    rejectExternal(externalFailure);
+
+    await expect(settled).rejects.toBe(externalFailure);
   });
 
   it('records the same execution identity on operating transitions and flow logs', async () => {

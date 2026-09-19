@@ -482,13 +482,40 @@ describe('Usage lifecycle persistence around external flows', () => {
     });
 
     await expect(usage.startSession(1, users[0], { notes: 'Ended by flow' })).rejects.toThrow(
-      'The usage lifecycle attempt is no longer active',
+      'The tentative usage session was cancelled',
     );
 
     expect(await source.getRepository(ResourceUsage).count()).toBe(0);
     expect(await source.getRepository(ResourceUsageLifecycleAttempt).count()).toBe(0);
     expect(billing.handleResourceUsageStart).not.toHaveBeenCalled();
     expect(flow.trackResourceActivity).not.toHaveBeenCalled();
+  });
+
+  it('keeps a canceled candidate reservation until its flow settles', async () => {
+    let releaseFlow!: () => void;
+    const flowSettled = new Promise<void>((resolve) => {
+      releaseFlow = resolve;
+    });
+    let candidateCancelled!: () => void;
+    const cancellationComplete = new Promise<void>((resolve) => {
+      candidateCancelled = resolve;
+    });
+    flow.runFlow.mockImplementation(async (_resourceId, _trigger, _payload, _manager, { lifecycleAttemptId }) => {
+      await usage.cancelLifecycleCandidate(lifecycleAttemptId, 1);
+      candidateCancelled();
+      await flowSettled;
+    });
+
+    const firstStart = usage.startSession(1, users[0], { notes: 'Ended by flow' });
+    await cancellationComplete;
+
+    await expect(usage.startSession(1, users[1], { notes: 'Competing start' })).rejects.toThrow(
+      'A usage lifecycle operation is already in progress',
+    );
+
+    releaseFlow();
+    await expect(firstStart).rejects.toThrow('The tentative usage session was cancelled');
+    expect(await source.getRepository(ResourceUsageLifecycleAttempt).count()).toBe(0);
   });
 
   it('aborts an abandoned takeover at startup without replaying flows or discarding accepted operation', async () => {

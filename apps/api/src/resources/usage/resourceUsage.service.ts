@@ -222,22 +222,16 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
 
   /** A flow may end the tentative session it was started for before it becomes visible. */
   async cancelLifecycleCandidate(attemptId: string, resourceId: number): Promise<void> {
-    const cancelled = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
+    await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
       const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
       if (attempt.candidateUsageId === null) {
         throw new ConflictException('The usage lifecycle attempt has no candidate session');
       }
       const result = await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
       if (result.affected === 0) throw new ConflictException('The tentative usage session no longer exists');
-      await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
-      return true;
+      // Keep the reservation until the owning flow has settled all of its branches.
+      await manager.update(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId }, { candidateUsageId: null });
     });
-    if (cancelled) {
-      this.eventEmitter.emit(
-        ResourceUsageLifecycleAbortedEvent.EVENT_NAME,
-        new ResourceUsageLifecycleAbortedEvent(resourceId),
-      );
-    }
   }
 
   /** A restart has the same outcome as a rolled-back lifecycle: never replay physical effects. */
@@ -957,6 +951,9 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       );
       newSession = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
         const currentAttempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
+        if (currentAttempt.candidateUsageId !== createdSession.id) {
+          throw new ConflictException('The tentative usage session was cancelled');
+        }
         // The flow may have independently triggered maintenance while this start was pending.
         // Recheck the gate before making the candidate session visible.
         await this.getResource(resourceId, user, { checkMaintenance: true, checkControlPermission: false }, manager);

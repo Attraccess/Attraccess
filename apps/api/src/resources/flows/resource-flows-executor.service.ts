@@ -607,12 +607,17 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
 
   private async settleFlowBranches(branches: Promise<NodeProcessingResult[]>[]): Promise<NodeProcessingResult[]> {
     // A failed branch cannot release a lifecycle reservation while sibling effects are still running.
-    // Wait for work already started, then propagate the first observed failure without replaying it.
+    // Wait for work already started, then preserve lifecycle-fatal failures over ordinary node errors.
     let failure: { error: unknown } | undefined;
     const results = await Promise.allSettled(
       branches.map((branch) =>
         branch.catch((error) => {
-          failure ??= { error };
+          if (
+            !failure ||
+            (error instanceof ExternalEffectFailureError && !(failure.error instanceof ExternalEffectFailureError))
+          ) {
+            failure = { error };
+          }
           throw error;
         }),
       ),
