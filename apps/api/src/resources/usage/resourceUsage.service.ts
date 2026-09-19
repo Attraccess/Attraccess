@@ -937,6 +937,9 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       );
       newSession = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
         const currentAttempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
+        // The flow may have independently triggered maintenance while this start was pending.
+        // Recheck the gate before making the candidate session visible.
+        await this.getResource(resourceId, user, { checkMaintenance: true, checkControlPermission: false }, manager);
         if (existingActiveSession) {
           await this.applyLifecycleDrafts(manager, currentAttempt);
           const result = await manager.update(

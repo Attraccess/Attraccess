@@ -114,15 +114,20 @@ export class ResourceOperatingAttributionService {
     const intervalRepository = manager?.getRepository(ResourceOperatingInterval) ?? this.intervalRepository;
     const usageRepository = manager?.getRepository(ResourceUsage) ?? this.usageRepository;
 
-    // Bound IN parameters and memory per batch while loading each resource's history just once.
-    for (let offset = 0; offset < resourceIds.length; offset += 500) {
-      const batchIds = resourceIds.slice(offset, offset + 500);
+    // Each resource gets its own oldest requested boundary. Sharing a boundary across a batch
+    // would load an unbounded history for unrelated resources with newer service cycles.
+    for (let offset = 0; offset < resourceIds.length; offset += 150) {
+      const batchIds = resourceIds.slice(offset, offset + 150);
       const batchWindows = batchIds.flatMap((id) => windowsByResource.get(id) ?? []);
-      const start = new Date(Math.min(...batchWindows.map((window) => window.start.getTime())));
-      const where = [
-        { resourceId: In(batchIds), startTime: LessThan(asOf), endTime: IsNull() },
-        { resourceId: In(batchIds), startTime: LessThan(asOf), endTime: MoreThan(start) },
-      ];
+      const where = batchIds.flatMap((resourceId) => {
+        const start = new Date(
+          Math.min(...(windowsByResource.get(resourceId) ?? []).map((window) => window.start.getTime())),
+        );
+        return [
+          { resourceId, startTime: LessThan(asOf), endTime: IsNull() },
+          { resourceId, startTime: LessThan(asOf), endTime: MoreThan(start) },
+        ];
+      });
       const [intervals, usages, pendingSessionEnds] = await Promise.all([
         intervalRepository.find({ where, select: ['resourceId', 'startTime', 'endTime'] }),
         usageRepository.find({

@@ -4,7 +4,7 @@ import {
   ResourceUsageAction,
   ResourceUsageLifecycleAttempt,
 } from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
+import { MoreThan, Repository } from 'typeorm';
 import { ResourceOperatingAttributionService } from './resource-operating-attribution.service';
 
 const at = (time: string) => new Date(`2026-08-28T${time}.000Z`);
@@ -109,6 +109,31 @@ describe('ResourceOperatingAttributionService', () => {
       await expect(service.getDurationsForWindows([], asOf)).resolves.toEqual(new Map());
       expect(intervalRepository.find).not.toHaveBeenCalled();
       expect(usageRepository.find).not.toHaveBeenCalled();
+    });
+
+    it('uses each resource service-cycle boundary when loading a batch', async () => {
+      intervalRepository.find.mockResolvedValue([]);
+      usageRepository.find.mockResolvedValue([]);
+
+      await service.getDurationsForWindows(
+        [
+          { key: 'old:1', resourceId: 1, start: at('01:00:00') },
+          { key: 'new:2', resourceId: 2, start: at('11:00:00') },
+        ],
+        asOf,
+      );
+
+      const intervalWhere = intervalRepository.find.mock.calls[0][0].where as Array<{
+        resourceId: number;
+        endTime: unknown;
+      }>;
+      expect(intervalWhere).toHaveLength(4);
+      expect(intervalWhere.filter(({ resourceId }) => resourceId === 1)).toEqual(
+        expect.arrayContaining([expect.objectContaining({ endTime: MoreThan(at('01:00:00')) })]),
+      );
+      expect(intervalWhere.filter(({ resourceId }) => resourceId === 2)).toEqual(
+        expect.arrayContaining([expect.objectContaining({ endTime: MoreThan(at('11:00:00')) })]),
+      );
     });
 
     it('propagates unavailable authoritative data instead of returning a zero duration', async () => {

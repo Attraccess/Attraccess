@@ -178,6 +178,7 @@ describe('Usage lifecycle persistence around external flows', () => {
     chargeForResourceUsage: jest.Mock;
     notifyResourceUsageCharge: jest.Mock;
   };
+  let maintenance: { hasActiveMaintenance: jest.Mock; canManageMaintenance: jest.Mock };
   const draftItem = {
     name: 'Energy',
     description: 'Pending measurement',
@@ -245,6 +246,10 @@ describe('Usage lifecycle persistence around external flows', () => {
       }),
       notifyResourceUsageCharge: jest.fn().mockResolvedValue(undefined),
     };
+    maintenance = {
+      hasActiveMaintenance: jest.fn().mockResolvedValue(false),
+      canManageMaintenance: jest.fn().mockResolvedValue(false),
+    };
     usage = new ResourceUsageService(
       source.getRepository(Resource),
       source.getRepository(ResourceUsage),
@@ -254,7 +259,7 @@ describe('Usage lifecycle persistence around external flows', () => {
       {} as never,
       {} as never,
       {} as never,
-      { hasActiveMaintenance: jest.fn().mockResolvedValue(false) } as never,
+      maintenance as never,
       events,
       billing as never,
       new ResourceOperatingAttributionService(
@@ -449,6 +454,25 @@ describe('Usage lifecycle persistence around external flows', () => {
     expect(await source.getRepository(ResourceUsageLifecycleAttempt).count()).toBe(0);
     expect(await source.getRepository(ResourceOperatingInterval).count()).toBe(1);
     expect(billing.notifyResourceUsageCharge).not.toHaveBeenCalled();
+    expect(flow.trackResourceActivity).not.toHaveBeenCalled();
+  });
+
+  it('does not publish a pending start after its flow has triggered maintenance', async () => {
+    maintenance.hasActiveMaintenance.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    flow.runFlow.mockImplementation(async (resourceId) => {
+      await operating.transition(resourceId, 'operating', {
+        flowNodeId: 'observed-operation',
+        flowRunId: 'maintenance-triggered',
+      });
+    });
+
+    await expect(usage.startSession(1, users[0], { notes: 'Pending start' })).rejects.toThrow(
+      'ResourceMaintenanceInUseException',
+    );
+
+    expect(await source.getRepository(ResourceUsage).count()).toBe(0);
+    expect(await source.getRepository(ResourceUsageLifecycleAttempt).count()).toBe(0);
+    expect(billing.handleResourceUsageStart).not.toHaveBeenCalled();
     expect(flow.trackResourceActivity).not.toHaveBeenCalled();
   });
 
