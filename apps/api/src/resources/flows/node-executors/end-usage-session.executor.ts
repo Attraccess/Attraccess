@@ -8,6 +8,11 @@ export class EndUsageSessionExecutor implements NodeExecutor {
   constructor(private readonly resourceUsageService: ResourceUsageService) {}
 
   async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
+    if (ctx.lifecycleAttemptId) {
+      await this.resourceUsageService.cancelLifecycleCandidate(ctx.lifecycleAttemptId, node.resourceId);
+      return { payload: input };
+    }
+
     const activeUsage = await this.resourceUsageService.getActiveSession(node.resourceId, false, ctx.transactionManager);
 
     if (!activeUsage) {

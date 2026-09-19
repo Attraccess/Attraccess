@@ -18,7 +18,9 @@ function createNode(partial: Partial<ResourceFlowNode>): ResourceFlowNode {
 
 describe('EndUsageSessionExecutor', () => {
   let executor: EndUsageSessionExecutor;
-  let resourceUsageService: jest.Mocked<Pick<ResourceUsageService, 'getActiveSession' | 'endSession'>>;
+  let resourceUsageService: jest.Mocked<
+    Pick<ResourceUsageService, 'cancelLifecycleCandidate' | 'getActiveSession' | 'endSession'>
+  >;
   let ctx: NodeExecutionContext;
   let compileTemplate: jest.Mock;
 
@@ -29,6 +31,7 @@ describe('EndUsageSessionExecutor', () => {
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
 
     resourceUsageService = {
+      cancelLifecycleCandidate: jest.fn(),
       getActiveSession: jest.fn(),
       endSession: jest.fn(),
     };
@@ -59,6 +62,18 @@ describe('EndUsageSessionExecutor', () => {
     await executor.execute(node, {}, ctx);
 
     expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(42, false, txManager);
+  });
+
+  it('cancels the tentative session when executed by a usage lifecycle flow', async () => {
+    ctx.lifecycleAttemptId = 'attempt-id';
+
+    await expect(executor.execute(createNode({ resourceId: 42 }), { source: 'start' }, ctx)).resolves.toEqual({
+      payload: { source: 'start' },
+    });
+
+    expect(resourceUsageService.cancelLifecycleCandidate).toHaveBeenCalledWith('attempt-id', 42);
+    expect(resourceUsageService.getActiveSession).not.toHaveBeenCalled();
+    expect(resourceUsageService.endSession).not.toHaveBeenCalled();
   });
 
   it('throws NoUsageSessionError when there is no active session', async () => {

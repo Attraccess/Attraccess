@@ -220,6 +220,26 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       );
   }
 
+  /** A flow may end the tentative session it was started for before it becomes visible. */
+  async cancelLifecycleCandidate(attemptId: string, resourceId: number): Promise<void> {
+    const cancelled = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
+      const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
+      if (attempt.candidateUsageId === null) {
+        throw new ConflictException('The usage lifecycle attempt has no candidate session');
+      }
+      const result = await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
+      if (result.affected === 0) throw new ConflictException('The tentative usage session no longer exists');
+      await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
+      return true;
+    });
+    if (cancelled) {
+      this.eventEmitter.emit(
+        ResourceUsageLifecycleAbortedEvent.EVENT_NAME,
+        new ResourceUsageLifecycleAbortedEvent(resourceId),
+      );
+    }
+  }
+
   /** A restart has the same outcome as a rolled-back lifecycle: never replay physical effects. */
   async recoverInterruptedLifecycles(): Promise<void> {
     const resourceIds = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {

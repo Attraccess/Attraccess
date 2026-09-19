@@ -476,6 +476,21 @@ describe('Usage lifecycle persistence around external flows', () => {
     expect(flow.trackResourceActivity).not.toHaveBeenCalled();
   });
 
+  it('does not publish a tentative start when its flow ends the session', async () => {
+    flow.runFlow.mockImplementation(async (_resourceId, _trigger, _payload, _manager, { lifecycleAttemptId }) => {
+      await usage.cancelLifecycleCandidate(lifecycleAttemptId, 1);
+    });
+
+    await expect(usage.startSession(1, users[0], { notes: 'Ended by flow' })).rejects.toThrow(
+      'The usage lifecycle attempt is no longer active',
+    );
+
+    expect(await source.getRepository(ResourceUsage).count()).toBe(0);
+    expect(await source.getRepository(ResourceUsageLifecycleAttempt).count()).toBe(0);
+    expect(billing.handleResourceUsageStart).not.toHaveBeenCalled();
+    expect(flow.trackResourceActivity).not.toHaveBeenCalled();
+  });
+
   it('aborts an abandoned takeover at startup without replaying flows or discarding accepted operation', async () => {
     const previous = await seedActiveSession();
     const before = await publishedState();
