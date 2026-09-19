@@ -9,11 +9,16 @@ import {
   OnModuleInit,
   OnModuleDestroy,
   Optional,
+  ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, In, FindOneOptions, EntityManager } from 'typeorm';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
+  BillingTransaction,
+  BillingTransactionItem,
+  LifecycleBillingItem,
+  ResourceUsageLifecycleAttempt,
   FormSubmission,
   Resource,
   ResourceFlowNodeType,
@@ -38,6 +43,7 @@ import {
   ResourceUsageNoteAddedEvent,
   ResourceSupervisedUsageStartedEvent,
   ResourceSupervisedUsageEndedEvent,
+  ResourceUsageLifecycleAbortedEvent,
 } from './events/resource-usage.events';
 import { ResourceIntroductionsService } from '../introductions/resouceIntroductions.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
@@ -72,6 +78,8 @@ import { ExternalEffectFailureError } from '../flows/errors/external-effect-fail
 import { ResourceOperatingAttributionService } from '../operating-intervals/resource-operating-attribution.service';
 import { AuditService } from '../../audit/audit.service';
 import { ResourceAuditOrigin } from '../../audit/audit-policy';
+import { randomUUID } from 'node:crypto';
+import { runSerializedTransaction } from '../../database/run-serialized-transaction';
 
 export interface EndSessionOptions {
   /** Skip persisting required END-action form submissions (used by automated/flow paths). */
@@ -93,8 +101,6 @@ export interface StartSessionOptions {
 @Injectable()
 export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ResourceUsageService.name);
-  private sqliteEndSessionChain: Promise<unknown> = Promise.resolve();
-
   private readonly accessCache = new Map<
     string,
     { userId: number; resourceId: number; result: boolean; expiresAt: number }
@@ -107,36 +113,23 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
   private authorizationCacheSubscriber: Redis | null = null;
   private accessCacheGeneration = 0;
 
-  private isSqliteDriver(manager: EntityManager | undefined = this.resourceUsageRepository.manager): boolean {
-    const type = manager?.connection?.options?.type;
-    if (!type) {
-      return false;
-    }
-    return type === 'sqlite' || type === 'better-sqlite3' || type === 'sqljs';
-  }
-
-  private async runSerializedIfSqlite<T>(manager: EntityManager | undefined, task: () => Promise<T>): Promise<T> {
-    if (!this.isSqliteDriver(manager)) {
-      return task();
-    }
-
-    // Queue tasks sequentially to avoid nested transactions on sqlite's single connection
-    const next = this.sqliteEndSessionChain.then(task);
-    this.sqliteEndSessionChain = next.catch((error) => {
-      this.logger.warn('Serial endSession chain failed; continuing queue', error);
-    });
-    return next;
-  }
-
   private async runUsageFlow(
-    manager: EntityManager,
+    manager: EntityManager | undefined,
     resourceId: number,
     triggerNodeType: ResourceFlowNodeType,
     payload: object,
     description: string,
+    lifecycleAttemptId?: string,
+    lifecycleCandidateCancellation = false,
   ): Promise<void> {
     try {
-      await this.flowExecutorService.runFlow(resourceId, triggerNodeType, payload, manager);
+      await this.flowExecutorService.runFlow(
+        resourceId,
+        triggerNodeType,
+        payload,
+        manager,
+        lifecycleCandidateCancellation ? { lifecycleAttemptId, lifecycleCandidateCancellation: true } : { lifecycleAttemptId },
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Usage ${description} flow failed for resource ${resourceId}: ${message}`, error);
@@ -152,6 +145,149 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       : 0;
     await manager.update(ResourceUsage, usage.id, { attributedOperatingDurationInMinutes });
     usage.attributedOperatingDurationInMinutes = attributedOperatingDurationInMinutes;
+  }
+
+  private async assertLifecycleAvailable(manager: EntityManager, resourceId: number): Promise<void> {
+    if (await manager.findOne(ResourceUsageLifecycleAttempt, { where: { resourceId } })) {
+      throw new ConflictException('A usage lifecycle operation is already in progress for this resource');
+    }
+  }
+
+  private async getLifecycleAttempt(
+    manager: EntityManager,
+    id: string,
+    resourceId: number,
+  ): Promise<ResourceUsageLifecycleAttempt> {
+    const attempt = await manager.findOne(ResourceUsageLifecycleAttempt, { where: { id, resourceId } });
+    if (!attempt) throw new ConflictException('The usage lifecycle attempt is no longer active');
+    return attempt;
+  }
+
+  /** Billing flow effects belong to the attempt until the entire lifecycle succeeds. */
+  async stageLifecycleBillingItem(
+    attemptId: string,
+    resourceId: number,
+    usageId: number | undefined,
+    item: Omit<LifecycleBillingItem, 'usageId'>,
+  ): Promise<void> {
+    await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
+      const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
+      const targetUsageId = attempt.previousUsageId ?? attempt.candidateUsageId;
+      if (targetUsageId === null || (usageId !== undefined && usageId !== targetUsageId)) {
+        throw new ConflictException('Billing item does not belong to this usage lifecycle attempt');
+      }
+      await manager.update(ResourceUsageLifecycleAttempt, attempt.id, {
+        billingItems: [...attempt.billingItems, { ...item, usageId: targetUsageId }],
+      });
+    });
+  }
+
+  private async applyLifecycleDrafts(manager: EntityManager, attempt: ResourceUsageLifecycleAttempt): Promise<void> {
+    for (const submission of attempt.formSubmissions) {
+      await manager.save(FormSubmission, {
+        formId: submission.formId,
+        resourceUsageId: submission.resourceUsageId,
+        userId: submission.userId,
+        action: submission.action,
+        data: submission.data,
+      });
+    }
+    for (const { usageId, quantity, ...item } of attempt.billingItems) {
+      const transaction = await manager.findOne(BillingTransaction, { where: { resourceUsageId: usageId } });
+      if (!transaction) throw new ConflictException('The usage billing transaction is missing');
+      const where = {
+        billingTransactionId: transaction.id,
+        ...item,
+        description: item.description === null ? IsNull() : item.description,
+        externalReference: item.externalReference === null ? IsNull() : item.externalReference,
+      };
+      const existing = await manager.findOne(BillingTransactionItem, { where });
+      if (existing) {
+        await manager.update(BillingTransactionItem, existing.id, { quantity: existing.quantity + quantity });
+      } else {
+        await manager.save(BillingTransactionItem, { billingTransactionId: transaction.id, ...item, quantity });
+      }
+    }
+  }
+
+  private async abortLifecycleAttempt(attemptId: string, resourceId: number): Promise<void> {
+    const aborted = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
+      const attempt = await manager.findOne(ResourceUsageLifecycleAttempt, { where: { id: attemptId, resourceId } });
+      if (!attempt) return false;
+      if (attempt.candidateUsageId !== null) {
+        await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
+      }
+      await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
+      return true;
+    });
+    if (aborted)
+      this.eventEmitter.emit(
+        ResourceUsageLifecycleAbortedEvent.EVENT_NAME,
+        new ResourceUsageLifecycleAbortedEvent(resourceId),
+      );
+  }
+
+  /** A flow may end the tentative session it was started for before it becomes visible. */
+  async cancelLifecycleCandidate(attemptId: string, resourceId: number): Promise<void> {
+    await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
+      const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
+      if (attempt.candidateUsageId === null) {
+        throw new ConflictException('The usage lifecycle attempt has no candidate session');
+      }
+      const result = await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
+      if (result.affected === 0) throw new ConflictException('The tentative usage session no longer exists');
+      // Keep the reservation until the owning flow has settled all of its branches.
+      await manager.update(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId }, { candidateUsageId: null });
+    });
+  }
+
+  /** Claim and discard the candidate before dispatching stopped-flow effects. */
+  async endLifecycleCandidate(attemptId: string, resourceId: number, endNotes: string): Promise<void> {
+    const candidate = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
+      const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
+      if (attempt.candidateUsageId === null) {
+        throw new ConflictException('The usage lifecycle attempt has no candidate session');
+      }
+      const candidate = await manager.findOneOrFail(ResourceUsage, {
+        where: { id: attempt.candidateUsageId, lifecyclePending: true },
+        relations: ['resource', 'user', 'project'],
+      });
+      const result = await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
+      if (result.affected === 0) throw new ConflictException('The tentative usage session no longer exists');
+      // Keep the reservation until the owning flow has settled all of its branches.
+      await manager.update(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId }, { candidateUsageId: null });
+      return candidate;
+    });
+
+    await this.runUsageFlow(
+      undefined,
+      resourceId,
+      ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+      { ...this.getResourceUsageFlowPayload(candidate), endTime: new Date(), endNotes },
+      'tentative end',
+      attemptId,
+      true,
+    );
+  }
+
+  /** A restart has the same outcome as a rolled-back lifecycle: never replay physical effects. */
+  async recoverInterruptedLifecycles(): Promise<void> {
+    const resourceIds = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
+      const attempts = await manager.find(ResourceUsageLifecycleAttempt);
+      for (const attempt of attempts) {
+        if (attempt.candidateUsageId !== null) {
+          await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
+        }
+        await manager.delete(ResourceUsageLifecycleAttempt, attempt.id);
+      }
+      return attempts.map((attempt) => attempt.resourceId);
+    });
+    for (const resourceId of resourceIds) {
+      this.eventEmitter.emit(
+        ResourceUsageLifecycleAbortedEvent.EVENT_NAME,
+        new ResourceUsageLifecycleAbortedEvent(resourceId),
+      );
+    }
   }
 
   constructor(
@@ -183,6 +319,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    await this.recoverInterruptedLifecycles();
     this.cacheCleanupInterval = setInterval(() => this.pruneAccessCache(), 60_000);
     if (!this.valkeyClient) {
       return;
@@ -232,7 +369,10 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private setAccessCacheEntry(key: string, entry: { userId: number; resourceId: number; result: boolean; expiresAt: number }): void {
+  private setAccessCacheEntry(
+    key: string,
+    entry: { userId: number; resourceId: number; result: boolean; expiresAt: number },
+  ): void {
     this.accessCache.set(key, entry);
     const keys = this.accessCacheKeysByUser.get(entry.userId) ?? new Set<string>();
     keys.add(key);
@@ -678,217 +818,254 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     let startedUsageIdToEmit: number | null = null;
     let takeoverEndedUser: User | null = null;
 
-    const newSession = await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
-      // Maintenance/health are enforced here; the control gate is applied below so the supervised
-      // path can bypass the introduction requirement when a qualified supervisor is present.
-      const resource = await this.getResource(
-        resourceId,
-        user,
-        {
-          checkMaintenance: true,
-          checkControlPermission: false,
-        },
-        transactionalEntityManager,
-      );
-
-      // Gate: the solo path stays identical to today's behavior. Only when the user cannot start
-      // solo (or the resource mandates supervision) does the supervised path apply.
-      if (supervisorUserId === null) {
-        const userCanControl = await this.canControllResource(resourceId, user, transactionalEntityManager);
-        if (!userCanControl) {
-          this.logger.warn(`User ${user.id} cannot control resource ${resourceId} - missing introduction`);
-          throw new BadRequestException('You must complete the resource introduction before using it');
-        }
-        if (resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED) {
-          throw new BadRequestException('This resource requires a supervisor; request a supervised session instead');
-        }
-      } else {
-        await this.validateSupervisedStart(resourceId, user, supervisorUserId, transactionalEntityManager, resource);
-      }
-
-      if (resource.type !== ResourceType.Machine) {
-        throw new BadRequestException('Resource is not a machine');
-      }
-
-      const existingActiveSession = await this.getActiveSession(resourceId, false, transactionalEntityManager);
-      if (existingActiveSession) {
-        this.logger.debug(
-          `Found existing active session for resource ${resourceId} by user ${existingActiveSession.user.id}`,
+    const attemptId = randomUUID();
+    let chargeTransactionId: number | undefined;
+    const prepared = await runSerializedTransaction(
+      this.resourceUsageRepository.manager,
+      async (transactionalEntityManager) => {
+        await this.assertLifecycleAvailable(transactionalEntityManager, resourceId);
+        // Maintenance/health are enforced here; the control gate is applied below so the supervised
+        // path can bypass the introduction requirement when a qualified supervisor is present.
+        const resource = await this.getResource(
+          resourceId,
+          user,
+          {
+            checkMaintenance: true,
+            checkControlPermission: false,
+          },
+          transactionalEntityManager,
         );
 
-        // If there's an active session, check if takeover is allowed
-        if (dto.forceTakeOver && resource.allowTakeOver) {
+        // Gate: the solo path stays identical to today's behavior. Only when the user cannot start
+        // solo (or the resource mandates supervision) does the supervised path apply.
+        if (supervisorUserId === null) {
+          const userCanControl = await this.canControllResource(resourceId, user, transactionalEntityManager);
+          if (!userCanControl) {
+            this.logger.warn(`User ${user.id} cannot control resource ${resourceId} - missing introduction`);
+            throw new BadRequestException('You must complete the resource introduction before using it');
+          }
+          if (resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED) {
+            throw new BadRequestException('This resource requires a supervisor; request a supervised session instead');
+          }
+        } else {
+          await this.validateSupervisedStart(resourceId, user, supervisorUserId, transactionalEntityManager, resource);
+        }
+
+        if (resource.type !== ResourceType.Machine) {
+          throw new BadRequestException('Resource is not a machine');
+        }
+
+        const existingActiveSession = await this.getActiveSession(resourceId, false, transactionalEntityManager);
+        if (existingActiveSession) {
           this.logger.debug(
-            `Forcing takeover of resource ${resourceId} from user ${existingActiveSession.user.id} to user ${user.id}`,
+            `Found existing active session for resource ${resourceId} by user ${existingActiveSession.user.id}`,
           );
 
-          const takeoverEndTime = new Date();
+          // If there's an active session, check if takeover is allowed
+          if (dto.forceTakeOver && resource.allowTakeOver) {
+            this.logger.debug(
+              `Forcing takeover of resource ${resourceId} from user ${existingActiveSession.user.id} to user ${user.id}`,
+            );
 
-          // End the existing session with a note about takeover
-          await transactionalEntityManager
-            .createQueryBuilder()
-            .update(ResourceUsage)
-            .set({
-              endTime: takeoverEndTime,
+            takeoverEndedUser = existingActiveSession.user;
+          } else if (dto.forceTakeOver && !resource.allowTakeOver) {
+            this.logger.warn(`Takeover attempted for resource ${resourceId} but not allowed`);
+            throw new BadRequestException('This resource does not allow overtaking');
+          } else {
+            this.logger.warn(`Resource ${resourceId} is currently in use by user ${existingActiveSession.user.id}`);
+            throw new ResourceInUseError();
+          }
+        }
+
+        const usageData: Partial<ResourceUsage> = {
+          resourceId,
+          usageAction: ResourceUsageAction.Usage,
+          userId: user.id,
+          startTime: new Date(),
+          startNotes: dto.notes,
+          endTime: null,
+          endNotes: null,
+          isFinalized: false,
+          lifecyclePending: true,
+        };
+
+        const billingConfiguration = await this.billingService.getResourceBillingConfiguration(
+          resourceId,
+          transactionalEntityManager,
+        );
+        usageData.sessionDurationCreditsPerMinute = billingConfiguration.creditsPerMinute;
+        usageData.operatingDurationCreditsPerMinute = billingConfiguration.creditsPerOperatingMinute;
+
+        if (supervisorUserId !== null) {
+          usageData.supervisorUserId = supervisorUserId;
+        }
+
+        if (dto.projectId !== undefined) {
+          const project = await this.projectsService.findOneById(user.id, dto.projectId);
+
+          usageData.projectId = project.id;
+        }
+
+        this.logger.debug(`Creating new usage session for resource ${resourceId}`, { usageData });
+
+        await transactionalEntityManager.createQueryBuilder().insert().into(ResourceUsage).values(usageData).execute();
+
+        const createdSession = await transactionalEntityManager.findOne(ResourceUsage, {
+          where: {
+            resourceId,
+            userId: user.id,
+            endTime: IsNull(),
+            lifecyclePending: true,
+          },
+          order: {
+            startTime: 'DESC',
+          },
+          relations: ['resource', 'user', 'project'],
+        });
+
+        if (!createdSession) {
+          this.logger.error(`Failed to retrieve newly created session for resource ${resourceId} and user ${user.id}`);
+          throw new Error('Failed to retrieve the newly created session.');
+        }
+
+        this.logger.debug(
+          `Successfully created session ${createdSession.id} for resource ${resourceId} by user ${user.id}`,
+        );
+
+        let formSubmissions: FormSubmission[] = [];
+        if (resource.type === ResourceType.Machine) {
+          const action = dto.forceTakeOver ? ResourceFormAction.TAKEOVER : ResourceFormAction.START;
+          formSubmissions = await this.resourceFormsService.prepareRequiredSubmissions({
+            resourceId,
+            action,
+            submissions: dto.formSubmissions,
+            userId: user.id,
+            resourceUsageId: createdSession.id,
+            manager: transactionalEntityManager,
+          });
+        }
+
+        await this.billingService.validateResourceUsageStart(
+          resourceId,
+          createdSession,
+          user,
+          transactionalEntityManager,
+        );
+        const attempt = await transactionalEntityManager.save(ResourceUsageLifecycleAttempt, {
+          id: attemptId,
+          resourceId,
+          kind: existingActiveSession ? 'takeover' : 'start',
+          candidateUsageId: createdSession.id,
+          previousUsageId: existingActiveSession?.id ?? null,
+          transitionTime: createdSession.startTime,
+          formSubmissions,
+          billingItems: [],
+        });
+        return { resource, createdSession, existingActiveSession, attempt, formSubmissions };
+      },
+    );
+
+    let newSession: ResourceUsage;
+    try {
+      const { createdSession, existingActiveSession, formSubmissions, attempt } = prepared;
+      await this.runUsageFlow(
+        undefined,
+        resourceId,
+        existingActiveSession
+          ? ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER
+          : ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+        existingActiveSession
+          ? {
+              ...this.getResourceUsageFlowPayload(existingActiveSession, formSubmissions),
+              takeOverTime: attempt.transitionTime,
+              newUser: user,
+              oldUser: existingActiveSession.user,
+            }
+          : this.getResourceUsageFlowPayload(createdSession, formSubmissions),
+        existingActiveSession ? 'takeover' : 'start',
+        attemptId,
+      );
+      newSession = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
+        const currentAttempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
+        if (currentAttempt.candidateUsageId !== createdSession.id) {
+          throw new ConflictException('The tentative usage session was cancelled');
+        }
+        // The flow may have independently triggered maintenance while this start was pending.
+        // Recheck the gate before making the candidate session visible.
+        await this.getResource(resourceId, user, { checkMaintenance: true, checkControlPermission: false }, manager);
+        if (existingActiveSession) {
+          await this.applyLifecycleDrafts(manager, currentAttempt);
+          const result = await manager.update(
+            ResourceUsage,
+            { id: existingActiveSession.id, endTime: IsNull() },
+            {
+              endTime: currentAttempt.transitionTime,
               endNotes: `Session ended due to takeover by user ${user.id}`,
-            })
-            .where('id = :id', { id: existingActiveSession.id })
-            .execute();
-
-          const updatedSession = await transactionalEntityManager.findOne(ResourceUsage, {
+            },
+          );
+          if (result.affected === 0) throw new ConflictException('Usage session changed during takeover');
+          const endedSession = await manager.findOneOrFail(ResourceUsage, {
             where: { id: existingActiveSession.id },
             relations: ['user', 'resource'],
           });
-
-          if (!updatedSession) {
-            throw new Error(`Failed to retrieve ended session ${existingActiveSession.id}`);
-          }
-          await this.persistAttributedOperatingDuration(updatedSession, transactionalEntityManager);
-
-          // Charge the previous user's ended session
-          await this.billingService.chargeForResourceUsage(updatedSession, transactionalEntityManager);
-
-          // Defer event for the ended session until after commit
-          endedUsageIdToEmit = updatedSession.id;
-          takeoverEndedUser = existingActiveSession.user;
-        } else if (dto.forceTakeOver && !resource.allowTakeOver) {
-          this.logger.warn(`Takeover attempted for resource ${resourceId} but not allowed`);
-          throw new BadRequestException('This resource does not allow overtaking');
+          await this.persistAttributedOperatingDuration(endedSession, manager);
+          chargeTransactionId = (await this.billingService.chargeForResourceUsage(endedSession, manager))?.id;
+          endedUsageIdToEmit = endedSession.id;
         } else {
-          this.logger.warn(`Resource ${resourceId} is currently in use by user ${existingActiveSession.user.id}`);
-          throw new ResourceInUseError();
+          startedUsageIdToEmit = createdSession.id;
         }
-      }
-
-      const usageData: Partial<ResourceUsage> = {
-        resourceId,
-        usageAction: ResourceUsageAction.Usage,
-        userId: user.id,
-        startTime: new Date(),
-        startNotes: dto.notes,
-        endTime: null,
-        endNotes: null,
-        isFinalized: false,
-      };
-
-      const billingConfiguration = await this.billingService.getResourceBillingConfiguration(
-        resourceId,
-        transactionalEntityManager,
-      );
-      usageData.sessionDurationCreditsPerMinute = billingConfiguration.creditsPerMinute;
-      usageData.operatingDurationCreditsPerMinute = billingConfiguration.creditsPerOperatingMinute;
-
-      if (supervisorUserId !== null) {
-        usageData.supervisorUserId = supervisorUserId;
-      }
-
-      if (dto.projectId !== undefined) {
-        const project = await this.projectsService.findOneById(user.id, dto.projectId);
-
-        usageData.projectId = project.id;
-      }
-
-      this.logger.debug(`Creating new usage session for resource ${resourceId}`, { usageData });
-
-      await transactionalEntityManager.createQueryBuilder().insert().into(ResourceUsage).values(usageData).execute();
-
-      const createdSession = await transactionalEntityManager.findOne(ResourceUsage, {
-        where: {
-          resourceId,
-          userId: user.id,
-          endTime: IsNull(),
-        },
-        order: {
-          startTime: 'DESC',
-        },
-        relations: ['resource', 'user', 'project'],
-      });
-
-      if (!createdSession) {
-        this.logger.error(`Failed to retrieve newly created session for resource ${resourceId} and user ${user.id}`);
-        throw new Error('Failed to retrieve the newly created session.');
-      }
-
-      this.logger.debug(
-        `Successfully created session ${createdSession.id} for resource ${resourceId} by user ${user.id}`,
-      );
-
-      let formSubmissions: FormSubmission[] = [];
-      if (resource.type === ResourceType.Machine) {
-        const action = dto.forceTakeOver ? ResourceFormAction.TAKEOVER : ResourceFormAction.START;
-        formSubmissions = await this.resourceFormsService.saveRequiredSubmissions({
-          resourceId,
-          action,
-          submissions: dto.formSubmissions,
-          userId: user.id,
-          resourceUsageId: createdSession.id,
-          manager: transactionalEntityManager,
+        // The outgoing charge must affect the final balance check, including same-user takeovers.
+        // Both changes remain atomic if the replacement can no longer be afforded.
+        await this.billingService.handleResourceUsageStart(resourceId, createdSession, user, manager);
+        if (!existingActiveSession) await this.applyLifecycleDrafts(manager, currentAttempt);
+        await manager.update(ResourceUsage, createdSession.id, { isFinalized: true, lifecyclePending: false });
+        await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
+        return manager.findOneOrFail(ResourceUsage, {
+          where: { id: createdSession.id },
+          relations: ['resource', 'user', 'project'],
         });
-      }
-
-      await this.billingService.handleResourceUsageStart(resourceId, createdSession, user, transactionalEntityManager);
-
-      if (existingActiveSession) {
-        const now = new Date();
-
-        await this.runUsageFlow(
-          transactionalEntityManager,
-          existingActiveSession.resourceId,
-          ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
-          {
-            ...this.getResourceUsageFlowPayload(existingActiveSession, formSubmissions),
-            takeOverTime: now,
-            newUser: user,
-            oldUser: existingActiveSession.user,
-          },
-          'takeover',
-        );
-
-        // Emit event for the takeover
-        this.eventEmitter.emit(
-          ResourceUsageSessionTakenOverEvent.EVENT_NAME,
-          new ResourceUsageSessionTakenOverEvent(resource, now, user, existingActiveSession.user),
-        );
-      } else {
-        // Defer event for the newly started session until after commit
-        startedUsageIdToEmit = createdSession.id;
-
-        await this.runUsageFlow(
-          transactionalEntityManager,
-          createdSession.resourceId,
-          ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
-          this.getResourceUsageFlowPayload(createdSession, formSubmissions),
-          'start',
-        );
-      }
-
-      this.flowExecutorService.trackResourceActivity(createdSession.resourceId);
-      await transactionalEntityManager.update(ResourceUsage, createdSession.id, { isFinalized: true });
-      return await transactionalEntityManager.findOne(ResourceUsage, {
-        where: { id: createdSession.id },
-        relations: ['resource', 'user', 'project'],
       });
-    });
+    } catch (error) {
+      await this.abortLifecycleAttempt(attemptId, resourceId);
+      throw error;
+    }
+    if (chargeTransactionId !== undefined) await this.billingService.notifyResourceUsageCharge(chargeTransactionId);
+    this.flowExecutorService.trackResourceActivity(resourceId);
+    if (prepared.existingActiveSession) {
+      this.eventEmitter.emit(
+        ResourceUsageSessionTakenOverEvent.EVENT_NAME,
+        new ResourceUsageSessionTakenOverEvent(
+          prepared.resource,
+          prepared.attempt.transitionTime,
+          user,
+          prepared.existingActiveSession.user,
+        ),
+      );
+    }
 
     if (endedUsageIdToEmit && takeoverEndedUser) {
-      await this.audit.recordResource({
-        action: 'usage_session.ended',
-        ...auditOrigin,
-        subjectId: resourceId,
-        details: { usageId: endedUsageIdToEmit, usageUserId: takeoverEndedUser.id },
-      }).catch(() => undefined);
+      await this.audit
+        .recordResource({
+          action: 'usage_session.ended',
+          ...auditOrigin,
+          subjectId: resourceId,
+          details: { usageId: endedUsageIdToEmit, usageUserId: takeoverEndedUser.id },
+        })
+        .catch(() => undefined);
     }
     if (newSession) {
-      await this.audit.recordResource({
-        action: 'usage_session.started',
-        ...auditOrigin,
-        subjectId: resourceId,
-        details: {
-          usageId: newSession.id,
-          usageUserId: newSession.userId,
-          ...(supervisorUserId === null ? {} : { supervisorUserId }),
-        },
-      }).catch(() => undefined);
+      await this.audit
+        .recordResource({
+          action: 'usage_session.started',
+          ...auditOrigin,
+          subjectId: resourceId,
+          details: {
+            usageId: newSession.id,
+            usageUserId: newSession.userId,
+            ...(supervisorUserId === null ? {} : { supervisorUserId }),
+          },
+        })
+        .catch(() => undefined);
     }
 
     // Emit events after the transaction committed to ensure readers can observe DB state
@@ -951,9 +1128,11 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     let activeSession: ResourceUsage | null = null;
     let endedUsageIdToEmit: number | null = null;
     let formSubmissions: FormSubmission[] = [];
-    let endFlowPayload: object | null = null;
-    const executeEndSession = async () =>
-      await this.resourceUsageRepository.manager.transaction(async (transactionalEntityManager) => {
+    const attemptId = randomUUID();
+    const prepared = await runSerializedTransaction(
+      this.resourceUsageRepository.manager,
+      async (transactionalEntityManager) => {
+        await this.assertLifecycleAvailable(transactionalEntityManager, resourceId);
         activeSession = await this.getActiveSession(resourceId, true, transactionalEntityManager);
         if (!activeSession) {
           throw new BadRequestException('No active session found');
@@ -995,7 +1174,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
         };
 
         if (!skipFormSubmissions && activeSession.resource?.type === ResourceType.Machine) {
-          formSubmissions = await this.resourceFormsService.saveRequiredSubmissions({
+          formSubmissions = await this.resourceFormsService.prepareRequiredSubmissions({
             resourceId,
             action: ResourceFormAction.END,
             submissions: dto.formSubmissions,
@@ -1005,59 +1184,63 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
           });
         }
 
-        this.logger.debug(`Updating session ${activeSession.id} with end time and notes`, { updateData });
-
-        // Update session with end time and notes - using explicit update to avoid the generated column
-        await transactionalEntityManager
-          .createQueryBuilder()
-          .update(ResourceUsage)
-          .set(updateData)
-          .where('id = :id', { id: activeSession.id })
-          .execute();
-
-        this.logger.debug(`Successfully ended session ${activeSession.id}`);
-
-        const updatedUsage = await transactionalEntityManager.getRepository(ResourceUsage).findOne({
-          where: { id: activeSession.id },
-          relations: ['resource', 'user'],
+        const attempt = await transactionalEntityManager.save(ResourceUsageLifecycleAttempt, {
+          id: attemptId,
+          resourceId,
+          kind: 'end',
+          candidateUsageId: null,
+          previousUsageId: activeSession.id,
+          transitionTime: endTime,
+          formSubmissions,
+          billingItems: [],
         });
+        return { activeSession, updateData, attempt };
+      },
+    );
 
-        if (!updatedUsage) {
-          throw new Error(`Failed to retrieve ended session ${activeSession.id}`);
-        }
-
-        await this.persistAttributedOperatingDuration(updatedUsage, transactionalEntityManager);
-
-        await this.billingService.chargeForResourceUsage(updatedUsage, transactionalEntityManager);
-
-        // Defer event after successful save until after commit
-        endedUsageIdToEmit = activeSession.id;
-        endFlowPayload = { ...this.getResourceUsageFlowPayload(activeSession, formSubmissions), ...updateData };
-
-        // Fetch the updated record
-        return updatedUsage;
+    let updatedUsage: ResourceUsage;
+    let chargeTransactionId: number | undefined;
+    try {
+      await this.runUsageFlow(
+        undefined,
+        resourceId,
+        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+        { ...this.getResourceUsageFlowPayload(prepared.activeSession, formSubmissions), ...prepared.updateData },
+        'end',
+        attemptId,
+      );
+      updatedUsage = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
+        const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
+        await this.applyLifecycleDrafts(manager, attempt);
+        const result = await manager.update(
+          ResourceUsage,
+          { id: prepared.activeSession.id, endTime: IsNull() },
+          prepared.updateData,
+        );
+        if (result.affected === 0) throw new ConflictException('Usage session changed while ending');
+        const endedSession = await manager.findOneOrFail(ResourceUsage, {
+          where: { id: prepared.activeSession.id },
+          relations: ['user', 'resource'],
+        });
+        await this.persistAttributedOperatingDuration(endedSession, manager);
+        chargeTransactionId = (await this.billingService.chargeForResourceUsage(endedSession, manager))?.id;
+        await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
+        return endedSession;
       });
-
-    const updatedUsage = await this.runSerializedIfSqlite(this.resourceUsageRepository.manager, executeEndSession);
-
-    if (updatedUsage) {
-      await this.audit.recordResource({
+    } catch (error) {
+      await this.abortLifecycleAttempt(attemptId, resourceId);
+      throw error;
+    }
+    endedUsageIdToEmit = updatedUsage.id;
+    if (chargeTransactionId !== undefined) await this.billingService.notifyResourceUsageCharge(chargeTransactionId);
+    await this.audit
+      .recordResource({
         action: 'usage_session.ended',
         ...auditOrigin,
         subjectId: resourceId,
         details: { usageId: updatedUsage.id, usageUserId: updatedUsage.userId },
-      }).catch(() => undefined);
-    }
-
-    if (endFlowPayload) {
-      await this.runUsageFlow(
-        this.resourceUsageRepository.manager,
-        resourceId,
-        ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
-        endFlowPayload,
-        'end',
-      );
-    }
+      })
+      .catch(() => undefined);
 
     // Emit event after the transaction committed to ensure readers can observe DB state
     try {
@@ -1250,6 +1433,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
         resourceId,
         endTime: IsNull(),
         isFinalized: onlyFinalized ? true : undefined,
+        lifecyclePending: false,
       },
       relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
     });
@@ -1259,7 +1443,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     const map = new Map<number, ResourceUsage | null>(resourceIds.map((id) => [id, null]));
     if (resourceIds.length === 0) return map;
     const sessions = await this.resourceUsageRepository.find({
-      where: { resourceId: In(resourceIds), endTime: IsNull(), isFinalized: true },
+      where: { resourceId: In(resourceIds), endTime: IsNull(), isFinalized: true, lifecyclePending: false },
       relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
     });
     for (const session of sessions) {
@@ -1274,7 +1458,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     limit = 10,
     userId?: number,
   ): Promise<{ data: ResourceUsage[]; total: number }> {
-    const whereClause: FindOneOptions<ResourceUsage>['where'] = { resourceId };
+    const whereClause: FindOneOptions<ResourceUsage>['where'] = { resourceId, lifecyclePending: false };
 
     // Add userId filter if provided
     if (userId) {

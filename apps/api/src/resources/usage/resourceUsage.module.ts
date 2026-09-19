@@ -19,9 +19,11 @@ import { ResourceFormsModule } from '../forms/forms.module';
 import { ResourceHealthModule } from '../health/resource-health.module';
 import { ResourceRetrainingModule } from '../retraining/resourceRetraining.module';
 import { ResourceOperatingIntervalModule } from '../operating-intervals/resource-operating-interval.module';
+import { ResourceTransactionsModule } from '../../database/resource-transactions.module';
 
 @Module({
   imports: [
+    ResourceTransactionsModule,
     TypeOrmModule.forFeature([ResourceUsage, Resource, ResourceIntroducer, User]),
     RbacModule,
     NotificationsModule,

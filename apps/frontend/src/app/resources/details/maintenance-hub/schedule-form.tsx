@@ -39,13 +39,14 @@ const DURATION_BASIS_OPTIONS = [
 
 interface Props {
   resourceId: number;
+  supportsOperatingDuration: boolean;
   scheduleId?: number;
   onSaved: () => void;
   onCancel: () => void;
 }
 
 export function ScheduleForm(props: Props) {
-  const { resourceId, scheduleId, onSaved, onCancel } = props;
+  const { resourceId, supportsOperatingDuration, scheduleId, onSaved, onCancel } = props;
   const { t } = useTranslations({ de, en });
   const queryClient = useQueryClient();
   const formRef = useRef<HTMLFormElement>(null);
@@ -100,12 +101,17 @@ export function ScheduleForm(props: Props) {
   const onSubmit = useCallback(() => {
     if (!formRef.current?.reportValidity()) return;
 
-    const base = { name: name || undefined, triggerType, enabled };
+    const base = {
+      name: name || undefined,
+      triggerType,
+      enabled,
+      durationBasis: supportsOperatingDuration ? durationBasis : 'SESSION_DURATION',
+    };
     const buildBody = () => {
       if (triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS) {
         const duration = parseInt(usageHoursDuration, 10);
         if (Number.isNaN(duration) || duration < 1) return null;
-        return { ...base, durationBasis, usageHoursConfig: { duration, unit: usageHoursUnit } };
+        return { ...base, usageHoursConfig: { duration, unit: usageHoursUnit } };
       }
       if (triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT) {
         const sessions = parseInt(thresholdSessions, 10);
@@ -126,7 +132,7 @@ export function ScheduleForm(props: Props) {
       create({ resourceId, requestBody: requestBody as never });
     }
   }, [
-    name, triggerType, usageHoursDuration, usageHoursUnit, durationBasis, thresholdSessions,
+    name, triggerType, usageHoursDuration, usageHoursUnit, durationBasis, supportsOperatingDuration, thresholdSessions,
     timeIntervalDuration, timeIntervalUnit, enabled, resourceId, scheduleId, create, update,
   ]);
 
@@ -168,9 +174,9 @@ export function ScheduleForm(props: Props) {
           />
           <Select
             label={t('form.durationBasis.label')}
-            value={durationBasis}
+            value={supportsOperatingDuration ? durationBasis : 'SESSION_DURATION'}
             onChange={(key) => { if (key) setDurationBasis(key as typeof durationBasis); }}
-            items={DURATION_BASIS_OPTIONS.map((option) => ({
+            items={DURATION_BASIS_OPTIONS.filter((option) => supportsOperatingDuration || option.value === 'SESSION_DURATION').map((option) => ({
               key: option.value,
               label: t(`form.durationBasis.${option.labelKey}`),
             }))}

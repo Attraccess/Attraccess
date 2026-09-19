@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import axios from 'axios';
 import { User, Resource, Project, ResourceUsage, Session } from '@attraccess/database-entities';
 import { GithubReleaseApiResponse, VersionService } from './version.service';
+import { IsNull } from 'typeorm';
 
 jest.mock('axios');
 
@@ -30,12 +31,14 @@ describe('VersionService', () => {
   let service: VersionService;
   let configService: { get: jest.Mock };
   let httpGet: jest.Mock;
+  let usageRepository: ReturnType<typeof makeRepo>;
 
   beforeEach(async () => {
     httpGet = jest.fn();
     axiosMock.create.mockReturnValue({ get: httpGet } as unknown as ReturnType<typeof axios.create>);
 
     configService = { get: jest.fn().mockReturnValue({ VERSION: '0.0.16' }) };
+    usageRepository = makeRepo(2);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -44,7 +47,7 @@ describe('VersionService', () => {
         { provide: getRepositoryToken(User), useValue: makeRepo(5) },
         { provide: getRepositoryToken(Resource), useValue: makeRepo(10) },
         { provide: getRepositoryToken(Project), useValue: makeRepo(3) },
-        { provide: getRepositoryToken(ResourceUsage), useValue: makeRepo(2) },
+        { provide: getRepositoryToken(ResourceUsage), useValue: usageRepository },
         { provide: getRepositoryToken(Session), useValue: makeRepo(7) },
       ],
     }).compile();
@@ -97,6 +100,9 @@ describe('VersionService', () => {
       expect(result.resourcesTotal).toBe(10);
       expect(result.projectsTotal).toBe(3);
       expect(result.activeResourceUsageSessions).toBe(2);
+      expect(usageRepository.count).toHaveBeenCalledWith({
+        where: { endTime: IsNull(), lifecyclePending: false },
+      });
       expect(result.activeAuthSessions).toBe(7);
     });
   });

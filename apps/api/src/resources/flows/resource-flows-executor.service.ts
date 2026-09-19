@@ -76,6 +76,11 @@ import { CompanionGatewayService } from '../../companion/companion-gateway.servi
 import { CompanionUsbDeviceDto } from '../../companion/companion.types';
 import { ExternalEffectFailureError } from './errors/external-effect-failure.error';
 
+interface FlowExecutionOptions {
+  lifecycleAttemptId?: string;
+  lifecycleCandidateCancellation?: boolean;
+}
+
 // Handlebars helpers
 Handlebars.registerHelper('json', (value: unknown) => {
   try {
@@ -196,7 +201,10 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
         this.operatingIntervals,
         'operating',
       ),
-      [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE]: new OperatingTransitionExecutor(this.operatingIntervals, 'idle'),
+      [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE]: new OperatingTransitionExecutor(
+        this.operatingIntervals,
+        'idle',
+      ),
 
       [ResourceFlowNodeType.PROCESSING_WAIT]: new WaitExecutor(),
       [ResourceFlowNodeType.PROCESSING_IF]: new IfExecutor(),
@@ -457,6 +465,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     triggerNodeType: ResourceFlowNodeType,
     initialData: object = {},
     transactionManager?: EntityManager,
+    options: FlowExecutionOptions = {},
   ): Promise<object[]> {
     const repository = this.getRepository(ResourceFlowNode, this.flowNodeRepository, transactionManager);
 
@@ -475,7 +484,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     }
 
     // TODO: propagate errors so when calling runFlow you can react to them and they dont get ignored
-    const results = await this.startFlow(nodes, { payload: initialData }, transactionManager);
+    const results = await this.startFlow(nodes, { payload: initialData }, transactionManager, new Map(), options);
     return results.map((r) => r.payload);
   }
 
@@ -518,22 +527,24 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       lastId = nodes[nodes.length - 1].id;
 
       for (let offset = 0; offset < nodes.length; offset += concurrency) {
-        await Promise.allSettled(nodes.slice(offset, offset + concurrency).map(async (node) => {
-          let isMatch: boolean;
-          try {
-            isMatch = matches(node.data as Record<string, unknown>, node.id);
-          } catch (error) {
-            this.logger.error(
-              `Failed to match plugin flow trigger node ID: ${node.id} (Type: ${nodeType})`,
-              error instanceof Error ? error.stack : undefined,
-            );
-            return;
-          }
+        await Promise.allSettled(
+          nodes.slice(offset, offset + concurrency).map(async (node) => {
+            let isMatch: boolean;
+            try {
+              isMatch = matches(node.data as Record<string, unknown>, node.id);
+            } catch (error) {
+              this.logger.error(
+                `Failed to match plugin flow trigger node ID: ${node.id} (Type: ${nodeType})`,
+                error instanceof Error ? error.stack : undefined,
+              );
+              return;
+            }
 
-          if (isMatch) {
-            await this.startFlow(node, { payload });
-          }
-        }));
+            if (isMatch) {
+              await this.startFlow(node, { payload });
+            }
+          }),
+        );
       }
 
       if (nodes.length < pageSize) return;
@@ -554,6 +565,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     data: NodeProcessingResult,
     transactionManager?: EntityManager,
     resourceContextCache: Map<number, FlowResourceContext> = new Map(),
+    options: FlowExecutionOptions = {},
   ): Promise<NodeProcessingResult[]> {
     const nodes = Array.isArray(node) ? node : [node];
 
@@ -573,12 +585,11 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
 
       let leafResults: NodeProcessingResult[] = [];
       try {
-        const results = await Promise.all(
+        leafResults = await this.settleFlowBranches(
           nodes.map((node) => {
-            return this.processNode(flowRunId, node, data, transactionManager, resourceContextCache);
+            return this.processNode(flowRunId, node, data, transactionManager, resourceContextCache, options);
           }),
         );
-        leafResults = results.flat();
         this.logger.log(`Successfully processed all ${nodes.length} flow nodes`);
       } catch (error) {
         this.logger.error(`Failed to process flow nodes`, error.stack);
@@ -595,13 +606,41 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     });
   }
 
+  private async settleFlowBranches(branches: Promise<NodeProcessingResult[]>[]): Promise<NodeProcessingResult[]> {
+    // A failed branch cannot release a lifecycle reservation while sibling effects are still running.
+    // Wait for work already started, then preserve lifecycle-fatal failures over ordinary node errors.
+    let failure: { error: unknown } | undefined;
+    const results = await Promise.allSettled(
+      branches.map((branch) =>
+        branch.catch((error) => {
+          if (
+            !failure ||
+            (error instanceof ExternalEffectFailureError && !(failure.error instanceof ExternalEffectFailureError))
+          ) {
+            failure = { error };
+          }
+          throw error;
+        }),
+      ),
+    );
+    if (failure) throw failure.error;
+    return results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
+  }
+
   /**
    * Builds the per-execution context handed to node executors. Exposes the
    * template helpers backed by the service-owned WeakMap so executors stay free
    * of Handlebars/variable plumbing.
    */
-  private buildExecutionContext(transactionManager?: EntityManager): NodeExecutionContext {
+  private buildExecutionContext(
+    flowRunId: string,
+    transactionManager?: EntityManager,
+    options: FlowExecutionOptions = {},
+  ): NodeExecutionContext {
     return {
+      flowRunId,
+      lifecycleAttemptId: options.lifecycleAttemptId,
+      lifecycleCandidateCancellation: options.lifecycleCandidateCancellation,
       transactionManager,
       compileTemplate: (template, data) => this.compileTemplate(template, data),
       getTemplateVariables: (data) => this.templateVariables.get(data),
@@ -610,14 +649,16 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
   }
 
   private async dispatchNode(
+    flowRunId: string,
     node: ResourceFlowNode,
     input: object,
     transactionManager?: EntityManager,
+    options: FlowExecutionOptions = {},
   ): Promise<NodeProcessingResult> {
     // Core node types are looked up in the exhaustive record.
     const executor = this.nodeExecutors[node.type as ResourceFlowNodeType];
     if (executor) {
-      return executor.execute(node, input, this.buildExecutionContext(transactionManager));
+      return executor.execute(node, input, this.buildExecutionContext(flowRunId, transactionManager, options));
     }
 
     // Plugin-contributed node types fall through to the plugin registry.
@@ -629,7 +670,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       return pluginNode.execute(
         { id: node.id, type: node.type, data: node.data as Record<string, unknown> },
         input,
-        this.buildExecutionContext(transactionManager),
+        this.buildExecutionContext(flowRunId, transactionManager, options),
       );
     }
 
@@ -642,6 +683,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     resultOfPreviousNode: NodeProcessingResult,
     transactionManager?: EntityManager,
     resourceContextCache?: Map<number, FlowResourceContext>,
+    options: FlowExecutionOptions = {},
   ): Promise<NodeProcessingResult[]> {
     this.logger.debug(`Processing flow node - ID: ${node.id}, Type: ${node.type}, Resource ID: ${node.resourceId}`);
 
@@ -669,7 +711,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
 
       dispatchStarted = true;
       responseOfNode = await this.flowTimer.timeNode(node.type, () =>
-        this.dispatchNode(node, input, transactionManager),
+        this.dispatchNode(flowRunId, node, input, transactionManager, options),
       );
 
       const processingTime = Date.now() - startTime;
@@ -710,7 +752,9 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       });
 
       if (!failureBehavior || failureBehavior === 'fail-flow') {
-        throw failureBehavior === 'fail-flow' ? new ExternalEffectFailureError(errorMessage, error, failureKind) : error;
+        throw failureBehavior === 'fail-flow'
+          ? new ExternalEffectFailureError(errorMessage, error, failureKind)
+          : error;
       }
 
       const payload =
@@ -723,7 +767,14 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       };
     }
 
-    return await this.executeNextNodes(flowRunId, node, responseOfNode, transactionManager, resourceContextCache);
+    return await this.executeNextNodes(
+      flowRunId,
+      node,
+      responseOfNode,
+      transactionManager,
+      resourceContextCache,
+      options,
+    );
   }
 
   private errorReason(error: unknown): string {
@@ -753,6 +804,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     resultOfPreviousNode: NodeProcessingResult,
     transactionManager?: EntityManager,
     resourceContextCache?: Map<number, FlowResourceContext>,
+    options: FlowExecutionOptions = {},
   ): Promise<NodeProcessingResult[]> {
     this.logger.debug(`Looking for outgoing edges from node ID: ${node.id} (Type: ${node.type})`);
 
@@ -789,11 +841,17 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
         return [] as NodeProcessingResult[];
       }
 
-      return this.processNode(flowRunId, targetNode, resultOfPreviousNode, transactionManager, resourceContextCache);
+      return this.processNode(
+        flowRunId,
+        targetNode,
+        resultOfPreviousNode,
+        transactionManager,
+        resourceContextCache,
+        options,
+      );
     });
 
-    const results = await Promise.all(edgePromises);
-    return results.flat();
+    return this.settleFlowBranches(edgePromises);
   }
 
   public trackResourceActivity(resourceId: number) {

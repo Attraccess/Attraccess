@@ -104,6 +104,8 @@ import { UserRole, UserRoleSource } from './entities/user-role.entity';
 import { ApiToken } from './entities/api-token.entity';
 import { ApiTokenPermission } from './entities/api-token-permission.entity';
 import { ResourceOperatingInterval } from './entities/resource-operating-interval.entity';
+import { ResourceUsageLifecycleAttempt } from './entities/resource-usage-lifecycle-attempt.entity';
+export type { LifecycleBillingItem } from './entities/resource-usage-lifecycle-attempt.entity';
 
 // Export all entities individually
 export {
@@ -221,6 +223,7 @@ export {
   ApiToken,
   ApiTokenPermission,
   ResourceOperatingInterval,
+  ResourceUsageLifecycleAttempt,
 };
 
 // Export the entities object
@@ -282,4 +285,5 @@ export const entities = {
   ApiToken,
   ApiTokenPermission,
   ResourceOperatingInterval,
+  ResourceUsageLifecycleAttempt,
 };

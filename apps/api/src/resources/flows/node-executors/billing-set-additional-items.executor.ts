@@ -24,14 +24,6 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
       typeof candidateUsageId === 'number' && Number.isSafeInteger(candidateUsageId) && candidateUsageId > 0
         ? candidateUsageId
         : undefined;
-    const activeUsageSession = usageId
-      ? undefined
-      : await this.resourceUsageService.getActiveSession(node.resourceId, false, ctx.transactionManager);
-
-    if (!usageId && !activeUsageSession) {
-      throw new NoUsageSessionError();
-    }
-
     const data = BillingTransactionItemCreateSchema.parse(node.data);
 
     this.logger.debug(
@@ -55,6 +47,28 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
       this.logger.debug(`Compiling quantity template: ${input.quantity}`);
       const numberQuantity = BillingTransactionItemCreateSchema.shape.quantity.parse(input.quantity);
       quantity = numberQuantity;
+    }
+
+    const item = {
+      name: data.name,
+      description: data.description,
+      externalReference,
+      unitPrice: data.unitPrice,
+      quantity,
+    };
+    if (ctx.lifecycleAttemptId) {
+      await this.resourceUsageService.stageLifecycleBillingItem(ctx.lifecycleAttemptId, node.resourceId, usageId, {
+        ...item,
+        externalReference: externalReference ?? null,
+      });
+      return { payload: item };
+    }
+
+    const activeUsageSession = usageId
+      ? undefined
+      : await this.resourceUsageService.getActiveSession(node.resourceId, false, ctx.transactionManager);
+    if (!usageId && !activeUsageSession) {
+      throw new NoUsageSessionError();
     }
 
     const manager = ctx.transactionManager ?? this.billingTransactionItemRepository.manager;
@@ -93,14 +107,6 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
       });
     }
 
-    return {
-      payload: {
-        name: data.name,
-        description: data.description,
-        externalReference,
-        unitPrice: data.unitPrice,
-        quantity,
-      } as Omit<BillingTransactionItem, 'id' | 'billingTransactionId' | 'billingTransaction'>,
-    };
+    return { payload: item };
   }
 }

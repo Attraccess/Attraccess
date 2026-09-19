@@ -79,7 +79,7 @@
     "durationBasis": {
       "label": "Dauergrundlage",
       "SESSION_DURATION": "Sitzungsdauer",
-      "ATTRIBUTABLE_OPERATING_DURATION": "Zugeordnete Betriebsdauer"
+      "ATTRIBUTABLE_OPERATING_DURATION": "Betriebsdauer"
     },
     "unit": { "label": "Einheit", "MINUTES": "Minuten", "HOURS": "Stunden", "DAYS": "Tage" },
     "thresholdSessions": { "label": "Sitzungsschwelle" },

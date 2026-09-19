@@ -184,6 +184,14 @@ Zeichnet ein Aktivitätsereignis an der Ressource auf. Setzt den Inaktivitäts-T
 
 Keine zusätzlichen Einstellungen.
 
+### Maschinenbetriebszustand
+
+Aktionen zum Betriebszustand erfassen, ob eine Maschine tatsächlich arbeitet oder stillsteht. Verwenden Sie dafür ein beobachtetes Signal, das Ihr Flow auswertet. Ein gesendeter Befehl oder der Start einer Nutzungssitzung ist allein kein Nachweis für Maschinenbetrieb.
+
+Wiederholte Zuweisungen desselben Zustands ändern nichts. Ein Betriebsintervall bleibt über Sitzungsgrenzen und Serverneustarts hinweg offen, bis ein Flow den Ruhezustand zuweist. Akzeptierte Änderungen speichern den Serverzeitpunkt sowie den auslösenden Flow-Knoten und Flow-Durchlauf. Liegt die Serverzeit vor der letzten akzeptierten Änderung, schlägt die Zuweisung fehl, statt ein ungültiges Intervall zu schreiben.
+
+Eine akzeptierte Betriebsbeobachtung bleibt gespeichert, auch wenn ein späterer Knoten fehlschlägt. Ein fehlgeschlagener Nutzungsstart oder eine fehlgeschlagene Übernahme bricht die zugehörigen Sitzungs- und Abrechnungsänderungen weiterhin ab. Stoppt der Server während einer ausstehenden Nutzungsänderung, wird dieser Versuch beim Neustart verworfen; seine physischen Befehle werden nicht erneut ausgeführt. Aufgezeichneter Maschinenbetrieb bleibt für Auswertungen und Wartung erhalten.
+
 ## Siehe auch
 
 - [Flow-Editor](flows/flow-editor.md) -- Knoten platzieren und verbinden
