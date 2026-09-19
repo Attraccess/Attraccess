@@ -68,7 +68,7 @@ export class VersionService {
         this.userRepository.count(),
         this.resourceRepository.count(),
         this.projectRepository.count(),
-        this.resourceUsageRepository.count({ where: { endTime: IsNull() } }),
+        this.resourceUsageRepository.count({ where: { endTime: IsNull(), lifecyclePending: false } }),
         this.sessionRepository.count({ where: { expiresAt: MoreThan(new Date()) } }),
       ]);
 

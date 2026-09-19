@@ -3,6 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
 
 @Index('IDX_resource_operating_interval_resourceId_endTime', ['resourceId', 'endTime'])
+@Index('IDX_resource_operating_interval_resourceId_startTime_id', ['resourceId', 'startTime', 'id'])
 @Entity()
 export class ResourceOperatingInterval {
   @PrimaryGeneratedColumn()

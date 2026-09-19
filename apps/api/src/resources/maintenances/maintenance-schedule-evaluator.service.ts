@@ -284,11 +284,11 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
 
       for (const schedule of schedules) {
         // Re-check active maintenance (another schedule might have just created one)
-        const hasActiveMaintenanceOfThisSchedule = await this.maintenanceService.hasActiveMaintenance(
-          { resourceId, scheduleId: schedule.id },
+        const hasActiveMaintenance = await this.maintenanceService.hasActiveMaintenance(
+          resourceId,
           transactionalEntityManager,
         );
-        if (hasActiveMaintenanceOfThisSchedule) {
+        if (hasActiveMaintenance) {
           continue;
         }
 

@@ -25,6 +25,7 @@ import { ResourceOperatingIntervalService } from '../operating-intervals/resourc
 import { ResourceOperatingAttributionService } from '../operating-intervals/resource-operating-attribution.service';
 import { ExternalEffectFailureError } from '../flows/errors/external-effect-failure.error';
 import { closeResourceTransactionConnection } from '../../database/run-serialized-transaction';
+import { InsufficientBalanceError } from '../../billing/errors/insufficient-balance.error';
 
 // Real repositories and relations for the lifecycle boundary; peripheral domain tables are omitted.
 const schemas = [
@@ -196,15 +197,13 @@ describe('Usage lifecycle persistence around external flows', () => {
       synchronize: true,
       entities: schemas,
     }).initialize();
-    await source
-      .getRepository(Resource)
-      .save({
-        id: 1,
-        name: 'Machine',
-        type: ResourceType.Machine,
-        allowTakeOver: true,
-        supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED,
-      });
+    await source.getRepository(Resource).save({
+      id: 1,
+      name: 'Machine',
+      type: ResourceType.Machine,
+      allowTakeOver: true,
+      supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED,
+    });
     users = await source.getRepository(User).save([
       { id: 1, username: 'owner' },
       { id: 2, username: 'next-user' },
@@ -412,6 +411,45 @@ describe('Usage lifecycle persistence around external flows', () => {
 
     expect(await publishedState()).toEqual(before);
     await expectObservationAndNoAttempt();
+  });
+
+  it('rejects same-user takeover when the outgoing charge leaves too little balance for replacement', async () => {
+    await seedActiveSession();
+    await source.getRepository(User).update(users[0].id, { creditBalance: 23 });
+    const before = await publishedState();
+    const checkedBalances: number[] = [];
+    billing.validateResourceUsageStart.mockImplementation(async (_resourceId, session, user, manager) => {
+      const storedUser = await manager.findOneByOrFail(User, { id: user.id });
+      checkedBalances.push(storedUser.creditBalance);
+      if (storedUser.creditBalance < session.sessionDurationCreditsPerMinute) throw new InsufficientBalanceError();
+    });
+    billing.handleResourceUsageStart.mockImplementation(async (resourceId, session, user, manager) => {
+      await billing.validateResourceUsageStart(resourceId, session, user, manager);
+      return manager.save(BillingTransaction, {
+        resourceUsageId: session.id,
+        userId: user.id,
+        amount: 0,
+        status: BillingTransactionStatus.Pending,
+      });
+    });
+    flow.runFlow.mockImplementation(async (resourceId, _trigger, payload, _manager, { lifecycleAttemptId }) => {
+      await operating.transition(resourceId, 'operating', {
+        flowNodeId: 'observed-operation',
+        flowRunId: 'same-user-takeover',
+      });
+      await usage.stageLifecycleBillingItem(lifecycleAttemptId, resourceId, payload.id, draftItem);
+    });
+
+    await expect(usage.startSession(1, users[0], { forceTakeOver: true })).rejects.toBeInstanceOf(
+      InsufficientBalanceError,
+    );
+
+    expect(checkedBalances).toEqual([23, 0]);
+    expect(await publishedState()).toEqual(before);
+    expect(await source.getRepository(ResourceUsageLifecycleAttempt).count()).toBe(0);
+    expect(await source.getRepository(ResourceOperatingInterval).count()).toBe(1);
+    expect(billing.notifyResourceUsageCharge).not.toHaveBeenCalled();
+    expect(flow.trackResourceActivity).not.toHaveBeenCalled();
   });
 
   it('aborts an abandoned takeover at startup without replaying flows or discarding accepted operation', async () => {

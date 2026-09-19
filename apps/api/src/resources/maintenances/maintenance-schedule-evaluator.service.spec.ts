@@ -172,6 +172,24 @@ describe('MaintenanceScheduleEvaluatorService', () => {
   });
 
   describe('evaluateResource', () => {
+    it.each([
+      { kind: 'manual', activeScheduleId: null },
+      { kind: 'another schedule', activeScheduleId: scheduleId + 1 },
+    ])('does not create a second maintenance while $kind maintenance is active', async ({ activeScheduleId }) => {
+      jest
+        .spyOn(scheduleRepository, 'find')
+        .mockResolvedValue([{ id: scheduleId, resourceId, enabled: true } as ResourceMaintenanceSchedule]);
+      jest.spyOn(service, 'shouldTrigger').mockResolvedValue(true);
+      // The resource has an active record, but it does not belong to the schedule being evaluated.
+      jest
+        .spyOn(maintenanceService, 'hasActiveMaintenance')
+        .mockImplementation(async (filter) => typeof filter === 'number' || filter.scheduleId === activeScheduleId);
+
+      await service.evaluateResource(resourceId);
+
+      expect(maintenanceService.createMaintenanceFromSchedule).not.toHaveBeenCalled();
+    });
+
     it('should not create maintenance when resource has active maintenance', async () => {
       jest.spyOn(maintenanceService, 'hasActiveMaintenance').mockResolvedValue(true);
       jest.spyOn(scheduleRepository, 'find').mockResolvedValue([

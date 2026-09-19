@@ -54,4 +54,29 @@ describe('Operating transition provenance migration', () => {
       { startTime: '2026-09-19 12:02:00.789', endTime: null },
     ]);
   });
+
+  it('indexes the latest-boundary lookup without sorting resource history and removes the index on rollback', async () => {
+    await migration.up(runner);
+    await runner.query(
+      'INSERT INTO resource_operating_interval (resourceId, startTime, endTime) VALUES (1, ?, ?), (1, ?, ?)',
+      ['2026-09-19 12:02:00.123', '2026-09-19 12:02:00.456', '2026-09-19 12:02:00.123', '2026-09-19 12:03:00.456'],
+    );
+    const lookup =
+      'SELECT * FROM resource_operating_interval WHERE resourceId = ? ORDER BY startTime DESC, id DESC LIMIT 1';
+    const plan: { detail: string }[] = await runner.query(`EXPLAIN QUERY PLAN ${lookup}`, [1]);
+
+    expect(plan).toEqual([
+      expect.objectContaining({
+        detail: expect.stringContaining('USING INDEX IDX_resource_operating_interval_resourceId_startTime_id'),
+      }),
+    ]);
+    expect(await runner.query(lookup, [1])).toEqual([
+      expect.objectContaining({ id: 3, endTime: '2026-09-19 12:03:00.456' }),
+    ]);
+
+    await migration.down(runner);
+
+    const indexes: { name: string }[] = await runner.query('PRAGMA index_list(resource_operating_interval)');
+    expect(indexes.map(({ name }) => name)).not.toContain('IDX_resource_operating_interval_resourceId_startTime_id');
+  });
 });

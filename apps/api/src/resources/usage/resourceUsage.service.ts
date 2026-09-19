@@ -937,9 +937,8 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
       );
       newSession = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
         const currentAttempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
-        await this.billingService.handleResourceUsageStart(resourceId, createdSession, user, manager);
-        await this.applyLifecycleDrafts(manager, currentAttempt);
         if (existingActiveSession) {
+          await this.applyLifecycleDrafts(manager, currentAttempt);
           const result = await manager.update(
             ResourceUsage,
             { id: existingActiveSession.id, endTime: IsNull() },
@@ -959,6 +958,10 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
         } else {
           startedUsageIdToEmit = createdSession.id;
         }
+        // The outgoing charge must affect the final balance check, including same-user takeovers.
+        // Both changes remain atomic if the replacement can no longer be afforded.
+        await this.billingService.handleResourceUsageStart(resourceId, createdSession, user, manager);
+        if (!existingActiveSession) await this.applyLifecycleDrafts(manager, currentAttempt);
         await manager.update(ResourceUsage, createdSession.id, { isFinalized: true, lifecyclePending: false });
         await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
         return manager.findOneOrFail(ResourceUsage, {
