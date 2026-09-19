@@ -42,6 +42,16 @@ export class OperatingTransitionDto {
     example: 'flow-signal',
   })
   source!: string;
+
+  @ApiProperty({ description: 'Flow node that applied this transition, if recorded', type: String, nullable: true })
+  flowNodeId!: string | null;
+
+  @ApiProperty({
+    description: 'Flow execution that applied this transition, if recorded',
+    type: String,
+    nullable: true,
+  })
+  flowRunId!: string | null;
 }
 
 export class OperatingTransitionPageDto {
@@ -85,7 +95,10 @@ export class OperatingDataQualityReportDto {
   @ApiProperty({ description: 'Whether the resource has operating/idle flow nodes configured' })
   trackingConfigured!: boolean;
 
-  @ApiProperty({ description: 'Data-quality failures found; empty when the timeline is clean', type: [OperatingDataQualityIssueDto] })
+  @ApiProperty({
+    description: 'Data-quality failures found; empty when the timeline is clean',
+    type: [OperatingDataQualityIssueDto],
+  })
   issues!: OperatingDataQualityIssueDto[];
 }
 
@@ -117,17 +130,27 @@ export class OperatingTimelineVerificationDto {
   recomputedOperatingDurationMs!: number;
 
   @ApiProperty({
-    description: 'False when the resource never produced operating data; reported durations are then null (unavailable), distinct from a measured 0',
+    description:
+      'False when the resource never produced operating data; reported durations are then null (unavailable), distinct from a measured 0',
   })
   operatingDataAvailable!: boolean;
 
-  @ApiProperty({ description: 'Operating duration reported by the derived attribution view, in ms; null when unavailable', nullable: true })
+  @ApiProperty({
+    description: 'Operating duration reported by the derived attribution view, in ms; null when unavailable',
+    nullable: true,
+  })
   reportedOperatingDurationMs!: number | null;
 
-  @ApiProperty({ description: 'Attributed operating duration reported by the derived view, in ms; null when unavailable', nullable: true })
+  @ApiProperty({
+    description: 'Attributed operating duration reported by the derived view, in ms; null when unavailable',
+    nullable: true,
+  })
   reportedAttributedDurationMs!: number | null;
 
-  @ApiProperty({ description: 'Unattributed operating duration reported by the derived view, in ms; null when unavailable', nullable: true })
+  @ApiProperty({
+    description: 'Unattributed operating duration reported by the derived view, in ms; null when unavailable',
+    nullable: true,
+  })
   reportedUnattributedDurationMs!: number | null;
 
   @ApiProperty({ description: 'Number of authoritative interval rows overlapping the range', example: 7 })

@@ -316,9 +316,9 @@ export class ResourcesService {
 
     if (onlyInUse || onlyInUseByUserId !== undefined || returnUsingUser) {
       if (returnUsingUser) {
-        queryBuilder.leftJoinAndSelect('resource.usages', 'usage');
+        queryBuilder.leftJoinAndSelect('resource.usages', 'usage', 'usage.lifecyclePending = FALSE');
       } else {
-        queryBuilder.leftJoin('resource.usages', 'usage', 'usage.endTime IS NULL');
+        queryBuilder.leftJoin('resource.usages', 'usage', 'usage.endTime IS NULL AND usage.lifecyclePending = FALSE');
       }
     }
 

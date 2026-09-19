@@ -76,6 +76,7 @@ export class ProjectUsageService {
       .leftJoinAndSelect('usage.resource', 'resource')
       .leftJoinAndSelect('usage.project', 'project')
       .where('usage.projectId = :projectId', { projectId })
+      .andWhere('usage.lifecyclePending = FALSE')
       .orderBy('usage.startTime', 'DESC');
 
     this.applyDateFilters(qb, 'usage', query.startDate, query.endDate);

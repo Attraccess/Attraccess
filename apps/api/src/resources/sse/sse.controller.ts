@@ -119,7 +119,7 @@ export class SSEController implements OnModuleInit, OnModuleDestroy {
     }
 
     // Look for active usage sessions (those without an end time)
-    const activeUsage = resource.usages?.find((usage) => usage.endTime === null);
+    const activeUsage = resource.usages?.find((usage) => usage.endTime === null && !usage.lifecyclePending);
 
     return !!activeUsage;
   }

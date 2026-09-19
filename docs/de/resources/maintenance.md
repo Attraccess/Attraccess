@@ -72,10 +72,15 @@ Wartungspläne erstellen automatisch Wartungserinnerungen basierend auf Nutzung 
 |-------------|-------------|
 | **Auslösertyp** | Einer von USAGE_HOURS, USAGE_COUNT oder TIME_INTERVAL |
 | **Auslöserwert** | Der Schwellenwert, der die Wartung auslöst (z.B. 100 Stunden, 500 Sitzungen, 30 Tage) |
+| **Dauerbasis** | Bei zeitbasierten Nutzungsplänen: Sitzungsdauer oder Maschinenbetriebsdauer |
 | **Aktiviert** | Ob der Plan derzeit aktiv ist |
 
+Die Sitzungsdauer zählt Nutzungssitzungen. Die Betriebsdauer zählt den aufgezeichneten Maschinenbetrieb, einschließlich Zeiten ohne aktive Nutzungssitzung. Bestehende Pläne behalten die Sitzungsdauer; aus alten Nutzungssitzungen werden keine Betriebszeiten erzeugt.
+
+Beide Grundlagen berücksichtigen die laufende Dauer offener Intervalle. Für den nächsten Wartungszyklus zählt nur die Zeit nach dem letzten Wartungsabschluss: Überschreitet eine Sitzung oder ein Betriebsintervall diesen Zeitpunkt, wird die Dauer dort ohne Rundung aufgeteilt. Vor dem ersten Abschluss beginnt der Zyklus mit der Erstellung der Ressource. Die regelmäßige Auswertung läuft alle fünf Minuten; das Erkennen einer Schwellenüberschreitung kann daher entsprechend verzögert sein.
+
 > [!NOTE]
-> Das Deaktivieren eines Plans löscht ihn nicht. Sie können ihn jederzeit wieder aktivieren. Der Plan setzt die Zählung dort fort, wo er aufgehört hat.
+> Das Deaktivieren eines Plans pausiert die Erinnerungen, nicht die Erfassung der Dauer. Beim erneuten Aktivieren zählt die Zeit seit dem unveränderten Beginn des Wartungszyklus.
 
 ### So funktionieren automatisierte Pläne
 

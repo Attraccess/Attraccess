@@ -67,6 +67,7 @@ describe('BillingService', () => {
           provide: getRepositoryToken(BillingTransaction),
           useValue: {
             findAndCount: jest.fn(),
+            findOne: jest.fn(),
             findOneBy: jest.fn(),
             save: jest.fn(),
           },
@@ -341,13 +342,15 @@ describe('BillingService', () => {
       billingTransactionRepository.save.mockResolvedValue({ id: 999 } as BillingTransaction);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await service.chargeForResourceUsage(usage as ResourceUsage, createMockManager() as any);
+      const transaction = await service.chargeForResourceUsage(usage as ResourceUsage, createMockManager() as any);
 
       expect(service.getResourceBillingConfiguration).toHaveBeenCalledWith(102, expect.any(Object));
-      // Transaction is created via provided manager; notification is emitted with full transaction
-      expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(
+      // A caller-owned transaction returns the charge without publishing it before commit.
+      expect(transaction).toEqual(
         expect.objectContaining({ id: 999, amount: -35, userId: 10, resourceUsageId: 13 }),
       );
+      expect(liveNotificationsService.notifyTransactionUpdate).not.toHaveBeenCalled();
+      expect(emailService.sendResourceUsageBillingSummaryEmail).not.toHaveBeenCalled();
     });
 
     it('applies billingFactor < 100% (discount) and creates BILLING_FACTOR item', async () => {
@@ -393,10 +396,10 @@ describe('BillingService', () => {
       };
 
       // ceil(2) = 2 -> 2 * 20 + 0 = 40 credits; billingFactor 50% -> 20
-      await service.chargeForResourceUsage(usage as ResourceUsage, manager as unknown as never);
+      const transaction = await service.chargeForResourceUsage(usage as ResourceUsage, manager as unknown as never);
 
       expect(service.getResourceBillingConfiguration).toHaveBeenCalledWith(200, expect.any(Object));
-      expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(
+      expect(transaction).toEqual(
         expect.objectContaining({ amount: -20 }),
       );
 
@@ -457,7 +460,8 @@ describe('BillingService', () => {
       };
 
       // ceil(3) = 3 -> 3 * 10 + 5 = 35 credits; 100% factor -> 35
-      await service.chargeForResourceUsage(usage as ResourceUsage, manager as unknown as never);
+      const transaction = await service.chargeForResourceUsage(usage as ResourceUsage, manager as unknown as never);
+      expect(transaction.amount).toBe(-35);
 
       const saves = (manager.save as jest.Mock).mock.calls
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -506,9 +510,9 @@ describe('BillingService', () => {
       };
 
       // base = 20, factor 150% -> total 30, surcharge item +10
-      await service.chargeForResourceUsage(usage as ResourceUsage, manager as unknown as never);
+      const transaction = await service.chargeForResourceUsage(usage as ResourceUsage, manager as unknown as never);
 
-      expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(
+      expect(transaction).toEqual(
         expect.objectContaining({ amount: -30 }),
       );
 
@@ -558,12 +562,11 @@ describe('BillingService', () => {
       };
 
       // base = 30, factor 0% -> total 0
-      await service.chargeForResourceUsage(usage as ResourceUsage, manager as unknown as never);
+      const transaction = await service.chargeForResourceUsage(usage as ResourceUsage, manager as unknown as never);
 
       // Handle -0 vs 0 by checking numerically
-      const notifiedTx = (liveNotificationsService.notifyTransactionUpdate as jest.Mock).mock.calls.at(-1)[0];
-      expect(notifiedTx).toBeDefined();
-      expect(notifiedTx.amount).toBeCloseTo(0);
+      expect(transaction).toBeDefined();
+      expect(transaction.amount).toBeCloseTo(0);
 
       expect(manager.save).toHaveBeenCalledWith(
         BillingTransactionItem,
@@ -618,10 +621,10 @@ describe('BillingService', () => {
       };
 
       // base = ceil(2) * 5 = 10; plus existing items 14 => 24; factor 100% -> 24
-      await service.chargeForResourceUsage(usage as ResourceUsage, manager as unknown as never);
+      const transaction = await service.chargeForResourceUsage(usage as ResourceUsage, manager as unknown as never);
 
       expect(manager.update).toHaveBeenCalledWith(BillingTransaction, 77, expect.objectContaining({ amount: -24 }));
-      expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(
+      expect(transaction).toEqual(
         expect.objectContaining({ id: 77, amount: -24 }),
       );
       expect(auditService.recordBillingTransactionAfterCommit).toHaveBeenCalledWith({
@@ -692,9 +695,9 @@ describe('BillingService', () => {
         ),
       } as unknown as never;
 
-      await service.chargeForResourceUsage(usage, manager);
+      const transaction = await service.chargeForResourceUsage(usage, manager);
 
-      expect(liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(
+      expect(transaction).toEqual(
         expect.objectContaining({ amount: -23 }),
       );
       expect((manager as { save: jest.Mock }).save).toHaveBeenCalledWith(
@@ -896,6 +899,7 @@ describe('BillingService', () => {
     });
 
     it('sends email after completing usage transaction', async () => {
+      let committed = false;
       const usage: Partial<ResourceUsage> = {
         id: 5,
         usageInMinutes: 10,
@@ -938,11 +942,28 @@ describe('BillingService', () => {
         update: jest.fn(),
       };
 
-      // override transaction wrapper to call doCalculation directly
+      // Publishing must happen after the transaction wrapper has committed.
       (billingTransactionItemRepository.manager.transaction as unknown as jest.Mock).mockImplementation(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        async (fn: any) => fn(manager),
+        async (fn: any) => {
+          const result = await fn(manager);
+          expect(emailService.sendResourceUsageBillingSummaryEmail).not.toHaveBeenCalled();
+          expect(liveNotificationsService.notifyTransactionUpdate).not.toHaveBeenCalled();
+          committed = true;
+          return result;
+        },
       );
+      billingTransactionRepository.findOne.mockImplementation(async () => {
+        expect(committed).toBe(true);
+        return {
+          id: 123,
+          amount: -105,
+          status: BillingTransactionStatus.Completed,
+          user: { id: 10, email: 'u@example.com' },
+          resourceUsage: usage,
+          items: [],
+        } as unknown as BillingTransaction;
+      });
 
       jest
         .spyOn(service, 'getResourceBillingConfiguration')
@@ -954,6 +975,40 @@ describe('BillingService', () => {
       const args = (emailService.sendResourceUsageBillingSummaryEmail as jest.Mock).mock.calls[0];
       expect(args[0]).toMatchObject({ id: 10, email: 'u@example.com' });
       expect(args[2]).toMatchObject({ resource: { name: 'CNC' } });
+    });
+
+    it('does not publish an aborted or pending charge', async () => {
+      billingTransactionRepository.findOne.mockResolvedValue(null);
+
+      await service.notifyResourceUsageCharge(123);
+
+      expect(billingTransactionRepository.findOne).toHaveBeenCalledWith(expect.objectContaining({
+        where: { id: 123, status: BillingTransactionStatus.Completed },
+      }));
+      expect(liveNotificationsService.notifyTransactionUpdate).not.toHaveBeenCalled();
+      expect(emailService.sendResourceUsageBillingSummaryEmail).not.toHaveBeenCalled();
+    });
+
+    it('validates a tentative start without creating billing records', async () => {
+      jest.spyOn(service, 'getResourceBillingConfiguration').mockResolvedValue({
+        creditsPerUsage: 10, creditsPerMinute: 2,
+      } as ResourceBillingConfiguration);
+      jest.spyOn(service, 'isBillingEnabled').mockResolvedValue(true);
+      jest.spyOn(service, 'getBalance').mockResolvedValue(12);
+
+      await service.validateResourceUsageStart(1, { sessionDurationCreditsPerMinute: 2 } as ResourceUsage, { id: 7 } as User);
+
+      expect(billingTransactionRepository.save).not.toHaveBeenCalled();
+      expect(auditService.recordBillingTransactionAfterCommit).not.toHaveBeenCalled();
+      expect(liveNotificationsService.notifyTransactionUpdate).not.toHaveBeenCalled();
+    });
+
+    it('does not turn a committed lifecycle into a failure when charge publication fails', async () => {
+      billingTransactionRepository.findOne.mockRejectedValue(new Error('Read unavailable'));
+
+      await expect(service.notifyResourceUsageCharge(123)).resolves.toBeUndefined();
+
+      expect(emailService.sendResourceUsageBillingSummaryEmail).not.toHaveBeenCalled();
     });
   });
 });

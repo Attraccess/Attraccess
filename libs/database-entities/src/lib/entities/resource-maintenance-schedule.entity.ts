@@ -22,6 +22,7 @@ export enum ResourceMaintenanceScheduleTriggerType {
 
 export enum ResourceMaintenanceScheduleDurationBasis {
   SESSION_DURATION = 'SESSION_DURATION',
+  /** All machine operation, including unattributed time. Keep the legacy storage/API value. */
   ATTRIBUTABLE_OPERATING_DURATION = 'ATTRIBUTABLE_OPERATING_DURATION',
 }
 

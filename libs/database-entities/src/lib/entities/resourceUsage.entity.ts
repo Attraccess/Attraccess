@@ -178,6 +178,10 @@ export class ResourceUsage {
   @ApiProperty({ description: 'Whether the resource usage is finalized' })
   isFinalized!: boolean;
 
+  /** Internal lifecycle reservation; excluded from public usage and duration calculations. */
+  @Column({ type: 'boolean', default: false })
+  lifecyclePending!: boolean;
+
   @Column({ nullable: true, type: 'integer' })
   @ApiProperty({
     description: 'The ID of the supervisor who supervised this session (null if unsupervised or supervisor deleted)',

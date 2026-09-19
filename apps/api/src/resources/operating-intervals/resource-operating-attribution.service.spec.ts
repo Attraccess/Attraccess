@@ -1,4 +1,9 @@
-import { ResourceOperatingInterval, ResourceUsage, ResourceUsageAction } from '@attraccess/database-entities';
+import {
+  ResourceOperatingInterval,
+  ResourceUsage,
+  ResourceUsageAction,
+  ResourceUsageLifecycleAttempt,
+} from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
 import { ResourceOperatingAttributionService } from './resource-operating-attribution.service';
 
@@ -23,6 +28,7 @@ describe('ResourceOperatingAttributionService', () => {
     Pick<Repository<ResourceOperatingInterval>, 'createQueryBuilder' | 'find' | 'existsBy'>
   >;
   let usageRepository: jest.Mocked<Pick<Repository<ResourceUsage>, 'find'>>;
+  let lifecycleAttemptRepository: jest.Mocked<Pick<Repository<ResourceUsageLifecycleAttempt>, 'find'>>;
   let availabilityQuery: {
     select: jest.Mock;
     where: jest.Mock;
@@ -41,9 +47,11 @@ describe('ResourceOperatingAttributionService', () => {
       createQueryBuilder: jest.fn().mockReturnValue(availabilityQuery),
     };
     usageRepository = { find: jest.fn() };
+    lifecycleAttemptRepository = { find: jest.fn().mockResolvedValue([]) };
     service = new ResourceOperatingAttributionService(
       intervalRepository as unknown as Repository<ResourceOperatingInterval>,
       usageRepository as unknown as Repository<ResourceUsage>,
+      lifecycleAttemptRepository as Repository<ResourceUsageLifecycleAttempt>,
     );
   });
 
@@ -65,6 +73,50 @@ describe('ResourceOperatingAttributionService', () => {
           isProvisional: false,
         },
       ],
+    });
+  });
+
+  describe('getDurationsForWindows', () => {
+    it('clips independent service cycles and unions overlapping intervals without requiring attribution', async () => {
+      intervalRepository.find.mockResolvedValue([
+        operating(1, '09:00:00', null),
+        operating(2, '10:00:00', '11:00:00'),
+        { ...operating(3, '11:30:00', null), resourceId: 2 },
+      ]);
+      usageRepository.find.mockResolvedValue([usage(1, '10:15:00', '10:45:00')]);
+
+      const totals = await service.getDurationsForWindows(
+        [
+          { key: 'old:1', resourceId: 1, start: at('10:00:00') },
+          { key: 'new:1', resourceId: 1, start: at('11:00:00') },
+          { key: 'old:2', resourceId: 2, start: at('10:00:00') },
+        ],
+        asOf,
+      );
+
+      expect(totals).toEqual(
+        new Map([
+          ['old:1', { sessionDurationMs: 30 * 60_000, operatingDurationMs: 120 * 60_000 }],
+          ['new:1', { sessionDurationMs: 0, operatingDurationMs: 60 * 60_000 }],
+          ['old:2', { sessionDurationMs: 0, operatingDurationMs: 30 * 60_000 }],
+        ]),
+      );
+      expect(intervalRepository.find).toHaveBeenCalledTimes(1);
+      expect(usageRepository.find).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not query the database when there are no duration windows', async () => {
+      await expect(service.getDurationsForWindows([], asOf)).resolves.toEqual(new Map());
+      expect(intervalRepository.find).not.toHaveBeenCalled();
+      expect(usageRepository.find).not.toHaveBeenCalled();
+    });
+
+    it('propagates unavailable authoritative data instead of returning a zero duration', async () => {
+      intervalRepository.find.mockRejectedValue(new Error('interval read failed'));
+      usageRepository.find.mockResolvedValue([]);
+      await expect(
+        service.getDurationsForWindows([{ key: '1', resourceId: 1, start: at('10:00:00') }], asOf),
+      ).rejects.toThrow('interval read failed');
     });
   });
 
@@ -238,10 +290,7 @@ describe('ResourceOperatingAttributionService', () => {
         find: jest.fn().mockResolvedValue([operating(1, '10:00:00', '11:00:00')]),
       })),
     };
-    const minutes = await service.getForUsage(
-      usage(2, '10:15:00', '10:45:00'),
-      manager as never,
-    );
+    const minutes = await service.getForUsage(usage(2, '10:15:00', '10:45:00'), manager as never);
 
     expect(minutes).toBe(30);
   });

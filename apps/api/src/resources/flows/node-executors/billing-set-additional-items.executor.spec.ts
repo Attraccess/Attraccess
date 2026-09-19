@@ -13,7 +13,7 @@ import { NodeExecutionContext } from './node-executor.interface';
 
 describe('BillingSetAdditionalItemsExecutor', () => {
   let executor: BillingSetAdditionalItemsExecutor;
-  let resourceUsageService: { getActiveSession: jest.Mock };
+  let resourceUsageService: { getActiveSession: jest.Mock; stageLifecycleBillingItem: jest.Mock };
   let manager: { findOne: jest.Mock; update: jest.Mock; save: jest.Mock };
   let repoManager: { findOne: jest.Mock; update: jest.Mock; save: jest.Mock };
   let billingItemRepository: Repository<BillingTransactionItem>;
@@ -43,6 +43,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
 
     resourceUsageService = {
       getActiveSession: jest.fn().mockResolvedValue({ id: 'ru-1' }),
+      stageLifecycleBillingItem: jest.fn().mockResolvedValue(undefined),
     };
 
     manager = {
@@ -122,6 +123,37 @@ describe('BillingSetAdditionalItemsExecutor', () => {
     });
   });
 
+  it.each([12, undefined])('stages lifecycle billing for usage %s without touching active billing', async (id) => {
+    ctx.lifecycleAttemptId = 'lifecycle-attempt';
+    resourceUsageService.getActiveSession.mockResolvedValue(null);
+    (ctx.compileTemplate as jest.Mock).mockReturnValue('meter-1');
+
+    const result = await executor.execute(createNode(baseData), { id, quantity: '4', externalReference: 'meter' }, ctx);
+
+    expect(resourceUsageService.stageLifecycleBillingItem).toHaveBeenCalledWith('lifecycle-attempt', 1, id, {
+      ...baseData,
+      quantity: 4,
+      externalReference: 'meter-1',
+    });
+    expect(resourceUsageService.getActiveSession).not.toHaveBeenCalled();
+    expect(manager.findOne).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
+    expect(result).toEqual({ payload: { ...baseData, quantity: 4, externalReference: 'meter-1' } });
+  });
+
+  it('propagates a rejected lifecycle attempt without writing billing items', async () => {
+    ctx.lifecycleAttemptId = 'stale-attempt';
+    resourceUsageService.stageLifecycleBillingItem.mockRejectedValueOnce(
+      new Error('Lifecycle attempt is no longer pending'),
+    );
+
+    await expect(executor.execute(createNode(baseData), { id: 12 }, ctx)).rejects.toThrow(
+      'Lifecycle attempt is no longer pending',
+    );
+    expect(manager.save).not.toHaveBeenCalled();
+    expect(manager.update).not.toHaveBeenCalled();
+  });
+
   it('uses the usage ID in stopped-session flow input', async () => {
     manager.findOne.mockResolvedValueOnce({ id: 99 }).mockResolvedValueOnce(null);
 
@@ -173,10 +205,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
 
     const result = await executor.execute(createNode(baseData), { quantity: '10' }, ctx);
 
-    expect(manager.save).toHaveBeenCalledWith(
-      BillingTransactionItem,
-      expect.objectContaining({ quantity: 10 }),
-    );
+    expect(manager.save).toHaveBeenCalledWith(BillingTransactionItem, expect.objectContaining({ quantity: 10 }));
     expect(result.payload).toMatchObject({ quantity: 10 });
   });
 

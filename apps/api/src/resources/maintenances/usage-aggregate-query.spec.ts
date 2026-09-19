@@ -16,12 +16,14 @@ const UsageSchema = new EntitySchema<{
   startTime: Date;
   endTime: Date | null;
   usageInMinutes: number;
+  lifecyclePending: boolean;
   attributedOperatingDurationInMinutes: number | null;
 }>({
   name: 'resource_usage',
   columns: {
     id: { type: Number, primary: true, generated: true },
     resourceId: { type: 'integer' },
+    lifecyclePending: { type: Boolean, default: false },
     startTime: { type: 'datetime' },
     endTime: { type: 'datetime', nullable: true },
     usageInMinutes: {
@@ -83,8 +85,8 @@ describe('buildScheduleEvaluationQuery (real sqlite)', () => {
       {
         resourceId: RESOURCE,
         startTime: new Date('2025-03-01T10:00:00.000Z'),
-      endTime: new Date('2025-03-01T11:00:00.000Z'),
-      attributedOperatingDurationInMinutes: 12,
+        endTime: new Date('2025-03-01T11:00:00.000Z'),
+        attributedOperatingDurationInMinutes: 12,
       },
       // 30 min, exactly at the recent baseline -> boundary must be inclusive for both
       {
@@ -123,18 +125,13 @@ describe('buildScheduleEvaluationQuery (real sqlite)', () => {
       [RESOURCE, SCHEDULE_RECENT, recentBaseline],
     ]);
 
-    const bySchedule = new Map<number, { totalMinutes: number; totalOperatingMinutes: number; totalCount: number }>(
+    const bySchedule = new Map<number, { totalCount: number }>(
       rows.map((r: { scheduleId: number }) => [r.scheduleId, r]),
     );
 
-    // usageInMinutes is derived from julianday() arithmetic, so totals are fractional.
-    // 60 + 30 + 15 across three completed sessions
-    expect(bySchedule.get(SCHEDULE_NEW)?.totalMinutes).toBeCloseTo(105, 3);
-    expect(bySchedule.get(SCHEDULE_NEW)?.totalOperatingMinutes).toBe(21);
+    // Preserve usage-count behavior: three completed sessions across the original cycle.
     expect(bySchedule.get(SCHEDULE_NEW)?.totalCount).toBe(3);
     // Only the two sessions at/after the recent baseline — proves baselines aren't collapsed per resource
-    expect(bySchedule.get(SCHEDULE_RECENT)?.totalMinutes).toBeCloseTo(45, 3);
-    expect(bySchedule.get(SCHEDULE_RECENT)?.totalOperatingMinutes).toBe(9);
     expect(bySchedule.get(SCHEDULE_RECENT)?.totalCount).toBe(2);
   });
 
@@ -150,14 +147,12 @@ describe('buildScheduleEvaluationQuery (real sqlite)', () => {
       [RESOURCE, SCHEDULE_NEW, oldBaseline],
       [RESOURCE, SCHEDULE_RECENT, oldBaseline],
     ]);
-    const bySchedule = new Map<number, { baseline: string; totalMinutes: number; totalCount: number }>(
+    const bySchedule = new Map<number, { baseline: string; totalCount: number }>(
       rows.map((row: { scheduleId: number }) => [row.scheduleId, row]),
     );
 
     expect(bySchedule.get(SCHEDULE_RECENT)).toMatchObject({
       baseline: formatDbDate(recentBaseline),
-      totalMinutes: expect.closeTo(45, 3),
-      totalOperatingMinutes: 9,
       totalCount: 2,
     });
   });
@@ -171,8 +166,6 @@ describe('buildScheduleEvaluationQuery (real sqlite)', () => {
         scheduleId: SCHEDULE_NEW,
         baseline: formatDbDate(oldBaseline),
         hasActiveMaintenance: 0,
-        totalMinutes: 0,
-        totalOperatingMinutes: 0,
         totalCount: 0,
       },
     ]);
@@ -181,6 +174,6 @@ describe('buildScheduleEvaluationQuery (real sqlite)', () => {
   it('matches the stored datetime format, so a baseline in the future excludes everything', async () => {
     const rows = await runAggregate([[RESOURCE, SCHEDULE_NEW, new Date('2030-01-01T00:00:00.000Z')]]);
 
-    expect(rows[0]).toMatchObject({ totalMinutes: 0, totalOperatingMinutes: 0, totalCount: 0 });
+    expect(rows[0]).toMatchObject({ totalCount: 0 });
   });
 });

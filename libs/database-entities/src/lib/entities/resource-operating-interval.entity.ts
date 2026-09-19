@@ -21,6 +21,23 @@ export class ResourceOperatingInterval {
   @ApiProperty({ description: 'UTC instant at which operation ended', format: 'date-time', nullable: true })
   endTime!: Date | null;
 
+  // Snapshot IDs deliberately have no foreign keys: deleting a flow must preserve its timeline provenance.
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({ description: 'Flow node that opened this interval, if recorded', nullable: true })
+  startFlowNodeId!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({ description: 'Flow execution that opened this interval, if recorded', nullable: true })
+  startFlowRunId!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({ description: 'Flow node that closed this interval, if recorded', nullable: true })
+  endFlowNodeId!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({ description: 'Flow execution that closed this interval, if recorded', nullable: true })
+  endFlowRunId!: string | null;
+
   @CreateDateColumn()
   createdAt!: Date;
 

@@ -1,7 +1,15 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Form, FormField, FormFieldType, FormSubmission, Resource, ResourceFormAction } from '@attraccess/database-entities';
+import {
+  Form,
+  FormField,
+  FormFieldType,
+  FormSubmission,
+  Resource,
+  ResourceFormAction,
+} from '@attraccess/database-entities';
 import { ResourceFormsService } from './forms.service';
+import { EntityManager } from 'typeorm';
 
 const makeField = (overrides: Partial<FormField>): FormField =>
   ({
@@ -104,5 +112,33 @@ describe('ResourceFormsService pagination + per-field validation', () => {
     const result = await service.validatePageAnswers(5, 7, [{ fieldId: 999, value: 'x' }]);
     expect(result.valid).toBe(false);
     expect(result.errors[0].fieldId).toBe(999);
+  });
+
+  it('validates lifecycle form drafts without publishing submissions', async () => {
+    const save = jest.fn();
+    const manager = {
+      getRepository: jest.fn((entity) => (entity === Form ? formRepo : { save })),
+    } as unknown as EntityManager;
+    const drafts = await service.prepareRequiredSubmissions({
+      resourceId: 5,
+      action: ResourceFormAction.START,
+      userId: 3,
+      resourceUsageId: 9,
+      manager,
+      submissions: [
+        {
+          formId: 7,
+          answers: [
+            { fieldId: 11, value: 'Alice' },
+            { fieldId: 13, value: true },
+            { fieldId: 14, value: 'blue' },
+          ],
+        },
+      ],
+    });
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0]).toMatchObject({ resourceUsageId: 9, userId: 3, formId: 7 });
+    expect(drafts[0].data['11'].value).toBe('Alice');
+    expect(save).not.toHaveBeenCalled();
   });
 });

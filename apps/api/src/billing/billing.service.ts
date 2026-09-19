@@ -8,7 +8,7 @@ import {
   ResourceUsage,
   ResourceFlowNodeType,
 } from '@attraccess/database-entities';
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { UserNotFoundException } from '../exceptions/user.notFound.exception';
@@ -32,6 +32,8 @@ import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class BillingService {
+  private readonly logger = new Logger(BillingService.name);
+
   constructor(
     @InjectRepository(BillingTransaction)
     private readonly billingTransactionRepository: Repository<BillingTransaction>,
@@ -386,32 +388,6 @@ export class BillingService {
         });
       }
 
-      this.liveNotificationsService.notifyTransactionUpdate(transaction);
-
-      const freshUser = await manager.findOne(User, { where: { id: transaction.userId } });
-      if (freshUser?.email) {
-        try {
-          // load items relation if not present
-          // Ensure items relation is loaded
-          transaction = await manager.findOne(BillingTransaction, {
-            where: { id: transaction.id },
-            relations: ['items'],
-          });
-          const billingConfiguration = await this.getConfiguration();
-
-          if (transaction.amount !== 0) {
-            await this.emailService.sendResourceUsageBillingSummaryEmail(
-              freshUser,
-              transaction,
-              usage,
-              billingConfiguration.minorUnit,
-            );
-          }
-        } catch {
-          // ignore email failures to not break billing
-        }
-      }
-
       return transaction;
     };
 
@@ -419,12 +395,40 @@ export class BillingService {
       return await doCalculation(transactionManager);
     }
 
-    return await this.billingTransactionItemRepository.manager.transaction(async (transactionalEntityManager) => {
-      return await doCalculation(transactionalEntityManager);
-    });
+    const transaction = await this.billingTransactionItemRepository.manager.transaction(
+      (transactionalEntityManager) => doCalculation(transactionalEntityManager),
+    );
+    if (transaction) await this.notifyResourceUsageCharge(transaction.id);
+    return transaction;
   }
 
-  public async handleResourceUsageStart(
+  /** Publish a completed charge only after its owning usage transaction has committed. */
+  async notifyResourceUsageCharge(transactionId: number): Promise<void> {
+    try {
+      const transaction = await this.billingTransactionRepository.findOne({
+        where: { id: transactionId, status: BillingTransactionStatus.Completed },
+        relations: ['items', 'user', 'resourceUsage', 'resourceUsage.resource', 'resourceUsage.user'],
+      });
+      if (!transaction) return;
+
+      this.liveNotificationsService.notifyTransactionUpdate(transaction);
+      if (!transaction.user?.email || !transaction.resourceUsage || transaction.amount === 0) return;
+
+      const configuration = await this.getConfiguration();
+      await this.emailService.sendResourceUsageBillingSummaryEmail(
+        transaction.user,
+        transaction,
+        transaction.resourceUsage,
+        configuration.minorUnit,
+      );
+    } catch (error) {
+      // A receipt delivery failure must not change an already committed charge.
+      this.logger.warn(`Failed to publish resource usage charge ${transactionId}`, error);
+    }
+  }
+
+  /** Validate a tentative start without creating an externally visible billing transaction. */
+  public async validateResourceUsageStart(
     resourceId: number,
     usage: ResourceUsage,
     user: User,
@@ -442,6 +446,15 @@ export class BillingService {
         throw new InsufficientBalanceError();
       }
     }
+  }
+
+  public async handleResourceUsageStart(
+    resourceId: number,
+    usage: ResourceUsage,
+    user: User,
+    transactionalEntityManager?: EntityManager,
+  ) {
+    await this.validateResourceUsageStart(resourceId, usage, user, transactionalEntityManager);
 
     const transactionRepository = transactionalEntityManager
       ? transactionalEntityManager.getRepository(BillingTransaction)

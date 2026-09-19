@@ -20,6 +20,8 @@ export interface TemplateVariables {
  * executors stay free of the Handlebars/variable plumbing.
  */
 export interface NodeExecutionContext {
+  flowRunId?: string;
+  lifecycleAttemptId?: string;
   transactionManager?: EntityManager;
   compileTemplate(template: string, data: object): string;
   getTemplateVariables(data: object): TemplateVariables | undefined;

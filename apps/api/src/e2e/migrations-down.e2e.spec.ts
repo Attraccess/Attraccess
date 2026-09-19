@@ -65,6 +65,7 @@ import {
   ResourceOperatingInterval,
   ResourceType,
   ResourceUsage,
+  ResourceUsageLifecycleAttempt,
   ResourceUsageAction,
   Session,
   Setting,
@@ -436,6 +437,35 @@ const seedDatabase = async (dataSource: DataSource) => {
     endNotes: null,
     isFinalized: false,
   }));
+
+  const lifecycleAttemptRepo = dataSource.getRepository(ResourceUsageLifecycleAttempt);
+  if (!(await lifecycleAttemptRepo.existsBy({ resourceId: resource.id }))) {
+    // An interrupted takeover owns only a hidden candidate; the existing usage and bill stay intact.
+    const candidate = await usageRepo.save(
+      usageRepo.create({
+        usageAction: ResourceUsageAction.Usage,
+        resourceId: resource.id,
+        userId: secondaryUser.id,
+        projectId: project.id,
+        startTime: new Date(),
+        startNotes: 'Seed interrupted takeover',
+        isFinalized: false,
+        lifecyclePending: true,
+      }),
+    );
+    await lifecycleAttemptRepo.save(
+      lifecycleAttemptRepo.create({
+        id: `seed-lifecycle-attempt-${seedTag}`,
+        resourceId: resource.id,
+        kind: 'takeover',
+        candidateUsageId: candidate.id,
+        previousUsageId: usage.id,
+        transitionTime: candidate.startTime,
+        formSubmissions: [],
+        billingItems: [],
+      }),
+    );
+  }
 
   const billingTransaction = await ensureEntity(billingTransactionRepo, () => ({
     userId: primaryUser.id,

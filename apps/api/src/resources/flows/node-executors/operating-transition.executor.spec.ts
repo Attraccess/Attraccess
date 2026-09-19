@@ -9,13 +9,22 @@ describe('OperatingTransitionExecutor', () => {
       transition: jest.fn().mockResolvedValue(null),
     } as unknown as ResourceOperatingIntervalService;
     const executor = new OperatingTransitionExecutor(transitions, 'operating');
-    const node = { resourceId: 7, type: ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_OPERATING } as ResourceFlowNode;
+    const node = {
+      id: 'operating-node',
+      resourceId: 7,
+      type: ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_OPERATING,
+    } as ResourceFlowNode;
     const payload = { source: 'mqtt' };
 
     const transactionManager = {} as EntityManager;
 
-    await expect(executor.execute(node, payload, { transactionManager } as never)).resolves.toEqual({ payload });
-    expect(transitions.transition).toHaveBeenCalledWith(7, 'operating', transactionManager);
+    await expect(
+      executor.execute(node, payload, { transactionManager, flowRunId: 'flow-run' } as never),
+    ).resolves.toEqual({ payload });
+    expect(transitions.transition).toHaveBeenCalledWith(7, 'operating', {
+      flowNodeId: 'operating-node',
+      flowRunId: 'flow-run',
+    });
   });
 
   it('emits an idle transition', async () => {
@@ -23,10 +32,14 @@ describe('OperatingTransitionExecutor', () => {
       transition: jest.fn().mockResolvedValue(null),
     } as unknown as ResourceOperatingIntervalService;
     const executor = new OperatingTransitionExecutor(transitions, 'idle');
-    const node = { resourceId: 7, type: ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE } as ResourceFlowNode;
+    const node = {
+      id: 'idle-node',
+      resourceId: 7,
+      type: ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE,
+    } as ResourceFlowNode;
 
     await executor.execute(node, {}, {} as never);
 
-    expect(transitions.transition).toHaveBeenCalledWith(7, 'idle', undefined);
+    expect(transitions.transition).toHaveBeenCalledWith(7, 'idle', { flowNodeId: 'idle-node', flowRunId: undefined });
   });
 });
