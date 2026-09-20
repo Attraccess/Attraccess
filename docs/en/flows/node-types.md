@@ -184,6 +184,14 @@ Records an activity event on the resource. Resets the inactivity timer for **No 
 
 No additional settings.
 
+### Machine Operating State
+
+Operating-state actions record whether a machine is physically operating or idle. Feed them from an observed signal interpreted by your flow; sending a command or starting a usage session does not itself prove operation.
+
+Repeated assignments of the same state do nothing. An operating interval stays open across session boundaries and server restarts until a flow assigns idle. Accepted changes keep their server timestamp and the originating flow node/run. If the server clock moves behind the last accepted transition, the assignment fails instead of writing an invalid interval.
+
+An accepted operating observation remains recorded even if a later node fails. A failed usage start or takeover still aborts its session change and billing changes. If the server stops during a pending usage change, that attempt is canceled on restart; its physical commands are not replayed. Actual recorded operation remains available for reporting and maintenance.
+
 ## See Also
 
 - [Flow Editor](flows/flow-editor.md) -- How to place and connect nodes

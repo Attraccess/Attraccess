@@ -76,3 +76,8 @@ export class ResourceSupervisedUsageEndedEvent {
     public readonly usageId: number,
   ) {}
 }
+/** A failed/interrupted attempt released its duration cap; no usage started or ended. */
+export class ResourceUsageLifecycleAbortedEvent {
+  static readonly EVENT_NAME = 'resource.usage.lifecycle.aborted';
+  constructor(public readonly resourceId: number) {}
+}

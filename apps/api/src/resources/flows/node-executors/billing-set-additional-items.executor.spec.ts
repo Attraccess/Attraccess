@@ -5,6 +5,7 @@ import {
   ResourceFlowNodeType,
   BillingTransaction,
   BillingTransactionItem,
+  BillingTransactionStatus,
 } from '@attraccess/database-entities';
 import { ResourceUsageService } from '../../usage/resourceUsage.service';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
@@ -13,9 +14,9 @@ import { NodeExecutionContext } from './node-executor.interface';
 
 describe('BillingSetAdditionalItemsExecutor', () => {
   let executor: BillingSetAdditionalItemsExecutor;
-  let resourceUsageService: { getActiveSession: jest.Mock };
+  let resourceUsageService: { getActiveSession: jest.Mock; stageLifecycleBillingItem: jest.Mock };
   let manager: { findOne: jest.Mock; update: jest.Mock; save: jest.Mock };
-  let repoManager: { findOne: jest.Mock; update: jest.Mock; save: jest.Mock };
+  let repoManager: { findOne: jest.Mock; update: jest.Mock; save: jest.Mock; transaction: jest.Mock };
   let billingItemRepository: Repository<BillingTransactionItem>;
   let ctx: NodeExecutionContext;
 
@@ -43,6 +44,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
 
     resourceUsageService = {
       getActiveSession: jest.fn().mockResolvedValue({ id: 'ru-1' }),
+      stageLifecycleBillingItem: jest.fn().mockResolvedValue(undefined),
     };
 
     manager = {
@@ -56,6 +58,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
       findOne: jest.fn(),
       update: jest.fn().mockResolvedValue(undefined),
       save: jest.fn().mockResolvedValue(undefined),
+      transaction: jest.fn(async (work) => work(repoManager)),
     };
 
     billingItemRepository = {
@@ -91,7 +94,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
     const result = await executor.execute(createNode(baseData), {}, ctx);
 
     expect(manager.findOne).toHaveBeenNthCalledWith(1, BillingTransaction, {
-      where: { resourceUsageId: 'ru-1', resourceUsage: { resourceId: 1 } },
+      where: { resourceUsageId: 'ru-1', resourceUsage: { resourceId: 1 }, status: BillingTransactionStatus.Pending },
     });
     expect(manager.findOne).toHaveBeenNthCalledWith(2, BillingTransactionItem, {
       where: {
@@ -122,6 +125,37 @@ describe('BillingSetAdditionalItemsExecutor', () => {
     });
   });
 
+  it.each([12, undefined])('stages lifecycle billing for usage %s without touching active billing', async (id) => {
+    ctx.lifecycleAttemptId = 'lifecycle-attempt';
+    resourceUsageService.getActiveSession.mockResolvedValue(null);
+    (ctx.compileTemplate as jest.Mock).mockReturnValue('meter-1');
+
+    const result = await executor.execute(createNode(baseData), { id, quantity: '4', externalReference: 'meter' }, ctx);
+
+    expect(resourceUsageService.stageLifecycleBillingItem).toHaveBeenCalledWith('lifecycle-attempt', 1, id, {
+      ...baseData,
+      quantity: 4,
+      externalReference: 'meter-1',
+    });
+    expect(resourceUsageService.getActiveSession).not.toHaveBeenCalled();
+    expect(manager.findOne).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
+    expect(result).toEqual({ payload: { ...baseData, quantity: 4, externalReference: 'meter-1' } });
+  });
+
+  it('propagates a rejected lifecycle attempt without writing billing items', async () => {
+    ctx.lifecycleAttemptId = 'stale-attempt';
+    resourceUsageService.stageLifecycleBillingItem.mockRejectedValueOnce(
+      new Error('Lifecycle attempt is no longer pending'),
+    );
+
+    await expect(executor.execute(createNode(baseData), { id: 12 }, ctx)).rejects.toThrow(
+      'Lifecycle attempt is no longer pending',
+    );
+    expect(manager.save).not.toHaveBeenCalled();
+    expect(manager.update).not.toHaveBeenCalled();
+  });
+
   it('uses the usage ID in stopped-session flow input', async () => {
     manager.findOne.mockResolvedValueOnce({ id: 99 }).mockResolvedValueOnce(null);
 
@@ -129,7 +163,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
 
     expect(resourceUsageService.getActiveSession).not.toHaveBeenCalled();
     expect(manager.findOne).toHaveBeenNthCalledWith(1, BillingTransaction, {
-      where: { resourceUsageId: 12, resourceUsage: { resourceId: 1 } },
+      where: { resourceUsageId: 12, resourceUsage: { resourceId: 1 }, status: BillingTransactionStatus.Pending },
     });
   });
 
@@ -140,7 +174,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
 
     expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(1, false, ctx.transactionManager);
     expect(manager.findOne).toHaveBeenNthCalledWith(1, BillingTransaction, {
-      where: { resourceUsageId: 'ru-1', resourceUsage: { resourceId: 1 } },
+      where: { resourceUsageId: 'ru-1', resourceUsage: { resourceId: 1 }, status: BillingTransactionStatus.Pending },
     });
   });
 
@@ -149,7 +183,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
 
     await expect(executor.execute(createNode(baseData), { id: 12 }, ctx)).rejects.toBeInstanceOf(NoUsageSessionError);
     expect(manager.findOne).toHaveBeenCalledWith(BillingTransaction, {
-      where: { resourceUsageId: 12, resourceUsage: { resourceId: 1 } },
+      where: { resourceUsageId: 12, resourceUsage: { resourceId: 1 }, status: BillingTransactionStatus.Pending },
     });
     expect(manager.save).not.toHaveBeenCalled();
   });
@@ -173,10 +207,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
 
     const result = await executor.execute(createNode(baseData), { quantity: '10' }, ctx);
 
-    expect(manager.save).toHaveBeenCalledWith(
-      BillingTransactionItem,
-      expect.objectContaining({ quantity: 10 }),
-    );
+    expect(manager.save).toHaveBeenCalledWith(BillingTransactionItem, expect.objectContaining({ quantity: 10 }));
     expect(result.payload).toMatchObject({ quantity: 10 });
   });
 
@@ -232,7 +263,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
 
     await executor.execute(createNode(baseData), {}, ctx);
 
-    expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(1, false, undefined);
+    expect(resourceUsageService.getActiveSession).toHaveBeenCalledWith(1, false, repoManager);
     expect(repoManager.save).toHaveBeenCalledWith(
       BillingTransactionItem,
       expect.objectContaining({ billingTransactionId: 42, quantity: 2 }),

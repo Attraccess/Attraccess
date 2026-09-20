@@ -46,4 +46,12 @@ export class BillingTransactionItem {
   @Column({ type: 'integer' })
   @ApiProperty({ description: 'The quantity of the billing transaction item', example: '100' })
   quantity!: number;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'Raw milliseconds used to calculate this duration charge; null for legacy or non-duration items',
+    nullable: true,
+    required: false,
+  })
+  durationMs!: number | null;
 }

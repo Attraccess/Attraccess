@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -10,11 +10,13 @@ import {
   ResourceMaintenanceScheduleTimeIntervalConfig,
   ResourceMaintenance,
   Resource,
+  ResourceType,
   UsageDurationUnit,
 } from '@attraccess/database-entities';
 import { CreateMaintenanceScheduleDto } from './dtos/create-maintenance-schedule.dto';
 import { UpdateMaintenanceScheduleDto } from './dtos/update-maintenance-schedule.dto';
 import { AuditService } from '../../audit/audit.service';
+import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 
 @Injectable()
 export class MaintenanceScheduleService {
@@ -30,7 +32,8 @@ export class MaintenanceScheduleService {
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
     private readonly audit: AuditService,
-  ) { }
+    private readonly evaluator: MaintenanceScheduleEvaluatorService,
+  ) {}
 
   async findAllByResourceId(resourceId: number): Promise<ResourceMaintenanceSchedule[]> {
     await this.ensureResourceExists(resourceId);
@@ -59,7 +62,8 @@ export class MaintenanceScheduleService {
     authenticationMethod: 'session' | 'api-token' = 'session',
     apiTokenId?: number,
   ): Promise<ResourceMaintenanceSchedule> {
-    await this.ensureResourceExists(resourceId);
+    const resource = await this.ensureResourceExists(resourceId);
+    this.validateDurationBasis(resource, dto.durationBasis);
 
     const schedule = this.scheduleRepository.create({
       resourceId,
@@ -85,6 +89,7 @@ export class MaintenanceScheduleService {
       subjectId: resourceId,
       details: this.scheduleDetails(result),
     });
+    if (result.enabled) await this.evaluator.evaluateResource(resourceId);
     return result;
   }
 
@@ -97,6 +102,10 @@ export class MaintenanceScheduleService {
     apiTokenId?: number,
   ): Promise<ResourceMaintenanceSchedule> {
     const schedule = await this.getOne(resourceId, scheduleId);
+    const durationBasis = dto.durationBasis ?? schedule.durationBasis;
+    if (durationBasis === ResourceMaintenanceScheduleDurationBasis.ATTRIBUTABLE_OPERATING_DURATION) {
+      this.validateDurationBasis(await this.ensureResourceExists(resourceId), durationBasis);
+    }
 
     if (dto.name !== undefined) schedule.name = dto.name ?? null;
     if (dto.enabled !== undefined) schedule.enabled = dto.enabled;
@@ -117,7 +126,8 @@ export class MaintenanceScheduleService {
         usageHoursConfig:
           dto.usageHoursConfig ??
           (schedule.usageHoursConfig as { duration: number; unit: UsageDurationUnit } | undefined),
-        usageCountConfig: dto.usageCountConfig ?? (schedule.usageCountConfig as { thresholdSessions: number } | undefined),
+        usageCountConfig:
+          dto.usageCountConfig ?? (schedule.usageCountConfig as { thresholdSessions: number } | undefined),
         timeIntervalConfig:
           dto.timeIntervalConfig ??
           (schedule.timeIntervalConfig as { duration: number; unit: UsageDurationUnit } | undefined),
@@ -133,6 +143,7 @@ export class MaintenanceScheduleService {
       subjectId: resourceId,
       details: this.scheduleDetails(result),
     });
+    if (result.enabled) await this.evaluator.evaluateResource(resourceId);
     return result;
   }
 
@@ -146,10 +157,9 @@ export class MaintenanceScheduleService {
     const schedule = await this.getOne(resourceId, scheduleId);
     const details = this.scheduleDetails(schedule);
     await this.scheduleRepository.manager.transaction(async (manager) => {
-      await manager.getRepository(ResourceMaintenance).update(
-        { maintenanceSchedule: { id: scheduleId } },
-        { maintenanceSchedule: null },
-      );
+      await manager
+        .getRepository(ResourceMaintenance)
+        .update({ maintenanceSchedule: { id: scheduleId } }, { maintenanceSchedule: null });
       await manager.getRepository(ResourceMaintenanceScheduleUsageHoursConfig).delete({ scheduleId });
       await manager.getRepository(ResourceMaintenanceScheduleUsageCountConfig).delete({ scheduleId });
       await manager.getRepository(ResourceMaintenanceScheduleTimeIntervalConfig).delete({ scheduleId });
@@ -165,10 +175,20 @@ export class MaintenanceScheduleService {
     });
   }
 
-  private async ensureResourceExists(resourceId: number): Promise<void> {
-    const exists = await this.resourceRepository.findOne({ where: { id: resourceId } });
-    if (!exists) {
+  private async ensureResourceExists(resourceId: number): Promise<Resource> {
+    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    if (!resource) {
       throw new NotFoundException(`Resource with ID ${resourceId} not found`);
+    }
+    return resource;
+  }
+
+  private validateDurationBasis(resource: Resource, basis?: ResourceMaintenanceScheduleDurationBasis): void {
+    if (
+      basis === ResourceMaintenanceScheduleDurationBasis.ATTRIBUTABLE_OPERATING_DURATION &&
+      resource.type !== ResourceType.Machine
+    ) {
+      throw new BadRequestException('Operating duration is only supported for machine resources');
     }
   }
 

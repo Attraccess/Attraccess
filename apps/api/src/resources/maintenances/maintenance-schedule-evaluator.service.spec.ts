@@ -4,9 +4,11 @@ import { Repository } from 'typeorm';
 import { MaintenanceScheduleEvaluatorService, formatDbDate } from './maintenance-schedule-evaluator.service';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceChangedEvent } from './events/resource-maintenance-changed.event';
-import { ResourceSessionStartedEvent } from '../usage/events/resource-usage.events';
+import { ResourceSessionStartedEvent, ResourceUsageLifecycleAbortedEvent } from '../usage/events/resource-usage.events';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { MetricsService } from '../../metrics/metrics.service';
+import { ResourceOperatingStateChangedEvent } from '../operating-intervals/events/resource-operating-state-changed.event';
+import { ResourceOperatingAttributionService } from '../operating-intervals/resource-operating-attribution.service';
 import {
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleDurationBasis,
@@ -41,6 +43,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
   let maintenanceRepository: Repository<ResourceMaintenance>;
   let resourceRepository: Repository<Resource>;
   let usageRepository: Repository<ResourceUsage>;
+  let operatingAttribution: { getDurationsForWindows: jest.Mock };
 
   const resourceId = 1;
   const scheduleId = 10;
@@ -48,13 +51,20 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
   beforeEach(async () => {
     const qb = createQueryBuilderMock();
+    operatingAttribution = { getDurationsForWindows: jest.fn().mockResolvedValue(new Map()) };
     const scheduleRepoMock = {
       find: jest.fn(),
       findOne: jest.fn(),
       manager: {
         transaction: jest.fn(async (cb: (em: { getRepository: (entity: unknown) => unknown }) => Promise<unknown>) => {
           const transactionalEntityManager = {
-            getRepository: (entity: unknown) => (entity === ResourceMaintenanceSchedule ? scheduleRepoMock : {}),
+            getRepository: (entity: unknown) => {
+              if (entity === ResourceMaintenanceSchedule) return scheduleRepoMock;
+              if (entity === ResourceMaintenance) return maintenanceRepository;
+              if (entity === Resource) return resourceRepository;
+              if (entity === ResourceUsage) return usageRepository;
+              return {};
+            },
             query: jest.fn().mockResolvedValue([]),
           };
           return cb(transactionalEntityManager);
@@ -65,6 +75,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MaintenanceScheduleEvaluatorService,
+        { provide: ResourceOperatingAttributionService, useValue: operatingAttribution },
         {
           provide: getRepositoryToken(ResourceMaintenanceSchedule),
           useValue: scheduleRepoMock,
@@ -138,11 +149,10 @@ describe('MaintenanceScheduleEvaluatorService', () => {
     });
   });
 
-  it('uses only persisted attributable operating duration for an operating-duration schedule', async () => {
-    const queryBuilder = createQueryBuilderMock();
-    queryBuilder.getRawOne.mockResolvedValue({ total: '60' });
-    jest.spyOn(usageRepository, 'createQueryBuilder').mockReturnValue(queryBuilder as never);
-
+  it('selects total operating duration independently of session duration', async () => {
+    operatingAttribution.getDurationsForWindows.mockResolvedValue(
+      new Map([[`${scheduleId}:${resourceId}`, { sessionDurationMs: 0, operatingDurationMs: 60 * 60_000 }]]),
+    );
     const triggered = await service.shouldTrigger(
       {
         id: scheduleId,
@@ -153,15 +163,33 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       } as ResourceMaintenanceSchedule,
       resourceId,
     );
-
     expect(triggered).toBe(true);
-    expect(queryBuilder.select).toHaveBeenCalledWith(
-      'COALESCE(SUM(usage.attributedOperatingDurationInMinutes), 0)',
-      'total',
+    expect(operatingAttribution.getDurationsForWindows).toHaveBeenCalledWith(
+      [{ key: `${scheduleId}:${resourceId}`, resourceId, start: baselineDate }],
+      expect.any(Date),
+      undefined,
     );
   });
 
   describe('evaluateResource', () => {
+    it.each([
+      { kind: 'manual', activeScheduleId: null },
+      { kind: 'another schedule', activeScheduleId: scheduleId + 1 },
+    ])('does not create a second maintenance while $kind maintenance is active', async ({ activeScheduleId }) => {
+      jest
+        .spyOn(scheduleRepository, 'find')
+        .mockResolvedValue([{ id: scheduleId, resourceId, enabled: true } as ResourceMaintenanceSchedule]);
+      jest.spyOn(service, 'shouldTrigger').mockResolvedValue(true);
+      // The resource has an active record, but it does not belong to the schedule being evaluated.
+      jest
+        .spyOn(maintenanceService, 'hasActiveMaintenance')
+        .mockImplementation(async (filter) => typeof filter === 'number' || filter.scheduleId === activeScheduleId);
+
+      await service.evaluateResource(resourceId);
+
+      expect(maintenanceService.createMaintenanceFromSchedule).not.toHaveBeenCalled();
+    });
+
     it('should not create maintenance when resource has active maintenance', async () => {
       jest.spyOn(maintenanceService, 'hasActiveMaintenance').mockResolvedValue(true);
       jest.spyOn(scheduleRepository, 'find').mockResolvedValue([
@@ -192,10 +220,9 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         } as ResourceMaintenanceSchedule,
       ]);
 
-      const usageQb = createQueryBuilderMock();
-      usageQb.getRawOne.mockResolvedValue({ total: '120' }); // 120 minutes >= 60
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      jest.spyOn(usageRepository, 'createQueryBuilder').mockReturnValue(usageQb as any);
+      operatingAttribution.getDurationsForWindows.mockResolvedValue(
+        new Map([[`${scheduleId}:${resourceId}`, { sessionDurationMs: 120 * 60_000, operatingDurationMs: 0 }]]),
+      );
 
       await service.evaluateResource(resourceId);
 
@@ -224,10 +251,9 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         } as ResourceMaintenanceSchedule,
       ]);
 
-      const usageQb = createQueryBuilderMock();
-      usageQb.getRawOne.mockResolvedValue({ total: '100' }); // 100 < 600 (10 hours)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      jest.spyOn(usageRepository, 'createQueryBuilder').mockReturnValue(usageQb as any);
+      operatingAttribution.getDurationsForWindows.mockResolvedValue(
+        new Map([[`${scheduleId}:${resourceId}`, { sessionDurationMs: 100 * 60_000, operatingDurationMs: 0 }]]),
+      );
 
       await service.evaluateResource(resourceId);
 
@@ -558,7 +584,10 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       jest.spyOn(resourceRepository, 'find').mockResolvedValue([{ id: 1, createdAt: oldCreatedAt } as Resource]);
 
-      // SQL aggregation returns totalMinutes=120 (>= 60 threshold) and totalCount
+      operatingAttribution.getDurationsForWindows.mockResolvedValue(
+        new Map([[`${scheduleId}:1`, { sessionDurationMs: 120 * 60_000, operatingDurationMs: 0 }]]),
+      );
+      // The state query supplies each service-cycle baseline.
       jest
         .spyOn(usageRepository, 'query')
         .mockResolvedValue([{ resourceId: 1, scheduleId, totalMinutes: '120', totalCount: '3' }]);
@@ -572,6 +601,35 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         expect.anything(),
         false,
       );
+    });
+
+    it('rechecks a duration cycle completed between the bulk read and maintenance creation', async () => {
+      jest.spyOn(scheduleRepository, 'find').mockResolvedValue([
+        {
+          id: scheduleId,
+          resourceId: 1,
+          enabled: true,
+          triggerType: ResourceMaintenanceScheduleTriggerType.USAGE_HOURS,
+          usageHoursConfig: { duration: 1, unit: 'HOURS' },
+        } as ResourceMaintenanceSchedule,
+      ]);
+      operatingAttribution.getDurationsForWindows
+        .mockResolvedValueOnce(
+          new Map([[`${scheduleId}:1`, { sessionDurationMs: 120 * 60_000, operatingDurationMs: 0 }]]),
+        )
+        .mockResolvedValueOnce(new Map([[`${scheduleId}:1`, { sessionDurationMs: 0, operatingDurationMs: 0 }]]));
+      const completedAt = new Date();
+      jest.spyOn(service, 'getBaselineDate').mockResolvedValue(completedAt);
+
+      await service.evaluateAll();
+
+      expect(operatingAttribution.getDurationsForWindows).toHaveBeenNthCalledWith(
+        2,
+        [{ key: `${scheduleId}:1`, resourceId: 1, start: completedAt }],
+        expect.any(Date),
+        expect.anything(),
+      );
+      expect(maintenanceService.createMaintenanceFromSchedule).not.toHaveBeenCalled();
     });
 
     it('should not create maintenance when USAGE_HOURS threshold not met in bulk data', async () => {
@@ -595,6 +653,9 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       jest.spyOn(resourceRepository, 'find').mockResolvedValue([{ id: 1, createdAt: oldCreatedAt } as Resource]);
 
+      operatingAttribution.getDurationsForWindows.mockResolvedValue(
+        new Map([[`${scheduleId}:1`, { sessionDurationMs: 100 * 60_000, operatingDurationMs: 0 }]]),
+      );
       // 100 minutes < 600 minutes threshold
       jest
         .spyOn(usageRepository, 'query')
@@ -713,7 +774,13 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       jest.spyOn(resourceRepository, 'find').mockResolvedValue([{ id: 1, createdAt: resourceCreatedAt } as Resource]);
 
-      // Same resource, different per-schedule windows: 900 min since createdAt, 30 min since service
+      operatingAttribution.getDurationsForWindows.mockResolvedValue(
+        new Map([
+          [`${scheduleId}:1`, { sessionDurationMs: 900 * 60_000, operatingDurationMs: 0 }],
+          [`${otherScheduleId}:1`, { sessionDurationMs: 30 * 60_000, operatingDurationMs: 0 }],
+        ]),
+      );
+      // Same resource, different service-cycle baselines.
       const querySpy = jest.spyOn(usageRepository, 'query').mockResolvedValue([
         { resourceId: 1, scheduleId, baseline: resourceCreatedAt.toISOString(), totalMinutes: '900', totalCount: '9' },
         {
@@ -727,11 +794,18 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       await service.evaluateAll();
 
-      // Baseline resolution and usage aggregation must be one statement so a completed maintenance
-      // cannot change the baseline between the two reads.
+      // Resolve all service-cycle baselines together, then derive exact durations per window.
       expect(querySpy).toHaveBeenCalledTimes(1);
       expect(querySpy.mock.calls[0][0]).toContain('resource_maintenance');
-      expect(querySpy.mock.calls[0][0]).toContain('resource_usage');
+      expect(querySpy.mock.calls[0][0]).not.toContain('resource_usage');
+      expect(operatingAttribution.getDurationsForWindows).toHaveBeenNthCalledWith(
+        1,
+        [
+          { key: `${scheduleId}:1`, resourceId: 1, start: resourceCreatedAt },
+          { key: `${otherScheduleId}:1`, resourceId: 1, start: recentlyServiced },
+        ],
+        expect.any(Date),
+      );
 
       // Both schedules must be sent to SQL with their resource-created fallback baseline.
       const params = querySpy.mock.calls[0][1] as unknown[];
@@ -915,7 +989,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       expect(evalSpy).not.toHaveBeenCalled();
     });
 
-    it('should not call evaluateResource when session not ended (endTime null)', async () => {
+    it('should reevaluate when an open session starts', async () => {
       const evalSpy = jest.spyOn(service, 'evaluateResource').mockResolvedValue();
       const event = usageEndedEvent({
         id: 1,
@@ -926,7 +1000,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       service.onResourceUsage(event);
       jest.runAllTimers();
 
-      expect(evalSpy).not.toHaveBeenCalled();
+      expect(evalSpy).toHaveBeenCalledWith(resourceId);
     });
 
     it('should call evaluateResource after debounce when session ended', async () => {
@@ -944,6 +1018,22 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
       jest.runAllTimers();
 
+      expect(evalSpy).toHaveBeenCalledWith(resourceId);
+    });
+
+    it.each(['operating', 'idle'] as const)('reevaluates after the committed %s transition', (state) => {
+      const evalSpy = jest.spyOn(service, 'evaluateResource').mockResolvedValue();
+      service.onOperatingStateChanged(new ResourceOperatingStateChangedEvent(resourceId, state));
+      expect(evalSpy).not.toHaveBeenCalled();
+      jest.runAllTimers();
+      expect(evalSpy).toHaveBeenCalledWith(resourceId);
+    });
+
+    it('reevaluates resumed session duration after an aborted lifecycle commits', () => {
+      const evalSpy = jest.spyOn(service, 'evaluateResource').mockResolvedValue();
+      service.onUsageLifecycleAborted(new ResourceUsageLifecycleAbortedEvent(resourceId));
+      expect(evalSpy).not.toHaveBeenCalled();
+      jest.runAllTimers();
       expect(evalSpy).toHaveBeenCalledWith(resourceId);
     });
 

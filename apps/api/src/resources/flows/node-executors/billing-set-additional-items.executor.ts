@@ -1,14 +1,16 @@
 import { Logger } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import {
   ResourceFlowNode,
   BillingTransaction,
   BillingTransactionItem,
   BillingTransactionItemCreateSchema,
+  BillingTransactionStatus,
 } from '@attraccess/database-entities';
 import { ResourceUsageService } from '../../usage/resourceUsage.service';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
+import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
 
 export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
   private readonly logger = new Logger(BillingSetAdditionalItemsExecutor.name);
@@ -24,14 +26,6 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
       typeof candidateUsageId === 'number' && Number.isSafeInteger(candidateUsageId) && candidateUsageId > 0
         ? candidateUsageId
         : undefined;
-    const activeUsageSession = usageId
-      ? undefined
-      : await this.resourceUsageService.getActiveSession(node.resourceId, false, ctx.transactionManager);
-
-    if (!usageId && !activeUsageSession) {
-      throw new NoUsageSessionError();
-    }
-
     const data = BillingTransactionItemCreateSchema.parse(node.data);
 
     this.logger.debug(
@@ -57,50 +51,70 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
       quantity = numberQuantity;
     }
 
-    const manager = ctx.transactionManager ?? this.billingTransactionItemRepository.manager;
-
-    const billingTransaction = await manager.findOne(BillingTransaction, {
-      where: {
-        resourceUsageId: usageId ?? activeUsageSession.id,
-        resourceUsage: { resourceId: node.resourceId },
-      },
-    });
-
-    if (!billingTransaction) {
-      throw new NoUsageSessionError();
-    }
-
-    const dedupData = {
-      billingTransactionId: billingTransaction.id,
+    const item = {
       name: data.name,
       description: data.description,
       externalReference,
       unitPrice: data.unitPrice,
+      quantity,
     };
-
-    const existingItem = await manager.findOne(BillingTransactionItem, {
-      where: dedupData,
-    });
-
-    if (existingItem) {
-      await manager.update(BillingTransactionItem, existingItem.id, {
-        quantity: existingItem.quantity + quantity,
+    if (ctx.lifecycleAttemptId) {
+      await this.resourceUsageService.stageLifecycleBillingItem(ctx.lifecycleAttemptId, node.resourceId, usageId, {
+        ...item,
+        externalReference: externalReference ?? null,
       });
-    } else {
-      await manager.save(BillingTransactionItem, {
-        ...dedupData,
-        quantity,
-      });
+      return { payload: item };
     }
 
-    return {
-      payload: {
+    const savePendingItem = async (manager: EntityManager): Promise<void> => {
+      const activeUsageSession = usageId
+        ? undefined
+        : await this.resourceUsageService.getActiveSession(node.resourceId, false, manager);
+      if (!usageId && !activeUsageSession) {
+        throw new NoUsageSessionError();
+      }
+
+      const billingTransaction = await manager.findOne(BillingTransaction, {
+        where: {
+          resourceUsageId: usageId ?? activeUsageSession.id,
+          resourceUsage: { resourceId: node.resourceId },
+          status: BillingTransactionStatus.Pending,
+        },
+      });
+
+      if (!billingTransaction) {
+        throw new NoUsageSessionError();
+      }
+
+      const dedupData = {
+        billingTransactionId: billingTransaction.id,
         name: data.name,
         description: data.description,
         externalReference,
         unitPrice: data.unitPrice,
-        quantity,
-      } as Omit<BillingTransactionItem, 'id' | 'billingTransactionId' | 'billingTransaction'>,
+      };
+
+      const existingItem = await manager.findOne(BillingTransactionItem, {
+        where: dedupData,
+      });
+
+      if (existingItem) {
+        await manager.update(BillingTransactionItem, existingItem.id, {
+          quantity: existingItem.quantity + quantity,
+        });
+      } else {
+        await manager.save(BillingTransactionItem, { ...dedupData, quantity });
+      }
     };
+
+    if (ctx.transactionManager) {
+      await savePendingItem(ctx.transactionManager);
+    } else {
+      // Share finalization's write queue so a delayed event cannot pass the status check
+      // before finalization and then change its completed items afterward.
+      await runSerializedTransaction(this.billingTransactionItemRepository.manager, savePendingItem);
+    }
+
+    return { payload: item };
   }
 }

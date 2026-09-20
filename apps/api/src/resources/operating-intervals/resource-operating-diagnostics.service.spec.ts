@@ -62,9 +62,7 @@ describe('ResourceOperatingDiagnosticsService', () => {
   describe('getCurrentState', () => {
     it('reports operating with the open interval when one exists', async () => {
       const open = interval(5, at(18, '08:00:00'), null);
-      intervalRepository.findOne
-        .mockResolvedValueOnce(open)
-        .mockResolvedValueOnce(open);
+      intervalRepository.findOne.mockResolvedValueOnce(open).mockResolvedValueOnce(open);
 
       const state = await service.getCurrentState(1);
 
@@ -100,6 +98,30 @@ describe('ResourceOperatingDiagnosticsService', () => {
   });
 
   describe('getTransitionHistory', () => {
+    it('exposes recorded provenance for each boundary and leaves legacy provenance unknown', async () => {
+      intervalRepository.findAndCount.mockResolvedValue([
+        [
+          {
+            ...interval(2, at(12, '09:00:00'), at(12, '11:00:00')),
+            startFlowNodeId: 'start-node',
+            startFlowRunId: 'start-run',
+            endFlowNodeId: 'stop-node',
+            endFlowRunId: 'stop-run',
+          },
+          interval(1, at(10, '08:00:00'), null),
+        ],
+        2,
+      ]);
+
+      const page = await service.getTransitionHistory(1, 1, 20);
+
+      expect(page.items.map(({ state, flowNodeId, flowRunId }) => ({ state, flowNodeId, flowRunId }))).toEqual([
+        { state: 'idle', flowNodeId: 'stop-node', flowRunId: 'stop-run' },
+        { state: 'operating', flowNodeId: 'start-node', flowRunId: 'start-run' },
+        { state: 'operating', flowNodeId: null, flowRunId: null },
+      ]);
+    });
+
     it('derives descending transitions from interval rows and paginates over rows', async () => {
       intervalRepository.findAndCount.mockResolvedValue([
         [interval(2, at(12, '09:00:00'), at(12, '11:00:00')), interval(1, at(10, '08:00:00'), null)],
@@ -146,9 +168,7 @@ describe('ResourceOperatingDiagnosticsService', () => {
 
       const report = await service.getDataQualityReport(1, at(20, '00:00:00'));
 
-      expect(report.issues).toEqual([
-        expect.objectContaining({ kind: 'stale-signal', count: 1 }),
-      ]);
+      expect(report.issues).toEqual([expect.objectContaining({ kind: 'stale-signal', count: 1 })]);
       expect(operatingMetrics.recordDataQualityFailures).toHaveBeenCalledWith('stale-signal', 1);
     });
 

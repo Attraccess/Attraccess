@@ -46,11 +46,7 @@ export class EmailService {
     this.logger.debug('EmailService initialized');
   }
 
-  private async convertTemplate(
-    template: EmailTemplate,
-    context: Record<string, unknown>,
-    locale: string,
-  ) {
+  private async convertTemplate(template: EmailTemplate, context: Record<string, unknown>, locale: string) {
     const translationsMap = await this.emailTemplateService.getTranslationsMap(template.type, locale);
 
     const tHelper = (key: string, defaultValue: string, options: Handlebars.HelperOptions) => {
@@ -253,13 +249,31 @@ export class EmailService {
       return;
     }
 
-    const roundedMinutes = Math.ceil(usage.usageInMinutes ?? 0);
+    // Receipts describe the settled transaction, including its original rounding.
+    const roundedMinutes = transaction.items?.find((item) => item.name === 'PER_MINUTE')?.quantity;
+    const secondsFormatOptions = { maximumFractionDigits: 3 };
+    let secondsFormatter: Intl.NumberFormat;
+    try {
+      secondsFormatter = new Intl.NumberFormat(user.locale ?? 'en', secondsFormatOptions);
+    } catch {
+      // Persisted locales are not restricted to valid Intl tags. Match the default email language.
+      secondsFormatter = new Intl.NumberFormat('en', secondsFormatOptions);
+    }
 
     const items = (transaction.items ?? []).map((item) => ({
       name: item.name,
+      description: item.description,
       quantity: item.quantity,
       unitPrice: dbCurrencyToUserCurrency(item.unitPrice, currencyMinorUnit),
       total: dbCurrencyToUserCurrency(item.unitPrice * item.quantity, currencyMinorUnit),
+      isFixedFee: item.name === 'PER_SESSION',
+      isSessionDuration: item.name === 'PER_MINUTE',
+      isOperatingDuration: item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+      isBillingFactor: item.name === 'BILLING_FACTOR',
+      isDuration: item.name === 'PER_MINUTE' || item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+      durationMs: item.durationMs,
+      hasDuration: item.durationMs != null,
+      durationSeconds: item.durationMs == null ? undefined : secondsFormatter.format(item.durationMs / 1000),
     }));
 
     const totalCredits = dbCurrencyToUserCurrency(-transaction.amount, currencyMinorUnit);
@@ -274,6 +288,7 @@ export class EmailService {
         startTime: usage.startTime?.toISOString?.() ?? usage.startTime,
         endTime: usage.endTime?.toISOString?.() ?? usage.endTime,
         roundedMinutes,
+        billingFactor: usage.billingFactor == null ? undefined : `${usage.billingFactor}%`,
       },
       items,
       totalCredits,
@@ -434,10 +449,7 @@ export class EmailService {
     await this.sendEmail(recipient, EmailTemplateType.RESOURCE_TAKEOVER, context);
   }
 
-  async sendAccessChangeEmail(
-    recipient: User,
-    accessChange: { title: string; body: string; url?: string },
-  ) {
+  async sendAccessChangeEmail(recipient: User, accessChange: { title: string; body: string; url?: string }) {
     const resolvedRecipient = recipient?.email
       ? recipient
       : await this.userRepository.findOne({ where: { id: recipient.id } });
@@ -447,9 +459,7 @@ export class EmailService {
     }
 
     const base = await this.getBaseContext(resolvedRecipient);
-    const url = accessChange.url
-      ? new URL(accessChange.url, base.host.frontend).toString()
-      : undefined;
+    const url = accessChange.url ? new URL(accessChange.url, base.host.frontend).toString() : undefined;
 
     const context = {
       ...base,
@@ -463,10 +473,7 @@ export class EmailService {
     await this.sendEmail(resolvedRecipient, EmailTemplateType.ACCESS_CHANGE, context);
   }
 
-  async sendNewMessageEmail(
-    recipient: User,
-    message: { conversationId: number; senderName: string; preview: string },
-  ) {
+  async sendNewMessageEmail(recipient: User, message: { conversationId: number; senderName: string; preview: string }) {
     if (!recipient?.email) {
       return;
     }

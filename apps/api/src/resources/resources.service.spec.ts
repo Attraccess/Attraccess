@@ -261,20 +261,20 @@ describe('ResourcesService', () => {
       it('should filter resources currently in use by specific user', async () => {
         await service.listResources({ onlyInUseByUserId: 10 });
 
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.usages', 'usage', 'usage.endTime IS NULL');
+        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.usages', 'usage', 'usage.endTime IS NULL AND usage.lifecyclePending = FALSE');
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(expect.any(Brackets));
       });
 
       it('should not add in-use filter when onlyInUseByUserId is undefined', async () => {
         await service.listResources();
 
-        expect(mockQueryBuilder.leftJoin).not.toHaveBeenCalledWith('resource.usages', 'usage', 'usage.endTime IS NULL');
+        expect(mockQueryBuilder.leftJoin).not.toHaveBeenCalledWith('resource.usages', 'usage', 'usage.endTime IS NULL AND usage.lifecyclePending = FALSE');
       });
 
       it('should filter resources currently in use (onlyInUse)', async () => {
         await service.listResources({ onlyInUse: true });
 
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.usages', 'usage', 'usage.endTime IS NULL');
+        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.usages', 'usage', 'usage.endTime IS NULL AND usage.lifecyclePending = FALSE');
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('usage.endTime IS NULL');
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('usage.startTime IS NOT NULL');
       });
@@ -282,14 +282,14 @@ describe('ResourcesService', () => {
       it('should return using user information when returnUsingUser is true', async () => {
         await service.listResources({ returnUsingUser: true });
 
-        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('resource.usages', 'usage');
+        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('resource.usages', 'usage', 'usage.lifecyclePending = FALSE');
         expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('usage.user', 'usingUser');
       });
 
       it('should handle combination of onlyInUse and returnUsingUser', async () => {
         await service.listResources({ onlyInUse: true, returnUsingUser: true });
 
-        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('resource.usages', 'usage');
+        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('resource.usages', 'usage', 'usage.lifecyclePending = FALSE');
         expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('usage.user', 'usingUser');
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('usage.endTime IS NULL');
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('usage.startTime IS NOT NULL');
@@ -360,7 +360,7 @@ describe('ResourcesService', () => {
         expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('resource.id IN (:...ids)', { ids: [1, 2, 3] });
 
         // Verify all joins for both in-use and permission filtering
-        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.usages', 'usage', 'usage.endTime IS NULL');
+        expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.usages', 'usage', 'usage.endTime IS NULL AND usage.lifecyclePending = FALSE');
         expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith('resource.introducers', 'introducer');
 
         // Verify result structure
@@ -393,7 +393,7 @@ describe('ResourcesService', () => {
         });
 
         // Should use leftJoinAndSelect for usages when returnUsingUser is true
-        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('resource.usages', 'usage');
+        expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('resource.usages', 'usage', 'usage.lifecyclePending = FALSE');
         expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('usage.user', 'usingUser');
 
         // Should still add permission filtering joins

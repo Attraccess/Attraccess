@@ -3,11 +3,7 @@
 // aggregates yet, so verification recomputes derived durations from the timeline and compares.
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import {
-  ResourceFlowNode,
-  ResourceFlowNodeType,
-  ResourceOperatingInterval,
-} from '@attraccess/database-entities';
+import { ResourceFlowNode, ResourceFlowNodeType, ResourceOperatingInterval } from '@attraccess/database-entities';
 import { In, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
 import {
   OperatingDataQualityFailureKind,
@@ -53,11 +49,7 @@ export class ResourceOperatingDiagnosticsService {
     return {
       state: openInterval ? 'operating' : 'idle',
       openInterval: openInterval ? { id: openInterval.id, startTime: openInterval.startTime } : null,
-      lastTransitionAt: latest
-        ? (openInterval
-            ? latest.startTime
-            : (latest.endTime ?? latest.startTime))
-        : null,
+      lastTransitionAt: latest ? (openInterval ? latest.startTime : (latest.endTime ?? latest.startTime)) : null,
     };
   }
 
@@ -66,11 +58,7 @@ export class ResourceOperatingDiagnosticsService {
    * contributes an `operating` transition at its start and, once closed, an `idle` transition at
    * its end. Pagination is over interval rows, so a page holds up to `2 * limit` transitions.
    */
-  async getTransitionHistory(
-    resourceId: number,
-    page: number,
-    limit: number,
-  ): Promise<OperatingTransitionPageDto> {
+  async getTransitionHistory(resourceId: number, page: number, limit: number): Promise<OperatingTransitionPageDto> {
     const [intervals, totalIntervals] = await this.intervalRepository.findAndCount({
       where: { resourceId },
       order: { startTime: 'DESC' },
@@ -85,6 +73,8 @@ export class ResourceOperatingDiagnosticsService {
           state: 'operating',
           intervalId: interval.id,
           source: 'flow-signal',
+          flowNodeId: interval.startFlowNodeId ?? null,
+          flowRunId: interval.startFlowRunId ?? null,
         },
       ];
       if (interval.endTime) {
@@ -93,6 +83,8 @@ export class ResourceOperatingDiagnosticsService {
           state: 'idle',
           intervalId: interval.id,
           source: 'flow-signal',
+          flowNodeId: interval.endFlowNodeId ?? null,
+          flowRunId: interval.endFlowRunId ?? null,
         });
       }
       return transitions;
@@ -109,7 +101,10 @@ export class ResourceOperatingDiagnosticsService {
     const [trackingNodes, intervals, openCount] = await Promise.all([
       this.flowNodeRepository.count({ where: { resourceId, type: In(TRACKING_NODE_TYPES) } }),
       this.intervalRepository.find({
-        where: [{ resourceId, startTime: MoreThan(from) }, { resourceId, endTime: MoreThan(from) }],
+        where: [
+          { resourceId, startTime: MoreThan(from) },
+          { resourceId, endTime: MoreThan(from) },
+        ],
         order: { startTime: 'ASC' },
       }),
       this.intervalRepository.count({ where: { resourceId, endTime: IsNull() } }),
@@ -140,7 +135,9 @@ export class ResourceOperatingDiagnosticsService {
       });
     }
 
-    const negative = intervals.filter((interval) => interval.endTime !== null && interval.endTime <= interval.startTime);
+    const negative = intervals.filter(
+      (interval) => interval.endTime !== null && interval.endTime <= interval.startTime,
+    );
     if (negative.length > 0) {
       issues.push({
         kind: 'negative-duration',

@@ -305,7 +305,7 @@ export class MetricsService implements OnModuleInit {
       this.projectRepository.count(),
       this.resourceGroupRepository.count(),
       this.mqttServerRepository.count(),
-      this.resourceUsageRepository.count({ where: { endTime: IsNull() } }),
+      this.resourceUsageRepository.count({ where: { endTime: IsNull(), lifecyclePending: false } }),
       this.sessionRepository.count({ where: { expiresAt: MoreThan(new Date()) } }),
       this.userRepository
         .createQueryBuilder('user')

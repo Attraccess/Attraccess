@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import {
   ResourceMaintenance,
   ResourceMaintenanceSchedule,
@@ -14,9 +14,14 @@ import {
 } from '@attraccess/database-entities';
 import { ResourceMaintenanceService } from './maintenance.service';
 import { ResourceMaintenanceChangedEvent } from './events/resource-maintenance-changed.event';
-import { ResourceSessionStartedEvent } from '../usage/events/resource-usage.events';
+import { ResourceSessionStartedEvent, ResourceUsageLifecycleAbortedEvent } from '../usage/events/resource-usage.events';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { MetricsService } from '../../metrics/metrics.service';
+import { ResourceOperatingStateChangedEvent } from '../operating-intervals/events/resource-operating-state-changed.event';
+import {
+  ResourceDurations,
+  ResourceOperatingAttributionService,
+} from '../operating-intervals/resource-operating-attribution.service';
 
 /**
  * SQLite stores `datetime` columns as `YYYY-MM-DD HH:mm:ss.SSS` in UTC (TypeORM's
@@ -64,12 +69,11 @@ export const buildScheduleEvaluationQuery = (
                  b.scheduleId AS scheduleId,
                  b.baseline AS baseline,
                  b.hasActiveMaintenance AS hasActiveMaintenance,
-                  COALESCE(SUM(u.usageInMinutes), 0) AS totalMinutes,
-                  COALESCE(SUM(u.attributedOperatingDurationInMinutes), 0) AS totalOperatingMinutes,
                  COUNT(u.id) AS totalCount
           FROM baselines b
           LEFT JOIN "${usageTable}" u
             ON u.resourceId = b.resourceId
+           AND u.lifecyclePending = 0
            AND u.endTime IS NOT NULL
            AND u.endTime >= b.baseline
           GROUP BY b.resourceId, b.scheduleId, b.baseline, b.hasActiveMaintenance`;
@@ -106,7 +110,7 @@ export const buildScheduleStateQuery = (maintenanceTable: string, pairCount: num
  * Baseline for all trigger types: when the last maintenance created by this schedule was marked done
  * (that maintenance's endTime/completedAt). If none, uses resource.createdAt.
  *
- * Runs via cron (periodic) and on usage events (session ended) so USAGE_HOURS and USAGE_COUNT triggers take effect immediately.
+ * Runs via cron (periodic) and on usage events (session started or ended) so USAGE_HOURS and USAGE_COUNT triggers take effect immediately.
  */
 @Injectable()
 export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
@@ -133,6 +137,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
     private readonly maintenanceService: ResourceMaintenanceService,
     private readonly cronTimer: CronTimer,
     private readonly metricsService: MetricsService,
+    private readonly operatingAttributionService: ResourceOperatingAttributionService,
   ) {}
 
   /** Drop pending debounce timers so shutdown isn't held up (and they don't fire against a closed DB). */
@@ -146,8 +151,10 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
    * Get the baseline date for a schedule: when the last maintenance created by this schedule was done,
    * or the resource's creation date if no such maintenance exists.
    */
-  async getBaselineDate(resourceId: number, scheduleId: number): Promise<Date> {
-    const lastDone = await this.maintenanceRepository
+  async getBaselineDate(resourceId: number, scheduleId: number, manager?: EntityManager): Promise<Date> {
+    const maintenanceRepository = manager?.getRepository(ResourceMaintenance) ?? this.maintenanceRepository;
+    const resourceRepository = manager?.getRepository(Resource) ?? this.resourceRepository;
+    const lastDone = await maintenanceRepository
       .createQueryBuilder('m')
       .where('m.resourceId = :resourceId', { resourceId })
       .andWhere('m.maintenanceScheduleId = :scheduleId', { scheduleId })
@@ -160,7 +167,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
       return lastDone.endTime;
     }
 
-    const resource = await this.resourceRepository.findOne({
+    const resource = await resourceRepository.findOne({
       where: { id: resourceId },
       select: ['id', 'createdAt'],
     });
@@ -168,73 +175,51 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
   }
 
   /**
-   * Sum usage minutes for the resource since baseline (completed sessions only).
-   */
-  private async getUsageMinutesSince(
-    resourceId: number,
-    since: Date,
-    durationBasis: ResourceMaintenanceScheduleDurationBasis,
-  ): Promise<number> {
-    const durationColumn =
-      durationBasis === ResourceMaintenanceScheduleDurationBasis.ATTRIBUTABLE_OPERATING_DURATION
-        ? 'usage.attributedOperatingDurationInMinutes'
-        : 'usage.usageInMinutes';
-    const result = await this.usageRepository
-      .createQueryBuilder('usage')
-      .select(`COALESCE(SUM(${durationColumn}), 0)`, 'total')
-      .where('usage.resourceId = :resourceId', { resourceId })
-      .andWhere('usage.endTime IS NOT NULL')
-      .andWhere('usage.endTime >= :since', { since })
-      .getRawOne<{ total: string }>();
-
-    return Number(result?.total ?? '0');
-  }
-
-  /**
    * Count usage sessions for the resource since baseline (completed sessions only).
    */
-  private async getUsageSessionCountSince(resourceId: number, since: Date): Promise<number> {
-    return this.usageRepository
+  private async getUsageSessionCountSince(resourceId: number, since: Date, manager?: EntityManager): Promise<number> {
+    return (manager?.getRepository(ResourceUsage) ?? this.usageRepository)
       .createQueryBuilder('usage')
       .where('usage.resourceId = :resourceId', { resourceId })
+      .andWhere('usage.lifecyclePending = :lifecyclePending', { lifecyclePending: false })
       .andWhere('usage.endTime IS NOT NULL')
       .andWhere('usage.endTime >= :since', { since })
       .getCount();
   }
 
   /**
-   * Convert duration + unit to total minutes (for usage threshold comparison).
+   * Convert duration + unit to exact milliseconds (for usage threshold comparison).
    */
-  private durationToMinutes(duration: number, unit: UsageDurationUnit): number {
+  private durationToMs(duration: number, unit: UsageDurationUnit): number {
     switch (unit) {
       case UsageDurationUnit.MINUTES:
-        return duration;
+        return duration * 60_000;
       case UsageDurationUnit.HOURS:
-        return duration * 60;
+        return duration * 60 * 60_000;
       case UsageDurationUnit.DAYS:
-        return duration * 24 * 60;
+        return duration * 24 * 60 * 60_000;
       default:
-        return duration;
+        return duration * 60_000;
     }
   }
 
   /**
    * Pure comparison: given pre-fetched usage numbers and elapsed time, returns true if the schedule
-   * threshold is met. Both shouldTrigger() and shouldTriggerInMemory() delegate here so the
+   * threshold is met. Both individual and bulk evaluation delegate here so the
    * switch-on-triggerType logic lives in exactly one place.
    */
   private evaluateTriggerThreshold(
     schedule: ResourceMaintenanceSchedule,
     baseline: Date,
     now: Date,
-    usageMinutes: number,
+    durationMs: number,
     usageCount: number,
   ): boolean {
     switch (schedule.triggerType) {
       case ResourceMaintenanceScheduleTriggerType.USAGE_HOURS: {
         const config = schedule.usageHoursConfig;
         if (!config) return false;
-        return usageMinutes >= this.durationToMinutes(config.duration, config.unit);
+        return durationMs >= this.durationToMs(config.duration, config.unit);
       }
       case ResourceMaintenanceScheduleTriggerType.USAGE_COUNT: {
         const config = schedule.usageCountConfig;
@@ -244,8 +229,8 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
       case ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL: {
         const config = schedule.timeIntervalConfig;
         if (!config) return false;
-        const elapsedMinutes = (now.getTime() - baseline.getTime()) / (60 * 1000);
-        return elapsedMinutes >= this.durationToMinutes(config.duration, config.unit);
+        const elapsedMs = now.getTime() - baseline.getTime();
+        return elapsedMs >= this.durationToMs(config.duration, config.unit);
       }
       default:
         return false;
@@ -255,42 +240,35 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
   /**
    * Returns true if the schedule's condition is met.
    */
-  async shouldTrigger(schedule: ResourceMaintenanceSchedule, resourceId: number): Promise<boolean> {
-    const baseline = await this.getBaselineDate(resourceId, schedule.id);
+  async shouldTrigger(
+    schedule: ResourceMaintenanceSchedule,
+    resourceId: number,
+    manager?: EntityManager,
+  ): Promise<boolean> {
+    const baseline = await this.getBaselineDate(resourceId, schedule.id, manager);
     const now = new Date();
-    let usageMinutes = 0;
+    let durationMs = 0;
     let usageCount = 0;
 
     if (schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS) {
-      usageMinutes = await this.getUsageMinutesSince(resourceId, baseline, schedule.durationBasis);
+      const key = `${schedule.id}:${resourceId}`;
+      const durations = await this.operatingAttributionService.getDurationsForWindows(
+        [{ key, resourceId, start: baseline }],
+        now,
+        manager,
+      );
+      durationMs = this.selectedDuration(schedule, durations.get(key));
     } else if (schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT) {
-      usageCount = await this.getUsageSessionCountSince(resourceId, baseline);
+      usageCount = await this.getUsageSessionCountSince(resourceId, baseline, manager);
     }
 
-    return this.evaluateTriggerThreshold(schedule, baseline, now, usageMinutes, usageCount);
+    return this.evaluateTriggerThreshold(schedule, baseline, now, durationMs, usageCount);
   }
 
-  /**
-   * Evaluate trigger condition for a schedule using pre-fetched in-memory aggregates.
-   * Used by evaluateAll() to avoid per-resource queries.
-   */
-  private shouldTriggerInMemory(
-    schedule: ResourceMaintenanceSchedule,
-    resourceId: number,
-    baseline: Date,
-    now: Date,
-    usageAggBySchedule: Map<string, { totalMinutes: number; totalOperatingMinutes: number; totalCount: number }>,
-  ): boolean {
-    const { totalMinutes, totalOperatingMinutes, totalCount } = usageAggBySchedule.get(`${schedule.id}:${resourceId}`) ?? {
-      totalMinutes: 0,
-      totalOperatingMinutes: 0,
-      totalCount: 0,
-    };
-    const usageMinutes =
-      schedule.durationBasis === ResourceMaintenanceScheduleDurationBasis.ATTRIBUTABLE_OPERATING_DURATION
-        ? totalOperatingMinutes
-        : totalMinutes;
-    return this.evaluateTriggerThreshold(schedule, baseline, now, usageMinutes, totalCount);
+  private selectedDuration(schedule: ResourceMaintenanceSchedule, durations?: ResourceDurations): number {
+    return schedule.durationBasis === ResourceMaintenanceScheduleDurationBasis.ATTRIBUTABLE_OPERATING_DURATION
+      ? (durations?.operatingDurationMs ?? 0)
+      : (durations?.sessionDurationMs ?? 0);
   }
 
   /**
@@ -306,15 +284,15 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
 
       for (const schedule of schedules) {
         // Re-check active maintenance (another schedule might have just created one)
-        const hasActiveMaintenanceOfThisSchedule = await this.maintenanceService.hasActiveMaintenance(
-          { resourceId, scheduleId: schedule.id },
+        const hasActiveMaintenance = await this.maintenanceService.hasActiveMaintenance(
+          resourceId,
           transactionalEntityManager,
         );
-        if (hasActiveMaintenanceOfThisSchedule) {
+        if (hasActiveMaintenance) {
           continue;
         }
 
-        const triggers = await this.shouldTrigger(schedule, resourceId);
+        const triggers = await this.shouldTrigger(schedule, resourceId, transactionalEntityManager);
         if (!triggers) {
           continue;
         }
@@ -402,7 +380,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
   }
 
   /**
-   * On usage events (session ended): evaluate schedules for that resource so USAGE_HOURS and USAGE_COUNT
+   * On usage events (session started or ended): evaluate schedules for that resource so USAGE_HOURS and USAGE_COUNT
    * triggers take effect immediately instead of waiting for the next cron run.
    *
    * Debounced per resource with a maximum wait: rapid session end/start bursts collapse into a single
@@ -418,9 +396,20 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
   onResourceUsage(event: ResourceSessionStartedEvent): void {
     const resourceId = event.usage?.resource?.id;
     if (resourceId == null) return;
-    // Only re-evaluate when a session was ended (endTime set); that's when usage minutes and session count increase.
-    if (event.usage.endTime == null) return;
+    this.queueEvaluation(resourceId);
+  }
 
+  @OnEvent(ResourceOperatingStateChangedEvent.EVENT_NAME)
+  onOperatingStateChanged(event: ResourceOperatingStateChangedEvent): void {
+    this.queueEvaluation(event.resourceId);
+  }
+
+  @OnEvent(ResourceUsageLifecycleAbortedEvent.EVENT_NAME)
+  onUsageLifecycleAborted(event: ResourceUsageLifecycleAbortedEvent): void {
+    this.queueEvaluation(event.resourceId);
+  }
+
+  private queueEvaluation(resourceId: number): void {
     const now = Date.now();
 
     // Record the timestamp of the first event in the current debounce window
@@ -441,7 +430,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
       this.usageEvalFirstEventAt.delete(resourceId);
       this.evaluateResource(resourceId).catch((err) => {
         this.logger.error(
-          `Error evaluating schedules for resource ${resourceId} after usage event: ${err}`,
+          `Error evaluating schedules for resource ${resourceId} after duration event: ${err}`,
           (err as Error)?.stack,
         );
       });
@@ -520,13 +509,9 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
         );
       }
 
-      // 3. Time schedules only need baseline and active state. Usage schedules resolve their
-      // baseline and aggregate usage in one statement below so both values share a DB snapshot.
-      const usageAggBySchedule = new Map<string, {
-        totalMinutes: number;
-        totalOperatingMinutes: number;
-        totalCount: number;
-      }>();
+      // 3. Resolve service-cycle state for duration/calendar schedules and retain the
+      // single-statement baseline/count query for completed-session count schedules.
+      const usageCountBySchedule = new Map<string, number>();
       const baselineMap = new Map<string, Date>();
       const activeResourceIds = new Set<number>();
       const pairs = allSchedules
@@ -553,11 +538,11 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
         if (row.hasActiveMaintenance) activeResourceIds.add(row.resourceId);
       };
 
-      const timePairs = pairs.filter(
-        ({ triggerType }) => triggerType === ResourceMaintenanceScheduleTriggerType.TIME_INTERVAL,
+      const statePairs = pairs.filter(
+        ({ triggerType }) => triggerType !== ResourceMaintenanceScheduleTriggerType.USAGE_COUNT,
       );
-      for (let offset = 0; offset < timePairs.length; offset += MAX_PAIRS_PER_QUERY) {
-        const chunk = timePairs.slice(offset, offset + MAX_PAIRS_PER_QUERY);
+      for (let offset = 0; offset < statePairs.length; offset += MAX_PAIRS_PER_QUERY) {
+        const chunk = statePairs.slice(offset, offset + MAX_PAIRS_PER_QUERY);
         const stateRows: Array<{
           resourceId: number;
           scheduleId: number;
@@ -573,12 +558,9 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
         for (const row of stateRows) setState(row);
       }
 
-      const usagePairs = pairs.filter(({ triggerType }) => {
-        return (
-          triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS ||
-          triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT
-        );
-      });
+      const usagePairs = pairs.filter(
+        ({ triggerType }) => triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_COUNT,
+      );
       for (let offset = 0; offset < usagePairs.length; offset += MAX_PAIRS_PER_QUERY) {
         const chunk = usagePairs.slice(offset, offset + MAX_PAIRS_PER_QUERY);
         const aggregates: Array<{
@@ -586,9 +568,7 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
           scheduleId: number;
           baseline?: string | Date;
           hasActiveMaintenance?: number | boolean;
-           totalMinutes: number | string | null;
-           totalOperatingMinutes: number | string | null;
-           totalCount: number | string | null;
+          totalCount: number | string | null;
         }> = await this.usageRepository.query(
           buildScheduleEvaluationQuery(
             this.maintenanceRepository.metadata.tableName,
@@ -603,16 +583,24 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
         for (const row of aggregates) {
           setState(row);
           const key = `${row.scheduleId}:${row.resourceId}`;
-          usageAggBySchedule.set(key, {
-              totalMinutes: Number(row.totalMinutes ?? 0),
-              totalOperatingMinutes: Number(row.totalOperatingMinutes ?? 0),
-              totalCount: Number(row.totalCount ?? 0),
-          });
+          usageCountBySchedule.set(key, Number(row.totalCount ?? 0));
         }
       }
 
       const getBaseline = (resourceId: number, scheduleId: number): Date =>
         baselineMap.get(`${scheduleId}:${resourceId}`) ?? resourceCreatedAtMap.get(resourceId) ?? now;
+
+      const durationWindows = pairs
+        .filter(
+          ({ resourceId, triggerType }) =>
+            triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS && !activeResourceIds.has(resourceId),
+        )
+        .map(({ resourceId, scheduleId }) => ({
+          key: `${scheduleId}:${resourceId}`,
+          resourceId,
+          start: getBaseline(resourceId, scheduleId),
+        }));
+      const durations = await this.operatingAttributionService.getDurationsForWindows(durationWindows, now);
 
       // Observe query window sizes so we can alert if they grow unexpectedly large.
       // No lookback clamp: rarely-used machines need their full history to reach the threshold.
@@ -640,7 +628,16 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
           if (activeResourceIds.has(resourceId)) continue;
 
           const baseline = getBaseline(resourceId, schedule.id);
-          if (this.shouldTriggerInMemory(schedule, resourceId, baseline, now, usageAggBySchedule)) {
+          const key = `${schedule.id}:${resourceId}`;
+          if (
+            this.evaluateTriggerThreshold(
+              schedule,
+              baseline,
+              now,
+              this.selectedDuration(schedule, durations.get(key)),
+              usageCountBySchedule.get(key) ?? 0,
+            )
+          ) {
             toCreate.push({ resourceId, schedule });
             break; // Only one maintenance at a time per resource
           }
@@ -661,6 +658,16 @@ export class MaintenanceScheduleEvaluatorService implements OnModuleDestroy {
               try {
                 // Recheck by resource to prevent a concurrent manual or different-schedule maintenance.
                 if (await this.maintenanceService.hasActiveMaintenance(resourceId, em)) {
+                  await em.query(`RELEASE SAVEPOINT ${savepoint}`);
+                  continue;
+                }
+
+                // A maintenance may have completed since the bulk read. Re-read the service cycle
+                // and its duration within the write transaction before creating a new obligation.
+                if (
+                  schedule.triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS &&
+                  !(await this.shouldTrigger(schedule, resourceId, em))
+                ) {
                   await em.query(`RELEASE SAVEPOINT ${savepoint}`);
                   continue;
                 }

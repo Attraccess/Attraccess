@@ -143,6 +143,22 @@ export class ResourceUsage {
   })
   operatingDurationCreditsPerMinute!: number | null;
 
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'Fixed usage fee snapshotted at session start; null for legacy sessions',
+    nullable: true,
+    required: false,
+  })
+  creditsPerUsage!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'User billing percentage snapshotted at session start; null for legacy sessions',
+    nullable: true,
+    required: false,
+  })
+  billingFactor!: number | null;
+
   @OneToOne(() => BillingTransaction, (billingTransaction) => billingTransaction.resourceUsage, {
     onDelete: 'CASCADE',
     nullable: true,
@@ -177,6 +193,10 @@ export class ResourceUsage {
   @Column({ type: 'boolean', default: false })
   @ApiProperty({ description: 'Whether the resource usage is finalized' })
   isFinalized!: boolean;
+
+  /** Internal lifecycle reservation; excluded from public usage and duration calculations. */
+  @Column({ type: 'boolean', default: false })
+  lifecyclePending!: boolean;
 
   @Column({ nullable: true, type: 'integer' })
   @ApiProperty({

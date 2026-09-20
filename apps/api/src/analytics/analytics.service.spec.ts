@@ -80,6 +80,7 @@ describe('AnalyticsService', () => {
         where: {
           startTime: Between(dateRange.start, dateRange.end),
           usageAction: ResourceUsageAction.Usage,
+          lifecyclePending: false,
         },
         order: {
           id: 'DESC',

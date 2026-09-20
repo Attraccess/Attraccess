@@ -65,6 +65,7 @@ import {
   ResourceOperatingInterval,
   ResourceType,
   ResourceUsage,
+  ResourceUsageLifecycleAttempt,
   ResourceUsageAction,
   Session,
   Setting,
@@ -168,12 +169,8 @@ const seedDatabase = async (dataSource: DataSource) => {
   const billingConfigRepo = dataSource.getRepository(ResourceBillingConfiguration);
   const resourceMaintenanceRepo = dataSource.getRepository(ResourceMaintenance);
   const maintenanceScheduleRepo = dataSource.getRepository(ResourceMaintenanceSchedule);
-  const maintenanceScheduleUsageHoursConfigRepo = dataSource.getRepository(
-    ResourceMaintenanceScheduleUsageHoursConfig,
-  );
-  const maintenanceScheduleUsageCountConfigRepo = dataSource.getRepository(
-    ResourceMaintenanceScheduleUsageCountConfig,
-  );
+  const maintenanceScheduleUsageHoursConfigRepo = dataSource.getRepository(ResourceMaintenanceScheduleUsageHoursConfig);
+  const maintenanceScheduleUsageCountConfigRepo = dataSource.getRepository(ResourceMaintenanceScheduleUsageCountConfig);
   const maintenanceScheduleTimeIntervalConfigRepo = dataSource.getRepository(
     ResourceMaintenanceScheduleTimeIntervalConfig,
   );
@@ -435,7 +432,38 @@ const seedDatabase = async (dataSource: DataSource) => {
     startNotes: 'Seed usage',
     endNotes: null,
     isFinalized: false,
+    creditsPerUsage: 5,
+    billingFactor: 50,
   }));
+
+  const lifecycleAttemptRepo = dataSource.getRepository(ResourceUsageLifecycleAttempt);
+  if (!(await lifecycleAttemptRepo.existsBy({ resourceId: resource.id }))) {
+    // An interrupted takeover owns only a hidden candidate; the existing usage and bill stay intact.
+    const candidate = await usageRepo.save(
+      usageRepo.create({
+        usageAction: ResourceUsageAction.Usage,
+        resourceId: resource.id,
+        userId: secondaryUser.id,
+        projectId: project.id,
+        startTime: new Date(),
+        startNotes: 'Seed interrupted takeover',
+        isFinalized: false,
+        lifecyclePending: true,
+      }),
+    );
+    await lifecycleAttemptRepo.save(
+      lifecycleAttemptRepo.create({
+        id: `seed-lifecycle-attempt-${seedTag}`,
+        resourceId: resource.id,
+        kind: 'takeover',
+        candidateUsageId: candidate.id,
+        previousUsageId: usage.id,
+        transitionTime: candidate.startTime,
+        formSubmissions: [],
+        billingItems: [],
+      }),
+    );
+  }
 
   const billingTransaction = await ensureEntity(billingTransactionRepo, () => ({
     userId: primaryUser.id,
@@ -452,6 +480,7 @@ const seedDatabase = async (dataSource: DataSource) => {
     description: 'Seed billing item',
     unitPrice: 100,
     quantity: 1,
+    durationMs: 60_000,
   }));
 
   const introduction = await ensureEntity(introductionRepo, () => ({
