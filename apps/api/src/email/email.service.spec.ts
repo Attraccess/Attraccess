@@ -381,6 +381,35 @@ describe('EmailService', () => {
       expect(html).not.toContain('20%'); // Current user factor cannot alter a historical receipt.
     });
 
+    it.each(['en_US', 'de_DE', 'invalid!', '', '   '])(
+      'sends a receipt with English number formatting when the persisted locale is %j',
+      async (locale) => {
+        const { service, sendMail, emailTemplateService, user, usage, transaction } = setupReceipt('en');
+        user.locale = locale;
+
+        await service.sendResourceUsageBillingSummaryEmail(user, transaction, usage, 2);
+
+        expect(sendMail).toHaveBeenCalledTimes(1);
+        expect(sendMail.mock.calls[0][0].html).toContain('Measured: 61.001 s');
+        expect(emailTemplateService.getTranslationsMap).toHaveBeenCalledWith(receiptType, locale);
+      },
+    );
+
+    it.each(['en-US', 'de-DE'])(
+      'retains valid regional number formatting for %s',
+      async (locale) => {
+        const language = locale === 'de-DE' ? 'de' : 'en';
+        const { service, sendMail, user, usage, transaction } = setupReceipt(language);
+        user.locale = locale;
+
+        await service.sendResourceUsageBillingSummaryEmail(user, transaction, usage, 2);
+
+        expect(sendMail.mock.calls[0][0].html).toContain(
+          locale === 'de-DE' ? 'Gemessen: 61,001 s' : 'Measured: 61.001 s',
+        );
+      },
+    );
+
     it('renders historical rounded quantities without inventing raw durations or a factor snapshot', async () => {
       const { service, sendMail, user, usage, transaction } = setupReceipt('en');
       usage.billingFactor = null;

@@ -251,7 +251,14 @@ export class EmailService {
 
     // Receipts describe the settled transaction, including its original rounding.
     const roundedMinutes = transaction.items?.find((item) => item.name === 'PER_MINUTE')?.quantity;
-    const secondsFormatter = new Intl.NumberFormat(user.locale ?? 'en', { maximumFractionDigits: 3 });
+    const secondsFormatOptions = { maximumFractionDigits: 3 };
+    let secondsFormatter: Intl.NumberFormat;
+    try {
+      secondsFormatter = new Intl.NumberFormat(user.locale ?? 'en', secondsFormatOptions);
+    } catch {
+      // Persisted locales are not restricted to valid Intl tags. Match the default email language.
+      secondsFormatter = new Intl.NumberFormat('en', secondsFormatOptions);
+    }
 
     const items = (transaction.items ?? []).map((item) => ({
       name: item.name,
