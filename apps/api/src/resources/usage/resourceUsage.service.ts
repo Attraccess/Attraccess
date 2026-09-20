@@ -895,6 +895,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
         );
         usageData.sessionDurationCreditsPerMinute = billingConfiguration.creditsPerMinute;
         usageData.operatingDurationCreditsPerMinute = billingConfiguration.creditsPerOperatingMinute;
+        usageData.creditsPerUsage = billingConfiguration.creditsPerUsage;
 
         if (supervisorUserId !== null) {
           usageData.supervisorUserId = supervisorUserId;
@@ -927,6 +928,12 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
           this.logger.error(`Failed to retrieve newly created session for resource ${resourceId} and user ${user.id}`);
           throw new Error('Failed to retrieve the newly created session.');
         }
+
+        // Use the user read inside this transaction, not the potentially stale authentication object.
+        createdSession.billingFactor = createdSession.user.billingFactor;
+        await transactionalEntityManager.update(ResourceUsage, createdSession.id, {
+          billingFactor: createdSession.billingFactor,
+        });
 
         this.logger.debug(
           `Successfully created session ${createdSession.id} for resource ${resourceId} by user ${user.id}`,

@@ -151,6 +151,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         findOneBy: jest.fn(),
         save: jest.fn(async (_e: unknown, data: unknown) => data),
         update: jest.fn(),
+        transaction: jest.fn(async (work) => work(billingItemRepoMock.manager)),
       },
     } as unknown as Repository<BillingTransactionItem>;
 

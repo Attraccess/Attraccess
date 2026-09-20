@@ -509,6 +509,7 @@ describe('ResourceUsageService', () => {
         lifecyclePending: true,
         sessionDurationCreditsPerMinute: 0,
         operatingDurationCreditsPerMinute: 0,
+        creditsPerUsage: 0,
       });
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
       expect(eventEmitter.emitAsync).not.toHaveBeenCalled();
@@ -702,7 +703,7 @@ describe('ResourceUsageService', () => {
         endTime: new Date(),
         endNotes: 'Session ended due to takeover by user 1',
       } as ResourceUsage;
-      const mockNewUsage = { id: 11, resourceId: 1, userId: 1 } as ResourceUsage;
+      const mockNewUsage = { id: 11, resourceId: 1, userId: 1, user: { id: 1, billingFactor: 100 } } as ResourceUsage;
 
       resourceUsageRepository.findOne
         .mockResolvedValueOnce(mockActiveSession) // getActiveSession
@@ -813,6 +814,7 @@ describe('ResourceUsageService', () => {
         startTime: new Date(),
         endTime: null,
         isFinalized: false,
+        user: { id: 1, billingFactor: 100 } as User,
       } as ResourceUsage;
       const finalizedSession = { ...createdSession, isFinalized: true };
 
@@ -856,6 +858,7 @@ describe('ResourceUsageService', () => {
         startTime: new Date(),
         endTime: null,
         isFinalized: false,
+        user: { id: 1, billingFactor: 100 } as User,
       } as ResourceUsage;
       const finalizedSession = { ...createdSession, isFinalized: true };
 
@@ -941,6 +944,7 @@ describe('ResourceUsageService', () => {
         startTime: new Date(),
         endTime: null,
         isFinalized: false,
+        user: { id: 1, billingFactor: 100 } as User,
       } as ResourceUsage;
       const finalizedSession = { ...createdSession, isFinalized: true };
 

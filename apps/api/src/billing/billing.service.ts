@@ -263,7 +263,9 @@ export class BillingService {
       throw new BadRequestException('Credits per minute must be an integer (multiply by currency minor unit)');
     }
     if (data.creditsPerOperatingMinute !== undefined && data.creditsPerOperatingMinute % 1 !== 0) {
-      throw new BadRequestException('Credits per operating minute must be an integer (multiply by currency minor unit)');
+      throw new BadRequestException(
+        'Credits per operating minute must be an integer (multiply by currency minor unit)',
+      );
     }
 
     const savedConfiguration = await this.resourceBillingConfigurationRepository.save(configuration);
@@ -296,11 +298,15 @@ export class BillingService {
 
       const sessionDurationRate = usage.sessionDurationCreditsPerMinute ?? configuration.creditsPerMinute;
       const operatingDurationRate = usage.operatingDurationCreditsPerMinute ?? 0;
-      const roundedMinutes = Math.ceil(usage.usageInMinutes);
-      const roundedOperatingMinutes = Math.ceil(usage.attributedOperatingDurationInMinutes ?? 0);
+      const sessionDurationMs = usage.endTime ? Math.max(0, usage.endTime.getTime() - usage.startTime.getTime()) : 0;
+      // Attribution originates from integer-millisecond intervals; remove only minute-storage float noise.
+      const operatingDurationMs = Math.round((usage.attributedOperatingDurationInMinutes ?? 0) * 60_000);
+      const roundedMinutes = Math.ceil(sessionDurationMs / 60_000);
+      const roundedOperatingMinutes = Math.ceil(operatingDurationMs / 60_000);
       const creditsForUsageDuration = sessionDurationRate * roundedMinutes;
       const creditsForOperatingDuration = operatingDurationRate * roundedOperatingMinutes;
-      const creditsForSession = configuration.creditsPerUsage;
+      // Legacy sessions have no complete snapshot; preserve their existing configuration fallback.
+      const creditsForSession = usage.creditsPerUsage ?? configuration.creditsPerUsage;
       let totalCredits = creditsForUsageDuration + creditsForOperatingDuration;
       totalCredits += creditsForSession;
 
@@ -319,7 +325,8 @@ export class BillingService {
         totalCredits += item.unitPrice * item.quantity;
       });
 
-      const billingFactorDiscountAmount = Math.round(totalCredits - totalCredits * (usage.user.billingFactor / 100));
+      const billingFactor = usage.billingFactor ?? usage.user.billingFactor;
+      const billingFactorDiscountAmount = Math.round(totalCredits - totalCredits * (billingFactor / 100));
       totalCredits = totalCredits - billingFactorDiscountAmount;
 
       if (transaction) {
@@ -331,14 +338,17 @@ export class BillingService {
 
         transaction.amount = -totalCredits;
         transaction.status = BillingTransactionStatus.Completed;
-        void this.auditService.recordBillingTransactionAfterCommit({
-          transactionId: transaction.id,
-          userId: transaction.userId,
-          amount: transaction.amount,
-          status: transaction.status,
-          previousStatus,
-          source: 'resource-usage',
-        }, manager);
+        void this.auditService.recordBillingTransactionAfterCommit(
+          {
+            transactionId: transaction.id,
+            userId: transaction.userId,
+            amount: transaction.amount,
+            status: transaction.status,
+            previousStatus,
+            source: 'resource-usage',
+          },
+          manager,
+        );
       } else {
         transaction = await manager.save(BillingTransaction, {
           userId: usage.userId,
@@ -346,25 +356,29 @@ export class BillingService {
           amount: -totalCredits,
           status: BillingTransactionStatus.Completed,
         } as Partial<BillingTransaction>);
-        void this.auditService.recordBillingTransactionAfterCommit({
-          transactionId: transaction.id,
-          userId: transaction.userId,
-          amount: transaction.amount,
-          status: transaction.status,
-          source: 'resource-usage',
-        }, manager);
+        void this.auditService.recordBillingTransactionAfterCommit(
+          {
+            transactionId: transaction.id,
+            userId: transaction.userId,
+            amount: transaction.amount,
+            status: transaction.status,
+            source: 'resource-usage',
+          },
+          manager,
+        );
       }
 
       await manager.save(BillingTransactionItem, {
         billingTransactionId: transaction.id,
         name: 'PER_SESSION',
-        unitPrice: configuration.creditsPerUsage,
+        unitPrice: creditsForSession,
         quantity: 1,
       });
 
       await manager.save(BillingTransactionItem, {
         billingTransactionId: transaction.id,
         name: 'PER_MINUTE',
+        durationMs: sessionDurationMs,
         unitPrice: sessionDurationRate,
         quantity: roundedMinutes,
       });
@@ -373,6 +387,7 @@ export class BillingService {
         await manager.save(BillingTransactionItem, {
           billingTransactionId: transaction.id,
           name: 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+          durationMs: operatingDurationMs,
           unitPrice: operatingDurationRate,
           quantity: roundedOperatingMinutes,
         });
@@ -382,7 +397,7 @@ export class BillingService {
         await manager.save(BillingTransactionItem, {
           billingTransactionId: transaction.id,
           name: 'BILLING_FACTOR',
-          description: `${usage.user.billingFactor}%`,
+          description: `${billingFactor}%`,
           unitPrice: -billingFactorDiscountAmount,
           quantity: 1,
         });
@@ -439,10 +454,12 @@ export class BillingService {
       transactionalEntityManager,
     );
 
-    if (await this.isBillingEnabled(resourceId, transactionalEntityManager)) {
+    if (await this.isBillingEnabled(resourceId, transactionalEntityManager, usage)) {
       const balance = await this.getBalance(user.id, transactionalEntityManager);
-      const sessionDurationRate = usage.sessionDurationCreditsPerMinute ?? resourceBillingConfiguration.creditsPerMinute;
-      if (balance < resourceBillingConfiguration.creditsPerUsage + sessionDurationRate) {
+      const sessionDurationRate =
+        usage.sessionDurationCreditsPerMinute ?? resourceBillingConfiguration.creditsPerMinute;
+      const creditsPerUsage = usage.creditsPerUsage ?? resourceBillingConfiguration.creditsPerUsage;
+      if (balance < creditsPerUsage + sessionDurationRate) {
         throw new InsufficientBalanceError();
       }
     }
@@ -466,21 +483,24 @@ export class BillingService {
       amount: 0,
       status: BillingTransactionStatus.Pending,
     });
-    void this.auditService.recordBillingTransactionAfterCommit({
-      transactionId: transaction.id,
-      userId: transaction.userId,
-      amount: transaction.amount,
-      status: transaction.status,
-      source: 'resource-usage',
-    }, transactionalEntityManager);
+    void this.auditService.recordBillingTransactionAfterCommit(
+      {
+        transactionId: transaction.id,
+        userId: transaction.userId,
+        amount: transaction.amount,
+        status: transaction.status,
+        source: 'resource-usage',
+      },
+      transactionalEntityManager,
+    );
   }
 
-  public async isBillingEnabled(resourceId: number, transactionalEntityManager?: EntityManager) {
+  public async isBillingEnabled(resourceId: number, transactionalEntityManager?: EntityManager, usage?: ResourceUsage) {
     const configuration = await this.getResourceBillingConfiguration(resourceId, transactionalEntityManager);
     if (
-      configuration.creditsPerUsage > 0 ||
-      configuration.creditsPerMinute > 0 ||
-      configuration.creditsPerOperatingMinute > 0
+      (usage?.creditsPerUsage ?? configuration.creditsPerUsage) > 0 ||
+      (usage?.sessionDurationCreditsPerMinute ?? configuration.creditsPerMinute) > 0 ||
+      (usage?.operatingDurationCreditsPerMinute ?? configuration.creditsPerOperatingMinute) > 0
     ) {
       return true;
     }

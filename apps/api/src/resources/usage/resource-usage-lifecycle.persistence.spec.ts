@@ -49,6 +49,7 @@ const schemas = [
       id: { type: Number, primary: true },
       username: { type: String },
       creditBalance: { type: Number, default: 100 },
+      billingFactor: { type: Number, default: 100 },
     },
   }),
   new EntitySchema<Project>({
@@ -78,6 +79,8 @@ const schemas = [
       projectId: { type: Number, nullable: true },
       sessionDurationCreditsPerMinute: { type: Number, nullable: true },
       operatingDurationCreditsPerMinute: { type: Number, nullable: true },
+      creditsPerUsage: { type: Number, nullable: true },
+      billingFactor: { type: Number, nullable: true },
       attributedOperatingDurationInMinutes: { type: Number, nullable: true },
     },
     relations: {
@@ -224,7 +227,7 @@ describe('Usage lifecycle persistence around external flows', () => {
     billing = {
       getResourceBillingConfiguration: jest
         .fn()
-        .mockResolvedValue({ creditsPerMinute: 2, creditsPerOperatingMinute: 3 }),
+        .mockResolvedValue({ creditsPerUsage: 5, creditsPerMinute: 2, creditsPerOperatingMinute: 3 }),
       validateResourceUsageStart: jest.fn().mockResolvedValue(undefined),
       handleResourceUsageStart: jest.fn(
         async (_resourceId: number, session: ResourceUsage, user: User, manager: EntityManager) =>
@@ -337,6 +340,70 @@ describe('Usage lifecycle persistence around external flows', () => {
       submissions: await source.getRepository(FormSubmission).find(),
     };
   }
+
+  it.each([false, true])(
+    'preserves the complete price contract through a start flow (takeover=%s)',
+    async (takeover) => {
+      if (takeover) await seedActiveSession();
+      const starter = users[1];
+      await source.getRepository(User).update(starter.id, { billingFactor: 50 });
+      starter.billingFactor = 75; // Request authentication may predate a billing-factor edit.
+      flow.runFlow.mockImplementation(async () => {
+        await source.getRepository(User).update(starter.id, { billingFactor: 150 });
+        billing.getResourceBillingConfiguration.mockResolvedValue({
+          creditsPerUsage: 99,
+          creditsPerMinute: 99,
+          creditsPerOperatingMinute: 99,
+        });
+      });
+
+      const session = await usage.startSession(1, starter, { forceTakeOver: takeover });
+
+      expect(session).toMatchObject({
+        lifecyclePending: false,
+        creditsPerUsage: 5,
+        billingFactor: 50,
+        sessionDurationCreditsPerMinute: 2,
+        operatingDurationCreditsPerMinute: 3,
+      });
+      expect(await source.getRepository(BillingTransaction).findOneBy({ resourceUsageId: session.id })).toMatchObject({
+        status: BillingTransactionStatus.Pending,
+        amount: 0,
+      });
+      expect(await source.getRepository(ResourceUsageLifecycleAttempt).count()).toBe(0);
+    },
+  );
+
+  it('does not start or run physical flows if its price snapshot cannot be persisted', async () => {
+    await source.query(`CREATE TRIGGER reject_price_snapshot BEFORE UPDATE OF billingFactor ON resource_usage
+      BEGIN SELECT RAISE(ABORT, 'snapshot unavailable'); END`);
+
+    await expect(usage.startSession(1, users[0], {})).rejects.toThrow('snapshot unavailable');
+
+    expect(await source.getRepository(ResourceUsage).count()).toBe(0);
+    expect(await source.getRepository(BillingTransaction).count()).toBe(0);
+    expect(await source.getRepository(ResourceUsageLifecycleAttempt).count()).toBe(0);
+    expect(flow.runFlow).not.toHaveBeenCalled();
+  });
+
+  it('publishes neither the session nor its bill if pending transaction creation fails', async () => {
+    billing.handleResourceUsageStart.mockImplementation(async (_resourceId, session, user, manager) => {
+      await manager.save(BillingTransaction, {
+        resourceUsageId: session.id,
+        userId: user.id,
+        amount: 0,
+        status: BillingTransactionStatus.Pending,
+      });
+      throw new Error('pending transaction unavailable');
+    });
+
+    await expect(usage.startSession(1, users[0], {})).rejects.toThrow('pending transaction unavailable');
+
+    expect(await source.getRepository(ResourceUsage).count()).toBe(0);
+    expect(await source.getRepository(BillingTransaction).count()).toBe(0);
+    expect(await source.getRepository(ResourceUsageLifecycleAttempt).count()).toBe(0);
+    expect(flow.trackResourceActivity).not.toHaveBeenCalled();
+  });
 
   function failAfterObservation() {
     flow.runFlow.mockImplementation(async (resourceId, _trigger, payload, manager, { lifecycleAttemptId }) => {

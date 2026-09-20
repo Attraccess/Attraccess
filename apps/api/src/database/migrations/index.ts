@@ -166,5 +166,7 @@ export * from './1784100000000-full-audit-domains';
 export * from './1784200000000-operating-duration-billing-and-maintenance';
 export * from './1784300000000-operating-transition-provenance';
 export * from './1789800000000-resource-usage-lifecycle-attempt';
+export * from './1789900000000-usage-price-contract';
+export * from './1789900001000-refresh-default-usage-receipt';
 export * from './1765442000000-form-field-position';
 export * from './1783700000000-refresh-default-email-layout';

@@ -110,7 +110,10 @@ describe('BillingService', () => {
           provide: MetricsService,
           useValue: mockMetricsService,
         },
-        { provide: AuditService, useValue: { recordBillingTransaction: jest.fn(), recordBillingTransactionAfterCommit: jest.fn() } },
+        {
+          provide: AuditService,
+          useValue: { recordBillingTransaction: jest.fn(), recordBillingTransactionAfterCommit: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -257,11 +260,105 @@ describe('BillingService', () => {
       };
     };
 
+    it.each([
+      { creditsPerUsage: 6, billingFactor: 50, expectedCharge: 15 },
+      { creditsPerUsage: 0, billingFactor: 100, expectedCharge: 24 },
+      { creditsPerUsage: 6, billingFactor: 0, expectedCharge: 0 },
+    ])('charges the complete start-time contract ($creditsPerUsage fixed, $billingFactor%)', async (contract) => {
+      const usage = {
+        id: 22,
+        startTime: new Date('2026-09-20T09:00:00Z'),
+        endTime: new Date('2026-09-20T09:02:00Z'),
+        usageInMinutes: 2,
+        attributedOperatingDurationInMinutes: 1,
+        sessionDurationCreditsPerMinute: 10,
+        operatingDurationCreditsPerMinute: 4,
+        creditsPerUsage: contract.creditsPerUsage,
+        billingFactor: contract.billingFactor,
+        resource: { id: 205 },
+        userId: 25,
+        user: { id: 25, billingFactor: 200 },
+      } as ResourceUsage;
+      jest.spyOn(service, 'getResourceBillingConfiguration').mockResolvedValue({
+        creditsPerUsage: 99,
+        creditsPerMinute: 99,
+        creditsPerOperatingMinute: 99,
+      } as ResourceBillingConfiguration);
+      const manager = createMockManager();
+
+      const transaction = await service.chargeForResourceUsage(usage, manager as never);
+
+      expect(transaction.amount).toBe(-contract.expectedCharge);
+      expect(manager.save).toHaveBeenCalledWith(
+        BillingTransactionItem,
+        expect.objectContaining({ name: 'PER_SESSION', unitPrice: contract.creditsPerUsage, quantity: 1 }),
+      );
+      if (contract.billingFactor !== 100) {
+        expect(manager.save).toHaveBeenCalledWith(
+          BillingTransactionItem,
+          expect.objectContaining({ name: 'BILLING_FACTOR', description: `${contract.billingFactor}%` }),
+        );
+      }
+    });
+
+    it.each([
+      { durationMs: 0, roundedMinutes: 0 },
+      { durationMs: 60_000, roundedMinutes: 1 },
+      { durationMs: 60_001, roundedMinutes: 2 },
+    ])(
+      'bills and records exact duration $durationMs ms independently for both components',
+      async ({ durationMs, roundedMinutes }) => {
+        const startTime = new Date('2026-09-20T09:05:00Z');
+        const usage = {
+          id: 22,
+          startTime,
+          endTime: new Date(startTime.getTime() + durationMs),
+          // SQLite's generated Julian-day duration can be just above an exact minute.
+          usageInMinutes: durationMs === 60_000 ? 1.000000610947609 : durationMs / 60_000,
+          attributedOperatingDurationInMinutes: durationMs / 60_000,
+          sessionDurationCreditsPerMinute: 3,
+          operatingDurationCreditsPerMinute: 7,
+          creditsPerUsage: 0,
+          billingFactor: 100,
+          resource: { id: 205 },
+          userId: 25,
+        } as ResourceUsage;
+        jest
+          .spyOn(service, 'getResourceBillingConfiguration')
+          .mockResolvedValue({ creditsPerUsage: 0, creditsPerMinute: 0 } as ResourceBillingConfiguration);
+        const manager = createMockManager();
+        manager.findOne.mockResolvedValue({ id: 999, items: [], status: BillingTransactionStatus.Pending });
+
+        const transaction = await service.chargeForResourceUsage(usage, manager as never);
+
+        expect(transaction.amount).toBe(-roundedMinutes * 10);
+        expect(manager.save).toHaveBeenCalledWith(
+          BillingTransactionItem,
+          expect.objectContaining({
+            name: 'PER_MINUTE',
+            durationMs,
+            quantity: roundedMinutes,
+            unitPrice: 3,
+          }),
+        );
+        expect(manager.save).toHaveBeenCalledWith(
+          BillingTransactionItem,
+          expect.objectContaining({
+            name: 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+            durationMs,
+            quantity: roundedMinutes,
+            unitPrice: 7,
+          }),
+        );
+      },
+    );
+
     it('processes non-Usage actions without creating a transaction when credits are zero', async () => {
       const usage = {
         id: 10,
         usageAction: ResourceUsageAction.DoorLock,
-        endTime: new Date(),
+        startTime: new Date('2026-09-20T09:07:00.000Z'),
+        endTime: new Date('2026-09-20T09:10:00.000Z'),
         usageInMinutes: 3,
         resource: { id: 99 },
         userId: 7,
@@ -303,7 +400,8 @@ describe('BillingService', () => {
       const usage = {
         id: 12,
         usageAction: ResourceUsageAction.Usage,
-        endTime: new Date(),
+        startTime: new Date('2026-09-20T09:05:00.000Z'),
+        endTime: new Date('2026-09-20T09:10:00.000Z'),
         usageInMinutes: 5,
         resource: { id: 101 },
         userId: 9,
@@ -324,7 +422,8 @@ describe('BillingService', () => {
       const usage = {
         id: 13,
         usageAction: ResourceUsageAction.Usage,
-        endTime: new Date(),
+        startTime: new Date('2026-09-20T09:07:36.000Z'),
+        endTime: new Date('2026-09-20T09:10:00.000Z'),
         usageInMinutes: 2.4,
         resource: { id: 102 },
         userId: 10,
@@ -346,9 +445,7 @@ describe('BillingService', () => {
 
       expect(service.getResourceBillingConfiguration).toHaveBeenCalledWith(102, expect.any(Object));
       // A caller-owned transaction returns the charge without publishing it before commit.
-      expect(transaction).toEqual(
-        expect.objectContaining({ id: 999, amount: -35, userId: 10, resourceUsageId: 13 }),
-      );
+      expect(transaction).toEqual(expect.objectContaining({ id: 999, amount: -35, userId: 10, resourceUsageId: 13 }));
       expect(liveNotificationsService.notifyTransactionUpdate).not.toHaveBeenCalled();
       expect(emailService.sendResourceUsageBillingSummaryEmail).not.toHaveBeenCalled();
     });
@@ -357,7 +454,8 @@ describe('BillingService', () => {
       const usage = {
         id: 14,
         usageAction: ResourceUsageAction.Usage,
-        endTime: new Date(),
+        startTime: new Date('2026-09-20T09:08:00.000Z'),
+        endTime: new Date('2026-09-20T09:10:00.000Z'),
         usageInMinutes: 2,
         resource: { id: 200 },
         userId: 20,
@@ -399,9 +497,7 @@ describe('BillingService', () => {
       const transaction = await service.chargeForResourceUsage(usage as ResourceUsage, manager as unknown as never);
 
       expect(service.getResourceBillingConfiguration).toHaveBeenCalledWith(200, expect.any(Object));
-      expect(transaction).toEqual(
-        expect.objectContaining({ amount: -20 }),
-      );
+      expect(transaction).toEqual(expect.objectContaining({ amount: -20 }));
 
       // Ensure BILLING_FACTOR item saved with the discount as a negative unit price
       expect(manager.save).toHaveBeenCalledWith(
@@ -424,7 +520,8 @@ describe('BillingService', () => {
       const usage = {
         id: 15,
         usageAction: ResourceUsageAction.Usage,
-        endTime: new Date(),
+        startTime: new Date('2026-09-20T09:07:00.000Z'),
+        endTime: new Date('2026-09-20T09:10:00.000Z'),
         usageInMinutes: 3,
         resource: { id: 201 },
         userId: 21,
@@ -474,7 +571,8 @@ describe('BillingService', () => {
       const usage = {
         id: 16,
         usageAction: ResourceUsageAction.Usage,
-        endTime: new Date(),
+        startTime: new Date('2026-09-20T09:09:00.000Z'),
+        endTime: new Date('2026-09-20T09:10:00.000Z'),
         usageInMinutes: 1,
         resource: { id: 202 },
         userId: 22,
@@ -512,9 +610,7 @@ describe('BillingService', () => {
       // base = 20, factor 150% -> total 30, surcharge item +10
       const transaction = await service.chargeForResourceUsage(usage as ResourceUsage, manager as unknown as never);
 
-      expect(transaction).toEqual(
-        expect.objectContaining({ amount: -30 }),
-      );
+      expect(transaction).toEqual(expect.objectContaining({ amount: -30 }));
 
       expect(manager.save).toHaveBeenCalledWith(
         BillingTransactionItem,
@@ -526,7 +622,8 @@ describe('BillingService', () => {
       const usage = {
         id: 17,
         usageAction: ResourceUsageAction.Usage,
-        endTime: new Date(),
+        startTime: new Date('2026-09-20T09:07:00.000Z'),
+        endTime: new Date('2026-09-20T09:10:00.000Z'),
         usageInMinutes: 3,
         resource: { id: 203 },
         userId: 23,
@@ -578,7 +675,8 @@ describe('BillingService', () => {
       const usage = {
         id: 18,
         usageAction: ResourceUsageAction.Usage,
-        endTime: new Date(),
+        startTime: new Date('2026-09-20T09:08:00.000Z'),
+        endTime: new Date('2026-09-20T09:10:00.000Z'),
         usageInMinutes: 2,
         resource: { id: 204 },
         userId: 24,
@@ -624,17 +722,18 @@ describe('BillingService', () => {
       const transaction = await service.chargeForResourceUsage(usage as ResourceUsage, manager as unknown as never);
 
       expect(manager.update).toHaveBeenCalledWith(BillingTransaction, 77, expect.objectContaining({ amount: -24 }));
-      expect(transaction).toEqual(
-        expect.objectContaining({ id: 77, amount: -24 }),
+      expect(transaction).toEqual(expect.objectContaining({ id: 77, amount: -24 }));
+      expect(auditService.recordBillingTransactionAfterCommit).toHaveBeenCalledWith(
+        {
+          transactionId: 77,
+          userId: 24,
+          amount: -24,
+          status: BillingTransactionStatus.Completed,
+          previousStatus: BillingTransactionStatus.Pending,
+          source: 'resource-usage',
+        },
+        manager,
       );
-      expect(auditService.recordBillingTransactionAfterCommit).toHaveBeenCalledWith({
-        transactionId: 77,
-        userId: 24,
-        amount: -24,
-        status: BillingTransactionStatus.Completed,
-        previousStatus: BillingTransactionStatus.Pending,
-        source: 'resource-usage',
-      }, manager);
 
       // No BILLING_FACTOR item because billingFactor is 100%
       const saves = (manager.save as jest.Mock).mock.calls
@@ -675,7 +774,8 @@ describe('BillingService', () => {
     it('charges both snapped duration rates without changing legacy session-duration charging', async () => {
       const usage = {
         id: 22,
-        endTime: new Date(),
+        startTime: new Date('2026-09-20T09:07:54.000Z'),
+        endTime: new Date('2026-09-20T09:10:00.000Z'),
         usageInMinutes: 2.1,
         attributedOperatingDurationInMinutes: 1.1,
         sessionDurationCreditsPerMinute: 3,
@@ -697,9 +797,7 @@ describe('BillingService', () => {
 
       const transaction = await service.chargeForResourceUsage(usage, manager);
 
-      expect(transaction).toEqual(
-        expect.objectContaining({ amount: -23 }),
-      );
+      expect(transaction).toEqual(expect.objectContaining({ amount: -23 }));
       expect((manager as { save: jest.Mock }).save).toHaveBeenCalledWith(
         BillingTransactionItem,
         expect.objectContaining({ name: 'PER_MINUTE', unitPrice: 3, quantity: 3 }),
@@ -712,6 +810,33 @@ describe('BillingService', () => {
   });
 
   describe('handleResourceUsageStart', () => {
+    it('validates the frozen fixed fee after pricing changes during a start flow', async () => {
+      const usage = {
+        id: 22,
+        creditsPerUsage: 5,
+        sessionDurationCreditsPerMinute: 3,
+        operatingDurationCreditsPerMinute: 7,
+      } as ResourceUsage;
+      jest.spyOn(service, 'getResourceBillingConfiguration').mockResolvedValue({
+        creditsPerUsage: 99,
+        creditsPerMinute: 99,
+        creditsPerOperatingMinute: 99,
+      } as ResourceBillingConfiguration);
+      jest.spyOn(service, 'getBalance').mockResolvedValue(8);
+
+      await expect(service.validateResourceUsageStart(205, usage, { id: 25 } as User)).resolves.toBeUndefined();
+
+      jest.spyOn(service, 'getResourceBillingConfiguration').mockResolvedValue({
+        creditsPerUsage: 0,
+        creditsPerMinute: 0,
+        creditsPerOperatingMinute: 0,
+      } as ResourceBillingConfiguration);
+      jest.spyOn(service, 'getBalance').mockResolvedValue(7);
+      await expect(service.validateResourceUsageStart(205, usage, { id: 25 } as User)).rejects.toBeInstanceOf(
+        InsufficientBalanceError,
+      );
+    });
+
     it('does not reserve an operating-minute charge that may not be incurred', async () => {
       const usage = {
         id: 22,
@@ -982,9 +1107,11 @@ describe('BillingService', () => {
 
       await service.notifyResourceUsageCharge(123);
 
-      expect(billingTransactionRepository.findOne).toHaveBeenCalledWith(expect.objectContaining({
-        where: { id: 123, status: BillingTransactionStatus.Completed },
-      }));
+      expect(billingTransactionRepository.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 123, status: BillingTransactionStatus.Completed },
+        }),
+      );
       expect(liveNotificationsService.notifyTransactionUpdate).not.toHaveBeenCalled();
       expect(emailService.sendResourceUsageBillingSummaryEmail).not.toHaveBeenCalled();
     });
@@ -996,7 +1123,11 @@ describe('BillingService', () => {
       jest.spyOn(service, 'isBillingEnabled').mockResolvedValue(true);
       jest.spyOn(service, 'getBalance').mockResolvedValue(12);
 
-      await service.validateResourceUsageStart(1, { sessionDurationCreditsPerMinute: 2 } as ResourceUsage, { id: 7 } as User);
+      await service.validateResourceUsageStart(
+        1,
+        { sessionDurationCreditsPerMinute: 2 } as ResourceUsage,
+        { id: 7 } as User,
+      );
 
       expect(billingTransactionRepository.save).not.toHaveBeenCalled();
       expect(auditService.recordBillingTransactionAfterCommit).not.toHaveBeenCalled();

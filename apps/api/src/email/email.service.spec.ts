@@ -15,6 +15,11 @@ import { SmtpServiceType } from '../settings/dto/smtp-settings.dto';
 import { MetricsService } from '../metrics/metrics.service';
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
 import { Repository } from 'typeorm';
+import {
+  EMAIL_TEMPLATE_DEFAULTS,
+  readDefaultTemplateBody,
+  SHIPPED_TRANSLATIONS,
+} from '../email-template/email-defaults';
 
 jest.mock('nodemailer', () => ({
   createTransport: jest.fn(),
@@ -251,7 +256,7 @@ describe('EmailService', () => {
     const usage: Partial<ResourceUsage> = {
       startTime: new Date('2024-01-01T10:00:00Z'),
       endTime: new Date('2024-01-01T11:10:00Z'),
-      usageInMinutes: 70,
+      usageInMinutes: 999, // The settled item quantity, not a recalculation, is authoritative.
       resource: { id: 3, name: 'Laser Cutter' } as Resource,
       user,
     };
@@ -273,6 +278,143 @@ describe('EmailService', () => {
     // With minor unit 2, amounts are converted to user currency strings
     expect(callArg.html).toContain('3.45');
     expect(callArg.html).toContain('12.34');
+    expect(callArg.html).not.toContain('999');
+  });
+
+  describe('shipped usage receipt', () => {
+    const receiptType = EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY;
+
+    const setupReceipt = (locale: 'en' | 'de') => {
+      const harness = setup();
+      harness.emailTemplateService.findOne.mockResolvedValue({
+        type: receiptType,
+        subject: EMAIL_TEMPLATE_DEFAULTS[receiptType].subject,
+        body: readDefaultTemplateBody(receiptType),
+      });
+      harness.emailTemplateService.getTranslationsMap.mockResolvedValue(
+        Object.fromEntries(
+          SHIPPED_TRANSLATIONS.filter((row) => row.templateType === receiptType && row.locale === locale).map((row) => [
+            row.key,
+            row.value,
+          ]),
+        ),
+      );
+      const user = makeUser({ creditBalance: 1234, locale, billingFactor: 20 });
+      const usage = Object.assign(new ResourceUsage(), {
+        startTime: new Date('2026-09-20T10:00:00Z'),
+        endTime: new Date('2026-09-20T10:01:01.001Z'),
+        usageInMinutes: 999,
+        billingFactor: 80,
+        resource: Object.assign(new Resource(), { id: 3, name: 'Laser <script>unsafe</script>' }),
+      });
+      const item = (values: Partial<BillingTransactionItem>) => Object.assign(new BillingTransactionItem(), values);
+      const transaction = Object.assign(new BillingTransaction(), {
+        amount: -94,
+        items: [
+          item({ name: 'PER_SESSION', quantity: 1, unitPrice: 100 }),
+          item({ name: 'PER_MINUTE', quantity: 2, unitPrice: 5, durationMs: 61001 }),
+          item({ name: 'PER_ATTRIBUTABLE_OPERATING_MINUTE', quantity: 1, unitPrice: 7, durationMs: 60000 }),
+          item({ name: 'BILLING_FACTOR', quantity: 1, unitPrice: -23, description: '80%' }),
+          item({
+            name: 'Custom <strong>item</strong>',
+            description: '<script>item description</script>',
+            quantity: 1,
+            unitPrice: 0,
+          }),
+        ],
+      });
+      return { ...harness, user, usage, transaction };
+    };
+
+    it.each([
+      {
+        locale: 'en',
+        labels: [
+          'Session time',
+          'Attributable operating time',
+          'Fixed session fee',
+          'Billing factor adjustment',
+          'Measured: 61.001 s',
+          'Measured: 60 s',
+          'Billed: 2 min',
+          'Billed: 1 min',
+          '0.05 credits/min',
+          '0.07 credits/min',
+          'Applied billing factor: 80%',
+        ],
+      },
+      {
+        locale: 'de',
+        labels: [
+          'Sitzungszeit',
+          'Zugeordnete Betriebszeit',
+          'Feste Sitzungsgebühr',
+          'Anpassung durch Abrechnungsfaktor',
+          'Gemessen: 61,001 s',
+          'Gemessen: 60 s',
+          'Abgerechnet: 2 min',
+          'Abgerechnet: 1 min',
+          '0.05 Credits/min',
+          '0.07 Credits/min',
+          'Angewendeter Abrechnungsfaktor: 80%',
+        ],
+      },
+    ] as const)('renders immutable calculations and escaped custom content in $locale', async ({ locale, labels }) => {
+      const { service, sendMail, user, usage, transaction } = setupReceipt(locale);
+
+      await service.sendResourceUsageBillingSummaryEmail(user, transaction, usage, 2);
+
+      const { html } = sendMail.mock.calls[0][0];
+      for (const label of labels) expect(html).toContain(label);
+      expect(html).toContain('>0.1</td>'); // 2 rounded session minutes at 0.05 credits/min.
+      expect(html).toContain('0.07'); // 1 rounded operating minute at 0.07 credits/min.
+      expect(html).toContain('-0.23');
+      expect(html).toContain('0.94');
+      expect(html).toContain('12.34');
+      expect(html).toContain('Custom &lt;strong&gt;item&lt;/strong&gt;');
+      expect(html).toContain('&lt;script&gt;item description&lt;/script&gt;');
+      expect(html).toContain('Laser &lt;script&gt;unsafe&lt;/script&gt;');
+      expect(html).not.toContain('<script>');
+      expect(html).not.toContain('PER_MINUTE');
+      expect(html).not.toContain('PER_ATTRIBUTABLE_OPERATING_MINUTE');
+      expect(html).not.toContain('999');
+      expect(html).not.toContain('20%'); // Current user factor cannot alter a historical receipt.
+    });
+
+    it('renders historical rounded quantities without inventing raw durations or a factor snapshot', async () => {
+      const { service, sendMail, user, usage, transaction } = setupReceipt('en');
+      usage.billingFactor = null;
+      for (const item of transaction.items) item.durationMs = null;
+
+      await service.sendResourceUsageBillingSummaryEmail(user, transaction, usage, 2);
+
+      const { html } = sendMail.mock.calls[0][0];
+      expect(html).toContain('Billed: 2 min');
+      expect(html).toContain('Billed: 1 min');
+      expect(html).toContain('80%'); // The immutable adjustment description remains available.
+      expect(html).not.toContain('Measured:');
+      expect(html).not.toContain('Applied billing factor:');
+      expect(html).not.toContain('999');
+    });
+
+    it.each([0, 100])(
+      'renders a frozen %i%% factor and zero raw duration without a truthiness fallback',
+      async (factor) => {
+        const { service, sendMail, user, usage, transaction } = setupReceipt('en');
+        usage.billingFactor = factor;
+        transaction.items = transaction.items.filter((item) => item.name !== 'BILLING_FACTOR');
+        const operatingItem = transaction.items.find((item) => item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE');
+        operatingItem.durationMs = 0;
+        operatingItem.quantity = 0;
+
+        await service.sendResourceUsageBillingSummaryEmail(user, transaction, usage, 2);
+
+        const { html } = sendMail.mock.calls[0][0];
+        expect(html).toContain(`Applied billing factor: ${factor}%`);
+        expect(html).toContain('Measured: 0 s');
+        expect(html).toContain('Billed: 0 min');
+      },
+    );
   });
 
   it('sends resource takeover email with expected context', async () => {
@@ -350,12 +492,16 @@ describe('EmailService', () => {
       const { service, sendMail } = setup();
       const user = makeUser({ email: 'alice@example.com' });
 
-      await service.sendResourceHealthChangedEmail(user, { id: 1, name: 'Laser Cutter' }, {
-        status: 'unhealthy' as never,
-        previousStatus: 'healthy' as never,
-        reason: 'sensor offline',
-        identifier: 'laser.temperature',
-      });
+      await service.sendResourceHealthChangedEmail(
+        user,
+        { id: 1, name: 'Laser Cutter' },
+        {
+          status: 'unhealthy' as never,
+          previousStatus: 'healthy' as never,
+          reason: 'sensor offline',
+          identifier: 'laser.temperature',
+        },
+      );
 
       const { html } = (sendMail as jest.Mock).mock.calls[0][0];
       expect(html).toContain('Degraded');
@@ -368,12 +514,16 @@ describe('EmailService', () => {
       const { service, sendMail } = setup();
       const user = makeUser({ email: 'alice@example.com' });
 
-      await service.sendResourceHealthChangedEmail(user, { id: 2, name: 'Laser Cutter' }, {
-        status: 'healthy' as never,
-        previousStatus: 'unhealthy' as never,
-        reason: null,
-        identifier: 'laser.temperature',
-      });
+      await service.sendResourceHealthChangedEmail(
+        user,
+        { id: 2, name: 'Laser Cutter' },
+        {
+          status: 'healthy' as never,
+          previousStatus: 'unhealthy' as never,
+          reason: null,
+          identifier: 'laser.temperature',
+        },
+      );
 
       const { html } = (sendMail as jest.Mock).mock.calls[0][0];
       expect(html).toContain('Recovered');
@@ -382,12 +532,16 @@ describe('EmailService', () => {
 
     it('skips send when user has no email', async () => {
       const { service, sendMail } = setup();
-      await service.sendResourceHealthChangedEmail({ email: null } as never, { id: 1, name: 'X' }, {
-        status: 'unhealthy' as never,
-        previousStatus: null,
-        reason: null,
-        identifier: 'x',
-      });
+      await service.sendResourceHealthChangedEmail(
+        { email: null } as never,
+        { id: 1, name: 'X' },
+        {
+          status: 'unhealthy' as never,
+          previousStatus: null,
+          reason: null,
+          identifier: 'x',
+        },
+      );
       expect(sendMail).not.toHaveBeenCalled();
     });
   });
@@ -397,10 +551,14 @@ describe('EmailService', () => {
       const { service, sendMail } = setup();
       const user = makeUser({ email: 'bob@example.com' });
 
-      await service.sendUserRetrainingEmail(user, { id: 5, name: 'Printer', isGroup: false }, {
-        reason: 'age',
-        blocksAccess: true,
-      });
+      await service.sendUserRetrainingEmail(
+        user,
+        { id: 5, name: 'Printer', isGroup: false },
+        {
+          reason: 'age',
+          blocksAccess: true,
+        },
+      );
 
       const { html } = (sendMail as jest.Mock).mock.calls[0][0];
       expect(html).toContain('Age reason');
@@ -413,10 +571,14 @@ describe('EmailService', () => {
       const { service, sendMail } = setup();
       const user = makeUser({ email: 'bob@example.com' });
 
-      await service.sendUserRetrainingEmail(user, { id: 3, name: 'Printer', isGroup: false }, {
-        reason: 'inactivity',
-        blocksAccess: false,
-      });
+      await service.sendUserRetrainingEmail(
+        user,
+        { id: 3, name: 'Printer', isGroup: false },
+        {
+          reason: 'inactivity',
+          blocksAccess: false,
+        },
+      );
 
       const { html } = (sendMail as jest.Mock).mock.calls[0][0];
       expect(html).toContain('Inactivity reason');
@@ -428,10 +590,14 @@ describe('EmailService', () => {
       const { service, sendMail } = setup();
       const user = makeUser({ email: 'bob@example.com' });
 
-      await service.sendUserRetrainingEmail(user, { id: 3, name: 'Printer', isGroup: false }, {
-        reason: null,
-        blocksAccess: false,
-      });
+      await service.sendUserRetrainingEmail(
+        user,
+        { id: 3, name: 'Printer', isGroup: false },
+        {
+          reason: null,
+          blocksAccess: false,
+        },
+      );
 
       const { html } = (sendMail as jest.Mock).mock.calls[0][0];
       expect(html).toContain('Default reason');
@@ -443,11 +609,15 @@ describe('EmailService', () => {
       const { service, sendMail } = setup();
       const user = makeUser({ email: 'carol@example.com' });
 
-      await service.sendResourceUsageNoteEmail(user, { id: 7, name: 'CNC' }, {
-        content: 'Blade worn',
-        phase: 'start',
-        authorName: 'alice',
-      });
+      await service.sendResourceUsageNoteEmail(
+        user,
+        { id: 7, name: 'CNC' },
+        {
+          content: 'Blade worn',
+          phase: 'start',
+          authorName: 'alice',
+        },
+      );
 
       const { html } = (sendMail as jest.Mock).mock.calls[0][0];
       expect(html).toContain('Start note');
@@ -460,11 +630,15 @@ describe('EmailService', () => {
       const { service, sendMail } = setup();
       const user = makeUser({ email: 'carol@example.com' });
 
-      await service.sendResourceUsageNoteEmail(user, { id: 7, name: 'CNC' }, {
-        content: 'All good',
-        phase: 'end',
-        authorName: 'bob',
-      });
+      await service.sendResourceUsageNoteEmail(
+        user,
+        { id: 7, name: 'CNC' },
+        {
+          content: 'All good',
+          phase: 'end',
+          authorName: 'bob',
+        },
+      );
 
       const { html } = (sendMail as jest.Mock).mock.calls[0][0];
       expect(html).toContain('End note');

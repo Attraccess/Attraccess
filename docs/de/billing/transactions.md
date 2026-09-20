@@ -13,12 +13,16 @@ Das Abrechnungs-Dashboard zeigt alle Credit-Transaktionen im gesamten System. Ve
 
 Jede Transaktion enthaelt folgende Informationen:
 
-| Feld | Beschreibung |
-|------|-------------|
-| **Benutzer** | Der Benutzer, dem Credits berechnet wurden |
-| **Ressource** | Die genutzte Ressource |
-| **Credits** | Anzahl der berechneten Credits |
-| **Zeitstempel** | Wann die Transaktion stattfand |
+| Feld            | Beschreibung                               |
+| --------------- | ------------------------------------------ |
+| **Benutzer**    | Der Benutzer, dem Credits berechnet wurden |
+| **Ressource**   | Die genutzte Ressource                     |
+| **Credits**     | Anzahl der berechneten Credits             |
+| **Zeitstempel** | Wann die Transaktion stattfand             |
+
+Für neue Nutzungssitzungen speichern abgeschlossene zeitabhängige Abrechnungsposten die gemessene Dauer, die aufgerundeten Minuten und den beim Sitzungsstart gespeicherten Tarif. Spätere Änderungen an Preisen, Abrechnungsfaktoren oder Betriebsverläufen berechnen abgeschlossene Transaktionen nicht neu.
+
+Bei einer Gesamtsumme ungleich null zeigt der Standardbeleg per E-Mail getrennte Berechnungen für Sitzungs- und Betriebsdauer sowie den gespeicherten Abrechnungsfaktor. Bei einer Gesamtsumme von null wird keine Abrechnungs-E-Mail versendet. Angepasste E-Mail-Vorlagen bleiben beim Aktualisieren des Standardbelegs erhalten; Administratoren können die Vorlage auf den Standard zurücksetzen, um das neue Layout zu übernehmen. Historische Transaktionen werden nicht umgeschrieben.
 
 ## Transaktionen filtern
 

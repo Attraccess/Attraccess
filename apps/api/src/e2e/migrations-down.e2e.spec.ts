@@ -169,12 +169,8 @@ const seedDatabase = async (dataSource: DataSource) => {
   const billingConfigRepo = dataSource.getRepository(ResourceBillingConfiguration);
   const resourceMaintenanceRepo = dataSource.getRepository(ResourceMaintenance);
   const maintenanceScheduleRepo = dataSource.getRepository(ResourceMaintenanceSchedule);
-  const maintenanceScheduleUsageHoursConfigRepo = dataSource.getRepository(
-    ResourceMaintenanceScheduleUsageHoursConfig,
-  );
-  const maintenanceScheduleUsageCountConfigRepo = dataSource.getRepository(
-    ResourceMaintenanceScheduleUsageCountConfig,
-  );
+  const maintenanceScheduleUsageHoursConfigRepo = dataSource.getRepository(ResourceMaintenanceScheduleUsageHoursConfig);
+  const maintenanceScheduleUsageCountConfigRepo = dataSource.getRepository(ResourceMaintenanceScheduleUsageCountConfig);
   const maintenanceScheduleTimeIntervalConfigRepo = dataSource.getRepository(
     ResourceMaintenanceScheduleTimeIntervalConfig,
   );
@@ -436,6 +432,8 @@ const seedDatabase = async (dataSource: DataSource) => {
     startNotes: 'Seed usage',
     endNotes: null,
     isFinalized: false,
+    creditsPerUsage: 5,
+    billingFactor: 50,
   }));
 
   const lifecycleAttemptRepo = dataSource.getRepository(ResourceUsageLifecycleAttempt);
@@ -482,6 +480,7 @@ const seedDatabase = async (dataSource: DataSource) => {
     description: 'Seed billing item',
     unitPrice: 100,
     quantity: 1,
+    durationMs: 60_000,
   }));
 
   const introduction = await ensureEntity(introductionRepo, () => ({
