@@ -111,21 +111,34 @@ export class ResourceGroupsService {
     return savedResourceGroup;
   }
 
-  public async getMany(visibility?: GroupVisibilityContext): Promise<ResourceGroup[]> {
-    // Users that can manage resources (and any caller without a visibility context) see every group.
-    if (!visibility || visibility.canUpdateResources) {
-      return await this.resourceGroupRepository.find();
-    }
+  private visibleGroupsQuery(visibility?: GroupVisibilityContext) {
+    const query = this.resourceGroupRepository.createQueryBuilder('group');
+    if (!visibility || visibility.canUpdateResources) return query;
 
-    return await this.resourceGroupRepository
-      .createQueryBuilder('group')
+    return query
       .where('group.isHidden = :notHidden', { notHidden: false })
       .orWhere(
         `EXISTS (SELECT 1 FROM "resource_introducer" "ri" WHERE "ri"."resourceGroupId" = group.id AND "ri"."userId" = :userId)`,
         { userId: visibility.userId },
       )
-      .orWhere(ResourceGroupsService.ACTIVE_INTRODUCTION_EXISTS_SQL, { userId: visibility.userId })
-      .getMany();
+      .orWhere(ResourceGroupsService.ACTIVE_INTRODUCTION_EXISTS_SQL, { userId: visibility.userId });
+  }
+
+  public async getMany(visibility?: GroupVisibilityContext): Promise<ResourceGroup[]> {
+    return this.visibleGroupsQuery(visibility).getMany();
+  }
+
+  public async hasVisibleResources(visibility: GroupVisibilityContext): Promise<boolean> {
+    const resources = this.resourceRepository.createQueryBuilder('resource');
+    if (visibility.canUpdateResources) return resources.getExists();
+
+    const visibleGroups = this.visibleGroupsQuery(visibility).select('group.id');
+    return resources
+      .leftJoin('resource.groups', 'resourceGroup')
+      .where('resourceGroup.id IS NULL')
+      .orWhere(`resourceGroup.id IN (${visibleGroups.getQuery()})`)
+      .setParameters(visibleGroups.getParameters())
+      .getExists();
   }
 
   public async getOne(

@@ -21,7 +21,7 @@
   "schedules": {
     "empty": "Noch keine Wartungs-Zeitpläne.",
     "addFirst": "Ersten Zeitplan anlegen",
-    "status": { "on": "An", "paused": "Pausiert" },
+    "status": { "on": "Aktiviert", "paused": "Pausiert" },
     "triggerType": {
       "USAGE_HOURS": "Nutzungsstunden",
       "USAGE_COUNT": "Nutzungsanzahl",

@@ -1,0 +1,10 @@
+{
+  "title": "Enable push notifications",
+  "description": "Get notified about new messages, resource sessions, access changes, and other events — even when the app is in the background.",
+  "question": "Would you like to enable push notifications? You can change notification preferences in your account.",
+  "actions": {
+    "defer": "Not now",
+    "allow": "Allow"
+  },
+  "subscribeFailed": "Could not enable push notifications. Try again, or check your browser notification settings and enable this device in your account."
+}

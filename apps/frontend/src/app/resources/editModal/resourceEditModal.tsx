@@ -1,3 +1,4 @@
+import { recordUsefulAction } from '../../../components/DonationPrompt/usefulAction';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Button,
@@ -133,6 +134,7 @@ export function ResourceEditModal(props: ResourceEditModalProps) {
   });
   const createResource = useResourcesServiceCreateOneResource({
     onSuccess: (createdResource) => {
+      recordUsefulAction();
       toast.success({
         title: t('create.success.toast.title'),
         description: t('create.success.toast.description', { name: createdResource.name }),

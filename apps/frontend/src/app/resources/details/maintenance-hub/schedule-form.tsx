@@ -1,14 +1,6 @@
 // Reusable schedule form body for the maintenance hub drawer
 // FEATURE: Maintenance Hub - schedule create/edit form without overlay state
-import {
-  Alert,
-  AlertContent,
-  AlertTitle,
-  Form,
-  Input,
-  Label,
-  TextField,
-} from '@heroui/react';
+import { Alert, AlertContent, AlertTitle, Form, Input, Label, TextField } from '@heroui/react';
 import { Button } from '../../../../components/button';
 import { Select } from '../../../../components/select';
 import { LabeledSwitch } from '../../../../components/labeledSwitch';
@@ -23,6 +15,7 @@ import {
   UsageDurationUnit,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
+import { OperatingTrackingNotice, useOperatingTrackingReadiness } from '../operating-readiness';
 import de from './de.json';
 import en from './en.json';
 
@@ -57,7 +50,13 @@ export function ScheduleForm(props: Props) {
   );
   const [usageHoursDuration, setUsageHoursDuration] = useState('100');
   const [usageHoursUnit, setUsageHoursUnit] = useState<UsageDurationUnit>(UsageDurationUnit.HOURS);
-  const [durationBasis, setDurationBasis] = useState<(typeof DURATION_BASIS_OPTIONS)[number]['value']>('SESSION_DURATION');
+  const [durationBasis, setDurationBasis] =
+    useState<(typeof DURATION_BASIS_OPTIONS)[number]['value']>('SESSION_DURATION');
+  const usesOperatingDuration =
+    supportsOperatingDuration &&
+    triggerType === ResourceMaintenanceScheduleTriggerType.USAGE_HOURS &&
+    durationBasis === 'ATTRIBUTABLE_OPERATING_DURATION';
+  const trackingReadiness = useOperatingTrackingReadiness(resourceId, usesOperatingDuration);
   const [thresholdSessions, setThresholdSessions] = useState('50');
   const [timeIntervalDuration, setTimeIntervalDuration] = useState('500');
   const [timeIntervalUnit, setTimeIntervalUnit] = useState<UsageDurationUnit>(UsageDurationUnit.HOURS);
@@ -77,7 +76,8 @@ export function ScheduleForm(props: Props) {
     setUsageHoursDuration(existing.usageHoursConfig?.duration?.toString() ?? '100');
     setUsageHoursUnit(existing.usageHoursConfig?.unit ?? UsageDurationUnit.HOURS);
     setDurationBasis(
-      (existing as { durationBasis?: (typeof DURATION_BASIS_OPTIONS)[number]['value'] }).durationBasis ?? 'SESSION_DURATION',
+      (existing as { durationBasis?: (typeof DURATION_BASIS_OPTIONS)[number]['value'] }).durationBasis ??
+        'SESSION_DURATION',
     );
     setThresholdSessions(existing.usageCountConfig?.thresholdSessions?.toString() ?? '50');
     setTimeIntervalDuration(existing.timeIntervalConfig?.duration?.toString() ?? '500');
@@ -91,10 +91,16 @@ export function ScheduleForm(props: Props) {
     onSaved();
   }, [queryClient, onSaved]);
 
-  const { mutate: create, isPending: isCreating, error: createError } =
-    useResourceMaintenanceSchedulesServiceCreateMaintenanceSchedule({ onSuccess: onDone });
-  const { mutate: update, isPending: isUpdating, error: updateError } =
-    useResourceMaintenanceSchedulesServiceUpdateMaintenanceSchedule({ onSuccess: onDone });
+  const {
+    mutate: create,
+    isPending: isCreating,
+    error: createError,
+  } = useResourceMaintenanceSchedulesServiceCreateMaintenanceSchedule({ onSuccess: onDone });
+  const {
+    mutate: update,
+    isPending: isUpdating,
+    error: updateError,
+  } = useResourceMaintenanceSchedulesServiceUpdateMaintenanceSchedule({ onSuccess: onDone });
 
   const error = (createError ?? updateError) as Error | undefined;
 
@@ -132,14 +138,29 @@ export function ScheduleForm(props: Props) {
       create({ resourceId, requestBody: requestBody as never });
     }
   }, [
-    name, triggerType, usageHoursDuration, usageHoursUnit, durationBasis, supportsOperatingDuration, thresholdSessions,
-    timeIntervalDuration, timeIntervalUnit, enabled, resourceId, scheduleId, create, update,
+    name,
+    triggerType,
+    usageHoursDuration,
+    usageHoursUnit,
+    durationBasis,
+    supportsOperatingDuration,
+    thresholdSessions,
+    timeIntervalDuration,
+    timeIntervalUnit,
+    enabled,
+    resourceId,
+    scheduleId,
+    create,
+    update,
   ]);
 
   return (
     <Form
       ref={formRef}
-      onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit();
+      }}
       className="flex flex-col gap-4"
     >
       <TextField value={name} onChange={setName}>
@@ -150,7 +171,9 @@ export function ScheduleForm(props: Props) {
       <Select
         label={t('form.triggerType.label')}
         value={triggerType}
-        onChange={(key) => { if (key) setTriggerType(key as ResourceMaintenanceScheduleTriggerType); }}
+        onChange={(key) => {
+          if (key) setTriggerType(key as ResourceMaintenanceScheduleTriggerType);
+        }}
         items={TRIGGER_OPTIONS.map((opt) => ({
           key: opt.value,
           label: t(`schedules.triggerType.${opt.labelKey}`),
@@ -166,7 +189,9 @@ export function ScheduleForm(props: Props) {
           <Select
             label={t('form.unit.label')}
             value={usageHoursUnit}
-            onChange={(key) => { if (key) setUsageHoursUnit(key as UsageDurationUnit); }}
+            onChange={(key) => {
+              if (key) setUsageHoursUnit(key as UsageDurationUnit);
+            }}
             items={Object.values(UsageDurationUnit).map((unit) => ({
               key: unit,
               label: t(`form.unit.${unit}`),
@@ -175,8 +200,12 @@ export function ScheduleForm(props: Props) {
           <Select
             label={t('form.durationBasis.label')}
             value={supportsOperatingDuration ? durationBasis : 'SESSION_DURATION'}
-            onChange={(key) => { if (key) setDurationBasis(key as typeof durationBasis); }}
-            items={DURATION_BASIS_OPTIONS.filter((option) => supportsOperatingDuration || option.value === 'SESSION_DURATION').map((option) => ({
+            onChange={(key) => {
+              if (key) setDurationBasis(key as typeof durationBasis);
+            }}
+            items={DURATION_BASIS_OPTIONS.filter(
+              (option) => supportsOperatingDuration || option.value === 'SESSION_DURATION',
+            ).map((option) => ({
               key: option.value,
               label: t(`form.durationBasis.${option.labelKey}`),
             }))}
@@ -200,7 +229,9 @@ export function ScheduleForm(props: Props) {
           <Select
             label={t('form.unit.label')}
             value={timeIntervalUnit}
-            onChange={(key) => { if (key) setTimeIntervalUnit(key as UsageDurationUnit); }}
+            onChange={(key) => {
+              if (key) setTimeIntervalUnit(key as UsageDurationUnit);
+            }}
             items={Object.values(UsageDurationUnit).map((unit) => ({
               key: unit,
               label: t(`form.unit.${unit}`),
@@ -208,6 +239,10 @@ export function ScheduleForm(props: Props) {
           />
           <p className="text-sm text-default-500">{t('form.timeIntervalNote')}</p>
         </>
+      )}
+
+      {usesOperatingDuration && (
+        <OperatingTrackingNotice resourceId={resourceId} readiness={trackingReadiness} schedule />
       )}
 
       <LabeledSwitch isSelected={enabled} onChange={setEnabled}>

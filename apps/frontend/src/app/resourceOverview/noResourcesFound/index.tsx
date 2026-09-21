@@ -2,15 +2,20 @@ import { Button } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { PackageOpenIcon, RotateCcwIcon } from 'lucide-react';
 
+import { useAuth } from '../../../hooks/useAuth';
+import { CreateResourceButton } from '../createResourceButton';
 import de from './de.json';
 import en from './en.json';
 
 interface Props {
+  hasResources: boolean;
   onClearFilterAndSearch: () => void;
 }
 
 export function NoResourcesFound(props: Props) {
-  const { onClearFilterAndSearch } = props;
+  const { onClearFilterAndSearch, hasResources } = props;
+  const { hasPermission } = useAuth();
+  const canCreateResources = hasPermission('resources.create');
   const { t } = useTranslations({
     de,
     en,
@@ -21,13 +26,27 @@ export function NoResourcesFound(props: Props) {
         <PackageOpenIcon className="w-8 h-8" />
       </div>
       <div className="space-y-1 max-w-md">
-        <h2 className="text-lg font-semibold text-foreground">{t('alert.title')}</h2>
-        <p className="text-sm text-muted">{t('alert.description')}</p>
+        <h2 className="text-lg font-semibold text-foreground">
+          {t(hasResources ? 'alert.title' : 'firstResource.title')}
+        </h2>
+        <p className="text-sm text-muted">
+          {t(
+            hasResources
+              ? 'alert.description'
+              : canCreateResources
+                ? 'firstResource.description'
+                : 'firstResource.noPermission',
+          )}
+        </p>
       </div>
-      <Button variant="primary" onPress={onClearFilterAndSearch}>
-        <RotateCcwIcon className="w-4 h-4" />
-        {t('alert.clear')}
-      </Button>
+      {hasResources ? (
+        <Button variant="primary" onPress={onClearFilterAndSearch}>
+          <RotateCcwIcon className="w-4 h-4" />
+          {t('alert.clear')}
+        </Button>
+      ) : canCreateResources ? (
+        <CreateResourceButton />
+      ) : null}
     </div>
   );
 }

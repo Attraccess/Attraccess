@@ -21,7 +21,7 @@
   "schedules": {
     "empty": "No maintenance schedules yet.",
     "addFirst": "Create your first schedule",
-    "status": { "on": "On", "paused": "Paused" },
+    "status": { "on": "Enabled", "paused": "Paused" },
     "triggerType": {
       "USAGE_HOURS": "Usage hours",
       "USAGE_COUNT": "Usage count",

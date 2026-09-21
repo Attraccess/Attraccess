@@ -4,6 +4,7 @@ import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ResourceGroup } from '@attraccess/database-entities';
 import { CreateResourceGroupDto } from './dto/createGroup.dto';
 import { UpdateResourceGroupDto } from './dto/updateGroup.dto';
+import { VisibleResourcesExistDto } from './dto/visibleResourcesExist.dto';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
 @ApiTags('Resources')
@@ -40,6 +41,17 @@ export class ResourceGroupsController {
   })
   async getAll(@Req() req: AuthenticatedRequest): Promise<ResourceGroup[]> {
     return await this.resourceGroupsService.getMany(this.getVisibilityContext(req));
+  }
+
+  @Get('resources-exist')
+  @Auth()
+  @ApiOperation({
+    summary: 'Check whether any resources belong to visible groups or are ungrouped',
+    operationId: 'resourceGroupsResourcesExist',
+  })
+  @ApiResponse({ status: 200, type: VisibleResourcesExistDto })
+  async resourcesExist(@Req() req: AuthenticatedRequest): Promise<VisibleResourcesExistDto> {
+    return { hasResources: await this.resourceGroupsService.hasVisibleResources(this.getVisibilityContext(req)) };
   }
 
   @Get(':id')
@@ -122,7 +134,10 @@ export class ResourceGroupsController {
     status: 200,
     description: 'The resource group has been successfully deleted.',
   })
-  async deleteOne(@Param('groupId', ParseIntPipe) groupId: number, @Req() req: AuthenticatedRequest): Promise<{ OK: true }> {
+  async deleteOne(
+    @Param('groupId', ParseIntPipe) groupId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<{ OK: true }> {
     await this.resourceGroupsService.deleteOne(groupId, req.user);
 
     return {

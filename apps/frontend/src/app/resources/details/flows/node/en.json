@@ -608,20 +608,6 @@
         }
       },
       "resource": {
-        "activity": {
-          "operating": {
-            "title": "Record operation started",
-            "description": "Records that the resource began operating at the current server time.",
-            "inputs": { "input": "Input" },
-            "outputs": { "output": "Output" }
-          },
-          "idle": {
-            "title": "Record operation stopped",
-            "description": "Records that the resource stopped operating at the current server time.",
-            "inputs": { "input": "Input" },
-            "outputs": { "output": "Output" }
-          }
-        },
         "usage": {
           "end-session": {
             "title": "End active session",
@@ -678,6 +664,18 @@
         },
 
         "activity": {
+          "operating": {
+            "title": "Record operation started",
+            "description": "Records that the resource began operating at the current server time.",
+            "inputs": { "input": "Input" },
+            "outputs": { "output": "Output" }
+          },
+          "idle": {
+            "title": "Record operation stopped",
+            "description": "Records that the resource stopped operating at the current server time.",
+            "inputs": { "input": "Input" },
+            "outputs": { "output": "Output" }
+          },
           "track-activity": {
             "title": "Record activity",
             "description": "Records activity for this resource at the current server time.",

@@ -6,5 +6,5 @@
   "running": "Maschine läuft gerade",
   "idle": "Maschine ist gerade im Leerlauf",
   "provisional": "Live-Werte sind vorläufig.",
-  "unavailable": "Für diese Ressource ist keine Betriebsintervallquelle verfügbar."
+  "unavailable": "Nicht verfügbar"
 }

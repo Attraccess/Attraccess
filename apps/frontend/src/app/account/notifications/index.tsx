@@ -10,6 +10,8 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button } from '../../../components/button';
+import { usePushNotifications } from '../../../hooks/usePushNotifications';
 import { LabeledSwitch } from '../../../components/labeledSwitch';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './en.json';
@@ -29,6 +31,7 @@ function getCategoryPreference(
 export function NotificationPreferencesForm() {
   const { t } = useTranslations({ en, de });
   const queryClient = useQueryClient();
+  const push = usePushNotifications();
   const { success: showSuccess, error: showError } = useToastMessage();
   const { data: license } = useLicenseServiceGetLicenseInformation();
   const hasMaintenance = license?.modules.includes('maintenance') ?? true;
@@ -135,10 +138,12 @@ export function NotificationPreferencesForm() {
   const toggleAll = useCallback(
     (value: boolean) => {
       void runBulkUpdate(
-        categoryGroups.flatMap((g) => g.categories).map((category) => ({
-          category,
-          channelValues: { email: value, push: value, toast: value },
-        })),
+        categoryGroups
+          .flatMap((g) => g.categories)
+          .map((category) => ({
+            category,
+            channelValues: { email: value, push: value, toast: value },
+          })),
       );
     },
     [categoryGroups, runBulkUpdate],
@@ -270,7 +275,33 @@ export function NotificationPreferencesForm() {
         })}
       </div>
 
-      <p className="text-xs text-default-500">{t('description.push')}</p>
+      <div className="flex flex-col items-start gap-2">
+        <p className="text-xs text-default-500">{t('description.push')}</p>
+        {!push.isSupported ? (
+          <p className="text-sm text-default-500">{t('messagesPush.unsupported')}</p>
+        ) : push.permission === 'denied' ? (
+          <p className="text-sm text-default-500">{t('messagesPush.permissionDenied')}</p>
+        ) : (
+          <Button
+            variant="secondary"
+            isPending={push.isBusy}
+            isDisabled={push.isLoadingKey || !push.publicKey}
+            onPress={async () => {
+              try {
+                if (await push.subscribe()) {
+                  showSuccess({ title: t('messagesPush.enabled') });
+                  return;
+                }
+              } catch {
+                // Use the same actionable feedback for rejected and failed subscriptions.
+              }
+              showError({ title: t('messagesPush.errors.subscribeFailed') });
+            }}
+          >
+            {t('messagesPush.enable')}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

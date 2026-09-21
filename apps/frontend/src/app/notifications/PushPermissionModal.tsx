@@ -5,13 +5,38 @@ import { useCallback, useEffect, useState } from 'react';
 import { ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
 import { Button } from '../../components/button';
 import { StandardModal } from '../../components/standardModal';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import en from './permission.en.json';
+import de from './permission.de.json';
+import { useToastMessage } from '../../components/toastProvider';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
 
 const DISMISSED_KEY = 'push-permission-dismissed';
 
-export function PushPermissionModal({ enabled }: { enabled: boolean }) {
+function readDismissal(storage: 'localStorage' | 'sessionStorage', key: string): boolean {
+  try {
+    return window[storage].getItem(key) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function persistDismissal(key: string) {
+  try {
+    localStorage.setItem(key, 'true');
+  } catch {
+    // Storage restrictions must not prevent consent or closing the prompt.
+  }
+}
+
+export function PushPermissionModal({ enabled, userId }: { enabled: boolean; userId?: number }) {
+  const { t } = useTranslations({ en, de });
+  const dismissedKey = `${DISMISSED_KEY}:${userId ?? 'anonymous'}`;
   const push = usePushNotifications();
+  const { error: showError } = useToastMessage();
+  const [failedKey, setFailedKey] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [dismissedKeys, setDismissedKeys] = useState<string[]>([]);
 
   useEffect(() => {
     if (
@@ -20,45 +45,66 @@ export function PushPermissionModal({ enabled }: { enabled: boolean }) {
       push.isLoadingKey ||
       !push.publicKey ||
       push.isSubscribed ||
-      push.isBusy ||
-      sessionStorage.getItem(DISMISSED_KEY) === 'true'
+      dismissedKeys.includes(dismissedKey) ||
+      readDismissal('sessionStorage', DISMISSED_KEY) ||
+      readDismissal('localStorage', dismissedKey)
     ) {
+      setIsOpen(false);
       return;
     }
 
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      setIsOpen(true);
-    }
-  }, [enabled, push.isSupported, push.isLoadingKey, push.publicKey, push.isSubscribed, push.isBusy]);
-
-  const handleAllow = useCallback(async () => {
-    setIsOpen(false);
-    await push.subscribe().catch(() => undefined);
-  }, [push]);
+    setIsOpen(push.permission === 'default' || (failedKey === dismissedKey && push.permission === 'granted'));
+  }, [
+    enabled,
+    push.isSupported,
+    push.isLoadingKey,
+    push.publicKey,
+    push.isSubscribed,
+    failedKey,
+    push.permission,
+    dismissedKey,
+    dismissedKeys,
+  ]);
 
   const handleDismiss = useCallback(() => {
-    sessionStorage.setItem(DISMISSED_KEY, 'true');
+    persistDismissal(dismissedKey);
+    setDismissedKeys((keys) => (keys.includes(dismissedKey) ? keys : [...keys, dismissedKey]));
     setIsOpen(false);
-  }, []);
+  }, [dismissedKey]);
+
+  const handleAllow = useCallback(async () => {
+    try {
+      if (await push.subscribe()) {
+        handleDismiss();
+        return;
+      }
+    } catch {
+      // A browser or server failure is not a decision to dismiss future prompts.
+    }
+    setFailedKey(dismissedKey);
+    showError({ title: t('subscribeFailed') });
+  }, [push, dismissedKey, showError, t, handleDismiss]);
 
   return (
-    <StandardModal isOpen={isOpen} onOpenChange={(open) => { if (!open) handleDismiss(); }}>
+    <StandardModal
+      isOpen={isOpen}
+      onOpenChange={(open) => {
+        if (!open) handleDismiss();
+      }}
+    >
       {({ close: _close }) => (
         <>
-          <ModalHeader>Enable push notifications</ModalHeader>
+          <ModalHeader>{t('title')}</ModalHeader>
           <ModalBody>
-            <p className="text-sm text-default-600">
-              Stay informed about resource sessions, access changes, and other events — even when the app is in the
-              background.
-            </p>
-            <p className="text-sm text-default-600">Would you like to enable push notifications?</p>
+            <p className="text-sm text-default-600">{t('description')}</p>
+            <p className="text-sm text-default-600">{t('question')}</p>
           </ModalBody>
           <ModalFooter>
             <Button variant="ghost" onPress={handleDismiss}>
-              Not now
+              {t('actions.defer')}
             </Button>
             <Button variant="primary" onPress={handleAllow} isPending={push.isBusy}>
-              Allow
+              {t('actions.allow')}
             </Button>
           </ModalFooter>
         </>

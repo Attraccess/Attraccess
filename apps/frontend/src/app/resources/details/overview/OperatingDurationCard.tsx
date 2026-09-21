@@ -5,6 +5,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './operatingDurationCard.de.json';
 import en from './operatingDurationCard.en.json';
 import { useCanViewOperatingDuration, useOperatingDuration } from '../../operatingDuration';
+import { OperatingTrackingNotice, useOperatingTrackingReadinessFromSummary } from '../operating-readiness';
 import { formatDurationMs } from '@attraccess/shared';
 
 interface OperatingDurationCardProps {
@@ -20,6 +21,12 @@ export function OperatingDurationCard({ resourceId, className }: OperatingDurati
   const { t } = useTranslations({ de, en });
   const canView = useCanViewOperatingDuration(resourceId);
   const { data, isLoading } = useOperatingDuration(resourceId, canView);
+
+  const trackingReadiness = useOperatingTrackingReadinessFromSummary(
+    resourceId,
+    canView && data?.operatingDataAvailable === false,
+    data?.operatingDataAvailable,
+  );
 
   if (!canView) return null;
 
@@ -49,7 +56,11 @@ export function OperatingDurationCard({ resourceId, className }: OperatingDurati
             <dd className="font-medium">{formatDuration(data.unattributedOperatingDurationMs, t('unavailable'))}</dd>
           </div>
           {data.isProvisional && <div className="col-span-2 text-warning">{t('provisional')}</div>}
-          {!data.operatingDataAvailable && <div className="col-span-2 text-foreground-500">{t('unavailable')}</div>}
+          {!data.operatingDataAvailable && (
+            <div className="col-span-2">
+              <OperatingTrackingNotice resourceId={resourceId} readiness={trackingReadiness} />
+            </div>
+          )}
         </dl>
       )}
     </FlatSection>
