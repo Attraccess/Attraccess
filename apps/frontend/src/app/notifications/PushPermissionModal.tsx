@@ -5,11 +5,16 @@ import { useCallback, useEffect, useState } from 'react';
 import { ModalBody, ModalFooter, ModalHeader } from '@heroui/react';
 import { Button } from '../../components/button';
 import { StandardModal } from '../../components/standardModal';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import en from './permission.en.json';
+import de from './permission.de.json';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
 
 const DISMISSED_KEY = 'push-permission-dismissed';
 
-export function PushPermissionModal({ enabled }: { enabled: boolean }) {
+export function PushPermissionModal({ enabled, userId }: { enabled: boolean; userId?: number }) {
+  const { t } = useTranslations({ en, de });
+  const dismissedKey = `${DISMISSED_KEY}:${userId ?? 'anonymous'}`;
   const push = usePushNotifications();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -21,44 +26,56 @@ export function PushPermissionModal({ enabled }: { enabled: boolean }) {
       !push.publicKey ||
       push.isSubscribed ||
       push.isBusy ||
-      sessionStorage.getItem(DISMISSED_KEY) === 'true'
+      sessionStorage.getItem(DISMISSED_KEY) === 'true' ||
+      localStorage.getItem(dismissedKey) === 'true'
     ) {
+      setIsOpen(false);
       return;
     }
 
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      setIsOpen(true);
-    }
-  }, [enabled, push.isSupported, push.isLoadingKey, push.publicKey, push.isSubscribed, push.isBusy]);
+    setIsOpen(push.permission === 'default');
+  }, [
+    enabled,
+    push.isSupported,
+    push.isLoadingKey,
+    push.publicKey,
+    push.isSubscribed,
+    push.isBusy,
+    push.permission,
+    dismissedKey,
+  ]);
 
   const handleAllow = useCallback(async () => {
+    localStorage.setItem(dismissedKey, 'true');
     setIsOpen(false);
     await push.subscribe().catch(() => undefined);
-  }, [push]);
+  }, [push, dismissedKey]);
 
   const handleDismiss = useCallback(() => {
-    sessionStorage.setItem(DISMISSED_KEY, 'true');
+    localStorage.setItem(dismissedKey, 'true');
     setIsOpen(false);
-  }, []);
+  }, [dismissedKey]);
 
   return (
-    <StandardModal isOpen={isOpen} onOpenChange={(open) => { if (!open) handleDismiss(); }}>
+    <StandardModal
+      isOpen={isOpen}
+      onOpenChange={(open) => {
+        if (!open) handleDismiss();
+      }}
+    >
       {({ close: _close }) => (
         <>
-          <ModalHeader>Enable push notifications</ModalHeader>
+          <ModalHeader>{t('title')}</ModalHeader>
           <ModalBody>
-            <p className="text-sm text-default-600">
-              Stay informed about resource sessions, access changes, and other events — even when the app is in the
-              background.
-            </p>
-            <p className="text-sm text-default-600">Would you like to enable push notifications?</p>
+            <p className="text-sm text-default-600">{t('description')}</p>
+            <p className="text-sm text-default-600">{t('question')}</p>
           </ModalBody>
           <ModalFooter>
             <Button variant="ghost" onPress={handleDismiss}>
-              Not now
+              {t('actions.defer')}
             </Button>
             <Button variant="primary" onPress={handleAllow} isPending={push.isBusy}>
-              Allow
+              {t('actions.allow')}
             </Button>
           </ModalFooter>
         </>

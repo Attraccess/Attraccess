@@ -5,6 +5,7 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './operatingDurationCard.de.json';
 import en from './operatingDurationCard.en.json';
 import { useCanViewOperatingDuration, useOperatingDuration } from '../../operatingDuration';
+import { OperatingTrackingNotice } from '../operating-readiness';
 import { formatDurationMs } from '@attraccess/shared';
 
 interface OperatingDurationCardProps {
@@ -49,7 +50,11 @@ export function OperatingDurationCard({ resourceId, className }: OperatingDurati
             <dd className="font-medium">{formatDuration(data.unattributedOperatingDurationMs, t('unavailable'))}</dd>
           </div>
           {data.isProvisional && <div className="col-span-2 text-warning">{t('provisional')}</div>}
-          {!data.operatingDataAvailable && <div className="col-span-2 text-foreground-500">{t('unavailable')}</div>}
+          {!data.operatingDataAvailable && (
+            <div className="col-span-2">
+              <OperatingTrackingNotice resourceId={resourceId} readiness="unavailable" />
+            </div>
+          )}
         </dl>
       )}
     </FlatSection>

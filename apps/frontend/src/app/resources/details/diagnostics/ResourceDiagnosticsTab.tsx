@@ -25,6 +25,7 @@ import { Button } from '../../../../components/button';
 import { FlatSection } from '../../../../components/flatSection';
 import { Select } from '../../../../components/select';
 import { AlertStatusIcon } from '../../../../components/AlertStatusIcon';
+import { OperatingTrackingNotice } from '../operating-readiness';
 import en from './en.json';
 import de from './de.json';
 
@@ -57,8 +58,9 @@ export function ResourceDiagnosticsTab() {
 
   const range = useMemo(() => rangeToBounds(rangeDays), [rangeDays]);
 
-  const { data: state, isLoading: isLoadingState } =
-    useResourcesServiceResourceOperatingDiagnosticsGetState({ resourceId });
+  const { data: state, isLoading: isLoadingState } = useResourcesServiceResourceOperatingDiagnosticsGetState({
+    resourceId,
+  });
   const { data: transitions, isLoading: isLoadingTransitions } =
     useResourcesServiceResourceOperatingDiagnosticsGetTransitions({ resourceId, page, limit: PAGE_LIMIT });
   // Unattributed summary rides the shared operating-attribution endpoint (ATT-1025/ATT-1027) —
@@ -95,13 +97,16 @@ export function ResourceDiagnosticsTab() {
           <Spinner size="sm" />
         ) : (
           <div className="flex flex-wrap items-center gap-3">
-            <Chip size="sm" color={state?.state === 'operating' ? 'success' : 'default'} data-testid="diagnostics-state-chip">
+            <Chip
+              size="sm"
+              color={state?.state === 'operating' ? 'success' : 'default'}
+              data-testid="diagnostics-state-chip"
+            >
               {state?.state === 'operating' ? t('state.operating') : t('state.idle')}
             </Chip>
             {state?.openInterval && (
               <span className="text-sm text-muted">
-                {t('state.openSince')}:{' '}
-                <DateTimeDisplay date={new Date(state.openInterval.startTime)} />
+                {t('state.openSince')}: <DateTimeDisplay date={new Date(state.openInterval.startTime)} />
               </span>
             )}
             <span className="text-sm text-muted">
@@ -122,34 +127,27 @@ export function ResourceDiagnosticsTab() {
           <Spinner size="sm" />
         ) : (
           <div className="flex flex-col gap-2" data-testid="diagnostics-data-quality">
-            {!dataQuality?.trackingConfigured && (
-              <Alert status="default">
-                <AlertStatusIcon status="default" />
-                <AlertContent>
-                  <AlertDescription>{t('dataQuality.trackingMissing')}</AlertDescription>
-                </AlertContent>
-              </Alert>
+            {dataQuality?.trackingConfigured === false && (
+              <OperatingTrackingNotice resourceId={resourceId} readiness="missing" />
             )}
-            {(dataQuality?.issues ?? []).length === 0 ? (
-              dataQuality?.trackingConfigured && (
-                <Alert status="success">
-                  <AlertStatusIcon status="success" />
-                  <AlertContent>
-                    <AlertDescription>{t('dataQuality.clean')}</AlertDescription>
-                  </AlertContent>
-                </Alert>
-              )
-            ) : (
-              (dataQuality?.issues ?? []).map((issue) => (
-                <Alert key={issue.kind} status="warning" data-testid={`diagnostics-issue-${issue.kind}`}>
-                  <AlertStatusIcon status="warning" />
-                  <AlertContent>
-                    <AlertTitle>{t(`dataQuality.kinds.${issue.kind}`)}</AlertTitle>
-                    <AlertDescription>{issue.message}</AlertDescription>
-                  </AlertContent>
-                </Alert>
-              ))
-            )}
+            {(dataQuality?.issues ?? []).length === 0
+              ? dataQuality?.trackingConfigured && (
+                  <Alert status="success">
+                    <AlertStatusIcon status="success" />
+                    <AlertContent>
+                      <AlertDescription>{t('dataQuality.clean')}</AlertDescription>
+                    </AlertContent>
+                  </Alert>
+                )
+              : (dataQuality?.issues ?? []).map((issue) => (
+                  <Alert key={issue.kind} status="warning" data-testid={`diagnostics-issue-${issue.kind}`}>
+                    <AlertStatusIcon status="warning" />
+                    <AlertContent>
+                      <AlertTitle>{t(`dataQuality.kinds.${issue.kind}`)}</AlertTitle>
+                      <AlertDescription>{issue.message}</AlertDescription>
+                    </AlertContent>
+                  </Alert>
+                ))}
           </div>
         )}
       </FlatSection>
@@ -197,7 +195,11 @@ export function ResourceDiagnosticsTab() {
                 {formatDuration(unattributed.unattributedOperatingDurationMs, t('unattributed.unavailable'))}
               </p>
             </Card>
-            {unattributed.isProvisional && <Chip size="sm" color="warning">{t('unattributed.provisional')}</Chip>}
+            {unattributed.isProvisional && (
+              <Chip size="sm" color="warning">
+                {t('unattributed.provisional')}
+              </Chip>
+            )}
           </div>
         )}
       </FlatSection>
@@ -230,14 +232,19 @@ export function ResourceDiagnosticsTab() {
                   </AlertTitle>
                   <AlertDescription>
                     {t('verification.recomputed')}: {formatDurationMs(verification.recomputedOperatingDurationMs)} ·{' '}
-                    {t('verification.reported')}: {formatDuration(verification.reportedOperatingDurationMs, t('verification.unavailable'))} ·{' '}
+                    {t('verification.reported')}:{' '}
+                    {formatDuration(verification.reportedOperatingDurationMs, t('verification.unavailable'))} ·{' '}
                     {t('verification.intervalCount')}: {verification.intervalCount}
                   </AlertDescription>
                 </AlertContent>
               </Alert>
               <ul className="flex flex-col gap-1 text-sm">
                 {verification.checks.map((check) => (
-                  <li key={check.name} className="flex items-center gap-2" data-testid={`diagnostics-check-${check.name}`}>
+                  <li
+                    key={check.name}
+                    className="flex items-center gap-2"
+                    data-testid={`diagnostics-check-${check.name}`}
+                  >
                     {check.passed ? (
                       <CheckCircle2Icon size={14} className="text-success" />
                     ) : (

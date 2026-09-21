@@ -59,7 +59,7 @@
     }
   },
   "description": {
-    "push": "Push preferences are saved for your account. Supported browsers are subscribed automatically when you use the app."
+    "push": "Push preferences are saved for your account. Enable notifications separately on each device with your permission."
   },
   "messagesEmailOnOffline": {
     "label": "Email me about messages when I'm offline",
@@ -72,7 +72,9 @@
     "permissionDenied": "Notifications are blocked for this site. Allow them in your browser settings to enable push notifications.",
     "errors": {
       "subscribeFailed": "Could not enable push notifications. Please check your browser notification permissions."
-    }
+    },
+    "enable": "Enable on this device",
+    "enabled": "Push notifications are enabled on this device."
   },
   "toggleAll": {
     "label": "All notifications",

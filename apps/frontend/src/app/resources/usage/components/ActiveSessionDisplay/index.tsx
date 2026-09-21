@@ -1,3 +1,4 @@
+import { recordUsefulAction } from '../../../../../components/DonationPrompt/usefulAction';
 import { useState, useCallback } from 'react';
 import { ButtonGroup, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownPopover } from '@heroui/react';
 import { SessionStatusCard } from '../SessionStatusCard';
@@ -51,6 +52,7 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
 
   const endSession = useResourcesServiceResourceUsageEndSession({
     onSuccess: () => {
+      recordUsefulAction();
       setIsNotesModalOpen(false);
 
       // Invalidate all history queries for this resource (regardless of pagination/user filters)

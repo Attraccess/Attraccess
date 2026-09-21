@@ -1,0 +1,9 @@
+{
+  "title": "Push-Benachrichtigungen aktivieren",
+  "description": "Erhalte Benachrichtigungen über neue Nachrichten, Ressourcennutzungen, Zugriffsänderungen und weitere Ereignisse – auch wenn die App im Hintergrund ist.",
+  "question": "Möchtest du Push-Benachrichtigungen aktivieren? Du kannst die Benachrichtigungseinstellungen in deinem Konto ändern.",
+  "actions": {
+    "defer": "Jetzt nicht",
+    "allow": "Erlauben"
+  }
+}

@@ -121,7 +121,7 @@ export function Layout({ children }: LayoutProps) {
 
         <GlobalMessagingLive enabled={isAuthenticated && !needsTwoFactorSetup} />
         <GlobalSystemNotificationsLive enabled={isAuthenticated && !needsTwoFactorSetup} />
-        <GlobalPushNotifications enabled={isAuthenticated && !needsTwoFactorSetup} />
+        <GlobalPushNotifications enabled={isAuthenticated && !needsTwoFactorSetup} userId={currentUser?.id} />
 
         {/* Page Content */}
         <main className="flex-1 min-h-0 overflow-auto p-4 md:p-6 lg:p-8 bg-background app-scroll-container">

@@ -11,6 +11,8 @@ const getDataQuality = vi.fn();
 const verifyTimeline = vi.fn();
 const useOperatingDurationMock = vi.fn();
 
+vi.mock('../../../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: () => true }) }));
+
 vi.mock('react-router-dom', () => ({ useParams: () => ({ id: '11' }) }));
 vi.mock('@attraccess/react-query-client', () => ({
   useResourcesServiceResourceOperatingDiagnosticsGetState: (...args: unknown[]) => getState(...args),
@@ -87,7 +89,11 @@ describe('ResourceDiagnosticsTab', () => {
     render(<ResourceDiagnosticsTab />);
 
     // The summary comes from the shared operating-attribution endpoint (single derivation path).
-    expect(useOperatingDurationMock).toHaveBeenCalledWith(11, true, expect.objectContaining({ start: expect.any(Date), end: expect.any(Date) }));
+    expect(useOperatingDurationMock).toHaveBeenCalledWith(
+      11,
+      true,
+      expect.objectContaining({ start: expect.any(Date), end: expect.any(Date) }),
+    );
     expect(screen.getByTestId('diagnostics-operating-duration')).toHaveTextContent('2:00:00');
     expect(screen.getByTestId('diagnostics-attributed-duration')).toHaveTextContent('1:30:00');
     expect(screen.getByTestId('diagnostics-unattributed-duration')).toHaveTextContent('0:30:00');
@@ -113,6 +119,16 @@ describe('ResourceDiagnosticsTab', () => {
       'No operating data has ever been recorded for this resource — durations are unavailable, not zero.',
     );
     expect(screen.queryByTestId('diagnostics-operating-duration')).not.toBeInTheDocument();
+  });
+
+  it('offers authorized administrators a direct setup action when tracking is missing', () => {
+    getDataQuality.mockReturnValue({ data: { trackingConfigured: false, issues: [] }, isLoading: false });
+    render(<ResourceDiagnosticsTab />);
+    expect(screen.getByRole('link', { name: 'Set up operating/idle signals' })).toHaveAttribute(
+      'href',
+      '/resources/11/flows',
+    );
+    expect(screen.getByText(/Configure operating and idle signals in Flows/)).toBeInTheDocument();
   });
 
   it('renders the derived transition history', () => {

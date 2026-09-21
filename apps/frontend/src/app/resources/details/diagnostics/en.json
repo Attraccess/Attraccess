@@ -29,7 +29,6 @@
     "title": "Data quality",
     "clean": "No data-quality issues found in the scanned window.",
     "trackingConfigured": "Operating tracking is configured for this resource.",
-    "trackingMissing": "No operating/idle flow nodes are configured — the timeline stays empty until tracking is set up.",
     "kinds": {
       "stale-signal": "Tracking configured but no signal recently",
       "overlapping-intervals": "Overlapping intervals (duplicate or out-of-order transitions)",

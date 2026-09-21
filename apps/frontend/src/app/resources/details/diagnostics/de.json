@@ -29,7 +29,6 @@
     "title": "Datenqualität",
     "clean": "Keine Datenqualitätsprobleme im untersuchten Zeitraum gefunden.",
     "trackingConfigured": "Die Betriebserfassung ist für diese Ressource konfiguriert.",
-    "trackingMissing": "Keine Betriebs-/Inaktiv-Flowknoten konfiguriert — die Zeitleiste bleibt leer, bis die Erfassung eingerichtet ist.",
     "kinds": {
       "stale-signal": "Erfassung konfiguriert, aber kürzlich kein Signal",
       "overlapping-intervals": "Überlappende Intervalle (doppelte oder ungeordnete Übergänge)",

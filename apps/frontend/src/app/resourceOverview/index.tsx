@@ -83,6 +83,16 @@ export function ResourceOverview() {
     limit: 1, // We only need to check if any resources exist
   });
 
+  // Default permission filters can hide every resource, so check the unfiltered
+  // list before offering first-resource setup instead of filter recovery.
+  const { data: unfilteredResources } = useResourcesServiceGetAllResources(
+    { page: 1, limit: 1, onlyInUseByMe: false, onlyWithPermissions: false },
+    undefined,
+    { enabled: allResources?.data.length === 0 },
+  );
+  const hasResources = Boolean(unfilteredResources?.data.length);
+  const showEmptyState = !isLoadingAllResources && allResources?.data.length === 0 && !!unfilteredResources;
+
   return (
     <div>
       <Toolbar
@@ -94,15 +104,16 @@ export function ResourceOverview() {
         onOnlyWithPermissionsChanged={setFilterByOnlyWithPermissions}
         hideEmptyResourceGroups={filterByHideEmptyResourceGroups}
         onHideEmptyResourceGroupsChanged={setFilterByHideEmptyResourceGroups}
-        highlightSearch={allResources?.data.length === 0}
-        highlightFilter={allResources?.data.length === 0}
+        highlightSearch={showEmptyState && hasResources}
+        highlightFilter={showEmptyState && hasResources}
       />
 
       <ActiveUsageSessionsBanner onShowMySessions={() => setFilterByOnlyInUseByMe(true)} />
 
       <div className="flex flex-row flex-wrap gap-4">
-        {!isLoadingAllResources && allResources?.data.length === 0 && (
+        {showEmptyState && (
           <NoResourcesFound
+            hasResources={hasResources}
             onClearFilterAndSearch={() => {
               setFilterByOnlyInUseByMe(false);
               setFilterByOnlyWithPermissions(false);
