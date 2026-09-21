@@ -1,4 +1,4 @@
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import {
   useResourcesServiceResourceGroupsGetMany,
   ResourcesService,
@@ -98,26 +98,15 @@ export function ResourceOverview() {
   });
   const noMatchingResources = groups !== undefined && matchingResources.every((query) => query.data?.data.length === 0);
 
-  // Default permission filters can hide every visible resource. Only when no
-  // cards match, check those same groups without the user's search/filters.
-  const unfilteredResources = useQueries({
-    queries: groupIds.map((groupId) => {
-      const params = {
-        groupId: groupId === 'none' ? -1 : groupId,
-        onlyInUseByMe: false,
-        onlyWithPermissions: false,
-        page: 1,
-        limit: 1,
-      };
-      return {
-        queryKey: UseResourcesServiceGetAllResourcesKeyFn(params),
-        queryFn: () => ResourcesService.getAllResources(params),
-        enabled: noMatchingResources,
-      };
-    }),
+  // One server-side visibility check replaces per-group unfiltered probes.
+  // Keep it under the resource-list prefix so resource mutations invalidate it.
+  const { data: unfilteredResources } = useQuery({
+    queryKey: UseResourcesServiceGetAllResourcesKeyFn({}, ['visible-existence', groupIds]),
+    queryFn: () => ResourcesService.resourceGroupsResourcesExist(),
+    enabled: noMatchingResources,
   });
-  const hasResources = unfilteredResources.some((query) => Boolean(query.data?.data.length));
-  const showEmptyState = noMatchingResources && unfilteredResources.every((query) => query.data !== undefined);
+  const hasResources = unfilteredResources?.hasResources ?? false;
+  const showEmptyState = noMatchingResources && unfilteredResources !== undefined;
 
   return (
     <div>
