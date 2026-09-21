@@ -198,6 +198,7 @@ export function PluginsSection() {
   const [permissionApproved, setPermissionApproved] = useState(false);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const [isReplacing, setIsReplacing] = useState(false);
+  const [isCheckingForUpdates, setIsCheckingForUpdates] = useState(false);
   const [npmPluginNames, setNpmPluginNames] = useState<Set<string>>(new Set());
   const [installedNpmPlugins, setInstalledNpmPlugins] = useState<Map<string, InstalledNpmPlugin>>(new Map());
   const [isMarketplaceOpen, setIsMarketplaceOpen] = useState(false);
@@ -528,6 +529,28 @@ export function PluginsSection() {
     }
   };
 
+  const checkForUpdates = async () => {
+    setIsCheckingForUpdates(true);
+    try {
+      const response = await fetch(`${getBaseUrl()}/api/plugins/installed/check`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error();
+      const installed = (await response.json()) as InstalledNpmPlugin[];
+      setInstalledNpmPlugins(new Map(installed.map((plugin) => [plugin.name, plugin] as const)));
+      toast.success({ title: t('updatePolicy.checked') });
+    } catch {
+      toast.error({ title: t('updatePolicy.checkError') });
+    } finally {
+      setIsCheckingForUpdates(false);
+    }
+  };
+
+  const availableUpdates = [...installedNpmPlugins.values()].filter(
+    (plugin) => plugin.updateCheck?.state === 'available',
+  );
+
   const aside = (
     <div className="flex flex-col gap-2">
       <h3 className="text-sm font-semibold text-foreground">{t('aside.title')}</h3>
@@ -552,7 +575,36 @@ export function PluginsSection() {
             </AlertContent>
           </Alert>
         ) : null}
-        <div className="flex justify-end">
+        {availableUpdates.length > 0 ? (
+          <Alert status="warning" data-cy="plugins-list-updates-available">
+            <AlertContent>
+              <AlertTitle>{t('updatePolicy.availableTitle')}</AlertTitle>
+              <AlertDescription>
+                {t('updatePolicy.availableDescription', { count: String(availableUpdates.length) })}
+              </AlertDescription>
+              <Button
+                className="mt-2"
+                variant="secondary"
+                size="sm"
+                onPress={() => void openVersionManagement(availableUpdates[0])}
+              >
+                {t('updatePolicy.reviewUpdates')}
+              </Button>
+            </AlertContent>
+          </Alert>
+        ) : null}
+        <div className="flex flex-wrap justify-end gap-2">
+          {installedNpmPlugins.size > 0 ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onPress={() => void checkForUpdates()}
+              isPending={isCheckingForUpdates}
+              data-cy="plugins-list-check-updates-button"
+            >
+              {t('updatePolicy.checkNow')}
+            </Button>
+          ) : null}
           <Dropdown>
             <DropdownTrigger
               className={`${buttonVariants({ variant: 'primary', size: 'sm' })} !inline-flex items-center gap-2`}
@@ -807,10 +859,18 @@ export function PluginsSection() {
                 {marketplacePlugin ? (
                   <MarketplacePluginDetails
                     plugin={marketplacePlugin}
-                    isInstalled={npmPluginNames.has(marketplacePlugin.name)}
+                    installedPlugin={installedNpmPlugins.get(marketplacePlugin.name)}
                     onInstall={() => {
                       setInstallApproved(false);
                       setPluginToInstall(marketplacePlugin);
+                    }}
+                    onManageVersion={() => {
+                      setIsMarketplaceOpen(false);
+                      void openVersionManagement({
+                        name: marketplacePlugin.name,
+                        version:
+                          installedNpmPlugins.get(marketplacePlugin.name)?.version ?? marketplacePlugin.version ?? '',
+                      });
                     }}
                     t={t}
                   />
@@ -1221,15 +1281,18 @@ function MarketplaceDetail({ label, value }: { label: string; value: string }) {
 
 function MarketplacePluginDetails({
   plugin,
-  isInstalled,
+  installedPlugin,
   onInstall,
+  onManageVersion,
   t,
 }: {
   plugin: MarketplacePlugin;
-  isInstalled: boolean;
+  installedPlugin?: InstalledNpmPlugin;
   onInstall: () => void;
+  onManageVersion: () => void;
   t: (key: string, values?: Record<string, string>) => string;
 }) {
+  const isInstalled = installedPlugin !== undefined;
   return (
     <div className="mx-auto grid w-full max-w-6xl items-start gap-6 py-2 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <Card>
@@ -1287,8 +1350,10 @@ function MarketplacePluginDetails({
         <Card.Header>
           <div className="flex flex-col gap-2">
             <PluginClassificationBadge classification={plugin.classification} />
-            <Card.Title>{t('marketplace.install')}</Card.Title>
-            <Card.Description>{t('marketplace.installDescription')}</Card.Description>
+            <Card.Title>{isInstalled ? t('marketplace.update') : t('marketplace.install')}</Card.Title>
+            <Card.Description>
+              {isInstalled ? t('marketplace.updateDescription') : t('marketplace.installDescription')}
+            </Card.Description>
           </div>
         </Card.Header>
         <Card.Content className="flex flex-col gap-4">
@@ -1313,8 +1378,13 @@ function MarketplacePluginDetails({
           </p>
         </Card.Content>
         <Card.Footer>
-          <Button variant="primary" fullWidth isDisabled={!plugin.installable || isInstalled} onPress={onInstall}>
-            {isInstalled ? t('marketplace.installed') : t('marketplace.install')}
+          <Button
+            variant="primary"
+            fullWidth
+            isDisabled={!isInstalled && !plugin.installable}
+            onPress={isInstalled ? onManageVersion : onInstall}
+          >
+            {isInstalled ? t('manageVersion') : t('marketplace.install')}
           </Button>
         </Card.Footer>
       </Card>

@@ -44,6 +44,8 @@
     "safetyWarning": "Review the source and requested permissions before installing.",
     "details": "Details",
     "installed": "Installed",
+    "update": "Update plugin",
+    "updateDescription": "Review compatible published versions and update this installed marketplace plugin.",
     "install": "Install",
     "noResults": "No packages found. Incompatible packages remain visible with the reason they cannot be installed.",
     "loadError": "Could not load the marketplace.",
@@ -123,6 +125,9 @@
     "saved": "Update policy saved",
     "saveError": "Could not save update policy",
     "available": "Update available",
+    "availableTitle": "Plugin updates are available",
+    "availableDescription": "{{count}} installed marketplace plugin can be updated. Review the available version before applying it.",
+    "reviewUpdates": "Review updates",
     "modes": { "off": "Off", "patch": "Patch only", "minor": "Patch and minor", "follow": "Follow package policy" }
   },
   "deleteTooltip": "Remove plugin",

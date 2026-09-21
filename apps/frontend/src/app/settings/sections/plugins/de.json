@@ -44,6 +44,8 @@
     "safetyWarning": "Überprüfen Sie die Quelle und die angeforderten Berechtigungen vor der Installation.",
     "details": "Details",
     "installed": "Installiert",
+    "update": "Plugin aktualisieren",
+    "updateDescription": "Prüfe kompatible veröffentlichte Versionen und aktualisiere dieses installierte Marketplace-Plugin.",
     "install": "Installieren",
     "noResults": "Keine Pakete gefunden. Inkompatible Pakete bleiben mit dem Grund sichtbar.",
     "loadError": "Der Marktplatz konnte nicht geladen werden.",
@@ -123,6 +125,9 @@
     "saved": "Update-Regel gespeichert",
     "saveError": "Update-Regel konnte nicht gespeichert werden",
     "available": "Update verfügbar",
+    "availableTitle": "Plugin-Updates sind verfügbar",
+    "availableDescription": "{{count}} installiertes Marketplace-Plugin kann aktualisiert werden. Prüfe die verfügbare Version vor der Installation.",
+    "reviewUpdates": "Updates prüfen",
     "modes": { "off": "Aus", "patch": "Nur Patches", "minor": "Patches und Minor", "follow": "Paketregel folgen" }
   },
   "deleteTooltip": "Plugin entfernen",

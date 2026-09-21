@@ -127,6 +127,64 @@ describe('PluginsSection', () => {
     expect(screen.getByText('Actions')).toBeInTheDocument();
   });
 
+  it('checks marketplace plugins for updates and takes the admin to the in-place update flow', async () => {
+    hoisted.plugins = [makePlugin()];
+    const installed = {
+      name: 'Cool Plugin',
+      version: '1.2.3',
+      registryId: 'npm',
+      registryUrl: 'https://registry.npmjs.org',
+      classification: 'community',
+      classificationReason: 'Marketplace package',
+      requestedSpec: 'latest',
+      updateOverride: 'inherit',
+    };
+    const checked = {
+      ...installed,
+      updateCheck: {
+        checkedAt: '2026-09-21T12:00:00.000Z',
+        candidate: '1.2.4',
+        state: 'available',
+        error: null,
+      },
+    };
+    const fetchMock = vi.fn((input: { url?: string } | string, _init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : (input.url ?? '');
+      if (url.endsWith('/api/plugins/installed/check'))
+        return Promise.resolve({ ok: true, json: async () => [checked] });
+      if (url.endsWith('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [installed] });
+      if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+      if (url.endsWith('/api/plugins/installed/Cool%20Plugin/versions'))
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { version: '1.2.3', direction: 'current', compatible: true },
+            { version: '1.2.4', direction: 'newer', compatible: true },
+          ],
+        });
+      return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+
+    await user.click(await screen.findByRole('button', { name: 'Check all now' }));
+    expect(await screen.findByText('Plugin updates are available')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        '1 installed marketplace plugin can be updated. Review the available version before applying it.',
+      ),
+    ).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/plugins/installed/check'),
+      expect.objectContaining({ method: 'POST' }),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Review updates' }));
+    expect(await screen.findByRole('heading', { name: 'Manage Cool Plugin version' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '1.2.4 Newer' })).toBeInTheDocument();
+  });
+
   async function openMarketplace(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByRole('button', { name: 'Install plugin' }));
     await user.click(screen.getByText('Browse marketplace'));
