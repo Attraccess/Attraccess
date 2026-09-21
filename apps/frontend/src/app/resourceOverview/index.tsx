@@ -1,6 +1,8 @@
+import { useQueries } from '@tanstack/react-query';
 import {
   useResourcesServiceResourceGroupsGetMany,
-  useResourcesServiceGetAllResources,
+  ResourcesService,
+  UseResourcesServiceGetAllResourcesKeyFn,
 } from '@attraccess/react-query-client';
 import { Toolbar } from './toolbar/toolbar';
 import { ResourceGroupCard } from './resourceGroupCard';
@@ -74,24 +76,48 @@ export function ResourceOverview() {
     return ids;
   }, [groups]);
 
-  // Check if there are any resources matching the current filters across all groups
-  const { data: allResources, isLoading: isLoadingAllResources } = useResourcesServiceGetAllResources({
-    search: debouncedSearchValue?.trim() || undefined,
-    onlyInUseByMe: filterByOnlyInUseByMe,
-    onlyWithPermissions: filterByOnlyWithPermissions,
-    page: 1,
-    limit: 1, // We only need to check if any resources exist
+  // Match the cards' visible group scope; a global resource query can include
+  // resources belonging only to hidden groups that this user cannot see.
+  const matchingResources = useQueries({
+    queries: groupIds.map((groupId) => {
+      const params = {
+        groupId: groupId === 'none' ? -1 : groupId,
+        search: debouncedSearchValue?.trim() || undefined,
+        onlyInUseByMe: filterByOnlyInUseByMe,
+        onlyWithPermissions: filterByOnlyWithPermissions,
+        page: 1,
+        // Share the first-page query with ResourceGroupCard instead of fetching twice.
+        limit: 10,
+      };
+      return {
+        queryKey: UseResourcesServiceGetAllResourcesKeyFn(params),
+        queryFn: () => ResourcesService.getAllResources(params),
+        enabled: groups !== undefined,
+      };
+    }),
   });
+  const noMatchingResources = groups !== undefined && matchingResources.every((query) => query.data?.data.length === 0);
 
-  // Default permission filters can hide every resource, so check the unfiltered
-  // list before offering first-resource setup instead of filter recovery.
-  const { data: unfilteredResources } = useResourcesServiceGetAllResources(
-    { page: 1, limit: 1, onlyInUseByMe: false, onlyWithPermissions: false },
-    undefined,
-    { enabled: allResources?.data.length === 0 },
-  );
-  const hasResources = Boolean(unfilteredResources?.data.length);
-  const showEmptyState = !isLoadingAllResources && allResources?.data.length === 0 && !!unfilteredResources;
+  // Default permission filters can hide every visible resource. Only when no
+  // cards match, check those same groups without the user's search/filters.
+  const unfilteredResources = useQueries({
+    queries: groupIds.map((groupId) => {
+      const params = {
+        groupId: groupId === 'none' ? -1 : groupId,
+        onlyInUseByMe: false,
+        onlyWithPermissions: false,
+        page: 1,
+        limit: 1,
+      };
+      return {
+        queryKey: UseResourcesServiceGetAllResourcesKeyFn(params),
+        queryFn: () => ResourcesService.getAllResources(params),
+        enabled: noMatchingResources,
+      };
+    }),
+  });
+  const hasResources = unfilteredResources.some((query) => Boolean(query.data?.data.length));
+  const showEmptyState = noMatchingResources && unfilteredResources.every((query) => query.data !== undefined);
 
   return (
     <div>

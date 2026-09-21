@@ -17,13 +17,22 @@ export function operatingTrackingReadiness(
   return operatingDataAvailable === true ? 'available' : 'unknown';
 }
 
-export function useOperatingTrackingReadiness(resourceId: number, enabled: boolean) {
+export function useOperatingTrackingReadinessFromSummary(
+  resourceId: number,
+  enabled: boolean,
+  operatingDataAvailable: boolean | undefined,
+) {
   const { hasPermission } = useAuth();
-  const { data: summary } = useOperatingDuration(resourceId, enabled);
+  const canConfigure = hasPermission('resources.update');
   const { data: quality } = useResourcesServiceResourceOperatingDiagnosticsGetDataQuality({ resourceId }, undefined, {
-    enabled: enabled && hasPermission('resources.update'),
+    enabled: enabled && canConfigure,
   });
-  return operatingTrackingReadiness(summary?.operatingDataAvailable, quality?.trackingConfigured);
+  return operatingTrackingReadiness(operatingDataAvailable, canConfigure ? quality?.trackingConfigured : undefined);
+}
+
+export function useOperatingTrackingReadiness(resourceId: number, enabled: boolean) {
+  const { data: summary } = useOperatingDuration(resourceId, enabled);
+  return useOperatingTrackingReadinessFromSummary(resourceId, enabled, summary?.operatingDataAvailable);
 }
 
 export function OperatingTrackingStatus({ readiness }: { readiness: OperatingTrackingReadiness }) {
