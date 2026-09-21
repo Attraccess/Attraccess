@@ -8,15 +8,35 @@ import { StandardModal } from '../../components/standardModal';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './permission.en.json';
 import de from './permission.de.json';
+import { useToastMessage } from '../../components/toastProvider';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
 
 const DISMISSED_KEY = 'push-permission-dismissed';
+
+function readDismissal(storage: 'localStorage' | 'sessionStorage', key: string): boolean {
+  try {
+    return window[storage].getItem(key) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function persistDismissal(key: string) {
+  try {
+    localStorage.setItem(key, 'true');
+  } catch {
+    // Storage restrictions must not prevent consent or closing the prompt.
+  }
+}
 
 export function PushPermissionModal({ enabled, userId }: { enabled: boolean; userId?: number }) {
   const { t } = useTranslations({ en, de });
   const dismissedKey = `${DISMISSED_KEY}:${userId ?? 'anonymous'}`;
   const push = usePushNotifications();
+  const { error: showError } = useToastMessage();
+  const [failedKey, setFailedKey] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [dismissedKeys, setDismissedKeys] = useState<string[]>([]);
 
   useEffect(() => {
     if (
@@ -25,36 +45,45 @@ export function PushPermissionModal({ enabled, userId }: { enabled: boolean; use
       push.isLoadingKey ||
       !push.publicKey ||
       push.isSubscribed ||
-      push.isBusy ||
-      sessionStorage.getItem(DISMISSED_KEY) === 'true' ||
-      localStorage.getItem(dismissedKey) === 'true'
+      dismissedKeys.includes(dismissedKey) ||
+      readDismissal('sessionStorage', DISMISSED_KEY) ||
+      readDismissal('localStorage', dismissedKey)
     ) {
       setIsOpen(false);
       return;
     }
 
-    setIsOpen(push.permission === 'default');
+    setIsOpen(push.permission === 'default' || (failedKey === dismissedKey && push.permission === 'granted'));
   }, [
     enabled,
     push.isSupported,
     push.isLoadingKey,
     push.publicKey,
     push.isSubscribed,
-    push.isBusy,
+    failedKey,
     push.permission,
     dismissedKey,
+    dismissedKeys,
   ]);
 
-  const handleAllow = useCallback(async () => {
-    localStorage.setItem(dismissedKey, 'true');
-    setIsOpen(false);
-    await push.subscribe().catch(() => undefined);
-  }, [push, dismissedKey]);
-
   const handleDismiss = useCallback(() => {
-    localStorage.setItem(dismissedKey, 'true');
+    persistDismissal(dismissedKey);
+    setDismissedKeys((keys) => (keys.includes(dismissedKey) ? keys : [...keys, dismissedKey]));
     setIsOpen(false);
   }, [dismissedKey]);
+
+  const handleAllow = useCallback(async () => {
+    try {
+      if (await push.subscribe()) {
+        handleDismiss();
+        return;
+      }
+    } catch {
+      // A browser or server failure is not a decision to dismiss future prompts.
+    }
+    setFailedKey(dismissedKey);
+    showError({ title: t('subscribeFailed') });
+  }, [push, dismissedKey, showError, t, handleDismiss]);
 
   return (
     <StandardModal

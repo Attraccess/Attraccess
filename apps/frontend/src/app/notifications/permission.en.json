@@ -5,5 +5,6 @@
   "actions": {
     "defer": "Not now",
     "allow": "Allow"
-  }
+  },
+  "subscribeFailed": "Could not enable push notifications. Try again, or check your browser notification settings and enable this device in your account."
 }

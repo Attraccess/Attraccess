@@ -1,12 +1,13 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { GlobalPushNotifications } from './GlobalPushNotifications';
 import { TestWrapper } from '../../test-utils/wrappers';
 
 const hoisted = vi.hoisted(() => ({
   subscribe: vi.fn(),
+  errorToast: vi.fn(),
   pushState: {
     isSupported: true,
     isLoadingKey: false,
@@ -17,6 +18,11 @@ const hoisted = vi.hoisted(() => ({
   },
 }));
 
+vi.mock('../../components/toastProvider', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../components/toastProvider')>();
+  return { ...actual, useToastMessage: () => ({ error: hoisted.errorToast }) };
+});
+
 vi.mock('../../hooks/usePushNotifications', () => ({
   usePushNotifications: () => ({
     ...hoisted.pushState,
@@ -25,8 +31,10 @@ vi.mock('../../hooks/usePushNotifications', () => ({
 }));
 
 describe('GlobalPushNotifications', () => {
+  afterEach(() => vi.restoreAllMocks());
   beforeEach(() => {
     hoisted.subscribe.mockReset().mockResolvedValue(true);
+    hoisted.errorToast.mockReset();
     hoisted.pushState.isSupported = true;
     hoisted.pushState.isLoadingKey = false;
     hoisted.pushState.publicKey = 'AQID';
@@ -63,6 +71,7 @@ describe('GlobalPushNotifications', () => {
     await userEvent.click(screen.getByText('Allow'));
 
     await waitFor(() => expect(hoisted.subscribe).toHaveBeenCalledTimes(1));
+    expect(localStorage.getItem('push-permission-dismissed:anonymous')).toBe('true');
   });
 
   it('does not show the modal when browser push is unsupported', () => {
@@ -139,5 +148,58 @@ describe('GlobalPushNotifications', () => {
       wrapper: ({ children }) => <TestWrapper initialRoute="/messages">{children}</TestWrapper>,
     });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+  it.each(['native-dismissal', 'subscription-error', 'granted-registration-error'])(
+    'keeps retry available after %s without recording dismissal',
+    async (failure) => {
+      if (failure === 'native-dismissal') hoisted.subscribe.mockResolvedValueOnce(false);
+      else
+        hoisted.subscribe.mockImplementationOnce(async () => {
+          if (failure === 'granted-registration-error') hoisted.pushState.permission = 'granted';
+          throw new Error('Push registration failed');
+        });
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <TestWrapper initialRoute="/messages">{children}</TestWrapper>
+      );
+      const first = render(<GlobalPushNotifications enabled userId={1} />, { wrapper });
+      await userEvent.click(await screen.findByRole('button', { name: 'Allow' }));
+      await waitFor(() =>
+        expect(hoisted.errorToast).toHaveBeenCalledWith({
+          title:
+            'Could not enable push notifications. Try again, or check your browser notification settings and enable this device in your account.',
+        }),
+      );
+      expect(localStorage.getItem('push-permission-dismissed:1')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Allow' })).toBeInTheDocument();
+      if (failure !== 'granted-registration-error') {
+        first.unmount();
+        render(<GlobalPushNotifications enabled userId={1} />, { wrapper });
+      }
+      await userEvent.click(await screen.findByRole('button', { name: 'Allow' }));
+      expect(hoisted.subscribe).toHaveBeenCalledTimes(2);
+      expect(localStorage.getItem('push-permission-dismissed:1')).toBe('true');
+    },
+  );
+  it.each(['Allow', 'Not now'])('still handles %s when browser storage is blocked', async (action) => {
+    const getItem = Storage.prototype.getItem;
+    const setItem = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (key) {
+      if (key.startsWith('push-permission-dismissed')) throw new Error('Storage blocked');
+      return getItem.call(this, key);
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (key, value) {
+      if (key.startsWith('push-permission-dismissed')) throw new Error('Storage blocked');
+      return setItem.call(this, key, value);
+    });
+    const view = render(<GlobalPushNotifications enabled userId={1} />, {
+      wrapper: ({ children }) => <TestWrapper initialRoute="/messages">{children}</TestWrapper>,
+    });
+    await userEvent.click(await screen.findByRole('button', { name: action }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    view.rerender(<GlobalPushNotifications enabled={false} userId={1} />);
+    view.rerender(<GlobalPushNotifications enabled userId={1} />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(hoisted.subscribe).toHaveBeenCalledTimes(action === 'Allow' ? 1 : 0);
+    expect(hoisted.errorToast).not.toHaveBeenCalled();
   });
 });

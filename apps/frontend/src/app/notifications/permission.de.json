@@ -5,5 +5,6 @@
   "actions": {
     "defer": "Jetzt nicht",
     "allow": "Erlauben"
-  }
+  },
+  "subscribeFailed": "Push-Benachrichtigungen konnten nicht aktiviert werden. Versuche es erneut oder prüfe die Benachrichtigungseinstellungen deines Browsers und aktiviere dieses Gerät in deinem Konto."
 }
