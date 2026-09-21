@@ -8,6 +8,12 @@ import {
 } from '@attraccess/react-query-client';
 
 const SERVICE_WORKER_READY_TIMEOUT_MS = 3000;
+const PUSH_STATE_CHANGED_EVENT = 'attraccess:push-state-changed';
+type BrowserPushState = { permission: NotificationPermission; isSubscribed: boolean };
+
+function announceBrowserPushState(state: BrowserPushState) {
+  window.dispatchEvent(new CustomEvent<BrowserPushState>(PUSH_STATE_CHANGED_EVENT, { detail: state }));
+}
 
 // The VAPID public key arrives base64url-encoded; PushManager.subscribe expects a Uint8Array.
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
@@ -42,7 +48,11 @@ async function getServiceWorkerRegistration(waitForReady = false): Promise<Servi
 
 export function usePushNotifications() {
   const isSupported = useMemo(
-    () => typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window,
+    () =>
+      typeof window !== 'undefined' &&
+      'serviceWorker' in navigator &&
+      'PushManager' in window &&
+      'Notification' in window,
     [],
   );
 
@@ -58,23 +68,33 @@ export function usePushNotifications() {
   const { mutateAsync: upsertSubscription } = usePushServicePushUpsertSubscription();
   const { mutateAsync: deleteSubscription } = usePushServicePushDeleteSubscription();
 
-  // Reflect the current browser subscription state on mount.
+  // Share browser state across the global prompt and account settings. This does
+  // not assert that an existing browser subscription is registered to the current account.
   useEffect(() => {
     if (!isSupported) {
       return;
     }
 
     let cancelled = false;
+    let receivedUpdate = false;
+    const onStateChanged = (event: Event) => {
+      receivedUpdate = true;
+      const state = (event as CustomEvent<BrowserPushState>).detail;
+      setPermission(state.permission);
+      setIsSubscribed(state.isSubscribed);
+    };
+    window.addEventListener(PUSH_STATE_CHANGED_EVENT, onStateChanged);
     (async () => {
       const registration = await getServiceWorkerRegistration();
       const subscription = await registration?.pushManager.getSubscription();
-      if (!cancelled) {
+      if (!cancelled && !receivedUpdate) {
         setIsSubscribed(Boolean(subscription));
       }
     })();
 
     return () => {
       cancelled = true;
+      window.removeEventListener(PUSH_STATE_CHANGED_EVENT, onStateChanged);
     };
   }, [isSupported]);
 
@@ -116,7 +136,7 @@ export function usePushNotifications() {
         },
       });
 
-      setIsSubscribed(true);
+      announceBrowserPushState({ permission: currentPermission, isSubscribed: true });
       return true;
     } finally {
       setIsBusy(false);
@@ -136,7 +156,7 @@ export function usePushNotifications() {
         await deleteSubscription({ endpoint: subscription.endpoint });
         await subscription.unsubscribe();
       }
-      setIsSubscribed(false);
+      announceBrowserPushState({ permission: Notification.permission, isSubscribed: false });
     } finally {
       setIsBusy(false);
     }

@@ -101,4 +101,98 @@ describe('usePushNotifications', () => {
     expect(result.current.isBusy).toBe(false);
     expect(upsertSubscription).not.toHaveBeenCalled();
   });
+  it('updates the mounted global hook only after account enrollment succeeds, and shares unsubscribe', async () => {
+    const subscription = {
+      endpoint: 'https://push.example/subscription',
+      toJSON: () => ({
+        endpoint: 'https://push.example/subscription',
+        keys: { p256dh: 'p256dh-key', auth: 'auth-secret' },
+      }),
+      unsubscribe: vi.fn().mockResolvedValue(true),
+    };
+    let browserSubscription: typeof subscription | null = null;
+    const registration = {
+      pushManager: {
+        getSubscription: vi.fn(async () => browserSubscription),
+        subscribe: vi.fn(async () => {
+          browserSubscription = subscription;
+          return subscription;
+        }),
+      },
+    };
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: { getRegistration: vi.fn().mockResolvedValue(registration) },
+    });
+    const { result } = renderHook(
+      () => ({
+        global: usePushNotifications(),
+        account: usePushNotifications(),
+      }),
+      { wrapper },
+    );
+    await act(async () => undefined);
+    expect(result.current.global.permission).toBe('default');
+    expect(result.current.global.isSubscribed).toBe(false);
+    expect(upsertSubscription).not.toHaveBeenCalled();
+
+    upsertSubscription.mockRejectedValueOnce(new Error('Server enrollment failed'));
+    await act(async () => {
+      await expect(result.current.account.subscribe()).rejects.toThrow('Server enrollment failed');
+    });
+    expect(result.current.global.isSubscribed).toBe(false);
+
+    await act(async () => {
+      await expect(result.current.account.subscribe()).resolves.toBe(true);
+    });
+    expect(result.current.global.permission).toBe('granted');
+    expect(result.current.global.isSubscribed).toBe(true);
+    expect(result.current.account.isSubscribed).toBe(true);
+    expect(upsertSubscription).toHaveBeenCalledTimes(2);
+    // Retrying enrollment reuses the browser subscription left by the failed upsert.
+    expect(registration.pushManager.subscribe).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await result.current.account.unsubscribe();
+    });
+    expect(result.current.global.isSubscribed).toBe(false);
+    expect(result.current.account.isSubscribed).toBe(false);
+    expect(subscription.unsubscribe).toHaveBeenCalledTimes(1);
+  });
+  it('does not let an older mount snapshot overwrite a successful enrollment', async () => {
+    let resolveInitial: (value: null) => void = () => undefined;
+    const initialSubscription = new Promise<null>((resolve) => {
+      resolveInitial = resolve;
+    });
+    const subscription = {
+      toJSON: () => ({ endpoint: 'https://push.example/subscription', keys: { p256dh: 'key', auth: 'secret' } }),
+    };
+    const registration = {
+      pushManager: {
+        getSubscription: vi
+          .fn()
+          .mockResolvedValue(null)
+          .mockReturnValueOnce(initialSubscription)
+          .mockReturnValueOnce(initialSubscription),
+        subscribe: vi.fn().mockResolvedValue(subscription),
+      },
+    };
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: { getRegistration: vi.fn().mockResolvedValue(registration) },
+    });
+    const { result } = renderHook(() => ({ global: usePushNotifications(), account: usePushNotifications() }), {
+      wrapper,
+    });
+    await act(async () => undefined);
+    await act(async () => {
+      await result.current.account.subscribe();
+    });
+    expect(result.current.global.isSubscribed).toBe(true);
+    await act(async () => {
+      resolveInitial(null);
+    });
+    expect(result.current.global.isSubscribed).toBe(true);
+    expect(result.current.account.isSubscribed).toBe(true);
+  });
 });
