@@ -9,7 +9,7 @@ import {
 
 const SERVICE_WORKER_READY_TIMEOUT_MS = 3000;
 const PUSH_STATE_CHANGED_EVENT = 'attraccess:push-state-changed';
-type BrowserPushState = { permission: NotificationPermission; isSubscribed: boolean };
+type BrowserPushState = { permission: NotificationPermission; isSubscribed?: boolean };
 
 function announceBrowserPushState(state: BrowserPushState) {
   window.dispatchEvent(new CustomEvent<BrowserPushState>(PUSH_STATE_CHANGED_EVENT, { detail: state }));
@@ -78,10 +78,12 @@ export function usePushNotifications() {
     let cancelled = false;
     let receivedUpdate = false;
     const onStateChanged = (event: Event) => {
-      receivedUpdate = true;
       const state = (event as CustomEvent<BrowserPushState>).detail;
       setPermission(state.permission);
-      setIsSubscribed(state.isSubscribed);
+      if (state.isSubscribed !== undefined) {
+        receivedUpdate = true;
+        setIsSubscribed(state.isSubscribed);
+      }
     };
     window.addEventListener(PUSH_STATE_CHANGED_EVENT, onStateChanged);
     (async () => {
@@ -106,7 +108,9 @@ export function usePushNotifications() {
     setIsBusy(true);
     try {
       const currentPermission = await Notification.requestPermission();
-      setPermission(currentPermission);
+      // Native consent is browser-wide even when enrollment fails or is declined.
+      // Do not announce a subscription until the server registration succeeds.
+      announceBrowserPushState({ permission: currentPermission });
       if (currentPermission !== 'granted') {
         return false;
       }

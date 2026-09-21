@@ -141,6 +141,8 @@ describe('usePushNotifications', () => {
       await expect(result.current.account.subscribe()).rejects.toThrow('Server enrollment failed');
     });
     expect(result.current.global.isSubscribed).toBe(false);
+    expect(result.current.global.permission).toBe('granted');
+    expect(result.current.account.permission).toBe('granted');
 
     await act(async () => {
       await expect(result.current.account.subscribe()).resolves.toBe(true);
@@ -195,4 +197,34 @@ describe('usePushNotifications', () => {
     expect(result.current.global.isSubscribed).toBe(true);
     expect(result.current.account.isSubscribed).toBe(true);
   });
+  it.each(['denied', 'default'] as const)(
+    'shares native %s permission without claiming enrollment',
+    async (permission) => {
+      const subscribe = vi.fn();
+      Object.defineProperty(navigator, 'serviceWorker', {
+        configurable: true,
+        value: {
+          getRegistration: vi.fn().mockResolvedValue({
+            pushManager: { getSubscription: vi.fn().mockResolvedValue(null), subscribe },
+          }),
+        },
+      });
+      vi.mocked(Notification.requestPermission).mockResolvedValue(permission);
+      const { result } = renderHook(() => ({ global: usePushNotifications(), account: usePushNotifications() }), {
+        wrapper,
+      });
+      await act(async () => undefined);
+      expect(Notification.requestPermission).not.toHaveBeenCalled();
+      await act(async () => {
+        await expect(result.current.account.subscribe()).resolves.toBe(false);
+      });
+      expect(result.current.global.permission).toBe(permission);
+      expect(result.current.account.permission).toBe(permission);
+      expect(result.current.global.isSubscribed).toBe(false);
+      expect(result.current.account.isSubscribed).toBe(false);
+      expect(subscribe).not.toHaveBeenCalled();
+      expect(upsertSubscription).not.toHaveBeenCalled();
+      expect(Notification.requestPermission).toHaveBeenCalledTimes(1);
+    },
+  );
 });
