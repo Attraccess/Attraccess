@@ -3,5 +3,13 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "tools/config-ui",
   "projectType": "application",
-  "tags": []
+  "tags": [],
+  "targets": {
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs tools/config-ui"
+      }
+    }
+  }
 }

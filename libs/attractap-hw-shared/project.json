@@ -43,6 +43,12 @@
         "cwd": "libs/attractap-hw-shared",
         "command": "pnpm exec tsx src/doc-gen/generate.ts --check"
       }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs libs/attractap-hw-shared"
+      }
     }
   }
 }

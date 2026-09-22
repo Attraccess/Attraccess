@@ -15,6 +15,12 @@
         "main": "libs/shared/src/index.ts",
         "assets": ["libs/shared/*.md"]
       }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs libs/shared"
+      }
     }
   }
 }

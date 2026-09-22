@@ -5,7 +5,13 @@ import babel from '@rolldown/plugin-babel';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 
 export default defineConfig({
-  plugins: [react(), babel({ presets: [reactCompilerPreset()] }), nxViteTsPaths()],
+  plugins: [
+    react(),
+    // React Compiler source maps can omit function columns. CRAP needs original
+    // function boundaries to match coverage to source complexity.
+    ...(process.env.CRAP_SCORE_COVERAGE === '1' ? [] : [babel({ presets: [reactCompilerPreset()] })]),
+    nxViteTsPaths(),
+  ],
   resolve: {
     alias: {
       'virtual:__federation__': path.join(__dirname, 'src/test-utils/federation-stub.ts'),

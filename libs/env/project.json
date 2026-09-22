@@ -21,6 +21,12 @@
         "packageRoot": "dist/{projectRoot}",
         "access": "public"
       }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs libs/env"
+      }
     }
   }
 }

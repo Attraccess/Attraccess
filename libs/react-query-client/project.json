@@ -60,6 +60,15 @@
         "registry": "https://registry.npmjs.org/",
         "access": "public"
       }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs libs/react-query-client"
+      },
+      "dependsOn": [
+        "react-query-client:generate"
+      ]
     }
   }
 }
