@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { getCrapReport } from 'crap-score';
-import { completeCoverage, isSource } from './run.mjs';
+import { completeCoverage, isSource, summarizeScores } from './run.mjs';
 
 test('source selection includes apps and scripts but excludes tests and generated clients', () => {
   for (const file of ['apps/companion/renderer/App.tsx', 'apps/api/src/main.ts', 'scripts/dev-serve.mts'])
@@ -16,8 +16,44 @@ test('source selection includes apps and scripts but excludes tests and generate
     'libs/react-query-client/src/lib/client.ts',
     'apps/api/src/types.d.ts',
     'apps/plugins/wago/frontend/vitest.config.mts',
+    'apps/frontend/public/openscad/openscad.wasm.js',
   ])
     assert.ok(!isSource(file), file);
+});
+
+test('only the vendored OpenSCAD runtime is excluded, not maintained public scripts', () => {
+  assert.ok(isSource('apps/frontend/public/worker.js'));
+  assert.ok(isSource('apps/frontend/public/openscad/adapter.js'));
+});
+
+test('the strict target counts scores exactly equal to 30', () => {
+  assert.deepEqual(summarizeScores([29.99, 30, 30.01].map((crap) => ({ statements: { crap } }))), {
+    functions: 3,
+    atLeast30: 2,
+    max: 30.01,
+  });
+  assert.deepEqual(summarizeScores([]), { functions: 0, atLeast30: 0, max: 0 });
+});
+
+test('duplicate source locations collapse without losing same-line anonymous functions', async () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'crap-duplicates-'));
+  try {
+    const file = path.join(dir, 'callbacks.ts');
+    writeFileSync(file, 'const callbacks = [() => 1, () => 2];\n');
+    const measured = completeCoverage([file], [])[file];
+    const [first, second] = Object.keys(measured.fnMap);
+    measured.fnMap.extra = structuredClone(measured.fnMap[first]);
+    measured.f[first] = 2;
+    measured.f.extra = 3;
+    measured.f[second] = 1;
+    const completed = completeCoverage([file], [{ [file]: measured }])[file];
+    assert.equal(Object.keys(completed.fnMap).length, 2);
+    assert.deepEqual(Object.values(completed.f).sort(), [1, 3]);
+    const report = await getCrapReport({ testCoverage: { [file]: completed } });
+    assert.equal(Object.values(report).flatMap(Object.values).length, 2);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('uncovered functions are scored and coverage preserves repeated function names', async () => {

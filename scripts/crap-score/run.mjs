@@ -13,6 +13,8 @@ export const workspace = fileURLToPath(new URL('../../', import.meta.url));
 export function isSource(file) {
   return (
     /\.[cm]?[jt]sx?$/.test(file) &&
+    // Upstream OpenSCAD WebAssembly runtime, distributed unchanged with the app.
+    file !== 'apps/frontend/public/openscad/openscad.wasm.js' &&
     !/(^|\/)(__tests__|__mocks__|test|tests|test-utils|fixtures|generated|node_modules|dist|package)(\/|$)/.test(
       file,
     ) &&
@@ -39,6 +41,7 @@ export function completeCoverage(files, reports) {
     } else {
       repairFunctionLocations(coverage.fileCoverageFor(file).fnMap, original.fnMap);
     }
+    deduplicateFunctions(coverage.fileCoverageFor(file));
   }
   const result = coverage.toJSON();
   // Upstream indexes functions by name. Repeated methods/anonymous names must not overwrite each other.
@@ -46,6 +49,32 @@ export function completeCoverage(files, reports) {
     for (const [id, fn] of Object.entries(file.fnMap)) fn.name = `${fn.name}:${fn.loc.start.line}:${id}`;
   }
   return result;
+}
+
+// Use complete source ranges, not names or just line numbers: anonymous
+// callbacks and same-named methods can share a line and still be distinct.
+export function deduplicateFunctions(file) {
+  const locations = new Map();
+  for (const [id, fn] of Object.entries(file.fnMap)) {
+    const key = JSON.stringify([fn.loc.start.line, fn.loc.start.column, fn.loc.end.line, fn.loc.end.column]);
+    const existing = locations.get(key);
+    if (existing === undefined) {
+      locations.set(key, id);
+      continue;
+    }
+    // Duplicated mappings describe the same execution, not additional calls.
+    file.f[existing] = Math.max(file.f[existing], file.f[id]);
+    delete file.fnMap[id];
+    delete file.f[id];
+  }
+}
+
+export function summarizeScores(functions) {
+  return {
+    functions: functions.length,
+    atLeast30: functions.filter((fn) => fn.statements.crap >= 30).length,
+    max: Math.max(0, ...functions.map((fn) => fn.statements.crap)),
+  };
 }
 
 // Source-map remapping may leave end columns null (end of line). Restore exact
@@ -176,13 +205,11 @@ export async function run(root) {
   const summary = {
     project: project.name,
     files: files.length,
-    functions: functions.length,
-    above30: functions.filter((fn) => fn.statements.crap > 30).length,
-    max: Math.max(0, ...functions.map((fn) => fn.statements.crap)),
+    ...summarizeScores(functions),
   };
   writeFileSync(path.join(output, 'summary.json'), JSON.stringify(summary, null, 2) + '\n');
   console.log(
-    `CRAP ${project.name}: ${summary.functions} functions, ${summary.above30} above 30, max ${summary.max.toFixed(2)}. Reports: ${path.relative(workspace, output)}`,
+    `CRAP ${project.name}: ${summary.functions} functions, ${summary.atLeast30} at or above 30, max ${summary.max.toFixed(2)}. Reports: ${path.relative(workspace, output)}`,
   );
 }
 
