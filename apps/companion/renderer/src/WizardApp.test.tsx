@@ -95,12 +95,16 @@ it('protects settings with a PIN and saves monitoring preferences before returni
 });
 it.each(['quit', 'admin-override'] as const)('requires main-process PIN verification for %s', async (action) => {
   await mount({ requirePin: action, registered: true, connected: true });
-  bridge.verifyPin.mockResolvedValue(true);
+  bridge.verifyPin.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
   bridge.enableAdminOverride.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
   fireEvent.change(screen.getByLabelText('PIN'), { target: { value: '1234' } });
   const name = action === 'quit' ? 'Quit' : 'Enable override';
   fireEvent.click(screen.getByRole('button', { name }));
   if (action === 'quit') {
+    expect(await screen.findByText('Incorrect PIN.')).toBeTruthy();
+    expect(bridge.verifyPin).toHaveBeenCalledWith('1234');
+    expect(bridge.confirmQuit).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name }));
     await waitFor(() => expect(bridge.confirmQuit).toHaveBeenCalledOnce());
   } else {
     expect(await screen.findByText('Incorrect PIN.')).toBeTruthy();
