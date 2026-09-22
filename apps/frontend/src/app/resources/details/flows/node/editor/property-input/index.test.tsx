@@ -62,6 +62,23 @@ it('adds, edits, and removes dictionary entries', async () => {
   expect(screen.getByLabelText('Saved value')).toHaveTextContent('{}');
 });
 
+it('renames dictionary entries in place without moving focus to a sibling', async () => {
+  const user = userEvent.setup();
+  render(
+    <Editor
+      schema={{ type: 'object', title: 'Headers', additionalProperties: { type: 'string' } }}
+      initial={{ First: 'one', Second: 'two' }}
+    />,
+  );
+  const [firstHeader, secondHeader] = screen.getAllByPlaceholderText('Header name');
+  await user.clear(firstHeader);
+  await user.type(firstHeader, 'X-First');
+  expect(firstHeader).toHaveFocus();
+  expect(firstHeader).toHaveValue('X-First');
+  expect(secondHeader).toHaveValue('Second');
+  expect(screen.getByLabelText('Saved value')).toHaveTextContent('{"X-First":"one","Second":"two"}');
+});
+
 it('initializes object array defaults and edits row properties', async () => {
   const user = userEvent.setup();
   render(

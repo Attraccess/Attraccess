@@ -379,10 +379,11 @@ function ObjectPropertyInput<TValue>(props: PropertyViewProps<TValue>) {
                 value={key}
                 onChange={(newKey) =>
                   onChange(
-                    Object.fromEntries([
-                      ...Object.entries(value as Record<string, unknown>).filter(([existing]) => existing !== key),
-                      [newKey, currentValueOfKey],
-                    ]) as TValue,
+                    Object.fromEntries(
+                      Object.entries(value as Record<string, unknown>).map(([existing, entryValue]) =>
+                        existing === key ? [newKey, currentValueOfKey] : [existing, entryValue],
+                      ),
+                    ) as TValue,
                   )
                 }
                 isRequired
