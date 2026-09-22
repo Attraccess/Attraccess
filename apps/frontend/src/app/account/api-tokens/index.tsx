@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Input,
   Label,
@@ -62,7 +62,7 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
   const [permissionKeys, setPermissionKeys] = useState<Set<string>>(() => new Set());
   const [expiresAt, setExpiresAt] = useState('');
   const [secret, setSecret] = useState<string | null>(null);
-  const { data: tokenPage, isPending: isLoadingTokens, refetch: refetchTokens } =
+  const { data: tokenPage, isPending: isLoadingTokens, isError: isTokenListError, refetch: refetchTokens } =
     useApiTokensServiceListApiTokens<ApiTokenPage>({ limit: PAGE_SIZE, page });
   const { mutateAsync: createApiToken, isPending: isCreating } = useApiTokensServiceCreateApiToken<CreatedApiToken>();
   const { mutateAsync: revokeApiToken, isPending: isRevoking } = useApiTokensServiceRevokeApiToken();
@@ -70,6 +70,10 @@ export function ApiTokensCard({ availablePermissions }: { availablePermissions: 
     () => (allPermissions ?? []).filter((permission) => availablePermissions.includes(permission.key)),
     [allPermissions, availablePermissions],
   );
+
+  useEffect(() => {
+    if (isTokenListError) showToast({ title: t('errors.loadFailed'), type: 'error' });
+  }, [isTokenListError, showToast, t]);
 
   const createToken = async () => {
     try {

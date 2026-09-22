@@ -58,7 +58,7 @@ export function KeycloakDiscoveryDialog(props: Props) {
     setIsDiscovering(true);
 
     try {
-      const { data: config } = await discoverKeycloak();
+      const { data: config } = await discoverKeycloak({ throwOnError: true });
       if (!config) throw new Error('Failed to fetch configuration');
       onDiscovery(config);
       close();

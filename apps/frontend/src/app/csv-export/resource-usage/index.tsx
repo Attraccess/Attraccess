@@ -1,6 +1,6 @@
 import {
+  AnalyticsService,
   ResourceUsage,
-  useAnalyticsServiceGetResourceOperatingDurations,
   useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite,
 } from '@attraccess/react-query-client';
 import { ExportProps } from '../export-props';
@@ -33,8 +33,6 @@ export function ResourceUsageExport(props: ExportProps) {
   });
 
   const [fetchAll, setFetchAll] = useState(false);
-  const { mutateAsync: getResourceOperatingDurations } =
-    useAnalyticsServiceGetResourceOperatingDurations<Record<number, OperatingDurationSummary>>();
 
   const { data, status, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } =
     useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite({
@@ -64,18 +62,28 @@ export function ResourceUsageExport(props: ExportProps) {
   );
   const { data: operatingDurations, status: operatingDurationsStatus } = useQuery({
     queryKey: ['resource-operating-durations', resourceIds, props.start, props.end],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const operatingDurations: Record<number, OperatingDurationSummary> = {};
       for (let index = 0; index < resourceIds.length; index += RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST) {
         for (const range of operatingDurationRanges) {
-          const summaries = await getResourceOperatingDurations({
+          signal.throwIfAborted();
+          const request = AnalyticsService.getResourceOperatingDurations({
             requestBody: {
               resourceIds: resourceIds.slice(index, index + RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST),
               start: range.start.toISOString(),
               end: range.end.toISOString(),
             },
           });
-          mergeOperatingDurationSummaries(operatingDurations, summaries);
+          const cancelRequest = () => request.cancel();
+          signal.addEventListener('abort', cancelRequest, { once: true });
+          try {
+            mergeOperatingDurationSummaries(
+              operatingDurations,
+              (await request) as Record<number, OperatingDurationSummary>,
+            );
+          } finally {
+            signal.removeEventListener('abort', cancelRequest);
+          }
         }
       }
       return operatingDurations;

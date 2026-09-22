@@ -58,7 +58,7 @@ export function AuthentikDiscoveryDialog(props: Props) {
     setIsDiscovering(true);
 
     try {
-      const { data: config } = await discoverAuthentik();
+      const { data: config } = await discoverAuthentik({ throwOnError: true });
       if (!config) throw new Error('Failed to fetch configuration');
       onDiscovery(config);
       close();
