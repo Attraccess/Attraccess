@@ -377,15 +377,16 @@ function ObjectPropertyInput<TValue>(props: PropertyViewProps<TValue>) {
             <div key={index} className="flex gap-2 items-center">
               <TextField
                 value={key}
-                onChange={(newKey) =>
+                onChange={(newKey) => {
+                  if (newKey !== key && Object.prototype.hasOwnProperty.call(value, newKey)) return;
                   onChange(
                     Object.fromEntries(
                       Object.entries(value as Record<string, unknown>).map(([existing, entryValue]) =>
                         existing === key ? [newKey, currentValueOfKey] : [existing, entryValue],
                       ),
                     ) as TValue,
-                  )
-                }
+                  );
+                }}
                 isRequired
                 className="flex-1"
               >

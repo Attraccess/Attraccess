@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -77,6 +77,19 @@ it('renames dictionary entries in place without moving focus to a sibling', asyn
   expect(firstHeader).toHaveValue('X-First');
   expect(secondHeader).toHaveValue('Second');
   expect(screen.getByLabelText('Saved value')).toHaveTextContent('{"X-First":"one","Second":"two"}');
+});
+
+it('rejects dictionary key renames that would overwrite a sibling value', () => {
+  render(
+    <Editor
+      schema={{ type: 'object', title: 'Headers', additionalProperties: { type: 'string' } }}
+      initial={{ First: 'one', Second: 'two' }}
+    />,
+  );
+  const [firstHeader] = screen.getAllByPlaceholderText('Header name');
+  fireEvent.change(firstHeader, { target: { value: 'Second' } });
+  expect(firstHeader).toHaveValue('First');
+  expect(screen.getByLabelText('Saved value')).toHaveTextContent('{"First":"one","Second":"two"}');
 });
 
 it('initializes object array defaults and edits row properties', async () => {
