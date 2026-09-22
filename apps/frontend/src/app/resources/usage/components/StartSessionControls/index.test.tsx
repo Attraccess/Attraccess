@@ -1,11 +1,13 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@attraccess/react-query-client';
 import { StartSessionControls } from './index';
 
-const { startMutate, supervisionMode } = vi.hoisted(() => ({
+const { startMutate, supervisionMode, requestForms } = vi.hoisted(() => ({
   startMutate: vi.fn(),
+  requestForms: vi.fn().mockResolvedValue([]),
   supervisionMode: { value: 'introduction_required' },
 }));
 
@@ -18,7 +20,7 @@ vi.mock('../../../../../components/toastProvider', () => ({
 }));
 
 vi.mock('../../../forms/hooks/useResourceFormsSubmission', () => ({
-  useResourceFormsSubmission: () => ({ requestForms: () => Promise.resolve([]), modal: null }),
+  useResourceFormsSubmission: () => ({ requestForms, modal: null }),
 }));
 
 // Stand-ins that expose exactly the two things this test cares about: a way to press Start, and
@@ -37,8 +39,8 @@ vi.mock('../SupervisedStartModal', () => ({
   SupervisedStartModal: () => <div data-testid="supervised-start-modal" />,
 }));
 
-vi.mock('@attraccess/react-query-client', () => ({
-  ApiError: class ApiError extends Error {},
+vi.mock('@attraccess/react-query-client', async (original) => ({
+  ...(await original<typeof import('@attraccess/react-query-client')>()),
   ResourceType: { MACHINE: 'machine', DOOR: 'door' },
   SupervisionMode: {
     INTRODUCTION_REQUIRED: 'introduction_required',
@@ -63,6 +65,7 @@ vi.mock('@tanstack/react-query', () => ({
 describe('StartSessionControls supervision gating', () => {
   beforeEach(() => {
     startMutate.mockClear();
+    requestForms.mockReset().mockResolvedValue([]);
     supervisionMode.value = 'introduction_required';
   });
 
@@ -107,4 +110,54 @@ describe('StartSessionControls supervision gating', () => {
     expect(startMutate).toHaveBeenCalled();
     expect(screen.queryByTestId('supervised-start-modal')).not.toBeInTheDocument();
   });
+});
+
+it.each([
+  { status: 400, body: { message: 'Please submit required forms' }, message: 'Bad request', retry: true },
+  { status: 400, body: { message: ['Please submit', 'required forms'] }, message: 'Bad request', retry: true },
+  { status: 400, body: {}, message: 'Submit form answers', retry: true },
+  { status: 403, body: { message: 'Submit forms' }, message: 'Forbidden', retry: false },
+  { status: 400, body: { message: 'Unrelated validation' }, message: 'Bad request', retry: false },
+])('retries only missing-form validation responses ($status / $message)', async ({ status, body, message, retry }) => {
+  startMutate.mockClear();
+  requestForms.mockReset().mockResolvedValue([]);
+  supervisionMode.value = 'introduction_required';
+  render(<StartSessionControls resourceId={1} />);
+  await userEvent.click(screen.getByText('start'));
+  const callbacks = startMutate.mock.calls[0][1];
+  const submissions = [{ formId: 7, data: { training: true } }];
+  requestForms.mockResolvedValue(submissions);
+  const error = new ApiError(
+    { method: 'POST', url: '/start' },
+    { url: '/start', ok: false, status, statusText: 'Error', body },
+    message,
+  );
+  await act(() => callbacks.onError(error));
+  expect(startMutate).toHaveBeenCalledTimes(retry ? 2 : 1);
+  if (retry)
+    expect(startMutate).toHaveBeenLastCalledWith({
+      resourceId: 1,
+      requestBody: { projectId: undefined, formSubmissions: submissions },
+    });
+});
+it('does not retry ordinary errors or a cancelled form resubmission', async () => {
+  startMutate.mockClear();
+  requestForms.mockReset().mockResolvedValue([]);
+  supervisionMode.value = 'introduction_required';
+  render(<StartSessionControls resourceId={1} />);
+  await userEvent.click(screen.getByText('start'));
+  const callbacks = startMutate.mock.calls[0][1];
+  await act(() => callbacks.onError(new Error('Network unavailable')));
+  expect(startMutate).toHaveBeenCalledOnce();
+  requestForms.mockRejectedValueOnce(new Error('user_cancelled_forms'));
+  await act(() =>
+    callbacks.onError(
+      new ApiError(
+        { method: 'POST', url: '/start' },
+        { url: '/start', ok: false, status: 400, statusText: 'Error', body: { message: 'Submit forms' } },
+        'Bad request',
+      ),
+    ),
+  );
+  expect(startMutate).toHaveBeenCalledOnce();
 });

@@ -26,7 +26,10 @@ jest.mock('./plugin-system/npm-plugin.service', () => ({ NpmPluginService: { rec
 jest.mock('./plugin-system/plugin-migration.service', () => ({
   PluginMigrationService: { runPendingUpMigrationsForAllPlugins: jest.fn() },
 }));
-jest.mock('fs', () => ({ ...jest.requireActual('fs'), existsSync: jest.fn(() => true) }));
+jest.mock('fs', () => {
+  const actual = jest.requireActual<typeof import('fs')>('fs');
+  return { ...actual, existsSync: jest.fn(actual.existsSync) };
+});
 jest.mock('fs/promises', () => ({ readFile: jest.fn(async () => Buffer.from('certificate')), writeFile: jest.fn() }));
 jest.mock('mkcert', () => ({
   createCA: jest.fn(async () => ({ key: 'ca-key', cert: 'ca-cert' })),
@@ -78,6 +81,7 @@ describe('API bootstrap ordering and configuration', () => {
   const originalSkip = process.env.SKIP_DATABASE_MIGRATIONS;
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(existsSync).mockImplementation(jest.requireActual<typeof import('fs')>('fs').existsSync);
     delete process.env.SKIP_DATABASE_MIGRATIONS;
     appConfig.DISABLE_PLUGINS = false;
     appConfig.SSL_GENERATE_SELF_SIGNED_CERTIFICATES = false;

@@ -636,7 +636,11 @@ export function PluginsSection() {
                   {t('columns.actions')}
                 </TableColumn>
               </TableHeader>
-              <TableBody items={plugins ?? []} renderEmptyState={() => <EmptyState />}>
+              <TableBody
+                items={plugins ?? []}
+                dependencies={[installedNpmPlugins, npmPluginNames, t]}
+                renderEmptyState={() => <EmptyState />}
+              >
                 {(plugin) => (
                   <TableRow key={plugin.name} id={plugin.name}>
                     <TableCell>

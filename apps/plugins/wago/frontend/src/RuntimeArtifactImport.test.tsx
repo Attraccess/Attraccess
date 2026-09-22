@@ -67,12 +67,12 @@ describe('RuntimeArtifactImport', () => {
     expect(onBusyChange).toHaveBeenLastCalledWith(true);
     expect((await screen.findByRole('alert')).textContent).toContain('Check your connection and retry');
     expect(screen.getByRole('alert').textContent).not.toContain('/private/source');
-    expect(onBusyChange).toHaveBeenLastCalledWith(false);
+    await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false));
     expect(screen.getByRole('group').hasAttribute('disabled')).toBe(true);
     fetch.mockImplementation(normalFetch);
     await userEvent.click(screen.getByRole('button', { name: 'Retry loading releases' }));
     await screen.findByText('Import a release before commissioning a controller.');
-    expect(onBusyChange.mock.calls.map(([value]) => value)).toEqual([true, false, true, false]);
+    await waitFor(() => expect(onBusyChange.mock.calls.map(([value]) => value)).toEqual([true, false, true, false]));
     expect(screen.queryByRole('alert')).toBeNull();
   });
   it('aborts a pending initial load and ignores its late result', async () => {

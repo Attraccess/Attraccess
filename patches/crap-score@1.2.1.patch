@@ -1,0 +1,13 @@
+diff --git a/dist/crap/html-report/html-report.service.js b/dist/crap/html-report/html-report.service.js
+index 6655fc63e18d1ec85f10ba4708f84066e22a2e29..ae23392acc990c8bb3296ff15eab4246f2f86b6b 100644
+--- a/dist/crap/html-report/html-report.service.js
++++ b/dist/crap/html-report/html-report.service.js
+@@ -60,7 +60,7 @@ let HtmlReportService = class HtmlReportService {
+                 prismStyles,
+                 prismScript,
+             });
+-            this.fileSystemService.writeHtmlReport(join(htmlReportDir, functionReport.filePath, `${functionReport.fileIndex}.html`), html);
++            await this.fileSystemService.writeHtmlReport(join(htmlReportDir, functionReport.filePath, `${functionReport.fileIndex}.html`), html);
+         }));
+         const result = pageTemplate({ functions, content: "overview", title: "CRAP", prismStyles, prismScript });
+         await this.fileSystemService.writeHtmlReport(join(htmlReportDir, "index.html"), result, { logLevel: "log" });

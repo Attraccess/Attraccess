@@ -375,7 +375,56 @@ test('runs an Nx library suite and writes consistent JSON, HTML, and summary art
       max: summary.max,
     });
     assert.ok(existsSync(path.join(directory, 'html/index.html')));
+    for (const [file, functions] of Object.entries(report)) {
+      for (const index of Object.keys(Object.values(functions))) {
+        const page = readFileSync(path.join(directory, 'html', file, `${index}.html`), 'utf8');
+        assert.ok(page.trimEnd().endsWith('</html>'), `Incomplete function page: ${file}/${index}`);
+      }
+    }
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('HTML reporting waits for every function page before resolving', async () => {
+  const { createRequire } = await import('node:module');
+  const { pathToFileURL } = await import('node:url');
+  const require = createRequire(import.meta.url);
+  const servicePath = path.join(path.dirname(require.resolve('crap-score')), 'crap/html-report/html-report.service.js');
+  const { HtmlReportService } = await import(pathToFileURL(servicePath).href);
+  let notifyStarted;
+  const started = new Promise((resolve) => {
+    notifyStarted = resolve;
+  });
+  let finishPage;
+  const pendingPage = new Promise((resolve) => {
+    finishPage = resolve;
+  });
+  const written = [];
+  const service = new HtmlReportService(
+    {
+      loadSourceFile: async () => '',
+      loadHandlebarsTemplate: async () => () => '<html></html>',
+      writeHtmlReport: async (file) => {
+        if (file.endsWith('/0.html')) {
+          notifyStarted();
+          await pendingPage;
+        }
+        written.push(file);
+      },
+    },
+    { getHtmlReportDir: () => '/reports' },
+  );
+  let resolved = false;
+  const report = service.createReport({ 'source.ts': { run: { statements: { crap: 2 } } } }).then(() => {
+    resolved = true;
+  });
+  await started;
+  // The overview and completion must be ordered after the blocked function write.
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(resolved, false);
+  assert.deepEqual(written, []);
+  finishPage();
+  await report;
+  assert.deepEqual(written, ['/reports/source.ts/0.html', '/reports/index.html']);
 });
