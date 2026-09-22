@@ -48,6 +48,7 @@ export function useOperatingDuration(resourceId: number, enabled: boolean, range
     enabled,
     queryFn: async () => {
       const params = range && new URLSearchParams({ start: range.start.toISOString(), end: range.end.toISOString() });
+      // eslint-disable-next-line no-restricted-syntax -- The generated client has no query hook for this range-dependent request.
       const response = await fetch(
         `${getBaseUrl()}/api/resources/${resourceId}/operating-attribution${params ? `?${params}` : ''}`,
         {

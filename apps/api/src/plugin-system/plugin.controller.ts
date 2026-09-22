@@ -8,7 +8,6 @@ import {
   Logger,
   NotFoundException,
   Param,
-  ParseArrayPipe,
   Post,
   Query,
   StreamableFile,
@@ -19,7 +18,7 @@ import {
 import { PluginService } from './plugin.service';
 import { PluginModule } from './plugin.module';
 import { createReadStream, existsSync } from 'fs';
-import { ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiConsumes, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { join } from 'path';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -32,6 +31,12 @@ import { safeAuditOrigin, safeRequestedSpec } from '../audit/audit-administratio
 import { randomUUID } from 'crypto';
 import { PluginSystemStatusDto } from './dto/plugin-system-status.dto';
 import { RetryPluginResponseDto } from './dto/retry-plugin-response.dto';
+import {
+  AddPluginRegistryDto,
+  InstallPluginDto,
+  ReplaceInstalledPluginDto,
+  UpdateInstalledPluginPolicyDto,
+} from './dto/npm-plugin-request.dto';
 
 const PLUGIN_SYSTEM_INSTANCE_ID = randomUUID();
 
@@ -54,7 +59,7 @@ export class PluginController {
 
   @Post('registries')
   @Auth('system.plugins.manage')
-  addRegistry(@Body() body: { name: string; url: string; token?: string | null }, @Req() req: AuthenticatedRequest) {
+  addRegistry(@Body() body: AddPluginRegistryDto, @Req() req: AuthenticatedRequest) {
     return this.npmPluginService.addRegistry(body).then(async (registry) => {
       await this.record(req, 'plugin.registry_added', auditSubjectKeyId(registry.id), 'plugin-registry', {
         registryId: registry.id,
@@ -85,24 +90,29 @@ export class PluginController {
 
   @Get('npm/:packageName/metadata')
   @Auth('system.plugins.manage')
+  @ApiQuery({ name: 'registryId', required: false, type: String })
   packageMetadata(@Param('packageName') packageName: string, @Query('registryId') registryId?: string) {
     return this.npmPluginService.packageMetadata(packageName, registryId);
   }
 
   @Get('npm/:packageName/versions')
   @Auth('system.plugins.manage')
+  @ApiQuery({ name: 'registryId', required: false, type: String })
   packageVersions(@Param('packageName') packageName: string, @Query('registryId') registryId?: string) {
     return this.npmPluginService.packageVersions(packageName, registryId);
   }
 
   @Get('marketplace/search')
   @Auth('system.plugins.manage')
+  @ApiQuery({ name: 'query', required: false, type: String })
+  @ApiQuery({ name: 'registryId', required: false, type: String })
   searchMarketplace(@Query('query') query = '', @Query('registryId') registryId?: string) {
     return this.npmPluginService.searchMarketplace(query, registryId);
   }
 
   @Get('marketplace/:packageName')
   @Auth('system.plugins.manage')
+  @ApiQuery({ name: 'registryId', required: false, type: String })
   marketplacePackage(@Param('packageName') packageName: string, @Query('registryId') registryId?: string) {
     return this.npmPluginService.marketplacePackage(packageName, registryId);
   }
@@ -112,11 +122,11 @@ export class PluginController {
   installPackage(
     @Param('packageName') packageName: string,
     @Param('version') version: string,
-    @Body('registryId') registryId?: string,
+    @Body() body: InstallPluginDto,
     @Req() req?: AuthenticatedRequest,
   ) {
     return this.installWithAudit(req, 'plugin.installed', packageName, version, (state) =>
-      this.npmPluginService.install(packageName, version, registryId, state),
+      this.npmPluginService.install(packageName, version, body.registryId, state),
     );
   }
 
@@ -218,12 +228,11 @@ export class PluginController {
   @Auth('system.plugins.manage')
   updateInstalledPackagePolicy(
     @Param('packageName') packageName: string,
-    @Body('requestedSpec') requestedSpec: string,
-    @Body('updateOverride') updateOverride: 'inherit' | 'off' | 'patch' | 'minor' | 'follow',
+    @Body() body: UpdateInstalledPluginPolicyDto,
     @Req() req: AuthenticatedRequest,
   ) {
     return this.npmPluginService
-      .updateVersionPolicy(packageName, requestedSpec, updateOverride)
+      .updateVersionPolicy(packageName, body.requestedSpec, body.updateOverride)
       .then(async (installed) => {
         await this.recordPackage(req, 'plugin.package_policy_updated', installed);
         return installed;
@@ -241,9 +250,7 @@ export class PluginController {
   replaceInstalledPackage(
     @Param('packageName') packageName: string,
     @Param('version') version: string,
-    @Body('approvedPermissionAdditions', new ParseArrayPipe({ items: String, optional: true }))
-    approvedPermissionAdditions?: string[],
-    @Body('approvedMajorVersion') approvedMajorVersion?: boolean,
+    @Body() body: ReplaceInstalledPluginDto,
     @Req() req?: AuthenticatedRequest,
   ) {
     const before = this.npmPluginService.listInstalled().find((plugin) => plugin.name === packageName);
@@ -256,8 +263,8 @@ export class PluginController {
         this.npmPluginService.replaceInstalled(
           packageName,
           version,
-          approvedPermissionAdditions ?? [],
-          approvedMajorVersion === true,
+          body.approvedPermissionAdditions ?? [],
+          body.approvedMajorVersion === true,
           state,
         ),
       before,

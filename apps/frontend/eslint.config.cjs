@@ -33,6 +33,19 @@ module.exports = [
     ignores: ['**/*.json'],
     rules: {
       'no-console': ['error', { allow: ['warn', 'error', 'info', 'debug', 'trace'] }],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.name='fetch']",
+          message:
+            'Use a generated React Query hook instead of fetch(). If a direct request is necessary, disable this rule for that statement and explain why.',
+        },
+        {
+          selector: "CallExpression[callee.property.name='fetch']",
+          message:
+            'Use a generated React Query hook instead of fetch(). If a direct request is necessary, disable this rule for that statement and explain why.',
+        },
+      ],
       ...reactCompilerRulesAsWarn,
     },
   },

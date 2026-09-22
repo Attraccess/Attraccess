@@ -44,6 +44,13 @@ import {
   Upload,
 } from 'lucide-react';
 import {
+  usePluginsServicePluginControllerCheckAllInstalledPackages,
+  usePluginsServicePluginControllerAddRegistry,
+  usePluginsServicePluginControllerInstallPackage,
+  usePluginsServicePluginControllerRemoveRegistry,
+  usePluginsServicePluginControllerReplaceInstalledPackage,
+  usePluginsServicePluginControllerTestRegistry,
+  usePluginsServicePluginControllerUpdateInstalledPackagePolicy,
   usePluginsServiceDeletePlugin,
   usePluginsServiceGetPluginSystemStatus,
   usePluginsServiceGetPlugins,
@@ -186,6 +193,16 @@ export function PluginsSection() {
 
   const { data: plugins } = usePluginsServiceGetPlugins();
   const { data: pluginSystemStatus, refetch: refetchPluginSystemStatus } = usePluginsServiceGetPluginSystemStatus();
+  const { mutateAsync: checkAllInstalledPackages, isPending: isCheckingForUpdates } =
+    usePluginsServicePluginControllerCheckAllInstalledPackages<InstalledNpmPlugin[]>();
+  const { mutateAsync: addPluginRegistry } = usePluginsServicePluginControllerAddRegistry<Registry>();
+  const { mutateAsync: testPluginRegistry } = usePluginsServicePluginControllerTestRegistry();
+  const { mutateAsync: removePluginRegistry } = usePluginsServicePluginControllerRemoveRegistry();
+  const { mutateAsync: installPluginPackage } = usePluginsServicePluginControllerInstallPackage<InstalledNpmPlugin>();
+  const { mutateAsync: replaceInstalledPlugin } =
+    usePluginsServicePluginControllerReplaceInstalledPackage<InstalledNpmPlugin>();
+  const { mutateAsync: updateInstalledPluginPolicy } =
+    usePluginsServicePluginControllerUpdateInstalledPackagePolicy<InstalledNpmPlugin>();
   const { mutateAsync: retryFailedPlugin } = usePluginsServiceRetryPlugin();
   const pluginsDisabled = pluginSystemStatus?.disabled === true;
   const [failedPlugin, setFailedPlugin] = useState<{ id: string; name: string; error: string } | null>(null);
@@ -247,6 +264,7 @@ export function PluginsSection() {
 
   useEffect(() => {
     if (!globalThis.fetch) return;
+    // eslint-disable-next-line no-restricted-syntax -- Existing marketplace state loading awaits a broader hook migration.
     void fetch(`${getBaseUrl()}/api/plugins/installed`, { credentials: 'include' })
       .then(async (response) => (response.ok ? (response.json() as Promise<InstalledNpmPlugin[]>) : []))
       .then((installed) => {
@@ -261,6 +279,7 @@ export function PluginsSection() {
   const loadRegistries = async () => {
     const request = ++registryRequest.current;
     try {
+      // eslint-disable-next-line no-restricted-syntax -- Existing registry loading awaits a broader hook migration.
       const response = await fetch(`${getBaseUrl()}/api/plugins/registries`, { credentials: 'include' });
       if (!response.ok) throw new Error();
       const result = (await response.json()) as unknown;
@@ -285,6 +304,7 @@ export function PluginsSection() {
     let result: { results: MarketplacePlugin[]; errors: string[] } = { results: [], errors: [] };
     let searchFailed = false;
     try {
+      // eslint-disable-next-line no-restricted-syntax -- Existing marketplace search awaits a broader hook migration.
       const response = await fetch(
         `${getBaseUrl()}/api/plugins/marketplace/search?query=${encodeURIComponent(query)}${selectedRegistryId ? `&registryId=${encodeURIComponent(selectedRegistryId)}` : ''}`,
         {
@@ -300,6 +320,7 @@ export function PluginsSection() {
     let directPackage: MarketplacePlugin | null = null;
     if (selectedRegistryId && query.trim()) {
       try {
+        // eslint-disable-next-line no-restricted-syntax -- Existing package lookup awaits a broader hook migration.
         const packageResponse = await fetch(
           `${getBaseUrl()}/api/plugins/marketplace/${encodeURIComponent(query.trim())}?registryId=${encodeURIComponent(selectedRegistryId)}`,
           { credentials: 'include' },
@@ -328,13 +349,9 @@ export function PluginsSection() {
   const addRegistry = async () => {
     setIsSavingRegistry(true);
     try {
-      const response = await fetch(`${getBaseUrl()}/api/plugins/registries`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: registryName, url: registryUrl, token: registryToken || undefined }),
+      await addPluginRegistry({
+        requestBody: { name: registryName, url: registryUrl, token: registryToken || undefined },
       });
-      if (!response.ok) throw new Error(await response.text());
       setRegistryName('');
       setRegistryUrl('');
       setRegistryToken('');
@@ -352,11 +369,7 @@ export function PluginsSection() {
     latestRegistryTest.current = request;
     setTestingRegistryId(registryId);
     try {
-      const response = await fetch(`${getBaseUrl()}/api/plugins/registries/${encodeURIComponent(registryId)}/test`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error();
+      await testPluginRegistry({ registryId });
       toast.success({ title: t('marketplace.registryTestSuccess') });
     } catch {
       toast.error({ title: t('marketplace.registryTestError') });
@@ -370,11 +383,7 @@ export function PluginsSection() {
 
   const removeRegistry = async (registryId: string) => {
     try {
-      const response = await fetch(`${getBaseUrl()}/api/plugins/registries/${encodeURIComponent(registryId)}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error();
+      await removePluginRegistry({ registryId });
       if (selectedRegistryId === registryId) setSelectedRegistryId('');
       await loadRegistries();
     } catch {
@@ -396,6 +405,7 @@ export function PluginsSection() {
     const request = ++marketplaceDetailRequest.current;
     setIsLoadingMarketplaceDetail(true);
     try {
+      // eslint-disable-next-line no-restricted-syntax -- Existing package details loading awaits a broader hook migration.
       const response = await fetch(
         `${getBaseUrl()}/api/plugins/marketplace/${encodeURIComponent(plugin.name)}?registryId=${encodeURIComponent(plugin.registry.id)}`,
         { credentials: 'include' },
@@ -417,16 +427,11 @@ export function PluginsSection() {
     if (!pluginToInstall?.version) return;
     setIsInstalling(true);
     try {
-      const response = await fetch(
-        `${getBaseUrl()}/api/plugins/npm/${encodeURIComponent(pluginToInstall.name)}/versions/${pluginToInstall.version}`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ registryId: pluginToInstall.registry.id }),
-        },
-      );
-      if (!response.ok) throw new Error();
+      await installPluginPackage({
+        packageName: pluginToInstall.name,
+        version: pluginToInstall.version,
+        requestBody: { registryId: pluginToInstall.registry.id },
+      });
       toast.success({ title: t('marketplace.installSuccess') });
       setTimeout(() => window.location.reload(), 5000);
       setPluginToInstall(null);
@@ -463,6 +468,7 @@ export function PluginsSection() {
     setUpdateOverride(installed?.updateOverride ?? 'inherit');
     setIsLoadingVersions(true);
     try {
+      // eslint-disable-next-line no-restricted-syntax -- Existing version loading awaits a broader hook migration.
       const response = await fetch(
         `${getBaseUrl()}/api/plugins/installed/${encodeURIComponent(plugin.name)}/versions`,
         {
@@ -484,19 +490,14 @@ export function PluginsSection() {
     if (!versionPlugin || !selectedVersion) return;
     setIsReplacing(true);
     try {
-      const response = await fetch(
-        `${getBaseUrl()}/api/plugins/installed/${encodeURIComponent(versionPlugin.name)}/versions/${selectedVersion.version}`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            approvedPermissionAdditions: selectedVersion.permissionAdditions,
-            approvedMajorVersion: majorApproved,
-          }),
+      await replaceInstalledPlugin({
+        packageName: versionPlugin.name,
+        version: selectedVersion.version,
+        requestBody: {
+          approvedPermissionAdditions: selectedVersion.permissionAdditions,
+          approvedMajorVersion: majorApproved,
         },
-      );
-      if (!response.ok) throw new Error(await response.text());
+      });
       toast.success({ title: t('success.replace.title'), description: t('success.replace.description') });
       setTimeout(() => window.location.reload(), 5000);
       setVersionPlugin(null);
@@ -510,23 +511,38 @@ export function PluginsSection() {
   const saveVersionPolicy = async () => {
     if (!versionPlugin) return;
     try {
-      const response = await fetch(
-        `${getBaseUrl()}/api/plugins/installed/${encodeURIComponent(versionPlugin.name)}/update-policy`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ requestedSpec, updateOverride }),
-        },
-      );
-      if (!response.ok) throw new Error();
-      const installed = (await response.json()) as InstalledNpmPlugin;
+      const installed = await updateInstalledPluginPolicy({
+        packageName: versionPlugin.name,
+        requestBody: { requestedSpec, updateOverride },
+      });
       setInstalledNpmPlugins((current) => new Map(current).set(installed.name, installed));
       toast.success({ title: t('versionManagement.policySaved') });
     } catch {
       toast.error({ title: t('versionManagement.policyError') });
     }
   };
+
+  const checkForUpdates = async () => {
+    try {
+      const installed = await checkAllInstalledPackages();
+      setInstalledNpmPlugins((current) => {
+        const updated = new Map(current);
+        for (const plugin of installed) updated.set(plugin.name, plugin);
+        return updated;
+      });
+      if (installed.some((plugin) => plugin.updateCheck?.state === 'failed')) {
+        toast.error({ title: t('updatePolicy.checkError') });
+      } else {
+        toast.success({ title: t('updatePolicy.checked') });
+      }
+    } catch {
+      toast.error({ title: t('updatePolicy.checkError') });
+    }
+  };
+
+  const availableUpdates = [...installedNpmPlugins.values()].filter(
+    (plugin) => plugin.updateCheck?.state === 'available',
+  );
 
   const aside = (
     <div className="flex flex-col gap-2">
@@ -552,7 +568,36 @@ export function PluginsSection() {
             </AlertContent>
           </Alert>
         ) : null}
-        <div className="flex justify-end">
+        {availableUpdates.length > 0 ? (
+          <Alert status="warning" data-cy="plugins-list-updates-available">
+            <AlertContent>
+              <AlertTitle>{t('updatePolicy.availableTitle')}</AlertTitle>
+              <AlertDescription>
+                {t('updatePolicy.availableDescription', { count: String(availableUpdates.length) })}
+              </AlertDescription>
+              <Button
+                className="mt-2"
+                variant="secondary"
+                size="sm"
+                onPress={() => void openVersionManagement(availableUpdates[0])}
+              >
+                {t('updatePolicy.reviewUpdates')}
+              </Button>
+            </AlertContent>
+          </Alert>
+        ) : null}
+        <div className="flex flex-wrap justify-end gap-2">
+          {installedNpmPlugins.size > 0 ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onPress={() => void checkForUpdates()}
+              isPending={isCheckingForUpdates}
+              data-cy="plugins-list-check-updates-button"
+            >
+              {t('updatePolicy.checkNow')}
+            </Button>
+          ) : null}
           <Dropdown>
             <DropdownTrigger
               className={`${buttonVariants({ variant: 'primary', size: 'sm' })} !inline-flex items-center gap-2`}
@@ -807,10 +852,18 @@ export function PluginsSection() {
                 {marketplacePlugin ? (
                   <MarketplacePluginDetails
                     plugin={marketplacePlugin}
-                    isInstalled={npmPluginNames.has(marketplacePlugin.name)}
+                    installedPlugin={installedNpmPlugins.get(marketplacePlugin.name)}
                     onInstall={() => {
                       setInstallApproved(false);
                       setPluginToInstall(marketplacePlugin);
+                    }}
+                    onManageVersion={() => {
+                      setIsMarketplaceOpen(false);
+                      void openVersionManagement({
+                        name: marketplacePlugin.name,
+                        version:
+                          installedNpmPlugins.get(marketplacePlugin.name)?.version ?? marketplacePlugin.version ?? '',
+                      });
                     }}
                     t={t}
                   />
@@ -1221,15 +1274,18 @@ function MarketplaceDetail({ label, value }: { label: string; value: string }) {
 
 function MarketplacePluginDetails({
   plugin,
-  isInstalled,
+  installedPlugin,
   onInstall,
+  onManageVersion,
   t,
 }: {
   plugin: MarketplacePlugin;
-  isInstalled: boolean;
+  installedPlugin?: InstalledNpmPlugin;
   onInstall: () => void;
+  onManageVersion: () => void;
   t: (key: string, values?: Record<string, string>) => string;
 }) {
+  const isInstalled = installedPlugin !== undefined;
   return (
     <div className="mx-auto grid w-full max-w-6xl items-start gap-6 py-2 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <Card>
@@ -1287,8 +1343,10 @@ function MarketplacePluginDetails({
         <Card.Header>
           <div className="flex flex-col gap-2">
             <PluginClassificationBadge classification={plugin.classification} />
-            <Card.Title>{t('marketplace.install')}</Card.Title>
-            <Card.Description>{t('marketplace.installDescription')}</Card.Description>
+            <Card.Title>{isInstalled ? t('marketplace.update') : t('marketplace.install')}</Card.Title>
+            <Card.Description>
+              {isInstalled ? t('marketplace.updateDescription') : t('marketplace.installDescription')}
+            </Card.Description>
           </div>
         </Card.Header>
         <Card.Content className="flex flex-col gap-4">
@@ -1313,8 +1371,13 @@ function MarketplacePluginDetails({
           </p>
         </Card.Content>
         <Card.Footer>
-          <Button variant="primary" fullWidth isDisabled={!plugin.installable || isInstalled} onPress={onInstall}>
-            {isInstalled ? t('marketplace.installed') : t('marketplace.install')}
+          <Button
+            variant="primary"
+            fullWidth
+            isDisabled={!isInstalled && !plugin.installable}
+            onPress={isInstalled ? onManageVersion : onInstall}
+          >
+            {isInstalled ? t('manageVersion') : t('marketplace.install')}
           </Button>
         </Card.Footer>
       </Card>

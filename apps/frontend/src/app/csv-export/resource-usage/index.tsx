@@ -1,4 +1,5 @@
 import {
+  AnalyticsService,
   ResourceUsage,
   useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite,
 } from '@attraccess/react-query-client';
@@ -9,7 +10,6 @@ import de from './de.json';
 import en from './en.json';
 import { CsvExportDrawerContent, ColumnDefinition } from '../export-drawer';
 import { useQuery } from '@tanstack/react-query';
-import { getBaseUrl } from '../../../api';
 import {
   attributedDurationByResourceAndUsage,
   combinedOperatingDurationStatus,
@@ -66,19 +66,24 @@ export function ResourceUsageExport(props: ExportProps) {
       const operatingDurations: Record<number, OperatingDurationSummary> = {};
       for (let index = 0; index < resourceIds.length; index += RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST) {
         for (const range of operatingDurationRanges) {
-          const response = await fetch(`${getBaseUrl()}/api/analytics/resource-operating-durations`, {
-            method: 'POST',
-            credentials: 'include',
-            signal,
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({
+          signal.throwIfAborted();
+          const request = AnalyticsService.getResourceOperatingDurations({
+            requestBody: {
               resourceIds: resourceIds.slice(index, index + RESOURCE_IDS_PER_OPERATING_DURATION_REQUEST),
               start: range.start.toISOString(),
               end: range.end.toISOString(),
-            }),
+            },
           });
-          if (!response.ok) throw new Error('Failed to load operating durations');
-          mergeOperatingDurationSummaries(operatingDurations, await response.json());
+          const cancelRequest = () => request.cancel();
+          signal.addEventListener('abort', cancelRequest, { once: true });
+          try {
+            mergeOperatingDurationSummaries(
+              operatingDurations,
+              (await request) as Record<number, OperatingDurationSummary>,
+            );
+          } finally {
+            signal.removeEventListener('abort', cancelRequest);
+          }
         }
       }
       return operatingDurations;

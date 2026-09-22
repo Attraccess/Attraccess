@@ -11,6 +11,13 @@ interface DeleteOptions {
 
 const hoisted = vi.hoisted(() => ({
   deleteMutateMock: vi.fn(),
+  checkAllInstalledPackagesMock: vi.fn(),
+  addRegistryMock: vi.fn(),
+  testRegistryMock: vi.fn(),
+  removeRegistryMock: vi.fn(),
+  installPackageMock: vi.fn(),
+  replaceInstalledPackageMock: vi.fn(),
+  updateInstalledPackagePolicyMock: vi.fn(),
   retryMutateAsyncMock: vi.fn(),
   statusRefetchMock: vi.fn(),
   successToast: vi.fn(),
@@ -34,6 +41,28 @@ vi.mock('@attraccess/react-query-client', () => ({
   usePluginsServiceGetPluginSystemStatus: () => ({
     data: hoisted.pluginSystemStatus,
     refetch: hoisted.statusRefetchMock,
+  }),
+  usePluginsServicePluginControllerCheckAllInstalledPackages: () => ({
+    mutateAsync: hoisted.checkAllInstalledPackagesMock,
+    isPending: false,
+  }),
+  usePluginsServicePluginControllerAddRegistry: () => ({ mutateAsync: hoisted.addRegistryMock, isPending: false }),
+  usePluginsServicePluginControllerTestRegistry: () => ({ mutateAsync: hoisted.testRegistryMock, isPending: false }),
+  usePluginsServicePluginControllerRemoveRegistry: () => ({
+    mutateAsync: hoisted.removeRegistryMock,
+    isPending: false,
+  }),
+  usePluginsServicePluginControllerInstallPackage: () => ({
+    mutateAsync: hoisted.installPackageMock,
+    isPending: false,
+  }),
+  usePluginsServicePluginControllerReplaceInstalledPackage: () => ({
+    mutateAsync: hoisted.replaceInstalledPackageMock,
+    isPending: false,
+  }),
+  usePluginsServicePluginControllerUpdateInstalledPackagePolicy: () => ({
+    mutateAsync: hoisted.updateInstalledPackagePolicyMock,
+    isPending: false,
   }),
   usePluginsServiceRetryPlugin: () => ({ mutateAsync: hoisted.retryMutateAsyncMock, isPending: false }),
   usePluginsServiceDeletePlugin: (options: DeleteOptions) => {
@@ -64,6 +93,13 @@ function makePlugin(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   hoisted.deleteMutateMock.mockReset();
+  hoisted.checkAllInstalledPackagesMock.mockReset();
+  hoisted.addRegistryMock.mockReset();
+  hoisted.testRegistryMock.mockReset();
+  hoisted.removeRegistryMock.mockReset();
+  hoisted.installPackageMock.mockReset();
+  hoisted.replaceInstalledPackageMock.mockReset();
+  hoisted.updateInstalledPackagePolicyMock.mockReset();
   hoisted.retryMutateAsyncMock.mockReset();
   hoisted.statusRefetchMock.mockReset();
   hoisted.successToast.mockReset();
@@ -73,6 +109,13 @@ beforeEach(() => {
   hoisted.deleteOptions = undefined;
   hoisted.statusRefetchMock.mockResolvedValue({ data: hoisted.pluginSystemStatus });
   hoisted.retryMutateAsyncMock.mockResolvedValue({ ok: true });
+  hoisted.checkAllInstalledPackagesMock.mockResolvedValue([]);
+  hoisted.addRegistryMock.mockResolvedValue({});
+  hoisted.testRegistryMock.mockResolvedValue({ ok: true });
+  hoisted.removeRegistryMock.mockResolvedValue(undefined);
+  hoisted.installPackageMock.mockResolvedValue({});
+  hoisted.replaceInstalledPackageMock.mockResolvedValue({});
+  hoisted.updateInstalledPackagePolicyMock.mockResolvedValue({});
   vi.stubGlobal(
     'fetch',
     vi.fn((input: { url?: string } | string) => {
@@ -125,6 +168,101 @@ describe('PluginsSection', () => {
     expect(screen.getByText('Permissions')).toBeInTheDocument();
     expect(screen.getByText('Status')).toBeInTheDocument();
     expect(screen.getByText('Actions')).toBeInTheDocument();
+  });
+
+  it('checks marketplace plugins for updates and takes the admin to the in-place update flow', async () => {
+    hoisted.plugins = [makePlugin()];
+    const installed = {
+      name: 'Cool Plugin',
+      version: '1.2.3',
+      registryId: 'npm',
+      registryUrl: 'https://registry.npmjs.org',
+      classification: 'community',
+      classificationReason: 'Marketplace package',
+      requestedSpec: 'latest',
+      updateOverride: 'inherit',
+    };
+    const checked = {
+      ...installed,
+      updateCheck: {
+        checkedAt: '2026-09-21T12:00:00.000Z',
+        candidate: '1.2.4',
+        state: 'available',
+        error: null,
+      },
+    };
+    const fetchMock = vi.fn((input: { url?: string } | string, _init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : (input.url ?? '');
+      if (url.endsWith('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [installed] });
+      if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+      if (url.endsWith('/api/plugins/installed/Cool%20Plugin/versions'))
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { version: '1.2.3', direction: 'current', compatible: true },
+            { version: '1.2.4', direction: 'newer', compatible: true },
+          ],
+        });
+      return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    hoisted.checkAllInstalledPackagesMock.mockResolvedValue([checked]);
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+
+    await user.click(await screen.findByRole('button', { name: 'Check all now' }));
+    expect(await screen.findByText('Plugin updates are available')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        '1 installed marketplace plugin can be updated. Review the available version before applying it.',
+      ),
+    ).toBeInTheDocument();
+    expect(hoisted.checkAllInstalledPackagesMock).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByRole('button', { name: 'Review updates' }));
+    expect(await screen.findByRole('heading', { name: 'Manage Cool Plugin version' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '1.2.4 Newer' })).toBeInTheDocument();
+  });
+
+  it('reports failed package update checks', async () => {
+    hoisted.plugins = [makePlugin()];
+    const installed = {
+      name: 'Cool Plugin',
+      version: '1.2.3',
+      registryId: 'npm',
+      registryUrl: 'https://registry.npmjs.org',
+      classification: 'community',
+      classificationReason: 'Marketplace package',
+      requestedSpec: 'latest',
+      updateOverride: 'inherit',
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: { url?: string } | string) => {
+        const url = typeof input === 'string' ? input : (input.url ?? '');
+        if (url.endsWith('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [installed] });
+        if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+        return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
+      }),
+    );
+    hoisted.checkAllInstalledPackagesMock.mockResolvedValue([
+      {
+        ...installed,
+        updateCheck: {
+          checkedAt: '2026-09-22T12:00:00.000Z',
+          candidate: null,
+          state: 'failed',
+          error: 'Registry unavailable',
+        },
+      },
+    ]);
+    const user = userEvent.setup();
+    render(<PluginsSection />);
+
+    await user.click(await screen.findByRole('button', { name: 'Check all now' }));
+
+    await waitFor(() => expect(hoisted.errorToast).toHaveBeenCalledWith({ title: 'Could not check plugin updates' }));
+    expect(hoisted.successToast).not.toHaveBeenCalled();
   });
 
   async function openMarketplace(user: ReturnType<typeof userEvent.setup>) {
@@ -280,10 +418,11 @@ describe('PluginsSection', () => {
     await user.click(within(installDialog as HTMLElement).getByRole('button', { name: 'Install plugin' }));
 
     await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('/api/plugins/npm/%40private%2Fplugin/versions/2.3.4'),
-        expect.objectContaining({ method: 'POST', body: JSON.stringify({ registryId: 'private' }) }),
-      ),
+      expect(hoisted.installPackageMock).toHaveBeenCalledWith({
+        packageName: '@private/plugin',
+        version: '2.3.4',
+        requestBody: { registryId: 'private' },
+      }),
     );
   });
 
@@ -386,6 +525,13 @@ describe('PluginsSection', () => {
     const secondTest = deferred<{ ok: boolean }>();
     const latestFirstTest = deferred<{ ok: boolean }>();
     let firstTestRequests = 0;
+    hoisted.testRegistryMock.mockImplementation(({ registryId }: { registryId: string }) => {
+      if (registryId === 'first') {
+        firstTestRequests += 1;
+        return firstTestRequests === 1 ? firstTest.promise : latestFirstTest.promise;
+      }
+      return secondTest.promise;
+    });
     vi.stubGlobal(
       'fetch',
       vi.fn((input: { url?: string } | string, init?: { method?: string }) => {
@@ -398,11 +544,6 @@ describe('PluginsSection', () => {
               { id: 'second', name: 'Second', url: 'https://second.example.test', tokenConfigured: false },
             ],
           });
-        if (request.url?.endsWith('/registries/first/test')) {
-          firstTestRequests += 1;
-          return firstTestRequests === 1 ? firstTest.promise : latestFirstTest.promise;
-        }
-        if (request.url?.endsWith('/registries/second/test')) return secondTest.promise;
         if (request.url?.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
         return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
       }),

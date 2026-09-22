@@ -26,6 +26,10 @@ vi.mock('../../components/toastProvider', () => ({
   useToastMessage: () => ({ info: hoisted.infoToast }),
 }));
 
+vi.mock('@attraccess/react-query-client', () => ({
+  useNotificationsServiceNotificationsUpdateWebPresence: () => ({ mutate: vi.fn() }),
+}));
+
 vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router-dom')>();
   return { ...actual, useNavigate: () => hoisted.navigate };
