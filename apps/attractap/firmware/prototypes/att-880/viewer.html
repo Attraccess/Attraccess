@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ATT-880 · Reader flow prototype</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #111c20;
+        --panel: #1e2c2f;
+        --ink: #f4f8f8;
+        --muted: #afc0c3;
+        --accent: #82c4ce;
+        --line: #42575c;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          15px/1.55 system-ui,
+          sans-serif;
+      }
+      button,
+      a {
+        touch-action: manipulation;
+      }
+      button,
+      select {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: #26363a;
+        color: var(--ink);
+        padding: 9px 14px;
+        text-align: left;
+      }
+      button:hover {
+        background: #30454a;
+      }
+      button:focus-visible,
+      a:focus-visible {
+        outline: 3px solid var(--accent);
+        outline-offset: 3px;
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      button.primary,
+      button[aria-pressed='true'] {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #142e34;
+      }
+      a {
+        color: var(--accent);
+      }
+      header {
+        padding: 24px 32px 16px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 24px;
+      }
+      h1 {
+        font-size: 25px;
+        line-height: 1.2;
+        margin: 6px 0;
+      }
+      h2 {
+        font-size: 21px;
+        line-height: 1.3;
+        margin: 8px 0 12px;
+      }
+      h3 {
+        font-size: 15px;
+        margin: 0 0 10px;
+      }
+      .eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+        font-weight: 700;
+      }
+      p {
+        margin: 8px 0;
+        color: var(--muted);
+      }
+      .intro {
+        max-width: 920px;
+        font-size: 14px;
+      }
+      .tabs {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .layout {
+        max-width: 1440px;
+        margin: auto;
+        display: grid;
+        grid-template-columns: 220px 508px minmax(250px, 1fr);
+        gap: 28px;
+        padding: 28px;
+      }
+      .paths {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .paths button {
+        font-size: 14px;
+      }
+      .paths small {
+        display: block;
+        font-size: 12px;
+        opacity: 0.7;
+      }
+      .device {
+        padding: 14px;
+        background: #080e10;
+        border-radius: 16px;
+        box-shadow: 0 20px 50px #0004;
+        width: 508px;
+      }
+      .display {
+        width: 480px;
+        height: 480px;
+        position: relative;
+        overflow: hidden;
+      }
+      .display img {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .hotspot {
+        position: absolute;
+        padding: 0;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+      }
+      .hotspot:hover {
+        background: #82c4ce1a;
+        outline: 2px solid #82c4ce;
+      }
+      .hotspot:focus-visible {
+        outline-offset: -3px;
+      }
+      .under-device {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 16px;
+      }
+      .state-number {
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .state-note {
+        font-size: 15px;
+      }
+      .actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 22px;
+      }
+      .actions button {
+        width: 100%;
+      }
+      .facts {
+        border-top: 1px solid var(--line);
+        margin-top: 22px;
+        padding-top: 15px;
+        display: grid;
+        grid-template-columns: 100px 1fr;
+        font-size: 13px;
+        gap: 7px;
+      }
+      .facts dt {
+        color: var(--muted);
+      }
+      .facts dd {
+        margin: 0;
+      }
+      .steps {
+        list-style: none;
+        padding: 0;
+        margin: 20px 0 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .steps button {
+        font-size: 12px;
+        padding: 6px 10px;
+      }
+      .flow {
+        max-width: 1384px;
+        margin: 0 auto 24px;
+        padding: 18px 22px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      .flow-line {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 8px 0;
+      }
+      .flow-line button {
+        font-size: 13px;
+        padding: 7px 11px;
+      }
+      .flow-line span {
+        color: var(--muted);
+      }
+      .notice {
+        font-size: 13px;
+        border-left: 2px solid var(--accent);
+        padding: 0 0 0 12px;
+        margin-top: 26px;
+      }
+      .gallery {
+        padding: 28px 32px;
+        max-width: 1680px;
+        margin: auto;
+      }
+      .gallery-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+        gap: 28px;
+      }
+      .tile {
+        margin: 0;
+      }
+      .tile img {
+        display: block;
+        width: 100%;
+        max-width: 480px;
+        border-radius: 8px;
+      }
+      .tile button {
+        padding: 0;
+        background: none;
+        border: 0;
+        width: 100%;
+        display: block;
+      }
+      .tile h3 {
+        margin: 12px 0 4px;
+        font-size: 16px;
+      }
+      .tile p {
+        font-size: 13px;
+      }
+      .gallery-group {
+        margin-bottom: 38px;
+      }
+      .review {
+        max-width: 1384px;
+        margin: 0 auto 40px;
+        padding: 0 22px;
+        font-size: 13px;
+      }
+      .review strong {
+        color: var(--ink);
+      }
+      [hidden] {
+        display: none !important;
+      }
+      .arrow {
+        font-size: 20px;
+      }
+      .download {
+        font-size: 13px;
+        white-space: nowrap;
+      }
+      .source {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      @media (max-width: 1150px) {
+        .layout {
+          grid-template-columns: 190px 508px;
+          justify-content: center;
+        }
+        .inspector {
+          grid-column: 1/-1;
+        }
+        .actions {
+          flex-direction: row;
+          flex-wrap: wrap;
+        }
+        .actions button {
+          width: auto;
+        }
+        .facts {
+          grid-template-columns: 120px 1fr;
+        }
+        .flow {
+          margin: 0 24px 24px;
+        }
+      }
+      @media (max-width: 760px) {
+        header {
+          display: block;
+          padding: 20px;
+        }
+        .tabs {
+          margin-top: 16px;
+        }
+        .layout {
+          display: flex;
+          flex-direction: column;
+          padding: 20px;
+          gap: 20px;
+        }
+        .paths {
+          flex-direction: row;
+          overflow-x: auto;
+        }
+        .paths button {
+          min-width: 170px;
+        }
+        .device {
+          width: min(508px, 100%);
+          padding: 10px;
+          border-radius: 12px;
+        }
+        .display {
+          width: 100%;
+          height: auto;
+          aspect-ratio: 1;
+        }
+        .gallery {
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <div class="eyebrow">Attractap · ATT-880 · Review prototype</div>
+        <h1>One list. Two clear actions.</h1>
+        <p class="intro">
+          Does this reader flow work before we implement it? Explore the 480 × 480 LVGL renders and each transition.
+          Fictional data, no reader or server connection.
+        </p>
+      </div>
+      <nav class="tabs">
+        <button id="flow-tab" aria-pressed="true">Walkthrough</button
+        ><button id="gallery-tab" aria-pressed="false">All 34 states</button>
+      </nav>
+    </header>
+    <main id="walkthrough">
+      <div class="layout">
+        <aside>
+          <h3>Guided paths</h3>
+          <div id="paths" class="paths"></div>
+          <p class="notice">
+            Click the rendered screen or use the action buttons. Pending states wait for you to choose the simulated
+            response.
+          </p>
+          <p class="source">
+            Native LVGL pixels, current firmware fonts and theme. Details and prerequisites are representative fixtures,
+            not production behavior.
+          </p>
+        </aside>
+        <section>
+          <div class="device">
+            <div id="display" class="display">
+              <img id="frame" alt="" />
+              <div id="hotspots"></div>
+            </div>
+          </div>
+          <div class="under-device">
+            <span>480 × 480 · actual reader resolution</span><button id="restart">Restart path</button>
+          </div>
+          <ol id="steps" class="steps"></ol>
+        </section>
+        <section class="inspector" aria-live="polite">
+          <div id="number" class="state-number"></div>
+          <h2 id="state-title"></h2>
+          <p id="state-note" class="state-note"></p>
+          <div id="actions" class="actions"></div>
+          <dl class="facts">
+            <dt>Signed in</dt>
+            <dd id="auth-fact"></dd>
+            <dt>View</dt>
+            <dd id="view-fact"></dd>
+            <dt>Actions</dt>
+            <dd id="action-fact"></dd>
+            <dt>Persistence</dt>
+            <dd>None · storyboard resets per path</dd>
+          </dl>
+          <p class="notice">
+            The latest ticket corrections govern this proposal: details on the left, action on the right, equal flush
+            halves on every row, no selected-row highlight.
+          </p>
+        </section>
+      </div>
+      <section class="flow">
+        <h3>UI flow</h3>
+        <div class="flow-line">
+          <button data-goto="01-home">Unsigned list</button><span>→ NFC scan →</span
+          ><button data-goto="04-authenticated">Signed-in list</button><span>→ left half →</span
+          ><button data-goto="10-details">Details / project</button>
+        </div>
+        <div class="flow-line">
+          <span>Right half →</span><button data-goto="14-required-form">Form, if required</button><span>or</span
+          ><button data-goto="17-supervisor-waiting">Supervisor, if required</button><span>→</span
+          ><button data-goto="06-starting">Pending action</button><span>→</span
+          ><button data-goto="07-started">Updated list</button>
+        </div>
+        <div class="flow-line">
+          <button data-goto="02-scan-for-details">Resource first</button><span>→ NFC scan →</span
+          ><button data-goto="10-details">That resource’s details</button><span> · logout / expiry →</span
+          ><button data-goto="31-logged-out">Unsigned list</button>
+        </div>
+      </section>
+      <section class="review">
+        <strong>Review choices:</strong> the resource-first path retains the ticket’s original requirement without
+        highlighting a selection. Quick Start has no project; project-specific starts use details. Doors get “Öffnen” on
+        the right. A one-resource reader keeps the split list. These are proposals to validate before implementation.
+        Setup, enrollment and firmware-update screens are outside ATT-880.
+      </section>
+    </main>
+    <main id="gallery" class="gallery" hidden></main>
+    <script>
+      const states = __STATES__;
+      const stateById = Object.fromEntries(states.map((s) => [s.id, s]));
+      const paths = [
+        {
+          name: 'Scan → quick Start',
+          hint: 'Main path · 5 states',
+          ids: ['01-home', '03-authenticating', '04-authenticated', '06-starting', '07-started'],
+        },
+        {
+          name: 'Resource → scan → details',
+          hint: 'The alternate entry path',
+          ids: [
+            '01-home',
+            '02-scan-for-details',
+            '03-authenticating',
+            '10-details',
+            '11-project-picker',
+            '12-project-selected',
+            '06-starting',
+            '13-active-details',
+          ],
+        },
+        {
+          name: 'Quick Stop',
+          hint: 'Stop your 3D printer usage',
+          ids: ['04-authenticated', '08-stopping', '09-stopped'],
+        },
+        {
+          name: 'Required form',
+          hint: 'Complete, validate or cancel',
+          ids: [
+            '04-authenticated',
+            '14-required-form',
+            '16-form-validation',
+            '15-form-ready',
+            '06-starting',
+            '07-started',
+          ],
+        },
+        {
+          name: 'Supervisor approval',
+          hint: 'Wait, reject, retry, approve',
+          ids: [
+            '04-authenticated',
+            '17-supervisor-waiting',
+            '18-supervisor-checking',
+            '19-supervisor-rejected',
+            '17-supervisor-waiting',
+            '06-starting',
+            '07-started',
+          ],
+        },
+        {
+          name: 'Door controls',
+          hint: 'Quick open and full details',
+          ids: ['04-authenticated', '21-door-details', '22-door-pending', '23-door-opened'],
+        },
+        {
+          name: 'Errors and restrictions',
+          hint: 'Permission and recovery fixtures',
+          ids: [
+            '05-auth-rejected',
+            '20-action-error',
+            '24-other-user',
+            '25-takeover',
+            '26-no-introduction',
+            '28-introduction-details',
+            '27-maintenance',
+            '29-offline',
+          ],
+        },
+        {
+          name: 'Logout and setup',
+          hint: 'Expiry, empty and one-resource',
+          ids: ['30-expiring', '32-expired', '31-logged-out', '33-no-resources', '34-one-resource'],
+        },
+      ];
+      // Pure finite storyboard state. Screens are native LVGL fixtures, not browser copies.
+      function reduce(current, event) {
+        if (event.type === 'path')
+          return { path: event.path, id: paths[event.path].ids[0], entry: event.path === 1 ? 'resource' : 'scan' };
+        if (event.type === 'goto') return { ...current, id: event.id, entry: event.entry || current.entry };
+        return current;
+      }
+      let review = { path: 0, id: '01-home', entry: 'scan' };
+      const guestIds = new Set([
+        '01-home',
+        '02-scan-for-details',
+        '03-authenticating',
+        '05-auth-rejected',
+        '29-offline',
+        '31-logged-out',
+        '32-expired',
+        '33-no-resources',
+      ]);
+      const busyIds = new Set([
+        '03-authenticating',
+        '06-starting',
+        '08-stopping',
+        '18-supervisor-checking',
+        '22-door-pending',
+      ]);
+      function choices() {
+        const id = review.id;
+        const authSuccess = review.entry === 'resource' ? '10-details' : '04-authenticated';
+        const startSuccess = review.path === 1 ? '13-active-details' : '07-started';
+        const list = [
+          ['Scan NFC card', '03-authenticating'],
+          ['Open Lasercutter', '02-scan-for-details'],
+        ];
+        const actions = {
+          '01-home': list,
+          '31-logged-out': list,
+          '32-expired': list,
+          '02-scan-for-details': [
+            ['Scan NFC card', '03-authenticating'],
+            ['Cancel → list', '01-home'],
+          ],
+          '03-authenticating': [
+            ['Card accepted', authSuccess],
+            ['Card rejected', '05-auth-rejected'],
+          ],
+          '04-authenticated': [
+            ['Start Lasercutter', '06-starting'],
+            ['Lasercutter details', '10-details'],
+            ['Stop 3D printer', '08-stopping'],
+            ['Open door', '22-door-pending'],
+            ['Log out', '31-logged-out'],
+          ],
+          '05-auth-rejected': [['Dismiss → try again', '01-home']],
+          '06-starting': [
+            ['Server confirms start', startSuccess],
+            ['Required form returned', '14-required-form'],
+            ['Supervisor required', '17-supervisor-waiting'],
+            ['No confirmed result', '20-action-error'],
+          ],
+          '07-started': [
+            ['Open active Lasercutter details', '13-active-details'],
+            ['Stop 3D printer', '08-stopping'],
+            ['Log out (usage continues)', '31-logged-out'],
+          ],
+          '08-stopping': [
+            ['Server confirms stop', '09-stopped'],
+            ['Connection lost', '29-offline'],
+          ],
+          '09-stopped': [
+            ['Open Lasercutter details', '10-details'],
+            ['Log out', '31-logged-out'],
+          ],
+          '10-details': [
+            ['Use resource', '06-starting'],
+            ['Choose project', '11-project-picker'],
+            ['Back → signed-in list', '04-authenticated'],
+            ['Log out', '31-logged-out'],
+          ],
+          '11-project-picker': [
+            ['Select Regalbau', '12-project-selected'],
+            ['Without project / cancel', '10-details'],
+          ],
+          '12-project-selected': [
+            ['Start with Regalbau', '06-starting'],
+            ['Change project', '11-project-picker'],
+            ['Back → list', '04-authenticated'],
+          ],
+          '13-active-details': [
+            ['Back → signed-in list', '07-started'],
+            ['Log out (usage continues)', '31-logged-out'],
+          ],
+          '14-required-form': [
+            ['Confirm safety check', '15-form-ready'],
+            ['Submit incomplete form', '16-form-validation'],
+            ['Cancel → list', '04-authenticated'],
+          ],
+          '15-form-ready': [
+            ['Submit → resume start', '06-starting'],
+            ['Cancel → list', '04-authenticated'],
+          ],
+          '16-form-validation': [
+            ['Complete the missing field', '15-form-ready'],
+            ['Cancel → list', '04-authenticated'],
+          ],
+          '17-supervisor-waiting': [
+            ['Hold supervisor NFC card', '18-supervisor-checking'],
+            ['Cancel → list', '04-authenticated'],
+          ],
+          '18-supervisor-checking': [
+            ['Supervisor accepted', '06-starting'],
+            ['Supervisor rejected', '19-supervisor-rejected'],
+          ],
+          '19-supervisor-rejected': [
+            ['Try another supervisor', '17-supervisor-waiting'],
+            ['Cancel → list', '04-authenticated'],
+          ],
+          '20-action-error': [
+            ['Refresh: resource is available', '04-authenticated'],
+            ['Refresh: usage did start', '07-started'],
+            ['Reader disconnected', '29-offline'],
+          ],
+          '21-door-details': [
+            ['Open door', '22-door-pending'],
+            ['Back → list', '04-authenticated'],
+          ],
+          '22-door-pending': [
+            ['Server confirms door command', '23-door-opened'],
+            ['Connection lost', '29-offline'],
+          ],
+          '23-door-opened': [
+            ['Back → signed-in list', '04-authenticated'],
+            ['Log out', '31-logged-out'],
+          ],
+          '24-other-user': [
+            ['Details: takeover permission present', '25-takeover'],
+            ['Back → normal fixture', '04-authenticated'],
+          ],
+          '25-takeover': [['Back → list', '24-other-user']],
+          '26-no-introduction': [
+            ['See introduction guidance', '28-introduction-details'],
+            ['Back → normal fixture', '04-authenticated'],
+          ],
+          '27-maintenance': [['Back → list', '04-authenticated']],
+          '28-introduction-details': [['Back → list', '26-no-introduction']],
+          '29-offline': [['Connection restored → sign in', '01-home']],
+          '30-expiring': [
+            ['Touch screen → renew login', '04-authenticated'],
+            ['Wait 5 seconds → expire', '32-expired'],
+            ['Log out now', '31-logged-out'],
+          ],
+          '33-no-resources': [['Fixture: reader is configured', '01-home']],
+          '34-one-resource': [
+            ['Start Lasercutter', '06-starting'],
+            ['Open details', '10-details'],
+            ['Log out', '31-logged-out'],
+          ],
+        };
+        return actions[id] || [];
+      }
+      function go(id, entry) {
+        review = reduce(review, { type: 'goto', id, entry });
+        render();
+      }
+      function makeButton(title, onClick, primary = false) {
+        const b = document.createElement('button');
+        b.textContent = title;
+        b.addEventListener('click', onClick);
+        if (primary) b.className = 'primary';
+        return b;
+      }
+      function addHotspot(x, y, w, h, title, id, entry) {
+        const b = makeButton(title, () => go(id, entry));
+        b.textContent = '';
+        b.className = 'hotspot';
+        b.setAttribute('aria-label', title);
+        b.title = title;
+        Object.assign(b.style, {
+          left: x / 4.8 + '%',
+          top: y / 4.8 + '%',
+          width: w / 4.8 + '%',
+          height: h / 4.8 + '%',
+        });
+        document.querySelector('#hotspots').append(b);
+      }
+      function render() {
+        const s = stateById[review.id];
+        document.querySelector('#frame').src = s.image;
+        document.querySelector('#frame').alt = s.title + ' — ' + s.note;
+        document.querySelector('#number').textContent = 'STATE ' + s.id.slice(0, 2) + ' / 34 · ' + s.group;
+        document.querySelector('#state-title').textContent = s.title;
+        document.querySelector('#state-note').textContent = s.note;
+        document.querySelector('#auth-fact').textContent = guestIds.has(s.id) ? 'No' : 'jappy';
+        document.querySelector('#view-fact').textContent = s.title;
+        document.querySelector('#action-fact').textContent = busyIds.has(s.id)
+          ? 'Blocked while waiting for response'
+          : 'As shown in this fixture';
+        const actions = document.querySelector('#actions');
+        actions.replaceChildren();
+        choices().forEach(([title, id], i) =>
+          actions.append(
+            makeButton(
+              title,
+              () =>
+                go(
+                  id,
+                  id === '02-scan-for-details'
+                    ? 'resource'
+                    : review.id === '01-home' && id === '03-authenticating'
+                      ? 'scan'
+                      : undefined,
+                ),
+              i === 0,
+            ),
+          ),
+        );
+        const nav = document.querySelector('#paths');
+        nav.replaceChildren();
+        paths.forEach((p, i) => {
+          const b = makeButton(p.name, () => {
+            review = reduce(review, { type: 'path', path: i });
+            render();
+          });
+          const sub = document.createElement('small');
+          sub.textContent = p.hint;
+          b.append(sub);
+          b.setAttribute('aria-pressed', String(review.path === i));
+          nav.append(b);
+        });
+        const steps = document.querySelector('#steps');
+        steps.replaceChildren();
+        paths[review.path].ids.forEach((id, i) => {
+          const li = document.createElement('li');
+          const b = makeButton(i + 1 + '. ' + stateById[id].title, () => go(id));
+          b.setAttribute('aria-pressed', String(s.id === id));
+          li.append(b);
+          steps.append(li);
+        });
+        document.querySelector('#hotspots').replaceChildren();
+        if (!guestIds.has(s.id) && !busyIds.has(s.id)) addHotspot(20, 20, 104, 46, 'Log out', '31-logged-out');
+        if (['01-home', '31-logged-out', '32-expired'].includes(s.id))
+          addHotspot(20, 86, 440, 72, 'Open Lasercutter, then scan', '02-scan-for-details', 'resource');
+        if (['04-authenticated', '34-one-resource', '07-started', '09-stopped'].includes(s.id)) {
+          addHotspot(
+            20,
+            86,
+            220,
+            72,
+            'Lasercutter details',
+            s.id === '07-started' ? '13-active-details' : '10-details',
+          );
+          if (s.id !== '07-started') addHotspot(240, 86, 220, 72, 'Start Lasercutter', '06-starting');
+          if (s.id !== '34-one-resource') {
+            if (s.id !== '09-stopped') addHotspot(240, 168, 220, 72, 'Stop 3D printer', '08-stopping');
+            addHotspot(20, 250, 220, 72, 'Maintenance details', '27-maintenance');
+            addHotspot(20, 332, 220, 72, 'Door details', '21-door-details');
+            addHotspot(240, 332, 220, 72, 'Open door', '22-door-pending');
+          }
+        }
+        if (
+          [
+            '10-details',
+            '12-project-selected',
+            '13-active-details',
+            '21-door-details',
+            '23-door-opened',
+            '27-maintenance',
+            '28-introduction-details',
+          ].includes(s.id)
+        )
+          addHotspot(20, 83, 92, 36, 'Back to list', s.id === '13-active-details' ? '07-started' : '04-authenticated');
+        if (['10-details', '12-project-selected'].includes(s.id)) {
+          addHotspot(20, 230, 440, 52, 'Choose a project', '11-project-picker');
+          addHotspot(20, 302, 440, 60, 'Use Lasercutter', '06-starting');
+        }
+        if (s.id === '02-scan-for-details') addHotspot(20, 84, 110, 42, 'Cancel resource-first sign in', '01-home');
+        if (s.id === '11-project-picker') {
+          addHotspot(20, 192, 440, 58, 'Without project', '10-details');
+          addHotspot(20, 262, 440, 58, 'Choose Regalbau', '12-project-selected');
+          addHotspot(20, 410, 440, 48, 'Cancel', '10-details');
+        }
+        if (['14-required-form', '15-form-ready', '16-form-validation'].includes(s.id)) {
+          addHotspot(36, 245, 408, 42, 'Confirm safety check', '15-form-ready');
+          addHotspot(20, 390, 166, 58, 'Cancel form', '04-authenticated');
+          addHotspot(196, 390, 264, 58, 'Submit form', s.id === '15-form-ready' ? '06-starting' : '16-form-validation');
+        }
+        if (['17-supervisor-waiting', '19-supervisor-rejected'].includes(s.id))
+          addHotspot(20, 390, 440, 58, 'Cancel supervision', '04-authenticated');
+        if (s.id === '21-door-details' || s.id === '23-door-opened')
+          addHotspot(20, 234, 440, 55, 'Open door', '22-door-pending');
+        if (s.id === '05-auth-rejected') addHotspot(48, 313, 384, 54, 'Dismiss error', '01-home');
+        if (s.id === '20-action-error') addHotspot(48, 313, 384, 54, 'Refresh resource status', '04-authenticated');
+        try {
+          history.replaceState(null, '', '#' + s.id);
+        } catch {}
+      }
+      function showGallery(on) {
+        document.querySelector('#walkthrough').hidden = on;
+        document.querySelector('#gallery').hidden = !on;
+        document.querySelector('#gallery-tab').setAttribute('aria-pressed', String(on));
+        document.querySelector('#flow-tab').setAttribute('aria-pressed', String(!on));
+      }
+      const gallery = document.querySelector('#gallery');
+      for (const group of [...new Set(states.map((s) => s.group))]) {
+        const section = document.createElement('section');
+        section.className = 'gallery-group';
+        const h = document.createElement('h2');
+        h.textContent = group;
+        section.append(h);
+        const grid = document.createElement('div');
+        grid.className = 'gallery-grid';
+        for (const s of states.filter((s) => s.group === group)) {
+          const tile = document.createElement('article');
+          tile.className = 'tile';
+          const b = makeButton('', () => {
+            go(s.id);
+            showGallery(false);
+            window.scrollTo(0, 0);
+          });
+          b.setAttribute('aria-label', 'Explore ' + s.title);
+          const img = document.createElement('img');
+          img.src = s.image;
+          img.alt = s.title;
+          img.loading = 'lazy';
+          b.append(img);
+          const title = document.createElement('h3');
+          title.textContent = s.id.slice(0, 2) + ' · ' + s.title;
+          const note = document.createElement('p');
+          note.textContent = s.note;
+          tile.append(b, title, note);
+          grid.append(tile);
+        }
+        section.append(grid);
+        gallery.append(section);
+      }
+      document.querySelector('#flow-tab').addEventListener('click', () => showGallery(false));
+      document.querySelector('#gallery-tab').addEventListener('click', () => showGallery(true));
+      document.querySelector('#restart').addEventListener('click', () => {
+        review = reduce(review, { type: 'path', path: review.path });
+        render();
+      });
+      document.querySelectorAll('[data-goto]').forEach((b) => b.addEventListener('click', () => go(b.dataset.goto)));
+      if (stateById[location.hash.slice(1)]) review.id = location.hash.slice(1);
+      render();
+    </script>
+  </body>
+</html>
