@@ -262,7 +262,11 @@ describe('administration lifecycle hooks', () => {
     await controller.removeRegistry('private', req);
     await controller.updateInstalledPackageSpec(plugin.name, plugin.requestedSpec, req);
     await controller.updateInstalledPackageOverride(plugin.name, 'inherit', req);
-    await controller.updateInstalledPackagePolicy(plugin.name, plugin.requestedSpec, 'inherit', req);
+    await controller.updateInstalledPackagePolicy(
+      plugin.name,
+      { requestedSpec: plugin.requestedSpec, updateOverride: 'inherit' },
+      req,
+    );
     await controller.setUpdatePolicy({}, req);
     await controller.checkInstalledPackage(plugin.name, req);
     await controller.removeInstalledPackage(plugin.name, req);
@@ -298,8 +302,15 @@ describe('administration lifecycle hooks', () => {
       }),
     };
     const controller = new PluginController({ requestRestart: jest.fn() } as never, npm as never, audit as never);
-    await controller.installPackage(plugin.name, '2.0.0', 'default', req);
-    await expect(controller.replaceInstalledPackage(plugin.name, '2.0.0', [], true, req)).rejects.toThrow(secret);
+    await controller.installPackage(plugin.name, '2.0.0', { registryId: 'default' }, req);
+    await expect(
+      controller.replaceInstalledPackage(
+        plugin.name,
+        '2.0.0',
+        { approvedPermissionAdditions: [], approvedMajorVersion: true },
+        req,
+      ),
+    ).rejects.toThrow(secret);
     const events = recorded(audit);
     expect(events[0]).toMatchObject({
       outcome: 'succeeded',

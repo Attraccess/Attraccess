@@ -12,6 +12,12 @@ interface DeleteOptions {
 const hoisted = vi.hoisted(() => ({
   deleteMutateMock: vi.fn(),
   checkAllInstalledPackagesMock: vi.fn(),
+  addRegistryMock: vi.fn(),
+  testRegistryMock: vi.fn(),
+  removeRegistryMock: vi.fn(),
+  installPackageMock: vi.fn(),
+  replaceInstalledPackageMock: vi.fn(),
+  updateInstalledPackagePolicyMock: vi.fn(),
   retryMutateAsyncMock: vi.fn(),
   statusRefetchMock: vi.fn(),
   successToast: vi.fn(),
@@ -38,6 +44,24 @@ vi.mock('@attraccess/react-query-client', () => ({
   }),
   usePluginsServicePluginControllerCheckAllInstalledPackages: () => ({
     mutateAsync: hoisted.checkAllInstalledPackagesMock,
+    isPending: false,
+  }),
+  usePluginsServicePluginControllerAddRegistry: () => ({ mutateAsync: hoisted.addRegistryMock, isPending: false }),
+  usePluginsServicePluginControllerTestRegistry: () => ({ mutateAsync: hoisted.testRegistryMock, isPending: false }),
+  usePluginsServicePluginControllerRemoveRegistry: () => ({
+    mutateAsync: hoisted.removeRegistryMock,
+    isPending: false,
+  }),
+  usePluginsServicePluginControllerInstallPackage: () => ({
+    mutateAsync: hoisted.installPackageMock,
+    isPending: false,
+  }),
+  usePluginsServicePluginControllerReplaceInstalledPackage: () => ({
+    mutateAsync: hoisted.replaceInstalledPackageMock,
+    isPending: false,
+  }),
+  usePluginsServicePluginControllerUpdateInstalledPackagePolicy: () => ({
+    mutateAsync: hoisted.updateInstalledPackagePolicyMock,
     isPending: false,
   }),
   usePluginsServiceRetryPlugin: () => ({ mutateAsync: hoisted.retryMutateAsyncMock, isPending: false }),
@@ -70,6 +94,12 @@ function makePlugin(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   hoisted.deleteMutateMock.mockReset();
   hoisted.checkAllInstalledPackagesMock.mockReset();
+  hoisted.addRegistryMock.mockReset();
+  hoisted.testRegistryMock.mockReset();
+  hoisted.removeRegistryMock.mockReset();
+  hoisted.installPackageMock.mockReset();
+  hoisted.replaceInstalledPackageMock.mockReset();
+  hoisted.updateInstalledPackagePolicyMock.mockReset();
   hoisted.retryMutateAsyncMock.mockReset();
   hoisted.statusRefetchMock.mockReset();
   hoisted.successToast.mockReset();
@@ -80,6 +110,12 @@ beforeEach(() => {
   hoisted.statusRefetchMock.mockResolvedValue({ data: hoisted.pluginSystemStatus });
   hoisted.retryMutateAsyncMock.mockResolvedValue({ ok: true });
   hoisted.checkAllInstalledPackagesMock.mockResolvedValue([]);
+  hoisted.addRegistryMock.mockResolvedValue({});
+  hoisted.testRegistryMock.mockResolvedValue({ ok: true });
+  hoisted.removeRegistryMock.mockResolvedValue(undefined);
+  hoisted.installPackageMock.mockResolvedValue({});
+  hoisted.replaceInstalledPackageMock.mockResolvedValue({});
+  hoisted.updateInstalledPackagePolicyMock.mockResolvedValue({});
   vi.stubGlobal(
     'fetch',
     vi.fn((input: { url?: string } | string) => {
@@ -382,10 +418,11 @@ describe('PluginsSection', () => {
     await user.click(within(installDialog as HTMLElement).getByRole('button', { name: 'Install plugin' }));
 
     await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('/api/plugins/npm/%40private%2Fplugin/versions/2.3.4'),
-        expect.objectContaining({ method: 'POST', body: JSON.stringify({ registryId: 'private' }) }),
-      ),
+      expect(hoisted.installPackageMock).toHaveBeenCalledWith({
+        packageName: '@private/plugin',
+        version: '2.3.4',
+        requestBody: { registryId: 'private' },
+      }),
     );
   });
 
@@ -488,6 +525,13 @@ describe('PluginsSection', () => {
     const secondTest = deferred<{ ok: boolean }>();
     const latestFirstTest = deferred<{ ok: boolean }>();
     let firstTestRequests = 0;
+    hoisted.testRegistryMock.mockImplementation(({ registryId }: { registryId: string }) => {
+      if (registryId === 'first') {
+        firstTestRequests += 1;
+        return firstTestRequests === 1 ? firstTest.promise : latestFirstTest.promise;
+      }
+      return secondTest.promise;
+    });
     vi.stubGlobal(
       'fetch',
       vi.fn((input: { url?: string } | string, init?: { method?: string }) => {
@@ -500,11 +544,6 @@ describe('PluginsSection', () => {
               { id: 'second', name: 'Second', url: 'https://second.example.test', tokenConfigured: false },
             ],
           });
-        if (request.url?.endsWith('/registries/first/test')) {
-          firstTestRequests += 1;
-          return firstTestRequests === 1 ? firstTest.promise : latestFirstTest.promise;
-        }
-        if (request.url?.endsWith('/registries/second/test')) return secondTest.promise;
         if (request.url?.includes('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [] });
         return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
       }),

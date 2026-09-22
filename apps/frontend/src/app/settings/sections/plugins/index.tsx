@@ -45,6 +45,12 @@ import {
 } from 'lucide-react';
 import {
   usePluginsServicePluginControllerCheckAllInstalledPackages,
+  usePluginsServicePluginControllerAddRegistry,
+  usePluginsServicePluginControllerInstallPackage,
+  usePluginsServicePluginControllerRemoveRegistry,
+  usePluginsServicePluginControllerReplaceInstalledPackage,
+  usePluginsServicePluginControllerTestRegistry,
+  usePluginsServicePluginControllerUpdateInstalledPackagePolicy,
   usePluginsServiceDeletePlugin,
   usePluginsServiceGetPluginSystemStatus,
   usePluginsServiceGetPlugins,
@@ -187,10 +193,16 @@ export function PluginsSection() {
 
   const { data: plugins } = usePluginsServiceGetPlugins();
   const { data: pluginSystemStatus, refetch: refetchPluginSystemStatus } = usePluginsServiceGetPluginSystemStatus();
-  const {
-    mutateAsync: checkAllInstalledPackages,
-    isPending: isCheckingForUpdates,
-  } = usePluginsServicePluginControllerCheckAllInstalledPackages<InstalledNpmPlugin[]>();
+  const { mutateAsync: checkAllInstalledPackages, isPending: isCheckingForUpdates } =
+    usePluginsServicePluginControllerCheckAllInstalledPackages<InstalledNpmPlugin[]>();
+  const { mutateAsync: addPluginRegistry } = usePluginsServicePluginControllerAddRegistry<Registry>();
+  const { mutateAsync: testPluginRegistry } = usePluginsServicePluginControllerTestRegistry();
+  const { mutateAsync: removePluginRegistry } = usePluginsServicePluginControllerRemoveRegistry();
+  const { mutateAsync: installPluginPackage } = usePluginsServicePluginControllerInstallPackage<InstalledNpmPlugin>();
+  const { mutateAsync: replaceInstalledPlugin } =
+    usePluginsServicePluginControllerReplaceInstalledPackage<InstalledNpmPlugin>();
+  const { mutateAsync: updateInstalledPluginPolicy } =
+    usePluginsServicePluginControllerUpdateInstalledPackagePolicy<InstalledNpmPlugin>();
   const { mutateAsync: retryFailedPlugin } = usePluginsServiceRetryPlugin();
   const pluginsDisabled = pluginSystemStatus?.disabled === true;
   const [failedPlugin, setFailedPlugin] = useState<{ id: string; name: string; error: string } | null>(null);
@@ -337,14 +349,9 @@ export function PluginsSection() {
   const addRegistry = async () => {
     setIsSavingRegistry(true);
     try {
-      // eslint-disable-next-line no-restricted-syntax -- Existing registry creation awaits a broader hook migration.
-      const response = await fetch(`${getBaseUrl()}/api/plugins/registries`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: registryName, url: registryUrl, token: registryToken || undefined }),
+      await addPluginRegistry({
+        requestBody: { name: registryName, url: registryUrl, token: registryToken || undefined },
       });
-      if (!response.ok) throw new Error(await response.text());
       setRegistryName('');
       setRegistryUrl('');
       setRegistryToken('');
@@ -362,12 +369,7 @@ export function PluginsSection() {
     latestRegistryTest.current = request;
     setTestingRegistryId(registryId);
     try {
-      // eslint-disable-next-line no-restricted-syntax -- Existing registry testing awaits a broader hook migration.
-      const response = await fetch(`${getBaseUrl()}/api/plugins/registries/${encodeURIComponent(registryId)}/test`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error();
+      await testPluginRegistry({ registryId });
       toast.success({ title: t('marketplace.registryTestSuccess') });
     } catch {
       toast.error({ title: t('marketplace.registryTestError') });
@@ -381,12 +383,7 @@ export function PluginsSection() {
 
   const removeRegistry = async (registryId: string) => {
     try {
-      // eslint-disable-next-line no-restricted-syntax -- Existing registry deletion awaits a broader hook migration.
-      const response = await fetch(`${getBaseUrl()}/api/plugins/registries/${encodeURIComponent(registryId)}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error();
+      await removePluginRegistry({ registryId });
       if (selectedRegistryId === registryId) setSelectedRegistryId('');
       await loadRegistries();
     } catch {
@@ -430,17 +427,11 @@ export function PluginsSection() {
     if (!pluginToInstall?.version) return;
     setIsInstalling(true);
     try {
-      // eslint-disable-next-line no-restricted-syntax -- Existing package installation awaits a broader hook migration.
-      const response = await fetch(
-        `${getBaseUrl()}/api/plugins/npm/${encodeURIComponent(pluginToInstall.name)}/versions/${pluginToInstall.version}`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ registryId: pluginToInstall.registry.id }),
-        },
-      );
-      if (!response.ok) throw new Error();
+      await installPluginPackage({
+        packageName: pluginToInstall.name,
+        version: pluginToInstall.version,
+        requestBody: { registryId: pluginToInstall.registry.id },
+      });
       toast.success({ title: t('marketplace.installSuccess') });
       setTimeout(() => window.location.reload(), 5000);
       setPluginToInstall(null);
@@ -499,20 +490,14 @@ export function PluginsSection() {
     if (!versionPlugin || !selectedVersion) return;
     setIsReplacing(true);
     try {
-      // eslint-disable-next-line no-restricted-syntax -- Existing version replacement awaits a broader hook migration.
-      const response = await fetch(
-        `${getBaseUrl()}/api/plugins/installed/${encodeURIComponent(versionPlugin.name)}/versions/${selectedVersion.version}`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            approvedPermissionAdditions: selectedVersion.permissionAdditions,
-            approvedMajorVersion: majorApproved,
-          }),
+      await replaceInstalledPlugin({
+        packageName: versionPlugin.name,
+        version: selectedVersion.version,
+        requestBody: {
+          approvedPermissionAdditions: selectedVersion.permissionAdditions,
+          approvedMajorVersion: majorApproved,
         },
-      );
-      if (!response.ok) throw new Error(await response.text());
+      });
       toast.success({ title: t('success.replace.title'), description: t('success.replace.description') });
       setTimeout(() => window.location.reload(), 5000);
       setVersionPlugin(null);
@@ -526,18 +511,10 @@ export function PluginsSection() {
   const saveVersionPolicy = async () => {
     if (!versionPlugin) return;
     try {
-      // eslint-disable-next-line no-restricted-syntax -- Existing update-policy saving awaits a broader hook migration.
-      const response = await fetch(
-        `${getBaseUrl()}/api/plugins/installed/${encodeURIComponent(versionPlugin.name)}/update-policy`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ requestedSpec, updateOverride }),
-        },
-      );
-      if (!response.ok) throw new Error();
-      const installed = (await response.json()) as InstalledNpmPlugin;
+      const installed = await updateInstalledPluginPolicy({
+        packageName: versionPlugin.name,
+        requestBody: { requestedSpec, updateOverride },
+      });
       setInstalledNpmPlugins((current) => new Map(current).set(installed.name, installed));
       toast.success({ title: t('versionManagement.policySaved') });
     } catch {
