@@ -111,7 +111,7 @@ export async function run(root) {
     encoding: 'utf8',
   })
     .split('\0')
-    .filter(Boolean);
+    .filter((file) => file && existsSync(path.resolve(workspace, file)));
   const roots =
     root === '.' ? ['scripts', 'examples', 'apps/plugins/scripts', 'apps/attractap/hardware/scripts'] : [root];
   const nestedProjects = tracked
