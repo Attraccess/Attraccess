@@ -206,35 +206,19 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
           {diagnostics.data && <Chip variant="soft">Runtime {diagnostics.data.runtimeVersion}</Chip>}
         </div>
       </header>
-      <div className="wg:sticky wg:top-0 wg:z-10 wg:flex wg:flex-wrap wg:items-center wg:justify-between wg:gap-3 wg:rounded-xl wg:border wg:border-border wg:bg-surface wg:p-4">
-        <div>
-          <p role="status" className="wg:font-medium">
-            {dirty
-              ? 'Unsaved local edits'
-              : draft.data
-                ? 'Draft is saved'
-                : baseline.data
-                  ? `Starting from applied revision ${baseline.data.revision}`
-                  : 'No saved draft yet'}
-          </p>
-          <p className="wg:text-sm wg:text-muted">
-            {snapshot.logicalChannels.length} channels · {snapshot.modbus?.devices.length ?? 0} external devices
-          </p>
-        </div>
-        <div className="wg:flex wg:flex-wrap wg:gap-2">
-          <Button
-            variant="secondary"
-            isDisabled={editingDisabled || modbusErrors.length > 0}
-            isPending={save.isPending || validate.isPending}
-            onPress={() => void saveDraft()}
-          >
-            Save draft
-          </Button>
-          <Button isDisabled={busy || !initialized} onPress={() => setSection('review')}>
-            Review changes <ArrowRight className="wg:size-4" />
-          </Button>
-        </div>
-      </div>
+      <ConfigurationToolbar
+        snapshot={snapshot}
+        dirty={dirty}
+        draft={draft.data}
+        baseline={baseline.data}
+        editingDisabled={editingDisabled}
+        hasErrors={modbusErrors.length > 0}
+        saving={save.isPending || validate.isPending}
+        busy={busy}
+        initialized={initialized}
+        onSave={() => void saveDraft()}
+        onReview={() => setSection('review')}
+      />
       <DraftFeedback
         draft={draft}
         baseline={baseline}
@@ -555,5 +539,58 @@ function LocalDraftReview({
         )}
       </Card.Content>
     </Card>
+  );
+}
+
+function ConfigurationToolbar({
+  snapshot,
+  dirty,
+  draft,
+  baseline,
+  editingDisabled,
+  hasErrors,
+  saving,
+  busy,
+  initialized,
+  onSave,
+  onReview,
+}: {
+  snapshot: WagoConfigurationSnapshot;
+  dirty: boolean;
+  draft: ReturnType<typeof useDraftQuery>['data'];
+  baseline: ReturnType<typeof useConfigurationBaselineQuery>['data'];
+  editingDisabled: boolean;
+  hasErrors: boolean;
+  saving: boolean;
+  busy: boolean;
+  initialized: boolean;
+  onSave: () => void;
+  onReview: () => void;
+}) {
+  return (
+    <div className="wg:sticky wg:top-0 wg:z-10 wg:flex wg:flex-wrap wg:items-center wg:justify-between wg:gap-3 wg:rounded-xl wg:border wg:border-border wg:bg-surface wg:p-4">
+      <div>
+        <p role="status" className="wg:font-medium">
+          {dirty
+            ? 'Unsaved local edits'
+            : draft
+              ? 'Draft is saved'
+              : baseline
+                ? `Starting from applied revision ${baseline.revision}`
+                : 'No saved draft yet'}
+        </p>
+        <p className="wg:text-sm wg:text-muted">
+          {snapshot.logicalChannels.length} channels · {snapshot.modbus?.devices.length ?? 0} external devices
+        </p>
+      </div>
+      <div className="wg:flex wg:flex-wrap wg:gap-2">
+        <Button variant="secondary" isDisabled={editingDisabled || hasErrors} isPending={saving} onPress={onSave}>
+          Save draft
+        </Button>
+        <Button isDisabled={busy || !initialized} onPress={onReview}>
+          Review changes <ArrowRight className="wg:size-4" />
+        </Button>
+      </div>
+    </div>
   );
 }

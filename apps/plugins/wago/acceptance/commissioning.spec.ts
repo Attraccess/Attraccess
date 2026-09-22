@@ -39,6 +39,25 @@ describe('signed import to commissioning through real controllers and services (
   const credential = { username: 'operator', password: 'fixture-password' };
   const attempt = { confirmInstall: true, temporarySsh: credential };
 
+  it('keeps browser fixture controls explicit and resets transport and database state', async () => {
+    const server = fixture.app.getHttpServer();
+    await request(server).get('/fixture/reset').expect(405);
+    await request(server).post('/fixture/unknown').expect(404);
+    await request(server).post('/fixture/discover').expect(500);
+    await request(server).post('/fixture/allow-delivery').expect(200);
+    await request(server).post('/fixture/allow-recovery').expect(200);
+    await request(server).post('/fixture/allow-management-recovery').expect(200);
+    expect(fixture.transport.failDelivery).toBe(false);
+    expect(fixture.transport.failRecovery).toBe(false);
+    expect(fixture.transport.failManagementRecovery).toBe(false);
+    await request(server).post('/fixture/reset').expect(200);
+    expect(fixture.transport.failDelivery).toBe(true);
+    expect(fixture.transport.failRecovery).toBe(true);
+    expect(fixture.transport.failManagementRecovery).toBe(true);
+    expect(fixture.transport.copies).toEqual([]);
+    expect(await fixture.catalog.list()).toEqual([]);
+  });
+
   it('verifies actual multipart bytes and rejects a foreign signature without changing the catalog', async () => {
     const original = (await upload().expect(201)).body;
     await upload(fixture.second, signingFixture().release('0.2.0').signature).expect(400);

@@ -11,7 +11,8 @@ import {
   PasswordPolicyRole,
 } from '@attraccess/database-entities';
 import { DEFAULT_PASSWORD_POLICY } from '@attraccess/shared';
-import { PasswordPolicyService } from './password-policy.service';
+import { IdentityAuditService } from '../../audit/identity-audit.service';
+import { PasswordPolicyService, type AuditContext } from './password-policy.service';
 import { HibpClient } from './hibp.client';
 import { ZxcvbnService } from './zxcvbn.service';
 import { RbacService } from '../rbac/rbac.service';
@@ -58,6 +59,16 @@ const buildRow = (overrides: Partial<PasswordPolicy> = {}): PasswordPolicy => ({
 
 describe('PasswordPolicyService', () => {
   let service: PasswordPolicyService;
+  const identityAudit = { record: jest.fn() };
+  const audit: AuditContext = {
+    actorId: 7,
+    actorUsername: 'admin',
+    authenticationMethod: 'api-token',
+    apiTokenId: 9,
+    ip: '192.0.2.7',
+    userAgent: 'fixture',
+    requestId: 'fixture-request',
+  };
   let repo: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; update: jest.Mock };
   let overrideRepo: {
     find: jest.Mock;
@@ -80,6 +91,7 @@ describe('PasswordPolicyService', () => {
   let rbacService: { getEffectivePermissions: jest.Mock };
 
   beforeEach(async () => {
+    identityAudit.record.mockReset();
     repo = {
       findOne: jest.fn(async () => buildRow()),
       create: jest.fn((row) => row),
@@ -109,7 +121,9 @@ describe('PasswordPolicyService', () => {
     };
     authDetailRepo = { findOne: jest.fn(async () => null) };
     hibp = { check: jest.fn(async () => ({ pwned: false, count: 0, available: true })) };
-    zxcvbn = { evaluate: jest.fn(() => ({ score: 4, guessesLog10: 12, crackTimesSeconds: {}, warning: '', suggestions: [] })) };
+    zxcvbn = {
+      evaluate: jest.fn(() => ({ score: 4, guessesLog10: 12, crackTimesSeconds: {}, warning: '', suggestions: [] })),
+    };
     const repoByEntity = new Map<unknown, unknown>([
       [PasswordPolicy, repo],
       [PasswordPolicyOverride, overrideRepo],
@@ -125,6 +139,7 @@ describe('PasswordPolicyService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PasswordPolicyService,
+        { provide: IdentityAuditService, useValue: identityAudit },
         { provide: getRepositoryToken(PasswordPolicy), useValue: repo },
         { provide: getRepositoryToken(PasswordPolicyOverride), useValue: overrideRepo },
         { provide: getRepositoryToken(PasswordHistory), useValue: historyRepo },
@@ -136,6 +151,53 @@ describe('PasswordPolicyService', () => {
       ],
     }).compile();
     service = module.get(PasswordPolicyService);
+  });
+
+  it('audits a committed global policy change with before/after values and actor attribution', async () => {
+    await service.updatePolicy({ minLength: 14 }, audit);
+    expect(identityAudit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'password_policy_updated',
+        actorId: 7,
+        apiTokenId: 9,
+        authenticationMethod: 'api-token',
+        subjectId: 1,
+        outcome: 'succeeded',
+        request: { ipAddress: '192.0.2.7', userAgent: 'fixture' },
+        details: { field: 'minLength', before: expect.any(String), after: expect.any(String) },
+      }),
+    );
+    const details = identityAudit.record.mock.calls[0][0].details;
+    expect(JSON.parse(details.before).minLength).toBe(12);
+    expect(JSON.parse(details.after).minLength).toBe(14);
+  });
+
+  it('audits role override creation and deletion while retaining the deleted policy snapshot', async () => {
+    await service.upsertOverride(PasswordPolicyRole.ADMIN, { minLength: 16, requireDigit: true }, audit);
+    expect(identityAudit.record).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        action: 'password_policy_override_updated',
+        details: { role: PasswordPolicyRole.ADMIN, after: expect.any(String) },
+      }),
+    );
+    overrideRepo.findOne.mockResolvedValue(buildOverride({ minLength: 16, requireDigit: true }));
+    await service.deleteOverride(PasswordPolicyRole.ADMIN, audit);
+    expect(identityAudit.record).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        action: 'password_policy_override_deleted',
+        details: { role: PasswordPolicyRole.ADMIN, before: expect.any(String) },
+      }),
+    );
+    expect(JSON.parse(identityAudit.record.mock.calls[1][0].details.before)).toMatchObject({
+      minLength: 16,
+      requireDigit: true,
+    });
+  });
+
+  it('does not emit successful audit records when policy persistence fails', async () => {
+    repo.save.mockRejectedValueOnce(new Error('Database unavailable'));
+    await expect(service.updatePolicy({ minLength: 14 }, audit)).rejects.toThrow('Database unavailable');
+    expect(identityAudit.record).not.toHaveBeenCalled();
   });
 
   it('seeds defaults when no row exists', async () => {
@@ -162,7 +224,13 @@ describe('PasswordPolicyService', () => {
   });
 
   it('rejects a weak password with structured policy errors', async () => {
-    zxcvbn.evaluate = jest.fn(() => ({ score: 0, guessesLog10: 1, crackTimesSeconds: {}, warning: '', suggestions: [] }));
+    zxcvbn.evaluate = jest.fn(() => ({
+      score: 0,
+      guessesLog10: 1,
+      crackTimesSeconds: {},
+      warning: '',
+      suggestions: [],
+    }));
     const result = await service.validate('password', { username: 'alice', email: 'alice@example.com' });
     expect(result.ok).toBe(false);
     const codes = result.errors.map((e) => e.code);
@@ -204,7 +272,10 @@ describe('PasswordPolicyService', () => {
     it('flags PASSWORD_REUSED when candidate matches current password hash', async () => {
       const currentHash = await bcrypt.hash(currentPassword, 4);
       repo.findOne = jest.fn(async () => buildRow({ historySize: 3 }));
-      authDetailRepo.findOne = jest.fn(async () => ({ password: currentHash, type: AuthenticationType.LOCAL_PASSWORD }));
+      authDetailRepo.findOne = jest.fn(async () => ({
+        password: currentHash,
+        type: AuthenticationType.LOCAL_PASSWORD,
+      }));
 
       const result = await service.validate(
         currentPassword,
@@ -220,9 +291,7 @@ describe('PasswordPolicyService', () => {
       const priorHash = await bcrypt.hash(reusedPriorPassword, 4);
       repo.findOne = jest.fn(async () => buildRow({ historySize: 3 }));
       authDetailRepo.findOne = jest.fn(async () => ({ password: currentHash }));
-      historyRepo.find = jest.fn(async () => [
-        { id: 1, passwordHash: priorHash, userId: 7, createdAt: new Date() },
-      ]);
+      historyRepo.find = jest.fn(async () => [{ id: 1, passwordHash: priorHash, userId: 7, createdAt: new Date() }]);
 
       const result = await service.validate(
         reusedPriorPassword,
@@ -281,18 +350,14 @@ describe('PasswordPolicyService', () => {
     });
 
     it('null override fields fall back to base', async () => {
-      overrideRepo.findOne = jest.fn(async () =>
-        buildOverride({ role: PasswordPolicyRole.ADMIN, minLength: 20 }),
-      );
+      overrideRepo.findOne = jest.fn(async () => buildOverride({ role: PasswordPolicyRole.ADMIN, minLength: 20 }));
       const effective = await service.getEffectivePolicy(PasswordPolicyRole.ADMIN);
       expect(effective.minLength).toBe(20);
       expect(effective.requireUppercase).toBe(false);
     });
 
     it('validate honours role-specific policy via getEffectivePolicy', async () => {
-      overrideRepo.findOne = jest.fn(async () =>
-        buildOverride({ role: PasswordPolicyRole.ADMIN, minLength: 24 }),
-      );
+      overrideRepo.findOne = jest.fn(async () => buildOverride({ role: PasswordPolicyRole.ADMIN, minLength: 24 }));
       const result = await service.validate(
         'short-pw-1A!',
         { username: 'a', email: 'a@x.de' },
@@ -317,17 +382,13 @@ describe('PasswordPolicyService', () => {
       const existing = buildOverride({ role: PasswordPolicyRole.ADMIN, minLength: 16 });
       overrideRepo.findOne = jest.fn(async () => existing);
       await service.upsertOverride(PasswordPolicyRole.ADMIN, { minLength: 32, requireSpecial: true });
-      expect(overrideRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({ minLength: 32, requireSpecial: true }),
-      );
+      expect(overrideRepo.save).toHaveBeenCalledWith(expect.objectContaining({ minLength: 32, requireSpecial: true }));
     });
 
     it('upsertOverride rejects when post-merge minLength exceeds global maxLength', async () => {
       repo.findOne = jest.fn(async () => buildRow({ minLength: 12, maxLength: 16 }));
       overrideRepo.findOne = jest.fn(async () => null);
-      await expect(service.upsertOverride(PasswordPolicyRole.ADMIN, { minLength: 32 })).rejects.toThrow(
-        /minLength/,
-      );
+      await expect(service.upsertOverride(PasswordPolicyRole.ADMIN, { minLength: 32 })).rejects.toThrow(/minLength/);
     });
 
     it('updatePolicy rejects when new global minLength exceeds existing override maxLength', async () => {

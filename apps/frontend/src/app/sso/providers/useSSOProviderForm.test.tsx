@@ -1,6 +1,9 @@
-import { act, cleanup, renderHook } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SSOProviderType } from '@attraccess/react-query-client';
+import { SAMLConfigForm } from './form/SAMLConfigForm';
+import { SetupInstructionsSection } from './form/SetupInstructionsSection';
+import { useSSOProviderSetupUrls } from './useSSOProviderSetupUrls';
 import { useSSOProviderForm } from './useSSOProviderForm';
 
 const state = vi.hoisted(() => ({
@@ -165,4 +168,83 @@ describe('SSO provider form', () => {
     expect(state.error).toHaveBeenCalledWith({ title: 'errorGeneric', description: 'provider conflict' });
     expect(state.navigate).not.toHaveBeenCalled();
   });
+});
+
+function SamlEditor() {
+  const form = useSSOProviderForm(8);
+  return (
+    <>
+      <SAMLConfigForm form={form} />
+      <button onClick={() => form.handleSubmit()}>Save fixture</button>
+    </>
+  );
+}
+it('edits SAML identity, signing and provisioning fields through the rendered controls', async () => {
+  state.provider = {
+    id: 8,
+    name: 'SAML',
+    type: SSOProviderType.SAML,
+    samlConfiguration: {
+      entryPoint: 'https://idp.test',
+      issuer: 'app',
+      certificate: 'existing-certificate',
+      spSigningKeyEncrypted: true,
+      roleMappings: {},
+    },
+  };
+  state.update.mockResolvedValueOnce({});
+  const { container } = render(<SamlEditor />);
+  expect(screen.getByText('spSigningPrivateKeyHintExisting')).toBeTruthy();
+  fireEvent.change(screen.getByLabelText('entryPoint'), { target: { value: 'https://idp.test/saml' } });
+  fireEvent.change(screen.getByLabelText('issuer'), { target: { value: 'workshop' } });
+  fireEvent.change(screen.getByLabelText('audience'), { target: { value: 'members' } });
+  fireEvent.change(screen.getByLabelText('emailAttributeKeys'), { target: { value: 'mail, email' } });
+  fireEvent.change(screen.getByLabelText('samlProvisioningSecret'), { target: { value: 'new-secret' } });
+  const toggle = container.querySelector('[data-cy="sso-provider-form-saml-provisioning-secret-toggle-button"]');
+  if (!toggle) throw new Error('Missing secret visibility control');
+  fireEvent.click(toggle);
+  expect((screen.getByLabelText('samlProvisioningSecret') as HTMLInputElement).type).toBe('text');
+  for (const [field, value] of [
+    ['certificate', 'new-certificate'],
+    ['spSigningCertificate', 'signing-cert'],
+    ['spSigningPrivateKey', 'signing-key'],
+  ]) {
+    const input = container.querySelector(`[name="samlConfiguration.${field}"]`);
+    if (!input) throw new Error(`Missing ${field}`);
+    fireEvent.change(input, { target: { value } });
+  }
+  fireEvent.click(screen.getByRole('switch', { name: 'signRequest' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save fixture' }));
+  await waitFor(() => expect(state.update).toHaveBeenCalledOnce());
+  expect(state.update.mock.calls[0][0].requestBody.samlConfiguration).toMatchObject({
+    entryPoint: 'https://idp.test/saml',
+    issuer: 'workshop',
+    audience: 'members',
+    certificate: 'new-certificate',
+    emailAttributeKeys: ['mail', 'email'],
+    provisioningSecret: 'new-secret',
+    spSigningCertificate: 'signing-cert',
+    spSigningPrivateKey: 'signing-key',
+    signRequest: true,
+  });
+});
+function Setup({ saml, id }: { saml: boolean; id?: number }) {
+  const urls = useSSOProviderSetupUrls(id);
+  return <SetupInstructionsSection isSamlProvider={saml} setupUrls={urls} onCopy={state.success} />;
+}
+it('shows pending setup before save and copies the protocol-specific callback after save', () => {
+  const view = render(<Setup saml={false} />);
+  expect(screen.getAllByText('setupUrlPending').length).toBeGreaterThan(0);
+  view.rerender(<Setup saml={false} id={8} />);
+  const copy = () => {
+    const button = view.container.querySelector('[data-cy="sso-provider-form-callback-url-copy-button"]');
+    if (!button) throw new Error('Missing callback copy control');
+    fireEvent.click(button);
+  };
+  copy();
+  expect(state.success).toHaveBeenLastCalledWith(expect.stringContaining('/api/auth/sso/OIDC/8/callback'));
+  view.rerender(<Setup saml id={8} />);
+  copy();
+  expect(state.success).toHaveBeenLastCalledWith(expect.stringContaining('/api/auth/sso/SAML/8/callback*'));
+  expect(screen.queryByText('authentikRedirectRegex')).toBeNull();
 });

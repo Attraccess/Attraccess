@@ -272,6 +272,7 @@ const vitestSuites = {
     { cwd: workspace, args: ['--config', 'apps/plugins/wago/frontend/vitest.config.mts'] },
     { cwd: workspace, args: ['--config', 'apps/plugins/wago/frontend/vitest.config.ts'] },
   ],
+  'apps/plugins/rabbitmq': [{ cwd: workspace, args: ['--config', 'apps/plugins/rabbitmq/frontend/vitest.config.ts'] }],
   'apps/plugins/shelly': [{ cwd: path.join(workspace, 'apps/plugins/shelly'), args: ['--root', 'frontend'] }],
   ...Object.fromEntries(
     [

@@ -18,7 +18,14 @@
     "test": {
       "executor": "@nx/jest:jest",
       "cache": true,
-      "inputs": ["default", "^production", "{workspaceRoot}/jest.preset.js", { "externalDependencies": ["jest"] }],
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/jest.preset.js",
+        {
+          "externalDependencies": ["jest"]
+        }
+      ],
       "outputs": ["{workspaceRoot}/coverage/apps/plugins/rabbitmq"],
       "options": {
         "jestConfig": "apps/plugins/rabbitmq/jest.config.ts",
@@ -32,7 +39,9 @@
         "default",
         "^production",
         "{workspaceRoot}/jest.preset.js",
-        { "externalDependencies": ["jest", "testcontainers", "mqtt"] }
+        {
+          "externalDependencies": ["jest", "testcontainers", "mqtt"]
+        }
       ],
       "outputs": ["{workspaceRoot}/coverage/apps/plugins/rabbitmq-e2e"],
       "options": {
@@ -120,6 +129,13 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/plugins/rabbitmq"
+      }
+    },
+    "test-frontend": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "command": "vitest run --config apps/plugins/rabbitmq/frontend/vitest.config.ts"
       }
     }
   }

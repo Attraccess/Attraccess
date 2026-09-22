@@ -1068,3 +1068,146 @@ describe('configuration workspace', () => {
     expect(screen.queryByText('Saved draft changed')).not.toBeInTheDocument();
   });
 });
+
+it('recovers from an initial draft read failure through the retry control', async () => {
+  state.getDraft.mockRejectedValueOnce(new Error('draft temporarily unavailable'));
+  mount();
+  expect(await screen.findByText(/Could not load draft: draft temporarily unavailable/)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Retry loading draft' }));
+  expect(await screen.findByRole('button', { name: 'Save draft' })).toBeEnabled();
+  expect(await screen.findByText('Draft is saved')).toBeInTheDocument();
+});
+
+it('recovers an applied baseline after a failed initial fetch without claiming a saved draft', async () => {
+  state.getDraft.mockResolvedValue(null);
+  state.baseline.mockRejectedValueOnce(new Error('baseline temporarily unavailable')).mockResolvedValue({
+    revision: 3,
+    snapshot: JSON.stringify(state.snapshot),
+    presetProvenance: null,
+  });
+  mount();
+  expect(
+    await screen.findByText(/Could not load applied configuration: baseline temporarily unavailable/),
+  ).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Retry loading configuration' }));
+  expect(await screen.findByText('Starting from applied revision 3')).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled());
+  expect(state.save).not.toHaveBeenCalled();
+});
+
+it('shows field validation failures and prevents persistence until the draft is valid', async () => {
+  state.validate.mockResolvedValue({
+    valid: false,
+    errors: [{ path: 'logicalChannels[0].profile', code: 'invalid_profile', message: 'Choose a supported profile' }],
+  });
+  mount();
+  const save = await screen.findByRole('button', { name: 'Save draft' });
+  await waitFor(() => expect(save).toBeEnabled());
+  await userEvent.click(save);
+  expect(await screen.findByText('Resolve these configuration fields')).toBeInTheDocument();
+  expect(screen.getAllByText(/Choose a supported profile/).length).toBeGreaterThan(0);
+  expect(state.save).not.toHaveBeenCalled();
+});
+
+it('renders reported configuration, hardware faults, and channel samples without treating them as readiness proof', async () => {
+  const diagnostic = diagnosticsFixture();
+  Object.assign(diagnostic, {
+    stateHardwareAvailable: false,
+    trackingExhausted: true,
+    incompatible: true,
+    faults: [{ channelId: 'output', code: 'io-unavailable', receivedAt: '2026-09-22T10:00:00Z' }],
+  });
+  Object.assign(diagnostic.configuration, {
+    draftUpdatedAt: '2026-09-22T10:00:00Z',
+    draftChanged: true,
+    revisionMismatch: true,
+    rejected: true,
+    validationErrorCount: 1,
+    validationCodes: ['invalid_channel'],
+    validationErrors: [{ path: 'logicalChannels[0]', code: 'invalid_channel' }],
+    rejectionErrors: [{ path: 'physicalPoints[0]', code: 'unavailable' }],
+  });
+  diagnostic.channels = [
+    {
+      id: 'output',
+      profile: 'generic-digital-output',
+      capabilities: ['output'],
+      disconnectPolicy: { mode: 'watchdog', timeoutMs: 800 },
+      safeState: 'off',
+      current: false,
+      fault: null,
+      samples: [
+        {
+          kind: 'output',
+          value: false,
+          sourceAt: null,
+          receivedAt: '2026-09-22T10:00:00Z',
+          streamId: 'boot-1',
+          sequence: 3,
+          sourceFreshness: 'stale',
+          current: false,
+          availabilityReason: 'source stale',
+        },
+      ],
+      acknowledgement: { id: 'cmd-1', status: 'accepted', receivedAt: '2026-09-22T10:00:01Z' },
+    },
+  ];
+  state.diagnostics.mockResolvedValue(new Response(JSON.stringify(diagnostic)));
+  mount();
+  expect(await screen.findByText(/Runtime reports hardware unavailable/)).toBeInTheDocument();
+  expect(screen.getByText(/Stream tracking limit reached/)).toBeInTheDocument();
+  expect(screen.getByText(/controller rejected publication/)).toBeInTheDocument();
+  expect(screen.getByText(/Recent fault on output: io-unavailable/)).toBeInTheDocument();
+  expect(screen.getByText(/Latest output: false/)).toHaveTextContent('not current: source stale');
+  expect(screen.getByText(/Last correlated acknowledgement:/)).toHaveTextContent('accepted · cmd-1');
+  expect(screen.getByText(/Hardware readiness: unknown/)).toBeInTheDocument();
+});
+
+it('requires a selected input for a guarded output and preserves its watchdog configuration', async () => {
+  const snapshot: WagoConfigurationSnapshot = {
+    version: 1,
+    physicalPoints: [{ id: 'input-point', hardwareProfile: '751-9301', channel: 4 }],
+    logicalChannels: [
+      {
+        id: 'guard-input',
+        physicalPointId: 'input-point',
+        profile: 'generic-monitored-input',
+        capabilities: ['input'],
+        disconnectPolicy: { mode: 'hold' },
+      },
+    ],
+  };
+  state.getDraft.mockResolvedValue({
+    controllerId: 1,
+    snapshot: JSON.stringify(snapshot),
+    reviewedHash: null,
+    updatedAt: '2026-09-05',
+    presetProvenance: JSON.stringify({ editor: { names: { 'guard-input': 'Door contact' }, presets: [] } }),
+  });
+  mount();
+  const user = userEvent.setup();
+  const add = await screen.findByRole('button', { name: 'Add channel' });
+  await waitFor(() => expect(add).toBeEnabled());
+  await user.click(add);
+  await user.click(screen.getByRole('button', { name: /Request an enable/ }));
+  await user.click(screen.getByRole('button', { name: 'Continue' }));
+  await user.type(screen.getByRole('textbox', { name: 'New channel name' }), 'Guarded lock');
+  expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: /Guard input/ }));
+  await user.click(screen.getByRole('option', { name: 'Door contact' }));
+  await user.click(screen.getByRole('button', { name: /On disconnect/ }));
+  await user.click(screen.getByRole('option', { name: 'Off after watchdog timeout' }));
+  await user.clear(screen.getByRole('spinbutton', { name: 'Watchdog timeout (ms)' }));
+  expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
+  await user.type(screen.getByRole('spinbutton', { name: 'Watchdog timeout (ms)' }), '2000');
+  await user.click(screen.getByRole('button', { name: 'Continue' }));
+  await user.click(screen.getByRole('button', { name: 'Add to configuration' }));
+  await user.click(screen.getByRole('button', { name: 'Save draft' }));
+  await waitFor(() => expect(state.save).toHaveBeenCalledOnce());
+  const saved = state.save.mock.calls[0][1] as WagoConfigurationSnapshot;
+  expect(saved.logicalChannels.find((channel) => channel.profile === 'guarded-enable-request')).toMatchObject({
+    guard: { channelId: 'guard-input', when: 'on' },
+    disconnectPolicy: { mode: 'watchdog', timeoutMs: 2000 },
+  });
+  expect(validateEditorSnapshot(saved)).toEqual([]);
+});

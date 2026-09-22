@@ -101,6 +101,72 @@ describe('MaintenanceService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('maintenance listing', () => {
+    it.each([
+      [true, false, false, 'maintenance.startTime > :now'],
+      [false, true, false, 'maintenance.endTime IS NULL'],
+      [false, false, true, 'maintenance.endTime < :now'],
+      [true, true, true, null],
+    ])(
+      'filters upcoming=%s active=%s past=%s before pagination',
+      async (includeUpcoming, includeActive, includePast, condition) => {
+        jest.spyOn(resourceRepository, 'findOne').mockResolvedValue(mockResource);
+        const query = maintenanceRepository.createQueryBuilder();
+        jest.spyOn(maintenanceRepository, 'createQueryBuilder').mockReturnValue(query);
+        jest.spyOn(query, 'getCount').mockResolvedValue(11);
+        jest.spyOn(query, 'getMany').mockResolvedValue([mockMaintenance]);
+        expect(
+          await service.findMaintenances(1, { page: 2, limit: 5, includeUpcoming, includeActive, includePast }),
+        ).toEqual({ data: [mockMaintenance], total: 11, page: 2, limit: 5 });
+        expect(query.where).toHaveBeenCalledWith('maintenance.resourceId = :resourceId', { resourceId: 1 });
+        if (condition)
+          expect(query.andWhere).toHaveBeenCalledWith(expect.stringContaining(condition), { now: expect.any(Date) });
+        else expect(query.andWhere).not.toHaveBeenCalled();
+        expect(query.skip).toHaveBeenCalledWith(5);
+        expect(query.take).toHaveBeenCalledWith(5);
+        expect(query.leftJoinAndSelect).toHaveBeenCalledWith('maintenance.completedByUser', 'completedByUser');
+      },
+    );
+
+    it('rejects missing resources and an empty filter selection', async () => {
+      jest.spyOn(resourceRepository, 'findOne').mockResolvedValue(null);
+      await expect(service.findMaintenances(99)).rejects.toBeInstanceOf(NotFoundException);
+      jest.spyOn(resourceRepository, 'findOne').mockResolvedValue(mockResource);
+      await expect(
+        service.findMaintenances(1, { includeUpcoming: false, includeActive: false, includePast: false }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('individual maintenance access', () => {
+    it('accepts global and direct permissions without needing resource groups', async () => {
+      const user = { id: 7, effectivePermissions: new Set(['resources.maintenance.manage']) } as Parameters<
+        typeof service.canManageMaintenance
+      >[0];
+      expect(await service.canManageMaintenance(user, 1)).toBe(true);
+      expect(resourceIntroducerRepository.findOne).not.toHaveBeenCalled();
+      jest.spyOn(resourceIntroducerRepository, 'findOne').mockResolvedValue({ id: 2 });
+      expect(await service.canManageMaintenance({ ...user, effectivePermissions: new Set() }, 1)).toBe(true);
+      expect(resourceRepository.findOne).not.toHaveBeenCalled();
+    });
+
+    it('checks resource group introductions and denies missing or failed lookups', async () => {
+      const user = { id: 7 } as Parameters<typeof service.canManageMaintenance>[0];
+      jest.spyOn(resourceIntroducerRepository, 'findOne').mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 4 });
+      jest.spyOn(resourceRepository, 'findOne').mockResolvedValue({ ...mockResource, groups: [{ id: 3 }] });
+      expect(await service.canManageMaintenance(user, 1)).toBe(true);
+      expect(resourceIntroducerRepository.findOne).toHaveBeenLastCalledWith({
+        where: { user: { id: 7 }, resourceGroup: { id: expect.objectContaining({ _value: [3] }) } },
+      });
+      jest.spyOn(resourceIntroducerRepository, 'findOne').mockResolvedValue(null);
+      expect(await service.canManageMaintenance(user, 1)).toBe(false);
+      jest.spyOn(resourceRepository, 'findOne').mockResolvedValue(null);
+      expect(await service.canManageMaintenance(user, 1)).toBe(false);
+      jest.spyOn(resourceIntroducerRepository, 'findOne').mockRejectedValue(new Error('Database unavailable'));
+      expect(await service.canManageMaintenance(user, 1)).toBe(false);
+    });
+  });
+
   describe('createMaintenance', () => {
     it('should create a maintenance successfully', async () => {
       const futureDate = new Date();

@@ -107,6 +107,33 @@ describe('configuration editor service boundaries', () => {
     expect(mqtt.publish).not.toHaveBeenCalled();
   });
 
+  it('audits persistent preset reapplication using saved editor provenance', async () => {
+    const { service, audit, draft, mqtt } = fixture();
+    const principal = { userId: 7, authenticationMethod: 'session' as const };
+    const application = { presetId: 'generic-digital-output' as const, channelId: 'output', physicalPointId: 'point' };
+    const edited: WagoConfigurationSnapshot = {
+      ...snapshot,
+      logicalChannels: [{ ...snapshot.logicalChannels[0], disconnectPolicy: { mode: 'hold' } }],
+    };
+    await service.saveDraft(1, edited, { names: {}, presets: [application] }, principal);
+    audit.record.mockClear();
+    const preview = await service.previewPreset(1, application);
+    await service.applyPreset(
+      1,
+      application,
+      preview.diff.map((change) => change.path),
+      preview.draftHash,
+      principal,
+    );
+    expect(JSON.parse(draft()!.snapshot).logicalChannels[0].disconnectPolicy).toEqual({ mode: 'immediate' });
+    expect(draft()!.reviewedHash).toBeNull();
+    expect(audit.record.mock.calls.map(([event]) => [event.action, event.outcome])).toEqual([
+      ['wago.preset_reapplication', 'attempted'],
+      ['wago.preset_reapplication', 'succeeded'],
+    ]);
+    expect(mqtt.publish).not.toHaveBeenCalled();
+  });
+
   it('persists names only on explicit save and never includes them in published snapshots', async () => {
     const { service, mqtt, draft } = fixture();
     const metadata = { names: { output: 'Machine enable' }, presets: [] };
