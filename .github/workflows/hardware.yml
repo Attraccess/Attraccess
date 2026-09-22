@@ -4,6 +4,8 @@ on:
   pull_request:
     types: [opened, synchronize]
     paths:
+      - 'apps/attractap/desktop/**'
+      - 'apps/attractap/firmware/**'
       - 'apps/attractap/hardware/**'
       - 'libs/attractap-hw-shared/**'
       - '.github/workflows/hardware.yml'
